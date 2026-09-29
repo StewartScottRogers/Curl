@@ -40,10 +40,11 @@ internal sealed class Http3Session(IMultiplexedConnection connection) : IHttpStr
     public string UsingLine => HttpConnectionInfoLines.UsingHttp3;
 
     /// <summary>
-    /// Gets a value indicating whether the connection can carry another request: always, since
-    /// the server's control stream, whose <c>GOAWAY</c> would end that, is not read yet.
+    /// Gets a value indicating whether the connection can carry another request: until the
+    /// server refuses a request stream (<see cref="StopNewStreams" />), since the server's
+    /// control stream, whose <c>GOAWAY</c> would also end that, is not read yet.
     /// </summary>
-    public bool AcceptsNewStreams => true;
+    public bool AcceptsNewStreams { get; private set; } = true;
 
     /// <summary>Gets a value indicating that QUIC traffic is always encrypted.</summary>
     public bool IsSecure => true;
@@ -55,7 +56,7 @@ internal sealed class Http3Session(IMultiplexedConnection connection) : IHttpStr
     public EndPoint? LocalEndPoint => Connection.LocalEndPoint;
 
     /// <inheritdoc />
-    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength) => new Http3StreamConnection(this, scheme, bodyLength);
+    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody) => new Http3StreamConnection(this, scheme, bodyLength, ignoresBody);
 
     /// <summary>
     /// Opens the client's control stream with curl's <c>SETTINGS</c> and its QPACK encoder
@@ -76,6 +77,12 @@ internal sealed class Http3Session(IMultiplexedConnection connection) : IHttpStr
         openedStreams.Add(requestStream);
         return requestStream;
     }
+
+    /// <summary>
+    /// Stops the connection carrying another request, as curl marks a connection closed once
+    /// the server refuses a stream with <c>H3_REQUEST_REJECTED</c> (ADR-0187).
+    /// </summary>
+    internal void StopNewStreams() => AcceptsNewStreams = false;
 
     /// <summary>Always throws: bytes travel only on the session's streams.</summary>
     /// <param name="buffer">Not used.</param>

@@ -155,7 +155,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_Http3StreamResetMidBody_FailsWithExit18AndCurlsMessage()
     {
-        // curl_ngtcp2.c: "HTTP/3 stream %d reset by server", CURLE_PARTIAL_FILE once body bytes arrived.
+        // cf-ngtcp2.c at curl-8_21_0: "HTTP/3 stream %d reset by server (error 0x%x %s)", CURLE_PARTIAL_FILE once body bytes arrived (ADR-0187).
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200", ("content-length", "10")), Http3Data("hello")))
         {
             EndException = new MultiplexedStreamResetException(0x10c, "reset"),
@@ -166,7 +166,7 @@ public sealed partial class HttpProtocolHandlerTests
             .ExecuteAsync(Http3Context("https://example.com/", output));
 
         Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
-        Assert.AreEqual("HTTP/3 stream 0 reset by server", result.ErrorMessage);
+        Assert.AreEqual("HTTP/3 stream 0 reset by server (error 0x10c REQUEST_CANCELLED)", result.ErrorMessage);
         Assert.AreEqual("hello", Latin1(output.ToArray()));
     }
 
@@ -182,7 +182,7 @@ public sealed partial class HttpProtocolHandlerTests
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
         Assert.AreEqual(CurlExitCode.Http3, result.ExitCode);
-        Assert.AreEqual("HTTP/3 stream 4 reset by server", result.ErrorMessage);
+        Assert.AreEqual("HTTP/3 stream 4 reset by server (error 0x10c REQUEST_CANCELLED)", result.ErrorMessage);
     }
 
     [TestMethod]
@@ -206,8 +206,124 @@ public sealed partial class HttpProtocolHandlerTests
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
         Assert.AreEqual(CurlExitCode.Http3, result.ExitCode);
-        Assert.AreEqual("HTTP/3 stream 0 reset by server", result.ErrorMessage);
+        Assert.AreEqual("HTTP/3 stream 0 reset by server (error 0x10e MESSAGE_ERROR)", result.ErrorMessage);
         Assert.AreEqual(0x10eL, stream.AbortCode, "H3_MESSAGE_ERROR");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http3StreamRefusedBeforeAnyResponse_SendsTheRequestAgainOnANewQuicConnection()
+    {
+        // cf-ngtcp2.c and Curl_retry_request at curl-8_21_0 (ADR-0187): the refused line, then the
+        // retry on a fresh connect, which needs no --retry.
+        FakeMultiplexedStream refused = new(0, []) { EndException = new MultiplexedStreamResetException(0x10b, "refused") };
+        FakeMultiplexedStream answered = new(0, Http3Response(Http3Head("200", ("content-length", "2")), Http3Data("ok")));
+        FakeMultiplexedConnection first = new(refused);
+        FakeMultiplexedConnection second = new(answered);
+        QueueConnector connector = QuicConnector(first, second);
+        MemoryStream output = new();
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Http3Context(
+            "https://example.com/",
+            output,
+            options: new HttpRequestOptions { Body = new BytesBody("a=b"u8.ToArray(), "application/x-www-form-urlencoded") },
+            events: events));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+        Assert.HasCount(2, connector.MultiplexedTargets);
+        Assert.IsTrue(first.IsDisposed, "the refusing connection is closed");
+        Assert.AreEqual("a=b", Latin1(((Http3DataFrame)(await RequestFramesAsync(answered))[1]).Payload.ToArray()), "the body is sent again");
+        Assert.AreEqual(
+            string.Join(
+                "\n",
+                "using HTTP/3",
+                "upload completely sent off: 3 bytes",
+                "HTTP/3 stream 0 refused by server, try again on a new connection",
+                "REFUSED_STREAM, retrying a fresh connect",
+                "Connection died, retrying a fresh connect (retry count: 1)",
+                "shutting down connection #0",
+                "Issue another request to this URL: 'https://example.com/'",
+                "using HTTP/3",
+                "upload completely sent off: 3 bytes",
+                "Connection #0 to host example.com:443 left intact"),
+            string.Join("\n", events.Info));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http3StreamRefusedEveryTime_GivesUpAfterFiveRetriesWithExit56()
+    {
+        FakeMultiplexedConnection[] connections = [.. Enumerable.Range(0, 7).Select(_ => new FakeMultiplexedConnection(
+            new FakeMultiplexedStream(0, []) { EndException = new MultiplexedStreamResetException(0x10b, "refused") }))];
+        QueueConnector connector = QuicConnector(connections);
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), events: events));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Connection died, tried 5 times before giving up", result.ErrorMessage);
+        Assert.HasCount(6, connector.MultiplexedTargets, "the first attempt and five retries");
+        CollectionAssert.AreEqual(
+            new[] { 1, 2, 3, 4, 5 },
+            events.Info.Where(line => line.StartsWith("Connection died, retrying", StringComparison.Ordinal)).Select(line => line[^2] - '0').ToArray());
+        Assert.AreEqual(6, events.Info.Count(line => line == "REFUSED_STREAM, retrying a fresh connect"));
+        Assert.IsTrue(connections.Take(6).All(connection => connection.IsDisposed));
+    }
+
+    [TestMethod]
+    [DataRow("head", DisplayName = "after the response head")]
+    [DataRow("stream-body", DisplayName = "with a body read from a stream")]
+    public async Task ExecuteAsync_Http3StreamRefusedOnceTheResponseBeganOrWithAStreamBody_FailsWithExit56WithoutRetrying(string kind)
+    {
+        FakeMultiplexedStream refused = new(0, kind == "head" ? Http3Response(Http3Head("200", ("content-length", "5"))) : [])
+        {
+            EndException = new MultiplexedStreamResetException(0x10b, "refused"),
+        };
+        QueueConnector connector = QuicConnector(new FakeMultiplexedConnection(refused));
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Http3Context(
+            "https://example.com/",
+            new MemoryStream(),
+            upload: kind == "head" ? null : new UnseekableStream("abc"u8.ToArray()),
+            events: events));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
+        Assert.HasCount(1, connector.MultiplexedTargets);
+        CollectionAssert.Contains(events.Info, "HTTP/3 stream 0 refused by server, try again on a new connection");
+        CollectionAssert.DoesNotContain(events.Info, "REFUSED_STREAM, retrying a fresh connect");
+    }
+
+    [TestMethod]
+    [DataRow(0x10cL, DisplayName = "H3_REQUEST_CANCELLED")]
+    [DataRow(0x100L, DisplayName = "H3_NO_ERROR")]
+    public async Task ExecuteAsync_Http3HeadRequestResetAfterTheHead_EndsWithExit0(long errorCode)
+    {
+        // curl-8_21_0's recv_closed_stream ignores a reset after the whole head when no body is wanted.
+        FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200", ("content-length", "5"))))
+        {
+            EndException = new MultiplexedStreamResetException(errorCode, "reset"),
+        };
+        MemoryStream headerOutput = new();
+
+        TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
+            .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), headerOutput, noBody: true));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("HTTP/3 200 \r\ncontent-length: 5\r\n\r\n", Latin1(headerOutput.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http3StreamResetWithNoErrorBeforeTheHead_FailsAsAStreamClosedBeforeItsHead()
+    {
+        FakeMultiplexedStream stream = new(0, []) { EndException = new MultiplexedStreamResetException(0x100, "closed") };
+
+        TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
+            .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.Http3, result.ExitCode);
+        Assert.AreEqual("HTTP/3 stream 0 was closed cleanly, but before getting all response header fields, treated as error", result.ErrorMessage);
     }
 
     [TestMethod]
@@ -393,10 +509,14 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual("Connection timed out after 1000 milliseconds", result.ErrorMessage);
     }
 
-    private static QueueConnector QuicConnector(FakeMultiplexedConnection quic)
+    private static QueueConnector QuicConnector(params FakeMultiplexedConnection[] quicConnections)
     {
         QueueConnector connector = new();
-        connector.MultiplexedResults.Enqueue(MultiplexedConnectResult.Connected(quic, null));
+        foreach (FakeMultiplexedConnection quic in quicConnections)
+        {
+            connector.MultiplexedResults.Enqueue(MultiplexedConnectResult.Connected(quic, null));
+        }
+
         return connector;
     }
 
@@ -408,13 +528,15 @@ public sealed partial class HttpProtocolHandlerTests
         Stream? upload = null,
         RecordingTransferEvents? events = null,
         HttpVersionPreference version = HttpVersionPreference.Http3Only,
-        TimeProvider? time = null) =>
+        TimeProvider? time = null,
+        bool noBody = false) =>
         new()
         {
             Url = CurlUrl.Parse(url),
             Output = output,
             HeaderOutput = headerOutput,
             Upload = upload,
+            NoBody = noBody,
             Events = (ITransferEvents?)events ?? NoTransferEvents.Instance,
             TimeProvider = time ?? TimeProvider.System,
             ConnectTimeout = TimeSpan.FromMilliseconds(1000),

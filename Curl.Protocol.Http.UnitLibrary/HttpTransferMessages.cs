@@ -107,13 +107,55 @@ internal static class HttpTransferMessages
 
     /// <summary>
     /// Formats the message for an HTTP/3 request stream the server reset, exit 95 before any
-    /// body byte arrived and exit 18 after: <c>HTTP/3 stream 0 reset by server</c>
-    /// (<c>curl_ngtcp2.c</c>, ADR-0144 section 7).
+    /// body byte arrived and exit 18 after: <c>HTTP/3 stream 0 reset by server (error 0x10c
+    /// REQUEST_CANCELLED)</c> (<c>cf-ngtcp2.c</c> at <c>curl-8_21_0</c>, ADR-0187).
     /// </summary>
     /// <param name="streamId">The QUIC stream ID.</param>
+    /// <param name="errorCode">The application error code the reset carried.</param>
     /// <returns>The message.</returns>
-    internal static string Http3StreamReset(long streamId) =>
-        string.Create(CultureInfo.InvariantCulture, $"HTTP/3 stream {streamId} reset by server");
+    internal static string Http3StreamReset(long streamId, long errorCode) =>
+        string.Create(CultureInfo.InvariantCulture, $"HTTP/3 stream {streamId} reset by server (error 0x{errorCode:x} {Http3ErrorName(errorCode)})");
+
+    /// <summary>
+    /// Formats the <c>-v</c> line for an HTTP/3 request stream the server reset with
+    /// <c>H3_REQUEST_REJECTED</c>: <c>HTTP/3 stream 0 refused by server, try again on a new
+    /// connection</c> (<c>cf-ngtcp2.c</c> at <c>curl-8_21_0</c>, ADR-0187).
+    /// </summary>
+    /// <param name="streamId">The QUIC stream ID.</param>
+    /// <returns>The line.</returns>
+    internal static string Http3StreamRefused(long streamId) =>
+        string.Create(CultureInfo.InvariantCulture, $"HTTP/3 stream {streamId} refused by server, try again on a new connection");
+
+    /// <summary>
+    /// Formats the exit 56 message for a request refused once more after curl's own retries on
+    /// a new connection ran out: <c>Connection died, tried 5 times before giving up</c>
+    /// (<c>Curl_retry_request</c>, ADR-0187).
+    /// </summary>
+    /// <param name="retries">The retries run.</param>
+    /// <returns>The message.</returns>
+    internal static string ConnectionDiedGivingUp(int retries) =>
+        string.Create(CultureInfo.InvariantCulture, $"Connection died, tried {retries} times before giving up");
+
+    /// <summary>
+    /// Gives an HTTP/3 error code's name as <c>vquic_h3_err_str</c> gives it at
+    /// <c>curl-8_21_0</c>: the RFC 9114 name without its <c>H3_</c> prefix, <c>NO_ERROR</c> for
+    /// a reserved greasing code (<c>0x21 + 0x1f * N</c>) and <c>unknown</c> for any other.
+    /// </summary>
+    private static string Http3ErrorName(long errorCode) =>
+        errorCode switch
+        {
+            >= 0x100 and <= 0x110 => Http3ErrorNames[errorCode - 0x100],
+            >= 0x21 when (errorCode - 0x21) % 0x1f == 0 => Http3ErrorNames[0],
+            _ => "unknown",
+        };
+
+    private static readonly string[] Http3ErrorNames =
+    [
+        "NO_ERROR", "GENERAL_PROTOCOL_ERROR", "INTERNAL_ERROR", "STREAM_CREATION_ERROR", "CLOSED_CRITICAL_STREAM",
+        "FRAME_UNEXPECTED", "FRAME_ERROR", "EXCESSIVE_LOAD", "ID_ERROR", "SETTINGS_ERROR", "MISSING_SETTINGS",
+        "REQUEST_REJECTED", "REQUEST_CANCELLED", "REQUEST_INCOMPLETE", "MESSAGE_ERROR", "CONNECT_ERROR",
+        "VERSION_FALLBACK",
+    ];
 
     /// <summary>
     /// Formats the exit 95 message for an HTTP/3 request stream that ended before the final

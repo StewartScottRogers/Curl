@@ -59,8 +59,9 @@ internal sealed class Http2Session(IConnection connection) : IHttpStreamSession
     /// The request body's length, 0 when there is none, or <see langword="null" /> when it is
     /// unknown.
     /// </param>
+    /// <param name="ignoresBody">Not used: HTTP/2 fails a reset stream whatever the request wanted.</param>
     /// <returns>The stream.</returns>
-    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength) => new Http2StreamConnection(this, scheme, bodyLength);
+    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody) => new Http2StreamConnection(this, scheme, bodyLength);
 
     /// <summary>
     /// Sends the client preface if it has not gone yet, then opens a stream and sends

@@ -11,10 +11,20 @@ namespace Curl.Protocol.Http;
 internal static class HttpConnectionInfoLines
 {
     /// <summary>
-    /// The line for a reused connection that failed before any byte of the response arrived,
-    /// written before it is closed and the request is sent again on a fresh connection.
+    /// Formats the line for a reused connection that failed before any byte of the response
+    /// arrived, or an HTTP/3 stream the server refused (ADR-0187), written before the
+    /// connection is closed and the request is sent again on a fresh one.
     /// </summary>
-    internal const string ConnectionDiedRetrying = "Connection died, retrying a fresh connect (retry count: 1)";
+    /// <param name="retryCount">The transfer's retries so far, this one included.</param>
+    /// <returns>The line.</returns>
+    internal static string ConnectionDiedRetrying(int retryCount) =>
+        string.Create(CultureInfo.InvariantCulture, $"Connection died, retrying a fresh connect (retry count: {retryCount})");
+
+    /// <summary>
+    /// The line written when an HTTP/3 stream the server refused before any byte of its
+    /// response is sent again, or given up on (<c>Curl_retry_request</c>, ADR-0187).
+    /// </summary>
+    internal const string RefusedStreamRetrying = "REFUSED_STREAM, retrying a fresh connect";
 
     /// <summary>
     /// The line written before the first request on a connection this transfer opened, not on

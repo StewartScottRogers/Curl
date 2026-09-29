@@ -200,6 +200,12 @@ public sealed class HttpProtocolHandler(
     ICookieStore? cookieStore = null,
     HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic) : IProtocolHandler
 {
+    /// <summary>
+    /// How many times a request whose HTTP/3 stream the server refused is sent again on a new
+    /// connection before the transfer gives up: curl's <c>CONN_MAX_RETRIES</c> (ADR-0187).
+    /// </summary>
+    internal const int MaximumStreamRefusedRetries = 5;
+
     private static readonly string[] Schemes = ["http", "https"];
 
     private readonly IConnector connector = connector ?? throw new ArgumentNullException(nameof(connector));
@@ -467,7 +473,7 @@ public sealed class HttpProtocolHandler(
         }
         else if (outcome.DiedBeforeResponse)
         {
-            plan.Context.Events.ReportInfo(HttpConnectionInfoLines.ConnectionDiedRetrying);
+            plan.Context.Events.ReportInfo(HttpConnectionInfoLines.ConnectionDiedRetrying(outcome.RetryCount));
         }
 
         return outcome;
@@ -655,7 +661,7 @@ public sealed class HttpProtocolHandler(
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
             { Report = exchange.Report(body) };
-            return FailedOutcome(plan, failed, DiedBeforeResponse(plan, connect, headReader, failure));
+            return FailedOutcome(plan, connect, headReader, failure, failed);
         }
         catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
         {
@@ -679,7 +685,7 @@ public sealed class HttpProtocolHandler(
     /// none), or gives <see langword="null" /> when the connection speaks HTTP/1.x.
     /// </summary>
     private static IHttpStreamConnection? CreateRequestStream(HttpRequestPlan plan, IHttpStreamSession? streams) =>
-        streams?.CreateStream(plan.Context.Url.Scheme, plan.Framing.Body is null ? 0 : plan.Framing.KnownLength);
+        streams?.CreateStream(plan.Context.Url.Scheme, plan.Framing.Body is null ? 0 : plan.Framing.KnownLength, plan.Context.NoBody);
 
     /// <summary>
     /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one;
@@ -818,24 +824,56 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Reports a read the peer reset as the <c>-v</c> line curl 8.21.0 prints for it,
     /// <c>Recv failure: Connection was reset</c>, before the connection's end is reported
-    /// (measured, BL-449 Notes). Any other failure is left to the transfer's result.
+    /// (measured, BL-449 Notes), and an HTTP/3 stream the server refused as the line curl 8.21.0's
+    /// <c>cf-ngtcp2.c</c> prints for it (ADR-0187). Any other failure is left to the transfer's result.
     /// </summary>
     private static void ReportReceiveFailure(ITransferEvents events, HttpTransferException failure)
     {
-        if (failure.Message == HttpTransferMessages.ConnectionReset)
+        if (failure.IsStreamRefused || failure.Message == HttpTransferMessages.ConnectionReset)
         {
             events.ReportInfo(failure.Message);
         }
     }
 
     /// <summary>
-    /// Builds the outcome of an exchange that failed: sent again once on a fresh connection when
-    /// its pooled connection <paramref name="diedBeforeResponse" />, and final otherwise.
+    /// Builds the outcome of an exchange whose HTTP/3 stream the server refused, as curl
+    /// 8.21.0's <c>Curl_retry_request</c> does (ADR-0187): when no byte of the response had
+    /// arrived, the request is sent again on a new connection up to
+    /// <see cref="MaximumStreamRefusedRetries" /> times, and the refusal after that fails with
+    /// <c>Connection died, tried 5 times before giving up</c>; once the response had begun it
+    /// fails at once with curl's text for exit 56. A body read from a stream is not sent again,
+    /// as none of this handler's retries sends one again, and fails as a begun response does.
     /// </summary>
-    private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, TransferResult failed, bool diedBeforeResponse) =>
-        diedBeforeResponse
+    private static HttpAttemptOutcome StreamRefusedOutcome(HttpRequestPlan plan, TransferResult refused, bool responseBegan)
+    {
+        if (responseBegan || plan.Framing.Body is StreamBody)
+        {
+            return new HttpAttemptOutcome(refused with { ErrorMessage = HttpTransferMessages.ReceiveFailed }, null, KeepsAlive: false);
+        }
+
+        plan.Context.Events.ReportInfo(HttpConnectionInfoLines.RefusedStreamRetrying);
+        return plan.StreamRefusedRetries < MaximumStreamRefusedRetries
+            ? new HttpAttemptOutcome(refused, plan.AfterStreamRefused(), KeepsAlive: false) { DiedBeforeResponse = true, RetryCount = plan.StreamRefusedRetries + 1 }
+            : new HttpAttemptOutcome(refused with { ErrorMessage = HttpTransferMessages.ConnectionDiedGivingUp(MaximumStreamRefusedRetries) }, null, KeepsAlive: false);
+    }
+
+    /// <summary>
+    /// Builds the outcome of an exchange that failed with <paramref name="failure" />: as
+    /// <see cref="StreamRefusedOutcome" /> says when the server refused its HTTP/3 stream; sent
+    /// again once on a fresh connection when its pooled connection died before the response
+    /// (<see cref="DiedBeforeResponse" />); and final otherwise.
+    /// </summary>
+    private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, ConnectResult connect, HttpResponseHeadReader headReader, HttpTransferException failure, TransferResult failed)
+    {
+        if (failure.IsStreamRefused)
+        {
+            return StreamRefusedOutcome(plan, failed, headReader.HasReceived);
+        }
+
+        return DiedBeforeResponse(plan, connect, headReader, failure)
             ? new HttpAttemptOutcome(failed, plan.OnFreshConnection(), KeepsAlive: false) { DiedBeforeResponse = true }
             : new HttpAttemptOutcome(failed, null, KeepsAlive: false);
+    }
 
     /// <summary>
     /// Decides whether the connection can carry another request: not after a body a status of
@@ -1531,6 +1569,13 @@ public sealed class HttpProtocolHandler(
         public bool SentOnFreshConnection { get; init; }
 
         /// <summary>
+        /// Gets how many times the request has been sent again on a new connection because the
+        /// server refused its HTTP/3 stream (ADR-0187); curl gives up after
+        /// <see cref="MaximumStreamRefusedRetries" />.
+        /// </summary>
+        public int StreamRefusedRetries { get; private set; }
+
+        /// <summary>
         /// Gets how many redirects the transfer has followed before this request: the chain's
         /// count (<see cref="HttpRequestOptions.RedirectsFollowed" />) and one for each resend
         /// after a 417, as curl 8.21.0 counts them (BL-396 Notes).
@@ -1587,6 +1632,18 @@ public sealed class HttpProtocolHandler(
         /// <returns>The resent request's plan.</returns>
         public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true, RedirectsFollowed, AuthorizationAnswersChallenge);
 
+        /// <summary>
+        /// Makes the same request, sent again on a new connection because the server refused its
+        /// HTTP/3 stream, with <see cref="StreamRefusedRetries" /> one higher.
+        /// </summary>
+        /// <returns>The resent request's plan.</returns>
+        public HttpRequestPlan AfterStreamRefused()
+        {
+            HttpRequestPlan retry = With(Framing, Authorization);
+            retry.StreamRefusedRetries = StreamRefusedRetries + 1;
+            return retry;
+        }
+
         private HttpRequestPlan With(HttpRequestFraming framing, string? authorization) =>
             With(framing, authorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge);
 
@@ -1613,6 +1670,7 @@ public sealed class HttpProtocolHandler(
                 SentOnFreshConnection = sentOnFreshConnection,
                 RedirectsFollowed = redirectsFollowed,
                 AuthorizationAnswersChallenge = authorizationAnswersChallenge,
+                StreamRefusedRetries = StreamRefusedRetries,
             };
     }
 
@@ -1634,6 +1692,12 @@ public sealed class HttpProtocolHandler(
         /// before its response began, so <see cref="Retry" /> resends the request on a fresh one.
         /// </summary>
         public bool DiedBeforeResponse { get; init; }
+
+        /// <summary>
+        /// Gets the transfer's retries on a fresh connection so far, this one included, as
+        /// <c>-v</c> counts them when <see cref="DiedBeforeResponse" />.
+        /// </summary>
+        public int RetryCount { get; init; } = 1;
 
         /// <summary>
         /// Gets a value indicating whether the connection is reported left intact although the

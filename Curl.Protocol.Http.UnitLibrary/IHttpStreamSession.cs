@@ -33,6 +33,10 @@ internal interface IHttpStreamSession
     /// The request body's length, 0 when there is none, or <see langword="null" /> when it is
     /// unknown.
     /// </param>
+    /// <param name="ignoresBody">
+    /// <see langword="true" /> when no response body is wanted (<c>-I</c>): an HTTP/3 stream then
+    /// takes a reset after the final head as its end (ADR-0187).
+    /// </param>
     /// <returns>The stream.</returns>
-    IHttpStreamConnection CreateStream(string scheme, long? bodyLength);
+    IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody);
 }

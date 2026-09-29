@@ -17,18 +17,27 @@ namespace Curl.Protocol.Http;
 /// <see cref="TrailerBytes" />.
 /// </summary>
 /// <remarks>
-/// Failures are the ones curl's <c>curl_ngtcp2.c</c> reports (ADR-0144 section 7, ADR-0172):
-/// a stream the server resets is exit 95, or 18 once body bytes have arrived, with
-/// <c>HTTP/3 stream &lt;id&gt; reset by server</c>; so is a response head with no valid
-/// <c>:status</c>, which this client resets with <c>H3_MESSAGE_ERROR</c> as nghttp3 does; a
-/// stream that ends before the final head is exit 95; frames or field sections that break
-/// RFC 9114 or RFC 9204 are exit 56 with nghttp3's error name; and a lost connection is the
-/// exit code and message its <see cref="MultiplexedConnectionFailedException" /> carries.
+/// Failures are the ones curl 8.21.0's <c>cf-ngtcp2.c</c> reports (ADR-0144 section 7,
+/// ADR-0172, ADR-0187): a stream the server resets is exit 95, or 18 once body bytes have
+/// arrived, with <c>HTTP/3 stream &lt;id&gt; reset by server (error 0x&lt;hex&gt;
+/// &lt;name&gt;)</c>; so is a response head with no valid <c>:status</c>, which this client
+/// resets with <c>H3_MESSAGE_ERROR</c> as nghttp3 does. A reset with
+/// <c>H3_REQUEST_REJECTED</c> stops the session taking new streams and is exit 56 marked
+/// <see cref="HttpTransferException.IsStreamRefused" />, for the handler to send the request
+/// again; a reset with <c>H3_NO_ERROR</c>, or with any other code after the final head when
+/// no body is wanted, ends the stream as its end would. A stream that ends before the final
+/// head is exit 95; frames or field sections that break RFC 9114 or RFC 9204 are exit 56 with
+/// nghttp3's error name; and a lost connection is the exit code and message its
+/// <see cref="MultiplexedConnectionFailedException" /> carries.
 /// </remarks>
 /// <param name="session">The connection's HTTP/3 session.</param>
 /// <param name="scheme">The URL's scheme, sent as <c>:scheme</c>.</param>
 /// <param name="bodyLength">The request body's length, 0 when there is none, or <see langword="null" /> when unknown.</param>
-internal sealed class Http3StreamConnection(Http3Session session, string scheme, long? bodyLength) : IHttpStreamConnection
+/// <param name="ignoresBody">
+/// <see langword="true" /> when no response body is wanted (<c>-I</c>), so a reset after the
+/// final head ends the stream instead of failing it.
+/// </param>
+internal sealed class Http3StreamConnection(Http3Session session, string scheme, long? bodyLength, bool ignoresBody) : IHttpStreamConnection
 {
     /// <summary>
     /// The longest frame payload read off a request stream: <c>Curl.Http3</c> reads each
@@ -224,9 +233,18 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         {
             return await frames!.ReadFrameAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (MultiplexedStreamResetException)
+        catch (MultiplexedStreamResetException reset) when (reset.ApplicationErrorCode == (long)Http3ErrorCode.RequestRejected)
         {
-            throw Reset();
+            session.StopNewStreams();
+            throw new HttpTransferException(CurlExitCode.RecvError, HttpTransferMessages.Http3StreamRefused(stream!.StreamId)) { IsStreamRefused = true };
+        }
+        catch (MultiplexedStreamResetException reset) when (reset.ApplicationErrorCode == (long)Http3ErrorCode.NoError || (isFinalHeadReceived && ignoresBody))
+        {
+            return null;
+        }
+        catch (MultiplexedStreamResetException reset)
+        {
+            throw Reset(reset.ApplicationErrorCode);
         }
         catch (MultiplexedConnectionFailedException lost)
         {
@@ -239,12 +257,12 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     }
 
     /// <summary>
-    /// Gives the failure for a reset request stream: exit 95, or exit 18 once body bytes have
-    /// arrived, as <c>curl_ngtcp2.c</c> counts them.
+    /// Gives the failure for a request stream reset with <paramref name="errorCode" />: exit
+    /// 95, or exit 18 once body bytes have arrived, as <c>cf-ngtcp2.c</c> counts them.
     /// </summary>
-    private HttpTransferException Reset() => new(
+    private HttpTransferException Reset(long errorCode) => new(
         bodyBytesReceived > 0 ? CurlExitCode.PartialFile : CurlExitCode.Http3,
-        HttpTransferMessages.Http3StreamReset(stream!.StreamId));
+        HttpTransferMessages.Http3StreamReset(stream!.StreamId, errorCode));
 
     private void ReceiveEnd()
     {
@@ -271,7 +289,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         if (Http2ResponseHead.StatusOf(fields) is not { } statusCode)
         {
             stream!.Abort((long)Http3ErrorCode.MessageError);
-            throw Reset();
+            throw Reset((long)Http3ErrorCode.MessageError);
         }
 
         received.Enqueue(Http2ResponseHead.Format(session.VersionName, statusCode, fields));
