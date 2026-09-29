@@ -89,7 +89,7 @@ After the transport is up, the handler requests `ssh-userauth` and authenticates
   close (`-43`); a MAC failure there keeps ADR-0212's `-4`/`-12`; a MAC failure or broken
   framing during a method fails that method; a KEXINIT during authentication runs
   `SshTransport.ReExchangeKeysAsync` and carries on.
-- **Follow-up filed:** BL-901, ssh-agent identities (curl tries them between `password`
+- **Follow-up filed:** BL-902, ssh-agent identities (curl tries them between `password`
   and `keyboard-interactive` when `publickey` is listed); no task covered it.
 - **Touches.** Added ADR-0215 and `Documentation/Planning/Decisions/README.md`: the
   decision needed an ADR, and no task in Doing names either.

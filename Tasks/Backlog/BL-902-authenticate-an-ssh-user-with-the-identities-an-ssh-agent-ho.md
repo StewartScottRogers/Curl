@@ -1,5 +1,5 @@
 ---
-id: BL-901
+id: BL-902
 title: Authenticate an SSH user with the identities an ssh-agent holds
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-901 — Authenticate an SSH user with the identities an ssh-agent holds
+# BL-902 — Authenticate an SSH user with the identities an ssh-agent holds
 
 ## Goal
 
