@@ -13,6 +13,10 @@ namespace Curl.Protocol.Ftp;
 /// each reply line read, as a response header.
 /// </param>
 /// <param name="cancellationToken">Cancels every send and read, until <see cref="CancellationToken" /> is set.</param>
+/// <param name="diagnostics">
+/// Where the diagnostic log learns of each command sent and each reply read, at
+/// <c>verbose</c>, <c>QUIT</c> included (BL-924).
+/// </param>
 /// <remarks>
 /// Commands and replies are Latin-1, so every byte of a percent-decoded path reaches the
 /// server unchanged, as curl sends it. A reply ends at the first line that starts with
@@ -22,7 +26,7 @@ namespace Curl.Protocol.Ftp;
 /// sent is reported with its CRLF, <c>PASS</c>'s password in clear, and every complete line
 /// read with its line end, skipped or not, until <see cref="StopReporting" />.
 /// </remarks>
-internal sealed class FtpControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken)
+internal sealed class FtpControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken, FtpDiagnosticLog diagnostics)
 {
     /// <summary>Where lines are reported: <c>events</c> until <see cref="StopReporting" />, nowhere after.</summary>
     private ITransferEvents reporting = events;
@@ -88,6 +92,7 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
         }
 
         reporting.ReportRequestHeader(line);
+        diagnostics.CommandSent(command);
         return true;
     }
 
@@ -103,10 +108,13 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
     /// </exception>
     public async ValueTask<FtpReply?> ReadReplyAsync()
     {
+        string? firstLine = null;
         while (await ReadLineAsync().ConfigureAwait(false) is { } line)
         {
+            firstLine ??= line;
             if (TryParseLastLine(line, out int code))
             {
+                diagnostics.ReplyRead(code, firstLine);
                 return new FtpReply(code, line);
             }
         }

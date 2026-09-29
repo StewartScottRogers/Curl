@@ -146,6 +146,9 @@ internal sealed class FtpSession(
 
     private readonly FtpQuoteCommands quotes = FtpQuoteCommands.Parse(context.QuoteCommands);
 
+    /// <summary>Where each session step is written to Curl's own diagnostic log (BL-924).</summary>
+    private readonly FtpDiagnosticLog log = new(context.DiagnosticLog);
+
     private readonly FtpTlsRequirement tlsRequirement = FtpTlsRequirements.Of(context);
 
     /// <summary>The URL path without its <c>;type=</c> suffix, and whether it asks for ASCII or a name-only listing.</summary>
@@ -237,6 +240,7 @@ internal sealed class FtpSession(
     /// </returns>
     public async ValueTask<TransferResult> RunAsync()
     {
+        long started = context.TimeProvider.GetTimestamp();
         TransferResult result;
         try
         {
@@ -248,6 +252,7 @@ internal sealed class FtpSession(
             result = lost.Result;
         }
 
+        log.SessionEnded(result, context.TimeProvider.GetElapsedTime(started));
         return result with
         {
             Report = new TransferReport { ResponseCode = lastReplyCode, FtpEntryPath = entryPath },
@@ -344,8 +349,8 @@ internal sealed class FtpSession(
         FtpReply greeting = await ReadReplyAsync().ConfigureAwait(false);
         return greeting.Code switch
         {
-            230 => null,
-            220 => await SecureControlAsync().ConfigureAwait(false) ?? await LogInAsync().ConfigureAwait(false),
+            230 => LoggedIn(),
+            220 =>await SecureControlAsync().ConfigureAwait(false) ?? await LogInAsync().ConfigureAwait(false),
             _ => TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.UnexpectedGreeting(greeting.Code)),
         };
     }
@@ -374,9 +379,13 @@ internal sealed class FtpSession(
             }
         }
 
-        return tlsRequirement == FtpTlsRequirement.Try
-            ? null
-            : TransferResult.Failure(CurlExitCode.UseSslFailed, FtpTransferMessages.RequestedSslLevelFailed);
+        if (tlsRequirement != FtpTlsRequirement.Try)
+        {
+            return TransferResult.Failure(CurlExitCode.UseSslFailed, FtpTransferMessages.RequestedSslLevelFailed);
+        }
+
+        log.ControlLeftPlaintext();
+        return null;
     }
 
     /// <summary>
@@ -396,6 +405,7 @@ internal sealed class FtpSession(
         securedControl = connection;
         control.SwitchTo(connection);
         controlSecured = true;
+        log.ControlSecured();
         return null;
     }
 
@@ -416,6 +426,7 @@ internal sealed class FtpSession(
         bool privateData = tlsRequirement != FtpTlsRequirement.ControlConnection;
         FtpReply prot = await ExchangeAsync(privateData ? "PROT P" : "PROT C").ConfigureAwait(false);
         protectData = privateData && prot.IsCompletion;
+        log.DataProtection(privateData, prot.IsCompletion);
         return prot.IsCompletion || tlsRequirement != FtpTlsRequirement.AllConnections
             ? null
             : TransferResult.Failure(CurlExitCode.UseSslFailed, FtpTransferMessages.RequestedSslLevelFailed);
@@ -426,7 +437,7 @@ internal sealed class FtpSession(
         FtpReply user = await ExchangeAsync("USER " + (context.Credentials?.UserName ?? AnonymousUser)).ConfigureAwait(false);
         if (user.IsCompletion)
         {
-            return null;
+            return LoggedIn();
         }
 
         return user.Code == 331
@@ -439,12 +450,19 @@ internal sealed class FtpSession(
         FtpReply pass = await ExchangeAsync("PASS " + (context.Credentials?.Password ?? AnonymousPassword)).ConfigureAwait(false);
         if (pass.IsCompletion)
         {
-            return null;
+            return LoggedIn();
         }
 
         return TransferResult.Failure(
             CurlExitCode.LoginDenied,
             pass.Code == 332 ? FtpTransferMessages.AccountRequested : FtpTransferMessages.AccessDenied(pass.Code));
+    }
+
+    /// <summary>Logs the login complete and goes on.</summary>
+    private TransferResult? LoggedIn()
+    {
+        log.LoggedIn();
+        return null;
     }
 
     private async ValueTask<TransferResult> TransferPathAsync()
@@ -454,6 +472,7 @@ internal sealed class FtpSession(
             return TransferResult.Failure(CurlExitCode.UrlMalformat, FtpTransferMessages.PathHasControlCharacters);
         }
 
+        log.PathWalk(context.FtpFileMethod, path.Directories.Count);
         rememberedDirectory = string.Concat(path.Directories.Select(directory => directory + "/"));
         return context.Upload is { } upload
             ? await UploadAsync(path, upload).ConfigureAwait(false)
@@ -577,6 +596,8 @@ internal sealed class FtpSession(
         {
             return await QuitAndFailAsync(CurlExitCode.UploadFailed, FtpTransferMessages.UploadRefused(opened.Code)).ConfigureAwait(false);
         }
+
+        log.TransferStarted(command);
 
         if (await ReadyDataConnectionAsync().ConfigureAwait(false) is { } notReady)
         {
@@ -764,6 +785,7 @@ internal sealed class FtpSession(
             }
         }
 
+        log.DirectoryReached(directories);
         return null;
     }
 
@@ -831,11 +853,11 @@ internal sealed class FtpSession(
 
             if ((await ExchangeAsync(FtpActiveCommand.Eprt(ListeningEndPoint)).ConfigureAwait(false)).IsCompletion)
             {
-                context.Events.ReportInfo(FtpTransferMessages.ConnectDataStreamActively);
-                return null;
+                return AnnouncedActively("EPRT");
             }
 
             await ReleasePendingConnectionAsync().ConfigureAwait(false);
+            WarnEprtRefused(ipv6);
         }
 
         return ipv6
@@ -847,11 +869,30 @@ internal sealed class FtpSession(
     {
         if ((await ExchangeAsync(FtpActiveCommand.Port(ListeningEndPoint)).ConfigureAwait(false)).IsCompletion)
         {
-            context.Events.ReportInfo(FtpTransferMessages.ConnectDataStreamActively);
-            return null;
+            return AnnouncedActively("PORT");
         }
 
         return await QuitAndFailAsync(CurlExitCode.FtpPortFailed, FtpTransferMessages.FailedToDoPort).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reports curl 8.21.0's <c>-v</c> line for an accepted <c>EPRT</c> or <c>PORT</c>, logs
+    /// it, and goes on.
+    /// </summary>
+    private TransferResult? AnnouncedActively(string verb)
+    {
+        context.Events.ReportInfo(FtpTransferMessages.ConnectDataStreamActively);
+        log.ActivePortAnnounced(verb);
+        return null;
+    }
+
+    /// <summary>Logs a refused <c>EPRT</c> that <c>PORT</c> follows, which only IPv4 has.</summary>
+    private void WarnEprtRefused(bool ipv6)
+    {
+        if (!ipv6)
+        {
+            log.EprtRefused();
+        }
     }
 
     /// <summary>The announced address and the port the active-mode listener is bound to.</summary>
@@ -1016,6 +1057,7 @@ internal sealed class FtpSession(
         }
 
         ReportAccepted(dataConnection.RemoteEndPoint, (IPEndPoint)pending.LocalEndPoint);
+        log.ActiveDataAccepted();
         return null;
     }
 
@@ -1048,9 +1090,13 @@ internal sealed class FtpSession(
             .AuthenticateAsClientAsync(dataConnection!, context.Url.IdnHost, context.CancellationToken)
             .ConfigureAwait(false);
         dataConnection = secured.Connection;
-        return dataConnection is null
-            ? TransferResult.Failure(secured.ExitCode, secured.ErrorMessage!, bytesTransferred)
-            : null;
+        if (dataConnection is null)
+        {
+            return TransferResult.Failure(secured.ExitCode, secured.ErrorMessage!, bytesTransferred);
+        }
+
+        log.DataSecured();
+        return null;
     }
 
     /// <summary>
@@ -1074,7 +1120,7 @@ internal sealed class FtpSession(
         FtpReply epsv = await ExchangeAsync("EPSV", FtpTransferMessages.ConnectDataStreamPassively).ConfigureAwait(false);
         if (epsv.Code != 229)
         {
-            return await AnswerRefusedEpsvAsync().ConfigureAwait(false);
+            return await AnswerRefusedEpsvAsync(epsv.Code).ConfigureAwait(false);
         }
 
         return FtpPassiveReply.TryParseEpsvPort(epsv.LastLine, out int epsvPort)
@@ -1086,7 +1132,7 @@ internal sealed class FtpSession(
     /// Answers an <c>EPSV</c> refused with anything but <c>229</c>: over IPv6 the transfer
     /// ends with exit 8 and no <c>QUIT</c>; otherwise curl 8.21.0's <c>-v</c> line and <c>PASV</c>.
     /// </summary>
-    private async ValueTask<TransferResult?> AnswerRefusedEpsvAsync()
+    private async ValueTask<TransferResult?> AnswerRefusedEpsvAsync(int code)
     {
         if (controlPeerIsIPv6)
         {
@@ -1094,6 +1140,7 @@ internal sealed class FtpSession(
         }
 
         context.Events.ReportInfo(FtpTransferMessages.EpsvFailed);
+        log.EpsvRefused(code);
         return await EnterPassiveModeAsync(afterSent: null).ConfigureAwait(false);
     }
 
@@ -1128,6 +1175,7 @@ internal sealed class FtpSession(
         }
 
         context.Events.ReportInfo(FtpTransferMessages.SkipPassiveAddress(address, context.Url.IdnHost));
+        log.PassiveAddressSkipped(address, context.Url.IdnHost);
         return await ConnectDataAsync(context.Url.IdnHost, controlPeerAddress, port).ConfigureAwait(false);
     }
 
@@ -1144,12 +1192,17 @@ internal sealed class FtpSession(
         {
             Proxy = context.Proxy,
             Events = new FtpDataConnectEvents(context.Events, failure),
+            DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connected = await connections.Connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         dataConnection = connected.Connection;
-        return dataConnection is null
-            ? new TransferResult(connected.ExitCode, 0, failure.Rewrite(connected.ErrorMessage!)) { IsConnectionRefused = connected.IsConnectionRefused }
-            : null;
+        if (dataConnection is null)
+        {
+            return new TransferResult(connected.ExitCode, 0, failure.Rewrite(connected.ErrorMessage!)) { IsConnectionRefused = connected.IsConnectionRefused };
+        }
+
+        log.PassiveDataConnected(host, port);
+        return null;
     }
 
     /// <summary>Sends <c>TYPE A</c> for a listing or an ASCII transfer, <c>TYPE I</c> otherwise.</summary>
@@ -1260,6 +1313,7 @@ internal sealed class FtpSession(
         FtpReply opened = await ExchangeAsync(command).ConfigureAwait(false);
         if (opened.Code is 125 or 150)
         {
+            log.TransferStarted(command);
             context.Events.ReportInfo(FtpTransferMessages.MaxDownload(window.MaxDownload));
             if (!listing)
             {
@@ -1494,9 +1548,14 @@ internal sealed class FtpSession(
         foreach (FtpQuoteCommand quote in commands)
         {
             FtpReply reply = await ExchangeAsync(quote.Command).ConfigureAwait(false);
-            if (reply.Code >= 400 && !quote.IgnoreFailure)
+            if (reply.Code >= 400)
             {
-                return (quote, reply.Code);
+                if (!quote.IgnoreFailure)
+                {
+                    return (quote, reply.Code);
+                }
+
+                log.QuoteFailureIgnored(quote.Command, reply.Code);
             }
         }
 
