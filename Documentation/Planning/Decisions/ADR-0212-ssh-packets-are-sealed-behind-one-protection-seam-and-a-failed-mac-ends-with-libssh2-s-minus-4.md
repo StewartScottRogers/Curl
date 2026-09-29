@@ -63,7 +63,7 @@ connect to the Windows listener; Docker was down).
   compared with `CryptographicOperations.FixedTimeEquals`, and under encrypt-then-MAC the
   MAC is checked before anything is decrypted. The -4 is measured; the -12 is taken from
   libssh2 1.11.1's `transport.c` (`decrypt()` returns `LIBSSH2_ERROR_DECRYPT` when the
-  cipher refuses, and its OpenSSL AES-GCM refuses a bad tag), and BL-889 measures it on
+  cipher refuses, and its OpenSSL AES-GCM refuses a bad tag), and BL-897 measures it on
   the OpenSSL build.
 - **libssh2 keeps the failed read's code and names the step in the description.** The
   first packet the server protects answers the `ssh-userauth` service request, so curl
@@ -78,7 +78,7 @@ connect to the Windows listener; Docker was down).
 
 - Real curl decrypts what this library encrypts and the reverse, for every CTR pair, so
   BL-567 onwards can be measured against a server built from these classes.
-- The GCM exit is the one unmeasured value; if BL-889 finds another code, one constant and
+- The GCM exit is the one unmeasured value; if BL-897 finds another code, one constant and
   its tests change.
 - A packet that fails its check is not counted, and the session is over: nothing reads
   from the connection after the exception.

@@ -1,5 +1,5 @@
 ---
-id: BL-889
+id: BL-897
 title: Measure the OpenSSL build's exit for an SSH AES-GCM packet whose tag fails
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-889 — Measure the OpenSSL build's exit for an SSH AES-GCM packet whose tag fails
+# BL-897 — Measure the OpenSSL build's exit for an SSH AES-GCM packet whose tag fails
 
 ## Goal
 

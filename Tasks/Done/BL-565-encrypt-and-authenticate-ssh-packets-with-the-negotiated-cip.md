@@ -52,7 +52,7 @@ After `NEWKEYS`, packets are encrypted and authenticated with the ciphers and MA
 - **Exit code.** BL-560's ADR (ADR-0122) states none for this case; ADR-0212 records the
   measured `-4` (MAC) and `-12` for an AES-GCM tag, the latter from libssh2 1.11.1's
   `transport.c` since the Windows build offers no GCM and WSL's OpenSSL curl could not
-  reach the Windows listener (Docker down). Filed **BL-889** to measure it. The
+  reach the Windows listener (Docker down). Filed **BL-897** to measure it. The
   `ssh-userauth` request is BL-567's; it maps `SshPacketAuthenticationException` to
   `Libssh2ErrorCode.FailedToGetUserAuthResponse`. Here a failed check during a
   re-exchange ends with exit 2 and `-4` / `-12, Unable to exchange encryption keys`.
