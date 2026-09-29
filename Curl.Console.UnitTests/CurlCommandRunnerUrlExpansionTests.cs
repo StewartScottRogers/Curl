@@ -386,6 +386,27 @@ public sealed class CurlCommandRunnerUrlExpansionTests
         Assert.AreEqual("http://gw:1/ipfs/bafyabc/n.txt", Assert.ContainsSingle(http.Contexts).Url.OriginalString);
     }
 
+    [TestMethod]
+    public async Task RunAsync_IpfsUrlOnARunnerWithoutAnEnvironment_TakesTheGatewayOption()
+    {
+        int exitCode = await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                fileSystem,
+                fileSystem,
+                standardOutput,
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: false,
+                outputPaths: fileSystem,
+                configFileReader: dataFiles)
+            .RunAsync(["--ipfs-gateway", "http://gw:1", "ipfs://bafyabc/n.txt", "ipfs://bafydef/m.txt"]);
+
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(
+            new[] { "http://gw:1/ipfs/bafyabc/n.txt", "http://gw:1/ipfs/bafydef/m.txt" },
+            http.Contexts.Select(context => context.Url.OriginalString).ToArray());
+    }
+
     private string WrittenText(string path) => Encoding.ASCII.GetString(fileSystem.Written[path].ToArray());
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, bool runsOnWindows = false) =>

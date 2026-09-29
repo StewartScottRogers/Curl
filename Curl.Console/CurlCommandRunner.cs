@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Net;
 using System.Text;
 using Curl.Authentication;
 using Curl.Cli;
@@ -266,6 +267,25 @@ internal sealed class CurlCommandRunner(
     /// the reader the runner was given, else the disk.
     /// </summary>
     private IDataFileReader DataFileReader => configFileReader ?? DiskDataFileReader.ForProcess;
+
+    /// <summary>
+    /// Gets what chooses each transfer's credentials from the netrc file, reading it with
+    /// <see cref="DataFileReader" /> and the home directory from the runner's environment (BL-505).
+    /// </summary>
+    private NetrcCredentialLookup NetrcCredentials =>
+        new(DataFileReader, EnvironmentVariables, runsOnWindows);
+
+    /// <summary>
+    /// Reads no environment variable, created once with <see langword="new" /> so no use of it carries
+    /// the compiler's method-group cache.
+    /// </summary>
+    private static readonly Func<string, string?> NoEnvironmentVariables = new(ReadNoEnvironmentVariable);
+
+    /// <summary>
+    /// Gets what reads an environment variable: the function the runner was given, else
+    /// <see cref="NoEnvironmentVariables" />.
+    /// </summary>
+    private Func<string, string?> EnvironmentVariables => readEnvironmentVariable ?? NoEnvironmentVariables;
 
     /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
     private const string StandardOutputHeaderFile = "-";
@@ -1411,7 +1431,7 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
-        IpfsGatewayRewriter rewriter = new(readEnvironmentVariable ?? ReadNoEnvironmentVariable, ReadGatewayFileText);
+        IpfsGatewayRewriter rewriter = new(EnvironmentVariables, ReadGatewayFileText);
         if (!rewriter.TryRewrite(parsed, options.IpfsGateway, out string? gatewayUrl, out failure))
         {
             return false;
@@ -2180,12 +2200,41 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Chooses the transfer's proxy with <see cref="TransferProxySelection" />, then its credentials
+    /// with <see cref="NetrcCredentialLookup" />, which it keeps as the running transfer's
+    /// <see cref="RunningTransferState.NetrcCredentials" /> for every attempt's context.
+    /// </summary>
+    /// <param name="proxySelector">Chooses the transfer's proxy.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="url">The transfer's URL.</param>
+    /// <param name="proxy">The proxy chosen, or <see langword="null" /> to connect directly.</param>
+    /// <param name="failure">The proxy's or the netrc file's failure, when either refuses the transfer.</param>
+    /// <returns><see langword="false" /> when the transfer ends before it starts.</returns>
+    private bool TrySelectProxyAndCredentials(
+        ProxySelector proxySelector,
+        CommandLineOptions options,
+        CurlUrl url,
+        out ProxyEndpoint? proxy,
+        [NotNullWhen(false)] out TransferResult? failure)
+    {
+        if (!TransferProxySelection.TrySelect(proxySelector, options, url, out proxy, out failure))
+        {
+            return false;
+        }
+
+        bool looked = NetrcCredentials.TryLookUp(options, url, out NetworkCredential? netrcCredentials, out failure);
+        Running.NetrcCredentials = netrcCredentials;
+        return looked;
+    }
+
+    /// <summary>
     /// Performs one checked transfer, sending <paramref name="formBody" /> when given, to the file
     /// <see cref="ResolveOutputFileAsync" /> names when it names one, nowhere under <c>--out-null</c>
     /// (<see cref="Stream.Null" />, with the progress meter drawn as for a file) and to standard
     /// output otherwise, and writes the progress meter after it. The transfer goes through the proxy
-    /// <see cref="TransferProxySelection" /> chooses; when it refuses one, the transfer ends with
-    /// its failure and nothing is sent.
+    /// <see cref="TransferProxySelection" /> chooses, with the credentials
+    /// <see cref="NetrcCredentialLookup" /> chooses; when either fails, the transfer ends with its
+    /// failure and nothing is sent (<see cref="TrySelectProxyAndCredentials" />).
     /// </summary>
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="proxySelector">Chooses the transfer's proxy from <c>-x</c>, <c>--noproxy</c> and the proxy environment variables.</param>
@@ -2221,7 +2270,7 @@ internal sealed class CurlCommandRunner(
             return unstarted;
         }
 
-        if (!TransferProxySelection.TrySelect(proxySelector, options, url, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
+        if (!TrySelectProxyAndCredentials(proxySelector, options, url, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
             return proxyFailure;
         }
@@ -2244,7 +2293,8 @@ internal sealed class CurlCommandRunner(
                 events: transferEventOutput.Events,
                 lowSpeedWatchdog: StartLowSpeedWatchdog(options),
                 abortToken: Running.AbortToken,
-                maxTimeWatchdog: StartMaxTimeWatchdog(options));
+                maxTimeWatchdog: StartMaxTimeWatchdog(options),
+                netrcCredentials: Running.NetrcCredentials);
             TransferResult result = toStandardOutput
                 ? await TransferToStandardOutputAsync(follower, options, createAttemptContext).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null).ConfigureAwait(false);
@@ -2794,7 +2844,8 @@ internal sealed class CurlCommandRunner(
                         transferEventOutput.Events,
                         StartLowSpeedWatchdog(options),
                         Running.AbortToken,
-                        StartMaxTimeWatchdog(options)),
+                        StartMaxTimeWatchdog(options),
+                        Running.NetrcCredentials),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);

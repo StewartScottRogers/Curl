@@ -79,4 +79,11 @@ internal sealed class RunningTransferState(
     /// the <c>-o</c> file holds (task BL-416).
     /// </summary>
     internal bool UploadResumesFromUnknownOffset { get; set; }
+
+    /// <summary>
+    /// Gets or sets the credentials <see cref="NetrcCredentialLookup" /> chose for the transfer, sent in
+    /// place of the <c>-u</c> ones; <see langword="null" /> when the netrc file had nothing to say
+    /// (task BL-505).
+    /// </summary>
+    internal System.Net.NetworkCredential? NetrcCredentials { get; set; }
 }

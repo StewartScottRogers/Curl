@@ -172,6 +172,18 @@ cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy,
 proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with exit 4 until the connector opens those tunnels
 (ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep
 the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
+
+Under `-n`, `--netrc-file` or `--netrc-optional`, `NetrcCredentialLookup` then chooses the
+transfer's credentials, once per URL, and the runner keeps them as the running transfer's
+`NetrcCredentials`, which `TransferContextFactory` puts on every attempt's context in place of
+`-u`'s. A `-u` with a user name wins and no file is read. The file is the `--netrc-file` one, else
+`.netrc` in `HOME` (on Windows `_netrc` after it, and `USERPROFILE` when `HOME` is not set), read
+through the runner's `IDataFileReader` and environment. The URL's percent-decoded user name picks
+the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; with no entry the
+URL's user and password are sent. A required file that is missing or malformed fails each URL with
+`curl: (26) .netrc error: no such file` or `syntax error` before anything is sent;
+`--netrc-optional` ignores both. A redirect keeps the credentials to the same host and drops them
+to another; curl's per-hop lookup is BL-790. Measured on curl 8.21.0 (BL-505 Notes).
 An `ftp` or `ftps` URL is claimed by `RoutingFtpProtocolHandler`, which hands an `ftp` one to
 the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
