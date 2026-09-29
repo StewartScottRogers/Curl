@@ -5,7 +5,7 @@ namespace Curl.Authentication;
 
 /// <summary>
 /// Answers with <c>Authorization: Negotiate &lt;base64&gt;</c> as curl 8.21.0 does
-/// (RFC 4559, ADR-0142, ADR-0173): the first token of a Negotiate context for the service
+/// (RFC 4559, ADR-0142, ADR-0176): the first token of a Negotiate context for the service
 /// <c>HTTP</c> on the URL's host, from <paramref name="securityContexts" />. When no token
 /// can be made - no ticket, no logged-on user's credential, no mechanism - it answers
 /// nothing, and the transfer ends on the 401 with exit 0, as both platform curls do.

@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking;
 
 /// <summary>
-/// The production <see cref="IKerberosKdcTransport" /> (ADR-0142, ADR-0173): a UDP datagram
+/// The production <see cref="IKerberosKdcTransport" /> (ADR-0142, ADR-0176): a UDP datagram
 /// through an <see cref="IDatagramConnector" />, answered within
 /// <paramref name="replyTimeout" />, and a direct TCP connection through an
 /// <see cref="IConnector" />. It only moves bytes: <c>Curl.Kerberos</c>'s KDC sender picks

@@ -2,7 +2,7 @@ namespace Curl.Protocol.Abstractions;
 
 /// <summary>
 /// Pins the default member of <see cref="IHttpAuthenticator" />, which lets an
-/// authenticator that does no I/O leave it out (ADR-0173).
+/// authenticator that does no I/O leave it out (ADR-0176).
 /// </summary>
 [TestClass]
 public sealed class IHttpAuthenticatorTests

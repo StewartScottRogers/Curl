@@ -8,7 +8,7 @@ OAUTHBEARER, CRAM-MD5 and DIGEST-MD5, the last as SSPI on Windows; ADR-0121, ADR
 ADR-0139), and the netrc reader (`NetrcFile`: which login and
 password curl 8.21.0 picks from `--netrc-file` text, BL-503).
 
-Negotiate (BL-527, ADR-0142, ADR-0173): `RankedHttpAuthenticator.CreateAuthorizationAsync`
+Negotiate (BL-527, ADR-0142, ADR-0176): `RankedHttpAuthenticator.CreateAuthorizationAsync`
 hands a Negotiate pick to `NegotiateHttpAuthenticator`, which asks an `ISecurityContextFactory`
 (the seam in `Curl.Protocol.Abstractions`) for the first token of a context for `HTTP` on the
 URL's host. The production factory is `RoutingSecurityContextFactory`: on Windows

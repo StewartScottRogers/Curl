@@ -10,7 +10,7 @@ production implementations of the transport contracts in
 else: `KerberosKdcSocketTransport` moves a KDC's UDP datagram through an `IDatagramConnector`
 (one-second reply wait) and its TCP stream through an `IConnector` (the stream owns and
 disposes the connection, `ConnectionStream`'s `ownsConnection`), and `KerberosDnsSrvLookup`
-answers SRV lookups through `DnsServerResolver.ResolveServiceAsync` (BL-527, ADR-0173).
+answers SRV lookups through `DnsServerResolver.ResolveServiceAsync` (BL-527, ADR-0176).
 
 Per ADR-0140 and ADR-0162 (BL-708) there are two TLS providers, and `TlsClientRouting.Choose`
 picks one from a `TlsClientOptions` as one pure function: `HandBuiltTlsProvider` when a row of

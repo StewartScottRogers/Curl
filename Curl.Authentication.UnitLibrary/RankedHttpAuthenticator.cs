@@ -14,7 +14,7 @@ namespace Curl.Authentication;
 /// There is no fallback, as the reference build has none: when the pick is NTLM, which is
 /// not built here, a Negotiate context that makes no token, or a Digest challenge curl cannot
 /// read, it sends nothing rather than answer a lower-ranked scheme also offered. Negotiate
-/// needs I/O, so only <see cref="CreateAuthorizationAsync" /> answers it (ADR-0173). As
+/// needs I/O, so only <see cref="CreateAuthorizationAsync" /> answers it (ADR-0176). As
 /// libcurl does, <c>--negotiate</c> alone tries it on the first request, and after a
 /// challenge answers only when <c>-u</c> was given, even as <c>-u :</c>.
 /// </remarks>

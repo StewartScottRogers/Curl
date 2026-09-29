@@ -128,7 +128,7 @@ internal static class CurlComposition
     /// drawing each client nonce from <see cref="DigestClientNonce.CreateRandom" />, both encoding
     /// credentials in the platform's encoding (<see cref="CredentialEncoding.ForPlatform" />),
     /// and a <see cref="NegotiateHttpAuthenticator" /> over <paramref name="securityContexts" />
-    /// for <c>--negotiate</c> (ADR-0173).
+    /// for <c>--negotiate</c> (ADR-0176).
     /// </summary>
     /// <param name="securityContexts">Makes Negotiate's contexts: <see cref="CreateSecurityContextFactory" />'s in production.</param>
     /// <returns>The authenticator.</returns>
@@ -148,7 +148,7 @@ internal static class CurlComposition
     /// exchanges go through a <see cref="KerberosKdcSocketTransport" /> over
     /// <paramref name="datagramConnector" /> and <paramref name="connector" /> (waiting
     /// <see cref="KdcReplyTimeout" /> for a UDP reply) and whose SRV lookups go through a
-    /// <see cref="DnsServerResolver" /> asking the system's DNS servers (ADR-0173).
+    /// <see cref="DnsServerResolver" /> asking the system's DNS servers (ADR-0176).
     /// </summary>
     /// <param name="connector">Opens TCP connections to a KDC.</param>
     /// <param name="datagramConnector">Opens UDP channels to a KDC.</param>

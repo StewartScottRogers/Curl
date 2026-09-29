@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Authentication;
 
 /// <summary>
-/// SSPI's Negotiate as curl 8.21.0 gets it (ADR-0173): a first token that falls back to NTLM,
+/// SSPI's Negotiate as curl 8.21.0 gets it (ADR-0176): a first token that falls back to NTLM,
 /// which the BCL's <c>NegotiateAuthentication</c> makes off a domain, answers
 /// <see cref="SecurityContextStatus.NoCredentials" /> instead, because curl measured on the
 /// same SSPI gets <c>SEC_E_NO_CREDENTIALS</c> there, with <c>-u :</c> and <c>-u u:p</c> alike,

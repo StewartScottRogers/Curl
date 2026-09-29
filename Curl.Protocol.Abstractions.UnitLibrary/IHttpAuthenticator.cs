@@ -9,7 +9,7 @@ namespace Curl.Protocol.Abstractions;
 /// <c>Curl.Console</c>, so the handler never references the implementation. Neither call
 /// keeps state between calls. <see cref="CreateAuthorization" /> does no I/O;
 /// <see cref="CreateAuthorizationAsync" />, which the HTTP handler calls, may, as Negotiate
-/// asks a KDC (ADR-0173). A handshake of more than one leg (NTLM) needs a later ADR.
+/// asks a KDC (ADR-0176). A handshake of more than one leg (NTLM) needs a later ADR.
 /// </remarks>
 public interface IHttpAuthenticator
 {
@@ -34,7 +34,7 @@ public interface IHttpAuthenticator
 
     /// <summary>
     /// Creates the authorization header value for <paramref name="request" />, doing whatever
-    /// I/O the scheme needs, as Negotiate asks a KDC for a service ticket (ADR-0173). By
+    /// I/O the scheme needs, as Negotiate asks a KDC for a service ticket (ADR-0176). By
     /// default it returns <see cref="CreateAuthorization" />'s answer.
     /// </summary>
     /// <param name="request">The request being authorised, and what it may be authorised with.</param>

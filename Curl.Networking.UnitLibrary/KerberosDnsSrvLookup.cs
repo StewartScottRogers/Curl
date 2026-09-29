@@ -3,7 +3,7 @@ using Curl.Kerberos;
 namespace Curl.Networking;
 
 /// <summary>
-/// The production <see cref="IKerberosSrvLookup" /> (ADR-0142, ADR-0173): SRV records through
+/// The production <see cref="IKerberosSrvLookup" /> (ADR-0142, ADR-0176): SRV records through
 /// the hand-built DNS client, <see cref="DnsServerResolver.ResolveServiceAsync" />. A failed
 /// lookup, whatever its reason, is no records, as MIT's locator treats it.
 /// </summary>

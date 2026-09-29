@@ -111,7 +111,7 @@ SSPI on Windows, elsewhere the system GSS-API with the hand-built SPNEGO and Ker
 reaching KDCs through `Curl.Networking`'s `KerberosKdcSocketTransport` over the run's connectors
 and finding them through `KerberosDnsSrvLookup`. `HandBuiltKerberosSources` reads `krb5.conf`
 and the credential cache from disk (`KerberosDiskFileReader`) only when a hand-built context first
-asks, with the `<uid>` of `/tmp/krb5cc_<uid>` from `ProcessUserId` (BL-527, ADR-0173). Tests pass
+asks, with the `<uid>` of `/tmp/krb5cc_<uid>` from `ProcessUserId` (BL-527, ADR-0176). Tests pass
 their own `ISecurityContextFactory` to `CreateRunner`.
 `-0` / `--http1.0` and `--http1.1` set `HttpRequestOptions.Version` (the last one wins, HTTP/1.1
 when neither is given), and `--compressed`, `--tr-encoding`, `--raw` and `--ignore-content-length`

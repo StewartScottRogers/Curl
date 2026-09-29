@@ -18,7 +18,7 @@ Under `-v`, `--negotiate` writes the lines curl 8.21.0 writes: the platform's co
 
 ## Context
 
-- ADR-0173 records the measured lines (BL-527 Notes). Windows (SSPI): `* InitializeSecurityContext failed: SEC_E_NO_CREDENTIALS (0x8009030e) - No credentials are available in the security package`. Linux (MIT GSS-API, curl 8.18.0): `* gss_init_sec_context() failed: No credentials were supplied, or the credentials were unavailable or inaccessible. SPNEGO cannot find mechanisms to negotiate. ` (trailing space). Both then `* Server auth using Negotiate with user ''`.
+- ADR-0176 records the measured lines (BL-527 Notes). Windows (SSPI): `* InitializeSecurityContext failed: SEC_E_NO_CREDENTIALS (0x8009030e) - No credentials are available in the security package`. Linux (MIT GSS-API, curl 8.18.0): `* gss_init_sec_context() failed: No credentials were supplied, or the credentials were unavailable or inaccessible. SPNEGO cannot find mechanisms to negotiate. ` (trailing space). Both then `* Server auth using Negotiate with user ''`.
 - The failure line comes from the `ISecurityContext` step's status; the seam (`SecurityContextStep`) carries no text yet, so the task decides where the text is made. `Server auth using Basic with user '...'` is not written for any scheme yet either; check curl for Basic and Digest and write them in the same change if the pattern is shared.
 - Events go through `ITransferEvents.ReportInfo`.
 

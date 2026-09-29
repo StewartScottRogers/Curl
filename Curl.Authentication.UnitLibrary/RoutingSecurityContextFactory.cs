@@ -5,7 +5,7 @@ namespace Curl.Authentication;
 /// <summary>
 /// Chooses the implementation of each exchange by ADR-0142's tables: on Windows the system
 /// (SSPI) context for every mechanism and credential, Negotiate never falling back to NTLM
-/// (<see cref="SspiNegotiateSecurityContext" />, ADR-0173); elsewhere the hand-built route for
+/// (<see cref="SspiNegotiateSecurityContext" />, ADR-0176); elsewhere the hand-built route for
 /// NTLM, and for Negotiate and Kerberos the system GSS-API context with the default
 /// credentials, falling back to the hand-built route only when it answers
 /// <see cref="SecurityContextStatus.NoMechanism" />.

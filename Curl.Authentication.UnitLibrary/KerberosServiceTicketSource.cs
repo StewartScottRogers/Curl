@@ -7,7 +7,7 @@ namespace Curl.Authentication;
 /// host-based service: the principal <c>service/host@REALM</c>, with the host lower-cased
 /// and the realm from <c>krb5.conf</c>'s <c>[domain_realm]</c> or <c>default_realm</c>, else
 /// the credential cache's own; the ticket from the default credential cache, or by a TGS
-/// exchange with its ticket-granting ticket (ADR-0142, ADR-0173).
+/// exchange with its ticket-granting ticket (ADR-0142, ADR-0176).
 /// </summary>
 /// <param name="readConfiguration">Reads <c>krb5.conf</c>; called on each request, so nothing is read until Negotiate is answered.</param>
 /// <param name="readCredentialCache">Reads the default credential cache.</param>

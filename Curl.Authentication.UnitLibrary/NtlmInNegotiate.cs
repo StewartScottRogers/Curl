@@ -5,7 +5,7 @@ namespace Curl.Authentication;
 /// <summary>
 /// Tells whether a first Negotiate token carries NTLM: a bare NTLMSSP message, as SSPI sends
 /// for an IP address, or a SPNEGO NegTokenInit whose optimistic <c>mechToken</c> is one, as
-/// it sends for a name (ADR-0173).
+/// it sends for a name (ADR-0176).
 /// </summary>
 internal static class NtlmInNegotiate
 {

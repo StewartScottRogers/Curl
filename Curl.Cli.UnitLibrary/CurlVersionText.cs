@@ -29,7 +29,7 @@ public static class CurlVersionText
     /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c> on every
     /// platform now that <c>--http2</c> is accepted (ADR-0141, Decision 5), and <c>GSS-API</c>,
     /// <c>Kerberos</c> and <c>SPNEGO</c> on every platform now that <c>--negotiate</c> is answered
-    /// (ADR-0142, ADR-0173).
+    /// (ADR-0142, ADR-0176).
     /// </summary>
     public const string FeaturesLine = "Features: AsynchDNS brotli GSS-API HTTP2 IPv6 Kerberos Largefile libz SPNEGO SSL";
 

@@ -2,7 +2,7 @@ namespace Curl.Protocol.Abstractions;
 
 /// <summary>
 /// The initiator's side of one authentication exchange in NTLM, SPNEGO or Kerberos, made by
-/// <see cref="ISecurityContextFactory.Create" /> (ADR-0142, ADR-0173). It works in raw token
+/// <see cref="ISecurityContextFactory.Create" /> (ADR-0142, ADR-0176). It works in raw token
 /// bytes; base64 and the header or command that carries them are each caller's.
 /// </summary>
 /// <remarks>

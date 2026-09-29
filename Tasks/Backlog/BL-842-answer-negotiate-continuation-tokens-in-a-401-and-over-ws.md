@@ -18,7 +18,7 @@ A Negotiate exchange of more than one leg works as curl 8.21.0's does: a `401` w
 
 ## Context
 
-- BL-527 answers one leg: `NegotiateHttpAuthenticator` makes a fresh context per request and the HTTP handler retries once, only when the request that drew the 401 sent no `Authorization` (ADR-0173). SSPI can need several legs (NTLM inside SPNEGO on a domain without Kerberos, which ADR-0173 otherwise suppresses only for the first token), and a Kerberos acceptor may answer with a token.
+- BL-527 answers one leg: `NegotiateHttpAuthenticator` makes a fresh context per request and the HTTP handler retries once, only when the request that drew the 401 sent no `Authorization` (ADR-0176). SSPI can need several legs (NTLM inside SPNEGO on a domain without Kerberos, which ADR-0176 otherwise suppresses only for the first token), and a Kerberos acceptor may answer with a token.
 - The context must live across the legs of one connection; `ISecurityContext.NextTokenAsync` already takes the incoming token. `IHttpAuthenticator` keeps no state today, so the task decides where the context lives (ADR needed if the contract changes). NTLM (BL-526) needs the same, so check whether it landed first and share the mechanism.
 - `WsProtocolHandler` calls the synchronous `CreateAuthorization`; switch it to `CreateAuthorizationAsync`.
 - Measure against a server that answers `401 Negotiate <token>` with `Record-CurlExchange.ps1` before pinning bytes.

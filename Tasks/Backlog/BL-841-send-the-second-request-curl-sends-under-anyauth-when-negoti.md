@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Measured on Windows 2026-09-28 (ADR-0173, BL-527 Notes): the first request is a probe; after the 401 curl picks Negotiate, logs `Issue another request to this URL`, fails the context, sends the same request with no `Authorization`, and ends on that 401 with exit 0. Measure the Linux build too before pinning.
+- Measured on Windows 2026-09-28 (ADR-0176, BL-527 Notes): the first request is a probe; after the 401 curl picks Negotiate, logs `Issue another request to this URL`, fails the context, sends the same request with no `Authorization`, and ends on that 401 with exit 0. Measure the Linux build too before pinning.
 - Today `IHttpAuthenticator` returning `null` means "no retry" to `HttpProtocolHandler.RetryAuthorizationAsync`, so the handler cannot express "retry without a header". The task decides how the answer says so without looping (the second 401 must end the transfer).
 
 ## Acceptance criteria
