@@ -42,6 +42,9 @@ Namespace `Curl.Cryptography`. It holds:
 - `BcryptPbkdf` (public): OpenBSD's `bcrypt_pbkdf`, the KDF of encrypted
   `openssh-key-v1` keys - `DeriveKey`, plus the internal bcrypt `ComputeHash`. Not
   constant-time.
+- `Camellia` (public, `IDisposable`): RFC 3713, keys of 16, 24 or 32 bytes - `EncryptBlock`,
+  `DecryptBlock`, and the CBC mode of TLS's Camellia suites (RFC 5932), `EncryptCbc` and
+  `DecryptCbc`, plus the internal F, FL and FLINV functions. Not constant-time (ADR-0145).
 - `AesCtr` (public, `IDisposable`): NIST SP 800-38A counter mode on the BCL's AES-ECB,
   128-bit big-endian counter that wraps to zero (SSH `aes*-ctr`, RFC 4344).
   `ApplyKeyStream` keeps the counter and keystream position between calls, plus the
@@ -93,7 +96,8 @@ to BL-745).
   secret: select and swap with masks (`ConstantTime`), fixed-width limbs, never `/`, `%`
   or `BigInteger` on a secret. Compare tags and MACs with
   `CryptographicOperations.FixedTimeEquals`. Each public type says in its XML docs
-  whether it is constant-time; Blowfish, CAST-128 and RC4 are not, by design, and say so.
+  whether it is constant-time; Blowfish, CAST-128, RC4 and Camellia (ADR-0145) are not,
+  by design, and say so.
 - **Zeroing.** Every secret, `stackalloc` temporaries and intermediate key material
   included, is cleared with `CryptographicOperations.ZeroMemory` in a `finally` block or
   in `Dispose`. Keyed types copy the key in their constructor, implement `IDisposable`,
