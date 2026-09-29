@@ -58,6 +58,13 @@ internal sealed class SshSessionChannel(SshTransport transport)
     private bool remoteClosed;
 
     /// <summary>
+    /// Gets the reason code of the server's <c>SSH_MSG_CHANNEL_OPEN_FAILURE</c> once
+    /// <see cref="OpenAsync" /> has returned <see langword="false" />, such as 2 for
+    /// <c>SSH_OPEN_CONNECT_FAILED</c>; 0 before then.
+    /// </summary>
+    internal uint OpenFailureReasonCode { get; private set; }
+
+    /// <summary>
     /// Sends <c>SSH_MSG_CHANNEL_OPEN</c> for a <c>session</c> channel and waits for the
     /// server's answer.
     /// </summary>
@@ -75,13 +82,14 @@ internal sealed class SshSessionChannel(SshTransport transport)
         open.WriteUInt32(MaximumPacketSize);
         await transport.PacketWriter.WriteAsync(open.ToArray(), cancellationToken).ConfigureAwait(false);
         byte[] answer = await WaitForAsync(SshConnectionMessageNumber.ChannelOpenConfirmation, SshConnectionMessageNumber.ChannelOpenFailure, cancellationToken).ConfigureAwait(false);
+        SshWireReader confirmation = new(answer.AsMemory(1));
+        confirmation.ReadUInt32();
         if (answer[0] == SshConnectionMessageNumber.ChannelOpenFailure)
         {
+            OpenFailureReasonCode = confirmation.ReadUInt32();
             return false;
         }
 
-        SshWireReader confirmation = new(answer.AsMemory(1));
-        confirmation.ReadUInt32();
         remoteChannelNumber = confirmation.ReadUInt32();
         remoteWindow = confirmation.ReadUInt32();
         remoteMaximumPacketSize = Math.Max(confirmation.ReadUInt32(), 1);
@@ -97,14 +105,31 @@ internal sealed class SshSessionChannel(SshTransport transport)
     /// <returns>Whether the server started the subsystem.</returns>
     /// <exception cref="EndOfStreamException">The peer closed or disconnected.</exception>
     /// <exception cref="InvalidDataException">The peer broke the framing or sent a malformed message.</exception>
-    internal async ValueTask<bool> RequestSubsystemAsync(string subsystem, CancellationToken cancellationToken)
+    internal ValueTask<bool> RequestSubsystemAsync(string subsystem, CancellationToken cancellationToken) =>
+        RequestProcessAsync("subsystem"u8.ToArray(), Encoding.ASCII.GetBytes(subsystem), cancellationToken);
+
+    /// <summary>
+    /// Sends <c>SSH_MSG_CHANNEL_REQUEST</c> to run <paramref name="command" /> with
+    /// <c>exec</c>, with a reply wanted, as libssh2 starts <c>scp</c>, and waits for the
+    /// reply.
+    /// </summary>
+    /// <param name="command">The command line's bytes, such as <c>scp -pf '/f'</c>.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>Whether the server started the command.</returns>
+    /// <exception cref="EndOfStreamException">The peer closed or disconnected.</exception>
+    /// <exception cref="InvalidDataException">The peer broke the framing or sent a malformed message.</exception>
+    internal ValueTask<bool> RequestExecAsync(byte[] command, CancellationToken cancellationToken) =>
+        RequestProcessAsync("exec"u8.ToArray(), command, cancellationToken);
+
+    // RFC 4254 section 6.5: the request's type, want-reply, then the subsystem or command.
+    private async ValueTask<bool> RequestProcessAsync(byte[] requestType, byte[] value, CancellationToken cancellationToken)
     {
         SshWireWriter request = new();
         request.WriteByte(SshConnectionMessageNumber.ChannelRequest);
         request.WriteUInt32(remoteChannelNumber);
-        request.WriteString("subsystem"u8);
+        request.WriteString(requestType);
         request.WriteBoolean(true);
-        request.WriteString(Encoding.ASCII.GetBytes(subsystem));
+        request.WriteString(value);
         await transport.PacketWriter.WriteAsync(request.ToArray(), cancellationToken).ConfigureAwait(false);
         byte[] answer = await WaitForAsync(SshConnectionMessageNumber.ChannelSuccess, SshConnectionMessageNumber.ChannelFailure, cancellationToken).ConfigureAwait(false);
         return answer[0] == SshConnectionMessageNumber.ChannelSuccess;

@@ -1,5 +1,4 @@
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.PacketProtection;
 using Curl.Protocol.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Sftp;
@@ -56,16 +55,13 @@ internal sealed class SftpFileDownload(SshTransport transport)
         return result;
     }
 
-    private static bool IsConnectionFailure(Exception exception) =>
-        exception is EndOfStreamException or InvalidDataException or SshPacketAuthenticationException;
-
     private static async ValueTask<T> InSshLayerAsync<T>(Func<ValueTask<T>> step)
     {
         try
         {
             return await step().ConfigureAwait(false);
         }
-        catch (Exception exception) when (IsConnectionFailure(exception))
+        catch (Exception exception) when (SshConnectionFailure.Is(exception))
         {
             throw SshTransferException.SshLayerError();
         }
@@ -79,7 +75,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
         {
             await session.CloseHandleAsync(handle, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (IsConnectionFailure(exception))
+        catch (Exception exception) when (SshConnectionFailure.Is(exception))
         {
         }
     }
@@ -95,7 +91,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
             {
                 return await CopyUntilEndAsync(cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception exception) when (exception is SshTransferException || IsConnectionFailure(exception))
+            catch (Exception exception) when (exception is SshTransferException || SshConnectionFailure.Is(exception))
             {
                 SshTransferException failure = SshTransferException.SshLayerError();
                 return TransferResult.Failure(failure.ExitCode, failure.Message, received);

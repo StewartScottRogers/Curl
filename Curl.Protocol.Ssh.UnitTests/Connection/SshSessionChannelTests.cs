@@ -38,11 +38,14 @@ public sealed class SshSessionChannelTests
     }
 
     [TestMethod]
-    public async Task OpenAsync_ServerRefuses_ReturnsFalse()
+    public async Task OpenAsync_ServerRefuses_ReturnsFalseAndKeepsTheReasonCode()
     {
-        Peer peer = Connect(new SftpServerScript().Ssh(Join([SshConnectionMessageNumber.ChannelOpenFailure], UInt32(0), UInt32(1), Name("refused"), Name(string.Empty))));
+        Peer peer = Connect(new SftpServerScript().Ssh(Join([SshConnectionMessageNumber.ChannelOpenFailure], UInt32(0), UInt32(2), Name("refused"), Name(string.Empty))));
+        Assert.AreEqual(0u, peer.Channel.OpenFailureReasonCode);
 
         Assert.IsFalse(await peer.Channel.OpenAsync(CancellationToken.None));
+
+        Assert.AreEqual(2u, peer.Channel.OpenFailureReasonCode);
     }
 
     [TestMethod]
@@ -87,6 +90,26 @@ public sealed class SshSessionChannelTests
         Peer peer = await OpenedAsync(new SftpServerScript().Confirm().Ssh([SshConnectionMessageNumber.ChannelFailure, .. UInt32(0)]));
 
         Assert.IsFalse(await peer.Channel.RequestSubsystemAsync("sftp", CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task RequestExecAsync_ServerAccepts_SendsTheCommandWithAReplyWantedAsLibssh2Does()
+    {
+        Peer peer = await OpenedAsync(new SftpServerScript().Confirm().Ssh([SshConnectionMessageNumber.ChannelSuccess, .. UInt32(0)]));
+
+        Assert.IsTrue(await peer.Channel.RequestExecAsync("scp -pf '/f'"u8.ToArray(), CancellationToken.None));
+
+        CollectionAssert.AreEqual(
+            Join([SshConnectionMessageNumber.ChannelRequest], ServerChannelBytes, Name("exec"), [1], Name("scp -pf '/f'")),
+            SftpServerScript.SshPayloads(peer.Connection.Written)[1]);
+    }
+
+    [TestMethod]
+    public async Task RequestExecAsync_ServerRefuses_ReturnsFalse()
+    {
+        Peer peer = await OpenedAsync(new SftpServerScript().Confirm().Ssh([SshConnectionMessageNumber.ChannelFailure, .. UInt32(0)]));
+
+        Assert.IsFalse(await peer.Channel.RequestExecAsync("scp -pf '/f'"u8.ToArray(), CancellationToken.None));
     }
 
     [TestMethod]
