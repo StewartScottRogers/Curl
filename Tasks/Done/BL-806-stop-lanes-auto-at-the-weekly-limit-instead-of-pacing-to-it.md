@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1, CLAUDE.md, Documentation/Planning/Decisions/ADR-0130-lanes-auto-paces-dark-factory-lanes-to-the-usage-windows-the-board-and-the-machine.md]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-806 — Stop -Lanes Auto at the weekly limit instead of pacing to it, and wait quietly for the weekly reset
 
@@ -46,3 +46,4 @@ This task reverses that default (decided by Claude under Stewart's delegation, w
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. Weekly window stops claims at 97% by default, -WeeklyPace opts into pacing, a used-up week waits with a notice; ADR-0130 and CLAUDE.md amended; -TestAutoLanes, build and fast tests green.
