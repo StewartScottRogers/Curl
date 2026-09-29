@@ -18,7 +18,7 @@ Through `--unix-socket <path>`, `-w '%{remote_ip}|%{remote_port}|%{local_ip}|%{l
 
 ## Context
 
-- Found while doing BL-507 (ADR-0147, Consequences). Measured 2026-09-28 with curl 8.21.0 (mingw, Schannel) and `Record-CurlExchange.ps1 -UnixSocket`: a successful transfer through `C:\Users\Stewart Rogers\AppData\Local\Temp\bl507.sock` printed `[C:\Users\Stewart Rogers\AppData\Local\Temp\bl|-1||-1|1]` for `[%{remote_ip}|%{remote_port}|%{local_ip}|%{local_port}|%{num_connects}]`; a refused one printed `[|-1||-1|0]`.
+- Found while doing BL-507 (ADR-0149, Consequences). Measured 2026-09-28 with curl 8.21.0 (mingw, Schannel) and `Record-CurlExchange.ps1 -UnixSocket`: a successful transfer through `C:\Users\Stewart Rogers\AppData\Local\Temp\bl507.sock` printed `[C:\Users\Stewart Rogers\AppData\Local\Temp\bl|-1||-1|1]` for `[%{remote_ip}|%{remote_port}|%{local_ip}|%{local_port}|%{num_connects}]`; a refused one printed `[|-1||-1|0]`.
 - The end points come from `Curl.Console/ConnectionEndPointRecorder.cs` into `TransferReport.RemoteEndPoint`/`LocalEndPoint` (Abstractions, `IPEndPoint`), formatted by `Curl.Output.UnitLibrary/TransferWriteOutVariables.cs`. A Unix socket connection's `IConnection.RemoteEndPoint` is a `UnixDomainSocketEndPoint` and its `ConnectResult.LocalEndPoint` is null; `UnixSocketAddress.RemoteIpText` (Networking) is the text curl shows.
 - HTTP keeps its own end points (ADR-0119); check what it reports through a socket.
 

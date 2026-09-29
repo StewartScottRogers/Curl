@@ -36,8 +36,8 @@ With `--unix-socket <path>` the connector opens a `UnixDomainSocketEndPoint` at 
 ### Scope
 
 - `touches` widened (rule 3; no task in Doing names any of them): `Curl.Protocol.Abstractions.UnitLibrary` and `Curl.Output.UnitLibrary` (with their test projects), because the measured `Established connection` line names the socket, which the `IPEndPoint`-only `ConnectionOpenedEvent` could not carry (an additive, optional `UnixSocketRemoteIp`); `Record-CurlExchange.ps1`, extended with `-UnixSocket` as the task asked. The ADR is a new file under `Documentation/Planning/Decisions` plus its README row.
-- Decisions recorded in ADR-0147 (Decided by Claude under Stewart's delegation).
-- Follow-ups filed: BL-792 (HTTP's `left intact` line names the lower-cased socket path and port 0) and BL-793 (`%{remote_ip}` etc. for a socket). Sharing one pool across `--next` groups is BL-754's; ADR-0147 notes the socket must then join `ConnectionPoolKey`.
+- Decisions recorded in ADR-0149 (Decided by Claude under Stewart's delegation).
+- Follow-ups filed: BL-794 (HTTP's `left intact` line names the lower-cased socket path and port 0) and BL-793 (`%{remote_ip}` etc. for a socket). Sharing one pool across `--next` groups is BL-754's; ADR-0149 notes the socket must then join `ConnectionPoolKey`.
 
 ### Recorder
 
@@ -86,11 +86,11 @@ No 8.21.0 build exists there; a listener was `nc -lU`. Each `curl -sS -v <args>`
 | `--abstract-unix-socket abs1 http://localhost/` (listening on `@abs1`) | 0 | `*   Trying :0...` / `* Established connection to localhost ( port 0) from  port 0 ` |
 | `-x http://127.0.0.1:9/ --unix-socket /tmp/l.sock http://example.com/` | 0 | origin-form `GET / HTTP/1.1` to the socket: the proxy is ignored |
 
-8.18.0's wording differs from 8.21.0's (no `unix://`, no `:<port>`, no `connect to` line, the URL's host in `Established`); the text is curl's common code, so ADR-0147 takes 8.21.0's everywhere and only the OS reason differs.
+8.18.0's wording differs from 8.21.0's (no `unix://`, no `:<port>`, no `connect to` line, the URL's host in `Established`); the text is curl's common code, so ADR-0149 takes 8.21.0's everywhere and only the OS reason differs.
 
 ### Ours against curl
 
-`dotnet run --project Curl.Console --no-build` through the recorder, same arguments: the `-v` lines, request bytes, stdout and exit codes match curl 8.21.0 for the listening socket (with a bad `-x`) and the missing one, except the `left intact` line (BL-792) and the elapsed milliseconds.
+`dotnet run --project Curl.Console --no-build` through the recorder, same arguments: the `-v` lines, request bytes, stdout and exit codes match curl 8.21.0 for the listening socket (with a bad `-x`) and the missing one, except the `left intact` line (BL-794) and the elapsed milliseconds.
 
 ### Tests
 
