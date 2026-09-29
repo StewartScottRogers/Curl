@@ -9,7 +9,7 @@ namespace Curl.Core.Hsts;
 /// <summary>
 /// The HSTS cache behind <c>--hsts</c>: reads curl 8.21.0's HSTS file, learns from
 /// <c>Strict-Transport-Security</c> headers, answers whether a host is known, and writes the
-/// file back byte for byte as curl does, measured on 2026-09-29 UTC (BL-620's notes, ADR-0177).
+/// file back byte for byte as curl does, measured on 2026-09-29 UTC (BL-620's notes, ADR-0179).
 /// </summary>
 /// <remarks>
 /// Entries keep the order they were read or learned in. An entry expires once the current

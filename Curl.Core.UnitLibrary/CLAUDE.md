@@ -113,7 +113,7 @@ curl's file byte for byte with the line ending the caller passes (`Environment.N
 curl's Windows build writes CR LF). Time comes from the injected `TimeProvider`; it touches
 no file. It is not yet wired into `Curl.Console` (BL-623).
 
-`Hsts\HstsCache` is the `--hsts` cache (ADR-0177, BL-620): `ReadFile` takes curl 8.21.0's HSTS
+`Hsts\HstsCache` is the `--hsts` cache (ADR-0179, BL-620): `ReadFile` takes curl 8.21.0's HSTS
 file text (`[.]host "date"` lines read by `HstsFileLineParser`, dates by `CurlDateParser` or
 `unlimited`, expired lines skipped, a repeated host merged), `ApplyHeader` learns from one
 `Strict-Transport-Security` value as `HstsHeaderParser` reads it (nothing from an IP address;

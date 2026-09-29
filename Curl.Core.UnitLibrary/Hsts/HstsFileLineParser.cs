@@ -2,7 +2,7 @@ namespace Curl.Core.Hsts;
 
 /// <summary>
 /// Reads one line of curl's HSTS file as libcurl 8.21.0's <c>hsts_load</c> and <c>hsts_add</c>
-/// do, measured on 2026-09-29 UTC (BL-620's notes, ADR-0177).
+/// do, measured on 2026-09-29 UTC (BL-620's notes, ADR-0179).
 /// </summary>
 /// <remarks>
 /// A line is <c>host "expiry"</c>: blanks before the host are skipped, the host runs to the

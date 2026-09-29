@@ -4,7 +4,7 @@ namespace Curl.Core.Hsts;
 
 /// <summary>
 /// Reads a <c>Strict-Transport-Security</c> header value (RFC 6797) as libcurl 8.21.0's
-/// <c>Curl_hsts_parse</c> does, measured on 2026-09-29 UTC (BL-620's notes, ADR-0177).
+/// <c>Curl_hsts_parse</c> does, measured on 2026-09-29 UTC (BL-620's notes, ADR-0179).
 /// </summary>
 /// <remarks>
 /// Directives are separated by <c>;</c>, blanks (space and tab) around them skipped. A
