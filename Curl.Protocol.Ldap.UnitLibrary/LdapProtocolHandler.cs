@@ -39,6 +39,11 @@ namespace Curl.Protocol.Ldap;
 /// the session, search and UnbindRequest, is then signed and sealed with the bind's keys as
 /// <see cref="LdapSaslSecurityLayer" /> describes, as WinLDAP does.
 /// </para>
+/// <para>
+/// The bind, the search, each message sent and search reply received, and the transfer's end
+/// are written to <see cref="ITransferContext.DiagnosticLog" /> under the <c>ldap</c>
+/// component (<see cref="LdapTransferLog" />).
+/// </para>
 /// </remarks>
 /// <param name="logonTokenSource">Produces the logged-on user's tokens for the WinLDAP dialect's bind without <c>-u</c>.</param>
 public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialect, ILdapLogonTokenSource logonTokenSource) : IProtocolHandler
@@ -88,6 +93,15 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        long startTimestamp = context.TimeProvider.GetTimestamp();
+        TransferResult result = await ConnectAndSearchAsync(context).ConfigureAwait(false);
+        new LdapTransferLog(context.DiagnosticLog).Ended(result, context.TimeProvider.GetElapsedTime(startTimestamp));
+        return result;
+    }
+
+    // Reads the URL, connects, binds and searches; ExecuteAsync logs how it ended.
+    private async ValueTask<TransferResult> ConnectAndSearchAsync(ITransferContext context)
+    {
         // The OpenLDAP build reads the URL before it connects and again to search; the Windows
         // build reads it only once connected.
         if (dialect == LdapDialect.OpenLdap && OpenLdapUrlReader.Read(context.Url).Failure is { } refused)
@@ -161,7 +175,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         CurlUrl url = context.Url;
         bool useTls = url.Scheme == TlsScheme;
         int defaultPort = useTls ? DefaultTlsPort : DefaultPort;
-        return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, useTls) { Events = context.Events };
+        return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, useTls) { Events = context.Events, DiagnosticLog = context.DiagnosticLog };
     }
 
     /// <summary>
@@ -170,16 +184,19 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// </summary>
     private async ValueTask<TransferResult> BindAndSearchAsync(IConnection connection, ITransferContext context, LdapSearchParameters search)
     {
-        var exchange = new LdapExchange(connection, new LdapBerWriter(dialect));
+        var exchange = new LdapExchange(connection, new LdapBerWriter(dialect), new LdapTransferLog(context.DiagnosticLog));
         await using (exchange.ConfigureAwait(false))
         {
-            TransferResult? bindFailure = dialect == LdapDialect.WinLdap && context.Credentials is null
+            bool bindsAsLogonUser = dialect == LdapDialect.WinLdap && context.Credentials is null;
+            TransferResult? bindFailure = bindsAsLogonUser
                 ? await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.CancellationToken).ConfigureAwait(false)
                 : await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false);
             if (bindFailure is not null)
             {
                 return bindFailure;
             }
+
+            exchange.Log.Bound(bindsAsLogonUser ? "as the logged-on user" : DescribeSimpleBind(context.Credentials));
 
             if (dialect == LdapDialect.OpenLdap)
             {
@@ -189,6 +206,10 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
             return await LdapSearch.RunAsync(dialect, exchange, search, context).ConfigureAwait(false);
         }
     }
+
+    /// <summary>Names a simple bind by its DN, never its password, for the diagnostic log.</summary>
+    private static string DescribeSimpleBind(NetworkCredential? credentials) =>
+        credentials is null ? "anonymously" : $"with a simple bind as \"{credentials.UserName}\"";
 
     /// <summary>Binds with a simple bind: the transfer's credentials, or the anonymous bind without them.</summary>
     private ValueTask<TransferResult?> BindWithCredentialsAsync(LdapExchange exchange, ITransferContext context)

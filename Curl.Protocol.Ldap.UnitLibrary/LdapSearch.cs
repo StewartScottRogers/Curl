@@ -74,6 +74,7 @@ internal static class LdapSearch
         var encoder = new LdapFilterEncoder(dialect, exchange.Writer);
         byte[]? filter = search.Filter is null ? encoder.EncodeDefault() : encoder.Encode(search.Filter);
         int messageId = exchange.TakeMessageId();
+        exchange.Log.Searching(search);
         if (filter is null)
         {
             return await UnbindAndReturnAsync(exchange, FilterRefused(dialect), cancellationToken).ConfigureAwait(false);
@@ -87,8 +88,10 @@ internal static class LdapSearch
             filter,
             search.Attributes.Select(attribute => LdapWireText.Encode(dialect, attribute)));
         await exchange.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        exchange.Log.Sent("SearchRequest", messageId);
         var entries = new LdapEntryWriter(dialect, context);
         LdapSearchReply reply = await ReadToTheEndAsync(dialect, exchange, messageId, entries, cancellationToken).ConfigureAwait(false);
+        exchange.Log.EntriesReturned(entries.EntryCount);
         TransferResult result = entries.WriteFailure is { } writeFailure
             ? await AbandonAndUnbindAsync(exchange, messageId, writeFailure, cancellationToken).ConfigureAwait(false)
             : await FinishAsync(dialect, exchange, messageId, reply, entries, cancellationToken).ConfigureAwait(false);

@@ -9,7 +9,8 @@ namespace Curl.Protocol.Ldap;
 /// </summary>
 /// <param name="connection">The connection to the LDAP server, which the session does not dispose.</param>
 /// <param name="writer">Writes the requests with the dialect's length form.</param>
-internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer) : IAsyncDisposable
+/// <param name="log">Receives each message sent and each search reply received (<see cref="LdapTransferLog" />).</param>
+internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer, LdapTransferLog log) : IAsyncDisposable
 {
     private IConnection connection = connection;
 
@@ -45,7 +46,7 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer)
     /// <param name="cancellationToken">Cancels the exchange.</param>
     /// <returns>The server's answer.</returns>
     public ValueTask<LdapBindReply> BindAsync(int version, string name, string password, CancellationToken cancellationToken) =>
-        BindWithAsync(messageId => LdapRequests.Bind(writer, messageId, version, name, password), cancellationToken);
+        BindWithAsync("BindRequest", messageId => LdapRequests.Bind(writer, messageId, version, name, password), cancellationToken);
 
     /// <summary>Sends a BindRequest with SASL authentication and reads the server's answer.</summary>
     /// <param name="mechanism">The SASL mechanism's name.</param>
@@ -53,7 +54,7 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer)
     /// <param name="cancellationToken">Cancels the exchange.</param>
     /// <returns>The server's answer.</returns>
     public ValueTask<LdapBindReply> SaslBindAsync(string mechanism, byte[] credentials, CancellationToken cancellationToken) =>
-        BindWithAsync(messageId => LdapRequests.SaslBind(writer, messageId, mechanism, credentials), cancellationToken);
+        BindWithAsync("SASL BindRequest", messageId => LdapRequests.SaslBind(writer, messageId, mechanism, credentials), cancellationToken);
 
     /// <summary>Sends a BindRequest with a Sicily authentication choice and reads the server's answer.</summary>
     /// <param name="name">The BindRequest's name.</param>
@@ -62,13 +63,14 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer)
     /// <param name="cancellationToken">Cancels the exchange.</param>
     /// <returns>The server's answer.</returns>
     public ValueTask<LdapBindReply> SicilyBindAsync(string name, int choice, byte[] token, CancellationToken cancellationToken) =>
-        BindWithAsync(messageId => LdapRequests.SicilyBind(writer, messageId, name, choice, token), cancellationToken);
+        BindWithAsync("Sicily BindRequest", messageId => LdapRequests.SicilyBind(writer, messageId, name, choice, token), cancellationToken);
 
     /// <summary>Sends the BindRequest <paramref name="encode" /> writes for the next messageID and reads the server's answer.</summary>
-    private async ValueTask<LdapBindReply> BindWithAsync(Func<int, byte[]> encode, CancellationToken cancellationToken)
+    private async ValueTask<LdapBindReply> BindWithAsync(string operation, Func<int, byte[]> encode, CancellationToken cancellationToken)
     {
         int messageId = nextMessageId++;
         await SendAsync(encode(messageId), cancellationToken).ConfigureAwait(false);
+        log.Sent(operation, messageId);
         (LdapReadStatus status, byte[] message) = await ReadMessageAsync(cancellationToken).ConfigureAwait(false);
         return status switch
         {
@@ -80,6 +82,9 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer)
 
     /// <summary>Gets the writer the requests are written with, in the dialect's length form.</summary>
     public LdapBerWriter Writer => writer;
+
+    /// <summary>Gets where the session's steps are written to the diagnostic log.</summary>
+    public LdapTransferLog Log => log;
 
     /// <summary>
     /// Takes the next messageID. A search takes one before its filter is known to be good, so
@@ -95,9 +100,11 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer)
     public async ValueTask<LdapSearchReply> ReadSearchReplyAsync(int messageId, CancellationToken cancellationToken)
     {
         (LdapReadStatus status, byte[] message) = await ReadMessageAsync(cancellationToken).ConfigureAwait(false);
-        return status == LdapReadStatus.Message
+        LdapSearchReply reply = status == LdapReadStatus.Message
             ? LdapSearchResponse.Decode(message, messageId)
             : LdapSearchReply.Of(LdapSearchReplyKind.Lost);
+        log.SearchReplyReceived(reply, messageId);
+        return reply;
     }
 
     /// <summary>Sends an AbandonRequest for the request with <paramref name="abandoned" />, which the server does not answer.</summary>
@@ -105,13 +112,21 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer)
     /// <param name="cancellationToken">Cancels the send.</param>
     /// <returns>A task that completes when the request has been flushed.</returns>
     public ValueTask AbandonAsync(int abandoned, CancellationToken cancellationToken) =>
-        SendAsync(LdapRequests.Abandon(writer, nextMessageId++, abandoned), cancellationToken);
+        SendLoggedAsync("AbandonRequest", messageId => LdapRequests.Abandon(writer, messageId, abandoned), cancellationToken);
 
     /// <summary>Sends an UnbindRequest, which the server does not answer.</summary>
     /// <param name="cancellationToken">Cancels the send.</param>
     /// <returns>A task that completes when the request has been flushed.</returns>
     public ValueTask UnbindAsync(CancellationToken cancellationToken) =>
-        SendAsync(LdapRequests.Unbind(writer, nextMessageId++), cancellationToken);
+        SendLoggedAsync("UnbindRequest", messageId => LdapRequests.Unbind(writer, messageId), cancellationToken);
+
+    /// <summary>Sends the request <paramref name="encode" /> writes for the next messageID and logs it as <paramref name="operation" />.</summary>
+    private async ValueTask SendLoggedAsync(string operation, Func<int, byte[]> encode, CancellationToken cancellationToken)
+    {
+        int messageId = nextMessageId++;
+        await SendAsync(encode(messageId), cancellationToken).ConfigureAwait(false);
+        log.Sent(operation, messageId);
+    }
 
     /// <summary>Sends <paramref name="message" /> and flushes it.</summary>
     /// <param name="message">One whole LDAPMessage.</param>
