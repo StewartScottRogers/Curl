@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-800 — Clear a lane's herdr tab after each task and caption it empty while it holds none
 
@@ -53,3 +53,4 @@ already running keep the old behaviour until they restart or the next shift star
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. Lanes clear their tab after each task and caption it empty / empty, close; parse clean, -TestAutoLanes 24/24, build and fast tests green.
