@@ -112,9 +112,25 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
             mail.ServiceName ?? DefaultServiceName,
             context.Url.IdnHost,
             context.Url.Port);
-        return saslAuthenticator.ChooseMechanism(request, capabilities.SaslMechanisms) is { } mechanism
-            ? saslAuthenticator.Begin(mechanism, request)
-            : null;
+        if (saslAuthenticator.ChooseMechanism(request, capabilities.SaslMechanisms) is { } mechanism)
+        {
+            return saslAuthenticator.Begin(mechanism, request);
+        }
+
+        if (capabilities.SaslMechanisms.Count > 0)
+        {
+            Pop3DiagnosticLogLines.NoUsableMechanism(context.DiagnosticLog, capabilities.SaslMechanisms);
+        }
+
+        return null;
+    }
+
+    /// <summary>Logs the login that succeeded by <paramref name="method" />.</summary>
+    /// <returns><see langword="null" />, to carry on.</returns>
+    private TransferResult? LoggedIn(string method)
+    {
+        Pop3DiagnosticLogLines.LoggedIn(context.DiagnosticLog, method);
+        return null;
     }
 
     /// <summary>
@@ -133,19 +149,21 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
         byte[]? unsent = mail.SaslInitialResponse ? await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false) : null;
         bool initialResponseDue = !mail.SaslInitialResponse;
         string command = "AUTH " + exchange.Mechanism;
+        string? logged = null;
         if (SendsInitialResponseInline(exchange, unsent))
         {
+            logged = command + " " + Pop3DiagnosticLogLines.SaslResponseNotLogged;
             command += " " + Encode(unsent!);
             unsent = null;
         }
 
-        await channel.SendAsync(command).ConfigureAwait(false);
+        await channel.SendAsync(command, logged).ConfigureAwait(false);
         while (true)
         {
             Pop3Response response = await channel.ReadResponseAsync().ConfigureAwait(false);
             if (response.IsOk)
             {
-                return unsent is null && !initialResponseDue ? null : LoginDenied();
+                return unsent is null && !initialResponseDue ? LoggedIn("SASL " + exchange.Mechanism) : LoginDenied();
             }
 
             if (await AnswerToAsync(response, unsent, initialResponseDue, exchange).ConfigureAwait(false) is not { } answer)
@@ -155,7 +173,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
 
             unsent = null;
             initialResponseDue = false;
-            await channel.SendAsync(Encode(answer)).ConfigureAwait(false);
+            await channel.SendAsync(Encode(answer), Pop3DiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
         }
     }
 
@@ -216,10 +234,10 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
 
     private async ValueTask<TransferResult?> SendApopAsync(string user, string digest)
     {
-        await channel.SendAsync("APOP " + user + " " + digest).ConfigureAwait(false);
+        await channel.SendAsync("APOP " + user + " " + digest, "APOP " + user + " " + Pop3DiagnosticLogLines.DigestNotLogged).ConfigureAwait(false);
         Pop3Response response = await channel.ReadResponseAsync().ConfigureAwait(false);
         return response.IsOk
-            ? null
+            ? LoggedIn("APOP")
             : TransferResult.Failure(
                 CurlExitCode.LoginDenied,
                 string.Format(CultureInfo.InvariantCulture, Pop3SessionMessages.AuthenticationFailed, (int)RefusalCode(response)));
@@ -228,12 +246,13 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     private async ValueTask<TransferResult?> SendUserAndPassAsync(string user, string password)
     {
         return await SendCredentialAsync("USER " + user).ConfigureAwait(false)
-            ?? await SendCredentialAsync("PASS " + password).ConfigureAwait(false);
+            ?? await SendCredentialAsync("PASS " + password, "PASS " + Pop3DiagnosticLogLines.PasswordNotLogged).ConfigureAwait(false)
+            ?? LoggedIn("USER and PASS");
     }
 
-    private async ValueTask<TransferResult?> SendCredentialAsync(string command)
+    private async ValueTask<TransferResult?> SendCredentialAsync(string command, string? logged = null)
     {
-        await channel.SendAsync(command).ConfigureAwait(false);
+        await channel.SendAsync(command, logged).ConfigureAwait(false);
         Pop3Response response = await channel.ReadResponseAsync().ConfigureAwait(false);
         return response.IsOk
             ? null
