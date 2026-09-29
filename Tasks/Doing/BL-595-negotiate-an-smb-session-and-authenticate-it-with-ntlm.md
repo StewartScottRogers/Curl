@@ -33,3 +33,4 @@ On every platform, an `SmbProtocolHandler` connects through `IConnector`, sends 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
