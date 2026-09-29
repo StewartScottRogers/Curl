@@ -35,7 +35,7 @@ BCL's `DSA` cannot be relied on for this on macOS, and the BCL does not hash SHA
   (ADR-0140) offers a DSS suite (OpenSSL 3.5.5's does list `dsa_*` in
   `signature_algorithms`; `ClientHelloProfile.OpenSsl` carries that). A caller that wants
   DSS sets `CipherSuites` and `SignatureAlgorithms`; routing `--ciphers DHE-DSS-*` there
-  is BL-891's, and `--sigalgs` BL-709's.
+  is BL-896's, and `--sigalgs` BL-709's.
 - **A key whose domain parameters DSA refuses** (q not 160, 224 or 256 bits, p longer
   than 10,000 bits, g out of range) reads, but `VerifyHash` answers false for it, so its
   signature is `decrypt_error`; judging a key's size is the certificate verifier's part.
@@ -46,5 +46,5 @@ BCL's `DSA` cannot be relied on for this on macOS, and the BCL does not hash SHA
 
 - `Tls12ClientHandshake` completes a DHE_DSS handshake at TLS 1.2, 1.1 and 1.0 when the
   caller offers the suite (and, at TLS 1.2, a `dsa_*` scheme); `curl --ciphers` reaches it
-  once BL-891 lands.
+  once BL-896 lands.
 - A DSA client certificate cannot be presented until a DSA `TlsSigningKey` exists.

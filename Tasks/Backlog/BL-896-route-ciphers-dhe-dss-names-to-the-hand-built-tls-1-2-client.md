@@ -1,5 +1,5 @@
 ---
-id: BL-891
+id: BL-896
 title: Route --ciphers DHE-DSS names to the hand-built TLS 1.2 client
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-891 — Route --ciphers DHE-DSS names to the hand-built TLS 1.2 client
+# BL-896 — Route --ciphers DHE-DSS names to the hand-built TLS 1.2 client
 
 ## Goal
 

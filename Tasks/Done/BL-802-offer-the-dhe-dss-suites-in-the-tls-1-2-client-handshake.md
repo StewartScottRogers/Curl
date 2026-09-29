@@ -39,7 +39,7 @@ completed: 2026-09-29
 - Touches widened to `Curl.Cryptography.UnitLibrary` and `Curl.Cryptography.UnitTests` (no task in Doing names them): SHA-224 for `dsa_sha224` lives only there, so `DsaSignature.HashData` was added beside the DSA it serves rather than a second SHA-224 in `Curl.Tls`. `Documentation/Planning/Decisions` added for ADR-0211 and its index row.
 - Tests: `TestDsaKey` (RFC 6979 A.2.2's 2048/256 key) signs for the in-memory server; `TestServerCredential.Dsa` builds its certificate. RFC 6979's published `sample` signatures (SHA-256, and SHA-1 for TLS 1.0/1.1) are the known-good vectors.
 - Measured: Curl.Tls.UnitLibrary and Curl.Cryptography.UnitLibrary both 100% line and branch, 0 failing members; Curl.Tls.UnitTests 867 passed.
-- Follow-up filed: BL-891 (route `--ciphers DHE-DSS-*` names and `dsa_*` schemes through `Curl.Networking`'s hand-built provider).
+- Follow-up filed: BL-896 (route `--ciphers DHE-DSS-*` names and `dsa_*` schemes through `Curl.Networking`'s hand-built provider).
 
 ## Log
 
