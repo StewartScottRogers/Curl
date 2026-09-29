@@ -9,7 +9,8 @@ namespace Curl.Kerberos;
 /// from the credential cache when it holds a live one, otherwise by a TGS exchange with the
 /// cache's ticket-granting ticket; or, from a password, a ticket-granting ticket by an AS
 /// exchange with <c>PA-ENC-TIMESTAMP</c> pre-authentication and then the service ticket by
-/// a TGS exchange, following the KDCs' cross-realm referrals (ADR-0200). Every KRB-ERROR
+/// a TGS exchange, following the KDCs' cross-realm referrals (ADR-0200); and, for
+/// <c>--delegation</c>, a forwarded ticket-granting ticket from a forwardable one (ADR-0210). Every KRB-ERROR
 /// becomes a <see cref="KerberosKdcException" />.
 /// </summary>
 public sealed class KerberosKdcClient
@@ -214,7 +215,7 @@ public sealed class KerberosKdcClient
             for (int referrals = 0; ; referrals++)
             {
                 string kdcRealm = granting.Server.Components[^1];
-                KerberosCredential reply = await ExchangeWithTicketGrantingServiceAsync(granting, server, cancellationToken).ConfigureAwait(false);
+                KerberosCredential reply = await ExchangeWithTicketGrantingServiceAsync(granting, server, KerberosKdcOptions.Canonicalize, expectedServer: null, cancellationToken).ConfigureAwait(false);
                 if (SamePrincipal(reply.Server, server))
                 {
                     return reply;
@@ -230,6 +231,45 @@ public sealed class KerberosKdcClient
         {
             ReleaseReferral(granting, ticketGrantingTicket);
         }
+    }
+
+    /// <summary>
+    /// Gets a forwarded ticket-granting ticket from <paramref name="ticketGrantingTicket" />
+    /// for <c>--delegation</c>, as MIT's <c>krb5_fwd_tgt_creds</c> does for
+    /// <c>gss_init_sec_context</c> (ADR-0210): one TGS exchange with the KDCs of the ticket's
+    /// realm for <c>krbtgt/REALM@REALM</c>, asking with <c>forwarded</c> and <c>forwardable</c>
+    /// plus the ticket's own <c>proxiable</c> and <c>renewable</c>, and for no addresses. A
+    /// ticket without <c>forwardable</c> is refused before anything is sent.
+    /// </summary>
+    /// <param name="ticketGrantingTicket">A ticket for <c>krbtgt/REALM@REALM</c>; it stays the caller's.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The forwarded ticket-granting ticket, for <see cref="KerberosGssContextOptions.ForwardedTicketGrantingTicket" />; the caller disposes it.</returns>
+    /// <exception cref="KerberosKdcException">
+    /// No ticket could be got; <see cref="KerberosKdcException.Error" /> says why, and is
+    /// <see cref="KerberosKdcError.TicketNotForwardable" /> for a ticket without <c>forwardable</c>.
+    /// </exception>
+    public async Task<KerberosCredential> GetForwardedTicketGrantingTicketAsync(KerberosCredential ticketGrantingTicket, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(ticketGrantingTicket);
+        if (!ticketGrantingTicket.Flags.HasFlag(KerberosTicketFlags.Forwardable))
+        {
+            throw new KerberosKdcException(KerberosKdcError.TicketNotForwardable);
+        }
+
+        KerberosPrincipal server = TicketGrantingServer(ticketGrantingTicket.Server.Realm);
+        KerberosKdcOptions options = ForwardingOptions(ticketGrantingTicket.Flags);
+        return await ExchangeWithTicketGrantingServiceAsync(ticketGrantingTicket, server, options, expectedServer: server, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The options a forwarding TGS-REQ asks with: MIT's <c>flags2options</c> of the ticket's
+    /// flags (<c>forwardable</c>, <c>proxiable</c>, <c>renewable</c>) with <c>forwarded</c>
+    /// added, <c>forwardable</c> kept because <c>gss_init_sec_context</c> asks for it.
+    /// </summary>
+    private static KerberosKdcOptions ForwardingOptions(KerberosTicketFlags flags)
+    {
+        const KerberosTicketFlags Carried = KerberosTicketFlags.Forwardable | KerberosTicketFlags.Proxiable | KerberosTicketFlags.Renewable;
+        return (KerberosKdcOptions)(uint)(flags & Carried) | KerberosKdcOptions.Forwarded;
     }
 
     /// <summary>
@@ -268,16 +308,27 @@ public sealed class KerberosKdcClient
         }
     }
 
-    /// <summary>One TGS exchange: asks the KDCs of <paramref name="ticketGrantingTicket" />'s realm for <paramref name="server" /> with <c>canonicalize</c>.</summary>
-    private async Task<KerberosCredential> ExchangeWithTicketGrantingServiceAsync(KerberosCredential ticketGrantingTicket, KerberosPrincipal server, CancellationToken cancellationToken)
+    /// <summary>
+    /// One TGS exchange: asks the KDCs of <paramref name="ticketGrantingTicket" />'s realm for
+    /// <paramref name="server" /> with <paramref name="options" />, until the ticket's end and,
+    /// with <c>renewable</c>, its renew-until time. The reply must name
+    /// <paramref name="expectedServer" /> when one is given.
+    /// </summary>
+    private async Task<KerberosCredential> ExchangeWithTicketGrantingServiceAsync(
+        KerberosCredential ticketGrantingTicket,
+        KerberosPrincipal server,
+        KerberosKdcOptions options,
+        KerberosPrincipal? expectedServer,
+        CancellationToken cancellationToken)
     {
         KerberosEncryption encryption = EncryptionOf(ticketGrantingTicket.SessionKey.EncryptionType, ImplementedEncryptionTypes);
         KerberosKdcRequestBody body = new()
         {
-            Options = KerberosKdcOptions.Canonicalize,
+            Options = options,
             Realm = server.Realm,
             ServerName = NameOf(server),
             Till = ticketGrantingTicket.EndTime,
+            RenewTill = options.HasFlag(KerberosKdcOptions.Renewable) ? ticketGrantingTicket.RenewUntil : null,
             Nonce = NextNonce(),
             EncryptionTypes = Offered(TgsRequestEncryptionTypes),
         };
@@ -290,7 +341,7 @@ public sealed class KerberosKdcClient
         byte[] reply = await sender.SendAsync(ticketGrantingTicket.Server.Components[^1], request.Encode(), cancellationToken).ConfigureAwait(false);
         KerberosKdcReply kdcReply = ReadReply(reply, KerberosMessageType.TgsReply);
         byte[] plaintext = Decrypt(encryption, ticketGrantingTicket.SessionKey.Value, TgsReplyUsage, kdcReply.EncryptedPart, KerberosKdcError.UnexpectedReply);
-        return CredentialFrom(kdcReply, plaintext, body.Nonce, expectedServer: null);
+        return CredentialFrom(kdcReply, plaintext, body.Nonce, expectedServer);
     }
 
     /// <summary>The time the cache's tickets are judged live at: now plus the cache's KDC time offset.</summary>

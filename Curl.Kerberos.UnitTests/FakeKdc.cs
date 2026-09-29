@@ -204,7 +204,7 @@ internal sealed class FakeKdc : IKerberosKdcTransport, IKerberosKdcProxyTranspor
         KerberosAuthenticator authenticator = KerberosAuthenticator.Decode(encryption.Decrypt(TicketGrantingSessionKey, 7, apRequest.Authenticator.Cipher));
         Assert.IsTrue(encryption.VerifyChecksum(TicketGrantingSessionKey, 6, request.Body.Encode(), authenticator.Checksum!.Value), "The authenticator must checksum the request body.");
         LastAuthenticator = authenticator;
-        if (!request.Body.ServerName!.Components.SequenceEqual(Service.Components))
+        if (!request.Body.ServerName!.Components.SequenceEqual(Service.Components) && !request.Body.ServerName.Components.SequenceEqual(["krbtgt", Realm]))
         {
             return Error(7);
         }
@@ -226,7 +226,9 @@ internal sealed class FakeKdc : IKerberosKdcTransport, IKerberosKdcProxyTranspor
         Key = new KerberosKey(18, [.. sessionKey]),
         LastRequests = [],
         Nonce = ReplyNonce(body.Nonce),
-        Flags = KerberosTicketFlags.Initial | KerberosTicketFlags.PreAuthenticated,
+        Flags = body.Options.HasFlag(KerberosKdcOptions.Forwarded)
+            ? KerberosTicketFlags.Forwarded | KerberosTicketFlags.Forwardable | KerberosTicketFlags.PreAuthenticated
+            : KerberosTicketFlags.Initial | KerberosTicketFlags.PreAuthenticated,
         AuthenticationTime = new DateTimeOffset(2026, 9, 28, 12, 0, 0, TimeSpan.Zero),
         StartTime = ReplyStartTime,
         EndTime = new DateTimeOffset(2026, 9, 28, 22, 0, 0, TimeSpan.Zero),

@@ -52,7 +52,11 @@ back in a `FILE:` or `DIR:` cache by appending it through the injected
 (`CredentialCacheWriter`, `CredentialCacheStore.Store`; BL-825, ADR-0208). Its AS-REQs offer
 `default_tkt_enctypes` and its TGS-REQs `default_tgs_enctypes`, resolved by
 `KerberosEncryptionTypeList` as MIT's `krb5int_parse_enctype_list` does and kept to the
-types the library has (BL-828, ADR-0209). It is the initiator of the GSS-API Kerberos V5 mechanism:
+types the library has (BL-828, ADR-0209). For `--delegation`,
+`GetForwardedTicketGrantingTicketAsync` turns a forwardable ticket-granting ticket into a
+forwarded one by a TGS-REQ with `forwarded`, as MIT's `krb5_fwd_tgt_creds` does, and
+refuses one without `forwardable` as `KerberosKdcError.TicketNotForwardable` (BL-831,
+ADR-0210). It is the initiator of the GSS-API Kerberos V5 mechanism:
 `KerberosGssContext` makes the initial context token (an AP-REQ whose authenticator
 carries RFC 4121's checksum with the context flags and, for `--delegation`, a KRB-CRED of
 a forwarded ticket-granting ticket), checks the acceptor's AP-REP, and then makes and

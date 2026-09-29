@@ -50,4 +50,7 @@ public enum KerberosKdcError
 
     /// <summary>The KDCs referred the TGS request to another realm more than <see cref="KerberosKdcClient.MaximumReferralHops" /> times, as a referral loop does.</summary>
     ReferralLimitExceeded,
+
+    /// <summary>A forwarded ticket-granting ticket was asked for with a ticket that lacks the <c>forwardable</c> flag; nothing was sent.</summary>
+    TicketNotForwardable,
 }
