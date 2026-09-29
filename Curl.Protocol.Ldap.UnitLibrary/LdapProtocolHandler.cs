@@ -25,8 +25,12 @@ namespace Curl.Protocol.Ldap;
 /// <see cref="OpenLdapUrlReader" />): the OpenLDAP build refuses a bad URL with exit 3 before it
 /// connects, the Windows build after connecting and before it sends a byte. Once bound, the
 /// search runs as <see cref="LdapSearch" /> describes, writing each entry to
-/// <see cref="ITransferContext.Output" /> as the build writes it. The handler is not
-/// registered in <c>Curl.Console</c> until BL-589.
+/// <see cref="ITransferContext.Output" /> as the build writes it.
+/// </para>
+/// <para>
+/// Every <c>-v</c> line either build writes is reported to <see cref="ITransferContext.Events" />
+/// as <see cref="LdapVerboseLines" /> describes, and each piece of an entry written to the
+/// output as received data.
 /// </para>
 /// <para>
 /// Without <c>-u</c> the WinLDAP dialect binds as the logged-on user as
@@ -88,37 +92,76 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         // build reads it only once connected.
         if (dialect == LdapDialect.OpenLdap && OpenLdapUrlReader.Read(context.Url).Failure is { } refused)
         {
+            LdapVerboseLines.ReportFailure(context.Events, refused);
+            context.Events.ReportInfo(LdapVerboseLines.Closing(LdapVerboseLines.NoConnection));
             return refused;
         }
 
-        ConnectResult connect = await connector.ConnectAsync(TargetOf(context.Url), context.CancellationToken).ConfigureAwait(false);
+        ConnectTarget target = TargetOf(context);
+        ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
             return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
         }
 
         context.Progress.ReportTransferStarted();
-        return await SearchOnAsync(connection, context).ConfigureAwait(false);
+        TransferResult result = await SearchOnAsync(connection, context).ConfigureAwait(false);
+        ReportConnectionEnd(context.Events, result, target, connect.ConnectionNumber);
+        return result;
     }
 
     /// <summary>Reads the URL, then binds and searches on <paramref name="connection" />, which it disposes.</summary>
+    /// <remarks>The WinLDAP dialect first names the library and the URL, and once the URL is read, the kind of connection.</remarks>
     private async ValueTask<TransferResult> SearchOnAsync(IConnection connection, ITransferContext context)
     {
         await using (connection.ConfigureAwait(false))
         {
+            if (dialect == LdapDialect.WinLdap)
+            {
+                context.Events.ReportInfo(LdapVerboseLines.WinLdapVendor);
+                context.Events.ReportInfo(LdapVerboseLines.Url(context.Url));
+            }
+
             LdapUrlReading reading = dialect == LdapDialect.OpenLdap ? OpenLdapUrlReader.Read(context.Url) : WinLdapUrlReader.Read(context.Url);
-            return reading.Search is { } search
-                ? await BindAndSearchAsync(connection, context, search).ConfigureAwait(false)
-                : reading.Failure!;
+            if (reading.Search is not { } search)
+            {
+                return reading.Failure!;
+            }
+
+            if (dialect == LdapDialect.WinLdap)
+            {
+                context.Events.ReportInfo(LdapVerboseLines.Establishing(context.Url.Scheme == TlsScheme));
+            }
+
+            return await BindAndSearchAsync(connection, context, search).ConfigureAwait(false);
         }
     }
 
-    /// <summary>The host and port <paramref name="url" /> names, with TLS from the first byte for <c>ldaps</c>.</summary>
-    private static ConnectTarget TargetOf(CurlUrl url)
+    /// <summary>
+    /// Writes the lines each build's <c>-v</c> ends a transfer with: a failure's message, unless
+    /// it is curl's text for the exit code; then <c>shutting down connection #N</c> from WinLDAP's
+    /// build, and from the OpenLDAP build <c>Connection #N to host H:P left intact</c> after a
+    /// success and <c>closing connection #N</c> after a failure.
+    /// </summary>
+    private void ReportConnectionEnd(ITransferEvents events, TransferResult result, ConnectTarget target, long connectionNumber)
     {
+        LdapVerboseLines.ReportFailure(events, result);
+        events.ReportInfo(
+            dialect == LdapDialect.WinLdap ? LdapVerboseLines.ShuttingDown(connectionNumber)
+            : result.ExitCode == CurlExitCode.Ok ? LdapVerboseLines.LeftIntact(connectionNumber, target.Host, target.Port)
+            : LdapVerboseLines.Closing(connectionNumber));
+    }
+
+    /// <summary>
+    /// The host and port the transfer's URL names, with TLS from the first byte for
+    /// <c>ldaps</c>, reporting the connect to the transfer's events.
+    /// </summary>
+    private static ConnectTarget TargetOf(ITransferContext context)
+    {
+        CurlUrl url = context.Url;
         bool useTls = url.Scheme == TlsScheme;
         int defaultPort = useTls ? DefaultTlsPort : DefaultPort;
-        return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, useTls);
+        return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, useTls) { Events = context.Events };
     }
 
     /// <summary>
@@ -136,6 +179,11 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
             if (bindFailure is not null)
             {
                 return bindFailure;
+            }
+
+            if (dialect == LdapDialect.OpenLdap)
+            {
+                context.Events.ReportInfo(LdapVerboseLines.Url(context.Url));
             }
 
             return await LdapSearch.RunAsync(dialect, exchange, search, context).ConfigureAwait(false);

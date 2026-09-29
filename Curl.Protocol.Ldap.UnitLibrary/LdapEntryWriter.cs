@@ -11,7 +11,8 @@ namespace Curl.Protocol.Ldap;
 /// </summary>
 /// <remarks>
 /// Each entry is written in the pieces <see cref="LdapEntryFormatter.FormatPieces" /> gives,
-/// one write each, as curl does. An output that stops accepting bytes ends the writing with
+/// one write each, as curl does, and reported to <see cref="ITransferContext.Events" /> as
+/// received data first, for <c>-v</c>'s <c>{ [N bytes data]</c> line. An output that stops accepting bytes ends the writing with
 /// exit 23 <c>Failure writing output to destination, passed N returned M</c>: <c>N</c> the
 /// size of the piece it failed on, <c>M</c> the bytes of it the output accepted, as
 /// <see cref="OutputWriteFailedException.BytesAccepted" /> says, and 0 for any other
@@ -53,6 +54,7 @@ internal sealed class LdapEntryWriter(LdapDialect dialect, ITransferContext cont
     {
         foreach (byte[] piece in pieces.Where(piece => piece.Length > 0))
         {
+            context.Events.ReportDataReceived(piece);
             try
             {
                 await context.Output.WriteAsync(piece, context.CancellationToken).ConfigureAwait(false);
