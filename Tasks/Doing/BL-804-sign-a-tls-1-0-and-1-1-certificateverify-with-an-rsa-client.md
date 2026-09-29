@@ -38,3 +38,4 @@ A client with an RSA certificate key answers a TLS 1.0 or 1.1 server's Certifica
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
