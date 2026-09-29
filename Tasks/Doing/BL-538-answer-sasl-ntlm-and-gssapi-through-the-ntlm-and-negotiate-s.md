@@ -61,3 +61,4 @@ The SASL authenticator answers the NTLM and GSSAPI mechanisms with the token sou
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Waits on BL-851: the SASL exchange contract is synchronous and ISecurityContext has no GSS Wrap/Unwrap, both in Curl.Protocol.Abstractions
+- 2026-09-29: Backlog -> Doing.
