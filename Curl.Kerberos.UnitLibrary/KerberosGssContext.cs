@@ -258,7 +258,7 @@ public sealed class KerberosGssContext : IDisposable
         byte[] plaintext;
         try
         {
-            plaintext = encryption.Decrypt(serviceTicket.SessionKey.Value, ApReplyUsage, reply.EncryptedPart.Cipher);
+            plaintext = KerberosAsn1.WithoutPadding(encryption.Decrypt(serviceTicket.SessionKey.Value, ApReplyUsage, reply.EncryptedPart.Cipher));
         }
         catch (KerberosCryptographyException)
         {

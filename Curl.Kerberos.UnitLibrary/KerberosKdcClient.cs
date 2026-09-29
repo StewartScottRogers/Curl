@@ -442,7 +442,7 @@ public sealed class KerberosKdcClient
     {
         try
         {
-            return encryption.Decrypt(key, usage, encrypted.Cipher);
+            return KerberosAsn1.WithoutPadding(encryption.Decrypt(key, usage, encrypted.Cipher));
         }
         catch (KerberosCryptographyException)
         {
