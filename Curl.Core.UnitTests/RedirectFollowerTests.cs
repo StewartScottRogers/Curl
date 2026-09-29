@@ -377,6 +377,124 @@ public sealed class RedirectFollowerTests
         Assert.IsNull(second.Body);
     }
 
+    // ---- -X with -L and --follow (curl 8.21.0, measured, BL-627 Notes) ---------------
+
+    [TestMethod]
+    [DataRow(false, 301, "PUT", false)]
+    [DataRow(false, 302, "PUT", false)]
+    [DataRow(false, 303, "PUT", false)]
+    [DataRow(false, 307, "PUT", true)]
+    [DataRow(true, 301, null, false)]
+    [DataRow(true, 302, null, false)]
+    [DataRow(true, 303, null, false)]
+    [DataRow(true, 307, "PUT", true)]
+    [DataRow(true, 308, "PUT", true)]
+    public async Task FollowAsync_CustomPutWithBody_SecondRequestAsCurlSendsIt(bool follow, int status, string? method, bool keepsBody)
+    {
+        // curl -L (or --follow) -X PUT -d x: -L sends PUT without the body on 301/302/303,
+        // --follow sends GET; both send PUT with the body on 307 and 308.
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
+
+        await Follow(
+            handler,
+            Context(Location() with { CustomMethod = "PUT", Body = PostBody }, postData: true),
+            new RedirectPolicy { DropsCustomMethodOnSwitchToGet = follow });
+
+        ITransferContext second = handler.Contexts[1];
+        Assert.AreEqual(method, second.Http!.CustomMethod);
+        Assert.AreEqual(keepsBody, second.Http.Body is not null);
+        Assert.AreEqual(keepsBody, second.PostData is not null);
+    }
+
+    [TestMethod]
+    [DataRow(false, 301, "DELETE")]
+    [DataRow(false, 302, "DELETE")]
+    [DataRow(false, 303, "DELETE")]
+    [DataRow(true, 301, "DELETE")]
+    [DataRow(true, 302, "DELETE")]
+    [DataRow(true, 303, null)]
+    [DataRow(true, 307, "DELETE")]
+    public async Task FollowAsync_CustomDeleteWithoutBody_SecondRequestAsCurlSendsIt(bool follow, int status, string? method)
+    {
+        // curl -L (or --follow) -X DELETE: DELETE again, except --follow on a 303, which sends GET.
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
+
+        await Follow(
+            handler,
+            Context(Location() with { CustomMethod = "DELETE" }),
+            new RedirectPolicy { DropsCustomMethodOnSwitchToGet = follow });
+
+        Assert.AreEqual(method, handler.Contexts[1].Http!.CustomMethod);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_FollowCustomDeleteWithPost303Answered303_SendsGet()
+    {
+        // curl --follow --post303 -X DELETE: DELETE /a, GET /b - --post303 keeps only a body.
+        ScriptedHandler handler = new(Redirect(303, Next), Ok(200, 0));
+
+        await Follow(
+            handler,
+            Context(Location() with { CustomMethod = "DELETE" }),
+            new RedirectPolicy { DropsCustomMethodOnSwitchToGet = true, KeepPostOn303 = true });
+
+        Assert.IsNull(handler.Contexts[1].Http!.CustomMethod);
+    }
+
+    [TestMethod]
+    [DataRow(301)]
+    [DataRow(302)]
+    [DataRow(303)]
+    public async Task FollowAsync_FollowCustomPutWithMatchingPostOption_KeepsMethodAndBody(int status)
+    {
+        // curl --follow --post301 (--post302, --post303) -X PUT -d x: PUT with the body again.
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
+        RedirectPolicy policy = new()
+        {
+            DropsCustomMethodOnSwitchToGet = true,
+            KeepPostOn301 = status == 301,
+            KeepPostOn302 = status == 302,
+            KeepPostOn303 = status == 303,
+        };
+
+        await Follow(handler, Context(Location() with { CustomMethod = "PUT", Body = PostBody }), policy);
+
+        HttpRequestOptions second = handler.Contexts[1].Http!;
+        Assert.AreEqual("PUT", second.CustomMethod);
+        Assert.AreSame(PostBody, second.Body);
+    }
+
+    [TestMethod]
+    [DataRow(302, "PUT", true)]
+    [DataRow(303, null, false)]
+    public async Task FollowAsync_FollowCustomPutUpload_SecondRequestAsCurlSendsIt(int status, string? method, bool keepsUpload)
+    {
+        // curl --follow -X PUT -T file: PUT with the file again on a 302, GET with nothing on a 303.
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
+
+        await Follow(
+            handler,
+            Context(Location() with { CustomMethod = "PUT" }, upload: true),
+            new RedirectPolicy { DropsCustomMethodOnSwitchToGet = true });
+
+        ITransferContext second = handler.Contexts[1];
+        Assert.AreEqual(method, second.Http!.CustomMethod);
+        Assert.AreEqual(keepsUpload, second.Upload is not null);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_FollowMethodDroppedOnce_StaysDroppedOn307()
+    {
+        ScriptedHandler handler = new(Redirect(302, "http://127.0.0.1:18203/b"), Redirect(307, Next), Ok(200, 0));
+
+        await Follow(
+            handler,
+            Context(Location() with { CustomMethod = "PUT", Body = PostBody }),
+            new RedirectPolicy { DropsCustomMethodOnSwitchToGet = true });
+
+        Assert.IsNull(handler.Contexts[2].Http!.CustomMethod);
+    }
+
     [TestMethod]
     public async Task FollowAsync_BodyDroppedOnce_StaysDroppedOn307()
     {

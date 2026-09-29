@@ -166,6 +166,7 @@ public sealed class RedirectFollower(
         long? bodyStart = SeekableStart(bodyContent);
         ITransferContext hop = context;
         bool bodyDropped = false;
+        bool methodDropped = false;
         while (true)
         {
             TransferResult result = await DispatchAsync(hop, policy);
@@ -175,7 +176,9 @@ public sealed class RedirectFollower(
                 return chain.Merge(result);
             }
 
-            bodyDropped |= DropsBody(result.Report!.ResponseCode, hop, policy);
+            int responseCode = result.Report!.ResponseCode;
+            bodyDropped |= DropsBody(responseCode, hop, policy);
+            methodDropped |= DropsCustomMethod(responseCode, hop, policy, bodyDropped);
             bool bodyCannotBeResent = CannotBeResent(bodyContent, bodyDropped);
             if (StopBeforeHop(context, http, ref target, chain, policy, result, bodyCannotBeResent, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
             {
@@ -186,7 +189,7 @@ public sealed class RedirectFollower(
             Rewind(bodyContent, bodyStart, bodyDropped);
             chain.Followed(target);
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, http with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
         }
     }
 
@@ -217,12 +220,33 @@ public sealed class RedirectFollower(
         }
 
         // No refusal means the target parsed, so next is set.
-        if (policy.DisallowsUserInUrl && next!.User is not null)
-        {
-            return CredentialsInUrlFailure(target, chain, result);
-        }
+        return UserInUrlFailure(target, next!, chain, policy, result)
+            ?? HopProxyOrRewindFailure(first, http, target, next!, chain, result, bodyCannotBeResent, out hopProxy);
+    }
 
-        if (!TrySelectHopProxy(first, http, next!, out hopProxy, out TransferResult? failure))
+    /// <summary>
+    /// <see cref="CredentialsInUrlFailure" /> when <c>--disallow-username-in-url</c> meets a
+    /// target with user information; <see langword="null" /> otherwise.
+    /// </summary>
+    private static TransferResult? UserInUrlFailure(string target, CurlUrl next, RedirectChain chain, RedirectPolicy policy, TransferResult result) =>
+        policy.DisallowsUserInUrl && next.User is not null ? CredentialsInUrlFailure(target, chain, result) : null;
+
+    /// <summary>
+    /// The hop proxy selector's failure, else <see cref="BodyRewindFailure" /> when
+    /// <paramref name="bodyCannotBeResent" />; <see langword="null" />, with <paramref name="hopProxy" />
+    /// set, when the hop goes ahead.
+    /// </summary>
+    private TransferResult? HopProxyOrRewindFailure(
+        ITransferContext first,
+        HttpRequestOptions http,
+        string target,
+        CurlUrl next,
+        RedirectChain chain,
+        TransferResult result,
+        bool bodyCannotBeResent,
+        out HopProxy hopProxy)
+    {
+        if (!TrySelectHopProxy(first, http, next, out hopProxy, out TransferResult? failure))
         {
             return failure;
         }
@@ -377,6 +401,18 @@ public sealed class RedirectFollower(
             _ => false,
         };
     }
+
+    /// <summary>
+    /// Whether <c>--follow</c> drops the <c>-X</c> method for the next hop: when the request switches
+    /// to GET, as it does once the body is dropped and on a 303 to a request without a body, as curl
+    /// 8.21.0 sends <c>GET</c> after <c>--follow -X DELETE</c> meets a 303 but <c>DELETE</c> after a
+    /// 301 or 302 (measured, BL-627 Notes).
+    /// </summary>
+    private static bool DropsCustomMethod(int responseCode, ITransferContext hop, RedirectPolicy policy, bool bodyDropped) =>
+        policy.DropsCustomMethodOnSwitchToGet && (bodyDropped || (responseCode == 303 && hop.Http!.Body is null));
+
+    private static HttpRequestOptions HopMethod(HttpRequestOptions http, bool methodDropped) =>
+        methodDropped ? http with { CustomMethod = null } : http;
 
     private static long? SeekableStart(Stream? upload) =>
         upload is { CanSeek: true } ? upload.Position : null;
