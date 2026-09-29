@@ -143,8 +143,37 @@ Namespace `Curl.Cryptography`. It holds:
   static `VerifyHash` returns `false` for bad parameters, y not below p, r or s outside
   [1, q - 1], or a mismatch. Signatures are r || s at q's length (ADR-0201). Constant-time
   in x and k.
+- `KeccakPermutation` (internal): Keccak-p[1600, 24] (FIPS 202 section 3.3) on 25
+  64-bit lanes.
+- `KeccakSponge` (internal, `IDisposable`): FIPS 202's sponge with byte-aligned pad10*1 -
+  `Absorb` any number of pieces, then `Squeeze` any number (absorbing after squeezing
+  throws `InvalidOperationException`), `Reset`; the rate and the domain byte (`0x06`
+  SHA-3, `0x1F` SHAKE) are constructor parameters.
+- `Sha3` (public, static): SHA3-256 and SHA3-512, `HashData256` and `HashData512`; the
+  BCL's are missing on macOS. Constant-time.
+- `Shake` (public, `IDisposable`): SHAKE128 and SHAKE256 - static `HashData128` and
+  `HashData256` for one output of any length, and `Create128`/`Create256` instances that
+  `AppendData`, then `Read` output a piece at a time, then `Reset`. Ed448 (BL-741) and
+  ML-DSA (BL-744) reuse it. Constant-time.
+- `MlKemParameterSet` (public enum): `MlKem512`, `MlKem768`, `MlKem1024`.
+- `MlKemParameters` (internal): k, eta1, eta2, du, dv and the key and ciphertext lengths
+  of each set (FIPS 203 tables 2 and 3).
+- `MlKemPolynomial` (internal): arithmetic mod q = 3329 without division (`DivideByModulus`
+  by reciprocal and masked correction), `Ntt`, `InverseNtt`, `MultiplyNttsAndAdd`,
+  `Compress`, `Decompress`, `Encode`, `Decode`, the encapsulation-key modulus check
+  `AreAllBelowModulus`, and the samplers `SampleNtt` (rejection on public rho) and
+  `SampleCenteredBinomial`.
+- `MlKemPublicKeyEncryption` (internal): K-PKE's `GenerateKeys`, `Encrypt` and `Decrypt`
+  (FIPS 203 section 5); matrix entries are sampled where used, never stored.
+- `MlKem` (public, `IDisposable`): FIPS 203 ML-KEM - an instance holds one decapsulation
+  key: `GenerateKey` (random, or from the seeds d and z for known answers),
+  `ImportDecapsulationKey` (`ArgumentException` when its stored H(ek) does not match),
+  `ExportEncapsulationKey`, `ExportDecapsulationKey` and `Decapsulate`, which compares the
+  re-encrypted ciphertext branch-free and picks the key or J(z || c) by mask. Static
+  `TryEncapsulate` (random m, or m given) returns `false` with its outputs zeroed for an
+  encapsulation key failing the modulus check. `Dispose` zeroes the key. Constant-time.
 
-The remaining primitives land under their own tasks (BL-677, BL-738, BL-740 to BL-744).
+The remaining primitives land under their own tasks (BL-677, BL-738, BL-740 to BL-742, BL-744).
 
 ## Rules
 
