@@ -8,7 +8,7 @@ depends-on: [BL-827]
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-883 — Record the MS-KKDCP KDC proxy decision in an ADR amending ADR-0168
 
@@ -26,12 +26,16 @@ A new ADR in `Documentation/Planning/Decisions`, marked "Decided by Claude under
 
 ## Acceptance criteria
 
-- [ ] The new ADR exists, states the three decisions above, and cites BL-827 and MIT `sendto_kdc.c`.
-- [ ] ADR-0168 names the new ADR where it said `https://` KDCs are skipped, and the Decisions `README.md` index lists it.
+- [x] The new ADR exists, states the three decisions above, and cites BL-827 and MIT `sendto_kdc.c`.
+- [x] ADR-0168 names the new ADR where it said `https://` KDCs are skipped, and the Decisions `README.md` index lists it.
 
 ## Notes
+
+- ADR-0204 records BL-827's three decisions (separate optional `IKerberosKdcProxyTransport` seam, MIT-encoded `KDC-PROXY-MESSAGE`, malformed proxy reply tries the next KDC), citing BL-827, MIT `sendto_kdc.c`, `asn1_k5.c` and `service_https_read`; numbered 0204 as the next free ADR after ADR-0203.
+- ADR-0168 amended in two places: the Decision's `https://` line and the Consequences' "MS-KKDCP ... separate work" line. README index lists 0204. Docs only; no code changed.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. ADR-0204 records the MS-KKDCP KDC proxy decisions and ADR-0168 points at it
