@@ -36,3 +36,4 @@ For `ftp://` and `ftps://`, `-v` shows curl 8.21.0's `* ` info lines about the d
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
