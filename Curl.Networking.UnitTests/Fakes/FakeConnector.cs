@@ -19,6 +19,15 @@ public sealed class FakeConnector : IConnector
     /// <summary>Gets or sets the result to return instead of opening a connection.</summary>
     public ConnectResult? Failure { get; set; }
 
+    /// <summary>
+    /// Gets the bytes each opened connection reads, by the order they are opened; a connection
+    /// opened past the last reads nothing.
+    /// </summary>
+    public List<byte[]> BytesToRead { get; } = [];
+
+    /// <summary>Gets or sets the exception every opened connection's reads throw, or <see langword="null" /> to answer reads.</summary>
+    public Exception? ReadException { get; set; }
+
     /// <inheritdoc />
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -29,7 +38,10 @@ public sealed class FakeConnector : IConnector
             return ValueTask.FromResult(Failure);
         }
 
-        var connection = new ScriptedConnection([]);
+        var connection = new ScriptedConnection(Opened.Count < BytesToRead.Count ? BytesToRead[Opened.Count] : [])
+        {
+            ReadException = ReadException,
+        };
         Opened.Add(connection);
         var number = Opened.Count;
 

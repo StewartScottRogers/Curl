@@ -547,7 +547,7 @@ public sealed class TcpConnector(
     }
 
     // curl 8.21.0 answers localhost and every name under .localhost itself, with ::1 and 127.0.0.1.
-    private static bool IsLocalhost(string host) =>
+    internal static bool IsLocalhost(string host) =>
         string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
         || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
 

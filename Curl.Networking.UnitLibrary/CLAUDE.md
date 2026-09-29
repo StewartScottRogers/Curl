@@ -209,6 +209,18 @@ the smallest TTL, or a `DnsMessageFailure`, a pointer loop ending as `LabelLoop`
 `DnsMessageFailureText` gives curl's `--trace-config doh` text for each failure. For an SRV query
 the decoder also keeps each SRV record as `DnsAnswer.ServiceRecords` (`DnsServiceRecord`).
 
+`DohDnsResolver` (ADR-0152 and its BL-641 amendment) is the `IDnsResolver` behind `--doh-url`. It
+takes an `IConnector` for the DoH connections (a `TcpConnector` of its own, built with the system
+resolver and the DoH TLS options) and the DoH URL, and for each name POSTs the A query and the AAAA
+query in parallel on two connections, A first, each request written byte for byte as curl 8.21.0
+writes it (no `User-Agent`; `Host` with the port only when it is not the default). The target
+carries `PoolScheme` `https`, so the handshake offers ALPN `http/1.1`. `DohResponseReader` reads the
+response as curl does: status and `Content-Type` ignored, a `Content-Length` or chunked body of at
+most 3000 bytes, anything else a failure. It returns the AAAA answer's addresses, then the A
+answer's; a query that fails yields none, and none from both makes `TcpConnector` fail with exit 6.
+IP literals and `localhost` (`TcpConnector.IsLocalhost`) are answered without a query. Its tests
+drive it through `Fakes/FakeConnector`'s `BytesToRead` and through a `TcpConnector` over fakes.
+
 Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
 `--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr`, measured against curl 8.22.0's c-ares
 1.34.8 build. It takes the options verbatim (`DnsServerResolverOptions`) and parses them when it
