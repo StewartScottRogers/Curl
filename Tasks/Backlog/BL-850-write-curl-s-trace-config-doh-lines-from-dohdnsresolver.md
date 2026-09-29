@@ -1,5 +1,5 @@
 ---
-id: BL-848
+id: BL-850
 title: Write curl's --trace-config doh lines from DohDnsResolver
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-848 — Write curl's --trace-config doh lines from DohDnsResolver
+# BL-850 — Write curl's --trace-config doh lines from DohDnsResolver
 
 ## Goal
 

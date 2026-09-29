@@ -32,7 +32,7 @@ A `DohDnsResolver` implementing `IDnsResolver` resolves a host by POSTing BL-640
 - Measured before pinning (2026-09-28, curl 8.21.0 Schannel, `Record-CurlExchange.ps1 -Tls`): curl decodes the body whatever the status or `Content-Type` (a `500`, a `text/plain` and a Content-Type-less answer carrying a valid A answer all resolved), reads chunked bodies, and fails a close-delimited body with `DoH request Failure when receiving data from the peer`; IP literals, `localhost` and `*.localhost` never reach the DoH server. This contradicted ADR-0152 point 4's unmeasured guess about status and `Content-Type`, so ADR-0152 gained a "BL-641 amendment" (decided by Claude under Stewart's delegation). ADR-0152's file was added to `touches` for that; no task in Doing names it.
 - Defaults taken from curl's `lib/doh.c`: a DoH body over 3000 bytes (`DYN_DOH_RESPONSE`) fails; response lines are capped at 100 KB (`CURL_MAX_HTTP_HEADER`). Interim `1xx` responses are not skipped (unmeasured; a DoH server does not send them to a POST without `Expect`).
 - The DoH connection's target carries `PoolScheme` = the URL's scheme, so `TcpConnector` offers ALPN `http/1.1` as measured; the connections are never marked reusable, so each closes.
-- `--trace-config doh` lines are not written yet: filed as BL-848.
+- `--trace-config doh` lines are not written yet: filed as BL-850.
 - Tests: `DohDnsResolverTests` (26 incl. rows), `DohResponseReaderTests` (30 incl. rows). `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10. Full fast run green.
 
 ## Log
