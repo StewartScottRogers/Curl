@@ -4,7 +4,7 @@ title: Offer the hand-built TLS client through ITlsProvider as the TLS-options A
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-700, BL-703, BL-617]
+depends-on: [BL-700, BL-703, BL-617, BL-815]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-28
@@ -31,7 +31,11 @@ A second `ITlsProvider` in `Curl.Networking.UnitLibrary` runs the hand-built TLS
 
 ## Notes
 
+- 2026-09-28 (lane 1): returned to Backlog before any code. `Curl.Tls.UnitLibrary` has the TLS 1.2/1.1/1.0 handshake (`Tls12ClientHandshake`, BL-703) and record states (BL-702) but nothing that runs them over a byte stream; only TLS 1.3 has a connection and stream (`Tls13ClientConnection`, `Tls13ClientStream`, BL-700). The first criterion (a TLS 1.2 exchange through the new provider) and the legacy-versions row (which routes to TLS 1.0/1.1) both need that, and it belongs in `Curl.Tls.UnitLibrary` with its own tests, so it is filed as BL-815 and added to `depends-on`.
+- Routing rows: `TlsClientOptions` today carries only the legacy-versions condition (`MaximumVersion` TLS 1.0 or 1.1); the other rows' options reach it with BL-618 (`--curves`, `--sigalgs`, `--tls-earlydata`, `--ech`, `--ssl-sessions`, `--tlsuser`/`--tlspassword`), BL-713 (`--no-sessionid`, `--ssl-allow-beast`) and BL-610 (`--cert-status`). As this task's Context says, those tasks add their rows; this task builds the function with the rows whose options exist when it runs.
+
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Backlog. Waits on BL-815: no TLS 1.2/1.1/1.0 connection over a byte stream exists in Curl.Tls.UnitLibrary yet
