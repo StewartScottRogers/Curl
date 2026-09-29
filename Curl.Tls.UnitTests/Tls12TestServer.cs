@@ -66,6 +66,9 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
 
     public Tls12KeyBlock KeyBlock { get; private set; } = null!;
 
+    /// <summary>Gets the record protection the key block was derived for.</summary>
+    public Tls12RecordProtectionParameters RecordProtection { get; private set; } = null!;
+
     public List<byte[]> ClientCertificates { get; } = [];
 
     private Tls12CipherSuite Suite => Tls12CipherSuite.Find(CipherSuite)!;
@@ -106,13 +109,20 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
     /// <summary>Checks the client's flight and answers with the server's ChangeCipherSpec and Finished, or checks the client's last Finished of a resumption.</summary>
     public List<Tls12OutgoingMessage> ReceiveClientFlight(IReadOnlyList<Tls12OutgoingMessage> flight)
     {
-        Queue<Tls12OutgoingMessage> messages = new(flight);
+        int changeCipherSpec = flight.ToList().FindIndex(message => message.ContentType == TlsContentType.ChangeCipherSpec);
+        ReceiveClientKeyExchange([.. flight.Take(changeCipherSpec)]);
+        return ReceiveClientFinished([.. flight.Skip(changeCipherSpec)]);
+    }
+
+    /// <summary>Checks the client's flight up to its ChangeCipherSpec and derives the key block; a resumption sends nothing before it.</summary>
+    public void ReceiveClientKeyExchange(IReadOnlyList<Tls12OutgoingMessage> flight)
+    {
         if (resumed)
         {
-            ReceiveChangeCipherSpecAndFinished(messages);
-            return [];
+            return;
         }
 
+        Queue<Tls12OutgoingMessage> messages = new(flight);
         if (RequestClientCertificate)
         {
             ReceiveClientCertificate(messages.Dequeue().Bytes);
@@ -126,7 +136,18 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
         }
 
         DeriveKeyBlock();
+    }
+
+    /// <summary>Checks the client's ChangeCipherSpec and Finished and answers with the server's, or with nothing after a resumption.</summary>
+    public List<Tls12OutgoingMessage> ReceiveClientFinished(IReadOnlyList<Tls12OutgoingMessage> flight)
+    {
+        Queue<Tls12OutgoingMessage> messages = new(flight);
         ReceiveChangeCipherSpecAndFinished(messages);
+        if (resumed)
+        {
+            return [];
+        }
+
         Sessions.Add(sessionId, new Tls12TestSession(MasterSecret, extendedMasterSecret));
         List<Tls12OutgoingMessage> answer = [];
         AddTicketChangeCipherSpecAndFinished(answer);
@@ -300,7 +321,9 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
 
     private void ReceiveChangeCipherSpecAndFinished(Queue<Tls12OutgoingMessage> messages)
     {
-        Assert.AreEqual(Tls12OutgoingMessage.ChangeCipherSpec, messages.Dequeue());
+        Tls12OutgoingMessage changeCipherSpec = messages.Dequeue();
+        Assert.AreEqual(TlsContentType.ChangeCipherSpec, changeCipherSpec.ContentType);
+        CollectionAssert.AreEqual(Tls12OutgoingMessage.ChangeCipherSpec.Bytes, changeCipherSpec.Bytes);
         byte[] expected = Prf.ComputeClientVerifyData(MasterSecret, Prf.HashHandshake(transcript.ToArray()));
         byte[] finished = Take(messages, HandshakeType.Finished);
         CollectionAssert.AreEqual(expected, Body(finished));
@@ -323,6 +346,7 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
     private void DeriveKeyBlock()
     {
         Tls12RecordProtectionParameters parameters = Suite.RecordProtectionFor(Version, encryptThenMac);
+        RecordProtection = parameters;
         KeyBlock = Tls12KeyBlock.Partition(parameters, Prf.ComputeKeyBlock(MasterSecret, serverRandom, hello.Random, parameters.KeyBlockLength));
     }
 

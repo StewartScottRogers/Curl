@@ -77,6 +77,13 @@ public sealed record Tls12ClientSettings
     /// <summary>Gets the certificate presented when the server asks for one, or <see langword="null" /> to answer with an empty Certificate.</summary>
     public TlsClientCertificate? ClientCertificate { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether a TLS 1.0 CBC connection writes an empty application
+    /// data record before each write, OpenSSL's BEAST countermeasure; <see langword="false" />
+    /// for <c>--ssl-allow-beast</c>. Only <see cref="Tls12ClientConnection" /> reads it.
+    /// </summary>
+    public bool InsertEmptyFragment { get; init; } = true;
+
     /// <summary>Throws when the settings cannot drive a handshake.</summary>
     /// <exception cref="ArgumentException">
     /// The version range is empty, a suite is unknown, a group is not an ECDHE group, a

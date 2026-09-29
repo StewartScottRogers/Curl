@@ -18,8 +18,8 @@ public sealed record TlsHandshakeFailure(TlsAlertDescription Alert, object? Cert
 
     /// <summary>
     /// Gets where the failure came from. The I/O-free handshakes only ever send an alert;
-    /// <see cref="Tls13ClientConnection" /> also reports an alert the server sent and a
-    /// transport that closed.
+    /// <see cref="Tls13ClientConnection" /> and <see cref="Tls12ClientConnection" /> also
+    /// report an alert the server sent and a transport that closed.
     /// </summary>
     public TlsHandshakeFailureOrigin Origin { get; init; } = TlsHandshakeFailureOrigin.AlertSent;
 }

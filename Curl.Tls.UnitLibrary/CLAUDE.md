@@ -12,8 +12,8 @@ where the operating system disables them, `--ssl-allow-beast`). Everything else 
 Namespace `Curl.Tls`. What is here so far: the handshake message codecs (BL-698), the
 TLS 1.3 key schedule (BL-697), the TLS 1.3 client handshake (BL-699, ADR-0146), the
 TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
-1.1 and 1.0 client handshake (BL-703, ADR-0154), and TLS 1.3 over a byte stream
-(BL-700, ADR-0157).
+1.1 and 1.0 client handshake (BL-703, ADR-0154), TLS 1.3 over a byte stream
+(BL-700, ADR-0157), and TLS 1.2, 1.1 and 1.0 over a byte stream (BL-815, ADR-0158).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -103,7 +103,19 @@ TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
 - `Tls12ClientSettings`: version range, suites (and the renegotiation SCSV), ECDHE
   groups, TLS 1.2 signature algorithms, ALPN, `status_request`, whether to offer
   `session_ticket`, `extended_master_secret` and `encrypt_then_mac`, the session to
-  resume, and the client certificate. The ClientHello's extensions follow OpenSSL's order.
+  resume, the client certificate, and TLS 1.0 CBC's empty fragment
+  (`InsertEmptyFragment`, off for `--ssl-allow-beast`). The ClientHello's extensions
+  follow OpenSSL's order.
+- TLS 1.2 and below over a byte stream (ADR-0158): the internal `Tls12RecordLayer` reads
+  whole records off the caller's `Stream`, removes their protection with the read state in
+  force and writes under the write state in force; the ClientHello record carries TLS 1.0,
+  later records the negotiated version, and a record read with another is
+  `protocol_version`. `Tls12ClientConnection.ConnectAsync` runs `Tls12ClientHandshake`
+  over it, switching each state at its ChangeCipherSpec, and returns a
+  `Tls12ConnectResult`: a `Tls12ClientStream` or a `TlsHandshakeFailure` with its
+  `Origin`. `Tls12ClientStream` behaves as `Tls13ClientStream` does (0 at `close_notify`
+  or a bare transport end, `CloseNotifyReceived`, `TlsAlertException`, `ShutdownAsync`)
+  and ignores HelloRequest.
 - `ITlsRandomSource` supplies the random, session ID, key shares, DHE exponent and RSA
   pre-master secret; `SystemTlsRandomSource` is the production one.
 - `IServerCertificateVerifier` gets the chain as a `ServerCertificateChain` (DER
@@ -117,6 +129,8 @@ TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
 - Tests: `Tls13TestServer` and `Tls12TestServer` in `Curl.Tls.UnitTests` are in-memory
   servers built from these codecs; `Tls12TestServer` resumes from a shared
   `Tls12TestSessionCache` and signs TLS 1.0/1.1 RSA with `BigInteger` (test code only).
+  `Tls13RecordTestServer` and `Tls12RecordTestServer` put them on the server end of an
+  `InMemoryPipe`.
 
 ## Rules
 

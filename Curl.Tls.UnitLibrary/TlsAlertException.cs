@@ -3,8 +3,8 @@ namespace Curl.Tls;
 /// <summary>
 /// A TLS connection ended with a fatal alert after its handshake: the client sent
 /// <see cref="Alert" /> because of what the server sent, or received it from the server.
-/// <see cref="Tls13ClientStream" /> throws it from a read or write, as <c>SslStream</c>
-/// throws an <see cref="IOException" />.
+/// <see cref="Tls13ClientStream" /> and <see cref="Tls12ClientStream" /> throw it from a
+/// read or write, as <c>SslStream</c> throws an <see cref="IOException" />.
 /// </summary>
 public sealed class TlsAlertException : IOException
 {
