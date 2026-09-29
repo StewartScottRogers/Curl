@@ -401,6 +401,25 @@ function Set-HeartbeatStep {
 # into one file and force-pushed as a single parentless commit. It has one writer - the
 # coordinator of a lane shift, or the single runner for its own lane 0. Lanes never push.
 $script:BoardStatus = @{ Lanes = @{}; PublishedAt = [datetime]::MinValue; PushFailing = $false }
+# The latest -Lanes Auto step, published as status.json's autoLanes (BL-770): lanes, target,
+# binding, reason and changedAt. Only the Auto start and step set it, so a fixed-lane shift
+# publishes null.
+$script:AutoLanesStatus = $null
+
+function Set-AutoLanesStatus {
+    # Records the Auto lane count, its target and what binds it. -Reason, given only when
+    # the count starts or changes, replaces the last change's reason and time.
+    param([int]$Lanes, $Target, [string]$Binding, [string]$Reason)
+    $old = $script:AutoLanesStatus
+    $changed = $Reason -or -not $old
+    $script:AutoLanesStatus = [pscustomobject][ordered]@{
+        lanes = $Lanes
+        target = $(if ($null -ne $Target) { [math]::Round([double]$Target, 1) } else { $null })
+        binding = $Binding
+        reason = $(if ($changed) { $Reason } else { $old.reason })
+        changedAt = $(if ($changed) { Get-UtcStamp } else { $old.changedAt })
+    }
+}
 
 function Get-BoardStatusJson {
     # Merges every lane-<n>.heartbeat.json of this shift into status.json schema 1, lanes
@@ -423,6 +442,7 @@ function Get-BoardStatusJson {
         branch = $Branch
         state = $State
         publishedAt = Get-UtcStamp
+        autoLanes = $script:AutoLanesStatus
         lanes = $laneObjects
     } | ConvertTo-Json -Depth 4
 }
@@ -965,15 +985,18 @@ function Get-NextLaneCount {
         if (-not $low -or $PreviousLow) { $lanes = [int][math]::Max(1, [math]::Floor($desired + 0.25)) } else { $lowOnce = $true }
     }
     $culture = [Globalization.CultureInfo]::InvariantCulture
-    $limit = if ($paceValue -le $ceiling) {
-        if ($Pace) { "$($Pace.Binding) allows $($paceValue.ToString('0.0', $culture))" } else { 'no burn rate yet' }
+    if ($paceValue -le $ceiling) {
+        $binding = if ($Pace) { $Pace.Binding } else { 'no burn rate' }
+        $limit = if ($Pace) { "$($Pace.Binding) allows $($paceValue.ToString('0.0', $culture))" } else { 'no burn rate yet' }
     } elseif ($Capacity -eq $ceiling) {
-        if ($Capacity -eq 1) { '1 ready task can run at once' } else { "$Capacity ready tasks can run at once" }
-    } elseif ($MachineCap -eq $ceiling) { "machine sustains $MachineCap" }
-    else { "lane maximum $MaxLanes" }
+        $binding = 'capacity'
+        $limit = if ($Capacity -eq 1) { '1 ready task can run at once' } else { "$Capacity ready tasks can run at once" }
+    } elseif ($MachineCap -eq $ceiling) { $binding = 'machine'; $limit = "machine sustains $MachineCap" }
+    else { $binding = 'maximum'; $limit = "lane maximum $MaxLanes" }
     if ($lowOnce) { $limit += ', low once' }
     $step = if ($lanes -eq $Current) { "lanes $Current held" } else { "lanes $Current -> $lanes" }
-    return [pscustomobject]@{ Lanes = $lanes; Changed = ($lanes -ne $Current); Desired = $desired; Low = $low; Reason = "$step ($limit)" }
+    # Binding names the limit for status.json's autoLanes (BL-770).
+    return [pscustomobject]@{ Lanes = $lanes; Changed = ($lanes -ne $Current); Desired = $desired; Low = $low; Binding = $binding; Reason = "$step ($limit)" }
 }
 
 function Get-AutoStartCount {
@@ -1071,6 +1094,11 @@ if ($TestAutoLanes) {
         ,@('machine-ceiling', 'lanes 7 held (machine sustains 7)', (Get-NextLaneCount 7 $infinite 20 7 16).Reason)
         ,@('max-ceiling', 'lanes 2 held (lane maximum 2)', (Get-NextLaneCount 2 $infinite 20 16 2).Reason)
         ,@('no-rate', 'lanes 2 held (no burn rate yet)', (Get-NextLaneCount 2 $null 6 8 16).Reason)
+        ,@('binding pace', '5-hour pace', (Get-NextLaneCount 4 (New-TestPace 3.8) 16 16 16).Binding)
+        ,@('binding capacity', 'capacity', (Get-NextLaneCount 5 (New-TestPace 9.0) 3 16 16).Binding)
+        ,@('binding machine', 'machine', (Get-NextLaneCount 7 $infinite 20 7 16).Binding)
+        ,@('binding maximum', 'maximum', (Get-NextLaneCount 2 $infinite 20 16 2).Binding)
+        ,@('binding no rate', 'no burn rate', (Get-NextLaneCount 2 $null 6 8 16).Binding)
         ,@('idle-lanes', 'null', "$(if ($null -eq (Get-BurnRate $idle FiveHour)) { 'null' } else { 'a rate' })")
         ,@('lane-to-add 1,2,4', '3', "$(Get-LaneToAdd -Active 1, 2, 4 -Max 16)")
         ,@('lane-to-add 1..16', 'null', "$(if ($null -eq (Get-LaneToAdd -Active (1..16) -Max 16)) { 'null' } else { 'a lane' })")
@@ -2166,6 +2194,8 @@ if ($TestHeartbeat) {
             Set-HeartbeatTask $fake.Task -Title $fake.Title
             Write-Heartbeat $fake.Phase $fake.Step
         }
+        # A made-up Auto step, so the merged file carries an autoLanes object.
+        Set-AutoLanesStatus -Lanes 4 -Target 5.24 -Binding 'weekly pace' -Reason 'lanes 3 -> 4 (weekly pace allows 5.2)'
         $json = Get-BoardStatusJson -Branch 'work/dark-factory'
         $json
         New-BoardCommit $json
@@ -2410,6 +2440,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if ($LaneCount -gt $start.Count) { $why = "lane $LaneCount adopted from the previous shift" }
         $LaneCount = [math]::Max($LaneCount, $start.Count)
         Write-Trace '-' 'lanes' "lanes auto: starting at $LaneCount ($why)" 'Cyan'
+        Set-AutoLanesStatus -Lanes $LaneCount -Target $null -Binding 'no burn rate' -Reason "lanes auto: starting at $LaneCount ($why)"
     }
 
     # The previous shift stopped claiming work near the end of its session; this one starts
@@ -2524,7 +2555,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         $current = @($activeLanes | Where-Object { $retiring -notcontains $_ }).Count
         $low = Get-UsageStop
         $hold = if ($low) { "tokens low: $low" } elseif ((Get-Date) -gt $shiftEnd) { 'shift time up' } else { '' }
-        if ($hold) { Write-Trace '-' 'lanes' "lanes $current held ($hold)" 'DarkGray'; return }
+        if ($hold) {
+            Write-Trace '-' 'lanes' "lanes $current held ($hold)" 'DarkGray'
+            Set-AutoLanesStatus -Lanes $current -Target $script:AutoLanesStatus.target -Binding $script:AutoLanesStatus.binding
+            return
+        }
         $now = Get-Date
         $reading = Get-UsageReading -ThisShift
         if ($reading) {
@@ -2539,6 +2574,9 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         $script:Auto.WeeklyRate = $step.WeeklyRate
         # A low step that retired a lane starts the count again; one that held arms the next.
         $script:Auto.LastLow = [bool]($step.Next.Low -and -not $step.Next.Changed)
+        # status.json's autoLanes follows every step; the reason and time only a change.
+        $target = if ($step.Pace) { $step.Next.Desired } else { $null }
+        Set-AutoLanesStatus -Lanes $current -Target $target -Binding $step.Next.Binding
         if (-not $step.Next.Changed) { Write-Trace '-' 'lanes' $step.Next.Reason 'DarkGray'; return }
         Write-Trace '-' 'lanes' $step.Next.Reason 'Cyan'
         if ($step.Next.Lanes -gt $current) {
@@ -2555,6 +2593,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             $script:LaneCount = $current - $retired
         }
         try { $Host.UI.RawUI.WindowTitle = "Dark factory - $($script:LaneCount) lanes (auto)" } catch { }
+        Set-AutoLanesStatus -Lanes $script:LaneCount -Target $target -Binding $step.Next.Binding -Reason $step.Next.Reason
         Save-AutoLanes $script:LaneCount
     }
 
