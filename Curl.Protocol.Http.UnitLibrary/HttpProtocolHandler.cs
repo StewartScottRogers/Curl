@@ -227,7 +227,8 @@ public sealed class HttpProtocolHandler(
             IsProxy: false);
         ProxyEndpoint? forwardProxy = ForwardProxyOf(context.Url, options);
         using HttpTransferDeadline deadline = new(context);
-        HttpRequestPlan plan = new(context, options, framing, authRequest, Authenticator.CreateAuthorization(authRequest, []))
+        string? authorization = await Authenticator.CreateAuthorizationAsync(authRequest, [], context.CancellationToken).ConfigureAwait(false);
+        HttpRequestPlan plan = new(context, options, framing, authRequest, authorization)
         {
             Started = started,
             Deadline = deadline,
@@ -608,7 +609,7 @@ public sealed class HttpProtocolHandler(
             ThrowIfClosedBeforeContentLength(plan, actedOn, headReader);
             headReader.ReportHeaderHeldAtClose();
             ReportNoEndOfMessageIndicator(plan, actedOn, headReader);
-            retry = RetryOf(plan, actedOn, bodyLeftUnsent, upload);
+            retry = await RetryOfAsync(plan, actedOn, bodyLeftUnsent, upload, cancellationToken).ConfigureAwait(false);
             HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
             bool discardsBody = retry is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
@@ -1022,7 +1023,7 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Decides whether a response is answered with one more request, and which: the same
-    /// request with the <c>Authorization</c> value <see cref="RetryAuthorization" /> gives, or
+    /// request with the <c>Authorization</c> value <see cref="RetryAuthorizationAsync" /> gives, or
     /// else, for a 417 <see cref="RetriesWithoutExpect" /> accepts, the same request without
     /// <c>Expect</c> and with the body <paramref name="upload" /> rewinds; <see langword="null" />
     /// when the response is the result. A resend after a 417 that arrived while the body was
@@ -1032,9 +1033,9 @@ public sealed class HttpProtocolHandler(
     /// <exception cref="HttpTransferException">
     /// The resend would pass <see cref="HttpRequestOptions.MaxRedirects" /> (exit 47).
     /// </exception>
-    private HttpRequestPlan? RetryOf(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent, HttpRequestBodyWriter upload)
+    private async ValueTask<HttpRequestPlan?> RetryOfAsync(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent, HttpRequestBodyWriter upload, CancellationToken cancellationToken)
     {
-        if (RetryAuthorization(plan, head) is { } authorization)
+        if (await RetryAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorization)
         {
             return plan.WithAuthorization(authorization);
         }
@@ -1085,7 +1086,7 @@ public sealed class HttpProtocolHandler(
     /// when its body can be sent again, and only when the authenticator answers the
     /// response's <c>WWW-Authenticate</c> challenges.
     /// </summary>
-    private string? RetryAuthorization(HttpRequestPlan plan, HttpResponseHead head)
+    private async ValueTask<string?> RetryAuthorizationAsync(HttpRequestPlan plan, HttpResponseHead head, CancellationToken cancellationToken)
     {
         if (!MayRetry(plan, head))
         {
@@ -1093,7 +1094,7 @@ public sealed class HttpProtocolHandler(
         }
 
         string[] challenges = ValuesOf(head, "WWW-Authenticate");
-        return challenges.Length == 0 ? null : Authenticator.CreateAuthorization(plan.AuthRequest, challenges);
+        return challenges.Length == 0 ? null : await Authenticator.CreateAuthorizationAsync(plan.AuthRequest, challenges, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
