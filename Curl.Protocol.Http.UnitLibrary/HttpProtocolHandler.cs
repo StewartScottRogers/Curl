@@ -770,10 +770,18 @@ public sealed class HttpProtocolHandler(
             _ => HttpConnectionInfoLines.ShuttingDown(connect.ConnectionNumber),
         };
 
+    /// <summary>
+    /// Names a connection left intact by its Unix domain socket, else by the alt-svc
+    /// alternative it was dialled to, else by the target's host and port: curl 8.21.0 names the
+    /// host it connected to, not the origin (BL-623 case 1, BL-900).
+    /// </summary>
     private static string LeftIntactLine(ConnectTarget target, ConnectResult connect) =>
-        connect.UnixSocketPath is { } socketPath
-            ? HttpConnectionInfoLines.LeftIntactOverUnixSocket(connect.ConnectionNumber, socketPath)
-            : HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, target.Host, target.Port);
+        (connect.UnixSocketPath, target.AltSvcRoute) switch
+        {
+            ({ } socketPath, _) => HttpConnectionInfoLines.LeftIntactOverUnixSocket(connect.ConnectionNumber, socketPath),
+            (null, { Alternative: var alternative }) => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, alternative.Host, alternative.Port),
+            _ => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, target.Host, target.Port),
+        };
 
     /// <summary>
     /// Sends the request on <paramref name="transport" /> and reads the response into the
