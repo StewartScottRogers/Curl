@@ -305,6 +305,13 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
+    public void FromCommandLine_Crlfile_SetsTheTargetsCertificateRevocationListFileOnly()
+    {
+        Assert.AreEqual(new TlsClientOptions(CertificateRevocationListFile: "revoked.crl"), Map("--crlfile", "revoked.crl", Url));
+        Assert.AreEqual(new TlsClientOptions(), MapProxy("--crlfile", "revoked.crl", Url));
+    }
+
+    [TestMethod]
     public void ProxyFromCommandLine_CertStatusAndSslAutoClientCert_NeverReachTheProxy()
     {
         Assert.AreEqual(new TlsClientOptions(), MapProxy("--cert-status", "--ssl-auto-client-cert", Url));
