@@ -1,5 +1,5 @@
 ---
-id: BL-978
+id: BL-981
 title: Fail --negotiate -f with the context's failure as curl's error message
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-978 — Fail --negotiate -f with the context's failure as curl's error message
+# BL-981 — Fail --negotiate -f with the context's failure as curl's error message
 
 ## Goal
 

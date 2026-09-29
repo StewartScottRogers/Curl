@@ -44,7 +44,7 @@ Under `-v`, `--negotiate` on a `ws://` or `wss://` URL writes the context-failur
   ticket on hand to measure it).
 - `touches` widened with ADR-0231's file, whose "the WebSocket handler does not yet (BL-955)"
   became false; no task in Doing names it (BL-943 touches ADR-0172 only).
-- Follow-up filed: BL-978, the HTTP handler's `-f` exit 22 message after a Negotiate failure
+- Follow-up filed: BL-981, the HTTP handler's `-f` exit 22 message after a Negotiate failure
   (measured: curl writes the failure line there too).
 - Tests: `WsProtocolHandlerNegotiateTests` (per-platform `OSCondition` transcripts, error message,
   header placement, no-step cases), `WsNegotiateInfoLinesTests`, `WsInfoLineRecorderTests`.
