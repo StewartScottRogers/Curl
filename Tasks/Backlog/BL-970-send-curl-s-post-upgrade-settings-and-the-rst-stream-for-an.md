@@ -1,5 +1,5 @@
 ---
-id: BL-969
+id: BL-970
 title: Send curl's post-upgrade SETTINGS and the RST_STREAM for an ignored stream-1 body after an h2c upgrade
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-969 — Send curl's post-upgrade SETTINGS and the RST_STREAM for an ignored stream-1 body after an h2c upgrade
+# BL-970 — Send curl's post-upgrade SETTINGS and the RST_STREAM for an ignored stream-1 body after an h2c upgrade
 
 ## Goal
 

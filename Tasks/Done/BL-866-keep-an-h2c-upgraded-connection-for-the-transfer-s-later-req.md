@@ -135,7 +135,7 @@ curl: (16) Error in the HTTP2 framing layer
   BL-959 (already filed); the `Reusing existing` and `[HTTP/2] [3] OPENED` lines come from the
   existing pooled-HTTP/2 path for the next URL.
 - The extra SETTINGS INITIAL_WINDOW_SIZE 65536 and the RST_STREAM on stream 1 for an ignored
-  body are not sent: filed as BL-969.
+  body are not sent: filed as BL-970.
 
 ## Log
 
