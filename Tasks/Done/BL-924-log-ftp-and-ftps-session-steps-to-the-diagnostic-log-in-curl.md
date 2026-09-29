@@ -8,7 +8,7 @@ depends-on: [BL-938]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-924 — Log FTP and FTPS session steps to the diagnostic log in Curl.Protocol.Ftp
 
@@ -27,17 +27,21 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Protocol.Ftp.UnitTests` pin: a passive download logs `info` for login, the data connection and the transfer end; an EPSV refusal then PASV logs `warning`; at `verbose` a `USER` command appears and no message contains the password; a `550` on `RETR` logs `error` naming its `CurlExitCode`; the data connection's `ConnectTarget` carries the incoming `DiagnosticLog`.
-- [ ] With the default `NoDiagnosticLog.Instance` every existing test in the touched test projects passes unmodified.
-- [ ] A test shows that at `DiagnosticLogLevel.Error` no `info` or `verbose` line is recorded, and one test per credential-bearing path listed in Context shows no recorded message contains the secret.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
-- [ ] `Measure-CodeQuality.ps1 -Library <library>` reports 100% line and branch coverage and no failing member for each library touched (complexity at most 10 per method: put logging in small helpers rather than growing a method).
+- [x] `Curl.Protocol.Ftp.UnitTests` pin: a passive download logs `info` for login, the data connection and the transfer end; an EPSV refusal then PASV logs `warning`; at `verbose` a `USER` command appears and no message contains the password; a `550` on `RETR` logs `error` naming its `CurlExitCode`; the data connection's `ConnectTarget` carries the incoming `DiagnosticLog`.
+- [x] With the default `NoDiagnosticLog.Instance` every existing test in the touched test projects passes unmodified.
+- [x] A test shows that at `DiagnosticLogLevel.Error` no `info` or `verbose` line is recorded, and one test per credential-bearing path listed in Context shows no recorded message contains the secret.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `Measure-CodeQuality.ps1 -Library <library>` reports 100% line and branch coverage and no failing member for each library touched (complexity at most 10 per method: put logging in small helpers rather than growing a method).
 
 ## Notes
 
 - BL-930 and BL-931 (curl's own FTP `-v`/`--trace` lines) touch the same library; whichever lands second keeps the other's tests green.
+- Delivered (2026-09-29): `FtpDiagnosticLog` wraps `ITransferContext.DiagnosticLog` with one small method per session step, each testing `IsEnabled` before formatting, so `FtpSession` gains only one-line calls and no method passes complexity 10. `FtpControlChannel` logs each command sent and each reply (code and first line) at `verbose`, `QUIT` included, though `-v` stops before it. `FtpSession.RunAsync` logs the outcome once: `error` `failed with <CurlExitCode> (<n>): <message>`, or `info` `transfer finished: <bytes> bytes in <ms> ms`; the handler logs a failed control connect the same way. Both `ConnectTarget`s carry the incoming log.
+- Choice: `PASS` and `ACCT` are redacted by verb, ignoring case, wherever they come from (the login or a `-Q` quote), as `sent PASS (not logged)`. The session never sends `ACCT` itself yet (a `332` ends with exit 67), so `--ftp-account` is pinned by a test that its value appears in no message. No new ADR: ADR-0222 already fixes the levels, the component and the never-logged values.
+- Tests: `FtpProtocolHandlerDiagnosticLogTests` (16) with a hand-rolled `RecordingDiagnosticLog` that also fails any write at a level it did not enable. `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. FTP and FTPS sessions write login, TLS, directory, data connection, fallbacks, transfer and failures to the diagnostic log (component ftp), never a password
