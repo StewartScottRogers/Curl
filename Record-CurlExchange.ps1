@@ -123,7 +123,8 @@
     for the reply sent after RETR's or LIST's data, or STORDONE for the reply sent after
     STOR's or APPE's data. An overridden EPSV, PASV, RETR, LIST, NLST, STOR or APPE sends
     only the reply: no data connection is offered. The reply CLOSE closes the control
-    connection instead of answering, e.g. 'PWD=CLOSE'. Several overrides for one VERB are
+    connection instead of answering, e.g. 'PWD=CLOSE', and the reply STALL sends nothing and
+    waits for curl's next command, e.g. 'USER=STALL' or 'GREETING=STALL' (BL-512). Several overrides for one VERB are
     answered in the order given, one per command, the last repeating for the rest, e.g.
     'CWD=550 No such directory' 'CWD=250 OK' (BL-436). In a reply, {DATAPORT} stands for
     the data listener's port and {DATAPORT_HI} and {DATAPORT_LO} for its two PASV numbers,
@@ -133,6 +134,11 @@
     The file served by RETR, and the listing served by LIST, in -Ftp mode, with the
     same backslash escapes as Response.
     Default empty.
+
+.PARAMETER FtpDataHoldMilliseconds
+    How long, in -Ftp mode, the server keeps a RETR, LIST or NLST data connection open after
+    sending FtpData, before it closes it and sends the 226. Default 0. With a SIZE override
+    larger than FtpData it stalls a download midway, to measure -m mid-RETR (BL-512).
 
 .PARAMETER Smtp
     Serve one SMTP session instead of HTTP responses (BL-529): send a greeting, then read
@@ -377,6 +383,7 @@ param(
     [string[]] $FtpReply = @(),
     [string] $FtpData = '',
     [ValidateRange(1, 600000)] [int] $FtpIdleMilliseconds = 5000,
+    [ValidateRange(0, 600000)] [int] $FtpDataHoldMilliseconds = 0,
     [switch] $Smtp,
     [string[]] $SmtpReply = @(),
     [ValidateRange(1, 600000)] [int] $SmtpIdleMilliseconds = 5000,
@@ -618,7 +625,7 @@ $sessionHelpers = {
 # one array, writes the two-way transcript into $Transcript, and the bytes uploaded on
 # STOR and APPE data connections into $UploadedData.
 $serveFtpSession = {
-    param($Listener, [hashtable] $Overrides, [byte[]] $DataBytes, [System.Text.StringBuilder] $Transcript, [System.IO.MemoryStream] $UploadedData, $TlsCertificate, [bool] $ImplicitTls, [int] $ControlIdleMilliseconds, [System.Net.IPAddress] $ListenAddress, [string] $SessionHelpers)
+    param($Listener, [hashtable] $Overrides, [byte[]] $DataBytes, [System.Text.StringBuilder] $Transcript, [System.IO.MemoryStream] $UploadedData, $TlsCertificate, [bool] $ImplicitTls, [int] $ControlIdleMilliseconds, [System.Net.IPAddress] $ListenAddress, [string] $SessionHelpers, [int] $DataHoldMilliseconds)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -684,7 +691,7 @@ $serveFtpSession = {
             if ($ImplicitTls) { $stream = Wrap-Tls -Stream $stream }
             $stream.ReadTimeout = $ControlIdleMilliseconds
             $greeting = if ($Overrides.ContainsKey('GREETING')) { Get-Override -Verb 'GREETING' } else { '220 Recorder ready' }
-            Send-Reply -Stream $stream -Reply $greeting
+            if ($greeting -cne 'STALL') { Send-Reply -Stream $stream -Reply $greeting }
             $line = New-Object System.IO.MemoryStream
             while ($true) {
                 try {
@@ -704,6 +711,7 @@ $serveFtpSession = {
                 if ($Overrides.ContainsKey($verb)) {
                     $override = Get-Override -Verb $verb
                     if ($override -ceq 'CLOSE') { break }  # Hang up instead of replying.
+                    if ($override -ceq 'STALL') { continue }  # Answer nothing; curl waits (BL-512).
                     Send-Reply -Stream $stream -Reply $override
                     if ($verb -eq 'QUIT') { break }
                     # A refused PROT leaves the data connections in plaintext.
@@ -751,6 +759,8 @@ $serveFtpSession = {
                             $start = [int] [Math]::Max(0, [Math]::Min($restOffset, $DataBytes.Length))
                             $dataStream.Write($DataBytes, $start, $DataBytes.Length - $start)
                             $dataStream.Flush()
+                            # Stall the download midway, as a server that stops sending does (BL-512).
+                            if ($DataHoldMilliseconds -gt 0) { [System.Threading.Thread]::Sleep($DataHoldMilliseconds) }
                             # A TLS data connection ends with close_notify, so curl reads a clean end.
                             if ($dataStream -is [System.Net.Security.SslStream]) { $dataStream.ShutdownAsync().Wait() }
                         } catch [System.IO.IOException] {
@@ -1487,7 +1497,7 @@ try {
     if ($NoServer) {
         $serverRun = $null
     } elseif ($Ftp) {
-        [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress).AddArgument($sessionHelpers.ToString())
+        [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress).AddArgument($sessionHelpers.ToString()).AddArgument($FtpDataHoldMilliseconds)
     } elseif ($Smtp) {
         [void] $server.AddScript($serveSmtpSession).AddArgument($listener).AddArgument($smtpOverrides).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($SmtpIdleMilliseconds).AddArgument($sessionHelpers.ToString())
     } elseif ($Imap) {
