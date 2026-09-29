@@ -21,6 +21,7 @@ A second `ITlsProvider` in `Curl.Networking.UnitLibrary` runs the hand-built TLS
 - Standing rule (root `CLAUDE.md`, "Decisions", 2026-09-28). Code: `Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs`, `ITlsProvider`, `TlsClientOptions.cs`, `TlsFailureMessages.cs`, `OpenSslVerifyResult.cs`; composition in `Curl.Console/CurlTransports.cs` and `TlsClientOptionsMapping.cs`. `Curl.Networking.UnitLibrary` gains a reference to `Curl.Tls.UnitLibrary` (allowed: it is not a protocol library).
 - The routing rule is the ADRs'; this task implements it as one pure function with data-row tests, so later option tasks (BL-709 to BL-714) only add rows.
 - HTTPS proxies (ADR-0095) route the same way with their own options.
+- ADR-0157 (BL-700): `Tls13ClientStream` returns 0 at a transport end without `close_notify`, as `SslStream` does; where that leaves a transfer unfinished, the provider fails it with exit 56 and the OpenSSL text in `TlsFailureMessages`, using `CloseNotifyReceived`.
 
 ## Acceptance criteria
 
