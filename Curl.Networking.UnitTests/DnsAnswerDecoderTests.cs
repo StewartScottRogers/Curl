@@ -313,6 +313,53 @@ public sealed class DnsAnswerDecoderTests
         Assert.HasCount(4, answer.CanonicalNames);
     }
 
+    [TestMethod]
+    public void Decode_AnSrvAnswer_StoresEachRecordWithItsTargetFollowedThroughPointers()
+    {
+        // Question: _k.example.test SRV; answers: 0 100 88 kdc.<question's example.test>, and 5 1 750 "." (no service).
+        const string QuestionSrv = "025F6B076578616D706C6504746573740000210001";
+        const string First = "C00C002100010000003C000C" + "0000" + "0064" + "0058" + "036B6463C00F";
+        const string Second = "C00C002100010000003C0007" + "0005" + "0001" + "02EE" + "00";
+        var message = Message(Header("8180", 1, 2) + QuestionSrv + First + Second);
+
+        var answer = DnsAnswerDecoder.Decode(message, DnsRecordType.Srv);
+
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
+        CollectionAssert.AreEqual(
+            new[] { new DnsServiceRecord(0, 100, 88, "kdc.example.test"), new DnsServiceRecord(5, 1, 750, string.Empty) },
+            answer.ServiceRecords.ToArray());
+        Assert.IsEmpty(answer.Addresses);
+    }
+
+    [TestMethod]
+    public void Decode_AnSrvRecordTooShortForItsNumbersAndName_IsAnRdataLengthFailure()
+    {
+        const string QuestionSrv = "025F6B076578616D706C6504746573740000210001";
+        var message = Message(Header("8180", 1, 1) + QuestionSrv + "C00C002100010000003C0006000000000058");
+
+        var answer = DnsAnswerDecoder.Decode(message, DnsRecordType.Srv);
+
+        Assert.AreEqual(DnsMessageFailure.RdataLength, answer.Failure);
+        Assert.IsEmpty(answer.ServiceRecords);
+    }
+
+    [TestMethod]
+    public void Decode_ARecordOfATypeItDoesNotStore_IsAcceptedButStoresNothing()
+    {
+        // Asked for NS (type 2), which neither DoH nor the --dns-servers client asks for.
+        var message = Message(Header("8180", 1, 1) + "076578616D706C6504746573740000020001" + AuthorityNs);
+
+        var answer = DnsAnswerDecoder.Decode(message, (DnsRecordType)2);
+
+        Assert.AreEqual(DnsMessageFailure.NoContent, answer.Failure);
+    }
+
+    [TestMethod]
+    public void Decode_AnAAnswer_HasNoServiceRecords()
+    {
+        Assert.IsEmpty(DnsAnswerDecoder.Decode(MeasuredAnswer, DnsRecordType.A).ServiceRecords);
+    }
+
     /// <summary>A header with ID 0, the given flags and section counts, in hex.</summary>
     private static string Header(string flags, int questions, int answers, int authorities = 0, int additionals = 0) =>
         "0000" + flags + $"{questions:X4}{answers:X4}{authorities:X4}{additionals:X4}";

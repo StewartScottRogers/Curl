@@ -94,7 +94,9 @@ public sealed class UdpDatagramConnector : IDatagramConnector
     /// <c>Failed to connect to &lt;host&gt;:&lt;port&gt; after &lt;n&gt; ms: Could not connect
     /// to server</c> for exit 7 when no resolved address can have a socket opened for it, with
     /// <c> via &lt;mapped host&gt;:&lt;mapped port&gt;</c> before <c>after</c> when a mapping
-    /// matched, where <c>n</c> is measured by the injected <see cref="TimeProvider" />.
+    /// matched, where <c>n</c> is measured by the injected <see cref="TimeProvider" />. A resolver
+    /// that says why a name did not resolve adds the reason, or makes it exit 43, as
+    /// <see cref="NameResolutionFailure" /> words it (BL-694).
     /// </para>
     /// </remarks>
     public async ValueTask<DatagramOpenResult> OpenAsync(string host, int port, CancellationToken cancellationToken)
@@ -107,12 +109,11 @@ public sealed class UdpDatagramConnector : IDatagramConnector
             return DatagramOpenResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
         }
 
-        var addresses = await ResolveAsync(destination, cancellationToken).ConfigureAwait(false);
+        var (addresses, failure) = await ResolveAsync(destination, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
-            return DatagramOpenResult.Failed(
-                CurlExitCode.CouldntResolveHost,
-                CurlErrorBuffer.Truncate($"Could not resolve host: {destination.Host}"));
+            var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
+            return DatagramOpenResult.Failed(exitCode, message);
         }
 
         var openStarted = _timeProvider.GetTimestamp();
@@ -122,12 +123,19 @@ public sealed class UdpDatagramConnector : IDatagramConnector
             : DatagramOpenResult.Opened(channel);
     }
 
-    private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(ConnectDestination destination, CancellationToken cancellationToken) =>
-        AddressFamilyFilter.Dialable(
-            destination.Host,
-            _resolveOverrides.Find(destination.Host, destination.Port)
-                ?? await _dnsResolver.ResolveAsync(destination.Host, cancellationToken).ConfigureAwait(false),
-            _addressFamily);
+    private async ValueTask<DnsResolution> ResolveAsync(ConnectDestination destination, CancellationToken cancellationToken)
+    {
+        var (addresses, failure) = _resolveOverrides.Find(destination.Host, destination.Port) is { } overridden
+            ? new DnsResolution(overridden, DnsLookupFailure.None)
+            : await LookUpAsync(destination.Host, cancellationToken).ConfigureAwait(false);
+        return new DnsResolution(AddressFamilyFilter.Dialable(destination.Host, addresses, _addressFamily), failure);
+    }
+
+    /// <summary>Asks the resolver, with its failure reason when it gives one.</summary>
+    private async ValueTask<DnsResolution> LookUpAsync(string host, CancellationToken cancellationToken) =>
+        _dnsResolver is IDnsResolverWithFailureReason withFailureReason
+            ? await withFailureReason.ResolveWithFailureReasonAsync(host, cancellationToken).ConfigureAwait(false)
+            : new DnsResolution(await _dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false), DnsLookupFailure.None);
 
     private DatagramOpenResult OpenFailure(string host, int port, ConnectDestination destination, long openStarted)
     {

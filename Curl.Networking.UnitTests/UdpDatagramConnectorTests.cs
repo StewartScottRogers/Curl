@@ -41,6 +41,40 @@ public sealed class UdpDatagramConnectorTests
     }
 
     [TestMethod]
+    public async Task OpenAsync_WhenTheResolverExplainsTheFailure_AddsTheReason()
+    {
+        // curl --dns-servers <nxdomain> tftp://bl694.example/x -> curl: (6) Could not resolve host: bl694.example (Domain name not found)
+        var connector = CreateConnector(new ReasoningDnsResolver(new DnsResolution([], DnsLookupFailure.NotFound)), OpenFake([]));
+
+        var result = await connector.OpenAsync("bl694.example", 69, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.AreEqual("Could not resolve host: bl694.example (Domain name not found)", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WhenTheDnsConfigurationDoesNotParse_FailsWithExit43()
+    {
+        var connector = CreateConnector(new ReasoningDnsResolver(new DnsResolution([], DnsLookupFailure.BadConfiguration)), OpenFake([]));
+
+        var result = await connector.OpenAsync("bl694.example", 69, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
+        Assert.AreEqual("Error 43 resolving bl694.example:69", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WhenTheExplainingResolverResolves_OpensItsAddress()
+    {
+        var opened = new List<IPEndPoint>();
+        var connector = CreateConnector(new ReasoningDnsResolver(new DnsResolution([IPAddress.Loopback], DnsLookupFailure.None)), OpenFake(opened));
+
+        await connector.OpenAsync("bl694.example", 69, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Loopback, 69) }, opened);
+    }
+
+    [TestMethod]
     public async Task OpenAsync_WhenOpenSucceeds_ReportsTheFirstResolvedAddressWithTheRequestedPort()
     {
         var first = IPAddress.Parse("192.0.2.1");

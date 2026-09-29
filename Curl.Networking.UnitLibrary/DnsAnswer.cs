@@ -16,4 +16,11 @@ public sealed record DnsAnswer(
     DnsMessageFailure Failure,
     IReadOnlyList<IPAddress> Addresses,
     IReadOnlyList<string> CanonicalNames,
-    uint TimeToLiveSeconds);
+    uint TimeToLiveSeconds)
+{
+    /// <summary>
+    /// Gets the SRV records of an answer to a <see cref="DnsRecordType.Srv" /> query, in answer
+    /// order; empty for any other query and when <see cref="Failure" /> is not <see cref="DnsMessageFailure.None" />.
+    /// </summary>
+    public IReadOnlyList<DnsServiceRecord> ServiceRecords { get; init; } = [];
+}

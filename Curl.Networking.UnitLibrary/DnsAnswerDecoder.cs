@@ -10,20 +10,22 @@ namespace Curl.Networking;
 /// must be the type asked for, a CNAME or a DNAME, of class IN; A and AAAA data are stored, CNAME
 /// targets are followed through compression pointers, and DNAME records and the authority and
 /// additional sections are skipped; every byte must be accounted for, and an answer with no
-/// address and no CNAME is <see cref="DnsMessageFailure.NoContent" />.
+/// address and no CNAME is <see cref="DnsMessageFailure.NoContent" />. For a
+/// <see cref="DnsRecordType.Srv" /> query, which DoH never sends and <see cref="DnsServerResolver" />
+/// does (BL-694), SRV records are stored as <see cref="DnsAnswer.ServiceRecords" /> and count as content.
 /// </summary>
 public static class DnsAnswerDecoder
 {
     /// <summary>Decodes <paramref name="message" /> as the answer to a query for <paramref name="askedType" />.</summary>
     /// <param name="message">The DNS message, the DoH response body.</param>
-    /// <param name="askedType">The record type the query asked for, <see cref="DnsRecordType.A" /> or <see cref="DnsRecordType.Aaaa" />.</param>
+    /// <param name="askedType">The record type the query asked for, <see cref="DnsRecordType.A" />, <see cref="DnsRecordType.Aaaa" /> or <see cref="DnsRecordType.Srv" />.</param>
     /// <returns>The addresses, CNAMEs and TTL, or the failure that stopped the decode.</returns>
     public static DnsAnswer Decode(ReadOnlySpan<byte> message, DnsRecordType askedType)
     {
         var reader = new DnsAnswerReader(message.ToArray(), askedType);
         var failure = reader.Read();
         return failure == DnsMessageFailure.None
-            ? new DnsAnswer(failure, reader.Addresses, reader.CanonicalNames, reader.TimeToLiveSeconds)
+            ? new DnsAnswer(failure, reader.Addresses, reader.CanonicalNames, reader.TimeToLiveSeconds) { ServiceRecords = reader.ServiceRecords }
             : new DnsAnswer(failure, [], [], reader.TimeToLiveSeconds);
     }
 
@@ -48,6 +50,8 @@ public static class DnsAnswerDecoder
         public List<IPAddress> Addresses { get; } = [];
 
         public List<string> CanonicalNames { get; } = [];
+
+        public List<DnsServiceRecord> ServiceRecords { get; } = [];
 
         public uint TimeToLiveSeconds { get; private set; } = int.MaxValue;
 
@@ -92,7 +96,7 @@ public static class DnsAnswerDecoder
                 return DnsMessageFailure.Malformed;
             }
 
-            return Addresses.Count == 0 && CanonicalNames.Count == 0
+            return Addresses.Count == 0 && CanonicalNames.Count == 0 && ServiceRecords.Count == 0
                 ? DnsMessageFailure.NoContent
                 : DnsMessageFailure.None;
         }
@@ -182,6 +186,7 @@ public static class DnsAnswerDecoder
                 (ushort)DnsRecordType.A => StoreAddress(4),
                 (ushort)DnsRecordType.Aaaa => StoreAddress(16),
                 (ushort)DnsRecordType.Cname => StoreCanonicalName(),
+                (ushort)DnsRecordType.Srv => StoreServiceRecord(),
                 _ => DnsMessageFailure.None,
             };
             _index += _recordDataLength;
@@ -213,6 +218,23 @@ public static class DnsAnswerDecoder
             var name = new StringBuilder();
             var failure = FollowName(_index, name);
             CanonicalNames.Add(name.ToString());
+            return failure;
+        }
+
+        /// <summary>
+        /// Stores an SRV record's priority, weight, port and target (RFC 2782); data too short to
+        /// hold the three numbers and a name is <see cref="DnsMessageFailure.RdataLength" />.
+        /// </summary>
+        private DnsMessageFailure StoreServiceRecord()
+        {
+            if (_recordDataLength < 7)
+            {
+                return DnsMessageFailure.RdataLength;
+            }
+
+            var target = new StringBuilder();
+            var failure = FollowName(_index + 6, target);
+            ServiceRecords.Add(new DnsServiceRecord(ReadUInt16At(_index), ReadUInt16At(_index + 2), ReadUInt16At(_index + 4), target.ToString()));
             return failure;
         }
 

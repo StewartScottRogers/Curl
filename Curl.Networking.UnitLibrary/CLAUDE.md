@@ -26,8 +26,9 @@ This is the one project allowed to construct a `Socket`, and only inside a trans
 type: `TcpDialer` (behind `ITcpDialer`) and `TcpConnectionListener` with its
 `TcpPendingConnection` (behind `IConnectionListener`) are the only types that construct a TCP
 `Socket` or a `NetworkStream` (`TcpDialer` also connects the Unix domain socket, BL-507), and `UdpDatagramChannel` (opened by
-`UdpDatagramConnector`, behind `IDatagramConnector`) the only one that constructs a
-UDP `Socket`. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
+`UdpDatagramConnector`, behind `IDatagramConnector`, and by `DnsSocketOpener`) the only one that constructs a
+UDP `Socket`; `DnsSocketOpener` (behind `IDnsSocketOpener`) also constructs the TCP `Socket` and
+`NetworkStream` a truncated DNS reply is asked again over. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
 `TlsClientOptions`) is the only type that constructs an `SslStream`; it runs the
 handshake over the plaintext `IConnection` through the internal `ConnectionStream`
 adapter and returns an `SslStreamConnection`. With `--cacert` (`TlsClientOptions.CaCertificateFile`)
@@ -200,7 +201,23 @@ curl 8.21.0's `lib/doh.c` does it. `DnsQueryEncoder` writes the measured query (
 bytes and a query over 272 bytes. `DnsAnswerDecoder` returns a `DnsAnswer`: the addresses of the
 type asked for (at most 24), the CNAME targets followed through compression pointers (at most 4),
 the smallest TTL, or a `DnsMessageFailure`, a pointer loop ending as `LabelLoop` after 128 steps.
-`DnsMessageFailureText` gives curl's `--trace-config doh` text for each failure.
+`DnsMessageFailureText` gives curl's `--trace-config doh` text for each failure. For an SRV query
+the decoder also keeps each SRV record as `DnsAnswer.ServiceRecords` (`DnsServiceRecord`).
+
+Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
+`--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr`, measured against curl 8.22.0's c-ares
+1.34.8 build. It takes the options verbatim (`DnsServerResolverOptions`) and parses them when it
+resolves: `DnsServerList` for the list, `DnsSourceBinding` for the bind addresses; one that does not
+parse is `DnsLookupFailure.BadConfiguration`, exit 43. Without `--dns-servers` it asks
+`SystemDnsServers`. It sends AAAA and A at once (one family under `-4`/`-6`), each built by
+`DnsServerQuery` (the encoder's question plus an ID and an EDNS OPT record with a client cookie
+over UDP), to the servers in list order for `Rounds` rounds, waiting `FirstTimeout` doubled each
+round on its `TimeProvider`; a truncated reply is asked again over TCP. Replies are matched
+(`DnsReplyMatch`) and read through `DnsAnswerDecoder` into a `DnsQueryOutcome`. It implements
+`IDnsResolverWithFailureReason`, so `TcpConnector` and `UdpDatagramConnector` add c-ares' reason
+(`DnsLookupFailureText`) in brackets, or make it exit 43, through `NameResolutionFailure`.
+`ResolveServiceAsync` looks up SRV records for Kerberos KDC location (BL-689). Sockets come from
+`IDnsSocketOpener`; tests use `Fakes/ScriptedDnsSocketOpener` and `ManualTimeProvider`.
 
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in
@@ -214,8 +231,8 @@ the test, so TLS is tested without a socket. `TcpConnectionListenerTests` and
 `TcpPendingConnectionTests` bind local TCP sockets without connecting to them. The tests that
 connect or send bytes are the loopback tests in `TcpDialerTests` (TCP and Unix socket), `UdpDatagramChannelTests`,
 `TcpConnectorTests.LocalEndPoint` (plain and over TLS) and the accepting test in `TcpConnectionListenerTests`, tagged
-`[TestCategory("Integration")]`. Per ADR-0083 the five members only those tests can reach,
+`[TestCategory("Integration")]`, as is `DnsSocketOpenerTests`' TCP connect. Per ADR-0083 the six members only those tests can reach,
 `TcpDialer.DialAsync`, `TcpDialer.DialUnixSocketAsync`, `TcpPendingConnection.AcceptStreamConnectionAsync` (behind the internal
-`AcceptConnectionAsync` seam), `UdpDatagramChannel.SendAsync` and `UdpDatagramChannel.ReceiveAsync`,
+`AcceptConnectionAsync` seam), `UdpDatagramChannel.SendAsync`, `UdpDatagramChannel.ReceiveAsync` and `DnsSocketOpener.ConnectStreamAsync`,
 carry `[ExcludeFromCodeCoverage]`, so the fast-run coverage gate holds without the network.
 Keep them thin: logic added there is not measured.

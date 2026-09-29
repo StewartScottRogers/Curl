@@ -209,6 +209,13 @@ public sealed class TcpConnector(
     /// <c>Could not resolve host: &lt;host&gt;</c>, or exit 5 for a proxy. An IP address literal
     /// is dialled as written, as curl 8.21.0 dials it (measured, BL-500).
     /// </para>
+    /// <para>
+    /// A resolver that says why a name did not resolve (<see cref="IDnsResolverWithFailureReason" />,
+    /// the <c>--dns-servers</c> client) adds the reason in brackets, <c>Could not resolve host:
+    /// &lt;host&gt; (Domain name not found)</c>, and a c-ares option that did not parse is exit 43
+    /// <c>Error 43 resolving &lt;host&gt;:&lt;port&gt;</c>, as curl's c-ares build reports them
+    /// (<see cref="NameResolutionFailure" />, BL-694).
+    /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -273,12 +280,11 @@ public sealed class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        var addresses = await ResolveAsync(destination.Host, destination.Port, target.Events, cancellationToken).ConfigureAwait(false);
+        var (addresses, failure) = await ResolveWithFailureReasonAsync(destination.Host, destination.Port, target.Events, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
-            return ConnectResult.Failed(
-                CurlExitCode.CouldntResolveHost,
-                CurlErrorBuffer.Truncate($"Could not resolve host: {destination.Host}"));
+            var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
+            return ConnectResult.Failed(exitCode, message);
         }
 
         var nameResolved = timeProvider.GetTimestamp();
@@ -415,15 +421,15 @@ public sealed class TcpConnector(
     /// whole, and one left with no address of the family is reported as <c>Negative DNS
     /// entry</c> instead, and so fails the resolve (measured on curl 8.21.0, BL-500).
     /// </remarks>
-    private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, ITransferEvents events, CancellationToken cancellationToken)
+    private async ValueTask<DnsResolution> ResolveWithFailureReasonAsync(string host, int port, ITransferEvents events, CancellationToken cancellationToken)
     {
         var cacheKey = DnsCacheKey(host, port);
         if ((_dnsCache.GetValueOrDefault(cacheKey) ?? _dnsCache.GetValueOrDefault(DnsCacheKey(AnyHost, port))) is { } cached)
         {
-            return AnswerFromCache(host, cached, events);
+            return new DnsResolution(AnswerFromCache(host, cached, events), DnsLookupFailure.None);
         }
 
-        var addresses = await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
+        var (addresses, failure) = await LookUpAsync(host, cancellationToken).ConfigureAwait(false);
         var answered = IsLocalhost(host) ? addresses : AddressFamilyFilter.Dialable(host, addresses, addressFamily);
         if (answered.Count > 0)
         {
@@ -432,8 +438,18 @@ public sealed class TcpConnector(
             ReportResolved(resolved, events);
         }
 
-        return AddressFamilyFilter.Dialable(host, answered, addressFamily);
+        return new DnsResolution(AddressFamilyFilter.Dialable(host, answered, addressFamily), failure);
     }
+
+    /// <summary>Resolves as <see cref="ResolveWithFailureReasonAsync" /> does, for a SOCKS handshake, which needs only the addresses.</summary>
+    private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, ITransferEvents events, CancellationToken cancellationToken) =>
+        (await ResolveWithFailureReasonAsync(host, port, events, cancellationToken).ConfigureAwait(false)).Addresses;
+
+    /// <summary>Asks the resolver, with its failure reason when it gives one.</summary>
+    private async ValueTask<DnsResolution> LookUpAsync(string host, CancellationToken cancellationToken) =>
+        dnsResolver is IDnsResolverWithFailureReason withFailureReason
+            ? await withFailureReason.ResolveWithFailureReasonAsync(host, cancellationToken).ConfigureAwait(false)
+            : new DnsResolution(await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false), DnsLookupFailure.None);
 
     private IReadOnlyList<IPAddress> AnswerFromCache(string host, DnsCacheEntry cached, ITransferEvents events)
     {
@@ -487,12 +503,11 @@ public sealed class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        var addresses = await ResolveAsync(proxy.Host, proxy.Port, target.Events, cancellationToken).ConfigureAwait(false);
+        var (addresses, failure) = await ResolveWithFailureReasonAsync(proxy.Host, proxy.Port, target.Events, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
-            return ConnectResult.Failed(
-                CurlExitCode.CouldntResolveProxy,
-                CurlErrorBuffer.Truncate($"Could not resolve proxy: {proxy.Host}"));
+            var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveProxy, "proxy", proxy.Host, proxy.Port, failure);
+            return ConnectResult.Failed(exitCode, message);
         }
 
         var nameResolved = timeProvider.GetTimestamp();
