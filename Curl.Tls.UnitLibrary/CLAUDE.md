@@ -87,7 +87,8 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   the tests (`X25519MlKem768ServerShare`), since the client never needs it.
 - TLS 1.3 over a byte stream (ADR-0157): `Tls13RecordProtection` is one direction under
   one traffic secret (RFC 8446 section 5.2 nonces, no padding sent, peer padding removed,
-  the GCM and ChaCha20-Poly1305 suites; CCM is BL-811's). The internal
+  every TLS 1.3 suite: GCM, ChaCha20-Poly1305, CCM, and CCM8 with its 8-byte tag,
+  BL-811). The internal
   `Tls13RecordLayer` reads whole records off the caller's `Stream` and holds a protection
   per level. `Tls13ClientConnection.ConnectAsync` runs `Tls13ClientHandshake` over it
   (middlebox compatibility `change_cipher_spec` included) and returns a
@@ -99,7 +100,7 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   returns 0 at `close_notify` or a bare transport end (`CloseNotifyReceived` tells them
   apart), and throws `TlsAlertException` for any other alert. The AEADs behind
   `ITlsAead` (`AesGcmTlsAead`, `AriaGcmTlsAead`, `ChaCha20Poly1305TlsAead`) serve both
-  TLS 1.2 and 1.3; `AesCcmTlsAead` (over `Curl.Cryptography`'s `AeadAesCcm`) serves TLS 1.2.
+  TLS 1.2 and 1.3; `AesCcmTlsAead` (over `Curl.Cryptography`'s `AeadAesCcm`) serves both too.
 - `TlsPrf` (`Md5Sha1` for TLS 1.0 and 1.1, `Sha256`, `Sha384`): the PRF of RFC 2246 and
   RFC 5246, the master secret, the extended master secret (RFC 7627), the key block and
   both Finished `verify_data`s. `Tls12KeyBlock.Partition` divides the key block into each

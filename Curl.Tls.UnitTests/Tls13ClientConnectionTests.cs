@@ -212,7 +212,7 @@ public sealed class Tls13ClientConnectionTests
         ScriptedTransport transport = new([]);
 
         await Assert.ThrowsExactlyAsync<ArgumentException>(() => Tls13ClientConnection.ConnectAsync(
-            transport, DefaultSettings with { CipherSuites = [Tls13CipherSuite.Aes128CcmSha256.Code] }, SystemTlsRandomSource.Instance, new RecordingCertificateVerifier(), CancellationToken.None));
+            transport, DefaultSettings with { CipherSuites = [0x1306] }, SystemTlsRandomSource.Instance, new RecordingCertificateVerifier(), CancellationToken.None));
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Tls13ClientConnection.ConnectAsync(
             null!, DefaultSettings, SystemTlsRandomSource.Instance, new RecordingCertificateVerifier(), CancellationToken.None));
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Tls13ClientConnection.ConnectAsync(

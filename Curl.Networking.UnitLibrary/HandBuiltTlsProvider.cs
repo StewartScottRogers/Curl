@@ -339,7 +339,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         IServerCertificateVerifier verifier,
         CancellationToken cancellationToken)
     {
-        var runsTls13 = OffersTls13 && settings.OffersSuiteFor(Tls13RecordProtection.CanProtect);
+        // Every TLS 1.3 suite is runnable (BL-811), and a --tls13-ciphers list naming none
+        // is exit 59 before this, so a range reaching TLS 1.3 always offers it.
+        var runsTls13 = OffersTls13;
         var runsTls12 = OffersBelowTls13 && settings.OffersSuiteFor(IsTls12Suite);
         return runsTls13 && runsTls12 ? await HandshakeTls13OrTls12Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false)
             : runsTls13 ? await HandshakeTls13Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false)

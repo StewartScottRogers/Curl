@@ -16,6 +16,8 @@ public sealed class Tls13ClientStreamTests
     [DataRow((ushort)0x1301)]
     [DataRow((ushort)0x1302)]
     [DataRow((ushort)0x1303)]
+    [DataRow((ushort)0x1304)]
+    [DataRow((ushort)0x1305)]
     public async Task ApplicationDataCrossesBothWaysWithEachCipherSuite(int cipherSuite)
     {
         (Tls13ClientStream client, Tls13RecordTestServer server, _) = await ConnectAsync(
