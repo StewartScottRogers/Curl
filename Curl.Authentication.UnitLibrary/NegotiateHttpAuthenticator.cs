@@ -107,12 +107,17 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
     /// <param name="request">The request being authorised.</param>
     /// <returns>
     /// A Negotiate request for the server's (or proxy's) service on the URL's host, with the
-    /// delegation level and the explicit credential if any.
+    /// delegation level, the connection's server certificate for channel bindings, and the
+    /// explicit credential if any.
     /// </returns>
     internal SecurityContextRequest ContextRequestFor(HttpAuthRequest request)
     {
         string serviceName = (request.IsProxy ? options.ProxyServiceName : options.ServiceName) ?? HttpServiceName;
-        SecurityContextRequest defaults = new(SecurityMechanism.Negotiate, serviceName, request.Url.IdnHost) { Delegation = options.Delegation };
+        SecurityContextRequest defaults = new(SecurityMechanism.Negotiate, serviceName, request.Url.IdnHost)
+        {
+            Delegation = options.Delegation,
+            ServerCertificate = request.ServerCertificate,
+        };
         if (request.Credential is not { UserName.Length: > 0 } credential)
         {
             return defaults;

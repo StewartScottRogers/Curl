@@ -48,4 +48,10 @@ public sealed record HttpAuthRequest(
     /// land.
     /// </summary>
     public ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
+
+    /// <summary>
+    /// Gets the DER of the TLS server certificate of the connection the request goes over;
+    /// empty, the default, when it has no TLS. Negotiate turns it into channel bindings (BL-915).
+    /// </summary>
+    public ReadOnlyMemory<byte> ServerCertificate { get; init; }
 }

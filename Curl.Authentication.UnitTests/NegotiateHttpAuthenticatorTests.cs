@@ -168,6 +168,15 @@ public sealed class NegotiateHttpAuthenticatorTests
     }
 
     [TestMethod]
+    public void ContextRequestFor_ServerCertificate_PassesItForChannelBindings()
+    {
+        byte[] certificate = [0x30, 0x03, 0x02, 0x01, 0x01];
+        HttpAuthRequest request = Request(":") with { ServerCertificate = certificate };
+
+        CollectionAssert.AreEqual(certificate, Default.ContextRequestFor(request).ServerCertificate.ToArray());
+    }
+
+    [TestMethod]
     [DataRow(null, DisplayName = "no -u")]
     [DataRow(":", DisplayName = "-u :")]
     [DataRow(":secret", DisplayName = "-u :secret")]

@@ -143,7 +143,12 @@ internal sealed class HandBuiltKerberosSecurityContext(
         {
             serviceTicket = await tickets.GetAsync(request.ServiceName, request.HostName, cancellationToken).ConfigureAwait(false);
             forwardedTicketGrantingTicket = await ForwardedTicketGrantingTicketAsync(serviceTicket, cancellationToken).ConfigureAwait(false);
-            KerberosGssContextOptions options = new() { Delegation = DelegationOf(request.Delegation), ForwardedTicketGrantingTicket = forwardedTicketGrantingTicket };
+            KerberosGssContextOptions options = new()
+            {
+                Delegation = DelegationOf(request.Delegation),
+                ForwardedTicketGrantingTicket = forwardedTicketGrantingTicket,
+                ChannelBindings = TlsServerEndPointChannelBindings.Of(request.ServerCertificate),
+            };
             gss = new KerberosGssContext(serviceTicket, options, timeProvider, randomSource);
         }
         catch (KerberosFileException)
