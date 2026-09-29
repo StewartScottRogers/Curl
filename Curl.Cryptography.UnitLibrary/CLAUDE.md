@@ -24,6 +24,11 @@ Namespace `Curl.Cryptography`. It holds:
 - `X25519` (public): RFC 7748 key agreement - `GeneratePrivateKey`, `ComputePublicKey`,
   and `TryComputeSharedSecret`, which returns `false` for the all-zero result of a
   low-order peer key.
+- `Field448` (internal): GF(2^448 - 2^224 - 1) arithmetic on 28 limbs of 16 bits in a
+  caller's `Span<long>`; X448 uses it and Ed448 is to reuse it.
+- `X448` (public): RFC 7748 key agreement on Curve448 - `GeneratePrivateKey`,
+  `ComputePublicKey`, and `TryComputeSharedSecret`, which returns `false` for the
+  all-zero result of a low-order peer key, as `X25519` does.
 - `ChaCha20` (public): RFC 8439's block function (`ComputeBlock`) and stream cipher
   (`ApplyKeyStream`), counter and nonce as parameters. A 12-byte nonce leaves RFC 8439's
   32-bit counter; an 8-byte nonce gives the original 64-bit counter OpenSSH uses.

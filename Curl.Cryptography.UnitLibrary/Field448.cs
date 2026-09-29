@@ -1,0 +1,254 @@
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+
+namespace Curl.Cryptography;
+
+/// <summary>
+/// Arithmetic in GF(2^448 - 2^224 - 1), the field X448 (RFC 7748) and Ed448 (RFC 8032)
+/// work in. An element is <see cref="LimbCount" /> signed 64-bit limbs of 16 bits each,
+/// least significant first, held in a caller's <see cref="Span{T}" /> (usually a
+/// <c>stackalloc</c>), so no operation allocates. The prime's shape makes reduction two
+/// additions per limb: 2^448 = 2^224 + 1 (mod p), and 2^224 is limb
+/// <see cref="MiddleLimb" />. Every member is constant-time: loop bounds and indexes
+/// depend only on the limb count, and conditional moves are masks. Outputs may alias
+/// inputs.
+/// </summary>
+internal static class Field448
+{
+    /// <summary>The number of limbs in one field element.</summary>
+    public const int LimbCount = 28;
+
+    /// <summary>The number of bytes in an element's little-endian encoding.</summary>
+    public const int EncodedLength = 56;
+
+    /// <summary>The limb that holds 2^224, where a carry out of 2^448 folds in beside limb 0.</summary>
+    private const int MiddleLimb = 14;
+
+    /// <summary>Sets <paramref name="element" /> to the small value <paramref name="value" />.</summary>
+    public static void SetSmall(Span<long> element, ushort value)
+    {
+        element.Clear();
+        element[0] = value;
+    }
+
+    /// <summary>
+    /// Decodes a 56-byte little-endian value, every bit of it (RFC 7748 section 5 masks no
+    /// bit for X448); a value of p or more is accepted and reduced as it is used.
+    /// </summary>
+    public static void Decode(Span<long> element, ReadOnlySpan<byte> encoded)
+    {
+        for (int index = 0; index < LimbCount; index++)
+        {
+            element[index] = encoded[2 * index] | ((long)encoded[(2 * index) + 1] << 8);
+        }
+    }
+
+    /// <summary>
+    /// Encodes <paramref name="element" /> as the 56-byte little-endian encoding of its
+    /// canonical value, fully reduced modulo p.
+    /// </summary>
+    public static void Encode(Span<byte> encoded, ReadOnlySpan<long> element)
+    {
+        Span<long> reduced = stackalloc long[LimbCount];
+        Span<long> subtracted = stackalloc long[LimbCount];
+        try
+        {
+            element.CopyTo(reduced);
+            Carry(reduced);
+            Carry(reduced);
+            Carry(reduced);
+            SubtractPrimeIfNotBelow(reduced, subtracted);
+            for (int index = 0; index < LimbCount; index++)
+            {
+                encoded[2 * index] = (byte)reduced[index];
+                encoded[(2 * index) + 1] = (byte)(reduced[index] >> 8);
+            }
+        }
+        finally
+        {
+            Clear(reduced);
+            Clear(subtracted);
+        }
+    }
+
+    /// <summary>Sets <paramref name="result" /> to <paramref name="left" /> + <paramref name="right" />.</summary>
+    public static void Add(Span<long> result, ReadOnlySpan<long> left, ReadOnlySpan<long> right)
+    {
+        for (int index = 0; index < LimbCount; index++)
+        {
+            result[index] = left[index] + right[index];
+        }
+    }
+
+    /// <summary>Sets <paramref name="result" /> to <paramref name="left" /> - <paramref name="right" />.</summary>
+    public static void Subtract(Span<long> result, ReadOnlySpan<long> left, ReadOnlySpan<long> right)
+    {
+        for (int index = 0; index < LimbCount; index++)
+        {
+            result[index] = left[index] - right[index];
+        }
+    }
+
+    /// <summary>
+    /// Sets <paramref name="result" /> to <paramref name="left" /> * <paramref name="right" />,
+    /// folding the high half back in with 2^448 = 2^224 + 1 (mod p) and carrying twice.
+    /// </summary>
+    public static void Multiply(Span<long> result, ReadOnlySpan<long> left, ReadOnlySpan<long> right)
+    {
+        Span<long> product = stackalloc long[(2 * LimbCount) - 1];
+        try
+        {
+            product.Clear();
+            for (int leftIndex = 0; leftIndex < LimbCount; leftIndex++)
+            {
+                long leftLimb = left[leftIndex];
+                Span<long> row = product.Slice(leftIndex, LimbCount);
+                for (int rightIndex = 0; rightIndex < LimbCount; rightIndex++)
+                {
+                    row[rightIndex] += leftLimb * right[rightIndex];
+                }
+            }
+
+            Reduce(result, product);
+        }
+        finally
+        {
+            Clear(product);
+        }
+    }
+
+    /// <summary>
+    /// Sets <paramref name="result" /> to <paramref name="value" /> squared, forming each
+    /// cross product once and doubling it.
+    /// </summary>
+    public static void Square(Span<long> result, ReadOnlySpan<long> value)
+    {
+        Span<long> product = stackalloc long[(2 * LimbCount) - 1];
+        try
+        {
+            product.Clear();
+            for (int leftIndex = 0; leftIndex < LimbCount; leftIndex++)
+            {
+                long leftLimb = value[leftIndex];
+                product[2 * leftIndex] += leftLimb * leftLimb;
+                long doubled = 2 * leftLimb;
+                for (int rightIndex = leftIndex + 1; rightIndex < LimbCount; rightIndex++)
+                {
+                    product[leftIndex + rightIndex] += doubled * value[rightIndex];
+                }
+            }
+
+            Reduce(result, product);
+        }
+        finally
+        {
+            Clear(product);
+        }
+    }
+
+    /// <summary>
+    /// Sets <paramref name="result" /> to the inverse of <paramref name="value" />, computed
+    /// as value^(p - 2) by a fixed square-and-multiply chain; zero maps to zero.
+    /// </summary>
+    public static void Invert(Span<long> result, ReadOnlySpan<long> value)
+    {
+        Span<long> power = stackalloc long[LimbCount];
+        try
+        {
+            value.CopyTo(power);
+            // p - 2 = 2^448 - 2^224 - 3: every bit from 446 down to 0 is set except bits
+            // 224 and 1 (bit 447, the top one, is the starting value).
+            for (int bit = 446; bit >= 0; bit--)
+            {
+                Square(power, power);
+                if (bit != 224 && bit != 1)
+                {
+                    Multiply(power, power, value);
+                }
+            }
+
+            power.CopyTo(result);
+        }
+        finally
+        {
+            Clear(power);
+        }
+    }
+
+    /// <summary>
+    /// Swaps <paramref name="left" /> and <paramref name="right" /> when the lowest bit of
+    /// <paramref name="bit" /> is <c>1</c>, by masking, touching every limb either way.
+    /// </summary>
+    public static void ConditionalSwap(Span<long> left, Span<long> right, uint bit)
+    {
+        long mask = -(long)(bit & 1u);
+        for (int index = 0; index < LimbCount; index++)
+        {
+            long difference = mask & (left[index] ^ right[index]);
+            left[index] ^= difference;
+            right[index] ^= difference;
+        }
+    }
+
+    /// <summary>Zeroes an element that held secret material.</summary>
+    public static void Clear(Span<long> element) =>
+        CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(element));
+
+    /// <summary>
+    /// Folds a 55-limb product into <paramref name="result" /> with 2^448 = 2^224 + 1
+    /// (mod p), from the top limb down so a limb folded into the high half is folded again,
+    /// and carries twice.
+    /// </summary>
+    private static void Reduce(Span<long> result, Span<long> product)
+    {
+        for (int index = product.Length - 1; index >= LimbCount; index--)
+        {
+            product[index - LimbCount] += product[index];
+            product[index - LimbCount + MiddleLimb] += product[index];
+        }
+
+        product[..LimbCount].CopyTo(result);
+        Carry(result);
+        Carry(result);
+    }
+
+    /// <summary>
+    /// Brings every limb into 0 to 2^16 - 1 plus a carry into limbs 0 and
+    /// <see cref="MiddleLimb" />, folding the carry out of the top limb back in with
+    /// 2^448 = 2^224 + 1 (mod p).
+    /// </summary>
+    private static void Carry(Span<long> element)
+    {
+        for (int index = 0; index < LimbCount - 1; index++)
+        {
+            long carry = element[index] >> 16;
+            element[index] -= carry << 16;
+            element[index + 1] += carry;
+        }
+
+        long topCarry = element[LimbCount - 1] >> 16;
+        element[LimbCount - 1] -= topCarry << 16;
+        element[0] += topCarry;
+        element[MiddleLimb] += topCarry;
+    }
+
+    /// <summary>
+    /// Replaces a carried <paramref name="element" /> (a value below 2^448, so below 2p)
+    /// with element - p when that is not negative, choosing by mask;
+    /// <paramref name="scratch" /> receives the difference. p's limbs are all 0xFFFF but
+    /// limb <see cref="MiddleLimb" />, which is 0xFFFE.
+    /// </summary>
+    private static void SubtractPrimeIfNotBelow(Span<long> element, Span<long> scratch)
+    {
+        long borrow = 0;
+        for (int index = 0; index < LimbCount; index++)
+        {
+            long primeLimb = 0xFFFF - (index == MiddleLimb ? 1 : 0);
+            scratch[index] = element[index] - primeLimb - borrow;
+            borrow = (scratch[index] >> 16) & 1;
+            scratch[index] &= 0xFFFF;
+        }
+
+        ConditionalSwap(element, scratch, 1u - (uint)borrow);
+    }
+}
