@@ -9,9 +9,19 @@ decides what HTTP/2 does and when Curl speaks it.
 Namespace `Curl.Http2`. What is here so far: HPACK (BL-656) - `HpackEncoder` and
 `HpackDecoder` over `HeaderField` lists, the public `HpackHuffman` codec, and
 `HpackDecodingException` carrying an `HpackDecodingError`. The encoder chooses each
-field's representation as nghttp2's deflater does (ADR-0148). The frame layer, connection
-preface and `SETTINGS` come with BL-657, and a request and response on a stream with
-BL-658.
+field's representation as nghttp2's deflater does (ADR-0148).
+
+The frame layer (BL-657): `Http2FrameCodec` reads and writes frames on a stream,
+`Http2FrameFactory` creates each frame type and `Http2FramePayloadParser` reads and
+validates each payload. `Http2Connection` drives one client connection over a stream the
+caller owns: `SendPrefaceAsync` sends the preface, SETTINGS and connection WINDOW_UPDATE
+curl sends (measured, pinned in `Http2ConnectionTests`), `OpenStream` allocates odd
+stream identifiers, `WriteHeadersAsync` and `WriteDataAsync` split into frames within the
+peer's frame size and flow-control windows, and `ReadStreamFrameAsync` returns DATA and
+whole header blocks while answering SETTINGS and PING and applying WINDOW_UPDATE itself.
+Failures are typed: `Http2ProtocolException` (a connection error; GOAWAY already sent),
+`Http2StreamResetException` (the peer's RST_STREAM) and `Http2GoAwayException` (the
+peer's GOAWAY). A request and response on a stream come with BL-658.
 
 ## Rules
 
