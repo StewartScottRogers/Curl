@@ -962,7 +962,7 @@ internal sealed class CurlCommandRunner(
             {
                 eventStandardError = new HoldableStream(standardError);
                 transferEventOutput = await TransferEventOutput
-                    .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider)
+                    .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider, () => standardOutputSwitchedToBinary)
                     .ConfigureAwait(false);
             }
 
@@ -2161,6 +2161,9 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer,
         Stream? headerOutput)
     {
+        // curl switches standard output to binary mode as the transfer starts, so the transfer's
+        // own --trace - lines already end in a bare line feed (measured, BL-546 Notes).
+        standardOutputSwitchedToBinary |= !transfer.WritesToFile;
         if (!options.Silent)
         {
             await WriteErrorLinesAsync(dispatch.WarningLinesBeforeEachTransfer).ConfigureAwait(false);

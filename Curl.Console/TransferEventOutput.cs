@@ -16,7 +16,8 @@ namespace Curl.Console;
 /// a <c>--trace</c> or <c>--trace-ascii</c> file is opened once per run, truncated, and every
 /// transfer's dump goes into it; <c>-</c> names standard output and <c>%</c> standard error; a
 /// file that cannot be opened sends the dump to standard error, with no warning. Each is in text
-/// mode on Windows, so every line ends CR LF there.
+/// mode on Windows, so every line ends CR LF there, except standard output once a transfer has
+/// switched it to binary mode (BL-546).
 /// </remarks>
 internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedTraceFile) : IAsyncDisposable
 {
@@ -49,6 +50,10 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
     /// Whether standard output is a terminal, where curl's <c>-v</c> shows no <c>[N bytes data]</c> lines.
     /// </param>
     /// <param name="timeProvider">The clock a <c>--trace-time</c> stamp on a <c>-v</c> line or a dump reads.</param>
+    /// <param name="standardOutputIsBinary">
+    /// Tells, at each write of a <c>--trace -</c> dump on Windows, whether a transfer has switched
+    /// standard output to binary mode, where its line feeds stay bare (<see cref="TextModeUntilBinaryStream" />).
+    /// </param>
     /// <returns>The output; <see cref="None" /> when no trace option is in effect.</returns>
     internal static async Task<TransferEventOutput> OpenAsync(
         CommandLineOptions options,
@@ -57,7 +62,8 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
         Stream standardError,
         bool runsOnWindows,
         bool standardOutputIsTerminal,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        Func<bool> standardOutputIsBinary)
     {
         if (options.Trace == TraceKind.None)
         {
@@ -80,8 +86,11 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
             .ConfigureAwait(false);
         TraceDumpFormat format = options.Trace == TraceKind.HexDump ? TraceDumpFormat.HexAndText : TraceDumpFormat.TextOnly;
 
+        Stream textModeTarget = runsOnWindows && ReferenceEquals(target, standardOutput)
+            ? new TextModeUntilBinaryStream(standardOutput, standardOutputIsBinary)
+            : TextMode(target, runsOnWindows);
         return new TransferEventOutput(
-            new TraceTransferEventWriter(TextMode(target, runsOnWindows), format, options.TraceTime, timeProvider),
+            new TraceTransferEventWriter(textModeTarget, format, options.TraceTime, timeProvider),
             ownedFile);
     }
 
