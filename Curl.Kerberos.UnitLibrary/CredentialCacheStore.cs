@@ -7,7 +7,7 @@ namespace Curl.Kerberos;
 /// <summary>
 /// Finds the default credential cache as MIT Kerberos does and reads a <c>FILE:</c> cache
 /// or a <c>DIR:</c> collection's cache through the injected file reader, and a <c>KCM:</c>
-/// cache through the injected KCM connector (ADR-0142, ADR-0158, ADR-0193).
+/// cache through the injected KCM connector (ADR-0142, ADR-0158, ADR-0194).
 /// </summary>
 /// <param name="files">Reads the cache file, and a <c>DIR:</c> collection's <c>primary</c> file.</param>
 /// <param name="readEnvironmentVariable">Reads an environment variable; <see langword="null" /> when unset.</param>
