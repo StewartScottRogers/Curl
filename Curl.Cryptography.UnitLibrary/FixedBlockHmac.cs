@@ -53,7 +53,12 @@ public static class FixedBlockHmac
         }
     }
 
-    private static void Compute<TCompression>(ReadOnlySpan<byte> key, ReadOnlySpan<byte> header, ReadOnlySpan<byte> data, int dataLength, int minimumDataLength, Span<byte> destination)
+    /// <summary>
+    /// <see cref="Compute(HashAlgorithmName, ReadOnlySpan{byte}, ReadOnlySpan{byte}, ReadOnlySpan{byte}, int, int, Span{byte})" />
+    /// on any compression function; <see cref="DeterministicDsaNonce" /> runs it on <see cref="Sha224" />,
+    /// which the BCL's HMAC lacks.
+    /// </summary>
+    internal static void Compute<TCompression>(ReadOnlySpan<byte> key, ReadOnlySpan<byte> header, ReadOnlySpan<byte> data, int dataLength, int minimumDataLength, Span<byte> destination)
         where TCompression : struct, IBigEndianCompressionFunction
     {
         ArgumentOutOfRangeException.ThrowIfNegative(minimumDataLength);
