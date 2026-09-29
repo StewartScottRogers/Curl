@@ -9,7 +9,8 @@ address that is not local is bound once more on the control connection's address
 announced, with curl's `-v` line, ADR-0107; a host name is resolved through the injected
 `IDnsResolver` and its first address used, ADR-0108, after the injected
 `INetworkInterfaceLookup` finds no interface of that name, ADR-0110), honouring
-`-r`, `-C` and `-I` (ADR-0093's BL-438 addendum), and uploads `-T` with `STOR`, or `APPE`
+`-r`, `-C` and `-I` (ADR-0093's BL-438 addendum), `-z` and `-R` through `MDTM`
+(`FtpTimeCondition`, `FtpModificationTime`, ADR-0093's BL-637 addendum), and uploads `-T` with `STOR`, or `APPE`
 for `-C` (ADR-0093's BL-439 addendum), and honours `--disable-epsv`,
 `--no-ftp-skip-pasv-ip`, `--ftp-method`, `--ftp-create-dirs`, `-l` and `-Q`
 (ADR-0093's BL-436 addendum). TLS: `ftps://` is TLS from the first byte, and `--ssl`,

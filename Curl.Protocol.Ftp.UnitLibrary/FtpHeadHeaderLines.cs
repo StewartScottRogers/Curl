@@ -11,8 +11,6 @@ internal static class FtpHeadHeaderLines
     /// <summary>The line written when <c>REST 0</c> is answered with <c>350</c>.</summary>
     internal const string AcceptRanges = "Accept-ranges: bytes\r\n";
 
-    private const int TimestampDigits = 14;
-
     /// <summary>The line written for a <c>213</c> reply to <c>SIZE</c>.</summary>
     /// <param name="size">The <c>SIZE</c> count.</param>
     /// <returns>The header line.</returns>
@@ -20,24 +18,14 @@ internal static class FtpHeadHeaderLines
         string.Create(CultureInfo.InvariantCulture, $"Content-Length: {size}\r\n");
 
     /// <summary>
-    /// The line written for a <c>213</c> reply to <c>MDTM</c> whose text starts with a
-    /// <c>YYYYMMDDHHMMSS</c> timestamp that names a real UTC time.
+    /// The line written for the time a reply to <c>MDTM</c> named
+    /// (<see cref="FtpModificationTime" />).
     /// </summary>
-    /// <param name="reply">The reply's last line, such as <c>213 20260927123456</c>.</param>
+    /// <param name="modifiedUtc">The time, or <see langword="null" /> when the reply named none.</param>
     /// <returns>
-    /// The header line, or <see langword="null" /> when the reply carries no timestamp, as
-    /// curl then writes none.
+    /// The header line, or <see langword="null" /> when the time is unknown, as curl then
+    /// writes none.
     /// </returns>
-    internal static string? LastModified(FtpReply reply)
-    {
-        string text = reply.LastLine[4..];
-        if (reply.Code != 213
-            || text.Length < TimestampDigits
-            || !DateTime.TryParseExact(text[..TimestampDigits], "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out DateTime modified))
-        {
-            return null;
-        }
-
-        return modified.ToString("'Last-Modified: 'ddd, dd MMM yyyy HH:mm:ss' GMT'", CultureInfo.InvariantCulture) + "\r\n";
-    }
+    internal static string? LastModified(DateTimeOffset? modifiedUtc) =>
+        modifiedUtc?.ToString("'Last-Modified: 'ddd, dd MMM yyyy HH:mm:ss' GMT'\r\n", CultureInfo.InvariantCulture);
 }

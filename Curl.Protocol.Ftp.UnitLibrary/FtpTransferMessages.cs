@@ -32,6 +32,35 @@ internal static class FtpTransferMessages
     /// <summary>The exit 28 message for a <c>421</c> reply that ends the data transfer.</summary>
     internal const string ControlConnectionLooksDead = "control connection looks dead";
 
+    /// <summary>The <c>-v</c> line for an if-modified-since <c>-z</c> the <c>MDTM</c> time fails (BL-637).</summary>
+    internal const string NotNewEnough = "The requested document is not new enough";
+
+    /// <summary>The <c>-v</c> line for an if-unmodified-since <c>-z</c> the <c>MDTM</c> time fails (BL-637).</summary>
+    internal const string NotOldEnough = "The requested document is not old enough";
+
+    /// <summary>The <c>-v</c> line for a <c>-z</c> that cannot be applied, the time or the condition being unknown (BL-637).</summary>
+    internal const string SkippingTimeComparison = "Skipping time comparison";
+
+    /// <summary>The <c>-v</c> line for <c>MDTM</c> answered with <c>550</c>; the transfer goes on (BL-637).</summary>
+    internal const string ModificationTimeRefused = "MDTM failed: file does not exist or permission problem, continuing";
+
+    /// <summary>The <c>-v</c> line for <c>MDTM</c> answered with neither <c>213</c> nor <c>550</c>; the transfer goes on (BL-637).</summary>
+    internal const string UnsupportedModificationTimeReply = "unsupported MDTM reply format";
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.21.0 writes for a reply to <c>MDTM</c>: none for a <c>213</c>,
+    /// <see cref="ModificationTimeRefused" /> for a <c>550</c> and
+    /// <see cref="UnsupportedModificationTimeReply" /> for anything else (BL-637).
+    /// </summary>
+    /// <param name="code">The reply's code.</param>
+    /// <returns>The line, or <see langword="null" /> for none.</returns>
+    internal static string? ModificationTimeReply(int code) => code switch
+    {
+        213 => null,
+        550 => ModificationTimeRefused,
+        _ => UnsupportedModificationTimeReply,
+    };
+
     /// <summary>The exit 55 message for a command that could not be sent.</summary>
     internal const string SendFailed = "Failure when sending data to the peer";
 

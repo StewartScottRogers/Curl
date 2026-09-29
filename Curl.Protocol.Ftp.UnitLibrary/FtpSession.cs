@@ -163,13 +163,21 @@ internal sealed class FtpSession(
     private string? entryPath;
 
     /// <summary>
+    /// The time the reply to <c>MDTM</c> named, reported as
+    /// <see cref="TransferResult.SourceLastWriteTimeUtc" /> under <c>-R</c>;
+    /// <see langword="null" /> before <c>MDTM</c> or when the reply named none.
+    /// </summary>
+    private DateTimeOffset? modifiedUtc;
+
+    /// <summary>
     /// Holds the whole conversation. The data connection it opens stays open until the
     /// session is disposed.
     /// </summary>
     /// <returns>
     /// The transfer's outcome, its <see cref="TransferReport.ResponseCode" /> the code of
     /// the last reply read before <c>QUIT</c>, as curl 8.21.0 reports
-    /// <c>%{response_code}</c> for FTP (BL-392).
+    /// <c>%{response_code}</c> for FTP (BL-392), and under <c>-R</c> a success's
+    /// <see cref="TransferResult.SourceLastWriteTimeUtc" /> the time <c>MDTM</c> named.
     /// </returns>
     public async ValueTask<TransferResult> RunAsync()
     {
@@ -184,7 +192,11 @@ internal sealed class FtpSession(
             result = lost.Result;
         }
 
-        return result with { Report = new TransferReport { ResponseCode = lastReplyCode, FtpEntryPath = entryPath } };
+        return result with
+        {
+            Report = new TransferReport { ResponseCode = lastReplyCode, FtpEntryPath = entryPath },
+            SourceLastWriteTimeUtc = result.IsSuccess && context.RemoteTime ? modifiedUtc : null,
+        };
     }
 
     /// <summary>
@@ -359,6 +371,7 @@ internal sealed class FtpSession(
     {
         return await SendQuotesAsync(quotes.AfterLogin).ConfigureAwait(false)
             ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
+            ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
             ?? (context.NoBody
                 ? await ReportHeadAsync(path.FileName).ConfigureAwait(false)
                 : await DownloadAsync(path).ConfigureAwait(false));
@@ -403,6 +416,7 @@ internal sealed class FtpSession(
 
         return await SendQuotesAsync(quotes.AfterLogin).ConfigureAwait(false)
             ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
+            ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
             ?? await OpenDataConnectionAsync().ConfigureAwait(false)
             ?? await SetTypeAsync(false).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer).ConfigureAwait(false)
@@ -502,10 +516,67 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
-    /// Answers <c>-I</c> as curl does, with no data connection: a directory URL sends
-    /// nothing more; a file sends <c>MDTM</c>, <c>TYPE I</c>, <c>SIZE</c> and
-    /// <c>REST 0</c>, writing a <c>Last-Modified</c>, <c>Content-Length</c> and
-    /// <c>Accept-ranges</c> line for each that succeeded.
+    /// Sends <c>MDTM</c> for a file when <c>-z</c>, <c>-R</c> or <c>-I</c> asks for its time,
+    /// as curl 8.21.0 does straight after the <c>CWD</c>s, for a download, an <c>-l</c>
+    /// listing of a file URL and an upload alike (BL-637). Under <c>-I</c> it writes the
+    /// <c>Last-Modified</c> line; then it applies <c>-z</c>.
+    /// </summary>
+    /// <returns>
+    /// <see langword="null" /> to go on; a success with no body when <c>-z</c> is not met;
+    /// or a failed header write.
+    /// </returns>
+    private async ValueTask<TransferResult?> CheckModificationTimeAsync(string fileName)
+    {
+        if (fileName.Length == 0 || !AsksForModificationTime)
+        {
+            return null;
+        }
+
+        FtpReply modified = await ExchangeAsync("MDTM " + fileName).ConfigureAwait(false);
+        ReportInfo(FtpTransferMessages.ModificationTimeReply(modified.Code));
+        modifiedUtc = FtpModificationTime.Of(modified);
+        return await WriteHeaderAsync(context.NoBody ? FtpHeadHeaderLines.LastModified(modifiedUtc) : null).ConfigureAwait(false)
+            ?? await ApplyTimeConditionAsync().ConfigureAwait(false);
+    }
+
+    private bool AsksForModificationTime => context.NoBody || context.RemoteTime || context.TimeCondition is not null;
+
+    /// <summary>
+    /// Applies <c>-z</c> to the <c>MDTM</c> time through <see cref="FtpTimeCondition" />: when
+    /// it is not met, the post-transfer quotes and <c>QUIT</c> end the transfer with no data
+    /// connection, as curl 8.21.0 does; a refused quote is still exit 21.
+    /// </summary>
+    private async ValueTask<TransferResult?> ApplyTimeConditionAsync()
+    {
+        if (context.TimeCondition is not { } condition)
+        {
+            return null;
+        }
+
+        (bool isMet, string? verboseLine) = FtpTimeCondition.Check(condition, modifiedUtc);
+        ReportInfo(verboseLine);
+        if (isMet)
+        {
+            return null;
+        }
+
+        TransferResult ended = await QuitAndSucceedAsync().ConfigureAwait(false);
+        return ended.IsSuccess ? TransferResult.TimeConditionNotMet() : ended;
+    }
+
+    private void ReportInfo(string? line)
+    {
+        if (line is not null)
+        {
+            context.Events.ReportInfo(line);
+        }
+    }
+
+    /// <summary>
+    /// Answers <c>-I</c> as curl does, with no data connection, once
+    /// <see cref="CheckModificationTimeAsync" /> has sent <c>MDTM</c> for a file: a directory
+    /// URL sends nothing more; a file sends <c>TYPE I</c>, <c>SIZE</c> and <c>REST 0</c>,
+    /// writing a <c>Content-Length</c> and <c>Accept-ranges</c> line for each that succeeded.
     /// </summary>
     private async ValueTask<TransferResult> ReportHeadAsync(string fileName)
     {
@@ -515,9 +586,7 @@ internal sealed class FtpSession(
                 ?? await QuitAndSucceedAsync().ConfigureAwait(false);
         }
 
-        FtpReply modified = await ExchangeAsync("MDTM " + fileName).ConfigureAwait(false);
-        return await WriteHeaderAsync(FtpHeadHeaderLines.LastModified(modified)).ConfigureAwait(false)
-            ?? await SetTypeAsync(false).ConfigureAwait(false)
+        return await SetTypeAsync(false).ConfigureAwait(false)
             ?? await ReadSizeAsync(fileName, false).ConfigureAwait(false)
             ?? await WriteHeaderAsync(fileSize is { } size ? FtpHeadHeaderLines.ContentLength(size) : null).ConfigureAwait(false)
             ?? await ReportRestAsync().ConfigureAwait(false);
