@@ -270,6 +270,45 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_EpsvRefusedOverIPv6_FailsWithExit8AndSendsNeitherPasvNorQuit()
+    {
+        // curl -v -g ftp://[::1]:47931/file.txt, EPSV answered 500 no (BL-903)
+        DataRun run = await RunAsync("/file.txt", LoggedIn + "500 no\r\n" + Pasv + Retrieved, _ => { }, controlPeer: new IPEndPoint(IPAddress.IPv6Loopback, ControlPort));
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Failed EPSV attempt, exiting"), run.Result);
+        CollectionAssert.AreEqual(
+            new[] { "> EPSV\r\n", "* Connect data stream passively", "< 500 no\r\n" },
+            run.Events.Transcript.Skip(9).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DisableEpsvOverIPv6_StillSendsEpsv()
+    {
+        // curl -sS -g --disable-epsv ftp://[::1]:47931/file.txt sends EPSV all the same (BL-903)
+        DataRun run = await RunAsync(
+            "/file.txt",
+            LoggedIn + Epsv + Retrieved,
+            context => context.FtpDisableEpsv = true,
+            controlPeer: new IPEndPoint(IPAddress.IPv6Loopback, ControlPort));
+
+        Assert.AreEqual("> EPSV\r\n", run.Events.Transcript[9]);
+        Assert.AreEqual(TransferResult.Success(11), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EpsvRefusedOverIPv4MappedPeer_StillFallsBackToPasv()
+    {
+        DataRun run = await RunAsync(
+            "/file.txt",
+            LoggedIn + "500 no\r\n" + Pasv + Retrieved,
+            _ => { },
+            controlPeer: new IPEndPoint(IPAddress.Loopback.MapToIPv6(), ControlPort));
+
+        Assert.AreEqual("> PASV\r\n", run.Events.Transcript[13]);
+        Assert.AreEqual(TransferResult.Success(11), run.Result);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NoFtpSkipPasvIp_ConnectsToThe227AddressWithNoSkipLine()
     {
         // curl -v --disable-epsv --no-ftp-skip-pasv-ip ftp://127.0.0.1:47931/file.txt

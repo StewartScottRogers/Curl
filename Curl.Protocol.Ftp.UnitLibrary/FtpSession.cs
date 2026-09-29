@@ -84,7 +84,8 @@ namespace Curl.Protocol.Ftp;
 /// </para>
 /// <para>
 /// The FTP control options change that conversation as ADR-0093's BL-436 addendum records:
-/// <c>--disable-epsv</c> goes straight to <c>PASV</c>; <c>--no-ftp-skip-pasv-ip</c>
+/// <c>--disable-epsv</c> goes straight to <c>PASV</c>, except over IPv6, where curl ignores
+/// it (BL-903); <c>--no-ftp-skip-pasv-ip</c>
 /// connects to the address a <c>227</c> reply names; <c>--ftp-method</c> picks the
 /// <c>CWD</c>s through <see cref="FtpUrlPath" />; <c>--ftp-create-dirs</c> answers a refused
 /// <c>CWD</c> with <c>MKD</c> and one more <c>CWD</c>; <c>-l</c> lists with <c>NLST</c>,
@@ -159,6 +160,13 @@ internal sealed class FtpSession(
     /// </summary>
     private readonly string controlPeerAddress =
         Unmapped((control.Connection.RemoteEndPoint as IPEndPoint)?.Address)?.ToString() ?? context.Url.IdnHost;
+
+    /// <summary>
+    /// Whether the control connection's peer is an IPv6 address (not an IPv4-mapped one),
+    /// which makes curl 8.21.0 send <c>EPSV</c> despite <c>--disable-epsv</c> and give up
+    /// rather than fall back to <c>PASV</c> when it is refused (BL-903).
+    /// </summary>
+    private readonly bool controlPeerIsIPv6 = IsIPv6(control.Connection.RemoteEndPoint);
 
     /// <summary>
     /// The URL path's directories, each followed by <c>/</c>, which curl 8.21.0's <c>-v</c>
@@ -909,6 +917,9 @@ internal sealed class FtpSession(
     private static IPAddress? Unmapped(IPAddress? address) =>
         address is { IsIPv4MappedToIPv6: true } ? address.MapToIPv4() : address;
 
+    private static bool IsIPv6(EndPoint? endPoint) =>
+        Unmapped((endPoint as IPEndPoint)?.Address) is { AddressFamily: AddressFamily.InterNetworkV6 };
+
     /// <summary>
     /// Ends a transfer whose <c>-P</c> address could not be used: exit 30 after <c>QUIT</c>
     /// when the control connection's own address is unknown, and for a name that does not
@@ -1049,11 +1060,13 @@ internal sealed class FtpSession(
     /// <remarks>
     /// curl 8.21.0's <c>-v</c> says <see cref="FtpTransferMessages.ConnectDataStreamPassively" />
     /// once the first of them is sent, and <see cref="FtpTransferMessages.EpsvFailed" /> when
-    /// <c>EPSV</c> is refused (BL-931).
+    /// <c>EPSV</c> is refused (BL-931). Over IPv6 there is no <c>PASV</c>: <c>EPSV</c> is sent
+    /// even under <c>--disable-epsv</c>, and a refusal ends the transfer with exit 8 and no
+    /// <c>QUIT</c>, as curl 8.21.0 does (BL-903).
     /// </remarks>
     private async ValueTask<TransferResult?> OpenPassiveDataConnectionAsync()
     {
-        if (context.FtpDisableEpsv)
+        if (context.FtpDisableEpsv && !controlPeerIsIPv6)
         {
             return await EnterPassiveModeAsync(FtpTransferMessages.ConnectDataStreamPassively).ConfigureAwait(false);
         }
@@ -1061,13 +1074,27 @@ internal sealed class FtpSession(
         FtpReply epsv = await ExchangeAsync("EPSV", FtpTransferMessages.ConnectDataStreamPassively).ConfigureAwait(false);
         if (epsv.Code != 229)
         {
-            context.Events.ReportInfo(FtpTransferMessages.EpsvFailed);
-            return await EnterPassiveModeAsync(afterSent: null).ConfigureAwait(false);
+            return await AnswerRefusedEpsvAsync().ConfigureAwait(false);
         }
 
         return FtpPassiveReply.TryParseEpsvPort(epsv.LastLine, out int epsvPort)
             ? await ConnectDataAsync(context.Url.IdnHost, controlPeerAddress, epsvPort).ConfigureAwait(false)
             : await QuitAndFailAsync(CurlExitCode.FtpWeirdPasvReply, FtpTransferMessages.WeirdEpsvReply).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Answers an <c>EPSV</c> refused with anything but <c>229</c>: over IPv6 the transfer
+    /// ends with exit 8 and no <c>QUIT</c>; otherwise curl 8.21.0's <c>-v</c> line and <c>PASV</c>.
+    /// </summary>
+    private async ValueTask<TransferResult?> AnswerRefusedEpsvAsync()
+    {
+        if (controlPeerIsIPv6)
+        {
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.EpsvFailedOverIPv6, bytesTransferred);
+        }
+
+        context.Events.ReportInfo(FtpTransferMessages.EpsvFailed);
+        return await EnterPassiveModeAsync(afterSent: null).ConfigureAwait(false);
     }
 
     /// <summary>

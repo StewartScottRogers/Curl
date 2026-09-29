@@ -259,6 +259,9 @@ internal static class FtpTransferMessages
     /// <summary>The <c>-v</c> line after an <c>EPSV</c> answered with anything but <c>229</c>, before <c>PASV</c> (BL-931).</summary>
     internal const string EpsvFailed = "Failed EPSV attempt. Disabling EPSV";
 
+    /// <summary>The exit 8 message for an <c>EPSV</c> answered with anything but <c>229</c> over IPv6 (BL-903).</summary>
+    internal const string EpsvFailedOverIPv6 = "Failed EPSV attempt, exiting";
+
     /// <summary>The first of the <c>-v</c> lines before an active-mode data connection is accepted (BL-931).</summary>
     internal const string DataConnectionNotAvailable = "Data conn was not available immediately";
 
