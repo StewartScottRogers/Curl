@@ -68,6 +68,8 @@ internal sealed class TelnetReceiver
 
     private readonly TelnetOptionSide remoteOptions;
 
+    private readonly TelnetDiagnosticLog log;
+
     private readonly List<byte> subnegotiation = [];
 
     private TelnetReceiveState state;
@@ -75,6 +77,9 @@ internal sealed class TelnetReceiver
     private bool serverNegotiated;
 
     private bool optionsOffered;
+
+    /// <summary>The <c>WILL</c>, <c>WONT</c>, <c>DO</c> or <c>DONT</c> byte whose option is awaited.</summary>
+    private byte negotiationCommand;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TelnetReceiver" /> class.
@@ -84,9 +89,11 @@ internal sealed class TelnetReceiver
     /// <c>NEW-ENVIRON</c> that has a value is one more option this side performs and offers,
     /// and a refused <c>BINARY</c> is neither offered nor accepted.
     /// </param>
-    public TelnetReceiver(TelnetOptionValues optionValues)
+    /// <param name="log">Where each option negotiation received and sent is logged.</param>
+    public TelnetReceiver(TelnetOptionValues optionValues, TelnetDiagnosticLog log)
     {
         this.optionValues = optionValues;
+        this.log = log;
         optionsOfferedBothWays = optionValues.BinaryRefused
             ? [TelnetByte.SuppressGoAheadOption]
             : [TelnetByte.BinaryOption, TelnetByte.SuppressGoAheadOption];
@@ -94,11 +101,13 @@ internal sealed class TelnetReceiver
         localOptions = new TelnetOptionSide(
             TelnetByte.Will,
             TelnetByte.Wont,
-            [.. localOptionsOffered, TelnetByte.WindowSizeOption]);
+            [.. localOptionsOffered, TelnetByte.WindowSizeOption],
+            log);
         remoteOptions = new TelnetOptionSide(
             TelnetByte.Do,
             TelnetByte.Dont,
-            [.. optionsOfferedBothWays, TelnetByte.EchoOption]);
+            [.. optionsOfferedBothWays, TelnetByte.EchoOption],
+            log);
     }
 
     /// <summary>
@@ -192,6 +201,7 @@ internal sealed class TelnetReceiver
             _ => TelnetReceiveState.Data,
         };
 
+        negotiationCommand = value;
         if (value == TelnetByte.InterpretAsCommand)
         {
             data.Add(value);
@@ -201,6 +211,7 @@ internal sealed class TelnetReceiver
     private void ReceiveNegotiation(byte option, List<byte> replies)
     {
         serverNegotiated = true;
+        log.OptionReceived(negotiationCommand, option);
         switch (state)
         {
             case TelnetReceiveState.Will:

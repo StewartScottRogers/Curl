@@ -9,7 +9,12 @@ namespace Curl.Protocol.Telnet;
 /// <param name="enableCommand">The command this side sends to enable an option.</param>
 /// <param name="disableCommand">The command this side sends to disable an option.</param>
 /// <param name="preferredOptions">The options this side agrees to enable.</param>
-internal sealed class TelnetOptionSide(byte enableCommand, byte disableCommand, byte[] preferredOptions)
+/// <param name="log">Where each command sent, and each request or offer refused, is logged.</param>
+internal sealed class TelnetOptionSide(
+    byte enableCommand,
+    byte disableCommand,
+    byte[] preferredOptions,
+    TelnetDiagnosticLog log)
 {
     private readonly TelnetOptionState[] states = new TelnetOptionState[256];
 
@@ -34,6 +39,7 @@ internal sealed class TelnetOptionSide(byte enableCommand, byte disableCommand, 
 
         if (Array.IndexOf(preferredOptions, option) < 0)
         {
+            log.OptionRefused(disableCommand, option);
             AppendCommand(replies, disableCommand, option);
             return false;
         }
@@ -73,8 +79,9 @@ internal sealed class TelnetOptionSide(byte enableCommand, byte disableCommand, 
         }
     }
 
-    private static void AppendCommand(List<byte> replies, byte command, byte option)
+    private void AppendCommand(List<byte> replies, byte command, byte option)
     {
+        log.OptionSent(command, option);
         replies.Add(TelnetByte.InterpretAsCommand);
         replies.Add(command);
         replies.Add(option);

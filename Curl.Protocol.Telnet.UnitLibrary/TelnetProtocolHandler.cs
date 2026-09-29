@@ -103,29 +103,36 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        long startedAt = context.OperationStarted ?? context.TimeProvider.GetTimestamp();
+        long sessionStarted = context.TimeProvider.GetTimestamp();
+        long startedAt = context.OperationStarted ?? sessionStarted;
+        var log = new TelnetDiagnosticLog(context.DiagnosticLog);
         CurlUrl url = context.Url;
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false)
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
+            var failed = new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
+            log.Failed(failed);
+            return failed;
         }
 
+        log.SessionStarted(target.Host, target.Port);
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
             var optionValues = new TelnetOptionValues();
-            TransferResult? optionFailure = TelnetOptionParser.Parse(
+            TransferResult result = TelnetOptionParser.Parse(
                 context.Credentials?.UserName,
                 context.TelnetOptions,
-                optionValues);
-            return optionFailure
-                ?? await RunSessionAsync(connection, context, optionValues, startedAt).ConfigureAwait(false);
+                optionValues)
+                ?? await RunSessionAsync(connection, context, optionValues, log, startedAt).ConfigureAwait(false);
+            log.SessionEnded(result, context.TimeProvider.GetElapsedTime(sessionStarted));
+            return result;
         }
     }
 
@@ -133,6 +140,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         IConnection connection,
         ITransferContext context,
         TelnetOptionValues optionValues,
+        TelnetDiagnosticLog log,
         long startedAt)
     {
         var sendLock = new SemaphoreSlim(1, 1);
@@ -144,7 +152,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
         try
         {
-            return await ReceiveUntilClosedAsync(connection, context, optionValues, sendLock, uploadSendFailed.Task, startedAt)
+            return await ReceiveUntilClosedAsync(connection, context, new TelnetReceiver(optionValues, log), sendLock, uploadSendFailed.Task, startedAt)
                 .ConfigureAwait(false);
         }
         finally
@@ -168,13 +176,12 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     private static async Task<TransferResult> ReceiveUntilClosedAsync(
         IConnection connection,
         ITransferContext context,
-        TelnetOptionValues optionValues,
+        TelnetReceiver receiver,
         SemaphoreSlim sendLock,
         Task uploadSendFailed,
         long startedAt)
     {
         CancellationToken cancellationToken = context.CancellationToken;
-        var receiver = new TelnetReceiver(optionValues);
         var buffer = new byte[ReceiveBufferSize];
         var data = new List<byte>();
         var replies = new List<byte>();
