@@ -12,7 +12,7 @@ namespace Curl.Console;
 /// connects through, the <c>Alt-Svc</c> headers it learns from, and the file written when it ends.
 /// </summary>
 /// <remarks>
-/// Measured on 2026-09-29 (BL-623 Notes, ADR-0213). Only <c>h1</c> alternatives are used for now, as curl skips
+/// Measured on 2026-09-29 (BL-623 Notes, ADR-0214). Only <c>h1</c> alternatives are used for now, as curl skips
 /// an alternative whose HTTP version the transfer may not use (<c>h2</c> and <c>h3</c> are BL-733's), and none
 /// is used for plain <c>http</c>, for an origin a <c>--connect-to</c> mapping matches, or for an entry naming
 /// the origin itself. Every header is learned as having come over <c>h1</c>, from the origin, never the

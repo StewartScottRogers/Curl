@@ -94,7 +94,7 @@ the HTTP handler learns each `Alt-Svc` header of an `https` response and prints 
 and sets `AltSvcRoute` to the first unexpired `h1` alternative for an `https` origin, unless a
 `--connect-to` mapping matches it or the entry names the origin itself; the TCP connector dials it
 and the handler sends `Alt-Used`. `h2` and `h3` alternatives are skipped until BL-733, and a redirect
-to another origin drops the route (`RedirectFollower`). Measured on curl 8.21.0 (ADR-0213, BL-623 Notes).
+to another origin drops the route (`RedirectFollower`). Measured on curl 8.21.0 (ADR-0214, BL-623 Notes).
 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
