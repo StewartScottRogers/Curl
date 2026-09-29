@@ -1,5 +1,5 @@
 ---
-id: BL-952
+id: BL-953
 title: Write curl's -v auth lines on the WebSocket upgrade
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-952 — Write curl's -v auth lines on the WebSocket upgrade
+# BL-953 — Write curl's -v auth lines on the WebSocket upgrade
 
 ## Goal
 
