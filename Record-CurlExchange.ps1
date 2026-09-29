@@ -271,6 +271,49 @@
     How long, in -Pop3 mode, the server waits for curl's next line before it hangs up.
     Default 5000.
 
+.PARAMETER Tftp
+    Serve one TFTP transfer on UDP instead of HTTP responses (BL-932): bind UDP on
+    ListenAddress and Port, take curl's first request there, and answer it from a fresh
+    ephemeral port, as RFC 1350 requires. A read request (RRQ) is answered with TftpData
+    in DATA blocks of the agreed block size, each sent once the previous one is
+    acknowledged; a write request (WRQ) is answered with ACK 0 and every DATA block curl
+    sends is acknowledged, its bytes written to upload.bin. When the request carries
+    blksize, tsize or timeout (RFC 2347, 2348, 2349), the first answer is an OACK echoing
+    them - tsize filled in with TftpData's length for an RRQ - unless -TftpNoOack is given,
+    and the transfer then uses the requested block size. A repeated ACK (or DATA) is
+    answered by sending the last packet again, and a repeated request by sending the first
+    answer again, so curl's retransmissions are served. The transfer ends when the last
+    block is acknowledged, when curl sends an ERROR, or after TftpIdleMilliseconds without
+    a datagram.
+
+    datagrams.txt then holds one line per datagram in both directions, in order: "> " for
+    curl's, "< " for the server's, the bytes as lowercase hex, a space and a decoded
+    summary, e.g. "> 000166696c65006f6374657400... RRQ file octet blksize=512 tsize=0",
+    "< 00030001... DATA 1 6 bytes", "> 00040001 ACK 1", "< 0005... ERROR 1 File not found"
+    or "< 0006... OACK tsize=6". There is no request.bin. Combining it with -Ftp, -Smtp,
+    -Imap, -Pop3, -Script, -Tls, -NoServer, -UnixSocket or -UdpSink is refused.
+
+.PARAMETER TftpData
+    The file an RRQ is answered with, in -Tftp mode, with the same backslash escapes as
+    Response. Default 'hello\n'.
+
+.PARAMETER TftpReply
+    Overrides for the -Tftp transfer, each 'STEP=reply'. 'RRQ=ERROR <code> <text>' (or
+    WRQ) answers the request with an ERROR packet of that code and text instead of a
+    transfer, e.g. 'RRQ=ERROR 1 File not found'. '<packet><n>=DROP', where packet is ACK
+    or DATA, drops the n-th packet of that kind once, whichever side sends it: one curl
+    sends is ignored the first time it arrives, one the server sends is not sent the first
+    time, so curl times out and retransmits. E.g. 'ACK1=DROP' on a download ignores curl's
+    ACK 1, and 'DATA1=DROP' does not send block 1 until curl asks again.
+
+.PARAMETER TftpNoOack
+    In -Tftp mode, ignore the options a request carries: answer with no OACK and transfer
+    in RFC 1350's 512-byte blocks.
+
+.PARAMETER TftpIdleMilliseconds
+    How long, in -Tftp mode, the server waits for curl's next datagram before it ends the
+    transfer. Default 15000, longer than curl's retransmission interval.
+
 .PARAMETER Script
     Serve one connection from a script of steps instead of HTTP responses, for binary
     request-reply protocols that no line-at-a-time mode speaks, such as LDAP's BER
@@ -502,6 +545,11 @@ param(
     [string[]] $Pop3Reply = @(),
     [string] $Pop3Message = 'From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n.A line that starts with a dot.\r\n',
     [ValidateRange(1, 600000)] [int] $Pop3IdleMilliseconds = 5000,
+    [switch] $Tftp,
+    [string] $TftpData = 'hello\n',
+    [string[]] $TftpReply = @(),
+    [switch] $TftpNoOack,
+    [ValidateRange(1, 600000)] [int] $TftpIdleMilliseconds = 15000,
     [string] $Script,
     [ValidateRange(1, 600000)] [int] $ScriptIdleMilliseconds = 5000,
     [ValidateRange(1, 600000)] [int] $ScriptGapMilliseconds = 250,
@@ -534,6 +582,7 @@ if (@($Ftp, $Smtp, $Imap, $Pop3, [bool] $Script | Where-Object { $_ }).Count -gt
 if ($UnixSocket -and ($NoServer -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls -or $UdpSink)) { throw '-UnixSocket serves HTTP only, so it cannot be combined with -NoServer, -Ftp, -Smtp, -Imap, -Pop3, -Script, -Tls or -UdpSink.' }
 if (-not $NoServer -and -not $UnixSocket -and $Port -eq 0) { throw '-Port is required unless -NoServer is given: the URL in CurlArgs must name the port the server listens on.' }
 if ($UdpSink -and $Port -eq 0) { throw '-UdpSink binds UDP on -Port, so -Port is required with it.' }
+if ($Tftp -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls -or $NoServer -or $UnixSocket -or $UdpSink)) { throw '-Tftp serves one TFTP transfer on UDP -Port, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script, -Tls, -NoServer, -UnixSocket or -UdpSink.' }
 if (@($DnsSilentPort | Where-Object { $DnsPort -notcontains $_ }).Count -gt 0) { throw '-DnsSilentPort names a port -DnsPort does not; give each silent port in -DnsPort too.' }
 
 function Get-ReferenceCurlPath {
@@ -1802,6 +1851,17 @@ $ftpOverrides = ConvertTo-ReplyOverrides -Entries $FtpReply -ParameterName 'FtpR
 $smtpOverrides = ConvertTo-ReplyOverrides -Entries $SmtpReply -ParameterName 'SmtpReply'
 $imapOverrides = ConvertTo-ReplyOverrides -Entries $ImapReply -ParameterName 'ImapReply'
 $pop3Overrides = ConvertTo-ReplyOverrides -Entries $Pop3Reply -ParameterName 'Pop3Reply'
+$tftpOverrides = ConvertTo-ReplyOverrides -Entries $TftpReply -ParameterName 'TftpReply'
+foreach ($step in $tftpOverrides.Keys) {
+    $reply = $tftpOverrides[$step][0]
+    if ($step -match '^(RRQ|WRQ)$') {
+        if ($reply -notmatch '^ERROR (\d{1,5})( |$)' -or [int] $Matches[1] -gt 65535) { throw "TftpReply '$step=$reply': a request is answered 'ERROR <code> <text>', the code 0 to 65535." }
+    } elseif ($step -match '^(ACK|DATA)\d{1,5}$') {
+        if ($reply -ne 'DROP') { throw "TftpReply '$step=$reply': an ACK or DATA packet can only be DROP." }
+    } else {
+        throw "TftpReply '$step=$reply': the step is RRQ, WRQ, ACK<n> or DATA<n>."
+    }
+}
 $scriptSteps = if ($Script) { ConvertFrom-ExchangeScript -Path $Script } else { $null }
 $transcript = New-Object System.Text.StringBuilder
 $uploadedData = New-Object System.IO.MemoryStream
@@ -1871,7 +1931,7 @@ public sealed class RecorderUnixSocketListener
     if (Test-Path -LiteralPath $UnixSocket) { Remove-Item -LiteralPath $UnixSocket -Force }
     $listener = New-Object RecorderUnixSocketListener($UnixSocket)
     $server = [System.Management.Automation.PowerShell]::Create()
-} elseif (-not $NoServer) {
+} elseif (-not $NoServer -and -not $Tftp) {
     $listener = New-Object System.Net.Sockets.TcpListener($ListenAddress, $Port)
     $listener.Start()
     $server = [System.Management.Automation.PowerShell]::Create()
@@ -2042,6 +2102,316 @@ public sealed class RecorderDnsResponder
 '@
     $dnsResponder = New-Object RecorderDnsResponder($ListenAddress, $DnsPort, $DnsSilentPort, $DnsAnswerAddress, [bool] $DnsTruncate, $DnsResponseCode)
 }
+$tftpResponder = $null
+if ($Tftp) {
+    # C#, not a PowerShell class, so its thread needs no runspace; Windows PowerShell 5.1
+    # compiles it as C# 5.
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+
+public sealed class RecorderTftpResponder
+{
+    private static readonly Encoding Latin1 = Encoding.GetEncoding(28591);
+    private readonly IPAddress _address;
+    private readonly Socket _listen;
+    private readonly byte[] _data;
+    private readonly bool _noOack;
+    private readonly int _idleMilliseconds;
+    private readonly Dictionary<string, string> _overrides = new Dictionary<string, string>();
+    private readonly HashSet<string> _dropped = new HashSet<string>();
+    private readonly StringBuilder _log = new StringBuilder();
+    private readonly MemoryStream _upload = new MemoryStream();
+    private readonly Thread _thread;
+    private Socket _transfer;
+    private EndPoint _peer;
+    private byte[] _firstAnswer;
+    private byte[] _lastSent;
+
+    public RecorderTftpResponder(IPAddress address, int port, byte[] data, bool noOack, int idleMilliseconds, string[] steps, string[] replies)
+    {
+        _address = address;
+        _data = data;
+        _noOack = noOack;
+        _idleMilliseconds = idleMilliseconds;
+        for (int i = 0; i < steps.Length; i++) { _overrides[steps[i]] = replies[i]; }
+        _listen = new Socket(address.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+        _listen.Bind(new IPEndPoint(address, port));
+        _thread = new Thread(Serve) { IsBackground = true };
+        _thread.Start();
+    }
+
+    public string Log { get { lock (_log) { return _log.ToString(); } } }
+
+    public byte[] Uploaded { get { lock (_upload) { return _upload.ToArray(); } } }
+
+    /// Ends the transfer, if it is still waiting, and gives the thread a moment to finish.
+    public void Stop()
+    {
+        _listen.Close();
+        Socket transfer = _transfer;
+        if (transfer != null) { transfer.Close(); }
+        _thread.Join(2000);
+    }
+
+    private void Serve()
+    {
+        try
+        {
+            var buffer = new byte[65536];
+            EndPoint sender = new IPEndPoint(_address.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any, 0);
+            int length = _listen.ReceiveFrom(buffer, ref sender);
+            byte[] request = Copy(buffer, length);
+            Record('>', request);
+            _peer = sender;
+            _transfer = new Socket(_address.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            _transfer.Bind(new IPEndPoint(_address, 0));
+            int opcode = Number(request, 0);
+            if (opcode != 1 && opcode != 2)
+            {
+                Send(Error(4, "Illegal TFTP operation"), null);
+                return;
+            }
+            string reply;
+            if (_overrides.TryGetValue(opcode == 1 ? "RRQ" : "WRQ", out reply))
+            {
+                // "ERROR <code> <text>", checked by the script before the responder starts.
+                string[] parts = reply.Split(new[] { ' ' }, 3);
+                Send(Error(int.Parse(parts[1]), parts.Length > 2 ? parts[2] : string.Empty), null);
+                return;
+            }
+            List<string> fields = Strings(request, 2);
+            var options = new List<KeyValuePair<string, string>>();
+            int blockSize = 512;
+            for (int i = 2; i + 1 < fields.Count; i += 2)
+            {
+                string name = fields[i].ToLowerInvariant();
+                if (name != "blksize" && name != "tsize" && name != "timeout") { continue; }
+                string value = name == "tsize" && opcode == 1 ? _data.Length.ToString() : fields[i + 1];
+                options.Add(new KeyValuePair<string, string>(fields[i], value));
+                if (name == "blksize") { blockSize = int.Parse(value); }
+            }
+            bool oack = options.Count > 0 && !_noOack;
+            if (!oack) { blockSize = 512; }
+            if (opcode == 1) { ServeRead(oack, options, blockSize); } else { ServeWrite(oack, options, blockSize); }
+        }
+        catch (SocketException) { }
+        catch (ObjectDisposedException) { }
+    }
+
+    private void ServeRead(bool oack, List<KeyValuePair<string, string>> options, int blockSize)
+    {
+        int expectedAck = 0;
+        bool finalSent = false;
+        if (oack) { Send(Oack(options), null); } else { finalSent = SendDataBlock(expectedAck = 1, blockSize); }
+        _firstAnswer = _lastSent;
+        while (true)
+        {
+            bool fromListen;
+            byte[] packet = Receive(out fromListen);
+            if (packet == null) { return; }
+            if (fromListen) { Resend(_firstAnswer); continue; }
+            int opcode = Number(packet, 0);
+            if (opcode == 5) { return; }
+            if (opcode != 4 || packet.Length < 4) { continue; }
+            int block = Number(packet, 2);
+            if (block != expectedAck) { Resend(_lastSent); continue; }
+            if (DropOnce("ACK" + block)) { continue; }
+            if (finalSent) { return; }
+            expectedAck = (expectedAck + 1) & 0xFFFF;
+            finalSent = SendDataBlock(expectedAck, blockSize);
+        }
+    }
+
+    private void ServeWrite(bool oack, List<KeyValuePair<string, string>> options, int blockSize)
+    {
+        int expectedData = 1;
+        if (oack) { Send(Oack(options), null); } else { Send(Ack(0), "ACK0"); }
+        _firstAnswer = _lastSent;
+        while (true)
+        {
+            bool fromListen;
+            byte[] packet = Receive(out fromListen);
+            if (packet == null) { return; }
+            if (fromListen) { Resend(_firstAnswer); continue; }
+            int opcode = Number(packet, 0);
+            if (opcode == 5) { return; }
+            if (opcode != 3 || packet.Length < 4) { continue; }
+            int block = Number(packet, 2);
+            // A repeated block means curl missed its ACK; acknowledge it again. After the
+            // last block this keeps answering until curl stops asking.
+            if (block != expectedData) { Resend(_lastSent); continue; }
+            if (DropOnce("DATA" + block)) { continue; }
+            lock (_upload) { _upload.Write(packet, 4, packet.Length - 4); }
+            Send(Ack(block), "ACK" + block);
+            expectedData = (expectedData + 1) & 0xFFFF;
+        }
+    }
+
+    /// Sends DATA block n of the file; true when it is the last one (shorter than a block).
+    private bool SendDataBlock(int block, int blockSize)
+    {
+        long offset = (long)(block - 1) * blockSize;
+        int length = (int)Math.Max(0, Math.Min(blockSize, _data.Length - offset));
+        var packet = new byte[4 + length];
+        packet[1] = 3;
+        packet[2] = (byte)(block >> 8);
+        packet[3] = (byte)block;
+        if (length > 0) { Array.Copy(_data, offset, packet, 4, length); }
+        Send(packet, "DATA" + block);
+        return length < blockSize;
+    }
+
+    /// True, once, when the step is overridden with DROP.
+    private bool DropOnce(string step)
+    {
+        string reply;
+        if (!_overrides.TryGetValue(step, out reply) || reply != "DROP" || _dropped.Contains(step)) { return false; }
+        _dropped.Add(step);
+        return true;
+    }
+
+    private void Send(byte[] packet, string step)
+    {
+        _lastSent = packet;
+        if (step != null && DropOnce(step)) { return; }
+        _transfer.SendTo(packet, _peer);
+        Record('<', packet);
+    }
+
+    private void Resend(byte[] packet)
+    {
+        if (packet == null) { return; }
+        _transfer.SendTo(packet, _peer);
+        Record('<', packet);
+    }
+
+    /// The next datagram curl sends to either port, or null after the idle time.
+    private byte[] Receive(out bool fromListen)
+    {
+        fromListen = false;
+        var readable = new List<Socket> { _transfer, _listen };
+        Socket.Select(readable, null, null, _idleMilliseconds * 1000);
+        if (readable.Count == 0) { return null; }
+        Socket socket = readable[0];
+        fromListen = socket == _listen;
+        var buffer = new byte[65536];
+        EndPoint sender = new IPEndPoint(_address.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any, 0);
+        int length = socket.ReceiveFrom(buffer, ref sender);
+        byte[] packet = Copy(buffer, length);
+        Record('>', packet);
+        return packet;
+    }
+
+    private static byte[] Ack(int block)
+    {
+        return new byte[] { 0, 4, (byte)(block >> 8), (byte)block };
+    }
+
+    private static byte[] Error(int code, string text)
+    {
+        var packet = new List<byte> { 0, 5, (byte)(code >> 8), (byte)code };
+        packet.AddRange(Latin1.GetBytes(text));
+        packet.Add(0);
+        return packet.ToArray();
+    }
+
+    private static byte[] Oack(List<KeyValuePair<string, string>> options)
+    {
+        var packet = new List<byte> { 0, 6 };
+        foreach (KeyValuePair<string, string> option in options)
+        {
+            packet.AddRange(Latin1.GetBytes(option.Key));
+            packet.Add(0);
+            packet.AddRange(Latin1.GetBytes(option.Value));
+            packet.Add(0);
+        }
+        return packet.ToArray();
+    }
+
+    private static int Number(byte[] packet, int offset)
+    {
+        return packet.Length < offset + 2 ? -1 : (packet[offset] << 8) | packet[offset + 1];
+    }
+
+    /// The NUL-terminated strings from the offset on; a last one without its NUL is kept.
+    private static List<string> Strings(byte[] packet, int offset)
+    {
+        var strings = new List<string>();
+        int start = offset;
+        for (int i = offset; i < packet.Length; i++)
+        {
+            if (packet[i] != 0) { continue; }
+            strings.Add(Latin1.GetString(packet, start, i - start));
+            start = i + 1;
+        }
+        if (start < packet.Length) { strings.Add(Latin1.GetString(packet, start, packet.Length - start)); }
+        return strings;
+    }
+
+    private static byte[] Copy(byte[] buffer, int length)
+    {
+        var bytes = new byte[length];
+        Array.Copy(buffer, bytes, length);
+        return bytes;
+    }
+
+    private static string Describe(byte[] packet)
+    {
+        int opcode = Number(packet, 0);
+        switch (opcode)
+        {
+            case 1:
+            case 2:
+            {
+                List<string> fields = Strings(packet, 2);
+                var text = new StringBuilder(opcode == 1 ? "RRQ" : "WRQ");
+                if (fields.Count > 0) { text.Append(' ').Append(fields[0]); }
+                if (fields.Count > 1) { text.Append(' ').Append(fields[1]); }
+                for (int i = 2; i + 1 < fields.Count; i += 2) { text.Append(' ').Append(fields[i]).Append('=').Append(fields[i + 1]); }
+                return text.ToString();
+            }
+            case 3:
+                return "DATA " + Number(packet, 2) + " " + Math.Max(0, packet.Length - 4) + " bytes";
+            case 4:
+                return "ACK " + Number(packet, 2);
+            case 5:
+            {
+                List<string> fields = Strings(packet, 4);
+                return "ERROR " + Number(packet, 2) + (fields.Count > 0 ? " " + fields[0] : string.Empty);
+            }
+            case 6:
+            {
+                List<string> fields = Strings(packet, 2);
+                var text = new StringBuilder("OACK");
+                for (int i = 0; i + 1 < fields.Count; i += 2) { text.Append(' ').Append(fields[i]).Append('=').Append(fields[i + 1]); }
+                return text.ToString();
+            }
+            default:
+                return "opcode " + opcode;
+        }
+    }
+
+    private void Record(char direction, byte[] packet)
+    {
+        lock (_log)
+        {
+            _log.Append(direction).Append(' ');
+            _log.Append(BitConverter.ToString(packet).Replace("-", string.Empty).ToLowerInvariant());
+            _log.Append(' ').Append(Describe(packet)).Append('\n');
+        }
+    }
+}
+'@
+    $tftpSteps = [string[]] @($tftpOverrides.Keys)
+    $tftpReplies = [string[]] @($tftpSteps | ForEach-Object { $tftpOverrides[$_][0] })
+    $tftpResponder = New-Object RecorderTftpResponder($ListenAddress, $Port, [byte[]] (ConvertFrom-EscapedResponse -Text $TftpData), [bool] $TftpNoOack, $TftpIdleMilliseconds, $tftpSteps, $tftpReplies)
+}
 # The sink never answers; the datagrams wait in its receive buffer until curl exits.
 $udpSinkClient = $null
 if ($UdpSink) {
@@ -2049,7 +2419,7 @@ if ($UdpSink) {
     $udpSinkClient.Client.ReceiveBufferSize = 8MB
 }
 try {
-    if ($NoServer) {
+    if ($NoServer -or $Tftp) {
         $serverRun = $null
     } elseif ($Ftp) {
         [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress).AddArgument($sessionHelpers.ToString()).AddArgument($FtpDataHoldMilliseconds)
@@ -2113,6 +2483,8 @@ try {
         if ($server.Streams.Error.Count -gt 0) { throw $server.Streams.Error[0] }
     }
 
+    if ($null -ne $tftpResponder) { $tftpResponder.Stop() }
+
     $udpDatagrams = New-Object System.Text.StringBuilder
     if ($null -ne $udpSinkClient) {
         $sender = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Any, 0)
@@ -2124,6 +2496,7 @@ try {
 } finally {
     if ($null -ne $udpSinkClient) { $udpSinkClient.Close() }
     if ($null -ne $dnsResponder) { $dnsResponder.Stop() }
+    if ($null -ne $tftpResponder) { $tftpResponder.Stop() }
     if ($null -ne $listener) { $listener.Stop() }
     if ($UnixSocket -and (Test-Path -LiteralPath $UnixSocket)) { Remove-Item -LiteralPath $UnixSocket -Force }
     if ($null -ne $server) { $server.Dispose() }
@@ -2136,7 +2509,7 @@ foreach ($request in $requests) {
     foreach ($bytes in $request) { $requestBytes.Write($bytes, 0, $bytes.Length) }
 }
 
-if (-not $NoServer) { [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'request.bin'), $requestBytes.ToArray()) }
+if (-not $NoServer -and -not $Tftp) { [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'request.bin'), $requestBytes.ToArray()) }
 [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'stdout.bin'), $stdout.ToArray())
 [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'stderr.txt'), $stderr.ToArray())
 [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'exitcode.txt'), [string] $exitCode, [System.Text.Encoding]::ASCII)
@@ -2146,6 +2519,10 @@ if ($Ftp) {
 }
 if ($UdpSink) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'datagrams.txt'), $udpDatagrams.ToString(), [System.Text.Encoding]::ASCII)
+}
+if ($Tftp) {
+    [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'datagrams.txt'), $tftpResponder.Log, [System.Text.Encoding]::GetEncoding(28591))
+    [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'upload.bin'), $tftpResponder.Uploaded)
 }
 if ($null -ne $dnsResponder) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'dns.txt'), $dnsResponder.Log, [System.Text.Encoding]::ASCII)
