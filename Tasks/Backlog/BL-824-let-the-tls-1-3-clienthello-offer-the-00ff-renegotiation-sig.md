@@ -1,5 +1,5 @@
 ---
-id: BL-819
+id: BL-824
 title: Let the TLS 1.3 ClientHello offer the 00ff renegotiation signalling value for curl's QUIC profile
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-819 — Let the TLS 1.3 ClientHello offer the 00ff renegotiation signalling value for curl's QUIC profile
+# BL-824 — Let the TLS 1.3 ClientHello offer the 00ff renegotiation signalling value for curl's QUIC profile
 
 ## Goal
 

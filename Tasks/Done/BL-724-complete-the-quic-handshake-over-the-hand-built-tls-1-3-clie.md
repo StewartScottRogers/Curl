@@ -31,7 +31,7 @@ A QUIC client connection in `Curl.Quic.UnitLibrary` completes the handshake over
 - Design decisions (layers, exit mapping, the ClientHello less `00ff`, packet layout, timeouts) are in ADR-0165, decided by Claude under Stewart's delegation.
 - `touches` widened to `Curl.Tls.UnitLibrary` and `Curl.Tls.UnitTests`: QUIC needs the server's `quic_transport_parameters` from EncryptedExtensions, which only the TLS handshake sees, so `Tls13ClientHandshake` now exposes `ServerQuicTransportParameters`. No task in Doing named either project. `Documentation/Planning/Decisions` added for ADR-0165.
 - `Curl.Quic.UnitLibrary` now references `Curl.Protocol.Abstractions.UnitLibrary` for `IDatagramChannel` and `CurlExitCode`.
-- Follow-ups: BL-819 (offer `00ff` in the QUIC ClientHello, as curl does); a note on BL-725 about coalescing packets for different destination connection IDs.
+- Follow-ups: BL-824 (offer `00ff` in the QUIC ClientHello, as curl does); a note on BL-725 about coalescing packets for different destination connection IDs.
 - Measured at the end: Quic 100%/100%, 312 members, 0 failing; Tls 100%/100%, 653 members, 0 failing. `dotnet format --verify-no-changes` reports only the ENDOFLINE issues in `Tls12CbcRecordTests.cs`, a file this task did not touch.
 
 ## Log
