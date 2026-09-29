@@ -5,8 +5,8 @@ namespace Curl.Cli;
 /// <summary>
 /// Pins the transfer-encoding and HTTP version options: <c>--compressed</c>, <c>--raw</c>,
 /// <c>--tr-encoding</c>, <c>--ignore-content-length</c> and <c>--path-as-is</c> (each negatable),
-/// <c>--http0.9</c> (negatable), <c>--request-target</c>, <c>-0</c>/<c>--http1.0</c> and <c>--http1.1</c>, and the refusal of
-/// <c>--http2</c>, <c>--http2-prior-knowledge</c>, <c>--http3</c> and <c>--http3-only</c> (ADR-0017).
+/// <c>--http0.9</c> (negatable), <c>--request-target</c>, <c>-0</c>/<c>--http1.0</c>, <c>--http1.1</c>, <c>--http2</c> and
+/// <c>--http2-prior-knowledge</c> (ADR-0141), and the refusal of <c>--http3</c> and <c>--http3-only</c> (ADR-0017).
 /// Every refusal and warning line was measured with <c>/mingw64/bin/curl</c> 8.21.0 against
 /// <c>http://127.0.0.1:1/</c> on 2026-09-26.
 /// </summary>
@@ -178,19 +178,19 @@ public sealed class CommandLineTransferEncodingOptionTests
     [DataRow("--http1.0")]
     public void Parse_Http10_SelectsHttp10(string spelling)
     {
-        Assert.AreEqual(HttpVersionPreference.Http10, Accept(spelling).HttpVersion);
+        Assert.AreEqual(RequestedHttpVersion.Http10, Accept(spelling).HttpVersion);
     }
 
     [TestMethod]
     public void Parse_Http11_SelectsHttp11()
     {
-        Assert.AreEqual(HttpVersionPreference.Http11, Accept("--http1.1").HttpVersion);
+        Assert.AreEqual(RequestedHttpVersion.Http11, Accept("--http1.1").HttpVersion);
     }
 
     [TestMethod]
     public void Parse_Http10InABundle_SelectsHttp10()
     {
-        Assert.AreEqual(HttpVersionPreference.Http10, Accept("-s0").HttpVersion);
+        Assert.AreEqual(RequestedHttpVersion.Http10, Accept("-s0").HttpVersion);
     }
 
     [TestMethod]
@@ -199,7 +199,7 @@ public sealed class CommandLineTransferEncodingOptionTests
         CommandLineParseResult result = CommandLineParser.Parse(["--http1.1", "-0", Url]);
 
         Assert.IsTrue(result.IsAccepted);
-        Assert.AreEqual(HttpVersionPreference.Http10, result.Options.HttpVersion);
+        Assert.AreEqual(RequestedHttpVersion.Http10, result.Options.HttpVersion);
         CollectionAssert.AreEqual(new[] { OverridesWarning }, result.WarningLines.ToArray());
     }
 
@@ -209,7 +209,7 @@ public sealed class CommandLineTransferEncodingOptionTests
         CommandLineParseResult result = CommandLineParser.Parse(["-0", "--http1.1", "-0", Url]);
 
         Assert.IsTrue(result.IsAccepted);
-        Assert.AreEqual(HttpVersionPreference.Http10, result.Options.HttpVersion);
+        Assert.AreEqual(RequestedHttpVersion.Http10, result.Options.HttpVersion);
         CollectionAssert.AreEqual(new[] { OverridesWarning, OverridesWarning }, result.WarningLines.ToArray());
     }
 
@@ -231,7 +231,7 @@ public sealed class CommandLineTransferEncodingOptionTests
         CommandLineParseResult result = CommandLineParser.Parse(["-s", "--http1.0", "--http1.1", Url]);
 
         Assert.IsTrue(result.IsAccepted);
-        Assert.AreEqual(HttpVersionPreference.Http11, result.Options.HttpVersion);
+        Assert.AreEqual(RequestedHttpVersion.Http11, result.Options.HttpVersion);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -245,11 +245,31 @@ public sealed class CommandLineTransferEncodingOptionTests
     }
 
     [TestMethod]
-    [DataRow("--http2")]
-    [DataRow("--http2-prior-knowledge")]
+    [DataRow("--http2", RequestedHttpVersion.Http2)]
+    [DataRow("--http2=x", RequestedHttpVersion.Http2)]
+    [DataRow("--http2-prior-knowledge", RequestedHttpVersion.Http2PriorKnowledge)]
+    public void Parse_Http2Option_IsAcceptedOnEveryPlatform(string spelling, RequestedHttpVersion expected)
+    {
+        Assert.AreEqual(expected, Accept(spelling).HttpVersion);
+    }
+
+    [TestMethod]
+    [DataRow("--http1.1", "--http2", RequestedHttpVersion.Http2)]
+    [DataRow("--http2", "-0", RequestedHttpVersion.Http10)]
+    [DataRow("--http2", "--http2-prior-knowledge", RequestedHttpVersion.Http2PriorKnowledge)]
+    public void Parse_Http2OptionAndAnotherVersion_KeepsTheLastAndWarns(string first, string second, RequestedHttpVersion expected)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([first, second, Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(expected, result.Options.HttpVersion);
+        CollectionAssert.AreEqual(new[] { OverridesWarning }, result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
     [DataRow("--http3")]
     [DataRow("--http3-only")]
-    [DataRow("--http2=x")]
+    [DataRow("--http3=x")]
     public void Parse_UnsupportedHttpVersion_IsRefusedAsNotSupported(string spelling)
     {
         CommandLineParseResult result = CommandLineParser.Parse([spelling, Url]);
@@ -258,27 +278,27 @@ public sealed class CommandLineTransferEncodingOptionTests
     }
 
     [TestMethod]
-    public void Parse_Http2AfterSilent_IsStillRefusedWithBothLines()
+    public void Parse_Http3AfterSilent_IsStillRefusedWithBothLines()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--http2", Url]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--http3", Url]);
 
-        AssertRefused(result, $"curl: option --http2: {NotSupported}");
+        AssertRefused(result, $"curl: option --http3: {NotSupported}");
     }
 
     [TestMethod]
-    public void Parse_Http2BeforeAnUnknownOption_IsRefusedAsNotSupported()
+    public void Parse_Http3BeforeAnUnknownOption_IsRefusedAsNotSupported()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--http2", "--bogus", Url]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--http3", "--bogus", Url]);
 
-        AssertRefused(result, $"curl: option --http2: {NotSupported}");
+        AssertRefused(result, $"curl: option --http3: {NotSupported}");
     }
 
     [TestMethod]
-    public void Parse_Http2AfterHttp10_IsRefusedWithoutAWarning()
+    public void Parse_Http3AfterHttp10_IsRefusedWithoutAWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-0", "--http2", Url]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-0", "--http3", Url]);
 
-        AssertRefused(result, $"curl: option --http2: {NotSupported}");
+        AssertRefused(result, $"curl: option --http3: {NotSupported}");
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -299,12 +319,12 @@ public sealed class CommandLineTransferEncodingOptionTests
         AssertRefused(result, $"curl: option {spelling}: {CannotBeReversed}");
     }
 
-    // Measured: printf 'http2\n' > k.txt; curl -K k.txt http://127.0.0.1:1/ (exit 2).
+    // Measured: printf 'http3\n' > k.txt; curl -K k.txt http://127.0.0.1:1/ (exit 2).
     [TestMethod]
-    public void Parse_Http2InAConfigFile_IsRefusedAsNotSupportedWithCurlsWrappedLines()
+    public void Parse_Http3InAConfigFile_IsRefusedAsNotSupportedWithCurlsWrappedLines()
     {
         RecordingDataFileReader reader = new();
-        reader.Files["k.txt"] = "http2\n"u8.ToArray();
+        reader.Files["k.txt"] = "http3\n"u8.ToArray();
 
         CommandLineParseResult result = CommandLineParser.Parse(["-K", "k.txt", Url], _ => true, ConsolePasswordPrompt.ForProcessConsole, reader);
 
@@ -313,7 +333,7 @@ public sealed class CommandLineTransferEncodingOptionTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "curl: k.txt:1 config file option 'http2' the installed libcurl version does ",
+                "curl: k.txt:1 config file option 'http3' the installed libcurl version does ",
                 "curl: not support this",
                 $"curl: option -K: {NotSupported}",
                 TryHelp,

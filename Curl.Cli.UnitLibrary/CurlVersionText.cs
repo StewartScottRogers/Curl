@@ -26,9 +26,10 @@ public static class CurlVersionText
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
     /// ignoring case). ADR-0021's four, plus <c>brotli</c> and <c>libz</c> now that the registered
-    /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies.
+    /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c> on every
+    /// platform now that <c>--http2</c> is accepted (ADR-0141, Decision 5).
     /// </summary>
-    public const string FeaturesLine = "Features: AsynchDNS brotli IPv6 Largefile libz SSL";
+    public const string FeaturesLine = "Features: AsynchDNS brotli HTTP2 IPv6 Largefile libz SSL";
 
     /// <summary>Returns the four lines for the platform described, without line terminators.</summary>
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>

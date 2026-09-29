@@ -135,7 +135,7 @@ public sealed class CommandLineOption
     /// every spelling of it, with or without an attached value, is refused with
     /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport(string)"/>, and its <c>--no-</c>
     /// spelling with <see cref="CommandLineRefusal.CannotBeReversed(string)"/>, as the Windows curl 8.21.0
-    /// refuses <c>--http2</c> and <c>--no-http2</c> (ADR-0017).
+    /// refuses <c>--http3</c> and <c>--no-http3</c> (ADR-0017).
     /// </summary>
     /// <param name="longName">The long name without its leading <c>--</c>.</param>
     /// <returns>The row.</returns>

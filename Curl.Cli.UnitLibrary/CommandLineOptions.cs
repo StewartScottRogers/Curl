@@ -1316,10 +1316,11 @@ public sealed class CommandLineOptions
     public bool SaslInitialResponse { get; internal set; }
 
     /// <summary>
-    /// The HTTP version the last <c>-0</c> / <c>--http1.0</c> or <c>--http1.1</c> asked for;
-    /// <see langword="null"/> when neither was given, which means curl's default, HTTP/1.1.
+    /// The HTTP version the last <c>-0</c> / <c>--http1.0</c>, <c>--http1.1</c>, <c>--http2</c> or
+    /// <c>--http2-prior-knowledge</c> asked for; <see langword="null"/> when none was given, which
+    /// means curl's default: an HTTP/1.1 request line, and the platform's default ALPN offer (ADR-0141).
     /// </summary>
-    public HttpVersionPreference? HttpVersion { get; private set; }
+    public RequestedHttpVersion? HttpVersion { get; private set; }
 
     /// <summary>
     /// The IP address family the last <c>-4</c> / <c>--ipv4</c> or <c>-6</c> / <c>--ipv6</c> chose;
@@ -1375,7 +1376,7 @@ public sealed class CommandLineOptions
     /// unless <c>-s</c> came first, when an earlier option asked for a different version, as curl 8.21.0 does.
     /// </summary>
     /// <param name="version">The version the option asks for.</param>
-    internal void SelectHttpVersion(HttpVersionPreference version)
+    internal void SelectHttpVersion(RequestedHttpVersion version)
     {
         if (HttpVersion is not null && HttpVersion != version)
         {
