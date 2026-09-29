@@ -34,3 +34,4 @@ On Windows, a DIGEST-MD5 challenge that SSPI rejects fails the transfer with exi
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
