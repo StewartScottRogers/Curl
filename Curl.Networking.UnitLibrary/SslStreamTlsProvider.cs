@@ -385,7 +385,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             },
         };
 
-        var sslStream = new SslStream(new ConnectionStream(plaintext), leaveInnerStreamOpen: true);
+        var transport = new ConnectionStream(plaintext);
+        var sslStream = new SslStream(transport, leaveInnerStreamOpen: true);
         Exception failure;
         try
         {
@@ -397,7 +398,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
             });
             return ConnectResult.Connected(
-                new SslStreamConnection(sslStream, plaintext, clientCertificate),
+                new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild)),
                 new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
                 peerCertificates: peerCertificates);
         }

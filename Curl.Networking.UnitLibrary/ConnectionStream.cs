@@ -47,13 +47,24 @@ internal sealed class ConnectionStream(IConnection connection, bool ownsConnecti
         set => throw new NotSupportedException();
     }
 
+    /// <summary>
+    /// Gets a value indicating whether a read into a non-empty buffer has returned 0: the
+    /// connection underneath has ended. <see cref="SslStreamConnection" /> reads it to tell a
+    /// bare end from the server's <c>close_notify</c>, which <c>SslStream</c> does not say.
+    /// </summary>
+    public bool TransportEnded { get; private set; }
+
     /// <inheritdoc />
-    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
-        connection.ReadAsync(buffer, cancellationToken);
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        var read = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        TransportEnded |= read == 0 && !buffer.IsEmpty;
+        return read;
+    }
 
     /// <inheritdoc />
     public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
-        connection.ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
 
     /// <inheritdoc />
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>

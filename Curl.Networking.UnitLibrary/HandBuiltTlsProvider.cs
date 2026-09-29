@@ -184,7 +184,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             VerifiedHostName = SslStreamTlsProvider.VerifiedHostName(targetHost, _options.Insecure),
         });
         return ConnectResult.Connected(
-            new HandBuiltTlsConnection(handshake.Stream!, plaintext, prepared.ClientCertificate),
+            new HandBuiltTlsConnection(handshake.Stream!, plaintext, prepared.ClientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild)),
             new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
             peerCertificates: prepared.Verifier.PeerCertificates);
     }
