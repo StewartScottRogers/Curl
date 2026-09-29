@@ -132,6 +132,7 @@ public sealed class WsProtocolHandlerTests
         Assert.AreEqual("onetwo\x03\xe8", Encoding.Latin1.GetString(output.ToArray()));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(14L, result.Report!.DownloadSize);
+        Assert.AreEqual(8L, result.Report.DeliveredSize);
         Assert.AreEqual(0L, result.Report.UploadSize);
         Assert.AreEqual(Head101.Length, result.Report.HeaderSize);
         Assert.AreEqual(Request.Length, result.Report.RequestSize);
@@ -140,7 +141,7 @@ public sealed class WsProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_FragmentedBinaryMessage_WritesItsBytesAndCountsEveryFrameHead()
     {
-        // Measured: 01 02 03 on stdout, size_download 9.
+        // Measured: 01 02 03 on stdout, size_download 9, size_delivered 3.
         var output = new MemoryStream();
 
         TransferResult result = await Handler(new ScriptedConnection(Bytes(Head101), Bytes("\x02\x02\x01\x02"), Bytes("\x80\x01\x03\x88\x00"))).ExecuteAsync(Context("ws://h/", output));
@@ -148,12 +149,13 @@ public sealed class WsProtocolHandlerTests
         CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, output.ToArray());
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(9L, result.Report!.DownloadSize);
+        Assert.AreEqual(3L, result.Report.DeliveredSize);
     }
 
     [TestMethod]
-    [DataRow("\x81\x05hello", "hello", 7L)]
-    [DataRow("\x81\x05hel", "hel", 5L)]
-    public async Task ExecuteAsync_ServerDropsTheConnectionWithoutAClose_SucceedsWithWhatArrived(string frames, string written, long downloadSize)
+    [DataRow("\x81\x05hello", "hello", 7L, 5L)]
+    [DataRow("\x81\x05hel", "hel", 5L, 3L)]
+    public async Task ExecuteAsync_ServerDropsTheConnectionWithoutAClose_SucceedsWithWhatArrived(string frames, string written, long downloadSize, long deliveredSize)
     {
         var output = new MemoryStream();
 
@@ -162,6 +164,7 @@ public sealed class WsProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(written, Encoding.Latin1.GetString(output.ToArray()));
         Assert.AreEqual(downloadSize, result.Report!.DownloadSize);
+        Assert.AreEqual(deliveredSize, result.Report.DeliveredSize);
     }
 
     [TestMethod]

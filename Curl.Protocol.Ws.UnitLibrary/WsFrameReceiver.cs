@@ -35,6 +35,12 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
     /// </summary>
     internal long BytesReceived { get; private set; }
 
+    /// <summary>
+    /// Gets how many payload bytes have been handed on to be written so far, close frame
+    /// payloads included: curl's <c>%{size_delivered}</c> for a WebSocket transfer (BL-777).
+    /// </summary>
+    internal long BytesDelivered { get; private set; }
+
     /// <summary>Gets how many bytes of pong frames have been sent so far.</summary>
     internal long BytesSent { get; private set; }
 
@@ -89,6 +95,7 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
         if (decoded.Payload.Length > 0)
         {
             await writePayload(decoded.Payload, cancellationToken).ConfigureAwait(false);
+            BytesDelivered += decoded.Payload.Length;
         }
 
         if (decoded.Failure is { } failure)

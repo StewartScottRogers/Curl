@@ -196,7 +196,8 @@ public sealed class WsProtocolHandler(
     /// Measured against curl 8.21.0 (BL-582): the transfer ends with exit 0 when the server
     /// closes the connection after at least one frame byte, close frame or not, and with 52
     /// <c>Empty reply from server</c> when none arrived. <c>%{size_download}</c> counts frame
-    /// bytes, heads included; <c>%{size_upload}</c> the upload frame; <c>%{size_request}</c>
+    /// bytes, heads included; <c>%{size_delivered}</c> the payload bytes written, close frame
+    /// payloads included (BL-777); <c>%{size_upload}</c> the upload frame; <c>%{size_request}</c>
     /// the upgrade request, the upload frame and every pong. A failure keeps the report, so
     /// <c>%{http_code}</c> is still <c>101</c>. <c>-m</c> cancels the reads, and the
     /// cancellation escapes for the runner's exit 28 (ADR-0117).
@@ -233,6 +234,7 @@ public sealed class WsProtocolHandler(
             {
                 RequestSize = report.RequestSize + uploaded + receiver.BytesSent,
                 DownloadSize = receiver.BytesReceived,
+                DeliveredSize = receiver.BytesDelivered,
                 UploadSize = uploaded,
             },
         };
