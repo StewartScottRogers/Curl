@@ -94,3 +94,29 @@ not whether. Measured on 2026-09-29:
   lacks the extended-security bit.
 - **Leave `smb` out on Windows to match the Schannel build.** Ruled out by the standing
   rule: an official build supports it, so every platform does.
+
+## Addendum (BL-595, 2026-09-29)
+
+Decided by Claude under Stewart's delegation, from a second measurement: Ubuntu's curl
+8.18.0 in WSL, driven by `Record-CurlExchange.ps1 -Script -Curl wsl.exe` with the
+recorder listening on the WSL host address, against a hand-assembled server.
+
+- **The session setup is pinned byte for byte**, as sent for `-u User:Password` (domain
+  the URL's host) and `-u DOM\Us:pw`: its LM and NT responses to MS-NLMP 4.2.1's
+  challenge are MS-NLMP 4.2.2's, which `NtlmResponseComputation.ComputeV1` reproduces.
+- **The native operating system string** is curl's compiled-in `CURL_OS`, so it differs
+  by build (`x86_64-pc-linux-gnu` measured). Each platform sends the host triple its own
+  `curl -V` line shows (`CurlVersionText`): `x86_64-w64-mingw32` on Windows,
+  `aarch64-apple-darwin25.0.0` on macOS, `x86_64-pc-linux-gnu` on Linux. No Windows
+  reference exists to measure, and this keeps the two strings a script can see in step.
+- **Outcomes, measured:** no user is exit 67 `Login denied` once connected, nothing sent; a
+  negotiate response with an error status is exit 7 `Could not connect to server`; a
+  session setup response with an error status is exit 67 `Login denied`; a path with no
+  share is exit 3 `missing share in URL path for SMB` before connecting. A server that
+  closes the connection mid-exchange leaves curl polling until `-m` (exit 28), so Curl
+  waits on the transfer's cancellation there too. The frame checks (exit 56) and the
+  1024-byte session setup limit (exit 63) follow `lib/smb.c` at `curl-8_21_0`.
+- **`smbs` without a user** fails 67 only after the TLS handshake, because the connector
+  completes TLS before the handler runs; curl checks the user first. A TLS failure there
+  therefore reports the TLS exit code rather than 67. Accepted: it needs both no `-u`
+  and a failing handshake to show.
