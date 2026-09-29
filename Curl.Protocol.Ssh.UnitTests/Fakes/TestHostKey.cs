@@ -104,6 +104,21 @@ internal sealed record TestHostKey(string Algorithm, byte[] Blob, Func<byte[], b
         });
     }
 
+    /// <summary>RFC 8032 section 7.1's first Ed25519 key as an <c>ssh-ed25519</c> host key; its signatures are deterministic.</summary>
+    internal static TestHostKey Ed25519()
+    {
+        byte[] privateKey = Convert.FromHexString("9D61B19DEFFD5A60BA844AF492EC2CC44449C5697B326919703BAC031CAE7F60");
+        byte[] publicKey = new byte[Cryptography.Ed25519.PublicKeySize];
+        Cryptography.Ed25519.ComputePublicKey(privateKey, publicKey);
+        byte[] blob = SshTestEncoding.Join(SshTestEncoding.Name("ssh-ed25519"), SshTestEncoding.String(publicKey));
+        return new TestHostKey("ssh-ed25519", blob, h =>
+        {
+            byte[] signature = new byte[Cryptography.Ed25519.SignatureSize];
+            Cryptography.Ed25519.Sign(privateKey, h, signature);
+            return SshTestEncoding.Join(SshTestEncoding.Name("ssh-ed25519"), SshTestEncoding.String(signature));
+        });
+    }
+
     /// <summary>The host key for an algorithm name.</summary>
     internal static TestHostKey For(string algorithm) => algorithm switch
     {
@@ -113,6 +128,7 @@ internal sealed record TestHostKey(string Algorithm, byte[] Blob, Func<byte[], b
         "rsa-sha2-512" => Rsa(algorithm, HashAlgorithmName.SHA512),
         "rsa-sha2-256" => Rsa(algorithm, HashAlgorithmName.SHA256),
         "ssh-rsa" => Rsa(algorithm, HashAlgorithmName.SHA1),
+        "ssh-ed25519" => Ed25519(),
         _ => Dsa(),
     };
 }

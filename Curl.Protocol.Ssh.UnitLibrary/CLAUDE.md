@@ -8,7 +8,7 @@ File transfer over SSH.
 
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and the
 hand-built libraries ADR-0120 lists; it references `Curl.Cryptography.UnitLibrary`
-for `FiniteFieldDiffieHellman` and `DsaSignature`. Referencing another protocol
+for `FiniteFieldDiffieHellman`, `DsaSignature`, `X25519` and `Ed25519`. Referencing another protocol
 library is a build break, and `Curl.Protocol.Abstractions.UnitTests` fails if one
 appears.
 

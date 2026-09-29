@@ -18,6 +18,8 @@ public sealed partial class SshTransportTests
         SshKexInit.ForClient(SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33)).ToPayload();
 
     [TestMethod]
+    [DataRow("curve25519-sha256")]
+    [DataRow("curve25519-sha256@libssh.org")]
     [DataRow("ecdh-sha2-nistp256")]
     [DataRow("ecdh-sha2-nistp384")]
     [DataRow("ecdh-sha2-nistp521")]
@@ -62,6 +64,7 @@ public sealed partial class SshTransportTests
     [DataRow("rsa-sha2-256")]
     [DataRow("ssh-rsa")]
     [DataRow("ssh-dss")]
+    [DataRow("ssh-ed25519")]
     public async Task ExchangeKeysAsync_EachHostKeyAlgorithm_VerifiesTheServersSignature(string hostKeyAlgorithm)
     {
         ScriptedExchange run = Script("ecdh-sha2-nistp256", TestHostKey.For(hostKeyAlgorithm));
@@ -103,6 +106,64 @@ public sealed partial class SshTransportTests
     }
 
     [TestMethod]
+    public async Task ExchangeKeysAsync_FixedX25519KeysAndEd25519HostKey_PinsTheExchangeHashAndTheSixKeys()
+    {
+        ScriptedExchange run = Script("curve25519-sha256", TestHostKey.Ed25519());
+
+        SshKeyExchangeResult result = await ExchangeAsync(run);
+
+        Assert.AreEqual("ssh-ed25519", result.Algorithms.ServerHostKey);
+        CollectionAssert.AreEqual(run.Server.ExchangeHash, result.ExchangeHash, "H as RFC 8731 defines it, computed by the test server");
+        Assert.AreEqual(PinnedCurve25519ExchangeHash, Convert.ToHexString(result.ExchangeHash));
+        string[] keys =
+        [
+            Convert.ToHexString(result.Keys.DeriveKey(SshKeyPurpose.InitialIvClientToServer, 16)),
+            Convert.ToHexString(result.Keys.DeriveKey(SshKeyPurpose.InitialIvServerToClient, 16)),
+            Convert.ToHexString(result.Keys.DeriveKey(SshKeyPurpose.EncryptionKeyClientToServer, 32)),
+            Convert.ToHexString(result.Keys.DeriveKey(SshKeyPurpose.EncryptionKeyServerToClient, 32)),
+            Convert.ToHexString(result.Keys.DeriveKey(SshKeyPurpose.IntegrityKeyClientToServer, 64)),
+            Convert.ToHexString(result.Keys.DeriveKey(SshKeyPurpose.IntegrityKeyServerToClient, 64)),
+        ];
+        Assert.AreEqual(string.Join(",", PinnedCurve25519Keys), string.Join(",", keys));
+    }
+
+    [TestMethod]
+    [DataRow("00", DisplayName = "u = 0 gives an all-zero secret")]
+    [DataRow("01", DisplayName = "u = 1 gives an all-zero secret")]
+    [DataRow("short", DisplayName = "31 bytes")]
+    [DataRow("long", DisplayName = "33 bytes")]
+    public async Task ExchangeKeysAsync_UnusableX25519ServerKey_FailsWithMinus8(string defect)
+    {
+        TestHostKey hostKey = TestHostKey.Ed25519();
+        byte[] serverKey = defect switch
+        {
+            "short" => new byte[31],
+            "long" => new byte[33],
+            _ => [.. Convert.FromHexString(defect), .. new byte[31]],
+        };
+
+        await AssertKeyExchangeFailsAsync(Script("curve25519-sha256", hostKey, tamper: _ => [TestKeyExchangeServer.EcdhReply(hostKey.Blob, serverKey, hostKey.Sign([]))]));
+    }
+
+    [TestMethod]
+    [DataRow("key", DisplayName = "a 31-byte public key")]
+    [DataRow("truncated", DisplayName = "no public key after the name")]
+    [DataRow("signature", DisplayName = "a 63-byte signature")]
+    public async Task ExchangeKeysAsync_MalformedEd25519HostKeyOrSignature_FailsWithMinus8(string defect)
+    {
+        const string name = "ssh-ed25519";
+        TestHostKey valid = TestHostKey.Ed25519();
+        TestHostKey broken = defect switch
+        {
+            "key" => valid with { Blob = Join(Name(name), String(new byte[31])) },
+            "truncated" => valid with { Blob = Name(name) },
+            _ => valid with { Sign = h => Join(Name(name), String(valid.Sign(h)[^64..^1])) },
+        };
+
+        await AssertKeyExchangeFailsAsync(Script("curve25519-sha256", broken));
+    }
+
+    [TestMethod]
     public async Task ExchangeKeysAsync_WithoutStrictKeyExchange_KeepsCountingSequenceNumbers_AndSkipsIgnoreDebugAndUnimplemented()
     {
         ScriptedExchange run = Script(
@@ -141,6 +202,7 @@ public sealed partial class SshTransportTests
     [DataRow("rsa-sha2-256")]
     [DataRow("ssh-rsa")]
     [DataRow("ssh-dss")]
+    [DataRow("ssh-ed25519")]
     public async Task ExchangeKeysAsync_BadSignature_FailsWithMinus8AsMeasured(string hostKeyAlgorithm)
     {
         ScriptedExchange run = Script("ecdh-sha2-nistp256", TestHostKey.For(hostKeyAlgorithm), tamper: payloads =>
@@ -436,11 +498,12 @@ public sealed partial class SshTransportTests
     [TestMethod]
     public async Task ExchangeKeysAsync_MethodOrHostKeyNotImplemented_ThrowsNotSupported()
     {
-        SshAlgorithmCatalogue withCurve25519 = new([.. SshAlgorithmPreferences.Full.KeyExchange, "ssh-dss", "ssh-ed25519", "aes128-ctr", "hmac-sha2-256", "none"]);
-        foreach ((string method, string hostKey) in new[] { ("curve25519-sha256", "ssh-dss"), ("ecdh-sha2-nistp256", "ssh-ed25519") })
+        const string hostCertificate = "ssh-ed25519-cert-v01@openssh.com";
+        SshAlgorithmCatalogue withUnimplemented = new([.. SshAlgorithmPreferences.Full.KeyExchange, "ssh-dss", hostCertificate, "aes128-ctr", "hmac-sha2-256", "none"]);
+        foreach ((string method, string hostKey) in new[] { ("sntrup761x25519-sha512@openssh.com", "ssh-dss"), ("ecdh-sha2-nistp256", hostCertificate) })
         {
             byte[] serverBytes = new SshServerScript().Line(TestKeyExchangeServer.ServerIdentification).KexInit(ServerKexInit(method, hostKey, strict: false)).Bytes;
-            SshTransport transport = new(new ScriptedConnection(serverBytes), SshAlgorithmPreferences.Full, withCurve25519, new RepeatingRandomSource(0), new TestEphemeralKeys());
+            SshTransport transport = new(new ScriptedConnection(serverBytes), SshAlgorithmPreferences.Full, withUnimplemented, new RepeatingRandomSource(0), new TestEphemeralKeys());
             SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(CancellationToken.None);
 
             await Assert.ThrowsExactlyAsync<NotSupportedException>(
@@ -458,6 +521,18 @@ public sealed partial class SshTransportTests
         "52880EA49E2C29265B459F10B0BCA5B69FEC81ABDFF2EE303486BAEEE0F89833",
         "6897DF7A66123460AD78C1D675F6E87DE9D50C5730FE7D59931B54C78302EDF8FFF7E967A2EAC5EBD6621257ECD496AAA748D8A3AF56FF24A81868C3EED9D3A7",
         "0A898B744EAC47A319035EE81A181061843480BAF5AF7693962CDA855481065469D21AE6E5B946F33FDAC42158A085AD3D06E32C696A8184207BA388FA56E6A4",
+    ];
+
+    private const string PinnedCurve25519ExchangeHash = "0C524D421BAD267BDD2DF593FD5DBC7100E06C650BA142E344F746B7DB02D4EF";
+
+    private static readonly string[] PinnedCurve25519Keys =
+    [
+        "7068C2B58B62580D73423BF4C5712CC8",
+        "AD20B3F9CC5D76A40A93E6BFA4CDD365",
+        "B8EDAFDC83BB559D68E733066ADC979AE6C93BD9D23B2839757657D8D4BDD19A",
+        "A4DEA14CE464A997ACBBE58A7D61BD98052EBDF936612E808E6D33131C7C2F7B",
+        "401909CFF74C73E151EB19A7E962511143A08EBC283BDE13AD09A298F4F80D9DCBFFAC96850B86B38F4E7F87A0DF6DD31E3B1D6E0C542C0774BF25D09E4D0BE7",
+        "FB6E6D39F7443A0E23CDBE894C3AF331D0DD3C4EF6B4C3067BB9AD241D600A1DE34E8C28704BAFF174CFB31AFE359FF8203AD6C1EEBF0BC8F7A7FCE151E5B7D5",
     ];
 
     private const string PinnedGroup14ExchangeHash = "E00B7ACDC1E39CF85CCB4C1A94907F329E83EB15471197304BA94883DC661243";

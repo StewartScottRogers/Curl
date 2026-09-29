@@ -42,6 +42,7 @@ internal sealed record TestKeyExchangeServer(
         byte[] common = Join(Name(ClientIdentification), Name(ServerIdentification), String(clientKexInit), String(serverKexInit), String(hostKey.Blob));
         return method switch
         {
+            "curve25519-sha256" or "curve25519-sha256@libssh.org" => Curve25519(hostKey, common),
             "ecdh-sha2-nistp256" => Ecdh(ECCurve.NamedCurves.nistP256, HashAlgorithmName.SHA256, hostKey, keys, common),
             "ecdh-sha2-nistp384" => Ecdh(ECCurve.NamedCurves.nistP384, HashAlgorithmName.SHA384, hostKey, keys, common),
             "ecdh-sha2-nistp521" => Ecdh(ECCurve.NamedCurves.nistP521, HashAlgorithmName.SHA512, hostKey, keys, common),
@@ -85,6 +86,25 @@ internal sealed record TestKeyExchangeServer(
             k,
             h,
             hash);
+    }
+
+    // RFC 8731 section 3: Q_C and Q_S as strings, and the 32 X25519 bytes as K read
+    // big-endian, straight into an mpint.
+    private static TestKeyExchangeServer Curve25519(TestHostKey hostKey, byte[] common)
+    {
+        byte[] clientPublic = new byte[X25519.KeySize];
+        byte[] serverPublic = new byte[X25519.KeySize];
+        byte[] k = new byte[X25519.KeySize];
+        X25519.ComputePublicKey(TestEphemeralKeys.ClientX25519, clientPublic);
+        X25519.ComputePublicKey(TestEphemeralKeys.ServerX25519, serverPublic);
+        X25519.TryComputeSharedSecret(TestEphemeralKeys.ServerX25519, clientPublic, k);
+        byte[] h = SHA256.HashData(Join(common, String(clientPublic), String(serverPublic), Mpint(k)));
+        return new TestKeyExchangeServer(
+            [EcdhReply(hostKey.Blob, serverPublic, hostKey.Sign(h))],
+            [[30, .. String(clientPublic)]],
+            k,
+            h,
+            HashAlgorithmName.SHA256);
     }
 
     private static TestKeyExchangeServer FiniteField(FiniteFieldDiffieHellmanGroup group, HashAlgorithmName hash, TestHostKey hostKey, byte[] common)

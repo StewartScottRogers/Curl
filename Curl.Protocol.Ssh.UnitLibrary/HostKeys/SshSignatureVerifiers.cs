@@ -5,7 +5,7 @@ namespace Curl.Protocol.Ssh.HostKeys;
 
 /// <summary>
 /// The host-key algorithms this library verifies, by the name <c>KEXINIT</c> offers them
-/// under (ADR-0122's host-key table; <c>ssh-ed25519</c>, certificates and <c>sk-</c> keys
+/// under (ADR-0122's host-key table; certificates and <c>sk-</c> keys
 /// join when their tasks land).
 /// </summary>
 internal static class SshSignatureVerifiers
@@ -19,6 +19,7 @@ internal static class SshSignatureVerifiers
         ["rsa-sha2-256"] = new RsaSshSignatureVerifier("rsa-sha2-256", HashAlgorithmName.SHA256),
         ["ssh-rsa"] = new RsaSshSignatureVerifier("ssh-rsa", HashAlgorithmName.SHA1),
         ["ssh-dss"] = new DsaSshSignatureVerifier(),
+        ["ssh-ed25519"] = new Ed25519SshSignatureVerifier(),
     };
 
     /// <summary>Gets the names of the verified host-key algorithms.</summary>

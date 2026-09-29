@@ -39,4 +39,18 @@ public sealed class SystemSshEphemeralKeySourceTests
 
         CollectionAssert.AreNotEqual(first, second);
     }
+
+    [TestMethod]
+    public void CreateX25519PrivateKey_FillsAFreshKey()
+    {
+        SystemSshEphemeralKeySource source = new();
+        byte[] first = new byte[X25519.KeySize];
+        byte[] second = new byte[X25519.KeySize];
+
+        source.CreateX25519PrivateKey(first);
+        source.CreateX25519PrivateKey(second);
+
+        CollectionAssert.AreNotEqual(new byte[X25519.KeySize], first);
+        CollectionAssert.AreNotEqual(first, second);
+    }
 }

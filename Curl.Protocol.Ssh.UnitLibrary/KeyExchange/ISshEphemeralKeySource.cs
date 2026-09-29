@@ -23,4 +23,11 @@ internal interface ISshEphemeralKeySource
     /// <param name="group">The group.</param>
     /// <returns>The key pair, which the caller disposes.</returns>
     FiniteFieldDiffieHellman CreateFiniteFieldKey(FiniteFieldDiffieHellmanGroup group);
+
+    /// <summary>
+    /// Fills <paramref name="privateKey" /> with an X25519 private key for
+    /// <c>curve25519-sha256</c> (RFC 8731); the caller zeroes it when done.
+    /// </summary>
+    /// <param name="privateKey">The <see cref="X25519.KeySize" /> bytes to fill.</param>
+    void CreateX25519PrivateKey(Span<byte> privateKey);
 }

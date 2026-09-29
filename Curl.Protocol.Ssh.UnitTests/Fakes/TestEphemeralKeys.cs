@@ -42,6 +42,12 @@ internal sealed class TestEphemeralKeys : ISshEphemeralKeySource
     /// <summary>Gets the server's finite-field private exponent.</summary>
     internal static byte[] ServerExponent { get; } = Convert.FromHexString("9FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA987654321");
 
+    /// <summary>Gets the client's fixed X25519 private key (RFC 7748 section 6.1's Alice).</summary>
+    internal static byte[] ClientX25519 { get; } = Convert.FromHexString("77076D0A7318A57D3C16C17251B26645DF4C2F87EBC0992AB177FBA51DB92C2A");
+
+    /// <summary>Gets the server's fixed X25519 private key.</summary>
+    internal static byte[] ServerX25519 { get; } = Convert.FromHexString("5DAB087E624A8A4B79E17F8B83800EE66F3BB1292618B6FD1C2F8B27FF88E0EB");
+
     /// <summary>Gets how many elliptic-curve keys the transport asked for.</summary>
     internal int EllipticCurveKeysCreated { get; private set; }
 
@@ -61,6 +67,9 @@ internal sealed class TestEphemeralKeys : ISshEphemeralKeySource
     /// <inheritdoc />
     public FiniteFieldDiffieHellman CreateFiniteFieldKey(FiniteFieldDiffieHellmanGroup group) =>
         new(group, ClientExponent);
+
+    /// <inheritdoc />
+    public void CreateX25519PrivateKey(Span<byte> privateKey) => ClientX25519.CopyTo(privateKey);
 
     private static ECParameters Fixed(string d, string x, string y) => new()
     {
