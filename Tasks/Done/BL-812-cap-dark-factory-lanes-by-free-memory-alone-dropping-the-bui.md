@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1, Documentation/Planning/Decisions/ADR-0130-lanes-auto-paces-dark-factory-lanes-to-the-usage-windows-the-board-and-the-machine.md]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-812 — Cap dark factory lanes by free memory alone, dropping the build slowdown test
 
@@ -42,3 +42,4 @@ one at a time. Stewart said "cap by memory".
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. Probe passes a step on successful builds and >= 20% free memory; ADR-0130 amended; all self-checks, build and fast tests green.
