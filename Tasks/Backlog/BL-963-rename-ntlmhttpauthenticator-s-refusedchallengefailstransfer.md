@@ -1,5 +1,5 @@
 ---
-id: BL-962
+id: BL-963
 title: Rename NtlmHttpAuthenticator's refusedChallengeFailsTransfer to say it picks the SSPI build
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-962 — Rename NtlmHttpAuthenticator's refusedChallengeFailsTransfer to say it picks the SSPI build
+# BL-963 — Rename NtlmHttpAuthenticator's refusedChallengeFailsTransfer to say it picks the SSPI build
 
 ## Goal
 

@@ -104,7 +104,7 @@ CHALLENGE>` and body `nope`, `read`, `send` 200 `ok`), CurlArgs `curl -sS --ntlm
   Doing named it.
 - The parameter name `refusedChallengeFailsTransfer` now says less than it does; renaming
   it reaches `Curl.Console`, `Curl.Networking.UnitTests` and `Curl.Protocol.Http.UnitTests`,
-  held by other lanes, so BL-962 does it.
+  held by other lanes, so BL-963 does it.
 - Results: `Curl.Authentication.UnitTests` 665 passed, 4 skipped; full fast run green (33
   test assemblies); `Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary`
   100% line, 100% branch, worst CRAP 10.
