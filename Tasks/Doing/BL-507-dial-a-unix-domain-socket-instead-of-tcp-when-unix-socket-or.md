@@ -36,3 +36,4 @@ With `--unix-socket <path>` the connector opens a `UnixDomainSocketEndPoint` at 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
