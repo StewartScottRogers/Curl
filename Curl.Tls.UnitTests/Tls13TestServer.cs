@@ -14,7 +14,6 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
 {
     private readonly List<byte[]> transcriptMessages = [];
     private Tls13CipherSuite suite = Tls13CipherSuite.Aes128GcmSha256;
-    private byte[] clientHandshakeTrafficSecret = [];
     private byte[] masterSecret = [];
     private bool retried;
 
@@ -35,6 +34,10 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         [TlsSignatureScheme.Ed25519, TlsSignatureScheme.EcdsaSecp256r1Sha256, TlsSignatureScheme.RsaPssRsaeSha256];
 
     public IReadOnlyList<TlsExtension> LeafExtensions { get; init; } = [];
+
+    public byte[] ClientHandshakeTrafficSecret { get; private set; } = [];
+
+    public byte[] ServerHandshakeTrafficSecret { get; private set; } = [];
 
     public byte[] ClientApplicationTrafficSecret { get; private set; } = [];
 
@@ -79,7 +82,7 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
 
         HandshakeMessageReadResult finished = HandshakeMessageReader.Read(flight.AsSpan(position));
         Assert.AreEqual(HandshakeType.Finished, finished.Message!.Type);
-        CollectionAssert.AreEqual(suite.KeySchedule.ComputeFinishedVerifyData(clientHandshakeTrafficSecret, TranscriptHash()), finished.Message.Body);
+        CollectionAssert.AreEqual(suite.KeySchedule.ComputeFinishedVerifyData(ClientHandshakeTrafficSecret, TranscriptHash()), finished.Message.Body);
         Assert.AreEqual(flight.Length, position + finished.BytesConsumed);
     }
 
@@ -110,8 +113,8 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         Tls13KeySchedule schedule = suite.KeySchedule;
         byte[] handshakeSecret = schedule.ComputeHandshakeSecret(schedule.ComputeEarlySecret(null), sharedSecret);
         byte[] serverHelloHash = TranscriptHash();
-        clientHandshakeTrafficSecret = schedule.DeriveClientHandshakeTrafficSecret(handshakeSecret, serverHelloHash);
-        byte[] serverHandshakeTrafficSecret = schedule.DeriveServerHandshakeTrafficSecret(handshakeSecret, serverHelloHash);
+        ClientHandshakeTrafficSecret = schedule.DeriveClientHandshakeTrafficSecret(handshakeSecret, serverHelloHash);
+        ServerHandshakeTrafficSecret = schedule.DeriveServerHandshakeTrafficSecret(handshakeSecret, serverHelloHash);
         masterSecret = schedule.ComputeMasterSecret(handshakeSecret);
 
         List<byte[]> flight = [];
@@ -124,7 +127,7 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         Add(flight, new CertificateMessage([], [new CertificateEntry(credential.Certificate, LeafExtensions)]).Encode());
         byte[] content = TlsSignatureScheme.BuildCertificateVerifyContent(true, TranscriptHash());
         Add(flight, new CertificateVerify(credential.Scheme, credential.SigningKey.Sign(credential.Scheme, content)).Encode());
-        Add(flight, new Finished(schedule.ComputeFinishedVerifyData(serverHandshakeTrafficSecret, TranscriptHash())).Encode());
+        Add(flight, new Finished(schedule.ComputeFinishedVerifyData(ServerHandshakeTrafficSecret, TranscriptHash())).Encode());
         byte[] serverFinishedHash = TranscriptHash();
         ClientApplicationTrafficSecret = schedule.DeriveClientApplicationTrafficSecret(masterSecret, serverFinishedHash);
         ServerApplicationTrafficSecret = schedule.DeriveServerApplicationTrafficSecret(masterSecret, serverFinishedHash);

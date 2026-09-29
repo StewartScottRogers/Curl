@@ -10,7 +10,7 @@ namespace Curl.Tls;
 /// explicit nonce. The additional data is the sequence number, type, version and
 /// plaintext length; the 16-byte tag ends the record.
 /// </summary>
-internal sealed class Tls12AeadRecordCipher(ITls12Aead aead, byte[] keyBlockIv, bool hasExplicitNonce) : Tls12RecordCipher
+internal sealed class Tls12AeadRecordCipher(ITlsAead aead, byte[] keyBlockIv, bool hasExplicitNonce) : Tls12RecordCipher
 {
     /// <summary>The length in bytes of the tag.</summary>
     public const int TagLength = 16;

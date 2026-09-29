@@ -70,10 +70,10 @@ internal abstract class Tls12RecordCipher : IDisposable
         return new SymmetricAlgorithmCbcBlockCipher(algorithm);
     }
 
-    private static ITls12Aead CreateAead(Tls12BulkCipher bulkCipher, byte[] key) => bulkCipher switch
+    private static ITlsAead CreateAead(Tls12BulkCipher bulkCipher, byte[] key) => bulkCipher switch
     {
-        Tls12BulkCipher.Aria128Gcm or Tls12BulkCipher.Aria256Gcm => new AriaGcmTls12Aead(key),
-        Tls12BulkCipher.ChaCha20Poly1305 => new ChaCha20Poly1305Tls12Aead(key),
-        _ => new AesGcmTls12Aead(key),
+        Tls12BulkCipher.Aria128Gcm or Tls12BulkCipher.Aria256Gcm => new AriaGcmTlsAead(key),
+        Tls12BulkCipher.ChaCha20Poly1305 => new ChaCha20Poly1305TlsAead(key),
+        _ => new AesGcmTlsAead(key),
     };
 }

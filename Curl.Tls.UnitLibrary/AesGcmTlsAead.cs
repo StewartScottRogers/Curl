@@ -2,8 +2,8 @@ using System.Security.Cryptography;
 
 namespace Curl.Tls;
 
-/// <summary>The BCL's <see cref="AesGcm" /> with 16-byte tags, for the RFC 5288 suites.</summary>
-internal sealed class AesGcmTls12Aead(byte[] key) : ITls12Aead
+/// <summary>The BCL's <see cref="AesGcm" /> with 16-byte tags, for the RFC 5288 suites and the TLS 1.3 AES-GCM suites.</summary>
+internal sealed class AesGcmTlsAead(byte[] key) : ITlsAead
 {
     private readonly AesGcm aesGcm = new(key, 16);
 

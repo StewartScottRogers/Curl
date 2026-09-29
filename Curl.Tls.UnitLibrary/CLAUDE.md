@@ -11,8 +11,9 @@ where the operating system disables them, `--ssl-allow-beast`). Everything else 
 
 Namespace `Curl.Tls`. What is here so far: the handshake message codecs (BL-698), the
 TLS 1.3 key schedule (BL-697), the TLS 1.3 client handshake (BL-699, ADR-0146), the
-TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), and the TLS 1.2,
-1.1 and 1.0 client handshake (BL-703, ADR-0154).
+TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
+1.1 and 1.0 client handshake (BL-703, ADR-0154), and TLS 1.3 over a byte stream
+(BL-700, ADR-0157).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -50,6 +51,19 @@ TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), and the TLS 1
   extensions (`padding` in the order pads a 256-to-511-byte hello to 512).
 - Key shares: `X25519KeyShare`, `EcdhKeyShare` (NIST curves, points checked by
   `NistCurve`), `FfdheKeyShare` (RFC 7919 groups); `TlsNamedGroup` names them.
+- TLS 1.3 over a byte stream (ADR-0157): `Tls13RecordProtection` is one direction under
+  one traffic secret (RFC 8446 section 5.2 nonces, no padding sent, peer padding removed,
+  the GCM and ChaCha20-Poly1305 suites; CCM is BL-810's). The internal
+  `Tls13RecordLayer` reads whole records off the caller's `Stream` and holds a protection
+  per level. `Tls13ClientConnection.ConnectAsync` runs `Tls13ClientHandshake` over it
+  (middlebox compatibility `change_cipher_spec` included) and returns a
+  `Tls13ConnectResult`: a `Tls13ClientStream` or a `TlsHandshakeFailure` whose `Origin`
+  (`TlsHandshakeFailureOrigin`) says who ended it. `Tls13ClientStream` reads and writes
+  application data like `SslStream`'s stream, handles NewSessionTicket and KeyUpdate,
+  returns 0 at `close_notify` or a bare transport end (`CloseNotifyReceived` tells them
+  apart), and throws `TlsAlertException` for any other alert. The AEADs behind
+  `ITlsAead` (`AesGcmTlsAead`, `AriaGcmTlsAead`, `ChaCha20Poly1305TlsAead`) serve both
+  TLS 1.2 and 1.3.
 - `TlsPrf` (`Md5Sha1` for TLS 1.0 and 1.1, `Sha256`, `Sha384`): the PRF of RFC 2246 and
   RFC 5246, the master secret, the extended master secret (RFC 7627), the key block and
   both Finished `verify_data`s. `Tls12KeyBlock.Partition` divides the key block into each

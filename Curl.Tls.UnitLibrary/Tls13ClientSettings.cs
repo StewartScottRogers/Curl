@@ -61,6 +61,13 @@ public sealed record Tls13ClientSettings
     public bool SendLegacySessionId { get; init; }
 
     /// <summary>
+    /// Gets the <c>legacy_record_version</c> of the record that carries the first
+    /// ClientHello over a byte stream: <c>0x0301</c>, as OpenSSL and Schannel send and RFC
+    /// 8446 section 5.1 allows; every later record carries <c>0x0303</c>. Unused inside QUIC.
+    /// </summary>
+    public ushort ClientHelloRecordVersion { get; init; } = 0x0301;
+
+    /// <summary>
     /// Gets the order of the ClientHello's extensions. An extension the handshake builds is
     /// sent only when its type is listed; <c>cookie</c> only after a HelloRetryRequest that
     /// carried one; <c>padding</c>, when listed, pads a hello of 256 to 511 bytes to 512.
