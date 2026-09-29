@@ -20,7 +20,7 @@ internal static class SpnegoMechanism
 
     /// <summary>
     /// Gets the mechanism list curl 8.18.0 with MIT krb5 1.22.1 (no <c>gss-ntlmssp</c>) sent
-    /// in its NegTokenInit, measured on 2026-09-28: Kerberos V5 alone (ADR-0165).
+    /// in its NegTokenInit, measured on 2026-09-28: Kerberos V5 alone (ADR-0167).
     /// </summary>
     public static IReadOnlyList<string> MitKerberosMechanismTypes { get; } = [KerberosV5];
 }

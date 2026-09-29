@@ -87,8 +87,8 @@ anything but `Unsupported`, and the hand-built route only when it answers `Unsup
 | SOCKS5 GSS-API | G, package `Kerberos`, else K | Same as default |
 | SMB | N | N |
 
-The hand-built SPNEGO offers the mechanism list BL-692 measures (Kerberos V5, then the
-legacy Microsoft OID, as MIT's library offers without `gss-ntlmssp`). `--service-name`,
+The hand-built SPNEGO offers the mechanism list BL-692 measured: Kerberos V5 alone, as
+MIT's library offers without `gss-ntlmssp` (ADR-0167). `--service-name`,
 `--proxy-service-name` and `--socks5-gssapi-service` set the target name
 (`TargetName` for W and G, the service principal for K); `--delegation` maps to
 `AllowedImpersonationLevel = Delegation` for W and G and to the forwardable-TGT
