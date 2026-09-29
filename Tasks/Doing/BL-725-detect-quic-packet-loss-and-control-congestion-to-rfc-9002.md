@@ -33,3 +33,4 @@ The QUIC connection acknowledges packets (ACK frames with ranges and ACK delay),
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
