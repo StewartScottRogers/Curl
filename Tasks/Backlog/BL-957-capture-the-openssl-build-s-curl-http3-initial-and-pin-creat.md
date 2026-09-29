@@ -1,5 +1,5 @@
 ---
-id: BL-943
+id: BL-957
 title: Capture the OpenSSL build's curl --http3 Initial and pin CreateOpenSslTlsSettings to it
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-943 — Capture the OpenSSL build's curl --http3 Initial and pin CreateOpenSslTlsSettings to it
+# BL-957 — Capture the OpenSSL build's curl --http3 Initial and pin CreateOpenSslTlsSettings to it
 
 ## Goal
 
