@@ -32,8 +32,8 @@ completed: 2026-09-29
 
 - Filed by BL-525 as the follow-up ADR-0142 names.
 - Lane 1 rerun (2026-09-29): cherry-picked lane 5's `feat(kerberos)` commit from `factory/BL-789-lane-5-20260929-023709`. On today's `factory/lane-1` it builds clean and every fast test passes (the earlier failure came from the other lanes' work, not this task's); `Measure-CodeQuality.ps1 -Library Curl.Kerberos.UnitLibrary`: 100% line, 100% branch, worst CRAP 10.
-- The decisions are recorded in ADR-0193, "Decided by Claude under Stewart's delegation". `Documentation/Planning/Decisions` was added to `touches` for it: lane 5 had to file a separate ADR task (its BL-877, never integrated) because BL-610 held that folder then; no task in Doing names it now, so the ADR is written here and no follow-up task is needed. `CredentialCacheStore`'s summary cites ADR-0193.
-- Decided by Claude under Stewart's delegation (ADR-0193):
+- The decisions are recorded in ADR-0194, "Decided by Claude under Stewart's delegation". `Documentation/Planning/Decisions` was added to `touches` for it: lane 5 had to file a separate ADR task (its BL-877, never integrated) because BL-610 held that folder then; no task in Doing names it now, so the ADR is written here and no follow-up task is needed. `CredentialCacheStore`'s summary cites ADR-0194.
+- Decided by Claude under Stewart's delegation (ADR-0194):
   - `DIR:/d` reads `/d/primary` as MIT `cc_dir.c`'s `read_primary_file` does: the first line must end in a newline and name a file starting `tkt`; a `/` in it is refused too. Anything else is `KerberosFileError.DirectoryPrimaryMalformed`. No `primary` means `tkt`. `DIR::/d/tkt2` reads that file directly.
   - `KRB5CCNAME` unset falls back to `krb5.conf`'s `default_ccache_name` (`%{uid}`, `%{euid}` expanded), then `FILE:/tmp/krb5cc_<uid>`.
   - `KCM:` connects to `kcm_socket`, else `/var/run/.heim_org.h5l.kcm-socket`; `-` turns it off. Failures are `KcmNotRunning`, `KcmFailed` (with `KcmStatus`) or `KcmReplyMalformed` (replies over 10 MiB included).
@@ -45,4 +45,4 @@ completed: 2026-09-29
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Lane 5 could not integrate: fast tests failed after rebasing onto the other lanes' work. The work is on branch factory/BL-789-lane-5-20260929-023709; start with git cherry-pick --no-commit factory/BL-789-lane-5-20260929-023709 and fix it.
 - 2026-09-29: Backlog -> Doing.
-- 2026-09-29: Doing -> Done. DIR: and KCM: credential caches read by the hand-built Kerberos (ADR-0193); Curl.Kerberos.UnitLibrary at 100% line and branch coverage
+- 2026-09-29: Doing -> Done. DIR: and KCM: credential caches read by the hand-built Kerberos (ADR-0194); Curl.Kerberos.UnitLibrary at 100% line and branch coverage
