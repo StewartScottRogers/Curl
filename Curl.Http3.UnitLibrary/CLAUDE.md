@@ -6,14 +6,18 @@ framing (RFC 9114) - frames, the control and QPACK encoder and decoder streams,
 `--http3` and `--http3-only` under ADR-0144
 (`Documentation/Planning/Decisions/ADR-0144-http-3-is-hand-built-over-a-hand-built-quic-and-http3-races-tcp-as-curls-ngtcp2-build-does.md`).
 
-Namespace `Curl.Http3`. Nothing is here yet: BL-720 created the empty project. QPACK
-lands with BL-729 and the frame, control stream and QPACK stream layer with BL-730.
+Namespace `Curl.Http3`. QPACK is here (BL-729, ADR-0163): `QpackEncoder` and
+`QpackDecoder` over `QpackStaticTable`, `QpackDynamicTable`, `QpackPrimitives` and
+`QpackRequiredInsertCount`, failing with `QpackException` and its `QpackErrorCode`. Both
+work on byte spans and queue their stream instructions for the caller to take; nothing
+reads or writes a stream yet. The frame, control stream and QPACK stream layer lands with
+BL-730.
 
 ## Rules
 
 - **Base class library plus `Curl.Http2.UnitLibrary`, and nothing else.** QPACK reuses
   HPACK's Huffman code from `Curl.Http2.UnitLibrary` (ADR-0144), never the other way
-  round; BL-729 adds that reference. `Curl.Protocol.Abstractions.UnitLibrary` is added by
+  round. `Curl.Protocol.Abstractions.UnitLibrary` is added by
   the first task that needs its stream contracts. No package, and no other project
   reference.
 - **Never a reference to `Curl.Quic.UnitLibrary`.** QUIC streams arrive through the

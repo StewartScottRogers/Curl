@@ -4,4 +4,8 @@
     <InternalsVisibleTo Include="Curl.Http3.UnitTests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Http2.UnitLibrary\Curl.Http2.UnitLibrary.csproj" />
+  </ItemGroup>
+
 </Project>
