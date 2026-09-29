@@ -82,20 +82,49 @@ public sealed class WsProtocolHandler(
         }
 
         context.Progress.ReportTransferStarted();
+        context.Events.ReportInfo(WsInfoLines.UsingHttp1);
         await using (connection.ConfigureAwait(false))
         {
             try
             {
-                return await UpgradeAsync(connection, context).ConfigureAwait(false);
+                return await UpgradeAsync(connection, context, connect.ConnectionNumber).ConfigureAwait(false);
             }
             catch (WsTransferException failure)
             {
+                context.Events.ReportInfo(failure.Message);
+                context.Events.ReportInfo(WsInfoLines.Closing(connect.ConnectionNumber));
                 return TransferResult.Failure(failure.ExitCode, failure.Message);
             }
         }
     }
 
-    private async Task<TransferResult> UpgradeAsync(IConnection connection, ITransferContext context)
+    /// <summary>
+    /// Reports each line of the reply head as curl's <c>-v</c> does, with
+    /// <paramref name="refusal" />, when given, reported before the blank line that ends it, where
+    /// curl 8.21.0 writes <c>Refused WebSocket upgrade</c> (BL-584).
+    /// </summary>
+    private static void ReportHead(ITransferEvents events, byte[] head, string? refusal)
+    {
+        int lineStart = 0;
+        while (lineStart < head.Length)
+        {
+            int lineEnd = Array.IndexOf(head, (byte)'\n', lineStart) + 1;
+            if (lineEnd == head.Length && refusal is not null)
+            {
+                events.ReportInfo(refusal);
+            }
+
+            events.ReportResponseHeader(head.AsSpan(lineStart, lineEnd - lineStart));
+            lineStart = lineEnd;
+        }
+    }
+
+    /// <summary>
+    /// Sends the upgrade request and reads the reply head, reporting both for <c>-v</c> and
+    /// <c>--trace</c> as curl 8.21.0 does (BL-584): the request as one header event, the head
+    /// one line at a time, and on a refusal <c>closing connection #N</c>.
+    /// </summary>
+    private async Task<TransferResult> UpgradeAsync(IConnection connection, ITransferContext context, long connectionNumber)
     {
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
         string method = options.CustomMethod ?? "GET";
@@ -110,7 +139,9 @@ public sealed class WsProtocolHandler(
                 IsProxy: false),
             []);
         byte[] request = WsUpgradeRequestFormatter.Format(context.Url, options, method, NewKey(), authorization);
+        context.Events.ReportRequestHeader(request);
         await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
+        context.Events.ReportInfo(WsInfoLines.RequestSent);
         WsUpgradeResponse response = await WsUpgradeResponseReader.ReadAsync(connection, context.CancellationToken).ConfigureAwait(false);
         await WriteHeadAsync(context.HeaderOutput, response.Head, context.CancellationToken).ConfigureAwait(false);
         TransferReport report = new()
@@ -124,10 +155,37 @@ public sealed class WsProtocolHandler(
         if (response.StatusCode != SwitchingProtocols)
         {
             string message = string.Create(CultureInfo.InvariantCulture, $"Refused WebSocket upgrade: {response.StatusCode}");
+            ReportHead(context.Events, response.Head, message);
+            context.Events.ReportInfo(WsInfoLines.Closing(connectionNumber));
             return TransferResult.Failure(CurlExitCode.HttpReturnedError, message) with { Report = report };
         }
 
-        return await ExchangeFramesAsync(connection, context, response.Remaining, report).ConfigureAwait(false);
+        ReportHead(context.Events, response.Head, refusal: null);
+        context.Events.ReportInfo(WsInfoLines.SwitchingToWebSocket);
+        context.Events.ReportInfo(WsInfoLines.SwitchedToWebSocket);
+        TransferResult result = await ExchangeFramesAsync(connection, context, response.Remaining, report).ConfigureAwait(false);
+        ReportTransferEnd(context.Events, result, connectionNumber);
+        return result;
+    }
+
+    /// <summary>
+    /// Writes the lines curl 8.21.0's <c>-v</c> ends an upgraded transfer with (BL-584):
+    /// <c>shutting down connection #N</c> after the server closed the connection; a failure's
+    /// message, then <c>shutting down connection #N</c> for <c>Empty reply from server</c> and
+    /// <c>closing connection #N</c> for any other.
+    /// </summary>
+    private static void ReportTransferEnd(ITransferEvents events, TransferResult result, long connectionNumber)
+    {
+        if (result.ExitCode == CurlExitCode.Ok)
+        {
+            events.ReportInfo(WsInfoLines.ShuttingDown(connectionNumber));
+            return;
+        }
+
+        events.ReportInfo(result.ErrorMessage!);
+        events.ReportInfo(result.ExitCode == CurlExitCode.GotNothing
+            ? WsInfoLines.ShuttingDown(connectionNumber)
+            : WsInfoLines.Closing(connectionNumber));
     }
 
     /// <summary>
@@ -149,7 +207,7 @@ public sealed class WsProtocolHandler(
         byte[] alreadyReceived,
         TransferReport report)
     {
-        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress);
+        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events);
         long uploaded = 0;
         TransferResult result;
         try
@@ -204,7 +262,9 @@ public sealed class WsProtocolHandler(
         }
 
         byte[] frame = WsFrameEncoder.Encode(WsOpcode.Binary, payload.GetBuffer().AsSpan(0, (int)payload.Length), randomSource);
+        context.Events.ReportDataSent(frame);
         await SendAsync(connection, frame, context.CancellationToken).ConfigureAwait(false);
+        context.Events.ReportInfo(WsInfoLines.UploadSent(frame.Length));
         context.Progress.ReportUploaded(frame.Length, frame.Length);
         return frame.Length;
     }
