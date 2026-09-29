@@ -45,12 +45,12 @@ public sealed class ScriptedSaslAuthenticator(params (string Mechanism, string[]
 
         public string Mechanism => mechanism;
 
-        public byte[]? InitialResponse => messages[0];
+        public ValueTask<byte[]?> GetInitialResponseAsync(CancellationToken cancellationToken) => ValueTask.FromResult<byte[]?>(messages[0]);
 
-        public byte[]? Respond(ReadOnlySpan<byte> challenge)
+        public ValueTask<byte[]?> RespondAsync(ReadOnlyMemory<byte> challenge, CancellationToken cancellationToken)
         {
-            owner.Challenges.Add(Encoding.Latin1.GetString(challenge));
-            return ++answersGiven < messages.Length ? messages[answersGiven] : null;
+            owner.Challenges.Add(Encoding.Latin1.GetString(challenge.Span));
+            return ValueTask.FromResult(++answersGiven < messages.Length ? messages[answersGiven] : null);
         }
     }
 }

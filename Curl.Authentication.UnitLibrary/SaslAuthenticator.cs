@@ -32,7 +32,7 @@ namespace Curl.Authentication;
 /// <para>
 /// Every mechanism here has an initial response, LOGIN's being the user name, as curl sends
 /// with <c>--sasl-ir</c>. Without it the handler sends the initial response in answer to the
-/// server's first challenge, and <see cref="ISaslExchange.Respond" /> answers the challenges
+/// server's first challenge, and <see cref="ISaslExchange.RespondAsync" /> answers the challenges
 /// after that: LOGIN's password, and OAUTHBEARER's single <c>0x01</c> byte acknowledging an
 /// error continuation. CRAM-MD5 and DIGEST-MD5 have no initial response and compute their
 /// answers from the server's challenge; DIGEST-MD5 answers the server's <c>rspauth</c>

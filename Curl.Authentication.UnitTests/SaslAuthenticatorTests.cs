@@ -24,81 +24,81 @@ public sealed class SaslAuthenticatorTests
     [TestMethod]
     [DataRow(null, "AHUAcA==", DisplayName = "--sasl-ir -u u:p: AUTH PLAIN AHUAcA==")]
     [DataRow("z", "egB1AHA=", DisplayName = "--sasl-ir --sasl-authzid z -u u:p: AUTH PLAIN egB1AHA=")]
-    public void Begin_Plain_InitialResponseMatchesCurl(string? authorizationIdentity, string expected)
+    public async Task Begin_Plain_InitialResponseMatchesCurl(string? authorizationIdentity, string expected)
     {
         ISaslExchange exchange = Authenticator.Begin("PLAIN", Request(new NetworkCredential("u", "p"), authorizationIdentity: authorizationIdentity));
 
         Assert.AreEqual("PLAIN", exchange.Mechanism);
-        Assert.AreEqual(expected, Base64(exchange.InitialResponse));
-        Assert.IsNull(exchange.Respond([]));
+        Assert.AreEqual(expected, Base64((await InitialResponseAsync(exchange))));
+        Assert.IsNull((await RespondAsync(exchange, [])));
     }
 
     [TestMethod]
-    public void Begin_PlainWithoutInitialResponse_AnswersTheEmptyChallengeWithTheSameMessage()
+    public async Task Begin_PlainWithoutInitialResponse_AnswersTheEmptyChallengeWithTheSameMessage()
     {
         // Measured: AUTH PLAIN, 334 (empty), AHUAcA==, 235.
-        string[] lines = Converse(Authenticator.Begin("PLAIN", Request(new NetworkCredential("u", "p"))), sendInitialResponse: false, "");
+        string[] lines = await ConverseAsync(Authenticator.Begin("PLAIN", Request(new NetworkCredential("u", "p"))), sendInitialResponse: false, "");
 
         CollectionAssert.AreEqual(new[] { "AHUAcA==" }, lines);
     }
 
     [TestMethod]
-    public void Begin_LoginWithInitialResponse_SendsTheUserThenThePassword()
+    public async Task Begin_LoginWithInitialResponse_SendsTheUserThenThePassword()
     {
         // Measured: AUTH LOGIN dQ==, 334 UGFzc3dvcmQ6, cA==, 235.
-        string[] lines = Converse(Authenticator.Begin("LOGIN", Request(new NetworkCredential("u", "p"))), sendInitialResponse: true, "UGFzc3dvcmQ6");
+        string[] lines = await ConverseAsync(Authenticator.Begin("LOGIN", Request(new NetworkCredential("u", "p"))), sendInitialResponse: true, "UGFzc3dvcmQ6");
 
         CollectionAssert.AreEqual(new[] { "dQ==", "cA==" }, lines);
     }
 
     [TestMethod]
-    public void Begin_LoginWithoutInitialResponse_AnswersUsernameThenPassword()
+    public async Task Begin_LoginWithoutInitialResponse_AnswersUsernameThenPassword()
     {
         // Measured: AUTH LOGIN, 334 VXNlcm5hbWU6, dQ==, 334 UGFzc3dvcmQ6, cA==, 235.
-        string[] lines = Converse(
+        string[] lines = await ConverseAsync(
             Authenticator.Begin("LOGIN", Request(new NetworkCredential("u", "p"))), sendInitialResponse: false, "VXNlcm5hbWU6", "UGFzc3dvcmQ6");
 
         CollectionAssert.AreEqual(new[] { "dQ==", "cA==" }, lines);
     }
 
     [TestMethod]
-    public void Begin_LoginThirdChallenge_CannotAnswer()
+    public async Task Begin_LoginThirdChallenge_CannotAnswer()
     {
         ISaslExchange exchange = Authenticator.Begin("LOGIN", Request(new NetworkCredential("u", "p")));
 
         Assert.AreEqual("LOGIN", exchange.Mechanism);
-        Assert.AreEqual("cA==", Base64(exchange.Respond([])));
-        Assert.IsNull(exchange.Respond([]));
+        Assert.AreEqual("cA==", Base64((await RespondAsync(exchange, []))));
+        Assert.IsNull((await RespondAsync(exchange, [])));
     }
 
     [TestMethod]
     [DataRow(null, DisplayName = "--sasl-ir --login-options AUTH=EXTERNAL -u u:: AUTH EXTERNAL dQ==")]
     [DataRow("z", DisplayName = "The authorization identity is not sent: AUTH EXTERNAL dQ==")]
-    public void Begin_External_SendsTheUserName(string? authorizationIdentity)
+    public async Task Begin_External_SendsTheUserName(string? authorizationIdentity)
     {
         ISaslExchange exchange = Authenticator.Begin("EXTERNAL", Request(new NetworkCredential("u", ""), authorizationIdentity: authorizationIdentity));
 
         Assert.AreEqual("EXTERNAL", exchange.Mechanism);
-        Assert.AreEqual("dQ==", Base64(exchange.InitialResponse));
-        Assert.IsNull(exchange.Respond([]));
+        Assert.AreEqual("dQ==", Base64((await InitialResponseAsync(exchange))));
+        Assert.IsNull((await RespondAsync(exchange, [])));
     }
 
     [TestMethod]
-    public void Begin_XOAuth2_InitialResponseMatchesCurl()
+    public async Task Begin_XOAuth2_InitialResponseMatchesCurl()
     {
         ISaslExchange exchange = Authenticator.Begin("XOAUTH2", Request(new NetworkCredential("u", ""), bearerToken: "tok"));
 
         Assert.AreEqual("XOAUTH2", exchange.Mechanism);
-        Assert.AreEqual("dXNlcj11AWF1dGg9QmVhcmVyIHRvawEB", Base64(exchange.InitialResponse));
-        Assert.IsNull(exchange.Respond(Encoding.ASCII.GetBytes("{\"status\":\"401\"}")), "curl fails an XOAUTH2 error continuation with exit 67.");
+        Assert.AreEqual("dXNlcj11AWF1dGg9QmVhcmVyIHRvawEB", Base64((await InitialResponseAsync(exchange))));
+        Assert.IsNull((await RespondAsync(exchange, Encoding.ASCII.GetBytes("{\"status\":\"401\"}"))), "curl fails an XOAUTH2 error continuation with exit 67.");
     }
 
     [TestMethod]
-    public void Begin_XOAuth2WithoutUser_SendsAnEmptyUser()
+    public async Task Begin_XOAuth2WithoutUser_SendsAnEmptyUser()
     {
         ISaslExchange exchange = Authenticator.Begin("XOAUTH2", Request(null, bearerToken: "tok"));
 
-        Assert.AreEqual("user=\u0001auth=Bearer tok\u0001\u0001", Windows1252.GetString(exchange.InitialResponse!));
+        Assert.AreEqual("user=\u0001auth=Bearer tok\u0001\u0001", Windows1252.GetString((await InitialResponseAsync(exchange))!));
     }
 
     [TestMethod]
@@ -112,45 +112,45 @@ public sealed class SaslAuthenticatorTests
     }
 
     [TestMethod]
-    public void Begin_OAuthBearer_LeavesThePortOutUntilTheRequestCarriesIt()
+    public async Task Begin_OAuthBearer_LeavesThePortOutUntilTheRequestCarriesIt()
     {
         ISaslExchange exchange = Authenticator.Begin("OAUTHBEARER", Request(new NetworkCredential("u", ""), bearerToken: "tok"));
 
         Assert.AreEqual("OAUTHBEARER", exchange.Mechanism);
-        Assert.AreEqual("n,a=u,\u0001host=127.0.0.1\u0001auth=Bearer tok\u0001\u0001", Windows1252.GetString(exchange.InitialResponse!));
+        Assert.AreEqual("n,a=u,\u0001host=127.0.0.1\u0001auth=Bearer tok\u0001\u0001", Windows1252.GetString((await InitialResponseAsync(exchange))!));
     }
 
     [TestMethod]
-    public void Begin_OAuthBearerErrorContinuation_AcknowledgedOnceWithOneByte()
+    public async Task Begin_OAuthBearerErrorContinuation_AcknowledgedOnceWithOneByte()
     {
         ISaslExchange exchange = Authenticator.Begin("OAUTHBEARER", Request(null, bearerToken: "tok"));
 
-        CollectionAssert.AreEqual(new byte[] { 0x01 }, exchange.Respond(Encoding.ASCII.GetBytes("{\"status\":\"401\"}")));
-        Assert.IsNull(exchange.Respond([]));
+        CollectionAssert.AreEqual(new byte[] { 0x01 }, (await RespondAsync(exchange, Encoding.ASCII.GetBytes("{\"status\":\"401\"}"))));
+        Assert.IsNull((await RespondAsync(exchange, [])));
     }
 
     [TestMethod]
-    public void Begin_PlainWithoutCredential_SendsEmptyUserAndPassword()
+    public async Task Begin_PlainWithoutCredential_SendsEmptyUserAndPassword()
     {
         ISaslExchange exchange = Authenticator.Begin("PLAIN", Request(null));
 
-        CollectionAssert.AreEqual(new byte[] { 0, 0 }, exchange.InitialResponse);
+        CollectionAssert.AreEqual(new byte[] { 0, 0 }, (await InitialResponseAsync(exchange)));
     }
 
     [TestMethod]
-    public void Begin_XOAuth2WithoutToken_SendsAnEmptyToken()
+    public async Task Begin_XOAuth2WithoutToken_SendsAnEmptyToken()
     {
         ISaslExchange exchange = Authenticator.Begin("XOAUTH2", Request(new NetworkCredential("u", "p")));
 
-        Assert.AreEqual("user=u\u0001auth=Bearer \u0001\u0001", Windows1252.GetString(exchange.InitialResponse!));
+        Assert.AreEqual("user=u\u0001auth=Bearer \u0001\u0001", Windows1252.GetString((await InitialResponseAsync(exchange))!));
     }
 
     [TestMethod]
-    public void Begin_NonAsciiUser_EncodedInTheCredentialEncoding()
+    public async Task Begin_NonAsciiUser_EncodedInTheCredentialEncoding()
     {
         ISaslExchange exchange = Authenticator.Begin("LOGIN", Request(new NetworkCredential("é", "p")));
 
-        CollectionAssert.AreEqual(new byte[] { 0xE9 }, exchange.InitialResponse);
+        CollectionAssert.AreEqual(new byte[] { 0xE9 }, (await InitialResponseAsync(exchange)));
     }
 
     [TestMethod]
@@ -164,23 +164,23 @@ public sealed class SaslAuthenticatorTests
     [TestMethod]
     [DataRow("user", "pencil", "dXNlciBlZTg3NzliY2M1MzFhNzhmNGRiMzc4YzQ3N2E1N2IwZA==", DisplayName = "-u user:pencil: user ee8779bc...")]
     [DataRow("user", "", "dXNlciAzYjFkZDYxZDNmODM4ZDAzZWVlYWJmZGRlOTFlYzVlOQ==", DisplayName = "-u user: : user 3b1dd61d...")]
-    public void Begin_CramMd5_AnswersTheChallengeAsCurl(string user, string password, string expected)
+    public async Task Begin_CramMd5_AnswersTheChallengeAsCurl(string user, string password, string expected)
     {
         // Measured: AUTH CRAM-MD5 (also under --sasl-ir), 334 PDE4OTYuNjk3MTcwOTUyQGxvY2FsaG9zdD4=, the answer, 235.
         ISaslExchange exchange = Authenticator.Begin("cram-md5", Request(new NetworkCredential(user, password)));
 
         Assert.AreEqual("CRAM-MD5", exchange.Mechanism);
-        Assert.IsNull(exchange.InitialResponse);
-        Assert.AreEqual(expected, Base64(exchange.Respond(Encoding.ASCII.GetBytes("<1896.697170952@localhost>"))));
-        Assert.IsNull(exchange.Respond([]));
+        Assert.IsNull((await InitialResponseAsync(exchange)));
+        Assert.AreEqual(expected, Base64((await RespondAsync(exchange, Encoding.ASCII.GetBytes("<1896.697170952@localhost>")))));
+        Assert.IsNull((await RespondAsync(exchange, [])));
     }
 
     [TestMethod]
-    public void Begin_CramMd5WithoutCredential_SendsAnEmptyUserAndPassword()
+    public async Task Begin_CramMd5WithoutCredential_SendsAnEmptyUserAndPassword()
     {
         ISaslExchange exchange = Authenticator.Begin("CRAM-MD5", Request(null));
 
-        StringAssert.StartsWith(Windows1252.GetString(exchange.Respond("c"u8)!), " ");
+        StringAssert.StartsWith(Windows1252.GetString((await RespondAsync(exchange, "c"u8))!), " ");
     }
 
     [TestMethod]
@@ -190,7 +190,7 @@ public sealed class SaslAuthenticatorTests
     [DataRow(false, "172.26.96.1", "dab6bbea0a329577a0c691f97f35a087",
         "username=\"user\",realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",cnonce=\"dab6bbea0a329577a0c691f97f35a087\",nc=\"00000001\",digest-uri=\"smtp/172.26.96.1\",response=8c416297044dbc635e16a5432c6cc0a1,qop=auth",
         DisplayName = "OpenSSL")]
-    public void Begin_DigestMd5_AnswersTheChallengeThenRspauthAsCurl(bool answerAsSspi, string host, string clientNonce, string expected)
+    public async Task Begin_DigestMd5_AnswersTheChallengeThenRspauthAsCurl(bool answerAsSspi, string host, string clientNonce, string expected)
     {
         // Measured: AUTH DIGEST-MD5, 334 <challenge>, the answer, 334 <rspauth>, an empty line, 235.
         var authenticator = new SaslAuthenticator(Windows1252, () => clientNonce, answerAsSspi);
@@ -198,30 +198,30 @@ public sealed class SaslAuthenticatorTests
         ISaslExchange exchange = authenticator.Begin("DIGEST-MD5", request);
 
         Assert.AreEqual("DIGEST-MD5", exchange.Mechanism);
-        Assert.IsNull(exchange.InitialResponse);
+        Assert.IsNull((await InitialResponseAsync(exchange)));
         byte[] challenge = Encoding.ASCII.GetBytes("realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth\",algorithm=md5-sess,charset=utf-8");
-        Assert.AreEqual(expected, Windows1252.GetString(exchange.Respond(challenge)!));
-        CollectionAssert.AreEqual(Array.Empty<byte>(), exchange.Respond("rspauth=ea40f60335c427b5527b84dbabcdfffd"u8));
-        Assert.IsNull(exchange.Respond([]));
+        Assert.AreEqual(expected, Windows1252.GetString((await RespondAsync(exchange, challenge))!));
+        CollectionAssert.AreEqual(Array.Empty<byte>(), (await RespondAsync(exchange, "rspauth=ea40f60335c427b5527b84dbabcdfffd"u8)));
+        Assert.IsNull((await RespondAsync(exchange, [])));
     }
 
     [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
-    public void Begin_DigestMd5WithoutCredential_SendsAnEmptyUser(bool answerAsSspi)
+    public async Task Begin_DigestMd5WithoutCredential_SendsAnEmptyUser(bool answerAsSspi)
     {
         ISaslExchange exchange = new SaslAuthenticator(Windows1252, () => "c", answerAsSspi).Begin("DIGEST-MD5", Request(null));
 
         StringAssert.StartsWith(
-            Windows1252.GetString(exchange.Respond("nonce=\"n\",qop=\"auth\",algorithm=md5-sess"u8)!), "username=\"\",");
+            Windows1252.GetString((await RespondAsync(exchange, "nonce=\"n\",qop=\"auth\",algorithm=md5-sess"u8))!), "username=\"\",");
     }
 
     [TestMethod]
-    public void Begin_DigestMd5ChallengeCurlCancels_AnswersNull()
+    public async Task Begin_DigestMd5ChallengeCurlCancels_AnswersNull()
     {
         ISaslExchange exchange = Authenticator.Begin("DIGEST-MD5", Request(new NetworkCredential("u", "p")));
 
-        Assert.IsNull(exchange.Respond("realm=\"r\""u8));
+        Assert.IsNull((await RespondAsync(exchange, "realm=\"r\""u8)));
     }
 
     [TestMethod]
@@ -329,19 +329,25 @@ public sealed class SaslAuthenticatorTests
     }
 
     // Plays a handler's side of one exchange: the initial response on the command line or in
-    // answer to the first challenge, then Respond for the rest. Returns the base64 lines sent.
-    private static string[] Converse(ISaslExchange exchange, bool sendInitialResponse, params string[] challenges)
+    // answer to the first challenge, then RespondAsync for the rest. Returns the base64 lines sent.
+    private static async Task<string[]> ConverseAsync(ISaslExchange exchange, bool sendInitialResponse, params string[] challenges)
     {
         List<string> lines = [];
         int next = sendInitialResponse ? 0 : 1;
-        lines.Add(Base64(exchange.InitialResponse));
+        lines.Add(Base64(await InitialResponseAsync(exchange)));
         for (; next < challenges.Length; next++)
         {
-            lines.Add(Base64(exchange.Respond(Convert.FromBase64String(challenges[next]))));
+            lines.Add(Base64(await RespondAsync(exchange, Convert.FromBase64String(challenges[next]))));
         }
 
         return [.. lines];
     }
+
+    private static ValueTask<byte[]?> InitialResponseAsync(ISaslExchange exchange) =>
+        exchange.GetInitialResponseAsync(CancellationToken.None);
+
+    private static ValueTask<byte[]?> RespondAsync(ISaslExchange exchange, ReadOnlySpan<byte> challenge) =>
+        exchange.RespondAsync(challenge.ToArray(), CancellationToken.None);
 
     private static string Base64(byte[]? bytes)
     {

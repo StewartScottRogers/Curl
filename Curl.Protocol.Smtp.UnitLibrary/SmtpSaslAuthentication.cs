@@ -140,9 +140,9 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     /// only while the mechanism's name and the base64 fit in 504 characters.
     /// </summary>
     /// <returns>The encoded response, or <see langword="null" /> to send it after the first <c>334</c>.</returns>
-    private string? InlineInitialResponse(ISaslExchange exchange)
+    private string? InlineInitialResponse(ISaslExchange exchange, byte[]? initialResponse)
     {
-        if (exchange.InitialResponse is not { } initialResponse || context.Mail is not { SaslInitialResponse: true })
+        if (initialResponse is null || context.Mail is not { SaslInitialResponse: true })
         {
             return null;
         }
@@ -157,8 +157,9 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     /// <returns>Whether the server accepted the exchange.</returns>
     private async ValueTask<bool> ExchangeAsync(ISaslExchange exchange)
     {
-        string? inline = InlineInitialResponse(exchange);
-        byte[]? pending = inline is null ? exchange.InitialResponse : null;
+        byte[]? initialResponse = await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false);
+        string? inline = InlineInitialResponse(exchange, initialResponse);
+        byte[]? pending = inline is null ? initialResponse : null;
         bool messageSent = inline is not null;
         await channel.SendAsync(AuthKeyword + exchange.Mechanism + (inline is null ? string.Empty : " " + inline)).ConfigureAwait(false);
         while (true)
@@ -169,7 +170,7 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
                 return reply.Code == Authenticated && messageSent;
             }
 
-            byte[]? response = pending ?? exchange.Respond(DecodeChallenge(reply));
+            byte[]? response = pending ?? await exchange.RespondAsync(DecodeChallenge(reply), context.CancellationToken).ConfigureAwait(false);
             pending = null;
             if (response is null)
             {

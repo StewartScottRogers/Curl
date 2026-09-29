@@ -123,8 +123,8 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     /// length limit.
     /// </summary>
     /// <returns>The encoded response, or <see langword="null" /> to send it after the first <c>+</c>.</returns>
-    private string? InlineInitialResponse(ISaslExchange exchange, bool serverTakesInitialResponse) =>
-        exchange.InitialResponse is { } initialResponse
+    private string? InlineInitialResponse(byte[]? initialResponse, bool serverTakesInitialResponse) =>
+        initialResponse is not null
             && (serverTakesInitialResponse || context.Mail is { SaslInitialResponse: true })
             ? Encode(initialResponse)
             : null;
@@ -135,8 +135,9 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     /// <returns>Whether the server accepted the exchange.</returns>
     private async ValueTask<bool> ExchangeAsync(ISaslExchange exchange, bool serverTakesInitialResponse)
     {
-        string? inline = InlineInitialResponse(exchange, serverTakesInitialResponse);
-        byte[]? pending = inline is null ? exchange.InitialResponse : null;
+        byte[]? initialResponse = await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false);
+        string? inline = InlineInitialResponse(initialResponse, serverTakesInitialResponse);
+        byte[]? pending = inline is null ? initialResponse : null;
         bool messageSent = inline is not null;
         await channel.SendCommandAsync("AUTHENTICATE " + exchange.Mechanism + (inline is null ? string.Empty : " " + inline))
             .ConfigureAwait(false);
@@ -149,7 +150,7 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
                 return response.Status == ImapResponseStatus.Ok && messageSent;
             }
 
-            byte[]? answer = pending ?? exchange.Respond(DecodeChallenge(response.Untagged[0]));
+            byte[]? answer = pending ?? await exchange.RespondAsync(DecodeChallenge(response.Untagged[0]), context.CancellationToken).ConfigureAwait(false);
             pending = null;
             if (answer is null)
             {

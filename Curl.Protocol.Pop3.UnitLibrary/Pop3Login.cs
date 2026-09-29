@@ -123,9 +123,9 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// </summary>
     private async ValueTask<TransferResult?> AuthenticateAsync(ISaslExchange exchange)
     {
-        byte[]? unsent = exchange.InitialResponse;
+        byte[]? unsent = await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false);
         string command = "AUTH " + exchange.Mechanism;
-        if (SendsInitialResponseInline(exchange))
+        if (SendsInitialResponseInline(exchange, unsent))
         {
             command += " " + Encode(unsent!);
             unsent = null;
@@ -140,7 +140,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
                 return unsent is null ? null : LoginDenied();
             }
 
-            if (AnswerTo(response, unsent, exchange) is not { } answer)
+            if (await AnswerToAsync(response, unsent, exchange).ConfigureAwait(false) is not { } answer)
             {
                 return LoginDenied();
             }
@@ -154,9 +154,9 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// Whether the initial response goes on the <c>AUTH</c> line: only under <c>--sasl-ir</c>,
     /// and only while the mechanism's name and the base64 fit in 247 characters.
     /// </summary>
-    private bool SendsInitialResponseInline(ISaslExchange exchange) =>
+    private bool SendsInitialResponseInline(ISaslExchange exchange, byte[]? initialResponse) =>
         mail.SaslInitialResponse
-        && exchange.InitialResponse is { } initialResponse
+        && initialResponse is not null
         && exchange.Mechanism.Length + Encode(initialResponse).Length <= MaxInitialResponseLength;
 
     /// <summary>
@@ -164,14 +164,14 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// exchange's answer to the challenge, for a continuation; <see langword="null" /> for
     /// <c>-ERR</c> or a challenge the exchange cannot answer.
     /// </summary>
-    private static byte[]? AnswerTo(Pop3Response response, byte[]? unsentInitialResponse, ISaslExchange exchange)
+    private async ValueTask<byte[]?> AnswerToAsync(Pop3Response response, byte[]? unsentInitialResponse, ISaslExchange exchange)
     {
         if (response.Line[0] != '+')
         {
             return null;
         }
 
-        return unsentInitialResponse ?? exchange.Respond(DecodeChallenge(response));
+        return unsentInitialResponse ?? await exchange.RespondAsync(DecodeChallenge(response), context.CancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

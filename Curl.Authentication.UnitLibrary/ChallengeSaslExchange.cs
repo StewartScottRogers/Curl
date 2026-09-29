@@ -10,8 +10,8 @@ namespace Curl.Authentication;
 /// <param name="answerChallenges">
 /// One function per expected challenge, each given the decoded challenge and answering the
 /// response, or <see langword="null" /> when curl would cancel. Once they run out,
-/// <see cref="Respond" /> answers <see langword="null" />, as curl fails a challenge it does
-/// not expect.
+/// <see cref="RespondAsync" /> answers <see langword="null" />, as curl fails a challenge it
+/// does not expect.
 /// </param>
 internal sealed class ChallengeSaslExchange(string mechanism, params Func<byte[], byte[]?>[] answerChallenges) : ISaslExchange
 {
@@ -21,9 +21,10 @@ internal sealed class ChallengeSaslExchange(string mechanism, params Func<byte[]
     public string Mechanism => mechanism;
 
     /// <inheritdoc />
-    public byte[]? InitialResponse => null;
+    public ValueTask<byte[]?> GetInitialResponseAsync(CancellationToken cancellationToken) =>
+        ValueTask.FromResult<byte[]?>(null);
 
     /// <inheritdoc />
-    public byte[]? Respond(ReadOnlySpan<byte> challenge) =>
-        challengesAnswered < answerChallenges.Length ? answerChallenges[challengesAnswered++](challenge.ToArray()) : null;
+    public ValueTask<byte[]?> RespondAsync(ReadOnlyMemory<byte> challenge, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(challengesAnswered < answerChallenges.Length ? answerChallenges[challengesAnswered++](challenge.ToArray()) : null);
 }
