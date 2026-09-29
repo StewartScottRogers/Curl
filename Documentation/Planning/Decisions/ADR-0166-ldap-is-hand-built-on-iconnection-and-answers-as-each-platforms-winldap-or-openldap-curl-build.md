@@ -95,8 +95,9 @@ with exit 39, `LDAP remote: Server Down`.
   | Bind not `success` | 38 `LdapCannotBind`, `LDAP local: bind via ldap_win_bind <WinLDAP text>`, after one LDAPv2 retry | 67 `LoginDenied` for 49 `invalidCredentials`, else 38 with curl's own `LDAP: cannot bind` |
   | Connection closed before the bind is answered | 38, `Timeout` when the first bind is unanswered (after a 30-second wait), `Unavailable` when the LDAPv2 retry is (BL-586) | Unbind not sent, exit 7, `LDAP local: connecting ldap_result Can't contact LDAP server` (BL-586) |
   | SearchResultDone not `success` | 39 `LdapSearchFailed`, `LDAP remote: <WinLDAP text>` | 39, `LDAP remote: search failed <libldap text> <diagnostic message>` |
-  | No search result in time | 39, `LDAP remote: Server Down` | measured by BL-587 |
-  | URL curl refuses | measured by BL-587 | measured by BL-587 |
+  | No search result in time | 39, `LDAP remote: Server Down` | 56 `RecvError`, `LDAP local: search ldap_result Can't contact LDAP server` (BL-587) |
+  | URL curl refuses | 3, `Bad LDAP URL: Invalid Syntax` or `... No Memory`, after connecting (BL-587) | 3, `LDAP local: <ldap_url_parse's reason>`, before connecting (BL-587) |
+  | Filter the build refuses | 39, `LDAP remote: Filter Error`, then Unbind (BL-587) | 39, `LDAP local: ldap_search_ext Bad search filter`, then Unbind (BL-587) |
   | Connect and TLS failures | 7, 28, 35, 60 and the rest, from `IConnector` as for every protocol | the same |
 
   The result-code texts are two tables in the library, one per dialect (WinLDAP's
@@ -130,6 +131,51 @@ recordings on 2026-09-28 (Windows curl 8.21.0 with WinLDAP; Linux curl 8.18.0 wi
 - Without `-u` the Windows build reads the rootDSE (`supportedCapabilities`, time limit
   120) before its NTLM bind. That bind is its own task, BL-830; until it lands the WinLDAP
   dialect binds anonymously without `-u`, and BL-589 registers the handler only after it.
+
+## Measured by BL-587
+
+Decided by Claude under Stewart's delegation, in BL-587, from about 60 `Record-CurlExchange.ps1
+-Script` recordings on 2026-09-28 (the same two builds as BL-586), each with `-sS -u cn=u:p`,
+and from curl 8.21.0's `lib/ldap.c` and `lib/openldap.c`:
+
+- **Messages.** Both builds send the SearchRequest with messageID 2 after one bind and the
+  UnbindRequest with 3. A filter the build refuses sends no SearchRequest but still uses up
+  messageID 2, so the UnbindRequest is 3 there too. `sizeLimitExceeded` (4) ends the search
+  successfully in both (`ldap.c` and `openldap.c` both let it through).
+- **Reading the URL.** The Windows build reads it with curl's own `ldap_url_parse2_low` once
+  connected (its connection opens, nothing is sent, and it fails with exit 3): each part is
+  decoded by `Curl_urldecode`, which leaves an invalid `%` as it is and refuses a decoded
+  zero byte (`Bad LDAP URL: No Memory`); the scope is not decoded and is one of `base`,
+  `one`, `onetree`, `sub`, `subtree`; attributes stop at the first empty one; extensions and
+  every part after them are ignored, even a critical `!` one, but a trailing `?` with
+  nothing after it is `Invalid Syntax`. The OpenLDAP build reads it with `ldap_url_parse`
+  before it connects: each part decoded whole, an invalid `%` empties the part (a DN sent
+  empty, a filter refused), a zero byte ends it; scopes add `onelevel`, `subord`,
+  `subordinate` and `children` (scope 3) and drop `onetree`; a fifth `?` is `bad URL`, an
+  empty extensions part `bad or missing extensions`, and user information in the URL `bad URL`.
+- **Text on the wire.** The OpenLDAP build sends the URL's bytes. The Windows build hands them
+  to WinLDAP's ANSI functions, which read the system ANSI code page and send UTF-8:
+  `%C3%A9` goes out as `c3 83 c2 a9` and `%80` as `e2 82 ac`. The library uses Windows-1252,
+  the measuring machine's code page; a filter's `\XX` escape is sent as the raw byte.
+- **Filters.** `LdapFilterEncoder` records where the two parsers part: WinLDAP encodes every
+  top-level item of `(a=1)(b=2)` and every item under `!`, refuses `(cn=)`, `(&)` and `(|)`,
+  keeps a `\` that is not a hex escape, drops empty substrings, sends the text between the
+  first `:` and `:=` as the matching rule (`dn:1.2.3`) and always sends `dnAttributes`;
+  `libldap` refuses a second top-level item, `!` with two, `\zz`, `(cn=a**b)` and attribute
+  names outside `[A-Za-z0-9;.-]`, accepts `(cn=)`, `(&)` and `(|)`, and sends `dnAttributes`
+  only when true. Not measured, decided by the same rules: WinLDAP's `(cn=**)` sends an
+  empty substrings list, and a `*` in a `>=`, `<=` or `~=` value is literal to WinLDAP and
+  refused by `libldap`.
+- **Failures after the SearchRequest.** WinLDAP: `LDAP remote: <ldap_err2string>` (the
+  BL-586 table), and a server that closes, or answers with anything but a SearchResultDone
+  for the search, ends after its 30-second wait as `LDAP remote: Server Down`, reported here
+  at once. OpenLDAP: `LDAP remote: search failed <libldap text> <diagnosticMessage>`, the
+  texts recorded for every code from 1 to 128 and 4096 (`LibLdapResultText`); a server that
+  closes is exit 56; and a reply to the search that is neither an entry nor the
+  SearchResultDone ends the transfer successfully, as `oldap_recv` returns end-of-transfer for
+  any other message type, after an AbandonRequest (messageID 3) and the UnbindRequest (4).
+- `Record-CurlExchange.ps1 -Script` no longer throws when curl exits without writing on any
+  connection, as the Windows build does for a URL it refuses after connecting.
 
 ## Consequences
 
