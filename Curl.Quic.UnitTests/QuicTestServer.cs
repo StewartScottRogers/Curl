@@ -50,6 +50,9 @@ internal sealed class QuicTestServer : IDisposable
     /// <summary>Gets how the server's transport parameters are encoded; <see langword="null" /> sends no extension.</summary>
     public Func<QuicTransportParameters, byte[]?> EncodeTransportParameters { get; init; } = parameters => parameters.Encode();
 
+    /// <summary>Gets what changes the server's transport parameters before they are encoded, such as its stream and flow control limits.</summary>
+    public Func<QuicTransportParameters, QuicTransportParameters> ConfigureTransportParameters { get; init; } = parameters => parameters;
+
     /// <summary>Gets the frames the server sends in 1-RTT once the client's Finished checks out.</summary>
     public Func<QuicTestServer, IEnumerable<QuicFrame>> FramesAfterHandshake { get; init; } = _ => [new QuicHandshakeDoneFrame()];
 
@@ -204,7 +207,7 @@ internal sealed class QuicTestServer : IDisposable
             ActiveConnectionIdLimit = 4,
             InitialMaxData = 1 << 20,
         };
-        (byte[] serverHello, byte[] flight) = tls.Answer([.. clientHello], ApplicationProtocol, EncodeTransportParameters(parameters));
+        (byte[] serverHello, byte[] flight) = tls.Answer([.. clientHello], ApplicationProtocol, EncodeTransportParameters(ConfigureTransportParameters(parameters)));
         initial.QueueCrypto(serverHello);
         handshake.SendProtection = QuicPacketProtection.Create(tls.Suite, tls.ServerHandshakeSecret);
         handshake.ReceiveProtection = QuicPacketProtection.Create(tls.Suite, tls.ClientHandshakeSecret);

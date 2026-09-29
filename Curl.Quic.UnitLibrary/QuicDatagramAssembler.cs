@@ -60,11 +60,14 @@ internal static class QuicDatagramAssembler
         return packets;
     }
 
-    // A packet that does not fit in what is left of a datagram, or goes to another connection
-    // ID, starts the next one; a datagram always takes its first packet.
+    // A packet that does not fit in what is left of a datagram, goes to another connection
+    // ID, or would follow a short header packet, which has no length and so ends its datagram
+    // (RFC 9000 section 12.2), starts the next one; a datagram always takes its first packet.
     private static bool StartsNewDatagram(List<PlannedPacket> datagram, PlannedPacket next) =>
         datagram.Count > 0
-        && (datagram.Sum(packet => packet.Size) + next.Size > DatagramSize || !datagram[0].Destination.Span.SequenceEqual(next.Destination.Span));
+        && (datagram[^1].Space.PacketType == QuicPacketType.OneRtt
+            || datagram.Sum(packet => packet.Size) + next.Size > DatagramSize
+            || !datagram[0].Destination.Span.SequenceEqual(next.Destination.Span));
 
     private static PlannedPacket Plan(QuicPacketNumberSpace space, QuicPacketAddress address, TimeSpan now)
     {

@@ -15,6 +15,9 @@ namespace Curl.Quic;
 /// Handshake packet and the Handshake keys at HANDSHAKE_DONE, issues connection IDs up to
 /// the server's limit and retires the server's as asked, and keeps NEW_TOKEN tokens for
 /// the next connection. Failures map to curl's exit codes (ADR-0144 section 7, ADR-0165).
+/// Once complete it carries the connection's <see cref="Streams" />: their frames go in and
+/// out of its 1-RTT packets, and a stream or flow control violation closes the connection
+/// with its transport error.
 /// </summary>
 public sealed class QuicClientHandshake : IDisposable
 {
@@ -81,6 +84,8 @@ public sealed class QuicClientHandshake : IDisposable
         TlsExtension parameters = QuicTransportParametersExtension.Encode(TransportParameters.Encode());
         tls = new Tls13ClientHandshake(settings.Tls with { FixedExtensions = [.. settings.Tls.FixedExtensions, parameters] }, random, verifier);
         token = settings.Token;
+        Streams = new QuicStreamSet(TransportParameters);
+        application.Streams = Streams;
         spacesByLevel = [initial, null, handshake, application];
         spacesById = [initial, handshake, application];
         foreach (var space in spacesById)
@@ -120,6 +125,9 @@ public sealed class QuicClientHandshake : IDisposable
 
     /// <summary>Gets a value indicating whether the Handshake keys are discarded.</summary>
     public bool HandshakeKeysDiscarded => handshake.IsDiscarded;
+
+    /// <summary>Gets the connection's streams and flow control (RFC 9000 sections 2 to 4); streams open once the server's transport parameters have arrived.</summary>
+    public QuicStreamSet Streams { get; }
 
     /// <summary>Gets the loss detection and congestion control of the connection (RFC 9002).</summary>
     public QuicLossRecovery Recovery { get; }
@@ -222,6 +230,19 @@ public sealed class QuicClientHandshake : IDisposable
         return Flush(outcome.ProbeRequired);
     }
 
+    /// <summary>Returns the datagrams carrying what waits to be sent, such as the stream data, STOP_SENDING or raised limits the application's use of <see cref="Streams" /> queued, as far as the congestion window allows; nothing once the connection has failed.</summary>
+    /// <returns>The datagrams to send.</returns>
+    public IReadOnlyList<byte[]> TakeDatagramsToSend() => Failure is null ? Flush() : [];
+
+    /// <summary>Closes the connection with an application CONNECTION_CLOSE (frame type 0x1d) carrying <paramref name="applicationErrorCode" />, such as HTTP/3's <c>H3_NO_ERROR</c>.</summary>
+    /// <param name="applicationErrorCode">The application's error code.</param>
+    /// <returns>The datagrams to send, whatever the congestion window says.</returns>
+    public IReadOnlyList<byte[]> CloseWithApplicationError(ulong applicationErrorCode)
+    {
+        application.QueueFrame(new QuicConnectionCloseFrame(applicationErrorCode, null, ReadOnlyMemory<byte>.Empty));
+        return Flush(ignoreCongestionWindow: true);
+    }
+
     /// <summary>Gives up on the handshake, as when its timeout fires: records the failure and closes the connection with <paramref name="errorCode" />.</summary>
     /// <param name="errorCode">The transport error CONNECTION_CLOSE carries.</param>
     /// <param name="failure">Why the handshake failed.</param>
@@ -252,11 +273,11 @@ public sealed class QuicClientHandshake : IDisposable
     private static bool SameConnectionId(byte[]? actual, byte[]? expected) =>
         actual is null ? expected is null : expected is not null && actual.AsSpan().SequenceEqual(expected);
 
-    private static void RequeueLost(QuicPacketNumberSpace space, IEnumerable<QuicSentPacket> packets)
+    private void RequeueLost(QuicPacketNumberSpace space, IEnumerable<QuicSentPacket> packets)
     {
         foreach (var packet in packets)
         {
-            space.RequeueLost(packet.Frames);
+            space.RequeueLost(packet.Frames.Where(Streams.ShouldResend));
         }
     }
 
@@ -269,7 +290,7 @@ public sealed class QuicClientHandshake : IDisposable
     {
         if (Recovery.GetUnacknowledgedPackets(space.Id).FirstOrDefault(packet => packet.IsAckEliciting) is { } oldest)
         {
-            space.RequeueLost(oldest.Frames);
+            space.RequeueLost(oldest.Frames.Where(Streams.ShouldResend));
         }
 
         if (!space.HasFramesToSend)
@@ -523,8 +544,10 @@ public sealed class QuicClientHandshake : IDisposable
             case QuicRetireConnectionIdFrame retireConnectionId:
                 QueueApplicationFrames(LocalConnectionIds.Retire(retireConnectionId));
                 break;
-
-                // PADDING and PING ask for nothing more; stream and flow control frames are the streams' (BL-726).
+            default:
+                // Stream and flow control frames are the streams'; PADDING and PING ask for nothing more.
+                Streams.Receive(frame);
+                break;
         }
     }
 
@@ -605,6 +628,7 @@ public sealed class QuicClientHandshake : IDisposable
         }
 
         PeerConnectionIds!.SetHandshakeResetToken(parameters.StatelessResetToken);
+        Streams.SetPeerTransportParameters(parameters);
         Recovery.MaxAckDelay = TimeSpan.FromMilliseconds(parameters.MaxAckDelay);
         ServerTransportParameters = parameters;
     }

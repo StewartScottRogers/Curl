@@ -78,10 +78,16 @@ internal sealed class QuicPacketNumberSpace(QuicPacketType packetType) : IDispos
 
     /// <summary>Gets a value indicating whether the space has an acknowledgement, a frame or CRYPTO bytes to send and keys to send them with.</summary>
     public bool HasFramesToSend =>
-        SendProtection is not null && (acknowledgementDue || pendingFrames.Count > 0 || cryptoLost.Count > 0 || cryptoQueuedFrom < cryptoSent.WrittenCount);
+        SendProtection is not null && (acknowledgementDue || HasMoreThanAcknowledgementToSend);
 
     /// <summary>Gets a value indicating whether what waits to be sent is only an acknowledgement, which the congestion window does not hold back (RFC 9002 section 7).</summary>
-    public bool HasOnlyAcknowledgementToSend => acknowledgementDue && pendingFrames.Count == 0 && cryptoLost.Count == 0 && cryptoQueuedFrom == cryptoSent.WrittenCount;
+    public bool HasOnlyAcknowledgementToSend => acknowledgementDue && !HasMoreThanAcknowledgementToSend;
+
+    /// <summary>Gets or sets the streams whose frames go out in this space's packets: the application data space's, <see langword="null" /> elsewhere.</summary>
+    public QuicStreamSet? Streams { get; set; }
+
+    private bool HasMoreThanAcknowledgementToSend =>
+        pendingFrames.Count > 0 || cryptoLost.Count > 0 || cryptoQueuedFrom < cryptoSent.WrittenCount || Streams is { HasFramesToSend: true };
 
     /// <summary>Records a received packet number and when it arrived; returns <see langword="false" /> for a duplicate, which is dropped unread.</summary>
     /// <param name="packetNumber">The packet number.</param>
@@ -147,8 +153,8 @@ internal sealed class QuicPacketNumberSpace(QuicPacketType packetType) : IDispos
 
     /// <summary>
     /// Takes the frames for the next packet: the ACK when one is due, the queued frames, then
-    /// lost CRYPTO ranges and new CRYPTO bytes as far as what is left of
-    /// <paramref name="payloadRoom" /> allows, and reserves its packet number.
+    /// lost CRYPTO ranges, new CRYPTO bytes and the <see cref="Streams" />' frames as far as
+    /// what is left of <paramref name="payloadRoom" /> allows, and reserves its packet number.
     /// </summary>
     /// <param name="payloadRoom">The most bytes the packet's frames may take.</param>
     /// <param name="now">The time now, which sets the ACK Delay.</param>
@@ -171,7 +177,10 @@ internal sealed class QuicPacketNumberSpace(QuicPacketType packetType) : IDispos
         {
             frames.Add(CryptoFrame(cryptoQueuedFrom, cryptoLength));
             cryptoQueuedFrom += cryptoLength;
+            room -= CryptoFrameOverhead + cryptoLength;
         }
+
+        Streams?.TakeFrames(frames, room);
 
         return (frames, NextPacketNumber++);
     }

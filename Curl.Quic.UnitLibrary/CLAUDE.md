@@ -78,7 +78,30 @@ Loss detection and congestion control (BL-725, RFC 9002, RFC 9438):
   CONNECTION_CLOSE go regardless) and starts a new datagram when the destination
   connection ID changes (RFC 9000 section 12.2).
 
-No streams yet (BL-726). The rest of the transport lands in the tasks ADR-0144 lists.
+Streams and flow control (BL-726, RFC 9000 sections 2 to 4, ADR-0172):
+
+- `QuicStreamSet` (`QuicClientHandshake.Streams`): opens client bidirectional and
+  unidirectional streams up to the server's MAX_STREAMS (STREAMS_BLOCKED once per limit),
+  creates the server's streams with every lower-numbered one of their type, routes the
+  stream frames of sections 19.4 to 19.14, holds the server's MAX_DATA and MAX_STREAM_DATA
+  (DATA_BLOCKED and STREAM_DATA_BLOCKED once per limit), and raises the client's limits by
+  fixed windows at half. Violations throw `FLOW_CONTROL_ERROR`, `STREAM_LIMIT_ERROR`,
+  `STREAM_STATE_ERROR` or `FINAL_SIZE_ERROR`, which close the connection.
+- `QuicStream`: reassembles reordered and repeated STREAM frames, checks the final size,
+  keeps the peer's RESET_STREAM and STOP_SENDING (answered with RESET_STREAM), and queues
+  writes until flow control lets them go. `Abort` sends RESET_STREAM and STOP_SENDING.
+- The internal `QuicSendCredit` and `QuicReceiveCredit` hold one limit each way.
+  `QuicPacketNumberSpace.Streams` puts the streams' frames in 1-RTT packets; a lost STREAM
+  frame goes again unless its stream was reset. A short header packet ends its datagram.
+- `QuicClientHandshake.TakeDatagramsToSend` and `CloseWithApplicationError` send what the
+  streams queued and an application CONNECTION_CLOSE.
+- `QuicConnection` implements `IMultiplexedConnection` over a completed handshake and its
+  `IDatagramChannel`: one loop sends, receives and runs the loss detection timer; streams
+  (the internal `QuicMultiplexedStream`) change state under its lock and wake it. A lost
+  channel is exit 56.
+
+The rest of the transport (close, idle timeout, stateless reset: BL-727) lands in the
+tasks ADR-0144 lists.
 
 ## Rules
 
