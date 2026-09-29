@@ -51,6 +51,11 @@ namespace Curl.Networking;
 /// The Unix domain socket <c>--unix-socket</c> or <c>--abstract-unix-socket</c> named, dialled for
 /// every target in place of its host, port and proxy; <see langword="null" /> to dial TCP (BL-507).
 /// </param>
+/// <param name="httpOverTlsApplicationProtocols">
+/// What the handshake for HTTP over TLS to the origin offers through ALPN, one of
+/// <see cref="HttpApplicationProtocols" />' lists as the HTTP version options and the platform
+/// choose it (ADR-0141); <see langword="null" /> for <see cref="HttpApplicationProtocols.Http11Only" />.
+/// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -62,7 +67,8 @@ public sealed class TcpConnector(
     ITlsProvider? proxyTlsProvider = null,
     TimeSpan? connectTimeout = null,
     AddressFamily addressFamily = AddressFamily.Unspecified,
-    UnixSocketAddress? unixSocket = null) : IConnector
+    UnixSocketAddress? unixSocket = null,
+    IReadOnlyList<string>? httpOverTlsApplicationProtocols = null) : IConnector
 {
     private const string AnyHost = "*";
 
@@ -82,6 +88,12 @@ public sealed class TcpConnector(
     /// proxy (<c>--unix-socket</c>, <c>--abstract-unix-socket</c>), or <see langword="null" /> to dial TCP.
     /// </summary>
     public UnixSocketAddress? UnixSocket { get; } = unixSocket;
+
+    /// <summary>
+    /// Gets what the handshake for HTTP over TLS to the origin offers through ALPN (ADR-0141).
+    /// </summary>
+    public IReadOnlyList<string> HttpOverTlsApplicationProtocols { get; } =
+        httpOverTlsApplicationProtocols ?? HttpApplicationProtocols.Http11Only;
 
     private readonly ITlsProvider _proxyTlsProvider = proxyTlsProvider ?? tlsProvider;
     private readonly HttpProxyTunnelOptions _proxyTunnelOptions = proxyTunnelOptions ?? HttpProxyTunnelOptions.Default;
@@ -723,23 +735,22 @@ public sealed class TcpConnector(
             target.Host,
             target.Events,
             target.IsForwardProxy,
-            ApplicationProtocolsFor(target),
+            ApplicationProtocolsFor(target, HttpOverTlsApplicationProtocols),
             cancellationToken);
 
     /// <summary>
     /// Returns the protocols the handshake with <paramref name="target" /> offers through ALPN:
-    /// <c>http/1.1</c> for HTTP over TLS to the origin, the one target the HTTP handler pools
-    /// as <c>https</c>, as curl 8.21.0's Schannel build offers it (measured, BL-490); nothing
-    /// for a forward proxy or any other protocol, which curl offers no ALPN.
+    /// <paramref name="httpOverTls" /> for HTTP over TLS to the origin, the one target the HTTP
+    /// handler pools as <c>https</c> (BL-490, ADR-0141); nothing for a forward proxy or any other
+    /// protocol, which curl offers no ALPN.
     /// </summary>
     /// <param name="target">The target whose handshake is about to run.</param>
+    /// <param name="httpOverTls">What HTTP over TLS to the origin offers.</param>
     /// <returns>The protocols, in preference order; empty to offer none.</returns>
-    internal static IReadOnlyList<string> ApplicationProtocolsFor(ConnectTarget target) =>
+    internal static IReadOnlyList<string> ApplicationProtocolsFor(ConnectTarget target, IReadOnlyList<string> httpOverTls) =>
         !target.IsForwardProxy && string.Equals(target.PoolScheme, "https", StringComparison.OrdinalIgnoreCase)
-            ? HttpOverTlsApplicationProtocols
+            ? httpOverTls
             : [];
-
-    private static readonly string[] HttpOverTlsApplicationProtocols = ["http/1.1"];
 
     // A provider that can report its handshake reports its trust and handshake on the
     // target's events, marked as the proxy's when it is with an HTTPS proxy (BL-404, BL-452),

@@ -196,18 +196,43 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
-    [DataRow("https", false, "http/1.1")]
-    [DataRow("HTTPS", false, "http/1.1")]
-    [DataRow("https", true, null)]
-    [DataRow("http", false, null)]
-    [DataRow(null, false, null)]
-    public void ApplicationProtocolsFor_OffersHttp11OnlyForHttpOverTlsToTheOrigin(string? poolScheme, bool isForwardProxy, string? expected)
+    public async Task ConnectAsync_BuiltWithH2ThenHttp11_OffersThemToAnHttpsTargetTheHttpHandlerPools()
+    {
+        // curl -v --http2 https://www.google.com/ says ALPN: curl offers h2,http/1.1 (nghttp2 builds, ADR-0141).
+        var tlsProvider = new FakeTlsProvider();
+        var connector = new TcpConnector(
+            new FakeDnsResolver(Loopback),
+            new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
+            tlsProvider,
+            TimeProvider.System,
+            httpOverTlsApplicationProtocols: HttpApplicationProtocols.H2ThenHttp11);
+
+        await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "h2", "http/1.1" }, Assert.ContainsSingle(tlsProvider.ReceivedApplicationProtocols).ToArray());
+    }
+
+    [TestMethod]
+    public void HttpOverTlsApplicationProtocols_NotGiven_IsHttp11Only()
+    {
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), new FakeTcpDialer(), new FakeTlsProvider(), TimeProvider.System);
+
+        Assert.AreSame(HttpApplicationProtocols.Http11Only, connector.HttpOverTlsApplicationProtocols);
+    }
+
+    [TestMethod]
+    [DataRow("https", false, true)]
+    [DataRow("HTTPS", false, true)]
+    [DataRow("https", true, false)]
+    [DataRow("http", false, false)]
+    [DataRow(null, false, false)]
+    public void ApplicationProtocolsFor_OffersTheHttpListOnlyForHttpOverTlsToTheOrigin(string? poolScheme, bool isForwardProxy, bool offersHttpList)
     {
         var target = new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = poolScheme, IsForwardProxy = isForwardProxy };
 
         CollectionAssert.AreEqual(
-            expected is null ? Array.Empty<string>() : new[] { expected },
-            TcpConnector.ApplicationProtocolsFor(target).ToArray());
+            offersHttpList ? new[] { "h2" } : Array.Empty<string>(),
+            TcpConnector.ApplicationProtocolsFor(target, HttpApplicationProtocols.H2Only).ToArray());
     }
 
     [TestMethod]
