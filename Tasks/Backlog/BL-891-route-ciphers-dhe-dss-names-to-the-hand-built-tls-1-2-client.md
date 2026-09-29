@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- BL-802 (ADR-0208) taught `Curl.Tls`'s `Tls12ClientHandshake` the 13 `DHE_DSS` suites and the `dsa_*` ServerKeyExchange signatures, but only when the caller sets `Tls12ClientSettings.CipherSuites` and `SignatureAlgorithms`.
+- BL-802 (ADR-0211) taught `Curl.Tls`'s `Tls12ClientHandshake` the 13 `DHE_DSS` suites and the `dsa_*` ServerKeyExchange signatures, but only when the caller sets `Tls12ClientSettings.CipherSuites` and `SignatureAlgorithms`.
 - `Curl.Networking.UnitLibrary/OpenSslCipherSuites.cs` (`Tls12Names`) has no `DHE-DSS-*` names, so `--ciphers` cannot name them.
 - `HandBuiltTlsProvider.ToTls12` (`Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs`) passes no `SignatureAlgorithms`, and the default list has no `dsa_*`, so a TLS 1.2 DSS ServerKeyExchange is refused with `illegal_parameter`. OpenSSL 3.5.5's measured ClientHello (ADR-0140) ends its `signature_algorithms` with `0402 0502 0602` (DSA); offer those (and `0202`, `0302` where the OpenSSL build does) when a DSS suite is offered, or take the list from `ClientHelloProfile.OpenSsl`. `--sigalgs` itself is BL-709's.
 - OpenSSL names (`openssl ciphers -V`): `DHE-DSS-AES128-SHA` 0x0032, `DHE-DSS-AES256-SHA` 0x0038, `DHE-DSS-AES128-SHA256` 0x0040, `DHE-DSS-AES256-SHA256` 0x006a, `DHE-DSS-AES128-GCM-SHA256` 0x00a2, `DHE-DSS-AES256-GCM-SHA384` 0x00a3, `DHE-DSS-CAMELLIA128-SHA` 0x0044, `DHE-DSS-CAMELLIA256-SHA` 0x0087, `DHE-DSS-CAMELLIA128-SHA256` 0x00bd, `DHE-DSS-CAMELLIA256-SHA256` 0x00c3, `DHE-DSS-ARIA128-GCM-SHA256` 0xc056, `DHE-DSS-ARIA256-GCM-SHA384` 0xc057, `DHE-DSS-DES-CBC3-SHA` 0x0013. Verify each against a real OpenSSL build before pinning.

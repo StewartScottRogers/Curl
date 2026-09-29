@@ -35,8 +35,8 @@ completed: 2026-09-29
 ## Notes
 
 - Signing a CertificateVerify with a DSA client key is not part of this task; it is server-side authentication only.
-- Decisions in ADR-0208 (decided by Claude under Stewart's delegation): verify with `Curl.Cryptography`'s `DsaSignature`; an unreadable DSA key is `bad_certificate`, a `Dss-Sig-Value` that does not decode or verify is `decrypt_error`; `Tls12ClientSettings`' defaults gain neither DSS suites nor `dsa_*` (none of the measured default hellos offers DSS).
-- Touches widened to `Curl.Cryptography.UnitLibrary` and `Curl.Cryptography.UnitTests` (no task in Doing names them): SHA-224 for `dsa_sha224` lives only there, so `DsaSignature.HashData` was added beside the DSA it serves rather than a second SHA-224 in `Curl.Tls`. `Documentation/Planning/Decisions` added for ADR-0208 and its index row.
+- Decisions in ADR-0211 (decided by Claude under Stewart's delegation): verify with `Curl.Cryptography`'s `DsaSignature`; an unreadable DSA key is `bad_certificate`, a `Dss-Sig-Value` that does not decode or verify is `decrypt_error`; `Tls12ClientSettings`' defaults gain neither DSS suites nor `dsa_*` (none of the measured default hellos offers DSS).
+- Touches widened to `Curl.Cryptography.UnitLibrary` and `Curl.Cryptography.UnitTests` (no task in Doing names them): SHA-224 for `dsa_sha224` lives only there, so `DsaSignature.HashData` was added beside the DSA it serves rather than a second SHA-224 in `Curl.Tls`. `Documentation/Planning/Decisions` added for ADR-0211 and its index row.
 - Tests: `TestDsaKey` (RFC 6979 A.2.2's 2048/256 key) signs for the in-memory server; `TestServerCredential.Dsa` builds its certificate. RFC 6979's published `sample` signatures (SHA-256, and SHA-1 for TLS 1.0/1.1) are the known-good vectors.
 - Measured: Curl.Tls.UnitLibrary and Curl.Cryptography.UnitLibrary both 100% line and branch, 0 failing members; Curl.Tls.UnitTests 867 passed.
 - Follow-up filed: BL-891 (route `--ciphers DHE-DSS-*` names and `dsa_*` schemes through `Curl.Networking`'s hand-built provider).
