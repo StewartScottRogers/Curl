@@ -56,7 +56,8 @@ internal static class TlsClientOptionsMapping
     /// <see cref="CommandLineOptions.Engine" />, <see cref="CommandLineOptions.TlsUser" />,
     /// <see cref="CommandLineOptions.TlsPassword" /> and <see cref="CommandLineOptions.TlsAuthType" />; and
     /// ADR-0191's <see cref="CommandLineOptions.RequireCertificateStatus" /> (<c>--cert-status</c>) and
-    /// <see cref="CommandLineOptions.AutoClientCertificate" /> (<c>--ssl-auto-client-cert</c>).
+    /// <see cref="CommandLineOptions.AutoClientCertificate" /> (<c>--ssl-auto-client-cert</c>); and
+    /// ADR-0192's <see cref="CommandLineOptions.PinnedPublicKey" /> (<c>--pinnedpubkey</c>).
     /// </returns>
     internal static TlsClientOptions FromCommandLine(CommandLineOptions options) =>
         new(
@@ -87,7 +88,8 @@ internal static class TlsClientOptionsMapping
             options.TlsPassword,
             options.TlsAuthType,
             options.RequireCertificateStatus,
-            options.AutoClientCertificate);
+            options.AutoClientCertificate,
+            options.PinnedPublicKey);
 
     /// <summary>
     /// Maps the proxy TLS options of a parsed command line onto the <see cref="TlsClientOptions" />

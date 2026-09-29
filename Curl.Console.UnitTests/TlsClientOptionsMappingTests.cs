@@ -298,6 +298,13 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
+    public void FromCommandLine_Pinnedpubkey_SetsTheTargetsPinnedPublicKeyOnly()
+    {
+        Assert.AreEqual(new TlsClientOptions(PinnedPublicKey: "sha256//a=;sha256//b="), Map("--pinnedpubkey", "sha256//a=;sha256//b=", Url));
+        Assert.AreEqual(new TlsClientOptions(), MapProxy("--pinnedpubkey", "sha256//a=", Url));
+    }
+
+    [TestMethod]
     public void ProxyFromCommandLine_CertStatusAndSslAutoClientCert_NeverReachTheProxy()
     {
         Assert.AreEqual(new TlsClientOptions(), MapProxy("--cert-status", "--ssl-auto-client-cert", Url));
