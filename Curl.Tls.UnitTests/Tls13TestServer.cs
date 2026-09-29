@@ -81,18 +81,25 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
     }
 
     /// <summary>Checks the client's second flight: its Certificate and CertificateVerify when asked for, then its Finished.</summary>
-    public void ReceiveClientFlight(byte[] flight)
-    {
-        int position = 0;
-        if (RequestClientCertificate)
-        {
-            position += ReceiveClientCertificate(flight);
-        }
+    public void ReceiveClientFlight(byte[] flight) =>
+        transcriptMessages.Add(ReceiveClientAuthentication(flight, [], ClientHandshakeTrafficSecret, RequestClientCertificate));
 
-        HandshakeMessageReadResult finished = HandshakeMessageReader.Read(flight.AsSpan(position));
-        Assert.AreEqual(HandshakeType.Finished, finished.Message!.Type);
-        CollectionAssert.AreEqual(suite.KeySchedule.ComputeFinishedVerifyData(ClientHandshakeTrafficSecret, TranscriptHash()), finished.Message.Body);
-        Assert.AreEqual(flight.Length, position + finished.BytesConsumed);
+    /// <summary>Returns a post-handshake CertificateRequest (RFC 8446 section 4.6.2) naming <paramref name="context" /> and <see cref="ClientCertificateSchemes" />.</summary>
+    public byte[] CreatePostHandshakeCertificateRequest(byte[] context) =>
+        new CertificateRequest(context, [SignatureAlgorithmsExtension.Encode(ClientCertificateSchemes)]).Encode();
+
+    /// <summary>
+    /// Checks the client's answer to a post-handshake CertificateRequest: Certificate echoing
+    /// <paramref name="context" />, CertificateVerify when it holds a certificate, and Finished
+    /// keyed from <paramref name="clientApplicationTrafficSecret" />, all over the handshake's
+    /// transcript plus the request, which is left as it was.
+    /// </summary>
+    public void ReceivePostHandshakeAnswer(byte[] request, byte[] answer, byte[] context, byte[] clientApplicationTrafficSecret)
+    {
+        int handshakeMessages = transcriptMessages.Count;
+        transcriptMessages.Add(request);
+        ReceiveClientAuthentication(answer, context, clientApplicationTrafficSecret, true);
+        transcriptMessages.RemoveRange(handshakeMessages, transcriptMessages.Count - handshakeMessages);
     }
 
     private static byte[] Body(byte[] message) => HandshakeMessageReader.Read(message).Message!.Body;
@@ -161,12 +168,28 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         return extensions;
     }
 
-    private int ReceiveClientCertificate(byte[] flight)
+    /// <summary>Checks a Certificate (and CertificateVerify) when <paramref name="certificateAsked" />, then the Finished ending <paramref name="flight" />, and returns the Finished.</summary>
+    private byte[] ReceiveClientAuthentication(byte[] flight, byte[] context, byte[] finishedBaseKey, bool certificateAsked)
+    {
+        int position = 0;
+        if (certificateAsked)
+        {
+            position += ReceiveClientCertificate(flight, context);
+        }
+
+        HandshakeMessageReadResult finished = HandshakeMessageReader.Read(flight.AsSpan(position));
+        Assert.AreEqual(HandshakeType.Finished, finished.Message!.Type);
+        CollectionAssert.AreEqual(suite.KeySchedule.ComputeFinishedVerifyData(finishedBaseKey, TranscriptHash()), finished.Message.Body);
+        Assert.AreEqual(flight.Length, position + finished.BytesConsumed);
+        return flight[position..];
+    }
+
+    private int ReceiveClientCertificate(byte[] flight, byte[] context)
     {
         HandshakeMessageReadResult certificate = HandshakeMessageReader.Read(flight);
         Assert.AreEqual(HandshakeType.Certificate, certificate.Message!.Type);
         CertificateMessage message = CertificateMessage.Decode(certificate.Message.Body).Value;
-        Assert.IsEmpty(message.CertificateRequestContext);
+        CollectionAssert.AreEqual(context, message.CertificateRequestContext);
         transcriptMessages.Add(flight[..certificate.BytesConsumed]);
         if (message.CertificateList.Count == 0)
         {

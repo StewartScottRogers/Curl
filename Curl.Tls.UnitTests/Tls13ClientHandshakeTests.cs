@@ -208,6 +208,31 @@ public sealed class Tls13ClientHandshakeTests
         Assert.IsFalse(client.ClientCertificateSent);
     }
 
+    [TestMethod]
+    public void APostHandshakeRequestIsAnsweredAtTheApplicationLevelWithNoNewSecrets()
+    {
+        TestServerCredential clientCredential = TestServerCredential.Rsa(TlsSignatureScheme.RsaPssRsaeSha256);
+        Tls13TestServer server = new(TestServerCredential.Ed25519()) { CipherSuite = Tls13CipherSuite.Aes256GcmSha384.Code };
+        using Tls13ClientHandshake client = Client(DefaultSettings with
+        {
+            CipherSuites = [Tls13CipherSuite.Aes256GcmSha384.Code],
+            ExtensionOrder = [.. Tls13ClientSettings.DefaultExtensionOrder, TlsExtensionType.PostHandshakeAuth],
+            ClientCertificate = new TlsClientCertificate([clientCredential.Certificate], clientCredential.SigningKey),
+        });
+        Assert.IsTrue(Run(client, server).IsComplete);
+        byte[] request = server.CreatePostHandshakeCertificateRequest([5, 5]);
+
+        Tls13HandshakeOutput answer = client.Receive(TlsEncryptionLevel.Application, request);
+
+        Assert.IsTrue(answer.IsComplete);
+        Assert.IsNull(answer.Failure);
+        Assert.IsEmpty(answer.SecretsInstalled);
+        Assert.HasCount(1, answer.BytesToSend);
+        Assert.AreEqual(TlsEncryptionLevel.Application, answer.BytesToSend[0].Level);
+        server.ReceivePostHandshakeAnswer(request, answer.BytesToSend[0].Bytes, [5, 5], server.ClientApplicationTrafficSecret);
+        CollectionAssert.AreEqual(clientCredential.Certificate, server.ClientCertificates[0]);
+    }
+
     private static void AssertCompletes(TestServerCredential credential)
     {
         Tls13TestServer server = new(credential);

@@ -115,6 +115,7 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
             ? null
             : ApplicationLayerProtocolNegotiationExtension.Encode(settings.ApplicationProtocols),
         TlsExtensionType.StatusRequest => BuildStatusRequest(),
+        TlsExtensionType.PostHandshakeAuth => PostHandshakeAuthExtension.Encode(),
         _ => FindFixedExtension(type),
     };
 

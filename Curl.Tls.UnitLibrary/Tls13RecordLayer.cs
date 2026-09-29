@@ -15,7 +15,6 @@ internal sealed class Tls13RecordLayer(Stream transport, Tls13ClientHandshake ha
     private readonly SemaphoreSlim writeLock = new(1, 1);
     private Tls13RecordProtection? reader;
     private byte[] readSecret = [];
-    private byte[] writeSecret = [];
 
     /// <summary>Gets the level of the read protection in force: <see cref="TlsEncryptionLevel.Initial" /> while records arrive in plaintext.</summary>
     public TlsEncryptionLevel ReadLevel { get; private set; } = TlsEncryptionLevel.Initial;
@@ -40,7 +39,6 @@ internal sealed class Tls13RecordLayer(Stream transport, Tls13ClientHandshake ha
         }
 
         writers[secret.Level] = protection;
-        writeSecret = secret.Secret;
         WriteLevel = secret.Level;
     }
 
@@ -140,9 +138,37 @@ internal sealed class Tls13RecordLayer(Stream transport, Tls13ClientHandshake ha
         try
         {
             await WriteAsync(writers[TlsEncryptionLevel.Application].Protect(TlsContentType.Handshake, keyUpdate), cancellationToken).ConfigureAwait(false);
-            byte[] next = handshake.CipherSuite!.KeySchedule.DeriveNextApplicationTrafficSecret(writeSecret);
+            byte[] next = handshake.AdvanceClientApplicationTrafficSecret();
             writers[TlsEncryptionLevel.Application].Dispose();
             Install(new Tls13TrafficSecret(TlsEncryptionLevel.Application, TlsTrafficDirection.Write, next));
+        }
+        finally
+        {
+            writeLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Passes a post-handshake CertificateRequest to the handshake and sends its answer
+    /// (Certificate, CertificateVerify and Finished, RFC 8446 section 4.6.2) under the
+    /// application write keys, with no other write in between, so a KeyUpdate cannot move
+    /// the keys the Finished was keyed from before it goes out.
+    /// </summary>
+    /// <param name="message">The whole CertificateRequest, header included.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>The alert the request calls for, or <see langword="null" /> when it was answered.</returns>
+    public async Task<TlsAlertDescription?> AnswerCertificateRequestAsync(byte[] message, CancellationToken cancellationToken)
+    {
+        await writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            Tls13HandshakeOutput output = handshake.Receive(TlsEncryptionLevel.Application, message);
+            foreach (TlsHandshakeBytes answer in output.BytesToSend)
+            {
+                await WriteAsync(writers[TlsEncryptionLevel.Application].Protect(TlsContentType.Handshake, answer.Bytes), cancellationToken).ConfigureAwait(false);
+            }
+
+            return output.Failure?.Alert;
         }
         finally
         {

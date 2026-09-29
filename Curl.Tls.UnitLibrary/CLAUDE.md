@@ -15,8 +15,8 @@ TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
 1.1 and 1.0 client handshake (BL-703, ADR-0154), TLS 1.3 over a byte stream
 (BL-700, ADR-0157), TLS 1.2, 1.1 and 1.0 over a byte stream (BL-815, ADR-0158), and
 the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173), TLS 1.3
-certificate decompression (BL-786, ADR-0199), and TLS 1.3 and TLS 1.2 offered in one
-ClientHello (BL-821, ADR-0205).
+certificate decompression (BL-786, ADR-0199), TLS 1.3 and TLS 1.2 offered in one
+ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -39,7 +39,8 @@ ClientHello (BL-821, ADR-0205).
   handshake holds them.
 - `TranscriptHash` accumulates handshake messages (header included) and reads the hash
   without ending it; `ReplaceWithMessageHash` swaps the first ClientHello for the
-  `message_hash` message after a HelloRetryRequest.
+  `message_hash` message after a HelloRetryRequest; `Clone` copies it for a post-handshake
+  exchange that must not change it.
 - `Tls13ClientHandshake`: the I/O-free TLS 1.3 client state machine. `Start()` returns
   the ClientHello; `Receive(level, bytes)` takes server handshake bytes at an encryption
   level (`TlsEncryptionLevel`) and returns a `Tls13HandshakeOutput`: bytes to send per
@@ -48,7 +49,13 @@ ClientHello (BL-821, ADR-0205).
   HelloRetryRequest (cookie included), the TLS 1.3 suites (`Tls13CipherSuite`), ALPN,
   SNI, CertificateVerify with RSA-PSS (RSAE and PSS keys), ECDSA P-256/384/521 and
   Ed25519, the server Finished, an optional client certificate
-  (`TlsClientCertificate`), and NewSessionTicket after completion.
+  (`TlsClientCertificate`), and NewSessionTicket after completion. With `post_handshake_auth`
+  in `Tls13ClientSettings.ExtensionOrder` the hello offers it, and a CertificateRequest
+  after completion (its context non-empty, else `illegal_parameter`) is answered at the
+  Application level with Certificate (echoing the context), CertificateVerify when a
+  certificate fits, and Finished keyed from the client application traffic secret in force,
+  over a clone of the handshake transcript plus the request (RFC 8446 section 4.6.2); not
+  offered, it is `unexpected_message`.
 - Certificate compression (RFC 8879, ADR-0199): `CompressedCertificate` is the message
   codec, and `Decompress(offered)` returns the Certificate body through `ZLibStream`,
   `BrotliDecoder` or `Curl.Zstandard`'s `ZstandardDecoder` when the algorithm was offered
@@ -79,7 +86,9 @@ ClientHello (BL-821, ADR-0205).
   (middlebox compatibility `change_cipher_spec` included) and returns a
   `Tls13ConnectResult`: a `Tls13ClientStream` or a `TlsHandshakeFailure` whose `Origin`
   (`TlsHandshakeFailureOrigin`) says who ended it. `Tls13ClientStream` reads and writes
-  application data like `SslStream`'s stream, handles NewSessionTicket and KeyUpdate,
+  application data like `SslStream`'s stream, handles NewSessionTicket, KeyUpdate and a
+  post-handshake CertificateRequest (answered under the record layer's write lock, so a
+  KeyUpdate cannot slip between keying the Finished and sending it),
   returns 0 at `close_notify` or a bare transport end (`CloseNotifyReceived` tells them
   apart), and throws `TlsAlertException` for any other alert. The AEADs behind
   `ITlsAead` (`AesGcmTlsAead`, `AriaGcmTlsAead`, `ChaCha20Poly1305TlsAead`) serve both

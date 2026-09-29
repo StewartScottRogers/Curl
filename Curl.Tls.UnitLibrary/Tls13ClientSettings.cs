@@ -5,8 +5,9 @@ namespace Curl.Tls;
 /// ClientHello extensions it negotiates (<c>server_name</c>, <c>supported_groups</c>,
 /// <c>key_share</c>, <c>supported_versions</c>, <c>signature_algorithms</c>, ALPN,
 /// <c>cookie</c>, <c>status_request</c> with <see cref="RequestOcspStatus" />,
-/// <c>compress_certificate</c> with <see cref="CertificateCompressionAlgorithms" />, and
-/// <c>padding</c>) and sends them in <see cref="ExtensionOrder" />;
+/// <c>compress_certificate</c> with <see cref="CertificateCompressionAlgorithms" />,
+/// <c>post_handshake_auth</c>, which lets the server ask for <see cref="ClientCertificate" />
+/// after the handshake, and <c>padding</c>) and sends them in <see cref="ExtensionOrder" />;
 /// any other extension goes out verbatim from <see cref="FixedExtensions" />.
 /// </summary>
 public sealed record Tls13ClientSettings

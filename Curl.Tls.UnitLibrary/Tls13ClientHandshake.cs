@@ -11,9 +11,10 @@ namespace Curl.Tls;
 /// typed failure. QUIC drives it with CRYPTO frames (RFC 9001 section 4.1); over TCP the
 /// record layer drives it. Covers the full handshake with a HelloRetryRequest, key shares
 /// on X25519, the NIST curves and the finite-field groups, CertificateVerify with RSA-PSS,
-/// ECDSA and Ed25519, the server Finished check, and an optional client certificate; the
-/// server's chain, decompressed first when it arrives as a CompressedCertificate (RFC
-/// 8879), goes to <see cref="IServerCertificateVerifier" />.
+/// ECDSA and Ed25519, the server Finished check, and an optional client certificate, asked
+/// for during the handshake or, once <c>post_handshake_auth</c> was offered, after it (RFC
+/// 8446 section 4.6.2); the server's chain, decompressed first when it arrives as a
+/// CompressedCertificate (RFC 8879), goes to <see cref="IServerCertificateVerifier" />.
 /// </summary>
 public sealed class Tls13ClientHandshake : IDisposable
 {
@@ -52,6 +53,7 @@ public sealed class Tls13ClientHandshake : IDisposable
     private byte[] clientHandshakeTrafficSecret = [];
     private byte[] serverHandshakeTrafficSecret = [];
     private byte[] masterSecret = [];
+    private byte[] clientApplicationTrafficSecret = [];
     private TlsCertificatePublicKey? serverKey;
     private IReadOnlyList<ushort>? requestedSchemes;
     private object? certificateRejection;
@@ -105,10 +107,10 @@ public sealed class Tls13ClientHandshake : IDisposable
     /// </summary>
     public OcspStapleOutcome? CertificateStatus { get; private set; }
 
-    /// <summary>Gets a value indicating whether the server sent a CertificateRequest.</summary>
+    /// <summary>Gets a value indicating whether the server sent a CertificateRequest, during the handshake or after it.</summary>
     public bool ClientCertificateRequested => requestedSchemes is not null;
 
-    /// <summary>Gets a value indicating whether the client answered a CertificateRequest with a certificate and CertificateVerify.</summary>
+    /// <summary>Gets a value indicating whether the client answered a CertificateRequest, during the handshake or after it, with a certificate and CertificateVerify.</summary>
     public bool ClientCertificateSent { get; private set; }
 
     /// <summary>Gets <c>exporter_master_secret</c>, once the server's Finished has been checked.</summary>
@@ -180,6 +182,15 @@ public sealed class Tls13ClientHandshake : IDisposable
 
         return output.Build(IsComplete, Failure);
     }
+
+    /// <summary>
+    /// Moves <c>client_application_traffic_secret_N</c> on to N+1 (RFC 8446 section 7.2) as
+    /// the client sends a KeyUpdate, and returns it; a later post-handshake Finished is keyed
+    /// from the secret in force (section 4.4).
+    /// </summary>
+    /// <returns>The next client application traffic secret.</returns>
+    internal byte[] AdvanceClientApplicationTrafficSecret() =>
+        clientApplicationTrafficSecret = Schedule.DeriveNextApplicationTrafficSecret(clientApplicationTrafficSecret);
 
     /// <inheritdoc />
     public void Dispose()
@@ -266,8 +277,14 @@ public sealed class Tls13ClientHandshake : IDisposable
         State.WaitCertificateOrRequest or State.WaitCertificate => ExpectedCertificateType(arrived),
         State.WaitCertificateVerify => HandshakeType.CertificateVerify,
         State.WaitFinished => HandshakeType.Finished,
-        _ => HandshakeType.NewSessionTicket,
+        _ => ExpectedPostHandshakeType(arrived),
     };
+
+    /// <summary>RFC 8446 section 4.6.2: a CertificateRequest may follow the handshake only once <c>post_handshake_auth</c> was offered.</summary>
+    private HandshakeType ExpectedPostHandshakeType(HandshakeType arrived) =>
+        arrived == HandshakeType.CertificateRequest && WasOffered(TlsExtensionType.PostHandshakeAuth)
+            ? HandshakeType.CertificateRequest
+            : HandshakeType.NewSessionTicket;
 
     /// <summary>RFC 8879 section 4: a CompressedCertificate may replace the Certificate once <c>compress_certificate</c> was offered.</summary>
     private HandshakeType ExpectedCertificateType(HandshakeType arrived) =>
@@ -279,7 +296,7 @@ public sealed class Tls13ClientHandshake : IDisposable
     {
         HandshakeType.ServerHello => ReceiveServerHello(body, encoded, output),
         HandshakeType.EncryptedExtensions => ReceiveEncryptedExtensions(body, encoded),
-        HandshakeType.CertificateRequest => ReceiveCertificateRequest(body, encoded),
+        HandshakeType.CertificateRequest => ReceiveCertificateRequest(body, encoded, output),
         HandshakeType.CompressedCertificate => ReceiveCompressedCertificate(body, encoded),
         _ => DispatchAfterCertificateRequest(type, body, encoded, output),
     };
@@ -510,7 +527,7 @@ public sealed class Tls13ClientHandshake : IDisposable
         return null;
     }
 
-    private TlsAlertDescription? ReceiveCertificateRequest(byte[] body, byte[] encoded)
+    private TlsAlertDescription? ReceiveCertificateRequest(byte[] body, byte[] encoded, Tls13HandshakeOutputBuilder output)
     {
         TlsDecodeResult<CertificateRequest> decoded = CertificateRequest.Decode(body);
         if (!decoded.Succeeded)
@@ -518,7 +535,10 @@ public sealed class Tls13ClientHandshake : IDisposable
             return decoded.Alert;
         }
 
-        if (decoded.Value.CertificateRequestContext.Length != 0)
+        // RFC 8446 section 4.3.2: the context is empty during the handshake and names a request after it.
+        bool afterHandshake = state == State.Connected;
+        byte[] context = decoded.Value.CertificateRequestContext;
+        if ((context.Length != 0) != afterHandshake)
         {
             return TlsAlertDescription.IllegalParameter;
         }
@@ -536,9 +556,31 @@ public sealed class Tls13ClientHandshake : IDisposable
         }
 
         requestedSchemes = schemes.Value;
+        if (afterHandshake)
+        {
+            AnswerPostHandshakeRequest(context, schemes.Value, encoded, output);
+            return null;
+        }
+
         Transcript.Append(encoded);
         state = State.WaitCertificate;
         return null;
+    }
+
+    /// <summary>
+    /// Answers a post-handshake CertificateRequest (RFC 8446 section 4.6.2) at the
+    /// Application level: Certificate echoing its context, CertificateVerify when a
+    /// certificate fits, and Finished keyed from the client application traffic secret in
+    /// force, over the handshake's transcript plus this request and answer (section 4.4).
+    /// The handshake's own transcript is left as it was for the next request.
+    /// </summary>
+    private void AnswerPostHandshakeRequest(byte[] context, IReadOnlyList<ushort> schemes, byte[] encoded, Tls13HandshakeOutputBuilder output)
+    {
+        using TranscriptHash requestTranscript = Transcript.Clone();
+        requestTranscript.Append(encoded);
+        SendClientCertificate(context, schemes, requestTranscript, TlsEncryptionLevel.Application, output);
+        Finished finished = new(Schedule.ComputeFinishedVerifyData(clientApplicationTrafficSecret, requestTranscript.GetCurrentHash()));
+        SendHandshakeMessage(finished.Encode(), requestTranscript, TlsEncryptionLevel.Application, output);
     }
 
     /// <summary>
@@ -693,11 +735,11 @@ public sealed class Tls13ClientHandshake : IDisposable
         Transcript.Append(encoded);
         byte[] serverFinishedHash = Transcript.GetCurrentHash();
         output.Install(TlsEncryptionLevel.Application, TlsTrafficDirection.Read, Schedule.DeriveServerApplicationTrafficSecret(masterSecret, serverFinishedHash));
-        byte[] clientApplicationTrafficSecret = Schedule.DeriveClientApplicationTrafficSecret(masterSecret, serverFinishedHash);
+        clientApplicationTrafficSecret = Schedule.DeriveClientApplicationTrafficSecret(masterSecret, serverFinishedHash);
         ExporterMasterSecret = Schedule.DeriveExporterMasterSecret(masterSecret, serverFinishedHash);
         if (requestedSchemes is not null)
         {
-            SendClientCertificate(requestedSchemes, output);
+            SendClientCertificate([], requestedSchemes, Transcript, TlsEncryptionLevel.Handshake, output);
         }
 
         Finished finished = new(Schedule.ComputeFinishedVerifyData(clientHandshakeTrafficSecret, Transcript.GetCurrentHash()));
@@ -708,21 +750,26 @@ public sealed class Tls13ClientHandshake : IDisposable
         return null;
     }
 
-    private void SendClientCertificate(IReadOnlyList<ushort> schemes, Tls13HandshakeOutputBuilder output)
+    private void SendClientCertificate(
+        byte[] context,
+        IReadOnlyList<ushort> schemes,
+        TranscriptHash to,
+        TlsEncryptionLevel level,
+        Tls13HandshakeOutputBuilder output)
     {
         TlsClientCertificate? certificate = settings.ClientCertificate;
         ushort scheme = certificate is null ? (ushort)0 : schemes.FirstOrDefault(certificate.SigningKey.CanSign);
         if (scheme == 0)
         {
             // RFC 8446 section 4.4.2: no suitable certificate is an empty Certificate and no CertificateVerify.
-            SendHandshakeMessage(new CertificateMessage([], []).Encode(), output);
+            SendHandshakeMessage(new CertificateMessage(context, []).Encode(), to, level, output);
             return;
         }
 
         CertificateEntry[] entries = [.. certificate!.CertificateChain.Select(der => new CertificateEntry(der, []))];
-        SendHandshakeMessage(new CertificateMessage([], entries).Encode(), output);
-        byte[] content = TlsSignatureScheme.BuildCertificateVerifyContent(false, Transcript.GetCurrentHash());
-        SendHandshakeMessage(new CertificateVerify(scheme, certificate.SigningKey.Sign(scheme, content)).Encode(), output);
+        SendHandshakeMessage(new CertificateMessage(context, entries).Encode(), to, level, output);
+        byte[] content = TlsSignatureScheme.BuildCertificateVerifyContent(false, to.GetCurrentHash());
+        SendHandshakeMessage(new CertificateVerify(scheme, certificate.SigningKey.Sign(scheme, content)).Encode(), to, level, output);
         ClientCertificateSent = true;
     }
 
@@ -745,10 +792,13 @@ public sealed class Tls13ClientHandshake : IDisposable
         output.Send(TlsEncryptionLevel.Initial, clientHelloBytes);
     }
 
-    private void SendHandshakeMessage(byte[] message, Tls13HandshakeOutputBuilder output)
+    private void SendHandshakeMessage(byte[] message, Tls13HandshakeOutputBuilder output) =>
+        SendHandshakeMessage(message, Transcript, TlsEncryptionLevel.Handshake, output);
+
+    private static void SendHandshakeMessage(byte[] message, TranscriptHash to, TlsEncryptionLevel level, Tls13HandshakeOutputBuilder output)
     {
-        Transcript.Append(message);
-        output.Send(TlsEncryptionLevel.Handshake, message);
+        to.Append(message);
+        output.Send(level, message);
     }
 
     private void StartTranscript()

@@ -19,6 +19,12 @@ public sealed class TranscriptHash : IDisposable
         hash = IncrementalHash.CreateHash(hashAlgorithm);
     }
 
+    private TranscriptHash(IncrementalHash hash, int hashLength)
+    {
+        this.hash = hash;
+        HashLength = hashLength;
+    }
+
     /// <summary>Gets the length in bytes of the hash.</summary>
     public int HashLength { get; }
 
@@ -29,6 +35,14 @@ public sealed class TranscriptHash : IDisposable
     /// <summary>Returns the hash of every message appended so far; the transcript carries on.</summary>
     /// <returns>The transcript hash.</returns>
     public byte[] GetCurrentHash() => hash.GetCurrentHash();
+
+    /// <summary>
+    /// Returns an independent transcript holding every message appended so far, so a
+    /// post-handshake exchange (RFC 8446 section 4.6.2) can extend the handshake's
+    /// transcript without changing it.
+    /// </summary>
+    /// <returns>The copy; the caller disposes it.</returns>
+    public TranscriptHash Clone() => new(hash.Clone(), HashLength);
 
     /// <summary>
     /// Replaces the transcript so far, the first ClientHello, with the synthetic

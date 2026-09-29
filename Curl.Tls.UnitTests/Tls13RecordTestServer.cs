@@ -103,6 +103,22 @@ internal sealed class Tls13RecordTestServer(Stream transport, Tls13TestServer se
         InstallWriter(Suite.KeySchedule.DeriveNextApplicationTrafficSecret(writeSecret));
     }
 
+    /// <summary>Sends a post-handshake CertificateRequest naming <paramref name="context" /> and returns it.</summary>
+    public async Task<byte[]> SendCertificateRequestAsync(byte[] context)
+    {
+        byte[] request = server.CreatePostHandshakeCertificateRequest(context);
+        await SendAsync(TlsContentType.Handshake, request);
+        return request;
+    }
+
+    /// <summary>Reads the client's answer to <paramref name="request" /> and checks it under the client's application traffic secret in force.</summary>
+    public async Task ReceiveCertificateRequestAnswerAsync(byte[] request, byte[] context)
+    {
+        Tls13RecordContent answer = (await ReceiveAsync())!;
+        Assert.AreEqual(TlsContentType.Handshake, answer.Type);
+        server.ReceivePostHandshakeAnswer(request, answer.Content, context, readSecret);
+    }
+
     /// <summary>Moves the server's read keys on, as a client KeyUpdate asks.</summary>
     public void UpdateReadKeys() => InstallReader(Suite.KeySchedule.DeriveNextApplicationTrafficSecret(readSecret));
 

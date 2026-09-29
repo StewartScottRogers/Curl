@@ -4,8 +4,10 @@ namespace Curl.Tls;
 /// A connected TLS 1.3 client, read and written like the stream <c>SslStream</c> gives:
 /// writes go out as protected application data records of at most 2^14 bytes, reads
 /// return application data. Post-handshake messages are handled as they arrive: a
-/// NewSessionTicket goes to the handshake (<see cref="Handshake" />), a KeyUpdate moves the
-/// read keys on and, when the server asks, is answered before its own keys move on.
+/// NewSessionTicket goes to the handshake (<see cref="Handshake" />), a CertificateRequest
+/// (once <c>post_handshake_auth</c> was offered) is answered with the handshake's
+/// Certificate, CertificateVerify and Finished, and a KeyUpdate moves the read keys on and,
+/// when the server asks, is answered before its own keys move on.
 /// <c>close_notify</c> ends the stream, and so does the transport ending without one, as
 /// with <c>SslStream</c>: <see cref="CloseNotifyReceived" /> tells the two apart, so the
 /// caller can fail an unfinished transfer with curl's exit 56 (ADR-0157). Any
@@ -276,9 +278,14 @@ public sealed class Tls13ClientStream : Stream
             return;
         }
 
-        if (Handshake.Receive(TlsEncryptionLevel.Application, encoded).Failure is { } rejected)
+        // Only a CertificateRequest writes an answer, so only it waits for the write lock; a
+        // NewSessionTicket must not stall behind an application write the transport is holding up.
+        TlsAlertDescription? rejected = message.Type == HandshakeType.CertificateRequest
+            ? await layer.AnswerCertificateRequestAsync(encoded, cancellationToken).ConfigureAwait(false)
+            : Handshake.Receive(TlsEncryptionLevel.Application, encoded).Failure?.Alert;
+        if (rejected is { } alert)
         {
-            throw new TlsAlertException(rejected.Alert, false);
+            throw new TlsAlertException(alert, false);
         }
     }
 
