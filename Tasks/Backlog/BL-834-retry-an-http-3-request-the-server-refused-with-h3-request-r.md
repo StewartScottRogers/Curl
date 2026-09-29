@@ -32,6 +32,8 @@ An HTTP/3 request stream the server resets behaves as BL-839's ADR decides: if i
 
 ## Notes
 
+- BL-839 decided: ADR-0187 (`Documentation/Planning/Decisions/ADR-0187-http-3-stream-resets-follow-curl-8-21-0-and-a-refused-stream-is-retried-on-a-new-connection.md`) follows `curl-8_21_0` - retry up to 5 times, sixth refusal exit 56 `Connection died, tried 5 times before giving up`; reset text `(error 0x<hex> <name>)`; `-I` exemption. The `:status` abort (H3_MESSAGE_ERROR) then reads `... (error 0x10e MESSAGE_ERROR)`.
+
 ## Log
 
 - 2026-09-28: Created.

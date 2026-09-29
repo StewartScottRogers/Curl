@@ -32,6 +32,8 @@ An `https://` transfer with `--http3` or `--http3-only` and a proxy (`-x http://
 
 ## Notes
 
+- ADR-0187 (BL-839) makes `curl-8_21_0` the HTTP/3 reference: there `Curl_conn_may_http3` still refuses a SOCKS proxy (exit 3, `HTTP/3 is not supported over a SOCKS proxy`) but no longer refuses a tunnelling HTTP proxy (8.18.0 did, exit 3, `HTTP/3 is not supported over an HTTP proxy`). Match 8.21.0.
+
 ## Log
 
 - 2026-09-28: Created.
