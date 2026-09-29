@@ -155,6 +155,51 @@ public sealed class SshProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ScpUpload_StoresTheFileWithTheCreateFileModeAndReportsItsSizeAsMeasured()
+    {
+        InMemorySshServer server = Server();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse($"scp://{Host}/data/up.txt"),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential(User, Password),
+            Upload = new MemoryStream(Hello),
+            CreateFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
+        };
+
+        TransferResult result = await Handler(server).ExecuteAsync(context);
+        await server.WhenSessionsEndAsync();
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(Hello.Length, result.Report!.UploadSize);
+        CollectionAssert.AreEqual(Hello, server.Files["/data/up.txt"]);
+        AssertEvents(
+            server,
+            "service ssh-userauth", $"auth none {User} refused", $"auth password {User} ok", "channel open session", "exec scp -t '/data/up.txt'",
+            $"scp C0600 {Hello.Length} up.txt", "channel eof", "channel close", "disconnect 11 Shutdown");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ScpUploadFromStandardInput_IsExit25BeforeAnyChannelAsMeasured()
+    {
+        InMemorySshServer server = Server();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse($"scp://{Host}/data/up.txt"),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential(User, Password),
+            Upload = new UnseekableStream(Hello),
+        };
+
+        TransferResult result = await Handler(server).ExecuteAsync(context);
+        await server.WhenSessionsEndAsync();
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.UploadFailed, "SCP requires a known file size for upload"), result);
+        CollectionAssert.DoesNotContain(server.Events.ToArray(), "channel open session");
+        CollectionAssert.Contains(server.Events.ToArray(), "disconnect 11 Shutdown");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ScpChannelRefused_IsExit79AsMeasured()
     {
         InMemorySshServer server = new(User, Password) { RefusesSessionChannels = true };

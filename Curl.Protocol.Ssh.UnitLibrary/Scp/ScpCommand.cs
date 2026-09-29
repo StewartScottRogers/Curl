@@ -1,14 +1,16 @@
 namespace Curl.Protocol.Ssh.Scp;
 
 /// <summary>
-/// Builds the command line libssh2 1.11.1 runs with <c>exec</c> to download a file for
-/// curl 8.21.0: <c>scp -pf </c> and the path quoted for both Bourne and C shells, as
+/// Builds the command line libssh2 1.11.1 runs with <c>exec</c> to download or upload a
+/// file for curl 8.21.0: <c>scp -pf </c> or <c>scp -t </c> and the path quoted for both Bourne and C shells, as
 /// libssh2's <c>shell_quotearg</c> quotes it. Measured 2026-09-29 (BL-574): the path
 /// <c>/x/it's!''here</c> is sent as <c>scp -pf '/x/it'"'"'s'\!"''"'here'</c>.
 /// </summary>
 internal static class ScpCommand
 {
     private static readonly byte[] DownloadPrefix = "scp -pf "u8.ToArray();
+
+    private static readonly byte[] UploadPrefix = "scp -t "u8.ToArray();
 
     // Which quoting the bytes written so far are inside.
     private enum Quoting
@@ -29,6 +31,14 @@ internal static class ScpCommand
     /// <param name="path">The remote path's bytes.</param>
     /// <returns>The command line's bytes.</returns>
     internal static byte[] ForDownload(byte[] path) => [.. DownloadPrefix, .. Quote(path)];
+
+    /// <summary>
+    /// Builds <c>scp -t &lt;path&gt;</c>, the command that receives one file, measured
+    /// 2026-09-29 as <c>scp -t '/home/u/files/new.txt'</c> (BL-577).
+    /// </summary>
+    /// <param name="path">The remote path's bytes.</param>
+    /// <returns>The command line's bytes.</returns>
+    internal static byte[] ForUpload(byte[] path) => [.. UploadPrefix, .. Quote(path)];
 
     /// <summary>
     /// Quotes <paramref name="argument" /> as libssh2 does: runs of ordinary bytes in

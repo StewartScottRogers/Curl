@@ -215,6 +215,25 @@ internal sealed class SshSessionChannel(SshTransport transport)
         await SendChannelMessageAsync(SshConnectionMessageNumber.ChannelClose, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Closes the channel as libssh2 frees one a failed SCP upload leaves open: sends
+    /// <c>SSH_MSG_CHANNEL_EOF</c> and <c>SSH_MSG_CHANNEL_CLOSE</c> at once, then waits for
+    /// the server's <c>SSH_MSG_CHANNEL_CLOSE</c>, as measured 2026-09-29 (BL-577).
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the close.</param>
+    /// <returns>A task that completes once the server's <c>CLOSE</c> has arrived.</returns>
+    /// <exception cref="EndOfStreamException">The peer closed or disconnected first.</exception>
+    /// <exception cref="InvalidDataException">The peer broke the framing or sent a malformed message.</exception>
+    internal async ValueTask CloseAtOnceAsync(CancellationToken cancellationToken)
+    {
+        await SendChannelMessageAsync(SshConnectionMessageNumber.ChannelEof, cancellationToken).ConfigureAwait(false);
+        await SendChannelMessageAsync(SshConnectionMessageNumber.ChannelClose, cancellationToken).ConfigureAwait(false);
+        while (!remoteClosed)
+        {
+            await ReadNextMessageAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private async ValueTask<byte[]> WaitForAsync(byte wanted, byte alternative, CancellationToken cancellationToken)
     {
         while (true)

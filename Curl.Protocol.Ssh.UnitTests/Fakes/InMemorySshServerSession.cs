@@ -36,9 +36,15 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
 
     private static readonly byte[] ScpDownloadPrefix = "scp -pf "u8.ToArray();
 
+    private static readonly byte[] ScpUploadPrefix = "scp -t "u8.ToArray();
+
     private readonly SshConnectionReader connectionReader = new(connection);
 
     private readonly MemoryStream sftpInput = new();
+
+    private readonly MemoryStream scpInput = new();
+
+    private string? scpUploadPath;
 
     private readonly HashSet<string> listedDirectories = new(StringComparer.Ordinal);
 
@@ -156,8 +162,16 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
             case SshConnectionMessageNumber.ChannelRequest:
                 await AnswerChannelRequestAsync(message).ConfigureAwait(false);
                 break;
+            case SshConnectionMessageNumber.ChannelData when scpUploadPath is not null:
+                await ReceiveScpAsync(message.Skip(4).ReadString()).ConfigureAwait(false);
+                break;
             case SshConnectionMessageNumber.ChannelData:
                 await AnswerSftpAsync(message.Skip(4).ReadString()).ConfigureAwait(false);
+                break;
+            case SshConnectionMessageNumber.ChannelEof when scpUploadPath is not null:
+                StoreScpUpload();
+                server.Record("channel eof");
+                await SendCloseAsync().ConfigureAwait(false);
                 break;
             case SshConnectionMessageNumber.ChannelEof:
                 server.Record("channel eof");
@@ -232,10 +246,35 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         byte[] argument = message.ReadString().ToArray();
         server.Record($"{type} {Encoding.Latin1.GetString(argument)}");
         await SendAsync([SshConnectionMessageNumber.ChannelSuccess, .. UInt32(clientChannel)]).ConfigureAwait(false);
-        if (type == "exec")
+        if (type == "exec" && argument.AsSpan().StartsWith(ScpUploadPrefix))
+        {
+            scpUploadPath = Encoding.UTF8.GetString(Unquote(argument.AsSpan(ScpUploadPrefix.Length)));
+            await SendChannelDataAsync([0]).ConfigureAwait(false);
+        }
+        else if (type == "exec")
         {
             await RunScpAsync(Encoding.UTF8.GetString(Unquote(argument.AsSpan(ScpDownloadPrefix.Length)))).ConfigureAwait(false);
         }
+    }
+
+    // What OpenSSH's scp -t does: acknowledges the C line once it has arrived, then takes
+    // the bytes after it until the client's EOF.
+    private async Task ReceiveScpAsync(ReadOnlyMemory<byte> data)
+    {
+        bool lineWasComplete = scpInput.ToArray().Contains((byte)'\n');
+        scpInput.Write(data.Span);
+        if (!lineWasComplete && scpInput.ToArray().Contains((byte)'\n'))
+        {
+            await SendChannelDataAsync([0]).ConfigureAwait(false);
+        }
+    }
+
+    private void StoreScpUpload()
+    {
+        byte[] received = scpInput.ToArray();
+        int lineEnd = Array.IndexOf(received, (byte)'\n');
+        server.Record($"scp {Encoding.Latin1.GetString(received, 0, lineEnd)}");
+        server.Files[scpUploadPath!] = received[(lineEnd + 1)..];
     }
 
     // What OpenSSH's scp -pf sends: the times, the file line, the bytes and a zero byte, or

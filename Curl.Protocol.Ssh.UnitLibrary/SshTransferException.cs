@@ -193,14 +193,46 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     /// <param name="reasonCode">The <c>SSH_MSG_CHANNEL_OPEN_FAILURE</c> reason code.</param>
     /// <returns>The exception.</returns>
     internal static SshTransferException ScpChannelOpenFailed(uint reasonCode) =>
-        new(CurlExitCode.Ssh, reasonCode switch
-        {
-            1 => "Channel open failure (administratively prohibited)",
-            2 => "Channel open failure (connect failed)",
-            3 => "Channel open failure (unknown channel type)",
-            4 => "Channel open failure (resource shortage)",
-            _ => "Channel open failure",
-        });
+        new(CurlExitCode.Ssh, ChannelOpenFailureText(reasonCode));
+
+    /// <summary>
+    /// Creates the failure curl 8.21.0 reports when the server refuses the <c>session</c>
+    /// channel an SCP upload opens: exit 25 and libssh2's text for the reason code,
+    /// measured 2026-09-29 as <c>Channel open failure (connect failed)</c> for OpenSSH's
+    /// <c>MaxSessions 0</c> (BL-577, ADR-0258).
+    /// </summary>
+    /// <param name="reasonCode">The <c>SSH_MSG_CHANNEL_OPEN_FAILURE</c> reason code.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException ScpUploadChannelOpenFailed(uint reasonCode) =>
+        ScpUploadFailed(ChannelOpenFailureText(reasonCode));
+
+    /// <summary>
+    /// Creates the failure curl 8.21.0 reports when an SCP upload's source has no known
+    /// size, as standard input has: exit 25 and <c>SCP requires a known file size for
+    /// upload</c>, before any channel is opened, measured 2026-09-29 (BL-577, ADR-0258).
+    /// </summary>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException ScpUploadSizeUnknown() =>
+        ScpUploadFailed("SCP requires a known file size for upload");
+
+    /// <summary>
+    /// Creates the failure curl 8.21.0 reports when libssh2 cannot start an SCP upload:
+    /// exit 25, to which curl maps every libssh2 failure there, and libssh2's message, such
+    /// as <c>failed to send file</c>, measured 2026-09-29 (BL-577, ADR-0258).
+    /// </summary>
+    /// <param name="message">libssh2's message.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException ScpUploadFailed(string message) =>
+        new(CurlExitCode.UploadFailed, message);
+
+    private static string ChannelOpenFailureText(uint reasonCode) => reasonCode switch
+    {
+        1 => "Channel open failure (administratively prohibited)",
+        2 => "Channel open failure (connect failed)",
+        3 => "Channel open failure (unknown channel type)",
+        4 => "Channel open failure (resource shortage)",
+        _ => "Channel open failure",
+    };
 
     /// <summary>
     /// Creates the failure curl 8.21.0 reports when the server refuses the <c>exec</c>

@@ -15,7 +15,7 @@ appears.
 `SshProtocolHandler`, at the root, is the library's `IProtocolHandler`: it narrows the
 host-key list from the known-hosts file, connects through the injected `IConnector`,
 runs the handshake, requests `ssh-userauth`, checks the host key, authenticates, runs
-`SftpFileUpload` for an `sftp` transfer with an upload, and otherwise `SftpFileDownload`
+`SftpFileUpload` or `ScpFileUpload` for a transfer with an upload, and otherwise `SftpFileDownload`
 or `ScpFileDownload` - or `SftpDirectoryListing` for an `sftp` path
 ending with a slash - into the output, and ends the session with
 `DISCONNECT` 11 `Shutdown`; every `SshTransferException` becomes a failed
@@ -43,7 +43,9 @@ ADR-0122 lists but Ed25519 and bcrypt (BL-681), and one `SshPrivateKey` per key 
 window and packet size, which starts a subsystem or an `exec` command; `Scp` holds
 `ScpFileDownload`, which runs `scp -pf` (`ScpCommand`, `ScpRemotePath`), reads its `T`
 and `C` lines with libssh2's checks (`ScpFileHeaderReader`, `ScpHeaderNumber`) and copies
-the file (ADR-0225); `Sftp` holds `SftpSession`, the SFTP version 3 client over that
+the file (ADR-0225), and `ScpFileUpload`, which runs `scp -t`, sends the `C` line with
+`--create-file-mode` and the bytes between `scp`'s acknowledgements, and refuses a source
+of unknown size (ADR-0258); `Sftp` holds `SftpSession`, the SFTP version 3 client over that
 channel, and `SftpFileDownload`, which downloads one file with `SftpReadAhead`'s reads in
 flight and maps each `SSH_FX_*` status to curl's exit code through `SftpStatusCode`
 (ADR-0220) - only the `SftpDownloadPart` that `-r` and `-C` ask for (ADR-0253) - and `SftpDirectoryListing`, which lists a directory with `OPENDIR` and

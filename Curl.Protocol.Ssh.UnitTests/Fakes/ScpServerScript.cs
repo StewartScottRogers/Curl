@@ -38,10 +38,18 @@ internal sealed class ScpServerScript
     internal static ScpServerScript Sending(byte[] file) =>
         Started().Output(TimesLine + $"C0644 {file.Length} f\n").Output([.. file, 0]).Ended();
 
-    /// <summary>Scripts <c>SSH_MSG_CHANNEL_OPEN_CONFIRMATION</c>.</summary>
-    internal ScpServerScript Confirm()
+    /// <summary>
+    /// Scripts a started <c>scp -t</c> that acknowledges its start and the <c>C</c> line, as
+    /// OpenSSH's does, and ends the channel once the client has sent its bytes.
+    /// </summary>
+    /// <returns>The script.</returns>
+    internal static ScpServerScript Receiving() =>
+        Started().Output([0]).Output([0]).Ended();
+
+    /// <summary>Scripts <c>SSH_MSG_CHANNEL_OPEN_CONFIRMATION</c> with the server's window.</summary>
+    internal ScpServerScript Confirm(uint window = 2097152)
     {
-        script.Confirm();
+        script.Confirm(window);
         return this;
     }
 

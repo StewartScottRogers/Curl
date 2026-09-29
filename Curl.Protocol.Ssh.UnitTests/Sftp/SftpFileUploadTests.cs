@@ -440,12 +440,6 @@ public sealed class SftpFileUploadTests
 
     private sealed record Outcome(TransferResult Result, List<(long, long?)> Progress, byte[] Written);
 
-    // Standard input: bytes that cannot be sought.
-    private sealed class UnseekableStream(byte[] bytes) : MemoryStream(bytes)
-    {
-        public override bool CanSeek => false;
-    }
-
     private sealed class FailingStream : MemoryStream
     {
         public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
