@@ -1133,20 +1133,22 @@ internal sealed class FtpSession(
 
     /// <summary>
     /// Dials the passive data connection, after curl 8.21.0's <c>-v</c> line naming
-    /// <paramref name="shownHost" /> and the port.
+    /// <paramref name="shownHost" /> and the port. A dial that fails names the control
+    /// connection and then <paramref name="shownHost" /> after <c>via</c>, as curl 8.21.0's does (BL-904).
     /// </summary>
     private async ValueTask<TransferResult?> ConnectDataAsync(string host, string shownHost, int port)
     {
         context.Events.ReportInfo(FtpTransferMessages.ConnectingTo(shownHost, port));
+        var failure = new FtpDataConnectFailure(host, shownHost, port, controlName);
         var target = new ConnectTarget(host, port, false)
         {
             Proxy = context.Proxy,
-            Events = context.Events,
+            Events = new FtpDataConnectEvents(context.Events, failure),
         };
         ConnectResult connected = await connections.Connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         dataConnection = connected.Connection;
         return dataConnection is null
-            ? new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused }
+            ? new TransferResult(connected.ExitCode, 0, failure.Rewrite(connected.ErrorMessage!)) { IsConnectionRefused = connected.IsConnectionRefused }
             : null;
     }
 
