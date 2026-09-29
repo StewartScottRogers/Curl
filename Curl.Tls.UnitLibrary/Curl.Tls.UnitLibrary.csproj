@@ -4,4 +4,8 @@
     <InternalsVisibleTo Include="Curl.Tls.UnitTests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Cryptography.UnitLibrary\Curl.Cryptography.UnitLibrary.csproj" />
+  </ItemGroup>
+
 </Project>
