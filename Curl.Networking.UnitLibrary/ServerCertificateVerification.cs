@@ -71,7 +71,10 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
     /// <summary>
     /// Judges a certificate the server presented: what the handshake event reports about it,
-    /// and whether it is accepted.
+    /// and whether it is accepted. A certificate <see cref="VerifyPeer" /> accepts, or any
+    /// under <c>-k</c>, is then checked against <see cref="TlsClientOptions.PinnedPublicKey" />:
+    /// a key the pin does not name is exit 90, so a certificate that fails both is exit 60, as
+    /// curl reports it (ADR-0192, BL-608).
     /// </summary>
     /// <param name="errors">What was found wrong with the chain, as <see cref="SslStream" /> reports it.</param>
     /// <param name="chain">The chain built, if a certificate was presented.</param>
@@ -88,7 +91,9 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     {
         var anchoredErrors = WithTheNameCheckCurlRuns(
             WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
-        return (ObservePeerVerification(anchoredErrors, chain, peerCertificates), VerifyPeer(anchoredErrors, chain, targetHost, []));
+        return (
+            ObservePeerVerification(anchoredErrors, chain, peerCertificates),
+            VerifyPeer(anchoredErrors, chain, targetHost, []) ?? PinnedPublicKey.Refusal(options.PinnedPublicKey, peerCertificates));
     }
 
     /// <summary>

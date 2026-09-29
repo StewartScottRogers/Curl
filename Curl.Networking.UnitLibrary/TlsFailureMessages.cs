@@ -388,6 +388,13 @@ internal static class TlsFailureMessages
     public const string SchannelClientCertificateNotInStore = "schannel: client cert not found in cert store";
 
     /// <summary>
+    /// Every build's message for exit 90, when the server's public key does not match
+    /// <c>--pinnedpubkey</c>, the key file cannot be read or holds no key: measured with curl
+    /// 8.21.0's Schannel build and curl 8.18.0's OpenSSL build, 2026-09-29 (BL-608).
+    /// </summary>
+    public const string PinnedPublicKeyMismatch = "SSL: public key does not match pinned public key";
+
+    /// <summary>
     /// curl's own text for exit 58, printed when the failure has no message of its own, as
     /// for a <c>--cert</c> store path whose thumbprint is not hex (measured 2026-09-27).
     /// </summary>

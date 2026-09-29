@@ -156,6 +156,12 @@ namespace Curl.Networking;
 /// user's personal store is presented when the server asks for one, on every platform (ADR-0191,
 /// <see cref="AutomaticClientCertificate" />).
 /// </param>
+/// <param name="PinnedPublicKey">
+/// curl's <c>--pinnedpubkey</c>, verbatim: <c>sha256//</c> hashes separated by <c>;</c>, or the path of
+/// a PEM or DER public key file; <see langword="null" /> when not given. After the handshake, under
+/// <paramref name="Insecure" /> too, both providers fail with exit 90 unless the server certificate's
+/// public key matches it (<see cref="Networking.PinnedPublicKey" />, ADR-0192).
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsVersion MinimumVersion = TlsVersion.SystemDefault,
@@ -184,4 +190,5 @@ public sealed record TlsClientOptions(
     string? TlsPassword = null,
     string? TlsAuthType = null,
     bool RequireCertificateStatus = false,
-    bool AutoClientCertificate = false);
+    bool AutoClientCertificate = false,
+    string? PinnedPublicKey = null);

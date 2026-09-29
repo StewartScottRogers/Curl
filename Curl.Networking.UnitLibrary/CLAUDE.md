@@ -29,7 +29,10 @@ and returns a `HandBuiltTlsConnection`. Both providers judge the server's certif
 `ServerCertificateVerification` (trust anchors, tolerated chain errors, each build's name check,
 exit 60 and 77); the hand-built path reaches it through `HandBuiltCertificateVerifier`, which
 builds the chain and the `SslPolicyErrors` `SslStream` would. Both load `--cert` through
-`ClientCertificateLoader.Load`. The hand-built path's other exit 35 texts are
+`ClientCertificateLoader.Load`. Per ADR-0192 `ServerCertificateVerification.Judge` also checks
+`--pinnedpubkey` (`TlsClientOptions.PinnedPublicKey`) once the certificate is accepted, `-k` included:
+`PinnedPublicKey` matches `sha256//` hashes or a PEM or DER key file as curl's `Curl_pin_peer_pubkey`
+does, and a mismatch is exit 90 in both providers. The hand-built path's other exit 35 texts are
 `TlsFailureMessages.SchannelHandBuiltHandshakeFailure` and `OpenSslHandBuiltHandshakeFailure`.
 Its tests run it against a server-side `SslStream` over `Fakes/InMemoryDuplexStream`, TLS 1.3
 excluded on macOS, and compare each failure with `SslStreamTlsProvider`'s.
