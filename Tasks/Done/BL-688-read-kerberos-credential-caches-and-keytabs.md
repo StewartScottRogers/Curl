@@ -50,7 +50,7 @@ completed: 2026-09-28
   through `KerberosFileException.Error`; file bytes and keys zeroed.
 - `touches` gained `Documentation/Planning/Decisions` for ADR-0158 and its index row; no
   task in Doing names it.
-- Follow-up filed: BL-814 (honour `krb5.conf` `default_ccache_name` and
+- Follow-up filed: BL-816 (honour `krb5.conf` `default_ccache_name` and
   `default_keytab_name`, after BL-689).
 - Verified: `dotnet build Curl.slnx -warnaserror` clean; fast tests green (Kerberos 72);
   `Measure-CodeQuality.ps1 -Library Curl.Kerberos.UnitLibrary`: 100% line, 100% branch,

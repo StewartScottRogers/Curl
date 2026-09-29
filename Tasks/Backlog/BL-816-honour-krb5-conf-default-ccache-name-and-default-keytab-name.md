@@ -1,5 +1,5 @@
 ---
-id: BL-814
+id: BL-816
 title: Honour krb5.conf default_ccache_name and default_keytab_name when finding the default cache and keytab
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-814 — Honour krb5.conf default_ccache_name and default_keytab_name when finding the default cache and keytab
+# BL-816 — Honour krb5.conf default_ccache_name and default_keytab_name when finding the default cache and keytab
 
 ## Goal
 
