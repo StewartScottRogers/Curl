@@ -274,6 +274,18 @@ public static class CommandLineWarning
         WrappedMessage.Lines("Warning: ", $"unrecognized ftp file method '{value}', using default");
 
     /// <summary>
+    /// The lines curl prints for a <c>--ftp-ssl-ccc-mode</c> value that is neither <c>active</c> nor
+    /// <c>passive</c> (in any case), after which it uses <c>passive</c>:
+    /// <c>Warning: unrecognized ftp CCC method '&lt;value&gt;', using default</c>, wrapped at 79 columns as
+    /// curl wraps its warnings. Measured with <c>--ftp-ssl-ccc-mode bogus</c>, <c>''</c> and a long value
+    /// against an FTP loopback (curl 8.21.0, Windows, 2026-09-28, BL-634 Notes): the warning, then the transfer.
+    /// </summary>
+    /// <param name="value">The value exactly as given.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> UnrecognizedFtpCccMethod(string value) =>
+        WrappedMessage.Lines("Warning: ", $"unrecognized ftp CCC method '{value}', using default");
+
+    /// <summary>
     /// The lines curl prints for a <c>--delegation</c> value that is none of <c>none</c>, <c>policy</c> and
     /// <c>always</c> (in any case), after which it uses <c>none</c>:
     /// <c>Warning: unrecognized delegation method '&lt;value&gt;', using none</c>, wrapped at 79 columns as

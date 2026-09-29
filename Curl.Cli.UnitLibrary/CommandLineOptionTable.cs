@@ -165,6 +165,11 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("ssl-reqd", null, (options, on) => options.SslRequired = on),
         CommandLineOption.NegatableFlag("ftp-ssl-reqd", null, (options, on) => options.SslRequired = on),
         CommandLineOption.NegatableFlag("ftp-ssl-control", null, (options, on) => options.FtpSslControlOnly = on),
+        CommandLineOption.NegatableFlag("ftp-ssl-ccc", null, (options, on) => options.FtpSslCccRequested = on),
+        CommandLineOption.Value("ftp-ssl-ccc-mode", null, AcceptingEmpty(SetFtpSslCccMode)),
+        CommandLineOption.Text("ftp-account", null, (options, account) => options.FtpAccount = account),
+        CommandLineOption.Text("ftp-alternative-to-user", null, (options, command) => options.FtpAlternativeToUser = command),
+        CommandLineOption.NegatableFlag("ftp-pret", null, (options, on) => options.FtpSendPret = on),
         CommandLineOption.NegatableFlag("list-only", 'l', (options, on) => options.ListOnly = on),
         CommandLineOption.Value("quote", 'Q', AcceptingEmpty((options, command) => options.AddQuoteCommand(command))),
         CommandLineOption.Value("create-file-mode", null, SetCreateFileMode),
@@ -472,6 +477,30 @@ public static class CommandLineOptionTable
         }
 
         options.FtpFileMethod = FtpFileMethod.MultiCwd;
+    }
+
+    /// <summary>
+    /// Reads a <c>--ftp-ssl-ccc-mode</c> value as curl 8.21.0 does: it turns <c>--ftp-ssl-ccc</c> on, and
+    /// <c>active</c> in any case asks for <see cref="FtpClearCommandChannel.Active"/>, while <c>passive</c>
+    /// asks for <see cref="FtpClearCommandChannel.Passive"/>, as does any other value, empty included, after
+    /// a warning rather than a refusal (measured on Windows, BL-634 Notes). Case is folded for ASCII letters
+    /// only, as curl's <c>curl_strequal</c> folds it.
+    /// </summary>
+    private static void SetFtpSslCccMode(CommandLineOptions options, string value)
+    {
+        options.FtpSslCccRequested = true;
+        if (Ascii.EqualsIgnoreCase(value, "active"))
+        {
+            options.FtpSslCccMode = FtpClearCommandChannel.Active;
+            return;
+        }
+
+        if (!Ascii.EqualsIgnoreCase(value, "passive"))
+        {
+            options.AddWarningLinesUnlessSilent(CommandLineWarning.UnrecognizedFtpCccMethod(value));
+        }
+
+        options.FtpSslCccMode = FtpClearCommandChannel.Passive;
     }
 
     /// <summary>

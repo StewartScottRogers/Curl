@@ -716,6 +716,39 @@ public sealed class CommandLineOptions
     /// </summary>
     public bool FtpSslControlOnly { get; internal set; }
 
+    /// <summary>
+    /// Whether FTPS clears the control connection with <c>CCC</c> after login:
+    /// <see cref="FtpClearCommandChannel.Off"/> unless <c>--ftp-ssl-ccc</c> or <c>--ftp-ssl-ccc-mode</c> was
+    /// given and no <c>--no-ftp-ssl-ccc</c> came after it, otherwise the last <c>--ftp-ssl-ccc-mode</c>'s
+    /// mode, <see cref="FtpClearCommandChannel.Passive"/> when none was given, as curl 8.21.0 keeps the flag
+    /// and the mode apart.
+    /// </summary>
+    public FtpClearCommandChannel FtpClearCommandChannel =>
+        FtpSslCccRequested ? FtpSslCccMode : FtpClearCommandChannel.Off;
+
+    /// <summary><see langword="true"/> when <c>--ftp-ssl-ccc</c> or <c>--ftp-ssl-ccc-mode</c> was given and no <c>--no-ftp-ssl-ccc</c> came after it.</summary>
+    internal bool FtpSslCccRequested { get; set; }
+
+    /// <summary>The last <c>--ftp-ssl-ccc-mode</c>'s mode; <see cref="FtpClearCommandChannel.Passive"/> when none was given.</summary>
+    internal FtpClearCommandChannel FtpSslCccMode { get; set; } = FtpClearCommandChannel.Passive;
+
+    /// <summary>
+    /// The last <c>--ftp-account</c> value, verbatim: the account sent with <c>ACCT</c> when the server asks
+    /// for one after the password; <see langword="null"/> when not given. An empty value is refused as blank,
+    /// as curl 8.21.0 refuses it.
+    /// </summary>
+    public string? FtpAccount { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--ftp-alternative-to-user</c> value, verbatim: the command sent when the server refuses
+    /// <c>USER</c>; <see langword="null"/> when not given. An empty value is refused as blank, as curl 8.21.0
+    /// refuses it.
+    /// </summary>
+    public string? FtpAlternativeToUser { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--ftp-pret</c> was given and no <c>--no-ftp-pret</c> came after it: send <c>PRET</c> before <c>EPSV</c> or <c>PASV</c>.</summary>
+    public bool FtpSendPret { get; internal set; }
+
     /// <summary><see langword="true"/> when <c>--ssl</c> or <c>--ftp-ssl</c> was given and no <c>--no-ssl</c> or <c>--no-ftp-ssl</c> came after it.</summary>
     internal bool SslTry { get; private set; }
 
