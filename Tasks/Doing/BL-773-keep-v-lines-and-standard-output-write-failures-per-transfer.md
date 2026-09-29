@@ -33,3 +33,4 @@ Under `-Z`, one transfer's `-v` hold and one transfer's standard-output write fa
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
