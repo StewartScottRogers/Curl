@@ -62,7 +62,8 @@ password.
   A UDP reply of `KRB_ERR_RESPONSE_TOO_BIG` (52) is asked again of the same KDC over TCP,
   as Windows does. TCP messages carry a four-byte big-endian length; a reply claiming more
   than 1 MiB is `UnexpectedReply` rather than an allocation of whatever the peer says.
-  `https://` (MS-KKDCP) KDCs are skipped until a KDC proxy client is built.
+  `https://` (MS-KKDCP) KDCs are skipped until a KDC proxy client is built (amended by
+  ADR-0204, which reaches them through an optional `IKerberosKdcProxyTransport`).
 - **Nonces are 31 bits** from the injected random source, as MIT sends, because some KDCs
   read the field as signed. Timestamps come from the injected `TimeProvider`, split into
   whole seconds and microseconds.
@@ -72,7 +73,7 @@ password.
 - `IKerberosKdcTransport` moves bytes only; `Curl.Networking.UnitLibrary` supplies the
   socket implementation and BL-527 composes it.
 - Cross-realm referrals are not followed (amended by ADR-0200, which follows them): a TGS-REP naming a server other than the one
-  asked for is refused. MS-KKDCP, enctype names from `krb5.conf` and writing new tickets
+  asked for is refused. MS-KKDCP (amended by ADR-0204), enctype names from `krb5.conf` and writing new tickets
   back to the cache are separate work.
 - Tests drive every path through `FakeKdc` in `Curl.Kerberos.UnitTests`, an in-memory
   KDC built from this library's own messages and encryption with fixed keys.
