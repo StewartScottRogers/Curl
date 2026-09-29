@@ -140,9 +140,28 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection
             await Http3LocalUnidirectionalStreams.OpenQpackDecoderStreamAsync(await OpenLocalStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
         }
 
-        IMultiplexedStream requestStream = await Connection.OpenBidirectionalStreamAsync(cancellationToken).ConfigureAwait(false);
+        IMultiplexedStream requestStream = await OpenBidirectionalStreamAsync(cancellationToken).ConfigureAwait(false);
         openedStreams.Add(requestStream);
         return requestStream;
+    }
+
+    /// <summary>
+    /// Opens the request's bidirectional stream. An <see cref="IOException" /> other than a
+    /// lost connection's <see cref="MultiplexedConnectionFailedException" /> means the
+    /// connection is up but the stream cannot be opened, which curl 8.21.0 reports as exit 55
+    /// and <c>cannot open bidi streams</c> (ADR-0245).
+    /// </summary>
+    /// <exception cref="HttpTransferException">The stream cannot be opened (exit 55).</exception>
+    private async ValueTask<IMultiplexedStream> OpenBidirectionalStreamAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await Connection.OpenBidirectionalStreamAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException refused) when (refused is not MultiplexedConnectionFailedException)
+        {
+            throw new HttpTransferException(CurlExitCode.SendError, HttpTransferMessages.Http3CannotOpenBidiStreams);
+        }
     }
 
     /// <summary>

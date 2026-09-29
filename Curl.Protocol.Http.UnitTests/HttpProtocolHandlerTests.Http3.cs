@@ -406,6 +406,34 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Http3RequestStreamCannotBeOpened_FailsWithExit55AndCannotOpenBidiStreams()
+    {
+        FakeMultiplexedConnection quic = new()
+        {
+            BidirectionalOpenException = new IOException("the server's bidirectional stream limit is used up"),
+        };
+
+        TransferResult result = await Handler(QuicConnector(quic)).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("cannot open bidi streams", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http3ConnectionLostOpeningTheRequestStream_FailsWithTheConnectionsExitAndMessage()
+    {
+        FakeMultiplexedConnection quic = new()
+        {
+            BidirectionalOpenException = new MultiplexedConnectionFailedException(CurlExitCode.RecvError, "QUIC: connection lost"),
+        };
+
+        TransferResult result = await Handler(QuicConnector(quic)).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("QUIC: connection lost", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Http3ConnectionLostSendingTheHead_FailsWithTheConnectionsExitAndMessage()
     {
         FakeMultiplexedStream stream = new(0, [])

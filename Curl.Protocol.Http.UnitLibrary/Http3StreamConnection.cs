@@ -29,7 +29,8 @@ namespace Curl.Protocol.Http;
 /// head is exit 95; frames or field sections that break RFC 9114 or RFC 9204 are exit 56 with
 /// nghttp3's error name, as is a connection error on the server's control or QPACK streams
 /// (<see cref="Http3Session.ConnectionError" />), which fails the next read and any read it
-/// interrupts; and a lost connection is the exit code and message its
+/// interrupts; a request stream the connection cannot open is exit 55 with <c>cannot open
+/// bidi streams</c> (ADR-0245); and a lost connection is the exit code and message its
 /// <see cref="MultiplexedConnectionFailedException" /> carries.
 /// </remarks>
 /// <param name="session">The connection's HTTP/3 session.</param>

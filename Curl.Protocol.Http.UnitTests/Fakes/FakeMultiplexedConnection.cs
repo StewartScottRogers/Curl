@@ -34,6 +34,12 @@ public sealed class FakeMultiplexedConnection(params FakeMultiplexedStream[] req
     public Exception? OpenException { get; init; }
 
     /// <summary>
+    /// Gets the exception opening a bidirectional stream throws once the unidirectional
+    /// streams are open, or <see langword="null" /> to open them.
+    /// </summary>
+    public Exception? BidirectionalOpenException { get; init; }
+
+    /// <summary>
     /// Gets the exception <see cref="CloseAsync" /> throws, or <see langword="null" /> to close.
     /// </summary>
     public Exception? CloseException { get; init; }
@@ -54,9 +60,9 @@ public sealed class FakeMultiplexedConnection(params FakeMultiplexedStream[] req
     /// <exception cref="InvalidOperationException">Every scripted stream has been opened.</exception>
     public ValueTask<IMultiplexedStream> OpenBidirectionalStreamAsync(CancellationToken cancellationToken)
     {
-        if (OpenException is not null)
+        if ((OpenException ?? BidirectionalOpenException) is { } failure)
         {
-            return ValueTask.FromException<IMultiplexedStream>(OpenException);
+            return ValueTask.FromException<IMultiplexedStream>(failure);
         }
 
         return pending.TryDequeue(out FakeMultiplexedStream? stream)

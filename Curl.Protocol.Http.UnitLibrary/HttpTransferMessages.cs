@@ -132,6 +132,13 @@ internal static class HttpTransferMessages
         string.Create(CultureInfo.InvariantCulture, $"HTTP/3 stream {streamId} reset by server (error 0x{errorCode:x} {Http3ErrorName(errorCode)})");
 
     /// <summary>
+    /// The exit 55 message for an HTTP/3 request stream the QUIC connection cannot open, as
+    /// <c>h3_stream_open</c> in <c>cf-ngtcp2.c</c> at <c>curl-8_21_0</c> reports a failing
+    /// <c>ngtcp2_conn_open_bidi_stream</c> (ADR-0187, ADR-0245).
+    /// </summary>
+    internal const string Http3CannotOpenBidiStreams = "cannot open bidi streams";
+
+    /// <summary>
     /// Formats the <c>-v</c> line for an HTTP/3 request stream the server reset with
     /// <c>H3_REQUEST_REJECTED</c>: <c>HTTP/3 stream 0 refused by server, try again on a new
     /// connection</c> (<c>cf-ngtcp2.c</c> at <c>curl-8_21_0</c>, ADR-0187).
