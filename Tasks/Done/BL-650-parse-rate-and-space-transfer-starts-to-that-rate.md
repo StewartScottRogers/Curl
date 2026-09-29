@@ -56,7 +56,7 @@ Decisions (sensible defaults, no ADR needed since each follows the measurement):
 - The wait runs before the next serial transfer starts rather than after the previous one ends; the same thing as
   curl's "if there is a next transfer" check, without looking ahead in the URL/glob loops.
 - A retried transfer is measured from its first attempt's start, where curl resets `start` on every retry:
-  filed as BL-970. `--ai-help` needed no edit: it is generated from `CommandLineOptionTable`, so `--rate` lost its
+  filed as BL-971. `--ai-help` needed no edit: it is generated from `CommandLineOptionTable`, so `--rate` lost its
   "Not supported by this build yet" line with the new row.
 
 ## Log

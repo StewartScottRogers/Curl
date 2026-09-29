@@ -1,5 +1,5 @@
 ---
-id: BL-970
+id: BL-971
 title: Measure --rate from the last retry attempt's start, not the transfer's first
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-970 — Measure --rate from the last retry attempt's start, not the transfer's first
+# BL-971 — Measure --rate from the last retry attempt's start, not the transfer's first
 
 ## Goal
 
