@@ -8,7 +8,7 @@ depends-on: [BL-794]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-884 — Pass the Unix socket path from TcpConnector to the HTTP handler's left-intact line
 
@@ -26,13 +26,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Networking.UnitTests` pins that a `TcpConnector` with a `UnixSocket` returns `ConnectResult.UnixSocketPath` equal to the socket's `Path`, and a TCP connect returns `null`.
-- [ ] `Curl.Networking.UnitTests` pins that `PoolingConnector` keeps `UnixSocketPath` on both the opened and the reused result.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Networking.UnitLibrary`.
+- [x] `Curl.Networking.UnitTests` pins that a `TcpConnector` with a `UnixSocket` returns `ConnectResult.UnixSocketPath` equal to the socket's `Path`, and a TCP connect returns `null`.
+- [x] `Curl.Networking.UnitTests` pins that `PoolingConnector` keeps `UnixSocketPath` on both the opened and the reused result.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Networking.UnitLibrary`.
 
 ## Notes
+
+- `TcpConnector`'s private `DialedSocket` gained `UnixSocketPath`, set only by `ConnectOverUnixSocketAsync` and passed to `ConnectResult.Connected` by `Opened`, so plain and TLS over the socket both carry it; an abstract name is passed as given (not measured, per Context). `PoolEntry` keeps it for `Open` and `Reuse`. `Fakes/FakeConnector` gained a `UnixSocketPath` knob.
+- Tests: `TcpConnectorTests.ConnectAsync_WithAUnixSocket_ReturnsTheWholePathForTheLeftIntactLine`, `..._WithAnAbstractUnixSocket_ReturnsTheNameAsGiven`, the TLS test and the TCP address-order test (null); `PoolingConnectorTests.ConnectAsync_OverAUnixSocket_KeepsItsPathOnTheOpenedAndTheReusedResult`.
+- Measure-CodeQuality: Curl.Networking.UnitLibrary 100% line, 100% branch, 0 failing members.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. TcpConnector and PoolingConnector set ConnectResult.UnixSocketPath, so the left-intact line names the socket
