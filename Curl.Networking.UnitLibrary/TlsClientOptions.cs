@@ -162,6 +162,14 @@ namespace Curl.Networking;
 /// <paramref name="Insecure" /> too, both providers fail with exit 90 unless the server certificate's
 /// public key matches it (<see cref="Networking.PinnedPublicKey" />, ADR-0193).
 /// </param>
+/// <param name="CertificateRevocationListFile">
+/// curl's <c>--crlfile</c>: a PEM file of certificate revocation lists; <see langword="null" /> when
+/// not given. The OpenSSL build, unless <paramref name="Insecure" />, loads it before the
+/// handshake (exit 82 when it cannot) and then needs, for every certificate of the verified
+/// chain, a list from its issuer that does not revoke it (exit 60,
+/// <see cref="Networking.CertificateRevocationListFile" />, ADR-0194). The Schannel build ignores it,
+/// as curl 8.21.0's does (measured, BL-609).
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsVersion MinimumVersion = TlsVersion.SystemDefault,
@@ -191,4 +199,5 @@ public sealed record TlsClientOptions(
     string? TlsAuthType = null,
     bool RequireCertificateStatus = false,
     bool AutoClientCertificate = false,
-    string? PinnedPublicKey = null);
+    string? PinnedPublicKey = null,
+    string? CertificateRevocationListFile = null);

@@ -275,7 +275,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options));
         try
         {
-            var (chainPolicy, anchorsBesideSystemStore) = _verification.ReadTrustAnchors();
+            var (chainPolicy, anchorsBesideSystemStore, revocationLists) = _verification.ReadTrustAnchors();
             return (new PreparedHandshake(
                 ClientSettings.Of(targetHost, offeredApplicationProtocols, suites, ToTlsClientCertificate(clientCertificate)) with
                 {
@@ -283,12 +283,13 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                     TimeProvider = _timeProvider,
                 },
                 clientCertificate,
-                new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, targetHost)), null);
+                new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost)), null);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
         {
             clientCertificate?.Dispose();
-            return (null, ConnectResult.Failed(CurlExitCode.SslCacertBadfile, _verification.CaCertificateFileUnusable()));
+            var (exitCode, message) = _verification.TrustAnchorsUnusable(exception);
+            return (null, ConnectResult.Failed(exitCode, message));
         }
     }
 

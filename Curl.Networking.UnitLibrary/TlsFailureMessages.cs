@@ -11,7 +11,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// The one place the message for a failed TLS handshake is written: the text curl prints
-/// after <c>curl: (NN) </c> for exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77, in the two builds ADR-0009
+/// after <c>curl: (NN) </c> for exit 35, exit 43, exit 58, exit 59, exit 60, exit 77, exit 82 and exit 90, in the two builds ADR-0009
 /// reproduces, the Schannel build of curl on Windows and the OpenSSL build elsewhere.
 /// </summary>
 /// <remarks>
@@ -92,6 +92,18 @@ internal static class TlsFailureMessages
     private static readonly FrozenDictionary<SocketError, string> OpenSslSocketErrorTexts = new Dictionary<SocketError, string>
     {
         [SocketError.ConnectionReset] = "Connection reset by peer",
+    }.ToFrozenDictionary();
+
+    // OpenSSL's X509_verify_cert_error_string for each --crlfile refusal. 3, 8 and 23 were
+    // measured with curl 8.18.0's OpenSSL 3.5.5 build (BL-609); the others are OpenSSL's table.
+    private static readonly FrozenDictionary<long, string> OpenSslRevocationListErrorTexts = new Dictionary<long, string>
+    {
+        [OpenSslVerifyResult.UnableToGetCertificateRevocationList] = "unable to get certificate CRL",
+        [OpenSslVerifyResult.CertificateRevocationListSignatureFailure] = "CRL signature failure",
+        [OpenSslVerifyResult.CertificateRevocationListNotYetValid] = "CRL is not yet valid",
+        [OpenSslVerifyResult.CertificateRevocationListHasExpired] = "CRL has expired",
+        [OpenSslVerifyResult.CertificateRevoked] = "certificate revoked",
+        [OpenSslVerifyResult.KeyUsageDoesNotIncludeCrlSigning] = "key usage does not include CRL signing",
     }.ToFrozenDictionary();
 
     // What curl's Schannel build reports when the server sends a fatal alert during the
@@ -361,6 +373,25 @@ internal static class TlsFailureMessages
     /// <returns>The message curl prints.</returns>
     public static string OpenSslCaCertificateFileUnusable(string caCertificateFile) =>
         $"error adding trust anchors from file: {caCertificateFile}";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 82: the <c>--crlfile</c> could not be read, or
+    /// holds no PEM certificate revocation list, or one that does not decode (measured with
+    /// curl 8.18.0's OpenSSL build for garbage, an empty file, a DER list and a directory, BL-609).
+    /// </summary>
+    /// <param name="revocationListFile">The path given to <c>--crlfile</c>.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslRevocationListFileUnusable(string revocationListFile) =>
+        $"error loading CRL file: {revocationListFile}";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 60 when a <c>--crlfile</c> check refuses the chain,
+    /// e.g. <c>SSL certificate OpenSSL verify result: certificate revoked (23)</c> (BL-609).
+    /// </summary>
+    /// <param name="verifyResult">The refusal's <see cref="OpenSslVerifyResult" /> code.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslRevocationListRefusal(long verifyResult) =>
+        $"SSL certificate OpenSSL verify result: {OpenSslRevocationListErrorTexts[verifyResult]} ({verifyResult})";
 
     /// <summary>
     /// The Schannel build's message for exit 58 when the <c>--cert</c> file cannot be opened:

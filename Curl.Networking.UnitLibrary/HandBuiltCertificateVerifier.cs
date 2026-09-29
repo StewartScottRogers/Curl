@@ -19,11 +19,13 @@ namespace Curl.Networking;
 /// <param name="verification">The shared judgement.</param>
 /// <param name="chainPolicy">The <c>--cacert</c> chain policy, or <see langword="null" /> for the system store.</param>
 /// <param name="anchorsBesideSystemStore">The <c>--capath</c> roots trusted beside the system store.</param>
+/// <param name="revocationLists">The <c>--crlfile</c> lists, or <see langword="null" /> when none are checked.</param>
 /// <param name="targetHost">The host the certificate is checked against, IPv6 brackets and all.</param>
 internal sealed class HandBuiltCertificateVerifier(
     ServerCertificateVerification verification,
     X509ChainPolicy? chainPolicy,
     X509Certificate2Collection anchorsBesideSystemStore,
+    CertificateRevocationListFile? revocationLists,
     string targetHost) : IServerCertificateVerifier
 {
     // What SslStream asks of a server certificate's chain: the server authentication usage.
@@ -90,7 +92,7 @@ internal sealed class HandBuiltCertificateVerifier(
             ? SslPolicyErrors.RemoteCertificateNotAvailable
             : BuildChain(chain, sent);
         var (observed, failure) = verification.Judge(
-            errors, sent.Count == 0 ? null : chain, targetHost, anchorsBesideSystemStore, PeerCertificates);
+            errors, sent.Count == 0 ? null : chain, targetHost, anchorsBesideSystemStore, revocationLists, PeerCertificates);
         Observed = observed;
         return failure is { } rejected ? ServerCertificateVerdict.Rejected(rejected) : ServerCertificateVerdict.Accepted;
     }

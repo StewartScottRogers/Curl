@@ -352,15 +352,17 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         events.ReportTlsTrust(DescribeTrust());
         X509ChainPolicy? chainPolicy;
         X509Certificate2Collection anchorsBesideSystemStore;
+        CertificateRevocationListFile? revocationLists;
         try
         {
-            (chainPolicy, anchorsBesideSystemStore) = _verification.ReadTrustAnchors();
+            (chainPolicy, anchorsBesideSystemStore, revocationLists) = _verification.ReadTrustAnchors();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
         {
             clientCertificate?.Dispose();
             await plaintext.DisposeAsync().ConfigureAwait(false);
-            return ConnectResult.Failed(CurlExitCode.SslCacertBadfile, _verification.CaCertificateFileUnusable());
+            var (exitCode, message) = _verification.TrustAnchorsUnusable(exception);
+            return ConnectResult.Failed(exitCode, message);
         }
 
         (CurlExitCode ExitCode, string Message)? verificationFailure = null;
@@ -378,7 +380,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             {
                 peerCertificates = ListPeerCertificates(certificate, chain);
                 (peerVerification, verificationFailure) = _verification.Judge(
-                    errors, chain, targetHost, anchorsBesideSystemStore, peerCertificates);
+                    errors, chain, targetHost, anchorsBesideSystemStore, revocationLists, peerCertificates);
                 return verificationFailure is null;
             },
         };

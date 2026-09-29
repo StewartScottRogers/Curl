@@ -120,9 +120,11 @@ public sealed class QuicDialer
         var events = request.Target.Events;
         events.ReportInfo($"  Trying {endPoint}...");
         events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options));
-        if (CreateVerifier(request.Target.Host) is not { } verifier)
+        var (verifier, unusable) = CreateVerifier(request.Target.Host);
+        if (verifier is null)
         {
-            return (MultiplexedConnectResult.Failed(CurlExitCode.SslCacertBadfile, _verification.CaCertificateFileUnusable()), false);
+            var (exitCode, message) = _verification.TrustAnchorsUnusable(unusable!);
+            return (MultiplexedConnectResult.Failed(exitCode, message), false);
         }
 
         var (channel, openFailure) = OpenChannel(endPoint);
@@ -145,17 +147,18 @@ public sealed class QuicDialer
         return (Failed(request, endPoint, failure!), LeavesTimeForTheNextAddress(failure!));
     }
 
-    // The verifier over the --cacert or system anchors, or null when --cacert cannot be read.
-    private HandBuiltCertificateVerifier? CreateVerifier(string targetHost)
+    // The verifier over the --cacert or system anchors and the --crlfile lists, or what
+    // reading them threw.
+    private (HandBuiltCertificateVerifier? Verifier, Exception? Unusable) CreateVerifier(string targetHost)
     {
         try
         {
-            var (chainPolicy, anchorsBesideSystemStore) = _verification.ReadTrustAnchors();
-            return new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, targetHost);
+            var (chainPolicy, anchorsBesideSystemStore, revocationLists) = _verification.ReadTrustAnchors();
+            return (new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost), null);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
         {
-            return null;
+            return (null, exception);
         }
     }
 

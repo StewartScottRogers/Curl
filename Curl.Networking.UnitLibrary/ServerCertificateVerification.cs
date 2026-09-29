@@ -32,19 +32,49 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// <c>--cacert</c> the Schannel build checks revocation below the root unless
     /// <see cref="TlsClientOptions.SkipRevocationCheck" /> is set, so a private CA with no
     /// revocation endpoint fails with exit 60 as in curl (ADR-0086); the OpenSSL build never
-    /// checks it.
+    /// checks it. The OpenSSL build then loads the <c>--crlfile</c> lists, as curl loads them
+    /// after the <c>--cacert</c> file (BL-609); the Schannel build ignores <c>--crlfile</c>.
+    /// Under <c>-k</c> nothing is read.
     /// </summary>
-    /// <returns>The chain policy, or <see langword="null" />, and the roots trusted beside the system store.</returns>
+    /// <returns>
+    /// The chain policy, or <see langword="null" />, the roots trusted beside the system store, and
+    /// the <c>--crlfile</c> lists, or <see langword="null" /> when none are checked.
+    /// </returns>
     /// <exception cref="IOException">The <c>--cacert</c> file cannot be read.</exception>
     /// <exception cref="UnauthorizedAccessException">The <c>--cacert</c> file cannot be opened.</exception>
-    /// <exception cref="CryptographicException">The OpenSSL build refuses the <c>--cacert</c> file's contents.</exception>
-    internal (X509ChainPolicy? ChainPolicy, X509Certificate2Collection AnchorsBesideSystemStore) ReadTrustAnchors()
+    /// <exception cref="CryptographicException">
+    /// The OpenSSL build refuses the <c>--cacert</c> file's contents, or, as
+    /// <see cref="CertificateRevocationListFileException" />, the <c>--crlfile</c>.
+    /// </exception>
+    internal (X509ChainPolicy? ChainPolicy, X509Certificate2Collection AnchorsBesideSystemStore, CertificateRevocationListFile? RevocationLists) ReadTrustAnchors()
     {
         if (options.Insecure)
         {
-            return (null, []);
+            return (null, [], null);
         }
 
+        var (chainPolicy, anchorsBesideSystemStore) = ReadChainAnchors();
+        return (chainPolicy, anchorsBesideSystemStore, ReadRevocationLists());
+    }
+
+    /// <summary>
+    /// The build's exit code and message for trust anchors <see cref="ReadTrustAnchors" /> could
+    /// not read: exit 82 for the <c>--crlfile</c>, exit 77 for the <c>--cacert</c> file.
+    /// </summary>
+    /// <param name="exception">What <see cref="ReadTrustAnchors" /> threw.</param>
+    /// <returns>The exit code and the message curl prints.</returns>
+    internal (CurlExitCode ExitCode, string Message) TrustAnchorsUnusable(Exception exception) =>
+        exception is CertificateRevocationListFileException
+            ? (CurlExitCode.SslCrlBadfile, TlsFailureMessages.OpenSslRevocationListFileUnusable(options.CertificateRevocationListFile!))
+            : (CurlExitCode.SslCacertBadfile, CaCertificateFileUnusable());
+
+    private CertificateRevocationListFile? ReadRevocationLists() =>
+        matchesSchannelBuild || options.CertificateRevocationListFile is null
+            ? null
+            : CertificateRevocationListFile.Load(options.CertificateRevocationListFile);
+
+    private (X509ChainPolicy? ChainPolicy, X509Certificate2Collection AnchorsBesideSystemStore) ReadChainAnchors()
+    {
         var directoryAnchors = ReadCaCertificateDirectory();
         if (options.CaCertificateFile is null)
         {
@@ -63,9 +93,8 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         return (chainPolicy, []);
     }
 
-    /// <summary>The build's message for exit 77: the <c>--cacert</c> file cannot be used.</summary>
-    /// <returns>The message curl prints.</returns>
-    internal string CaCertificateFileUnusable() => matchesSchannelBuild
+    // The build's message for exit 77: the --cacert file cannot be used.
+    private string CaCertificateFileUnusable() => matchesSchannelBuild
         ? TlsFailureMessages.SchannelCaCertificateFileUnusable(options.CaCertificateFile!)
         : TlsFailureMessages.OpenSslCaCertificateFileUnusable(options.CaCertificateFile!);
 
@@ -74,12 +103,15 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// and whether it is accepted. A certificate <see cref="VerifyPeer" /> accepts, or any
     /// under <c>-k</c>, is then checked against <see cref="TlsClientOptions.PinnedPublicKey" />:
     /// a key the pin does not name is exit 90, so a certificate that fails both is exit 60, as
-    /// curl reports it (ADR-0193, BL-608).
+    /// curl reports it (ADR-0193, BL-608). Before the pin, a certificate
+    /// <see cref="VerifyPeer" /> accepts is checked against the <c>--crlfile</c> lists, when
+    /// there are any: a refusal is exit 60 with OpenSSL's verify result (ADR-0194, BL-609).
     /// </summary>
     /// <param name="errors">What was found wrong with the chain, as <see cref="SslStream" /> reports it.</param>
     /// <param name="chain">The chain built, if a certificate was presented.</param>
     /// <param name="targetHost">The host the certificate is checked against.</param>
     /// <param name="anchorsBesideSystemStore">The <c>--capath</c> roots trusted beside the system store.</param>
+    /// <param name="revocationLists">The <c>--crlfile</c> lists <see cref="ReadTrustAnchors" /> read, or <see langword="null" />.</param>
     /// <param name="peerCertificates">The DER of what the server sent, its own certificate first.</param>
     /// <returns>The observation for the handshake event and the failure, or <see langword="null" /> to accept.</returns>
     internal (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) Judge(
@@ -87,14 +119,23 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         X509Chain? chain,
         string targetHost,
         X509Certificate2Collection anchorsBesideSystemStore,
+        CertificateRevocationListFile? revocationLists,
         ReadOnlyMemory<byte>[] peerCertificates)
     {
         var anchoredErrors = WithTheNameCheckCurlRuns(
             WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
         return (
             ObservePeerVerification(anchoredErrors, chain, peerCertificates),
-            VerifyPeer(anchoredErrors, chain, targetHost, []) ?? PinnedPublicKey.Refusal(options.PinnedPublicKey, peerCertificates));
+            VerifyPeer(anchoredErrors, chain, targetHost, [])
+                ?? RevocationListRefusal(revocationLists, chain)
+                ?? PinnedPublicKey.Refusal(options.PinnedPublicKey, peerCertificates));
     }
+
+    // Reached only for a chain VerifyPeer accepted without -k, so a chain was built.
+    private (CurlExitCode ExitCode, string Message)? RevocationListRefusal(CertificateRevocationListFile? revocationLists, X509Chain? chain) =>
+        revocationLists?.FirstRefusal(chain!, timeProvider.GetUtcNow()) is { } verifyResult
+            ? (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslRevocationListRefusal(verifyResult))
+            : null;
 
     /// <summary>
     /// Decides whether the server certificate is accepted, and if not, what curl says.

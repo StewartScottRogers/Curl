@@ -73,5 +73,5 @@ public sealed class HandBuiltCertificateVerifierTests
         Assert.ThrowsExactly<ArgumentNullException>(() => Verifier(new TlsClientOptions()).Verify(null!));
 
     private static HandBuiltCertificateVerifier Verifier(TlsClientOptions options, bool matchesSchannelBuild = false) =>
-        new(new ServerCertificateVerification(options, matchesSchannelBuild, TimeProvider.System), null, [], "localhost");
+        new(new ServerCertificateVerification(options, matchesSchannelBuild, TimeProvider.System), null, [], null, "localhost");
 }
