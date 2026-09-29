@@ -36,3 +36,4 @@ The server's host key is accepted or refused as curl 8.21.0 does: matched agains
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Backlog. Lane 1 could not integrate: fast tests failed after rebasing onto the other lanes' work. The work is on branch factory/BL-566-lane-1-20260929-061257; start with git cherry-pick --no-commit factory/BL-566-lane-1-20260929-061257 and fix it.
