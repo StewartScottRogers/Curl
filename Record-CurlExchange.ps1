@@ -284,6 +284,8 @@
                   from its identifier and definite length octets
       send <b>    send the bytes <b>, with the same backslash escapes as Response
       close       close the connection and end the session
+      reset       reset the connection (RST, not FIN) and end the session, so curl's
+                  next receive or send fails with an I/O error (BL-845)
 
     A read takes only the bytes it asked for; any curl sent beyond them wait for the next
     read. A read that gets no byte for ScriptIdleMilliseconds, or during which curl closes
@@ -1602,6 +1604,13 @@ $serveScriptedSession = {
                 $stream.Write($step.Bytes, 0, $step.Bytes.Length)
                 $stream.Flush()
                 [void] $Transcript.Append("< $(ConvertTo-Hex -Bytes $step.Bytes)`r`n")
+            } elseif ($step.Kind -eq 'reset') {
+                # A zero linger time makes Close send RST instead of FIN.
+                $client.LingerState = New-Object System.Net.Sockets.LingerOption($true, 0)
+                $client.Close()
+                [void] $Transcript.Append("= server reset the connection`r`n")
+                $ended = $true
+                break
             } else {
                 [void] $Transcript.Append("= server closed the connection`r`n")
                 $ended = $true
@@ -1635,6 +1644,8 @@ function ConvertFrom-ExchangeScript {
             $steps.Add(@{ Kind = 'send'; Bytes = [byte[]] (ConvertFrom-EscapedResponse -Text $argument); Text = $text })
         } elseif ($verb -ceq 'close' -and $argument -eq '') {
             $steps.Add(@{ Kind = 'close'; Text = $text })
+        } elseif ($verb -ceq 'reset' -and $argument -eq '') {
+            $steps.Add(@{ Kind = 'reset'; Text = $text })
         } elseif ($verb -ceq 'read' -and $argument -eq '') {
             $steps.Add(@{ Kind = 'read'; Framing = 'gap'; Text = $text })
         } elseif ($verb -ceq 'read' -and $argument -ceq 'ber') {
