@@ -65,7 +65,7 @@ reply bytes, in `LdapProtocolHandlerTests.Output.cs`.
 - The Windows build's held entries are written in one write once the search succeeds; curl
   writes them piece by piece, which changes nothing a script sees.
 - Output-write and connection I/O failures are not handled by the LDAP handler (they were not
-  before either); filed as BL-842.
+  before either); filed as BL-845.
 
 ## Log
 

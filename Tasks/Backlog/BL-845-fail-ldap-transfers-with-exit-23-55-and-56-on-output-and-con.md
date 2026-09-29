@@ -1,5 +1,5 @@
 ---
-id: BL-842
+id: BL-845
 title: Fail LDAP transfers with exit 23, 55 and 56 on output and connection I/O errors as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-842 — Fail LDAP transfers with exit 23, 55 and 56 on output and connection I/O errors as curl does
+# BL-845 — Fail LDAP transfers with exit 23, 55 and 56 on output and connection I/O errors as curl does
 
 ## Goal
 

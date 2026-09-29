@@ -213,7 +213,7 @@ recordings on 2026-09-28 (the same two builds as BL-586), each with
   attributes of one entry whose names differ only in case are written each with its own values,
   where WinLDAP would look both up by name.
 - A failed write to the output, and a connection that fails with an I/O error rather than
-  closing, are not handled by the LDAP handler yet; BL-842 does that.
+  closing, are not handled by the LDAP handler yet; BL-845 does that.
 
 ## Consequences
 
