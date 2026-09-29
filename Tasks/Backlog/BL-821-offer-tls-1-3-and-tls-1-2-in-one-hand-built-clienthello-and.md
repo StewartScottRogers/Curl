@@ -1,5 +1,5 @@
 ---
-id: BL-818
+id: BL-821
 title: Offer TLS 1.3 and TLS 1.2 in one hand-built ClientHello and continue on the version the ServerHello picks
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-818 — Offer TLS 1.3 and TLS 1.2 in one hand-built ClientHello and continue on the version the ServerHello picks
+# BL-821 — Offer TLS 1.3 and TLS 1.2 in one hand-built ClientHello and continue on the version the ServerHello picks
 
 ## Goal
 
@@ -18,7 +18,7 @@ A hand-built TLS connection whose range spans TLS 1.3 and TLS 1.2 (or lower) sen
 
 ## Context
 
-- ADR-0160 decision 3 (BL-708): today a range reaching TLS 1.3 runs `Tls13ClientConnection` only, so a hand-built route with `--tlsv1.2` and no ceiling offers only TLS 1.3 and cannot talk to a TLS 1.2 server. No routing row sends such a range there yet, but BL-618's rows (`--curves`, `--sigalgs` and the rest) will.
+- ADR-0162 decision 3 (BL-708): today a range reaching TLS 1.3 runs `Tls13ClientConnection` only, so a hand-built route with `--tlsv1.2` and no ceiling offers only TLS 1.3 and cannot talk to a TLS 1.2 server. No routing row sends such a range there yet, but BL-618's rows (`--curves`, `--sigalgs` and the rest) will.
 - ADR-0140, "Class structure": `TlsClientConnection.ConnectAsync(Stream, TlsClientSettings, IServerCertificateVerifier, CancellationToken)` sends the hello and picks the TLS 1.3 or 1.2 path from the ServerHello. RFC 8446 section 4.1.3's downgrade sentinels must be checked when TLS 1.2 is chosen with TLS 1.3 offered.
 - Code: `Curl.Tls.UnitLibrary/Tls13ClientConnection.cs`, `Tls12ClientConnection.cs`, `Tls13ClientHandshake.cs`, `Tls12ClientHandshake.cs`; `Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs` (`HandshakeAsync`, `OffersTls13`).
 
@@ -30,7 +30,7 @@ A hand-built TLS connection whose range spans TLS 1.3 and TLS 1.2 (or lower) sen
 
 ## Notes
 
-- Filed by BL-708 (ADR-0160).
+- Filed by BL-708 (ADR-0162).
 
 ## Log
 

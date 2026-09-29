@@ -33,15 +33,15 @@ A second `ITlsProvider` in `Curl.Networking.UnitLibrary` runs the hand-built TLS
 
 - 2026-09-28 (lane 1): returned to Backlog before any code. `Curl.Tls.UnitLibrary` has the TLS 1.2/1.1/1.0 handshake (`Tls12ClientHandshake`, BL-703) and record states (BL-702) but nothing that runs them over a byte stream; only TLS 1.3 has a connection and stream (`Tls13ClientConnection`, `Tls13ClientStream`, BL-700). The first criterion (a TLS 1.2 exchange through the new provider) and the legacy-versions row (which routes to TLS 1.0/1.1) both need that, and it belongs in `Curl.Tls.UnitLibrary` with its own tests, so it is filed as BL-815 and added to `depends-on`.
 - Routing rows: `TlsClientOptions` today carries only the legacy-versions condition (`MaximumVersion` TLS 1.0 or 1.1); the other rows' options reach it with BL-618 (`--curves`, `--sigalgs`, `--tls-earlydata`, `--ech`, `--ssl-sessions`, `--tlsuser`/`--tlspassword`), BL-713 (`--no-sessionid`, `--ssl-allow-beast`) and BL-610 (`--cert-status`). As this task's Context says, those tasks add their rows; this task builds the function with the rows whose options exist when it runs.
-- 2026-09-28 (lane 3), plan and outcome (ADR-0160):
+- 2026-09-28 (lane 3), plan and outcome (ADR-0162):
   - `TlsClientRouting.Choose` (pure, `TlsClientRoute`) with the legacy-versions row only; `CurlComposition.CreateTlsProvider` builds `HandBuiltTlsProvider` or `SslStreamTlsProvider` for the origin and the HTTPS proxy; both implement the new `ITlsProviderWithWarnings`, which `CurlTransports` now holds.
   - The verification moved out of `SslStreamTlsProvider` into `ServerCertificateVerification` (with `PeerVerification`); `HandBuiltCertificateVerifier` builds the chain and `SslPolicyErrors` `SslStream` would and calls it. `--cert` loading moved to `ClientCertificateLoader.Load` for both.
   - Test servers: the criterion allows equivalents, and the `Curl.Tls.UnitTests` servers are internal to that project (reaching them would mean `InternalsVisibleTo` in `Curl.Tls.UnitLibrary`, outside `touches`). A server-side `SslStream` over `Fakes/InMemoryDuplexStream` is used instead, the same server the `SslStream` provider's tests use, which also tests interop with a real TLS stack: TLS 1.2 on every platform, TLS 1.3 excluded on macOS (`OSCondition`; no TLS 1.3 server there). The self-signed and name-mismatch failures are compared with `SslStreamTlsProvider`'s result against the same server in both builds, so no per-platform text is pinned twice.
-  - Sensible defaults taken: a range reaching TLS 1.3 runs the TLS 1.3 client only (one hello for both is BL-818); `server_name` left out for IP literals; `Curl.Tls`'s default suites and groups until the profiles (BL-787, then BL-820); OpenSSL alert error strings from `ssl_err.c` where not measured.
-  - The Context's exit 56 without `close_notify` is not wired: the `SslStream` path lacks it too and the HTTP handler has no typed failure to print curl's text, so both paths go to BL-819 (ADR-0160 decision 7).
-  - `touches` gained `Documentation/Planning/Decisions` for ADR-0160 and its index row; no task in Doing names it.
+  - Sensible defaults taken: a range reaching TLS 1.3 runs the TLS 1.3 client only (one hello for both is BL-821); `server_name` left out for IP literals; `Curl.Tls`'s default suites and groups until the profiles (BL-787, then BL-820); OpenSSL alert error strings from `ssl_err.c` where not measured.
+  - The Context's exit 56 without `close_notify` is not wired: the `SslStream` path lacks it too and the HTTP handler has no typed failure to print curl's text, so both paths go to BL-819 (ADR-0162 decision 7).
+  - `touches` gained `Documentation/Planning/Decisions` for ADR-0162 and its index row; no task in Doing names it.
   - Quality: `Curl.Networking.UnitLibrary` 100% line, 100% branch, 475 members, 0 failing (worst CRAP 10); `Curl.Console` 100%/100%, 0 failing.
-  - Filed: BL-818, BL-819, BL-820.
+  - Filed: BL-821, BL-819, BL-820.
 
 ## Log
 

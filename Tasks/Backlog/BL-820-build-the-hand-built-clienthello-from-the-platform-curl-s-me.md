@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- ADR-0140 gives BL-708 "the profile choice per platform"; the profiles are BL-787's and did not exist when BL-708 ran, so `HandBuiltTlsProvider` (ADR-0160 decision 4) sends `Curl.Tls`'s default `Tls13ClientSettings` and `Tls12ClientSettings` lists.
+- ADR-0140 gives BL-708 "the profile choice per platform"; the profiles are BL-787's and did not exist when BL-708 ran, so `HandBuiltTlsProvider` (ADR-0162 decision 4) sends `Curl.Tls`'s default `Tls13ClientSettings` and `Tls12ClientSettings` lists.
 - Options change a profile's lists, never its extension order: `--ciphers`/`--tls13-ciphers` the suites (see `HandBuiltTlsProvider.SelectOpenSslCipherSuites`), the version range the versions, `--no-alpn` removes ALPN.
 - Code: `Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs` (`ClientSettings`).
 
@@ -29,7 +29,7 @@ completed:
 
 ## Notes
 
-- Filed by BL-708 (ADR-0160).
+- Filed by BL-708 (ADR-0162).
 
 ## Log
 
