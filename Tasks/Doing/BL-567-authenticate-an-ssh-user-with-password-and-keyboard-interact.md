@@ -33,3 +33,4 @@ After the transport is up, the handler requests `ssh-userauth` and authenticates
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
