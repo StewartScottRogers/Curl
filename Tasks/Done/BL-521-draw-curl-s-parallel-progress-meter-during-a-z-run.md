@@ -56,13 +56,13 @@ Plan and what was learned:
 - The line layout comes from `Curl.Output`'s `ParallelProgressMeterText` (new, public), and the
   figures from `Curl.Console`'s `ParallelProgressMeter` and `ParallelTransferProgress`, which the
   run's `ParallelRun` owns. `TransferProgressRecorder` passes every byte report on, and the runner
-  stops drawing per-transfer meters and bars under `-Z`. When to draw is recorded in ADR-0154.
+  stops drawing per-transfer meters and bars under `-Z`. When to draw is recorded in ADR-0155.
 - Default taken: `Xfers` counts the transfers that have taken a `--parallel-max` slot, while curl
   counts the transfers it has created, up to twice `--parallel-max`. The two agree unless more
-  transfers are queued than `--parallel-max` (ADR-0154, decision 4).
+  transfers are queued than `--parallel-max` (ADR-0155, decision 4).
 - Default taken: `-s` and `--no-progress-meter` are read from the first option group, because curl's
   flags are global.
-- `touches` gained `Documentation/Planning/Decisions` for ADR-0154 and its index row. None of the
+- `touches` gained `Documentation/Planning/Decisions` for ADR-0155 and its index row. None of the
   tasks in Doing (BL-640, BL-703) names it.
 - Our binary, run against the same server, gives the same layout and counts. It also drew an extra
   ` 50` line where transfer B's size was known before its body arrived, which curl's algorithm also

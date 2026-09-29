@@ -4,7 +4,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// curl 8.21.0's combined progress meter for a <c>-Z</c> run, in place of each transfer's own
-/// (<c>progress_meter</c> in <c>src/tool_progress.c</c>; ADR-0154, BL-521): the header line with the
+/// (<c>progress_meter</c> in <c>src/tool_progress.c</c>; ADR-0155, BL-521): the header line with the
 /// first draw, then a status line of the run's totals whenever the run's loop would draw one - on a
 /// byte report, a transfer going live or ending, the runner having started every transfer it can,
 /// and a second without any of those - but only once more than 500 ms have passed since the last,

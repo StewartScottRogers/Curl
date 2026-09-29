@@ -154,7 +154,7 @@ in command-line order after the run's other transfers. A result that ends a seri
 the running transfers finish. Without `-Z` nothing changes.
 
 Under `-Z` no transfer draws its own meter or `-#` bar: `ParallelRun`'s `ParallelProgressMeter` draws
-curl 8.21.0's combined meter to standard error (ADR-0154, BL-521). Its header line and status lines
+curl 8.21.0's combined meter to standard error (ADR-0155, BL-521). Its header line and status lines
 come from `Curl.Output`'s `ParallelProgressMeterText`, drawn when a handler reports bytes (each
 transfer's `TransferProgressRecorder` passes them to its `ParallelTransferProgress`), when a transfer
 ends, when the runner has started every transfer it can, and after a second without a draw. A line

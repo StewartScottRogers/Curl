@@ -7,7 +7,7 @@ The 76 --write-out variables, progress meter, verbose and trace formatting.
 `ParallelProgressMeterText` writes the text of a `-Z` run's combined progress meter as curl 8.21.0's
 `progress_meter` in `src/tool_progress.c` does: the header line, and status lines with five-column
 sizes (`max5data`) and eight-column times (`time2str`). The figures come from `Curl.Console`
-(ADR-0154, BL-521).
+(ADR-0155, BL-521).
 
 `PeerCertificateText` prints one certificate for `%{certs}` as curl 8.21.0 does: it is a
 port of `Curl_extract_certinfo` in curl's `lib/vtls/x509asn1.c`, with `DerReader`,

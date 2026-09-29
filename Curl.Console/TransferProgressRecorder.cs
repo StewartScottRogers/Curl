@@ -12,7 +12,7 @@ namespace Curl.Console;
 /// Under <c>-#</c> it also passes every report on to the transfer's
 /// <see cref="ProgressBarRecorder" /> (task BL-132). Under <c>-L</c> each hop of the chain is
 /// drawn on a status line of its own (task BL-277, ADR-0086). Under <c>-Z</c> every byte report is also
-/// passed on to the transfer's share of the run's combined meter (task BL-521, ADR-0154).
+/// passed on to the transfer's share of the run's combined meter (task BL-521, ADR-0155).
 /// </summary>
 /// <remarks>
 /// The first draw is made when the recorder is made, with every counter zero, so it is
