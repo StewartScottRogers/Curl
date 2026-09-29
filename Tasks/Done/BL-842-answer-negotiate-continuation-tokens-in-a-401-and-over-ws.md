@@ -31,7 +31,7 @@ A Negotiate exchange of more than one leg works as curl 8.21.0's does: a `401` w
 
 ## Notes
 
-- Plan and decision: ADR-0226. NTLM (BL-526) had already landed with a stateless
+- Plan and decision: ADR-0227. NTLM (BL-526) had already landed with a stateless
   continuation (ADR-0181), replaying a fresh context; Negotiate cannot, since a Kerberos
   authenticator differs every time. So `NegotiateHttpAuthenticator` keeps a `ContinueNeeded`
   context in a concurrent dictionary keyed by the `Authorization` value it made, and
@@ -40,18 +40,18 @@ A Negotiate exchange of more than one leg works as curl 8.21.0's does: a `401` w
   to Negotiate when the value sent starts `Negotiate `, for the origin, with `-u` given (libcurl
   answers no 401 without a user).
 - `WsProtocolHandler` now calls `CreateAuthorizationAsync`. It still answers no 401 (exit 22);
-  that is BL-945.
+  that is BL-951.
 - Measured 2026-09-29, `Record-CurlExchange.ps1`, curl 8.21.0 SSPI, no domain,
   `--negotiate -u : -v` against `401 Negotiate oRQw...`: one request with no `Authorization`,
   `SEC_E_NO_CREDENTIALS` then `SEC_E_INVALID_HANDLE`, body, exit 0 - what Curl does. A working
   multi-leg exchange needs a KDC no lane has, so the two-leg bytes are pinned from curl's
   `Curl_input_negotiate` with scripted tokens.
 - Touches: added `Curl.Protocol.Abstractions.UnitLibrary` (the `IHttpAuthenticator` remarks
-  said no call keeps state, now false) and `Documentation/Planning/Decisions` (ADR-0226); no
+  said no call keeps state, now false) and `Documentation/Planning/Decisions` (ADR-0227); no
   task in Doing names either.
 - Quality: Authentication, Http, Ws and Abstractions libraries all 100% line and branch, 0
   failing members. Tests: Authentication 636, Http 1377, Ws 184 passed.
-- Follow-ups filed: BL-944 (check the acceptor's final token in a 2xx, mutual auth), BL-945
+- Follow-ups filed: BL-950 (check the acceptor's final token in a 2xx, mutual auth), BL-951
   (answer a 401 to the WebSocket upgrade).
 
 ## Log

@@ -1,5 +1,5 @@
 ---
-id: BL-944
+id: BL-950
 title: Check the acceptor's final Negotiate token in a 2xx as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-944 — Check the acceptor's final Negotiate token in a 2xx as curl does
+# BL-950 — Check the acceptor's final Negotiate token in a 2xx as curl does
 
 ## Goal
 
@@ -18,7 +18,7 @@ A `2xx` answering a Negotiate request that carries `WWW-Authenticate: Negotiate 
 
 ## Context
 
-- ADR-0226 (BL-842) keeps a Negotiate context awaiting its next leg in `NegotiateHttpAuthenticator`, keyed by the `Authorization` value it made, and continues it only on a 401. A context whose token drew a 200 is never stepped and stays in the dictionary.
+- ADR-0227 (BL-842) keeps a Negotiate context awaiting its next leg in `NegotiateHttpAuthenticator`, keyed by the `Authorization` value it made, and continues it only on a 401. A context whose token drew a 200 is never stepped and stays in the dictionary.
 - curl's `Curl_input_negotiate` runs for any response with a `WWW-Authenticate: Negotiate` header after a token was sent (lib/http.c `Curl_http_input_auth`, lib/http_negotiate.c); read curl 8.21.0's source to pin what a rejected final token does (exit code, message) before writing tests, and measure it where a KDC can be reached.
 - The HTTP handler asks the authenticator nothing about a 2xx today, so the contract (`IHttpAuthenticator`) gains a call for it; record that in an ADR.
 

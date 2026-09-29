@@ -6,7 +6,7 @@ namespace Curl.Protocol.Ws.Fakes;
 /// An <see cref="IHttpAuthenticator" /> that, as Negotiate does in
 /// <c>RankedHttpAuthenticator</c>, answers only through
 /// <see cref="IHttpAuthenticator.CreateAuthorizationAsync" />: the synchronous call sends
-/// nothing, so a handler still calling it sends no header (ADR-0176, ADR-0226).
+/// nothing, so a handler still calling it sends no header (ADR-0176, ADR-0227).
 /// </summary>
 /// <param name="authorization">The value the asynchronous call returns.</param>
 public sealed class AsynchronousOnlyAuthenticator(string authorization) : IHttpAuthenticator

@@ -1,5 +1,5 @@
 ---
-id: BL-945
+id: BL-951
 title: Answer a 401 to the WebSocket upgrade with the chosen auth scheme
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-945 — Answer a 401 to the WebSocket upgrade with the chosen auth scheme
+# BL-951 — Answer a 401 to the WebSocket upgrade with the chosen auth scheme
 
 ## Goal
 
@@ -18,8 +18,8 @@ A `ws://` or `wss://` upgrade answered with `401` and a `WWW-Authenticate` chall
 
 ## Context
 
-- `WsProtocolHandler` sends the upgrade with the pre-emptive `Authorization` from `IHttpAuthenticator.CreateAuthorizationAsync` (ADR-0226, BL-842) and fails any status but 101 with `Refused WebSocket upgrade: <code>` (ADR-0128).
-- curl drives the upgrade through its HTTP code, so a 401 is answered as HTTP answers it: `CreateAuthorizationAsync` with the challenges when the request sent nothing, `ContinueAuthorizationAsync` when it sent a value (ADR-0181, ADR-0226), on the same connection when it stays open.
+- `WsProtocolHandler` sends the upgrade with the pre-emptive `Authorization` from `IHttpAuthenticator.CreateAuthorizationAsync` (ADR-0227, BL-842) and fails any status but 101 with `Refused WebSocket upgrade: <code>` (ADR-0128).
+- curl drives the upgrade through its HTTP code, so a 401 is answered as HTTP answers it: `CreateAuthorizationAsync` with the challenges when the request sent nothing, `ContinueAuthorizationAsync` when it sent a value (ADR-0181, ADR-0227), on the same connection when it stays open.
 - Measure curl 8.21.0 with `Record-CurlExchange.ps1 -Script` (401 Digest then 101; 401 NTLM Type 2 then 101; 401 with no answerable challenge) before pinning bytes and exit codes.
 
 ## Acceptance criteria
