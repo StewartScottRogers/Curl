@@ -1,5 +1,5 @@
 ---
-id: BL-906
+id: BL-908
 title: Measure whether -b name=value alone turns on the cookie engine and align FR-098 with it
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-098
 created: 2026-09-29
 completed:
 ---
-# BL-906 — Measure whether -b name=value alone turns on the cookie engine and align FR-098 with it
+# BL-908 — Measure whether -b name=value alone turns on the cookie engine and align FR-098 with it
 
 ## Goal
 

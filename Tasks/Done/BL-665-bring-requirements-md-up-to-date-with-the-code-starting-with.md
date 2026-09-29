@@ -34,7 +34,7 @@ Every requirement row in `Documentation/Product/Requirements.md` says truthfully
 - Kept 2: FR-013 (`--crlf` parsed but never copied to the transfer context, BL-633) and FR-073 (the `zstd` part of `--compressed`, BL-861).
 - FR-030 cites `TelnetProtocolHandlerTelnetOptionTests` (exit 48 and 49 cases); FR-035 cites `TftpProtocolHandlerTests.ExecuteAsync_ErrorPacket_ReturnsCurlsExitCodeAndMessage` (rows 0 to 9) and two `TftpUploadTests`.
 - Header TODO paragraph is now a "Coverage" note naming the groups covered and what the code implements without requirements. Section intros that said nothing was wired now name the class doing the work.
-- Gaps with no task filed: BL-906 (FR-098 says any `-b` turns on the cookie engine; code and BL-237 measurement say only a `-b` file or `-c`), BL-907 (FR-064 and FR-042 cases untested, FR-085 wording stale).
+- Gaps with no task filed: BL-908 (FR-098 says any `-b` turns on the cookie engine; code and BL-237 measurement say only a `-b` file or `-c`), BL-909 (FR-064 and FR-042 cases untested, FR-085 wording stale).
 
 ## Log
 

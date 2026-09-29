@@ -1,5 +1,5 @@
 ---
-id: BL-907
+id: BL-909
 title: Pin FR-064 url-query refusal, FR-042 mqtt user info and FR-085 send-error text with tests
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-907 — Pin FR-064 url-query refusal, FR-042 mqtt user info and FR-085 send-error text with tests
+# BL-909 — Pin FR-064 url-query refusal, FR-042 mqtt user info and FR-085 send-error text with tests
 
 ## Goal
 
