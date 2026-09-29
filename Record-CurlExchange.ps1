@@ -271,6 +271,53 @@
     How long, in -Pop3 mode, the server waits for curl's next line before it hangs up.
     Default 5000.
 
+.PARAMETER Script
+    Serve one connection from a script of steps instead of HTTP responses, for binary
+    request-reply protocols that no line-at-a-time mode speaks, such as LDAP's BER
+    messages or SMB's frames (BL-532). The value is the path of a text file with one step
+    per line, run in order; blank lines and lines starting with # are skipped:
+
+      read        wait up to ScriptIdleMilliseconds for curl's first byte, then keep
+                  reading until curl is silent for ScriptGapMilliseconds
+      read <N>    read until N bytes have arrived
+      read ber    read one whole BER element (X.690 8.1), such as one LDAP message,
+                  from its identifier and definite length octets
+      send <b>    send the bytes <b>, with the same backslash escapes as Response
+      close       close the connection and end the session
+
+    A read takes only the bytes it asked for; any curl sent beyond them wait for the next
+    read. A read that gets no byte for ScriptIdleMilliseconds, or during which curl closes
+    its end, ends the session with a line saying so in transcript.txt, instead of
+    hanging. When the steps run out, the connection is closed. When the first step is a
+    read, every connection curl opens is accepted and the session is served on the first
+    one curl writes to: the Windows build's WinLDAP opens a connection of its own beside
+    the one curl opened, and speaks only on its own. The others are closed when the
+    session ends, and transcript.txt notes how many there were. Once the session ends the
+    listener stops, so a connection curl opens afterwards is refused at once. request.bin then holds
+    every byte curl sent, and transcript.txt one line per step: "> " and the bytes a read
+    took, or "< " and the bytes sent, as lowercase hex pairs separated by spaces, and "= "
+    lines for how the session ended. Response, Connections, ResponseDelayMilliseconds and
+    Reset are ignored. With -Tls it serves TLS from the first byte, as ldaps:// expects.
+
+    For example, this script answers curl's LDAP simple bind with success and records
+    the search request that follows it:
+
+      # BindRequest from curl
+      read ber
+      # BindResponse, message ID 1, resultCode success (RFC 4511 4.2.2)
+      send \x30\x0c\x02\x01\x01\x61\x07\x0a\x01\x00\x04\x00\x04\x00
+      # SearchRequest from curl
+      read ber
+      close
+
+.PARAMETER ScriptIdleMilliseconds
+    How long, in -Script mode, a read waits for a byte from curl before it ends the
+    session. Default 5000.
+
+.PARAMETER ScriptGapMilliseconds
+    How long, in -Script mode, a bare read waits for more bytes after the last that
+    arrived before it takes what it has. Default 250.
+
 .PARAMETER Tls
     Answer each connection over TLS 1.2 instead of plain TCP, so the recorder can stand
     in for an HTTPS server or an HTTPS proxy (BL-398, BL-442). The certificate served
@@ -283,7 +330,8 @@
     before any handshake. With -Ftp it serves implicit FTPS: the control connection is TLS
     from its first byte, as ftps:// expects (BL-437); with -Smtp, implicit SMTPS, as
     smtps:// expects (BL-529); with -Imap, implicit IMAPS, as imaps:// expects (BL-531);
-    with -Pop3, implicit POP3S, as pop3s:// expects (BL-530).
+    with -Pop3, implicit POP3S, as pop3s:// expects (BL-530); with -Script, TLS from the
+    first byte, as ldaps:// expects (BL-532).
 
 .PARAMETER TlsRootCertificateFile
     With -Tls, serve a certificate issued by a throwaway private root CA in place of the
@@ -315,8 +363,9 @@
     Response, Connections, ResponseDelayMilliseconds, Reset, HoldOpenMilliseconds,
     RespondAfterBodyBytes, FtpReply, FtpData, FtpIdleMilliseconds, SmtpReply,
     SmtpIdleMilliseconds, ImapReply, ImapMessage, ImapIdleMilliseconds, Pop3Reply,
-    Pop3Message, Pop3IdleMilliseconds and ListenAddress are ignored, and Port need not be given.
-    Combining it with a server mode, -Ftp, -Smtp, -Imap, -Pop3 or -Tls, is refused. StandardInput and Curl work as in every other mode.
+    Pop3Message, Pop3IdleMilliseconds, ScriptIdleMilliseconds, ScriptGapMilliseconds and
+    ListenAddress are ignored, and Port need not be given.
+    Combining it with a server mode, -Ftp, -Smtp, -Imap, -Pop3, -Script or -Tls, is refused. StandardInput and Curl work as in every other mode.
 
 .PARAMETER UdpSink
     Also bind UDP on ListenAddress and Port, and take every datagram curl sends there
@@ -330,7 +379,7 @@
 .PARAMETER UnixSocket
     Listen on a Unix domain socket at this path instead of TCP, for --unix-socket (BL-507).
     Any file already at the path is deleted first, and the socket file is deleted at the
-    end. Only the HTTP mode serves over it: combining it with -Ftp, -Smtp, -Imap, -Pop3,
+    end. Only the HTTP mode serves over it: combining it with -Ftp, -Smtp, -Imap, -Pop3, -Script,
     -Tls, -NoServer or -UdpSink is refused. Port need not be given. Windows PowerShell 5.1
     runs on .NET Framework, which has no UnixDomainSocketEndPoint, so the socket is bound
     through a small C# EndPoint compiled with Add-Type; Windows 10 1803 or later has AF_UNIX.
@@ -366,6 +415,13 @@
 
     Serves one POP3 session; transcript.txt shows CAPA, AUTH PLAIN, RETR 1 with the
     dot-stuffed message and QUIT, and stdout.bin the message curl printed.
+
+.EXAMPLE
+    .\Record-CurlExchange.ps1 -Port 18389 -Script ldap-bind-search.txt -CurlArgs 'ldap://127.0.0.1:18389/dc=example' -OutDirectory fixtures\ldap-search
+
+    Runs the steps in ldap-bind-search.txt (the example under .PARAMETER Script);
+    request.bin then holds curl's BindRequest and SearchRequest, and transcript.txt both
+    directions as hex.
 #>
 [CmdletBinding()]
 param(
@@ -395,6 +451,9 @@ param(
     [string[]] $Pop3Reply = @(),
     [string] $Pop3Message = 'From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n.A line that starts with a dot.\r\n',
     [ValidateRange(1, 600000)] [int] $Pop3IdleMilliseconds = 5000,
+    [string] $Script,
+    [ValidateRange(1, 600000)] [int] $ScriptIdleMilliseconds = 5000,
+    [ValidateRange(1, 600000)] [int] $ScriptGapMilliseconds = 250,
     [switch] $Tls,
     [string] $TlsRootCertificateFile,
     [string] $Curl,
@@ -410,9 +469,9 @@ $ErrorActionPreference = 'Stop'
 # powershell -File binds '-sS','http://...' as the one string "-sS,http://..."; only then
 # is the invocation line empty, so only then is that string split back into its elements.
 if ([string]::IsNullOrEmpty($MyInvocation.Line) -and $CurlArgs.Count -eq 1) { $CurlArgs = $CurlArgs[0].Split(',') }
-if ($NoServer -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3 or -Tls.' }
-if (@($Ftp, $Smtp, $Imap, $Pop3 | Where-Object { $_ }).Count -gt 1) { throw '-Ftp, -Smtp, -Imap and -Pop3 each serve a whole session; give one of them.' }
-if ($UnixSocket -and ($NoServer -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $Tls -or $UdpSink)) { throw '-UnixSocket serves HTTP only, so it cannot be combined with -NoServer, -Ftp, -Smtp, -Imap, -Pop3, -Tls or -UdpSink.' }
+if ($NoServer -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script or -Tls.' }
+if (@($Ftp, $Smtp, $Imap, $Pop3, [bool] $Script | Where-Object { $_ }).Count -gt 1) { throw '-Ftp, -Smtp, -Imap, -Pop3 and -Script each serve a whole session; give one of them.' }
+if ($UnixSocket -and ($NoServer -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls -or $UdpSink)) { throw '-UnixSocket serves HTTP only, so it cannot be combined with -NoServer, -Ftp, -Smtp, -Imap, -Pop3, -Script, -Tls or -UdpSink.' }
 if (-not $NoServer -and -not $UnixSocket -and $Port -eq 0) { throw '-Port is required unless -NoServer is given: the URL in CurlArgs must name the port the server listens on.' }
 if ($UdpSink -and $Port -eq 0) { throw '-UdpSink binds UDP on -Port, so -Port is required with it.' }
 
@@ -1346,6 +1405,190 @@ $servePop3Session = {
     return , @(, $received.ToArray())
 }
 
+# The -Script server: one connection, served by the steps of a script, for binary
+# request-reply protocols such as LDAP's BER messages (BL-532). It returns every byte curl
+# sent, as one array, and writes a hex transcript of both directions into $Transcript.
+$serveScriptedSession = {
+    param($Listener, [object[]] $Steps, [System.Text.StringBuilder] $Transcript, $TlsCertificate, [bool] $ImplicitTls, [int] $IdleMilliseconds, [int] $GapMilliseconds, [string] $SessionHelpers)
+
+    Set-StrictMode -Version Latest
+    $ErrorActionPreference = 'Stop'
+    . ([scriptblock]::Create($SessionHelpers))
+    $received = New-Object System.IO.MemoryStream
+    $unconsumed = New-Object System.Collections.Generic.List[byte]
+    $buffer = New-Object byte[] 65536
+    # A read that timed out stays pending, so the next wait picks up its bytes instead of
+    # starting a second read on the same stream.
+    $reader = @{ Pending = $null }
+
+    function ConvertTo-Hex {
+        param([byte[]] $Bytes)
+        return ([System.BitConverter]::ToString($Bytes) -replace '-', ' ').ToLowerInvariant()
+    }
+
+    # Waits up to TimeoutMilliseconds for bytes from curl, records them and appends them
+    # to $unconsumed. Returns how many arrived, 0 when curl closed its end, -1 on timeout.
+    function Receive-Bytes {
+        param($Stream, [int] $TimeoutMilliseconds)
+        if ($null -eq $reader.Pending) { $reader.Pending = $Stream.ReadAsync($buffer, 0, $buffer.Length) }
+        try {
+            if (-not $reader.Pending.Wait($TimeoutMilliseconds)) { return -1 }
+            $count = $reader.Pending.Result
+        } catch [System.AggregateException] {
+            $count = 0  # The connection was reset: the same as curl closing its end.
+        }
+        $reader.Pending = $null
+        if ($count -gt 0) {
+            $received.Write($buffer, 0, $count)
+            for ($index = 0; $index -lt $count; $index++) { $unconsumed.Add($buffer[$index]) }
+        }
+        return $count
+    }
+
+    # The length of the whole BER element at the start of $unconsumed (X.690 8.1), or -1
+    # while its identifier and length octets have not all arrived. An indefinite length,
+    # which LDAP forbids, is refused.
+    function Get-BerElementLength {
+        $index = 1
+        if ($unconsumed.Count -lt 1) { return -1 }
+        if (($unconsumed[0] -band 0x1F) -eq 0x1F) {
+            while ($index -lt $unconsumed.Count -and ($unconsumed[$index] -band 0x80) -ne 0) { $index++ }
+            $index++
+        }
+        if ($unconsumed.Count -le $index) { return -1 }
+        $first = [int] $unconsumed[$index]
+        if ($first -lt 0x80) { return $index + 1 + $first }
+        $octets = $first -band 0x7F
+        if ($octets -eq 0) { throw 'The read ber step met an indefinite length, which it does not support.' }
+        if ($unconsumed.Count -le $index + $octets) { return -1 }
+        [long] $length = 0
+        for ($offset = 1; $offset -le $octets; $offset++) { $length = $length * 256 + $unconsumed[$index + $offset] }
+        return $index + 1 + $octets + $length
+    }
+
+    # Runs one read step. Returns $true to go on, $false when the session has ended.
+    function Invoke-ReadStep {
+        param($Stream, $Step)
+        $wanted = -1
+        while ($true) {
+            if ($Step.Framing -eq 'ber') { $wanted = Get-BerElementLength } elseif ($Step.Framing -eq 'count') { $wanted = $Step.ByteCount }
+            if ($Step.Framing -eq 'gap') {
+                $timeout = if ($unconsumed.Count -eq 0) { $IdleMilliseconds } else { $GapMilliseconds }
+            } elseif ($wanted -ge 0 -and $unconsumed.Count -ge $wanted) {
+                break
+            } else {
+                $timeout = $IdleMilliseconds
+            }
+            $arrived = Receive-Bytes -Stream $Stream -TimeoutMilliseconds $timeout
+            if ($arrived -gt 0) { continue }
+            if ($Step.Framing -eq 'gap' -and $arrived -lt 0 -and $unconsumed.Count -gt 0) { break }
+            if ($unconsumed.Count -gt 0) { [void] $Transcript.Append("> $(ConvertTo-Hex -Bytes $unconsumed.ToArray())`r`n") }
+            $expected = if ($wanted -ge 0) { " of the $wanted expected" } else { '' }
+            if ($arrived -lt 0) {
+                [void] $Transcript.Append("= $($Step.Text) timed out after $IdleMilliseconds ms with $($unconsumed.Count) bytes$expected; session ended`r`n")
+            } else {
+                [void] $Transcript.Append("= curl closed the connection during $($Step.Text) with $($unconsumed.Count) bytes$expected; session ended`r`n")
+            }
+            return $false
+        }
+        if ($wanted -lt 0) { $wanted = $unconsumed.Count }
+        $message = $unconsumed.GetRange(0, $wanted).ToArray()
+        $unconsumed.RemoveRange(0, $wanted)
+        [void] $Transcript.Append("> $(ConvertTo-Hex -Bytes $message)`r`n")
+        return $true
+    }
+
+    # WinLDAP opens two connections at once and writes on only one of them, so when the
+    # script starts with a read, every connection curl opens is accepted and the session
+    # is served on the first that has bytes waiting; the others are held open until it ends.
+    function Select-SpokenConnection {
+        param([System.Collections.Generic.List[object]] $Accepted)
+        $clock = [System.Diagnostics.Stopwatch]::StartNew()
+        while ($clock.ElapsedMilliseconds -lt $IdleMilliseconds) {
+            while ($Listener.Pending()) { $Accepted.Add($Listener.AcceptTcpClient()) }
+            foreach ($candidate in $Accepted) {
+                if ($candidate.Client.Available -gt 0) { return $candidate }
+            }
+            Start-Sleep -Milliseconds 10
+        }
+        return $null
+    }
+
+    $accepted = New-Object System.Collections.Generic.List[object]
+    try {
+        $accepted.Add($Listener.AcceptTcpClient())
+    } catch {
+        return , @(, $received.ToArray())
+    }
+    try {
+        $client = $accepted[0]
+        if ($Steps.Count -gt 0 -and $Steps[0].Kind -eq 'read') {
+            $client = Select-SpokenConnection -Accepted $accepted
+            if ($accepted.Count -gt 1) { [void] $Transcript.Append("= curl opened $($accepted.Count) connections; the session is served on the first to send`r`n") }
+            if ($null -eq $client) {
+                [void] $Transcript.Append("= $($Steps[0].Text) timed out after $IdleMilliseconds ms with 0 bytes; session ended`r`n")
+                return , @(, $received.ToArray())
+            }
+        }
+        $stream = $client.GetStream()
+        if ($ImplicitTls) {
+            $stream = Wrap-Tls -Stream $stream
+            [void] $Transcript.Append("= TLS handshake completed`r`n")
+        }
+        $ended = $false
+        foreach ($step in $Steps) {
+            if ($step.Kind -eq 'read') {
+                if (-not (Invoke-ReadStep -Stream $stream -Step $step)) { $ended = $true; break }
+            } elseif ($step.Kind -eq 'send') {
+                $stream.Write($step.Bytes, 0, $step.Bytes.Length)
+                $stream.Flush()
+                [void] $Transcript.Append("< $(ConvertTo-Hex -Bytes $step.Bytes)`r`n")
+            } else {
+                [void] $Transcript.Append("= server closed the connection`r`n")
+                $ended = $true
+                break
+            }
+        }
+        if (-not $ended) { [void] $Transcript.Append("= script ended; server closed the connection`r`n") }
+    } catch [System.IO.IOException] {
+        [void] $Transcript.Append("= curl closed the connection mid-send; session ended`r`n")
+    } finally {
+        foreach ($connection in $accepted) { $connection.Close() }
+        # The session is over, so a reconnect is refused rather than left in the backlog,
+        # where WinLDAP would wait minutes for an answer before curl could exit.
+        $Listener.Stop()
+    }
+    return , @(, $received.ToArray())
+}
+
+function ConvertFrom-ExchangeScript {
+    # The -Script file as a list of steps; see .PARAMETER Script.
+    param([string] $Path)
+    $steps = New-Object System.Collections.Generic.List[object]
+    $lineNumber = 0
+    foreach ($line in [System.IO.File]::ReadAllLines([System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $Path)))) {
+        $lineNumber++
+        $text = $line.Trim()
+        if ($text.Length -eq 0 -or $text.StartsWith('#')) { continue }
+        $verb = ($text -split '\s+', 2)[0]
+        $argument = if ($text -match '^\S+\s+(.*)$') { $Matches[1] } else { '' }
+        if ($verb -ceq 'send') {
+            $steps.Add(@{ Kind = 'send'; Bytes = [byte[]] (ConvertFrom-EscapedResponse -Text $argument); Text = $text })
+        } elseif ($verb -ceq 'close' -and $argument -eq '') {
+            $steps.Add(@{ Kind = 'close'; Text = $text })
+        } elseif ($verb -ceq 'read' -and $argument -eq '') {
+            $steps.Add(@{ Kind = 'read'; Framing = 'gap'; Text = $text })
+        } elseif ($verb -ceq 'read' -and $argument -ceq 'ber') {
+            $steps.Add(@{ Kind = 'read'; Framing = 'ber'; Text = $text })
+        } elseif ($verb -ceq 'read' -and $argument -match '^\d+$' -and [int] $argument -gt 0) {
+            $steps.Add(@{ Kind = 'read'; Framing = 'count'; ByteCount = [int] $argument; Text = $text })
+        } else {
+            throw "Script line ${lineNumber} is not a step: $text"
+        }
+    }
+    return , $steps.ToArray()
+}
+
 function New-IssuedByThrowawayRoot {
     # Signs Request with a throwaway root CA named by no store and writes the root's PEM
     # to RootCertificateFile. Neither certificate names a CRL or OCSP endpoint.
@@ -1425,6 +1668,7 @@ $ftpOverrides = ConvertTo-ReplyOverrides -Entries $FtpReply -ParameterName 'FtpR
 $smtpOverrides = ConvertTo-ReplyOverrides -Entries $SmtpReply -ParameterName 'SmtpReply'
 $imapOverrides = ConvertTo-ReplyOverrides -Entries $ImapReply -ParameterName 'ImapReply'
 $pop3Overrides = ConvertTo-ReplyOverrides -Entries $Pop3Reply -ParameterName 'Pop3Reply'
+$scriptSteps = if ($Script) { ConvertFrom-ExchangeScript -Path $Script } else { $null }
 $transcript = New-Object System.Text.StringBuilder
 $uploadedData = New-Object System.IO.MemoryStream
 $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $OutDirectory))
@@ -1504,6 +1748,8 @@ try {
         [void] $server.AddScript($serveImapSession).AddArgument($listener).AddArgument($imapOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $ImapMessage)).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ImapIdleMilliseconds).AddArgument($sessionHelpers.ToString())
     } elseif ($Pop3) {
         [void] $server.AddScript($servePop3Session).AddArgument($listener).AddArgument($pop3Overrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $Pop3Message)).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($Pop3IdleMilliseconds).AddArgument($sessionHelpers.ToString())
+    } elseif ($Script) {
+        [void] $server.AddScript($serveScriptedSession).AddArgument($listener).AddArgument($scriptSteps).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ScriptIdleMilliseconds).AddArgument($ScriptGapMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
         [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds)
     }
@@ -1589,7 +1835,7 @@ if ($Ftp) {
 if ($UdpSink) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'datagrams.txt'), $udpDatagrams.ToString(), [System.Text.Encoding]::ASCII)
 }
-if ($Smtp -or $Imap -or $Pop3) {
+if ($Smtp -or $Imap -or $Pop3 -or $Script) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
 }
 
