@@ -34,7 +34,7 @@ completed: 2026-09-29
 - The handler now records what the authenticator reports while answering a 401 whose request did not pick Negotiate, and writes it before the retry (curl steps that context on the way out); a plan keeps its info lines across a fresh-connection resend, as curl steps a context per send.
 - `touches` grew, per rule 3, with no task in Doing naming either: `Curl.Protocol.Abstractions.UnitLibrary` (doc comments on `IHttpAuthenticator` only: the empty answer is part of its contract) and `Documentation/Planning/Decisions` (ADR-0232 and its index line).
 - Coverage: `Measure-CodeQuality.ps1 -Library` gives 100% line and branch and 0 failing members for `Curl.Authentication.UnitLibrary` and `Curl.Protocol.Http.UnitLibrary`; Abstractions changed only in comments.
-- Follow-up filed: BL-956 - no authentication retry writes curl's `Issue another request` and reuse lines yet; the `-v` test here pins everything else and says so.
+- Follow-up filed: BL-959 - no authentication retry writes curl's `Issue another request` and reuse lines yet; the `-v` test here pins everything else and says so.
 
 ## Log
 

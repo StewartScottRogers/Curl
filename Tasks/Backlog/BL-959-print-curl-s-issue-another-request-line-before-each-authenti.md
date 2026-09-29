@@ -1,5 +1,5 @@
 ---
-id: BL-956
+id: BL-959
 title: Print curl's Issue another request line before each authentication retry
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-956 — Print curl's Issue another request line before each authentication retry
+# BL-959 — Print curl's Issue another request line before each authentication retry
 
 ## Goal
 
