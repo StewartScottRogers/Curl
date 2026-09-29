@@ -36,3 +36,4 @@ A `tftp://` download or `-T` upload writes curl 8.21.0's `-v` lines and its `--t
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
