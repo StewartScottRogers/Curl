@@ -1344,6 +1344,13 @@ public sealed class CommandLineOptions
     public IReadOnlyList<FormPartSpecification> FormParts => formParts;
 
     /// <summary>
+    /// <see langword="true"/> when the last of <c>--form-escape</c> and <c>--no-form-escape</c> was
+    /// <c>--form-escape</c>: <see cref="FormParts"/> names and file names are escaped with backslashes
+    /// (<c>\\</c>, <c>\"</c>) rather than curl 8.21.0's default <c>%22</c>, <c>%0D</c> and <c>%0A</c> (BL-625).
+    /// </summary>
+    public bool FormEscape { get; internal set; }
+
+    /// <summary>
     /// The <c>-A</c> / <c>--user-agent</c> value, verbatim; empty when given empty, which curl 8.21.0
     /// sends as no <c>User-Agent</c> header at all; <see langword="null"/> when not given. The last value wins.
     /// </summary>
