@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: protocol
 depends-on: [BL-563, BL-739, BL-745]
-touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
+touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-28
 completed:
@@ -31,9 +31,28 @@ The transport runs every BCL-backed key exchange BL-560's ADR offers (ECDH on NI
 
 ## Notes
 
+### Lane 4 retry, 2026-09-29
+
+- The code is finished and green: `git cherry-pick --no-commit 9e19c6f4 5d5ae996` (the
+  feature and ADR commits on `factory/BL-564-lane-6-20260929-023709`) applies cleanly on
+  `factory/lane-4` at 691e5e10. After it, `dotnet build Curl.slnx -warnaserror` is clean,
+  every fast test passes (Ssh 174), and `Measure-CodeQuality.ps1 -Library
+  Curl.Protocol.Ssh.UnitLibrary` reports 100% line and branch, 0 failing members, worst
+  CRAP 10. Lane 6's failed integration was most likely the intermittent
+  `Curl.Networking.UnitTests` revocation test (BL-881), not this code.
+- Two fixes to apply after the cherry-pick: ADR-0204 still names the follow-up as
+  BL-882; it is BL-887 (commit b109aedc renumbered it). File BL-887 from that branch's
+  `Tasks/Backlog/BL-887-measure-the-openssl-curl-build-s-ssh-group-exchange-request.md`
+  (next free ID was still BL-887 at this retry; re-check with `next-id`).
+- Back to Backlog only for a `touches` overlap: the ADR and its index row live in
+  `Documentation/Planning/Decisions`, which BL-883 (in Doing) also touches. The
+  measurements and decisions are in lane 6's copy of this file and in ADR-0204 on that
+  branch.
+
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Lane 6 could not integrate: fast tests failed after rebasing onto the other lanes' work. The work is on branch factory/BL-564-lane-6-20260929-023709; start with git cherry-pick --no-commit factory/BL-564-lane-6-20260929-023709 and fix it.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Backlog. Overlaps Documentation/Planning/Decisions with BL-883 in Doing; code is green on factory/BL-564-lane-6-20260929-023709 - cherry-pick 9e19c6f4 5d5ae996 per Notes
