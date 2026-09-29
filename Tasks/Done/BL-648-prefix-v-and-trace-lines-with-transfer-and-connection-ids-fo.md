@@ -72,13 +72,13 @@ Parsing (first two lines of stderr): `--trace-ids -v` no IDs (a first-option `-v
 does `--trace-time`); `--trace-ids -sv` IDs; `-vv` stamp and IDs (plus `[SETUP]` component lines,
 BL-649's); `-vvv --no-trace-ids` no IDs; `-vvv -v` neither.
 
-Decisions (ADR-0198): each transfer reports through a `TraceIdsTransferEvents` view that sets the
+Decisions (ADR-0202): each transfer reports through a `TraceIdsTransferEvents` view that sets the
 shared `TraceIdsPrefix` under a lock, so `-Z` transfers never swap IDs; a transfer takes its
 `%{conn_id}` at its first event, and `-w` prints that number. Our runner writes no `-v` line for
 a rejected URL or unsupported scheme yet, so `[n-x]` shows only on the `--resolve`/`-b` lines;
 not measured: connection reuse (the recorder closes each connection).
 
-Added `Documentation/Planning/Decisions` to `touches` for ADR-0198; no task in Doing names it.
+Added `Documentation/Planning/Decisions` to `touches` for ADR-0202; no task in Doing names it.
 
 ## Log
 
