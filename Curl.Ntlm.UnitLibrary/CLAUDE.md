@@ -7,8 +7,13 @@ keys that answer a challenge. It is shared by HTTP and proxy NTLM
 (`Curl.Protocol.Smb.UnitLibrary`), so it lives in none of them. When SSPI on Windows
 answers instead of this library is ADR-0142's routing, not this library's.
 
-Namespace `Curl.Ntlm`. The project is scaffolded (BL-682) and holds no types yet; the
-messages land under BL-683 and the responses and session keys under BL-684.
+Namespace `Curl.Ntlm`. The messages are here (BL-683), written and read as curl 8.21.0's
+own `lib/vauth/ntlm.c` writes and reads them: `NtlmNegotiateMessage` (curl's fixed
+32-byte Type 1), `NtlmChallengeMessage.Decode` (Type 2, every offset checked, a malformed
+message an `NtlmMessageFailure`, never an exception), `NtlmTargetInformation` (its
+AV_PAIRs), `NtlmAuthenticateMessage` (Type 3 from supplied responses, within curl's
+1024-byte `NTLM_BUFSIZE`) and `NtlmUserName` (curl's `DOMAIN\user` split). The responses
+and session keys land under BL-684.
 
 ## Rules
 
