@@ -76,7 +76,7 @@ completed: 2026-09-28
 - Decided (rule 1): a failure other than 22 and 52 writes its message then `closing connection #N`,
   as measured for `Recv failure: Connection was reset`; the upload frame is reported as data sent
   plus `upload completely sent off: N bytes`. curl's `[WS]` frame-error lines and its read-first
-  order around `-T` were measured but differ from this; filed as BL-812.
+  order around `-T` were measured but differ from this; filed as BL-813.
 - Tests: `WsProtocolHandlerEventTests` (7), `CurlCommandRunnerWsTransferEventTests` (5; the random
   key is checked as base64 of 16 bytes then replaced by the measured one). Ws 171 passed.
   `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ws.UnitLibrary`: 100% line, 100% branch,

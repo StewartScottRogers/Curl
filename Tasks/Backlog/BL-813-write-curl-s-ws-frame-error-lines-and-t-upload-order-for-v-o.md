@@ -1,5 +1,5 @@
 ---
-id: BL-812
+id: BL-813
 title: Write curl's [WS] frame-error lines and -T upload order for -v on a WebSocket transfer
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-812 — Write curl's [WS] frame-error lines and -T upload order for -v on a WebSocket transfer
+# BL-813 — Write curl's [WS] frame-error lines and -T upload order for -v on a WebSocket transfer
 
 ## Goal
 
