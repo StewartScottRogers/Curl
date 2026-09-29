@@ -1,5 +1,5 @@
 ---
-id: BL-878
+id: BL-884
 title: Pass the Unix socket path from TcpConnector to the HTTP handler's left-intact line
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-878 — Pass the Unix socket path from TcpConnector to the HTTP handler's left-intact line
+# BL-884 — Pass the Unix socket path from TcpConnector to the HTTP handler's left-intact line
 
 ## Goal
 

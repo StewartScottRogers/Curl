@@ -40,7 +40,7 @@ Through `--unix-socket <path>`, `-v` ends an HTTP transfer with curl 8.21.0's `C
   - Not re-measured: two URLs over one socket (the recorder serves one request, so a second URL hangs it). The task's Context already records that the `Reusing existing http: connection with host` line names the URL's host, so it is left as it is.
 - Decisions (Claude, under Stewart's delegation; small enough for Notes rather than an ADR):
   - `ConnectResult` gains `UnixSocketPath` (a new optional `unixSocketPath` parameter on `Connected`), `null` for TCP and for a failure. The handler prints `LeftIntactOverUnixSocket`: the whole path, ASCII letters lower-cased as curl's `Curl_strntolower` does, port 0. Only ASCII is lowered because curl's lowering is ASCII-only.
-  - Split: setting the path in `TcpConnector` and `PoolingConnector` needs `Curl.Networking.UnitLibrary`, which BL-609 (in Doing) holds. The contract and the handler landed here, where every acceptance criterion is met; BL-878 (depends on BL-794) makes the connector set the path, so the end-to-end Goal completes there.
+  - Split: setting the path in `TcpConnector` and `PoolingConnector` needs `Curl.Networking.UnitLibrary`, which BL-609 (in Doing) holds. The contract and the handler landed here, where every acceptance criterion is met; BL-884 (depends on BL-794) makes the connector set the path, so the end-to-end Goal completes there.
 - Fast tests: one full run reported a failing project and a second hung in `Curl.Quic.UnitTests` (neither touched here); a rerun with `--blame-hang-timeout 5m` passed all 32 test projects. Http 1296, Abstractions 605 tests.
 - `Measure-CodeQuality.ps1`: Curl.Protocol.Abstractions.UnitLibrary 100/100, 176 members, 0 failing; Curl.Protocol.Http.UnitLibrary 100/100, 628 members, 0 failing.
 
@@ -48,4 +48,4 @@ Through `--unix-socket <path>`, `-v` ends an HTTP transfer with curl 8.21.0's `C
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
-- 2026-09-29: Doing -> Done. HTTP's -v left-intact line names a Unix socket connection by its lower-cased path and port 0 once the connector sets ConnectResult.UnixSocketPath (BL-878)
+- 2026-09-29: Doing -> Done. HTTP's -v left-intact line names a Unix socket connection by its lower-cased path and port 0 once the connector sets ConnectResult.UnixSocketPath (BL-884)
