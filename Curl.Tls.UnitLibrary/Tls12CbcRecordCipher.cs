@@ -13,8 +13,10 @@ namespace Curl.Tls;
 /// Opening a MAC-then-encrypt record checks the padding with <see cref="Tls12CbcPadding.Check" />
 /// and always computes and compares the MAC, and only the combined answer is branched on,
 /// so bad padding and a bad MAC both end in <c>bad_record_mac</c> by the same path. The
-/// MAC is computed over the content the padding implies, so its hashing time still follows
-/// the padding length by up to a few hash blocks (the Lucky Thirteen residual, ADR-0150).
+/// MAC is computed with <see cref="Tls12RecordMac.VerifyInFixedBlocks" />, which hashes the
+/// same number of blocks whatever the padding length, so neither the padding's length nor
+/// its validity shows in the time taken (the complete Lucky Thirteen countermeasure,
+/// ADR-0150).
 /// </remarks>
 internal sealed class Tls12CbcRecordCipher(
     ITls12CbcBlockCipher blockCipher,
@@ -92,7 +94,7 @@ internal sealed class Tls12CbcRecordCipher(
         byte[] plaintext = Decrypt(fragment);
         uint paddingGood = Tls12CbcPadding.Check(plaintext, mac.Length, out int unpaddedLength);
         int contentLength = unpaddedLength - mac.Length;
-        bool macGood = mac.Verify(sequenceNumber, contentType, version, plaintext.AsSpan(0, contentLength), plaintext.AsSpan(contentLength, mac.Length));
+        bool macGood = mac.VerifyInFixedBlocks(sequenceNumber, contentType, version, plaintext, contentLength);
         return Finish(plaintext, contentLength, macGood & (paddingGood == uint.MaxValue));
     }
 

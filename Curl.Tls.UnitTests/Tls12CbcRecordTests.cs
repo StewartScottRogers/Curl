@@ -31,6 +31,37 @@ public sealed class Tls12CbcRecordTests
     }
 
     [TestMethod]
+    [DataRow(Tls12MacAlgorithm.HmacSha1)]
+    [DataRow(Tls12MacAlgorithm.HmacSha256)]
+    [DataRow(Tls12MacAlgorithm.HmacSha384)]
+    public void EveryPaddingLengthOpensUnderTheBclHmacAndABadMacOrPaddingIsBadRecordMac(Tls12MacAlgorithm macAlgorithm)
+    {
+        Tls12RecordProtectionParameters parameters = new(TlsProtocolVersion.Tls12, Tls12BulkCipher.Aes256Cbc, macAlgorithm);
+        Tls12WriteKeys keys = Tls12Records.RandomKeys(parameters);
+        using Tls12RecordCipher cipher = Tls12RecordCipher.Create(parameters, keys, null);
+        int macLength = CryptographicOperations.HmacData(parameters.MacHash, keys.MacKey, ReadOnlySpan<byte>.Empty).Length;
+        for (int paddingLength = 0; paddingLength <= Tls12CbcPadding.MaximumPaddingLength; paddingLength++)
+        {
+            int contentLength = 40 + ((16 - ((40 + macLength + paddingLength + 1) % 16)) % 16);
+            byte[] content = Enumerable.Range(paddingLength, contentLength).Select(value => (byte)value).ToArray();
+            byte[] mac = CryptographicOperations.HmacData(parameters.MacHash, keys.MacKey, (byte[])[.. Tls12Records.AdditionalData(0, TlsContentType.ApplicationData, TlsProtocolVersion.Tls12, contentLength), .. content]);
+            byte[] padding = Enumerable.Repeat((byte)paddingLength, paddingLength + 1).ToArray();
+            byte[] badMac = [.. mac];
+            badMac[^1] ^= 0x80;
+            byte[] badPadding = [.. padding];
+            badPadding[0] = (byte)(paddingLength == 0 ? 200 : paddingLength ^ 1);
+
+            TlsDecodeResult<byte[]> opened = Open(cipher, keys.Key, content, mac, padding);
+            TlsDecodeResult<byte[]> withBadMac = Open(cipher, keys.Key, content, badMac, padding);
+            TlsDecodeResult<byte[]> withBadPadding = Open(cipher, keys.Key, content, mac, badPadding);
+
+            CollectionAssert.AreEqual(content, opened.Value, $"padding {paddingLength}");
+            Assert.AreEqual(TlsAlertDescription.BadRecordMac, withBadMac.Alert, $"padding {paddingLength}");
+            Assert.AreEqual(TlsAlertDescription.BadRecordMac, withBadPadding.Alert, $"padding {paddingLength}");
+        }
+    }
+
+    [TestMethod]
     public void ABadPaddingByteWithAGoodMacIsBadRecordMac()
     {
         using Tls12RecordReadState reader = Tls12RecordReadState.Create(Tls12AesSha1, new Tls12WriteKeys(MacKey, AesKey, []));
@@ -178,6 +209,14 @@ public sealed class Tls12CbcRecordTests
 
     private static byte[] Mac(byte[] content) =>
         HMACSHA1.HashData(MacKey, (byte[])[.. Tls12Records.AdditionalData(0, TlsContentType.ApplicationData, TlsProtocolVersion.Tls12, content.Length), .. content]);
+
+    private static TlsDecodeResult<byte[]> Open(Tls12RecordCipher cipher, byte[] key, byte[] content, byte[] mac, byte[] padding)
+    {
+        using Aes aes = Aes.Create();
+        aes.Key = key;
+        byte[] fragment = [.. Iv, .. aes.EncryptCbc((byte[])[.. content, .. mac, .. padding], Iv, PaddingMode.None)];
+        return cipher.Open(0, TlsContentType.ApplicationData, TlsProtocolVersion.Tls12, fragment);
+    }
 
     private static byte[] EncryptWithPadding(byte[] content, byte[] mac, byte[] padding)
     {

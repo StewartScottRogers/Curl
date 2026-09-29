@@ -89,7 +89,8 @@ the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173).
   ARIA-GCM with the sequence number as the explicit nonce, ChaCha20-Poly1305 with the
   XORed nonce). TLS 1.0 CBC writes an empty record before application data unless
   `insertEmptyFragment` is off (`--ssl-allow-beast`). CBC padding is checked with masks
-  (`Tls12CbcPadding`); the Lucky Thirteen hash-time residual is BL-795's. AES-CCM and RC4
+  (`Tls12CbcPadding`) and the MAC with `Tls12RecordMac.VerifyInFixedBlocks`, which hashes
+  the same number of blocks whatever the padding (`FixedBlockHmac`, BL-795). AES-CCM and RC4
   records are BL-796's.
 - `Tls12ClientHandshake`: the I/O-free TLS 1.2, 1.1 and 1.0 client state machine.
   `Start()` returns the ClientHello; `ReceiveHandshake(bytes)` takes handshake record

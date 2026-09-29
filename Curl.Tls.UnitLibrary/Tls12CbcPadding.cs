@@ -50,7 +50,7 @@ internal static class Tls12CbcPadding
     private static uint GreaterOrEqualMask(uint left, uint right) => ((left - right) >> 31) - 1;
 
     /// <summary>All ones when <paramref name="left" /> and <paramref name="right" /> differ.</summary>
-    private static uint NotEqualMask(uint left, uint right)
+    internal static uint NotEqualMask(uint left, uint right)
     {
         uint difference = left ^ right;
         return (uint)((int)(difference | (0u - difference)) >> 31);

@@ -48,10 +48,15 @@ up; BoringSSL and Go send the sequence number.
   decrypted bytes (every one of the last 256 bytes is read and folded into a mask, as
   OpenSSL's `tls1_cbc_remove_padding_and_mac` does), always computes and compares the
   MAC in fixed time, and branches once, on both answers together. Bad padding, a bad MAC
-  and a malformed length are all `bad_record_mac`. The MAC is computed over the content
-  the padding implies, so its hashing time still follows the padding length by up to a
-  few hash blocks: the Lucky Thirteen residual Go's `crypto/tls` also has. BL-795 removes
-  it with a fixed-block HMAC over hand-built SHA compression functions.
+  and a malformed length are all `bad_record_mac`. Since BL-795 the MAC is computed as
+  OpenSSL's `ssl3_cbc_digest_record` does: `Curl.Cryptography`'s `FixedBlockHmac` runs
+  hand-built SHA-1, SHA-256 and SHA-384 compression functions over the same number of
+  blocks whatever the padding length, writing the `0x80` byte and the bit length with
+  masks and picking the state after the true last block with a mask, and
+  `Tls12RecordMac.VerifyInFixedBlocks` copies the received MAC out of the record with
+  masks over every offset it could start at. The Lucky Thirteen residual the first
+  version had (the hashing time following the padding length by a few blocks, as in
+  Go's `crypto/tls`) is gone.
 - Encrypt-then-MAC (RFC 7366) checks the MAC first, over the IV and ciphertext, and only
   then decrypts, so no padding oracle exists there.
 - GCM's explicit nonce is the record's sequence number.
@@ -60,9 +65,10 @@ up; BoringSSL and Go send the sequence number.
 
 - TLS 1.0 CBC connections through the hand-built client send the same record sequence
   as curl's LibreSSL and OpenSSL builds, and `--ssl-allow-beast` changes it the same way.
-- A padding oracle through error codes or through a branch is closed; a remote timing
-  attacker who can measure a few hash blocks' difference across many connections keeps
-  the Lucky Thirteen residual until BL-795 lands. CBC suites are only reachable when a
+- A padding oracle through error codes, through a branch, or through the MAC's hashing
+  time is closed: opening a MAC-then-encrypt record takes the same number of
+  compression-function calls whatever its padding. The price is that the last 256 bytes
+  or so of each record are hashed byte by byte with masks. CBC suites are only reachable when a
   server prefers them over every AEAD suite Curl offers.
 - The GCM nonce is deterministic, so a test can pin a record byte for byte.
 
