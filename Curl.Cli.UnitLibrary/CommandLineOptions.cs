@@ -866,6 +866,20 @@ public sealed class CommandLineOptions
     public bool TcpKeepAlive { get; internal set; } = true;
 
     /// <summary>
+    /// The last <c>--keepalive-time</c>: the idle seconds before the first TCP keepalive probe and between
+    /// probes. Zero, the default and what <c>--keepalive-time 0</c> gives, means curl sets no time of its own,
+    /// so libcurl's 60 seconds apply.
+    /// </summary>
+    public long TcpKeepAliveSeconds { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--keepalive-cnt</c>: how many unanswered TCP keepalive probes end the connection. Zero, the
+    /// default and what <c>--keepalive-cnt 0</c> gives, means curl sets no count of its own, so libcurl's 9
+    /// apply.
+    /// </summary>
+    public long TcpKeepAliveProbeCount { get; internal set; }
+
+    /// <summary>
     /// <see langword="false"/> when the last of <c>--styled-output</c> and <c>--no-styled-output</c> was
     /// <c>--no-styled-output</c>: never style header output. <see langword="true"/> otherwise, as curl styles
     /// headers written to a terminal by default. Parsed only until BL-736 styles header output.

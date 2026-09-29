@@ -187,6 +187,8 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("sessionid", null, (options, on) => options.ReuseSessionIds = on),
         CommandLineOption.NegatableFlag("tcp-nodelay", null, (options, on) => options.TcpNoDelay = on),
         CommandLineOption.NegatableFlag("keepalive", null, (options, on) => options.TcpKeepAlive = on),
+        CommandLineOption.Value("keepalive-time", null, SetKeepAliveTime),
+        CommandLineOption.Value("keepalive-cnt", null, SetKeepAliveProbeCount),
         CommandLineOption.NegatableFlag("styled-output", null, (options, on) => options.StyledOutput = on),
         CommandLineOption.Value("cacert", null, SettingExistingFile("--cacert", (options, file) => options.CaCertificateFile = file)),
         CommandLineOption.FileName("capath", null, (options, directory) => options.CaCertificateDirectory = directory),
@@ -1189,6 +1191,36 @@ public static class CommandLineOptionTable
         if (refusal is null)
         {
             options.MaxFileSize = size;
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Records <c>--keepalive-time</c>: whole seconds, zero or more, at most the platform's C <c>LONG_MAX</c>,
+    /// as curl 8.21.0 reads it (measured 2026-09-29, BL-645 Notes). Zero keeps libcurl's default.
+    /// </summary>
+    private static CommandLineRefusal? SetKeepAliveTime(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long seconds);
+        if (refusal is null)
+        {
+            options.TcpKeepAliveSeconds = seconds;
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Records <c>--keepalive-cnt</c>: a probe count, zero or more, at most the platform's C <c>LONG_MAX</c>,
+    /// as curl 8.21.0 reads it (measured 2026-09-29, BL-645 Notes). Zero keeps libcurl's default.
+    /// </summary>
+    private static CommandLineRefusal? SetKeepAliveProbeCount(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long count);
+        if (refusal is null)
+        {
+            options.TcpKeepAliveProbeCount = count;
         }
 
         return refusal;
