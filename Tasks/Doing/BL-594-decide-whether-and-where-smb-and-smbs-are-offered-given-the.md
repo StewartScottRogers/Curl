@@ -34,3 +34,4 @@ An ADR decides how Curl offers `smb://` and `smbs://` on Windows, Linux and macO
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
