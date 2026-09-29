@@ -33,3 +33,4 @@ When the control connection is IPv6 and `EPSV` is answered with anything but `22
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
