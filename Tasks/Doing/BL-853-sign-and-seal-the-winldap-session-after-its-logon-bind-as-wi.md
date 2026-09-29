@@ -37,3 +37,4 @@ After the WinLDAP dialect's logon bind (`GSS-SPNEGO` or Sicily NTLM, BL-830) suc
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
