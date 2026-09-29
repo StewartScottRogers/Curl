@@ -31,3 +31,4 @@ An HPACK encoder and decoder in `Curl.Http2.UnitLibrary` implement RFC 7541 (sta
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
