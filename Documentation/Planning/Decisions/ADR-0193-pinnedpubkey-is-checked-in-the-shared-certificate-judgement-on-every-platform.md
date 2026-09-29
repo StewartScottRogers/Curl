@@ -50,7 +50,7 @@ verification is judged before the pin.
   then closes; the transfer's exit code and message are the same.
 - The message is `TlsFailureMessages.PinnedPublicKeyMismatch`, the same for both builds.
 - The `-v` lines (`public key hash: sha256//...`, the mismatch lines, and their order, which
-  differs by build) are BL-876's.
+  differs by build) are BL-877's.
 
 ## Alternatives considered
 
@@ -62,4 +62,4 @@ verification is judged before the pin.
 ## Consequences
 
 - A pinned transfer fails with exit 90 exactly where curl does, on Windows, Linux and macOS.
-- `-v` output for a pin is incomplete until BL-876.
+- `-v` output for a pin is incomplete until BL-877.

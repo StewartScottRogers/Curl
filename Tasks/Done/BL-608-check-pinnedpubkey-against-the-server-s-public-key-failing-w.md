@@ -46,7 +46,7 @@ After the TLS handshake, the server certificate's SubjectPublicKeyInfo is compar
     pin both builds on every platform through the providers' build flag.
   - `-v` differs: Schannel prints `*  public key hash: sha256//<b64>` (hash pins only) and, on a
     mismatch, `* SSL: public key does not match pinned public key` twice; OpenSSL prints it once,
-    after the certificate details. Left to follow-up BL-876.
+    after the certificate details. Left to follow-up BL-877.
 - Design (ADR-0193): the check lives in `ServerCertificateVerification.Judge`, shared by both TLS
   providers and the hand-built QUIC verifier, rather than after each provider's handshake; that
   kept both provider methods under the complexity limit and needs one implementation.

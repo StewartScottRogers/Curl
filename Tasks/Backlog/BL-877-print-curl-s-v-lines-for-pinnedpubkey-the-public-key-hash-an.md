@@ -1,5 +1,5 @@
 ---
-id: BL-876
+id: BL-877
 title: Print curl's -v lines for --pinnedpubkey: the public key hash and the mismatch
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-876 — Print curl's -v lines for --pinnedpubkey: the public key hash and the mismatch
+# BL-877 — Print curl's -v lines for --pinnedpubkey: the public key hash and the mismatch
 
 ## Goal
 
