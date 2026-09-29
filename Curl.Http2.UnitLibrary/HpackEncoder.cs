@@ -5,7 +5,7 @@ namespace Curl.Http2;
 /// <summary>
 /// Encodes header lists into HPACK header blocks (RFC 7541), choosing each field's
 /// representation as nghttp2's deflater does, so the bytes on the wire match curl's
-/// (ADR-0147). One encoder serves one connection's direction: its dynamic table carries
+/// (ADR-0148). One encoder serves one connection's direction: its dynamic table carries
 /// over from block to block, so blocks must be sent in the order they were encoded.
 /// </summary>
 /// <remarks>

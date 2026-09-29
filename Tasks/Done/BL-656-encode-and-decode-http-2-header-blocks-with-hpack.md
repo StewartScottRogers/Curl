@@ -30,9 +30,9 @@ An HPACK encoder and decoder in `Curl.Http2.UnitLibrary` implement RFC 7541 (sta
 
 - Built: `HeaderField`, `HpackEncoder`, `HpackDecoder`, public `HpackHuffman`, `HpackDecodingException` with `HpackDecodingError` (truncated block, integer overflow, invalid index, table size update too large / not at start / missing, invalid Huffman padding, EOS in data); internal `HpackPrimitives`, `HpackStaticTable`, `HpackDynamicTable`. 83 tests.
 - The Huffman table is stored as appendix B's code lengths only; the code is canonical, so the codes are derived. Tests pin spot codes (symbol 0 `0x1ff8`, EOS `0x3fffffff`, ...) and check the code is complete (Kraft sum 1).
-- BL-655's ADR-0141 does not say how the encoder picks representations, so ADR-0147 decides it: follow nghttp2's deflater. Measured with curl.se's Windows build (curl 8.18.0, nghttp2 1.68.0, from WinGet, since the reference Git-for-Windows curl has no HTTP/2) through `Record-CurlExchange.ps1 -Curl <that curl> -HoldOpenMilliseconds 1500` and `--http2-prior-knowledge`. The 90-byte HEADERS block it sent is pinned in `HpackEncoderTests.Encode_CurlsRequestHeaders_GivesTheBlockCurlSent`.
+- BL-655's ADR-0141 does not say how the encoder picks representations, so ADR-0148 decides it: follow nghttp2's deflater. Measured with curl.se's Windows build (curl 8.18.0, nghttp2 1.68.0, from WinGet, since the reference Git-for-Windows curl has no HTTP/2) through `Record-CurlExchange.ps1 -Curl <that curl> -HoldOpenMilliseconds 1500` and `--http2-prior-knowledge`. The 90-byte HEADERS block it sent is pinned in `HpackEncoderTests.Encode_CurlsRequestHeaders_GivesTheBlockCurlSent`.
 - Names and values are strings with one character per byte (Latin-1), which suits the HTTP/2 layer that sits on top.
-- `touches` now includes `Documentation/Planning/Decisions` for ADR-0147 and its index row. No task in Doing names it.
+- `touches` now includes `Documentation/Planning/Decisions` for ADR-0148 and its index row. No task in Doing names it.
 - `Measure-CodeQuality.ps1` throws before measuring because four empty test projects (Kerberos, Ldap, Rtsp, Smb) make `dotnet test` exit non-zero with nothing failed. Measured with `-SkipTestRun -ResultsDirectory` over a Http2-only coverage run instead (100% line, 100% branch, 0 failing members, worst CRAP 10). Filed BL-792 to fix the script.
 
 ## Log

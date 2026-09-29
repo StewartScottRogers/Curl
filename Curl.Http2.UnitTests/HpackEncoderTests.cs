@@ -4,7 +4,7 @@ namespace Curl.Http2;
 
 /// <summary>
 /// Pins <see cref="HpackEncoder" /> to RFC 7541 appendix C.4 and to the header block real
-/// curl sent, and checks each representation choice ADR-0147 takes from nghttp2.
+/// curl sent, and checks each representation choice ADR-0148 takes from nghttp2.
 /// </summary>
 [TestClass]
 public sealed class HpackEncoderTests

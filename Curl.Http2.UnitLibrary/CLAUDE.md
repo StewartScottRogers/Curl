@@ -9,7 +9,7 @@ decides what HTTP/2 does and when Curl speaks it.
 Namespace `Curl.Http2`. What is here so far: HPACK (BL-656) - `HpackEncoder` and
 `HpackDecoder` over `HeaderField` lists, the public `HpackHuffman` codec, and
 `HpackDecodingException` carrying an `HpackDecodingError`. The encoder chooses each
-field's representation as nghttp2's deflater does (ADR-0147). The frame layer, connection
+field's representation as nghttp2's deflater does (ADR-0148). The frame layer, connection
 preface and `SETTINGS` come with BL-657, and a request and response on a stream with
 BL-658.
 
