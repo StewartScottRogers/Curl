@@ -32,12 +32,12 @@ The QUIC client's slow start leaves early on a rising RTT as HyStart++ (RFC 9406
 ## Notes
 
 - Filed by BL-725, which left both out to stay one task.
-- Read ngtcp2's `lib/ngtcp2_cc.c` (main): `ngtcp2_cc_cubic_cc_on_ack_recv` and `ngtcp2_cc_reno_cc_on_pkt_acked`. Constants and ordering (grow, then round start, then sample, then CSS check) follow it; decisions in ADR-0196.
+- Read ngtcp2's `lib/ngtcp2_cc.c` (main): `ngtcp2_cc_cubic_cc_on_ack_recv` and `ngtcp2_cc_reno_cc_on_pkt_acked`. Constants and ordering (grow, then round start, then sample, then CSS check) follow it; decisions in ADR-0198.
 - Rounds are tracked by send time (a packet sent at or after the round started ends it), since the library has no rate sampler; one `OnPacketsAcknowledged` call is one acknowledgement and one `LatestRtt` sample, as ngtcp2 counts per ACK. The abstract `IncreaseWindow` now takes the acknowledgement's packets.
 - HyStart++ runs only in the first slow start (RFC 9406 section 4.2's SHOULD); slow start after persistent congestion is plain.
 - Application-limited is decided per flush in `QuicClientHandshake.Flush`: fewer bytes in flight sent than the allowance means the application or flow control ran out first. Probes and CONNECTION_CLOSE (window ignored) are never marked. CUBIC moves its epoch on by the time spent limited, as ngtcp2's `app_limited_duration`.
 - `Receive_InMemoryServer_...` now pins that the handshake leaves the 12000-byte window unchanged: none of its flights fills the window.
-- Touches widened to `Documentation/Planning/Decisions` for ADR-0196 and its README row; no task in Doing names it.
+- Touches widened to `Documentation/Planning/Decisions` for ADR-0198 and its README row; no task in Doing names it.
 - Results: Curl.Quic.UnitTests 399 pass (17 new); Measure-CodeQuality 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log
