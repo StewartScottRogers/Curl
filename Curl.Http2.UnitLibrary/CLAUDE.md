@@ -16,7 +16,8 @@ The frame layer (BL-657): `Http2FrameCodec` reads and writes frames on a stream,
 validates each payload. `Http2Connection` drives one client connection over a stream the
 caller owns: `SendPrefaceAsync` sends the preface, SETTINGS and connection WINDOW_UPDATE
 curl sends (measured, pinned in `Http2ConnectionTests`), `OpenStream` allocates odd
-stream identifiers, `WriteHeadersAsync` and `WriteDataAsync` split into frames within the
+stream identifiers (`OpenUpgradedStream` opens an h2c upgrade's stream 1 half closed by the
+client, BL-866), `WriteHeadersAsync` and `WriteDataAsync` split into frames within the
 peer's frame size and flow-control windows, and `ReadStreamFrameAsync` returns DATA and
 whole header blocks while answering SETTINGS and PING and applying WINDOW_UPDATE itself;
 `ReadFrameAsync` handles exactly one frame, so a sender waiting for window can take in

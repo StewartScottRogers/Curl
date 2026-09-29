@@ -78,6 +78,21 @@ public sealed class Http2ConnectionTests
     }
 
     [TestMethod]
+    public async Task OpenUpgradedStream_PeerEndsTheStream_ForgetsItSoTheNextStreamFitsTheConcurrencyLimit()
+    {
+        var (connection, _) = Connect(
+            CreateSettings([new(Http2SettingIdentifier.MaxConcurrentStreams, 1)]),
+            CreateHeaders(1, new byte[] { 0x88 }, isEndStream: true, isEndHeaders: true));
+
+        Assert.AreEqual(1, connection.OpenUpgradedStream());
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => connection.WriteHeadersAsync(1, new byte[] { 0x82 }, isEndStream: true, None));
+        _ = await connection.ReadStreamFrameAsync(None);
+
+        Assert.AreEqual(0, connection.OpenStreamCount);
+        Assert.AreEqual(3, connection.OpenStream());
+    }
+
+    [TestMethod]
     public async Task WriteHeadersAsync_SmallBlock_SendsOneHeadersFrame()
     {
         var (connection, peer) = Connect();

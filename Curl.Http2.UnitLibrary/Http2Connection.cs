@@ -166,6 +166,24 @@ public sealed class Http2Connection
     }
 
     /// <summary>
+    /// Opens the stream an HTTP/1.1 request upgraded to h2c becomes: the next identifier, 1 on
+    /// a new connection, half closed by this endpoint, since the request went out as HTTP/1.1
+    /// (RFC 7540 section 3.2). The stream is
+    /// forgotten once the peer ends it, so it no longer counts against the peer's
+    /// SETTINGS_MAX_CONCURRENT_STREAMS.
+    /// </summary>
+    /// <returns>The stream identifier.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// The stream cannot be opened, for the reasons <see cref="OpenStream" /> gives.
+    /// </exception>
+    public int OpenUpgradedStream()
+    {
+        var streamId = OpenStream();
+        streams[streamId].IsLocalEnded = true;
+        return streamId;
+    }
+
+    /// <summary>
     /// Returns how many DATA bytes may be sent on a stream now: the smaller of its window and
     /// the connection's.
     /// </summary>
