@@ -24,6 +24,10 @@ namespace Curl.Protocol.Http;
 /// <param name="cookieStore">
 /// The cookies to send and store, or <see langword="null" /> when cookies are off.
 /// </param>
+/// <param name="proxyAuthSchemes">
+/// The schemes a forward proxy may be answered with: the <c>--proxy-*</c> auth switches' pick,
+/// or <see cref="HttpAuthSchemes.Basic" />, curl's default.
+/// </param>
 /// <remarks>
 /// <para>
 /// The port is the URL's, or 80 for <c>http</c> and 443 for <c>https</c> when it names none.
@@ -90,6 +94,14 @@ namespace Curl.Protocol.Http;
 /// (<see cref="HttpConnectionPersistence" />), in which case on a new one. A 401 that is not
 /// retried is the result, exit 0, or exit 22 under <c>-f</c>; the 401 a retry answers never
 /// fails the transfer. Measured on curl 8.21.0 (BL-181 Notes, ADR-0034).
+/// </para>
+/// <para>
+/// Through a forward proxy a 407 is answered the same way, apart from the 401: once, when the
+/// request that drew it sent no <c>Proxy-Authorization</c> and the authenticator answers its
+/// <c>Proxy-Authenticate</c> challenges for the proxy's credential with the scheme set the
+/// handler was given (the <c>--proxy-*</c> auth switches' pick). Each retry keeps the other
+/// header as it was, so a 407 and a 401 can each be answered in the same transfer, in either
+/// order. Measured on curl 8.21.0 (BL-603 Notes, ADR-0187).
 /// </para>
 /// <para>
 /// A 417 that arrives while the body waits for <c>100 Continue</c> is answered, unless
@@ -185,7 +197,8 @@ namespace Curl.Protocol.Http;
 public sealed class HttpProtocolHandler(
     IConnector connector,
     IHttpAuthenticator authenticator,
-    ICookieStore? cookieStore = null) : IProtocolHandler
+    ICookieStore? cookieStore = null,
+    HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic) : IProtocolHandler
 {
     private static readonly string[] Schemes = ["http", "https"];
 
@@ -204,6 +217,12 @@ public sealed class HttpProtocolHandler(
     /// Gets the cookie store the handler was given, or <see langword="null" /> when cookies are off.
     /// </summary>
     internal ICookieStore? CookieStore { get; } = cookieStore;
+
+    /// <summary>
+    /// Gets the schemes a forward proxy may be answered with: <see cref="HttpAuthSchemes.Basic" />,
+    /// curl's default, unless the handler was given the <c>--proxy-*</c> auth switches' pick.
+    /// </summary>
+    internal HttpAuthSchemes ProxyAuthSchemes { get; } = proxyAuthSchemes;
 
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException"><paramref name="context" /> is <see langword="null" />.</exception>
@@ -226,6 +245,7 @@ public sealed class HttpProtocolHandler(
             options.AuthSchemes,
             IsProxy: false);
         ProxyEndpoint? forwardProxy = ForwardProxyOf(context.Url, options);
+        HttpAuthRequest? proxyAuthRequest = forwardProxy is null ? null : ProxyAuthRequestOf(authRequest, forwardProxy);
         using HttpTransferDeadline deadline = new(context);
         string? authorization = await Authenticator.CreateAuthorizationAsync(authRequest, [], context.CancellationToken).ConfigureAwait(false);
         HttpRequestPlan plan = new(context, options, framing, authRequest, authorization)
@@ -234,7 +254,8 @@ public sealed class HttpProtocolHandler(
             Deadline = deadline,
             Progress = new HttpTransferProgress(context.Progress),
             ForwardProxy = forwardProxy,
-            ProxyAuthorization = forwardProxy is null ? null : ProxyAuthorizationFor(authRequest, forwardProxy),
+            ProxyAuthRequest = proxyAuthRequest,
+            ProxyAuthorization = proxyAuthRequest is null ? null : Authenticator.CreateAuthorization(proxyAuthRequest, []),
             RedirectsFollowed = options.RedirectsFollowed,
         };
         return await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
@@ -276,13 +297,14 @@ public sealed class HttpProtocolHandler(
             : null;
 
     /// <summary>
-    /// Asks the authenticator for the pre-emptive <c>Proxy-Authorization</c> value: Basic, curl's
-    /// default proxy scheme, for the proxy's credential, with no bearer token.
+    /// Makes the request the authenticator is asked about for the forward proxy: the origin's
+    /// method, URL and request target (Digest's <c>uri</c> is the origin form, as curl 8.21.0
+    /// sends it), the proxy's credential, no bearer token, and <see cref="ProxyAuthSchemes" />.
+    /// Answered with no challenges it gives the pre-emptive <c>Proxy-Authorization</c>, which
+    /// only Basic sends.
     /// </summary>
-    private string? ProxyAuthorizationFor(HttpAuthRequest originRequest, ProxyEndpoint proxy) =>
-        Authenticator.CreateAuthorization(
-            originRequest with { Credential = proxy.Credential, BearerToken = null, AllowedSchemes = HttpAuthSchemes.Basic, IsProxy = true },
-            []);
+    private HttpAuthRequest ProxyAuthRequestOf(HttpAuthRequest originRequest, ProxyEndpoint proxy) =>
+        originRequest with { Credential = proxy.Credential, BearerToken = null, AllowedSchemes = ProxyAuthSchemes, IsProxy = true };
 
     /// <summary>
     /// Opens a connection, or takes a pooled one, and sends <paramref name="plan" /> on it, then
@@ -1041,7 +1063,8 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Decides whether a response is answered with one more request, and which: the same
-    /// request with the <c>Authorization</c> value <see cref="RetryAuthorizationAsync" /> gives, or
+    /// request with the <c>Proxy-Authorization</c> value <see cref="RetryProxyAuthorizationAsync" />
+    /// gives, or with the <c>Authorization</c> value <see cref="RetryAuthorizationAsync" /> gives, or
     /// else, for a 417 <see cref="RetriesWithoutExpect" /> accepts, the same request without
     /// <c>Expect</c> and with the body <paramref name="upload" /> rewinds; <see langword="null" />
     /// when the response is the result. A resend after a 417 that arrived while the body was
@@ -1053,6 +1076,11 @@ public sealed class HttpProtocolHandler(
     /// </exception>
     private async ValueTask<HttpRequestPlan?> RetryOfAsync(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent, HttpRequestBodyWriter upload, CancellationToken cancellationToken)
     {
+        if (await RetryProxyAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } proxyAuthorization)
+        {
+            return plan.WithProxyAuthorization(proxyAuthorization);
+        }
+
         if (await RetryAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorization)
         {
             return plan.WithAuthorization(authorization);
@@ -1107,9 +1135,35 @@ public sealed class HttpProtocolHandler(
     /// (ADR-0181).
     /// </summary>
     /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
-    private async ValueTask<string?> RetryAuthorizationAsync(HttpRequestPlan plan, HttpResponseHead head, CancellationToken cancellationToken)
+    private ValueTask<string?> RetryAuthorizationAsync(HttpRequestPlan plan, HttpResponseHead head, CancellationToken cancellationToken) =>
+        AnswerChallengesAsync(
+            plan.AuthRequest,
+            plan.Authorization,
+            plan.AuthorizationAnswersChallenge,
+            MayRetry(plan, head, 401) ? ValuesOf(head, "WWW-Authenticate") : [],
+            cancellationToken);
+
+    /// <summary>
+    /// Decides whether a response is answered with one more request, and with what
+    /// <c>Proxy-Authorization</c> value: only a 407 from a forward proxy, on the same terms as
+    /// <see cref="RetryAuthorizationAsync" /> sets for a 401, with the response's
+    /// <c>Proxy-Authenticate</c> challenges and the proxy's request (ADR-0187).
+    /// </summary>
+    /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
+    private ValueTask<string?> RetryProxyAuthorizationAsync(HttpRequestPlan plan, HttpResponseHead head, CancellationToken cancellationToken) =>
+        plan.ProxyAuthRequest is { } proxyRequest && MayRetry(plan, head, 407)
+            ? AnswerChallengesAsync(proxyRequest, plan.ProxyAuthorization, plan.ProxyAuthorizationAnswersChallenge, ValuesOf(head, "Proxy-Authenticate"), cancellationToken)
+            : ValueTask.FromResult<string?>(null);
+
+    /// <summary>
+    /// Asks the authenticator to answer <paramref name="challenges" /> for
+    /// <paramref name="request" />: nothing when there are none; through
+    /// <see cref="IHttpAuthenticator.ContinueAuthorizationAsync" /> when the request that drew
+    /// them already sent <paramref name="sent" />; and else afresh.
+    /// </summary>
+    /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
+    private async ValueTask<string?> AnswerChallengesAsync(HttpAuthRequest request, string? sent, bool sentAnswersChallenge, string[] challenges, CancellationToken cancellationToken)
     {
-        string[] challenges = MayRetry(plan, head) ? ValuesOf(head, "WWW-Authenticate") : [];
         if (challenges.Length == 0)
         {
             return null;
@@ -1117,9 +1171,9 @@ public sealed class HttpProtocolHandler(
 
         try
         {
-            return plan.Authorization is { } sent
-                ? await Authenticator.ContinueAuthorizationAsync(plan.AuthRequest, sent, !plan.AuthorizationAnswersChallenge, challenges, cancellationToken).ConfigureAwait(false)
-                : await Authenticator.CreateAuthorizationAsync(plan.AuthRequest, challenges, cancellationToken).ConfigureAwait(false);
+            return sent is not null
+                ? await Authenticator.ContinueAuthorizationAsync(request, sent, !sentAnswersChallenge, challenges, cancellationToken).ConfigureAwait(false)
+                : await Authenticator.CreateAuthorizationAsync(request, challenges, cancellationToken).ConfigureAwait(false);
         }
         catch (HttpAuthenticationFailedException failure)
         {
@@ -1128,11 +1182,11 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Decides whether <paramref name="head" /> may be answered with a retry at all: a 401 to
-    /// a request whose body is not a stream.
+    /// Decides whether <paramref name="head" /> may be answered with a retry at all: a
+    /// <paramref name="statusCode" /> response to a request whose body is not a stream.
     /// </summary>
-    private static bool MayRetry(HttpRequestPlan plan, HttpResponseHead head) =>
-        head.StatusLine.StatusCode == 401 && plan.Framing.Body is not StreamBody;
+    private static bool MayRetry(HttpRequestPlan plan, HttpResponseHead head, int statusCode) =>
+        head.StatusLine.StatusCode == statusCode && plan.Framing.Body is not StreamBody;
 
     /// <summary>
     /// Gets the values of every <paramref name="name" /> header of <paramref name="head" />,
@@ -1447,10 +1501,22 @@ public sealed class HttpProtocolHandler(
         public ProxyEndpoint? ForwardProxy { get; init; }
 
         /// <summary>
+        /// Gets the request as the authenticator is asked about it for <see cref="ForwardProxy" />,
+        /// or <see langword="null" /> when there is none.
+        /// </summary>
+        public HttpAuthRequest? ProxyAuthRequest { get; init; }
+
+        /// <summary>
         /// Gets the <c>Proxy-Authorization</c> value to send, or <see langword="null" /> to
         /// send none.
         /// </summary>
         public string? ProxyAuthorization { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether <see cref="ProxyAuthorization" /> answers a 407's
+        /// challenge; <see langword="false" /> for the value made before any challenge.
+        /// </summary>
+        public bool ProxyAuthorizationAnswersChallenge { get; init; }
 
         /// <summary>
         /// Gets a value indicating whether the request is being sent again on a fresh connection
@@ -1482,6 +1548,15 @@ public sealed class HttpProtocolHandler(
             With(Framing, authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true);
 
         /// <summary>
+        /// Makes the same request sent with <paramref name="proxyAuthorization" /> instead, in
+        /// answer to a 407's challenge, keeping its <c>Authorization</c> value.
+        /// </summary>
+        /// <param name="proxyAuthorization">The <c>Proxy-Authorization</c> value the retry is sent with.</param>
+        /// <returns>The retry's plan.</returns>
+        public HttpRequestPlan WithProxyAuthorization(string proxyAuthorization) =>
+            With(Framing, Authorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, proxyAuthorization, proxyAuthorizationAnswersChallenge: true);
+
+        /// <summary>
         /// Makes the same request without curl's own <c>Expect</c> and without the wait for
         /// <c>100 Continue</c> (<see cref="HttpRequestFraming.WithoutExpect" />), sending
         /// <paramref name="body" />.
@@ -1510,13 +1585,25 @@ public sealed class HttpProtocolHandler(
             With(framing, authorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge);
 
         private HttpRequestPlan With(HttpRequestFraming framing, string? authorization, bool sentOnFreshConnection, int redirectsFollowed, bool authorizationAnswersChallenge) =>
+            With(framing, authorization, sentOnFreshConnection, redirectsFollowed, authorizationAnswersChallenge, ProxyAuthorization, ProxyAuthorizationAnswersChallenge);
+
+        private HttpRequestPlan With(
+            HttpRequestFraming framing,
+            string? authorization,
+            bool sentOnFreshConnection,
+            int redirectsFollowed,
+            bool authorizationAnswersChallenge,
+            string? proxyAuthorization,
+            bool proxyAuthorizationAnswersChallenge) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
                 Started = Started,
                 Deadline = Deadline,
                 Progress = Progress,
                 ForwardProxy = ForwardProxy,
-                ProxyAuthorization = ProxyAuthorization,
+                ProxyAuthRequest = ProxyAuthRequest,
+                ProxyAuthorization = proxyAuthorization,
+                ProxyAuthorizationAnswersChallenge = proxyAuthorizationAnswersChallenge,
                 SentOnFreshConnection = sentOnFreshConnection,
                 RedirectsFollowed = redirectsFollowed,
                 AuthorizationAnswersChallenge = authorizationAnswersChallenge,
