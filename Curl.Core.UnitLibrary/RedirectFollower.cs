@@ -403,7 +403,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             MaxTime = first.MaxTime,
             OperationStarted = operationStarted,
             Proxy = hopProxy.Proxy,
-            Http = HopHttp(previousUrl, http, hopProxy.ForwardProxy, bodyDropped, sendCredentials),
+            Http = HopHttp(previousUrl, http, hopProxy.ForwardProxy, bodyDropped, sendCredentials) with { AltSvcRoute = IsSameOrigin(first.Url, url) ? http.AltSvcRoute : null },
             TimeProvider = first.TimeProvider,
             CancellationToken = first.CancellationToken,
             Progress = first.Progress,

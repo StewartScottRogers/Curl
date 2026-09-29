@@ -505,6 +505,24 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow("http://127.0.0.1:18203/next", true)]
+    [DataRow("http://localhost:18203/next", false)]
+    [DataRow("http://127.0.0.1:18204/next", false)]
+    [DataRow("https://127.0.0.1:18203/next", false)]
+    public async Task FollowAsync_AltSvcRoute_IsKeptOnlyForAHopToTheSameOrigin(string target, bool kept)
+    {
+        // The route was looked up for the first URL's origin (BL-623); another origin never dials it.
+        AltSvcRoute route = new("h1", new AltSvcAlternative("h1", "127.0.0.1", 18443));
+        ScriptedHandler handler = new(Redirect(302, target), Redirect(302, target), Ok(200, 0));
+
+        await Follow(handler, Context(Location() with { AltSvcRoute = route }));
+
+        Assert.AreSame(route, handler.Contexts[0].Http!.AltSvcRoute);
+        Assert.AreEqual(kept ? route : null, handler.Contexts[1].Http!.AltSvcRoute);
+        Assert.AreEqual(kept ? route : null, handler.Contexts[2].Http!.AltSvcRoute);
+    }
+
+    [TestMethod]
     [DataRow("http://127.0.0.1:18203/next", false)]
     [DataRow("HTTP://127.0.0.1:80/", false)]
     [DataRow("http://localhost:18203/next", true)]
