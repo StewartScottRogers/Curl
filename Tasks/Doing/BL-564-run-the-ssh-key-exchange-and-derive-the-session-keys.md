@@ -34,3 +34,4 @@ The transport runs every BCL-backed key exchange BL-560's ADR offers (ECDH on NI
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
