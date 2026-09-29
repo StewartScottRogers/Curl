@@ -17,7 +17,7 @@ TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
 the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173), TLS 1.3
 certificate decompression (BL-786, ADR-0199), TLS 1.3 and TLS 1.2 offered in one
 ClientHello (BL-821, ADR-0205), post-handshake client authentication (BL-880),
-TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0230).
+TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -174,7 +174,7 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0230).
   `supported_versions` continues in `Tls12ClientHandshake.StartFrom(sent)` (either
   downgrade sentinel is `illegal_parameter`), anything else in the TLS 1.3 client. It returns
   a `TlsConnectResult` with a `Tls13ClientStream` or a `Tls12ClientStream`, or the failure.
-- Encrypted Client Hello (RFC 9849, ADR-0230): `EchConfigList.Decode` reads an
+- Encrypted Client Hello (RFC 9849, ADR-0233): `EchConfigList.Decode` reads an
   `ECHConfigList` (malformed is `decode_error`, other versions skipped) into `EchConfig`s
   with their `EchCipherSuite`s; `SupportedConfig` is the first one HPKE can seal to.
   With `Tls13ClientSettings.EncryptedClientHelloConfigs` holding one (and
