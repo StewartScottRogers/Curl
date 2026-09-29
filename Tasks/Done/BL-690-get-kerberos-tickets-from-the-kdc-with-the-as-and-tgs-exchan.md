@@ -29,7 +29,7 @@ completed: 2026-09-28
 
 ## Notes
 
-- Plan (ADR-0164, decided by Claude under Stewart's delegation): `KerberosKdcClient` has two
+- Plan (ADR-0168, decided by Claude under Stewart's delegation): `KerberosKdcClient` has two
   `GetServiceTicketAsync` entry points, one per credential source. A `CredentialCache` gives its own
   live service ticket, else a TGS exchange with its live `krbtgt/REALM@REALM`, else `NoCredentials`
   (MIT's `gss_init_sec_context`). A `KerberosPasswordCredential` gives an AS exchange then a TGS
@@ -49,7 +49,7 @@ completed: 2026-09-28
 - Tests: `FakeKdc` is an in-memory KDC built from BL-686/BL-687 with fixed keys (`FakeKdcStream` its
   TCP side). 50 new tests; `Measure-CodeQuality.ps1 -Library Curl.Kerberos.UnitLibrary` reports 100%
   line, 100% branch, 0 failing members, worst CRAP 10.
-- Follow-ups filed: BL-822 (cross-realm referrals), BL-823 (MS-KKDCP), BL-824 (enctype names from
+- Follow-ups filed: BL-826 (cross-realm referrals), BL-827 (MS-KKDCP), BL-828 (enctype names from
   `krb5.conf`), BL-825 (store tickets back in the cache).
 
 ## Log

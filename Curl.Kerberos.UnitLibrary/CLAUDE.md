@@ -33,7 +33,7 @@ credential cache, by a TGS exchange with the cache's ticket-granting ticket, or 
 `KerberosPasswordCredential` by an AS exchange with `PA-ENC-TIMESTAMP` and then a TGS
 exchange, over the injected `IKerberosKdcTransport` (`KerberosKdcSender` picks UDP or
 TCP and frames TCP); every refusal is a `KerberosKdcException` with a `KerberosKdcError`
-(BL-690, ADR-0164). The GSS-API mechanism lands under its own task.
+(BL-690, ADR-0168). The GSS-API mechanism lands under its own task.
 
 ## Rules
 

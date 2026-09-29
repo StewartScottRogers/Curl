@@ -1,5 +1,5 @@
 ---
-id: BL-823
+id: BL-827
 title: Reach a Kerberos KDC through an MS-KKDCP HTTPS proxy
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-823 — Reach a Kerberos KDC through an MS-KKDCP HTTPS proxy
+# BL-827 — Reach a Kerberos KDC through an MS-KKDCP HTTPS proxy
 
 ## Goal
 
@@ -19,7 +19,7 @@ completed:
 ## Context
 
 - Follow-up from BL-690.
-- ADR-0164 skips `https://` KDCs; `KerberosKdcLocator` already parses them (ADR-0160).
+- ADR-0168 skips `https://` KDCs; `KerberosKdcLocator` already parses them (ADR-0160).
 - MS-KKDCP; MIT `src/lib/krb5/os/sendto_kdc.c` (HTTPS transport). The HTTPS exchange needs its own injected seam, not a socket in this library.
 
 ## Acceptance criteria

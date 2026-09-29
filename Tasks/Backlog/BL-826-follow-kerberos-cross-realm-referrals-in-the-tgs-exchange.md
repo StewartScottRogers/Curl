@@ -1,5 +1,5 @@
 ---
-id: BL-822
+id: BL-826
 title: Follow Kerberos cross-realm referrals in the TGS exchange
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-822 — Follow Kerberos cross-realm referrals in the TGS exchange
+# BL-826 — Follow Kerberos cross-realm referrals in the TGS exchange
 
 ## Goal
 
@@ -19,7 +19,7 @@ completed:
 ## Context
 
 - Follow-up from BL-690.
-- BL-690 and ADR-0164 refuse a TGS-REP naming a server other than the one asked for (`UnexpectedReply`).
+- BL-690 and ADR-0168 refuse a TGS-REP naming a server other than the one asked for (`UnexpectedReply`).
 - RFC 6806 section 8 (referrals), MIT `src/lib/krb5/krb/get_creds.c` and `gc_via_tkt.c`; a limit on referral hops as MIT's (KRB5_REFERRAL_MAXHOPS).
 
 ## Acceptance criteria

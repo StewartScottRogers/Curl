@@ -8,7 +8,7 @@ namespace Curl.Kerberos;
 /// <see cref="KerberosKdcTransport.UdpOrTcp" /> KDC gets UDP when the request is no longer
 /// than <see cref="KerberosConfiguration.UdpPreferenceLimit" /> and TCP otherwise; a UDP
 /// reply of <c>KRB_ERR_RESPONSE_TOO_BIG</c> is asked again of the same KDC over TCP. HTTPS
-/// (MS-KKDCP) KDCs are skipped (ADR-0164).
+/// (MS-KKDCP) KDCs are skipped (ADR-0168).
 /// </summary>
 /// <param name="configuration">The parsed <c>krb5.conf</c>.</param>
 /// <param name="locator">Finds the realm's KDCs.</param>

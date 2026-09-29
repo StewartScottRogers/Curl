@@ -5,7 +5,7 @@ using System.Text;
 namespace Curl.Kerberos;
 
 /// <summary>
-/// Gets tickets from the KDC (RFC 4120 sections 3.1 and 3.3, ADR-0164): a service ticket
+/// Gets tickets from the KDC (RFC 4120 sections 3.1 and 3.3, ADR-0168): a service ticket
 /// from the credential cache when it holds a live one, otherwise by a TGS exchange with the
 /// cache's ticket-granting ticket; or, from a password, a ticket-granting ticket by an AS
 /// exchange with <c>PA-ENC-TIMESTAMP</c> pre-authentication and then the service ticket by
@@ -49,7 +49,7 @@ public sealed class KerberosKdcClient
 
     /// <summary>
     /// Gets the encryption types every request offers, in order of preference: MIT's default
-    /// order of the types this library has (ADR-0164).
+    /// order of the types this library has (ADR-0168).
     /// </summary>
     public static IReadOnlyList<int> RequestedEncryptionTypes { get; } =
     [
