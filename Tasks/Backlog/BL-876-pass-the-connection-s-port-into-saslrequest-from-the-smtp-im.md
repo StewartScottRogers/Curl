@@ -1,5 +1,5 @@
 ---
-id: BL-875
+id: BL-876
 title: Pass the connection's port into SaslRequest from the SMTP, IMAP and POP3 handlers
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-875 — Pass the connection's port into SaslRequest from the SMTP, IMAP and POP3 handlers
+# BL-876 — Pass the connection's port into SaslRequest from the SMTP, IMAP and POP3 handlers
 
 ## Goal
 

@@ -40,7 +40,7 @@ completed: 2026-09-29
   `Curl.Protocol.Smtp.UnitLibrary/SmtpSaslAuthentication.cs` (`CreateRequest`). Adding a
   required `Port` breaks that call, so this task also touches `Curl.Protocol.Smtp.UnitLibrary`
   unless the member gets a default.
-- 2026-09-29 (Claude): `Port` has a default of `0` rather than being required, so the SMTP, IMAP and POP3 callers still compile and this task stays inside its `touches`; `0` leaves `port=` out, as curl does for port 0. Wiring the handlers to pass the real port is BL-875.
+- 2026-09-29 (Claude): `Port` has a default of `0` rather than being required, so the SMTP, IMAP and POP3 callers still compile and this task stays inside its `touches`; `0` leaves `port=` out, as curl does for port 0. Wiring the handlers to pass the real port is BL-876.
 - 2026-09-29: Resumed from lane 3's cherry-picked work; build clean and all fast tests green after rebasing. Both libraries measure 100% line and branch coverage, 0 failing members.
 
 ## Log
