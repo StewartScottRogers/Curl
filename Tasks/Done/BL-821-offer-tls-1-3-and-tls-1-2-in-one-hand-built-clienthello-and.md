@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Documentation/Planning/Decisions/ADR-0200-the-hand-built-tls-client-offers-tls-1-3-and-tls-1-2-in-one-clienthello.md, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Documentation/Planning/Decisions/ADR-0205-the-hand-built-tls-client-offers-tls-1-3-and-tls-1-2-in-one-clienthello.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-28
 completed: 2026-09-29
@@ -31,7 +31,7 @@ A hand-built TLS connection whose range spans TLS 1.3 and TLS 1.2 (or lower) sen
 ## Notes
 
 - Filed by BL-708 (ADR-0162).
-- 2026-09-29, design (ADR-0200, decided by Claude under Stewart's delegation): the TLS 1.3
+- 2026-09-29, design (ADR-0205, decided by Claude under Stewart's delegation): the TLS 1.3
   client builds the one hello, with the TLS 1.2 half added through the internal
   `Tls13ClientSettings.LowerVersions`; `TlsClientConnection` reads the first server message
   through `ServerHelloReplayStream` and replays it to whichever record layer the ServerHello
@@ -41,7 +41,7 @@ A hand-built TLS connection whose range spans TLS 1.3 and TLS 1.2 (or lower) sen
 - Default taken: beside TLS 1.3 an unset minimum offers TLS 1.2, curl's default minimum since
   8.10.0; ADR-0162's TLS 1.0 floor under a lower ceiling is unchanged. When the cipher options
   leave no runnable suite for one side, the other side runs alone.
-- Touches widened to the ADR and `Documentation/Planning/Decisions/README.md` for ADR-0200; no
+- Touches widened to the ADR and `Documentation/Planning/Decisions/README.md` for ADR-0205; no
   task in Doing names them.
 - Also fixed on the way, inside the touched projects: `Tls13ClientSettings.Validate` (complexity
   12 since BL-786) split in two for the quality gate; the Networking fake TLS 1.3 server now
