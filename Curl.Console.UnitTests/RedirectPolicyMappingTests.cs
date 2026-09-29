@@ -23,9 +23,16 @@ public sealed class RedirectPolicyMappingTests
         Assert.IsFalse(policy.KeepPostOn302);
         Assert.IsFalse(policy.KeepPostOn303);
         Assert.IsFalse(policy.LocationTrusted);
+        Assert.IsFalse(policy.DisallowsUserInUrl);
         CollectionAssert.AreEquivalent(
             new[] { "http", "https", "ftp", "ftps" },
             policy.AllowedSchemes.ToArray());
+    }
+
+    [TestMethod]
+    public void FromCommandLine_DisallowUsernameInUrl_DisallowsUserInUrl()
+    {
+        Assert.IsTrue(Map("-L", "--disallow-username-in-url", Url).DisallowsUserInUrl);
     }
 
     [TestMethod]

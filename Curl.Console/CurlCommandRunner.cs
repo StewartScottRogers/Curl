@@ -2613,9 +2613,9 @@ internal sealed class CurlCommandRunner(
             return TransferResult.Failure(CurlExitCode.UrlMalformat, UrlRejectedPrefix + rejection.ToCurlMessage());
         }
 
-        if (Encoding.UTF8.GetByteCount(transferUrl.Host) > MaximumHostLength)
+        if (ParsedUrlRefusal(options, transferUrl) is { } refusal)
         {
-            return TransferResult.Failure(CurlExitCode.UrlMalformat, TooLongHostnameMessage);
+            return refusal;
         }
 
         if (!TryParseRange(options.Range, transferUrl, out ByteRange? range))
@@ -2647,6 +2647,25 @@ internal sealed class CurlCommandRunner(
                     follower, dispatch.ProxySelector, options, transferUrl, transfer, range, headerOutput, form.Body, upload)
                 .ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Why the parsed URL is refused before any connection, or <see langword="null" /> when it is not:
+    /// under <c>--disallow-username-in-url</c> a URL with user information, even an empty user, fails
+    /// with exit 67 and <see cref="RedirectFollower.CredentialsInUrlMessage" /> (curl 8.21.0, measured,
+    /// BL-626 Notes); a host longer than <see cref="MaximumHostLength" /> fails with exit 3 and
+    /// <see cref="TooLongHostnameMessage" />.
+    /// </summary>
+    private static TransferResult? ParsedUrlRefusal(CommandLineOptions options, CurlUrl url)
+    {
+        if (options.DisallowUsernameInUrl && url.User is not null)
+        {
+            return TransferResult.Failure(CurlExitCode.LoginDenied, RedirectFollower.CredentialsInUrlMessage);
+        }
+
+        return Encoding.UTF8.GetByteCount(url.Host) > MaximumHostLength
+            ? TransferResult.Failure(CurlExitCode.UrlMalformat, TooLongHostnameMessage)
+            : null;
     }
 
     /// <summary>
