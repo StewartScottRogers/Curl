@@ -129,6 +129,14 @@ namespace Curl.Protocol.Http;
 /// head is written. Measured on curl 8.21.0 (BL-182 Notes).
 /// </para>
 /// <para>
+/// With <see cref="HttpRequestOptions.AltSvcRoute" /> the connect target carries the alternative
+/// for the connector to dial and the request sends <c>Alt-Used</c> naming it; with
+/// <see cref="HttpRequestOptions.AltSvcStore" /> each <c>Alt-Svc</c> header of a response to an
+/// <c>https</c> URL is handed to the store as it arrives, and each alternative the store added is
+/// reported as <c>Added alt-svc: &lt;host&gt;:&lt;port&gt; over &lt;id&gt;</c> before the header
+/// line. Measured on curl 8.21.0 (BL-623 and BL-878 Notes).
+/// </para>
+/// <para>
 /// With <see cref="HttpRequestOptions.ForwardProxy" /> an HTTP-kind proxy
 /// (<see cref="ProxyKind.Http" />, <see cref="ProxyKind.Http10" /> or
 /// <see cref="ProxyKind.Https" />), an <c>http</c> URL and no
@@ -286,7 +294,7 @@ public sealed class HttpProtocolHandler(
         ConnectTarget urlTarget = TargetOf(plan.Context.Url);
         ConnectTarget target = plan.ForwardProxy is { } proxy
             ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https) { IsForwardProxy = true }
-            : urlTarget with { Proxy = plan.Options.ForwardProxy };
+            : urlTarget with { Proxy = plan.Options.ForwardProxy, AltSvcRoute = plan.Options.AltSvcRoute };
         return target with { PoolScheme = urlTarget.UseTls ? "https" : "http", Events = plan.Context.Events };
     }
 
@@ -691,7 +699,11 @@ public sealed class HttpProtocolHandler(
         HttpResponseHeadReader headReader = new(responseConnection)
         {
             Events = context.Events,
-            HeaderReceived = header => cookiesStored = StoreCookie(context, header, cookiesStored),
+            HeaderReceived = header =>
+            {
+                cookiesStored = StoreCookie(context, header, cookiesStored);
+                StoreAltSvc(context, options.AltSvcStore, header);
+            },
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
             IsHttp2OrHttp3 = requestStream is not null,
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
@@ -1177,6 +1189,28 @@ public sealed class HttpProtocolHandler(
         CookieStore is { } store && string.Equals(header.Name, "Set-Cookie", StringComparison.OrdinalIgnoreCase)
             ? store.StoreFromResponse(context.Url, header.Value, storedFromResponse, context.TimeProvider.GetUtcNow(), context.Events)
             : storedFromResponse;
+
+    /// <summary>
+    /// Hands <paramref name="header" />, when it is an <c>Alt-Svc</c> header of a response to an
+    /// <c>https</c> URL and <paramref name="store" /> is set, to the store with the transfer's
+    /// URL as the origin, and reports curl 8.21.0's <c>Added alt-svc: &lt;host&gt;:&lt;port&gt; over
+    /// &lt;id&gt;</c> for each alternative it added, before the header line (measured, BL-623
+    /// Notes). curl learns no alternative over plain <c>http</c>.
+    /// </summary>
+    private static void StoreAltSvc(ITransferContext context, IAltSvcStore? store, HttpResponseHeader header)
+    {
+        if (store is null
+            || context.Url.Scheme != "https"
+            || !string.Equals(header.Name, "Alt-Svc", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        foreach (AltSvcAlternative added in store.StoreFromResponse(context.Url, header.Value, context.TimeProvider.GetUtcNow()))
+        {
+            context.Events.ReportInfo($"Added alt-svc: {added.Host}:{added.Port} over {added.Alpn}");
+        }
+    }
 
     /// <summary>
     /// Decides whether a response is answered with one more request, and which: the same

@@ -19,7 +19,8 @@ namespace Curl.Protocol.Http;
 /// <c>Authorization</c>, <c>Range</c>, <c>Content-Range</c> (for a <c>-T</c> upload resumed with
 /// <c>-C</c>, or <c>-r</c> on a <c>-d</c> body or a <c>-T</c> upload, <see cref="HttpRequestFraming.ContentRange" />), <c>User-Agent</c>, <c>Accept</c>, <c>TE: gzip</c> (for
 /// <c>--tr-encoding</c>), <c>Accept-Encoding</c> (for <c>--compressed</c>), <c>Referer</c>, <c>Proxy-Connection: Keep-Alive</c> (through a forward
-/// proxy), each left out when an <c>-H</c> value names it, then the cookie store's
+/// proxy), <c>Alt-Used</c> (to an alternative service, <see cref="HttpRequestOptions.AltSvcRoute" />),
+/// each left out when an <c>-H</c> value names it, then the cookie store's
 /// <c>Cookie</c>, then <c>If-Modified-Since</c> or <c>If-Unmodified-Since</c> for <c>-z</c>, also
 /// left out when an <c>-H</c> value names it; <c>Cookie</c> and <c>Proxy-Authorization</c> are sent even when an <c>-H</c>
 /// value names them. Through a forward proxy the request target is the absolute form,
@@ -126,6 +127,7 @@ internal static class HttpRequestHeadFormatter
         AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
         AppendClientHeaders(head, customHeaders, options);
         AppendUnlessOverridden(head, [.. customHeaders, .. proxyHeaders], "Proxy-Connection", forwardProxy ? "Keep-Alive" : null);
+        AppendUnlessOverridden(head, customHeaders, "Alt-Used", AltUsedOf(options.AltSvcRoute));
         AppendH2cUpgrade(head, upgradesToH2c);
         AppendAlways(head, "Cookie", cookie);
         AppendTimeCondition(head, customHeaders, timeCondition);
@@ -320,6 +322,14 @@ internal static class HttpRequestHeadFormatter
     /// </summary>
     private static bool SendsTe(HttpRequestOptions options, HttpCustomHeader[] customHeaders) =>
         options.TransferEncoding && !customHeaders.Any(header => header.Names("TE"));
+
+    /// <summary>
+    /// Gives the <c>Alt-Used</c> value for a transfer sent to an alternative service: its host
+    /// and port as curl 8.21.0 writes them, <c>&lt;host&gt;:&lt;port&gt;</c> (measured, BL-878
+    /// Notes); <see langword="null" /> to send none.
+    /// </summary>
+    private static string? AltUsedOf(AltSvcRoute? route) =>
+        route is null ? null : $"{route.Alternative.Host}:{route.Alternative.Port}";
 
     /// <summary>
     /// Appends the h2c upgrade request's <c>Upgrade: h2c</c> and <c>HTTP2-Settings</c> lines
