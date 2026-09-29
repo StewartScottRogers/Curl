@@ -497,6 +497,13 @@ internal sealed class CurlCommandRunner(
     private TransferResult? previousTransferResult;
 
     /// <summary>
+    /// When the run's last serial transfer started, as a <see cref="TimeProvider.GetTimestamp" />, which
+    /// <see cref="WaitForTransferStartRateAsync" /> measures <c>--rate</c> from; <see langword="null" />
+    /// before the first.
+    /// </summary>
+    private long? previousSerialTransferStart;
+
+    /// <summary>
     /// The run's HSTS cache, shared by every transfer of every option group and on with or without
     /// <c>--hsts</c>, as curl 8.21.0's tool shares one through its share handle: an <c>https</c>
     /// response's <c>Strict-Transport-Security</c> switches a later <c>http</c> URL or redirect to the
@@ -1295,11 +1302,72 @@ internal sealed class CurlCommandRunner(
             return (exitCode, await StartInParallelAsync(run, dispatch, options, transfer).ConfigureAwait(false));
         }
 
+        await WaitForTransferStartRateAsync(options).ConfigureAwait(false);
+        previousSerialTransferStart = timeProvider.GetTimestamp();
         TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
 
         return ReferenceEquals(result, EtagSaveFileSkippedTransfer)
             ? (exitCode, false)
             : (result.ExitCode, EndsTheRun(options, result));
+    }
+
+    /// <summary>
+    /// Waits, before a serial transfer starts, until <see cref="CommandLineOptions.MillisecondsBetweenTransferStarts" />
+    /// have passed since the previous one started, as curl 8.21.0 does for <c>--rate</c>: the wait follows a
+    /// failed transfer too, whole milliseconds are counted, and under <c>-v</c> or a <c>--trace</c> option,
+    /// <c>-s</c> or not, standard error first gets <c>Note: Transfer took &lt;n&gt; ms, waits &lt;m&gt;ms as set by --rate</c>
+    /// (measured 2026-09-29, BL-650 Notes). Nothing waits before the first transfer or once the interval has passed.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <returns>A task that completes when the transfer may start.</returns>
+    private async Task WaitForTransferStartRateAsync(CommandLineOptions options)
+    {
+        long wait = MillisecondsUntilTransferMayStart(options.MillisecondsBetweenTransferStarts, out long took);
+        if (wait == 0)
+        {
+            return;
+        }
+
+        if (options.Trace != TraceKind.None)
+        {
+            await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"Transfer took {took} ms, waits {wait}ms as set by --rate", terminalColumns))
+                .ConfigureAwait(false);
+        }
+
+        await DelayMillisecondsAsync(wait).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// How long a serial transfer must still wait for <c>--rate</c>, in whole milliseconds, as
+    /// <see cref="WaitForTransferStartRateAsync" /> describes.
+    /// </summary>
+    /// <param name="interval">The <c>--rate</c> interval, or <see langword="null" /> when none was given.</param>
+    /// <param name="took">The whole milliseconds since the previous transfer started; zero before the first.</param>
+    /// <returns>The milliseconds to wait; zero when there is no need.</returns>
+    private long MillisecondsUntilTransferMayStart(long? interval, out long took)
+    {
+        took = 0;
+        if (interval is not { } least || previousSerialTransferStart is not { } previousStart)
+        {
+            return 0;
+        }
+
+        took = (long)timeProvider.GetElapsedTime(previousStart).TotalMilliseconds;
+        return Math.Max(least - took, 0);
+    }
+
+    /// <summary>
+    /// Waits <paramref name="milliseconds" /> on the injected clock, in pieces no longer than
+    /// <see cref="int.MaxValue" /> milliseconds, since a <c>--rate</c> interval may be longer than one delay allows.
+    /// </summary>
+    /// <param name="milliseconds">How long to wait.</param>
+    /// <returns>A task that completes when the time has passed.</returns>
+    private async Task DelayMillisecondsAsync(long milliseconds)
+    {
+        for (long remaining = milliseconds; remaining > 0; remaining -= int.MaxValue)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(remaining, int.MaxValue)), timeProvider).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
