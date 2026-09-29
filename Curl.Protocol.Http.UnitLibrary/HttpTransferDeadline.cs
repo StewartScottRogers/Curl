@@ -48,13 +48,20 @@ internal sealed class HttpTransferDeadline : IDisposable
         startedAt = timeProvider.GetTimestamp();
         operationStartedAt = context.OperationStarted ?? startedAt;
         transferCancellation = context.CancellationToken;
-        connectTimeout = context.ConnectTimeout is { } given && given > TimeSpan.Zero ? given : DefaultConnectTimeout;
-        maxTime = context.MaxTime is { } limit && limit > TimeSpan.Zero ? limit : null;
+        connectTimeout = PositiveOrNull(context.ConnectTimeout) ?? DefaultConnectTimeout;
+        maxTime = PositiveOrNull(context.MaxTime);
         maxTimeElapsed = MaxTimeElapsed(maxTime);
         transfer = maxTimeElapsed is null
             ? CancellationTokenSource.CreateLinkedTokenSource(transferCancellation)
             : CancellationTokenSource.CreateLinkedTokenSource(transferCancellation, maxTimeElapsed.Token);
     }
+
+    /// <summary>
+    /// Gives a limit that is set and above zero, or <see langword="null" /> for one that is
+    /// not set or is zero or less, which curl takes as no limit.
+    /// </summary>
+    private static TimeSpan? PositiveOrNull(TimeSpan? limit) =>
+        limit > TimeSpan.Zero ? limit : null;
 
     /// <summary>
     /// Gets the token that cancels the transfer: when the transfer is cancelled, or when
