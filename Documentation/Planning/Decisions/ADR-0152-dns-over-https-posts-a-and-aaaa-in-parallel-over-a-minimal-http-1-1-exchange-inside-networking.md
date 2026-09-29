@@ -181,3 +181,28 @@ Decided by Claude under Stewart's delegation. BL-642 measured the rest of the de
   solution already has do the job.
 - **Ask A and AAAA in turn.** Simpler, but curl asks in parallel (measured), and the
   resolve time `-w %{time_namelookup}` reports would differ.
+
+## Amendment (BL-850, 2026-09-29)
+
+Decided by Claude under Stewart's delegation. BL-850 measured the `--trace-config doh` lines with
+`Record-CurlExchange.ps1 -Tls -Connections 2` (every connection given the same response) and
+`-sS -v --trace-config doh D --doh-insecure http://example.test:P2/` (curl 8.21.0 Schannel; every
+case is in BL-850's Notes):
+
+- The lines appear only with `-v`: `--trace-config doh` alone prints nothing. On this build the
+  option turns on the whole `[DNS]` trace; `DohDnsResolver` reports only the DoH lines.
+- After both queries finish, in this order: `[DNS] DoH request <curl_easy_strerror text>` for each
+  query whose connection or exchange failed; `[DNS] DoH: <failure> type A|AAAA for <host>` for each
+  answer that did not decode; and, when at least one query decoded *or failed to exchange* (curl skips
+  the decode of a failed exchange, so its result stays `DOH_OK`), `[DNS] hostname: <host>`,
+  `[DoH] TTL: <smallest TTL read> seconds` (`2147483647` when none), `[DoH] A: <dotted>` and
+  `[DoH] AAAA: <eight four-digit hex groups>` per address, A's first, and `CNAME: <name>` per name.
+- The `DoH request` lines are written by curl as each query completes, interleaved with its other
+  `[DNS]` trace lines; `DohDnsResolver` writes all its lines once both have finished, A's first. Only
+  the DoH lines are reported, so their order among themselves is what matters and is as measured.
+
+The sink is an `ITransferEvents` whose `ReportInfo` receives each line's text after `* `, and the
+`curl_easy_strerror` text comes from a `Func<CurlExitCode, string>` the composition root supplies from
+`Curl.Console`'s table, so Networking keeps no copy of it. The composition root passes a real sink only
+under `-v --trace-config doh`. curl's one shared entry also keeps what a failed decode read before it
+stopped (a CNAME is then printed twice); matching that is BL-958.
