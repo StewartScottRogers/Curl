@@ -13,8 +13,30 @@ Namespace `Curl.Quic`. So far it holds the wire codec (BL-722): `QuicVariableLen
 header form (`QuicLongHeaderPacket`, `QuicRetryPacket`, `QuicVersionNegotiationPacket`,
 `QuicShortHeaderPacket`), and `QuicFrameCodec` with one `QuicFrame` record per frame type of
 RFC 9000 section 19. Bytes the peer sent that break a rule are a `QuicTransportException`
-carrying the `QuicTransportErrorCode` to close with, never an out-of-range read. The rest
-of the transport lands in the tasks ADR-0144 lists.
+carrying the `QuicTransportErrorCode` to close with, never an out-of-range read.
+
+Packet protection (BL-723, RFC 9001 sections 5 and 6):
+
+- `QuicInitialSecrets`: the version 1 salt, `initial_secret`, `client in` and `server in`.
+- `QuicPacketKeys`: `quic key`, `quic iv` and `quic hp` of a secret, and `quic ku`
+  (`DeriveNextSecret`), with HKDF-Expand-Label from `Curl.Tls` (`Tls13KeySchedule`).
+- `QuicHeaderProtection`: the five-byte mask of a 16-byte sample, AES-ECB for the AES
+  suites and the hand-built ChaCha20 for ChaCha20-Poly1305; applies and removes it in place.
+- `QuicPacketProtection`: one direction at one encryption level. `Protect(packet,
+  packetNumber)` encrypts a `QuicLongHeaderPacket` or `QuicShortHeaderPacket` whose
+  payload is the plaintext frames (the BCL's `AesGcm`, or `AeadChaCha20Poly1305` from
+  `Curl.Cryptography`) and applies header protection. `Unprotect` returns a
+  `QuicUnprotectResult`: a packet too short for the sample or failing the AEAD is dropped
+  with its `QuicUnprotectStatus` and its length, never thrown; a Reserved Bit set on an
+  authentic packet is a `ProtocolViolation`. Key update: `UpdateKeys` moves to the next
+  phase and keeps the previous keys; a received short header of the other phase opens with
+  the previous keys when no packet of the current phase has arrived yet or its number is
+  lower than the first that did, otherwise with the next keys, and success moves the
+  receiver to that phase (`KeyPhaseChanged`). `DiscardPreviousKeys` drops the old ones.
+  Suites: `0x1301`, `0x1302`, `0x1303`; the AES-CCM suites wait for the hand-built AES-CCM.
+- `QuicRetryIntegrity`: the Retry Integrity Tag (section 5.8) and its fixed-time check.
+
+The rest of the transport lands in the tasks ADR-0144 lists.
 
 ## Rules
 
@@ -22,8 +44,8 @@ of the transport lands in the tasks ADR-0144 lists.
   nothing else.** `Curl.Tls.UnitLibrary` (its I/O-free `Tls13ClientHandshake` runs the
   QUIC handshake, ADR-0140), `Curl.Cryptography.UnitLibrary` (the primitives the BCL
   lacks on a CI platform) and `Curl.Protocol.Abstractions.UnitLibrary`. No package, and
-  no other project reference. The references are added by the first task that needs
-  them (BL-723), not before.
+  no other project reference. BL-723 added the `Curl.Tls` and `Curl.Cryptography`
+  references; `Curl.Protocol.Abstractions` is added by the first task that needs it.
 - **Never a `Socket`.** Datagrams go in and out through a seam the caller implements;
   the library turns datagrams into datagrams and never opens a socket or any stream.
   This is what keeps its tests off the network.
