@@ -20,6 +20,10 @@ public sealed class QuicClientHandshake : IDisposable
 {
     private readonly QuicClientSettings settings;
 
+    private readonly TimeProvider timeProvider;
+
+    private readonly long startTimestamp;
+
     private readonly Tls13ClientHandshake tls;
 
     private readonly QuicPacketNumberSpace initial = new(QuicPacketType.Initial);
@@ -29,6 +33,8 @@ public sealed class QuicClientHandshake : IDisposable
     private readonly QuicPacketNumberSpace application = new(QuicPacketType.OneRtt);
 
     private readonly QuicPacketNumberSpace?[] spacesByLevel;
+
+    private readonly QuicPacketNumberSpace[] spacesById;
 
     private readonly byte[] originalDestinationConnectionId;
 
@@ -54,11 +60,16 @@ public sealed class QuicClientHandshake : IDisposable
     /// <param name="settings">What the handshake offers.</param>
     /// <param name="random">Where connection IDs, reset tokens, the TLS client random and key shares come from.</param>
     /// <param name="verifier">Verifies the server's certificate chain.</param>
+    /// <param name="timeProvider">The clock loss detection, the probe timeout and the ACK Delay run on.</param>
     /// <exception cref="ArgumentOutOfRangeException">The connection ID length is not 8 to 20 bytes.</exception>
-    public QuicClientHandshake(QuicClientSettings settings, ITlsRandomSource random, IServerCertificateVerifier verifier)
+    public QuicClientHandshake(QuicClientSettings settings, ITlsRandomSource random, IServerCertificateVerifier verifier, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(random);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        this.timeProvider = timeProvider;
+        startTimestamp = timeProvider.GetTimestamp();
+        Recovery = new QuicLossRecovery(QuicCongestionController.Create(settings.CongestionControl, QuicDatagramAssembler.DatagramSize));
         ArgumentOutOfRangeException.ThrowIfLessThan(settings.ConnectionIdLength, 8);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(settings.ConnectionIdLength, QuicFrameCodec.MaximumConnectionIdLength);
         this.settings = settings;
@@ -71,6 +82,12 @@ public sealed class QuicClientHandshake : IDisposable
         tls = new Tls13ClientHandshake(settings.Tls with { FixedExtensions = [.. settings.Tls.FixedExtensions, parameters] }, random, verifier);
         token = settings.Token;
         spacesByLevel = [initial, null, handshake, application];
+        spacesById = [initial, handshake, application];
+        foreach (var space in spacesById)
+        {
+            space.AckDelayExponent = (int)TransportParameters.AckDelayExponent;
+        }
+
         InstallInitialKeys();
     }
 
@@ -103,6 +120,25 @@ public sealed class QuicClientHandshake : IDisposable
 
     /// <summary>Gets a value indicating whether the Handshake keys are discarded.</summary>
     public bool HandshakeKeysDiscarded => handshake.IsDiscarded;
+
+    /// <summary>Gets the loss detection and congestion control of the connection (RFC 9002).</summary>
+    public QuicLossRecovery Recovery { get; }
+
+    /// <summary>Gets how long until <see cref="OnLossDetectionTimeout" /> is due: zero when it is overdue, <see cref="Timeout.InfiniteTimeSpan" /> while the timer is not armed or once the handshake has failed.</summary>
+    public TimeSpan TimeUntilLossDetectionTimeout => Failure is null && Recovery.LossDetectionTimer is { } timer
+        ? TimeSpan.FromTicks(Math.Max(0, (timer - Now()).Ticks))
+        : Timeout.InfiniteTimeSpan;
+
+    /// <summary>Returns how long the pacer holds a datagram of <paramref name="length" /> bytes before it may go; zero when it may go now (RFC 9002 section 7.7).</summary>
+    /// <param name="length">The datagram's length.</param>
+    /// <returns>The wait.</returns>
+    public TimeSpan TimeUntilSend(int length) =>
+        Recovery.Pacer.TimeUntilSend(Now(), length, Recovery.Congestion.CongestionWindow, Recovery.Rtt.SmoothedRtt);
+
+    /// <summary>Takes a datagram that has just gone out of the pacer's budget.</summary>
+    /// <param name="length">The datagram's length.</param>
+    public void OnDatagramSent(int length) =>
+        Recovery.Pacer.OnPacketSent(Now(), length, Recovery.Congestion.CongestionWindow, Recovery.Rtt.SmoothedRtt);
 
     /// <summary>Gets why the handshake failed, or <see langword="null" /> while it has not.</summary>
     public QuicHandshakeFailure? Failure { get; private set; }
@@ -155,6 +191,37 @@ public sealed class QuicClientHandshake : IDisposable
         return Failure is null ? Flush() : CloseIfDetected();
     }
 
+    /// <summary>
+    /// Runs the loss detection timer's expiry (RFC 9002 section 6): packets lost by the time
+    /// threshold have their CRYPTO and other data queued again, or, at the probe timeout, the
+    /// oldest unacknowledged ack-eliciting packet's data goes again in a probe (a PING when
+    /// it carried nothing to resend), outside the congestion window.
+    /// </summary>
+    /// <returns>The datagrams to send.</returns>
+    /// <exception cref="InvalidOperationException"><see cref="Start" /> has not been called.</exception>
+    public IReadOnlyList<byte[]> OnLossDetectionTimeout()
+    {
+        if (!started)
+        {
+            throw new InvalidOperationException("Start the QUIC handshake before running its loss detection timer.");
+        }
+
+        if (Failure is not null)
+        {
+            return [];
+        }
+
+        var outcome = Recovery.OnLossDetectionTimeout(Now());
+        var space = SpaceOf(outcome.Space);
+        RequeueLost(space, outcome.Lost);
+        if (outcome.ProbeRequired)
+        {
+            QueueProbe(space);
+        }
+
+        return Flush(outcome.ProbeRequired);
+    }
+
     /// <summary>Gives up on the handshake, as when its timeout fires: records the failure and closes the connection with <paramref name="errorCode" />.</summary>
     /// <param name="errorCode">The transport error CONNECTION_CLOSE carries.</param>
     /// <param name="failure">Why the handshake failed.</param>
@@ -182,10 +249,40 @@ public sealed class QuicClientHandshake : IDisposable
         return bytes;
     }
 
-    private static bool IsAckEliciting(QuicFrame frame) => frame is not (QuicAckFrame or QuicPaddingFrame or QuicConnectionCloseFrame);
-
     private static bool SameConnectionId(byte[]? actual, byte[]? expected) =>
         actual is null ? expected is null : expected is not null && actual.AsSpan().SequenceEqual(expected);
+
+    private static void RequeueLost(QuicPacketNumberSpace space, IEnumerable<QuicSentPacket> packets)
+    {
+        foreach (var packet in packets)
+        {
+            space.RequeueLost(packet.Frames);
+        }
+    }
+
+    private TimeSpan Now() => timeProvider.GetElapsedTime(startTimestamp);
+
+    private QuicPacketNumberSpace SpaceOf(QuicPacketNumberSpaceId id) => spacesById[(int)id];
+
+    // A probe resends the oldest unacknowledged ack-eliciting packet's data; with none to resend it is a PING (RFC 9002 section 6.2.4).
+    private void QueueProbe(QuicPacketNumberSpace space)
+    {
+        if (Recovery.GetUnacknowledgedPackets(space.Id).FirstOrDefault(packet => packet.IsAckEliciting) is { } oldest)
+        {
+            space.RequeueLost(oldest.Frames);
+        }
+
+        if (!space.HasFramesToSend)
+        {
+            space.QueueFrame(new QuicPingFrame());
+        }
+    }
+
+    private void DiscardSpace(QuicPacketNumberSpace space)
+    {
+        space.Discard();
+        Recovery.DiscardSpace(space.Id, Now());
+    }
 
     private void InstallInitialKeys()
     {
@@ -207,27 +304,39 @@ public sealed class QuicClientHandshake : IDisposable
             return [];
         }
 
-        foreach (var space in new[] { initial, handshake, application }.Where(space => space.SendProtection is not null))
+        foreach (var space in spacesById.Where(space => space.SendProtection is not null))
         {
             space.DropUnsentCrypto();
             space.QueueFrame(new QuicConnectionCloseFrame((ulong)errorCode, 0, ReadOnlyMemory<byte>.Empty));
         }
 
-        return Flush();
+        return Flush(ignoreCongestionWindow: true);
     }
 
-    private List<byte[]> Flush()
+    // Probes and CONNECTION_CLOSE go whatever the congestion window says (RFC 9002 section 7.5).
+    private List<byte[]> Flush(bool ignoreCongestionWindow = false)
     {
-        var sendsHandshakePacket = handshake.HasFramesToSend;
-        var address = new QuicPacketAddress(destinationConnectionId, PeerConnectionIds?.Current.ConnectionId ?? destinationConnectionId, sourceConnectionId, token);
-        var datagrams = QuicDatagramAssembler.Assemble([initial, handshake, application], address);
-        if (sendsHandshakePacket)
+        var allowance = ignoreCongestionWindow ? long.MaxValue : Recovery.Congestion.AvailableWindow;
+        var assembly = QuicDatagramAssembler.Assemble(spacesById, SendAddress(), Now(), allowance);
+        foreach (var sent in assembly.Packets)
         {
-            // A client discards its Initial keys when it first sends a Handshake packet (RFC 9001 section 4.9.1).
-            initial.Discard();
+            RecordSent(sent.Space, sent.Packet);
         }
 
-        return datagrams;
+        return assembly.Datagrams;
+    }
+
+    private QuicPacketAddress SendAddress() =>
+        new(destinationConnectionId, PeerConnectionIds?.Current.ConnectionId ?? destinationConnectionId, sourceConnectionId, token);
+
+    private void RecordSent(QuicPacketNumberSpace space, QuicSentPacket packet)
+    {
+        Recovery.OnPacketSent(space.Id, packet);
+        if (space == handshake && !initial.IsDiscarded)
+        {
+            // A client discards its Initial keys when it first sends a Handshake packet (RFC 9001 section 4.9.1).
+            DiscardSpace(initial);
+        }
     }
 
     private void ReceivePackets(ReadOnlyMemory<byte> datagram)
@@ -302,6 +411,9 @@ public sealed class QuicClientHandshake : IDisposable
         token = packet.RetryToken.ToArray();
         InstallInitialKeys();
         initial.RequeueCrypto();
+
+        // A Retry resets loss recovery for the Initial packets sent before it (RFC 9002 section 6.3).
+        Recovery.DiscardSpace(QuicPacketNumberSpaceId.Initial, Now());
     }
 
     private void ReceiveLongHeader(QuicLongHeaderPacket header, ReadOnlyMemory<byte> bytes)
@@ -332,7 +444,7 @@ public sealed class QuicClientHandshake : IDisposable
     private QuicPacket? Open(QuicPacketNumberSpace space, ReadOnlyMemory<byte> bytes)
     {
         var result = space.ReceiveProtection?.Unprotect(bytes, settings.ConnectionIdLength, space.LargestReceived);
-        if (result is not { Status: QuicUnprotectStatus.Unprotected } || !space.RecordReceived(result.PacketNumber))
+        if (result is not { Status: QuicUnprotectStatus.Unprotected } || !space.RecordReceived(result.PacketNumber, Now()))
         {
             return null;
         }
@@ -355,7 +467,7 @@ public sealed class QuicClientHandshake : IDisposable
     private void ReceiveFrames(QuicPacketNumberSpace space, ReadOnlyMemory<byte> payload)
     {
         var frames = QuicFrameCodec.Decode(payload, space.PacketType);
-        if (frames.Any(IsAckEliciting))
+        if (frames.Any(frame => frame.IsAckEliciting))
         {
             space.RequireAcknowledgement();
         }
@@ -374,7 +486,7 @@ public sealed class QuicClientHandshake : IDisposable
                 ReceiveCrypto(space, crypto);
                 break;
             case QuicAckFrame acknowledgement:
-                space.ReceiveAcknowledgement(acknowledgement);
+                ReceiveAcknowledgement(space, acknowledgement);
                 break;
             case QuicConnectionCloseFrame close:
                 Fail(QuicHandshakeFailures.FromServerClose(close), null);
@@ -383,6 +495,16 @@ public sealed class QuicClientHandshake : IDisposable
                 ReceiveConnectionFrame(frame);
                 break;
         }
+    }
+
+    private void ReceiveAcknowledgement(QuicPacketNumberSpace space, QuicAckFrame frame)
+    {
+        space.ReceiveAcknowledgement(frame);
+
+        // The ACK Delay is scaled by the server's ack_delay_exponent, 3 until its transport parameters arrive (RFC 9000 section 18.2).
+        var exponent = (int)(ServerTransportParameters?.AckDelayExponent ?? QuicTransportParameters.DefaultAckDelayExponent);
+        var ackDelay = TimeSpan.FromMicroseconds(Math.Min(frame.AckDelay, 1UL << 32) << exponent);
+        RequeueLost(space, Recovery.OnAckReceived(space.Id, frame, ackDelay, Now()).Lost);
     }
 
     private void ReceiveConnectionFrame(QuicFrame frame)
@@ -454,6 +576,7 @@ public sealed class QuicClientHandshake : IDisposable
     {
         var space = spacesByLevel[(int)secret.Level]!;
         var protection = QuicPacketProtection.Create(tls.CipherSuite!, secret.Secret);
+        Recovery.HasHandshakeKeys |= secret.Level == TlsEncryptionLevel.Handshake;
         if (secret.Direction == TlsTrafficDirection.Read)
         {
             space.ReceiveProtection = protection;
@@ -482,6 +605,7 @@ public sealed class QuicClientHandshake : IDisposable
         }
 
         PeerConnectionIds!.SetHandshakeResetToken(parameters.StatelessResetToken);
+        Recovery.MaxAckDelay = TimeSpan.FromMilliseconds(parameters.MaxAckDelay);
         ServerTransportParameters = parameters;
     }
 
@@ -515,9 +639,10 @@ public sealed class QuicClientHandshake : IDisposable
     private void Confirm()
     {
         IsConfirmed = true;
+        Recovery.ConfirmHandshake(Now());
 
         // The client discards its Handshake keys once the handshake is confirmed (RFC 9001 section 4.9.2).
-        initial.Discard();
-        handshake.Discard();
+        DiscardSpace(initial);
+        DiscardSpace(handshake);
     }
 }

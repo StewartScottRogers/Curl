@@ -17,6 +17,9 @@ internal sealed class QuicTestChannel(QuicTestServer? server) : IDatagramChannel
 
     public EndPoint ServerEndPoint => ServerAddress;
 
+    /// <summary>Gets a semaphore released each time a receive finds nothing queued and starts to wait, so a test moves the clock only once the client is idle.</summary>
+    public SemaphoreSlim WaitingToReceive { get; } = new(0);
+
     /// <summary>Gets every datagram the client sent, in order.</summary>
     public List<byte[]> Sent { get; } = [];
 
@@ -43,9 +46,14 @@ internal sealed class QuicTestChannel(QuicTestServer? server) : IDatagramChannel
             return new DatagramReceived(next.Datagram.Length, next.From);
         }
 
+        WaitingToReceive.Release();
         await Task.Delay(Timeout.Infinite, cancellationToken);
         throw new UnreachableException();
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        WaitingToReceive.Dispose();
+        return ValueTask.CompletedTask;
+    }
 }

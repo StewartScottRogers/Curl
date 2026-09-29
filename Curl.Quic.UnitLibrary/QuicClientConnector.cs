@@ -4,12 +4,14 @@ namespace Curl.Quic;
 
 /// <summary>
 /// Runs a <see cref="QuicClientHandshake" /> over a datagram channel until it completes,
-/// fails or times out: sends its datagrams, hands it every datagram from the server's
-/// endpoint, and ignores datagrams from anywhere else. The handshake must complete within
-/// <c>--connect-timeout</c>, or within 10 seconds when none is given, as curl's ngtcp2
-/// build requires (ADR-0144 section 5); time comes from the injected <see cref="TimeProvider" />.
+/// fails or times out: sends its datagrams as the pacer lets them go, hands it every
+/// datagram from the server's endpoint, ignores datagrams from anywhere else, and runs its
+/// loss detection timer (RFC 9002), whose probes resend what was lost. The handshake must
+/// complete within <c>--connect-timeout</c>, or within 10 seconds when none is given, as
+/// curl's ngtcp2 build requires (ADR-0144 section 5); time comes from the injected
+/// <see cref="TimeProvider" />, which must be the handshake's.
 /// </summary>
-/// <param name="timeProvider">The clock the timeout runs on.</param>
+/// <param name="timeProvider">The clock the timeouts, the loss detection timer and pacing run on.</param>
 public sealed class QuicClientConnector(TimeProvider timeProvider)
 {
     /// <summary>How long the handshake may take when no connect timeout is given: curl's <c>QUIC_HANDSHAKE_TIMEOUT</c>.</summary>
@@ -37,7 +39,7 @@ public sealed class QuicClientConnector(TimeProvider timeProvider)
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         try
         {
-            await SendAsync(channel, handshake.Start(), linked.Token).ConfigureAwait(false);
+            await SendAsync(handshake, channel, handshake.Start(), linked.Token).ConfigureAwait(false);
             await ExchangeAsync(handshake, channel, linked.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -46,29 +48,42 @@ public sealed class QuicClientConnector(TimeProvider timeProvider)
             var close = connectTimeout is null
                 ? handshake.Abandon(QuicTransportErrorCode.InternalError, new QuicHandshakeFailure(CurlExitCode.SendError, "ngtcp2_conn_handle_expiry returned error: ERR_HANDSHAKE_TIMEOUT"))
                 : handshake.Abandon(QuicTransportErrorCode.NoError, new QuicHandshakeFailure(CurlExitCode.OperationTimedOut, $"Connection timed out after {milliseconds} milliseconds"));
-            await SendAsync(channel, close, cancellationToken).ConfigureAwait(false);
+            await SendAsync(handshake, channel, close, cancellationToken).ConfigureAwait(false);
         }
 
         return handshake.Failure;
     }
 
-    private static async Task ExchangeAsync(QuicClientHandshake handshake, IDatagramChannel channel, CancellationToken cancellationToken)
+    // Each receive waits at most until the loss detection timer is due; when it fires first
+    // the handshake declares losses or probes, and what it returns goes out.
+    private async Task ExchangeAsync(QuicClientHandshake handshake, IDatagramChannel channel, CancellationToken cancellationToken)
     {
         var buffer = new byte[ReceiveBufferLength];
         while (!handshake.IsComplete && handshake.Failure is null)
         {
-            var received = await channel.ReceiveAsync(buffer, cancellationToken).ConfigureAwait(false);
-            if (received.RemoteEndPoint.Equals(channel.ServerEndPoint))
+            using var lossDetectionTimer = new CancellationTokenSource(handshake.TimeUntilLossDetectionTimeout, timeProvider);
+            using var receiveCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lossDetectionTimer.Token);
+            try
             {
-                await SendAsync(channel, handshake.Receive(buffer.AsMemory(0, received.Length)), cancellationToken).ConfigureAwait(false);
+                var received = await channel.ReceiveAsync(buffer, receiveCancellation.Token).ConfigureAwait(false);
+                if (received.RemoteEndPoint.Equals(channel.ServerEndPoint))
+                {
+                    await SendAsync(handshake, channel, handshake.Receive(buffer.AsMemory(0, received.Length)), cancellationToken).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                await SendAsync(handshake, channel, handshake.OnLossDetectionTimeout(), cancellationToken).ConfigureAwait(false);
             }
         }
     }
 
-    private static async Task SendAsync(IDatagramChannel channel, IReadOnlyList<byte[]> datagrams, CancellationToken cancellationToken)
+    private async Task SendAsync(QuicClientHandshake handshake, IDatagramChannel channel, IReadOnlyList<byte[]> datagrams, CancellationToken cancellationToken)
     {
         foreach (var datagram in datagrams)
         {
+            await Task.Delay(handshake.TimeUntilSend(datagram.Length), timeProvider, cancellationToken).ConfigureAwait(false);
+            handshake.OnDatagramSent(datagram.Length);
             await channel.SendAsync(datagram, channel.ServerEndPoint, cancellationToken).ConfigureAwait(false);
         }
     }

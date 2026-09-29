@@ -86,7 +86,7 @@ internal sealed class QuicTestServer : IDisposable
         }
 
         ReceivePackets(datagram);
-        return QuicDatagramAssembler.Assemble([initial, handshake, application], Address);
+        return QuicDatagramAssembler.Assemble([initial, handshake, application], Address, TimeSpan.Zero, long.MaxValue).Datagrams;
     }
 
     /// <summary>Protects frames in one packet of <paramref name="type" />, for a test to hand the client directly.</summary>
@@ -98,7 +98,7 @@ internal sealed class QuicTestServer : IDisposable
             space.QueueFrame(frame);
         }
 
-        return QuicDatagramAssembler.Assemble([space], Address).Single();
+        return QuicDatagramAssembler.Assemble([space], Address, TimeSpan.Zero, long.MaxValue).Datagrams.Single();
     }
 
     public void Dispose()
@@ -148,7 +148,7 @@ internal sealed class QuicTestServer : IDisposable
             QuicPacketNumberSpace space = SpaceOf(header is QuicLongHeaderPacket longHeader ? longHeader.Type : QuicPacketType.OneRtt);
             QuicUnprotectResult result = space.ReceiveProtection!.Unprotect(remaining, ConnectionIdLength, space.LargestReceived);
             Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
-            space.RecordReceived(result.PacketNumber);
+            space.RecordReceived(result.PacketNumber, TimeSpan.Zero);
             ReadOnlyMemory<byte> payload = result.Packet is QuicLongHeaderPacket protectedLong ? protectedLong.Payload : ((QuicShortHeaderPacket)result.Packet!).Payload;
             IReadOnlyList<QuicFrame> frames = QuicFrameCodec.Decode(payload, space.PacketType);
             ClientPackets.Add((DatagramsReceived, space.PacketType, frames));
@@ -166,9 +166,10 @@ internal sealed class QuicTestServer : IDisposable
         }
     }
 
+    // A repeated ClientHello (a retransmission) brings no new bytes and is not answered again.
     private void ReceiveCrypto(QuicPacketNumberSpace space, byte[] bytes)
     {
-        if (space == initial)
+        if (space == initial && bytes.Length > 0)
         {
             clientHello.AddRange(bytes);
             if (HandshakeMessageReader.Read(clientHello.ToArray()).Message is not null)

@@ -28,6 +28,9 @@ public sealed record QuicClientSettings
     /// <summary>Gets an address-validation token a NEW_TOKEN frame gave on an earlier connection to this server, sent in the first Initial; empty for none.</summary>
     public ReadOnlyMemory<byte> Token { get; init; }
 
+    /// <summary>Gets the congestion controller: CUBIC, as curl's build runs, unless a test asks for RFC 9002's NewReno.</summary>
+    public QuicCongestionControlAlgorithm CongestionControl { get; init; } = QuicCongestionControlAlgorithm.Cubic;
+
     /// <summary>
     /// Returns the TLS settings of curl.se's ngtcp2 build's ClientHello as ADR-0144 section 5
     /// measured it (LibreSSL 4.2.1): suites <c>1302 1303 1301</c>, groups <c>001d 0017 0018

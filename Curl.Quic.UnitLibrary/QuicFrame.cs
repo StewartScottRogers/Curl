@@ -13,6 +13,12 @@ public abstract record QuicFrame
     public abstract QuicFrameType Type { get; }
 
     /// <summary>
+    /// Gets a value indicating whether a packet carrying this frame must be acknowledged:
+    /// every frame but ACK, PADDING and CONNECTION_CLOSE (RFC 9002 section 2).
+    /// </summary>
+    public bool IsAckEliciting => this is not (QuicAckFrame or QuicPaddingFrame or QuicConnectionCloseFrame);
+
+    /// <summary>
     /// Writes the frame, type first.
     /// </summary>
     /// <param name="writer">Where to write it.</param>

@@ -27,7 +27,7 @@ public sealed class QuicClientConnectorTests
     {
         ManualTimerTimeProvider clock = new();
         QuicTestChannel channel = new(null);
-        using QuicClientHandshake handshake = QuicHandshakeTest.Client();
+        using QuicClientHandshake handshake = QuicHandshakeTest.Client(clock: clock);
 
         Task<QuicHandshakeFailure?> run = new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
         clock.Advance(9999);
@@ -37,9 +37,40 @@ public sealed class QuicClientConnectorTests
 
         Assert.AreEqual(CurlExitCode.SendError, failure!.ExitCode);
         Assert.AreEqual("ngtcp2_conn_handle_expiry returned error: ERR_HANDSHAKE_TIMEOUT", failure.Message);
-        Assert.HasCount(2, channel.Sent);
-        Assert.AreEqual(1200, channel.Sent[1].Length);
-        Assert.AreEqual((ulong)QuicTransportErrorCode.InternalError, ClientClose(channel.Sent[1]).ErrorCode);
+        Assert.AreEqual(1200, channel.Sent[^1].Length);
+        Assert.AreEqual((ulong)QuicTransportErrorCode.InternalError, ClientClose(channel.Sent[^1]).ErrorCode);
+    }
+
+    [TestMethod]
+    public async Task RunHandshakeAsync_SilentPeer_ProbesTheInitialWithExponentialBackoff()
+    {
+        ManualTimerTimeProvider clock = new();
+        QuicTestChannel channel = new(null);
+        using QuicClientHandshake handshake = QuicHandshakeTest.Client(clock: clock);
+        List<int> sentBeforeEachProbe = [];
+
+        Task<QuicHandshakeFailure?> run = new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
+
+        // PTO = 333 + 4 x 166.5 = 999 ms before any RTT sample, doubling each time it fires (RFC 9002 section 6.2.1): at 999, 2997 and 6993 ms.
+        foreach (long wait in new long[] { 999, 1998, 3996 })
+        {
+            await channel.WaitingToReceive.WaitAsync();
+            clock.Advance(wait - 1);
+            sentBeforeEachProbe.Add(channel.Sent.Count);
+            clock.Advance(1);
+        }
+
+        await channel.WaitingToReceive.WaitAsync();
+        clock.Advance(3007);
+        await run;
+
+        CollectionAssert.AreEqual(new[] { 1, 2, 3 }, sentBeforeEachProbe);
+        Assert.HasCount(5, channel.Sent);
+        Assert.AreEqual(3, handshake.Recovery.ProbeTimeoutCount);
+        foreach (byte[] probe in channel.Sent.Skip(1).Take(3))
+        {
+            Assert.AreEqual(1200, probe.Length);
+        }
     }
 
     [TestMethod]

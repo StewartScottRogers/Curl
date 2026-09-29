@@ -53,8 +53,32 @@ The handshake (BL-724, RFC 9000 sections 5 to 8, 17 and 18, RFC 9001 section 4, 
 - `QuicCryptoReassembler`, `QuicPeerConnectionIds`, `QuicLocalConnectionIds`, and the
   internal `QuicPacketNumberSpace`, `QuicDatagramAssembler` and `QuicPacketAddress`.
 
-No retransmission yet (BL-725), no streams (BL-726). The rest of the transport lands in
-the tasks ADR-0144 lists.
+Loss detection and congestion control (BL-725, RFC 9002, RFC 9438):
+
+- `QuicRttEstimator`: latest, minimum and smoothed RTT and its variation (section 5),
+  the probe timeout and the time-threshold loss delay.
+- `QuicLossRecovery`: Appendix A with no clock of its own. Remembers every `QuicSentPacket`
+  per `QuicPacketNumberSpaceId`, takes RTT samples from ACK frames (the ACK Delay counts
+  only in application data), declares loss by packet threshold (3) and time threshold
+  (9/8 RTT), runs the probe timeout with exponential backoff and the client's
+  anti-deadlock probe, arms application data only once the handshake is confirmed, and
+  detects persistent congestion within the losses one call declares. It hands lost
+  packets back; it never resends one.
+- `QuicCongestionController` (bytes in flight, recovery period, persistent congestion) with
+  `QuicCubicCongestionController`, the default as in curl's build, and
+  `QuicNewRenoCongestionController` (Appendix B); `QuicClientSettings.CongestionControl`
+  chooses. `QuicPacer` is RFC 9002 section 7.7's token bucket.
+- `QuicClientHandshake` records each packet the assembler builds, resends the data of lost
+  packets in new packets (`QuicPacketNumberSpace.RequeueLost`: CRYPTO by range, other
+  frames as they were, never ACK, PADDING, PING, CONNECTION_CLOSE or path frames), sends
+  one probe per probe timeout (the oldest unacknowledged data, else a PING) and exposes
+  `TimeUntilLossDetectionTimeout`, `OnLossDetectionTimeout`, `TimeUntilSend` and
+  `OnDatagramSent`, which `QuicClientConnector` runs. It takes the `TimeProvider`.
+- `QuicDatagramAssembler` stops at the congestion window (acknowledgements, probes and
+  CONNECTION_CLOSE go regardless) and starts a new datagram when the destination
+  connection ID changes (RFC 9000 section 12.2).
+
+No streams yet (BL-726). The rest of the transport lands in the tasks ADR-0144 lists.
 
 ## Rules
 

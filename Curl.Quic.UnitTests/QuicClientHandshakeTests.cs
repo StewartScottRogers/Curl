@@ -388,12 +388,14 @@ public sealed class QuicClientHandshakeTests
         using QuicClientHandshake client = QuicHandshakeTest.Client();
 
         Assert.ThrowsExactly<InvalidOperationException>(() => client.Receive(new byte[1]));
+        Assert.ThrowsExactly<InvalidOperationException>(() => client.OnLossDetectionTimeout());
         client.Start();
         Assert.ThrowsExactly<InvalidOperationException>(() => client.Start());
-        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicClientHandshake(null!, random, verifier));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicClientHandshake(QuicHandshakeTest.CurlSettings, null!, verifier));
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new QuicClientHandshake(QuicHandshakeTest.CurlSettings with { ConnectionIdLength = 7 }, random, verifier));
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new QuicClientHandshake(QuicHandshakeTest.CurlSettings with { ConnectionIdLength = 21 }, random, verifier));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicClientHandshake(null!, random, verifier, TimeProvider.System));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicClientHandshake(QuicHandshakeTest.CurlSettings, null!, verifier, TimeProvider.System));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new QuicClientHandshake(QuicHandshakeTest.CurlSettings with { ConnectionIdLength = 7 }, random, verifier, TimeProvider.System));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new QuicClientHandshake(QuicHandshakeTest.CurlSettings with { ConnectionIdLength = 21 }, random, verifier, TimeProvider.System));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicClientHandshake(QuicHandshakeTest.CurlSettings, random, verifier, null!));
     }
 
     [TestMethod]
@@ -404,11 +406,140 @@ public sealed class QuicClientHandshakeTests
         Assert.AreEqual("0707", HexOf(OpenClientInitial(client.Start().Single()).Packet.Token));
     }
 
+    [TestMethod]
+    public void OnLossDetectionTimeout_FirstInitialLost_ResendsTheClientHelloInANewPacketAndCompletes()
+    {
+        ManualTimerTimeProvider clock = new();
+        using QuicTestServer server = new();
+        using QuicClientHandshake client = QuicHandshakeTest.Client(clock: clock);
+        byte[] lost = client.Start().Single();
+        Assert.AreEqual(TimeSpan.FromMilliseconds(999), client.TimeUntilLossDetectionTimeout);
+
+        clock.Advance(999);
+        Assert.AreEqual(TimeSpan.Zero, client.TimeUntilLossDetectionTimeout);
+        byte[] probe = client.OnLossDetectionTimeout().Single();
+
+        // The probe is a new packet, number 1, carrying the lost packet's CRYPTO data (RFC 9002 section 6.2.4).
+        (QuicLongHeaderPacket packet, IReadOnlyList<QuicFrame> frames) = OpenClientInitial(probe);
+        QuicCryptoFrame resent = (QuicCryptoFrame)frames[0];
+        QuicCryptoFrame original = (QuicCryptoFrame)OpenClientInitial(lost).Frames[0];
+        Assert.AreEqual(1U, packet.TruncatedPacketNumber);
+        Assert.AreEqual(1200, probe.Length);
+        Assert.AreEqual((original.Offset, HexOf(original.Data)), (resent.Offset, HexOf(resent.Data)));
+        Assert.AreEqual(1, client.Recovery.ProbeTimeoutCount);
+
+        Exchange(client, server, [probe]);
+
+        Assert.IsTrue(client.IsConfirmed);
+        Assert.IsNull(client.Failure);
+
+        // The server acknowledged packet 1 at once, so packet 0, sent 999 ms before, is lost by the time threshold: its CRYPTO data went again and CUBIC cut the window to 0.7 x 12000.
+        Assert.AreEqual(2, server.ClientPackets.Count(sent => sent.Type == QuicPacketType.Initial && sent.Frames.OfType<QuicCryptoFrame>().Any(crypto => crypto.Offset == 0)));
+        Assert.AreEqual(8400, client.Recovery.Congestion.CongestionWindow);
+    }
+
+    [TestMethod]
+    public void Receive_InMemoryServer_SamplesTheRttGrowsTheWindowAndDisarmsOnceNothingIsInFlight()
+    {
+        using QuicTestServer server = new();
+        using QuicClientHandshake client = QuicHandshakeTest.Client(QuicHandshakeTest.CurlSettings with { CongestionControl = QuicCongestionControlAlgorithm.NewReno });
+
+        Run(client, server);
+
+        Assert.IsInstanceOfType<QuicNewRenoCongestionController>(client.Recovery.Congestion);
+        Assert.IsTrue(client.Recovery.Rtt.HasSample);
+        Assert.IsGreaterThan(12000, client.Recovery.Congestion.CongestionWindow);
+        Assert.IsTrue(client.Recovery.IsHandshakeConfirmed);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(25), client.Recovery.MaxAckDelay);
+        Assert.AreEqual(Timeout.InfiniteTimeSpan, client.TimeUntilLossDetectionTimeout);
+    }
+
+    [TestMethod]
+    public void OnLossDetectionTimeout_OneRttPacketLostByTheTimeThreshold_ResendsItsNewConnectionIdInANewPacket()
+    {
+        ManualTimerTimeProvider clock = new();
+        using QuicTestServer server = new();
+        using QuicClientHandshake client = QuicHandshakeTest.Client(clock: clock);
+        Run(client, server);
+        clock.Advance(100);
+
+        // Two RETIRE_CONNECTION_ID frames at 100 ms: the client answers each with a NEW_CONNECTION_ID packet.
+        client.Receive(server.Protect(QuicPacketType.OneRtt, new QuicRetireConnectionIdFrame(1)));
+        client.Receive(server.Protect(QuicPacketType.OneRtt, new QuicRetireConnectionIdFrame(2)));
+        QuicSentPacket[] answers = [.. client.Recovery.GetUnacknowledgedPackets(QuicPacketNumberSpaceId.ApplicationData).Where(packet => packet.IsAckEliciting)];
+        QuicNewConnectionIdFrame lostFrame = answers[0].Frames.OfType<QuicNewConnectionIdFrame>().Single();
+
+        // Only the second is acknowledged, 50 ms later: the first waits 9/8 x 50 ms from when it went (RFC 9002 section 6.1.2).
+        clock.Advance(50);
+        client.Receive(server.Protect(QuicPacketType.OneRtt, new QuicAckFrame(answers[1].PacketNumber, 0, 0, [], null)));
+        Assert.AreEqual(TimeSpan.FromMilliseconds(6.25), client.TimeUntilLossDetectionTimeout);
+        clock.Advance(7);
+        IReadOnlyList<byte[]> resent = client.OnLossDetectionTimeout();
+
+        Assert.HasCount(1, resent);
+        Assert.AreEqual(0, client.Recovery.ProbeTimeoutCount);
+        QuicSentPacket again = client.Recovery.GetUnacknowledgedPackets(QuicPacketNumberSpaceId.ApplicationData).Last();
+        Assert.IsGreaterThan(answers[1].PacketNumber, again.PacketNumber);
+        Assert.AreEqual(lostFrame, again.Frames.OfType<QuicNewConnectionIdFrame>().Single());
+    }
+
+    [TestMethod]
+    public void OnLossDetectionTimeout_InitialAcknowledgedAndNothingElseInFlight_SendsAPaddedPingProbe()
+    {
+        ManualTimerTimeProvider clock = new();
+        using QuicTestServer server = new();
+        using QuicClientHandshake client = QuicHandshakeTest.Client(clock: clock);
+        server.Receive(client.Start().Single());
+        clock.Advance(500);
+
+        // The ACK alone asks for nothing, but the client cannot know the server can send, so a probe must go (RFC 9002 section 6.2.2.1).
+        Assert.IsEmpty(client.Receive(server.Protect(QuicPacketType.Initial, new QuicAckFrame(0, 0, 0, [], null))));
+        Assert.AreEqual(TimeSpan.FromMilliseconds(1500), client.TimeUntilLossDetectionTimeout);
+        clock.Advance(1500);
+        byte[] probe = client.OnLossDetectionTimeout().Single();
+
+        (QuicLongHeaderPacket packet, IReadOnlyList<QuicFrame> frames) = OpenClientInitial(probe, server.ServerConnectionId);
+        Assert.AreEqual(1200, probe.Length);
+        Assert.AreEqual(1U, packet.TruncatedPacketNumber);
+        Assert.IsInstanceOfType<QuicPingFrame>(frames[0]);
+    }
+
+    [TestMethod]
+    public void TimeUntilSend_BurstSent_PacesAtTheWindowOverTheSmoothedRtt()
+    {
+        ManualTimerTimeProvider clock = new();
+        using QuicClientHandshake client = QuicHandshakeTest.Client(clock: clock);
+        for (var datagram = 0; datagram < QuicPacer.BurstDatagrams; datagram++)
+        {
+            Assert.AreEqual(TimeSpan.Zero, client.TimeUntilSend(1200));
+            client.OnDatagramSent(1200);
+        }
+
+        // 1.25 x 12000 bytes per 333 ms: 1200 bytes take 26.64 ms.
+        Assert.AreEqual(26.64, client.TimeUntilSend(1200).TotalMilliseconds, 0.01);
+        clock.Advance(27);
+        Assert.AreEqual(TimeSpan.Zero, client.TimeUntilSend(1200));
+    }
+
+    [TestMethod]
+    public void OnLossDetectionTimeout_AfterFailure_SendsNothingAndTheTimerIsOff()
+    {
+        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        client.Start();
+        client.Abandon(QuicTransportErrorCode.NoError, new QuicHandshakeFailure(CurlExitCode.OperationTimedOut, "timed out"));
+
+        Assert.AreEqual(Timeout.InfiniteTimeSpan, client.TimeUntilLossDetectionTimeout);
+        Assert.IsEmpty(client.OnLossDetectionTimeout());
+    }
+
     /// <summary>Exchanges datagrams between the client and the server until neither has anything to send; returns what the client sent.</summary>
-    internal static List<byte[]> Run(QuicClientHandshake client, QuicTestServer server)
+    internal static List<byte[]> Run(QuicClientHandshake client, QuicTestServer server) => Exchange(client, server, client.Start());
+
+    /// <summary>Hands <paramref name="first" /> to the server, then exchanges datagrams until neither side has anything to send; returns what the client sent.</summary>
+    internal static List<byte[]> Exchange(QuicClientHandshake client, QuicTestServer server, IEnumerable<byte[]> first)
     {
         List<byte[]> sent = [];
-        Queue<byte[]> toServer = new(client.Start());
+        Queue<byte[]> toServer = new(first);
         while (toServer.TryDequeue(out byte[]? datagram))
         {
             sent.Add(datagram);

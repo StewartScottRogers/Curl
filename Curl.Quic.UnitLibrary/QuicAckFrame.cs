@@ -13,6 +13,21 @@ public sealed record QuicAckFrame(ulong LargestAcknowledged, ulong AckDelay, ulo
     /// <inheritdoc />
     public override QuicFrameType Type => EcnCounts is null ? QuicFrameType.Ack : QuicFrameType.AckWithEcnCounts;
 
+    /// <summary>Returns the acknowledged packet numbers as inclusive ranges, largest first (RFC 9000 section 19.3.1).</summary>
+    /// <returns>Each range's smallest and largest packet number.</returns>
+    public IReadOnlyList<(ulong Smallest, ulong Largest)> GetAcknowledgedRanges()
+    {
+        List<(ulong Smallest, ulong Largest)> ranges = [(LargestAcknowledged - FirstAckRange, LargestAcknowledged)];
+        foreach (var range in AckRanges)
+        {
+            // The next range's largest is two below the previous smallest, less the gap.
+            var largest = ranges[^1].Smallest - range.Gap - 2;
+            ranges.Add((largest - range.Length, largest));
+        }
+
+        return ranges;
+    }
+
     /// <inheritdoc />
     private protected override void WriteFieldsTo(QuicWriter writer)
     {
