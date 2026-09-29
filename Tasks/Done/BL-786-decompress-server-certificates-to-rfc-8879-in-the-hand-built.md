@@ -24,14 +24,14 @@ The hand-built TLS 1.3 client offers `compress_certificate` (27) with the algori
 
 ## Acceptance criteria
 
-- [x] The ClientHello built from `ClientHelloProfile.OpenSsl` carries `compress_certificate` pinned against ADR-0140's captured bytes - which are `0001 0003` (zlib, zstd), not the `0001 0002 0003` first written here; see Notes and ADR-0197. (`ClientHelloProfileTests.OpenSslProfileOffersCertificateCompressionAsCaptured`, `Tls13CertificateCompressionHandshakeTests.TheClientHelloOffersTheListedAlgorithmsAfterKeyShare`.)
+- [x] The ClientHello built from `ClientHelloProfile.OpenSsl` carries `compress_certificate` pinned against ADR-0140's captured bytes - which are `0001 0003` (zlib, zstd), not the `0001 0002 0003` first written here; see Notes and ADR-0199. (`ClientHelloProfileTests.OpenSslProfileOffersCertificateCompressionAsCaptured`, `Tls13CertificateCompressionHandshakeTests.TheClientHelloOffersTheListedAlgorithmsAfterKeyShare`.)
 - [x] A test server sending a `CompressedCertificate` with each algorithm completes the handshake and the verifier receives the same DER chain as with an uncompressed `Certificate`. (`ACompressedCertificateWithEachAlgorithmCompletesWithTheSameChain`, zlib, brotli, zstd.)
 - [x] A wrong `uncompressed_length`, an algorithm not offered, and corrupt compressed data each fail with a `bad_certificate` alert as a typed `TlsHandshakeFailure`. (`AWrongUncompressedLengthIsABadCertificate`, `AnAlgorithmNotOfferedIsABadCertificate`, `CorruptCompressedDataIsABadCertificate`.)
 - [x] The library meets the quality gates. (Every `Curl.Tls.UnitLibrary` class at 100% line and branch coverage in the Cobertura run; build clean with CA1502 at 10.)
 
 ## Notes
 
-- 2026-09-29, decision (ADR-0197): the criterion asked for `0001 0002 0003` *and* for
+- 2026-09-29, decision (ADR-0199): the criterion asked for `0001 0002 0003` *and* for
   ADR-0140's captured bytes, but the capture is `001b 0005 04 0001 0003`: Ubuntu's
   OpenSSL has no brotli. The measured bytes win, so `ClientHelloProfile.OpenSsl` keeps
   zlib and zstd; brotli is still decompressed when a caller offers it.
@@ -44,7 +44,7 @@ The hand-built TLS 1.3 client offers `compress_certificate` (27) with the algori
   enters the transcript (RFC 8879 section 4).
 - The test server's zstd "compressor" writes raw blocks: the BCL has no Zstandard encoder
   and the decoder under test reads any valid frame.
-- `touches` gained `Documentation/Planning/Decisions` for ADR-0197 and its index row; no
+- `touches` gained `Documentation/Planning/Decisions` for ADR-0199 and its index row; no
   task in Doing names it.
 - Added the `Curl.Zstandard.UnitLibrary` reference ADR-0185 allowed;
   `ProtocolIsolationTests` already carried that row.
