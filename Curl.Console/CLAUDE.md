@@ -85,6 +85,17 @@ header lines and replaces the file with the value of each `ETag` of a 200-399 re
 that cannot be created skips the transfer - no report, no `-w` - and a run whose every transfer was
 skipped ends with `curl: no transfer performed` and exit 26 (BL-619 Notes).
 
+Under `--alt-svc <file>` each `http` or `https` transfer gets its own `AltSvcTransferCache` (an
+`AltSvcCache` from `Curl.Core`, ADR-0175), as curl gives each transfer's handle one: the file is read
+just after the `-b` files, a missing one as empty, and written back after the `-c` jar, created if
+missing and silently left alone if it cannot be written; no other scheme reads or writes it, and
+`--alt-svc ""` does neither. `TransferContextFactory` puts it on `HttpRequestOptions.AltSvcStore`, so
+the HTTP handler learns each `Alt-Svc` header of an `https` response and prints `* Added alt-svc`,
+and sets `AltSvcRoute` to the first unexpired `h1` alternative for an `https` origin, unless a
+`--connect-to` mapping matches it or the entry names the origin itself; the TCP connector dials it
+and the handler sends `Alt-Used`. `h2` and `h3` alternatives are skipped until BL-733, and a redirect
+to another origin drops the route (`RedirectFollower`). Measured on curl 8.21.0 (ADR-0213, BL-623 Notes).
+
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
 segment, still percent-encoded; none gives `curl_response` and curl's

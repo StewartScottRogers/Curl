@@ -89,6 +89,10 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// The <c>If-None-Match</c> lines <c>--etag-compare</c> added to the option group so far, sent after every
     /// other header; <see langword="null" /> for none.
     /// </param>
+    /// <param name="altSvc">
+    /// The transfer's <c>--alt-svc</c> cache, which the HTTP handler stores <c>Alt-Svc</c> headers in and whose
+    /// <see cref="AltSvcTransferCache.RouteFor" /> gives the alternative it connects to; <see langword="null" /> for none.
+    /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, its
     /// <see cref="TransferContext.ResumeUploadFromUnknownOffset" /> is <c>-C -</c> with a
@@ -113,7 +117,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         CancellationToken abortToken = default,
         MaxTimeWatchdog? maxTimeWatchdog = null,
         NetworkCredential? lookedUpCredentials = null,
-        IReadOnlyList<string>? ifNoneMatchHeaders = null) =>
+        IReadOnlyList<string>? ifNoneMatchHeaders = null,
+        AltSvcTransferCache? altSvc = null) =>
         new()
         {
             Url = url,
@@ -150,7 +155,11 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             OperationStarted = OperationStartedOf(maxTimeWatchdog),
             TimeCondition = options.TimeCondition,
             Proxy = proxy,
-            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders),
+            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
+            {
+                AltSvcStore = altSvc,
+                AltSvcRoute = altSvc?.RouteFor(url, options.ConnectToEntries),
+            },
             Mail = MailRequestOptionsMapping.FromCommandLine(options, url.Scheme),
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
             Events = EventsOrNone(events),

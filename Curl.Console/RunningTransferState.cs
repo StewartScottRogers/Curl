@@ -120,6 +120,12 @@ internal sealed class RunningTransferState(
     internal IReadOnlyList<string>? IfNoneMatchHeaders { get; set; }
 
     /// <summary>
+    /// Gets or sets the transfer's alt-svc cache, read before it connects and written when it is reported;
+    /// <see langword="null" /> without <c>--alt-svc</c> and for a URL that is not <c>http</c> or <c>https</c> (task BL-623).
+    /// </summary>
+    internal AltSvcTransferCache? AltSvc { get; set; }
+
+    /// <summary>
     /// Gets or sets what saves an <c>ETag</c> line for <c>--etag-save</c>, which the transfer's
     /// <see cref="EtagSaveStream" /> calls; <see langword="null" /> without <c>--etag-save</c> (task BL-619).
     /// </summary>

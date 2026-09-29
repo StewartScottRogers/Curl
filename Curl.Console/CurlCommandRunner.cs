@@ -1449,7 +1449,7 @@ internal sealed class CurlCommandRunner(
         bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
             options, transfer.UrlIndex, standardOutputSwitchedToBinary, endsTheRun);
         await WriteOutAsync(options, transfer, givenUrl, transferUrl, result, standardOutputIsBinary).ConfigureAwait(false);
-        await WriteCookieJarAsync(dispatch, options, transferUrl, standardOutputIsBinary).ConfigureAwait(false);
+        await WriteCookieJarAndAltSvcFileAsync(dispatch, options, transferUrl, standardOutputIsBinary, state).ConfigureAwait(false);
 
         previousTransferResult = result;
     }
@@ -1532,6 +1532,7 @@ internal sealed class CurlCommandRunner(
         ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(transfer);
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
         await LoadCookieFilesAsync(dispatch, options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
+        await OpenAltSvcCacheAsync(options, transferUrl).ConfigureAwait(false);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
@@ -2055,6 +2056,30 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Writes the <c>-c</c> jar (<see cref="WriteCookieJarAsync" />) and then the transfer's <c>--alt-svc</c>
+    /// file, when it has one (<see cref="RunningTransferState.AltSvc" />).
+    /// </summary>
+    /// <param name="dispatch">What the run transfers through, with its cookies.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transferUrl">The URL transferred.</param>
+    /// <param name="standardOutputIsBinary">Whether standard output is in binary mode for <c>-c -</c>.</param>
+    /// <param name="state">The transfer's state, with its alt-svc cache.</param>
+    /// <returns>A task that completes when both are written.</returns>
+    private async Task WriteCookieJarAndAltSvcFileAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        string transferUrl,
+        bool standardOutputIsBinary,
+        RunningTransferState state)
+    {
+        await WriteCookieJarAsync(dispatch, options, transferUrl, standardOutputIsBinary).ConfigureAwait(false);
+        if (state.AltSvc is { } altSvc)
+        {
+            await altSvc.WriteAsync(fileSystem).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
     /// Loads the run's <c>-b</c> files before its first <c>http</c> or <c>https</c> transfer and
     /// not before any other: curl 8.21.0 reads <c>-b -</c> from standard input only then, so a
     /// <c>telnet</c> transfer or <c>file</c> upload before it gets standard input and the
@@ -2071,6 +2096,22 @@ internal sealed class CurlCommandRunner(
         if (dispatch.Cookies is { } cookies && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
         {
             await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow(), events).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Gives an <c>http</c> or <c>https</c> transfer of a group with <c>--alt-svc</c> its own alt-svc cache,
+    /// its file read now, as curl 8.21.0 gives each transfer's handle one; any other transfer gets none, and
+    /// its file is neither read nor written (measured 2026-09-29, BL-623 Notes).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transferUrl">The URL transferred.</param>
+    /// <returns>A task that completes when the file is read.</returns>
+    private async Task OpenAltSvcCacheAsync(CommandLineOptions options, string transferUrl)
+    {
+        if (options.AltSvcFile is { } file && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
+        {
+            Running.AltSvc = await AltSvcTransferCache.OpenAsync(file, fileSystem, timeProvider).ConfigureAwait(false);
         }
     }
 
@@ -2654,7 +2695,8 @@ internal sealed class CurlCommandRunner(
                 abortToken: Running.AbortToken,
                 maxTimeWatchdog: StartMaxTimeWatchdog(options),
                 lookedUpCredentials: Running.LookedUpCredentials,
-                ifNoneMatchHeaders: Running.IfNoneMatchHeaders);
+                ifNoneMatchHeaders: Running.IfNoneMatchHeaders,
+                altSvc: Running.AltSvc);
             TransferResult result = toStandardOutput
                 ? await TransferToStandardOutputAsync(follower, options, createAttemptContext).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null).ConfigureAwait(false);
@@ -3209,7 +3251,8 @@ internal sealed class CurlCommandRunner(
                         Running.AbortToken,
                         StartMaxTimeWatchdog(options),
                         Running.LookedUpCredentials,
-                        Running.IfNoneMatchHeaders),
+                        Running.IfNoneMatchHeaders,
+                        Running.AltSvc),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
