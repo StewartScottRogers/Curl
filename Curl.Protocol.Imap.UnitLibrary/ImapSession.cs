@@ -276,6 +276,7 @@ internal sealed class ImapSession(
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, ImapSessionMessages.UnexpectedGreeting);
         }
 
+        ImapDiagnosticLogLines.GreetingReceived(context.DiagnosticLog, greeting.Status);
         preauthenticated = greeting.Status == ImapResponseStatus.Preauth;
         if (preauthenticated)
         {
@@ -369,6 +370,7 @@ internal sealed class ImapSession(
         securedConnection = connection;
         channel.SwitchTo(connection);
         secure = true;
+        ImapDiagnosticLogLines.TlsUpgraded(context.DiagnosticLog);
         return await CapabilityAsync().ConfigureAwait(false);
     }
 

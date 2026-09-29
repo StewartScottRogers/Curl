@@ -83,12 +83,24 @@ public sealed class ImapProtocolHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        long started = context.TimeProvider.GetTimestamp();
+        TransferResult result = await TransferAsync(context).ConfigureAwait(false);
+        ImapDiagnosticLogLines.TransferEnded(context.DiagnosticLog, result, context.TimeProvider, started);
+        return result;
+    }
+
+    /// <summary>
+    /// Connects, runs the session and writes the lines <c>-v</c> ends the transfer with.
+    /// </summary>
+    private async ValueTask<TransferResult> TransferAsync(ITransferContext context)
+    {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
         var target = new ConnectTarget(url.IdnHost, url.Port, implicitTls)
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connected = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
@@ -102,7 +114,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
         await using (connection.ConfigureAwait(false))
         {
             var session = new ImapSession(
-                new ImapControlChannel(connection, context.Events, context.CancellationToken), tlsProvider, saslAuthenticator, context, implicitTls);
+                new ImapControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog), tlsProvider, saslAuthenticator, context, implicitTls);
             TransferResult result;
             await using (session.ConfigureAwait(false))
             {

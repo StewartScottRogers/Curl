@@ -10,6 +10,11 @@ namespace Curl.Protocol.Imap;
 /// <param name="connection">The connection; the caller owns and disposes it.</param>
 /// <param name="events">Where <c>-v</c> and <c>--trace</c> learn of each line and literal piece sent and each line read.</param>
 /// <param name="cancellationToken">Cancels every send and read.</param>
+/// <param name="diagnosticLog">
+/// Where each line sent and each tagged response's or continuation's status are logged at
+/// <c>verbose</c> (ADR-0222), a line as its sender says it may be logged;
+/// <see langword="null" /> logs nothing.
+/// </param>
 /// <remarks>
 /// <para>
 /// Commands and responses are Latin-1. As curl 8.21.0 does (<c>lib/imap.c</c>, measured in
@@ -37,7 +42,8 @@ namespace Curl.Protocol.Imap;
 /// <c>FETCH</c> literal that arrives with its response line is at most what 900 bytes leave.
 /// </para>
 /// </remarks>
-internal sealed class ImapControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken)
+internal sealed class ImapControlChannel(
+    IConnection connection, ITransferEvents events, CancellationToken cancellationToken, IDiagnosticLog? diagnosticLog = null)
 {
     /// <summary>The most bytes curl 8.21.0's pingpong reader takes in one read (measured, BL-559).</summary>
     private const int ReadBufferSize = 900;
@@ -54,6 +60,8 @@ internal sealed class ImapControlChannel(IConnection connection, ITransferEvents
 
     /// <summary>The most digits a literal's length is read from; a longer one is no literal.</summary>
     private const int MaxLiteralLengthDigits = 9;
+
+    private readonly IDiagnosticLog log = diagnosticLog ?? NoDiagnosticLog.Instance;
 
     private readonly byte[] buffer = new byte[ReadBufferSize];
 
@@ -113,12 +121,16 @@ internal sealed class ImapControlChannel(IConnection connection, ITransferEvents
     /// find closed, and the command is not reported.
     /// </summary>
     /// <param name="command">The command without its tag or line end, such as <c>CAPABILITY</c>.</param>
+    /// <param name="logged">
+    /// What the diagnostic log says was sent, without the tag, when <paramref name="command" />
+    /// carries a credential, or <see langword="null" /> to log <paramref name="command" /> itself.
+    /// </param>
     /// <returns>A task that completes once the command is sent or the send has failed.</returns>
-    public ValueTask SendCommandAsync(string command)
+    public ValueTask SendCommandAsync(string command, string? logged = null)
     {
         commandId = unchecked((byte)(commandId + 1));
         Tag = string.Create(CultureInfo.InvariantCulture, $"A{commandId:D3}");
-        return SendLineAsync(Tag + " " + command);
+        return SendLineAsync(Tag + " " + command, Tag + " " + (logged ?? command));
     }
 
     /// <summary>
@@ -129,9 +141,14 @@ internal sealed class ImapControlChannel(IConnection connection, ITransferEvents
     /// reported.
     /// </summary>
     /// <param name="text">The line without its line end.</param>
+    /// <param name="logged">
+    /// What the diagnostic log says was sent when <paramref name="text" /> carries a
+    /// credential, or <see langword="null" /> to log <paramref name="text" /> itself.
+    /// </param>
     /// <returns>A task that completes once the line is sent or the send has failed.</returns>
-    public async ValueTask SendLineAsync(string text)
+    public async ValueTask SendLineAsync(string text, string? logged = null)
     {
+        ImapDiagnosticLogLines.LineSent(log, logged ?? text);
         byte[] line = Encoding.Latin1.GetBytes(text + "\r\n");
         if (await TrySendAsync(line).ConfigureAwait(false))
         {
@@ -184,7 +201,7 @@ internal sealed class ImapControlChannel(IConnection connection, ITransferEvents
         {
             if (line.StartsWith(Tag + " ", StringComparison.Ordinal))
             {
-                return new ImapResponse(StatusOf(line.AsSpan(Tag.Length + 1)), untagged);
+                return Tagged(line, untagged);
             }
 
             if (line.StartsWith("* ", StringComparison.Ordinal))
@@ -197,7 +214,7 @@ internal sealed class ImapControlChannel(IConnection connection, ITransferEvents
             else if (IsContinuation(line))
             {
                 return acceptsContinuation
-                    ? new ImapResponse(ImapResponseStatus.Continuation, [line])
+                    ? Continued(line)
                     : throw new ImapWeirdResponseException(ImapSessionMessages.UnexpectedContinuation);
             }
         }
@@ -228,7 +245,7 @@ internal sealed class ImapControlChannel(IConnection connection, ITransferEvents
         {
             if (line.StartsWith(Tag + " ", StringComparison.Ordinal))
             {
-                return new ImapResponse(StatusOf(line.AsSpan(Tag.Length + 1)), []);
+                return Tagged(line, []);
             }
 
             if (line.StartsWith("* ", StringComparison.Ordinal) && isWanted(line))
@@ -269,6 +286,21 @@ internal sealed class ImapControlChannel(IConnection connection, ITransferEvents
         var bytes = new ReadOnlyMemory<byte>(buffer, bufferStart, take);
         bufferStart += take;
         return bytes;
+    }
+
+    /// <summary>The response a line tagged <see cref="Tag" /> completes, its status logged.</summary>
+    private ImapResponse Tagged(string line, IReadOnlyList<string> untagged)
+    {
+        ImapResponseStatus status = StatusOf(line.AsSpan(Tag.Length + 1));
+        ImapDiagnosticLogLines.ResponseRead(log, Tag, status);
+        return new ImapResponse(status, untagged);
+    }
+
+    /// <summary>The continuation <paramref name="line" /> is, logged without its text.</summary>
+    private ImapResponse Continued(string line)
+    {
+        ImapDiagnosticLogLines.ResponseRead(log, "+", ImapResponseStatus.Continuation);
+        return new ImapResponse(ImapResponseStatus.Continuation, [line]);
     }
 
     private static ImapResponseStatus StatusOf(ReadOnlySpan<char> afterTag) =>
