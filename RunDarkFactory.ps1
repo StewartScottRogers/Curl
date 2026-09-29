@@ -64,6 +64,10 @@
     the 5-hour window to reset before starting its lanes; a used-up weekly window is
     waited out the same way, with a notice rather than the alarm, however long it is.
 
+    A shift keeps this checkout on its branch: if something switched it (Visual Studio did,
+    once), the coordinator switches it back before its shift-end pull, and -Continuous
+    hands the next shift -ShiftBranch so it does the same before it starts (BL-809).
+
     At the end of every shift the coordinator merges the branch into master through a
     pull request, by Stewart's standing permission - only when the CI workflow passed on
     Windows, Linux and macOS for the exact commit being merged.
@@ -208,6 +212,8 @@ param(
     # then merge three made-up lanes into status.json, print it and the board commit built
     # from it (never pushed), and exit.
     [switch]$TestHeartbeat,
+    # Prove Restore-ShiftBranch on a throwaway repository in a temporary folder, and exit.
+    [switch]$TestShiftBranch,
     # How often, in minutes, the lanes' heartbeats are published as status.json on the
     # force-pushed board branch, plus once at shift end. 0 = never publish.
     [ValidateRange(0, 60)][int]$HeartbeatMinutes = 3,
@@ -245,6 +251,10 @@ param(
     # Start the shift somewhere of its own and return at once: a new herdr tab when this
     # is running inside herdr, otherwise a new console window. How Claude starts a shift.
     [switch]$NewTab,
+
+    # The branch the previous shift ran on, handed over by -Continuous: a shift switches
+    # this checkout back to it first, in case something (Visual Studio, once) moved it.
+    [string]$ShiftBranch = '',
 
     # The rest are set by the coordinator when it starts a lane; not for direct use.
     [int]$Lane = 0,
@@ -1493,6 +1503,46 @@ function Invoke-Requeue {
 
 function Get-Dirty { return @(git -C $Root status --porcelain) | Where-Object { $_ } }
 
+function Restore-ShiftBranch {
+    # Switches -Repo back to -Branch when something else checked out another branch under
+    # a running shift (BL-809). Returns '' when it is on -Branch, or why it was left alone.
+    param([string]$Branch, [string]$Repo = $Root)
+    $current = "$(git -C $Repo rev-parse --abbrev-ref HEAD 2>$null)".Trim()
+    if ($current -eq $Branch) { return '' }
+    if (@(git -C $Repo status --porcelain) | Where-Object { $_ }) {
+        return "checkout is on $current, not $Branch, and has uncommitted changes; left alone"
+    }
+    git -C $Repo switch -q $Branch 2>&1 | Out-Null
+    $now = "$(git -C $Repo rev-parse --abbrev-ref HEAD 2>$null)".Trim()
+    if ($now -ne $Branch) { return "checkout is on $current and could not be switched to $Branch" }
+    Write-Trace '-' 'branch' "checkout was on $current; switched back to $Branch" 'Yellow'
+    return ''
+}
+
+if ($TestShiftBranch) {
+    $repo = Join-Path ([IO.Path]::GetTempPath()) "df-shift-branch-$PID"
+    New-Item -ItemType Directory -Force -Path $repo | Out-Null
+    git -C $repo init -q -b master 2>&1 | Out-Null
+    git -C $repo -c user.name=t -c user.email=t@t commit -q --allow-empty -m one 2>&1 | Out-Null
+    git -C $repo branch work 2>&1 | Out-Null
+    $failed = 0
+    $cases = @(
+        ,@('clean switch-back', "'' on work", { $r = Restore-ShiftBranch -Branch work -Repo $repo; "'$r' on $((git -C $repo rev-parse --abbrev-ref HEAD).Trim())" })
+        ,@('already on it', "'' on work", { $r = Restore-ShiftBranch -Branch work -Repo $repo; "'$r' on $((git -C $repo rev-parse --abbrev-ref HEAD).Trim())" })
+        ,@('dirty refusal', "left alone on master", {
+            git -C $repo switch -q master 2>&1 | Out-Null
+            Set-Content -Path (Join-Path $repo 'x.txt') -Value 'x'
+            $r = Restore-ShiftBranch -Branch work -Repo $repo
+            "$(if ($r -match 'left alone$') { 'left alone' } else { $r }) on $((git -C $repo rev-parse --abbrev-ref HEAD).Trim())" }))
+    foreach ($case in $cases) {
+        $got = & $case[2]
+        if ($case[1] -ceq $got) { Write-Host "PASS $($case[0]): $got" -ForegroundColor Green }
+        else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $got" -ForegroundColor Red; $failed++ }
+    }
+    Remove-Item -Recurse -Force -Path $repo -ErrorAction SilentlyContinue
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
 function Invoke-MergeToMaster {
     # Stewart's standing permission (2026-09-27): at the end of a shift, merge the branch
     # into master through a pull request - only when the CI workflow passed, on every
@@ -2273,6 +2323,7 @@ $shiftEnd = (Get-Date).AddHours($Hours)
 # Auto always coordinates lanes, even at one lane.
 if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     try { $Host.UI.RawUI.WindowTitle = "Dark factory - $(if ($AutoLanes) { 'auto' } else { $LaneCount }) lanes" } catch { }
+    if ($ShiftBranch) { $moved = Restore-ShiftBranch -Branch $ShiftBranch; if ($moved) { Write-Trace '-' 'branch' $moved 'Red' } }
     $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
     if ($branch -in 'master', 'main') { Write-Trace '-' 'refuse' "on $branch; switch to a feature branch" 'Red'; exit 1 }
     if (Get-Dirty) { Write-Trace '-' 'refuse' 'working tree not clean; commit or stash first' 'Red'; exit 1 }
@@ -2526,7 +2577,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         Start-Sleep -Seconds 5
     }
 
-    git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null
+    # Something may have checked out another branch here during the shift; pulling into it
+    # would fast-forward the wrong branch.
+    $moved = Restore-ShiftBranch -Branch $branch
+    if ($moved) { Write-Trace '-' 'branch' "$moved; not pulling" 'Red' }
+    else { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
     $stalls = @()
     # Every lane started this shift reports, retired ones included. A lane that blocked a
     # task or stalled keeps its tab for Stewart; so does a lane that never wrote a summary.
@@ -2557,7 +2612,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
         # An Auto shift hands on Auto, not the count it ended at; the next one starts from
         # the count auto-lanes.json saved.
-        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-HeartbeatMinutes', $HeartbeatMinutes, '-Continuous')
+        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-HeartbeatMinutes', $HeartbeatMinutes, '-Continuous', '-ShiftBranch', $branch)
         if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
         if ($WeeklyPace) { $forward += '-WeeklyPace' }
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
@@ -2581,6 +2636,7 @@ if ($Lane) {
     if (-not $Branch) { Write-Trace '-' 'refuse' 'a lane needs -Branch' 'Red'; exit 1 }
     $branch = $Branch
 } else {
+    if ($ShiftBranch) { $moved = Restore-ShiftBranch -Branch $ShiftBranch; if ($moved) { Write-Trace '-' 'branch' $moved 'Red' } }
     $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
     if ($branch -in 'master', 'main') { Write-Trace '-' 'refuse' "on $branch; switch to a feature branch" 'Red'; exit 1 }
     if (Get-Dirty) { Write-Trace '-' 'refuse' 'working tree not clean; commit or stash first' 'Red'; exit 1 }

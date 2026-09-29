@@ -28,14 +28,14 @@ would have stopped the factory without an alarm.
 
 ## Acceptance criteria
 
-- [ ] A function `Restore-ShiftBranch -Branch <name> [-Repo <path>]` switches a clean
+- [x] A function `Restore-ShiftBranch -Branch <name> [-Repo <path>]` switches a clean
       checkout that is on another branch back to `<name>` and traces it; it returns a
       reason, and switches nothing, when the tree is dirty.
-- [ ] The coordinator calls it before the shift-end pull, and skips the pull with a red
+- [x] The coordinator calls it before the shift-end pull, and skips the pull with a red
       trace when it returns a reason.
-- [ ] `-Continuous` hands the next shift `-ShiftBranch <branch>`; a coordinator or single
+- [x] `-Continuous` hands the next shift `-ShiftBranch <branch>`; a coordinator or single
       runner given `-ShiftBranch` restores that branch before reading HEAD.
-- [ ] `-TestShiftBranch` builds a throwaway repository in a temporary folder, proves the
+- [x] `-TestShiftBranch` builds a throwaway repository in a temporary folder, proves the
       clean switch-back and the dirty refusal, and exits 0.
 
 ## Notes
