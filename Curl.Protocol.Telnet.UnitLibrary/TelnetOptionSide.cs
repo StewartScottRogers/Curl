@@ -10,11 +10,13 @@ namespace Curl.Protocol.Telnet;
 /// <param name="disableCommand">The command this side sends to disable an option.</param>
 /// <param name="preferredOptions">The options this side agrees to enable.</param>
 /// <param name="log">Where each command sent, and each request or offer refused, is logged.</param>
+/// <param name="trace">Where each command sent is reported for <c>-v</c> and <c>--trace</c>.</param>
 internal sealed class TelnetOptionSide(
     byte enableCommand,
     byte disableCommand,
     byte[] preferredOptions,
-    TelnetDiagnosticLog log)
+    TelnetDiagnosticLog log,
+    TelnetTraceReporter trace)
 {
     private readonly TelnetOptionState[] states = new TelnetOptionState[256];
 
@@ -82,6 +84,7 @@ internal sealed class TelnetOptionSide(
     private void AppendCommand(List<byte> replies, byte command, byte option)
     {
         log.OptionSent(command, option);
+        trace.OptionSent(command, option);
         replies.Add(TelnetByte.InterpretAsCommand);
         replies.Add(command);
         replies.Add(option);

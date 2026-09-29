@@ -43,9 +43,11 @@ internal static class TelnetOptionParser
 
     private const string BinaryName = "BINARY";
 
-    private const string UnknownOptionMessage = "An unknown option was passed in to libcurl";
+    /// <summary>The exit 48 text curl prints, without a <c>-v</c> line, for an option name of a known one's length that matches none.</summary>
+    internal const string UnknownOptionMessage = "An unknown option was passed in to libcurl";
 
-    private const string BadFunctionArgumentMessage = "A libcurl function was given a bad argument";
+    /// <summary>The exit 43 text curl prints, without a <c>-v</c> line, for a non-ASCII user name.</summary>
+    internal const string BadFunctionArgumentMessage = "A libcurl function was given a bad argument";
 
     /// <summary>
     /// The most user name characters curl 8.21.0 sends: it formats <c>USER,</c> and the

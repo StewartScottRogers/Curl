@@ -44,6 +44,12 @@ namespace Curl.Protocol.Telnet;
 /// <c>USER</c>, a non-ASCII one ends the transfer with exit 43, and a bad option with
 /// exit 48 or 49, before a byte is sent.
 /// </para>
+/// <para>
+/// After connecting, <see cref="ITransferContext.Events" /> gets what curl 8.21.0's
+/// <c>-v</c> and <c>--trace</c> show (measured, BL-935), through
+/// <see cref="TelnetTraceReporter" />: each negotiation and subnegotiation received and
+/// sent, each run of output data as data received, and the line the connection ends with.
+/// </para>
 /// </remarks>
 public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandler
 {
@@ -123,6 +129,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
         log.SessionStarted(target.Host, target.Port);
         context.Progress.ReportTransferStarted();
+        var trace = new TelnetTraceReporter(context.Events);
         await using (connection.ConfigureAwait(false))
         {
             var optionValues = new TelnetOptionValues();
@@ -130,8 +137,9 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
                 context.Credentials?.UserName,
                 context.TelnetOptions,
                 optionValues)
-                ?? await RunSessionAsync(connection, context, optionValues, log, startedAt).ConfigureAwait(false);
+                ?? await RunSessionAsync(connection, context, new TelnetReceiver(optionValues, log, trace), startedAt).ConfigureAwait(false);
             log.SessionEnded(result, context.TimeProvider.GetElapsedTime(sessionStarted));
+            trace.ConnectionEnded(result, connect.ConnectionNumber);
             return result;
         }
     }
@@ -139,8 +147,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     private static async Task<TransferResult> RunSessionAsync(
         IConnection connection,
         ITransferContext context,
-        TelnetOptionValues optionValues,
-        TelnetDiagnosticLog log,
+        TelnetReceiver receiver,
         long startedAt)
     {
         var sendLock = new SemaphoreSlim(1, 1);
@@ -152,7 +159,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
         try
         {
-            return await ReceiveUntilClosedAsync(connection, context, new TelnetReceiver(optionValues, log), sendLock, uploadSendFailed.Task, startedAt)
+            return await ReceiveUntilClosedAsync(connection, context, receiver, sendLock, uploadSendFailed.Task, startedAt)
                 .ConfigureAwait(false);
         }
         finally
