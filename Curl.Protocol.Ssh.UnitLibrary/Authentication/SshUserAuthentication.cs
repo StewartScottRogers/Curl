@@ -8,7 +8,7 @@ namespace Curl.Protocol.Ssh.Authentication;
 
 /// <summary>
 /// The client side of SSH user authentication (RFC 4252, RFC 4256) as curl 8.21.0 drives
-/// libssh2 1.11.1 through it (ADR-0214): the <c>ssh-userauth</c> service request, which
+/// libssh2 1.11.1 through it (ADR-0215): the <c>ssh-userauth</c> service request, which
 /// libssh2 sends as the last step of starting the session, before the host key is
 /// checked; then, after the check, a <c>none</c> request for the server's method list,
 /// <c>password</c> and <c>keyboard-interactive</c>, in that order.

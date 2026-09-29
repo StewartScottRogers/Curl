@@ -16,7 +16,7 @@ namespace Curl.Protocol.Ssh.Authentication;
 /// Pins <see cref="SshUserAuthentication" /> against an in-memory peer: the client's
 /// messages byte for byte and the outcome of each case measured 2026-09-29 with curl
 /// 8.21.0 (libssh2 1.11.1, WinCNG) against a loopback server built from this library
-/// (BL-567, ADR-0214).
+/// (BL-567, ADR-0215).
 /// </summary>
 [TestClass]
 public sealed class SshUserAuthenticationTests
