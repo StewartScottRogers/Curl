@@ -1,5 +1,5 @@
 ---
-id: BL-913
+id: BL-915
 title: Pass the HTTPS server certificate's tls-server-end-point bindings to the hand-built Kerberos Negotiate
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-913 — Pass the HTTPS server certificate's tls-server-end-point bindings to the hand-built Kerberos Negotiate
+# BL-915 — Pass the HTTPS server certificate's tls-server-end-point bindings to the hand-built Kerberos Negotiate
 
 ## Goal
 

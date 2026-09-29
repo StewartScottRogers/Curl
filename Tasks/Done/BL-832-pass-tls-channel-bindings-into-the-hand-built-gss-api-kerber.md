@@ -32,14 +32,14 @@ completed: 2026-09-29
 - Filed by BL-691.
 - **Answer: yes, curl with MIT sends channel bindings over HTTPS.** Recorded 2026-09-29 and written into ADR-0171 as an amendment ("Channel bindings").
 - **Which curl.** The only Linux curl at hand was WSL Ubuntu's 8.18.0 (OpenSSL 3.5.5, `mit-krb5/1.22.1`); 8.21.0 exists here only as the Windows Schannel/SSPI build, which does not use MIT. I took 8.18.0 as the measurement and said so in the ADR. A newer curl is not expected to drop bindings it already sends.
-- **How it was recorded** (reusable by BL-914):
+- **How it was recorded** (reusable by BL-916):
   1. WSL's user-space MIT KDC from an earlier lane (`~/krbtools`, realm `EXAMPLE.TEST`, `alice`/`alicepw`, `HTTP/server.example.test` in `kdc/http.keytab`, KDC on 127.0.0.1:18888).
   2. A throwaway WSL script started the KDC, ran `kinit alice`, fetched the served certificate with `openssl s_client`, then ran `/usr/bin/curl -sk --negotiate -u : --resolve server.example.test:18443:<host IP> https://server.example.test:18443/`.
   3. `Record-CurlExchange.ps1 -Tls -ListenAddress <Windows host WSL IP> -Connections 3 -Curl wsl.exe` served 401 `WWW-Authenticate: Negotiate` then 200. No script change was needed.
   4. A throwaway C# file-based app referencing `Curl.Kerberos.UnitLibrary` pulled the AP-REQ out of the recorded SPNEGO token and decrypted its authenticator with the ccache's HTTP session key (usage 11).
 - **Result.** `Bnd` was `CCA1946F38023F173903A4E68BDCCCEA`, which is exactly MD5(00x16 || LE32(len) || "tls-server-end-point:" || SHA-256(cert)) for the sha256RSA certificate with SHA-256 `D7AD5D5F…568B08`. An earlier run with a different throwaway certificate also gave a non-zero `Bnd`.
-- **Design.** `KerberosGssContextOptions.ChannelBindings` (`byte[]?`) is the application data only. curl never passes addresses, so address types are 0 and empty. `null` keeps the zeros. Building `tls-server-end-point:` from the connection's certificate belongs to the caller: filed as BL-913 (`Curl.Authentication.UnitLibrary`).
-- **Found on the way.** The recorded checksum flags were `0x136`: MIT sends `GSS_C_TRANS_FLAG`, which contradicts ADR-0171's "Flags" bullet. Filed as BL-914 rather than widening this task.
+- **Design.** `KerberosGssContextOptions.ChannelBindings` (`byte[]?`) is the application data only. curl never passes addresses, so address types are 0 and empty. `null` keeps the zeros. Building `tls-server-end-point:` from the connection's certificate belongs to the caller: filed as BL-915 (`Curl.Authentication.UnitLibrary`).
+- **Found on the way.** The recorded checksum flags were `0x136`: MIT sends `GSS_C_TRANS_FLAG`, which contradicts ADR-0171's "Flags" bullet. Filed as BL-916 rather than widening this task.
 - Tests: `NextToken_ChannelBindings_PutsTheirMd5InTheChecksumAsCurlWithMitDoes` (the recorded value) and `NextToken_ChannelBindings_HashesTheRfc2744StructureWithNoAddresses` (a hand-computed MD5 over "abc", `420B92DA…`). The existing zero-`Bnd` pin still covers no bindings.
 - Added the ADR-0171 file to `touches` so it could be amended. No task in Doing names it.
 

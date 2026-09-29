@@ -1,5 +1,5 @@
 ---
-id: BL-914
+id: BL-916
 title: Send MIT's GSS_C_TRANS_FLAG (0x100) in the hand-built Kerberos checksum flags as measured
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-914 — Send MIT's GSS_C_TRANS_FLAG (0x100) in the hand-built Kerberos checksum flags as measured
+# BL-916 — Send MIT's GSS_C_TRANS_FLAG (0x100) in the hand-built Kerberos checksum flags as measured
 
 ## Goal
 

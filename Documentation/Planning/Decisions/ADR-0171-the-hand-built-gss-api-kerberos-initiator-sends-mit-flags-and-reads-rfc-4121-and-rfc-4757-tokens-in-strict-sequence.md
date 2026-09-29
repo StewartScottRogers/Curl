@@ -78,9 +78,9 @@ written independently from the RFCs.
   exactly the MD5 of that structure over `tls-server-end-point:` followed by the SHA-256 of
   the served sha256RSA certificate (`D7AD5D5F…568B08`), RFC 5929's binding. Plain HTTP
   passes none, so its `Bnd` stays zero. `KerberosGssContextTests` pin both values. Taking
-  the certificate hash from the HTTPS connection is the caller's (BL-913). The same
+  the certificate hash from the HTTPS connection is the caller's (BL-915). The same
   recording showed MIT's checksum flags as `0x136`, `GSS_C_TRANS_FLAG` included, against
-  the "Flags" bullet above; BL-914 re-measures and aligns it.
+  the "Flags" bullet above; BL-916 re-measures and aligns it.
 
 ## Consequences
 
@@ -88,7 +88,7 @@ written independently from the RFCs.
   can run the Kerberos mechanism with nothing more than a service ticket.
 - `--delegation` (BL-631) works on the hand-built route once a forwarded TGT is fetched.
 - Channel bindings are sent when the caller gives them (BL-832); the hand-built Negotiate
-  route passing the HTTPS server certificate's is BL-913.
+  route passing the HTTPS server certificate's is BL-915.
 
 ## Alternatives considered
 
