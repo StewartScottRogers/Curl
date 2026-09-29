@@ -6,7 +6,7 @@ namespace Curl.Protocol.Ftp;
 
 /// <summary>
 /// Pins what curl 8.21.0 does with each kind of <c>PASS</c> reply, and which exit code a data
-/// connection that cannot be reached ends with (BL-662, ADR-0215). Every case was recorded
+/// connection that cannot be reached ends with (BL-662, ADR-0216). Every case was recorded
 /// with <c>Record-CurlExchange.ps1 -Ftp -FtpReply</c> and <c>curl -sS -u u:p</c>. curl 8.21.0
 /// never ends with exit 11 for a <c>PASS</c> reply (only for a refused <c>ACCT</c>, BL-635)
 /// and never with exit 15: the data connection's host goes through the ordinary connect,
