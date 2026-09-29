@@ -80,6 +80,18 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// </remarks>
     public string? PoolScheme { get; init; }
 
+    /// <summary>
+    /// Gets the alternative service to dial in place of <see cref="Host" /> and
+    /// <see cref="Port" /> (<c>--alt-svc</c>), or <see langword="null" />, the default, to dial
+    /// them.
+    /// </summary>
+    /// <remarks>
+    /// The connector resolves and dials the alternative as it would a <c>--connect-to</c>
+    /// destination, and TLS still verifies <see cref="Host" />. A <c>--connect-to</c> mapping
+    /// that matches <see cref="Host" /> and <see cref="Port" /> wins over it, as in curl.
+    /// </remarks>
+    public AltSvcRoute? AltSvcRoute { get; init; }
+
     private static string RequireHost(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host, nameof(Host));

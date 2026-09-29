@@ -163,4 +163,21 @@ public sealed record HttpRequestOptions
     /// through an HTTP-kind proxy with CONNECT even for an <c>http://</c> URL.
     /// </summary>
     public bool ProxyTunnel { get; init; }
+
+    /// <summary>
+    /// Gets the alternative service this transfer connects to in place of its origin
+    /// (<c>--alt-svc</c>), or <see langword="null" />, the default, to connect to the origin.
+    /// </summary>
+    /// <remarks>
+    /// The handler puts it on the <see cref="ConnectTarget" /> for the connector to dial and
+    /// sends <c>Alt-Used: &lt;host&gt;:&lt;port&gt;</c> naming the alternative, unless an
+    /// <c>-H</c> value names <c>Alt-Used</c>.
+    /// </remarks>
+    public AltSvcRoute? AltSvcRoute { get; init; }
+
+    /// <summary>
+    /// Gets the store each <c>Alt-Svc</c> header of an HTTPS response is handed to
+    /// (<c>--alt-svc</c>), or <see langword="null" />, the default, to learn none.
+    /// </summary>
+    public IAltSvcStore? AltSvcStore { get; init; }
 }
