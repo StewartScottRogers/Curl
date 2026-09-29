@@ -48,4 +48,4 @@ beyond RFC 3961's key production. Three points had a choice:
 
 - RFC 3961 appendix A.3 and A.4 and MIT's `t_decrypt.c` and `t_cksums.c` vectors pin it.
 - A GSS-API context whose key is des3 still gets RFC 4121 tokens; MIT makes RFC 1964-style
-  DES3 tokens for it. BL-958 builds those.
+  DES3 tokens for it. BL-962 builds those.

@@ -44,7 +44,7 @@ completed: 2026-09-29
 - Tests that used 16 as the "unsupported" type now use 3 (`des-cbc-md5`), 1 (`des-cbc-crc`)
   and `arcfour-hmac-exp` with `allow_weak_crypto`.
 - Added the ADR file to `touches` (no task in Doing names it).
-- Follow-up: BL-958, RFC 1964-style DES3 GSS Wrap/MIC tokens for a des3 context key (today
+- Follow-up: BL-962, RFC 1964-style DES3 GSS Wrap/MIC tokens for a des3 context key (today
   such a key would get RFC 4121 tokens, which MIT refuses).
 
 ## Log

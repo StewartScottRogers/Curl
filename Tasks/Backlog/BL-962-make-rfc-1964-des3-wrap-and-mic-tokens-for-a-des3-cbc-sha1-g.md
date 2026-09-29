@@ -1,5 +1,5 @@
 ---
-id: BL-958
+id: BL-962
 title: Make RFC 1964 DES3 Wrap and MIC tokens for a des3-cbc-sha1 GSS context key
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-958 — Make RFC 1964 DES3 Wrap and MIC tokens for a des3-cbc-sha1 GSS context key
+# BL-962 — Make RFC 1964 DES3 Wrap and MIC tokens for a des3-cbc-sha1 GSS context key
 
 ## Goal
 
