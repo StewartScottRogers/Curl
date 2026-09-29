@@ -9,9 +9,18 @@ framing (RFC 9114) - frames, the control and QPACK encoder and decoder streams,
 Namespace `Curl.Http3`. QPACK is here (BL-729, ADR-0164): `QpackEncoder` and
 `QpackDecoder` over `QpackStaticTable`, `QpackDynamicTable`, `QpackPrimitives` and
 `QpackRequiredInsertCount`, failing with `QpackException` and its `QpackErrorCode`. Both
-work on byte spans and queue their stream instructions for the caller to take; nothing
-reads or writes a stream yet. The frame, control stream and QPACK stream layer lands with
-BL-730.
+work on byte spans and queue their stream instructions for the caller to take.
+
+HTTP/3 framing is here too (BL-730, ADR-0165): `Http3Frame` and its seven subclasses
+(`Http3DataFrame`, `Http3HeadersFrame`, `Http3CancelPushFrame`, `Http3SettingsFrame`,
+`Http3PushPromiseFrame`, `Http3GoawayFrame`, `Http3MaxPushIdFrame`) write themselves with
+`ToBytes`; `Http3FrameReader` reads them off a stream, skipping unknown and grease types.
+`Http3LocalUnidirectionalStreams` opens the client's control stream with curl's
+`SETTINGS` and its QPACK encoder and decoder streams; `Http3PeerUnidirectionalStreams`
+sorts the server's streams by type, `Http3ControlStreamReader` reads its control stream
+and `Http3PeerQpackStreams` feeds its QPACK streams to `QpackDecoder` and `QpackEncoder`.
+Every RFC 9114 violation is an `Http3Exception` carrying its `Http3ErrorCode`. Request
+streams (sending a request, reading a response) land with BL-731.
 
 ## Rules
 
