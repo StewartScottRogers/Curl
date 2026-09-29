@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-697, BL-698, BL-671, BL-672, BL-673]
-touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Documentation/Planning/Decisions/ADR-0143-the-tls-1-3-client-handshake-takes-its-key-shares-and-extension-order-from-its-caller.md, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Documentation/Planning/Decisions/ADR-0146-the-tls-1-3-client-handshake-takes-its-key-shares-and-extension-order-from-its-caller.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-28
 completed: 2026-09-28
@@ -38,7 +38,7 @@ The hand-built client runs a full TLS 1.3 client handshake as a message-level st
   `TlsCertificatePublicKey` for the CertificateVerify check, and `TlsSigningKey`
   (RSA-PSS, ECDSA, Ed25519) for client certificates. Added the
   `Curl.Cryptography.UnitLibrary` reference (X25519, Ed25519, finite-field DH).
-- Decisions in ADR-0143 (Decided by Claude under Stewart's delegation): key shares come
+- Decisions in ADR-0146 (Decided by Claude under Stewart's delegation): key shares come
   from `ITlsRandomSource.CreateKeyShare`, because importing a P-256 private key without its
   public point is not portable; the ClientHello extension order is data in the settings,
   so RFC 8448's hellos and BL-708's profiles are settings rather than code; `padding`
@@ -47,7 +47,7 @@ The hand-built client runs a full TLS 1.3 client handshake as a message-level st
   `ECDiffieHellman.Create` throw `PlatformNotSupportedException`, not
   `CryptographicException` (measured 2026-09-28). After completion only NewSessionTicket is
   taken. KeyUpdate is left to BL-700.
-- Touches: added the ADR-0143 file and `Documentation/Planning/Decisions/README.md` to
+- Touches: added the ADR-0146 file and `Documentation/Planning/Decisions/README.md` to
   record the decision. No task in Doing names either.
 - RFC 8448 sections 3 and 5 replay byte for byte: both ClientHellos, both client
   Finished messages, and every handshake and application secret, the exporter and
