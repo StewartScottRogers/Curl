@@ -189,6 +189,11 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
   drive-less URL such as `file:///dir/x` unless the drive letter is what the test is
   about. Where curl's answer differs by platform, pin each platform's answer in its own
   test (`[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]` for the other).
+- **`--ai-help` keeps pace with the options.** `curl --ai-help` is Markdown help for AI
+  agents beside the human `--help` (BL-911): a short index by default,
+  `--ai-help <category>` or `all` for the full reference. Every task that adds or
+  changes a command-line option also keeps `--ai-help` right, and says so in its
+  acceptance criteria.
 - Nullable reference types enabled, warnings treated as errors.
 - File-scoped namespaces; namespace matches folder path.
 - Central package management through `Directory.Packages.props`; never put a `Version` attribute on a `PackageReference` in a project file.
