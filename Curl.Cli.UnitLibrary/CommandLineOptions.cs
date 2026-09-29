@@ -705,6 +705,27 @@ public sealed class CommandLineOptions
     public string? DnsIPv6Address { get; internal set; }
 
     /// <summary>
+    /// The last <c>--doh-url</c>, the DNS-over-HTTPS server every host name is resolved through, verbatim
+    /// and unchecked; <see langword="null"/> when not given, or when the last value was empty, which curl
+    /// 8.21.0 accepts and which turns DoH off again (BL-642). A value curl cannot use as a DoH URL fails
+    /// each transfer with exit 6 when it resolves, not the parse.
+    /// </summary>
+    public string? DohUrl { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--doh-insecure</c> was given and no <c>--no-doh-insecure</c> came after
+    /// it: skip verification of the DoH server's certificate. <c>-k</c> never reaches the DoH server.
+    /// </summary>
+    public bool DohInsecure { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--doh-cert-status</c> was given and no <c>--no-doh-cert-status</c> came
+    /// after it: require a good OCSP response stapled to the DoH server's certificate, as
+    /// <see cref="RequireCertificateStatus"/> does for the transfer's server.
+    /// </summary>
+    public bool DohCertificateStatus { get; internal set; }
+
+    /// <summary>
     /// The path of the Unix domain socket to connect through, from whichever of <c>--unix-socket</c> and
     /// <c>--abstract-unix-socket</c> came last; <see langword="null"/> when neither was given. curl 8.21.0
     /// refuses an empty path as blank and accepts any other without looking at it, on Windows too (measured
