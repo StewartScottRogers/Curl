@@ -39,4 +39,27 @@ public interface IConnector
     /// a failed result instead.
     /// </exception>
     ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Opens a QUIC connection to <paramref name="target" />, negotiating HTTP/3 in its
+    /// TLS 1.3 handshake: the seam the HTTP handler takes for <c>--http3</c> and
+    /// <c>--http3-only</c> (ADR-0144).
+    /// </summary>
+    /// <param name="target">The host and port to connect to.</param>
+    /// <param name="cancellationToken">Cancels the resolve and handshake.</param>
+    /// <returns>
+    /// <see cref="MultiplexedConnectResult.Connected(IMultiplexedConnection, ConnectTimings?)" />
+    /// with the open connection, or
+    /// <see cref="MultiplexedConnectResult.Failed(CurlExitCode, string)" /> carrying curl's
+    /// exit code and message. The default, for a connector with no QUIC, fails with
+    /// <see cref="CurlExitCode.CouldntConnect" /> (7) and <c>QUIC is not available on this
+    /// connector</c>, so every existing connector and test fake compiles unchanged;
+    /// <c>Curl.Networking</c>'s connector overrides it.
+    /// </returns>
+    /// <exception cref="OperationCanceledException">
+    /// <paramref name="cancellationToken" /> was cancelled. This is the only exception an
+    /// implementation may let escape.
+    /// </exception>
+    ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC is not available on this connector"));
 }
