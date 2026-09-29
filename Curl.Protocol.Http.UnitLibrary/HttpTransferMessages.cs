@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Net.Sockets;
 
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Protocol.Http;
 
 /// <summary>
@@ -382,15 +384,18 @@ internal static class HttpTransferMessages
             $"Too large response headers: {headSize} > {HttpResponseHeadBuilder.MaximumHeadSize}");
 
     /// <summary>
-    /// Chooses the exit 56 message for a failed read: <see cref="ConnectionReset" /> when the
-    /// peer reset the connection, and <see cref="ReceiveFailed" /> for anything else.
+    /// Chooses the exit 56 message for a failed read: the TLS build's own text when the
+    /// connection ended without <c>close_notify</c> (ADR-0213), <see cref="ConnectionReset" />
+    /// when the peer reset the connection, and <see cref="ReceiveFailed" /> for anything else.
     /// </summary>
     /// <param name="exception">The failure the read threw.</param>
     /// <returns>The message.</returns>
     internal static string ReceiveFailure(IOException exception) =>
-        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
-            ? ConnectionReset
-            : ReceiveFailed;
+        exception is MissingCloseNotifyException
+            ? exception.Message
+            : exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
+                ? ConnectionReset
+                : ReceiveFailed;
 
     /// <summary>
     /// The exit 55 message for a write the peer reset (measured, BL-174 Notes).
