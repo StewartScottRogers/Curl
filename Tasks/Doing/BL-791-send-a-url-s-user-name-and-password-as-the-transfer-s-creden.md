@@ -33,3 +33,4 @@ A URL with user information (`http://zz:x@host/`, `ftp://u:p@host/f`) sends that
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
