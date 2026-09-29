@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions, Documentation/Product/Requirements.md]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-937 — Decide Curl's own --log-level diagnostic log: levels, sinks, line format and the no-extra-bytes guarantee
 
@@ -37,17 +37,19 @@ The decisions to record, as decided here (the ADR may sharpen wording, not rever
 
 ## Acceptance criteria
 
-- [ ] A new ADR exists in `Documentation/Planning/Decisions` with the next unused number (check the folder; 0221 was the lowest unused number at filing; duplicate numbers exist, so look for the number itself, not the file count), marked "Decided by Claude under Stewart's delegation", stating decisions 1 to 10 above and naming BL-938 and BL-917 to BL-929 as the tasks that build it.
-- [ ] The ADR states the departure from real curl (exit 2 for the unknown option) and why it cannot break a working script, as the `--ai-help` departure is recorded.
-- [ ] The ADR is indexed in `Documentation/Planning/Decisions/README.md` with a one-line summary.
-- [ ] `Documentation/Product/Requirements.md` has a new FR row (next unused FR number) for `--log-level`/`--log-file`, stating the levels, the default `none` with zero extra bytes, the line format and the refusal of a bad level with exit 2, with status `Draft` and the ADR linked.
-- [ ] No `.cs` or project file is changed.
+- [x] A new ADR exists in `Documentation/Planning/Decisions` with the next unused number (check the folder; 0221 was the lowest unused number at filing; duplicate numbers exist, so look for the number itself, not the file count), marked "Decided by Claude under Stewart's delegation", stating decisions 1 to 10 above and naming BL-938 and BL-917 to BL-929 as the tasks that build it.
+- [x] The ADR states the departure from real curl (exit 2 for the unknown option) and why it cannot break a working script, as the `--ai-help` departure is recorded.
+- [x] The ADR is indexed in `Documentation/Planning/Decisions/README.md` with a one-line summary.
+- [x] `Documentation/Product/Requirements.md` has a new FR row (next unused FR number) for `--log-level`/`--log-file`, stating the levels, the default `none` with zero extra bytes, the line format and the refusal of a bad level with exit 2, with status `Draft` and the ADR linked.
+- [x] No `.cs` or project file is changed.
 
 ## Notes
 
+- ADR-0222 written (0222 was the next unused number across master and every lane branch on 2026-09-29) and indexed; FR-107 added under a new "Curl's own diagnostic log" section of Requirements.md. Delivered directly rather than through align-and-document: a pure docs change inside `touches`. No `.cs` or project file changed, so the verify skill had nothing to verify; `git status` shows only Markdown.
 - Siblings in Part B (curl's own verbosity): BL-930 to BL-936, and the already filed BL-649, BL-850, BL-578, BL-598, BL-660, BL-734, BL-773.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. ADR-0222 and FR-107 fix the --log-level/--log-file diagnostic log design for BL-938 and BL-917 to BL-929
