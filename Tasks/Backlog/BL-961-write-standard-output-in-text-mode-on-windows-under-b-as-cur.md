@@ -1,5 +1,5 @@
 ---
-id: BL-956
+id: BL-961
 title: Write standard output in text mode on Windows under -B, as curl's tool does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-956 — Write standard output in text mode on Windows under -B, as curl's tool does
+# BL-961 — Write standard output in text mode on Windows under -B, as curl's tool does
 
 ## Goal
 
