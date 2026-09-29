@@ -100,6 +100,49 @@ public sealed class CurlCommandRunnerRedirectTests
     /// <see cref="ScriptedConnector" /> serving <paramref name="responses" />, one per
     /// connection, and <see cref="outputFiles" /> as the <c>-o</c> file system.
     /// </summary>
+    [TestMethod]
+    [DataRow("=https")]
+    [DataRow("-http")]
+    public async Task RunAsync_ProtoExcludesTheUrlScheme_Exits1ProtocolDisabledWithoutARequest(string proto)
+    {
+        // Measured against curl 8.21.0 on 2026-09-28 (BL-523 Notes): curl -sS --proto =https
+        // http://127.0.0.1:48523/ -> exit 1, "curl: (1) Protocol "http" is disabled", no request.
+        int exitCode = await RunAsync([Ok], "-sS", "--proto", proto, Url);
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual("curl: (1) Protocol \"http\" is disabled" + NewLine, StandardErrorText);
+        Assert.AreEqual(string.Empty, RequestsText);
+    }
+
+    [TestMethod]
+    [DataRow("file:///dir/x", "file")]
+    [DataRow("dict://127.0.0.1:48523/x", "dict")]
+    public async Task RunAsync_LocationToASchemeOutsideTheDefaultRedirectSet_Exits1ProtocolDisabledInRedirect(string target, string scheme)
+    {
+        // curl -sS -L, Location: file:///dir/x -> exit 1, "curl: (1) Protocol "file" is disabled (in redirect)" (BL-523 Notes).
+        int exitCode = await RunAsync([RedirectTo(target)], "-L", "-sS", Url);
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual($"curl: (1) Protocol \"{scheme}\" is disabled (in redirect)" + NewLine, StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow("file:///dir/x", "file", "--proto-redir", "=http,dict")]
+    [DataRow("dict://127.0.0.1:48523/x", "dict", "--proto", "=http")]
+    public async Task RunAsync_ProtoRedirOrProtoExcludesTheLocationScheme_Exits1ProtocolDisabledInRedirect(string target, string scheme, string option, string value)
+    {
+        // curl -sS -L --proto-redir =http,dict, Location: file:///dir/x, and curl -sS -L --proto =http
+        // --proto-redir =http,dict, Location: dict://... -> exit 1, "Protocol "..." is disabled (in redirect)" (BL-523 Notes).
+        int exitCode = await RunAsync([RedirectTo(target)], "-L", "-sS", "--proto-redir", "=http,dict", option, value, Url);
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual($"curl: (1) Protocol \"{scheme}\" is disabled (in redirect)" + NewLine, StandardErrorText);
+        Assert.AreEqual("GET /a HTTP/1.1\r\n" + Request, RequestsText);
+    }
+
+    private static string RedirectTo(string target) =>
+        $"HTTP/1.1 302 Found\r\nLocation: {target}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+
     private Task<int> RunAsync(string[] responses, params string[] arguments)
     {
         server = new ScriptedConnector(responses.Select(Encoding.Latin1.GetBytes));

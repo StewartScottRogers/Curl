@@ -76,6 +76,21 @@ public sealed class RedirectPolicyMappingTests
         Assert.IsTrue(Map("--location-trusted", Url).LocationTrusted);
     }
 
+    [TestMethod]
+    public void FromCommandLine_NoProto_AllowsEverySchemeForEveryUrl()
+    {
+        Assert.IsNull(Map("-L", Url).AllowedTransferSchemes);
+    }
+
+    [TestMethod]
+    public void FromCommandLine_ProtoAndProtoRedir_CopiesBothSchemeSets()
+    {
+        RedirectPolicy policy = Map("-L", "--proto", "=http,https", "--proto-redir", "=http,dict", Url);
+
+        CollectionAssert.AreEquivalent(new[] { "http", "https" }, policy.AllowedTransferSchemes!.ToArray());
+        CollectionAssert.AreEquivalent(new[] { "http", "dict" }, policy.AllowedSchemes.ToArray());
+    }
+
     private static RedirectPolicy Map(params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
