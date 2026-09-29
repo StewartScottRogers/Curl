@@ -29,13 +29,13 @@ exits with it. With six lanes building at once, the fast tests alone can pass 10
 
 ## Acceptance criteria
 
-- [ ] `Invoke-TaskRun` starts `claude` with `BASH_DEFAULT_TIMEOUT_MS=1800000` and
+- [x] `Invoke-TaskRun` starts `claude` with `BASH_DEFAULT_TIMEOUT_MS=1800000` and
       `BASH_MAX_TIMEOUT_MS=3600000` in its environment.
-- [ ] `$Prompt`, `$LanePrompt` and `$ResolvePrompt` each carry a rule: the run ends when
+- [x] `$Prompt`, `$LanePrompt` and `$ResolvePrompt` each carry a rule: the run ends when
       the reply ends, and anything in the background dies with it. So build and test in
       the foreground with the Bash tool and a timeout of up to 3600000 ms, and never end
       the reply to wait for a notification.
-- [ ] The script parses and `-TestAutoLanes`, `-TestMachineProbe` and `-TestShiftBranch`
+- [x] The script parses and `-TestAutoLanes`, `-TestMachineProbe` and `-TestShiftBranch`
       pass.
 
 ## Notes

@@ -1631,6 +1631,10 @@ Rules for this unattended run, in addition to CLAUDE.md:
 5. If the task ends Blocked or back in Backlog, commit only the task board change and
    push it. Leave any unfinished code uncommitted; the shift stashes it.
 6. The task must not be left in Doing.
+7. This run ends the moment your reply ends, and anything still in the background - a
+   command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
+   dotnet build and dotnet test in the foreground with the Bash tool and a timeout of up
+   to 3600000 ms, and never end your reply to wait for a notification.
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -1685,6 +1689,10 @@ Rules for this unattended run, in addition to CLAUDE.md:
 6. If the task ends Blocked or back in Backlog, commit only the task board change.
    Leave any unfinished code uncommitted; the shift stashes it.
 7. The task must not be left in Doing.
+8. This run ends the moment your reply ends, and anything still in the background - a
+   command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
+   dotnet build and dotnet test in the foreground with the Bash tool and a timeout of up
+   to 3600000 ms, and never end your reply to wait for a notification.
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -1709,6 +1717,9 @@ stopped on conflicts. Resolve them:
 4. Run `dotnet build` and `dotnet test --filter "TestCategory!=Integration"`; fix what
    the merge broke, and commit the fix.
 5. Never run git rebase --abort, git reset, git push, or git checkout of another branch.
+6. This run ends the moment your reply ends, and anything still in the background dies
+   with it. Run dotnet build and dotnet test in the foreground with the Bash tool and a
+   timeout of up to 3600000 ms, and never end your reply to wait for a notification.
 
 End your reply with exactly one line, either
 FACTORY: RESOLVED {ID}
@@ -1841,6 +1852,11 @@ function Invoke-TaskRun {
     $denied = ($Deny | ForEach-Object { "`"Bash($_`:*)`" `"PowerShell($_`:*)`"" }) -join ' '
     $psi.Arguments = "/d /c claude -p --model $Model --dangerously-skip-permissions --output-format stream-json --verbose --disallowedTools $denied 2>`"$err`""
     $psi.WorkingDirectory = $Root
+    # A tool call past its timeout is moved to the background, and a headless run that then
+    # ends its reply to wait for it exits with the task still in Doing (BL-855): give Bash
+    # calls room for a build and the fast tests while six lanes build at once.
+    $psi.EnvironmentVariables['BASH_DEFAULT_TIMEOUT_MS'] = '1800000'
+    $psi.EnvironmentVariables['BASH_MAX_TIMEOUT_MS'] = '3600000'
     $psi.UseShellExecute = $false
     $psi.RedirectStandardInput = $true
     $psi.RedirectStandardOutput = $true
