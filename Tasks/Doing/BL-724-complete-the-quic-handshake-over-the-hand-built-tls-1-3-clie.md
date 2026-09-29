@@ -31,3 +31,4 @@ A QUIC client connection in `Curl.Quic.UnitLibrary` completes the handshake over
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
