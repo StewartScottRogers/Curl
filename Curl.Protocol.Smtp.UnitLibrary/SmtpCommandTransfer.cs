@@ -15,8 +15,9 @@ namespace Curl.Protocol.Smtp;
 /// <item><c>VRFY</c> sends the address after one leading <c>&lt;</c> and one trailing
 /// <c>&gt;</c> are taken off it, its host part converted to an IDNA A-label, and
 /// <c> SMTPUTF8</c> appended when the <c>EHLO</c> reply advertised <c>SMTPUTF8</c> and the
-/// address is not all ASCII. The <c>-X</c> command is sent as given with the recipient as
-/// given, <c> SMTPUTF8</c> appended only to <c>EXPN</c>, in capitals, when advertised.</item>
+/// address is not all ASCII, all in the argv bytes of <see cref="SmtpCommandLineText" />. The
+/// <c>-X</c> command and the recipient after it are sent as their argv bytes, unconverted,
+/// <c> SMTPUTF8</c> appended only to <c>EXPN</c>, in capitals, when advertised.</item>
 /// <item>Every reply line is written to the output exactly as it arrived, line end included,
 /// unless <c>-I</c> asked for no body: each continuation line as it arrives, and the final
 /// line once the reply is accepted. A reply is accepted when it is 2xx, or 553 for a
@@ -29,7 +30,8 @@ namespace Curl.Protocol.Smtp;
 /// <c>QUIT</c>'s reply changes neither.</item>
 /// </list>
 /// </remarks>
-internal sealed class SmtpCommandTransfer(SmtpControlChannel channel, ITransferContext context, bool smtpUtf8Advertised)
+internal sealed class SmtpCommandTransfer(
+    SmtpControlChannel channel, ITransferContext context, bool smtpUtf8Advertised, SmtpCommandLineText commandLineText)
 {
     private const int AmbiguousRecipient = 553;
 
@@ -71,7 +73,7 @@ internal sealed class SmtpCommandTransfer(SmtpControlChannel channel, ITransferC
 
     private async ValueTask<TransferResult> SendCommandsAsync(MailRequestOptions mail)
     {
-        string? custom = string.IsNullOrEmpty(mail.CustomCommand) ? null : mail.CustomCommand;
+        string? custom = string.IsNullOrEmpty(mail.CustomCommand) ? null : commandLineText.ToWire(mail.CustomCommand);
         if (mail.Recipients.Count == 0)
         {
             return await ExchangeAsync(custom ?? "HELP", recipientCommand: false).ConfigureAwait(false)
@@ -92,14 +94,14 @@ internal sealed class SmtpCommandTransfer(SmtpControlChannel channel, ITransferC
 
     private string VerifyCommand(string recipient)
     {
-        bool utf8 = smtpUtf8Advertised && SmtpMailbox.NeedsSmtpUtf8(recipient);
-        return "VRFY " + SmtpMailbox.Bare(recipient) + (utf8 ? SmtpUtf8Keyword : string.Empty);
+        bool utf8 = smtpUtf8Advertised && SmtpMailbox.NeedsSmtpUtf8(recipient, commandLineText);
+        return "VRFY " + SmtpMailbox.Bare(recipient, commandLineText) + (utf8 ? SmtpUtf8Keyword : string.Empty);
     }
 
     private string CustomRecipientCommand(string custom, string recipient)
     {
         bool utf8 = smtpUtf8Advertised && custom == "EXPN";
-        return custom + " " + recipient + (utf8 ? SmtpUtf8Keyword : string.Empty);
+        return custom + " " + commandLineText.ToWire(recipient) + (utf8 ? SmtpUtf8Keyword : string.Empty);
     }
 
     /// <summary>
