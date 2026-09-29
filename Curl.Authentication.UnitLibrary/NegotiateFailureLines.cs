@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Authentication;
 
 /// <summary>
-/// The <c>-v</c> line curl 8.21.0 writes when a Negotiate context makes no token (ADR-0228):
+/// The <c>-v</c> line curl 8.21.0 writes when a Negotiate context makes no token (ADR-0231):
 /// its SSPI build's <c>InitializeSecurityContext failed: ...</c> on Windows, its GSS-API
 /// build's <c>gss_init_sec_context() failed: ...</c> elsewhere, each naming what the step
 /// came to.

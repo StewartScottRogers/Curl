@@ -14,7 +14,7 @@ namespace Curl.Authentication;
 /// ticket, no logged-on user's credential, no mechanism - it answers nothing, and the
 /// transfer ends on the 401 with exit 0, as both platform curls do, and the context's failure
 /// is reported to <see cref="HttpAuthRequest.Events" /> in the platform curl's words
-/// (ADR-0228).
+/// (ADR-0231).
 /// </summary>
 /// <param name="securityContexts">Makes the Negotiate context; ADR-0142's router in production.</param>
 /// <param name="options">The service names and delegation level; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>

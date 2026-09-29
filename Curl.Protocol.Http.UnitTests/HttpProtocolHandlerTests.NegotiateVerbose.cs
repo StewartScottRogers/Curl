@@ -8,7 +8,7 @@ namespace Curl.Protocol.Http;
 
 /// <content>
 /// Pins the <c>-v</c> lines of <c>--negotiate -u : -v</c> against a <c>401 Negotiate</c> with
-/// no ticket, as each platform's curl writes them (measured, BL-843 Notes; ADR-0228): the
+/// no ticket, as each platform's curl writes them (measured, BL-843 Notes; ADR-0231): the
 /// context's failure and <c>Server auth using Negotiate with user ''</c> before the request, and
 /// the failure again just before the <c>WWW-Authenticate</c> header that offers Negotiate.
 /// </content>

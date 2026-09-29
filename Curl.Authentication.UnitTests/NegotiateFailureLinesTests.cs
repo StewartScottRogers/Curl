@@ -4,7 +4,7 @@ namespace Curl.Authentication;
 
 /// <summary>
 /// Pins <see cref="NegotiateFailureLines" />: the line each platform curl writes when a
-/// Negotiate context makes no token, the no-credentials pair as measured (ADR-0176, ADR-0228).
+/// Negotiate context makes no token, the no-credentials pair as measured (ADR-0176, ADR-0231).
 /// </summary>
 [TestClass]
 public sealed class NegotiateFailureLinesTests

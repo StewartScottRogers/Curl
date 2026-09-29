@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Where curl 8.21.0 writes the <c>-v</c> lines of a Negotiate request (ADR-0228):
+/// Where curl 8.21.0 writes the <c>-v</c> lines of a Negotiate request (ADR-0231):
 /// <c>Server auth using Negotiate with user '...'</c> before each request Negotiate is picked
 /// for, after the context's failure line if any, and a 401's failure line just before the
 /// <c>WWW-Authenticate</c> header that offers Negotiate (measured, BL-843 Notes).

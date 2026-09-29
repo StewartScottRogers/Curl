@@ -97,7 +97,7 @@ answered everywhere (ADR-0021's rule that the list names what Curl does).
   ticket where one does: through SSPI on Windows, the system GSS-API elsewhere, and the
   hand-built SPNEGO and Kerberos where no system library answers.
 - The `-v` lines curl prints for a failed context and `Server auth using Negotiate with
-  user '...'` are not written yet (BL-843).
+  user '...'` are written as ADR-0231 records (BL-843).
 - Under `--anyauth` with no ticket curl sends a second request without `Authorization`;
   Curl sends one (BL-844).
 - A 401 that carries a Negotiate continuation token, a multi-leg exchange, is not answered
