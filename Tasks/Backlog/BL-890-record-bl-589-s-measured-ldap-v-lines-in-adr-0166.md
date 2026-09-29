@@ -1,5 +1,5 @@
 ---
-id: BL-887
+id: BL-890
 title: Record BL-589's measured LDAP -v lines in ADR-0166
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-887 — Record BL-589's measured LDAP -v lines in ADR-0166
+# BL-890 — Record BL-589's measured LDAP -v lines in ADR-0166
 
 ## Goal
 

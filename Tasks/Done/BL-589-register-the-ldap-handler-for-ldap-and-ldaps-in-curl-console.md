@@ -87,7 +87,7 @@ L, `ldap://127.0.0.1:1/dc=x?a?bogus` (exit 3): `* LDAP local: bad or missing sco
 - WinLDAP `ldaps` success lines are the `ldap` ones with `encrypted` for `cleartext`, as `lib/ldap.c` words it; not measurable here.
 - Each entry piece written to the output is reported as received data, before the write, so `-v` shows `{ [N bytes data]` once (the writer collapses the rest).
 - The composition picks the dialect with `OperatingSystem.IsWindows()`; the Console tests pin WinLDAP on Windows and OpenLDAP elsewhere with `OSCondition`.
-- ADR-0166 could not be edited: BL-883 in Doing holds `Documentation/Planning/Decisions`. Filed BL-887 to add a "Measured by BL-589" section from these Notes.
+- ADR-0166 could not be edited: BL-883 in Doing holds `Documentation/Planning/Decisions`. Filed BL-890 to add a "Measured by BL-589" section from these Notes.
 - Not examined: the handler does not pass `context.Proxy` to its connect target, as IMAP does; whether curl tunnels LDAP through `-x` was out of this task's scope.
 
 ## Log
