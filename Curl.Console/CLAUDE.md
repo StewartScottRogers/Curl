@@ -190,7 +190,9 @@ process's proxy environment variables in production and none in tests unless giv
 from `-x` or a `--socks` option, `--noproxy` and the variables; `-U` replaces its credential;
 it goes into `HttpRequestOptions.ForwardProxy` with `-p` as `ProxyTunnel`. A CONNECT tunnel
 authenticates with the scheme `--proxy-basic`, `--proxy-digest` and `--proxy-anyauth` pick,
-through the same `RankedHttpAuthenticator` the origin uses (`CreateProxyTunnelOptions`, ADR-0186). Under
+through the same `RankedHttpAuthenticator` the origin uses (`CreateProxyTunnelOptions`, ADR-0186),
+and a forward proxy's `407` is answered with the same pick, which `CreateProtocolHandlers` hands
+the HTTP handler (ADR-0187). Under
 `--unix-socket` or `--abstract-unix-socket` no proxy is chosen or even parsed, and the group's
 `TcpConnector` dials that socket (`CurlComposition.UnixSocketOf`), as curl 8.21.0 does (ADR-0149, BL-507). Proxy text curl
 cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy, or an HTTPS

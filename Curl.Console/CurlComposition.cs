@@ -39,7 +39,8 @@ internal static class CurlComposition
     /// <see cref="CreateSaslAuthenticator" />'s authenticator and upgrading with
     /// <paramref name="tlsProvider" /> after <c>STARTTLS</c> or <c>STLS</c>), and <c>http</c> and <c>https</c> over <paramref name="connector" />,
     /// the last two answering authentication with <see cref="CreateHttpAuthenticator" />'s
-    /// authenticator and keeping cookies in <paramref name="cookieStore" />; <c>ws</c> and <c>wss</c>
+    /// authenticator, answering a forward proxy with <paramref name="proxyAuthSchemes" /> (ADR-0187),
+    /// and keeping cookies in <paramref name="cookieStore" />; <c>ws</c> and <c>wss</c>
     /// over <paramref name="connector" />, sending a pre-emptive <c>Authorization</c> from
     /// <see cref="CreateHttpAuthenticator" />'s authenticator and drawing each
     /// <c>Sec-WebSocket-Key</c> and frame mask from <see cref="SystemWebSocketRandomSource" />
@@ -72,6 +73,10 @@ internal static class CurlComposition
     /// <see cref="CreateSecurityContextFactory" />'s router over <paramref name="connector" /> and
     /// <paramref name="datagramConnector" />.
     /// </param>
+    /// <param name="proxyAuthSchemes">
+    /// The scheme the <c>--proxy-*</c> auth switches pick (<see cref="CommandLineOptions.ProxyAuthSchemes" />),
+    /// which the HTTP handler answers a forward proxy with; Basic, curl's default, when not given.
+    /// </param>
     /// <returns>Every registered handler.</returns>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
@@ -79,13 +84,14 @@ internal static class CurlComposition
         ITlsProvider tlsProvider,
         IDnsResolver dnsResolver,
         ICookieStore? cookieStore = null,
-        ISecurityContextFactory? securityContexts = null)
+        ISecurityContextFactory? securityContexts = null,
+        HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
         EndPointRecordingDatagramConnector recordingDatagramConnector = new(datagramConnector, recorder);
         RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector));
-        HttpProtocolHandler http = new(recordingConnector, httpAuthenticator, cookieStore);
+        HttpProtocolHandler http = new(recordingConnector, httpAuthenticator, cookieStore, proxyAuthSchemes);
 
         IProtocolHandler[] handlers =
         [
@@ -490,7 +496,7 @@ internal static class CurlComposition
         ProxySelector? proxySelector = null,
         ISecurityContextFactory? securityContexts = null) =>
         new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(connector, datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts)),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(connector, datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts, options.ProxyAuthSchemes)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -532,7 +538,7 @@ internal static class CurlComposition
     /// <param name="transports">The run's connectors.</param>
     /// <returns>The dispatcher.</returns>
     internal static ProtocolDispatcher CreateDispatcher(CurlTransports transports) =>
-        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver));
+        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes));
 
     /// <summary>
     /// Creates what one run transfers through: the production handler set, every TCP handler
@@ -553,7 +559,7 @@ internal static class CurlComposition
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore)),
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes)),
             transports.ProxyTlsProvider.Warnings,
             cookies,
             new ProxySelector(Environment.GetEnvironmentVariable),
@@ -571,6 +577,7 @@ internal static class CurlComposition
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
     /// <param name="proxySelector">Chooses each transfer's proxy, or <see langword="null" /> for one that reads no environment variables.</param>
     /// <param name="securityContexts">Makes the HTTP handler's Negotiate contexts, or <see langword="null" /> for the production router.</param>
+    /// <param name="proxyAuthSchemes">The scheme the <c>--proxy-*</c> auth switches pick, which the HTTP handler answers a forward proxy with.</param>
     /// <returns>The dispatcher, no warning lines, the cookies and the proxy selector.</returns>
     private static TransferDispatch CreateTransferDispatch(
         IConnector connector,
@@ -578,9 +585,10 @@ internal static class CurlComposition
         ITlsProvider tlsProvider,
         CookieEngine? cookies,
         ProxySelector? proxySelector,
-        ISecurityContextFactory? securityContexts) =>
+        ISecurityContextFactory? securityContexts,
+        HttpAuthSchemes proxyAuthSchemes) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts)),
+            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, proxyAuthSchemes)),
             [],
             cookies,
             proxySelector);
