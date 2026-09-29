@@ -1,5 +1,5 @@
 ---
-id: BL-972
+id: BL-977
 title: Number file:// transfers from the same connection count as networked ones
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-972 — Number file:// transfers from the same connection count as networked ones
+# BL-977 — Number file:// transfers from the same connection count as networked ones
 
 ## Goal
 

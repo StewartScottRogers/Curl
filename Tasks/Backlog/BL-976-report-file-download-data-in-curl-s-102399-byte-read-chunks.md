@@ -1,5 +1,5 @@
 ---
-id: BL-971
+id: BL-976
 title: Report file:// download data in curl's 102399-byte read chunks
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-971 — Report file:// download data in curl's 102399-byte read chunks
+# BL-976 — Report file:// download data in curl's 102399-byte read chunks
 
 ## Goal
 
