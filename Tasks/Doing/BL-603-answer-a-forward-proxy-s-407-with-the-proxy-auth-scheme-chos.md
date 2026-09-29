@@ -32,3 +32,4 @@ A plain `http://` request through `-x` that the proxy answers `407` is retried w
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
