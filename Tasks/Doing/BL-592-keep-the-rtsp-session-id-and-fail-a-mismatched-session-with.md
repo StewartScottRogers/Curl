@@ -34,3 +34,4 @@ The RTSP handler records the `Session` header from a reply, sends it on later re
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
 - 2026-09-28: Doing -> Backlog. Lane 4 could not integrate: fast tests failed after rebasing onto the other lanes' work. The work is on branch factory/BL-592-lane-4-20260928-212155; start with git cherry-pick --no-commit factory/BL-592-lane-4-20260928-212155 and fix it.
+- 2026-09-28: Backlog -> Doing.
