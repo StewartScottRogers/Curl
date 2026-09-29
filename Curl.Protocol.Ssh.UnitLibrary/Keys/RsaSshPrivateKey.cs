@@ -80,6 +80,13 @@ internal sealed class RsaSshPrivateKey : SshPrivateKey
             throw new CryptographicException("An RSA prime must be greater than one.");
         }
 
+        // Windows' RSA import refuses a zero coefficient with CryptographicException, but
+        // OpenSSL's throws a subclass of it; refuse it here so every platform throws the same.
+        if (Unsigned(coefficient).IsZero)
+        {
+            throw new CryptographicException("The RSA coefficient must not be zero.");
+        }
+
         AsnWriter writer = new(AsnEncodingRules.DER);
         using (writer.PushSequence())
         {
