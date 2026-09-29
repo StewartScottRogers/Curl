@@ -45,6 +45,19 @@ public sealed class RankedHttpAuthenticatorTests
     }
 
     [TestMethod]
+    public async Task EndAuthorization_NegotiateContextKeptForTheNextLeg_DisposesOfItWithoutSteppingIt()
+    {
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]));
+        RankedHttpAuthenticator authenticator = WithContexts(new ScriptedSecurityContextFactory(context));
+        string? sent = await authenticator.CreateAuthorizationAsync(Request(HttpAuthSchemes.Negotiate), [], CancellationToken.None);
+
+        authenticator.EndAuthorization(sent!);
+
+        Assert.IsTrue(context.IsDisposed);
+        Assert.HasCount(1, context.IncomingTokens);
+    }
+
+    [TestMethod]
     public void RepeatAuthorization_BasicAnswer_SendsItAsSent()
     {
         Assert.AreEqual("Basic dTpw", Authenticator.RepeatAuthorization(Request(HttpAuthSchemes.Basic), "Basic dTpw"));

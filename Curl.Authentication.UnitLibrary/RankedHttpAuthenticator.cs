@@ -106,6 +106,15 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
         digest.RepeatAuthorization(request, sentAuthorization);
 
     /// <summary>
+    /// Ends the handshake that sent <paramref name="sentAuthorization" />: a Negotiate context
+    /// kept for its next leg is disposed of without being stepped (ADR-0248); the other schemes
+    /// keep nothing between requests.
+    /// </summary>
+    /// <param name="sentAuthorization">The header value the request sent.</param>
+    public void EndAuthorization(string sentAuthorization) =>
+        negotiate.EndAuthorization(sentAuthorization);
+
+    /// <summary>
     /// Decides whether the continuation is Negotiate's: for the origin only, when the request
     /// sent a Negotiate value, which only <see cref="NegotiateHttpAuthenticator" /> makes, and
     /// <c>-u</c> was given, as libcurl answers no 401 without a user (ADR-0227).

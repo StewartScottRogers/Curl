@@ -55,6 +55,28 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(1, tokens.ContextsDisposed);
     }
 
+    [TestMethod]
+    [DataRow(SecurityContextStatus.Completed, DisplayName = "Final token the context would accept")]
+    [DataRow(SecurityContextStatus.Refused, DisplayName = "Final token the context would reject")]
+    public async Task ExecuteAsync_200CarriesTheAcceptorsFinalNegotiateToken_TakesThe200AndDisposesTheContextUnstepped(SecurityContextStatus finalStep)
+    {
+        TurnTakingConnection connection = new(65536, "HTTP/1.1 200 OK\r\nWWW-Authenticate: Negotiate BAUG\r\nContent-Length: 2\r\n\r\nok");
+        ScriptedTokenSource tokens = new(
+            new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [1, 2, 3]),
+            new SecurityContextStep(finalStep, []));
+        MemoryStream output = new();
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await NegotiateHandler(QueueConnector.For(connection), tokens).ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(AuthUrl), Output = output, Credentials = new NetworkCredential(string.Empty, string.Empty), Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Negotiate }, Events = events });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(NegotiateRequest("AQID"), connection.Written);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+        Assert.AreEqual(1, tokens.ContextsDisposed);
+        Assert.HasCount(1, tokens.IncomingTokens);
+        Assert.IsFalse(events.Info.Any(line => line.Contains("failed", StringComparison.Ordinal)));
+    }
+
     private static string NegotiateChallengeHead(string token) =>
         "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Negotiate " + token + "\r\nContent-Length: 4\r\n\r\n";
 

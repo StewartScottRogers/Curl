@@ -103,6 +103,24 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
         return await StepAsync(context, incomingToken, request.Events, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Disposes of the context kept for the next leg of the handshake that sent
+    /// <paramref name="sentAuthorization" />, without stepping it, because the response to it
+    /// was not a challenge: curl 8.21.0 reads <c>WWW-Authenticate</c> only on a 401, so the
+    /// acceptor's final token in a 2xx (Kerberos mutual authentication) is never checked and
+    /// the 2xx is the result whatever the token (lib/http.c, ADR-0248). Does nothing when no
+    /// context is kept for the value.
+    /// </summary>
+    /// <param name="sentAuthorization">The header value the request sent.</param>
+    public void EndAuthorization(string sentAuthorization)
+    {
+        ArgumentNullException.ThrowIfNull(sentAuthorization);
+        if (contextsAwaitingALeg.TryRemove(sentAuthorization, out ISecurityContext? context))
+        {
+            context.Dispose();
+        }
+    }
+
     /// <summary>Gets the security context request <paramref name="request" /> comes to.</summary>
     /// <param name="request">The request being authorised.</param>
     /// <returns>

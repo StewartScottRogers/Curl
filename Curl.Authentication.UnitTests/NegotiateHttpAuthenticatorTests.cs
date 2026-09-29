@@ -130,6 +130,44 @@ public sealed class NegotiateHttpAuthenticatorTests
     }
 
     [TestMethod]
+    public async Task EndAuthorization_A200CarriedTheAcceptorsFinalToken_DisposesTheKeptContextWithoutSteppingIt()
+    {
+        ScriptedSecurityContext context = new(
+            new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]),
+            new SecurityContextStep(SecurityContextStatus.Refused, []));
+        RecordingInfoEvents events = new();
+        NegotiateHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(context));
+        string? sent = await authenticator.CreateAuthorizationAsync(Request(":"), CancellationToken.None);
+
+        authenticator.EndAuthorization(sent!);
+        string? afterwards = await authenticator.ContinueAuthorizationAsync(Request(":") with { Events = events }, sent!, ["Negotiate BA=="], CancellationToken.None);
+
+        Assert.IsTrue(context.IsDisposed);
+        Assert.HasCount(1, context.IncomingTokens);
+        Assert.IsNull(afterwards);
+        Assert.IsEmpty(events.Info);
+    }
+
+    [TestMethod]
+    [DataRow("Negotiate AQ==", DisplayName = "A value no context awaiting a leg made")]
+    [DataRow("", DisplayName = "Sent without a header")]
+    public void EndAuthorization_NoContextKeptForTheValue_DoesNothing(string sent)
+    {
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]));
+        NegotiateHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(context));
+
+        authenticator.EndAuthorization(sent);
+
+        Assert.IsFalse(context.IsDisposed);
+    }
+
+    [TestMethod]
+    public void EndAuthorization_NullValue_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(() => Default.EndAuthorization(null!));
+    }
+
+    [TestMethod]
     public async Task ContinueAuthorizationAsync_NullArguments_Throw()
     {
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Default.ContinueAuthorizationAsync(Request(":"), null!, [], CancellationToken.None).AsTask());

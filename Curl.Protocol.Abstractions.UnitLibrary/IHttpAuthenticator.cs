@@ -96,4 +96,17 @@ public interface IHttpAuthenticator
     /// <param name="sentAuthorization">The header value the last request sent; empty when it was sent without one (ADR-0232).</param>
     /// <returns>The header value to send again.</returns>
     string RepeatAuthorization(HttpAuthRequest request, string sentAuthorization) => sentAuthorization;
+
+    /// <summary>
+    /// Ends the handshake that sent <paramref name="sentAuthorization" />, because the response
+    /// to it was not a challenge (a 401, or a 407 for a proxy's answer), so no leg will follow:
+    /// a Negotiate context kept for its next leg is disposed of without being stepped, even when
+    /// the response carries the acceptor's final token, as curl 8.21.0 reads
+    /// <c>WWW-Authenticate</c> only on a 401 and <c>Proxy-Authenticate</c> only on a 407
+    /// (ADR-0248). By default it does nothing.
+    /// </summary>
+    /// <param name="sentAuthorization">The header value the request sent; empty when it was sent without one (ADR-0232).</param>
+    void EndAuthorization(string sentAuthorization)
+    {
+    }
 }

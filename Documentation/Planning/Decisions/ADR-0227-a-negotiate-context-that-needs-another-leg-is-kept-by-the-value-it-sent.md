@@ -69,12 +69,11 @@ key; the later replaces and disposes the earlier, whose transfer then ends on it
 
 - A multi-leg Negotiate exchange works on the connection it started on, since the HTTP
   handler resends on the same connection as for NTLM.
-- A context whose last token drew a `200` is never continued and stays in the dictionary
-  until the process ends; the authenticator is not `IDisposable`, because the composition
-  (`Curl.Console`) that would dispose it is outside BL-842. There is at most one per
-  transfer.
+- A context whose last token drew a `200` is never continued. Under this decision alone it
+  stayed in the dictionary until the process ended, at most one per transfer; ADR-0248
+  (BL-950) disposes of it once the response is not a challenge.
 - A `200` carrying the acceptor's final token (mutual authentication) is not checked, as
-  before; curl checks it, and that is follow-up work.
+  curl 8.21.0 does not check it either; ADR-0248 ends the kept context there instead.
 
 ## Alternatives considered
 

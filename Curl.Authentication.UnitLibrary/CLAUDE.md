@@ -22,7 +22,10 @@ the same factory with the default credentials, falling back (`FallbackSecurityCo
 (`SpnegoInitialToken`, `SpnegoNegotiationResponse`) over `Curl.Kerberos.UnitLibrary`'s
 `KerberosGssContext`, with the service ticket from `KerberosServiceTicketSource` (the default
 credential cache, else a TGS exchange). This library references `Curl.Kerberos.UnitLibrary`
-and `Curl.Ntlm.UnitLibrary`.
+and `Curl.Ntlm.UnitLibrary`. A context that needs another leg is kept, keyed by the value its
+token made, until a 401 continues it (ADR-0227) or `EndAuthorization` disposes of it unstepped
+because the response was not a challenge: the acceptor's final token in a 2xx is not checked,
+as curl 8.21.0 reads `WWW-Authenticate` only on a 401 (ADR-0248).
 
 NTLM (BL-526, ADR-0142, ADR-0181): `RankedHttpAuthenticator` hands an NTLM pick, and `--ntlm`
 before any challenge, to `NtlmHttpAuthenticator`, both on the first call and through

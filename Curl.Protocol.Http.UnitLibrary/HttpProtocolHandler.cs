@@ -1424,6 +1424,7 @@ public sealed class HttpProtocolHandler(
     /// </exception>
     private async ValueTask<HttpRequestPlan?> RetryOfAsync(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent, HttpRequestBodyWriter upload, CancellationToken cancellationToken)
     {
+        EndUnchallengedAuthorizations(plan, head.StatusLine.StatusCode);
         if (await RetryProxyAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } proxyAuthorization)
         {
             return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan));
@@ -1441,6 +1442,28 @@ public sealed class HttpProtocolHandler(
 
         ThrowIfRedirectLimitReached(plan);
         return plan.WithoutExpect(upload.Rewound(plan.Framing.Body!), keepsCustomWait: !bodyLeftUnsent);
+    }
+
+    /// <summary>
+    /// Tells the authenticator that the handshake behind each value <paramref name="plan" />
+    /// sent is over when the response is not that value's challenge - not a 401 for the
+    /// <c>Authorization</c> value, not a 407 for the <c>Proxy-Authorization</c> value - so a
+    /// Negotiate context kept for its next leg is disposed of. The acceptor's final token in a
+    /// 2xx is not checked, as curl 8.21.0 reads <c>WWW-Authenticate</c> only on a 401 and
+    /// <c>Proxy-Authenticate</c> only on a 407, so the response is the result whatever the
+    /// token (ADR-0248).
+    /// </summary>
+    private void EndUnchallengedAuthorizations(HttpRequestPlan plan, int statusCode)
+    {
+        if (plan.Authorization is { } sent && statusCode != 401)
+        {
+            Authenticator.EndAuthorization(sent);
+        }
+
+        if (plan.ProxyAuthorization is { } proxySent && statusCode != 407)
+        {
+            Authenticator.EndAuthorization(proxySent);
+        }
     }
 
     /// <summary>
