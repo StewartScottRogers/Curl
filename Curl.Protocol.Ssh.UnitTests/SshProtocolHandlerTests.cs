@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -57,6 +58,37 @@ public sealed class SshProtocolHandlerTests
             "service ssh-userauth", $"auth none {User} refused", $"auth password {User} ok", "channel open session", "subsystem sftp",
             "sftp 16 .", "sftp 3 /data/hello.txt", "sftp 17 /data/hello.txt", "sftp 5 /data/hello.txt",
             "sftp 4 /data/hello.txt", "channel eof", "channel close", "disconnect 11 Shutdown");
+    }
+
+    [TestMethod]
+    [DataRow(false, "-rw-r--r--    1 {0} {0}       11 Jan  1  2026 a.txt\n-rw-r--r--    1 {0} {0}        3 Jan  1  2026 b.bin\n", DisplayName = "long names")]
+    [DataRow(true, "a.txt\nb.bin\n", DisplayName = "-l, names only")]
+    public async Task ExecuteAsync_SftpPathEndingWithASlash_ListsTheDirectoryAsCurlDoes(bool listOnly, string expectedFormat)
+    {
+        InMemorySshServer server = Server();
+        server.Files["/data/a.txt"] = Hello;
+        server.Files["/data/b.bin"] = [1, 2, 3];
+        server.Files["/data/sub/c.txt"] = Hello;
+        byte[] expected = Encoding.UTF8.GetBytes(string.Format(CultureInfo.InvariantCulture, expectedFormat, User));
+
+        Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/", listOnly: listOnly);
+
+        Assert.AreEqual(TransferResult.Success(expected.Length), outcome.Result);
+        CollectionAssert.AreEqual(expected, outcome.Output);
+        AssertEvents(
+            server,
+            "service ssh-userauth", $"auth none {User} refused", $"auth password {User} ok", "channel open session", "subsystem sftp",
+            "sftp 16 .", "sftp 11 /data/", "sftp 12 /data/", "sftp 12 /data/", "sftp 4 /data/", "channel eof", "channel close", "disconnect 11 Shutdown");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SftpMissingDirectory_IsExit78AsMeasured()
+    {
+        InMemorySshServer server = Server();
+
+        Outcome outcome = await RunAsync(server, $"sftp://{Host}/nothere/");
+
+        AssertFailure(outcome, CurlExitCode.RemoteFileNotFound, "Could not open directory for reading: No such file or directory");
     }
 
     [TestMethod]
@@ -303,7 +335,8 @@ public sealed class SshProtocolHandlerTests
         SshOptions? options = null,
         NetworkCredential? credentials = null,
         Dictionary<string, string>? files = null,
-        SshAlgorithmPreferences? preferences = null)
+        SshAlgorithmPreferences? preferences = null,
+        bool listOnly = false)
     {
         MemoryStream output = new();
         TransferContext context = new()
@@ -312,6 +345,7 @@ public sealed class SshProtocolHandlerTests
             Output = output,
             Credentials = credentials ?? new NetworkCredential(User, Password),
             Ssh = options,
+            ListOnly = listOnly,
         };
 
         TransferResult result = await Handler(server, files, preferences).ExecuteAsync(context);

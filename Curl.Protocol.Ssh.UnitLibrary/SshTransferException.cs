@@ -77,6 +77,37 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
         new(Sftp.SftpStatusCode.ExitCodeFor(status), $"Could not open remote file for reading: {Sftp.SftpStatusCode.DescriptionOf(status)}");
 
     /// <summary>
+    /// Creates the failure curl 8.21.0 reports when the server answers
+    /// <c>SSH_FXP_OPENDIR</c> with a failed status: the status's exit code and <c>Could not
+    /// open directory for reading: &lt;description&gt;</c>, measured 2026-09-29 for codes 1,
+    /// 2, 3 and 4 (BL-570, ADR-0241).
+    /// </summary>
+    /// <param name="status">The <c>SSH_FX_*</c> code.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpOpenDirectoryFailed(uint status) =>
+        new(Sftp.SftpStatusCode.ExitCodeFor(status), $"Could not open directory for reading: {Sftp.SftpStatusCode.DescriptionOf(status)}");
+
+    /// <summary>
+    /// Creates the failure curl 8.21.0 reports when the server answers
+    /// <c>SSH_FXP_READDIR</c> with a failed status: the status's exit code and <c>Could not
+    /// open remote file for reading: &lt;description&gt; :: -31</c>, libssh2's
+    /// <c>LIBSSH2_ERROR_SFTP_PROTOCOL</c>, measured 2026-09-29 (BL-570, ADR-0241).
+    /// </summary>
+    /// <param name="status">The <c>SSH_FX_*</c> code.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpReadDirectoryFailed(uint status) =>
+        new(Sftp.SftpStatusCode.ExitCodeFor(status), $"Could not open remote file for reading: {Sftp.SftpStatusCode.DescriptionOf(status)} :: -31");
+
+    /// <summary>
+    /// Creates the failure curl 8.21.0 reports when the server's answer to
+    /// <c>SSH_FXP_READLINK</c> for a listed symbolic link is a failed status or names no
+    /// target: exit 27 and <c>Out of memory</c>, measured 2026-09-29 (BL-570, ADR-0241).
+    /// </summary>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpReadLinkFailed() =>
+        new(CurlExitCode.OutOfMemory, "Out of memory");
+
+    /// <summary>
     /// Creates the failure curl 8.21.0 reports when a request with no message of its own,
     /// such as <c>SSH_FXP_REALPATH</c>, ends in a failed status: the status's exit code
     /// and that exit code's text, measured for codes 2, 3 and 4 (BL-569, ADR-0220).

@@ -16,4 +16,24 @@ internal static class SshConnectionFailure
     /// <returns><see langword="true" /> for an <see cref="EndOfStreamException" />, an <see cref="InvalidDataException" /> or an <see cref="SshPacketAuthenticationException" />.</returns>
     internal static bool Is(Exception exception) =>
         exception is EndOfStreamException or InvalidDataException or SshPacketAuthenticationException;
+
+    /// <summary>
+    /// Runs <paramref name="step" />, reporting a broken connection as curl does when an SFTP
+    /// request has no message of its own: <see cref="SshTransferException.SshLayerError" />.
+    /// </summary>
+    /// <typeparam name="T">What the step returns.</typeparam>
+    /// <param name="step">The step.</param>
+    /// <returns>What the step returned.</returns>
+    /// <exception cref="SshTransferException">The step's own failure, or exit 79 when the connection broke.</exception>
+    internal static async ValueTask<T> ReportAsSshLayerErrorAsync<T>(Func<ValueTask<T>> step)
+    {
+        try
+        {
+            return await step().ConfigureAwait(false);
+        }
+        catch (Exception exception) when (Is(exception))
+        {
+            throw SshTransferException.SshLayerError();
+        }
+    }
 }

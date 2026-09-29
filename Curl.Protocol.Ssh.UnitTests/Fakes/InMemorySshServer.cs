@@ -13,7 +13,8 @@ namespace Curl.Protocol.Ssh.Fakes;
 /// the server role: <c>diffie-hellman-group14-sha256</c> with an <c>rsa-sha2-256</c> host key
 /// (both in the Windows and the OpenSSL presets), <c>aes128-ctr</c> and <c>hmac-sha2-256</c>;
 /// <c>password</c> and <c>publickey</c> authentication; one <c>session</c> channel running
-/// either the <c>sftp</c> subsystem or <c>scp -pf</c>, serving <see cref="Files" />.
+/// either the <c>sftp</c> subsystem or <c>scp -pf</c>, serving <see cref="Files" /> and, over
+/// SFTP, listing the files directly under a directory path that ends with a slash.
 /// </summary>
 /// <remarks>
 /// Public so that another test project, such as <c>Curl.Console.UnitTests</c>, can reference

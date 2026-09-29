@@ -16,8 +16,10 @@ namespace Curl.Protocol.Ssh;
 /// (ADR-0122): narrows the host-key list from the known-hosts file, connects,
 /// runs the transport's handshake, requests <c>ssh-userauth</c>, checks the server's host
 /// key, authenticates the user, downloads the URL's file with <see cref="SftpFileDownload" />
-/// or <see cref="ScpFileDownload" /> into <see cref="ITransferContext.Output" />, and ends the
-/// session with <c>SSH_MSG_DISCONNECT</c>.
+/// or <see cref="ScpFileDownload" /> - or, for an <c>sftp</c> path ending with a slash, lists
+/// the directory with <see cref="SftpDirectoryListing" /> - into
+/// <see cref="ITransferContext.Output" />, and ends the session with
+/// <c>SSH_MSG_DISCONNECT</c>.
 /// </summary>
 /// <remarks>
 /// The connector supplies the connection to the URL's host and port (22 by default); no
@@ -199,7 +201,16 @@ public sealed class SshProtocolHandler : IProtocolHandler
         await authentication.AuthenticateAsync(context.Credentials, context.CancellationToken).ConfigureAwait(false);
         return context.Url.Scheme == ScpScheme
             ? await new ScpFileDownload(transport).DownloadAsync(context.Url.AbsolutePath, context.Output, context.Progress, context.CancellationToken).ConfigureAwait(false)
-            : await new SftpFileDownload(transport).DownloadAsync(context.Url.AbsolutePath, context.CreateFileMode, context.Output, context.Progress, context.CancellationToken).ConfigureAwait(false);
+            : await TransferOverSftpAsync(context, transport).ConfigureAwait(false);
+    }
+
+    // A path ending with a slash is listed; any other is downloaded (ADR-0241).
+    private static async ValueTask<TransferResult> TransferOverSftpAsync(ITransferContext context, SshTransport transport)
+    {
+        string urlPath = context.Url.AbsolutePath;
+        return SftpRemotePath.NamesDirectory(urlPath)
+            ? await new SftpDirectoryListing(transport).ListAsync(urlPath, context.ListOnly, context.NoBody, context.Output, context.Progress, context.CancellationToken).ConfigureAwait(false)
+            : await new SftpFileDownload(transport).DownloadAsync(urlPath, context.CreateFileMode, context.Output, context.Progress, context.CancellationToken).ConfigureAwait(false);
     }
 
     // What the host-key check and the key files need to know about the session.

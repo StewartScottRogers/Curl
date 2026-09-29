@@ -93,6 +93,23 @@ internal sealed class SftpServerScript
     /// <summary>Scripts <c>SSH_FXP_DATA</c> for request <paramref name="id" />.</summary>
     internal SftpServerScript Data(uint id, byte[] data) => Sftp(Join([SftpPacketType.Data], UInt32(id), String(data)));
 
+    /// <summary>Scripts <c>SSH_FXP_NAME</c> carrying <paramref name="entries" /> for request <paramref name="id" />.</summary>
+    internal SftpServerScript Names(uint id, params byte[][] entries) =>
+        Sftp(Join([SftpPacketType.Name], UInt32(id), UInt32((uint)entries.Length), Join(entries)));
+
+    /// <summary>
+    /// One name of an <c>SSH_FXP_NAME</c> answer, with only a permissions attribute:
+    /// 0100644 for a regular file, 0120777 for a symbolic link.
+    /// </summary>
+    internal static byte[] Entry(string fileName, string longName, uint permissions = 0x81A4) =>
+        Join(Name(fileName), Name(longName), UInt32(4), UInt32(permissions));
+
+    /// <summary>
+    /// Scripts the answers before the first <c>READDIR</c>: the home directory (request 0)
+    /// and the directory's handle (1).
+    /// </summary>
+    internal SftpServerScript OpenedDirectory() => HomeDirectory().Handle();
+
     /// <summary>
     /// Scripts the answers before the first read: the home directory (request 0), the
     /// handle (1) and the size (2).
@@ -145,6 +162,17 @@ internal sealed class SftpServerScript
     /// <summary>The client's <c>SSH_FXP_READ</c> of handle <c>H1</c>.</summary>
     internal static byte[] ReadRequest(uint id, ulong offset, uint length) =>
         Join([SftpPacketType.Read], UInt32(id), Name("H1"), UInt32((uint)(offset >> 32)), UInt32((uint)offset), UInt32(length));
+
+    /// <summary>The client's <c>SSH_FXP_OPENDIR</c>.</summary>
+    internal static byte[] OpenDirectoryRequest(string path, uint id = 1) =>
+        Join([SftpPacketType.OpenDirectory], UInt32(id), String(Encoding.UTF8.GetBytes(path)));
+
+    /// <summary>The client's <c>SSH_FXP_READDIR</c> of handle <c>H1</c>.</summary>
+    internal static byte[] ReadDirectoryRequest(uint id) => Join([SftpPacketType.ReadDirectory], UInt32(id), Name("H1"));
+
+    /// <summary>The client's <c>SSH_FXP_READLINK</c>.</summary>
+    internal static byte[] ReadLinkRequest(string path, uint id) =>
+        Join([SftpPacketType.ReadLink], UInt32(id), String(Encoding.UTF8.GetBytes(path)));
 
     /// <summary>The client's <c>SSH_FXP_CLOSE</c> of handle <c>H1</c>.</summary>
     internal static byte[] CloseRequest(uint id) => Join([SftpPacketType.Close], UInt32(id), Name("H1"));

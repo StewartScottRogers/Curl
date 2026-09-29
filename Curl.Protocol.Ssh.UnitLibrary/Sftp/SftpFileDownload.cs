@@ -43,7 +43,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
         CancellationToken cancellationToken)
     {
         SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
-        (byte[] handle, long? size) = await InSshLayerAsync(async () =>
+        (byte[] handle, long? size) = await SshConnectionFailure.ReportAsSshLayerErrorAsync(async () =>
         {
             byte[] homeDirectory = await session.RealPathAsync(HomeDirectory, cancellationToken).ConfigureAwait(false);
             byte[] path = SftpRemotePath.Resolve(SftpRemotePath.Decode(urlPath), homeDirectory);
@@ -52,47 +52,8 @@ internal sealed class SftpFileDownload(SshTransport transport)
         }).ConfigureAwait(false);
         Copy copy = new(new SftpReadAhead(session, handle, size), size, output, progress);
         TransferResult result = await copy.RunAsync(cancellationToken).ConfigureAwait(false);
-        await CloseIgnoringFailureAsync(session, handle, cancellationToken).ConfigureAwait(false);
-        await ShutdownIgnoringFailureAsync(session, cancellationToken).ConfigureAwait(false);
+        await session.FinishIgnoringFailureAsync(handle, cancellationToken).ConfigureAwait(false);
         return result;
-    }
-
-    private static async ValueTask<T> InSshLayerAsync<T>(Func<ValueTask<T>> step)
-    {
-        try
-        {
-            return await step().ConfigureAwait(false);
-        }
-        catch (Exception exception) when (SshConnectionFailure.Is(exception))
-        {
-            throw SshTransferException.SshLayerError();
-        }
-    }
-
-    // curl only logs a close that fails, and a broken connection has already failed the
-    // transfer.
-    private static async ValueTask CloseIgnoringFailureAsync(SftpSession session, byte[] handle, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await session.CloseHandleAsync(handle, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception exception) when (SshConnectionFailure.Is(exception))
-        {
-        }
-    }
-
-    // Measured (ADR-0220): curl's CHANNEL_EOF, then its CHANNEL_CLOSE after the server's.
-    // A broken connection has already decided the transfer's outcome.
-    private static async ValueTask ShutdownIgnoringFailureAsync(SftpSession session, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await session.ShutdownAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception exception) when (SshConnectionFailure.Is(exception))
-        {
-        }
     }
 
     // One copy of the file's bytes to the output, counting them as they go.

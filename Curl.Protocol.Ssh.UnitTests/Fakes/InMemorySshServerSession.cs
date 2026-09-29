@@ -40,6 +40,8 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
 
     private readonly MemoryStream sftpInput = new();
 
+    private readonly HashSet<string> listedDirectories = new(StringComparer.Ordinal);
+
     private SshPacketReader? packetReader;
 
     private SshPacketWriter? packetWriter;
@@ -295,6 +297,8 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
             SftpPacketType.Open => Join([SftpPacketType.Handle], UInt32(id), Name(argument)),
             SftpPacketType.Stat => Join([SftpPacketType.Attributes], UInt32(id), UInt32(1), UInt32(0), UInt32((uint)file!.Length)),
             SftpPacketType.Read => ReadAnswer(id, file!, request.ReadBytes(8), request.ReadUInt32()),
+            SftpPacketType.OpenDirectory => FilesIn(argument).Any() ? Join([SftpPacketType.Handle], UInt32(id), Name(argument)) : Status(id, 2),
+            SftpPacketType.ReadDirectory => ReadDirectoryAnswer(id, argument),
             _ => Status(id, 0),
         };
         await SendSftpAsync(answer).ConfigureAwait(false);
@@ -306,6 +310,28 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         return offset >= file.Length
             ? Status(id, 1)
             : Join([SftpPacketType.Data], UInt32(id), String(file.AsSpan((int)offset, (int)Math.Min(length, file.Length - offset)).ToArray()));
+    }
+
+    // The files directly under directory, a path ending with a slash.
+    private IEnumerable<KeyValuePair<string, byte[]>> FilesIn(string directory) =>
+        server.Files.Where(file => file.Key.StartsWith(directory, StringComparison.Ordinal) && !file.Key[directory.Length..].Contains('/'));
+
+    // Every file of the directory in one SSH_FXP_NAME, each a regular file 0644 with an
+    // ls -l-style long name, then SSH_FX_EOF.
+    private byte[] ReadDirectoryAnswer(uint id, string directory)
+    {
+        if (!listedDirectories.Add(directory))
+        {
+            return Status(id, 1);
+        }
+
+        KeyValuePair<string, byte[]>[] files = [.. FilesIn(directory).OrderBy(file => file.Key, StringComparer.Ordinal)];
+        byte[] names = [.. files.SelectMany(file => Join(
+            Name(file.Key[directory.Length..]),
+            Name($"-rw-r--r--    1 {server.UserName} {server.UserName} {file.Value.Length,8} Jan  1  2026 {file.Key[directory.Length..]}"),
+            UInt32(4),
+            UInt32(0x81A4)))];
+        return Join([SftpPacketType.Name], UInt32(id), UInt32((uint)files.Length), names);
     }
 
     private static byte[] Status(uint id, uint code) =>

@@ -37,14 +37,25 @@ internal sealed class SftpSession
     /// <summary>libssh2's description when a <c>SSH_FXP_VERSION</c> extension's data is cut short.</summary>
     internal const string ExtensionDataTooShort = "Data too short when extracting extdata";
 
-    // SSH_FXF_READ, and the attribute flag and file-type bits libssh2 sends with an open.
+    // SSH_FXF_READ, the attribute flags, and the file-type bits libssh2 sends with an open
+    // and reads from a directory's entries.
     private const uint OpenForReading = 0x00000001;
 
     private const uint AttributeSize = 0x00000001;
 
+    private const uint AttributeUserAndGroup = 0x00000002;
+
     private const uint AttributePermissions = 0x00000004;
 
+    private const uint AttributeAccessAndModifyTimes = 0x00000008;
+
+    private const uint AttributeExtended = 0x80000000;
+
+    private const uint FileTypeMask = 0xF000;
+
     private const uint RegularFileType = 0x8000;
+
+    private const uint SymbolicLinkType = 0xA000;
 
     private readonly SshSessionChannel channel;
 
@@ -126,20 +137,69 @@ internal sealed class SftpSession
                 fields.WriteUInt32(RegularFileType | (uint)createFileMode);
             },
             cancellationToken).ConfigureAwait(false);
-        while (true)
-        {
-            (byte type, SshWireReader answer) = await ReadAnswerAsync(id, cancellationToken).ConfigureAwait(false);
-            if (type == SftpPacketType.Handle)
-            {
-                return answer.ReadString().ToArray();
-            }
+        return await ReadHandleAsync(id, SshTransferException.SftpOpenFailed, cancellationToken).ConfigureAwait(false);
+    }
 
-            uint status = ReadStatus(type, answer);
-            if (status != SftpStatusCode.Ok)
-            {
-                throw SshTransferException.SftpOpenFailed(status);
-            }
+    /// <summary>
+    /// Sends <c>SSH_FXP_OPENDIR</c> for <paramref name="path" />. A status of
+    /// <c>SSH_FX_OK</c> is not an answer: as measured, curl goes on waiting.
+    /// </summary>
+    /// <param name="path">The directory's path.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The directory's handle.</returns>
+    /// <exception cref="SshTransferException">The server answered with a failed status: <see cref="SshTransferException.SftpOpenDirectoryFailed" />.</exception>
+    /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
+    internal async ValueTask<byte[]> OpenDirectoryAsync(byte[] path, CancellationToken cancellationToken)
+    {
+        uint id = await SendRequestAsync(SftpPacketType.OpenDirectory, fields => fields.WriteString(path), cancellationToken).ConfigureAwait(false);
+        return await ReadHandleAsync(id, SshTransferException.SftpOpenDirectoryFailed, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>SSH_FXP_READDIR</c> for <paramref name="handle" /> and reads the names of
+    /// the answer, with each one's attributes read as far as its file type.
+    /// </summary>
+    /// <param name="handle">The open directory's handle.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The names; empty at the end of the directory, and, as measured, for an answer of no names.</returns>
+    /// <exception cref="SshTransferException">Any status but <c>SSH_FX_EOF</c>: <see cref="SshTransferException.SftpReadDirectoryFailed" />.</exception>
+    /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
+    internal async ValueTask<IReadOnlyList<SftpDirectoryEntry>> ReadDirectoryAsync(byte[] handle, CancellationToken cancellationToken)
+    {
+        uint id = await SendRequestAsync(SftpPacketType.ReadDirectory, fields => fields.WriteString(handle), cancellationToken).ConfigureAwait(false);
+        (byte type, SshWireReader answer) = await ReadAnswerAsync(id, cancellationToken).ConfigureAwait(false);
+        if (type == SftpPacketType.Name)
+        {
+            return ReadEntries(answer);
         }
+
+        uint status = ReadStatus(type, answer);
+        return status == SftpStatusCode.EndOfFile ? [] : throw SshTransferException.SftpReadDirectoryFailed(status);
+    }
+
+    /// <summary>
+    /// Sends <c>SSH_FXP_READLINK</c> for <paramref name="path" /> and reads the first name
+    /// of the answer.
+    /// </summary>
+    /// <param name="path">The symbolic link's path.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>
+    /// The link's target, as the server sent its bytes, or <see langword="null" /> when the
+    /// server answered <c>SSH_FX_OK</c>, which names no target and, as measured, leaves
+    /// curl printing the entry's own name.
+    /// </returns>
+    /// <exception cref="SshTransferException">A failed status or an answer of no names: <see cref="SshTransferException.SftpReadLinkFailed" />.</exception>
+    /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
+    internal async ValueTask<byte[]?> ReadLinkAsync(byte[] path, CancellationToken cancellationToken)
+    {
+        uint id = await SendRequestAsync(SftpPacketType.ReadLink, fields => fields.WriteString(path), cancellationToken).ConfigureAwait(false);
+        (byte type, SshWireReader answer) = await ReadAnswerAsync(id, cancellationToken).ConfigureAwait(false);
+        if (type == SftpPacketType.Name)
+        {
+            return answer.ReadUInt32() > 0 ? answer.ReadString().ToArray() : throw SshTransferException.SftpReadLinkFailed();
+        }
+
+        return ReadStatus(type, answer) == SftpStatusCode.Ok ? null : throw SshTransferException.SftpReadLinkFailed();
     }
 
     /// <summary>
@@ -217,6 +277,30 @@ internal sealed class SftpSession
     /// <returns>A task that completes once the channel is closed.</returns>
     internal ValueTask ShutdownAsync(CancellationToken cancellationToken) => channel.CloseAsync(cancellationToken);
 
+    /// <summary>
+    /// Closes <paramref name="handle" />, when there is one, then the channel, as curl ends
+    /// every SFTP transfer (ADR-0220): a close that fails is only logged by curl, and a
+    /// broken connection has already decided the transfer's outcome, so neither fails.
+    /// </summary>
+    /// <param name="handle">The open file's or directory's handle, or <see langword="null" /> when nothing was opened.</param>
+    /// <param name="cancellationToken">Cancels the close.</param>
+    /// <returns>A task that completes once the channel is closed or the connection found broken.</returns>
+    internal async ValueTask FinishIgnoringFailureAsync(byte[]? handle, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (handle is not null)
+            {
+                await CloseHandleAsync(handle, cancellationToken).ConfigureAwait(false);
+            }
+
+            await ShutdownAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (SshConnectionFailure.Is(exception))
+        {
+        }
+    }
+
     // A refusal, a close, a disconnect, broken framing or a failed packet check all fail
     // the step with libssh2's description for it.
     private static async ValueTask RequireAsync(Func<ValueTask<bool>> step, string failure)
@@ -263,6 +347,47 @@ internal sealed class SftpSession
     private static uint ReadStatus(byte type, SshWireReader answer) =>
         type == SftpPacketType.Status ? answer.ReadUInt32() : throw new InvalidDataException($"The SFTP server answered with packet type {type}.");
 
+    private static List<SftpDirectoryEntry> ReadEntries(SshWireReader answer)
+    {
+        uint count = answer.ReadUInt32();
+        List<SftpDirectoryEntry> entries = [];
+        for (uint index = 0; index < count; index++)
+        {
+            byte[] fileName = answer.ReadString().ToArray();
+            byte[] longName = answer.ReadString().ToArray();
+            entries.Add(new SftpDirectoryEntry(fileName, longName, ReadIsSymbolicLink(answer)));
+        }
+
+        return entries;
+    }
+
+    // Reads one entry's attributes (draft-ietf-secsh-filexfer-02 section 5) to their end,
+    // telling whether their permissions name a symbolic link.
+    private static bool ReadIsSymbolicLink(SshWireReader attributes)
+    {
+        uint flags = attributes.ReadUInt32();
+        SkipWhenFlagged(attributes, flags, AttributeSize, 8);
+        SkipWhenFlagged(attributes, flags, AttributeUserAndGroup, 8);
+        bool isSymbolicLink = (flags & AttributePermissions) != 0 && (attributes.ReadUInt32() & FileTypeMask) == SymbolicLinkType;
+        SkipWhenFlagged(attributes, flags, AttributeAccessAndModifyTimes, 8);
+        uint extendedCount = (flags & AttributeExtended) != 0 ? attributes.ReadUInt32() : 0;
+        for (uint index = 0; index < extendedCount; index++)
+        {
+            attributes.ReadString();
+            attributes.ReadString();
+        }
+
+        return isSymbolicLink;
+    }
+
+    private static void SkipWhenFlagged(SshWireReader attributes, uint flags, uint flag, int length)
+    {
+        if ((flags & flag) != 0)
+        {
+            attributes.ReadBytes(length);
+        }
+    }
+
     private static long? ReadSize(SshWireReader attributes)
     {
         try
@@ -274,6 +399,25 @@ internal sealed class SftpSession
         catch (InvalidDataException)
         {
             return null;
+        }
+    }
+
+    // The handle answering the open numbered id; an SSH_FX_OK status is waited past.
+    private async ValueTask<byte[]> ReadHandleAsync(uint id, Func<uint, SshTransferException> failure, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            (byte type, SshWireReader answer) = await ReadAnswerAsync(id, cancellationToken).ConfigureAwait(false);
+            if (type == SftpPacketType.Handle)
+            {
+                return answer.ReadString().ToArray();
+            }
+
+            uint status = ReadStatus(type, answer);
+            if (status != SftpStatusCode.Ok)
+            {
+                throw failure(status);
+            }
         }
     }
 

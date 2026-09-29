@@ -50,6 +50,15 @@ internal static class SftpRemotePath
     internal static byte[] Resolve(byte[] path, byte[] homeDirectory) =>
         path.AsSpan().StartsWith(HomePrefix) ? [.. homeDirectory, (byte)'/', .. path.AsSpan(HomePrefix.Length)] : path;
 
+    /// <summary>
+    /// Gets whether <paramref name="urlPath" /> names a directory, which curl lists rather
+    /// than downloads: its decoded path ends with a slash. Measured 2026-09-29 (BL-570):
+    /// <c>/d/x%2F</c> lists <c>/d/x/</c>.
+    /// </summary>
+    /// <param name="urlPath">The URL's path, with its percent-escapes.</param>
+    /// <returns><see langword="true" /> when the decoded path ends with <c>/</c>.</returns>
+    internal static bool NamesDirectory(string urlPath) => Decode(urlPath) is [.., (byte)'/'];
+
     // A percent sign followed by two hex digits; '%' and hex digits are single UTF-8 bytes.
     private static bool IsEscape(byte[] encoded, int index) =>
         encoded[index] == '%' && index + 2 < encoded.Length && char.IsAsciiHexDigit((char)encoded[index + 1]) && char.IsAsciiHexDigit((char)encoded[index + 2]);

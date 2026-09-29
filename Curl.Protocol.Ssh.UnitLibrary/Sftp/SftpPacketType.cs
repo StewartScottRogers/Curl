@@ -21,11 +21,20 @@ internal static class SftpPacketType
     /// <summary><c>SSH_FXP_READ</c>: asks for up to a length of bytes at an offset of an open file.</summary>
     internal const byte Read = 5;
 
+    /// <summary><c>SSH_FXP_OPENDIR</c>: opens a directory for listing, answered by a handle or a status.</summary>
+    internal const byte OpenDirectory = 11;
+
+    /// <summary><c>SSH_FXP_READDIR</c>: asks for the next names of an open directory, answered by names or a status.</summary>
+    internal const byte ReadDirectory = 12;
+
     /// <summary><c>SSH_FXP_REALPATH</c>: asks the server to make a path absolute; curl sends <c>.</c> for the home directory.</summary>
     internal const byte RealPath = 16;
 
     /// <summary><c>SSH_FXP_STAT</c>: asks for a path's attributes, following links.</summary>
     internal const byte Stat = 17;
+
+    /// <summary><c>SSH_FXP_READLINK</c>: asks for a symbolic link's target, answered by a name or a status.</summary>
+    internal const byte ReadLink = 19;
 
     /// <summary><c>SSH_FXP_STATUS</c>: a request's outcome, one of <see cref="SftpStatusCode" />.</summary>
     internal const byte Status = 101;
@@ -36,7 +45,7 @@ internal static class SftpPacketType
     /// <summary><c>SSH_FXP_DATA</c>: the bytes a read returned.</summary>
     internal const byte Data = 103;
 
-    /// <summary><c>SSH_FXP_NAME</c>: names, such as the answer to <see cref="RealPath" />.</summary>
+    /// <summary><c>SSH_FXP_NAME</c>: names, such as the answer to <see cref="RealPath" />, <see cref="ReadDirectory" /> or <see cref="ReadLink" />.</summary>
     internal const byte Name = 104;
 
     /// <summary><c>SSH_FXP_ATTRS</c>: attributes, such as the answer to <see cref="Stat" />.</summary>

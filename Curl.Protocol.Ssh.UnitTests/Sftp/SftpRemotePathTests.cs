@@ -24,6 +24,19 @@ public sealed class SftpRemotePathTests
     }
 
     [TestMethod]
+    [DataRow("/d/", true, DisplayName = "trailing slash")]
+    [DataRow("/d/x%2F", true, DisplayName = "escaped trailing slash, as measured")]
+    [DataRow("/d/x%2f", true, DisplayName = "lower-case escaped trailing slash")]
+    [DataRow("/", true, DisplayName = "root")]
+    [DataRow("/d/f", false, DisplayName = "file")]
+    [DataRow("/d/%2F%41", false, DisplayName = "escaped slash further in")]
+    [DataRow("", false, DisplayName = "empty")]
+    public void NamesDirectory_UrlPath_IsTrueWhenTheDecodedPathEndsWithASlash(string urlPath, bool expected)
+    {
+        Assert.AreEqual(expected, SftpRemotePath.NamesDirectory(urlPath));
+    }
+
+    [TestMethod]
     [DataRow("/~/f", "/home/fake/f", DisplayName = "home prefix")]
     [DataRow("/~/", "/home/fake/", DisplayName = "home prefix alone")]
     [DataRow("/~", "/~", DisplayName = "tilde without a slash")]
