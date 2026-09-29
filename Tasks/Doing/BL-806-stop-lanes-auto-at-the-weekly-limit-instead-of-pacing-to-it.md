@@ -30,14 +30,14 @@ This task reverses that default (decided by Claude under Stewart's delegation, w
 
 ## Acceptance criteria
 
-- [ ] `-NoWeeklyPace` is replaced by `-WeeklyPace`; without it `Get-AutoLaneStep` passes
+- [x] `-NoWeeklyPace` is replaced by `-WeeklyPace`; without it `Get-AutoLaneStep` passes
       `-WeeklyPace $false`, and `Get-PaceTarget` defaults to `$false`. `-Continuous`
       hands `-WeeklyPace` on; `-AutoLanesReport` says "(not pacing weekly)" without it.
-- [ ] `Wait-ForFreshSession` no longer returns an alarm reason for a used-up weekly window:
+- [x] `Wait-ForFreshSession` no longer returns an alarm reason for a used-up weekly window:
       it traces the reset time, waits for it with `Wait-ForNewSession -UsageOnly`, then
       checks the 5-hour window as today.
-- [ ] `-TestAutoLanes` passes, with the weekly-pacing cases passing `-WeeklyPace` explicitly.
-- [ ] ADR-0130 has a dated amendment; the script header and `CLAUDE.md` no longer say a
+- [x] `-TestAutoLanes` passes, with the weekly-pacing cases passing `-WeeklyPace` explicitly.
+- [x] ADR-0130 has a dated amendment; the script header and `CLAUDE.md` no longer say a
       used-up weekly window raises the alarm.
 
 ## Notes

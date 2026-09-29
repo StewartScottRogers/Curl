@@ -107,7 +107,9 @@ ends with work still ready start the next one itself. A shift ends before the to
 out: once 85% of the 5-hour window (`-StopAtUsage`) or 97% of the weekly window
 (`-StopAtWeeklyUsage`) is used, lanes claim
 nothing new, finish what they hold and push; the next shift waits for a fresh 5-hour
-window, and a used-up weekly window raises the alarm. Inside herdr (`HERDR_ENV=1`) that opens the shift
+window, or for the weekly reset when the week is used up, with a notice rather than the
+alarm. `-Lanes Auto` paces lanes to the 5-hour window only; `-WeeklyPace` also spreads
+the weekly budget evenly to its reset (ADR-0130, BL-806). Inside herdr (`HERDR_ENV=1`) that opens the shift
 and each of its lanes as herdr tabs in the current workspace; outside herdr, as console
 windows. Never start one with `Start-Process` or a bare background command: Stewart
 watches shifts in herdr. Stop a shift by closing its tabs (or killing its process tree).

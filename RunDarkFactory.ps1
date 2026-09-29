@@ -61,8 +61,8 @@
     5-hour and the weekly usage window is used; once the 5-hour window reaches
     -StopAtUsage (85%) or the weekly one -StopAtWeeklyUsage (97%) no lane claims another
     task, the tasks already running finish, integrate and push, and the shift ends clean. The next shift (-Continuous) starts at once and waits for
-    the 5-hour window to reset before starting its lanes; a used-up weekly window raises
-    the alarm instead, since it can be days from resetting.
+    the 5-hour window to reset before starting its lanes; a used-up weekly window is
+    waited out the same way, with a notice rather than the alarm, however long it is.
 
     At the end of every shift the coordinator merges the branch into master through a
     pull request, by Stewart's standing permission - only when the CI workflow passed on
@@ -112,9 +112,11 @@
                 <repo>.lanes\auto-lanes.json saved, raised to -MinStartLanes (default 3),
                 capped by the ceilings. -MinStartLanes is a start, not a floor.
       step      Every 15 minutes, except while waiting for tokens, it samples usage and
-                paces to the 5-hour window and (unless -NoWeeklyPace) the weekly one: the
+                paces to the 5-hour window (and, with -WeeklyPace, the weekly one): the
                 lanes that would spend each window up to -StopAtUsage or -StopAtWeeklyUsage
-                just as it resets. The lower target binds.
+                just as it resets. The lower target binds. Without -WeeklyPace the weekly
+                window only stops claims at -StopAtWeeklyUsage: pacing it finishes no more
+                work, and loses what an idle factory leaves at the reset (BL-806).
       ceilings  task-board.ps1 capacity (read in a detached worktree, <repo>.lanes\auto-board,
                 so this checkout is only pulled at shift end), the machine cap and -MaxLanes.
       change    At most one lane per step, added or retired; a retiring lane finishes and
@@ -233,9 +235,9 @@ param(
     # The fewest lanes a -Lanes Auto shift starts with (Stewart, 2026-09-28). A start, not a
     # floor: the ceilings still cap it, and Auto still retires below it when pace demands.
     [ValidateRange(1, 16)][int]$MinStartLanes = 3,
-    # -Lanes Auto paces to the 5-hour window only: burn fast and stop at -StopAtWeeklyUsage
-    # instead of spreading the weekly budget evenly until its reset.
-    [switch]$NoWeeklyPace,
+    # -Lanes Auto also paces to the weekly window, spreading its budget evenly until the
+    # reset, instead of burning at the 5-hour pace and stopping at -StopAtWeeklyUsage.
+    [switch]$WeeklyPace,
     # Print what -Lanes Auto would do now - machine cap, board capacity, burn rates, pace
     # targets, start count and the step's log line - without starting a lane, and exit.
     [switch]$AutoLanesReport,
@@ -915,7 +917,7 @@ function Get-WindowTarget {
 function Get-PaceTarget {
     # The 5-hour and weekly pace targets, in lanes, for -Sample; the lower is the Target
     # and names the Binding pace. $null while there is no 5-hour rate yet.
-    param($Sample, $FiveHourRate, $WeeklyRate, [bool]$WeeklyPace = $true, [double]$StopAtUsage, [double]$StopAtWeeklyUsage)
+    param($Sample, $FiveHourRate, $WeeklyRate, [bool]$WeeklyPace = $false, [double]$StopAtUsage, [double]$StopAtWeeklyUsage)
     if ($null -eq $FiveHourRate) { return $null }
     $fiveHour = Get-WindowTarget -Used $Sample.FiveHour -Resets $Sample.FiveHourResets -At $Sample.At -Rate $FiveHourRate -Stop $StopAtUsage
     $weekly = if ($WeeklyPace) {
@@ -1020,6 +1022,7 @@ if ($TestAutoLanes) {
         ,@('five-hour-binds weekly rate', 'null', "$(if ($null -eq (Get-BurnRate $fiveHourBinds Week)) { 'null' } else { 'a rate' })")
         ,@('weekly-binds', 'lanes 4 -> 3 (weekly pace allows 1.8)', (Get-SampledLaneCount $weeklyBinds 4 $true 6 8 16))
         ,@('weekly-pace-off', 'lanes 4 -> 5 (6 ready tasks can run at once)', (Get-SampledLaneCount $weeklyBinds 4 $false 6 8 16))
+        ,@('weekly-pace-off by default', 'Infinity', "$((Get-PaceTarget -Sample $weeklyBinds[-1] -FiveHourRate 1.0 -WeeklyRate 5.0 -StopAtUsage 0.85 -StopAtWeeklyUsage 0.97).Weekly)")
         ,@('five-hour-reset-in-window', 'lanes 3 -> 4 (5-hour pace allows 4.4)', (Get-SampledLaneCount $resetInWindow 3 $true 8 8 16))
         ,@('hold-inside-band 3.8', 'lanes 4 held (5-hour pace allows 3.8)', (Get-NextLaneCount 4 (New-TestPace 3.8) 16 16 16).Reason)
         ,@('hold-inside-band 3.7', 'lanes 4 -> 3 (5-hour pace allows 3.7)', (Get-NextLaneCount 4 (New-TestPace 3.7) 16 16 16).Reason)
@@ -1329,8 +1332,10 @@ function Wait-ForNewSession {
     $began = Get-Date
     $unix = ConvertTo-Unix $Until
     if (-not $UsageOnly) { Add-LimitMark "reset $unix" }
-    Write-Trace $Id 'tokens' "$(if ($UsageOnly) { 'saving tokens' } else { 'out of tokens' }); waiting for the new session at $($Until.ToString('HH:mm'))" 'Yellow'
-    Set-OwnTabLabel "tokens back $($Until.ToString('HH:mm'))"
+    # A weekly reset can be days away, so a reset on another day names the day.
+    $when = $Until.ToString($(if ($Until.Date -eq (Get-Date).Date) { 'HH:mm' } else { 'ddd HH:mm' }))
+    Write-Trace $Id 'tokens' "$(if ($UsageOnly) { 'saving tokens' } else { 'out of tokens' }); waiting for the new session at $when" 'Yellow'
+    Set-OwnTabLabel "tokens back $when"
     Write-Heartbeat 'tokens' "new session at $(Get-UtcStamp $Until)"
     # A little past the reset, so the first request lands in the new session.
     $resume = $Until.AddSeconds(20)
@@ -1357,13 +1362,17 @@ function Wait-ForNewSession {
 }
 
 function Wait-ForFreshSession {
-    # A shift starts on a fresh session: while the 5-hour window is at least -StopAtUsage
-    # used, announce its reset and wait for it. Returns '', or - when the weekly window is
-    # -StopAtWeeklyUsage used, days from resetting - why Stewart must be called instead.
+    # A shift starts on a fresh session: while the weekly window is at least
+    # -StopAtWeeklyUsage used, or the 5-hour one -StopAtUsage, announce the reset and wait
+    # for it - a notice, not the alarm, since running out is the plan working (BL-806).
+    # Returns '' once there is room.
     $u = Get-UsageReading
     if (-not $u) { return '' }
     if ($u.Week -ge $StopAtWeeklyUsage) {
-        return "WEEKLY TOKENS $([math]::Round($u.Week * 100))% USED  they reset $($u.WeekResets.ToString('dddd d MMM HH:mm')); start the factory again then, or with fewer lanes"
+        Write-Trace '-' 'tokens' "weekly tokens $([math]::Round($u.Week * 100))% used; this shift starts when they reset, $($u.WeekResets.ToString('dddd d MMM HH:mm'))" 'Yellow'
+        [void](Wait-ForNewSession -Id '-' -Until $u.WeekResets -UsageOnly)
+        $u = Get-UsageReading
+        if (-not $u) { return '' }
     }
     if ($u.FiveHour -lt $StopAtUsage) { return '' }
     Write-Trace '-' 'tokens' "session tokens $([math]::Round($u.FiveHour * 100))% used; this shift starts on the new session at $($u.FiveHourResets.ToString('HH:mm'))" 'Yellow'
@@ -2150,7 +2159,7 @@ function Get-AutoLaneStep {
     if ($null -eq $weeklyRate -and $Saved -and $null -ne $Saved.weeklyRatePerLane) { $weeklyRate = [double]$Saved.weeklyRatePerLane }
     $pace = $null
     if (@($Samples).Count) {
-        $pace = Get-PaceTarget -Sample @($Samples)[-1] -FiveHourRate $fiveHourRate -WeeklyRate $weeklyRate -WeeklyPace (-not $NoWeeklyPace) `
+        $pace = Get-PaceTarget -Sample @($Samples)[-1] -FiveHourRate $fiveHourRate -WeeklyRate $weeklyRate -WeeklyPace $WeeklyPace.IsPresent `
             -StopAtUsage $StopAtUsage -StopAtWeeklyUsage $StopAtWeeklyUsage
     }
     $next = Get-NextLaneCount -Current $Current -Pace $pace -Capacity $Capacity -MachineCap $MachineCap -MaxLanes $MaxLanes
@@ -2211,7 +2220,7 @@ if ($AutoLanesReport) {
         Write-Host ("usage 5-hour {0}% (reset {1}), weekly {2}% (reset {3})" -f [math]::Round($reading.FiveHour * 100),
             $reading.FiveHourResets.ToString('HH:mm'), [math]::Round($reading.Week * 100), $reading.WeekResets.ToString('ddd HH:mm'))
     } else { Write-Host "usage unknown (no reading in $LogDir)" }
-    if ($step.Pace) { Write-Host "5-hour target $(Format-Rate $step.Pace.FiveHour) lanes, weekly target $(Format-Rate $step.Pace.Weekly) lanes$(if ($NoWeeklyPace) { ' (not pacing weekly)' })" }
+    if ($step.Pace) { Write-Host "5-hour target $(Format-Rate $step.Pace.FiveHour) lanes, weekly target $(Format-Rate $step.Pace.Weekly) lanes$(if (-not $WeeklyPace) { ' (not pacing weekly)' })" }
     else { Write-Host '5-hour target none yet, weekly target none yet' }
     Write-Host "start count $($start.Count) ($($start.Why))"
     Write-Host $step.Next.Reason
@@ -2525,7 +2534,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         # the count auto-lanes.json saved.
         $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-HeartbeatMinutes', $HeartbeatMinutes, '-Continuous')
         if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
-        if ($NoWeeklyPace) { $forward += '-NoWeeklyPace' }
+        if ($WeeklyPace) { $forward += '-WeeklyPace' }
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
         $next = Start-Detached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
         Write-Trace '-' 'shift' "work is still ready; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'

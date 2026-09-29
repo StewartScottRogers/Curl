@@ -73,9 +73,9 @@ know.
 
    A rate of 0, or a reset that is due now, makes that target unbounded.
 
-   The pace target is `min(fiveHourTarget, weeklyTarget)`. Weekly pacing is the default.
-   `-NoWeeklyPace` drops the weekly target: burn fast and stop early at 97% weekly, as
-   today.
+   The pace target is `min(fiveHourTarget, weeklyTarget)` with `-WeeklyPace`, and
+   `fiveHourTarget` alone without it, which is the default since the BL-806 amendment
+   below: burn at the 5-hour pace and stop claiming at 97% weekly.
 
 4. **Ceilings.** `ceiling = min(capacity, machineCap, MaxLanes)`.
    - `capacity` comes from the board's new `capacity` command (BL-764): the tasks in
@@ -217,3 +217,30 @@ It is not a floor. After the start, Auto steps as before (item 5) and retires be
 `-MinStartLanes` when the pace demands it, because a fixed three lanes is what ran the
 tokens out on Max 5X. A fixed `-Lanes N` ignores `-MinStartLanes`, and `-Continuous`
 hands it on to the next shift. `-TestAutoLanes` covers the rule.
+
+## Amendment 2026-09-28: the weekly window stops claims instead of pacing lanes (BL-806)
+
+Decided by Claude under Stewart's delegation, after debugging a shift with him; he said
+"go" to this change.
+
+At 18:00 on 2026-09-28 the weekly pace retired lane 3. The week was 13% used, it reset
+on Wednesday at 06:00, and the meter read 0.885 points per lane-hour, so
+`(97 - 13) / (0.885 * 36) = 2.6`. The arithmetic was right, but pacing the weekly window
+was the wrong goal:
+
+- Pacing cannot finish more work than burning to 97% and then waiting. The budget spent
+  by the reset is the same either way.
+- It finishes less whenever the factory idles: an empty board, a wait for the 5-hour
+  window, a restart. What is left at the reset is lost. Item 3's "under-spends, which is
+  the safe side" treated that loss as safe.
+
+The default is now the old `-NoWeeklyPace` behaviour:
+
+- Lanes pace to the 5-hour window, the board and the machine.
+- Lanes stop claiming at `-StopAtWeeklyUsage` (97%). The 3% left is Stewart's for
+  interactive work.
+- A shift that finds the week used up waits for the weekly reset with the ordinary
+  notice. The alarm is for problems, and running out is the plan working.
+
+`-WeeklyPace` opts back into item 3's weekly target, for a week when Stewart wants tokens
+kept back.
