@@ -4,7 +4,7 @@ title: Transfer FTP files in ASCII mode, convert line endings with --crlf and ap
 priority: Normal
 assignee: Claude
 pipeline: protocol
-depends-on: [BL-632]
+depends-on: [BL-632, BL-913]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-28
@@ -30,7 +30,10 @@ completed:
 
 ## Notes
 
+- 2026-09-29 (lane 3): `ITransferContext` has `ConvertLineEndings` but no member for `-B` or `-a`, so neither can reach the FTP handler (`TransferContext` is its only implementer). As this task's Context directs, the contract change is filed as BL-913 (touches `Curl.Protocol.Abstractions.UnitLibrary`/`.UnitTests`) and this task depends on it. No code was changed here.
+
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Backlog. Waits on BL-913: ITransferContext needs UseAscii and Append before -B and -a can reach the FTP handler
