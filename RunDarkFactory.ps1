@@ -507,6 +507,8 @@ function Start-Detached {
 # go: "DF 09:07 L1 · BL-670 Create Curl.Cryptography", "DF 09:07 L2 · BLOCKED, read",
 # "DF 09:07 shift · done, close". DF and the shift's start time come first, so a shift's
 # tabs group together; a finished tab ends in "close" or "read"; anything else is working.
+# A lane holding no task is "DF 09:07 L1 · empty": after each task it clears its screen to
+# one line saying what it finished, and a lane that ends cleanly reads "empty, close".
 $Dot = [char]0x00B7
 $ShiftTime = if ($Stamp -match '^\d{8}-(\d\d)(\d\d)') { "$($Matches[1]):$($Matches[2])" } else { (Get-Date).ToString('HH:mm') }
 $OwnTabPrefix = if ($Lane) { "DF $ShiftTime L$Lane" } else { "DF $ShiftTime shift" }
@@ -543,6 +545,16 @@ function Set-OwnTabLabel {
     param([string]$Text)
     if (-not (Test-FactoryTab $env:HERDR_TAB_ID)) { return }
     Set-HerdrTabLabel $env:HERDR_TAB_ID $(if ($Text) { "$OwnTabPrefix $Dot $Text" } else { $OwnTabPrefix })
+}
+
+function Show-LaneEmpty {
+    # A lane that holds no task says so: the screen is cleared of the last run's output,
+    # $Line says what it last did, and the caption reads "empty" ($Caption overrides it).
+    param([string]$Line, [string]$Caption = 'empty')
+    if (-not $Lane) { return }
+    try { Clear-Host } catch { }
+    Write-Host $Line
+    Set-OwnTabLabel $Caption
 }
 
 function Close-HerdrTab {
@@ -2592,6 +2604,7 @@ while ($true) {
         $resumeId = ''
     } elseif ($Lane) {
         Set-HeartbeatTask ''
+        Set-OwnTabLabel 'empty'
         Write-Heartbeat 'claim'
         $claim = Invoke-Claim -Skip @($attempted.Keys)
         if ($claim.None) { $stopWhy = 'nothing ready'; break }
@@ -2670,21 +2683,27 @@ while ($true) {
 
     if ($state -eq 'Done') {
         $done++; $failStreak = 0
+        $outcome = 'done'
         Write-Trace $id 'DONE' (Get-Short (Get-LastLogLine $id)) 'Green'
     } elseif ($state -eq 'Blocked') {
         $blocked++
         if ($null -eq $script:RunResult -or $run.TimedOut) { $failStreak++ } else { $failStreak = 0 }
+        $outcome = 'BLOCKED (see Tasks\Blocked)'
         Write-Trace $id 'BLOCKED' (Get-Short (Get-LastLogLine $id)) 'Yellow'
     } elseif ($state -in 'Backlog', 'Parked') {
         # Waiting on other tasks, a widened touches, or work that would not integrate: back
         # in the queue for a later run, not a stall.
         $requeued++; $failStreak = 0
+        $outcome = 'requeued'
         Write-Trace $id 'REQUEUE' (Get-Short (Get-LastLogLine $id)) 'Yellow'
     } else {
         $failStreak++
         $stalls += "$id STALLED  ended in $state, exit $($run.ExitCode)"
+        $outcome = "STALLED (ended in $state)"
         Write-Trace $id 'STALL' "ended in $state, exit $($run.ExitCode)" 'Red'
     }
+    # The run's output is in its .jsonl log and the trace; the tab shows only what is next.
+    Show-LaneEmpty "$id $outcome at $(Get-Date -Format 'HH:mm'); empty, waiting for the next task. Trace: $TraceFile"
   } catch {
     $stopWhy = 'script error'
     $stalls += "FACTORY SCRIPT ERROR  $($_.Exception.Message)"
@@ -2702,6 +2721,10 @@ if (-not $Lane) { Publish-BoardStatus -Branch $branch -State 'ended' }
 if ($Lane) {
     # The coordinator raises one alarm for every lane; a lane only reports.
     Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)") + $stalls)
+    # A clean lane leaves an empty tab to close; one that blocked or stalled says read.
+    $endLine = "Lane $Lane ended at $(Get-Date -Format 'HH:mm') ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)"
+    if (-not $stalls.Count -and -not $blocked) { Show-LaneEmpty $endLine 'empty, close' }
+    else { Show-LaneEmpty (@($endLine) + $stalls -join "`n") $(if ($stalls.Count) { 'STALLED, read' } else { 'BLOCKED, read' }) }
     try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane finished" } catch { }
     exit 0
 }

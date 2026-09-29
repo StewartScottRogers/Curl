@@ -30,18 +30,18 @@ renames it, so a lane between tasks, or waiting because every ready task overlap
 
 ## Acceptance criteria
 
-- [ ] After a lane's task is integrated (Done, Blocked, Backlog or parked), the lane
+- [x] After a lane's task is integrated (Done, Blocked, Backlog or parked), the lane
       clears its screen and prints one line naming the task just finished and its result,
       e.g. `BL-514 done at 16:10; empty, waiting for the next task`.
-- [ ] While the lane holds no task, its caption is `DF <HH:mm> L<n> · empty`: set before
+- [x] While the lane holds no task, its caption is `DF <HH:mm> L<n> · empty`: set before
       each claim and kept while the claim waits on overlapping work.
-- [ ] A lane that ends cleanly (nothing ready, retired, time up or tokens low, with no
+- [x] A lane that ends cleanly (nothing ready, retired, time up or tokens low, with no
       stall and no block) clears its screen, prints why it ended, and captions itself
       `DF <HH:mm> L<n> · empty, close`. A lane that blocked or stalled a task keeps its
       output for Stewart, as today.
-- [ ] Only lanes change; the single-runner shift (`-Lanes 1`) and the coordinator's tab
+- [x] Only lanes change; the single-runner shift (`-Lanes 1`) and the coordinator's tab
       behave as before.
-- [ ] `powershell -NoProfile -File RunDarkFactory.ps1 -TestAutoLanes` still passes, the
+- [x] `powershell -NoProfile -File RunDarkFactory.ps1 -TestAutoLanes` still passes, the
       script parses, and the header documents the empty caption.
 
 ## Notes
