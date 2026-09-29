@@ -119,6 +119,42 @@ What the table shows:
 - Two large bodies bound for standard output can interleave chunk by chunk, as in curl; that is
   faithful, not a defect.
 
+## Implementation (BL-519)
+
+BL-519 built decisions 1 to 4 in `Curl.Console`: `ParallelTransferQueue` waits on `Task.WhenAny`
+over the running set before the runner starts the next transfer; `RunningTransferState`, held in an
+`AsyncLocal` on `CurlCommandRunner`, carries each transfer's own fields (its `-o` file, progress
+recorder, meter, low-speed watchdog, abort token), on the serial path too; `WriteGate` and
+`WriteGateStream` guard standard output, the raw standard output (`-D -`) and standard error with
+one `SemaphoreSlim(1, 1)`; `ParallelRun` keeps the first failure's code, the `--fail-early`
+`CancellationTokenSource` and the reports deferred to the end in `%{xfer_id}` order. It made these
+choices inside the decisions above (recorded first in BL-519's Notes, since this folder was held by
+another task then):
+
+1. **The write gate is always on, not only under `-Z`.** With one transfer it is never contended,
+   the bytes are the same, and there is one code path. Decided by Claude under Stewart's
+   delegation.
+2. **A transfer that ends after `--fail-early` has aborted the run is reported as aborted** (exit
+   42), whether or not its handler saw the cancellation: that is the state curl's multi loop leaves
+   it in, and it keeps the report deterministic. Decided by Claude under Stewart's delegation.
+3. **A result that ends a serial run without `--fail-early`** (a bad glob, a `-T` or `-D` file that
+   cannot be opened, a `--create-dirs` failure, an IPFS failure) stops further starts under `-Z` and
+   lets running transfers finish; it counts toward the first-failure exit code when it happens. Not
+   measured; the simplest rule consistent with the serial one. Decided by Claude under Stewart's
+   delegation.
+4. **A skipped transfer's `%{url}`** is its URL as expanded and its `%{url_effective}` has the
+   guessed scheme; it takes a `%{conn_id}` as any failed transfer does. Not pinned by measurement
+   (rows 12 and 13 print only `urlnum` and `exitcode`). Decided by Claude under Stewart's
+   delegation.
+5. **`%{conn_id}` is numbered by the runner, not by the pool**, departing from decision 2 until the
+   pool can report its connection number (left with BL-520 and BL-717, which touch connection
+   reuse). BL-519 took it when the report was written; since BL-648 a transfer takes it at its first
+   `-v` or trace event, and otherwise when its report is written. Decided by Claude under Stewart's
+   delegation.
+6. **A transfer that faults** (throws anything other than the abort) ends the run with that
+   exception, as it does without `-Z`; `ParallelRun.EndAsync` then leaves the groups' dispatches to
+   process exit. Decided by Claude under Stewart's delegation.
+
 ## Alternatives considered
 
 - **Buffer each transfer's output and write it in command-line order.** Deterministic, but row 2

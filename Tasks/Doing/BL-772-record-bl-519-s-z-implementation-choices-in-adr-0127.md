@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-772 — Record BL-519's -Z implementation choices in ADR-0127
+# BL-772 â€” Record BL-519's -Z implementation choices in ADR-0127
 
 ## Goal
 
