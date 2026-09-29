@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-898 — Rerun the fast tests once before parking a lane's work, and log the failing test names
 
@@ -30,17 +30,17 @@ other 13 failures left no names behind. Each park throws a finished paid run awa
 
 ## Acceptance criteria
 
-- [ ] `Test-Green` keeps the `dotnet test` output and returns the failing test names
+- [x] `Test-Green` keeps the `dotnet test` output and returns the failing test names
       (lines `  Failed <name>`) and failing assemblies alongside its reason.
-- [ ] After a red fast-test run, the lane traces `flaky?` with the names and runs the fast
+- [x] After a red fast-test run, the lane traces `flaky?` with the names and runs the fast
       tests once more. Green on the rerun integrates as normal, with a yellow trace
       naming the tests that failed only once. Red again parks, with the names from both
       runs in the park reason.
-- [ ] A build failure still parks at once, since rebuilding does not change it.
-- [ ] A pure `Get-FailedTestNames` extracts names from test output, and `-TestFlakyTests`
+- [x] A build failure still parks at once, since rebuilding does not change it.
+- [x] A pure `Get-FailedTestNames` extracts names from test output, and `-TestFlakyTests`
       proves it on recorded output (names, the summary line of an aborted host, no
       failures).
-- [ ] The script parses, and its self-checks pass.
+- [x] The script parses, and its self-checks pass.
 
 ## Notes
 
@@ -48,3 +48,4 @@ other 13 failures left no names behind. Each park throws a finished paid run awa
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. Test-Green reruns a red fast-test run once and names failures; -TestFlakyTests 4/4, other self-checks, build and fast tests green.

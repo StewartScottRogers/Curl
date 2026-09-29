@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Quic.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-899 — Run QuicConnectionTests on a manual clock instead of real time
 
@@ -29,11 +29,11 @@ one. The test project already has `ManualTimerTimeProvider`.
 
 ## Acceptance criteria
 
-- [ ] Every `QuicConnectionTests` test that waits on a timer drives it with a
+- [x] Every `QuicConnectionTests` test that waits on a timer drives it with a
       `ManualTimerTimeProvider` passed to `QuicConnection`, and asserts the same outcome
       as before.
-- [ ] No test in `QuicConnectionTests` relies on a wall-clock window to pass.
-- [ ] `dotnet test Curl.Quic.UnitTests` passes 20 runs in a row, and the fast tests pass.
+- [x] No test in `QuicConnectionTests` relies on a wall-clock window to pass.
+- [x] `dotnet test Curl.Quic.UnitTests` passes 20 runs in a row, and the fast tests pass.
 
 ## Notes
 
@@ -41,3 +41,4 @@ one. The test project already has `ManualTimerTimeProvider`.
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. QuicConnectionTests on ManualTimerTimeProvider; Curl.Quic.UnitTests 20/20 runs, fast suite 33 assemblies green.
