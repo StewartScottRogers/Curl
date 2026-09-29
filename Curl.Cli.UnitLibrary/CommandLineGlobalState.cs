@@ -51,6 +51,8 @@ internal sealed class CommandLineGlobalState
 
     public bool TraceTime { get; set; }
 
+    public bool TraceIds { get; set; }
+
     public string? StandardErrorFile { get; set; }
 
     public bool StyledOutput { get; set; } = true;

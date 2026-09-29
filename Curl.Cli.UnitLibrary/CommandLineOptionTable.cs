@@ -36,7 +36,7 @@ namespace Curl.Cli;
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
 /// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-ntlm</c>, <c>--no-negotiate</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
-/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-clobber</c> (measured 2026-09-28), <c>--no-skip-existing</c> and <c>--no-remove-on-error</c> (measured 2026-09-28), <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) <c>--no-buffer</c> (measured 2026-09-28; <c>-N</c> is <c>--no-buffer</c>), <c>--no-parallel</c> and <c>--no-parallel-immediate</c> (measured 2026-09-28), <c>--no-socks5-basic</c>, <c>--no-socks5-gssapi</c>, <c>--no-socks5-gssapi-nec</c>, <c>--no-haproxy-protocol</c> and <c>--no-suppress-connect-headers</c> (measured 2026-09-28, BL-612), <c>--no-proxy-ca-native</c>, <c>--no-proxy-ssl-auto-client-cert</c> and <c>--no-proxy-ssl-allow-beast</c> (measured 2026-09-28, BL-605), <c>--no-use-ascii</c>, <c>--no-crlf</c> and <c>--no-append</c> (measured 2026-09-29, BL-632) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-clobber</c> (measured 2026-09-28), <c>--no-skip-existing</c> and <c>--no-remove-on-error</c> (measured 2026-09-28), <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-trace-ids</c> (measured 2026-09-29, BL-648), <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) <c>--no-buffer</c> (measured 2026-09-28; <c>-N</c> is <c>--no-buffer</c>), <c>--no-parallel</c> and <c>--no-parallel-immediate</c> (measured 2026-09-28), <c>--no-socks5-basic</c>, <c>--no-socks5-gssapi</c>, <c>--no-socks5-gssapi-nec</c>, <c>--no-haproxy-protocol</c> and <c>--no-suppress-connect-headers</c> (measured 2026-09-28, BL-612), <c>--no-proxy-ca-native</c>, <c>--no-proxy-ssl-auto-client-cert</c> and <c>--no-proxy-ssl-allow-beast</c> (measured 2026-09-28, BL-605), <c>--no-use-ascii</c>, <c>--no-crlf</c> and <c>--no-append</c> (measured 2026-09-29, BL-632) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-out-null</c> is accepted and, as in curl 8.21.0, discards its URL's body just as <c>--out-null</c> does
 /// (measured 2026-09-28, BL-495 Notes).
@@ -73,6 +73,7 @@ public static class CommandLineOptionTable
         CommandLineOption.FileName("trace", null, (options, file) => options.SelectTraceDump(TraceKind.HexDump, file, "--trace")),
         CommandLineOption.FileName("trace-ascii", null, (options, file) => options.SelectTraceDump(TraceKind.AsciiDump, file, "--trace-ascii")),
         CommandLineOption.NegatableFlag("trace-time", null, (options, on) => options.TraceTime = on),
+        CommandLineOption.NegatableFlag("trace-ids", null, (options, on) => options.TraceIds = on),
         CommandLineOption.Value("stderr", null, SetStandardErrorFile),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
         CommandLineOption.Value("upload-file", 'T', AddUploadFile),
@@ -358,7 +359,7 @@ public static class CommandLineOptionTable
     /// <remarks>
     /// curl 8.21.0's manual marks <c>--fail-early</c>, <c>-#</c>, <c>--progress-meter</c>, <c>-S</c>,
     /// <c>--stderr</c>, <c>--styled-output</c>, <c>--trace</c>, <c>--trace-ascii</c>,
-    /// <c>--trace-time</c>, <c>-v</c>, <c>-Z</c>, <c>--parallel-immediate</c>, <c>--parallel-max</c> and <c>--parallel-max-host</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
+    /// <c>--trace-time</c>, <c>--trace-ids</c>, <c>-v</c>, <c>-Z</c>, <c>--parallel-immediate</c>, <c>--parallel-max</c> and <c>--parallel-max-host</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
     /// and <c>-M</c> are global in its tool (<c>struct GlobalConfig</c>) without the mark, as is
     /// <c>--ssl-sessions</c> (<c>global-&gt;ssl_sessions</c>); <c>--dump-ca-embed</c>, like <c>-V</c>, ends
     /// the command line rather than setting anything of one group. Measured
@@ -375,6 +376,7 @@ public static class CommandLineOptionTable
         "trace",
         "trace-ascii",
         "trace-time",
+        "trace-ids",
         "stderr",
         "styled-output",
         "fail-early",

@@ -78,6 +78,42 @@ public sealed class CommandLineTraceOptionTests
         Assert.IsTrue(Accept(arguments).TraceTime);
     }
 
+    // Measured 2026-09-29 (BL-648 Notes): --trace-ids -v prints no IDs, --trace-ids -sv and -vv do,
+    // and -vvv --no-trace-ids does not.
+    [TestMethod]
+    [DataRow("-v")]
+    [DataRow("--trace-ids -v")]
+    [DataRow("-vv -v")]
+    [DataRow("-vvv --no-trace-ids")]
+    [DataRow("--trace-ids --no-trace-ids")]
+    [DataRow("--trace-ids -v --no-verbose")]
+    public void Parse_TraceIdsResetOrNeverSet_ShowsNoIds(string arguments)
+    {
+        Assert.IsFalse(Accept(arguments).TraceIds);
+    }
+
+    [TestMethod]
+    [DataRow("--trace-ids")]
+    [DataRow("--no-trace-ids --trace-ids")]
+    [DataRow("-v --trace-ids")]
+    [DataRow("--trace-ids -sv")]
+    [DataRow("-vv")]
+    [DataRow("-vvv")]
+    [DataRow("--trace-ascii - --trace-ids")]
+    public void Parse_TraceIdsOrSecondV_ShowsIds(string arguments)
+    {
+        Assert.IsTrue(Accept(arguments).TraceIds);
+    }
+
+    [TestMethod]
+    public void Parse_TraceIdsInFirstGroup_ReachesTheSecondGroup()
+    {
+        CommandLineParseResult result = Parse("--trace-ids " + Url + " --next");
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Groups[1].TraceIds);
+    }
+
     [TestMethod]
     [DataRow("--no-trace-time")]
     [DataRow("--no-trace-time=x")]

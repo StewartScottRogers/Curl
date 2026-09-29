@@ -256,6 +256,13 @@ public sealed class CommandLineOptions
     public bool TraceTime { get => globals.TraceTime; internal set => globals.TraceTime = value; }
 
     /// <summary>
+    /// <see langword="true"/> when every verbose or trace line carries its transfer and connection
+    /// IDs, <c>[0-0] </c>: set by <c>--trace-ids</c> and by the second <c>v</c> of <c>-vv</c>, cleared
+    /// as <see cref="TraceTime"/> is (measured 2026-09-29, BL-648 Notes).
+    /// </summary>
+    public bool TraceIds { get => globals.TraceIds; internal set => globals.TraceIds = value; }
+
+    /// <summary>
     /// The file the last <c>--stderr</c> names, to which curl writes what it would write to standard
     /// error: <c>-</c> for standard output; <see langword="null"/> when none was given. An empty name is
     /// kept, not refused: curl 8.21.0 fails to open it, warns and carries on writing to standard error,
@@ -1631,6 +1638,7 @@ public sealed class CommandLineOptions
         {
             Verbosity = 0;
             TraceTime = false;
+            TraceIds = false;
         }
 
         if (!on)
@@ -1669,6 +1677,7 @@ public sealed class CommandLineOptions
         else if (Verbosity == 1)
         {
             TraceTime = true;
+            TraceIds = true;
         }
 
         Verbosity = Math.Min(Verbosity + 1, MostVerbose);
