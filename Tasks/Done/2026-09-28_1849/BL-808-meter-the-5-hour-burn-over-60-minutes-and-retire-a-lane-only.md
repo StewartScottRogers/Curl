@@ -8,7 +8,7 @@ depends-on: [BL-807]
 touches: [RunDarkFactory.ps1, Documentation/Planning/Decisions/ADR-0130-lanes-auto-paces-dark-factory-lanes-to-the-usage-windows-the-board-and-the-machine.md]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-808 — Meter the 5-hour burn over 60 minutes and retire a lane only after two low steps in a row
 
@@ -43,3 +43,4 @@ while a single step 0.25 lanes low retires a lane. Ceilings (board capacity, mac
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. 5-hour rate over 60 min (30 min minimum), pace-bound retire needs two low steps, ceilings retire at once; ADR-0130 amended; -TestAutoLanes 29/29, build and fast tests green.
