@@ -28,14 +28,22 @@ public enum ZstandardDecodeError
 
     /// <summary>
     /// The frame breaks RFC 8878 in its blocks: a reserved block type, a block larger than
-    /// <c>Block_Maximum_Size</c>, or content whose size differs from the declared
-    /// <c>Frame_Content_Size</c> (libzstd <c>corruption_detected</c>).
+    /// <c>Block_Maximum_Size</c>, content whose size differs from the declared
+    /// <c>Frame_Content_Size</c>, a literals section that runs past its block or regenerates
+    /// more than <c>Block_Maximum_Size</c>, a Huffman tree or stream that does not decode, or
+    /// treeless literals with no earlier tree (libzstd <c>corruption_detected</c>).
     /// </summary>
     CorruptionDetected,
 
     /// <summary>
-    /// The frame holds a compressed block, which this decoder does not decode yet (BL-859 and
-    /// BL-860 add it, and remove this member). libzstd has no such error.
+    /// A literals section splits fewer than 6 literals into four Huffman streams (libzstd
+    /// <c>literals_headerWrong</c>).
     /// </summary>
-    CompressedBlockNotYetSupported,
+    LiteralsHeaderWrong,
+
+    /// <summary>
+    /// A compressed block holds sequences, which this decoder does not decode yet (BL-860 adds
+    /// them, and removes this member). libzstd has no such error.
+    /// </summary>
+    SequencesNotYetSupported,
 }

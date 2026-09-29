@@ -11,12 +11,16 @@ namespace Curl.Zstandard;
 /// at a time.
 /// </summary>
 /// <remarks>
-/// It decodes Zstandard frames whose blocks are raw or RLE, checks each frame's
-/// <c>Content_Checksum</c>, and skips skippable frames. A compressed block is
+/// It decodes Zstandard frames of raw, RLE and compressed blocks, checks each frame's
+/// <c>Content_Checksum</c>, and skips skippable frames. A compressed block's literals
+/// section is decoded in full (raw, RLE, and Huffman-coded with or without its own tree,
+/// in one or four streams); a compressed block that holds sequences is
 /// <see cref="OperationStatus.InvalidData" /> with
-/// <see cref="ZstandardDecodeError.CompressedBlockNotYetSupported" /> until BL-859 and
-/// BL-860. Raw and RLE blocks are copied straight to the destination, so no window buffer
-/// is allocated yet; the compressed-block tasks allocate it at frame-header time.
+/// <see cref="ZstandardDecodeError.SequencesNotYetSupported" /> until BL-860. A compressed
+/// block is gathered whole and its literals decoded into a block buffer before any of them
+/// is given; no window buffer is allocated yet, as nothing refers back to earlier output
+/// until sequences do. A compressed block whose <c>Block_Size</c> is 0 is an empty block,
+/// as libzstd's streaming decoder, the one curl drives, treats it (ADR-0192).
 /// </remarks>
 public sealed class ZstandardDecoder
 {
@@ -52,6 +56,9 @@ public sealed class ZstandardDecoder
 
     private readonly ulong maxWindowSize;
 
+    /// <summary>A <c>Number_of_Sequences</c> of 0 in its 2-byte form.</summary>
+    private static ReadOnlySpan<byte> TwoByteZeroSequences => [128, 0];
+
     /// <summary>Holds a fixed-size field while its bytes arrive: at most a 13-byte frame header after its descriptor.</summary>
     private readonly byte[] field = new byte[13];
 
@@ -76,6 +83,12 @@ public sealed class ZstandardDecoder
 
     private byte rleValue;
 
+    /// <summary>Holds a compressed block while its bytes arrive; allocated at the first compressed block.</summary>
+    private byte[]? compressedBlock;
+
+    /// <summary>Decodes compressed blocks' literals; created at the first compressed block.</summary>
+    private ZstandardLiteralsDecoder? literalsDecoder;
+
     /// <summary>Creates a decoder that refuses frames whose window exceeds <c>2^<paramref name="maxWindowLog" /></c> bytes.</summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxWindowLog" /> is outside <see cref="MinimumMaxWindowLog" /> to <see cref="MaximumMaxWindowLog" />.</exception>
     public ZstandardDecoder(int maxWindowLog = DefaultMaxWindowLog)
@@ -96,6 +109,8 @@ public sealed class ZstandardDecoder
         RawBlock,
         RleBlockValue,
         RleBlock,
+        CompressedBlock,
+        CompressedBlockContent,
         Checksum,
         Failed,
     }
@@ -163,13 +178,16 @@ public sealed class ZstandardDecoder
         Stage.SkippableFrameContent => SkipSkippableFrameContent(ref buffers),
         Stage.RawBlock => CopyRawBlock(ref buffers),
         Stage.RleBlock => RepeatRleValue(ref buffers),
+        Stage.CompressedBlockContent => GiveLiterals(ref buffers),
         _ => GatherField(ref buffers),
     };
 
+    /// <summary>Gathers the <c>fieldNeeded</c> bytes the stage reads: a header field, or a whole compressed block.</summary>
     private OperationStatus? GatherField(ref DecodeBuffers buffers)
     {
+        var target = stage == Stage.CompressedBlock ? compressedBlock! : field;
         var count = Math.Min(fieldNeeded - fieldLength, buffers.Source.Length);
-        buffers.Take(count).CopyTo(field.AsSpan(fieldLength));
+        buffers.Take(count).CopyTo(target.AsSpan(fieldLength));
         fieldLength += count;
         if (fieldLength < fieldNeeded)
         {
@@ -177,7 +195,7 @@ public sealed class ZstandardDecoder
         }
 
         fieldLength = 0;
-        return ReadField(field.AsSpan(0, fieldNeeded));
+        return stage == Stage.CompressedBlock ? DecodeCompressedBlock(target.AsSpan(0, fieldNeeded)) : ReadField(field.AsSpan(0, fieldNeeded));
     }
 
     private OperationStatus? ReadField(ReadOnlySpan<byte> value) => stage switch
@@ -244,6 +262,7 @@ public sealed class ZstandardDecoder
 
         frameContentWritten = 0;
         contentChecksum.Reset();
+        literalsDecoder?.StartFrame();
         return Expect(Stage.BlockHeader, BlockHeaderLength);
     }
 
@@ -259,25 +278,102 @@ public sealed class ZstandardDecoder
         }
 
         remaining = blockSize;
-        return blockType == RawBlockType ? Expect(Stage.RawBlock, 0) : Expect(Stage.RleBlockValue, 1);
+        return blockType switch
+        {
+            RawBlockType => Expect(Stage.RawBlock, 0),
+            RleBlockType => Expect(Stage.RleBlockValue, 1),
+            _ when blockSize == 0 => EndBlock(),
+            _ => ExpectCompressedBlock(blockSize),
+        };
     }
 
-    /// <summary>Returns what is wrong with a block of <paramref name="blockType" /> regenerating <paramref name="blockSize" /> bytes, or <see cref="ZstandardDecodeError.None" />.</summary>
+    /// <summary>RFC 8878 section 3.1.1.2.3: <c>Block_Maximum_Size</c>, the smaller of the window and 128 KiB.</summary>
+    private int BlockMaximumSize => (int)Math.Min(frameHeader.WindowSize, BlockSizeLimit);
+
+    /// <summary>
+    /// Returns what is wrong with a block of <paramref name="blockType" /> whose
+    /// <c>Block_Size</c> is <paramref name="blockSize" />, or <see cref="ZstandardDecodeError.None" />.
+    /// A raw or RLE block's size is what it regenerates, so it must also fit the declared content size.
+    /// </summary>
     private ZstandardDecodeError CheckBlock(int blockType, int blockSize)
     {
-        if (blockType > CompressedBlockType || (ulong)blockSize > Math.Min(frameHeader.WindowSize, BlockSizeLimit))
+        if (blockType > CompressedBlockType || blockSize > BlockMaximumSize)
         {
             return ZstandardDecodeError.CorruptionDetected;
         }
 
-        if (blockType == CompressedBlockType)
-        {
-            return ZstandardDecodeError.CompressedBlockNotYetSupported;
-        }
-
-        return frameContentWritten + (ulong)blockSize > frameHeader.ContentSize.GetValueOrDefault(ulong.MaxValue)
+        return blockType != CompressedBlockType && ExceedsContentSize(blockSize)
             ? ZstandardDecodeError.CorruptionDetected
             : ZstandardDecodeError.None;
+    }
+
+    /// <summary>Whether <paramref name="count" /> more bytes of content would pass the declared <c>Frame_Content_Size</c>.</summary>
+    private bool ExceedsContentSize(int count) =>
+        frameContentWritten + (ulong)count > frameHeader.ContentSize.GetValueOrDefault(ulong.MaxValue);
+
+    private OperationStatus? ExpectCompressedBlock(int blockSize)
+    {
+        compressedBlock ??= new byte[BlockSizeLimit];
+        literalsDecoder ??= new ZstandardLiteralsDecoder(BlockSizeLimit);
+        return Expect(Stage.CompressedBlock, blockSize);
+    }
+
+    /// <summary>
+    /// Decodes a whole compressed block (RFC 8878 section 3.1.1.3): its literals section,
+    /// then its sequences section, which must hold no sequences.
+    /// </summary>
+    private OperationStatus? DecodeCompressedBlock(ReadOnlySpan<byte> block)
+    {
+        var error = literalsDecoder!.Decode(block, BlockMaximumSize, out var literalsSectionLength);
+        if (error == ZstandardDecodeError.None)
+        {
+            error = CheckSequencesSection(block[literalsSectionLength..]);
+        }
+
+        if (error == ZstandardDecodeError.None && ExceedsContentSize(literalsDecoder.Literals.Length))
+        {
+            error = ZstandardDecodeError.CorruptionDetected;
+        }
+
+        if (error != ZstandardDecodeError.None)
+        {
+            return Fail(error);
+        }
+
+        remaining = literalsDecoder.Literals.Length;
+        stage = Stage.CompressedBlockContent;
+        return null;
+    }
+
+    /// <summary>
+    /// RFC 8878 section 3.1.1.3.2.1: a <c>Number_of_Sequences</c> of 0, in its 1-byte form (0)
+    /// or its 2-byte form (128, 0), ends the block; any byte after it is corruption, as libzstd
+    /// finds it. Any other number of sequences waits for BL-860.
+    /// </summary>
+    private static ZstandardDecodeError CheckSequencesSection(ReadOnlySpan<byte> section)
+    {
+        if (section.IsEmpty)
+        {
+            return ZstandardDecodeError.CorruptionDetected;
+        }
+
+        var zeroSequences = section[0] == 0 ? section[..1] : TwoByteZeroSequences;
+        if (!section.StartsWith(zeroSequences))
+        {
+            return ZstandardDecodeError.SequencesNotYetSupported;
+        }
+
+        return section.Length == zeroSequences.Length ? ZstandardDecodeError.None : ZstandardDecodeError.CorruptionDetected;
+    }
+
+    /// <summary>Gives the decoded literals of a compressed block, as far as the destination allows.</summary>
+    private OperationStatus? GiveLiterals(ref DecodeBuffers buffers)
+    {
+        var literals = literalsDecoder!.Literals;
+        var content = buffers.Give((int)Math.Min(remaining, buffers.Destination.Length));
+        literals.Slice(literals.Length - (int)remaining, content.Length).CopyTo(content);
+        AddContent(content);
+        return remaining == 0 ? EndBlock() : OperationStatus.DestinationTooSmall;
     }
 
     private OperationStatus? CopyRawBlock(ref DecodeBuffers buffers)

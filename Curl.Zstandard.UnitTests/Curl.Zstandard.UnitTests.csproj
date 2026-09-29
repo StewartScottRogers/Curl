@@ -9,6 +9,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="GoldenDecompression\*.zst;GoldenDecompressionErrors\*.zst" LogicalName="%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Curl.Zstandard.UnitLibrary\Curl.Zstandard.UnitLibrary.csproj" />
   </ItemGroup>
 

@@ -7,17 +7,34 @@ decoder, and two layers need one - HTTP content decoding (`Content-Encoding: zst
 `Curl.Tls.UnitLibrary`) - so it lives in neither and both may reference it (ADR-0120's
 table, as amended by ADR-0185).
 
-Namespace `Curl.Zstandard`. What it holds so far (BL-858):
+Namespace `Curl.Zstandard`. What it holds so far (BL-858, BL-859):
 
 - `XxHash64` (one-shot) and `XxHash64Accumulator` (incremental), pinned to xxhsum's
   sanity table and python-xxhash's published values.
 - `ZstandardDecoder`: the streaming push decoder of ADR-0185 (`Decompress` returning
-  `OperationStatus`, `LastError`, static `TryDecompress`). It decodes frames of raw and
-  RLE blocks, skips skippable frames and checks `Content_Checksum`. A compressed block is
-  `InvalidData` with `ZstandardDecodeError.CompressedBlockNotYetSupported` until BL-859
-  and BL-860, which also allocate the window buffer (raw and RLE blocks need none).
+  `OperationStatus`, `LastError`, static `TryDecompress`). It decodes frames of raw, RLE
+  and compressed blocks, skips skippable frames and checks `Content_Checksum`. A
+  compressed block is gathered whole and its literals section decoded; a block that holds
+  sequences is `InvalidData` with `ZstandardDecodeError.SequencesNotYetSupported` until
+  BL-860, which also allocates the window buffer (literals alone need none). A 0-byte
+  compressed block is an empty block, as curl's streaming libzstd treats it (ADR-0192).
+- `ZstandardLiteralsDecoder` decodes a literals section (raw, RLE, compressed, treeless;
+  one or four Huffman streams) and keeps the frame's last Huffman table for treeless
+  literals; `ZstandardLiteralsHeader` and `ZstandardLiteralsType` read its header.
+- `ZstandardHuffmanTable` reads a Huffman tree description (direct or FSE-compressed
+  weights) and decodes a Huffman stream.
+- `ZstandardFseTable` reads an FSE table description and builds its decoding table; it is
+  general, so BL-860's sequences reuse it (its `Build` is pinned to RFC 8878 Appendix A.1).
+- `ZstandardBackwardBitReader` and `ZstandardForwardBitReader` read the bitstreams;
+  `ZstandardBitLoad` loads their bytes.
 - `ZstandardFrameHeader` reads the frame header; `ZstandardDecodeError` names each failure
   after the libzstd error code.
+
+Tests: `ZstandardTestLiterals` in `Curl.Zstandard.UnitTests` is a test-only encoder for
+literals sections. Every frame it builds for the tests was measured in real curl 8.21.0
+(libzstd 1.5.7) with `Record-CurlExchange.ps1`: the valid ones decode to the same bytes,
+the malformed ones fail with exit 61. The reference corpus frames are embedded resources,
+with provenance and licence in `GoldenDecompression/README.md`.
 
 ## Rules
 
