@@ -111,6 +111,8 @@
   <Project Path="Curl.Quic.UnitTests/Curl.Quic.UnitTests.csproj" />
   <Project Path="Curl.Tls.UnitLibrary/Curl.Tls.UnitLibrary.csproj" />
   <Project Path="Curl.Tls.UnitTests/Curl.Tls.UnitTests.csproj" />
+  <Project Path="Curl.Zstandard.UnitLibrary/Curl.Zstandard.UnitLibrary.csproj" />
+  <Project Path="Curl.Zstandard.UnitTests/Curl.Zstandard.UnitTests.csproj" />
 
   <Project Path="Documentation/Documentation.shproj" />
   <Project Path=".claude/Claude.shproj" />
