@@ -34,3 +34,4 @@ The hand-built TLS 1.3 client offers `compress_certificate` (27) with the algori
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
