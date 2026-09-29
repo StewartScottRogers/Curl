@@ -226,6 +226,16 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("proto-default", null, SetDefaultProtocol),
         CommandLineOption.Text("ciphers", null, (options, ciphers) => options.Ciphers = ciphers),
         CommandLineOption.Text("tls13-ciphers", null, (options, ciphers) => options.Tls13Ciphers = ciphers),
+        CommandLineOption.Text("curves", null, (options, curves) => options.Curves = curves),
+        CommandLineOption.Text("sigalgs", null, (options, algorithms) => options.SignatureAlgorithms = algorithms),
+        CommandLineOption.NegatableFlag("tls-earlydata", null, (options, on) => options.TlsEarlyData = on),
+        CommandLineOption.Value("ech", null, SetEch),
+        CommandLineOption.FileName("ssl-sessions", null, (options, file) => options.SslSessionsFile = file),
+        CommandLineOption.Text("engine", null, SetEngine),
+        CommandLineOption.Flag("dump-ca-embed", null, options => options.CaEmbedDumpRequested = true),
+        CommandLineOption.Text("tlsuser", null, (options, user) => options.TlsUser = user),
+        CommandLineOption.Value("tlspassword", null, AcceptingEmpty((options, password) => options.TlsPassword = password)),
+        CommandLineOption.Value("tlsauthtype", null, SetTlsAuthType),
         CommandLineOption.Value("range", 'r', SetRange),
         CommandLineOption.Value("continue-at", 'C', SetResumeFrom),
         CommandLineOption.Value("max-filesize", null, SetMaxFileSize),
@@ -342,7 +352,9 @@ public static class CommandLineOptionTable
     /// curl 8.21.0's manual marks <c>--fail-early</c>, <c>-#</c>, <c>--progress-meter</c>, <c>-S</c>,
     /// <c>--stderr</c>, <c>--styled-output</c>, <c>--trace</c>, <c>--trace-ascii</c>,
     /// <c>--trace-time</c>, <c>-v</c>, <c>-Z</c>, <c>--parallel-immediate</c>, <c>--parallel-max</c> and <c>--parallel-max-host</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
-    /// and <c>-M</c> are global in its tool (<c>struct GlobalConfig</c>) without the mark. Measured
+    /// and <c>-M</c> are global in its tool (<c>struct GlobalConfig</c>) without the mark, as is
+    /// <c>--ssl-sessions</c> (<c>global-&gt;ssl_sessions</c>); <c>--dump-ca-embed</c>, like <c>-V</c>, ends
+    /// the command line rather than setting anything of one group. Measured
     /// 2026-09-28 (BL-508 Notes): <c>-v</c> given only after <c>--next</c> shows the first group's
     /// transfer too, while <c>-w</c>, <c>-o</c> and <c>-H</c> given before it do not reach the second group.
     /// </remarks>
@@ -367,6 +379,8 @@ public static class CommandLineOptionTable
         "version",
         "help",
         "manual",
+        "dump-ca-embed",
+        "ssl-sessions",
         "config",
         "next",
         "disable");
@@ -501,6 +515,100 @@ public static class CommandLineOptionTable
         }
 
         options.FtpSslCccMode = FtpClearCommandChannel.Passive;
+    }
+
+    /// <summary>
+    /// Reads an <c>--ech</c> value as curl 8.21.0's <c>parse_ech</c> does. A value longer than four characters
+    /// starting <c>pn:</c> (in any case) sets <see cref="CommandLineOptions.EchPublicName"/>; one longer than
+    /// five starting <c>ecl:</c> sets <see cref="CommandLineOptions.EchConfigList"/>, from the file
+    /// <c>ecl:@&lt;file&gt;</c> names when it has the <c>@</c>; any other value is the mode,
+    /// <see cref="CommandLineOptions.Ech"/>, unchecked, an empty one refused as blank. A file that cannot be
+    /// read prints curl's warning and is refused as badly used.
+    /// </summary>
+    private static CommandLineRefusal? SetEch(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (value.Length > 4 && value.StartsWith("pn:", StringComparison.OrdinalIgnoreCase))
+        {
+            options.EchPublicName = value[3..];
+            return null;
+        }
+
+        if (value.Length > 5 && value.StartsWith("ecl:", StringComparison.OrdinalIgnoreCase))
+        {
+            return SetEchConfigList(options, value[4..], spelledOption, dataFileReader);
+        }
+
+        if (value.Length == 0)
+        {
+            return CommandLineRefusal.BlankArgument(spelledOption);
+        }
+
+        options.Ech = value;
+        return null;
+    }
+
+    /// <summary>
+    /// Sets <see cref="CommandLineOptions.EchConfigList"/> from what follows <c>--ech ecl:</c>: the list itself,
+    /// or, after <c>@</c>, the text of the file it names (standard input for <c>@-</c>) up to any NUL, with its
+    /// carriage returns and line feeds removed, as curl 8.21.0's <c>file2string</c> reads it. A file that cannot
+    /// be read adds <see cref="CommandLineWarning.EchConfigListFileUnreadable"/> unless <c>-s</c> has been read,
+    /// and is refused with <see cref="CommandLineRefusal.BadlyUsedHere"/>.
+    /// </summary>
+    private static CommandLineRefusal? SetEchConfigList(CommandLineOptions options, string list, string spelledOption, IDataFileReader dataFileReader)
+    {
+        if (list[0] != '@')
+        {
+            options.EchConfigList = list;
+            return null;
+        }
+
+        string file = list[1..];
+        byte[] contents;
+        if (file == "-")
+        {
+            contents = dataFileReader.ReadStandardInput();
+        }
+        else if (!dataFileReader.TryReadFile(file, out contents))
+        {
+            options.AddWarningLinesUnlessSilent(CommandLineWarning.EchConfigListFileUnreadable(file));
+            return CommandLineRefusal.BadlyUsedHere(spelledOption);
+        }
+
+        string text = Encoding.UTF8.GetString(contents);
+        int nul = text.IndexOf('\0', StringComparison.Ordinal);
+        options.EchConfigList = (nul < 0 ? text : text[..nul]).Replace("\r", string.Empty, StringComparison.Ordinal).Replace("\n", string.Empty, StringComparison.Ordinal);
+        return null;
+    }
+
+    /// <summary>
+    /// Sets <see cref="CommandLineOptions.Engine"/>, and, for <c>list</c> exactly, asks for the engine list
+    /// with <see cref="CommandLineOptions.EngineListRequested"/>, as curl 8.21.0 does.
+    /// </summary>
+    private static void SetEngine(CommandLineOptions options, string name)
+    {
+        options.Engine = name;
+        options.EngineListRequested = name == "list";
+    }
+
+    /// <summary>
+    /// Sets <see cref="CommandLineOptions.TlsAuthType"/> as curl 8.21.0 does: an empty value is refused as
+    /// blank, and any value but <c>SRP</c> (compared case-sensitively) with
+    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/>, the only type it supports.
+    /// </summary>
+    private static CommandLineRefusal? SetTlsAuthType(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (value.Length == 0)
+        {
+            return CommandLineRefusal.BlankArgument(spelledOption);
+        }
+
+        if (value != "SRP")
+        {
+            return CommandLineRefusal.InstalledLibcurlDoesNotSupport(spelledOption);
+        }
+
+        options.TlsAuthType = value;
+        return null;
     }
 
     /// <summary>

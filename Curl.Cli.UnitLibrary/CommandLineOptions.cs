@@ -142,10 +142,26 @@ public sealed class CommandLineOptions
     public bool ManualRequested { get => globals.ManualRequested; internal set => globals.ManualRequested = value; }
 
     /// <summary>
-    /// Whether an option has asked for information instead of a transfer (<see cref="VersionRequested"/>,
-    /// <see cref="HelpRequested"/> or <see cref="ManualRequested"/>), which ends parsing where it stands.
+    /// <see langword="true"/> when <c>--engine list</c> was given on the command line. Parsing stops there, as
+    /// curl 8.21.0's does; the console prints the build-time engine list and exits 0 instead of transferring.
+    /// An <c>engine list</c> line in a <c>-K</c> file does not set it: curl ignores the request there.
     /// </summary>
-    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested;
+    public bool EngineListRequested { get => globals.EngineListRequested; internal set => globals.EngineListRequested = value; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--dump-ca-embed</c> was given on the command line. Parsing stops there, as
+    /// curl 8.21.0's does; the console writes the embedded CA bundle, which is none (ADR-0151), and exits 0
+    /// instead of transferring. A <c>dump-ca-embed</c> line in a <c>-K</c> file does not set it: curl ignores
+    /// the request there.
+    /// </summary>
+    public bool CaEmbedDumpRequested { get => globals.CaEmbedDumpRequested; internal set => globals.CaEmbedDumpRequested = value; }
+
+    /// <summary>
+    /// Whether an option has asked for information instead of a transfer (<see cref="VersionRequested"/>,
+    /// <see cref="HelpRequested"/>, <see cref="ManualRequested"/>, <see cref="EngineListRequested"/> or
+    /// <see cref="CaEmbedDumpRequested"/>), which ends parsing where it stands.
+    /// </summary>
+    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested || EngineListRequested || CaEmbedDumpRequested;
 
     /// <summary>Records <c>--help</c> and its subject, an empty one read as none.</summary>
     /// <param name="subject">The subject as given, empty when there was none.</param>
@@ -178,6 +194,8 @@ public sealed class CommandLineOptions
         HelpRequested = false;
         HelpSubject = null;
         ManualRequested = false;
+        EngineListRequested = false;
+        CaEmbedDumpRequested = false;
     }
 
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
@@ -1047,6 +1065,66 @@ public sealed class CommandLineOptions
 
     /// <summary>The <c>--tls13-ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
     public string? Tls13Ciphers { get; internal set; }
+
+    /// <summary>
+    /// The <c>--curves</c> list of key-exchange groups, verbatim; <see langword="null"/> when not given. An empty
+    /// value is refused as blank, as curl 8.21.0 refuses it. The last value wins.
+    /// </summary>
+    public string? Curves { get; internal set; }
+
+    /// <summary>
+    /// The <c>--sigalgs</c> list of signature algorithms, verbatim; <see langword="null"/> when not given. An
+    /// empty value is refused as blank, as curl 8.21.0 refuses it. The last value wins.
+    /// </summary>
+    public string? SignatureAlgorithms { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--tls-earlydata</c> was given and no <c>--no-tls-earlydata</c> came after it: send TLS 1.3 early data on a resumed session.</summary>
+    public bool TlsEarlyData { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--ech</c> value that is neither <c>pn:&lt;name&gt;</c> nor <c>ecl:&lt;list&gt;</c>, verbatim:
+    /// the mode, <c>false</c>, <c>grease</c>, <c>true</c> or <c>hard</c>; <see langword="null"/> when none was
+    /// given. curl 8.21.0 does not check the keyword while parsing, so neither does this.
+    /// </summary>
+    public string? Ech { get; internal set; }
+
+    /// <summary>
+    /// The public name of the last <c>--ech pn:&lt;name&gt;</c>, without its <c>pn:</c> prefix;
+    /// <see langword="null"/> when none was given.
+    /// </summary>
+    public string? EchPublicName { get; internal set; }
+
+    /// <summary>
+    /// The base64 ECHConfigList of the last <c>--ech ecl:&lt;list&gt;</c>, without its <c>ecl:</c> prefix, or the
+    /// text of the file <c>ecl:@&lt;file&gt;</c> names (standard input for <c>ecl:@-</c>) with its carriage
+    /// returns and line feeds removed; <see langword="null"/> when none was given.
+    /// </summary>
+    public string? EchConfigList { get; internal set; }
+
+    /// <summary>
+    /// The <c>--engine</c> name, verbatim; <see langword="null"/> when not given. <c>--engine list</c> also sets
+    /// <see cref="EngineListRequested"/>. An empty value is refused as blank, as curl 8.21.0 refuses it.
+    /// </summary>
+    public string? Engine { get; internal set; }
+
+    /// <summary>The <c>--tlsuser</c> TLS-SRP user name, verbatim; <see langword="null"/> when not given. An empty value is refused as blank, as curl 8.21.0 refuses it.</summary>
+    public string? TlsUser { get; internal set; }
+
+    /// <summary>The <c>--tlspassword</c> TLS-SRP password, verbatim, empty included, as curl 8.21.0 accepts it; <see langword="null"/> when not given.</summary>
+    public string? TlsPassword { get; internal set; }
+
+    /// <summary>
+    /// The <c>--tlsauthtype</c> value: <c>SRP</c>, the only type curl 8.21.0 accepts (case-sensitively), or
+    /// <see langword="null"/> when not given.
+    /// </summary>
+    public string? TlsAuthType { get; internal set; }
+
+    /// <summary>
+    /// The <c>--ssl-sessions</c> file TLS session tickets are loaded from before the transfers and saved to
+    /// after them; <see langword="null"/> when not given. Global, as curl 8.21.0 keeps it: every option group
+    /// shares the last value given.
+    /// </summary>
+    public string? SslSessionsFile { get => globals.SslSessionsFile; internal set => globals.SslSessionsFile = value; }
 
     /// <summary>
     /// The <c>-r</c> / <c>--range</c> text as curl keeps it, not yet parsed; <see langword="null"/>

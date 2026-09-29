@@ -299,6 +299,17 @@ public static class CommandLineWarning
         WrappedMessage.Lines("Warning: ", $"unrecognized delegation method '{value}', using none");
 
     /// <summary>
+    /// The lines curl prints for an <c>--ech ecl:@&lt;file&gt;</c> whose file cannot be read, before refusing the
+    /// option as badly used: <c>Warning: Could not read file "&lt;file&gt;" specified for "--ech ecl:" option</c>,
+    /// wrapped at 79 columns as curl wraps its warnings. Taken from curl 8.21.0's <c>parse_ech</c>
+    /// (<c>src/tool_getparam.c</c>, tag <c>curl-8_21_0</c>); no measured build has ECH (ADR-0151).
+    /// </summary>
+    /// <param name="file">The file name after the <c>@</c>.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> EchConfigListFileUnreadable(string file) =>
+        WrappedMessage.Lines("Warning: ", $"Could not read file \"{file}\" specified for \"--ech ecl:\" option");
+
+    /// <summary>
     /// The line curl prints for a <c>--proto</c> or <c>--proto-redir</c> item naming a scheme it does not know:
     /// <c>Warning: unrecognized protocol '&lt;name&gt;'</c>, the name without its <c>+</c>, <c>-</c> or <c>=</c>
     /// and cut to its first 31 characters by the caller. Measured with <c>curl --proto http,bogus</c> and
