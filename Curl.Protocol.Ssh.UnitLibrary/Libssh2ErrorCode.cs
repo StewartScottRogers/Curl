@@ -45,20 +45,46 @@ internal static class Libssh2ErrorCode
 
     /// <summary>
     /// <c>LIBSSH2_ERROR_SOCKET_DISCONNECT</c>: the peer closed before sending a line that
-    /// starts <c>SSH-</c>.
+    /// starts <c>SSH-</c>, or sent <c>SSH_MSG_DISCONNECT</c> instead of accepting the
+    /// <c>ssh-userauth</c> service (measured 2026-09-29, BL-567).
     /// </summary>
     internal const int SocketDisconnect = -13;
+
+    /// <summary>
+    /// <c>LIBSSH2_ERROR_PROTO</c>: the server's <c>SSH_MSG_SERVICE_ACCEPT</c> is shorter than
+    /// five bytes or names another service. Measured 2026-09-29 (BL-567).
+    /// </summary>
+    internal const int Protocol = -14;
+
+    /// <summary>
+    /// <c>LIBSSH2_ERROR_SOCKET_RECV</c>: the peer closed instead of answering the
+    /// <c>ssh-userauth</c> service request. Measured 2026-09-29 (BL-565, BL-567).
+    /// </summary>
+    internal const int SocketReceive = -43;
 
     /// <summary>The description printed with every failure of the key exchange.</summary>
     internal const string UnableToExchangeEncryptionKeys = "Unable to exchange encryption keys";
 
     /// <summary>
-    /// The description printed when the first packet after the key exchange, the server's
-    /// answer to the <c>ssh-userauth</c> service request, cannot be read: measured
-    /// 2026-09-29 (BL-565) with <see cref="InvalidMac" /> when its MAC does not match. The
-    /// service request is BL-567's.
+    /// The description printed when the server's answer to the <c>ssh-userauth</c> service
+    /// request, the first packet after the key exchange, cannot be read: measured
+    /// 2026-09-29 with <see cref="InvalidMac" /> when its MAC does not match (BL-565),
+    /// <see cref="SocketReceive" /> when the peer closes and <see cref="SocketDisconnect" />
+    /// when it sends <c>SSH_MSG_DISCONNECT</c> (BL-567).
     /// </summary>
     internal const string FailedToGetUserAuthResponse = "Failed to get response to ssh-userauth request";
+
+    /// <summary>
+    /// The description printed with <see cref="Protocol" /> when the server's
+    /// <c>SSH_MSG_SERVICE_ACCEPT</c> is shorter than five bytes.
+    /// </summary>
+    internal const string UnexpectedPacketLength = "Unexpected packet length";
+
+    /// <summary>
+    /// The description printed with <see cref="Protocol" /> when the server's
+    /// <c>SSH_MSG_SERVICE_ACCEPT</c> names a service other than <c>ssh-userauth</c>.
+    /// </summary>
+    internal const string InvalidResponseReceivedFromServer = "Invalid response received from server";
 
     /// <summary>The description printed when no identification string arrives.</summary>
     internal const string FailedGettingBanner = "Failed getting banner";

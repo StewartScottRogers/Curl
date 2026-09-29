@@ -18,6 +18,12 @@ internal static class SshMessageNumber
     /// <summary><c>SSH_MSG_DEBUG</c>.</summary>
     internal const byte Debug = 4;
 
+    /// <summary><c>SSH_MSG_SERVICE_REQUEST</c> (RFC 4253 section 10): the service the client wants next.</summary>
+    internal const byte ServiceRequest = 5;
+
+    /// <summary><c>SSH_MSG_SERVICE_ACCEPT</c> (RFC 4253 section 10): the server grants the service it names.</summary>
+    internal const byte ServiceAccept = 6;
+
     /// <summary><c>SSH_MSG_KEXINIT</c>.</summary>
     internal const byte KeyExchangeInit = 20;
 

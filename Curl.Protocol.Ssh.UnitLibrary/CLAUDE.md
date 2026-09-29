@@ -19,7 +19,9 @@ implemented names; `KeyExchange` holds one `ISshKeyExchange` per method family a
 `SshKeyDerivation`; `HostKeys` holds one `ISshSignatureVerifier` per host-key type and
 `KnownHostsFile` and `SshHostKeyChecker`, which accept or refuse the host key (ADR-0213);
 `PacketProtection` holds one `ISshPacketProtection` per cipher family, which the packet
-reader and writer switch to at each `NEWKEYS` (ADR-0212). A new algorithm registers in
+reader and writer switch to at each `NEWKEYS` (ADR-0212); `Authentication` holds
+`SshUserAuthentication`, which requests the `ssh-userauth` service and authenticates the
+user with `none`, `password` and `keyboard-interactive` in curl's order (ADR-0214). A new algorithm registers in
 `SshKeyExchangeMethods`, `SshSignatureVerifiers` or `SshPacketProtections`, and
 `SshAlgorithmCatalogue.Implemented` offers it from then on. Failure messages and
 their libssh2 codes are ADR-0122's, ADR-0206's and ADR-0212's, measured from the
