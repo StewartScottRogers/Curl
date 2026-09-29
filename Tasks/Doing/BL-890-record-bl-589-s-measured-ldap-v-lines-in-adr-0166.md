@@ -32,3 +32,4 @@ ADR-0166 has a "Measured by BL-589" section stating the `-v` lines each LDAP bui
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
