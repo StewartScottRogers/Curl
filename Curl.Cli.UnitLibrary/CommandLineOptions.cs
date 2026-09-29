@@ -161,7 +161,29 @@ public sealed class CommandLineOptions
     /// <see cref="HelpRequested"/>, <see cref="ManualRequested"/>, <see cref="EngineListRequested"/> or
     /// <see cref="CaEmbedDumpRequested"/>), which ends parsing where it stands.
     /// </summary>
-    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested || EngineListRequested || CaEmbedDumpRequested;
+    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested || AiHelpRequested || EngineListRequested || CaEmbedDumpRequested;
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--ai-help</c> was given on the command line. Parsing stops there, as it
+    /// does for <c>--help</c>; the console prints <see cref="CurlAiHelpText"/>'s Markdown for
+    /// <see cref="AiHelpSubject"/> and exits 0 instead of transferring. An <c>ai-help</c> line in a <c>-K</c>
+    /// file does not set it: it is ignored there (ADR-0223).
+    /// </summary>
+    public bool AiHelpRequested { get => globals.AiHelpRequested; private set => globals.AiHelpRequested = value; }
+
+    /// <summary>
+    /// The subject <c>--ai-help</c> was given, read as <c>--help</c> reads its subject; <see langword="null"/>
+    /// when there was none or it was empty, which asks for the index. Set only with <see cref="AiHelpRequested"/>.
+    /// </summary>
+    public string? AiHelpSubject { get => globals.AiHelpSubject; private set => globals.AiHelpSubject = value; }
+
+    /// <summary>Records <c>--ai-help</c> and its subject, an empty one read as none.</summary>
+    /// <param name="subject">The subject as given, empty when there was none.</param>
+    internal void RequestAiHelp(string subject)
+    {
+        AiHelpRequested = true;
+        AiHelpSubject = subject.Length == 0 ? null : subject;
+    }
 
     /// <summary>Records <c>--help</c> and its subject, an empty one read as none.</summary>
     /// <param name="subject">The subject as given, empty when there was none.</param>
@@ -194,6 +216,8 @@ public sealed class CommandLineOptions
         HelpRequested = false;
         HelpSubject = null;
         ManualRequested = false;
+        AiHelpRequested = false;
+        AiHelpSubject = null;
         EngineListRequested = false;
         CaEmbedDumpRequested = false;
     }
