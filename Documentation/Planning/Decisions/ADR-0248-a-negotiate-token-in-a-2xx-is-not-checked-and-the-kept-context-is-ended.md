@@ -48,7 +48,7 @@ context failure.
 - A context no longer outlives the response that ends its handshake, as far as the HTTP
   handler reaches. `Curl.Console`'s `AwsSigV4HttpAuthenticator` wraps the ranked
   authenticator and does not forward the call yet, and the WebSocket handler does not make
-  it on a 101; both are follow-up work (BL-981), and until then those contexts live until
+  it on a 101; both are follow-up work (BL-982), and until then those contexts live until
   the process ends, as before.
 
 ## Alternatives considered

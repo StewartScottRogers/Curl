@@ -1,5 +1,5 @@
 ---
-id: BL-981
+id: BL-982
 title: End a kept Negotiate context through the aws-sigv4 wrapper and on a WebSocket upgrade
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-981 — End a kept Negotiate context through the aws-sigv4 wrapper and on a WebSocket upgrade
+# BL-982 — End a kept Negotiate context through the aws-sigv4 wrapper and on a WebSocket upgrade
 
 ## Goal
 

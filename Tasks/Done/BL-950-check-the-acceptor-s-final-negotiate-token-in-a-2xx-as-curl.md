@@ -46,7 +46,7 @@ A `2xx` answering a Negotiate request that carries `WWW-Authenticate: Negotiate 
   diverge from curl (a failure line curl never writes), which the Goal forbids.
 - Added `Documentation/Planning/Decisions` to `touches` for ADR-0248, the ADR index row and the
   ADR-0227 correction; no task in Doing touches it.
-- Follow-up BL-981: `Curl.Console`'s `AwsSigV4HttpAuthenticator` (always wrapping the ranked
+- Follow-up BL-982: `Curl.Console`'s `AwsSigV4HttpAuthenticator` (always wrapping the ranked
   authenticator in the composition) does not forward `EndAuthorization` yet, and the WebSocket
   handler does not call it; `Curl.Console` is in BL-576's touches and `Curl.Protocol.Ws` in
   BL-955's, so they were not widened in here. Nothing observable depends on it.
