@@ -109,3 +109,4 @@ Run from a scratch folder, `Record-CurlExchange.ps1 -Port 18443 -Tls` with
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Waits on BL-878: Alt-Used, the Alt-Svc response hook and dialling an alternative need Http, Abstractions and Networking (Http and Abstractions held by BL-794)
+- 2026-09-29: Backlog -> Doing.
