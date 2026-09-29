@@ -1,5 +1,5 @@
 ---
-id: BL-792
+id: BL-800
 title: Clear a lane's herdr tab after each task and caption it empty while it holds none
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-792 — Clear a lane's herdr tab after each task and caption it empty while it holds none
+# BL-800 — Clear a lane's herdr tab after each task and caption it empty while it holds none
 
 ## Goal
 
