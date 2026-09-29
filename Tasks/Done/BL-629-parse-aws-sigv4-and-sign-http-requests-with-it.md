@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-628]
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Documentation/Planning/Decisions/ADR-0243-aws-sigv4-signs-in-an-authenticator-that-puts-its-headers-in-the-authorization-slot.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-629 — Parse --aws-sigv4 and sign HTTP requests with it
 
@@ -24,8 +24,8 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Cli.UnitTests` cover parsing; `Curl.Console.UnitTests` pin the request bytes for BL-628's measured cases (fixed time) and the extra cases above, measured first with `Record-CurlExchange.ps1`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for each library changed.
+- [x] `Curl.Cli.UnitTests` cover parsing; `Curl.Console.UnitTests` pin the request bytes for BL-628's measured cases (fixed time) and the extra cases above, measured first with `Record-CurlExchange.ps1`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for each library changed.
 
 ## Notes
 
@@ -92,6 +92,43 @@ completed:
   User-Agent: curl/8.21.0
   Accept: */*
   ```
+- 2026-09-29 (lane 4): delivered. Decision in ADR-0243, decided by Claude under Stewart's
+  delegation. The ADR and the decisions README were added to `touches`; no task in Doing
+  names either one.
+  - Abstractions: a new `AwsSigV4Inputs` record on `HttpAuthRequest.AwsSigV4`, plus
+    `HttpRequestOptions.AwsSigV4`. `IHttpAuthenticator` now documents that a value may go on
+    with header lines after CRLFs. This replaced the plan's `ExtraHeaderLines` idea: less
+    contract, and the lines land in the same slot.
+  - Http: fills the inputs (Host value, `-H`, `-d` bytes, `-T` size, GET/HEAD,
+    `--path-as-is`). It never gives them to a proxy. It catches a pre-emptive
+    `HttpAuthenticationFailedException` and throws it inside the exchange, so the connection
+    is made first and nothing is sent, as measured.
+  - Console: `AwsSigV4HttpAuthenticator` wraps the ranked authenticator, for the HTTP handler
+    only. `CreateProtocolHandlers` and the test `CreateRunner` take an optional `signingClock`.
+  - Cli: `--aws-sigv4` accepts any value, empty included; the last one wins. It is
+    per-group. `--ai-help` picks the row up from `CommandLineOptionTable` on its own, so the
+    option no longer says "Not supported by this build yet".
+  - Learned: `cond ? memory : null` typed as `ReadOnlyMemory<byte>?` turns `null` into an
+    empty memory (the implicit conversion from `byte[]`), which would sign an S3 `-T` upload
+    as an empty body. Caught by `ExecuteAsync_AwsSigV4Upload_GivesTheUploadSize`, fixed with
+    a cast.
+  - Measured again with curl 8.21.0 via `Record-CurlExchange.ps1`:
+    - `--aws-sigv4 ""` signs as `aws:amz`.
+    - `--aws-sigv4 aws http://localhost:.../x` connects, sends nothing and gives
+      `curl: (3) aws-sigv4: service missing in parameters and hostname`.
+    - `-v` prints `aws_sigv4: String to sign (enclosed in []) - [...]`,
+      `aws_sigv4: Signature - <hex>` and `Server auth using AWS_SIGV4 with user 'AKID'` after
+      `using HTTP/1.x`. At 20260929T204200Z, for `/x` on 127.0.0.1:18633, the string-to-sign
+      hash was `e8d1e6c3...` and the signature `65b76dcb...`.
+    - With `-H "Authorization: mine"`, only the `Server auth` line is printed.
+  - Choice: with `--oauth2-bearer` and no `-u`, nothing is signed (libcurl would sign with
+    an empty key ID). Not measured; recorded in ADR-0243's consequences.
+  - Tests: `CurlCompositionAwsSigV4Tests` (7), `AwsSigV4HttpAuthenticatorTests` (9),
+    `HttpProtocolHandlerTests.AwsSigV4` (6 + 1 data row), `AwsSigV4InputsTests` (3), and
+    Cli parsing (4). The four libraries measure 100% line and branch coverage with 0 failing
+    members.
+  - `test1117` in Conformance timed out once (10 s) during a measuring run under load, then
+    passed in every other run. It is unrelated.
 
 ## Log
 
@@ -99,3 +136,4 @@ completed:
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Protocol.Abstractions.UnitLibrary and Curl.Protocol.Http.UnitLibrary (multi-line Authorization slot, pre-emptive auth failure), which BL-819 in Doing touches
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. --aws-sigv4 signs every HTTP request (redirect hops included) with the measured curl 8.21.0 bytes, header slot, -v lines and exit codes
