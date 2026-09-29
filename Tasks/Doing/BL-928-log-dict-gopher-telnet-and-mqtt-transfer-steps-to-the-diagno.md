@@ -40,3 +40,4 @@ The DICT, Gopher, TELNET and MQTT handlers write the diagnostic log (components 
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
