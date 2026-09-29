@@ -1,6 +1,6 @@
 # ADR-0124 — The connector honours --no-alpn, --no-keepalive, --no-tcp-nodelay and --ssl-revoke-best-effort; --ca-native changes nothing
 
-- **Status:** Accepted
+- **Status:** Accepted; the proxy handshake's ALPN is amended by [ADR-0190](ADR-0190-an-https-proxy-handshake-offers-http-1-1-through-alpn.md)
 - **Date:** 2026-09-28
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-490.
