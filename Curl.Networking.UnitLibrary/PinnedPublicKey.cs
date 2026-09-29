@@ -8,7 +8,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Checks the server certificate's public key against curl's <c>--pinnedpubkey</c> value, as
-/// curl 8.21.0's <c>Curl_pin_peer_pubkey</c> does in every TLS build (ADR-0192, BL-608): a
+/// curl 8.21.0's <c>Curl_pin_peer_pubkey</c> does in every TLS build (ADR-0193, BL-608): a
 /// value starting <c>sha256//</c> is a list of base64 SHA-256 hashes of the key's
 /// SubjectPublicKeyInfo, separated by <c>;sha256//</c>; anything else is the path of a file
 /// holding the key as DER or as a PEM <c>PUBLIC KEY</c> block. A file that cannot be read,

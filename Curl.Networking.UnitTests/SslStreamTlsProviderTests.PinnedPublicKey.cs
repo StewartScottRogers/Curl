@@ -9,7 +9,7 @@ namespace Curl.Networking;
 /// <see cref="SslStreamTlsProvider" /> with <c>--pinnedpubkey</c>
 /// (<see cref="TlsClientOptions.PinnedPublicKey" />): after the handshake, under <c>-k</c> too,
 /// a server key the pin does not name is exit 90 with the same message in both builds
-/// (ADR-0192). Measured with curl 8.21.0's Schannel build and curl 8.18.0's OpenSSL build
+/// (ADR-0193). Measured with curl 8.21.0's Schannel build and curl 8.18.0's OpenSSL build
 /// against Record-CurlExchange.ps1 -Tls, 2026-09-29 (BL-608).
 /// </summary>
 public sealed partial class SslStreamTlsProviderTests

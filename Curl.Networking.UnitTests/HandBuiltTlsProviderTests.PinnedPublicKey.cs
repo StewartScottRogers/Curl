@@ -5,7 +5,7 @@ namespace Curl.Networking;
 /// <summary>
 /// <see cref="HandBuiltTlsProvider" /> with <c>--pinnedpubkey</c>, as
 /// <see cref="SslStreamTlsProviderTests" /> pins it for the other provider: exit 90 when the
-/// server's key is not the pinned one (ADR-0192, BL-608).
+/// server's key is not the pinned one (ADR-0193, BL-608).
 /// </summary>
 public sealed partial class HandBuiltTlsProviderTests
 {

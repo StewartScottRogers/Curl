@@ -6,7 +6,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// <see cref="PinnedPublicKey" /> matches keys as curl 8.21.0's <c>Curl_pin_peer_pubkey</c> does
-/// (ADR-0192). The measured cases, curl 8.21.0 Schannel and curl 8.18.0 OpenSSL, 2026-09-29
+/// (ADR-0193). The measured cases, curl 8.21.0 Schannel and curl 8.18.0 OpenSSL, 2026-09-29
 /// (BL-608): the right hash, the right hash second in a list, a PEM file and a DER file of the
 /// key succeed; a wrong hash, <c>sha256//</c> with nothing after it, a hash that is not base64,
 /// another key's PEM file, a file holding no key and a missing file are exit 90.

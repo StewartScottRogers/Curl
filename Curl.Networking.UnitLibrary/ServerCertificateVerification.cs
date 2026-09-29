@@ -74,7 +74,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// and whether it is accepted. A certificate <see cref="VerifyPeer" /> accepts, or any
     /// under <c>-k</c>, is then checked against <see cref="TlsClientOptions.PinnedPublicKey" />:
     /// a key the pin does not name is exit 90, so a certificate that fails both is exit 60, as
-    /// curl reports it (ADR-0192, BL-608).
+    /// curl reports it (ADR-0193, BL-608).
     /// </summary>
     /// <param name="errors">What was found wrong with the chain, as <see cref="SslStream" /> reports it.</param>
     /// <param name="chain">The chain built, if a certificate was presented.</param>

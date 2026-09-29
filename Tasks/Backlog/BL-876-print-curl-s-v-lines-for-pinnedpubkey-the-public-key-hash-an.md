@@ -19,7 +19,7 @@ mismatch lines, byte for byte as each build does.
 
 ## Context
 
-- Follow-up from BL-608 (ADR-0192), which made `--pinnedpubkey` fail with exit 90 but prints no `-v` line for it.
+- Follow-up from BL-608 (ADR-0193), which made `--pinnedpubkey` fail with exit 90 but prints no `-v` line for it.
 - Measured 2026-09-29 against `Record-CurlExchange.ps1 -Tls -TlsPublicKeyFile` (stderr in BL-608's Notes):
   - Schannel curl 8.21.0, `sha256//` pin: `*  public key hash: sha256//<base64>` (two spaces) after `* ALPN: curl offers http/1.1`
     and before `* ALPN: server did not agree on a protocol. Uses default.`; on a mismatch, after that line,
