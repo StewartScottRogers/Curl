@@ -214,7 +214,7 @@ recordings on 2026-09-28 (the same two builds as BL-586), each with
   attributes of one entry whose names differ only in case are written each with its own values,
   where WinLDAP would look both up by name.
 - A failed write to the output, and a connection that fails with an I/O error rather than
-  closing, are not handled by the LDAP handler yet; BL-845 does that.
+  closing, were measured by BL-845 (below).
 
 ## Measured by BL-830
 
@@ -293,6 +293,31 @@ UnbindRequest, reported at once as BL-586 decided for WinLDAP's waits. The 16 Mi
 not WinLDAP's (it waits for any length); it keeps an unsealed reply from making this code
 allocate what the length says, and is far beyond any reply a search seals.
 
+## Measured by BL-845
+
+Decided by Claude under Stewart's delegation, in BL-845, from 10 `Record-CurlExchange.ps1 -Script`
+recordings on 2026-09-29 (the same two builds), each with `-sS -u cn=u:p`; the script gained a
+`reset` step (RST, not FIN) for them:
+
+- **Output that stops accepting bytes.** A 100-entry search (23-byte DNs, one 37-byte
+  `description` value each), WinLDAP to a closed standard output, OpenLDAP to `-o /dev/full`
+  and to a closed standard output: exit 23 `Failure writing output to destination, passed 37
+  returned 4` (WinLDAP) and `passed 37 returned 36` (OpenLDAP). Both builds hand curl's
+  writer each piece of an entry on its own (`lib/ldap.c`, `lib/openldap.c`): `DN: `, the
+  DN, the line end, and per value the tab, the name, the colon, the separator, the value and
+  the line end, then the blank lines; `passed` is the piece the 4096-byte stdio buffer
+  overflowed on and `returned` the room left in it, which is exactly those piece sizes.
+  After the failure WinLDAP sends its UnbindRequest; OpenLDAP sends an AbandonRequest for the
+  search and then its UnbindRequest. Under 4096 bytes curl's tool prints only `Failed writing
+  body`, which is `Curl.Console`'s side (BL-099).
+- **Connection reset.** A reset instead of the BindResponse, after the BindResponse (so the
+  SearchRequest goes into it), and after one entry, each answers exactly as the server closing
+  does: WinLDAP 38 `LDAP local: bind via ldap_win_bind Timeout` or 39 `LDAP remote: Server
+  Down` after its 30-second wait, OpenLDAP 7 `LDAP local: connecting ldap_result Can't contact
+  LDAP server` or 56 `LDAP local: search ldap_result Can't contact LDAP server` with the
+  entries written so far. Neither build reports exit 55: a send that fails is seen by the next
+  read. So an `IOException` from the connection, on a read or a send, is read as the server
+  closing, and a later read after a failed send finds it closed.
 ## Consequences
 
 - BL-586: the BER reader and writer, the message types, and the bind with both dialects,

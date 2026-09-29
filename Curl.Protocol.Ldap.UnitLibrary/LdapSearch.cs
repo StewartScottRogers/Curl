@@ -31,7 +31,12 @@ namespace Curl.Protocol.Ldap;
 /// succeeds with the entries written so far. A server that closes, or sends bytes that are not
 /// an LDAPMessage, fails without an UnbindRequest: WinLDAP with exit 39
 /// <c>LDAP remote: Server Down</c> (after a 30-second wait this does not make), <c>libldap</c>
-/// with exit 56.
+/// with exit 56. A connection reset, on a send or a receive, is a server that closed (BL-845).
+/// </para>
+/// <para>
+/// An output that stops accepting bytes ends the transfer with exit 23 as
+/// <see cref="LdapEntryWriter" /> words it (BL-845): the OpenLDAP build then abandons the search
+/// and unbinds, the Windows build, whose entries are written after the search, unbinds.
 /// </para>
 /// </remarks>
 internal static class LdapSearch
@@ -84,20 +89,29 @@ internal static class LdapSearch
         await exchange.SendAsync(request, cancellationToken).ConfigureAwait(false);
         var entries = new LdapEntryWriter(dialect, context);
         LdapSearchReply reply = await ReadToTheEndAsync(dialect, exchange, messageId, entries, cancellationToken).ConfigureAwait(false);
-        TransferResult result = reply.Kind switch
-        {
-            LdapSearchReplyKind.Lost => Lost(dialect),
-            LdapSearchReplyKind.Entry => await AbandonAsync(exchange, messageId, TransferResult.Failure(CurlExitCode.RecvError, ReceiveFailed), cancellationToken).ConfigureAwait(false),
-            LdapSearchReplyKind.OtherResponse => await UnbindAndReturnAsync(
-                exchange,
-                await AbandonAsync(exchange, messageId, TransferResult.Success(0), cancellationToken).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false),
-            _ => await UnbindAndReturnAsync(exchange, await OutcomeAsync(dialect, reply, entries).ConfigureAwait(false), cancellationToken).ConfigureAwait(false),
-        };
+        TransferResult result = entries.WriteFailure is { } writeFailure
+            ? await AbandonAndUnbindAsync(exchange, messageId, writeFailure, cancellationToken).ConfigureAwait(false)
+            : await FinishAsync(dialect, exchange, messageId, reply, entries, cancellationToken).ConfigureAwait(false);
 
         // Entries the OpenLDAP build wrote before a failure count too, as curl's size_download does.
         return result with { BytesTransferred = entries.BytesWritten };
     }
+
+    /// <summary>Leaves the search as <paramref name="dialect" />'s build leaves after <paramref name="reply" /> ended it.</summary>
+    private static async ValueTask<TransferResult> FinishAsync(
+        LdapDialect dialect,
+        LdapExchange exchange,
+        int messageId,
+        LdapSearchReply reply,
+        LdapEntryWriter entries,
+        CancellationToken cancellationToken) =>
+        reply.Kind switch
+        {
+            LdapSearchReplyKind.Lost => Lost(dialect),
+            LdapSearchReplyKind.Entry => await AbandonAsync(exchange, messageId, TransferResult.Failure(CurlExitCode.RecvError, ReceiveFailed), cancellationToken).ConfigureAwait(false),
+            LdapSearchReplyKind.OtherResponse => await AbandonAndUnbindAsync(exchange, messageId, TransferResult.Success(0), cancellationToken).ConfigureAwait(false),
+            _ => await UnbindAndReturnAsync(exchange, await OutcomeAsync(dialect, reply, entries).ConfigureAwait(false), cancellationToken).ConfigureAwait(false),
+        };
 
     /// <summary>
     /// Reads replies, handing each entry to <paramref name="entries" />, until the one that
@@ -116,7 +130,10 @@ internal static class LdapSearch
             LdapSearchReply reply = await exchange.ReadSearchReplyAsync(messageId, cancellationToken).ConfigureAwait(false);
             if (reply.Entry is { } entry && IsWritten(dialect, entry))
             {
-                await entries.AddAsync(entry).ConfigureAwait(false);
+                if (!await entries.AddAsync(entry).ConfigureAwait(false))
+                {
+                    return reply;
+                }
             }
             else if (!IsReadPast(dialect, reply))
             {
@@ -148,8 +165,7 @@ internal static class LdapSearch
     {
         if (done.IsSuccess)
         {
-            await entries.WriteHeldAsync().ConfigureAwait(false);
-            return TransferResult.Success(0);
+            return await entries.WriteHeldAsync().ConfigureAwait(false) ? TransferResult.Success(0) : entries.WriteFailure!;
         }
 
         string message = dialect == LdapDialect.WinLdap
@@ -163,6 +179,9 @@ internal static class LdapSearch
         await exchange.AbandonAsync(messageId, cancellationToken).ConfigureAwait(false);
         return result;
     }
+
+    private static async ValueTask<TransferResult> AbandonAndUnbindAsync(LdapExchange exchange, int messageId, TransferResult result, CancellationToken cancellationToken) =>
+        await UnbindAndReturnAsync(exchange, await AbandonAsync(exchange, messageId, result, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 
     private static async ValueTask<TransferResult> UnbindAndReturnAsync(LdapExchange exchange, TransferResult result, CancellationToken cancellationToken)
     {

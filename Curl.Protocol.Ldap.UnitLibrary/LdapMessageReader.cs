@@ -55,13 +55,30 @@ internal sealed class LdapMessageReader(IConnection connection)
                 Array.Resize(ref buffer, (int)Math.Min(buffer.Length * 2L, Array.MaxLength));
             }
 
-            int read = await connection.ReadAsync(buffer.AsMemory(count), cancellationToken).ConfigureAwait(false);
+            int read = await ReadConnectionAsync(cancellationToken).ConfigureAwait(false);
             if (read == 0)
             {
                 return (LdapReadStatus.Closed, []);
             }
 
             count += read;
+        }
+    }
+
+    /// <summary>
+    /// Reads what the connection has into the buffer; 0 when the server closed it or it failed
+    /// with an I/O error, such as a reset, which both builds treat as the server closing
+    /// (measured by BL-845).
+    /// </summary>
+    private async ValueTask<int> ReadConnectionAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await connection.ReadAsync(buffer.AsMemory(count), cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            return 0;
         }
     }
 

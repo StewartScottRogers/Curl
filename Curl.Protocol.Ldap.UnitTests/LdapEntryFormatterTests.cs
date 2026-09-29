@@ -21,7 +21,7 @@ public sealed class LdapEntryFormatterTests
     {
         var entry = new LdapSearchEntry(Hex.Bytes("78"), [new LdapEntryAttribute(Hex.Bytes("76"), [Hex.Bytes("61 " + control + " 62")])]);
 
-        byte[] text = LdapEntryFormatter.Format(dialect, entry);
+        byte[] text = [.. LdapEntryFormatter.FormatPieces(dialect, entry).SelectMany(piece => piece)];
 
         CollectionAssert.AreEqual(Encoding.Latin1.GetBytes("DN: x\n" + expectedAfterDn), text);
     }

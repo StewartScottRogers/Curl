@@ -19,6 +19,9 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer)
 
     private int nextMessageId = 1;
 
+    /// <summary>Whether a send failed with an I/O error, after which every read finds the server closed.</summary>
+    private bool sendFailed;
+
     /// <summary>
     /// Sends and reads every later message through the SASL security layer, sealed with the
     /// keys of <paramref name="authentication" />, which the session now owns.
@@ -66,7 +69,7 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer)
     {
         int messageId = nextMessageId++;
         await SendAsync(encode(messageId), cancellationToken).ConfigureAwait(false);
-        (LdapReadStatus status, byte[] message) = await reader.ReadMessageAsync(cancellationToken).ConfigureAwait(false);
+        (LdapReadStatus status, byte[] message) = await ReadMessageAsync(cancellationToken).ConfigureAwait(false);
         return status switch
         {
             LdapReadStatus.Message => LdapBindResponse.Decode(message, messageId),
@@ -91,7 +94,7 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer)
     /// <returns>What arrived; <see cref="LdapSearchReplyKind.Lost" /> when the server closed or sent bytes that cannot start an LDAPMessage.</returns>
     public async ValueTask<LdapSearchReply> ReadSearchReplyAsync(int messageId, CancellationToken cancellationToken)
     {
-        (LdapReadStatus status, byte[] message) = await reader.ReadMessageAsync(cancellationToken).ConfigureAwait(false);
+        (LdapReadStatus status, byte[] message) = await ReadMessageAsync(cancellationToken).ConfigureAwait(false);
         return status == LdapReadStatus.Message
             ? LdapSearchResponse.Decode(message, messageId)
             : LdapSearchReply.Of(LdapSearchReplyKind.Lost);
@@ -114,9 +117,25 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer)
     /// <param name="message">One whole LDAPMessage.</param>
     /// <param name="cancellationToken">Cancels the send.</param>
     /// <returns>A task that completes when the message has been flushed.</returns>
+    /// <remarks>
+    /// A send that fails with an I/O error, such as a reset, is the server closing, as both
+    /// builds treat it (measured by BL-845): it is not reported, and every later read finds the
+    /// server closed.
+    /// </remarks>
     public async ValueTask SendAsync(byte[] message, CancellationToken cancellationToken)
     {
-        await connection.WriteAsync(message, cancellationToken).ConfigureAwait(false);
-        await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await connection.WriteAsync(message, cancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            sendFailed = true;
+        }
     }
+
+    /// <summary>Reads the next whole LDAPMessage; <see cref="LdapReadStatus.Closed" /> once a send has failed.</summary>
+    private ValueTask<(LdapReadStatus Status, byte[] Message)> ReadMessageAsync(CancellationToken cancellationToken) =>
+        sendFailed ? ValueTask.FromResult((LdapReadStatus.Closed, Array.Empty<byte>())) : reader.ReadMessageAsync(cancellationToken);
 }
