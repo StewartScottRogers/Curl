@@ -42,7 +42,7 @@ completed: 2026-09-29
   `ZstandardHistory` is the frame's ring buffer of past content. `ZstandardDecoder` now
   executes every compressed block into a block buffer and appends all content it gives to
   the history. `SequencesNotYetSupported` is gone.
-- Decision (ADR-0193): real curl decodes matches that reach past `Window_Size` as long as
+- Decision (ADR-0196): real curl decodes matches that reach past `Window_Size` as long as
   libzstd still buffers the bytes (measured: 1025 back in a 1 KiB window after 2000 bytes,
   and 3040 back after 3072, both right and exit 0), so the history holds libzstd's buffer
   size, `Window_Size + 2 * Block_Maximum_Size + 64`, rather than refusing past the window.
@@ -55,7 +55,7 @@ completed: 2026-09-29
   time.
 - `off0.bin.zst` needed `WithCulture="false"` on the `EmbeddedResource`: MSBuild read
   `.bin` as the Bini culture and silently moved the file into a satellite assembly.
-- `touches` gained `Documentation/Planning/Decisions` for ADR-0193 and its index row; no
+- `touches` gained `Documentation/Planning/Decisions` for ADR-0196 and its index row; no
   task in Doing names it.
 
 ## Log
