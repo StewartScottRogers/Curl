@@ -35,3 +35,4 @@ With `--dns-servers <list>`, names are resolved by a hand-built DNS client in `C
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
