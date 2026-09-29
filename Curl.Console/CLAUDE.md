@@ -23,7 +23,7 @@ each URL; a `--retry` attempt and a followed redirect reload nothing, as in curl
 The origin's and the HTTPS proxy's TLS providers come from `CurlComposition.CreateTlsProvider`,
 which builds `HandBuiltTlsProvider` when `TlsClientRouting.Choose` routes the options to the
 hand-built client (a `--tls-max` of 1.0 or 1.1 today) and `SslStreamTlsProvider` otherwise
-(ADR-0140, ADR-0160, BL-708).
+(ADR-0140, ADR-0162, BL-708).
 
 `CurlComposition.CreateProtocolHandlers` gives every handler an `EndPointRecordingConnector` and
 an `EndPointRecordingDatagramConnector` sharing one `ConnectionEndPointRecorder`, and wraps

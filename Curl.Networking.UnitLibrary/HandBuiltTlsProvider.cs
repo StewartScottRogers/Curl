@@ -21,7 +21,7 @@ namespace Curl.Networking;
 /// <para>
 /// A range that reaches TLS 1.3 runs <see cref="Tls13ClientConnection" />; a range whose
 /// ceiling is TLS 1.2, 1.1 or 1.0 runs <see cref="Tls12ClientConnection" /> offering every
-/// version from the minimum (TLS 1.0 when none is given) to the ceiling (ADR-0160). The
+/// version from the minimum (TLS 1.0 when none is given) to the ceiling (ADR-0162). The
 /// ClientHello carries the target host in <c>server_name</c> unless it is an IP address,
 /// the connection's protocols through ALPN unless <c>--no-alpn</c>, and the <c>--cert</c>
 /// certificate when the server asks for one and its key is RSA or ECDSA.
@@ -97,7 +97,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// </summary>
     public IReadOnlyList<string> Warnings { get; }
 
-    // A range that reaches TLS 1.3 runs the TLS 1.3 client (ADR-0160).
+    // A range that reaches TLS 1.3 runs the TLS 1.3 client (ADR-0162).
     private bool OffersTls13 => _options.MaximumVersion is TlsVersion.SystemDefault or TlsVersion.Tls13;
 
     private bool OffersOnlyVersionsBelowTls12 => _options.MaximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11;
