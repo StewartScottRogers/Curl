@@ -74,7 +74,8 @@ internal static class CurlComposition
     /// The cookies the HTTP handler sends and stores, or <see langword="null" /> to keep none.
     /// </param>
     /// <param name="securityContexts">
-    /// Makes the HTTP handler's Negotiate and NTLM contexts, or <see langword="null" /> for
+    /// Makes the HTTP handler's Negotiate and NTLM contexts and the mail handlers' SASL GSSAPI and
+    /// NTLM contexts, or <see langword="null" /> for
     /// <see cref="CreateSecurityContextFactory" />'s router over <paramref name="connector" /> and
     /// <paramref name="datagramConnector" />.
     /// </param>
@@ -101,7 +102,8 @@ internal static class CurlComposition
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
         EndPointRecordingDatagramConnector recordingDatagramConnector = new(datagramConnector, recorder);
-        RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector), negotiateOptions);
+        ISecurityContextFactory contexts = securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector);
+        RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(contexts, negotiateOptions);
         HttpProtocolHandler http = new(recordingConnector, httpAuthenticator, cookieStore, proxyAuthSchemes);
 
         IProtocolHandler[] handlers =
@@ -112,9 +114,9 @@ internal static class CurlComposition
             new TelnetProtocolHandler(recordingConnector),
             new TftpProtocolHandler(recordingDatagramConnector, recordingConnector, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
             new MqttProtocolHandler(recordingConnector),
-            new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
-            new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
-            new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
+            new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts)),
+            new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts)),
+            new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts)),
             new LdapProtocolHandler(recordingConnector, OperatingSystem.IsWindows() ? LdapDialect.WinLdap : LdapDialect.OpenLdap),
             new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()),
             new RtspProtocolHandler(recordingConnector, httpAuthenticator),
@@ -203,11 +205,13 @@ internal static class CurlComposition
     /// <summary>
     /// Creates the SASL authenticator the SMTP, POP3 and IMAP handlers share (ADR-0121): a
     /// <see cref="SaslAuthenticator" /> encoding credentials in the platform's encoding
-    /// (<see cref="CredentialEncoding.ForPlatform" />), as the HTTP authenticator does.
+    /// (<see cref="CredentialEncoding.ForPlatform" />), as the HTTP authenticator does, and answering
+    /// GSSAPI and NTLM on the contexts <paramref name="securityContexts" /> makes (ADR-0184, BL-852).
     /// </summary>
+    /// <param name="securityContexts">Makes GSSAPI's and NTLM's contexts: <see cref="CreateSecurityContextFactory" />'s in production.</param>
     /// <returns>The authenticator.</returns>
-    internal static ISaslAuthenticator CreateSaslAuthenticator() =>
-        new SaslAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
+    internal static ISaslAuthenticator CreateSaslAuthenticator(ISecurityContextFactory securityContexts) =>
+        new SaslAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), securityContexts);
 
     /// <summary>
     /// Creates the network transports for one run: a <see cref="TcpConnector" /> over the
@@ -500,7 +504,7 @@ internal static class CurlComposition
     /// environment variables.
     /// </param>
     /// <param name="securityContexts">
-    /// Makes the HTTP handler's Negotiate and NTLM contexts, or <see langword="null" /> for the production router.
+    /// Makes the HTTP handler's Negotiate and NTLM contexts and the mail handlers' GSSAPI and NTLM contexts, or <see langword="null" /> for the production router.
     /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
@@ -593,7 +597,7 @@ internal static class CurlComposition
     /// <param name="tlsProvider">Upgrades an FTP connection after an accepted <c>AUTH</c> or <c>PROT P</c>.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
     /// <param name="proxySelector">Chooses each transfer's proxy, or <see langword="null" /> for one that reads no environment variables.</param>
-    /// <param name="securityContexts">Makes the HTTP handler's Negotiate contexts, or <see langword="null" /> for the production router.</param>
+    /// <param name="securityContexts">Makes the HTTP handler's Negotiate and NTLM contexts and the mail handlers' GSSAPI and NTLM contexts, or <see langword="null" /> for the production router.</param>
     /// <param name="options">
     /// The option group: its <c>--proxy-*</c> auth switches pick the scheme the HTTP handler answers a
     /// forward proxy with, and its <c>--service-name</c>, <c>--proxy-service-name</c> and

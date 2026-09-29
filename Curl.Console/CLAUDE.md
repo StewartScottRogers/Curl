@@ -131,8 +131,9 @@ SSPI on Windows, elsewhere the system GSS-API with the hand-built SPNEGO and Ker
 reaching KDCs through `Curl.Networking`'s `KerberosKdcSocketTransport` over the run's connectors
 and finding them through `KerberosDnsSrvLookup`. `HandBuiltKerberosSources` reads `krb5.conf`
 and the credential cache from disk (`KerberosDiskFileReader`) only when a hand-built context first
-asks, with the `<uid>` of `/tmp/krb5cc_<uid>` from `ProcessUserId` (BL-527, ADR-0176). Tests pass
-their own `ISecurityContextFactory` to `CreateRunner`.
+asks, with the `<uid>` of `/tmp/krb5cc_<uid>` from `ProcessUserId` (BL-527, ADR-0176). The same
+factory goes to `CreateSaslAuthenticator`, so SMTP, IMAP and POP3 answer SASL `GSSAPI` and `NTLM`
+on it (ADR-0184, BL-852). Tests pass their own `ISecurityContextFactory` to `CreateRunner`.
 `-0` / `--http1.0` and `--http1.1` set `HttpRequestOptions.Version` (the last one wins, HTTP/1.1
 when neither is given), as do `--http3` and `--http3-only`, for which the TCP connector hands
 QUIC connects to the group's `QuicDialer` (ADR-0182, BL-732), and `--compressed`, `--tr-encoding`, `--raw` and `--ignore-content-length`

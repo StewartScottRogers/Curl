@@ -101,7 +101,7 @@ public sealed class TransferContextFactoryMailTests
     [TestMethod]
     public async Task CreateSaslAuthenticator_IsTheAuthenticationLibrarysInThePlatformsEncoding()
     {
-        ISaslAuthenticator authenticator = CurlComposition.CreateSaslAuthenticator();
+        ISaslAuthenticator authenticator = CurlComposition.CreateSaslAuthenticator(new SystemSecurityContextFactory());
         SaslRequest request = new(new NetworkCredential("\u00e9", "p"), null, null, null, "smtp", "example.com");
 
         ISaslExchange exchange = authenticator.Begin("PLAIN", request);
