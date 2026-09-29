@@ -35,6 +35,22 @@ public static class CredentialCacheReader
         return new CredentialCache(kdcTimeOffset, defaultPrincipal, credentials);
     }
 
+    /// <summary>Reads one principal marshalled as in a version 4 cache, as a KCM reply carries it.</summary>
+    /// <exception cref="KerberosFileException">The bytes end inside a field (<see cref="KerberosFileError.Truncated" />).</exception>
+    internal static KerberosPrincipal ReadPrincipal(ReadOnlySpan<byte> bytes)
+    {
+        BigEndianFileCursor cursor = new(bytes);
+        return ReadPrincipal(ref cursor);
+    }
+
+    /// <summary>Reads one credential marshalled as in a version 4 cache, as a KCM reply carries it.</summary>
+    /// <exception cref="KerberosFileException">The bytes end inside a field (<see cref="KerberosFileError.Truncated" />).</exception>
+    internal static CachedCredential ReadCredential(ReadOnlySpan<byte> bytes)
+    {
+        BigEndianFileCursor cursor = new(bytes);
+        return ReadCredential(ref cursor);
+    }
+
     private static void RequireVersion(ref BigEndianFileCursor cursor)
     {
         byte marker = cursor.ReadByte();
