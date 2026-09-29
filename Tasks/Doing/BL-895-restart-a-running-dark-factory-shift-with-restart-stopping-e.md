@@ -31,18 +31,18 @@ each lane it sees die.
 
 ## Acceptance criteria
 
-- [ ] `-Restart` finds the coordinator whose command line runs this checkout's
+- [x] `-Restart` finds the coordinator whose command line runs this checkout's
       `RunDarkFactory.ps1` without `-Lane` (never another repository's factory). With no
       coordinator it says so and exits 1.
-- [ ] It stops the coordinator's process tree, then, every 5 seconds, stops each live
+- [x] It stops the coordinator's process tree, then, every 5 seconds, stops each live
       lane of the newest `lanes-<stamp>` whose heartbeat phase is not `claim` or
       `integrate`, tracing each, until none is left.
-- [ ] It starts the new shift with `Start-Detached`, passing the old coordinator's
+- [x] It starts the new shift with `Start-Detached`, passing the old coordinator's
       arguments, and prints where.
-- [ ] A pure `Select-LanesToStop` decides which lanes may stop from their phases, and
+- [x] A pure `Select-LanesToStop` decides which lanes may stop from their phases, and
       `-TestRestart` proves it (run, tokens, wait, finished and a missing heartbeat stop;
       claim and integrate wait).
-- [ ] The script header and `CLAUDE.md` say to restart a shift with `-Restart`.
+- [x] The script header and `CLAUDE.md` say to restart a shift with `-Restart`.
 
 ## Notes
 

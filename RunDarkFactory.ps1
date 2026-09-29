@@ -64,6 +64,12 @@
     the 5-hour window to reset before starting its lanes; a used-up weekly window is
     waited out the same way, with a notice rather than the alarm, however long it is.
 
+    To restart a running shift - to pick up a change to this script, say - run
+    `RunDarkFactory.cmd -Restart`. It stops the coordinator first, so nothing restarts the
+    lanes, then each lane as soon as that lane is neither claiming nor integrating, and
+    starts a new shift with the old one's arguments, which adopts the stopped lanes and
+    their tasks (BL-895). Only this checkout's shift is touched.
+
     A shift keeps this checkout on its branch: if something switched it (Visual Studio did,
     once), the coordinator switches it back before its shift-end pull, and -Continuous
     hands the next shift -ShiftBranch so it does the same before it starts (BL-809).
@@ -217,6 +223,11 @@ param(
     [switch]$TestHeartbeat,
     # Prove Restore-ShiftBranch on a throwaway repository in a temporary folder, and exit.
     [switch]$TestShiftBranch,
+    # Stop this checkout's running shift and start a new one with the same arguments: the
+    # coordinator first, then each lane as soon as it is neither claiming nor integrating.
+    [switch]$Restart,
+    # Prove which lanes -Restart may stop from their heartbeat phases, and exit.
+    [switch]$TestRestart,
     # How often, in minutes, the lanes' heartbeats are published as status.json on the
     # force-pushed board branch, plus once at shift end. 0 = never publish.
     [ValidateRange(0, 60)][int]$HeartbeatMinutes = 3,
@@ -2357,6 +2368,65 @@ if ($AutoLanesReport) {
     else { Write-Host '5-hour target none yet, weekly target none yet' }
     Write-Host "start count $($start.Count) ($($start.Why))"
     Write-Host $step.Next.Reason
+    exit 0
+}
+
+# ---------------------------------------------------------------------------- restart
+
+function Select-LanesToStop {
+    # The lanes -Restart may stop now, from -Phases (lane number -> heartbeat phase, '' when
+    # it has none): all but a lane mid-claim, which could leave a task in Doing that no
+    # lane holds, or mid-integration, which could leave a half-finished rebase (BL-895).
+    param([hashtable]$Phases)
+    return @($Phases.Keys | Where-Object { $Phases[$_] -notin 'claim', 'integrate' } | Sort-Object)
+}
+
+if ($TestRestart) {
+    $phases = @{ 1 = 'run'; 2 = 'integrate'; 3 = 'claim'; 4 = 'tokens'; 5 = 'wait'; 6 = 'finished'; 7 = '' }
+    $got = (Select-LanesToStop $phases) -join ','
+    $ok = $got -ceq '1,4,5,6,7'
+    Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) stop run, tokens, wait, finished and no heartbeat; wait for claim and integrate: $got" -ForegroundColor $(if ($ok) { 'Green' } else { 'Red' })
+    $none = (Select-LanesToStop @{ 1 = 'claim'; 2 = 'integrate' }).Count
+    $ok2 = $none -eq 0
+    Write-Host "$(if ($ok2) { 'PASS' } else { 'FAIL' }) nothing stops while every lane claims or integrates: $none" -ForegroundColor $(if ($ok2) { 'Green' } else { 'Red' })
+    exit $(if ($ok -and $ok2) { 0 } else { 1 })
+}
+
+if ($Restart) {
+    # This checkout's coordinator only: another repository's factory runs its own copy.
+    $mine = [regex]::Escape($PSCommandPath)
+    $coordinator = Get-CimInstance Win32_Process | Where-Object {
+        $_.ProcessId -ne $PID -and $_.CommandLine -match "-File\s+`"?$mine`"?(\s|$)" -and
+        $_.CommandLine -notmatch '\s-Lane\s' -and $_.CommandLine -notmatch '\s-(Restart|NewTab)\b'
+    } | Select-Object -First 1
+    if (-not $coordinator) { Write-Host 'No dark factory shift is running in this checkout.'; exit 1 }
+    # The same arguments, so a fixed lane count, -WeeklyPace or -Hours carry over.
+    $rest = ($coordinator.CommandLine -split [regex]::Escape((Split-Path $PSCommandPath -Leaf)), 2)[1]
+    $forward = @([regex]::Matches("$rest".Trim().TrimStart('"').Trim(), '"[^"]*"|\S+') | ForEach-Object { $_.Value })
+    $branchNow = "$(git -C $Root rev-parse --abbrev-ref HEAD)".Trim()
+    if ($forward -notcontains '-ShiftBranch' -and $branchNow -notin 'master', 'main', 'HEAD') { $forward += @('-ShiftBranch', $branchNow) }
+    $lanesDir = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
+    $stamp = if ($lanesDir) { $lanesDir.Name.Substring(6) } else { '' }
+    Write-Host "Stopping the shift's coordinator (pid $($coordinator.ProcessId)) first, so it restarts no lane."
+    taskkill /PID $coordinator.ProcessId /T /F 2>&1 | Out-Null
+    while ($stamp) {
+        $phases = @{}
+        foreach ($n in 1..16) {
+            $lanePid = Get-LaneState $n 'pid' $stamp
+            if (-not $lanePid -or -not (Get-Process -Id ([int]$lanePid) -ErrorAction SilentlyContinue | Where-Object ProcessName -eq 'powershell')) { continue }
+            $beat = Get-LaneStatePath $n 'heartbeat.json' $stamp
+            $phases[$n] = if (Test-Path $beat) { "$((Get-Content $beat -Raw | ConvertFrom-Json).phase)" } else { '' }
+        }
+        if (-not $phases.Count) { break }
+        foreach ($n in Select-LanesToStop $phases) {
+            taskkill /PID ([int](Get-LaneState $n 'pid' $stamp)) /T /F 2>&1 | Out-Null
+            Write-Host "$(Get-Date -Format 'HH:mm:ss') lane $n stopped ($(if ($phases[$n]) { $phases[$n] } else { 'no heartbeat' }); $(Get-LaneState $n 'task' $stamp))"
+        }
+        $waiting = @($phases.Keys | Where-Object { $phases[$_] -in 'claim', 'integrate' })
+        if ($waiting.Count) { Start-Sleep -Seconds 5 }
+    }
+    $where = Start-Detached -Label 'DF shift starting' -Dir $Root -ScriptArgs $forward
+    Write-Host "New shift started ($(if ($where.Tab) { "herdr tab $($where.Tab)" } else { "pid $($where.Process.Id)" })) with: $($forward -join ' ')"
     exit 0
 }
 
