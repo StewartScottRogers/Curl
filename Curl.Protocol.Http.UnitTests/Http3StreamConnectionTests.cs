@@ -3,6 +3,7 @@ using Curl.Http2;
 using Curl.Http3;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http.Fakes;
+using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Protocol.Http;
 
@@ -110,6 +111,47 @@ public sealed class Http3StreamConnectionTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DataFrameOneByteOverTheFramePayloadLimit_DeliversTheWholeBodyWithExit0()
+    {
+        // nghttp3 streams DATA of any length (BL-838); only other frames are held to the limit.
+        byte[] body = new byte[Http3StreamConnection.MaximumFramePayloadLength + 1];
+        new Random(838).NextBytes(body);
+        byte[] head = new Http3HeadersFrame(new QpackEncoder(0, 0).EncodeFieldSection(0, [new(":status", "200")])).ToBytes();
+        FakeMultiplexedStream request = new(0, [.. head, .. new Http3DataFrame(body).ToBytes()]);
+        MemoryStream output = new();
+
+        TransferResult result = await Http3Handler(request).ExecuteAsync(Http3Context(output));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.IsTrue(body.AsSpan().SequenceEqual(output.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HeadersFrameOverTheFramePayloadLimit_FailsWithExit56AndExcessiveLoad()
+    {
+        // A HEADERS frame's type and a four-byte length one over the limit; the payload need not follow.
+        FakeMultiplexedStream request = new(0, [0x01, 0x81, 0x00, 0x00, 0x01]);
+
+        TransferResult result = await Http3Handler(request).ExecuteAsync(Http3Context(new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("nghttp3_conn_read_stream returned error: ERR_H3_EXCESSIVE_LOAD", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ReadToEndAsync_BodyLongerThanTheDataBuffer_ReadsItAllAndEnds()
+    {
+        byte[] head = new Http3HeadersFrame(new QpackEncoder(0, 0).EncodeFieldSection(0, [new(":status", "200")])).ToBytes();
+        FakeMultiplexedStream request = new(0, [.. head, .. new Http3DataFrame(new byte[(Http3StreamConnection.DataBufferLength * 2) + 1]).ToBytes()]);
+        IHttpStreamConnection stream = new Http3Session(new FakeMultiplexedConnection(request)).CreateStream("https", 0, ignoresBody: false);
+        await stream.WriteAsync("GET / HTTP/1.1\r\nHost: a\r\n\r\n"u8.ToArray(), CancellationToken.None);
+
+        await stream.ReadToEndAsync(CancellationToken.None);
+
+        Assert.AreEqual(0, await stream.ReadAsync(new byte[16], CancellationToken.None));
+    }
+
+    [TestMethod]
     public async Task Connection_Stream_IsSecureWithTheSessionsRemoteEndpointAndLeavesDisposalToTheSession()
     {
         IPEndPoint remote = new(IPAddress.Loopback, 443);
@@ -124,4 +166,20 @@ public sealed class Http3StreamConnectionTests
         Assert.IsTrue(stream.TrailerBytes.IsEmpty);
         Assert.IsFalse(request.IsDisposed);
     }
+
+    private static HttpProtocolHandler Http3Handler(FakeMultiplexedStream request)
+    {
+        QueueConnector connector = new();
+        connector.MultiplexedResults.Enqueue(MultiplexedConnectResult.Connected(new FakeMultiplexedConnection(request), null));
+        return new HttpProtocolHandler(connector, new SilentAuthenticator());
+    }
+
+    private static TransferContext Http3Context(Stream output) => new()
+    {
+        Url = CurlUrl.Parse("https://example.com/"),
+        Output = output,
+        TimeProvider = TimeProvider.System,
+        ConnectTimeout = TimeSpan.FromSeconds(1),
+        Http = new HttpRequestOptions { Version = HttpVersionPreference.Http3Only },
+    };
 }

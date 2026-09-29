@@ -354,7 +354,7 @@ public sealed partial class HttpProtocolHandlerTests
     [DataRow("settings", "ERR_H3_FRAME_UNEXPECTED", DisplayName = "SETTINGS on a request stream")]
     [DataRow("truncated", "ERR_H3_FRAME_ERROR", DisplayName = "stream ends inside a frame")]
     [DataRow("http2-type", "ERR_H3_FRAME_UNEXPECTED", DisplayName = "reserved HTTP/2 frame type")]
-    [DataRow("too-large", "ERR_H3_EXCESSIVE_LOAD", DisplayName = "DATA frame over the 16 MiB limit")]
+    [DataRow("too-large", "ERR_H3_EXCESSIVE_LOAD", DisplayName = "HEADERS frame over the 16 MiB limit")]
     [DataRow("dynamic-reference", "ERR_QPACK_DECOMPRESSION_FAILED", DisplayName = "field section refers to the dynamic table")]
     public async Task ExecuteAsync_Http3FramesBreakingTheRfc_FailWithExit56AndNghttp3sErrorName(string kind, string errorName)
     {
@@ -362,9 +362,9 @@ public sealed partial class HttpProtocolHandlerTests
         {
             "data-first" => Http3Response(Http3Data("x")),
             "settings" => new Http3SettingsFrame([]).ToBytes(),
-            "truncated" => [0x00, 0x05, 0x61],
+            "truncated" => [0x01, 0x05, 0x61],
             "http2-type" => [0x06, 0x00],
-            "too-large" => [0x00, 0x81, 0x00, 0x00, 0x01],
+            "too-large" => [0x01, 0x81, 0x00, 0x00, 0x01],
             _ => new Http3HeadersFrame(new byte[] { 0x02, 0x00, 0x80 }).ToBytes(),
         };
         FakeMultiplexedStream stream = new(0, response);
