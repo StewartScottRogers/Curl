@@ -6,9 +6,12 @@ to `System.Net.Http`, so they are built here. ADR-0141
 (`Documentation/Planning/Decisions/ADR-0141-http-2-is-hand-built-and-accepted-everywhere-with-h2-offered-by-default-off-windows.md`)
 decides what HTTP/2 does and when Curl speaks it.
 
-Namespace `Curl.Http2`. What is here so far: nothing but the empty project (BL-715).
-HPACK comes with BL-656, the frame layer, connection preface and `SETTINGS` with
-BL-657, and a request and response on a stream with BL-658.
+Namespace `Curl.Http2`. What is here so far: HPACK (BL-656) - `HpackEncoder` and
+`HpackDecoder` over `HeaderField` lists, the public `HpackHuffman` codec, and
+`HpackDecodingException` carrying an `HpackDecodingError`. The encoder chooses each
+field's representation as nghttp2's deflater does (ADR-0147). The frame layer, connection
+preface and `SETTINGS` come with BL-657, and a request and response on a stream with
+BL-658.
 
 ## Rules
 
