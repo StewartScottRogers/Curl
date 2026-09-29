@@ -31,7 +31,8 @@ a negative `ResumeFrom` as exit 36 for both before either starts.
 | `TimeCondition` | honoured: an unmet condition is success with nothing written (`DownloadFromAsync`) | ignored |
 | `HeaderOutput` | honoured: receives the pseudo-headers (`DownloadFromAsync`) | ignored |
 | `ConvertLineEndings` | ignored | honoured: `--crlf` conversion of each chunk (`UploadIntoAsync`) |
-| `TimeProvider` | ignored | ignored |
+| `TimeProvider` | read only to time the diagnostic log's transfer-end line (`ExecuteAsync`) | the same |
+| `DiagnosticLog` | honoured: the path opened and its size, a failed open, and the transfer's end (`FileTransferLog`) | honoured: the path opened and its mode, a failed open, and the transfer's end (`FileTransferLog`) |
 | `MaxFileSize` | honoured: exit 63 past the limit (`DownloadFromAsync`) | ignored |
 | `CreateFileMode` | ignored | honoured: the mode the destination is opened with (`UploadAsync`) |
 | `PathAsIs` | not read: `Url` was parsed with it, so `FileUrlPath.TryParse` gets its dot segments already kept or removed (`ExecuteAsync`) | the same |
@@ -39,11 +40,12 @@ a negative `ResumeFrom` as exit 36 for both before either starts.
 | `PostData`, `Credentials`, `TelnetOptions`, `TftpBlockSize`, `TftpNoOptions` | ignored | ignored |
 
 Every row was read from `FileProtocolHandler.cs` — `ExecuteAsync`, `DownloadFromAsync`,
-`UploadAsync`, `UploadIntoAsync` and `TryResolveWindow` — on 2026-09-26, and the `PathAsIs` and `Progress` rows on 2026-09-27. When the handler
+`UploadAsync`, `UploadIntoAsync` and `TryResolveWindow` — on 2026-09-26, the `PathAsIs` and `Progress` rows on 2026-09-27,
+and the `TimeProvider` and `DiagnosticLog` rows on 2026-09-29 (BL-927). When the handler
 starts or stops reading a member, change its row in the same commit.
 
-`TimeProvider` is unused in both directions on purpose: nothing in a local file transfer
-is timed or retried, and `-z`/`--time-cond` compares against the timestamp the open
+`TimeProvider` only times the diagnostic log's transfer-end line: nothing in a local file
+transfer is timed out or retried, and `-z`/`--time-cond` compares against the timestamp the open
 reported (`FileOpenResult.LastWriteTimeUtc`), not against now.
 
 ## No path sandboxing
