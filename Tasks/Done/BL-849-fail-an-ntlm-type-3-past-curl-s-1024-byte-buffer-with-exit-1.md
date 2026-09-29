@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-526]
-touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
+touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-849 — Fail an NTLM Type 3 past curl's 1024-byte buffer with exit 100 off Windows
 
@@ -49,21 +49,21 @@ Record exit code, stdout, stderr (with `-sS`) and whether a second request is se
 
 ## Acceptance criteria
 
-- [ ] Notes record the measurement: curl version, command, exit code, stdout, the exact
+- [x] Notes record the measurement: curl version, command, exit code, stdout, the exact
       stderr line, and how many requests curl sent.
-- [ ] The hand-built route (`HandBuiltNtlmSecurityContext` and/or
+- [x] The hand-built route (`HandBuiltNtlmSecurityContext` and/or
       `NtlmHttpAuthenticator`) throws `HttpAuthenticationFailedException` carrying the
       measured exit code (expected `CurlExitCode` 100, `TooLarge`) and the measured
       message when Type 3 passes 1024 bytes; an SSPI-shaped refusal on Windows is
       unchanged (its existing tests still pass).
-- [ ] A test in `Curl.Authentication.UnitTests` pins the exit code and message for a
+- [x] A test in `Curl.Authentication.UnitTests` pins the exit code and message for a
       user name of about 600 characters, and a test pins that a Type 3 of exactly the
       largest size that fits still answers.
-- [ ] `dotnet build -warnaserror` is clean and
+- [x] `dotnet build -warnaserror` is clean and
       `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and
       branch coverage for `Curl.Authentication.UnitLibrary`.
-- [ ] ADR-0181's "a Type 3 past 1024 bytes ends on the 401" choice is marked as
+- [x] ADR-0181's "a Type 3 past 1024 bytes ends on the 401" choice is marked as
       superseded by this task in a line appended to its Consequences (or the task notes
       why no ADR edit was needed). If that edit is needed, add
       `Documentation/Planning/Decisions` to `touches` first.
@@ -73,7 +73,44 @@ Record exit code, stdout, stderr (with `-sS`) and whether a second request is se
 - If the measurement shows curl does not fail with exit 100 (for example, it sends
   nothing and exits 0), pin what curl does, record it here, and close with that.
 
+### Measured 2026-09-29
+
+curl 8.18.0 (x86_64-pc-linux-gnu, OpenSSL/3.5.5, curl's own NTLM) on Ubuntu under WSL,
+through `Record-CurlExchange.ps1 -Curl wsl.exe -ListenAddress 172.26.96.1 -Port 18849
+-Script <file>` (steps `read`, `send` 401 with `WWW-Authenticate: NTLM <MS-NLMP 4.2.4.3
+CHALLENGE>` and body `nope`, `read`, `send` 200 `ok`), CurlArgs `curl -sS --ntlm -u
+<600 x 'a'>:p http://172.26.96.1:18849/`:
+
+- exit code 100; stdout empty (the 401 body is not written);
+- stderr exactly `curl: (100) user + domain + hostname too big for NTLM` and a newline;
+- one request (carrying Type 1 `TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=`), then curl
+  closed the connection: no second request is sent.
+
+### Plan and decisions
+
+- The throw lives in `NtlmHttpAuthenticator`, not the context: the hand-built context is
+  also SASL's, where an `HttpAuthenticationFailedException` would be the wrong type. Off
+  Windows (`refusedChallengeFailsTransfer: false`) a `Refused` Type 3 step - which the
+  hand-built context gives only for an answer past curl's buffer, as a fresh context never
+  reaches its after-completion refusal - throws exit 100, `TooLarge`, with the measured
+  message (`NtlmHttpAuthenticator.Type3TooLargeMessage`). `MalformedToken` still ends on
+  the 401. The Windows (SSPI) branch is unchanged and runs first, so exit 94 stays.
+- Boundary: with the measured Type 2, a Type 3 is 194 bytes plus 2 per user character;
+  414 characters give 1022 bytes (the largest that fits curl's strict `< 1024`), 415 give
+  1024 and fail. Tests pin 600 (exit and message), 414 (answers, 1022 bytes) and 415
+  (exit 100).
+- No new ADR: the behaviour is measured, not chosen. ADR-0181's consequence is marked
+  superseded, so `Documentation/Planning/Decisions` was added to `touches`; no task in
+  Doing named it.
+- The parameter name `refusedChallengeFailsTransfer` now says less than it does; renaming
+  it reaches `Curl.Console`, `Curl.Networking.UnitTests` and `Curl.Protocol.Http.UnitTests`,
+  held by other lanes, so BL-962 does it.
+- Results: `Curl.Authentication.UnitTests` 665 passed, 4 skipped; full fast run green (33
+  test assemblies); `Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary`
+  100% line, 100% branch, worst CRAP 10.
+
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. Off Windows, an NTLM Type 3 past curl's 1024-byte buffer fails with exit 100, 'user + domain + hostname too big for NTLM', as measured
