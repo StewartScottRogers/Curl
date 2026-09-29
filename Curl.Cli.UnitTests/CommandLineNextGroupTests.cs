@@ -36,7 +36,7 @@ public sealed class CommandLineNextGroupTests
         "mail-rcpt-allowfails", "upload-flags", "login-options", "sasl-authzid", "sasl-ir", "resolve", "connect-to", "interface", "local-port", "dns-servers", "dns-interface", "dns-ipv4-addr", "dns-ipv6-addr", "unix-socket", "abstract-unix-socket", "tftp-no-options",
         "disable-epsv", "epsv", "ftp-skip-pasv-ip", "ftp-method", "ftp-create-dirs", "ftp-port", "ftp-pasv",
         "disable-eprt", "eprt", "ssl", "ftp-ssl", "ssl-reqd", "ftp-ssl-reqd", "ftp-ssl-control", "ftp-ssl-ccc",
-        "ftp-ssl-ccc-mode", "ftp-account", "ftp-alternative-to-user", "ftp-pret", "list-only",
+        "ftp-ssl-ccc-mode", "ftp-account", "ftp-alternative-to-user", "ftp-pret", "list-only", "use-ascii", "crlf", "append",
         "quote", "create-file-mode", "insecure", "ssl-no-revoke", "ssl-revoke-best-effort", "ssl-allow-beast",
         "ca-native", "alpn", "sessionid", "tcp-nodelay", "keepalive", "cacert", "capath", "crlfile",
         "pinnedpubkey", "cert-status", "ssl-auto-client-cert", "proxy-insecure",

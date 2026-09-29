@@ -789,6 +789,15 @@ public sealed class CommandLineOptions
     /// <summary><see langword="true"/> when <c>-l</c> / <c>--list-only</c> was given and no <c>--no-list-only</c> came after it.</summary>
     public bool ListOnly { get; internal set; }
 
+    /// <summary><see langword="true"/> when <c>-B</c> / <c>--use-ascii</c> was given and no <c>--no-use-ascii</c> came after it: transfer as ASCII text (FTP <c>TYPE A</c>, LDAP text output).</summary>
+    public bool UseAscii { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--crlf</c> was given and no <c>--no-crlf</c> came after it: convert LF to CRLF in an upload.</summary>
+    public bool ConvertLineEndings { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>-a</c> / <c>--append</c> was given and no <c>--no-append</c> came after it: append to the remote file instead of overwriting it.</summary>
+    public bool Append { get; internal set; }
+
     /// <summary>
     /// Every <c>-Q</c> / <c>--quote</c> value, verbatim (prefix included, possibly empty) and in command-line order.
     /// </summary>
