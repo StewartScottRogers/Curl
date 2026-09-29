@@ -94,3 +94,15 @@ mechanism on the line; that observation does not reproduce and is not implemente
   for PLAIN and LOGIN.
 - **Track a per-mechanism state machine in the handler.** Would duplicate the
   authenticator's knowledge in every mail handler, against ADR-0121.
+
+## Amendment - BL-774, 2026-09-29
+
+Decided by Claude under Stewart's delegation. Measured against curl 8.21.0 (mingw,
+Schannel) with `Record-CurlExchange.ps1 -Smtp`: point 7 now holds only for mechanisms that
+ignore their challenge (PLAIN, LOGIN, EXTERNAL, XOAUTH2, OAUTHBEARER). A `334` whose text
+is not base64 (empty text or text starting `=` is an empty challenge, not a bad one), for a
+mechanism that reads it - every GSSAPI challenge, the first CRAM-MD5, DIGEST-MD5 and NTLM
+answer - is cancelled with `*`. The server's reply to `*` is read whatever it is (501, 334
+and 235 alike), the mechanism is dropped from the offered set and the authenticator chooses
+again; with none left the transfer fails with exit 67 `Authentication cancelled` and no
+`QUIT`. A challenge the exchange cannot answer (`Respond` null) is still 67 `Login denied`.
