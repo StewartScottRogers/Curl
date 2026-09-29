@@ -68,6 +68,52 @@ public sealed class QuicClientStreamsTests
     }
 
     [TestMethod]
+    public void TakeDatagramsToSend_LessDataThanTheWindow_MarksThePacketsApplicationLimitedAndTheirAcknowledgementLeavesTheWindow()
+    {
+        using QuicTestServer server = new() { ConfigureTransportParameters = GenerousServerLimits };
+        using QuicClientHandshake client = Connect(server);
+        client.Streams.OpenBidirectional()!.Write(Bytes(3000), endStream: true);
+
+        IReadOnlyList<byte[]> datagrams = client.TakeDatagramsToSend();
+
+        // RFC 9002 section 7.8: 3000 bytes leave most of the 12000-byte window unused.
+        Assert.IsTrue(SentStreamPackets(client).All(packet => packet.IsApplicationLimited));
+        QuicClientHandshakeTests.Exchange(client, server, datagrams);
+        Assert.AreEqual(12000, client.Recovery.Congestion.CongestionWindow);
+    }
+
+    [TestMethod]
+    public void TakeDatagramsToSend_BlockedByFlowControl_MarksThePacketsApplicationLimited()
+    {
+        using QuicTestServer server = new()
+        {
+            ConfigureTransportParameters = parameters => GenerousServerLimits(parameters) with { InitialMaxData = 15 },
+        };
+        using QuicClientHandshake client = Connect(server);
+        client.Streams.OpenBidirectional()!.Write(Bytes(30000), endStream: true);
+
+        client.TakeDatagramsToSend();
+
+        Assert.IsTrue(SentStreamPackets(client).All(packet => packet.IsApplicationLimited));
+    }
+
+    [TestMethod]
+    public void TakeDatagramsToSend_MoreDataThanTheWindow_FillsItWithPacketsThatAreNotApplicationLimitedAndGrowIt()
+    {
+        using QuicTestServer server = new() { ConfigureTransportParameters = GenerousServerLimits };
+        using QuicClientHandshake client = Connect(server);
+        client.Streams.OpenBidirectional()!.Write(Bytes(30000), endStream: true);
+
+        IReadOnlyList<byte[]> datagrams = client.TakeDatagramsToSend();
+
+        List<QuicSentPacket> sent = SentStreamPackets(client);
+        Assert.IsTrue(sent.All(packet => !packet.IsApplicationLimited));
+        Assert.IsGreaterThanOrEqualTo(12000, client.Recovery.Congestion.BytesInFlight);
+        QuicClientHandshakeTests.Exchange(client, server, datagrams);
+        Assert.IsGreaterThan(12000, client.Recovery.Congestion.CongestionWindow);
+    }
+
+    [TestMethod]
     public void Read_HalfTheWindowConsumed_RaisesMaxStreamDataAndMaxData()
     {
         using QuicTestServer server = new();
@@ -201,5 +247,13 @@ public sealed class QuicClientStreamsTests
 
         QuicConnectionCloseFrame close = Sent<QuicConnectionCloseFrame>(server).Single();
         Assert.AreEqual((0x100UL, (ulong?)null), (close.ErrorCode, close.FrameType));
+    }
+
+    // The 1-RTT packets the client has sent with stream data and the server has not acknowledged yet.
+    private static List<QuicSentPacket> SentStreamPackets(QuicClientHandshake client)
+    {
+        List<QuicSentPacket> sent = [.. client.Recovery.GetUnacknowledgedPackets(QuicPacketNumberSpaceId.ApplicationData).Where(packet => packet.Frames.OfType<QuicStreamFrame>().Any())];
+        Assert.IsNotEmpty(sent);
+        return sent;
     }
 }

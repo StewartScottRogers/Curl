@@ -133,4 +133,31 @@ public sealed class QuicNewRenoCongestionControllerTests
         Assert.ThrowsExactly<ArgumentNullException>(() => controller.OnPacketsLost(null!, false, TimeSpan.Zero));
         Assert.ThrowsExactly<ArgumentNullException>(() => controller.RemoveFromBytesInFlight(null!));
     }
+
+    [TestMethod]
+    public void OnPacketsAcknowledged_ApplicationLimitedPacketsInSlowStart_GrowsTheWindowOnlyForTheOthers()
+    {
+        QuicNewRenoCongestionController controller = new(1200);
+
+        // RFC 9002 section 7.8: a packet sent while the application limited sending says nothing about the path's capacity.
+        controller.OnPacketsAcknowledged([Packet(0, 0) with { IsApplicationLimited = true }], Ms(10), new QuicRttEstimator());
+        Assert.AreEqual(12000, controller.CongestionWindow);
+
+        controller.OnPacketsAcknowledged([Packet(1, 0) with { IsApplicationLimited = true }, Packet(2, 0)], Ms(20), new QuicRttEstimator());
+        Assert.AreEqual(13200, controller.CongestionWindow);
+    }
+
+    [TestMethod]
+    public void OnPacketsAcknowledged_ApplicationLimitedPacketInCongestionAvoidance_LeavesTheWindow()
+    {
+        QuicNewRenoCongestionController controller = new(1200);
+        controller.OnPacketsLost([Packet(0, 0)], persistentCongestion: false, Ms(10));
+        Assert.AreEqual(6000, controller.CongestionWindow);
+
+        controller.OnPacketsAcknowledged([Packet(1, 20) with { IsApplicationLimited = true }], Ms(30), new QuicRttEstimator());
+        Assert.AreEqual(6000, controller.CongestionWindow);
+
+        controller.OnPacketsAcknowledged([Packet(2, 20)], Ms(30), new QuicRttEstimator());
+        Assert.AreEqual(6240, controller.CongestionWindow);
+    }
 }

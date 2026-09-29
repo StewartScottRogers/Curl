@@ -439,7 +439,7 @@ public sealed class QuicClientHandshakeTests
     }
 
     [TestMethod]
-    public void Receive_InMemoryServer_SamplesTheRttGrowsTheWindowAndDisarmsOnceNothingIsInFlight()
+    public void Receive_InMemoryServer_SamplesTheRttKeepsTheApplicationLimitedWindowAndDisarmsOnceNothingIsInFlight()
     {
         using QuicTestServer server = new();
         using QuicClientHandshake client = QuicHandshakeTest.Client(QuicHandshakeTest.CurlSettings with { CongestionControl = QuicCongestionControlAlgorithm.NewReno });
@@ -448,7 +448,9 @@ public sealed class QuicClientHandshakeTests
 
         Assert.IsInstanceOfType<QuicNewRenoCongestionController>(client.Recovery.Congestion);
         Assert.IsTrue(client.Recovery.Rtt.HasSample);
-        Assert.IsGreaterThan(12000, client.Recovery.Congestion.CongestionWindow);
+
+        // No flight of the handshake filled the window, so every packet was application-limited and none grew it (RFC 9002 section 7.8).
+        Assert.AreEqual(12000, client.Recovery.Congestion.CongestionWindow);
         Assert.IsTrue(client.Recovery.IsHandshakeConfirmed);
         Assert.AreEqual(TimeSpan.FromMilliseconds(25), client.Recovery.MaxAckDelay);
         Assert.AreEqual(Timeout.InfiniteTimeSpan, client.TimeUntilLossDetectionTimeout);

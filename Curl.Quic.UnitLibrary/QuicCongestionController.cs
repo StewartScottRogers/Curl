@@ -67,7 +67,12 @@ public abstract class QuicCongestionController
         }
     }
 
-    /// <summary>Takes acknowledged packets out of flight and grows the window for each sent outside recovery (RFC 9002 section B.5).</summary>
+    /// <summary>
+    /// Takes acknowledged packets out of flight and hands those sent outside recovery to the
+    /// derived controller to grow the window, once per acknowledgement (RFC 9002 section B.5).
+    /// The derived controller does not grow it for packets sent while application-limited
+    /// (section 7.8).
+    /// </summary>
     /// <param name="packets">The newly acknowledged packets.</param>
     /// <param name="now">The time now.</param>
     /// <param name="rtt">The RTT estimate, after this acknowledgement's sample.</param>
@@ -75,13 +80,19 @@ public abstract class QuicCongestionController
     {
         ArgumentNullException.ThrowIfNull(packets);
         ArgumentNullException.ThrowIfNull(rtt);
+        List<QuicSentPacket> outsideRecovery = [];
         foreach (var packet in packets.Where(packet => packet.IsInFlight))
         {
             BytesInFlight -= packet.SentBytes;
             if (!IsInRecovery(packet.TimeSent))
             {
-                IncreaseWindow(packet.SentBytes, now, rtt);
+                outsideRecovery.Add(packet);
             }
+        }
+
+        if (outsideRecovery.Count > 0)
+        {
+            IncreaseWindow(outsideRecovery, now, rtt);
         }
     }
 
@@ -131,11 +142,11 @@ public abstract class QuicCongestionController
         }
     }
 
-    /// <summary>Grows the window for one acknowledged packet sent outside recovery.</summary>
-    /// <param name="acknowledgedBytes">The packet's size.</param>
+    /// <summary>Grows the window for the packets one acknowledgement newly acknowledged that were sent outside recovery, leaving it as it is for those sent while application-limited.</summary>
+    /// <param name="acknowledged">The packets, at least one.</param>
     /// <param name="now">The time now.</param>
-    /// <param name="rtt">The RTT estimate.</param>
-    protected abstract void IncreaseWindow(int acknowledgedBytes, TimeSpan now, QuicRttEstimator rtt);
+    /// <param name="rtt">The RTT estimate, after this acknowledgement's sample.</param>
+    protected abstract void IncreaseWindow(IReadOnlyList<QuicSentPacket> acknowledged, TimeSpan now, QuicRttEstimator rtt);
 
     /// <summary>Lowers the window and slow start threshold at the start of a recovery period.</summary>
     /// <param name="now">The time now.</param>

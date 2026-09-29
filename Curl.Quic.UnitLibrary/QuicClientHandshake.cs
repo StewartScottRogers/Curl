@@ -412,13 +412,17 @@ public sealed class QuicClientHandshake : IDisposable
     }
 
     // Probes and CONNECTION_CLOSE go whatever the congestion window says (RFC 9002 section 7.5).
+    // A flush that stops with window to spare ran out of what the application or flow control
+    // let it send, so its packets are application-limited and do not grow the window (section 7.8).
     private List<byte[]> Flush(bool ignoreCongestionWindow = false)
     {
         var allowance = ignoreCongestionWindow ? long.MaxValue : Recovery.Congestion.AvailableWindow;
         var assembly = QuicDatagramAssembler.Assemble(spacesById, SendAddress(), Now(), allowance);
+        var sentInFlight = assembly.Packets.Where(sent => sent.Packet.IsInFlight).Sum(sent => (long)sent.Packet.SentBytes);
+        var applicationLimited = !ignoreCongestionWindow && sentInFlight < allowance;
         foreach (var sent in assembly.Packets)
         {
-            RecordSent(sent.Space, sent.Packet);
+            RecordSent(sent.Space, sent.Packet with { IsApplicationLimited = applicationLimited });
         }
 
         return assembly.Datagrams;
