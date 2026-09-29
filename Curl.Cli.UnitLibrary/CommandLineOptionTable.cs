@@ -36,7 +36,7 @@ namespace Curl.Cli;
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
 /// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-ntlm</c>, <c>--no-negotiate</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
-/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-clobber</c> (measured 2026-09-28), <c>--no-skip-existing</c> and <c>--no-remove-on-error</c> (measured 2026-09-28), <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) <c>--no-buffer</c> (measured 2026-09-28; <c>-N</c> is <c>--no-buffer</c>), <c>--no-parallel</c> and <c>--no-parallel-immediate</c> (measured 2026-09-28), <c>--no-socks5-basic</c>, <c>--no-socks5-gssapi</c>, <c>--no-socks5-gssapi-nec</c>, <c>--no-haproxy-protocol</c> and <c>--no-suppress-connect-headers</c> (measured 2026-09-28, BL-612) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-clobber</c> (measured 2026-09-28), <c>--no-skip-existing</c> and <c>--no-remove-on-error</c> (measured 2026-09-28), <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) <c>--no-buffer</c> (measured 2026-09-28; <c>-N</c> is <c>--no-buffer</c>), <c>--no-parallel</c> and <c>--no-parallel-immediate</c> (measured 2026-09-28), <c>--no-socks5-basic</c>, <c>--no-socks5-gssapi</c>, <c>--no-socks5-gssapi-nec</c>, <c>--no-haproxy-protocol</c> and <c>--no-suppress-connect-headers</c> (measured 2026-09-28, BL-612), <c>--no-proxy-ca-native</c>, <c>--no-proxy-ssl-auto-client-cert</c> and <c>--no-proxy-ssl-allow-beast</c> (measured 2026-09-28, BL-605) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-out-null</c> is accepted and, as in curl 8.21.0, discards its URL's body just as <c>--out-null</c> does
 /// (measured 2026-09-28, BL-495 Notes).
@@ -184,6 +184,18 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("proxy-insecure", null, (options, on) => options.ProxyInsecure = on),
         CommandLineOption.Value("proxy-cacert", null, SettingExistingFile("--proxy-cacert", (options, file) => options.ProxyCaCertificateFile = file)),
         CommandLineOption.FileName("proxy-capath", null, (options, directory) => options.ProxyCaCertificateDirectory = directory),
+        CommandLineOption.FileName("proxy-cert", null, (options, certificate) => options.ProxyClientCertificate = certificate),
+        CommandLineOption.FileName("proxy-key", null, (options, key) => options.ProxyPrivateKey = key),
+        CommandLineOption.Text("proxy-cert-type", null, (options, type) => options.ProxyClientCertificateType = type),
+        CommandLineOption.Text("proxy-key-type", null, (options, type) => options.ProxyPrivateKeyType = type),
+        CommandLineOption.Text("proxy-pass", null, (options, passphrase) => options.ProxyPassphrase = passphrase),
+        CommandLineOption.Text("proxy-ciphers", null, (options, ciphers) => options.ProxyCiphers = ciphers),
+        CommandLineOption.Text("proxy-tls13-ciphers", null, (options, ciphers) => options.ProxyTls13Ciphers = ciphers),
+        CommandLineOption.Value("proxy-crlfile", null, SettingExistingFile("--proxy-crlfile", (options, file) => options.ProxyCertificateRevocationListFile = file)),
+        CommandLineOption.Text("proxy-pinnedpubkey", null, (options, pins) => options.ProxyPinnedPublicKey = pins),
+        CommandLineOption.NegatableFlag("proxy-ca-native", null, (options, on) => options.ProxyUseNativeCaStore = on),
+        CommandLineOption.NegatableFlag("proxy-ssl-auto-client-cert", null, (options, on) => options.ProxyAutoClientCertificate = on),
+        CommandLineOption.NegatableFlag("proxy-ssl-allow-beast", null, (options, on) => options.ProxyAllowBeast = on),
         CommandLineOption.FileName("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),
         CommandLineOption.FileName("key", null, (options, key) => options.PrivateKey = key),
         CommandLineOption.Text("cert-type", null, (options, type) => options.ClientCertificateType = type),

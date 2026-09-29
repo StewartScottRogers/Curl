@@ -831,6 +831,63 @@ public sealed class CommandLineOptions
     public string? ProxyCaCertificateDirectory { get; internal set; }
 
     /// <summary>
+    /// The <c>--proxy-cert</c> value, verbatim, with <c>certificate[:password]</c> not yet split, as
+    /// <see cref="ClientCertificate"/> is; it authenticates to an HTTPS proxy only. <see langword="null"/>
+    /// when not given. The last value wins. Applied by BL-606 and BL-611.
+    /// </summary>
+    public string? ProxyClientCertificate { get; internal set; }
+
+    /// <summary>The <c>--proxy-key</c> private key file, verbatim and unchecked; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyPrivateKey { get; internal set; }
+
+    /// <summary>The <c>--proxy-cert-type</c> value, verbatim, as <see cref="ClientCertificateType"/> is; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyClientCertificateType { get; internal set; }
+
+    /// <summary>The <c>--proxy-key-type</c> value, verbatim, as <see cref="PrivateKeyType"/> is; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyPrivateKeyType { get; internal set; }
+
+    /// <summary>The <c>--proxy-pass</c> passphrase for the proxy's private key, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyPassphrase { get; internal set; }
+
+    /// <summary>The <c>--proxy-ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyCiphers { get; internal set; }
+
+    /// <summary>The <c>--proxy-tls13-ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyTls13Ciphers { get; internal set; }
+
+    /// <summary>
+    /// The <c>--proxy-crlfile</c> certificate revocation list file, verbatim, checked as <c>--crlfile</c> is;
+    /// <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? ProxyCertificateRevocationListFile { get; internal set; }
+
+    /// <summary>
+    /// The <c>--proxy-pinnedpubkey</c> value, verbatim and unchecked, as <see cref="PinnedPublicKey"/> is, matched
+    /// against the HTTPS proxy's key; <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? ProxyPinnedPublicKey { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--proxy-ca-native</c> was given and no <c>--no-proxy-ca-native</c> came
+    /// after it: verify an HTTPS proxy against the operating system's certificate store.
+    /// </summary>
+    public bool ProxyUseNativeCaStore { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--proxy-ssl-auto-client-cert</c> was given and no
+    /// <c>--no-proxy-ssl-auto-client-cert</c> came after it: the Schannel build picks a client certificate for
+    /// the HTTPS proxy from the user's store by itself.
+    /// </summary>
+    public bool ProxyAutoClientCertificate { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--proxy-ssl-allow-beast</c> was given and no
+    /// <c>--no-proxy-ssl-allow-beast</c> came after it: leave the TLS 1.0 BEAST workaround off towards the
+    /// HTTPS proxy, as <see cref="AllowBeast"/> does towards the server.
+    /// </summary>
+    public bool ProxyAllowBeast { get; internal set; }
+
+    /// <summary>
     /// The <c>-E</c> / <c>--cert</c> value, verbatim, with <c>certificate[:password]</c> not yet split;
     /// <see langword="null"/> when not given. The last value wins.
     /// </summary>

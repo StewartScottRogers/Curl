@@ -54,6 +54,8 @@ public sealed class CommandLineOptionTableTests
     [DataRow("pinnedpubkey", null, true)]
     [DataRow("cert-status", null, false)]
     [DataRow("ssl-auto-client-cert", null, false)]
+    [DataRow("proxy-crlfile", null, true)]
+    [DataRow("proxy-ca-native", null, false)]
     [DataRow("cert", 'E', true)]
     [DataRow("key", null, true)]
     [DataRow("cert-type", null, true)]
