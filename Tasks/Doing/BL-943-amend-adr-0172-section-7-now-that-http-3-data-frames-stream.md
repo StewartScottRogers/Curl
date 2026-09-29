@@ -31,3 +31,4 @@ ADR-0172 section 7 ("Frame size") says what the code does after BL-838: `DATA` o
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
