@@ -1,5 +1,5 @@
 ---
-id: BL-945
+id: BL-949
 title: Report Alt-svc connecting once when --http3 races QUIC and TCP to an alternative
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-945 — Report Alt-svc connecting once when --http3 races QUIC and TCP to an alternative
+# BL-949 — Report Alt-svc connecting once when --http3 races QUIC and TCP to an alternative
 
 ## Goal
 

@@ -69,12 +69,12 @@ Windows on 2026-09-29, are in BL-733's Notes:
 Known differences, each filed:
 
 - Headers are still learned under `h1` whatever version the response came over, where curl
-  records `h2` or `h3`; so `--http3-only` never uses an entry its own responses taught (BL-943).
+  records `h2` or `h3`; so `--http3-only` never uses an entry its own responses taught (BL-947).
 - ALPN is still the option group's list, where curl offers `h2` alone to an `h2` alternative and
   `http/1.1` alone after a switch to `h1`, and prefers a same-destination `h2` or `h1` entry's
-  version (BL-944). On Windows without a version option, an `h2` alternative is therefore
+  version (BL-948). On Windows without a version option, an `h2` alternative is therefore
   offered `http/1.1` and spoken to over HTTP/1.1.
-- A `--http3` race to an alternative reports `Alt-svc connecting` twice, once per attempt (BL-945).
+- A `--http3` race to an alternative reports `Alt-svc connecting` twice, once per attempt (BL-949).
 
 ## Alternatives considered
 

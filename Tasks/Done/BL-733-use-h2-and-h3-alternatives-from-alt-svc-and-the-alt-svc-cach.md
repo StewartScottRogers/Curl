@@ -133,10 +133,10 @@ loopback recorder (`-Tls`). The rule is read from `curl-8_21_0`: `lib/url.c` `ur
 
 ### Follow-ups filed
 
-- BL-943: learn headers under the version the response came over (`h2`/`h3` source lines, as case 1).
-- BL-944: offer the ALPN the alternative's version asks for (`h2` alone in case 4) and prefer a
+- BL-947: learn headers under the version the response came over (`h2`/`h3` source lines, as case 1).
+- BL-948: offer the ALPN the alternative's version asks for (`h2` alone in case 4) and prefer a
   same-destination `h2`/`h1` entry's version.
-- BL-945: report `Alt-svc connecting` once when `--http3` races to an alternative (case 5).
+- BL-949: report `Alt-svc connecting` once when `--http3` races to an alternative (case 5).
 
 ### Verified
 

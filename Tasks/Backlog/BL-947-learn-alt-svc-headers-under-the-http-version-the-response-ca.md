@@ -1,5 +1,5 @@
 ---
-id: BL-943
+id: BL-947
 title: Learn Alt-Svc headers under the HTTP version the response came over
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-943 — Learn Alt-Svc headers under the HTTP version the response came over
+# BL-947 — Learn Alt-Svc headers under the HTTP version the response came over
 
 ## Goal
 
