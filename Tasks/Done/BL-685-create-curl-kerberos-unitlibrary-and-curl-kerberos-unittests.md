@@ -8,7 +8,7 @@ depends-on: [BL-525]
 touches: [Curl.slnx, Curl.Kerberos.UnitLibrary, Curl.Kerberos.UnitTests]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-685 — Create Curl.Kerberos.UnitLibrary and Curl.Kerberos.UnitTests
 
@@ -25,13 +25,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Both projects exist, `Curl.slnx` lists them together in alphabetical order with no solution folder, and the test project references the library.
-- [ ] `Curl.Kerberos.UnitLibrary/CLAUDE.md` exists as described.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] Both projects exist, `Curl.slnx` lists them together in alphabetical order with no solution folder, and the test project references the library.
+- [x] `Curl.Kerberos.UnitLibrary/CLAUDE.md` exists as described.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
+
+- Scaffolded with `dotnet new classlib` / `dotnet new mstest`, then both csproj files were reduced to the shape of `Curl.Cryptography`'s (no `Version`, nothing `Directory.Build.props` already sets, `InternalsVisibleTo` the tests). `Class1.cs`, `Test1.cs` and `MSTestSettings.cs` removed.
+- The library holds no type yet: an empty `Curl.Kerberos.UnitTests` still exits 0 under `dotnet test`, so no stand-in type was invented; BL-686 adds the first code and the `Curl.Cryptography.UnitLibrary` reference.
+- `Measure-CodeQuality.ps1` picks libraries up by the `*.UnitLibrary` name, so the gates measure this one as soon as it has code.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. Curl.Kerberos.UnitLibrary and Curl.Kerberos.UnitTests exist, are in Curl.slnx in sorted place and build clean
