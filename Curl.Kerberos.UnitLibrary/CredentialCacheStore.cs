@@ -9,7 +9,7 @@ namespace Curl.Kerberos;
 /// or a <c>DIR:</c> collection's cache through the injected file reader, and a <c>KCM:</c>
 /// cache through the injected KCM connector (ADR-0142, ADR-0158, ADR-0194), and stores a
 /// credential in a <c>FILE:</c> or <c>DIR:</c> cache through the injected file writer
-/// (ADR-0208).
+/// (ADR-0208) and in a <c>KCM:</c> cache through the KCM connector (BL-891).
 /// </summary>
 /// <param name="files">Reads the cache file, and a <c>DIR:</c> collection's <c>primary</c> file.</param>
 /// <param name="readEnvironmentVariable">Reads an environment variable; <see langword="null" /> when unset.</param>
@@ -26,7 +26,7 @@ namespace Curl.Kerberos;
 /// <param name="fileWriter">
 /// Appends a stored credential to a <c>FILE:</c> or <c>DIR:</c> cache file;
 /// <see langword="null" /> when caches are only read, so <see cref="Store" /> fails as
-/// <see cref="KerberosFileError.NotWritable" />.
+/// <see cref="KerberosFileError.NotWritable" /> for such a cache.
 /// </param>
 public sealed class CredentialCacheStore(
     IKerberosFileReader files,
@@ -112,37 +112,61 @@ public sealed class CredentialCacheStore(
     }
 
     /// <summary>
-    /// Stores <paramref name="credential" /> in the cache <paramref name="cacheName" /> names
-    /// by appending it to the cache file after the credentials already there, as MIT's
-    /// <c>cc_file.c</c> does (ADR-0208). The file must already exist; it is never created.
+    /// Stores <paramref name="credential" /> in the cache <paramref name="cacheName" /> names:
+    /// in a <c>FILE:</c> or <c>DIR:</c> cache by appending it to the cache file after the
+    /// credentials already there, as MIT's <c>cc_file.c</c> does (ADR-0208), the file never
+    /// being created; in a <c>KCM:</c> cache by sending the KCM daemon <c>KCM_OP_STORE</c>, as
+    /// MIT's <c>cc_kcm.c</c> does (BL-891).
     /// </summary>
-    /// <param name="cacheName">A <c>FILE:</c> name or bare path, or a <c>DIR:</c> name, resolved as <see cref="Read" /> resolves it.</param>
+    /// <param name="cacheName">
+    /// A <c>FILE:</c> name or bare path, a <c>DIR:</c> name, or a <c>KCM:</c> name, resolved as
+    /// <see cref="Read" /> resolves it.
+    /// </param>
     /// <param name="credential">The credential, e.g. a service ticket from a TGS exchange; it stays the caller's.</param>
     /// <exception cref="KerberosFileException">
-    /// No file writer was given (<see cref="KerberosFileError.NotWritable" />), the name's type
-    /// is not <c>FILE</c> or <c>DIR</c> (<see cref="KerberosFileError.UnsupportedType" />), a
-    /// <c>DIR:</c> collection's <c>primary</c> file is malformed
-    /// (<see cref="KerberosFileError.DirectoryPrimaryMalformed" />), or the file does not exist
-    /// (<see cref="KerberosFileError.NotFound" />).
+    /// For a <c>FILE:</c> or <c>DIR:</c> cache, no file writer was given
+    /// (<see cref="KerberosFileError.NotWritable" />), a <c>DIR:</c> collection's
+    /// <c>primary</c> file is malformed (<see cref="KerberosFileError.DirectoryPrimaryMalformed" />),
+    /// or the file does not exist (<see cref="KerberosFileError.NotFound" />); for a
+    /// <c>KCM:</c> cache, the daemon cannot be reached (<see cref="KerberosFileError.KcmNotRunning" />)
+    /// or refuses (<see cref="KerberosFileError.KcmFailed" />); or the name's type is none of
+    /// these (<see cref="KerberosFileError.UnsupportedType" />).
     /// </exception>
     public void Store(string cacheName, KerberosCredential credential)
     {
         ArgumentNullException.ThrowIfNull(credential);
+        KerberosFileName parsed = KerberosFileName.Parse(cacheName);
+        if (parsed.Type == KcmType)
+        {
+            StoreMarshalled(credential, bytes => StoreKcmCredential(parsed.Residual, bytes));
+            return;
+        }
+
         IKerberosFileWriter writer = fileWriter ?? throw new KerberosFileException(KerberosFileError.NotWritable);
-        string path = CacheFilePath(KerberosFileName.Parse(cacheName));
+        string path = CacheFilePath(parsed);
+        StoreMarshalled(credential, bytes => AppendToExistingFile(writer, path, bytes));
+    }
+
+    private static void StoreMarshalled(KerberosCredential credential, Action<byte[]> store)
+    {
         CachedCredential cached = credential.ToCached();
         byte[] bytes = CredentialCacheWriter.WriteCredential(cached);
         cached.SessionKey.Dispose();
         try
         {
-            if (!writer.AppendAllBytes(path, bytes))
-            {
-                throw new KerberosFileException(KerberosFileError.NotFound);
-            }
+            store(bytes);
         }
         finally
         {
             CryptographicOperations.ZeroMemory(bytes);
+        }
+    }
+
+    private static void AppendToExistingFile(IKerberosFileWriter writer, string path, byte[] bytes)
+    {
+        if (!writer.AppendAllBytes(path, bytes))
+        {
+            throw new KerberosFileException(KerberosFileError.NotFound);
         }
     }
 
@@ -193,10 +217,21 @@ public sealed class CredentialCacheStore(
 
     private CredentialCache ReadKcmCache(string residual)
     {
+        using Stream connection = ConnectToKcm();
+        return KcmCredentialCacheReader.Read(new KerberosKcmClient(connection), residual);
+    }
+
+    private void StoreKcmCredential(string residual, byte[] credential)
+    {
+        using Stream connection = ConnectToKcm();
+        KcmCredentialCacheWriter.Store(new KerberosKcmClient(connection), residual, credential);
+    }
+
+    private Stream ConnectToKcm()
+    {
         string socketPath = ConfiguredValue("kcm_socket") ?? DefaultKcmSocketPath;
         Stream? connection = socketPath == KcmSocketTurnedOff ? null : kcm?.Connect(socketPath);
-        using Stream reachable = connection ?? throw new KerberosFileException(KerberosFileError.KcmNotRunning);
-        return KcmCredentialCacheReader.Read(new KerberosKcmClient(reachable), residual);
+        return connection ?? throw new KerberosFileException(KerberosFileError.KcmNotRunning);
     }
 
     private string? ConfiguredValue(string tag) =>

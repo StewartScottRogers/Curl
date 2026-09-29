@@ -273,9 +273,9 @@ public sealed class CredentialCacheStoreTests
     }
 
     [TestMethod]
-    [DataRow("KCM:")]
     [DataRow("MEMORY:x")]
-    public void Store_CacheTypeThatIsNotAFile_FailsAsUnsupportedType(string cacheName)
+    [DataRow("KEYRING:persistent:1000")]
+    public void Store_CacheTypeThatIsNotFileDirOrKcm_FailsAsUnsupportedType(string cacheName)
     {
         using KerberosCredential credential = ServiceCredential();
 

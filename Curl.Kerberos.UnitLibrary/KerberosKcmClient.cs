@@ -1,4 +1,6 @@
 using System.Buffers.Binary;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 
 namespace Curl.Kerberos;
 
@@ -6,7 +8,8 @@ namespace Curl.Kerberos;
 /// Speaks the KCM protocol over one connection as MIT's <c>cc_kcm.c</c> does over a Unix
 /// socket: each request is a 4-byte big-endian length, then protocol version 2.0, the 2-byte
 /// opcode and the arguments; each reply is a 4-byte big-endian length, then a 4-byte status
-/// code and the payload.
+/// code and the payload. A request's bytes are zeroed once sent, since a <c>STORE</c>
+/// request carries a session key.
 /// </summary>
 /// <param name="connection">The connection to the KCM daemon; the caller disposes it.</param>
 public sealed class KerberosKcmClient(Stream connection)
@@ -55,8 +58,16 @@ public sealed class KerberosKcmClient(Stream connection)
         byte[] request = new byte[LengthFieldLength + body.Count];
         BinaryPrimitives.WriteInt32BigEndian(request, body.Count);
         body.CopyTo(request, LengthFieldLength);
-        connection.Write(request);
-        connection.Flush();
+        CollectionsMarshal.AsSpan(body).Clear();
+        try
+        {
+            connection.Write(request);
+            connection.Flush();
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(request);
+        }
     }
 
     private byte[] ReadExactly(int length)

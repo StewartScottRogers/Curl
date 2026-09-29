@@ -6,6 +6,9 @@ namespace Curl.Kerberos;
 /// </summary>
 public enum KerberosKcmOperation
 {
+    /// <summary><c>KCM_OP_STORE</c>: adds one credential to the named cache.</summary>
+    Store = 6,
+
     /// <summary><c>KCM_OP_GET_PRINCIPAL</c>: the named cache's default principal.</summary>
     GetPrincipal = 8,
 

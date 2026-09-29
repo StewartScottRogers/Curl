@@ -29,7 +29,7 @@ internal static class KcmCredentialCacheReader
         return new CredentialCache(kdcTimeOffset, principal, ReadCredentials(client, name));
     }
 
-    private static string ReadDefaultCacheName(KerberosKcmClient client)
+    internal static string ReadDefaultCacheName(KerberosKcmClient client)
     {
         byte[] payload = RequireSuccess(client.Call(KerberosKcmOperation.GetDefaultCache));
         int end = Array.IndexOf(payload, (byte)0);
@@ -90,6 +90,6 @@ internal static class KcmCredentialCacheReader
         }
     }
 
-    private static byte[] RequireSuccess(KerberosKcmReply reply) =>
+    internal static byte[] RequireSuccess(KerberosKcmReply reply) =>
         reply.IsSuccess ? reply.Payload : throw new KerberosFileException(KerberosFileError.KcmFailed, reply.Status);
 }
