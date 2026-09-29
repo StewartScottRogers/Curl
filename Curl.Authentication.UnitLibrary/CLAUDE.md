@@ -31,7 +31,9 @@ Type 1, then Type 3 for the server's Type 2 from a fresh context stepped through
 context is kept between legs), and nothing after Type 3. The router gives SSPI on Windows and
 `HandBuiltNtlmSecurityContext` (curl's own NTLM, over `Curl.Ntlm`'s `NtlmChallengeAnswerer`)
 elsewhere; a Type 2 the context cannot answer throws `HttpAuthenticationFailedException`
-(exit 94) where the SSPI build is matched, and sends nothing elsewhere.
+(exit 94) where the SSPI build is matched, and sends nothing elsewhere, except that a Type 3
+past curl's 1024-byte buffer (the hand-built context's `Refused`) fails with exit 100,
+"user + domain + hostname too big for NTLM" (BL-849).
 Message protection (BL-851, ADR-0183): an established context wraps and unwraps
 (`ISecurityContext.Wrap`/`Unwrap`) - the BCL's on the system route, `KerberosGssContext`'s on
 the hand-built Kerberos route; curl's own NTLM throws `NotSupportedException`, and an unfinished

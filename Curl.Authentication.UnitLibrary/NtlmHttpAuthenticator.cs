@@ -13,7 +13,9 @@ namespace Curl.Authentication;
 /// <param name="refusedChallengeFailsTransfer">
 /// <see langword="true" /> where curl's SSPI build is matched (Windows): a Type 2 message the
 /// context cannot answer fails the transfer with exit 94. <see langword="false" /> where
-/// curl's own NTLM is (elsewhere): it ends the transfer on the 401, exit 0.
+/// curl's own NTLM is (elsewhere): a Type 2 message it cannot read ends the transfer on the
+/// 401, exit 0, and a <see cref="SecurityContextStatus.Refused" /> answer, which is a Type 3
+/// message past curl's 1024-byte buffer, fails it with exit 100 (BL-849).
 /// </param>
 /// <remarks>
 /// It keeps no context between legs. Type 3 comes from a new context stepped through its
@@ -25,6 +27,12 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
 {
     /// <summary>The message curl prints for exit 94, <see cref="CurlExitCode.AuthError" />.</summary>
     public const string AuthErrorMessage = "An authentication function returned an error";
+
+    /// <summary>
+    /// The message curl 8.18.0's own NTLM prints for exit 100, <see cref="CurlExitCode.TooLarge" />,
+    /// when the Type 3 message would not fit its 1024-byte buffer (measured on Ubuntu, BL-849).
+    /// </summary>
+    public const string Type3TooLargeMessage = "user + domain + hostname too big for NTLM";
 
     private const string SchemePrefix = "NTLM ";
 
@@ -44,7 +52,9 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
     /// <param name="cancellationToken">Cancels the context's steps.</param>
     /// <returns>The header value, or <see langword="null" /> to send none.</returns>
     /// <exception cref="HttpAuthenticationFailedException">
-    /// The context cannot answer the Type 2 message and <c>refusedChallengeFailsTransfer</c> is set.
+    /// The context cannot answer the Type 2 message and <c>refusedChallengeFailsTransfer</c> is set
+    /// (exit 94), or it is not set and the context refuses the answer because the Type 3 message
+    /// would not fit curl's buffer (exit 100).
     /// </exception>
     public async ValueTask<string?> CreateAuthorizationAsync(HttpAuthRequest request, string? sentAuthorization, bool sentBeforeAnyChallenge, IReadOnlyList<string> challenges, CancellationToken cancellationToken)
     {
@@ -124,6 +134,11 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
         if (header is null && refusedChallengeFailsTransfer)
         {
             throw new HttpAuthenticationFailedException(CurlExitCode.AuthError, AuthErrorMessage);
+        }
+
+        if (header is null && authenticate.Status == SecurityContextStatus.Refused)
+        {
+            throw new HttpAuthenticationFailedException(CurlExitCode.TooLarge, Type3TooLargeMessage);
         }
 
         return header;
