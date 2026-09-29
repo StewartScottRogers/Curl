@@ -34,12 +34,12 @@ completed: 2026-09-28
 - Built: `Aria` (RFC 5794, S-boxes copied from the RFC's section 2.4.2 tables), the
   internal `IBlockCipher` and `GaloisCounterMode` (NIST SP 800-38D, 12-byte nonce,
   16-byte tag, constant-time bitwise GHASH), and `AeadAriaGcm` over them. Decisions in
-  ADR-0146: ARIA indexes its fixed S-boxes (not constant-time, as OpenSSL's ARIA), GHASH
+  ADR-0147: ARIA indexes its fixed S-boxes (not constant-time, as OpenSSL's ARIA), GHASH
   is constant-time, GCM takes only the 12-byte nonce TLS and the BCL's `AesGcm` use.
 - ARIA-GCM vector: RFC 8269 Appendix A.2 (ARIA-GCM for SRTP) publishes 128- and 256-bit
   ARIA-GCM vectors; its salt is all zero, so the nonce is the published IV. Used those
   rather than an `openssl s_server` recording.
-- Added `Documentation/Planning/Decisions` to `touches` for ADR-0146; no task in `Doing`
+- Added `Documentation/Planning/Decisions` to `touches` for ADR-0147; no task in `Doing`
   names it.
 - The quality audit also failed `Camellia`'s constructor (BL-783) on compiled complexity
   16; split its subkey expansion into `ExpandEncryptionSubkeys` and computed the round
