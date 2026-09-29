@@ -20,6 +20,14 @@ internal sealed class RsaSshSignatureVerifier(string signatureName, HashAlgorith
         SshWireReader key = SshKeyBlobReader.Open(hostKey, KeyType);
         byte[] exponent = key.ReadMpint().ToArray();
         byte[] modulus = key.ReadMpint().ToArray();
+        if (modulus.Length == 0)
+        {
+            // Windows' RSA refuses an empty modulus with a CryptographicException, but
+            // OpenSSL's throws IndexOutOfRangeException; refuse it here so every platform
+            // fails the key exchange the same way.
+            throw new CryptographicException("The ssh-rsa host key has an empty modulus.");
+        }
+
         byte[] signatureBytes = SshKeyBlobReader.ReadSignature(signature, signatureName);
         if (signatureBytes.Length > modulus.Length)
         {
