@@ -35,3 +35,10 @@ or curl's source, or a measurement of the OpenSSL build of curl.
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network.
+
+`DiagnosticLogWriter` is Curl's own `--log-level` log (ADR-0222), not curl's `-v`: it writes
+`[<UTC timestamp>] [<level>] [<component>] <message>` and the caller's line end, one whole
+flushed line per call under a lock, escapes CR and LF in a message as `\r` and `\n`, and
+stops writing after the first `IOException` from its target. It is never built at
+`none`; components get `NoDiagnosticLog.Instance` instead. The format is a contract users
+may grep: change it only by a new ADR.

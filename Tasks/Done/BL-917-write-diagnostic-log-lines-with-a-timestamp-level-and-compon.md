@@ -8,7 +8,7 @@ depends-on: [BL-938]
 touches: [Curl.Output.UnitLibrary, Curl.Output.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-917 — Write diagnostic log lines with a timestamp, level and component through DiagnosticLogWriter in Curl.Output
 
@@ -28,14 +28,21 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Output.UnitLibrary/DiagnosticLogWriter.cs` exists and implements `IDiagnosticLog` as above.
-- [ ] `DiagnosticLogWriterTests` pin: `Write(Info, "http", "reply 200")` at 2026-09-29T14:03:07.123Z writes exactly `[2026-09-29T14:03:07.123Z] [info] [http] reply 200` plus the given line end; each level's `IsEnabled` at each configured level (a 5x4 table); a disabled level writes nothing; CR and LF in a message are escaped; `None` in the constructor throws; a target that throws `IOException` does not throw out of `Write` and later writes are skipped; two threads writing 1000 lines each produce 2000 whole lines.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `Curl.Output.UnitLibrary/DiagnosticLogWriter.cs` exists and implements `IDiagnosticLog` as above.
+- [x] `DiagnosticLogWriterTests` pin: `Write(Info, "http", "reply 200")` at 2026-09-29T14:03:07.123Z writes exactly `[2026-09-29T14:03:07.123Z] [info] [http] reply 200` plus the given line end; each level's `IsEnabled` at each configured level (a 5x4 table); a disabled level writes nothing; CR and LF in a message are escaped; `None` in the constructor throws; a target that throws `IOException` does not throw out of `Write` and later writes are skipped; two threads writing 1000 lines each produce 2000 whole lines.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- Delivered directly: the task and ADR-0222 fully specify the class, so no separate plan stage. One class, 19 tests.
+- Level validation: the constructor refuses every value outside Error..Verbose, not only None, so the level-text lookup (indexed by level - 1) has no unreachable branch. `IsEnabled` is `level > None && level <= configured`, so an undefined negative level counts as disabled.
+- A null `target`, `timeProvider` or `lineEnd` throws `ArgumentNullException`.
+- Tests reuse the project's existing `FixedTimeProvider`. One extra test pins that a non-UTC offset is written in UTC.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary` shows 100% line, 100% branch, 0 failing members; Curl.Output.UnitTests 467 passed; full fast suite green.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. DiagnosticLogWriter writes timestamped, levelled, component-tagged diagnostic lines, thread-safe and IOException-proof
