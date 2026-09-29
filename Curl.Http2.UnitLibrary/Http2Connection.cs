@@ -104,6 +104,12 @@ public sealed class Http2Connection
     /// <summary>Gets whether a read found the peer had closed the connection between frames.</summary>
     public bool IsClosedByPeer { get; private set; }
 
+    /// <summary>
+    /// Gets whether this endpoint has written a GOAWAY: after a protocol error the peer
+    /// committed, or through <see cref="SendGoAwayAsync(Http2ErrorCode, ReadOnlyMemory{byte}, CancellationToken)" />.
+    /// </summary>
+    public bool IsGoAwaySent { get; private set; }
+
     /// <summary>Gets how many streams are open or half closed; a closed or reset stream is forgotten.</summary>
     public int OpenStreamCount => streams.Count;
 
@@ -294,13 +300,29 @@ public sealed class Http2Connection
         await WriteFrameAsync(Http2FrameFactory.CreatePing(opaqueData, isAcknowledgement: false), cancellationToken).ConfigureAwait(false);
 
     /// <summary>
-    /// Sends GOAWAY. A client accepts no peer-initiated stream, so the last stream is 0.
+    /// Sends GOAWAY with no debug data. A client accepts no peer-initiated stream, so the last
+    /// stream is 0.
     /// </summary>
     /// <param name="errorCode">Why the connection is closing.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the frame is written.</returns>
-    public async Task SendGoAwayAsync(Http2ErrorCode errorCode, CancellationToken cancellationToken) =>
-        await WriteFrameAsync(Http2FrameFactory.CreateGoAway(0, errorCode, ReadOnlyMemory<byte>.Empty), cancellationToken).ConfigureAwait(false);
+    public Task SendGoAwayAsync(Http2ErrorCode errorCode, CancellationToken cancellationToken) =>
+        SendGoAwayAsync(errorCode, ReadOnlyMemory<byte>.Empty, cancellationToken);
+
+    /// <summary>
+    /// Sends GOAWAY carrying <paramref name="debugData" />, as curl closes a connection with
+    /// <c>shutdown</c> (BL-817). A client accepts no peer-initiated stream, so the last stream
+    /// is 0. Once written, <see cref="IsGoAwaySent" /> is set.
+    /// </summary>
+    /// <param name="errorCode">Why the connection is closing.</param>
+    /// <param name="debugData">The opaque debug data the frame ends with.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the frame is written.</returns>
+    public async Task SendGoAwayAsync(Http2ErrorCode errorCode, ReadOnlyMemory<byte> debugData, CancellationToken cancellationToken)
+    {
+        await WriteFrameAsync(Http2FrameFactory.CreateGoAway(0, errorCode, debugData), cancellationToken).ConfigureAwait(false);
+        IsGoAwaySent = true;
+    }
 
     /// <summary>
     /// Reads frames until one carries something for a stream: DATA, or a complete header

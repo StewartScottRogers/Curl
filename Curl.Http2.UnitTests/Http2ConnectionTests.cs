@@ -271,6 +271,28 @@ public sealed class Http2ConnectionTests
         await connection.SendGoAwayAsync(Http2ErrorCode.NoError, None);
 
         CollectionAssert.AreEqual(FromHex("000008 07 00 00000000 00000000 00000000"), peer.Written.ToArray());
+        Assert.IsTrue(connection.IsGoAwaySent);
+    }
+
+    [TestMethod]
+    public async Task SendGoAwayAsync_WithDebugData_WritesItAfterTheErrorCode()
+    {
+        var (connection, peer) = Connect();
+
+        await connection.SendGoAwayAsync(Http2ErrorCode.NoError, "shutdown\0"u8.ToArray(), None);
+
+        CollectionAssert.AreEqual(FromHex("000011 07 00 00000000 00000000 00000000 73687574646f776e00"), peer.Written.ToArray());
+        Assert.IsTrue(connection.IsGoAwaySent);
+    }
+
+    [TestMethod]
+    public void IsGoAwaySent_NothingSent_IsFalse()
+    {
+        var (connection, _) = Connect();
+
+        var isGoAwaySent = connection.IsGoAwaySent;
+
+        Assert.IsFalse(isGoAwaySent);
     }
 
     [TestMethod]
@@ -448,6 +470,7 @@ public sealed class Http2ConnectionTests
         var exception = await Assert.ThrowsExactlyAsync<Http2ProtocolException>(() => connection.ReadStreamFrameAsync(None));
 
         Assert.AreEqual("HTTP/2 ProtocolError: Ping on stream 0 interrupted stream 1's header block.", exception.Message);
+        Assert.IsTrue(connection.IsGoAwaySent);
     }
 
     [TestMethod]
