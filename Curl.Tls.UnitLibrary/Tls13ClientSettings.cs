@@ -137,6 +137,25 @@ public sealed record Tls13ClientSettings
     public bool SendEndOfEarlyData { get; init; } = true;
 
     /// <summary>
+    /// Gets the server's <c>ECHConfigList</c> (<c>--ech ecl:</c>, or an HTTPS record's
+    /// <c>ech</c>), or <see langword="null" /> to offer no Encrypted Client Hello. When its
+    /// <see cref="EchConfigList.SupportedConfig" /> is not <see langword="null" />, the
+    /// ClientHello sent is an outer hello naming that config's public name and carrying the
+    /// inner hello, which names <see cref="ServerName" />, sealed with HPKE (RFC 9849); no
+    /// <see cref="ResumptionSession" /> is offered then. <c>encrypted_client_hello</c> must be
+    /// in <see cref="ExtensionOrder" />.
+    /// </summary>
+    public EchConfigList? EncryptedClientHelloConfigs { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the ClientHello carries a GREASE
+    /// <c>encrypted_client_hello</c> (RFC 9849 section 6.2, <c>--ech grease</c>) when no
+    /// supported config is offered. <c>encrypted_client_hello</c> must then be in
+    /// <see cref="ExtensionOrder" />.
+    /// </summary>
+    public bool SendEncryptedClientHelloGrease { get; init; }
+
+    /// <summary>
     /// Gets the TLS 1.2-and-below offer the same ClientHello also carries, or
     /// <see langword="null" /> to offer TLS 1.3 alone (<see cref="TlsClientConnection" />):
     /// its versions follow TLS 1.3 in <c>supported_versions</c>, its suites follow the TLS 1.3
@@ -174,6 +193,10 @@ public sealed record Tls13ClientSettings
         Require(CertificateCompressionAlgorithms.Count == 0 || ExtensionOrder.Contains(TlsExtensionType.CompressCertificate), "Offering certificate compression needs compress_certificate in the extension order.", nameof(ExtensionOrder));
         Require(ResumptionSession is null || ExtensionOrder.Contains(TlsExtensionType.PskKeyExchangeModes), "Resuming a session needs psk_key_exchange_modes in the extension order.", nameof(ExtensionOrder));
         Require(!OfferEarlyData || ExtensionOrder.Contains(TlsExtensionType.EarlyData), "Offering early data needs early_data in the extension order.", nameof(ExtensionOrder));
+        Require(
+            (EncryptedClientHelloConfigs is null && !SendEncryptedClientHelloGrease) || ExtensionOrder.Contains(TlsExtensionType.EncryptedClientHello),
+            "Offering Encrypted Client Hello or its GREASE needs encrypted_client_hello in the extension order.",
+            nameof(ExtensionOrder));
     }
 
     private void ValidateOffers()

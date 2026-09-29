@@ -58,6 +58,16 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
     /// <summary>Gets the lifetime, in seconds, of the tickets the server issues.</summary>
     public uint TicketLifetime { get; init; } = 7200;
 
+    /// <summary>
+    /// Gets a value indicating whether the server confirms Encrypted Client Hello (RFC 9849
+    /// section 7.2) as a backend given the inner hello does: in the last 8 bytes of its
+    /// ServerHello random, and in an <c>encrypted_client_hello</c> in its HelloRetryRequest.
+    /// </summary>
+    public bool ConfirmEch { get; init; }
+
+    /// <summary>Gets the <c>retry_configs</c> EncryptedExtensions carries, or <see langword="null" /> to send none.</summary>
+    public byte[]? EchRetryConfigs { get; init; }
+
     /// <summary>Gets a value indicating whether the server answered a ClientHello with a HelloRetryRequest.</summary>
     public bool SentHelloRetryRequest { get; private set; }
 
@@ -102,7 +112,15 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
             extensions.Add(PreSharedKeyExtension.EncodeSelected(0));
         }
 
-        byte[] serverHello = new ServerHello(0x0303, RandomNumberGenerator.GetBytes(32), hello.LegacySessionId, CipherSuite, 0, extensions).Encode();
+        byte[] serverRandom = RandomNumberGenerator.GetBytes(32);
+        if (ConfirmEch)
+        {
+            serverRandom.AsSpan(24).Clear();
+            byte[] unconfirmed = new ServerHello(0x0303, serverRandom, hello.LegacySessionId, CipherSuite, 0, extensions).Encode();
+            EchConfirmation(hello.Random, "ech accept confirmation", [.. transcriptMessages, unconfirmed]).CopyTo(serverRandom, 24);
+        }
+
+        byte[] serverHello = new ServerHello(0x0303, serverRandom, hello.LegacySessionId, CipherSuite, 0, extensions).Encode();
         transcriptMessages.Add(serverHello);
         return new TestServerFlight(serverHello, EncryptedFlight(hello, sharedSecret, preSharedKey));
     }
@@ -180,12 +198,28 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
             extensions.Add(CookieExtension.Encode(RetryCookie));
         }
 
-        byte[] retry = new ServerHello(0x0303, ServerHello.HelloRetryRequestRandom.ToArray(), hello.LegacySessionId, CipherSuite, 0, extensions).Encode();
         byte[] firstHelloHash = CryptographicOperations.HashData(suite.KeySchedule.HashAlgorithm, transcriptMessages[0]);
         transcriptMessages.Clear();
         transcriptMessages.Add(new HandshakeMessage(HandshakeType.MessageHash, firstHelloHash).Encode());
+        if (ConfirmEch)
+        {
+            byte[] unconfirmed = RetryRequestMessage(hello, [.. extensions, new TlsExtension(TlsExtensionType.EncryptedClientHello, new byte[8])]);
+            extensions.Add(new TlsExtension(TlsExtensionType.EncryptedClientHello, EchConfirmation(hello.Random, "hrr ech accept confirmation", [.. transcriptMessages, unconfirmed])));
+        }
+
+        byte[] retry = RetryRequestMessage(hello, extensions);
         transcriptMessages.Add(retry);
         return new TestServerFlight(retry, []);
+    }
+
+    private byte[] RetryRequestMessage(ClientHello hello, List<TlsExtension> extensions) =>
+        new ServerHello(0x0303, ServerHello.HelloRetryRequestRandom.ToArray(), hello.LegacySessionId, CipherSuite, 0, extensions).Encode();
+
+    /// <summary>RFC 9849 section 7.2: HKDF-Expand-Label(HKDF-Extract(0, inner random), label, Transcript-Hash(messages), 8).</summary>
+    private byte[] EchConfirmation(byte[] innerRandom, string label, List<byte[]> messages)
+    {
+        Tls13KeySchedule schedule = suite.KeySchedule;
+        return schedule.ExpandLabel(schedule.Extract(new byte[schedule.HashLength], innerRandom), label, Hash(messages), 8);
     }
 
     /// <summary>
@@ -262,6 +296,11 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         if (EarlyDataAccepted)
         {
             extensions.Add(EarlyDataExtension.EncodeIndication());
+        }
+
+        if (EchRetryConfigs is not null)
+        {
+            extensions.Add(EncryptedClientHelloExtension.EncodeRetryConfigs(EchRetryConfigs));
         }
 
         return extensions;

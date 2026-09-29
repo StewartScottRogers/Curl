@@ -16,8 +16,8 @@ TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
 (BL-700, ADR-0157), TLS 1.2, 1.1 and 1.0 over a byte stream (BL-815, ADR-0158), and
 the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173), TLS 1.3
 certificate decompression (BL-786, ADR-0199), TLS 1.3 and TLS 1.2 offered in one
-ClientHello (BL-821, ADR-0205), post-handshake client authentication (BL-880), and
-TLS-SRP (BL-704, ADR-0229).
+ClientHello (BL-821, ADR-0205), post-handshake client authentication (BL-880),
+TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0230).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -174,8 +174,22 @@ TLS-SRP (BL-704, ADR-0229).
   `supported_versions` continues in `Tls12ClientHandshake.StartFrom(sent)` (either
   downgrade sentinel is `illegal_parameter`), anything else in the TLS 1.3 client. It returns
   a `TlsConnectResult` with a `Tls13ClientStream` or a `Tls12ClientStream`, or the failure.
-- `ITlsRandomSource` supplies the random, session ID, key shares, DHE exponent, SRP private value and RSA
-  pre-master secret; `SystemTlsRandomSource` is the production one.
+- Encrypted Client Hello (RFC 9849, ADR-0230): `EchConfigList.Decode` reads an
+  `ECHConfigList` (malformed is `decode_error`, other versions skipped) into `EchConfig`s
+  with their `EchCipherSuite`s; `SupportedConfig` is the first one HPKE can seal to.
+  With `Tls13ClientSettings.EncryptedClientHelloConfigs` holding one (and
+  `encrypted_client_hello` in the order), the internal `EchClientHello` builds the inner
+  hello (real SNI, TLS 1.3 alone, section 6.1.3 padding) and seals it with
+  `Curl.Cryptography`'s `Hpke` into the outer hello (the public name, the same key shares);
+  the handshake checks the confirmation in the HelloRetryRequest and ServerHello, runs on
+  the inner hello when accepted (`EncryptedClientHelloAccepted`), and on a rejection
+  verifies the chain for the public name, keeps `EncryptedClientHelloRetryConfigs` and
+  fails with `EchRequired` after the server's Finished. `SendEncryptedClientHelloGrease`
+  sends GREASE when no config is supported. An ECH offer offers no session to resume
+  (BL-954). `EncryptedClientHelloExtension` is the extension codec.
+- `ITlsRandomSource` supplies the random, session ID, key shares, DHE exponent, SRP private value, RSA
+  pre-master secret and ECH's inner random, HPKE ephemeral key and GREASE bytes;
+  `SystemTlsRandomSource` is the production one.
 - `IServerCertificateVerifier` gets the chain as a `ServerCertificateChain` (DER
   certificates, SNI name, stapled OCSP response) and answers a `ServerCertificateVerdict`.
 - OCSP stapling (ADR-0173): `OcspStapleVerifier.Verify(response, chain, now)` checks a
@@ -198,6 +212,8 @@ TLS-SRP (BL-704, ADR-0229).
 - Tests: `Tls13TestServer` and `Tls12TestServer` in `Curl.Tls.UnitTests` are in-memory
   servers built from these codecs; `Tls12TestServer` resumes from a shared
   `Tls12TestSessionCache` and signs TLS 1.0/1.1 RSA with `BigInteger` (test code only).
+  `Tls13TestServer.ConfirmEch` makes it an ECH backend, and `EchTestFrontEnd` (with
+  `EchTestConfig`) is the client-facing server that opens the outer hello for it.
   `Tls13RecordTestServer` and `Tls12RecordTestServer` put them on the server end of an
   `InMemoryPipe`.
 

@@ -15,11 +15,16 @@ namespace Curl.Tls;
 /// for during the handshake or, once <c>post_handshake_auth</c> was offered, after it (RFC
 /// 8446 section 4.6.2); the server's chain, decompressed first when it arrives as a
 /// CompressedCertificate (RFC 8879), goes to <see cref="IServerCertificateVerifier" />.
+/// With <see cref="Tls13ClientSettings.EncryptedClientHelloConfigs" /> it offers Encrypted
+/// Client Hello (RFC 9849), or GREASE with <see cref="Tls13ClientSettings.SendEncryptedClientHelloGrease" />.
 /// </summary>
 public sealed class Tls13ClientHandshake : IDisposable
 {
     private static readonly TlsExtensionType[] RetryRequestExtensions =
         [TlsExtensionType.KeyShare, TlsExtensionType.SupportedVersions, TlsExtensionType.Cookie];
+
+    private static readonly TlsExtensionType[] RetryRequestExtensionsWithEch =
+        [TlsExtensionType.KeyShare, TlsExtensionType.SupportedVersions, TlsExtensionType.Cookie, TlsExtensionType.EncryptedClientHello];
 
     private static readonly TlsExtensionType[] ServerHelloExtensions = [TlsExtensionType.KeyShare, TlsExtensionType.SupportedVersions];
 
@@ -53,7 +58,10 @@ public sealed class Tls13ClientHandshake : IDisposable
     private byte[] sessionEarlySecret = [];
     private Tls13ClientHelloBuilder? helloBuilder;
     private ClientHello? clientHello;
+    private ClientHello? transcriptHello;
     private byte[] clientHelloBytes = [];
+    private EchClientHello? ech;
+    private TlsExtension? echGrease;
     private State state = State.Start;
     private bool retried;
     private TranscriptHash? transcript;
@@ -161,6 +169,28 @@ public sealed class Tls13ClientHandshake : IDisposable
     /// <summary>Gets the suite that protects early data (the resumed session's), or <see langword="null" /> when no early data was offered.</summary>
     public Tls13CipherSuite? EarlyDataCipherSuite => EarlyDataOffered ? Tls13CipherSuite.Find(offeredSession!.CipherSuite) : null;
 
+    /// <summary>
+    /// Gets a value indicating whether the ClientHello offered Encrypted Client Hello to the
+    /// supported config of <see cref="Tls13ClientSettings.EncryptedClientHelloConfigs" /> (RFC
+    /// 9849); a GREASE extension is not an offer.
+    /// </summary>
+    public bool EncryptedClientHelloOffered => ech is not null;
+
+    /// <summary>
+    /// Gets a value indicating whether the server confirmed, in its ServerHello, that it took
+    /// the inner ClientHello. When it answered the outer one instead, the server's chain is
+    /// verified for the config's public name and, once its Finished checks out, the handshake
+    /// fails with <see cref="TlsAlertDescription.EchRequired" />.
+    /// </summary>
+    public bool EncryptedClientHelloAccepted => ech?.Accepted == true;
+
+    /// <summary>
+    /// Gets the <c>retry_configs</c> a server that rejected Encrypted Client Hello sent in its
+    /// EncryptedExtensions, for a retry on a new connection (RFC 9849 section 6.1.6), or
+    /// <see langword="null" /> when it sent none. Those sent in answer to GREASE are checked and dropped.
+    /// </summary>
+    public EchConfigList? EncryptedClientHelloRetryConfigs { get; private set; }
+
     /// <summary>Gets the last ClientHello <see cref="Start" /> or a HelloRetryRequest sent, or <see langword="null" /> before the start.</summary>
     internal ClientHello? SentClientHello => clientHello;
 
@@ -198,7 +228,11 @@ public sealed class Tls13ClientHandshake : IDisposable
         random.Fill(legacySessionId);
         helloBuilder = new Tls13ClientHelloBuilder(settings, clientRandom, legacySessionId);
         shares = [.. settings.KeyShareGroups.Select(random.CreateKeyShare)];
-        OfferSession(settings.TimeProvider.GetUtcNow());
+        PrepareEncryptedClientHello(clientRandom, legacySessionId);
+        if (ech is null)
+        {
+            OfferSession(settings.TimeProvider.GetUtcNow());
+        }
         Tls13HandshakeOutputBuilder output = new();
         SendClientHello(null, output);
         if (EarlyDataOffered)
@@ -249,6 +283,7 @@ public sealed class Tls13ClientHandshake : IDisposable
     public void Dispose()
     {
         DisposeShares();
+        ech?.Dispose();
         transcript?.Dispose();
     }
 
@@ -409,13 +444,13 @@ public sealed class Tls13ClientHandshake : IDisposable
 
     private TlsAlertDescription? ReceiveHelloRetryRequest(ServerHello hello, byte[] encoded, Tls13HandshakeOutputBuilder output)
     {
-        TlsAlertDescription? alert = retried ? TlsAlertDescription.UnexpectedMessage : CheckExtensionTypes(hello.Extensions, RetryRequestExtensions);
+        TlsAlertDescription? alert = retried ? TlsAlertDescription.UnexpectedMessage : CheckExtensionTypes(hello.Extensions, AllowedRetryRequestExtensions());
         if (alert is not null)
         {
             return alert;
         }
 
-        alert = DecodeRetryChanges(hello.Extensions, out ushort? group, out byte[]? cookie);
+        alert = DecodeRetryChanges(hello.Extensions, out ushort? group, out byte[]? cookie) ?? ReceiveEchConfirmation(hello, encoded);
         if (alert is not null)
         {
             return alert;
@@ -480,8 +515,31 @@ public sealed class Tls13ClientHandshake : IDisposable
     private TlsAlertDescription? ReceiveKeyShare(ServerHello hello, byte[] encoded, Tls13HandshakeOutputBuilder output)
     {
         TlsAlertDescription? alert = CheckExtensionTypes(hello.Extensions, pskOffer is null ? ServerHelloExtensions : ResumedServerHelloExtensions)
-            ?? ReadSelectedIdentity(FindExtension(hello.Extensions, TlsExtensionType.PreSharedKey), hello.CipherSuite);
+            ?? ReadSelectedIdentity(FindExtension(hello.Extensions, TlsExtensionType.PreSharedKey), hello.CipherSuite)
+            ?? ReceiveEchConfirmation(hello, encoded);
         return alert ?? ReceiveServerShare(hello, encoded, output);
+    }
+
+    /// <summary>A HelloRetryRequest may carry <c>encrypted_client_hello</c> only when the hello did (RFC 9849 section 7.2.1).</summary>
+    private TlsExtensionType[] AllowedRetryRequestExtensions() =>
+        WasOffered(TlsExtensionType.EncryptedClientHello) ? RetryRequestExtensionsWithEch : RetryRequestExtensions;
+
+    /// <summary>
+    /// With an ECH offer, reads the server's confirmation in its HelloRetryRequest or
+    /// ServerHello and moves the transcript to the hello the server answered (RFC 9849
+    /// section 7.2); a GREASE extension's answer is ignored (section 6.2.1).
+    /// </summary>
+    private TlsAlertDescription? ReceiveEchConfirmation(ServerHello hello, byte[] encoded)
+    {
+        if (ech is null)
+        {
+            return null;
+        }
+
+        Tls13KeySchedule schedule = Tls13CipherSuite.Find(hello.CipherSuite)!.KeySchedule;
+        TlsAlertDescription? alert = hello.IsHelloRetryRequest ? ech.ReceiveHelloRetryRequest(hello, schedule) : ech.ReceiveServerHello(encoded, schedule, transcript);
+        UseTranscriptHello(ech.TranscriptHello);
+        return alert;
     }
 
     /// <summary>Computes the shared secret from the ServerHello's <c>key_share</c> and the client's share of its group, and enters the handshake keys.</summary>
@@ -580,7 +638,35 @@ public sealed class Tls13ClientHandshake : IDisposable
     private TlsAlertDescription? ReadEncryptedExtensions(IReadOnlyList<TlsExtension> extensions) =>
         extensions.Select(extension => CheckEncryptedExtensionType(extension.Type)).FirstOrDefault(found => found is not null)
             ?? ReadApplicationProtocol(FindExtension(extensions, TlsExtensionType.ApplicationLayerProtocolNegotiation))
-            ?? ReadEarlyDataIndication(FindExtension(extensions, TlsExtensionType.EarlyData));
+            ?? ReadEarlyDataIndication(FindExtension(extensions, TlsExtensionType.EarlyData))
+            ?? ReadEchRetryConfigs(FindExtension(extensions, TlsExtensionType.EncryptedClientHello));
+
+    /// <summary>
+    /// RFC 9849 sections 6.1.4 and 6.2.1: a server that accepted ECH sends no
+    /// <c>encrypted_client_hello</c> here (<c>unsupported_extension</c>); one that rejected it,
+    /// or answered GREASE, may send <c>retry_configs</c>, which must decode. Only a rejection's are kept.
+    /// </summary>
+    private TlsAlertDescription? ReadEchRetryConfigs(byte[]? data)
+    {
+        if (data is null)
+        {
+            return null;
+        }
+
+        if (EncryptedClientHelloAccepted)
+        {
+            return TlsAlertDescription.UnsupportedExtension;
+        }
+
+        TlsDecodeResult<EchConfigList> configs = EncryptedClientHelloExtension.DecodeRetryConfigs(data);
+        if (!configs.Succeeded)
+        {
+            return configs.Alert;
+        }
+
+        EncryptedClientHelloRetryConfigs = ech is null ? null : configs.Value;
+        return null;
+    }
 
     /// <summary>
     /// RFC 8446 section 4.2.10: an empty <c>early_data</c> accepts the early data, and only
@@ -612,7 +698,7 @@ public sealed class Tls13ClientHandshake : IDisposable
         return type == TlsExtensionType.SupportedGroups || WasOffered(type) ? null : TlsAlertDescription.UnsupportedExtension;
     }
 
-    private bool WasOffered(TlsExtensionType type) => clientHello!.Extensions.Any(extension => extension.Type == type);
+    private bool WasOffered(TlsExtensionType type) => transcriptHello!.Extensions.Any(extension => extension.Type == type);
 
     private TlsAlertDescription? ReadApplicationProtocol(byte[]? data)
     {
@@ -745,7 +831,9 @@ public sealed class Tls13ClientHandshake : IDisposable
     /// <summary>Hands the chain to the verifier, then with <c>--cert-status</c> checks the response stapled to the leaf.</summary>
     private TlsAlertDescription? VerifyServerCertificates(byte[]? ocspResponse)
     {
-        ServerCertificateVerdict verdict = verifier.Verify(new ServerCertificateChain(ServerCertificates, settings.ServerName, ocspResponse));
+        // RFC 9849 section 6.1.6: after a rejection the server is authenticated as the public name.
+        string? name = ech is { Rejected: true } ? ech.Config.PublicName : settings.ServerName;
+        ServerCertificateVerdict verdict = verifier.Verify(new ServerCertificateChain(ServerCertificates, name, ocspResponse));
         if (!verdict.IsAccepted)
         {
             certificateRejection = verdict.Rejection;
@@ -842,6 +930,12 @@ public sealed class Tls13ClientHandshake : IDisposable
         }
 
         Transcript.Append(encoded);
+        if (ech is { Rejected: true })
+        {
+            // RFC 9849 section 6.1.6: the outer handshake is authenticated; end it before any application data.
+            return TlsAlertDescription.EchRequired;
+        }
+
         byte[] serverFinishedHash = Transcript.GetCurrentHash();
         output.Install(TlsEncryptionLevel.Application, TlsTrafficDirection.Read, Schedule.DeriveServerApplicationTrafficSecret(masterSecret, serverFinishedHash));
         clientApplicationTrafficSecret = Schedule.DeriveClientApplicationTrafficSecret(masterSecret, serverFinishedHash);
@@ -978,13 +1072,38 @@ public sealed class Tls13ClientHandshake : IDisposable
         return hello with { Extensions = [.. hello.Extensions.SkipLast(1), offered] };
     }
 
+    /// <summary>
+    /// With a supported config in <see cref="Tls13ClientSettings.EncryptedClientHelloConfigs" />
+    /// sets up the offer to it; otherwise, with <see cref="Tls13ClientSettings.SendEncryptedClientHelloGrease" />,
+    /// builds the GREASE extension every ClientHello of this handshake carries (RFC 9849 section 6.2.1).
+    /// </summary>
+    private void PrepareEncryptedClientHello(byte[] clientRandom, byte[] legacySessionId)
+    {
+        if (settings.EncryptedClientHelloConfigs?.SupportedConfig is { } config)
+        {
+            ech = EchClientHello.Create(settings, config, random, clientRandom, legacySessionId);
+        }
+        else if (settings.SendEncryptedClientHelloGrease)
+        {
+            echGrease = EchClientHello.CreateGrease(settings, random, [.. shares.Select(share => share.Entry)], clientRandom, legacySessionId);
+        }
+    }
+
+    /// <summary>Sends the next ClientHello: with an ECH offer the outer hello, whose inner hello the transcript holds until the server rejects it.</summary>
     private void SendClientHello(byte[]? cookie, Tls13HandshakeOutputBuilder output)
     {
-        ClientHello hello = helloBuilder!.Build([.. shares.Select(share => share.Entry)], cookie, pskOffer);
+        KeyShareEntry[] entries = [.. shares.Select(share => share.Entry)];
+        ClientHello hello = ech?.Build(entries, cookie) ?? helloBuilder!.Build(entries, cookie, pskOffer, echGrease);
         clientHello = pskOffer is null ? hello : BindPsk(hello);
-        clientHelloBytes = clientHello.Encode();
+        UseTranscriptHello(ech?.TranscriptHello ?? clientHello);
         transcript?.Append(clientHelloBytes);
-        output.Send(TlsEncryptionLevel.Initial, clientHelloBytes);
+        output.Send(TlsEncryptionLevel.Initial, clientHello.Encode());
+    }
+
+    private void UseTranscriptHello(ClientHello hello)
+    {
+        transcriptHello = hello;
+        clientHelloBytes = hello.Encode();
     }
 
     private void SendHandshakeMessage(byte[] message, Tls13HandshakeOutputBuilder output) =>
