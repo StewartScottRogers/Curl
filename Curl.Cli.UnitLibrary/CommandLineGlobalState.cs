@@ -78,6 +78,8 @@ internal sealed class CommandLineGlobalState
 
     public int ParallelMaxHost { get; set; }
 
+    public long? MillisecondsBetweenTransferStarts { get; set; }
+
     public string? DefaultConfigFile { get; set; }
 
     public int OpenConfigFileCount { get; set; }

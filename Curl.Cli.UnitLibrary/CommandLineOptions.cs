@@ -1586,6 +1586,14 @@ public sealed class CommandLineOptions
     public int ParallelMaxHost { get => globals.ParallelMaxHost; internal set => globals.ParallelMaxHost = value; }
 
     /// <summary>
+    /// The least time in milliseconds from one serial transfer's start to the next one's, from the last <c>--rate</c> as
+    /// <see cref="TransferStartRate"/> reads it: <c>--rate 2/s</c> is 500. A <see cref="long"/>, since a period of up to <see cref="long.MaxValue"/> milliseconds is accepted. <see langword="null"/> when
+    /// not given. Global, so it reaches every <c>--next</c> group; a <c>-Z</c> run ignores it, as curl
+    /// 8.21.0 does.
+    /// </summary>
+    public long? MillisecondsBetweenTransferStarts { get => globals.MillisecondsBetweenTransferStarts; internal set => globals.MillisecondsBetweenTransferStarts = value; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>--compressed</c> was given and no <c>--no-compressed</c> came after
     /// it: ask for a compressed response and decompress it.
     /// </summary>

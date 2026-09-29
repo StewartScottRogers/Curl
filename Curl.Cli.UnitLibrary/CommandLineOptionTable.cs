@@ -268,6 +268,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("retry-all-errors", null, (options, on) => options.RetryAllErrors = on),
         CommandLineOption.NegatableFlag("retry-connrefused", null, (options, on) => options.RetryConnectionRefused = on),
         CommandLineOption.Value("limit-rate", null, SetLimitRate),
+        CommandLineOption.Value("rate", null, SetTransferStartRate),
         CommandLineOption.Value("speed-limit", 'Y', SetSpeedLimit),
         CommandLineOption.Value("speed-time", 'y', SetSpeedTime),
         CommandLineOption.NegatableFlag("remote-time", 'R', (options, on) => options.RemoteTime = on),
@@ -374,7 +375,7 @@ public static class CommandLineOptionTable
     /// <remarks>
     /// curl 8.21.0's manual marks <c>--fail-early</c>, <c>-#</c>, <c>--progress-meter</c>, <c>-S</c>,
     /// <c>--stderr</c>, <c>--styled-output</c>, <c>--trace</c>, <c>--trace-ascii</c>,
-    /// <c>--trace-time</c>, <c>--trace-ids</c>, <c>-v</c>, <c>-Z</c>, <c>--parallel-immediate</c>, <c>--parallel-max</c> and <c>--parallel-max-host</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
+    /// <c>--trace-time</c>, <c>--trace-ids</c>, <c>-v</c>, <c>-Z</c>, <c>--parallel-immediate</c>, <c>--parallel-max</c>, <c>--parallel-max-host</c> and <c>--rate</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
     /// and <c>-M</c> are global in its tool (<c>struct GlobalConfig</c>) without the mark, as is
     /// <c>--ssl-sessions</c> (<c>global-&gt;ssl_sessions</c>); <c>--dump-ca-embed</c>, like <c>-V</c>, ends
     /// the command line rather than setting anything of one group. Measured
@@ -401,6 +402,7 @@ public static class CommandLineOptionTable
         "parallel-immediate",
         "parallel-max",
         "parallel-max-host",
+        "rate",
         "variable",
         "version",
         "help",
@@ -1409,6 +1411,17 @@ public static class CommandLineOptionTable
         if (refusal is null)
         {
             options.LimitRate = bytesPerSecond;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetTransferStartRate(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = TransferStartRate.Parse(spelledOption, value, options.ErrorsHidden, out long milliseconds);
+        if (refusal is null)
+        {
+            options.MillisecondsBetweenTransferStarts = milliseconds;
         }
 
         return refusal;
