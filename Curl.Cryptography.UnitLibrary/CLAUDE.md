@@ -141,7 +141,7 @@ Namespace `Curl.Cryptography`. It holds:
 - `DsaSignature` (public, `IDisposable`): FIPS 186-4 DSA - the constructor takes p, q, g
   and x, `SignHash` signs with RFC 6979's deterministic nonce over SHA1 to SHA512, and the
   static `VerifyHash` returns `false` for bad parameters, y not below p, r or s outside
-  [1, q - 1], or a mismatch. Signatures are r || s at q's length (ADR-0200). Constant-time
+  [1, q - 1], or a mismatch. Signatures are r || s at q's length (ADR-0201). Constant-time
   in x and k.
 
 The remaining primitives land under their own tasks (BL-677, BL-738, BL-740 to BL-744).
