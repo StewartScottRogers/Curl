@@ -8,7 +8,7 @@ depends-on: [BL-655]
 touches: [Curl.slnx, Curl.Http2.UnitLibrary, Curl.Http2.UnitTests]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-715 — Create Curl.Http2.UnitLibrary and Curl.Http2.UnitTests
 
@@ -25,13 +25,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Both projects exist, `Curl.slnx` lists them together in alphabetical order with no solution folder, and the test project references the library.
-- [ ] `Curl.Http2.UnitLibrary/CLAUDE.md` exists as described.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] Both projects exist, `Curl.slnx` lists them together in alphabetical order with no solution folder, and the test project references the library.
+- [x] `Curl.Http2.UnitLibrary/CLAUDE.md` exists as described.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
+
+- Csproj files mirror `Curl.Tls.UnitLibrary` and `.UnitTests` (BL-696): InternalsVisibleTo for the tests, MSTest from central package management, global `Using` for MSTest; written by hand rather than from `dotnet new`, so no template `Class1.cs`, `Test1.cs` or `MSTestSettings.cs` exists.
+- `Curl.slnx` lists the pair after `Curl.Cryptography.UnitTests`, before `Curl.Networking.UnitLibrary`, the alphabetical place.
+- The test project holds no test yet, so `dotnet test` reports "No test matches" for it and still exits 0, as for `Curl.Tls.UnitTests` when it was scaffolded.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. Curl.Http2.UnitLibrary and Curl.Http2.UnitTests exist, are in Curl.slnx and build clean
