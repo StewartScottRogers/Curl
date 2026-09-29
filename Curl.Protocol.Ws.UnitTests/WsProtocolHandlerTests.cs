@@ -315,6 +315,34 @@ public sealed class WsProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Negotiate_SendsTheContextsTokenOnTheUpgradeRequest()
+    {
+        var connection = new ScriptedConnection(Bytes(Head101));
+        var authenticator = new AsynchronousOnlyAuthenticator("Negotiate YIIB");
+        var credential = new NetworkCredential(string.Empty, string.Empty);
+        var options = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Negotiate };
+
+        await new WsProtocolHandler(Connector(connection), authenticator, new FixedRandomSource()).ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47901/"), Output = new MemoryStream(), Http = options, Credentials = credential });
+
+        Assert.AreEqual(
+            "GET / HTTP/1.1\r\n" +
+            "Host: 127.0.0.1:47901\r\n" +
+            "Authorization: Negotiate YIIB\r\n" +
+            "User-Agent: curl/8.21.0\r\n" +
+            "Accept: */*\r\n" +
+            "Upgrade: websocket\r\n" +
+            "Sec-WebSocket-Version: 13\r\n" +
+            "Sec-WebSocket-Key: " + FixedRandomSource.Key + "\r\n" +
+            "Connection: Upgrade\r\n" +
+            "\r\n",
+            Encoding.Latin1.GetString(connection.Sent));
+        HttpAuthRequest asked = authenticator.Requests.Single();
+        Assert.AreEqual(HttpAuthSchemes.Negotiate, asked.AllowedSchemes);
+        Assert.AreSame(credential, asked.Credential);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_CustomMethod_SendsItAndAsksAuthorizationForIt()
     {
         var connection = new ScriptedConnection(Bytes(Head101));

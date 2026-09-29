@@ -17,8 +17,9 @@ namespace Curl.Protocol.Ws;
 /// <see cref="System.Net.Sockets.Socket" /> is ever constructed here.
 /// </param>
 /// <param name="authenticator">
-/// Builds the pre-emptive <c>Authorization</c> value for <c>-u</c>, <c>--basic</c> and
-/// <c>--oauth2-bearer</c>, with no challenges.
+/// Builds the pre-emptive <c>Authorization</c> value for <c>-u</c>, <c>--basic</c>,
+/// <c>--oauth2-bearer</c> and <c>--negotiate</c>, with no challenges, through
+/// <see cref="IHttpAuthenticator.CreateAuthorizationAsync" /> (ADR-0226).
 /// </param>
 /// <param name="randomSource">Supplies the 16 bytes behind <c>Sec-WebSocket-Key</c>.</param>
 /// <remarks>
@@ -128,7 +129,7 @@ public sealed class WsProtocolHandler(
     {
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
         string method = options.CustomMethod ?? (context.NoBody ? "HEAD" : "GET");
-        string? authorization = authenticator.CreateAuthorization(
+        string? authorization = await authenticator.CreateAuthorizationAsync(
             new HttpAuthRequest(
                 method,
                 context.Url,
@@ -137,7 +138,8 @@ public sealed class WsProtocolHandler(
                 options.BearerToken,
                 options.AuthSchemes,
                 IsProxy: false),
-            []);
+            [],
+            context.CancellationToken).ConfigureAwait(false);
         byte[] request = WsUpgradeRequestFormatter.Format(context.Url, options, method, NewKey(), authorization);
         context.Events.ReportRequestHeader(request);
         await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
