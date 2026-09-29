@@ -5,7 +5,7 @@ namespace Curl.Quic;
 /// <summary>
 /// What one QUIC client handshake offers (ADR-0144 section 5): the TLS 1.3 ClientHello
 /// profile, the transport parameters, the length of the connection IDs and an
-/// address-validation token from an earlier connection. <see cref="QuicClientHandshake" />
+/// address-validation token from an earlier connection. <see cref="QuicClientConnectionState" />
 /// adds the <c>quic_transport_parameters</c> extension to the TLS settings itself.
 /// </summary>
 public sealed record QuicClientSettings

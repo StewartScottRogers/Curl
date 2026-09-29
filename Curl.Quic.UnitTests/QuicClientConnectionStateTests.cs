@@ -6,7 +6,7 @@ using static Curl.Quic.QuicTest;
 namespace Curl.Quic;
 
 [TestClass]
-public sealed class QuicClientHandshakeTests
+public sealed class QuicClientConnectionStateTests
 {
     // QuicTestRandomSource hands out 00, 01, 02, ...: the destination connection ID first, then the source.
     private static readonly byte[] OriginalDestinationConnectionId = [.. Enumerable.Range(0, 20).Select(value => (byte)value)];
@@ -16,7 +16,7 @@ public sealed class QuicClientHandshakeTests
     [TestMethod]
     public void Start_FixedRandomness_SendsThePinned1200ByteInitial()
     {
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
 
         byte[] datagram = client.Start().Single();
 
@@ -27,7 +27,7 @@ public sealed class QuicClientHandshakeTests
     [TestMethod]
     public void Start_CurlSettings_SendsCurlsClientHelloInOneCryptoFrameThenPadding()
     {
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
         byte[] datagram = client.Start().Single();
 
         (QuicLongHeaderPacket packet, IReadOnlyList<QuicFrame> frames) = OpenClientInitial(datagram);
@@ -55,7 +55,7 @@ public sealed class QuicClientHandshakeTests
     public void Receive_InMemoryServer_CompletesConfirmsAndDiscardsEarlierKeys()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
 
         Run(client, server);
 
@@ -75,7 +75,7 @@ public sealed class QuicClientHandshakeTests
     public void Receive_HandshakeComplete_IssuesConnectionIdsUpToTheServersLimit()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
 
         Run(client, server);
         List<QuicNewConnectionIdFrame> issued = [.. server.ClientPackets.SelectMany(packet => packet.Frames).OfType<QuicNewConnectionIdFrame>()];
@@ -99,7 +99,7 @@ public sealed class QuicClientHandshakeTests
                 new QuicPingFrame(),
             ],
         };
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
 
         Run(client, server);
         List<QuicFrame> sent = [.. server.ClientPackets.Where(packet => packet.Type == QuicPacketType.OneRtt).SelectMany(packet => packet.Frames)];
@@ -116,7 +116,7 @@ public sealed class QuicClientHandshakeTests
     public void Receive_Retry_ResendsTheClientHelloWithItsTokenAndConnectionId()
     {
         using QuicTestServer server = new() { SendRetry = true };
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
 
         List<byte[]> sent = Run(client, server);
         QuicLongHeaderPacket second = (QuicLongHeaderPacket)QuicPacketCodec.Decode(sent[1], QuicClientSettings.CurlConnectionIdLength).Packet;
@@ -131,7 +131,7 @@ public sealed class QuicClientHandshakeTests
     [TestMethod]
     public void Receive_SecondInvalidOrForeignRetry_IsIgnored()
     {
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
         client.Start();
         QuicRetryPacket unsigned = new(QuicPacketCodec.Version1, SourceConnectionId, new byte[] { 9, 9, 9, 9, 9, 9, 9, 9 }, new byte[] { 1 }, new byte[16]);
         QuicRetryPacket valid = unsigned with { RetryIntegrityTag = QuicRetryIntegrity.ComputeTag(OriginalDestinationConnectionId, unsigned) };
@@ -150,7 +150,7 @@ public sealed class QuicClientHandshakeTests
     public void Receive_VersionNegotiationWithoutVersion1_FailsWithExit7()
     {
         using QuicTestServer server = new() { VersionNegotiation = [0xff00001d, 0x6b3343cf] };
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
 
         List<byte[]> sent = Run(client, server);
 
@@ -162,7 +162,7 @@ public sealed class QuicClientHandshakeTests
     [TestMethod]
     public void Receive_VersionNegotiationListingVersion1ForeignOrLate_IsIgnored()
     {
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
         client.Start();
 
         Assert.IsEmpty(client.Receive(QuicPacketCodec.Encode(new QuicVersionNegotiationPacket(SourceConnectionId, new byte[] { 1 }, [2, QuicPacketCodec.Version1]))));
@@ -186,7 +186,7 @@ public sealed class QuicClientHandshakeTests
         };
         using QuicTestServer server = new() { EncodeTransportParameters = parameters => change(parameters).Encode() };
 
-        QuicClientHandshake client = AssertClosesWith(server, QuicTransportErrorCode.TransportParameterError, CurlExitCode.CouldntConnect);
+        QuicClientConnectionState client = AssertClosesWith(server, QuicTransportErrorCode.TransportParameterError, CurlExitCode.CouldntConnect);
 
         StringAssert.Contains(client.Failure!.Message, parameter);
         client.Dispose();
@@ -212,7 +212,7 @@ public sealed class QuicClientHandshakeTests
     public void Receive_ServerChoosesVersion1_Completes()
     {
         using QuicTestServer server = new() { EncodeTransportParameters = parameters => (parameters with { VersionInformation = QuicVersionInformation.Version1Only }).Encode() };
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
 
         Run(client, server);
 
@@ -222,7 +222,7 @@ public sealed class QuicClientHandshakeTests
     [TestMethod]
     public void Receive_AcknowledgementOfAPacketNeverSent_ClosesWithProtocolViolation()
     {
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
         client.Start();
 
         byte[] close = client.Receive(ServerInitial(SourceConnectionId, [8], 0, new QuicAckFrame(5, 0, 0, [], null))).Single();
@@ -252,7 +252,7 @@ public sealed class QuicClientHandshakeTests
     {
         using QuicTestServer server = new() { ApplicationProtocol = "h2" };
 
-        QuicClientHandshake client = AssertClosesWith(server, QuicTransportErrorCode.CryptoErrorBase + (int)TlsAlertDescription.IllegalParameter, CurlExitCode.SslConnectError);
+        QuicClientConnectionState client = AssertClosesWith(server, QuicTransportErrorCode.CryptoErrorBase + (int)TlsAlertDescription.IllegalParameter, CurlExitCode.SslConnectError);
 
         Assert.AreEqual(TlsAlertDescription.IllegalParameter, client.Failure!.TlsFailure!.Alert);
         StringAssert.Contains(client.Failure.Message, "IllegalParameter");
@@ -263,7 +263,7 @@ public sealed class QuicClientHandshakeTests
     public void Receive_RejectedCertificate_ClosesWithBadCertificateAndExit60()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = QuicHandshakeTest.Client(verifier: new QuicTestVerifier { Rejection = "SSL certificate problem: self-signed certificate" });
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client(verifier: new QuicTestVerifier { Rejection = "SSL certificate problem: self-signed certificate" });
 
         Run(client, server);
 
@@ -279,7 +279,7 @@ public sealed class QuicClientHandshakeTests
     public void Receive_ServerCloseDuringTheHandshake_FailsWithTheMappedExit(ulong errorCode, CurlExitCode exitCode, string description)
     {
         using QuicTestServer server = new() { CloseAfterClientHello = errorCode };
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
 
         List<byte[]> sent = Run(client, server);
 
@@ -292,7 +292,7 @@ public sealed class QuicClientHandshakeTests
     [TestMethod]
     public void Receive_FramesAfterAClose_AreNotRead()
     {
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
         client.Start();
         QuicConnectionCloseFrame close = new(0x0a, 0, ReadOnlyMemory<byte>.Empty);
 
@@ -305,7 +305,7 @@ public sealed class QuicClientHandshakeTests
     [TestMethod]
     public void Receive_ForbiddenFrame_ClosesWithProtocolViolation()
     {
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
         client.Start();
 
         byte[] close = client.Receive(ServerInitial(SourceConnectionId, [8], 0, new QuicHandshakeDoneFrame())).Single();
@@ -317,7 +317,7 @@ public sealed class QuicClientHandshakeTests
     [TestMethod]
     public void Receive_UnreadableForeignDuplicateOrUnkeyedPackets_AreDropped()
     {
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
         client.Start();
         byte[] ping = ServerInitial(SourceConnectionId, [8], 0, new QuicPingFrame());
         byte[] tampered = [.. ping];
@@ -340,7 +340,7 @@ public sealed class QuicClientHandshakeTests
     public void Receive_AfterTheHandshakeDiscardedKeysOrForeignIds_AreDropped()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
         Run(client, server);
 
         Assert.IsEmpty(client.Receive(server.Protect(QuicPacketType.Initial, new QuicPingFrame())));
@@ -352,12 +352,12 @@ public sealed class QuicClientHandshakeTests
     [TestMethod]
     public void Start_ClientHelloLargerThanOnePacket_SendsTwoFullDatagrams()
     {
-        QuicClientSettings settings = QuicHandshakeTest.CurlSettings with
+        QuicClientSettings settings = QuicClientConnectionStateTest.CurlSettings with
         {
-            Tls = QuicHandshakeTest.CurlSettings.Tls with { FixedExtensions = [.. QuicHandshakeTest.CurlSettings.Tls.FixedExtensions, new TlsExtension((TlsExtensionType)0x7a7a, new byte[1100])] },
+            Tls = QuicClientConnectionStateTest.CurlSettings.Tls with { FixedExtensions = [.. QuicClientConnectionStateTest.CurlSettings.Tls.FixedExtensions, new TlsExtension((TlsExtensionType)0x7a7a, new byte[1100])] },
         };
         using QuicTestServer server = new();
-        using QuicClientHandshake client = QuicHandshakeTest.Client(settings);
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client(settings);
 
         List<byte[]> sent = Run(client, server);
 
@@ -369,7 +369,7 @@ public sealed class QuicClientHandshakeTests
     [TestMethod]
     public void Abandon_AfterStart_ClosesAtEveryLevelWithKeys()
     {
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
         client.Start();
 
         byte[] close = client.Abandon(QuicTransportErrorCode.InternalError, new QuicHandshakeFailure(CurlExitCode.SendError, "timeout")).Single();
@@ -385,23 +385,23 @@ public sealed class QuicClientHandshakeTests
     {
         QuicTestRandomSource random = new();
         QuicTestVerifier verifier = new();
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
 
         Assert.ThrowsExactly<InvalidOperationException>(() => client.Receive(new byte[1]));
         Assert.ThrowsExactly<InvalidOperationException>(() => client.OnLossDetectionTimeout());
         client.Start();
         Assert.ThrowsExactly<InvalidOperationException>(() => client.Start());
-        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicClientHandshake(null!, random, verifier, TimeProvider.System));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicClientHandshake(QuicHandshakeTest.CurlSettings, null!, verifier, TimeProvider.System));
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new QuicClientHandshake(QuicHandshakeTest.CurlSettings with { ConnectionIdLength = 7 }, random, verifier, TimeProvider.System));
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new QuicClientHandshake(QuicHandshakeTest.CurlSettings with { ConnectionIdLength = 21 }, random, verifier, TimeProvider.System));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicClientHandshake(QuicHandshakeTest.CurlSettings, random, verifier, null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicClientConnectionState(null!, random, verifier, TimeProvider.System));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicClientConnectionState(QuicClientConnectionStateTest.CurlSettings, null!, verifier, TimeProvider.System));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new QuicClientConnectionState(QuicClientConnectionStateTest.CurlSettings with { ConnectionIdLength = 7 }, random, verifier, TimeProvider.System));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new QuicClientConnectionState(QuicClientConnectionStateTest.CurlSettings with { ConnectionIdLength = 21 }, random, verifier, TimeProvider.System));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicClientConnectionState(QuicClientConnectionStateTest.CurlSettings, random, verifier, null!));
     }
 
     [TestMethod]
     public void Start_TokenFromAnEarlierConnection_GoesInTheFirstInitial()
     {
-        using QuicClientHandshake client = QuicHandshakeTest.Client(QuicHandshakeTest.CurlSettings with { Token = new byte[] { 7, 7 } });
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client(QuicClientConnectionStateTest.CurlSettings with { Token = new byte[] { 7, 7 } });
 
         Assert.AreEqual("0707", HexOf(OpenClientInitial(client.Start().Single()).Packet.Token));
     }
@@ -411,7 +411,7 @@ public sealed class QuicClientHandshakeTests
     {
         ManualTimerTimeProvider clock = new();
         using QuicTestServer server = new();
-        using QuicClientHandshake client = QuicHandshakeTest.Client(clock: clock);
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client(clock: clock);
         byte[] lost = client.Start().Single();
         Assert.AreEqual(TimeSpan.FromMilliseconds(999), client.TimeUntilLossDetectionTimeout);
 
@@ -442,7 +442,7 @@ public sealed class QuicClientHandshakeTests
     public void Receive_InMemoryServer_SamplesTheRttKeepsTheApplicationLimitedWindowAndDisarmsOnceNothingIsInFlight()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = QuicHandshakeTest.Client(QuicHandshakeTest.CurlSettings with { CongestionControl = QuicCongestionControlAlgorithm.NewReno });
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client(QuicClientConnectionStateTest.CurlSettings with { CongestionControl = QuicCongestionControlAlgorithm.NewReno });
 
         Run(client, server);
 
@@ -461,7 +461,7 @@ public sealed class QuicClientHandshakeTests
     {
         ManualTimerTimeProvider clock = new();
         using QuicTestServer server = new();
-        using QuicClientHandshake client = QuicHandshakeTest.Client(clock: clock);
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client(clock: clock);
         Run(client, server);
         clock.Advance(100);
 
@@ -490,7 +490,7 @@ public sealed class QuicClientHandshakeTests
     {
         ManualTimerTimeProvider clock = new();
         using QuicTestServer server = new();
-        using QuicClientHandshake client = QuicHandshakeTest.Client(clock: clock);
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client(clock: clock);
         server.Receive(client.Start().Single());
         clock.Advance(500);
 
@@ -510,7 +510,7 @@ public sealed class QuicClientHandshakeTests
     public void TimeUntilSend_BurstSent_PacesAtTheWindowOverTheSmoothedRtt()
     {
         ManualTimerTimeProvider clock = new();
-        using QuicClientHandshake client = QuicHandshakeTest.Client(clock: clock);
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client(clock: clock);
         for (var datagram = 0; datagram < QuicPacer.BurstDatagrams; datagram++)
         {
             Assert.AreEqual(TimeSpan.Zero, client.TimeUntilSend(1200));
@@ -526,7 +526,7 @@ public sealed class QuicClientHandshakeTests
     [TestMethod]
     public void OnLossDetectionTimeout_AfterFailure_SendsNothingAndTheTimerIsOff()
     {
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
         client.Start();
         client.Abandon(QuicTransportErrorCode.NoError, new QuicHandshakeFailure(CurlExitCode.OperationTimedOut, "timed out"));
 
@@ -535,10 +535,10 @@ public sealed class QuicClientHandshakeTests
     }
 
     /// <summary>Exchanges datagrams between the client and the server until neither has anything to send; returns what the client sent.</summary>
-    internal static List<byte[]> Run(QuicClientHandshake client, QuicTestServer server) => Exchange(client, server, client.Start());
+    internal static List<byte[]> Run(QuicClientConnectionState client, QuicTestServer server) => Exchange(client, server, client.Start());
 
     /// <summary>Hands <paramref name="first" /> to the server, then exchanges datagrams until neither side has anything to send; returns what the client sent.</summary>
-    internal static List<byte[]> Exchange(QuicClientHandshake client, QuicTestServer server, IEnumerable<byte[]> first)
+    internal static List<byte[]> Exchange(QuicClientConnectionState client, QuicTestServer server, IEnumerable<byte[]> first)
     {
         List<byte[]> sent = [];
         Queue<byte[]> toServer = new(first);
@@ -554,9 +554,9 @@ public sealed class QuicClientHandshakeTests
         return sent;
     }
 
-    private static QuicClientHandshake AssertClosesWith(QuicTestServer server, QuicTransportErrorCode errorCode, CurlExitCode exitCode)
+    private static QuicClientConnectionState AssertClosesWith(QuicTestServer server, QuicTransportErrorCode errorCode, CurlExitCode exitCode)
     {
-        QuicClientHandshake client = QuicHandshakeTest.Client();
+        QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
         Run(client, server);
 
         Assert.AreEqual(exitCode, client.Failure!.ExitCode);

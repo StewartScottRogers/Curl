@@ -26,21 +26,21 @@ internal static class QuicStreamTest
     };
 
     /// <summary>Returns a client whose handshake with <paramref name="server" /> has completed and been confirmed, on <paramref name="clock" /> when one is given.</summary>
-    public static QuicClientHandshake Connect(QuicTestServer server, QuicTransportParameters? clientParameters = null, ManualTimerTimeProvider? clock = null)
+    public static QuicClientConnectionState Connect(QuicTestServer server, QuicTransportParameters? clientParameters = null, ManualTimerTimeProvider? clock = null)
     {
-        QuicClientHandshake client = QuicHandshakeTest.Client(QuicHandshakeTest.CurlSettings with { TransportParameters = clientParameters ?? SmallClientLimits }, clock: clock);
-        QuicClientHandshakeTests.Run(client, server);
+        QuicClientConnectionState client = QuicClientConnectionStateTest.Client(QuicClientConnectionStateTest.CurlSettings with { TransportParameters = clientParameters ?? SmallClientLimits }, clock: clock);
+        QuicClientConnectionStateTests.Run(client, server);
         Assert.IsTrue(client.IsConfirmed);
         return client;
     }
 
     /// <summary>Sends <paramref name="frames" /> from the server in one 1-RTT packet, then exchanges datagrams until both sides are quiet.</summary>
-    public static void Deliver(QuicClientHandshake client, QuicTestServer server, params QuicFrame[] frames) =>
-        QuicClientHandshakeTests.Exchange(client, server, client.Receive(server.Protect(QuicPacketType.OneRtt, frames)));
+    public static void Deliver(QuicClientConnectionState client, QuicTestServer server, params QuicFrame[] frames) =>
+        QuicClientConnectionStateTests.Exchange(client, server, client.Receive(server.Protect(QuicPacketType.OneRtt, frames)));
 
     /// <summary>Sends what the client has queued, then exchanges datagrams until both sides are quiet.</summary>
-    public static void Flush(QuicClientHandshake client, QuicTestServer server) =>
-        QuicClientHandshakeTests.Exchange(client, server, client.TakeDatagramsToSend());
+    public static void Flush(QuicClientConnectionState client, QuicTestServer server) =>
+        QuicClientConnectionStateTests.Exchange(client, server, client.TakeDatagramsToSend());
 
     /// <summary>Returns the frames of type <typeparamref name="T" /> the client has sent in 1-RTT packets, in order.</summary>
     public static List<T> Sent<T>(QuicTestServer server)

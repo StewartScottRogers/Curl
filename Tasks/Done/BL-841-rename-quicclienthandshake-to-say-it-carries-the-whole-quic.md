@@ -8,7 +8,7 @@ depends-on: [BL-726]
 touches: [Curl.Quic.UnitLibrary, Curl.Quic.UnitTests, Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-841 — Rename QuicClientHandshake to say it carries the whole QUIC connection
 
@@ -23,12 +23,14 @@ The I/O-free QUIC client state machine has a name that says it carries the conne
 
 ## Acceptance criteria
 
-- [ ] No type named `QuicClientHandshake` remains in the solution; `Curl.Quic.UnitLibrary/CLAUDE.md` names the new type and says what it carries.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] No type named `QuicClientHandshake` remains in the solution; `Curl.Quic.UnitLibrary/CLAUDE.md` names the new type and says what it carries.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
 
 - 2026-09-29: `Curl.Networking.UnitLibrary/QuicDialer.cs` constructs and passes `QuicClientHandshake` (lines 152, 240, 272), so the rename must edit it; added `Curl.Networking.UnitLibrary` to `touches`. BL-850 (in Doing) touches that project, so the task went back to Backlog until BL-850 finishes.
+
+- 2026-09-29: Renamed to `QuicClientConnectionState` (the task's suggestion; `QuicConnection` is already the async wrapper), with `QuicClientConnectionStateTests` and the test helper `QuicClientConnectionStateTest`. `QuicConnection`'s field is now `state`; its constructor parameter stays `handshake`, since it must be a completed handshake. ADRs keep the old name: they record the decision as it was made.
 
 ## Log
 
@@ -36,3 +38,4 @@ The I/O-free QUIC client state machine has a name that says it carries the conne
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Networking.UnitLibrary (QuicDialer uses QuicClientHandshake), which BL-850 in Doing touches
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. The I/O-free QUIC client state machine is QuicClientConnectionState, named for the whole connection it carries

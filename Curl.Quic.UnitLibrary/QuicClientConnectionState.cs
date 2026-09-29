@@ -4,8 +4,10 @@ using Curl.Tls;
 namespace Curl.Quic;
 
 /// <summary>
-/// The QUIC version 1 client handshake (RFC 9000 sections 7, 8 and 17, RFC 9001 section 4)
-/// with no I/O: datagrams go in and datagrams come out. It sends the ClientHello of the
+/// The whole state of a QUIC version 1 client connection - its handshake, its streams and
+/// flow control, its loss recovery and its idle timer - with no I/O: datagrams go in and
+/// datagrams come out. For the handshake (RFC 9000 sections 7, 8 and 17, RFC 9001 section 4)
+/// it sends the ClientHello of the
 /// hand-built <see cref="Tls13ClientHandshake" /> in the first Initial, padded to 1200
 /// bytes, carries TLS messages in CRYPTO frames at the Initial, Handshake and 1-RTT levels,
 /// installs the keys TLS derives, and acknowledges what the server sends. It follows one
@@ -19,7 +21,7 @@ namespace Curl.Quic;
 /// out of its 1-RTT packets, and a stream or flow control violation closes the connection
 /// with its transport error.
 /// </summary>
-public sealed class QuicClientHandshake : IDisposable
+public sealed class QuicClientConnectionState : IDisposable
 {
     private readonly QuicClientSettings settings;
 
@@ -67,13 +69,13 @@ public sealed class QuicClientHandshake : IDisposable
 
     private bool packetOpened;
 
-    /// <summary>Initializes a new instance of the <see cref="QuicClientHandshake" /> class: chooses the connection IDs and derives the Initial keys.</summary>
+    /// <summary>Initializes a new instance of the <see cref="QuicClientConnectionState" /> class: chooses the connection IDs and derives the Initial keys.</summary>
     /// <param name="settings">What the handshake offers.</param>
     /// <param name="random">Where connection IDs, reset tokens, the TLS client random and key shares come from.</param>
     /// <param name="verifier">Verifies the server's certificate chain.</param>
     /// <param name="timeProvider">The clock loss detection, the probe timeout and the ACK Delay run on.</param>
     /// <exception cref="ArgumentOutOfRangeException">The connection ID length is not 8 to 20 bytes.</exception>
-    public QuicClientHandshake(QuicClientSettings settings, ITlsRandomSource random, IServerCertificateVerifier verifier, TimeProvider timeProvider)
+    public QuicClientConnectionState(QuicClientSettings settings, ITlsRandomSource random, IServerCertificateVerifier verifier, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(random);

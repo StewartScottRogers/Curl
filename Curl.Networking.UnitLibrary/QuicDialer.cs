@@ -149,7 +149,7 @@ public sealed class QuicDialer
             return (Failed(request, endPoint, openFailure!), true);
         }
 
-        var handshake = new QuicClientHandshake(new QuicClientSettings { Tls = tls }, _random, verifier, _timeProvider);
+        var handshake = new QuicClientConnectionState(new QuicClientSettings { Tls = tls }, _random, verifier, _timeProvider);
         var (failure, cancellation) = await RunHandshakeAsync(handshake, channel, handshakeTimeout, cancellationToken).ConfigureAwait(false);
         if (failure is null && cancellation is null)
         {
@@ -237,7 +237,7 @@ public sealed class QuicDialer
     // The channel's socket failing is curl's recvfrom() failure, exit 56; a cancellation is
     // handed back for the caller to rethrow once it has disposed the handshake and channel.
     private async ValueTask<(QuicHandshakeFailure? Failure, ExceptionDispatchInfo? Cancellation)> RunHandshakeAsync(
-        QuicClientHandshake handshake,
+        QuicClientConnectionState handshake,
         IDatagramChannel channel,
         TimeSpan? handshakeTimeout,
         CancellationToken cancellationToken)
@@ -269,7 +269,7 @@ public sealed class QuicDialer
     private MultiplexedConnectResult Connected(
         QuicDialRequest request,
         IPEndPoint endPoint,
-        QuicClientHandshake handshake,
+        QuicClientConnectionState handshake,
         IDatagramChannel channel,
         HandBuiltCertificateVerifier verifier)
     {

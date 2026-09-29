@@ -11,9 +11,9 @@ public sealed class QuicConnectionCloseTests
     public void CloseWithApplicationError_EndOfANormalConnection_SendsOneApplicationCloseWithH3NoError()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
 
-        QuicClientHandshakeTests.Exchange(client, server, client.CloseWithApplicationError(0x100));
+        QuicClientConnectionStateTests.Exchange(client, server, client.CloseWithApplicationError(0x100));
 
         QuicConnectionCloseFrame close = Sent<QuicConnectionCloseFrame>(server).Single();
         Assert.AreEqual(0x100UL, close.ErrorCode);
@@ -28,7 +28,7 @@ public sealed class QuicConnectionCloseTests
     public void Receive_ServerCloseAfterTheHandshake_DrainsWithExit56(ulong errorCode)
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
         QuicConnectionCloseFrame close = new(errorCode, 0, "bye"u8.ToArray());
 
         IReadOnlyList<byte[]> answer = client.Receive(server.Protect(QuicPacketType.OneRtt, close));
@@ -45,7 +45,7 @@ public sealed class QuicConnectionCloseTests
     public void Receive_StatelessResetAfterTheHandshake_DrainsWithExit56()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
 
         IReadOnlyList<byte[]> answer = client.Receive(StatelessReset(server.StatelessResetToken, 30));
 
@@ -60,7 +60,7 @@ public sealed class QuicConnectionCloseTests
     public void Receive_DatagramsThatAreNotAStatelessReset_AreDropped()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
         byte[] token = server.StatelessResetToken;
         byte[] unusedConnectionIdToken = [.. Enumerable.Repeat((byte)7, 16)];
         byte[] longHeader = StatelessReset(token, 30);
@@ -82,7 +82,7 @@ public sealed class QuicConnectionCloseTests
     {
         ManualTimerTimeProvider clock = new();
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server, clock: clock);
+        using QuicClientConnectionState client = Connect(server, clock: clock);
         Assert.AreEqual(TimeSpan.FromSeconds(15), client.TimeUntilIdleTimer);
         Assert.IsEmpty(client.OnIdleTimer());
 
@@ -113,7 +113,7 @@ public sealed class QuicConnectionCloseTests
     {
         ManualTimerTimeProvider clock = new();
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server, clock: clock);
+        using QuicClientConnectionState client = Connect(server, clock: clock);
 
         clock.Advance(10_000);
         client.Receive(server.Protect(QuicPacketType.OneRtt, new QuicPingFrame()));
@@ -129,7 +129,7 @@ public sealed class QuicConnectionCloseTests
     public void TimeUntilIdleTimer_BothSidesTimeouts_KeepAliveAtHalfTheSmallerNonZero(ulong clientTimeout, ulong serverTimeout, long expectedMilliseconds)
     {
         using QuicTestServer server = new() { ConfigureTransportParameters = parameters => parameters with { MaxIdleTimeout = serverTimeout } };
-        using QuicClientHandshake client = Connect(server, SmallClientLimits with { MaxIdleTimeout = clientTimeout });
+        using QuicClientConnectionState client = Connect(server, SmallClientLimits with { MaxIdleTimeout = clientTimeout });
 
         Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), client.TimeUntilIdleTimer);
     }
@@ -139,7 +139,7 @@ public sealed class QuicConnectionCloseTests
     {
         ManualTimerTimeProvider clock = new();
         using QuicTestServer server = new() { ConfigureTransportParameters = parameters => parameters with { MaxIdleTimeout = 10 } };
-        using QuicClientHandshake client = Connect(server, clock: clock);
+        using QuicClientConnectionState client = Connect(server, clock: clock);
         long floor = (long)(3 * (client.Recovery.Rtt.ProbeTimeout + client.Recovery.MaxAckDelay)).TotalMilliseconds;
         clock.Advance(5);
         Assert.IsNotEmpty(client.OnIdleTimer());
@@ -158,7 +158,7 @@ public sealed class QuicConnectionCloseTests
     [TestMethod]
     public void TimeUntilIdleTimer_BeforeTheHandshakeCompletes_IsInfinite()
     {
-        using QuicClientHandshake client = QuicHandshakeTest.Client();
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client();
         client.Start();
 
         Assert.AreEqual(Timeout.InfiniteTimeSpan, client.TimeUntilIdleTimer);
