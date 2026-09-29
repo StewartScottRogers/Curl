@@ -8,7 +8,7 @@ depends-on: [BL-537]
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-774 — Cancel an SMTP SASL exchange with * on an undecodable challenge and try the next mechanism
 
@@ -28,11 +28,11 @@ When an SMTP server sends a 334 challenge that a challenge-decoding mechanism (C
 ## Acceptance criteria
 
 - [x] Before any code change, `Notes` holds curl 8.21.0's request lines, stderr and exit code measured with `Record-CurlExchange.ps1 -Smtp` for two cases: (a) server offers `AUTH CRAM-MD5 PLAIN` and answers `AUTH CRAM-MD5` with a 334 whose text is not valid base64; (b) server offers only `AUTH CRAM-MD5` with the same bad challenge.
-- [ ] Tests in `Curl.Protocol.Smtp.UnitTests`, driven through a fake connection and a fake SASL authenticator, pin for case (a) the `*` cancel line, the read of the server's reply, the retry `AUTH PLAIN ...` and success; and for case (b) the `*` cancel line, the final exit code (`CurlExitCode` 67 unless the measurement says otherwise) and stderr text, all as measured.
-- [ ] Mechanisms that do not decode their challenge (PLAIN, LOGIN, EXTERNAL, XOAUTH2, OAUTHBEARER) keep the ADR-0133 behaviour; an existing or new test pins it.
-- [ ] ADR-0133 has an amendment section stating the cancel-and-retry behaviour for challenge-decoding mechanisms and the curl version measured.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes; no test needs `TestCategory=Integration`.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` reports 100% line and 100% branch coverage and no failing member.
+- [x] Tests in `Curl.Protocol.Smtp.UnitTests`, driven through a fake connection and a fake SASL authenticator, pin for case (a) the `*` cancel line, the read of the server's reply, the retry `AUTH PLAIN ...` and success; and for case (b) the `*` cancel line, the final exit code (`CurlExitCode` 67 unless the measurement says otherwise) and stderr text, all as measured.
+- [x] Mechanisms that do not decode their challenge (PLAIN, LOGIN, EXTERNAL, XOAUTH2, OAUTHBEARER) keep the ADR-0133 behaviour; an existing or new test pins it.
+- [x] ADR-0133 has an amendment section stating the cancel-and-retry behaviour for challenge-decoding mechanisms and the curl version measured.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes; no test needs `TestCategory=Integration`.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` reports 100% line and 100% branch coverage and no failing member.
 
 ## Notes
 
@@ -48,33 +48,15 @@ Extra: EHLO `AUTH NTLM DIGEST-MD5 LOGIN`, every AUTH answered `334 !!!notbase64`
 `AUTH DIGEST-MD5` / `*` / `< 334 odd` (read and ignored) / `AUTH NTLM` / `< 334 !!!notbase64` / Type 1 sent (NTLM's first 334 is not read) / 502 -> exit 67 `Login denied`.
 Extra: DIGEST-MD5 with a valid-base64 but meaningless challenge (`bm9ub25jZT0x`) -> exit 94 on the Schannel (SSPI) build, nothing sent; out of scope here (not a base64 failure), `Respond` null keeps ADR-0133's 67.
 
-### Design (implemented, uncommitted in lane-2 - see Log)
+### Design (implemented)
 
 From curl's `lib/sasl.c`: `get_server_message` treats empty text or text starting `=` as an empty message, and a base64 failure is `CURLE_BAD_CONTENT_ENCODING`, which `Curl_sasl_continue` answers with `*` (`SASL_CANCEL`); on the next reply, whatever it is, the mechanism is XORed out of `authmechs` and `Curl_sasl_start` runs again; no mechanism left is `SASL_IDLE`, which `smtp_state_auth_resp` fails as 67 "Authentication cancelled". Mechanisms that call `get_server_message`: GSSAPI (every challenge), CRAM-MD5, DIGEST-MD5 (first only; `rspauth` is not read) and NTLM (Type 2, the first challenge its exchange answers, since Type 1 is the pending initial response).
 
-- `SmtpSaslAuthentication`: `ExchangeAsync` returns `ExchangeOutcome` (Accepted/Refused/Cancelled); `AuthenticateAsync` loops `ChooseMechanism` over `offered`, removing a cancelled mechanism; none left after a cancel -> `SmtpSessionMessages.AuthenticationCancelled`. `DecodeChallenge(reply, mechanism, index)` returns null (cancel) only for a non-base64 challenge that `ReadsChallenge` (GSSAPI any index; CRAM-MD5/DIGEST-MD5/NTLM index 0). Split into `SendAuthAsync`, `AnswerAsync`, `CancelAsync`, `ReadReplyAsync`, `Outcome` to keep complexity <= 10.
+- `SmtpSaslAuthentication`: `ExchangeAsync` returns `ExchangeOutcome` (Accepted/Refused/Cancelled); `TryMechanismsAsync` loops `ChooseMechanism` over `offered`, removing a cancelled mechanism; none left after a cancel -> `SmtpSessionMessages.AuthenticationCancelled`. `DecodeChallenge(reply, mechanism, index)` returns null (cancel) only for a non-base64 challenge that `ReadsChallenge` (GSSAPI any index; CRAM-MD5/DIGEST-MD5/NTLM index 0). Split into `SendAuthAsync`, `AnswerAsync`, `CancelAsync`, `ReadReplyAsync`, `Outcome` to keep complexity <= 10.
 - Tests: `Curl.Protocol.Smtp.UnitTests/SmtpProtocolHandlerSaslCancelTests.cs` with fake `Fakes/RankedSaslAuthenticator.cs` (cases a and b, reply to `*` of 501/334/235, every mechanism cancelled, cancel then refused, server closes after `*`, empty/`=` CRAM-MD5 challenges, DIGEST-MD5 rspauth, NTLM Type 2, GSSAPI later challenge, and PLAIN/LOGIN/EXTERNAL/XOAUTH2/OAUTHBEARER still handed an empty challenge).
-- Verified in lane-2 on 2026-09-29: Smtp.UnitTests 209 passed; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` 100% line, 100% branch, 0 failing members.
-
-### ADR-0133 amendment to add (text ready)
-
-```
-## Amendment - BL-774, 2026-09-29
-
-Decided by Claude under Stewart's delegation. Measured against curl 8.21.0 (mingw,
-Schannel) with `Record-CurlExchange.ps1 -Smtp`: point 7 now holds only for mechanisms that
-ignore their challenge (PLAIN, LOGIN, EXTERNAL, XOAUTH2, OAUTHBEARER). A `334` whose text
-is not base64 (empty text or text starting `=` is an empty challenge, not a bad one), for a
-mechanism that reads it - every GSSAPI challenge, the first CRAM-MD5, DIGEST-MD5 and NTLM
-answer - is cancelled with `*`. The server's reply to `*` is read whatever it is (501, 334
-and 235 alike), the mechanism is dropped from the offered set and the authenticator chooses
-again; with none left the transfer fails with exit 67 `Authentication cancelled` and no
-`QUIT`. A challenge the exchange cannot answer (`Respond` null) is still 67 `Login denied`.
-```
-
-### Why back in Backlog
-
-Criterion 4 needs `Documentation/Planning/Decisions` (ADR-0133); BL-610, in Doing, touches that folder. Per the shift rules the folder is added to `touches` and the task returns to Backlog; the code above is left uncommitted for the shift to stash, and a rerun needs only to restore it (or redo it from these Notes), paste the amendment, run the gates and tick the boxes.
+- An authenticator that chooses a mechanism the server never offered cannot drop it after a cancel; the loop then stops with `Authentication cancelled` rather than asking again forever (pinned by `ExecuteAsync_CancelledMechanismNotAmongTheOffered_StopsWithAuthenticationCancelled`).
+- Rerun in lane-4 on 2026-09-29: the lane-2 stash was not reachable from this lane, so the code was redone from these Notes. Smtp.UnitTests 211 passed; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` 100% line, 100% branch, 0 failing members (worst CRAP 10); `dotnet build Curl.slnx -warnaserror` clean, fast tests green.
+- ADR-0133 now ends with the "Amendment - BL-774, 2026-09-29" section.
 
 ## Log
 
@@ -82,3 +64,4 @@ Criterion 4 needs `Documentation/Planning/Decisions` (ADR-0133); BL-610, in Doin
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Documentation/Planning/Decisions (ADR-0133 amendment), which BL-610 in Doing touches; code and tests done and uncommitted, see Notes
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. SMTP AUTH cancels a non-base64 challenge for CRAM-MD5, DIGEST-MD5, NTLM and GSSAPI with *, reads the reply, tries the next mechanism, and fails 67 Authentication cancelled when none is left
