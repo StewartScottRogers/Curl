@@ -58,10 +58,18 @@ handshake. HPKE (RFC 9180) is `Curl.Cryptography`'s `Hpke` (BL-677).
    build with a `maximum_name_length` of 0, plus the 16-byte tag. The hello after a
    HelloRetryRequest repeats the extension unchanged (section 6.2.1); a server's
    confirmation is ignored and its `retry_configs` are checked for syntax and dropped.
-7. **No resumption with an offer.** A hello offering ECH to a config does not offer
-   `ResumptionSession`: resuming inside ECH needs the outer hello to carry a GREASE
-   `pre_shared_key` and the ServerHello's `pre_shared_key` judged against whichever hello
-   won, which BL-960 builds. GREASE hellos resume as any other.
+7. **Resumption inside an offer** (amended in BL-960, also decided by Claude under
+   Stewart's delegation). A hello offering ECH offers `ResumptionSession` in the inner
+   hello, its binder computed over the inner hello (and, after a HelloRetryRequest, the
+   inner transcript). The outer hello carries a GREASE `pre_shared_key` (RFC 9849 section
+   6.1.2): a random identity as long as the ticket, a random obfuscated age and a random
+   binder as long as the real one, and `early_data` exactly when the inner hello has it.
+   Early data is offered as without ECH and goes under the inner hello's early secret,
+   the only one an accepting server can derive; a rejecting server cannot open the inner
+   hello, so it drops the early data like any it cannot read. A ServerHello that accepted
+   ECH is judged against the inner hello's ticket; one that rejected it answered the
+   outer hello, whose `pre_shared_key` is GREASE, so selecting any identity there is
+   `illegal_parameter`. GREASE hellos resume as any other.
 
 ## Alternatives considered
 
@@ -84,4 +92,6 @@ handshake. HPKE (RFC 9180) is `Curl.Cryptography`'s `Hpke` (BL-677).
 - BL-711 builds `--ech` on `EncryptedClientHelloConfigs`, `SendEncryptedClientHelloGrease`,
   `EncryptedClientHelloOffered`, `EncryptedClientHelloAccepted`,
   `EncryptedClientHelloRetryConfigs` and the `EchRequired` failure.
-- BL-960 adds resumption inside an ECH offer.
+- BL-960 added resumption inside an ECH offer: `Curl.Tls.UnitTests` resumes through an
+  accepted offer, through a HelloRetryRequest too, checks early data's secret against the
+  server's, and refuses a rejecting ServerHello's `pre_shared_key`.
