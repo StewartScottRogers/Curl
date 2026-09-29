@@ -31,7 +31,7 @@ An ADR fixes how `Curl.Protocol.Ldap.UnitLibrary` speaks LDAPv3 on `IConnection`
 
 ## Notes
 
-- ADR-0165 (number checked unused on every local branch; highest elsewhere 0164). Measured with `Record-CurlExchange.ps1 -Script` and canned BER: Windows curl 8.21.0 (mingw, WinLDAP) and the Linux OpenLDAP build via WSL (curl 8.18.0, OpenLDAP 2.6.10; `-Curl wsl.exe -ListenAddress 172.26.96.1`) - the only OpenLDAP build at hand, recorded as such in the ADR. Recordings: successful search, bind 49, bind 53, bind 49 answered twice (Windows' LDAPv2 retry), search 32.
+- ADR-0166 (first written as ADR-0165; renumbered on rebase because the QUIC handshake ADR took 0165). Measured with `Record-CurlExchange.ps1 -Script` and canned BER: Windows curl 8.21.0 (mingw, WinLDAP) and the Linux OpenLDAP build via WSL (curl 8.18.0, OpenLDAP 2.6.10; `-Curl wsl.exe -ListenAddress 172.26.96.1`) - the only OpenLDAP build at hand, recorded as such in the ADR. Recordings: successful search, bind 49, bind 53, bind 49 answered twice (Windows' LDAPv2 retry), search 32.
 - Key facts: WinLDAP writes constructed lengths as `84 00 00 00 nn` and retries a failed bind as LDAPv2; OpenLDAP writes shortest lengths and maps bind 49 to exit 67 "Login denied" (other bind failures 38 "LDAP: cannot bind"). Default filter goes out as `ObjectClass` (WinLDAP) vs `objectclass` (OpenLDAP). Non-printable values are base64'd with `::` on both; OpenLDAP writes one more `\n` after an entry.
 - Decision: hand-built on IConnection; read with `System.Formats.Asn1` (as ADR-0163), write with a hand-built `LdapBerWriter` because AsnWriter cannot write WinLDAP's long-form lengths; an `LdapDialect` chosen in CurlComposition decides every per-platform difference so tests pin both on every OS.
 - The WSL `exit=$?` echo read 0 because the outer shell expanded it; the exit codes come from curl's own `curl: (NN)` prefix, which is the exit code it returns.
@@ -40,4 +40,4 @@ An ADR fixes how `Curl.Protocol.Ldap.UnitLibrary` speaks LDAPv3 on `IConnection`
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
-- 2026-09-28: Doing -> Done. ADR-0165 fixes how ldap and ldaps are hand-built on IConnection, with measured WinLDAP and OpenLDAP dialects, BER approach, URL model, output format and exits 38, 39 and 67
+- 2026-09-28: Doing -> Done. ADR-0166 fixes how ldap and ldaps are hand-built on IConnection, with measured WinLDAP and OpenLDAP dialects, BER approach, URL model, output format and exits 38, 39 and 67
