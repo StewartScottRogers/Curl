@@ -35,3 +35,4 @@ The I/O-free QUIC client state machine has a name that says it carries the conne
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Networking.UnitLibrary (QuicDialer uses QuicClientHandshake), which BL-850 in Doing touches
+- 2026-09-29: Backlog -> Doing.
