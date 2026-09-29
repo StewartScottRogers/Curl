@@ -52,5 +52,10 @@ public interface ISaslExchange
     /// first is each handler's decision (ADR-0133 decision 6).
     /// </returns>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
+    /// <exception cref="SaslAuthenticationFailedException">
+    /// An authentication function rejected the challenge and curl fails the transfer with the
+    /// exception's exit code, sending nothing more, as the Schannel build does with exit 94 for
+    /// a DIGEST-MD5 challenge SSPI rejects (BL-781).
+    /// </exception>
     ValueTask<byte[]?> RespondAsync(ReadOnlyMemory<byte> challenge, CancellationToken cancellationToken);
 }

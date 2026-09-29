@@ -87,6 +87,9 @@ public sealed class SaslAuthenticator(
     /// <summary>The byte OAUTHBEARER and XOAUTH2 separate their fields with (RFC 7628 section 3.1).</summary>
     private const char FieldSeparator = '\u0001';
 
+    /// <summary>The message curl prints for exit 94, <see cref="CurlExitCode.AuthError" />.</summary>
+    private const string AuthErrorMessage = "An authentication function returned an error";
+
     // Each built mechanism's messages: the initial response first, then the answers to the
     // challenges after it. OAUTHBEARER acknowledges an error continuation with 0x01, as curl
     // does; the others answer only what curl answers.
@@ -172,12 +175,14 @@ public sealed class SaslAuthenticator(
         credentialEncoding.GetBytes(
             UserOf(request) + " " + Convert.ToHexStringLower(HMACMD5.HashData(credentialEncoding.GetBytes(PasswordOf(request)), challenge)));
 
-    // The principal is service/host, as curl's Curl_auth_build_spn makes it.
+    // The principal is service/host, as curl's Curl_auth_build_spn makes it. A challenge SSPI
+    // rejects fails the transfer with exit 94 rather than cancelling it (BL-781).
     private byte[]? DigestMd5Answer(SaslRequest request, byte[] challenge)
     {
         string digestUri = request.ServiceName + "/" + request.Host;
         return answerDigestMd5AsSspi
             ? SaslDigestMd5.AnswerAsSspi(challenge, credentialEncoding, UserOf(request), PasswordOf(request), digestUri, createClientNonce())
+                ?? throw new SaslAuthenticationFailedException(CurlExitCode.AuthError, AuthErrorMessage)
             : SaslDigestMd5.AnswerAsCurl(challenge, credentialEncoding, UserOf(request), PasswordOf(request), digestUri, createClientNonce());
     }
 

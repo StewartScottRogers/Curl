@@ -228,9 +228,31 @@ public sealed class SaslAuthenticatorTests
     [TestMethod]
     public async Task Begin_DigestMd5ChallengeCurlCancels_AnswersNull()
     {
-        ISaslExchange exchange = Authenticator.Begin("DIGEST-MD5", Request(new NetworkCredential("u", "p")));
+        ISaslExchange exchange = new SaslAuthenticator(Windows1252, () => "c", answerDigestMd5AsSspi: false, securityContexts: null)
+            .Begin("DIGEST-MD5", Request(new NetworkCredential("u", "p")));
 
         Assert.IsNull((await RespondAsync(exchange, "realm=\"r\""u8)));
+    }
+
+    // BL-781: curl 8.21.0's Schannel build exits 94, "An authentication function returned an
+    // error", sending nothing after these challenges; the OpenSSL build cancels with exit 67.
+    [TestMethod]
+    [DataRow("realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth\"", DisplayName = "No algorithm")]
+    [DataRow("realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth-int\",algorithm=md5-sess", DisplayName = "qop=\"auth-int\"")]
+    [DataRow("realm=\"localhost\",qop=\"auth\",algorithm=md5-sess", DisplayName = "No nonce")]
+    public async Task Begin_DigestMd5ChallengeSspiRejects_FailsWithAuthError(string challenge)
+    {
+        ISaslExchange sspi = new SaslAuthenticator(Windows1252, () => "c", answerDigestMd5AsSspi: true, securityContexts: null)
+            .Begin("DIGEST-MD5", Request(new NetworkCredential("user", "pencil")));
+        ISaslExchange curl = new SaslAuthenticator(Windows1252, () => "c", answerDigestMd5AsSspi: false, securityContexts: null)
+            .Begin("DIGEST-MD5", Request(new NetworkCredential("user", "pencil")));
+
+        SaslAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<SaslAuthenticationFailedException>(
+            async () => await RespondAsync(sspi, Encoding.ASCII.GetBytes(challenge)));
+
+        Assert.AreEqual(CurlExitCode.AuthError, failure.ExitCode);
+        Assert.AreEqual("An authentication function returned an error", failure.Message);
+        Assert.IsNull(await RespondAsync(curl, Encoding.ASCII.GetBytes(challenge)));
     }
 
     [TestMethod]

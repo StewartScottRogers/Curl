@@ -108,6 +108,11 @@ internal sealed class Pop3Session(
         {
             return TransferResult.Failure(CurlExitCode.TooLarge, Pop3SessionMessages.ResponseLineTooLarge);
         }
+        catch (SaslAuthenticationFailedException failure)
+        {
+            // Nothing more is sent, not even QUIT, as curl's Schannel build does (BL-781).
+            return TransferResult.Failure(failure.ExitCode, failure.Message);
+        }
 
         if (!bodyCutOff)
         {
