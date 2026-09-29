@@ -33,3 +33,4 @@ A `2xx` answering a Negotiate request that carries `WWW-Authenticate: Negotiate 
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
