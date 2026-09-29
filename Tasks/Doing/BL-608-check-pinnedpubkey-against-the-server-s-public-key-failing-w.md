@@ -33,3 +33,4 @@ After the TLS handshake, the server certificate's SubjectPublicKeyInfo is compar
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
