@@ -114,6 +114,11 @@ namespace Curl.Console;
 /// With <paramref name="standardOutputIsTerminal" /> and <c>--styled-output</c>, the <c>-i</c> and <c>-I</c>
 /// header lines written to standard output are styled (<see cref="HeaderStylesFor" />, ADR-0246); off when not given.
 /// </param>
+/// <param name="accountHomeDirectory">
+/// The account's home directory from the user database, where an <c>scp</c> or <c>sftp</c> transfer looks
+/// for <c>.ssh/known_hosts</c> last off Windows (<see cref="SshKnownHostsFileSearch" />); the composition
+/// passes .NET's user profile folder. When not given, only the environment is searched.
+/// </param>
 /// <remarks>
 /// <para>
 /// The command line is parsed after the default config file, so its options apply first and the
@@ -237,7 +242,8 @@ internal sealed class CurlCommandRunner(
     IDataFileReader? configFileReader = null,
     DefaultConfigFileSearch? defaultConfigFileSearch = null,
     Func<string, string?>? readEnvironmentVariable = null,
-    bool terminalRendersStyles = false)
+    bool terminalRendersStyles = false,
+    string? accountHomeDirectory = null)
 {
     /// <summary>
     /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
@@ -282,6 +288,18 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private TransferCredentialLookup CredentialLookup =>
         new(DataFileReader, EnvironmentVariables, runsOnWindows);
+
+    /// <summary>
+    /// Gets where an <c>scp</c> or <c>sftp</c> transfer looks for its known-hosts file, from the runner's
+    /// environment and <c>accountHomeDirectory</c> (BL-576).
+    /// </summary>
+    private SshKnownHostsFileSearch KnownHostsSearch => new(EnvironmentVariables, runsOnWindows, accountHomeDirectory);
+
+    /// <summary>The line curl 8.21.0 prints before exit 2 when an SSH transfer has no known-hosts file.</summary>
+    internal const string KnownHostsFileMissingLine = "curl: Could not find a known_hosts file";
+
+    /// <summary>The warning curl 8.21.0 prints instead when a host key fingerprint was given.</summary>
+    internal const string KnownHostsFileMissingWarning = "Warning: Could not find a known_hosts file";
 
     /// <summary>
     /// Reads no environment variable, created once with <see langword="new" /> so no use of it carries
@@ -456,6 +474,15 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private static readonly TransferResult CannotOpenUploadFileFailure =
         TransferResult.Failure(CurlExitCode.ReadError, MultipartFormBodyBuilder.OpenFailedMessage);
+
+    /// <summary>
+    /// The result of an <c>scp</c> or <c>sftp</c> transfer with no <c>-k</c>, no <c>--knownhosts</c>, no
+    /// host key fingerprint and no known-hosts file to be found: exit 2 with curl's text for it, before
+    /// any connection, measured on curl 8.21.0 (BL-576 Notes). It is compared by reference, so that
+    /// <see cref="TransferAllAsync" /> stops before the remaining URLs, as curl does.
+    /// </summary>
+    private static readonly TransferResult KnownHostsFileMissingFailure =
+        TransferResult.Failure(CurlExitCode.FailedInit, CurlEasyErrorText.Of(CurlExitCode.FailedInit));
 
     /// <summary>
     /// Standard output, deferring a write failure as curl's stdio buffer does and recording
@@ -2524,8 +2551,8 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// The results, compared by reference, after which no further URL is transferred whatever
     /// the options: a resumed <c>-o</c> file, a <c>-T</c> or <c>-D</c> file that cannot be opened,
-    /// a <c>--create-dirs</c> directory that cannot be created, and an IPFS URL that cannot be
-    /// rewritten or asked for its remote name.
+    /// a <c>--create-dirs</c> directory that cannot be created, an IPFS URL that cannot be
+    /// rewritten or asked for its remote name, and an SSH transfer with no known-hosts file.
     /// </summary>
     private static readonly HashSet<TransferResult> RunEndingFailures = new(ReferenceEqualityComparer.Instance)
     {
@@ -2537,6 +2564,7 @@ internal sealed class CurlCommandRunner(
         IpfsMalformedGatewayOptionFailure,
         IpfsMalformedTargetUrlFailure,
         IpfsRemoteNameFailure,
+        KnownHostsFileMissingFailure,
     };
 
     /// <summary>
@@ -2950,6 +2978,60 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Sets <see cref="RunningTransferState.Ssh" /> for an <c>scp</c> or <c>sftp</c> transfer, resolving its
+    /// known-hosts file as curl 8.21.0's tool does (ADR-0122): none under <c>-k</c>, whatever
+    /// <c>--knownhosts</c> says; else the <c>--knownhosts</c> file; else <see cref="KnownHostsSearch" />'s.
+    /// When none is found, a <c>--hostpubmd5</c> or <c>--hostpubsha256</c> fingerprint lets the transfer
+    /// go on after <c>Warning: Could not find a known_hosts file</c> (hidden by <c>-s</c>); without one,
+    /// <c>curl: Could not find a known_hosts file</c> (hidden by <c>-s</c> unless <c>-S</c>) and
+    /// <see cref="KnownHostsFileMissingFailure" /> end the run before any connection (measured 2026-09-29,
+    /// BL-576 Notes). Any other scheme is left without SSH options.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="url">The URL to transfer.</param>
+    /// <returns><see cref="KnownHostsFileMissingFailure" />, or <see langword="null" /> to go on.</returns>
+    private async Task<TransferResult?> ResolveSshOptionsAsync(CommandLineOptions options, CurlUrl url)
+    {
+        if (!SshOptionsMapping.IsSshScheme(url.Scheme))
+        {
+            return null;
+        }
+
+        string? knownHosts = options.Insecure ? null : options.SshKnownHostsFile ?? KnownHostsSearch.Find(DataFileReader);
+        if (knownHosts is null && !options.Insecure
+            && await ReportKnownHostsFileMissingAsync(options).ConfigureAwait(false) is { } failure)
+        {
+            return failure;
+        }
+
+        Running.Ssh = SshOptionsMapping.FromCommandLine(options, knownHosts);
+        return null;
+    }
+
+    /// <summary>
+    /// Reports that an SSH transfer checked by known hosts has no known-hosts file, for
+    /// <see cref="ResolveSshOptionsAsync" />: a warning when a host key fingerprint was given, and
+    /// otherwise curl's line and <see cref="KnownHostsFileMissingFailure" />.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <returns><see cref="KnownHostsFileMissingFailure" />, or <see langword="null" /> when the transfer goes on.</returns>
+    private async Task<TransferResult?> ReportKnownHostsFileMissingAsync(CommandLineOptions options)
+    {
+        if (options.SshHostPublicKeyMd5 is not null || options.SshHostPublicKeySha256 is not null)
+        {
+            await WriteWarningUnlessSilentAsync(options, KnownHostsFileMissingWarning).ConfigureAwait(false);
+            return null;
+        }
+
+        if (ShowsErrors(options))
+        {
+            await WriteErrorLineAsync(KnownHostsFileMissingLine).ConfigureAwait(false);
+        }
+
+        return KnownHostsFileMissingFailure;
+    }
+
+    /// <summary>
     /// Performs one checked transfer, sending <paramref name="formBody" /> when given, to the file
     /// <see cref="ResolveOutputFileAsync" /> names when it names one, nowhere under <c>--out-null</c>
     /// (<see cref="Stream.Null" />, with the progress meter drawn as for a file) and to standard
@@ -2997,6 +3079,11 @@ internal sealed class CurlCommandRunner(
             return proxyFailure;
         }
 
+        if (await ResolveSshOptionsAsync(options, url).ConfigureAwait(false) is { } sshFailure)
+        {
+            return sshFailure;
+        }
+
         if (outputFile is null)
         {
             bool toStandardOutput = !transfer.DiscardsBody;
@@ -3019,7 +3106,8 @@ internal sealed class CurlCommandRunner(
                 lookedUpCredentials: Running.LookedUpCredentials,
                 ifNoneMatchHeaders: Running.IfNoneMatchHeaders,
                 altSvc: Running.AltSvc,
-                bodyHeaderStyles: toStandardOutput ? HeaderStylesFor(options, url) : null);
+                bodyHeaderStyles: toStandardOutput ? HeaderStylesFor(options, url) : null,
+                ssh: Running.Ssh);
             TransferResult result = toStandardOutput
                 ? await TransferToStandardOutputAsync(follower, options, createAttemptContext).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null).ConfigureAwait(false);
@@ -3618,7 +3706,8 @@ internal sealed class CurlCommandRunner(
                         StartMaxTimeWatchdog(options),
                         Running.LookedUpCredentials,
                         Running.IfNoneMatchHeaders,
-                        Running.AltSvc),
+                        Running.AltSvc,
+                        ssh: Running.Ssh),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);

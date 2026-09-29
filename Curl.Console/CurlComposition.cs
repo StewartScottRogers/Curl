@@ -21,6 +21,8 @@ using Curl.Protocol.Mqtt;
 using Curl.Protocol.Pop3;
 using Curl.Protocol.Rtsp;
 using Curl.Protocol.Smtp;
+using Curl.Protocol.Ssh;
+using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
 using Curl.Protocol.Ws;
@@ -49,7 +51,9 @@ internal static class CurlComposition
     /// <c>Sec-WebSocket-Key</c> and frame mask from <see cref="SystemWebSocketRandomSource" />
     /// (ADR-0128); <c>rtsp</c> over <paramref name="connector" />, sending one <c>OPTIONS *</c>
     /// request per transfer with a pre-emptive <c>Authorization</c> from the same authenticator
-    /// (ADR-0169); and <c>tftp</c> over
+    /// (ADR-0169); <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
+    /// and key files from the disk and offering the Windows curl's libssh2 algorithms on Windows and the
+    /// OpenSSL build's elsewhere (ADR-0122); and <c>tftp</c> over
     /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS
     /// proxy over <paramref name="connector" /> with the proxy credential in the platform's
     /// encoding (ADR-0056, rule 4); and <c>ftp</c> and <c>ftps</c>, which
@@ -126,6 +130,11 @@ internal static class CurlComposition
             new LdapProtocolHandler(recordingConnector, OperatingSystem.IsWindows() ? LdapDialect.WinLdap : LdapDialect.OpenLdap),
             new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()),
             new RtspProtocolHandler(recordingConnector, httpAuthenticator),
+            new SshProtocolHandler(
+                recordingConnector,
+                new PhysicalFileSystem(),
+                OperatingSystem.IsWindows() ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference,
+                CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
             http,
             new RoutingFtpProtocolHandler(http, CreateFtpProtocolHandler(recordingConnector, tlsProvider, dnsResolver)),
         ];
@@ -557,7 +566,8 @@ internal static class CurlComposition
             outputPaths: new PhysicalOutputPaths(),
             defaultConfigFileSearch: DefaultConfigFileSearch.ForProcess,
             readEnvironmentVariable: name => Environment.GetEnvironmentVariable(name),
-            terminalRendersStyles: terminalRendersStyles);
+            terminalRendersStyles: terminalRendersStyles,
+            accountHomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given

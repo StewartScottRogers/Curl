@@ -108,6 +108,12 @@ internal sealed class RunningTransferState(
     internal System.Net.NetworkCredential? LookedUpCredentials { get; set; }
 
     /// <summary>
+    /// Gets or sets the SSH options of an <c>scp</c> or <c>sftp</c> transfer, with the known-hosts file the
+    /// runner resolved (task BL-576); <see langword="null" /> for any other scheme.
+    /// </summary>
+    internal SshOptions? Ssh { get; set; }
+
+    /// <summary>
     /// Gets or sets where the transfer's <c>-v</c> and trace events go once it is set up to connect:
     /// under <c>--trace-ids</c> marked with its IDs (task BL-648); <see cref="NoTransferEvents.Instance" /> until then.
     /// </summary>

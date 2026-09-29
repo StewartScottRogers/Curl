@@ -106,6 +106,10 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// How <c>-i</c> and <c>-I</c> style the header lines they write to <paramref name="output" />, a terminal under
     /// <c>--styled-output</c> (ADR-0246); <see langword="null" /> to write them as they come.
     /// </param>
+    /// <param name="ssh">
+    /// The SSH options of an <c>scp</c> or <c>sftp</c> transfer (<see cref="SshOptionsMapping" />), with the
+    /// known-hosts file the runner resolved; <see langword="null" /> for any other scheme.
+    /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, its
     /// <see cref="TransferContext.ResumeUploadFromUnknownOffset" /> is <c>-C -</c> with a
@@ -132,7 +136,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         NetworkCredential? lookedUpCredentials = null,
         IReadOnlyList<string>? ifNoneMatchHeaders = null,
         AltSvcTransferCache? altSvc = null,
-        StyledHeaderLines? bodyHeaderStyles = null) =>
+        StyledHeaderLines? bodyHeaderStyles = null,
+        SshOptions? ssh = null) =>
         new()
         {
             Url = url,
@@ -180,6 +185,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
                 HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders),
                 altSvc),
             Mail = MailRequestOptionsMapping.FromCommandLine(options, url.Scheme),
+            Ssh = ssh,
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
             Events = EventsOrNone(events),
             TimeProvider = clock,
