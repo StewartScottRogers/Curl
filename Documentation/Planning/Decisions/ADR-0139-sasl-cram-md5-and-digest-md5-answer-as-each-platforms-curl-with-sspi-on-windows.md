@@ -62,3 +62,26 @@ implementation sends an empty user name, as it does for every other mechanism.
 - **Reusing HTTP Digest's parser (`DigestChallengeParameters`).** It reads quoted pairs as
   curl's HTTP code does; curl's SASL code instead finds each key by substring and cuts it at
   fixed buffer sizes, so reusing it would diverge on odd challenges.
+
+## Amendment (2026-09-29, BL-781)
+
+Decided by Claude under Stewart's delegation.
+
+The contract now carries SSPI's exit 94. `ISaslExchange.RespondAsync` may throw
+`SaslAuthenticationFailedException` (in `Curl.Protocol.Abstractions`), carrying an exit code
+and message, the same shape as HTTP's `HttpAuthenticationFailedException` (ADR-0181).
+`SaslAuthenticator` constructed with `answerDigestMd5AsSspi: true` throws it, exit 94 with
+"An authentication function returned an error", for a challenge with no nonce, no
+`algorithm` or no `auth` in its `qop`; the OpenSSL path still answers `null` (cancel, exit 67).
+The SMTP, IMAP and POP3 sessions catch it and fail the transfer with its exit code and
+message, sending nothing more.
+
+Measured with curl 8.21.0 Schannel on 2026-09-29 (`Record-CurlExchange.ps1 -Smtp`, `-Imap`,
+`-Pop3`, challenge `realm="localhost",qop="auth",algorithm=md5-sess,charset=utf-8`): on all
+three protocols curl sent nothing after `AUTH DIGEST-MD5` / `AUTHENTICATE DIGEST-MD5` - no
+answer, no `*`, no `QUIT` or `LOGOUT` - and wrote
+`curl: (94) An authentication function returned an error` to stderr.
+
+An exception rather than a third return value because the failure ends the transfer at once
+from deep inside each handler's exchange loop, as it does in curl, and every other
+`ISaslExchange` stays unchanged.

@@ -1,4 +1,5 @@
 using Curl.Networking;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
 
@@ -6,18 +7,31 @@ namespace Curl.Console;
 /// The production transports one run builds, and the pieces they were built from, kept
 /// so the composition can be checked without opening a socket.
 /// </summary>
-/// <param name="DnsResolver">The one resolver both connectors share.</param>
+/// <param name="DnsResolver">
+/// The one resolver both connectors share: <see cref="SystemDnsResolver" />, or
+/// <see cref="DnsServerResolver" /> when a c-ares option is given (BL-694).
+/// </param>
 /// <param name="TimeProvider">The clock both connectors share.</param>
 /// <param name="TcpDialer">Opens the plaintext TCP connections <see cref="TcpConnector" /> dials.</param>
 /// <param name="TlsClientOptions">The settings <see cref="TlsProvider" /> applies to every handshake.</param>
-/// <param name="TlsProvider">Upgrades a TCP connection to TLS with <see cref="System.Net.Security.SslStream" />.</param>
+/// <param name="TlsProvider">
+/// Upgrades a TCP connection to TLS with the client <see cref="TlsClientRouting" /> chooses for
+/// <see cref="TlsClientOptions" />: <see cref="SslStreamTlsProvider" /> or <see cref="HandBuiltTlsProvider" />.
+/// </param>
 /// <param name="ProxyTlsClientOptions">The settings <see cref="ProxyTlsProvider" /> applies to the handshake to an HTTPS proxy.</param>
-/// <param name="ProxyTlsProvider">Runs the handshake to an HTTPS proxy with <see cref="System.Net.Security.SslStream" />.</param>
+/// <param name="ProxyTlsProvider">Runs the handshake to an HTTPS proxy with the client <see cref="TlsClientRouting" /> chooses for <see cref="ProxyTlsClientOptions" />.</param>
 /// <param name="ProxyTunnelOptions">
 /// The <c>User-Agent</c> and credential encoding of the CONNECT request <see cref="TcpConnector" />
 /// sends to tunnel through an HTTP proxy.
 /// </param>
-/// <param name="TcpConnector">Connects the TCP protocols, with TLS when the target asks for it.</param>
+/// <param name="QuicDialer">
+/// Opens the QUIC connections <see cref="TcpConnector" /> hands it for <c>--http3</c> and
+/// <c>--http3-only</c>, judging the server's certificate with <see cref="TlsClientOptions" /> (ADR-0144).
+/// </param>
+/// <param name="TcpConnector">
+/// Connects the TCP protocols, with TLS when the target asks for it, and resolves each QUIC
+/// connection's host for <see cref="QuicDialer" />.
+/// </param>
 /// <param name="UdpDatagramConnector">Opens the UDP channels the datagram protocols use.</param>
 /// <param name="PoolingConnector">
 /// The run's one connection pool over <see cref="TcpConnector" />: every TCP handler connects
@@ -25,14 +39,15 @@ namespace Curl.Console;
 /// run disposes it when it ends (ADR-0050).
 /// </param>
 internal sealed record CurlTransports(
-    SystemDnsResolver DnsResolver,
+    IDnsResolver DnsResolver,
     TimeProvider TimeProvider,
     TcpDialer TcpDialer,
     TlsClientOptions TlsClientOptions,
-    SslStreamTlsProvider TlsProvider,
+    ITlsProviderWithWarnings TlsProvider,
     TlsClientOptions ProxyTlsClientOptions,
-    SslStreamTlsProvider ProxyTlsProvider,
+    ITlsProviderWithWarnings ProxyTlsProvider,
     HttpProxyTunnelOptions ProxyTunnelOptions,
+    QuicDialer QuicDialer,
     TcpConnector TcpConnector,
     UdpDatagramConnector UdpDatagramConnector,
     PoolingConnector PoolingConnector);

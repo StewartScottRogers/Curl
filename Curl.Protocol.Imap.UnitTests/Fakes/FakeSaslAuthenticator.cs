@@ -47,12 +47,12 @@ public sealed class FakeSaslAuthenticator(string mechanism, byte[]? initialRespo
 
         public string Mechanism => mechanism;
 
-        public byte[]? InitialResponse => owner.scriptedInitialResponse;
+        public ValueTask<byte[]?> GetInitialResponseAsync(CancellationToken cancellationToken) => ValueTask.FromResult(owner.scriptedInitialResponse);
 
-        public byte[]? Respond(ReadOnlySpan<byte> challenge)
+        public ValueTask<byte[]?> RespondAsync(ReadOnlyMemory<byte> challenge, CancellationToken cancellationToken)
         {
             owner.Challenges.Add(challenge.ToArray());
-            return answersGiven < owner.scriptedAnswers.Length ? owner.scriptedAnswers[answersGiven++] : null;
+            return ValueTask.FromResult(answersGiven < owner.scriptedAnswers.Length ? owner.scriptedAnswers[answersGiven++] : null);
         }
     }
 }

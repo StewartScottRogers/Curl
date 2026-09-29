@@ -82,6 +82,24 @@ public sealed class TelnetProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ContextWithEvents_PassesThemToTheConnectTargetSoTheConnectLinesAreReported()
+    {
+        var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
+        var events = new IgnoringTransferEvents();
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse("telnet://example.com/"),
+            Output = new MemoryStream(),
+            Upload = new MemoryStream(),
+            Events = events,
+        };
+
+        await new TelnetProtocolHandler(connector).ExecuteAsync(context);
+
+        Assert.AreSame(events, connector.Targets.Single().Events);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ContextWithoutProxy_ConnectsDirectly()
     {
         var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));

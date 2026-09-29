@@ -63,11 +63,15 @@ refusal stops the loop.
    line (100) send nothing more.
 5. `%{size_download}` is the bytes written and `%{response_code}` the last command reply's
    code; `QUIT`'s reply changes neither.
-6. Commands go out as Latin-1, like every other SMTP command here, so a character above
-   U+00FF cannot be sent. curl sends its argv bytes, which on Windows are the ANSI code
-   page (measured: `ö` went out as the single byte `F6`) and on Linux and macOS UTF-8.
-   Sending UTF-8 there is a question for `MAIL`, `RCPT` and `VRFY` together and is left to a
-   task of its own.
+6. Amended by BL-776 (2026-09-29): addresses in `MAIL FROM`, `AUTH=`, `RCPT TO` and `VRFY`,
+   and the `-X` command with its recipient, go out as curl's argv bytes
+   (`SmtpCommandLineText`): the system ANSI code page with best fit on Windows (measured on
+   code page 1252: `ö` is `F6`, `€` is `80`, `ł` is `l`) and UTF-8 on Linux and macOS
+   (curl's source sends argv as given). The host part is converted to an IDNA A-label from
+   the text as curl received it, and `SMTPUTF8` is added when those bytes are not all ASCII,
+   so a best-fitted `łx@ł.example` is `<lx@l.example>` without it (measured). The handler
+   picks the host's encoding itself, as `Curl.Console` passes it nothing for SMTP. Commands
+   that do not come from the command line stay Latin-1.
 
 ## Consequences
 
@@ -83,4 +87,7 @@ refusal stops the loop.
 - **Write the whole reply after it completes.** Simpler, but a refused multiline reply would
   print nothing where curl prints its continuation lines (measured `550-first\r\n`).
 - **Send UTF-8 for non-ASCII recipients.** Right for Linux and macOS, wrong for the measured
-  Windows build, and inconsistent with `RCPT TO` until both change together.
+  Windows build; BL-776 sends each platform's argv bytes instead.
+- **Carry the argv encoding on `MailRequestOptions`, as `HttpRequestOptions` does.**
+  Rejected for BL-776: it changes the shared contract in `Curl.Protocol.Abstractions` for
+  one protocol's use; the handler chooses the same encoding from the host it runs on.

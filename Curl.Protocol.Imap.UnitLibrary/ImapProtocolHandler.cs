@@ -101,17 +101,36 @@ public sealed class ImapProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            return await RunSessionAsync(connection, context, implicitTls).ConfigureAwait(false);
+            var session = new ImapSession(
+                new ImapControlChannel(connection, context.Events, context.CancellationToken), tlsProvider, saslAuthenticator, context, implicitTls);
+            TransferResult result;
+            await using (session.ConfigureAwait(false))
+            {
+                result = await session.RunAsync().ConfigureAwait(false);
+            }
+
+            ReportConnectionEnd(context.Events, result, session.Phase, target, connected.ConnectionNumber);
+            return result;
         }
     }
 
-    private async ValueTask<TransferResult> RunSessionAsync(IConnection connection, ITransferContext context, bool implicitTls)
+    /// <summary>
+    /// Writes the lines curl 8.21.0's <c>-v</c> ends an IMAP transfer with (BL-559): a failure's
+    /// message first, when curl reports it (<see cref="ImapSessionMessages.IsWrittenByVerbose" />);
+    /// then <c>Connection #N to host H:P left intact</c> for a success or a failure once the
+    /// literal was through, <c>shutting down connection #N</c> for one while logged in, and
+    /// <c>closing connection #N</c> for one before logging in or inside a literal.
+    /// </summary>
+    private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, ImapSessionPhase phase, ConnectTarget target, long connectionNumber)
     {
-        var session = new ImapSession(
-            new ImapControlChannel(connection, context.CancellationToken), tlsProvider, saslAuthenticator, context, implicitTls);
-        await using (session.ConfigureAwait(false))
+        if (result.ExitCode != CurlExitCode.Ok && ImapSessionMessages.IsWrittenByVerbose(result.ErrorMessage!))
         {
-            return await session.RunAsync().ConfigureAwait(false);
+            events.ReportInfo(result.ErrorMessage!);
         }
+
+        events.ReportInfo(
+            result.ExitCode == CurlExitCode.Ok || phase == ImapSessionPhase.Completing ? ImapInfoLines.LeftIntact(connectionNumber, target.Host, target.Port)
+            : phase == ImapSessionPhase.Performing ? ImapInfoLines.ShuttingDown(connectionNumber)
+            : ImapInfoLines.Closing(connectionNumber));
     }
 }

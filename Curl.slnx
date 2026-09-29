@@ -61,8 +61,16 @@
   <Project Path="Curl.Core.UnitTests/Curl.Core.UnitTests.csproj" />
   <Project Path="Curl.Cryptography.UnitLibrary/Curl.Cryptography.UnitLibrary.csproj" />
   <Project Path="Curl.Cryptography.UnitTests/Curl.Cryptography.UnitTests.csproj" />
+  <Project Path="Curl.Http2.UnitLibrary/Curl.Http2.UnitLibrary.csproj" />
+  <Project Path="Curl.Http2.UnitTests/Curl.Http2.UnitTests.csproj" />
+  <Project Path="Curl.Http3.UnitLibrary/Curl.Http3.UnitLibrary.csproj" />
+  <Project Path="Curl.Http3.UnitTests/Curl.Http3.UnitTests.csproj" />
+  <Project Path="Curl.Kerberos.UnitLibrary/Curl.Kerberos.UnitLibrary.csproj" />
+  <Project Path="Curl.Kerberos.UnitTests/Curl.Kerberos.UnitTests.csproj" />
   <Project Path="Curl.Networking.UnitLibrary/Curl.Networking.UnitLibrary.csproj" />
   <Project Path="Curl.Networking.UnitTests/Curl.Networking.UnitTests.csproj" />
+  <Project Path="Curl.Ntlm.UnitLibrary/Curl.Ntlm.UnitLibrary.csproj" />
+  <Project Path="Curl.Ntlm.UnitTests/Curl.Ntlm.UnitTests.csproj" />
   <Project Path="Curl.Output.UnitLibrary/Curl.Output.UnitLibrary.csproj" />
   <Project Path="Curl.Output.UnitTests/Curl.Output.UnitTests.csproj" />
   <Project Path="Curl.Protocol.Abstractions.UnitLibrary/Curl.Protocol.Abstractions.UnitLibrary.csproj" />
@@ -99,6 +107,12 @@
   <Project Path="Curl.Protocol.Tftp.UnitTests/Curl.Protocol.Tftp.UnitTests.csproj" />
   <Project Path="Curl.Protocol.Ws.UnitLibrary/Curl.Protocol.Ws.UnitLibrary.csproj" />
   <Project Path="Curl.Protocol.Ws.UnitTests/Curl.Protocol.Ws.UnitTests.csproj" />
+  <Project Path="Curl.Quic.UnitLibrary/Curl.Quic.UnitLibrary.csproj" />
+  <Project Path="Curl.Quic.UnitTests/Curl.Quic.UnitTests.csproj" />
+  <Project Path="Curl.Tls.UnitLibrary/Curl.Tls.UnitLibrary.csproj" />
+  <Project Path="Curl.Tls.UnitTests/Curl.Tls.UnitTests.csproj" />
+  <Project Path="Curl.Zstandard.UnitLibrary/Curl.Zstandard.UnitLibrary.csproj" />
+  <Project Path="Curl.Zstandard.UnitTests/Curl.Zstandard.UnitTests.csproj" />
 
   <Project Path="Documentation/Documentation.shproj" />
   <Project Path=".claude/Claude.shproj" />

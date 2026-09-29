@@ -8,7 +8,7 @@ namespace Curl.Protocol.Ftp;
 /// Sends commands on an FTP control connection and reads its replies, a line at a time.
 /// </summary>
 /// <param name="connection">The control connection; the caller owns and disposes it.</param>
-/// <param name="cancellationToken">Cancels every send and read.</param>
+/// <param name="cancellationToken">Cancels every send and read, until <see cref="CancellationToken" /> is set.</param>
 /// <remarks>
 /// Commands and replies are Latin-1, so every byte of a percent-decoded path reaches the
 /// server unchanged, as curl sends it. A reply ends at the first line that starts with
@@ -32,6 +32,12 @@ internal sealed class FtpControlChannel(IConnection connection, CancellationToke
     /// </summary>
     /// <param name="secured">The upgraded connection; the caller owns it.</param>
     public void SwitchTo(IConnection secured) => connection = secured;
+
+    /// <summary>
+    /// Gets or sets the token that cancels every send and read: the connect phase's limit
+    /// while the session logs in, the transfer's afterwards (BL-512).
+    /// </summary>
+    public CancellationToken CancellationToken { get; set; } = cancellationToken;
 
     /// <summary>
     /// The most bytes a reply line may hold before its LF, so that the line with its LF is
@@ -58,8 +64,8 @@ internal sealed class FtpControlChannel(IConnection connection, CancellationToke
         byte[] line = Encoding.Latin1.GetBytes(command + "\r\n");
         try
         {
-            await connection.WriteAsync(line, cancellationToken).ConfigureAwait(false);
-            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await connection.WriteAsync(line, CancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(CancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (IOException)
@@ -126,7 +132,7 @@ internal sealed class FtpControlChannel(IConnection connection, CancellationToke
         bufferStart = 0;
         try
         {
-            bufferEnd = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            bufferEnd = await connection.ReadAsync(buffer, CancellationToken).ConfigureAwait(false);
         }
         catch (IOException)
         {

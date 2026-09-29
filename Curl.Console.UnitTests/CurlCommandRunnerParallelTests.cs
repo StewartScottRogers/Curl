@@ -10,24 +10,25 @@ namespace Curl.Console;
 /// <c>--fail-early</c> the running transfers aborted with exit 42 and the queued ones ended with the
 /// first failure's code, both reported in command-line order after it. Each case is one of the ADR's
 /// rows measured on curl 8.21.0 (Schannel), with <see cref="HeldTransferHandler" /> ending the transfers
-/// in the measured order instead of real delays.
+/// in the measured order instead of real delays. Each of the ADR's URLs is on a host of its own, so
+/// <see cref="ParallelHostQueue" /> holds none back; the BL-520 cases put several on one host.
 /// </summary>
 [TestClass]
 public sealed class CurlCommandRunnerParallelTests
 {
-    private const string A = "http://h/a";
+    private const string A = "http://a.h/a";
 
-    private const string B = "http://h/b";
+    private const string B = "http://b.h/b";
 
-    private const string C = "http://h/c";
+    private const string C = "http://c.h/c";
 
-    private const string D = "http://h/d";
+    private const string D = "http://d.h/d";
 
-    private const string F = "http://h/f";
+    private const string F = "http://f.h/f";
 
-    private const string M = "http://h/m";
+    private const string M = "http://m.h/m";
 
-    private const string R = "http://h/r";
+    private const string R = "http://r.h/r";
 
     private const string MissingFile = "Could not open file /nonexistent/missing.txt";
 
@@ -102,14 +103,14 @@ public sealed class CurlCommandRunnerParallelTests
         Task<int> run = RunAsync(http, ["-Z", "-s", "-w", "%{urlnum} %{url} %{exitcode}\\n", A, F, C]);
         await Task.WhenAll(http.WhenStartedAsync("/a"), http.WhenStartedAsync("/f"), http.WhenStartedAsync("/c"));
         http.Finish("/f", "from-file\n");
-        await standardOutput.WhenEndsWithAsync("1 http://h/f 0\n");
+        await standardOutput.WhenEndsWithAsync("1 http://f.h/f 0\n");
         http.Finish("/a", "from-conn1\n");
-        await standardOutput.WhenEndsWithAsync("0 http://h/a 0\n");
+        await standardOutput.WhenEndsWithAsync("0 http://a.h/a 0\n");
         http.Finish("/c", "from-conn2\n");
 
         Assert.AreEqual(0, await run);
         Assert.AreEqual(
-            "from-file\n1 http://h/f 0\nfrom-conn1\n0 http://h/a 0\nfrom-conn2\n2 http://h/c 0\n",
+            "from-file\n1 http://f.h/f 0\nfrom-conn1\n0 http://a.h/a 0\nfrom-conn2\n2 http://c.h/c 0\n",
             standardOutput.Text);
     }
 
@@ -281,6 +282,94 @@ public sealed class CurlCommandRunnerParallelTests
 
         Assert.AreEqual(26, exitCode);
         Assert.IsEmpty(http.Started);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OneHostWithoutParallelImmediate_StartsTheOthersOnceTheFirstHasEnded()
+    {
+        // BL-520: -Z -s http://127.0.0.1/a /b /c: /b and /c connect once /a has ended.
+        HeldTransferHandler http = new();
+
+        Task<int> run = RunAsync(http, ["-Z", "-s", "http://h/1", "http://h/2", "http://h/3"]);
+        await http.WhenStartedAsync("/1");
+        Assert.HasCount(1, http.Started);
+        http.Finish("/1", "1");
+        await Task.WhenAll(http.WhenStartedAsync("/2"), http.WhenStartedAsync("/3"));
+        http.Finish("/2", "2");
+        http.Finish("/3", "3");
+
+        Assert.AreEqual(0, await run);
+        Assert.AreEqual(2, http.MostRunningAtOnce);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OneHostWithParallelImmediate_StartsEveryTransferAtOnce()
+    {
+        // BL-520: -Z --parallel-immediate -s http://127.0.0.1/a /b /c: three connections at once.
+        HeldTransferHandler http = new();
+
+        Task<int> run = RunAsync(http, ["-Z", "--parallel-immediate", "-s", "http://h/1", "http://h/2", "http://h/3"]);
+        await Task.WhenAll(http.WhenStartedAsync("/1"), http.WhenStartedAsync("/2"), http.WhenStartedAsync("/3"));
+        http.Finish("/1", "1");
+        http.Finish("/2", "2");
+        http.Finish("/3", "3");
+
+        Assert.AreEqual(0, await run);
+        Assert.AreEqual(3, http.MostRunningAtOnce);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ParallelMaxHostOne_RunsOneAtATimeToTheHostAndOtherHostsAlongside()
+    {
+        HeldTransferHandler http = new();
+
+        Task<int> run = RunAsync(http, ["-Z", "--parallel-immediate", "--parallel-max-host", "1", "-s", "http://h/1", "http://h/2", "http://o/3"]);
+        await Task.WhenAll(http.WhenStartedAsync("/1"), http.WhenStartedAsync("/3"));
+        Assert.HasCount(2, http.Started);
+        http.Finish("/1", "1");
+        await http.WhenStartedAsync("/2");
+        http.Finish("/2", "2");
+        http.Finish("/3", "3");
+
+        Assert.AreEqual(0, await run);
+        Assert.AreEqual(2, http.MostRunningAtOnce);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TransferWaitingForItsHost_KeepsItsParallelMaxSlot()
+    {
+        // BL-520: -Z --parallel-max 2 --parallel-max-host 1 --parallel-immediate A B C, C on another
+        // host: C starts only once A has ended, B holding the second slot while it waits.
+        HeldTransferHandler http = new();
+
+        Task<int> run = RunAsync(
+            http,
+            ["-Z", "--parallel-max", "2", "--parallel-max-host", "1", "--parallel-immediate", "-s", "http://h/1", "http://h/2", "http://o/3"]);
+        await http.WhenStartedAsync("/1");
+        Assert.HasCount(1, http.Started);
+        http.Finish("/1", "1");
+        await Task.WhenAll(http.WhenStartedAsync("/2"), http.WhenStartedAsync("/3"));
+        http.Finish("/2", "2");
+        http.Finish("/3", "3");
+
+        Assert.AreEqual(0, await run);
+        Assert.AreEqual(2, http.MostRunningAtOnce);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_FailEarlyWithATransferWaitingForItsHost_ReportsItAsAborted()
+    {
+        HeldTransferHandler http = new();
+
+        Task<int> run = RunAsync(
+            http,
+            ["-Z", "--fail-early", "-s", "-w", "%{urlnum} %{exitcode}\\n", "http://h/1", "http://h/2", "http://o/3"]);
+        await Task.WhenAll(http.WhenStartedAsync("/1"), http.WhenStartedAsync("/3"));
+        http.Fail("/3", CurlExitCode.CouldntConnect, CouldNotConnect);
+
+        Assert.AreEqual(7, await run);
+        Assert.AreEqual("2 7\n0 42\n1 42\n", standardOutput.Text);
+        CollectionAssert.AreEquivalent(new[] { "/1", "/3" }, http.Started.ToArray());
     }
 
     [TestMethod]

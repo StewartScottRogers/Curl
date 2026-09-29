@@ -505,6 +505,24 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow("http://127.0.0.1:18203/next", true)]
+    [DataRow("http://localhost:18203/next", false)]
+    [DataRow("http://127.0.0.1:18204/next", false)]
+    [DataRow("https://127.0.0.1:18203/next", false)]
+    public async Task FollowAsync_AltSvcRoute_IsKeptOnlyForAHopToTheSameOrigin(string target, bool kept)
+    {
+        // The route was looked up for the first URL's origin (BL-623); another origin never dials it.
+        AltSvcRoute route = new("h1", new AltSvcAlternative("h1", "127.0.0.1", 18443));
+        ScriptedHandler handler = new(Redirect(302, target), Redirect(302, target), Ok(200, 0));
+
+        await Follow(handler, Context(Location() with { AltSvcRoute = route }));
+
+        Assert.AreSame(route, handler.Contexts[0].Http!.AltSvcRoute);
+        Assert.AreEqual(kept ? route : null, handler.Contexts[1].Http!.AltSvcRoute);
+        Assert.AreEqual(kept ? route : null, handler.Contexts[2].Http!.AltSvcRoute);
+    }
+
+    [TestMethod]
     [DataRow("http://127.0.0.1:18203/next", false)]
     [DataRow("HTTP://127.0.0.1:80/", false)]
     [DataRow("http://localhost:18203/next", true)]
@@ -521,6 +539,57 @@ public sealed class RedirectFollowerTests
         Assert.IsNotNull(second.Credentials);
         Assert.AreEqual("zz", second.Http!.BearerToken);
         CollectionAssert.AreEqual(new[] { "Cookie: a=b" }, second.Http.Headers.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://a:b@127.0.0.1:18814/b", false, "a:b")]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://c:d@127.0.0.1:18814/b", false, "c:d")]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://c:d@localhost:18814/b", false, "c:d")]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://127.0.0.1:18814/b", false, null)]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://localhost:18814/b", false, null)]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://localhost:18814/b", true, null)]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://c@127.0.0.1:18814/b", false, "c:")]
+    [DataRow("http://127.0.0.1:18814/a", "q:r", "http://127.0.0.1:18814/b", false, "q:r")]
+    [DataRow("http://127.0.0.1:18814/a", "q:r", "http://c:d@127.0.0.1:18814/b", false, "q:r")]
+    [DataRow("http://127.0.0.1:18814/a", "q:r", "http://c:d@localhost:18814/b", false, "c:d")]
+    [DataRow("http://127.0.0.1:18814/a", "q:r", "http://localhost:18814/b", false, null)]
+    [DataRow("http://127.0.0.1:18814/a", "q:r", "http://c:d@localhost:18814/b", true, "q:r")]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "q:r", "http://c:d@127.0.0.1:18814/b", false, "q:r")]
+    [DataRow("http://127.0.0.1:18814/a", null, "http://c:d@127.0.0.1:18814/b", false, "c:d")]
+    public async Task FollowAsync_LocationWithUserInformation_SendsCurlsCredentials(
+        string first,
+        string? credentials,
+        string target,
+        bool trusted,
+        string? expected)
+    {
+        // Measured (BL-814 Notes): curl -s -L [--location-trusted] [-u q:r] <first>, 302 to <target>;
+        // the second request's Authorization: Basic decodes to <expected>.
+        ScriptedHandler handler = new(Redirect(302, target), Ok(200, 0));
+
+        await Follow(handler, CredentialContext(first, credentials), new RedirectPolicy { LocationTrusted = trusted });
+
+        Assert.AreEqual(expected, UserAndPassword(handler.Contexts[1].Credentials));
+    }
+
+    [TestMethod]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:x", "http://c:d@127.0.0.1:18814/b", "a:x")]
+    [DataRow("http://127.0.0.1:18814/a", null, "http://c%40e:d%3Af@127.0.0.1:18814/b", "c@e:d:f")]
+    [DataRow("http://127.0.0.1:18814/a", null, "http://:d@127.0.0.1:18814/b", ":d")]
+    [DataRow("http://127.0.0.1:18814/a", null, "http://@127.0.0.1:18814/b", null)]
+    public async Task FollowAsync_LocationUserInformation_IsDecodedAndLosesToOtherCredentials(
+        string first,
+        string? credentials,
+        string target,
+        string? expected)
+    {
+        // First-hop credentials that differ from the first URL's own came from -u; the hop URL's
+        // user information is percent-decoded, and an empty one is none.
+        ScriptedHandler handler = new(Redirect(302, target), Ok(200, 0));
+
+        await Follow(handler, CredentialContext(first, credentials));
+
+        Assert.AreEqual(expected, UserAndPassword(handler.Contexts[1].Credentials));
     }
 
     [TestMethod]
@@ -553,6 +622,77 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual(0, result.Report!.RedirectCount);
         // Measured against curl 8.21.0 on 2026-09-27 (BL-289): -w '[%{redirect_url}]' writes [].
         Assert.IsNull(result.Report.RedirectUrl);
+    }
+
+    [TestMethod]
+    [DataRow("file:///dir/x", "file")]
+    [DataRow("https://127.0.0.1:48523/x", "https")]
+    public async Task FollowAsync_ProtoRedirAllowsButProtoExcludes_Exits1ProtocolDisabledInRedirect(string target, string scheme)
+    {
+        // Measured against curl 8.21.0 on 2026-09-28 (BL-523 Notes): curl -sS -L --proto =http
+        // --proto-redir =http,dict with Location: dict://... -> exit 1, "Protocol "dict" is disabled
+        // (in redirect)"; --proto -https alone refuses a redirect to https the same way.
+        ScriptedHandler handler = new(Redirect(302, target));
+        RedirectPolicy policy = new()
+        {
+            AllowedSchemes = new HashSet<string>(["http", "https", "file"]),
+            AllowedTransferSchemes = new HashSet<string>(["http"]),
+        };
+
+        TransferResult result = await Follow(handler, Context(Location()), policy);
+
+        Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
+        Assert.AreEqual($"Protocol \"{scheme}\" is disabled (in redirect)", result.ErrorMessage);
+        Assert.HasCount(1, handler.Contexts);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_ProtoRedirExcludesFile_Exits1ProtocolDisabledInRedirect()
+    {
+        // curl -sS -L --proto-redir =http,dict, Location: file:///dir/x -> exit 1,
+        // "Protocol "file" is disabled (in redirect)" (BL-523 Notes).
+        ScriptedHandler handler = new(Redirect(302, "file:///dir/x"));
+        RedirectPolicy policy = new() { AllowedSchemes = new HashSet<string>(["http", "dict"]) };
+
+        TransferResult result = await Follow(handler, Context(Location()), policy);
+
+        Assert.AreEqual("Protocol \"file\" is disabled (in redirect)", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_ProtoRedirAndProtoAllowDict_FollowsTheRedirectToDict()
+    {
+        // curl -sS -L --proto-redir =http,dict, Location: dict://127.0.0.1:48523/x -> the dict
+        // request is sent and curl exits 0 (BL-523 Notes).
+        ScriptedHandler handler = new(Redirect(302, "dict://127.0.0.1:48523/x"), Ok(200, 0));
+        RedirectPolicy policy = new()
+        {
+            AllowedSchemes = new HashSet<string>(["http", "dict"]),
+            AllowedTransferSchemes = new HashSet<string>(["http", "dict"]),
+        };
+
+        TransferResult result = await Follow(handler, Context(Location()), policy);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("dict://127.0.0.1:48523/x", handler.Contexts[1].Url.OriginalString);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task FollowAsync_FirstUrlSchemeProtoExcludes_Exits1ProtocolDisabledBeforeAnyRequest(bool location)
+    {
+        // curl -sS --proto =https http://127.0.0.1:48523/ -> exit 1, "Protocol "http" is disabled",
+        // and no connection is opened, with or without -L (BL-523 Notes).
+        ScriptedHandler handler = new(Ok(200, 0));
+        RedirectPolicy policy = new() { AllowedTransferSchemes = new HashSet<string>(["https"]) };
+        HttpRequestOptions http = location ? Location() : new HttpRequestOptions();
+
+        TransferResult result = await Follow(handler, Context(http), policy);
+
+        Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
+        Assert.AreEqual("Protocol \"http\" is disabled", result.ErrorMessage);
+        Assert.IsEmpty(handler.Contexts);
     }
 
     [TestMethod]
@@ -984,6 +1124,19 @@ public sealed class RedirectFollowerTests
             Credentials = credentials ? new NetworkCredential("u", "p") : null,
             TimeProvider = timeProvider ?? TimeProvider.System,
         };
+
+    private static TransferContext CredentialContext(string url, string? credentials) =>
+        new()
+        {
+            Url = CurlUrl.Parse(url),
+            Output = Stream.Null,
+            Http = Location(),
+            Credentials = credentials is null ? null : new NetworkCredential(credentials.Split(':')[0], credentials.Split(':')[1]),
+            TimeProvider = TimeProvider.System,
+        };
+
+    private static string? UserAndPassword(NetworkCredential? credentials) =>
+        credentials is null ? null : $"{credentials.UserName}:{credentials.Password}";
 
     private static Task<TransferResult> Follow(IProtocolHandler handler, ITransferContext context, RedirectPolicy? policy = null) =>
         new RedirectFollower(new ProtocolDispatcher([handler]))

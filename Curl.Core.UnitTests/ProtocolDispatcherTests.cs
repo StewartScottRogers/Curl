@@ -55,6 +55,51 @@ public sealed class ProtocolDispatcherTests
     }
 
     [TestMethod]
+    [DataRow("dict://127.0.0.1:48523/", "dict")]
+    [DataRow("DICT://127.0.0.1:48523/", "dict")]
+    [DataRow("file:///dir/x", "file")]
+    public async Task DispatchAsync_SchemeProtoExcludes_ReturnsExit1ProtocolDisabledAndCallsNoHandler(string url, string scheme)
+    {
+        // Measured against curl 8.21.0 on 2026-09-28 (BL-523 Notes): curl -sS --proto =https
+        // http://127.0.0.1:48523/ -> exit 1, "curl: (1) Protocol "http" is disabled", no connection;
+        // --proto =http file:///dir/x -> "Protocol "file" is disabled".
+        RecordingHandler file = new(TransferResult.Success(0), "file");
+        RecordingHandler dict = new(TransferResult.Success(0), "dict");
+        ProtocolDispatcher dispatcher = new([file, dict]);
+
+        TransferResult result = await dispatcher.DispatchAsync(CreateContext(url), new HashSet<string>(["https"]));
+
+        Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
+        Assert.AreEqual($"Protocol \"{scheme}\" is disabled", result.ErrorMessage);
+        Assert.IsEmpty(file.ReceivedContexts);
+        Assert.IsEmpty(dict.ReceivedContexts);
+    }
+
+    [TestMethod]
+    public async Task DispatchAsync_SchemeProtoAllows_ReachesItsHandler()
+    {
+        TransferResult dictResult = TransferResult.Success(3);
+        RecordingHandler dict = new(dictResult, "dict");
+        ProtocolDispatcher dispatcher = new([dict]);
+
+        TransferResult result = await dispatcher.DispatchAsync(CreateContext("DICT://host/"), new HashSet<string>(["dict"]));
+
+        Assert.AreSame(dictResult, result);
+    }
+
+    [TestMethod]
+    public async Task DispatchAsync_UnservedSchemeProtoExcludes_ReturnsNotSupportedRatherThanDisabled()
+    {
+        // curl -sS --proto =http bogus://127.0.0.1:48523/ -> exit 1, "Protocol "bogus" not supported" (BL-523 Notes).
+        ProtocolDispatcher dispatcher = new([new RecordingHandler(TransferResult.Success(0), "http")]);
+
+        TransferResult result = await dispatcher.DispatchAsync(CreateContext("bogus://127.0.0.1:48523/"), new HashSet<string>(["http"]));
+
+        Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
+        Assert.AreEqual("Protocol \"bogus\" not supported", result.ErrorMessage);
+    }
+
+    [TestMethod]
     [DataRow("file:///x")]
     [DataRow("http://example.com/")]
     [DataRow("dict://host/")]

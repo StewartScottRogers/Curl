@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net.Security;
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Protocol.Abstractions;
@@ -7,8 +8,8 @@ namespace Curl.Authentication;
 
 /// <summary>
 /// Chooses a SASL mechanism as curl 8.21.0 does and answers PLAIN, LOGIN, EXTERNAL, XOAUTH2,
-/// OAUTHBEARER, CRAM-MD5 and DIGEST-MD5 with the bytes curl sends (ADR-0121, ADR-0123,
-/// ADR-0139).
+/// OAUTHBEARER, CRAM-MD5 and DIGEST-MD5 with the bytes curl sends, and GSSAPI and NTLM through
+/// security contexts (ADR-0121, ADR-0123, ADR-0139, ADR-0184).
 /// </summary>
 /// <param name="credentialEncoding">
 /// The encoding the user name, password, authorization identity and token are sent in; see
@@ -23,39 +24,71 @@ namespace Curl.Authentication;
 /// through SSPI; <see langword="false" /> to answer as curl's own code in the OpenSSL build
 /// does (ADR-0139).
 /// </param>
+/// <param name="securityContexts">
+/// Makes the Kerberos and NTLM contexts GSSAPI and NTLM run on, ADR-0142's router in
+/// production; <see langword="null" /> treats both mechanisms as not offered.
+/// </param>
 /// <remarks>
 /// <para>
 /// The preference order is EXTERNAL, GSSAPI, DIGEST-MD5, CRAM-MD5, NTLM, OAUTHBEARER,
-/// XOAUTH2, PLAIN, LOGIN. GSSAPI and NTLM are not built yet (BL-538) and are treated as not
-/// offered.
+/// XOAUTH2, PLAIN, LOGIN.
+/// </para>
+/// <para>
+/// GSSAPI and NTLM run on a context for the SASL service on the server's host
+/// (<c>smtp/host</c>). NTLM's initial response is the Type 1 message and its one answer the
+/// Type 3 message. GSSAPI's is the raw Kerberos token (RFC 4752, not SPNEGO); its answers are
+/// the context's tokens until it is established, then the server's wrapped security-layer
+/// offer is answered with no layer, a zero size and the authorization identity, wrapped
+/// without encryption, as curl's <c>Curl_auth_create_gssapi_security_message</c> does.
 /// </para>
 /// <para>
 /// Every mechanism here has an initial response, LOGIN's being the user name, as curl sends
 /// with <c>--sasl-ir</c>. Without it the handler sends the initial response in answer to the
-/// server's first challenge, and <see cref="ISaslExchange.Respond" /> answers the challenges
+/// server's first challenge, and <see cref="ISaslExchange.RespondAsync" /> answers the challenges
 /// after that: LOGIN's password, and OAUTHBEARER's single <c>0x01</c> byte acknowledging an
 /// error continuation. CRAM-MD5 and DIGEST-MD5 have no initial response and compute their
 /// answers from the server's challenge; DIGEST-MD5 answers the server's <c>rspauth</c>
 /// with an empty response, as curl does.
 /// </para>
 /// </remarks>
-public sealed class SaslAuthenticator(Encoding credentialEncoding, Func<string> createClientNonce, bool answerDigestMd5AsSspi) : ISaslAuthenticator
+public sealed class SaslAuthenticator(
+    Encoding credentialEncoding,
+    Func<string> createClientNonce,
+    bool answerDigestMd5AsSspi,
+    ISecurityContextFactory? securityContexts) : ISaslAuthenticator
 {
     /// <summary>
     /// Initializes an authenticator that answers DIGEST-MD5 as the platform's curl does, with
-    /// a random client nonce.
+    /// a random client nonce, and treats GSSAPI and NTLM as not offered.
     /// </summary>
     /// <param name="credentialEncoding">
     /// The encoding the user name, password, authorization identity and token are sent in;
     /// see <see cref="CredentialEncoding.ForPlatform" />.
     /// </param>
     public SaslAuthenticator(Encoding credentialEncoding)
-        : this(credentialEncoding, DigestClientNonce.CreateRandomHex, OperatingSystem.IsWindows())
+        : this(credentialEncoding, DigestClientNonce.CreateRandomHex, OperatingSystem.IsWindows(), securityContexts: null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes an authenticator that answers DIGEST-MD5 as the platform's curl does, with
+    /// a random client nonce, and GSSAPI and NTLM on the contexts <paramref name="securityContexts" /> makes.
+    /// </summary>
+    /// <param name="credentialEncoding">
+    /// The encoding the user name, password, authorization identity and token are sent in;
+    /// see <see cref="CredentialEncoding.ForPlatform" />.
+    /// </param>
+    /// <param name="securityContexts">Makes the Kerberos and NTLM contexts; ADR-0142's router in production.</param>
+    public SaslAuthenticator(Encoding credentialEncoding, ISecurityContextFactory securityContexts)
+        : this(credentialEncoding, DigestClientNonce.CreateRandomHex, OperatingSystem.IsWindows(), securityContexts)
     {
     }
 
     /// <summary>The byte OAUTHBEARER and XOAUTH2 separate their fields with (RFC 7628 section 3.1).</summary>
     private const char FieldSeparator = '\u0001';
+
+    /// <summary>The message curl prints for exit 94, <see cref="CurlExitCode.AuthError" />.</summary>
+    private const string AuthErrorMessage = "An authentication function returned an error";
 
     // Each built mechanism's messages: the initial response first, then the answers to the
     // challenges after it. OAUTHBEARER acknowledges an error continuation with 0x01, as curl
@@ -70,16 +103,17 @@ public sealed class SaslAuthenticator(Encoding credentialEncoding, Func<string> 
             [SaslMechanismRanking.XOAuth2] = request =>
                 [$"user={UserOf(request)}{FieldSeparator}auth=Bearer {TokenOf(request)}{FieldSeparator}{FieldSeparator}"],
             [SaslMechanismRanking.OAuthBearer] = request =>
-                [OAuthBearerMessage(UserOf(request), request.Host, port: null, TokenOf(request)), FieldSeparator.ToString()],
+                [OAuthBearerMessage(UserOf(request), request.Host, request.Port, TokenOf(request)), FieldSeparator.ToString()],
         };
 
     /// <inheritdoc />
     public string? ChooseMechanism(SaslRequest request, IReadOnlyList<string> offeredMechanisms) =>
-        SaslMechanismRanking.PickFirst(request, offeredMechanisms);
+        SaslMechanismRanking.PickFirst(request, offeredMechanisms, securityContexts is not null);
 
     /// <inheritdoc />
     /// <exception cref="ArgumentException">
-    /// <paramref name="mechanism" /> is not one this authenticator builds.
+    /// <paramref name="mechanism" /> is not one this authenticator builds, or is GSSAPI or NTLM
+    /// and it has no security context factory.
     /// </exception>
     public ISaslExchange Begin(string mechanism, SaslRequest request)
     {
@@ -90,6 +124,14 @@ public sealed class SaslAuthenticator(Encoding credentialEncoding, Func<string> 
             return new ScriptedSaslExchange(name, messages[0], messages[1..]);
         }
 
+        return securityContexts is not null && name is SaslMechanismRanking.Gssapi or SaslMechanismRanking.Ntlm
+            ? BeginOnSecurityContext(name, request, securityContexts)
+            : BeginAnsweringChallenges(name, mechanism, request);
+    }
+
+    // CRAM-MD5 and DIGEST-MD5, computed from the server's challenges.
+    private ChallengeSaslExchange BeginAnsweringChallenges(string name, string mechanism, SaslRequest request)
+    {
         return name switch
         {
             SaslMechanismRanking.CramMd5 => new ChallengeSaslExchange(name, challenge => CramMd5Answer(request, challenge)),
@@ -104,19 +146,28 @@ public sealed class SaslAuthenticator(Encoding credentialEncoding, Func<string> 
     /// <param name="user">The user name, sent as the GS2 authorization identity <c>a=</c>.</param>
     /// <param name="host">The server's host name.</param>
     /// <param name="port">
-    /// The server's port, which curl always sends; <see langword="null" /> leaves the
-    /// <c>port=</c> field out, as curl does for port 0, until <see cref="SaslRequest" />
-    /// carries the port.
+    /// The server's port, <see cref="SaslRequest.Port" />, sent as <c>port=</c>; <c>0</c> leaves
+    /// the field out, as curl does for port 0.
     /// </param>
     /// <param name="token">The bearer token.</param>
     /// <returns>The message, before encoding.</returns>
-    internal static string OAuthBearerMessage(string user, string host, int? port, string token)
+    internal static string OAuthBearerMessage(string user, string host, int port, string token)
     {
-        string portField = port is { } value
-            ? "port=" + value.ToString(CultureInfo.InvariantCulture) + FieldSeparator
+        string portField = port != 0
+            ? "port=" + port.ToString(CultureInfo.InvariantCulture) + FieldSeparator
             : string.Empty;
         return $"n,a={user},{FieldSeparator}host={host}{FieldSeparator}{portField}auth=Bearer {token}{FieldSeparator}{FieldSeparator}";
     }
+
+    // GSSAPI runs on the raw Kerberos mechanism with signing keys for its security-layer
+    // message; NTLM on an NTLM context with none.
+    private SecurityContextSaslExchange BeginOnSecurityContext(string name, SaslRequest request, ISecurityContextFactory contexts) =>
+        name == SaslMechanismRanking.Gssapi
+            ? new SecurityContextSaslExchange(
+                name,
+                contexts.Create(SecurityContextSaslExchange.ContextRequestFor(SecurityMechanism.Kerberos, request) with { MessageProtection = ProtectionLevel.Sign }),
+                credentialEncoding.GetBytes(request.AuthorizationIdentity ?? string.Empty))
+            : new SecurityContextSaslExchange(name, contexts.Create(SecurityContextSaslExchange.ContextRequestFor(SecurityMechanism.Ntlm, request)), securityLayerAuthorizationIdentity: null);
 
     // RFC 2195: the user name, a space, and the HMAC-MD5 of the challenge keyed with the
     // password, in lower-case hexadecimal.
@@ -124,12 +175,14 @@ public sealed class SaslAuthenticator(Encoding credentialEncoding, Func<string> 
         credentialEncoding.GetBytes(
             UserOf(request) + " " + Convert.ToHexStringLower(HMACMD5.HashData(credentialEncoding.GetBytes(PasswordOf(request)), challenge)));
 
-    // The principal is service/host, as curl's Curl_auth_build_spn makes it.
+    // The principal is service/host, as curl's Curl_auth_build_spn makes it. A challenge SSPI
+    // rejects fails the transfer with exit 94 rather than cancelling it (BL-781).
     private byte[]? DigestMd5Answer(SaslRequest request, byte[] challenge)
     {
         string digestUri = request.ServiceName + "/" + request.Host;
         return answerDigestMd5AsSspi
             ? SaslDigestMd5.AnswerAsSspi(challenge, credentialEncoding, UserOf(request), PasswordOf(request), digestUri, createClientNonce())
+                ?? throw new SaslAuthenticationFailedException(CurlExitCode.AuthError, AuthErrorMessage)
             : SaslDigestMd5.AnswerAsCurl(challenge, credentialEncoding, UserOf(request), PasswordOf(request), digestUri, createClientNonce());
     }
 

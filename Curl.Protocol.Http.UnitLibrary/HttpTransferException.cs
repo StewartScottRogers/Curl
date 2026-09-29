@@ -16,4 +16,11 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     /// Gets the curl exit code the transfer reports.
     /// </summary>
     internal CurlExitCode ExitCode { get; } = exitCode;
+
+    /// <summary>
+    /// Gets a value indicating whether the server refused the request's HTTP/3 stream with
+    /// <c>H3_REQUEST_REJECTED</c>, so the handler may send it again on a new connection
+    /// (ADR-0187). The message is then the <c>-v</c> line that reports the refusal.
+    /// </summary>
+    internal bool IsStreamRefused { get; init; }
 }

@@ -74,7 +74,9 @@ try {
         $voice.SetOutputToDefaultAudioDevice()
         try { $voice.SelectVoice('Microsoft Zira Desktop') } catch { }
         foreach ($phrase in $phrases) {
-            $text = [System.Security.SecurityElement]::Escape((Get-Spoken $phrase))
+            # The Surl dark factory whispers on the same PC in the same voice, so every
+            # phrase says whose it is (Stewart, 2026-09-29, BL-901).
+            $text = [System.Security.SecurityElement]::Escape((Get-Spoken "Curl. $phrase"))
             $voice.SpeakSsml("<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'><prosody volume='x-soft' rate='slow' pitch='low'>$text</prosody></speak>")
         }
         $voice.Dispose()

@@ -34,7 +34,8 @@ internal static class CommandLineProtocolSet
     /// <summary>
     /// The schemes curl 8.21.0 knows for these options: the <c>Protocols:</c> line of the Windows (Schannel)
     /// build's <c>curl -V</c>, less <c>ipfs</c> and <c>ipns</c>, which that build's curl tool handles itself and
-    /// its libcurl does not know. The same set on every platform, so a command line reads the same everywhere.
+    /// its libcurl does not know. The same set on every platform, so a command line reads the same everywhere
+    /// (ADR-0189).
     /// </summary>
     internal static FrozenSet<string> KnownSchemes { get; } = FrozenSet.Create(
         StringComparer.OrdinalIgnoreCase,

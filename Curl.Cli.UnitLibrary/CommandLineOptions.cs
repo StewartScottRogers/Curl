@@ -31,6 +31,11 @@ public sealed class CommandLineOptions
     private string? userAwaitingPassword;
     private string? proxyUserAwaitingPassword;
     private HttpAuthSchemes wantedAuthSchemes;
+    private HttpAuthSchemes wantedProxyAuthSchemes;
+    private bool proxyAnyAuthWanted;
+
+    /// <summary>The single proxy schemes curl 8.21.0's tool picks from, first match wins, after <c>--proxy-anyauth</c>.</summary>
+    private static readonly HttpAuthSchemes[] ProxyAuthSchemePrecedence = [HttpAuthSchemes.Negotiate, HttpAuthSchemes.Ntlm, HttpAuthSchemes.Digest];
 
     /// <summary>
     /// Creates the first option group of a command line, with nothing set, and so its own
@@ -137,10 +142,26 @@ public sealed class CommandLineOptions
     public bool ManualRequested { get => globals.ManualRequested; internal set => globals.ManualRequested = value; }
 
     /// <summary>
-    /// Whether an option has asked for information instead of a transfer (<see cref="VersionRequested"/>,
-    /// <see cref="HelpRequested"/> or <see cref="ManualRequested"/>), which ends parsing where it stands.
+    /// <see langword="true"/> when <c>--engine list</c> was given on the command line. Parsing stops there, as
+    /// curl 8.21.0's does; the console prints the build-time engine list and exits 0 instead of transferring.
+    /// An <c>engine list</c> line in a <c>-K</c> file does not set it: curl ignores the request there.
     /// </summary>
-    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested;
+    public bool EngineListRequested { get => globals.EngineListRequested; internal set => globals.EngineListRequested = value; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--dump-ca-embed</c> was given on the command line. Parsing stops there, as
+    /// curl 8.21.0's does; the console writes the embedded CA bundle, which is none (ADR-0151), and exits 0
+    /// instead of transferring. A <c>dump-ca-embed</c> line in a <c>-K</c> file does not set it: curl ignores
+    /// the request there.
+    /// </summary>
+    public bool CaEmbedDumpRequested { get => globals.CaEmbedDumpRequested; internal set => globals.CaEmbedDumpRequested = value; }
+
+    /// <summary>
+    /// Whether an option has asked for information instead of a transfer (<see cref="VersionRequested"/>,
+    /// <see cref="HelpRequested"/>, <see cref="ManualRequested"/>, <see cref="EngineListRequested"/> or
+    /// <see cref="CaEmbedDumpRequested"/>), which ends parsing where it stands.
+    /// </summary>
+    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested || EngineListRequested || CaEmbedDumpRequested;
 
     /// <summary>Records <c>--help</c> and its subject, an empty one read as none.</summary>
     /// <param name="subject">The subject as given, empty when there was none.</param>
@@ -173,6 +194,8 @@ public sealed class CommandLineOptions
         HelpRequested = false;
         HelpSubject = null;
         ManualRequested = false;
+        EngineListRequested = false;
+        CaEmbedDumpRequested = false;
     }
 
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
@@ -231,6 +254,13 @@ public sealed class CommandLineOptions
     /// argument (<c>--trace-time -v</c> shows no times; <c>--trace-time -sv</c> and <c>-v --trace-time</c> do).
     /// </summary>
     public bool TraceTime { get => globals.TraceTime; internal set => globals.TraceTime = value; }
+
+    /// <summary>
+    /// <see langword="true"/> when every verbose or trace line carries its transfer and connection
+    /// IDs, <c>[0-0] </c>: set by <c>--trace-ids</c> and by the second <c>v</c> of <c>-vv</c>, cleared
+    /// as <see cref="TraceTime"/> is (measured 2026-09-29, BL-648 Notes).
+    /// </summary>
+    public bool TraceIds { get => globals.TraceIds; internal set => globals.TraceIds = value; }
 
     /// <summary>
     /// The file the last <c>--stderr</c> names, to which curl writes what it would write to standard
@@ -362,6 +392,26 @@ public sealed class CommandLineOptions
     public string? DumpHeaderFile { get; internal set; }
 
     /// <summary>
+    /// The <c>--etag-save</c> file, verbatim and unchecked; <see langword="null"/> when not given. <c>-</c>
+    /// means standard output. The transfer writes the <c>ETag</c> of a 2xx or 3xx response there; nothing
+    /// is opened here. The last value wins.
+    /// </summary>
+    public string? EtagSaveFile { get; internal set; }
+
+    /// <summary>
+    /// The <c>--etag-compare</c> file, verbatim and unchecked; <see langword="null"/> when not given. The
+    /// transfer sends its content as <c>If-None-Match</c>; nothing is read here. The last value wins.
+    /// </summary>
+    public string? EtagCompareFile { get; internal set; }
+
+    /// <summary>
+    /// The <c>--alt-svc</c> cache file, verbatim and unchecked; <see langword="null"/> when not given. An
+    /// empty value turns alt-svc on without a file, as curl 8.21.0 accepts it. The transfer reads and writes
+    /// the file; nothing is opened here. The last value wins.
+    /// </summary>
+    public string? AltSvcFile { get; internal set; }
+
+    /// <summary>
     /// The <c>-u</c> / <c>--user</c> value split at its first colon into user name and password;
     /// <see langword="null"/> when not given. A value with no colon that does not start with <c>;</c>
     /// is a user name whose password <see cref="CommandLineParser"/> asks for through its
@@ -440,19 +490,136 @@ public sealed class CommandLineOptions
     }
 
     /// <summary>
+    /// The HTTP authentication schemes to allow for the proxy, as curl 8.21.0's tool asks libcurl
+    /// for them. Unlike <see cref="AuthSchemes"/>, the switches do not add up: <c>--proxy-basic</c>,
+    /// <c>--proxy-digest</c>, <c>--proxy-ntlm</c>, <c>--proxy-negotiate</c> and <c>--proxy-anyauth</c>
+    /// each set a switch (their <c>--no-</c> spellings clear it), and the set is one scheme, picked
+    /// in the order <c>--proxy-anyauth</c> (<see cref="HttpAuthSchemes.Any"/>), <c>--proxy-negotiate</c>,
+    /// <c>--proxy-ntlm</c>, <c>--proxy-digest</c>, whatever order they came in. When none of those is
+    /// on the set is <see cref="HttpAuthSchemes.Basic"/>, which is also libcurl's default.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the reference curl 8.21.0 (<c>Record-CurlExchange.ps1</c> as the proxy,
+    /// <c>-U u:p</c>, 2026-09-28): with no switch, <c>--proxy-basic --no-proxy-basic</c> or
+    /// <c>--proxy-digest --no-proxy-digest</c> curl sends <c>Basic dTpw</c> at once;
+    /// <c>--proxy-digest --proxy-ntlm</c> sends an NTLM type-1 message at once;
+    /// <c>--proxy-ntlm --proxy-negotiate</c> sends nothing; against a <c>407</c> offering only Basic,
+    /// <c>--proxy-digest --proxy-basic</c> and <c>--proxy-basic --proxy-digest</c> give up with the
+    /// <c>407</c>, while <c>--proxy-anyauth --proxy-basic</c> answers with <c>Basic dTpw</c>. See BL-601.
+    /// </remarks>
+    public HttpAuthSchemes ProxyAuthSchemes
+    {
+        get
+        {
+            if (proxyAnyAuthWanted)
+            {
+                return HttpAuthSchemes.Any;
+            }
+
+            foreach (HttpAuthSchemes scheme in ProxyAuthSchemePrecedence)
+            {
+                if ((wantedProxyAuthSchemes & scheme) != 0)
+                {
+                    return scheme;
+                }
+            }
+
+            return HttpAuthSchemes.Basic;
+        }
+    }
+
+    /// <summary>
     /// The last <c>--oauth2-bearer</c> token; <see langword="null"/> when not given. An empty value is
     /// refused as blank. While it is set, a <c>-u</c> user with no password is not prompted for.
     /// </summary>
     public string? BearerToken { get; private set; }
 
     /// <summary>
-    /// The last <c>-x</c> / <c>--proxy</c>, <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c> or
+    /// The last <c>-x</c> / <c>--proxy</c>, <c>--proxy1.0</c>, <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c> or
     /// <c>--socks5-hostname</c> value, with the kind of proxy that option names; <see langword="null"/>
     /// when none was given. curl 8.21.0 keeps one proxy: the last of these options wins, value and kind
     /// together, and a scheme in the value outranks the option's kind. An empty <c>-x ''</c> is kept:
     /// it asks for no proxy at all, the environment's included.
     /// </summary>
+    /// <remarks>
+    /// Measured with the reference curl 8.21.0 on 2026-09-28 (<c>Record-CurlExchange.ps1</c>, reading the
+    /// CONNECT line a <c>-p</c> tunnel sent; BL-612 Notes): <c>--proxy1.0 A</c>, <c>-x A --proxy1.0 B</c>
+    /// and <c>--socks5 A --proxy1.0 B</c> send <c>CONNECT … HTTP/1.0</c>; <c>--proxy1.0 A -x B</c> sends
+    /// <c>HTTP/1.1</c>; <c>--proxy1.0 A --socks5 B</c> and <c>--proxy1.0 socks5://A</c> speak SOCKS5.
+    /// </remarks>
     public CommandLineProxy? Proxy { get; private set; }
+
+    /// <summary>
+    /// The last <c>--preproxy</c> value, verbatim: the SOCKS proxy to pass through before
+    /// <see cref="Proxy"/>; <see langword="null"/> when not given. An empty value is refused as blank.
+    /// Parsing it as a proxy URL is the proxy selector's job.
+    /// </summary>
+    public string? PreProxy { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--socks5-basic</c> was given and no <c>--no-socks5-basic</c> came
+    /// after it: allow user name and password authentication with a SOCKS5 proxy.
+    /// </summary>
+    public bool Socks5BasicAuth { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--socks5-gssapi</c> was given and no <c>--no-socks5-gssapi</c> came
+    /// after it: allow GSS-API authentication with a SOCKS5 proxy.
+    /// </summary>
+    public bool Socks5GssapiAuth { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--socks5-gssapi-service</c> value, verbatim: the service name for SOCKS5 GSS-API
+    /// authentication; <see langword="null"/> when not given. An empty value is accepted, as curl 8.21.0
+    /// accepts it.
+    /// </summary>
+    public string? Socks5GssapiServiceName { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--delegation</c> value, read without regard to case; <see cref="Cli.GssApiDelegation.None"/>
+    /// when not given or when the last value was none of <c>none</c>, <c>policy</c> and <c>always</c>.
+    /// </summary>
+    public GssApiDelegation GssApiDelegation { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--service-name</c> value, verbatim: the service name SPNEGO, Kerberos and the SASL
+    /// mechanisms use in place of the protocol's default; <see langword="null"/> when not given. An empty
+    /// value is refused as blank, as curl 8.21.0 refuses it.
+    /// </summary>
+    public string? ServiceName { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--proxy-service-name</c> value, verbatim: the service name SPNEGO uses with a proxy in
+    /// place of <c>HTTP</c>; <see langword="null"/> when not given. An empty value is refused as blank, as
+    /// curl 8.21.0 refuses it.
+    /// </summary>
+    public string? ProxyServiceName { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--socks5-gssapi-nec</c> was given and no
+    /// <c>--no-socks5-gssapi-nec</c> came after it: leave the GSS-API protection negotiation
+    /// unprotected, as the NEC SOCKS5 server expects.
+    /// </summary>
+    public bool Socks5GssapiNec { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--haproxy-protocol</c> was given and no <c>--no-haproxy-protocol</c>
+    /// came after it: send a HAProxy PROXY protocol v1 header first on the connection.
+    /// </summary>
+    public bool HaproxyProtocol { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--haproxy-clientip</c> value, verbatim and unvalidated: the client address to put in
+    /// the HAProxy PROXY header; <see langword="null"/> when not given. An empty value is refused as blank.
+    /// </summary>
+    public string? HaproxyClientIp { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--suppress-connect-headers</c> was given and no
+    /// <c>--no-suppress-connect-headers</c> came after it: leave the proxy's CONNECT response headers
+    /// out of the headers shown and saved.
+    /// </summary>
+    public bool SuppressConnectHeaders { get; internal set; }
 
     /// <summary>
     /// The last <c>--noproxy</c> value, verbatim: the hosts to reach without a proxy. Empty is
@@ -484,6 +651,50 @@ public sealed class CommandLineOptions
     /// the parser never refuses one.
     /// </summary>
     public IReadOnlyList<string> ConnectToEntries => connectToEntries;
+
+    /// <summary>
+    /// The last <c>--interface</c>, split by its <c>if!</c>, <c>host!</c> or <c>ifhost!</c> prefix;
+    /// <see langword="null"/> when not given. An empty value is refused as blank; any other is accepted, a
+    /// value libcurl would refuse included (<see cref="InterfaceBinding.IsMalformed"/>).
+    /// </summary>
+    public InterfaceBinding? Interface { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--local-port</c> range; <see langword="null"/> when not given. A value that is not
+    /// <c>num</c> or <c>num-num</c> within 0 to 65535, low to high, is refused as badly used.
+    /// </summary>
+    public LocalPortRange? LocalPorts { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--dns-servers</c> value (<c>host[:port]</c> entries separated by commas), verbatim and
+    /// unvalidated; <see langword="null"/> when not given. An empty value is refused as blank. A c-ares
+    /// build of curl checks the list only when it resolves a host name, failing that transfer with exit
+    /// code 43, so the parser accepts any other value (measured 2026-09-28, BL-643 Notes).
+    /// </summary>
+    public string? DnsServers { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--dns-interface</c>, the network interface name DNS queries go out on, verbatim;
+    /// <see langword="null"/> when not given. An empty value is refused as blank; any other name is
+    /// accepted without looking it up, as a c-ares build of curl does.
+    /// </summary>
+    public string? DnsInterface { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--dns-ipv4-addr</c>, the local IPv4 address DNS queries are sent from, verbatim and
+    /// unvalidated; <see langword="null"/> when not given. An empty value is refused as blank. A c-ares
+    /// build of curl checks the address only when it resolves a host name, failing that transfer with
+    /// exit code 43.
+    /// </summary>
+    public string? DnsIPv4Address { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--dns-ipv6-addr</c>, the local IPv6 address DNS queries are sent from, verbatim and
+    /// unvalidated; <see langword="null"/> when not given. An empty value is refused as blank. A c-ares
+    /// build of curl checks the address only when it resolves a host name, failing that transfer with
+    /// exit code 43.
+    /// </summary>
+    public string? DnsIPv6Address { get; internal set; }
 
     /// <summary>
     /// The path of the Unix domain socket to connect through, from whichever of <c>--unix-socket</c> and
@@ -563,6 +774,39 @@ public sealed class CommandLineOptions
     /// </summary>
     public bool FtpSslControlOnly { get; internal set; }
 
+    /// <summary>
+    /// Whether FTPS clears the control connection with <c>CCC</c> after login:
+    /// <see cref="FtpClearCommandChannel.Off"/> unless <c>--ftp-ssl-ccc</c> or <c>--ftp-ssl-ccc-mode</c> was
+    /// given and no <c>--no-ftp-ssl-ccc</c> came after it, otherwise the last <c>--ftp-ssl-ccc-mode</c>'s
+    /// mode, <see cref="FtpClearCommandChannel.Passive"/> when none was given, as curl 8.21.0 keeps the flag
+    /// and the mode apart.
+    /// </summary>
+    public FtpClearCommandChannel FtpClearCommandChannel =>
+        FtpSslCccRequested ? FtpSslCccMode : FtpClearCommandChannel.Off;
+
+    /// <summary><see langword="true"/> when <c>--ftp-ssl-ccc</c> or <c>--ftp-ssl-ccc-mode</c> was given and no <c>--no-ftp-ssl-ccc</c> came after it.</summary>
+    internal bool FtpSslCccRequested { get; set; }
+
+    /// <summary>The last <c>--ftp-ssl-ccc-mode</c>'s mode; <see cref="FtpClearCommandChannel.Passive"/> when none was given.</summary>
+    internal FtpClearCommandChannel FtpSslCccMode { get; set; } = FtpClearCommandChannel.Passive;
+
+    /// <summary>
+    /// The last <c>--ftp-account</c> value, verbatim: the account sent with <c>ACCT</c> when the server asks
+    /// for one after the password; <see langword="null"/> when not given. An empty value is refused as blank,
+    /// as curl 8.21.0 refuses it.
+    /// </summary>
+    public string? FtpAccount { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--ftp-alternative-to-user</c> value, verbatim: the command sent when the server refuses
+    /// <c>USER</c>; <see langword="null"/> when not given. An empty value is refused as blank, as curl 8.21.0
+    /// refuses it.
+    /// </summary>
+    public string? FtpAlternativeToUser { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--ftp-pret</c> was given and no <c>--no-ftp-pret</c> came after it: send <c>PRET</c> before <c>EPSV</c> or <c>PASV</c>.</summary>
+    public bool FtpSendPret { get; internal set; }
+
     /// <summary><see langword="true"/> when <c>--ssl</c> or <c>--ftp-ssl</c> was given and no <c>--no-ssl</c> or <c>--no-ftp-ssl</c> came after it.</summary>
     internal bool SslTry { get; private set; }
 
@@ -571,6 +815,15 @@ public sealed class CommandLineOptions
 
     /// <summary><see langword="true"/> when <c>-l</c> / <c>--list-only</c> was given and no <c>--no-list-only</c> came after it.</summary>
     public bool ListOnly { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>-B</c> / <c>--use-ascii</c> was given and no <c>--no-use-ascii</c> came after it: transfer as ASCII text (FTP <c>TYPE A</c>, LDAP text output).</summary>
+    public bool UseAscii { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--crlf</c> was given and no <c>--no-crlf</c> came after it: convert LF to CRLF in an upload.</summary>
+    public bool ConvertLineEndings { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>-a</c> / <c>--append</c> was given and no <c>--no-append</c> came after it: append to the remote file instead of overwriting it.</summary>
+    public bool Append { get; internal set; }
 
     /// <summary>
     /// Every <c>-Q</c> / <c>--quote</c> value, verbatim (prefix included, possibly empty) and in command-line order.
@@ -640,6 +893,20 @@ public sealed class CommandLineOptions
     public bool TcpKeepAlive { get; internal set; } = true;
 
     /// <summary>
+    /// The last <c>--keepalive-time</c>: the idle seconds before the first TCP keepalive probe and between
+    /// probes. Zero, the default and what <c>--keepalive-time 0</c> gives, means curl sets no time of its own,
+    /// so libcurl's 60 seconds apply.
+    /// </summary>
+    public long TcpKeepAliveSeconds { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--keepalive-cnt</c>: how many unanswered TCP keepalive probes end the connection. Zero, the
+    /// default and what <c>--keepalive-cnt 0</c> gives, means curl sets no count of its own, so libcurl's 9
+    /// apply.
+    /// </summary>
+    public long TcpKeepAliveProbeCount { get; internal set; }
+
+    /// <summary>
     /// <see langword="false"/> when the last of <c>--styled-output</c> and <c>--no-styled-output</c> was
     /// <c>--no-styled-output</c>: never style header output. <see langword="true"/> otherwise, as curl styles
     /// headers written to a terminal by default. Parsed only until BL-736 styles header output.
@@ -657,6 +924,32 @@ public sealed class CommandLineOptions
     public string? CaCertificateDirectory { get; internal set; }
 
     /// <summary>
+    /// The <c>--crlfile</c> certificate revocation list file, verbatim, checked as <c>--cacert</c> is;
+    /// <see langword="null"/> when not given. The last value wins. Applied by BL-608 to BL-610.
+    /// </summary>
+    public string? CertificateRevocationListFile { get; internal set; }
+
+    /// <summary>
+    /// The <c>--pinnedpubkey</c> value, verbatim and unchecked: a public key file, or <c>sha256//</c> hashes
+    /// separated by <c>;</c>, for the connector to match the server's key against. <see langword="null"/>
+    /// when not given. The last value wins. Applied by BL-608 to BL-610.
+    /// </summary>
+    public string? PinnedPublicKey { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--cert-status</c> was given and no <c>--no-cert-status</c> came after it:
+    /// require a good OCSP response stapled to the server certificate. Applied by BL-608 to BL-610.
+    /// </summary>
+    public bool RequireCertificateStatus { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--ssl-auto-client-cert</c> was given and no <c>--no-ssl-auto-client-cert</c>
+    /// came after it: the Schannel build picks a client certificate from the user's store by itself.
+    /// curl accepts it in every build; the OpenSSL build ignores it. Applied by BL-608 to BL-610.
+    /// </summary>
+    public bool AutoClientCertificate { get; internal set; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>--proxy-insecure</c> was given and no <c>--no-proxy-insecure</c> came
     /// after it: skip verification of an HTTPS proxy's certificate. <c>-k</c> never reaches the proxy.
     /// </summary>
@@ -670,6 +963,63 @@ public sealed class CommandLineOptions
 
     /// <summary>The <c>--proxy-capath</c> directory, verbatim and unchecked; <see langword="null"/> when not given. The last value wins.</summary>
     public string? ProxyCaCertificateDirectory { get; internal set; }
+
+    /// <summary>
+    /// The <c>--proxy-cert</c> value, verbatim, with <c>certificate[:password]</c> not yet split, as
+    /// <see cref="ClientCertificate"/> is; it authenticates to an HTTPS proxy only. <see langword="null"/>
+    /// when not given. The last value wins. Applied by BL-606 and BL-611.
+    /// </summary>
+    public string? ProxyClientCertificate { get; internal set; }
+
+    /// <summary>The <c>--proxy-key</c> private key file, verbatim and unchecked; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyPrivateKey { get; internal set; }
+
+    /// <summary>The <c>--proxy-cert-type</c> value, verbatim, as <see cref="ClientCertificateType"/> is; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyClientCertificateType { get; internal set; }
+
+    /// <summary>The <c>--proxy-key-type</c> value, verbatim, as <see cref="PrivateKeyType"/> is; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyPrivateKeyType { get; internal set; }
+
+    /// <summary>The <c>--proxy-pass</c> passphrase for the proxy's private key, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyPassphrase { get; internal set; }
+
+    /// <summary>The <c>--proxy-ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyCiphers { get; internal set; }
+
+    /// <summary>The <c>--proxy-tls13-ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyTls13Ciphers { get; internal set; }
+
+    /// <summary>
+    /// The <c>--proxy-crlfile</c> certificate revocation list file, verbatim, checked as <c>--crlfile</c> is;
+    /// <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? ProxyCertificateRevocationListFile { get; internal set; }
+
+    /// <summary>
+    /// The <c>--proxy-pinnedpubkey</c> value, verbatim and unchecked, as <see cref="PinnedPublicKey"/> is, matched
+    /// against the HTTPS proxy's key; <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? ProxyPinnedPublicKey { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--proxy-ca-native</c> was given and no <c>--no-proxy-ca-native</c> came
+    /// after it: verify an HTTPS proxy against the operating system's certificate store.
+    /// </summary>
+    public bool ProxyUseNativeCaStore { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--proxy-ssl-auto-client-cert</c> was given and no
+    /// <c>--no-proxy-ssl-auto-client-cert</c> came after it: the Schannel build picks a client certificate for
+    /// the HTTPS proxy from the user's store by itself.
+    /// </summary>
+    public bool ProxyAutoClientCertificate { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--proxy-ssl-allow-beast</c> was given and no
+    /// <c>--no-proxy-ssl-allow-beast</c> came after it: leave the TLS 1.0 BEAST workaround off towards the
+    /// HTTPS proxy, as <see cref="AllowBeast"/> does towards the server.
+    /// </summary>
+    public bool ProxyAllowBeast { get; internal set; }
 
     /// <summary>
     /// The <c>-E</c> / <c>--cert</c> value, verbatim, with <c>certificate[:password]</c> not yet split;
@@ -778,6 +1128,66 @@ public sealed class CommandLineOptions
 
     /// <summary>The <c>--tls13-ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
     public string? Tls13Ciphers { get; internal set; }
+
+    /// <summary>
+    /// The <c>--curves</c> list of key-exchange groups, verbatim; <see langword="null"/> when not given. An empty
+    /// value is refused as blank, as curl 8.21.0 refuses it. The last value wins.
+    /// </summary>
+    public string? Curves { get; internal set; }
+
+    /// <summary>
+    /// The <c>--sigalgs</c> list of signature algorithms, verbatim; <see langword="null"/> when not given. An
+    /// empty value is refused as blank, as curl 8.21.0 refuses it. The last value wins.
+    /// </summary>
+    public string? SignatureAlgorithms { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--tls-earlydata</c> was given and no <c>--no-tls-earlydata</c> came after it: send TLS 1.3 early data on a resumed session.</summary>
+    public bool TlsEarlyData { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--ech</c> value that is neither <c>pn:&lt;name&gt;</c> nor <c>ecl:&lt;list&gt;</c>, verbatim:
+    /// the mode, <c>false</c>, <c>grease</c>, <c>true</c> or <c>hard</c>; <see langword="null"/> when none was
+    /// given. curl 8.21.0 does not check the keyword while parsing, so neither does this.
+    /// </summary>
+    public string? Ech { get; internal set; }
+
+    /// <summary>
+    /// The public name of the last <c>--ech pn:&lt;name&gt;</c>, without its <c>pn:</c> prefix;
+    /// <see langword="null"/> when none was given.
+    /// </summary>
+    public string? EchPublicName { get; internal set; }
+
+    /// <summary>
+    /// The base64 ECHConfigList of the last <c>--ech ecl:&lt;list&gt;</c>, without its <c>ecl:</c> prefix, or the
+    /// text of the file <c>ecl:@&lt;file&gt;</c> names (standard input for <c>ecl:@-</c>) with its carriage
+    /// returns and line feeds removed; <see langword="null"/> when none was given.
+    /// </summary>
+    public string? EchConfigList { get; internal set; }
+
+    /// <summary>
+    /// The <c>--engine</c> name, verbatim; <see langword="null"/> when not given. <c>--engine list</c> also sets
+    /// <see cref="EngineListRequested"/>. An empty value is refused as blank, as curl 8.21.0 refuses it.
+    /// </summary>
+    public string? Engine { get; internal set; }
+
+    /// <summary>The <c>--tlsuser</c> TLS-SRP user name, verbatim; <see langword="null"/> when not given. An empty value is refused as blank, as curl 8.21.0 refuses it.</summary>
+    public string? TlsUser { get; internal set; }
+
+    /// <summary>The <c>--tlspassword</c> TLS-SRP password, verbatim, empty included, as curl 8.21.0 accepts it; <see langword="null"/> when not given.</summary>
+    public string? TlsPassword { get; internal set; }
+
+    /// <summary>
+    /// The <c>--tlsauthtype</c> value: <c>SRP</c>, the only type curl 8.21.0 accepts (case-sensitively), or
+    /// <see langword="null"/> when not given.
+    /// </summary>
+    public string? TlsAuthType { get; internal set; }
+
+    /// <summary>
+    /// The <c>--ssl-sessions</c> file TLS session tickets are loaded from before the transfers and saved to
+    /// after them; <see langword="null"/> when not given. Global, as curl 8.21.0 keeps it: every option group
+    /// shares the last value given.
+    /// </summary>
+    public string? SslSessionsFile { get => globals.SslSessionsFile; internal set => globals.SslSessionsFile = value; }
 
     /// <summary>
     /// The <c>-r</c> / <c>--range</c> text as curl keeps it, not yet parsed; <see langword="null"/>
@@ -1157,10 +1567,11 @@ public sealed class CommandLineOptions
     public bool SaslInitialResponse { get; internal set; }
 
     /// <summary>
-    /// The HTTP version the last <c>-0</c> / <c>--http1.0</c> or <c>--http1.1</c> asked for;
-    /// <see langword="null"/> when neither was given, which means curl's default, HTTP/1.1.
+    /// The HTTP version the last <c>-0</c> / <c>--http1.0</c>, <c>--http1.1</c>, <c>--http2</c> or
+    /// <c>--http2-prior-knowledge</c> asked for; <see langword="null"/> when none was given, which
+    /// means curl's default: an HTTP/1.1 request line, and the platform's default ALPN offer (ADR-0141).
     /// </summary>
-    public HttpVersionPreference? HttpVersion { get; private set; }
+    public RequestedHttpVersion? HttpVersion { get; private set; }
 
     /// <summary>
     /// The IP address family the last <c>-4</c> / <c>--ipv4</c> or <c>-6</c> / <c>--ipv6</c> chose;
@@ -1216,7 +1627,7 @@ public sealed class CommandLineOptions
     /// unless <c>-s</c> came first, when an earlier option asked for a different version, as curl 8.21.0 does.
     /// </summary>
     /// <param name="version">The version the option asks for.</param>
-    internal void SelectHttpVersion(HttpVersionPreference version)
+    internal void SelectHttpVersion(RequestedHttpVersion version)
     {
         if (HttpVersion is not null && HttpVersion != version)
         {
@@ -1247,6 +1658,7 @@ public sealed class CommandLineOptions
         {
             Verbosity = 0;
             TraceTime = false;
+            TraceIds = false;
         }
 
         if (!on)
@@ -1285,6 +1697,7 @@ public sealed class CommandLineOptions
         else if (Verbosity == 1)
         {
             TraceTime = true;
+            TraceIds = true;
         }
 
         Verbosity = Math.Min(Verbosity + 1, MostVerbose);
@@ -1370,13 +1783,33 @@ public sealed class CommandLineOptions
     /// <returns>The variable's bytes; <see langword="null"/> when no variable has that name.</returns>
     internal byte[]? FindVariable(string name) => globals.Variables.GetValueOrDefault(name);
 
-    /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
+    /// <summary>
+    /// Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated, then refuses it as
+    /// <see cref="RefuseEtagOptionsWithSeveralUrls"/> does.
+    /// </summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
-    internal void AddUrl(string url)
+    /// <param name="spelledOption">The argument as typed: the URL itself, or <c>--url</c>.</param>
+    /// <returns><see langword="null"/>, or the refusal of a second URL beside an etag option.</returns>
+    internal CommandLineRefusal? AddUrl(string url, string spelledOption)
     {
         urls.Add(url);
         (urlOutputs.Find(output => output.Url is null) ?? AddUrlOutput()).Url = url;
+        return RefuseEtagOptionsWithSeveralUrls(spelledOption);
     }
+
+    /// <summary>
+    /// Refuses the argument just read when this option group has an <c>--etag-save</c> or
+    /// <c>--etag-compare</c> and more than one URL, as curl 8.21.0 does whichever comes last:
+    /// <c>curl: The etag options only work on a single URL</c> (hidden when <see cref="ErrorsHidden"/>),
+    /// then <c>curl: option &lt;spelled&gt;: is badly used here</c>. A glob in one URL and a URL in a
+    /// later <c>--next</c> group are not refused (measured 2026-09-29, BL-619 Notes).
+    /// </summary>
+    /// <param name="spelledOption">The argument as typed.</param>
+    /// <returns>The refusal, or <see langword="null"/> when the group has at most one URL or no etag option.</returns>
+    internal CommandLineRefusal? RefuseEtagOptionsWithSeveralUrls(string spelledOption) =>
+        (EtagSaveFile ?? EtagCompareFile) is not null && urls.Count > 1
+            ? CommandLineRefusal.EtagOptionsWithSeveralUrls(spelledOption, ErrorsHidden)
+            : null;
 
     /// <summary>Appends <paramref name="uploadFile"/> to <see cref="UploadFiles"/>; nothing is opened.</summary>
     /// <param name="uploadFile">A <c>-T</c> / <c>--upload-file</c> value, which may be empty.</param>
@@ -1571,6 +2004,19 @@ public sealed class CommandLineOptions
         wantedAuthSchemes = HttpAuthSchemes.Any | HttpAuthSchemes.Bearer;
 
     /// <summary>
+    /// Turns on, or for its <c>--no-</c> spelling off, the switch <c>--proxy-basic</c>,
+    /// <c>--proxy-digest</c>, <c>--proxy-ntlm</c> or <c>--proxy-negotiate</c> names; see <see cref="ProxyAuthSchemes"/>.
+    /// </summary>
+    /// <param name="scheme">The scheme the option names.</param>
+    /// <param name="on"><see langword="false"/> for the <c>--no-</c> spelling.</param>
+    internal void WantProxyAuthScheme(HttpAuthSchemes scheme, bool on) =>
+        wantedProxyAuthSchemes = on ? wantedProxyAuthSchemes | scheme : wantedProxyAuthSchemes & ~scheme;
+
+    /// <summary>Turns <c>--proxy-anyauth</c> on, or for <c>--no-proxy-anyauth</c> off; see <see cref="ProxyAuthSchemes"/>.</summary>
+    /// <param name="on"><see langword="false"/> for the <c>--no-</c> spelling.</param>
+    internal void WantEveryProxyAuthScheme(bool on) => proxyAnyAuthWanted = on;
+
+    /// <summary>
     /// Records an <c>--oauth2-bearer</c> token as <see cref="BearerToken"/> and adds
     /// <see cref="HttpAuthSchemes.Bearer"/> to the schemes asked for, as curl 8.21.0's tool does.
     /// </summary>
@@ -1582,8 +2028,8 @@ public sealed class CommandLineOptions
     }
 
     /// <summary>
-    /// Records a <c>-x</c> / <c>--proxy</c> value, or a <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c>
-    /// or <c>--socks5-hostname</c> one, as <see cref="Proxy"/>, replacing any earlier one.
+    /// Records a <c>-x</c> / <c>--proxy</c> value, or a <c>--proxy1.0</c>, <c>--socks4</c>, <c>--socks4a</c>,
+    /// <c>--socks5</c> or <c>--socks5-hostname</c> one, as <see cref="Proxy"/>, replacing any earlier one.
     /// </summary>
     /// <param name="address">The value as given, possibly empty.</param>
     /// <param name="kindWithoutScheme">The kind the option names, used when the value has no scheme.</param>

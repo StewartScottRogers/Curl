@@ -22,7 +22,7 @@ public sealed class HttpProxyTunnelTests
         var request = HttpProxyTunnel.BuildConnectRequest(
             "example.com", 80,
             HttpProxy,
-            HttpProxyTunnelOptions.Default);
+            HttpProxyTunnelOptions.Default, null);
 
         Assert.AreEqual(
             "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
@@ -30,32 +30,17 @@ public sealed class HttpProxyTunnelTests
     }
 
     [TestMethod]
-    public void BuildConnectRequest_WithACredential_SendsProxyAuthorizationBeforeUserAgent()
+    public void BuildConnectRequest_WithAProxyAuthorization_SendsItBeforeUserAgent()
     {
         // curl -x http://127.0.0.1:18262 -U user:p@ss https://example.com:8443/path
-        var proxy = HttpProxy with { Credential = new NetworkCredential("user", "p@ss") };
-
         var request = HttpProxyTunnel.BuildConnectRequest(
             "example.com", 8443,
-            proxy,
-            HttpProxyTunnelOptions.Default);
+            HttpProxy,
+            HttpProxyTunnelOptions.Default, "Basic dXNlcjpwQHNz");
 
         Assert.AreEqual(
             "CONNECT example.com:8443 HTTP/1.1\r\nHost: example.com:8443\r\nProxy-Authorization: Basic dXNlcjpwQHNz\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Encoding.Latin1.GetString(request));
-    }
-
-    [TestMethod]
-    public void BuildConnectRequest_EncodesTheCredentialWithTheGivenEncoding()
-    {
-        var proxy = HttpProxy with { Credential = new NetworkCredential("é", "p") };
-
-        var request = HttpProxyTunnel.BuildConnectRequest(
-            "example.com", 80,
-            proxy,
-            HttpProxyTunnelOptions.Default with { CredentialEncoding = Encoding.Latin1 });
-
-        StringAssert.Contains(Encoding.Latin1.GetString(request), "Proxy-Authorization: Basic 6Tpw\r\n");
     }
 
     [TestMethod]
@@ -67,7 +52,7 @@ public sealed class HttpProxyTunnelTests
         var request = HttpProxyTunnel.BuildConnectRequest(
             "example.com", 80,
             HttpProxy,
-            HttpProxyTunnelOptions.Default with { ProxyHeaders = ["X-A: €"], CommandLineTextEncoding = windows1252 });
+            HttpProxyTunnelOptions.Default with { ProxyHeaders = ["X-A: €"], CommandLineTextEncoding = windows1252 }, null);
 
         CollectionAssert.IsSubsetOf(new byte[] { 0x80 }, request);
         StringAssert.Contains(Encoding.Latin1.GetString(request), "\r\nX-A: \u0080\r\n");
@@ -79,7 +64,7 @@ public sealed class HttpProxyTunnelTests
         var request = HttpProxyTunnel.BuildConnectRequest(
             "example.com", 80,
             HttpProxy,
-            new HttpProxyTunnelOptions("é", Encoding.UTF8) { ProxyHeaders = ["X-A: é"], CommandLineTextEncoding = Encoding.UTF8 });
+            new HttpProxyTunnelOptions("é", Encoding.UTF8) { ProxyHeaders = ["X-A: é"], CommandLineTextEncoding = Encoding.UTF8 }, null);
 
         Assert.AreEqual(
             "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: Ã©\r\nProxy-Connection: Keep-Alive\r\nX-A: Ã©\r\n\r\n",
@@ -92,7 +77,7 @@ public sealed class HttpProxyTunnelTests
         var request = HttpProxyTunnel.BuildConnectRequest(
             "example.com", 80,
             HttpProxy,
-            HttpProxyTunnelOptions.Default with { ProxyHeaders = ["X-A: é"] });
+            HttpProxyTunnelOptions.Default with { ProxyHeaders = ["X-A: é"] }, null);
 
         StringAssert.Contains(Encoding.Latin1.GetString(request), "\r\nX-A: é\r\n");
     }
@@ -104,7 +89,7 @@ public sealed class HttpProxyTunnelTests
         var request = HttpProxyTunnel.BuildConnectRequest(
             "::1", 81,
             HttpProxy,
-            HttpProxyTunnelOptions.Default);
+            HttpProxyTunnelOptions.Default, null);
 
         Assert.AreEqual(
             "CONNECT [::1]:81 HTTP/1.1\r\nHost: [::1]:81\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
@@ -117,7 +102,7 @@ public sealed class HttpProxyTunnelTests
         var request = HttpProxyTunnel.BuildConnectRequest(
             "[::1]", 81,
             HttpProxy,
-            HttpProxyTunnelOptions.Default);
+            HttpProxyTunnelOptions.Default, null);
 
         StringAssert.StartsWith(Encoding.Latin1.GetString(request), "CONNECT [::1]:81 HTTP/1.1\r\n");
     }
@@ -129,7 +114,7 @@ public sealed class HttpProxyTunnelTests
         var request = HttpProxyTunnel.BuildConnectRequest(
             "example.com", 80,
             HttpProxy with { Kind = ProxyKind.Http10 },
-            HttpProxyTunnelOptions.Default);
+            HttpProxyTunnelOptions.Default, null);
 
         Assert.AreEqual(
             "CONNECT example.com:80 HTTP/1.0\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
@@ -143,7 +128,7 @@ public sealed class HttpProxyTunnelTests
         var request = HttpProxyTunnel.BuildConnectRequest(
             "example.com", 80,
             HttpProxy,
-            HttpProxyTunnelOptions.Default with { UserAgent = "Agent/1" });
+            HttpProxyTunnelOptions.Default with { UserAgent = "Agent/1" }, null);
 
         Assert.AreEqual(
             "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: Agent/1\r\nProxy-Connection: Keep-Alive\r\n\r\n",
@@ -156,7 +141,7 @@ public sealed class HttpProxyTunnelTests
         var request = HttpProxyTunnel.BuildConnectRequest(
             "example.com", 80,
             HttpProxy,
-            HttpProxyTunnelOptions.Default with { UserAgent = null });
+            HttpProxyTunnelOptions.Default with { UserAgent = null }, null);
 
         Assert.AreEqual(
             "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nProxy-Connection: Keep-Alive\r\n\r\n",
@@ -182,7 +167,7 @@ public sealed class HttpProxyTunnelTests
         var request = HttpProxyTunnel.BuildConnectRequest(
             "example.com", 80,
             HttpProxy,
-            HttpProxyTunnelOptions.Default with { ProxyHeaders = proxyHeaders });
+            HttpProxyTunnelOptions.Default with { ProxyHeaders = proxyHeaders }, null);
 
         Assert.AreEqual($"CONNECT example.com:80 HTTP/1.1\r\n{expectedHeaders}\r\n", Encoding.Latin1.GetString(request));
     }
@@ -196,7 +181,7 @@ public sealed class HttpProxyTunnelTests
         var request = HttpProxyTunnel.BuildConnectRequest(
             "example.com", 80,
             proxy,
-            HttpProxyTunnelOptions.Default with { ProxyHeaders = ["Proxy-Authorization: Z", "X-B: 2"] });
+            HttpProxyTunnelOptions.Default with { ProxyHeaders = ["Proxy-Authorization: Z", "X-B: 2"] }, "Basic dTpw");
 
         Assert.AreEqual(
             "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\nProxy-Authorization: Z\r\nX-B: 2\r\n\r\n",
@@ -212,7 +197,7 @@ public sealed class HttpProxyTunnelTests
         var request = HttpProxyTunnel.BuildConnectRequest(
             "example.com", 80,
             proxy,
-            HttpProxyTunnelOptions.Default with { ProxyHeaders = ["Host:", "Proxy-Authorization:", "Proxy-Connection:"] });
+            HttpProxyTunnelOptions.Default with { ProxyHeaders = ["Host:", "Proxy-Authorization:", "Proxy-Connection:"] }, "Basic dTpw");
 
         Assert.AreEqual("CONNECT example.com:80 HTTP/1.1\r\nUser-Agent: curl/8.21.0\r\n\r\n", Encoding.Latin1.GetString(request));
     }
@@ -243,7 +228,85 @@ public sealed class HttpProxyTunnelTests
 
         var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
 
-        Assert.AreEqual(new HttpProxyTunnelReply(expected, null), result);
+        Assert.AreEqual(expected, result.StatusCode);
+        Assert.IsNull(result.RecvErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ReadReplyAsync_ReturnsEveryProxyAuthenticateValueInOrder()
+    {
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(
+            "HTTP/1.1 407 Proxy Authentication Required\r\nproxy-authenticate:  Digest realm=\"r\", nonce=\"abc\"\t\r\nX-A: b\r\nProxy-Authenticate: Basic realm=\"r\"\r\n\r\n"));
+
+        var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "Digest realm=\"r\", nonce=\"abc\"", "Basic realm=\"r\"" }, result.ProxyAuthenticate.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("", 0L, true)]
+    [DataRow("Content-Length: 12\r\n", 12L, true)]
+    [DataRow("Content-Length: 12\r\nContent-Length: x\r\n", 12L, true)]
+    [DataRow("Content-Length: -1\r\n", 0L, true)]
+    [DataRow("Connection: keep-alive\r\n", 0L, true)]
+    [DataRow("Connection: close\r\n", 0L, false)]
+    [DataRow("Proxy-Connection: Keep-Alive, Close\r\n", 0L, false)]
+    [DataRow("Transfer-Encoding: gzip, chunked\r\n", 0L, false)]
+    [DataRow("Transfer-Encoding: gzip\r\n", 0L, true)]
+    [DataRow(": close\r\nno colon\r\n", 0L, true)]
+    public async Task ReadReplyAsync_ReadsTheBodyLengthAndWhetherTheConnectionIsReusable(string fields, long contentLength, bool reusable)
+    {
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes($"HTTP/1.1 407 Proxy Authentication Required\r\n{fields}\r\n"));
+
+        var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+
+        Assert.AreEqual(contentLength, result.ContentLength);
+        Assert.AreEqual(reusable, result.LeavesConnectionReusable);
+        Assert.IsEmpty(result.ProxyAuthenticate);
+    }
+
+    [TestMethod]
+    public void ProxyAuthenticate_OfADefaultReply_IsEmpty()
+    {
+        Assert.IsEmpty(default(HttpProxyTunnelReply).ProxyAuthenticate);
+    }
+
+    [TestMethod]
+    public async Task DiscardBodyAsync_ReadsExactlyTheBody()
+    {
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(new string('a', 5000) + "next"));
+
+        var discarded = await HttpProxyTunnel.DiscardBodyAsync(connection, 5000, CancellationToken.None);
+
+        Assert.IsTrue(discarded);
+        Assert.AreEqual("next".Length, connection.UnreadCount);
+    }
+
+    [TestMethod]
+    public async Task DiscardBodyAsync_WhenTheProxyClosesFirst_ReturnsFalse()
+    {
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes("abc"));
+
+        var discarded = await HttpProxyTunnel.DiscardBodyAsync(connection, 4, CancellationToken.None);
+
+        Assert.IsFalse(discarded);
+    }
+
+    [TestMethod]
+    public async Task DiscardBodyAsync_WhenReadingFails_ReturnsFalse()
+    {
+        var connection = new ScriptedConnection([]) { ReadException = new IOException("reset") };
+
+        var discarded = await HttpProxyTunnel.DiscardBodyAsync(connection, 1, CancellationToken.None);
+
+        Assert.IsFalse(discarded);
+    }
+
+    [TestMethod]
+    public void Default_ProxyAuthSchemes_IsBasicAndProxyAuthenticator_IsNull()
+    {
+        Assert.AreEqual(HttpAuthSchemes.Basic, HttpProxyTunnelOptions.Default.ProxyAuthSchemes);
+        Assert.IsNull(HttpProxyTunnelOptions.Default.ProxyAuthenticator);
     }
 
     [TestMethod]

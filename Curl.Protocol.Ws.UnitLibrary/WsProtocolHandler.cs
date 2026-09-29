@@ -82,20 +82,49 @@ public sealed class WsProtocolHandler(
         }
 
         context.Progress.ReportTransferStarted();
+        context.Events.ReportInfo(WsInfoLines.UsingHttp1);
         await using (connection.ConfigureAwait(false))
         {
             try
             {
-                return await UpgradeAsync(connection, context).ConfigureAwait(false);
+                return await UpgradeAsync(connection, context, connect.ConnectionNumber).ConfigureAwait(false);
             }
             catch (WsTransferException failure)
             {
+                context.Events.ReportInfo(failure.Message);
+                context.Events.ReportInfo(WsInfoLines.Closing(connect.ConnectionNumber));
                 return TransferResult.Failure(failure.ExitCode, failure.Message);
             }
         }
     }
 
-    private async Task<TransferResult> UpgradeAsync(IConnection connection, ITransferContext context)
+    /// <summary>
+    /// Reports each line of the reply head as curl's <c>-v</c> does, with
+    /// <paramref name="refusal" />, when given, reported before the blank line that ends it, where
+    /// curl 8.21.0 writes <c>Refused WebSocket upgrade</c> (BL-584).
+    /// </summary>
+    private static void ReportHead(ITransferEvents events, byte[] head, string? refusal)
+    {
+        int lineStart = 0;
+        while (lineStart < head.Length)
+        {
+            int lineEnd = Array.IndexOf(head, (byte)'\n', lineStart) + 1;
+            if (lineEnd == head.Length && refusal is not null)
+            {
+                events.ReportInfo(refusal);
+            }
+
+            events.ReportResponseHeader(head.AsSpan(lineStart, lineEnd - lineStart));
+            lineStart = lineEnd;
+        }
+    }
+
+    /// <summary>
+    /// Sends the upgrade request and reads the reply head, reporting both for <c>-v</c> and
+    /// <c>--trace</c> as curl 8.21.0 does (BL-584): the request as one header event, the head
+    /// one line at a time, and on a refusal <c>closing connection #N</c>.
+    /// </summary>
+    private async Task<TransferResult> UpgradeAsync(IConnection connection, ITransferContext context, long connectionNumber)
     {
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
         string method = options.CustomMethod ?? "GET";
@@ -110,7 +139,9 @@ public sealed class WsProtocolHandler(
                 IsProxy: false),
             []);
         byte[] request = WsUpgradeRequestFormatter.Format(context.Url, options, method, NewKey(), authorization);
+        context.Events.ReportRequestHeader(request);
         await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
+        context.Events.ReportInfo(WsInfoLines.RequestSent);
         WsUpgradeResponse response = await WsUpgradeResponseReader.ReadAsync(connection, context.CancellationToken).ConfigureAwait(false);
         await WriteHeadAsync(context.HeaderOutput, response.Head, context.CancellationToken).ConfigureAwait(false);
         TransferReport report = new()
@@ -124,21 +155,61 @@ public sealed class WsProtocolHandler(
         if (response.StatusCode != SwitchingProtocols)
         {
             string message = string.Create(CultureInfo.InvariantCulture, $"Refused WebSocket upgrade: {response.StatusCode}");
+            ReportHead(context.Events, response.Head, message);
+            context.Events.ReportInfo(WsInfoLines.Closing(connectionNumber));
             return TransferResult.Failure(CurlExitCode.HttpReturnedError, message) with { Report = report };
         }
 
-        return await ExchangeFramesAsync(connection, context, response.Remaining, report).ConfigureAwait(false);
+        ReportHead(context.Events, response.Head, refusal: null);
+        context.Events.ReportInfo(WsInfoLines.SwitchingToWebSocket);
+        context.Events.ReportInfo(WsInfoLines.SwitchedToWebSocket);
+        TransferResult result = await ExchangeFramesAsync(connection, context, response.Remaining, report).ConfigureAwait(false);
+        ReportTransferEnd(context.Events, result, connectionNumber);
+        return result;
     }
 
     /// <summary>
-    /// Sends the <c>-T</c> upload as one binary frame, then writes the payload of every frame
-    /// received to the output until the server closes the connection (ADR-0128, ADR-0131).
+    /// Writes the line curl 8.21.0's <c>-v</c> ends an upgraded transfer with (BL-584):
+    /// <c>shutting down connection #N</c> after the server closed the connection or for
+    /// <c>Empty reply from server</c>, and <c>closing connection #N</c> for any other failure.
+    /// </summary>
+    private static void ReportTransferEnd(ITransferEvents events, TransferResult result, long connectionNumber) =>
+        events.ReportInfo(result.ExitCode is CurlExitCode.Ok or CurlExitCode.GotNothing
+            ? WsInfoLines.ShuttingDown(connectionNumber)
+            : WsInfoLines.Closing(connectionNumber));
+
+    /// <summary>
+    /// Writes a failed exchange's message as curl 8.21.0's <c>-v</c> does, followed for a frame
+    /// violation by <c>[WS] decode frame error 56</c> and <c>[WS] decode payload error 56</c>
+    /// (BL-813).
+    /// </summary>
+    private static void ReportFailure(ITransferEvents events, TransferResult result, bool isFrameViolation)
+    {
+        if (result.ExitCode == CurlExitCode.Ok)
+        {
+            return;
+        }
+
+        events.ReportInfo(result.ErrorMessage!);
+        if (isFrameViolation)
+        {
+            events.ReportInfo(WsInfoLines.DecodeFrameError(result.ExitCode));
+            events.ReportInfo(WsInfoLines.DecodePayloadError(result.ExitCode));
+        }
+    }
+
+    /// <summary>
+    /// Writes the payload of the frame bytes that came with the reply head, sends the <c>-T</c>
+    /// upload as one binary frame, then writes the payload of every frame received to the output
+    /// until the server closes the connection (ADR-0128, ADR-0131), in curl 8.21.0's order
+    /// (BL-813).
     /// </summary>
     /// <remarks>
     /// Measured against curl 8.21.0 (BL-582): the transfer ends with exit 0 when the server
     /// closes the connection after at least one frame byte, close frame or not, and with 52
     /// <c>Empty reply from server</c> when none arrived. <c>%{size_download}</c> counts frame
-    /// bytes, heads included; <c>%{size_upload}</c> the upload frame; <c>%{size_request}</c>
+    /// bytes, heads included; <c>%{size_delivered}</c> the payload bytes written, close frame
+    /// payloads included (BL-777); <c>%{size_upload}</c> the upload frame; <c>%{size_request}</c>
     /// the upgrade request, the upload frame and every pong. A failure keeps the report, so
     /// <c>%{http_code}</c> is still <c>101</c>. <c>-m</c> cancels the reads, and the
     /// cancellation escapes for the runner's exit 28 (ADR-0117).
@@ -149,16 +220,17 @@ public sealed class WsProtocolHandler(
         byte[] alreadyReceived,
         TransferReport report)
     {
-        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress);
+        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events);
+        Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload =
+            (payload, token) => WriteAsync(context.Output, payload, token);
         long uploaded = 0;
+        bool isFrameViolation = false;
         TransferResult result;
         try
         {
+            await receiver.DeliverAlreadyReceivedAsync(alreadyReceived, writePayload, context.CancellationToken).ConfigureAwait(false);
             uploaded = await SendUploadAsync(connection, context).ConfigureAwait(false);
-            await receiver.ReceiveAsync(
-                alreadyReceived,
-                (payload, token) => WriteAsync(context.Output, payload, token),
-                context.CancellationToken).ConfigureAwait(false);
+            await receiver.ReceiveUntilClosedAsync(writePayload, context.CancellationToken).ConfigureAwait(false);
             result = receiver.BytesReceived == 0
                 ? TransferResult.Failure(CurlExitCode.GotNothing, WsUpgradeResponseReader.EmptyReply)
                 : TransferResult.Success(receiver.BytesReceived);
@@ -166,7 +238,10 @@ public sealed class WsProtocolHandler(
         catch (WsTransferException failure)
         {
             result = TransferResult.Failure(failure.ExitCode, failure.Message, receiver.BytesReceived);
+            isFrameViolation = failure.IsFrameViolation;
         }
+
+        ReportFailure(context.Events, result, isFrameViolation);
 
         context.Progress.ReportTransferDone();
         return result with
@@ -175,6 +250,7 @@ public sealed class WsProtocolHandler(
             {
                 RequestSize = report.RequestSize + uploaded + receiver.BytesSent,
                 DownloadSize = receiver.BytesReceived,
+                DeliveredSize = receiver.BytesDelivered,
                 UploadSize = uploaded,
             },
         };
@@ -204,7 +280,9 @@ public sealed class WsProtocolHandler(
         }
 
         byte[] frame = WsFrameEncoder.Encode(WsOpcode.Binary, payload.GetBuffer().AsSpan(0, (int)payload.Length), randomSource);
+        context.Events.ReportDataSent(frame);
         await SendAsync(connection, frame, context.CancellationToken).ConfigureAwait(false);
+        context.Events.ReportInfo(WsInfoLines.UploadSent(frame.Length));
         context.Progress.ReportUploaded(frame.Length, frame.Length);
         return frame.Length;
     }

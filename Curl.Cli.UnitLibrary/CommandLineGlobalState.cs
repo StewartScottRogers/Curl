@@ -29,6 +29,12 @@ internal sealed class CommandLineGlobalState
 
     public bool ManualRequested { get; set; }
 
+    public bool EngineListRequested { get; set; }
+
+    public bool CaEmbedDumpRequested { get; set; }
+
+    public string? SslSessionsFile { get; set; }
+
     public bool Silent { get; set; }
 
     public bool ShowError { get; set; }
@@ -44,6 +50,8 @@ internal sealed class CommandLineGlobalState
     public int Verbosity { get; set; }
 
     public bool TraceTime { get; set; }
+
+    public bool TraceIds { get; set; }
 
     public string? StandardErrorFile { get; set; }
 

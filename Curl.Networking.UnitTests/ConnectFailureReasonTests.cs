@@ -22,6 +22,8 @@ public sealed class ConnectFailureReasonTests
     [DataRow(SocketError.NetworkUnreachable, "Network unreachable")]
     [DataRow(SocketError.HostUnreachable, "Host unreachable")]
     [DataRow(SocketError.AddressNotAvailable, "Address not available")]
+    [DataRow(SocketError.NetworkDown, "Network down")]
+    [DataRow(SocketError.InvalidArgument, "Invalid arguments")]
     public void Describe_WithWinsockWording_GivesCurlsWords(SocketError error, string expected)
     {
         var reason = ConnectFailureReason.Describe(new SocketException((int)error), usesWinsockWording: true);

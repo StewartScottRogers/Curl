@@ -74,6 +74,7 @@ omitted because the BCL lacks it.
 | MD4 (`Md4`) | RFC 1320 | NTLM `NTOWFv1` (BL-684); Kerberos `rc4-hmac` string-to-key (BL-686) | missing / missing / missing | BL-675 | RFC 1320 A.5 |
 | RIPEMD-160 (`Ripemd160`), HMAC-RIPEMD-160 (`HmacRipemd160`) | Dobbertin, Bosselaers, Preneel 1996; RFC 2286 | SSH `hmac-ripemd160`, `hmac-ripemd160@openssh.com` (BL-680) | missing / missing / missing | BL-675 | Bosselaers' page; RFC 2286 §2 |
 | RC4 (`Rc4`) | RFC 6229 (vectors), RFC 4345 (discard) | SSH `arcfour`, `arcfour128` (BL-680); Kerberos `rc4-hmac` (BL-686); NTLM key exchange (BL-684) | missing / missing / missing | BL-676 | RFC 6229 |
+| DES (`Des`) | FIPS 46-3 | NTLM `LMOWFv1`, `DESL` and the `NEGOTIATE_LM_KEY` key exchange key (BL-684, ADR-0156) | **partial** everywhere: the BCL's `DES` throws on the weak keys an empty password's LM hash needs | BL-684 | NIST SP 500-20; the BCL's `DES` for the keys it accepts |
 | CAST-128 (`Cast128`) | RFC 2144 | SSH `cast128-cbc` (BL-680) | missing / missing / missing | BL-676 | RFC 2144 Appendix B |
 | HPKE base mode (`Hpke`) | RFC 9180 | Encrypted Client Hello, `--ech` (BL-706) | missing / missing / missing | BL-677 | RFC 9180 Appendix A (base mode) |
 | AES-CTR (`AesCtr`), AES-CBC-CTS (`AesCbcCts`) | NIST SP 800-38A; RFC 3962 | SSH `aes*-ctr` (BL-565) and `openssh-key-v1` `aes256-ctr` (BL-681); Kerberos `aes*-cts-*` (BL-686) | missing / missing / missing (built on the BCL's AES-ECB and AES-CBC) | BL-737 | SP 800-38A F.5; RFC 3962 Appendix B |
@@ -95,8 +96,8 @@ sntrup761 row and BL-747 were added by ADR-0122.
 
 Consumers use these directly, on every platform, with no hand-built fallback:
 `Aes` (ECB, CBC, CFB), `AesGcm` (every consumer, TLS, QUIC, SSH `aes*-gcm@openssh.com`
-and HPKE, uses 16-byte tags, which all three platforms support), `TripleDES`, `DES`
-(NTLMv1), `MD5`, `SHA1`, `SHA256`, `SHA384`, `SHA512`, their `HMAC*` types, `HKDF`,
+and HPKE, uses 16-byte tags, which all three platforms support), `TripleDES` (not `DES`,
+whose weak-key refusal ADR-0156 works around), `MD5`, `SHA1`, `SHA256`, `SHA384`, `SHA512`, their `HMAC*` types, `HKDF`,
 `Rfc2898DeriveBytes.Pbkdf2`, `RSA` (PKCS #1 v1.5, PSS, OAEP), `ECDsa` and
 `ECDiffieHellman` on NIST P-256, P-384 and P-521, `RandomNumberGenerator`, and
 `CryptographicOperations`. The BCL's `ChaCha20Poly1305`, `AesCcm` and `DSA` are not

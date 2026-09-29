@@ -34,19 +34,51 @@ public sealed class UdpDatagramChannel : IDatagramChannel
     }
 
     /// <summary>
+    /// Opens a UDP socket of <paramref name="serverEndPoint" />'s address family, bound to
+    /// <paramref name="localAddress" /> on an ephemeral port, as a DNS query's socket is bound
+    /// under <c>--dns-ipv4-addr</c>, <c>--dns-ipv6-addr</c> or <c>--dns-interface</c> (BL-694).
+    /// </summary>
+    /// <param name="serverEndPoint">The resolved endpoint the first datagram goes to.</param>
+    /// <param name="localAddress">The local address to bind.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="serverEndPoint" /> is <see langword="null" />.</exception>
+    /// <exception cref="SocketException">The socket could not be opened or bound.</exception>
+    public UdpDatagramChannel(IPEndPoint serverEndPoint, IPAddress localAddress)
+        : this(serverEndPoint, static (socket, localEndPoint) => socket.Bind(localEndPoint), localAddress)
+    {
+    }
+
+    /// <summary>
+    /// Opens a UDP socket of <paramref name="serverEndPoint" />'s address family, bound to
+    /// <paramref name="localAddress" /> (any address of the family when <see langword="null" />)
+    /// on <paramref name="localPort" /> (an ephemeral port when <c>0</c>), as a QUIC connection's
+    /// socket is bound under <c>--interface</c> and <c>--local-port</c> (BL-728).
+    /// </summary>
+    /// <param name="serverEndPoint">The resolved endpoint the first datagram goes to.</param>
+    /// <param name="localAddress">The local address to bind, or <see langword="null" /> for any.</param>
+    /// <param name="localPort">The local port to bind, or <c>0</c> for an ephemeral one.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="serverEndPoint" /> is <see langword="null" />.</exception>
+    /// <exception cref="SocketException">The socket could not be opened or bound.</exception>
+    public UdpDatagramChannel(IPEndPoint serverEndPoint, IPAddress? localAddress, int localPort)
+        : this(serverEndPoint, static (socket, localEndPoint) => socket.Bind(localEndPoint), localAddress, localPort)
+    {
+    }
+
+    /// <summary>
     /// Opens a UDP socket of <paramref name="serverEndPoint" />'s address family and binds
     /// it through <paramref name="bind" />, so a test can make the bind fail.
     /// </summary>
     /// <param name="serverEndPoint">The resolved endpoint the first datagram goes to.</param>
     /// <param name="bind">Binds the socket to the local endpoint it is given.</param>
-    internal UdpDatagramChannel(IPEndPoint serverEndPoint, Action<Socket, EndPoint> bind)
+    /// <param name="localAddress">The local address to bind; <see langword="null" /> for any address of the family.</param>
+    /// <param name="localPort">The local port to bind; <c>0</c> for an ephemeral one.</param>
+    internal UdpDatagramChannel(IPEndPoint serverEndPoint, Action<Socket, EndPoint> bind, IPAddress? localAddress = null, int localPort = 0)
     {
         ArgumentNullException.ThrowIfNull(serverEndPoint);
 
         _socket = new Socket(serverEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
         try
         {
-            bind(_socket, new IPEndPoint(AnyAddressOf(serverEndPoint.AddressFamily), 0));
+            bind(_socket, new IPEndPoint(localAddress ?? AnyAddressOf(serverEndPoint.AddressFamily), localPort));
         }
         catch
         {

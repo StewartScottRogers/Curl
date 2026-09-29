@@ -4,15 +4,52 @@ Phase 1.
 
 Sockets, DNS, TLS via SslStream, proxy and SOCKS handling, connection reuse: the
 production implementations of the transport contracts in
-`Curl.Protocol.Abstractions.UnitLibrary` (ADR-0005). It references that project and
-nothing else.
+`Curl.Protocol.Abstractions.UnitLibrary` (ADR-0005). It references that project,
+`Curl.Tls.UnitLibrary`, the hand-built TLS client (ADR-0120, ADR-0140), `Curl.Quic.UnitLibrary`,
+the hand-built QUIC client (ADR-0180), and `Curl.Kerberos.UnitLibrary`, whose KDC transport and SRV lookup it implements, and nothing
+else: `KerberosKdcSocketTransport` moves a KDC's UDP datagram through an `IDatagramConnector`
+(one-second reply wait) and its TCP stream through an `IConnector` (the stream owns and
+disposes the connection, `ConnectionStream`'s `ownsConnection`), and `KerberosDnsSrvLookup`
+answers SRV lookups through `DnsServerResolver.ResolveServiceAsync` (BL-527, ADR-0176).
+
+Per ADR-0140 and ADR-0162 (BL-708) there are two TLS providers, and `TlsClientRouting.Choose`
+picks one from a `TlsClientOptions` as one pure function: `HandBuiltTlsProvider` when a row of
+ADR-0140's table holds (today a `MaximumVersion` of TLS 1.0 or 1.1, and `RequireCertificateStatus`
+for `--cert-status` by ADR-0191; each option task adds its row and a data row in
+`TlsClientRoutingTests`), `SslStreamTlsProvider` otherwise. With `--cert-status` the hand-built
+client asks for the stapled OCSP response and a rejected one is exit 91 with
+`CertificateStatusFailureMessages`' text on every platform. Per ADR-0191 `--ssl-auto-client-cert`
+(`TlsClientOptions.AutoClientCertificate`) without `--cert` makes `ClientCertificateLoader.Load`
+present the certificate `AutomaticClientCertificate.Choose` takes from `CurrentUser\MY`, in both
+providers; `HandBuiltTlsProviderTests.CertificateStatus` drives it against `Fakes/Tls13Server`,
+a copy of `Curl.Tls.UnitTests`' in-memory TLS 1.3 server and OCSP response builder. Both
+implement `ITlsProviderWithWarnings`. `HandBuiltTlsProvider` runs `TlsClientConnection` (one
+ClientHello offering TLS 1.3 and TLS 1.2, TLS 1.2 the default minimum, ADR-0205) for a range
+spanning both, `Tls13ClientConnection` for a TLS 1.3 minimum and `Tls12ClientConnection` for a
+ceiling below TLS 1.3, over the internal `ConnectionStream`, and returns a `HandBuiltTlsConnection`. Both providers judge the server's certificate with
+`ServerCertificateVerification` (trust anchors, tolerated chain errors, each build's name check,
+exit 60 and 77); the hand-built path reaches it through `HandBuiltCertificateVerifier`, which
+builds the chain and the `SslPolicyErrors` `SslStream` would. Both load `--cert` through
+`ClientCertificateLoader.Load`. Per ADR-0193 `ServerCertificateVerification.Judge` also checks
+`--pinnedpubkey` (`TlsClientOptions.PinnedPublicKey`) once the certificate is accepted, `-k` included:
+`PinnedPublicKey` matches `sha256//` hashes or a PEM or DER key file as curl's `Curl_pin_peer_pubkey`
+does, and a mismatch is exit 90 in both providers. Per ADR-0197 the OpenSSL build, unless `-k`,
+reads `--crlfile` (`TlsClientOptions.CertificateRevocationListFile`) in `ReadTrustAnchors` through
+`CertificateRevocationListFile` (exit 82 through `CertificateRevocationListFileException` and
+`TrustAnchorsUnusable`) and `Judge` checks every chain certificate against a list from its issuer,
+decoded and signature-checked by `CertificateRevocationList`, exit 60 with OpenSSL's verify result;
+the Schannel build ignores `--crlfile`. The hand-built path's other exit 35 texts are
+`TlsFailureMessages.SchannelHandBuiltHandshakeFailure` and `OpenSslHandBuiltHandshakeFailure`.
+Its tests run it against a server-side `SslStream` over `Fakes/InMemoryDuplexStream`, TLS 1.3
+excluded on macOS, and compare each failure with `SslStreamTlsProvider`'s.
 
 This is the one project allowed to construct a `Socket`, and only inside a transport
 type: `TcpDialer` (behind `ITcpDialer`) and `TcpConnectionListener` with its
 `TcpPendingConnection` (behind `IConnectionListener`) are the only types that construct a TCP
-`Socket` or a `NetworkStream`, and `UdpDatagramChannel` (opened by
-`UdpDatagramConnector`, behind `IDatagramConnector`) the only one that constructs a
-UDP `Socket`. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
+`Socket` or a `NetworkStream` (`TcpDialer` also connects the Unix domain socket, BL-507), and `UdpDatagramChannel` (opened by
+`UdpDatagramConnector`, behind `IDatagramConnector`, and by `DnsSocketOpener`) the only one that constructs a
+UDP `Socket`; `DnsSocketOpener` (behind `IDnsSocketOpener`) also constructs the TCP `Socket` and
+`NetworkStream` a truncated DNS reply is asked again over. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
 `TlsClientOptions`) is the only type that constructs an `SslStream`; it runs the
 handshake over the plaintext `IConnection` through the internal `ConnectionStream`
 adapter and returns an `SslStreamConnection`. With `--cacert` (`TlsClientOptions.CaCertificateFile`)
@@ -76,7 +113,9 @@ transfer offers `http/1.1` through ALPN (`TcpConnector.ApplicationProtocolsFor`)
 (`TlsClientOptions.UseAlpn`); the Schannel build under `--ssl-revoke-best-effort`
 (`TlsClientOptions.RevocationCheckBestEffort`) accepts a `--cacert` chain whose only faults are an
 unknown or offline revocation status; and `TcpDialer` sets `TCP_NODELAY` and `SO_KEEPALIVE` from
-`TcpSocketOptions` (`--no-tcp-nodelay`, `--no-keepalive`) in `ApplySocketOptions`, which unit tests measure.
+`TcpSocketOptions` (`--no-tcp-nodelay`, `--no-keepalive`), with the keepalive idle time, interval and probe
+count from `--keepalive-time` and `--keepalive-cnt` (`TcpSocketOptions.FromCommandLine`), in `ApplySocketOptions`,
+which unit tests measure; a timer the platform refuses is skipped, as libcurl skips it.
 Per ADR-0100 it also reports curl's `-v` connect lines on the target's `Events`: `Trying` before
 each dial, `connect to ... failed: <reason>` after each failed one (the reason from
 `ConnectFailureReason`), the exit 7 message, and `ReportConnectionOpened` once any tunnel and
@@ -97,12 +136,23 @@ connect fails with exit 28 and `Connection timed out after N milliseconds`, N fr
 start, also reported as a `-v` line. A cancellation arriving once the limit has passed is that
 failure; an earlier one escapes. Tests stall through `Fakes/StallingTcpDialer`,
 `StallingTlsProvider` and `StallingConnection` and fire the limit with `ManualTimeProvider.Advance`.
+Per ADR-0143 (BL-500) `TcpConnector` and `UdpDatagramConnector` take the `-4`/`-6` choice as an
+`AddressFamily` (`Unspecified` for either): `AddressFamilyFilter` keeps a name's addresses of that
+family only, and leaves an IP address literal alone, as curl 8.21.0 does. A name left with none is
+exit 6 (exit 5 for a proxy). A looked-up answer is cached and reported with the one family;
+`localhost` and `--resolve` entries are reported whole, and an entry left empty is reported as
+`Negative DNS entry`.
 
 `TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT
 request (its `User-Agent`, credential encoding and `--proxy-header` values from `HttpProxyTunnelOptions`, ADR-0077) and reads
 the reply one byte at a time, so the tunnel's bytes stay on the connection; TLS then runs
-over the tunnel for an https target. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
+over the tunnel for an https target. Per ADR-0186 (BL-602) the CONNECT's `Proxy-Authorization`
+comes from `HttpProxyTunnelOptions.ProxyAuthenticator` (`PreemptiveBasicProxyAuthenticator`
+when none is given) for `ProxyAuthSchemes`: asked first with no challenge, and after a `407` to a
+CONNECT that sent none with its `Proxy-Authenticate` values, the answer sent on the same
+connection after the `Content-Length` body unless the reply closes it or is chunked, else on a
+newly dialled one. A `407` to a CONNECT that sent a credential is exit 7. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
 `Socks5Hostname`) `SocksProxyTunnel` runs curl 8.21.0's handshake, measured byte for byte
 (BL-213): `Socks4Handshake` resolves the target locally and sends its first IPv4 address,
 SOCKS4a sends the host as written; `Socks5Handshake` offers no authentication and GSSAPI (and
@@ -122,7 +172,10 @@ parses them (measured; BL-214). The first `--connect-to` mapping matching the UR
 and port gives the `ConnectDestination` that is resolved, dialled and named in the CONNECT
 request; TLS still verifies the URL's host. A `--resolve` entry for the host and port being
 resolved, the proxy's included, answers in place of `IDnsResolver`. An entry or a matching
-mapping that does not parse fails the connect with exit 49 and curl's message.
+mapping that does not parse fails the connect with exit 49 and curl's message. Per ADR-0208
+(BL-878) a target's `AltSvcRoute` (`--alt-svc`) is dialled the same way when no mapping matched,
+after curl's `Alt-svc connecting from [h1]H:P to [h1]H2:P2` line, and `ConnectionPoolKey` keys on
+the alternative too.
 
 `SystemDnsResolver` reports a host `Dns` refuses as over 255 characters as not resolved, so it
 is exit 6 (exit 5 for a proxy) as in curl 8.21.0, which accepts hosts up to 65535 bytes. Every
@@ -161,6 +214,67 @@ connection is reported `with proxy` (`ConnectionReusedEvent.IsProxy`) when the t
 forward proxy (`ConnectTarget.IsForwardProxy`) or tunnels through one, naming the proxy's host
 and port for a tunnel, as curl 8.21.0 prints it (BL-360).
 
+Per ADR-0149 (BL-507) `TcpConnector` takes an optional `UnixSocketAddress` (`--unix-socket`,
+`--abstract-unix-socket`, whose name starts with a NUL). With one, every connect dials it through
+`ITcpDialer.DialUnixSocketAsync` in place of the host, port and proxy, resolving nothing, then runs
+TLS to the URL's host when asked. `-v` shows curl 8.21.0's Windows lines on every platform: `Trying
+<name>:0...`, and for a failure `Immediate connect fail for <name>: <reason>` and `connect to <name>
+port 0 from  port 0 failed: <reason>` before exit 7 `Failed to connect to <host>:<port> over
+unix://<path> after N ms: Could not connect to server`; `<name>` is `UnixSocketAddress.RemoteIpText`,
+the path cut to 45 characters (empty for an abstract name). A success is reported opened with the
+path as the host and `ConnectionOpenedEvent.UnixSocketRemoteIp`. A path too long for `sun_path`
+(108 bytes, 104 on macOS, with its NUL) is exit 6 `Unix socket path too long: '<path>'`. Pools are
+per option group, so different sockets never share a connection.
+
+The DNS-over-HTTPS message codec (ADR-0152, BL-640) is pure code, bytes in and bytes out, as
+curl 8.21.0's `lib/doh.c` does it. `DnsQueryEncoder` writes the measured query (ID 0, flags
+`0x0100`, one question, QCLASS IN) for a `DnsRecordType`, refusing an empty label or one over 63
+bytes and a query over 272 bytes. `DnsAnswerDecoder` returns a `DnsAnswer`: the addresses of the
+type asked for (at most 24), the CNAME targets followed through compression pointers (at most 4),
+the smallest TTL, or a `DnsMessageFailure`, a pointer loop ending as `LabelLoop` after 128 steps.
+`DnsMessageFailureText` gives curl's `--trace-config doh` text for each failure. For an SRV query
+the decoder also keeps each SRV record as `DnsAnswer.ServiceRecords` (`DnsServiceRecord`).
+
+`DohDnsResolver` (ADR-0152 and its BL-641 amendment) is the `IDnsResolver` behind `--doh-url`. It
+takes an `IConnector` for the DoH connections (a `TcpConnector` of its own, built with the system
+resolver and the DoH TLS options) and the DoH URL, and for each name POSTs the A query and the AAAA
+query in parallel on two connections, A first, each request written byte for byte as curl 8.21.0
+writes it (no `User-Agent`; `Host` with the port only when it is not the default). The target
+carries `PoolScheme` `https`, so the handshake offers ALPN `http/1.1`. `DohResponseReader` reads the
+response as curl does: status and `Content-Type` ignored, a `Content-Length` or chunked body of at
+most 3000 bytes, anything else a failure. It returns the AAAA answer's addresses, then the A
+answer's; a query that fails yields none, and none from both makes `TcpConnector` fail with exit 6.
+IP literals and `localhost` (`TcpConnector.IsLocalhost`) are answered without a query. Its tests
+drive it through `Fakes/FakeConnector`'s `BytesToRead` and through a `TcpConnector` over fakes.
+
+Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
+`--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr`, measured against curl 8.22.0's c-ares
+1.34.8 build. It takes the options verbatim (`DnsServerResolverOptions`) and parses them when it
+resolves: `DnsServerList` for the list, `DnsSourceBinding` for the bind addresses; one that does not
+parse is `DnsLookupFailure.BadConfiguration`, exit 43. Without `--dns-servers` it asks
+`SystemDnsServers`. It sends AAAA and A at once (one family under `-4`/`-6`), each built by
+`DnsServerQuery` (the encoder's question plus an ID and an EDNS OPT record with a client cookie
+over UDP), to the servers in list order for `Rounds` rounds, waiting `FirstTimeout` doubled each
+round on its `TimeProvider`; a truncated reply is asked again over TCP. Replies are matched
+(`DnsReplyMatch`) and read through `DnsAnswerDecoder` into a `DnsQueryOutcome`. It implements
+`IDnsResolverWithFailureReason`, so `TcpConnector` and `UdpDatagramConnector` add c-ares' reason
+(`DnsLookupFailureText`) in brackets, or make it exit 43, through `NameResolutionFailure`.
+`ResolveServiceAsync` looks up SRV records for Kerberos KDC location (BL-689). Sockets come from
+`IDnsSocketOpener`; tests use `Fakes/ScriptedDnsSocketOpener` and `ManualTimeProvider`.
+
+Per ADR-0180 (BL-728) `TcpConnector` takes an optional `QuicDialer`, and its
+`ConnectMultiplexedAsync` resolves the host exactly as `ConnectAsync` does (the same DNS cache,
+`--resolve`, `--connect-to`, `-4`/`-6` and `-v` lines) and hands the addresses, as a
+`QuicDialRequest`, to the dialer. `QuicDialer` opens a UDP channel for each address in turn
+through `IUdpChannelOpener` (`UdpChannelOpener` in production, binding `UdpDatagramChannel` to a
+local address and port), runs `Curl.Quic`'s `QuicClientConnector` with curl's ClientHello and a
+`HandBuiltCertificateVerifier`, and returns a `QuicConnection`; failures print curl's `QUIC connect
+to` and `Failed to connect to <host> port <port>` lines, and a socket error is exit 56 `QUIC:
+recvfrom() ...`. This project therefore references `Curl.Quic.UnitLibrary`, which lets
+`Curl.Networking.UnitTests` see its internals: `Fakes/QuicTestServer` and `QuicTestTlsServer` are
+copies of `Curl.Quic.UnitTests`' in-memory server, reached through `Fakes/QuicServerChannelOpener`.
+`PoolingConnector.ConnectMultiplexedAsync` passes straight through to its inner connector.
+
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in
 `Curl.Networking.UnitTests` drive every branch with fakes and no network.
@@ -171,10 +285,10 @@ cancels and disposes local UDP sockets without sending anything.
 the in-memory `Fakes/InMemoryDuplexStream` pair, with a self-signed certificate made in
 the test, so TLS is tested without a socket. `TcpConnectionListenerTests` and
 `TcpPendingConnectionTests` bind local TCP sockets without connecting to them. The tests that
-connect or send bytes are the loopback tests in `TcpDialerTests`, `UdpDatagramChannelTests`,
+connect or send bytes are the loopback tests in `TcpDialerTests` (TCP and Unix socket), `UdpDatagramChannelTests`,
 `TcpConnectorTests.LocalEndPoint` (plain and over TLS) and the accepting test in `TcpConnectionListenerTests`, tagged
-`[TestCategory("Integration")]`. Per ADR-0083 the four members only those tests can reach,
-`TcpDialer.DialAsync`, `TcpPendingConnection.AcceptStreamConnectionAsync` (behind the internal
-`AcceptConnectionAsync` seam), `UdpDatagramChannel.SendAsync` and `UdpDatagramChannel.ReceiveAsync`,
+`[TestCategory("Integration")]`, as is `DnsSocketOpenerTests`' TCP connect. Per ADR-0083 the six members only those tests can reach,
+`TcpDialer.DialAsync`, `TcpDialer.DialUnixSocketAsync`, `TcpPendingConnection.AcceptStreamConnectionAsync` (behind the internal
+`AcceptConnectionAsync` seam), `UdpDatagramChannel.SendAsync`, `UdpDatagramChannel.ReceiveAsync` and `DnsSocketOpener.ConnectStreamAsync`,
 carry `[ExcludeFromCodeCoverage]`, so the fast-run coverage gate holds without the network.
 Keep them thin: logic added there is not measured.

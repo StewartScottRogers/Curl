@@ -113,6 +113,20 @@ public interface ITransferContext
     TimeCondition? TimeCondition { get; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>-R</c>/<c>--remote-time</c> was given, so a handler
+    /// that must ask the server for the resource's time does, and reports it as
+    /// <see cref="TransferResult.SourceLastWriteTimeUtc" />; <see langword="false" /> when
+    /// not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> reads it: curl 8.21.0 sends <c>MDTM</c> only under <c>-R</c>,
+    /// <c>-z</c> or <c>-I</c> (BL-637). A handler that learns the time anyway, as
+    /// <c>file://</c> does, ignores it. The caller, not the handler, applies the time to the
+    /// output file.
+    /// </remarks>
+    bool RemoteTime { get; }
+
+    /// <summary>
     /// Gets the stream that headers are written to for <c>-i</c>/<c>--include</c> and
     /// <c>-D</c>/<c>--dump-header</c>, or <see langword="null" /> when the caller asked
     /// for no header output.

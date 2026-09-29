@@ -143,6 +143,54 @@ public sealed class ConnectResultTests
     }
 
     [TestMethod]
+    public void Connected_WithoutApplicationProtocol_AgreedNone()
+    {
+        var result = ConnectResult.Connected(new UnusedConnection());
+
+        Assert.IsNull(result.ApplicationProtocol);
+    }
+
+    [TestMethod]
+    public void Connected_WithApplicationProtocol_CarriesIt()
+    {
+        var result = ConnectResult.Connected(new UnusedConnection(), null, applicationProtocol: "h2");
+
+        Assert.AreEqual("h2", result.ApplicationProtocol);
+    }
+
+    [TestMethod]
+    public void Connected_WithoutUnixSocketPath_WentOverTcp()
+    {
+        var result = ConnectResult.Connected(new UnusedConnection());
+
+        Assert.IsNull(result.UnixSocketPath);
+    }
+
+    [TestMethod]
+    public void Connected_WithUnixSocketPath_CarriesIt()
+    {
+        var result = ConnectResult.Connected(new UnusedConnection(), null, unixSocketPath: "/run/S.sock");
+
+        Assert.AreEqual("/run/S.sock", result.UnixSocketPath);
+    }
+
+    [TestMethod]
+    public void Failed_Always_NamesNoUnixSocketPath()
+    {
+        var result = ConnectResult.Failed(CurlExitCode.CouldntConnect, "refused");
+
+        Assert.IsNull(result.UnixSocketPath);
+    }
+
+    [TestMethod]
+    public void Failed_Always_AgreedNoApplicationProtocol()
+    {
+        var result = ConnectResult.Failed(CurlExitCode.CouldntConnect, "refused");
+
+        Assert.IsNull(result.ApplicationProtocol);
+    }
+
+    [TestMethod]
     public void MarkReusable_OnConnectionThatDoesNotOverrideIt_DoesNotThrow()
     {
         IConnection connection = new UnusedConnection();

@@ -24,6 +24,10 @@ namespace Curl.Output;
 /// </param>
 /// <param name="timeProvider">The clock read for each stamp, when an event arrives.</param>
 /// <param name="tlsBackend">The curl build whose wording a TLS handshake gets (ADR-0085).</param>
+/// <param name="traceIds">
+/// The <c>--trace-ids</c> marker each line that starts an event carries after its stamp, or
+/// <see langword="null"/> for none.
+/// </param>
 /// <remarks>
 /// A port of the <c>-v</c> branch of <c>tool_debug_cb</c> in curl's <c>src/tool_cb_dbg.c</c>.
 /// A run of body events with nothing between them is one data line carrying the first
@@ -39,7 +43,8 @@ public sealed class VerboseTransferEventWriter(
     bool writesDataLines,
     bool writesTimestamps,
     TimeProvider timeProvider,
-    TlsBackend tlsBackend) : ITransferEvents
+    TlsBackend tlsBackend,
+    TraceIdsPrefix? traceIds) : ITransferEvents
 {
     private const byte LineFeed = (byte)'\n';
 
@@ -90,6 +95,20 @@ public sealed class VerboseTransferEventWriter(
     /// <param name="timeProvider">The clock read for each stamp, when an event arrives.</param>
     public VerboseTransferEventWriter(Stream output, bool writesDataLines, bool writesTimestamps, TimeProvider timeProvider)
         : this(output, writesDataLines, writesTimestamps, timeProvider, PlatformTlsBackend.ForProcess)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="VerboseTransferEventWriter"/> class that
+    /// writes no <c>--trace-ids</c> markers.
+    /// </summary>
+    /// <param name="output">The stream the lines are written to, not owned.</param>
+    /// <param name="writesDataLines">Whether body bytes are shown as <c>[N bytes data]</c> lines.</param>
+    /// <param name="writesTimestamps">Whether each line that starts an event carries curl's <c>--trace-time</c> stamp.</param>
+    /// <param name="timeProvider">The clock read for each stamp, when an event arrives.</param>
+    /// <param name="tlsBackend">The curl build whose wording a TLS handshake gets (ADR-0085).</param>
+    public VerboseTransferEventWriter(Stream output, bool writesDataLines, bool writesTimestamps, TimeProvider timeProvider, TlsBackend tlsBackend)
+        : this(output, writesDataLines, writesTimestamps, timeProvider, tlsBackend, traceIds: null)
     {
     }
 
@@ -173,20 +192,20 @@ public sealed class VerboseTransferEventWriter(
             return;
         }
 
-        byte[] stamp = Timestamp();
+        byte[] lineStart = LineStart();
         int start = 0;
         for (int index = 0; index < bytes.Length - 1; index++)
         {
             if (bytes[index] == LineFeed)
             {
-                WriteLineStartUnlessLineIsOpen(stamp, RequestHeaderPrefix);
+                WriteLineStartUnlessLineIsOpen(lineStart, RequestHeaderPrefix);
                 output.Write(bytes[start..(index + 1)]);
                 start = index + 1;
                 lineIsOpen = false;
             }
         }
 
-        WriteLineStartUnlessLineIsOpen(stamp, RequestHeaderPrefix);
+        WriteLineStartUnlessLineIsOpen(lineStart, RequestHeaderPrefix);
         output.Write(bytes[start..]);
         FinishHeader(bytes);
     }
@@ -242,23 +261,24 @@ public sealed class VerboseTransferEventWriter(
     {
         if (!lineIsOpen)
         {
-            output.Write(Timestamp());
+            output.Write(LineStart());
             output.Write(prefix);
         }
     }
 
-    private void WriteLineStartUnlessLineIsOpen(byte[] stamp, byte[] prefix)
+    private void WriteLineStartUnlessLineIsOpen(byte[] lineStart, byte[] prefix)
     {
         if (!lineIsOpen)
         {
-            output.Write(stamp);
+            output.Write(lineStart);
             output.Write(prefix);
         }
     }
 
-    // curl's timebuf and log_line_start: the stamp goes in front of the prefix.
-    private byte[] Timestamp()
+    // curl's timebuf and log_line_start: the stamp, then the --trace-ids marker, go in front of the prefix.
+    private byte[] LineStart()
     {
-        return writesTimestamps ? Encoding.ASCII.GetBytes(TraceTimeStamp.Read(timeProvider)) : [];
+        string stamp = writesTimestamps ? TraceTimeStamp.Read(timeProvider) : string.Empty;
+        return Encoding.ASCII.GetBytes(stamp + traceIds?.Text);
     }
 }

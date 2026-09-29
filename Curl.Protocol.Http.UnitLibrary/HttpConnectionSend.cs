@@ -48,6 +48,32 @@ internal static class HttpConnectionSend
         }
     }
 
+    /// <summary>
+    /// Ends the request's HTTP/2 or HTTP/3 stream once its body has been written, when
+    /// <paramref name="connection" /> is one (<see cref="IHttpStreamConnection.EndRequestAsync" />);
+    /// does nothing for an HTTP/1.x connection, where the head and body frame the request.
+    /// </summary>
+    /// <param name="connection">The connection the request was sent on.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the stream's end is sent.</returns>
+    /// <exception cref="HttpTransferException">The connection failed the write (exit 55).</exception>
+    internal static async ValueTask EndStreamRequestAsync(IConnection connection, CancellationToken cancellationToken)
+    {
+        if (connection is not IHttpStreamConnection stream)
+        {
+            return;
+        }
+
+        try
+        {
+            await stream.EndRequestAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException exception)
+        {
+            throw SendFailed(exception);
+        }
+    }
+
     private static HttpTransferException SendFailed(IOException exception) =>
         new(CurlExitCode.SendError, HttpTransferMessages.SendFailure(exception));
 }

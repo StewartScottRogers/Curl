@@ -14,8 +14,17 @@ internal static class TransferEventInfoText
     /// <summary>Returns the <c>Established connection</c> line.</summary>
     /// <param name="opened">The facts about the connection.</param>
     /// <returns>The line.</returns>
+    /// <remarks>
+    /// Through a Unix domain socket curl 8.21.0 prints <c>Established connection to &lt;path&gt;
+    /// (&lt;path&gt; port 0) from  port 0 </c>, the second path cut to 45 characters (measured, BL-507).
+    /// </remarks>
     public static string ConnectionOpened(ConnectionOpenedEvent opened)
     {
+        if (opened.UnixSocketRemoteIp is { } unixSocketRemoteIp)
+        {
+            return $"Established connection to {opened.HostName} ({unixSocketRemoteIp} port 0) from  port 0 ";
+        }
+
         return $"Established connection to {opened.HostName} ({opened.RemoteEndPoint.Address} port {opened.RemoteEndPoint.Port}) " +
             $"from {opened.LocalEndPoint.Address} port {opened.LocalEndPoint.Port} ";
     }

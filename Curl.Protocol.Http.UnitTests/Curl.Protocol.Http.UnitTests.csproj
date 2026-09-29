@@ -9,6 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Curl.Authentication.UnitLibrary\Curl.Authentication.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Networking.UnitLibrary\Curl.Networking.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Protocol.Http.UnitLibrary\Curl.Protocol.Http.UnitLibrary.csproj" />
   </ItemGroup>

@@ -45,6 +45,9 @@ public sealed class TransferContext : ITransferContext
     public TimeCondition? TimeCondition { get; init; }
 
     /// <inheritdoc />
+    public bool RemoteTime { get; init; }
+
+    /// <inheritdoc />
     public Stream? HeaderOutput { get; init; }
 
     /// <inheritdoc />

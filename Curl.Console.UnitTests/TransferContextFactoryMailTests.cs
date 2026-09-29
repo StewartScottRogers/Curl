@@ -45,6 +45,12 @@ public sealed class TransferContextFactoryMailTests
     }
 
     [TestMethod]
+    public void Create_ServiceName_CarriesItForSasl()
+    {
+        Assert.AreEqual("svc", MailOf("smtp://example.com/", "--service-name", "svc").ServiceName);
+    }
+
+    [TestMethod]
     public void Create_MailSchemeWithoutMailOptions_CarriesTheDefaults()
     {
         MailRequestOptions mail = MailOf("imap://example.com/");
@@ -93,9 +99,9 @@ public sealed class TransferContextFactoryMailTests
     }
 
     [TestMethod]
-    public void CreateSaslAuthenticator_IsTheAuthenticationLibrarysInThePlatformsEncoding()
+    public async Task CreateSaslAuthenticator_IsTheAuthenticationLibrarysInThePlatformsEncoding()
     {
-        ISaslAuthenticator authenticator = CurlComposition.CreateSaslAuthenticator();
+        ISaslAuthenticator authenticator = CurlComposition.CreateSaslAuthenticator(new SystemSecurityContextFactory());
         SaslRequest request = new(new NetworkCredential("\u00e9", "p"), null, null, null, "smtp", "example.com");
 
         ISaslExchange exchange = authenticator.Begin("PLAIN", request);
@@ -103,7 +109,7 @@ public sealed class TransferContextFactoryMailTests
         Assert.IsInstanceOfType<SaslAuthenticator>(authenticator);
         CollectionAssert.AreEqual(
             CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()).GetBytes("\0\u00e9\0p"),
-            exchange.InitialResponse);
+            await exchange.GetInitialResponseAsync(CancellationToken.None));
     }
 
     /// <summary>Creates the context for <paramref name="url" /> and returns its mail options.</summary>

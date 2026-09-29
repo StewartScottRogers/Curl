@@ -6,7 +6,8 @@ namespace Curl.Console;
 /// <summary>
 /// Maps the redirect options of a parsed command line onto the <see cref="RedirectPolicy" />
 /// <see cref="RedirectFollower" /> applies under <c>-L</c>: <c>--max-redirs</c>,
-/// <c>--post301</c>, <c>--post302</c>, <c>--post303</c> and <c>--location-trusted</c>.
+/// <c>--post301</c>, <c>--post302</c>, <c>--post303</c>, <c>--location-trusted</c> and
+/// <c>--proto-redir</c>, with <c>--proto</c>, which the follower applies to every URL.
 /// </summary>
 internal static class RedirectPolicyMapping
 {
@@ -17,15 +18,23 @@ internal static class RedirectPolicyMapping
     /// <returns>
     /// The policy: <see cref="CommandLineOptions.MaxRedirects" />, the three
     /// <c>KeepPostAfter</c> flags and <see cref="CommandLineOptions.SendCredentialsToRedirectHosts" />
-    /// verbatim, and curl's default <see cref="RedirectPolicy.AllowedSchemes" />.
+    /// verbatim, <see cref="CommandLineOptions.AllowedRedirectProtocols" /> as
+    /// <see cref="RedirectPolicy.AllowedSchemes" /> (curl's default when not given), and
+    /// <see cref="CommandLineOptions.AllowedProtocols" /> as <see cref="RedirectPolicy.AllowedTransferSchemes" />.
     /// </returns>
-    internal static RedirectPolicy FromCommandLine(CommandLineOptions options) =>
-        new()
+    internal static RedirectPolicy FromCommandLine(CommandLineOptions options)
+    {
+        RedirectPolicy policy = new()
         {
             MaxRedirects = options.MaxRedirects,
             KeepPostOn301 = options.KeepPostAfter301,
             KeepPostOn302 = options.KeepPostAfter302,
             KeepPostOn303 = options.KeepPostAfter303,
             LocationTrusted = options.SendCredentialsToRedirectHosts,
+            AllowedTransferSchemes = options.AllowedProtocols,
         };
+        return options.AllowedRedirectProtocols is { } redirectSchemes
+            ? policy with { AllowedSchemes = redirectSchemes }
+            : policy;
+    }
 }

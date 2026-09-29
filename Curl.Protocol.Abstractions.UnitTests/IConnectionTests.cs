@@ -29,6 +29,32 @@ public sealed class IConnectionTests
         Assert.IsFalse(connection.IsSecure);
     }
 
+    [TestMethod]
+    public void Session_WhenNotOverridden_ReturnsNull()
+    {
+        IConnection connection = new MinimalConnection();
+
+        var session = connection.Session;
+
+        Assert.IsNull(session);
+    }
+
+    [TestMethod]
+    public void TryHoldSession_WhenNotOverridden_ReturnsFalseAndHoldsNothing()
+    {
+        IConnection connection = new MinimalConnection();
+
+        var isHeld = connection.TryHoldSession(new UnusedSession());
+
+        Assert.IsFalse(isHeld);
+        Assert.IsNull(connection.Session);
+    }
+
+    private sealed class UnusedSession : IConnectionSession
+    {
+        public ValueTask ShutDownAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
     private sealed class MinimalConnection : IConnection
     {
         public bool IsSecure => false;

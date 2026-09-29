@@ -599,6 +599,18 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    public void TryGetVariableText_RetryCountGiven_PrintsItAsNumRetries()
+    {
+        // curl --retry 2 against 503, 503, 200 printed num_retries 2 (BL-513's Notes).
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), LoopbackUrl, 0, LoopbackUrl, "http", Clock)
+        {
+            RetryCount = 2,
+        };
+
+        Assert.AreEqual("2", Get(variables, "num_retries"));
+    }
+
+    [TestMethod]
     public void Constructor_NullArguments_Throw()
     {
         TransferResult result = TransferResult.Success(0);

@@ -74,7 +74,8 @@ internal static class SaslDigestMd5
     /// The response, which ends <c>,charset=utf-8</c> when the challenge names it;
     /// <see langword="null" /> when the challenge has no <c>nonce</c>, an <c>algorithm</c>
     /// other than <c>md5-sess</c> in any case, or a <c>qop</c> without <c>auth</c>. SSPI
-    /// fails those with exit 94, not 67; see BL-547.
+    /// fails those with exit 94, not 67, which <see cref="SaslAuthenticator" /> throws as a
+    /// <see cref="Curl.Protocol.Abstractions.SaslAuthenticationFailedException" /> (BL-781).
     /// </returns>
     internal static byte[]? AnswerAsSspi(byte[] challenge, Encoding credentialEncoding, string userWithDomain, string password, string digestUri, string clientNonce)
     {

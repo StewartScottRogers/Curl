@@ -95,22 +95,29 @@ an ADR that decides a feature stays out.
 of the shift. `-Lanes N` runs N tasks at once, each in its own git worktree beside the
 checkout (`<repo>.lanes\lane-<n>`); the board never gives two lanes tasks whose
 `touches` overlap, and each lane rebases, rebuilds, tests and pushes its own work, one
-lane at a time. Running out of tokens is not a stall: the shift announces it with the
+lane at a time. `-Lanes Auto` sizes the shift itself, adding or retiring one lane at a
+time to the measured burn rate, the board's parallel capacity and the machine's cap, so
+it suits whichever Claude plan is in use. Running out of tokens is not a stall: the shift announces it with the
 reset time, waits (the wait does not count against `-Hours`), warns a minute before the
 new session and reruns the cut-off task. See the script's header for the details.
 
 When Claude starts a shift it always passes `-NewTab`, e.g.
-`RunDarkFactory.cmd -NewTab -Lanes 3 -Continuous`; `-Continuous` makes a shift that
+`RunDarkFactory.cmd -NewTab -Lanes Auto -Continuous`; `-Continuous` makes a shift that
 ends with work still ready start the next one itself. A shift ends before the tokens run
 out: once 85% of the 5-hour window (`-StopAtUsage`) or 97% of the weekly window
 (`-StopAtWeeklyUsage`) is used, lanes claim
 nothing new, finish what they hold and push; the next shift waits for a fresh 5-hour
-window, and a used-up weekly window raises the alarm. Inside herdr (`HERDR_ENV=1`) that opens the shift
+window, or for the weekly reset when the week is used up, with a notice rather than the
+alarm. `-Lanes Auto` paces lanes to the 5-hour window only; `-WeeklyPace` also spreads
+the weekly budget evenly to its reset (ADR-0130, BL-806). Inside herdr (`HERDR_ENV=1`) that opens the shift
 and each of its lanes as herdr tabs in the current workspace; outside herdr, as console
 windows. Never start one with `Start-Process` or a bare background command: Stewart
 watches shifts in herdr. Stop a shift by closing its tabs (or killing its process tree).
 Leave its tasks in `Doing` and its lane worktrees as they are: the next shift adopts each
-stopped lane and resumes its task from the work in place. While a shift runs, its
+stopped lane and resumes its task from the work in place. To restart a running shift,
+run `RunDarkFactory.cmd -Restart` (in the background: it waits for each lane to finish
+any claim or integration). It stops that shift lane by lane and starts the next one with
+the same arguments; never hand-kill the processes for a restart. While a shift runs, its
 coordinator restarts any lane whose process dies, and lanes wait out the usage limit and
 carry on when tokens return - nobody needs to restart them. The lanes' heartbeats are
 published as `status.json` on the `board` branch every `-HeartbeatMinutes` (default 3)

@@ -69,7 +69,7 @@ public sealed class SmtpProtocolHandlerUploadTests
 
         Assert.AreEqual(Envelope + "hi\n.x\n\r\n.\r\n" + Quit, run.Sent);
         AssertResult(run.Result, CurlExitCode.Ok, null, 250, 11);
-        CollectionAssert.AreEqual(new (long, long?)[] { (6, null), (11, null) }, progress.Uploaded);
+        CollectionAssert.AreEqual(new (long, long?)[] { (11, null) }, progress.Uploaded);
     }
 
     [TestMethod]

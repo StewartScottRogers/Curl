@@ -7,14 +7,20 @@ namespace Curl.Protocol.Pop3;
 /// Sends commands on a POP3 connection and reads its responses, a line at a time.
 /// </summary>
 /// <param name="connection">The connection; the caller owns and disposes it.</param>
+/// <param name="events">
+/// Where <c>-v</c> and <c>--trace</c> learn of each command sent, as a request header, and
+/// each line read, as a response header.
+/// </param>
 /// <param name="cancellationToken">Cancels every send and read.</param>
 /// <remarks>
 /// Commands and responses are Latin-1. As measured on curl 8.21.0 (BL-547): a line ends at
 /// LF, with a CR before it dropped; a status line starts with <c>+</c> or <c>-ERR</c> and any
 /// other line is skipped; while <c>CAPA</c> is answered every line counts, a line that is
-/// exactly <c>.</c> ends the list and a line starting <c>-ERR</c> refuses it.
+/// exactly <c>.</c> ends the list and a line starting <c>-ERR</c> refuses it. Every command
+/// sent is reported with its CRLF and every line read with its line end, skipped or not, until
+/// <see cref="StopReporting" />; a body's bytes are not reported here (BL-552).
 /// </remarks>
-internal sealed class Pop3ControlChannel(IConnection connection, CancellationToken cancellationToken)
+internal sealed class Pop3ControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken)
 {
     private const int ReadBufferSize = 4096;
 
@@ -34,6 +40,9 @@ internal sealed class Pop3ControlChannel(IConnection connection, CancellationTok
 
     private int bufferEnd;
 
+    /// <summary>Where lines are reported: <c>events</c> until <see cref="StopReporting" />, nowhere after.</summary>
+    private ITransferEvents reporting = events;
+
     /// <summary>
     /// Gets the connection commands are sent on and responses read from: the one the
     /// channel was built with until <see cref="SwitchTo(IConnection)" />.
@@ -48,8 +57,15 @@ internal sealed class Pop3ControlChannel(IConnection connection, CancellationTok
     public void SwitchTo(IConnection secured) => connection = secured;
 
     /// <summary>
-    /// Sends <paramref name="command" /> followed by CRLF. A connection that fails with an
-    /// <see cref="IOException" /> is left for the next read to find closed.
+    /// Reports nothing more: curl sends <c>QUIT</c> once the transfer is over, where <c>-v</c>
+    /// does not see it or its answer.
+    /// </summary>
+    public void StopReporting() => reporting = NoTransferEvents.Instance;
+
+    /// <summary>
+    /// Sends <paramref name="command" /> followed by CRLF, reported as a request header once
+    /// sent. A connection that fails with an <see cref="IOException" /> is left for the next
+    /// read to find closed, and the command is not reported.
     /// </summary>
     /// <param name="command">The command line without its line end, such as <c>CAPA</c>.</param>
     /// <returns>A task that completes once the command is sent or the send has failed.</returns>
@@ -63,7 +79,10 @@ internal sealed class Pop3ControlChannel(IConnection connection, CancellationTok
         }
         catch (IOException)
         {
+            return;
         }
+
+        reporting.ReportRequestHeader(line);
     }
 
     /// <summary>
@@ -135,7 +154,8 @@ internal sealed class Pop3ControlChannel(IConnection connection, CancellationTok
     }
 
     /// <summary>
-    /// Reads one line up to its LF, without the LF or a CR before it.
+    /// Reads one line up to its LF, without the LF or a CR before it. The line is reported
+    /// with its line end as a response header.
     /// </summary>
     private async ValueTask<string> ReadLineAsync()
     {
@@ -151,7 +171,10 @@ internal sealed class Pop3ControlChannel(IConnection connection, CancellationTok
             if (next == (byte)'\n')
             {
                 int length = line.Count > 0 && line[^1] == (byte)'\r' ? line.Count - 1 : line.Count;
-                return Encoding.Latin1.GetString([.. line], 0, length);
+                line.Add(next);
+                byte[] bytes = [.. line];
+                reporting.ReportResponseHeader(bytes);
+                return Encoding.Latin1.GetString(bytes, 0, length);
             }
 
             line.Add(next);

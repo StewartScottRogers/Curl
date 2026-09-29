@@ -20,6 +20,9 @@ public sealed class CommandLineProxyTests
     [DataRow("socks5://p:1", ProxyKind.Socks4, ProxyKind.Socks5)]
     [DataRow("socks5h://p:1", ProxyKind.Http, ProxyKind.Socks5Hostname)]
     [DataRow("SOCKS5H://p:1", ProxyKind.Http, ProxyKind.Socks5Hostname)]
+    [DataRow("http://p:1", ProxyKind.Http10, ProxyKind.Http10)]
+    [DataRow("HTTP://p:1", ProxyKind.Http10, ProxyKind.Http10)]
+    [DataRow("socks5://p:1", ProxyKind.Http10, ProxyKind.Socks5)]
     public void TryGetKind_SupportedScheme_OutranksTheOptionsKind(string address, ProxyKind kindWithoutScheme, ProxyKind expected)
     {
         bool supported = new CommandLineProxy(address, kindWithoutScheme).TryGetKind(out ProxyKind kind, out TransferResult? failure);
@@ -35,6 +38,7 @@ public sealed class CommandLineProxyTests
     [DataRow("user:pw@p:1", ProxyKind.Socks4a)]
     [DataRow("", ProxyKind.Socks5)]
     [DataRow("p:1", ProxyKind.Socks5Hostname)]
+    [DataRow("p:1", ProxyKind.Http10)]
     public void TryGetKind_NoScheme_IsTheOptionsKind(string address, ProxyKind kindWithoutScheme)
     {
         bool supported = new CommandLineProxy(address, kindWithoutScheme).TryGetKind(out ProxyKind kind, out TransferResult? failure);

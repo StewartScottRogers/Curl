@@ -1,12 +1,13 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
 
 namespace Curl.Protocol.Ssh.Transport;
 
 [TestClass]
-public sealed class SshTransportTests
+public sealed partial class SshTransportTests
 {
     private const string KeyExchangeFailed = "Failure establishing ssh session: -5, Unable to exchange encryption keys";
 
@@ -27,7 +28,7 @@ public sealed class SshTransportTests
             .KexInit(SshServerScript.OpenSshKexInit())
             .Bytes;
         ScriptedConnection connection = ScriptedConnection.InChunks(serverBytes, 7);
-        SshTransport transport = new(connection, SshAlgorithmPreferences.OpenSslReference, EverythingImplemented, new RepeatingRandomSource(0x33));
+        SshTransport transport = new(connection, SshAlgorithmPreferences.OpenSslReference, EverythingImplemented, new RepeatingRandomSource(0x33), new SystemSshEphemeralKeySource());
 
         SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(CancellationToken.None);
 
@@ -54,7 +55,7 @@ public sealed class SshTransportTests
     public async Task NegotiateAlgorithmsAsync_WindowsPresetAgainstAnOpenSshServer_PicksItsFirstSharedNames()
     {
         byte[] serverBytes = new SshServerScript().Line("SSH-2.0-OpenSSH_9.7").KexInit(SshServerScript.OpenSshKexInit()).Bytes;
-        SshTransport transport = new(new ScriptedConnection(serverBytes), SshAlgorithmPreferences.WindowsReference, EverythingImplemented, new RepeatingRandomSource(0));
+        SshTransport transport = new(new ScriptedConnection(serverBytes), SshAlgorithmPreferences.WindowsReference, EverythingImplemented, new RepeatingRandomSource(0), new SystemSshEphemeralKeySource());
 
         SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(CancellationToken.None);
 
@@ -73,7 +74,7 @@ public sealed class SshTransportTests
             .Packet(SshMessageNumber.Unimplemented, 0, 0, 0, 0)
             .KexInit(server)
             .Bytes;
-        SshTransport transport = new(new ScriptedConnection(serverBytes), SshAlgorithmPreferences.OpenSslReference, EverythingImplemented, new RepeatingRandomSource(0));
+        SshTransport transport = new(new ScriptedConnection(serverBytes), SshAlgorithmPreferences.OpenSslReference, EverythingImplemented, new RepeatingRandomSource(0), new SystemSshEphemeralKeySource());
 
         SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(CancellationToken.None);
 
@@ -115,11 +116,20 @@ public sealed class SshTransportTests
     }
 
     [TestMethod]
-    public async Task NegotiateAlgorithmsAsync_TodaysCatalogue_FailsEveryServerWithMinus5()
+    [DataRow(false, "aes256-gcm@openssh.com", null, DisplayName = "OpenSSL preset")]
+    [DataRow(true, "aes256-ctr", "hmac-sha2-256", DisplayName = "Windows preset")]
+    public async Task NegotiateAlgorithmsAsync_TodaysCatalogue_AgreesACipherAndMacWithAnOpenSshServer(bool windows, string cipher, string? mac)
     {
         byte[] serverBytes = new SshServerScript().Line("SSH-2.0-OpenSSH_9.7").KexInit(SshServerScript.OpenSshKexInit()).Bytes;
+        SshAlgorithmPreferences preferences = windows ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference;
+        SshTransport transport = new(new ScriptedConnection(serverBytes), preferences, SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0), new SystemSshEphemeralKeySource());
 
-        await AssertFailsAsync(serverBytes, SshAlgorithmCatalogue.Implemented, KeyExchangeFailed);
+        SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(CancellationToken.None);
+
+        Assert.AreEqual(cipher, handshake.Algorithms.CipherClientToServer);
+        Assert.AreEqual(cipher, handshake.Algorithms.CipherServerToClient);
+        Assert.AreEqual(mac, handshake.Algorithms.MacClientToServer);
+        Assert.AreEqual(mac, handshake.Algorithms.MacServerToClient);
     }
 
     [TestMethod]
@@ -164,7 +174,7 @@ public sealed class SshTransportTests
     {
         byte[] serverBytes = new SshServerScript().Line("HTTP/1.1 200 OK").Line("Content-Length: 0").Line(string.Empty).Bytes;
         ScriptedConnection connection = new(serverBytes);
-        SshTransport transport = new(connection, SshAlgorithmPreferences.WindowsReference, EverythingImplemented, new RepeatingRandomSource(0));
+        SshTransport transport = new(connection, SshAlgorithmPreferences.WindowsReference, EverythingImplemented, new RepeatingRandomSource(0), new SystemSshEphemeralKeySource());
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await transport.NegotiateAlgorithmsAsync(CancellationToken.None));
@@ -176,7 +186,7 @@ public sealed class SshTransportTests
     [TestMethod]
     public async Task NegotiateAlgorithmsAsync_Cancelled_Throws()
     {
-        SshTransport transport = new(new ScriptedConnection(), SshAlgorithmPreferences.WindowsReference, EverythingImplemented, new RepeatingRandomSource(0));
+        SshTransport transport = new(new ScriptedConnection(), SshAlgorithmPreferences.WindowsReference, EverythingImplemented, new RepeatingRandomSource(0), new SystemSshEphemeralKeySource());
 
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             async () => await transport.NegotiateAlgorithmsAsync(new CancellationToken(canceled: true)));
@@ -192,7 +202,7 @@ public sealed class SshTransportTests
             new ScriptedConnection(serverBytes),
             preferences ?? SshAlgorithmPreferences.OpenSslReference,
             catalogue,
-            new RepeatingRandomSource(0));
+            new RepeatingRandomSource(0), new SystemSshEphemeralKeySource());
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await transport.NegotiateAlgorithmsAsync(CancellationToken.None));

@@ -59,7 +59,8 @@ know.
    from the oldest kept sample inside the window, with the same `resetsAt` for that window
    as the newest sample, to the newest sample. A negative rise counts as 0. There is no
    rate when the mean active lanes is below 0.5.
-   - The five-hour rate uses a 30-minute window and needs a span of at least 15 minutes.
+   - The five-hour rate uses a 60-minute window and needs a span of at least 30 minutes
+     (30 and 15 until the BL-808 amendment).
    - The weekly rate uses a 3-hour window and needs a span of at least 60 minutes,
      because the weekly reading moves one point at a time.
 
@@ -73,9 +74,9 @@ know.
 
    A rate of 0, or a reset that is due now, makes that target unbounded.
 
-   The pace target is `min(fiveHourTarget, weeklyTarget)`. Weekly pacing is the default.
-   `-NoWeeklyPace` drops the weekly target: burn fast and stop early at 97% weekly, as
-   today.
+   The pace target is `min(fiveHourTarget, weeklyTarget)` with `-WeeklyPace`, and
+   `fiveHourTarget` alone without it, which is the default since the BL-806 amendment
+   below: burn at the 5-hour pace and stop claiming at 97% weekly.
 
 4. **Ceilings.** `ceiling = min(capacity, machineCap, MaxLanes)`.
    - `capacity` comes from the board's new `capacity` command (BL-764): the tasks in
@@ -84,7 +85,9 @@ know.
    - `machineCap` comes from the probe (item 7).
 
 5. **One step, with hysteresis.** Let `desired = min(pace target, ceiling)`. Scale up by
-   one when `desired >= current + 1`. Scale down by one when `desired < current - 0.25`.
+   one when `desired >= current + 1`. Scale down when `desired < current - 0.25`, straight
+   to `max(1, floor(desired + 0.25))` (BL-823 amendment): for a ceiling at once, and for a
+   pace target only when the previous step was below the band too (BL-808 amendment).
    Otherwise hold. There is never fewer than 1 lane.
 
    These cases hold too:
@@ -95,7 +98,7 @@ know.
 6. **Scaling mechanics.**
    - Scaling up starts the lowest free lane number through the existing `Start-Detached`
      path: a herdr tab, or a console window outside herdr.
-   - Scaling down marks the highest-numbered active lane to retire with a
+   - Scaling down marks the highest-numbered active lanes, as many as the step drops, to retire with a
      `lane-<n>.retire` state file. At the top of its loop, before its next claim, that
      lane stops with `retired`: it writes its summary and exits.
    - A lane never retires mid-task, mid-integration, or while resuming a held task.
@@ -105,9 +108,10 @@ know.
    `dotnet build <root> -nologo -v q --no-incremental --artifacts-path <LanesDir>\probe\<i>`
    builds of the same checkout. No worktrees are needed.
    - Each step records the wall time and the lowest free physical memory seen.
-   - `machineCap` is the largest `k` whose wall time is at most 2.0 times the one-build
-     time and whose free memory stayed at least 10% of RAM (and whose builds all
-     succeeded), and at least 1.
+   - `machineCap` is the largest `k` whose builds all succeeded and whose free memory
+     stayed at least 20% of RAM, and at least 1. Wall time is recorded but decides
+     nothing (BL-812 amendment). It was 2.0 times the one-build time and 10% free until
+     BL-807, then 4.0 times and 20% until BL-812.
    - The probe stops at the first `k` that fails either test, or at 16, the hard lane
      maximum.
    - A probe cut short by `-ProbeMaxLanes` before any step failed is marked incomplete.
@@ -115,7 +119,7 @@ know.
 
      ```json
      { "schema": 1, "probedAt": "2026-09-28T14:02:11Z", "logicalProcessors": 32, "memoryGB": 125.6,
-       "complete": true, "cap": 7, "rule": "wall <= 2.0x one build and free memory >= 10%",
+       "complete": true, "cap": 7, "rule": "every build succeeds and free memory >= 20%",
        "steps": [ { "lanes": 1, "seconds": 61.2, "slowdown": 1.0, "minFreeMemoryPercent": 71.3, "succeeded": true } ] }
      ```
 
@@ -131,8 +135,9 @@ know.
      | `steps[]` | One per `k`: `lanes`, `seconds` (wall time), `slowdown` (`seconds` over the one-build time), `minFreeMemoryPercent`, `succeeded`. |
 
    - The coordinator runs the probe at the start of an Auto shift, before any lane
-     starts, whenever that file is missing, is marked incomplete, or names a different
-     logical processor count or a RAM size more than 1 GB apart.
+     starts, whenever that file is missing, is marked incomplete, names a different
+     logical processor count or a RAM size more than 1 GB apart, or records a `rule`
+     other than the current one.
    - The finding is recorded on the machine, not in the repository, because it describes
      one PC.
 
@@ -151,7 +156,7 @@ know.
    | `fiveHourRatePerLane` | Last five-hour rate, percentage points per hour per lane, or `null`. |
    | `weeklyRatePerLane` | Last weekly rate, percentage points per hour per lane, or `null`. |
 
-   - An Auto shift starts at `lanes`, raised to `-MinStartLanes` (default 3) when that is
+   - An Auto shift starts at `lanes`, raised to `-MinStartLanes` (default 16 since BL-823) when that is
      more, capped by the ceilings, and meters from the saved rates until it has its own.
    - The first-ever start (no file) is `-MinStartLanes` lanes. See the amendment below.
    - When adopted lanes number more than the start count, the shift starts at the highest
@@ -217,3 +222,102 @@ It is not a floor. After the start, Auto steps as before (item 5) and retires be
 `-MinStartLanes` when the pace demands it, because a fixed three lanes is what ran the
 tokens out on Max 5X. A fixed `-Lanes N` ignores `-MinStartLanes`, and `-Continuous`
 hands it on to the next shift. `-TestAutoLanes` covers the rule.
+
+## Amendment 2026-09-28: the weekly window stops claims instead of pacing lanes (BL-806)
+
+Decided by Claude under Stewart's delegation, after debugging a shift with him; he said
+"go" to this change.
+
+At 18:00 on 2026-09-28 the weekly pace retired lane 3. The week was 13% used, it reset
+on Wednesday at 06:00, and the meter read 0.885 points per lane-hour, so
+`(97 - 13) / (0.885 * 36) = 2.6`. The arithmetic was right, but pacing the weekly window
+was the wrong goal:
+
+- Pacing cannot finish more work than burning to 97% and then waiting. The budget spent
+  by the reset is the same either way.
+- It finishes less whenever the factory idles: an empty board, a wait for the 5-hour
+  window, a restart. What is left at the reset is lost. Item 3's "under-spends, which is
+  the safe side" treated that loss as safe.
+
+The default is now the old `-NoWeeklyPace` behaviour:
+
+- Lanes pace to the 5-hour window, the board and the machine.
+- Lanes stop claiming at `-StopAtWeeklyUsage` (97%). The 3% left is Stewart's for
+  interactive work.
+- A shift that finds the week used up waits for the weekly reset with the ordinary
+  notice. The alarm is for problems, and running out is the plan working.
+
+`-WeeklyPace` opts back into item 3's weekly target, for a week when Stewart wants tokens
+kept back.
+
+## Amendment 2026-09-28: the machine cap knee moves to 4x and 20% free memory (BL-807)
+
+Decided by Claude under Stewart's delegation. The first probe on this 32-processor,
+125.6 GB PC capped the factory at 3 lanes: four simultaneous builds took 36.7 s against
+13.6 s for one (2.7x), with 71.5% of memory still free. That cap came from a worst case
+that almost never happens:
+
+- A lane builds for a few minutes of each task.
+- Lanes integrate one at a time under `integrate.lock`.
+
+So simultaneous builds rarely line up, and when they do, a slower build costs minutes of
+a task that takes most of an hour. Memory is the real limit, because running out stalls
+everything.
+
+The rule is now 4.0x the one-build time and at least 20% of memory free. A
+`machine-lanes.json` recorded under another rule is probed again at the next Auto shift.
+
+## Amendment 2026-09-28: a steadier meter and a two-step retire (BL-808)
+
+Decided by Claude under Stewart's delegation. Usage arrives in whole percentage points.
+A 30-minute five-hour span holds about 5 of them, so one point of rounding moves the
+target by about 20%. A single step a quarter lane low then retired a lane, and it did:
+2.9, then 2.6, then retire.
+
+Two changes make the step steadier:
+
+- The five-hour rate now uses a 60-minute window with a 30-minute minimum span.
+- A pace target below the band retires a lane only when the previous step was below it
+  too. The first low step holds and traces `low once`.
+
+Ceilings (board capacity, machine cap, `-MaxLanes`) are exact rather than measured, so
+they still retire a lane at once.
+
+## Amendment 2026-09-28: memory alone caps the machine (BL-812)
+
+Stewart said "cap by memory". BL-807's 4x knee still capped this PC at 3.
+
+The 19:18 probe measured one build at 9.0 s, against 13.6 s in the first probe. Four
+builds then took 41.4 s, which is 4.60x, with 63.8% of memory still free. A slowdown
+ratio swings with its one-build baseline. It also measures lanes building at the same
+moment, which rarely happens: a lane builds for minutes of a task that runs most of an
+hour, and lanes integrate one at a time.
+
+A slow build only costs time. Running out of memory stalls every lane. So a step now
+passes when every build succeeds and at least 20% of memory stays free. Wall time and
+slowdown are still recorded, for reading only.
+
+The new rule text makes the next Auto shift probe again.
+
+## Amendment 2026-09-28: start at the ceiling and retire straight down (BL-823)
+
+Stewart said "Just start aggressively and dial down", then "go" to making it the default,
+and "Maybe we should set the max lanes to 6". The details are decided by Claude under
+Stewart's delegation.
+
+With BL-808's two-low-steps rule, a shift retired at most one lane every 30 minutes.
+Going from 10 lanes to 4 took three hours, which can reach the 5-hour window's 85% stop
+first. So:
+
+- `-MinStartLanes` defaults to 16, so an Auto shift starts at its ceiling
+  (`min(capacity, machineCap, -MaxLanes)`). `-MinStartLanes 3` still starts at
+  `max(saved, 3)`, as the BL-780 amendment describes.
+- `-MaxLanes` defaults to 6, so a default start is at most 6 lanes.
+- A step that scales down goes straight to `max(1, floor(desired + 0.25))`, the count the
+  hold band accepts. A ceiling does this at once. A pace target does it once the previous
+  step was low too. So from 6 lanes with a confirmed pace of 2.4, the step traces
+  `lanes 6 -> 2 (5-hour pace allows 2.4)`.
+- The coordinator asks that many lanes to retire in one step, highest numbers first, and
+  traces each one. Each lane still finishes and integrates its task first.
+- Scaling up stays at one lane per step. The meter needs samples at each count before it
+  can trust the rate at the next one.

@@ -22,4 +22,12 @@ public sealed class StalledConnector : IConnector
         await Task.Delay(Timeout.Infinite, cancellationToken);
         throw new InvalidOperationException("An infinite wait ended without cancellation.");
     }
+
+    /// <inheritdoc />
+    public async ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken)
+    {
+        started.TrySetResult();
+        await Task.Delay(Timeout.Infinite, cancellationToken);
+        throw new InvalidOperationException("An infinite wait ended without cancellation.");
+    }
 }

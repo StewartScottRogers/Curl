@@ -1,0 +1,115 @@
+using System.Security.Cryptography;
+
+namespace Curl.Tls;
+
+/// <summary>
+/// The key shares on each group family: agreement between two shares, and the malformed
+/// or degenerate peer values each one refuses with <see langword="null" />.
+/// </summary>
+[TestClass]
+public sealed class KeyShareTests
+{
+    [TestMethod]
+    [DataRow(TlsNamedGroup.X25519)]
+    [DataRow(TlsNamedGroup.Secp256r1)]
+    [DataRow(TlsNamedGroup.Secp384r1)]
+    [DataRow(TlsNamedGroup.Secp521r1)]
+    [DataRow(TlsNamedGroup.Ffdhe2048)]
+    [DataRow(TlsNamedGroup.Ffdhe3072)]
+    [DataRow(TlsNamedGroup.Ffdhe4096)]
+    [DataRow(TlsNamedGroup.Ffdhe6144)]
+    [DataRow(TlsNamedGroup.Ffdhe8192)]
+    public void TwoSharesOnAGroupAgreeOnTheSharedSecret(int group)
+    {
+        using Tls13KeyShare client = SystemTlsRandomSource.Instance.CreateKeyShare((ushort)group);
+        using Tls13KeyShare server = SystemTlsRandomSource.Instance.CreateKeyShare((ushort)group);
+
+        byte[] clientSecret = client.ComputeSharedSecret(server.PublicKey)!;
+
+        Assert.AreEqual(group, client.Group);
+        Assert.AreEqual(group, client.Entry.Group);
+        CollectionAssert.AreEqual(clientSecret, server.ComputeSharedSecret(client.PublicKey));
+    }
+
+    [TestMethod]
+    public void AnX25519ShareRefusesAWrongLengthOrDegeneratePeer()
+    {
+        using X25519KeyShare share = new(RandomNumberGenerator.GetBytes(32));
+
+        Assert.IsNull(share.ComputeSharedSecret(new byte[31]));
+        Assert.IsNull(share.ComputeSharedSecret(new byte[32]));
+    }
+
+    [TestMethod]
+    public void AnEcdhShareRefusesAWrongLengthACompressedPointAndAPointOffTheCurve()
+    {
+        using EcdhKeyShare share = EcdhKeyShare.Generate(TlsNamedGroup.Secp256r1);
+        byte[] compressed = [.. share.PublicKey];
+        compressed[0] = 0x02;
+        byte[] offCurve = [.. share.PublicKey];
+        offCurve[^1] ^= 0x01;
+
+        Assert.IsNull(share.ComputeSharedSecret(new byte[64]));
+        Assert.IsNull(share.ComputeSharedSecret(compressed));
+        Assert.IsNull(share.ComputeSharedSecret(offCurve));
+    }
+
+    [TestMethod]
+    [DataRow(TlsNamedGroup.Secp256r1)]
+    [DataRow(TlsNamedGroup.Secp384r1)]
+    [DataRow(TlsNamedGroup.Secp521r1)]
+    public void AnEcdhShareRefusesACoordinateNotBelowThePrime(int group)
+    {
+        using EcdhKeyShare share = EcdhKeyShare.Generate((ushort)group);
+        int length = (share.PublicKey.Length - 1) / 2;
+        byte[] bigX = [.. share.PublicKey];
+        bigX.AsSpan(1, length).Fill(0xff);
+        byte[] bigY = [.. share.PublicKey];
+        bigY.AsSpan(1 + length).Fill(0xff);
+
+        Assert.IsNull(share.ComputeSharedSecret(bigX));
+        Assert.IsNull(share.ComputeSharedSecret(bigY));
+    }
+
+    [TestMethod]
+    public void AnEcdhShareIsOnlyForANistCurve() =>
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => EcdhKeyShare.Generate(TlsNamedGroup.X25519));
+
+    [TestMethod]
+    public void AFiniteFieldShareRefusesAWrongLengthOrOutOfRangePeer()
+    {
+        using Tls13KeyShare share = SystemTlsRandomSource.Instance.CreateKeyShare(TlsNamedGroup.Ffdhe2048);
+        byte[] one = new byte[256];
+        one[^1] = 1;
+
+        Assert.IsNull(share.ComputeSharedSecret(new byte[255]));
+        Assert.IsNull(share.ComputeSharedSecret(one));
+    }
+
+    [TestMethod]
+    public void AFiniteFieldShareIsOnlyForAFiniteFieldGroup() =>
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new FfdheKeyShare(TlsNamedGroup.Secp256r1, [1]));
+
+    [TestMethod]
+    [DataRow(TlsNamedGroup.X25519, true)]
+    [DataRow(TlsNamedGroup.Secp521r1, true)]
+    [DataRow(TlsNamedGroup.Ffdhe2048, true)]
+    [DataRow(TlsNamedGroup.Ffdhe8192, true)]
+    [DataRow(0x0016, false)]
+    [DataRow(0x001e, false)]
+    [DataRow(0x00ff, false)]
+    [DataRow(0x0105, false)]
+    [DataRow(0x11ec, false)]
+    public void CanShareNamesTheGroupsWithAKeyShare(int group, bool expected) =>
+        Assert.AreEqual(expected, TlsNamedGroup.CanShare((ushort)group));
+
+    [TestMethod]
+    public void TheSystemRandomSourceFillsBytes()
+    {
+        byte[] bytes = new byte[64];
+
+        SystemTlsRandomSource.Instance.Fill(bytes);
+
+        Assert.IsTrue(bytes.Any(value => value != 0));
+    }
+}

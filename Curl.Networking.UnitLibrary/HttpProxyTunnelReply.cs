@@ -2,7 +2,8 @@ namespace Curl.Networking;
 
 /// <summary>
 /// What <see cref="HttpProxyTunnel.ReadReplyAsync" /> read from the proxy: the status code
-/// of a complete reply, or the exit 56 message for one curl gives up on.
+/// and the header fields curl acts on of a complete reply, or the exit 56 message for one
+/// curl gives up on.
 /// </summary>
 /// <param name="StatusCode">
 /// The status code on the reply's first line, <c>0</c> when it is not an HTTP status line;
@@ -14,6 +15,8 @@ namespace Curl.Networking;
 /// </param>
 internal readonly record struct HttpProxyTunnelReply(int StatusCode, string? RecvErrorMessage)
 {
+    private readonly IReadOnlyList<string>? _proxyAuthenticate;
+
     /// <summary>
     /// Gets the status code on the reply's first line, or <c>0</c>.
     /// </summary>
@@ -23,6 +26,29 @@ internal readonly record struct HttpProxyTunnelReply(int StatusCode, string? Rec
     /// Gets the exit 56 message, or <see langword="null" /> for a complete reply.
     /// </summary>
     public string? RecvErrorMessage { get; } = RecvErrorMessage;
+
+    /// <summary>
+    /// Gets the value of every <c>Proxy-Authenticate</c> field, verbatim apart from the blanks
+    /// around it, in the order received; empty when there is none.
+    /// </summary>
+    public IReadOnlyList<string> ProxyAuthenticate
+    {
+        get => _proxyAuthenticate ?? [];
+        init => _proxyAuthenticate = value;
+    }
+
+    /// <summary>
+    /// Gets the length of the body after the header block, as the last valid
+    /// <c>Content-Length</c> gives it; <c>0</c> when there is none.
+    /// </summary>
+    public long ContentLength { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether another CONNECT can follow on the same connection once
+    /// <see cref="ContentLength" /> body bytes are read: no <c>Connection: close</c> or
+    /// <c>Proxy-Connection: close</c>, as curl 8.21.0 closes on either, and no chunked body.
+    /// </summary>
+    public bool LeavesConnectionReusable { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether the proxy opened the tunnel: a complete reply with a

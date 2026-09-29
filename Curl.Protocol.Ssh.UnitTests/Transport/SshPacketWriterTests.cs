@@ -1,4 +1,8 @@
+using System.Security.Cryptography;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.KeyExchange;
+using Curl.Protocol.Ssh.Negotiation;
+using Curl.Protocol.Ssh.PacketProtection;
 
 namespace Curl.Protocol.Ssh.Transport;
 
@@ -27,6 +31,37 @@ public sealed class SshPacketWriterTests
             Assert.IsTrue(padding is >= 4 and <= 11, $"payload {payloadLength}: padding {padding}");
             Assert.AreEqual(0, (4 + 1 + payloadLength + padding) % 8, $"payload {payloadLength}");
         }
+    }
+
+    [TestMethod]
+    [DataRow(0, true, 11, DisplayName = "MAC-then-encrypt, 16-byte block: length field counted")]
+    [DataRow(10, true, 17, DisplayName = "MAC-then-encrypt, three short of a block: another block")]
+    [DataRow(0, false, 15, DisplayName = "encrypt-then-MAC or AES-GCM: length field not counted")]
+    [DataRow(11, false, 4, DisplayName = "encrypt-then-MAC or AES-GCM: exactly four")]
+    [DataRow(12, false, 19, DisplayName = "encrypt-then-MAC or AES-GCM: three short of a block")]
+    public void PaddingLengthFor_SixteenByteBlocks_AlignsThePaddedPart(int payloadLength, bool padsPacketLengthField, int expected)
+    {
+        int padding = SshPacketWriter.PaddingLengthFor(payloadLength, 16, padsPacketLengthField);
+
+        Assert.AreEqual(expected, padding);
+        Assert.AreEqual(0, ((padsPacketLengthField ? 4 : 0) + 1 + payloadLength + padding) % 16);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_AfterChangeProtection_SealsWithTheNewKeysAndSequenceNumber()
+    {
+        SshKeyDerivation keys = new(HashAlgorithmName.SHA256, [9], [.. new byte[32]], [.. new byte[32]]);
+        SshNegotiatedAlgorithms algorithms = SshTestAlgorithms.With("aes128-ctr", "hmac-sha2-256-etm@openssh.com");
+        ScriptedConnection connection = new();
+        SshPacketWriter writer = new(connection, new RepeatingRandomSource(0x5A));
+        await writer.WriteAsync(new byte[] { 21 }, CancellationToken.None);
+
+        writer.ChangeProtection(SshPacketProtections.ForClientToServer(algorithms, keys));
+        await writer.WriteAsync(new byte[] { 5, 0xAB }, CancellationToken.None);
+
+        using ISshPacketProtection expected = SshPacketProtections.ForClientToServer(algorithms, keys);
+        byte[] packet = [0, 0, 0, 16, 13, 5, 0xAB, .. Enumerable.Repeat((byte)0x5A, 13)];
+        CollectionAssert.AreEqual(expected.Seal(1, packet), connection.Written[16..]);
     }
 
     [TestMethod]

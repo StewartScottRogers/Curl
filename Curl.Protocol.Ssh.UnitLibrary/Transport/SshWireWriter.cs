@@ -50,7 +50,25 @@ internal sealed class SshWireWriter
     }
 
     /// <summary>
-    /// Appends a <c>name-list</c>: the names joined by commas, as a <c>string</c> of
+    /// Appends a non-negative <c>mpint</c>: the magnitude without leading zero bytes, with
+    /// one zero byte in front when its top bit is set, as a <c>string</c>.
+    /// </summary>
+    /// <param name="magnitude">The value, unsigned big-endian, leading zeros allowed.</param>
+    internal void WriteMpint(ReadOnlySpan<byte> magnitude)
+    {
+        ReadOnlySpan<byte> trimmed = magnitude.TrimStart((byte)0);
+        bool needsSignByte = !trimmed.IsEmpty && trimmed[0] >= 0x80;
+        WriteUInt32((uint)(trimmed.Length + (needsSignByte ? 1 : 0)));
+        if (needsSignByte)
+        {
+            WriteByte(0);
+        }
+
+        WriteBytes(trimmed);
+    }
+
+    /// <summary>
+    /// Appends a <c>name-list</c>:the names joined by commas, as a <c>string</c> of
     /// US-ASCII bytes.
     /// </summary>
     /// <param name="names">The names, in preference order.</param>

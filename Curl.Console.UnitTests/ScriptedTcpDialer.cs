@@ -22,4 +22,18 @@ internal sealed class ScriptedTcpDialer(ScriptedConnector server) : ITcpDialer
 
         return new DialedTcpConnection(connection, new IPEndPoint(IPAddress.Loopback, 50000));
     }
+
+    /// <summary>
+    /// Connects as <see cref="DialAsync" /> does, recording the socket as a target whose host is
+    /// <c>unix:</c> (or <c>unix-abstract:</c>) and the path, with port 1, since a target needs one.
+    /// </summary>
+    public async ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken)
+    {
+        string scheme = address.IsAbstract ? "unix-abstract" : "unix";
+        ConnectResult connected = await server
+            .ConnectAsync(new ConnectTarget($"{scheme}:{address.Path}", 1, false), cancellationToken);
+
+        return connected.Connection
+            ?? throw new InvalidOperationException($"The scripted connect failed: {connected.ErrorMessage}");
+    }
 }

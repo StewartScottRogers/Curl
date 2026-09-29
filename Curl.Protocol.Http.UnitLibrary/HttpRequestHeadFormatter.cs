@@ -19,7 +19,8 @@ namespace Curl.Protocol.Http;
 /// <c>Authorization</c>, <c>Range</c>, <c>Content-Range</c> (for a <c>-T</c> upload resumed with
 /// <c>-C</c>, or <c>-r</c> on a <c>-d</c> body or a <c>-T</c> upload, <see cref="HttpRequestFraming.ContentRange" />), <c>User-Agent</c>, <c>Accept</c>, <c>TE: gzip</c> (for
 /// <c>--tr-encoding</c>), <c>Accept-Encoding</c> (for <c>--compressed</c>), <c>Referer</c>, <c>Proxy-Connection: Keep-Alive</c> (through a forward
-/// proxy), each left out when an <c>-H</c> value names it, then the cookie store's
+/// proxy), <c>Alt-Used</c> (to an alternative service, <see cref="HttpRequestOptions.AltSvcRoute" />),
+/// each left out when an <c>-H</c> value names it, then the cookie store's
 /// <c>Cookie</c>, then <c>If-Modified-Since</c> or <c>If-Unmodified-Since</c> for <c>-z</c>, also
 /// left out when an <c>-H</c> value names it; <c>Cookie</c> and <c>Proxy-Authorization</c> are sent even when an <c>-H</c>
 /// value names them. Through a forward proxy the request target is the absolute form,
@@ -90,6 +91,10 @@ internal static class HttpRequestHeadFormatter
     /// <paramref name="options" />; the resend after a 417 passes
     /// <see cref="HttpRequestFraming.WithoutExpect" />.
     /// </param>
+    /// <param name="upgradesToH2c">
+    /// <see langword="true" /> to ask to upgrade to h2c, for <c>--http2</c> over cleartext
+    /// (<see cref="AppendH2cUpgrade" />).
+    /// </param>
     /// <returns>The head's bytes, ending in the empty line.</returns>
     internal static byte[] Format(
         CurlUrl url,
@@ -101,7 +106,8 @@ internal static class HttpRequestHeadFormatter
         string? proxyAuthorization = null,
         string? range = null,
         TimeCondition? timeCondition = null,
-        HttpRequestFraming? framing = null)
+        HttpRequestFraming? framing = null,
+        bool upgradesToH2c = false)
     {
         options ??= new HttpRequestOptions();
         HttpCustomHeader[] customHeaders = CustomHeadersOf(options.Headers, options);
@@ -121,12 +127,14 @@ internal static class HttpRequestHeadFormatter
         AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
         AppendClientHeaders(head, customHeaders, options);
         AppendUnlessOverridden(head, [.. customHeaders, .. proxyHeaders], "Proxy-Connection", forwardProxy ? "Keep-Alive" : null);
+        AppendUnlessOverridden(head, customHeaders, "Alt-Used", AltUsedOf(options.AltSvcRoute));
+        AppendH2cUpgrade(head, upgradesToH2c);
         AppendAlways(head, "Cookie", cookie);
         AppendTimeCondition(head, customHeaders, timeCondition);
         AppendCustomHeaders(head, customHeaders, hostLine is not null);
         AppendCustomHeaders(head, proxyHeaders, hostLine is not null);
         AppendBodyHeaders(head, customHeaders, framing);
-        AppendConnection(head, customHeaders, SendsTe(options, customHeaders));
+        AppendConnection(head, customHeaders, SendsTe(options, customHeaders), upgradesToH2c);
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
     }
@@ -282,10 +290,18 @@ internal static class HttpRequestHeadFormatter
     }
 
     /// <summary>
-    /// Appends the body's framing headers: <c>Content-Length</c> unless the body is sent
-    /// chunked, <c>Transfer-Encoding: chunked</c> when its length is unknown, its
-    /// <c>Content-Type</c> unless it is a <c>-T</c> upload, and curl's own
-    /// <c>Expect: 100-continue</c>.
+    /// Gives the <c>Content-Length</c> value: the body's length, or <see langword="null" /> when
+    /// the body is sent chunked or its length is unknown (an HTTP/2 body,
+    /// <see cref="HttpRequestFraming.ForHttp2OrHttp3" />).
+    /// </summary>
+    private static string? ContentLengthOf(HttpRequestFraming framing) =>
+        framing.IsChunked ? null : framing.KnownLength?.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Appends the body's framing headers: <c>Content-Length</c> as
+    /// <see cref="ContentLengthOf" /> gives it, <c>Transfer-Encoding: chunked</c> when its
+    /// length is unknown, its <c>Content-Type</c> unless it is a <c>-T</c> upload, and curl's
+    /// own <c>Expect: 100-continue</c>.
     /// </summary>
     private static void AppendBodyHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, HttpRequestFraming framing)
     {
@@ -294,8 +310,7 @@ internal static class HttpRequestHeadFormatter
             return;
         }
 
-        string? contentLength = framing.IsChunked ? null : framing.KnownLength.GetValueOrDefault().ToString(CultureInfo.InvariantCulture);
-        AppendUnlessOverridden(head, customHeaders, "Content-Length", contentLength);
+        AppendUnlessOverridden(head, customHeaders, "Content-Length", ContentLengthOf(framing));
         AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.KnownLength is null ? "chunked" : null);
         AppendUnlessOverridden(head, customHeaders, "Content-Type", framing.IsUpload ? null : body.ContentType);
         AppendUnlessOverridden(head, customHeaders, "Expect", framing.AddsExpect ? "100-continue" : null);
@@ -309,20 +324,50 @@ internal static class HttpRequestHeadFormatter
         options.TransferEncoding && !customHeaders.Any(header => header.Names("TE"));
 
     /// <summary>
+    /// Gives the <c>Alt-Used</c> value for a transfer sent to an alternative service: its host
+    /// and port as curl 8.21.0 writes them, <c>&lt;host&gt;:&lt;port&gt;</c> (measured, BL-878
+    /// Notes); <see langword="null" /> to send none.
+    /// </summary>
+    private static string? AltUsedOf(AltSvcRoute? route) =>
+        route is null ? null : $"{route.Alternative.Host}:{route.Alternative.Port}";
+
+    /// <summary>
+    /// Appends the h2c upgrade request's <c>Upgrade: h2c</c> and <c>HTTP2-Settings</c> lines
+    /// (<see cref="Http2Session.UpgradeSettings" />) when <paramref name="upgradesToH2c" />, after
+    /// <c>Proxy-Connection</c> and before <c>Cookie</c>, whatever the <c>-H</c> values name, as
+    /// curl sends them for <c>--http2</c> over cleartext (measured, BL-716 Notes).
+    /// </summary>
+    private static void AppendH2cUpgrade(StringBuilder head, bool upgradesToH2c)
+    {
+        if (upgradesToH2c)
+        {
+            head.Append("Upgrade: h2c\r\nHTTP2-Settings: ").Append(Http2Session.UpgradeSettings).Append("\r\n");
+        }
+    }
+
+    /// <summary>
     /// Appends the <c>Connection</c> lines last, after <c>Expect</c>, as curl 8.21.0 does
     /// (measured, BL-315 Notes): the first <c>-H</c> value naming <c>Connection</c> that has a
     /// value, without the white space around it and with <c>, TE</c> added when
-    /// <paramref name="sendsTe" />, or <c>Connection: TE</c> alone when there is no such value;
-    /// then every later one verbatim. A <c>Connection</c> value with nothing after its colon
-    /// or semicolon, and a <c>--proxy-header</c> naming <c>Connection</c>, is not sent at all.
+    /// <paramref name="sendsTe" /> and <c>, Upgrade, HTTP2-Settings</c> after that when
+    /// <paramref name="upgradesToH2c" /> (measured, BL-716 Notes), or those options alone when
+    /// there is no such value; then every later one verbatim. A <c>Connection</c> value with
+    /// nothing after its colon or semicolon, and a <c>--proxy-header</c> naming <c>Connection</c>,
+    /// is not sent at all.
     /// </summary>
     /// <param name="head">The head being written.</param>
     /// <param name="customHeaders">The <c>-H</c> values.</param>
     /// <param name="sendsTe"><see langword="true" /> when <c>TE: gzip</c> was sent.</param>
-    private static void AppendConnection(StringBuilder head, HttpCustomHeader[] customHeaders, bool sendsTe)
+    /// <param name="upgradesToH2c"><see langword="true" /> when the request asks to upgrade to h2c.</param>
+    private static void AppendConnection(StringBuilder head, HttpCustomHeader[] customHeaders, bool sendsTe, bool upgradesToH2c)
     {
         HttpCustomHeader[] connections = [.. customHeaders.Where(header => header.Names(ConnectionName) && header.Value is not null)];
-        string[] options = [.. connections.Take(1).Select(header => header.Value!), .. sendsTe ? ["TE"] : Array.Empty<string>()];
+        string[] options =
+        [
+            .. connections.Take(1).Select(header => header.Value!),
+            .. sendsTe ? ["TE"] : Array.Empty<string>(),
+            .. upgradesToH2c ? ["Upgrade", "HTTP2-Settings"] : Array.Empty<string>(),
+        ];
         AppendAlways(head, ConnectionName, string.Join(", ", options));
         foreach (HttpCustomHeader header in connections.Skip(1))
         {

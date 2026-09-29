@@ -1,5 +1,6 @@
 using Curl.Cli;
 using Curl.Core;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
 
@@ -68,10 +69,23 @@ internal sealed class RunningTransferState(
     internal ProgressBarRecorder? ProgressBar { get; set; }
 
     /// <summary>
+    /// Gets or sets the transfer's share of a <c>-Z</c> run's combined progress meter, which its
+    /// <see cref="Progress" /> passes every byte report on to; <see langword="null" /> outside one or
+    /// when the run shows no meter (BL-521).
+    /// </summary>
+    internal ParallelTransferProgress? ParallelProgress { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the transfer has written the progress meter's header
     /// lines, which curl 8.21.0 writes once however many times <c>--retry</c> runs the transfer.
     /// </summary>
     internal bool ProgressMeterHeaderWritten { get; set; }
+
+    /// <summary>
+    /// Gets or sets how many times <c>--retry</c> has run the transfer again, printed by
+    /// <c>%{num_retries}</c> (task BL-513).
+    /// </summary>
+    internal int RetryCount { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the transfer is a <c>-T</c> upload under <c>-C -</c>,
@@ -79,4 +93,41 @@ internal sealed class RunningTransferState(
     /// the <c>-o</c> file holds (task BL-416).
     /// </summary>
     internal bool UploadResumesFromUnknownOffset { get; set; }
+
+    /// <summary>
+    /// Gets or sets the credentials <see cref="TransferCredentialLookup" /> chose for the transfer, sent in
+    /// place of the <c>-u</c> ones; <see langword="null" /> when neither the netrc file nor the URL had anything to say
+    /// (tasks BL-505, BL-791).
+    /// </summary>
+    internal System.Net.NetworkCredential? LookedUpCredentials { get; set; }
+
+    /// <summary>
+    /// Gets or sets where the transfer's <c>-v</c> and trace events go once it is set up to connect:
+    /// under <c>--trace-ids</c> marked with its IDs (task BL-648); <see cref="NoTransferEvents.Instance" /> until then.
+    /// </summary>
+    internal ITransferEvents Events { get; set; } = NoTransferEvents.Instance;
+
+    /// <summary>
+    /// Gets or sets the <c>%{conn_id}</c> the transfer took for its <c>--trace-ids</c> marker, which its
+    /// <c>-w</c> output then prints; <see langword="null" /> until its first event (task BL-648).
+    /// </summary>
+    internal long? ConnectionId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the <c>If-None-Match</c> lines <c>--etag-compare</c> has added to the transfer's option
+    /// group, this transfer's last; <see langword="null" /> without <c>--etag-compare</c> (task BL-619).
+    /// </summary>
+    internal IReadOnlyList<string>? IfNoneMatchHeaders { get; set; }
+
+    /// <summary>
+    /// Gets or sets the transfer's alt-svc cache, read before it connects and written when it is reported;
+    /// <see langword="null" /> without <c>--alt-svc</c> and for a URL that is not <c>http</c> or <c>https</c> (task BL-623).
+    /// </summary>
+    internal AltSvcTransferCache? AltSvc { get; set; }
+
+    /// <summary>
+    /// Gets or sets what saves an <c>ETag</c> line for <c>--etag-save</c>, which the transfer's
+    /// <see cref="EtagSaveStream" /> calls; <see langword="null" /> without <c>--etag-save</c> (task BL-619).
+    /// </summary>
+    internal Func<byte[], CancellationToken, ValueTask>? SaveEtag { get; set; }
 }

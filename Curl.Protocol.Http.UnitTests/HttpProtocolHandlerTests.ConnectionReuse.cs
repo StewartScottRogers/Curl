@@ -89,6 +89,27 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_KeptAliveOverUnixSocket_ReportsTheLowerCasedSocketPathAndPort0LeftIntact()
+    {
+        // curl 8.21.0 -v --unix-socket "C:\Users\Public\BL794 Sock.sock" http://Example.COM:8080/x
+        // ends "Connection #0 to host c:\users\public\bl794 sock.sock:0 left intact" (BL-794 Notes).
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedConnection connection = Connection("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\n\r\nhi", chunkSize);
+            RecordingTransferEvents events = new();
+
+            TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, unixSocketPath: @"C:\Users\Public\BL794 Sock-Z.sock")))
+                .ExecuteAsync(ReuseContext(events));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(
+                InfoLines(AssumeClose + "|" + Http10KeepAlive, @"Connection #0 to host c:\users\public\bl794 sock-z.sock:0 left intact"),
+                events.Info,
+                $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_SecondUrlAfterAnHttp10KeepAliveBodyRanToTheClose_ReportsThePooledConnectionDeadAndOpensConnection1()
     {
         // curl 8.21.0 -s -v http://127.0.0.1:P/a http://127.0.0.1:P/b, each answered

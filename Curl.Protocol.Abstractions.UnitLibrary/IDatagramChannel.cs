@@ -22,6 +22,18 @@ public interface IDatagramChannel : IAsyncDisposable
     EndPoint ServerEndPoint { get; }
 
     /// <summary>
+    /// Gets the local endpoint the channel's socket is bound to, or <see langword="null" />,
+    /// the default, when the implementation has no meaningful address.
+    /// </summary>
+    /// <remarks>
+    /// QUIC (<c>Curl.Quic</c>) reads it for curl's <c>Established connection … from &lt;ip&gt;
+    /// port &lt;port&gt;</c> line and for <c>%{local_ip}</c> and <c>%{local_port}</c>. Only the
+    /// UDP adapter in <c>Curl.Networking</c> overrides it, so TFTP's channel and every test
+    /// fake compile unchanged (ADR-0144).
+    /// </remarks>
+    EndPoint? LocalEndPoint => null;
+
+    /// <summary>
     /// Sends <paramref name="datagram" /> as one datagram to <paramref name="destination" />.
     /// </summary>
     /// <param name="datagram">The whole datagram to send.</param>

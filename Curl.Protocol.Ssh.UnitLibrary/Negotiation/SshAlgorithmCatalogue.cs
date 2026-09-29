@@ -1,3 +1,7 @@
+using Curl.Protocol.Ssh.HostKeys;
+using Curl.Protocol.Ssh.KeyExchange;
+using Curl.Protocol.Ssh.PacketProtection;
+
 namespace Curl.Protocol.Ssh.Negotiation;
 
 /// <summary>
@@ -29,12 +33,14 @@ internal sealed class SshAlgorithmCatalogue(IEnumerable<string> implementedNames
     private readonly HashSet<string> implemented = [.. implementedNames];
 
     /// <summary>
-    /// Gets what this build implements so far: the two key-exchange signals and no
-    /// compression. BL-564, BL-565, BL-575 and BL-678 to BL-680 each add their algorithms
-    /// until the <c>KEXINIT</c> offers the presets' full lists.
+    /// Gets what this build implements so far: the Curve25519, NIST-curve and finite-field key
+    /// exchanges, the RSA, ECDSA, DSA and Ed25519 host keys, the AES-GCM and AES-CTR ciphers, the
+    /// SHA-2 MACs, the two key-exchange signals and no compression. BL-575, BL-679 and
+    /// BL-680 each add their algorithms until the
+    /// <c>KEXINIT</c> offers the presets' full lists.
     /// </summary>
     internal static SshAlgorithmCatalogue Implemented { get; } =
-        new([ExtensionInfoClient, StrictKeyExchangeClient, NoCompression]);
+        new([.. SshKeyExchangeMethods.Names, .. SshSignatureVerifiers.Names, .. SshPacketProtections.Names, ExtensionInfoClient, StrictKeyExchangeClient, NoCompression]);
 
     /// <summary>
     /// Gets a value indicating whether <paramref name="name" /> in a key-exchange list is a

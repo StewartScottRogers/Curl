@@ -13,8 +13,8 @@ namespace Curl.Protocol.Smtp;
 /// <c>Record-CurlExchange.ps1 -Smtp</c>, curl running
 /// <c>-sS --mail-from a@b --mail-rcpt c@d -T mail.txt smtp://127.0.0.1:18025/h</c> with the
 /// 21-byte <c>Subject: t\r\n\r\nhello\r\n</c> and the options each test names (BL-544 Notes).
-/// curl sent <c>ü</c> as the single byte <c>FC</c>, its Windows argv, which is what the
-/// Latin-1 channel sends.
+/// curl sent <c>ü</c> as the single byte <c>FC</c>, its Windows argv, which is what
+/// <see cref="SmtpRun" /> pins on every host by running the handler with Windows-1252.
 /// </summary>
 [TestClass]
 public sealed class SmtpProtocolHandlerMailExtensionTests

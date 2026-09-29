@@ -112,6 +112,14 @@ public sealed record TransferReport
     public long DownloadSize { get; init; }
 
     /// <summary>
+    /// Gets the body bytes delivered to the output after content decoding, the source of
+    /// <c>%{size_delivered}</c>; <see langword="null" /> when nothing was decoded, meaning
+    /// <see cref="DownloadSize" />. Under <c>--compressed</c> a gzip body of 51 bytes that
+    /// decodes to 501 downloads 51 and delivers 501 (measured, BL-516 Notes).
+    /// </summary>
+    public long? DeliveredSize { get; init; }
+
+    /// <summary>
     /// Gets the body bytes sent, the source of <c>%{size_upload}</c> and
     /// <c>%{speed_upload}</c>.
     /// </summary>

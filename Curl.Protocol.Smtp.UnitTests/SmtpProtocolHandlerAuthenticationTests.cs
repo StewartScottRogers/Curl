@@ -370,6 +370,18 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
     }
 
     [TestMethod]
+    [DataRow(Url, 18025, DisplayName = "The URL's port")]
+    [DataRow("smtp://127.0.0.1/x", 25, DisplayName = "The scheme's default")]
+    public async Task ExecuteAsync_Request_CarriesTheConnectionsPort(string url, int expected)
+    {
+        var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
+
+        await RunAsync(Context(url: url), Greeting + EhloReply + "334 \r\n" + Accepted + HelpReplyAndBye, sasl);
+
+        Assert.AreEqual(expected, sasl.Choices.Single().Request.Port);
+    }
+
+    [TestMethod]
     public void Constructor_WithAuthenticator_ServesSmtpAndSmtps()
     {
         var handler = new SmtpProtocolHandler(new QueuedConnector(), new QueuedTlsProvider(), new FakeSaslAuthenticator(null, null));

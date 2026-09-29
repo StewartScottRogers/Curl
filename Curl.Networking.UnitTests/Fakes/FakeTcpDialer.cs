@@ -30,4 +30,22 @@ public sealed class FakeTcpDialer : ITcpDialer
 
         return ValueTask.FromResult(new DialedTcpConnection(DialOutcome(endPoint), LocalEndPoint));
     }
+
+    /// <summary>
+    /// Gets or sets what one Unix socket dial does: return a connection, or throw. Defaults to
+    /// refusing.
+    /// </summary>
+    public Func<UnixSocketAddress, IConnection> UnixSocketDialOutcome { get; init; } =
+        _ => throw new SocketException((int)SocketError.ConnectionRefused);
+
+    /// <summary>Gets the Unix sockets dialed, in order.</summary>
+    public List<UnixSocketAddress> DialedUnixSockets { get; } = [];
+
+    /// <inheritdoc />
+    public ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken)
+    {
+        DialedUnixSockets.Add(address);
+
+        return ValueTask.FromResult(UnixSocketDialOutcome(address));
+    }
 }

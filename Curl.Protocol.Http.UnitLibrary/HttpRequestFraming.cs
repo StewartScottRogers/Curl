@@ -139,6 +139,17 @@ internal sealed class HttpRequestFraming
         new(Method, body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: keepsCustomWait && AwaitsContinue && !AddsExpect, RefusesUnknownLength, Upload, ContentRange);
 
     /// <summary>
+    /// Makes the same framing for an HTTP/2 or HTTP/3 stream, where DATA frames carry the body and the
+    /// stream's end ends it: never chunked, and with no <c>Expect: 100-continue</c> of curl's
+    /// own and no wait for <c>100 Continue</c>, as curl 8.21.0 sends a 2 MB <c>-T</c> upload over
+    /// HTTP/2 (measured, BL-658 Notes); HTTP/3 carries the body the same way (ADR-0172). An <c>-H</c>
+    /// <c>Expect</c> line is still sent.
+    /// </summary>
+    /// <returns>The framing of the HTTP/2 or HTTP/3 request.</returns>
+    internal HttpRequestFraming ForHttp2OrHttp3() =>
+        new(Method, Body, KnownLength, isChunked: false, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload, ContentRange);
+
+    /// <summary>
     /// Decides the framing for a request with <paramref name="options" />.
     /// </summary>
     /// <param name="options">The HTTP options.</param>

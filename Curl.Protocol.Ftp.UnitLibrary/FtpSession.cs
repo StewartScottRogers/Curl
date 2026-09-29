@@ -15,6 +15,10 @@ namespace Curl.Protocol.Ftp;
 /// <see langword="true" /> for <c>ftps://</c>, whose control connection is TLS from its first
 /// byte, so no <c>AUTH</c> is sent.
 /// </param>
+/// <param name="connectPhase">
+/// Holds the greeting, the login and <c>PWD</c> to <c>--connect-timeout</c>, as curl holds its
+/// states before <c>DO</c> (BL-512); the caller owns it.
+/// </param>
 /// <remarks>
 /// <para>
 /// TLS (ADR-0102's BL-437 addendum): under <c>--ssl</c>, <c>--ftp-ssl-control</c> or
@@ -45,7 +49,10 @@ namespace Curl.Protocol.Ftp;
 /// <para>
 /// The directory the <c>257</c> reply to <c>PWD</c> quotes is reported as
 /// <see cref="TransferReport.FtpEntryPath" />; a quoted name that never ends is exit 8
-/// with no <c>QUIT</c>, as curl 8.21.0 does (<see cref="FtpEntryPath" />, BL-514).
+/// with no <c>QUIT</c>, as curl 8.21.0 does (<see cref="FtpEntryPath" />, BL-514). A
+/// directory that does not start with <c>/</c> sends <c>SYST</c>, and a <c>215</c> naming
+/// <c>OS/400</c> sends <c>SITE NAMEFMT 1</c> and, when that is accepted, <c>PWD</c> again
+/// (<see cref="FtpServerSystem" />, BL-782).
 /// </para>
 /// <para>
 /// A file download honours <c>-r</c> and <c>-C</c> through <see cref="FtpDownloadWindow" />:
@@ -56,6 +63,13 @@ namespace Curl.Protocol.Ftp;
 /// <c>SIZE</c> and <c>REST 0</c> and writes curl's <c>Last-Modified</c>,
 /// <c>Content-Length</c> and <c>Accept-ranges</c> lines to the header output; a directory
 /// sends nothing more. ADR-0093's BL-438 addendum records the measurements.
+/// </para>
+/// <para>
+/// <c>--max-filesize</c> (BL-638): a <c>SIZE</c> count over the limit, the whole file's
+/// whatever <c>-C</c> or <c>-r</c> asks for, is exit 63 before <c>REST</c> or <c>RETR</c>,
+/// with <c>ABOR</c> for a range and then <c>QUIT</c>. When the size is not known, a file or
+/// listing that delivers the limit with more arriving is exit 63 with no <c>QUIT</c>, the
+/// limit counted from this transfer's first byte.
 /// </para>
 /// <para>
 /// With <see cref="ITransferContext.Upload" /> set the conversation after <c>PWD</c> is
@@ -87,7 +101,12 @@ namespace Curl.Protocol.Ftp;
 /// given, CR and LF included, as curl sends them.
 /// </para>
 /// </remarks>
-internal sealed class FtpSession(FtpSessionConnections connections, FtpControlChannel control, ITransferContext context, bool implicitTls)
+internal sealed class FtpSession(
+    FtpSessionConnections connections,
+    FtpControlChannel control,
+    ITransferContext context,
+    bool implicitTls,
+    FtpConnectPhaseLimit connectPhase)
     : IAsyncDisposable
 {
     private const string AnonymousUser = "anonymous";
@@ -140,6 +159,9 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
 
     private long bytesTransferred;
 
+    /// <summary>The <c>--max-filesize</c> limit, or <see langword="null" /> when there is none; 0 is none, as in curl.</summary>
+    private readonly long? maxFileSize = context.MaxFileSize > 0 ? context.MaxFileSize : null;
+
     /// <summary>
     /// The code of the last reply read before <c>QUIT</c>, <c>ABOR</c>'s included; 0 before
     /// the greeting.
@@ -154,21 +176,28 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
     private string? entryPath;
 
     /// <summary>
+    /// The time the reply to <c>MDTM</c> named, reported as
+    /// <see cref="TransferResult.SourceLastWriteTimeUtc" /> under <c>-R</c>;
+    /// <see langword="null" /> before <c>MDTM</c> or when the reply named none.
+    /// </summary>
+    private DateTimeOffset? modifiedUtc;
+
+    /// <summary>
     /// Holds the whole conversation. The data connection it opens stays open until the
     /// session is disposed.
     /// </summary>
     /// <returns>
     /// The transfer's outcome, its <see cref="TransferReport.ResponseCode" /> the code of
     /// the last reply read before <c>QUIT</c>, as curl 8.21.0 reports
-    /// <c>%{response_code}</c> for FTP (BL-392).
+    /// <c>%{response_code}</c> for FTP (BL-392), and under <c>-R</c> a success's
+    /// <see cref="TransferResult.SourceLastWriteTimeUtc" /> the time <c>MDTM</c> named.
     /// </returns>
     public async ValueTask<TransferResult> RunAsync()
     {
         TransferResult result;
         try
         {
-            result = await GreetAndLogInAsync().ConfigureAwait(false)
-                ?? await ProtectDataAsync().ConfigureAwait(false)
+            result = await ConnectAsync().ConfigureAwait(false)
                 ?? await TransferPathAsync().ConfigureAwait(false);
         }
         catch (FtpControlConversationFailedException lost)
@@ -176,7 +205,11 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
             result = lost.Result;
         }
 
-        return result with { Report = new TransferReport { ResponseCode = lastReplyCode, FtpEntryPath = entryPath } };
+        return result with
+        {
+            Report = new TransferReport { ResponseCode = lastReplyCode, FtpEntryPath = entryPath },
+            SourceLastWriteTimeUtc = result.IsSuccess && context.RemoteTime ? modifiedUtc : null,
+        };
     }
 
     /// <summary>
@@ -194,6 +227,62 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
 
     private static ValueTask DisposeIfOpenAsync(IAsyncDisposable? disposable) =>
         disposable?.DisposeAsync() ?? ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Holds curl's connect phase - the greeting, the login, <c>PBSZ</c>, <c>PROT</c> and
+    /// <c>PWD</c> - under the connect phase's limit: exit 28 once <c>--connect-timeout</c> has
+    /// passed, and the transfer's own token for everything after it.
+    /// </summary>
+    private async ValueTask<TransferResult?> ConnectAsync()
+    {
+        try
+        {
+            return await GreetAndLogInAsync().ConfigureAwait(false)
+                ?? await ProtectDataAsync().ConfigureAwait(false)
+                ?? await ReadEntryPathAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (connectPhase.HasPassed)
+        {
+            return connectPhase.Failure();
+        }
+        finally
+        {
+            control.CancellationToken = context.CancellationToken;
+        }
+    }
+
+    private ValueTask<TransferResult?> ReadEntryPathAsync() => ReadEntryPathAsync(askSystemForRelativePath: true);
+
+    /// <summary>
+    /// Sends <c>PWD</c> and reads the entry path; a relative one sends <c>SYST</c> when
+    /// <paramref name="askSystemForRelativePath" /> is set, as curl 8.21.0 does while it
+    /// knows no server system yet (BL-782).
+    /// </summary>
+    private async ValueTask<TransferResult?> ReadEntryPathAsync(bool askSystemForRelativePath)
+    {
+        if (!FtpEntryPath.TryRead(await ExchangeAsync("PWD").ConfigureAwait(false), out entryPath))
+        {
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.WeirdServerReply);
+        }
+
+        return askSystemForRelativePath && entryPath?.StartsWith('/') == false
+            ? await AskServerSystemAsync().ConfigureAwait(false)
+            : null;
+    }
+
+    /// <summary>
+    /// Sends <c>SYST</c>, whose refusal curl carries on past. A <c>215</c> naming
+    /// <c>OS/400</c> sends <c>SITE NAMEFMT 1</c>, and a 2xx to that sends <c>PWD</c> again
+    /// for the entry path in the new name format, with no second <c>SYST</c>.
+    /// </summary>
+    private async ValueTask<TransferResult?> AskServerSystemAsync()
+    {
+        FtpReply system = await ExchangeAsync("SYST").ConfigureAwait(false);
+        return FtpServerSystem.IsOs400(system)
+            && (await ExchangeAsync("SITE NAMEFMT 1").ConfigureAwait(false)).IsCompletion
+            ? await ReadEntryPathAsync(askSystemForRelativePath: false).ConfigureAwait(false)
+            : null;
+    }
 
     /// <summary>
     /// Reads the greeting and logs in: a <c>230</c> greeting means already logged in, a
@@ -246,7 +335,7 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
     private async ValueTask<TransferResult?> UpgradeControlAsync()
     {
         ConnectResult secured = await connections.TlsProvider
-            .AuthenticateAsClientAsync(control.Connection, context.Url.IdnHost, context.CancellationToken)
+            .AuthenticateAsClientAsync(control.Connection, context.Url.IdnHost, control.CancellationToken)
             .ConfigureAwait(false);
         if (secured.Connection is not { } connection)
         {
@@ -309,11 +398,6 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
 
     private async ValueTask<TransferResult> TransferPathAsync()
     {
-        if (!FtpEntryPath.TryRead(await ExchangeAsync("PWD").ConfigureAwait(false), out entryPath))
-        {
-            return TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.WeirdServerReply);
-        }
-
         if (FtpUrlPath.Parse(context.Url.AbsolutePath, context.FtpFileMethod) is not { } path)
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, FtpTransferMessages.PathHasControlCharacters);
@@ -328,6 +412,7 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
     {
         return await SendQuotesAsync(quotes.AfterLogin).ConfigureAwait(false)
             ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
+            ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
             ?? (context.NoBody
                 ? await ReportHeadAsync(path.FileName).ConfigureAwait(false)
                 : await DownloadAsync(path).ConfigureAwait(false));
@@ -345,6 +430,7 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
             ?? await SetTypeAsync(listing).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer).ConfigureAwait(false)
             ?? await ReadSizeAsync(path.FileName, listing).ConfigureAwait(false)
+            ?? await RefuseOversizedFileAsync().ConfigureAwait(false)
             ?? await PositionAsync().ConfigureAwait(false)
             ?? await RetrieveAsync(listing ? ListCommand(path) : "RETR " + path.FileName, listing).ConfigureAwait(false);
     }
@@ -372,6 +458,7 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
 
         return await SendQuotesAsync(quotes.AfterLogin).ConfigureAwait(false)
             ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
+            ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
             ?? await OpenDataConnectionAsync().ConfigureAwait(false)
             ?? await SetTypeAsync(false).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer).ConfigureAwait(false)
@@ -422,7 +509,6 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
             return notReady;
         }
 
-        context.Progress.ReportTransferStarted();
         return await CopyUploadAsync(upload).ConfigureAwait(false)
             ?? await ReadTransferCompleteAsync().ConfigureAwait(false);
     }
@@ -472,10 +558,67 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
     }
 
     /// <summary>
-    /// Answers <c>-I</c> as curl does, with no data connection: a directory URL sends
-    /// nothing more; a file sends <c>MDTM</c>, <c>TYPE I</c>, <c>SIZE</c> and
-    /// <c>REST 0</c>, writing a <c>Last-Modified</c>, <c>Content-Length</c> and
-    /// <c>Accept-ranges</c> line for each that succeeded.
+    /// Sends <c>MDTM</c> for a file when <c>-z</c>, <c>-R</c> or <c>-I</c> asks for its time,
+    /// as curl 8.21.0 does straight after the <c>CWD</c>s, for a download, an <c>-l</c>
+    /// listing of a file URL and an upload alike (BL-637). Under <c>-I</c> it writes the
+    /// <c>Last-Modified</c> line; then it applies <c>-z</c>.
+    /// </summary>
+    /// <returns>
+    /// <see langword="null" /> to go on; a success with no body when <c>-z</c> is not met;
+    /// or a failed header write.
+    /// </returns>
+    private async ValueTask<TransferResult?> CheckModificationTimeAsync(string fileName)
+    {
+        if (fileName.Length == 0 || !AsksForModificationTime)
+        {
+            return null;
+        }
+
+        FtpReply modified = await ExchangeAsync("MDTM " + fileName).ConfigureAwait(false);
+        ReportInfo(FtpTransferMessages.ModificationTimeReply(modified.Code));
+        modifiedUtc = FtpModificationTime.Of(modified);
+        return await WriteHeaderAsync(context.NoBody ? FtpHeadHeaderLines.LastModified(modifiedUtc) : null).ConfigureAwait(false)
+            ?? await ApplyTimeConditionAsync().ConfigureAwait(false);
+    }
+
+    private bool AsksForModificationTime => context.NoBody || context.RemoteTime || context.TimeCondition is not null;
+
+    /// <summary>
+    /// Applies <c>-z</c> to the <c>MDTM</c> time through <see cref="FtpTimeCondition" />: when
+    /// it is not met, the post-transfer quotes and <c>QUIT</c> end the transfer with no data
+    /// connection, as curl 8.21.0 does; a refused quote is still exit 21.
+    /// </summary>
+    private async ValueTask<TransferResult?> ApplyTimeConditionAsync()
+    {
+        if (context.TimeCondition is not { } condition)
+        {
+            return null;
+        }
+
+        (bool isMet, string? verboseLine) = FtpTimeCondition.Check(condition, modifiedUtc);
+        ReportInfo(verboseLine);
+        if (isMet)
+        {
+            return null;
+        }
+
+        TransferResult ended = await QuitAndSucceedAsync().ConfigureAwait(false);
+        return ended.IsSuccess ? TransferResult.TimeConditionNotMet() : ended;
+    }
+
+    private void ReportInfo(string? line)
+    {
+        if (line is not null)
+        {
+            context.Events.ReportInfo(line);
+        }
+    }
+
+    /// <summary>
+    /// Answers <c>-I</c> as curl does, with no data connection, once
+    /// <see cref="CheckModificationTimeAsync" /> has sent <c>MDTM</c> for a file: a directory
+    /// URL sends nothing more; a file sends <c>TYPE I</c>, <c>SIZE</c> and <c>REST 0</c>,
+    /// writing a <c>Content-Length</c> and <c>Accept-ranges</c> line for each that succeeded.
     /// </summary>
     private async ValueTask<TransferResult> ReportHeadAsync(string fileName)
     {
@@ -485,9 +628,7 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
                 ?? await QuitAndSucceedAsync().ConfigureAwait(false);
         }
 
-        FtpReply modified = await ExchangeAsync("MDTM " + fileName).ConfigureAwait(false);
-        return await WriteHeaderAsync(FtpHeadHeaderLines.LastModified(modified)).ConfigureAwait(false)
-            ?? await SetTypeAsync(false).ConfigureAwait(false)
+        return await SetTypeAsync(false).ConfigureAwait(false)
             ?? await ReadSizeAsync(fileName, false).ConfigureAwait(false)
             ?? await WriteHeaderAsync(fileSize is { } size ? FtpHeadHeaderLines.ContentLength(size) : null).ConfigureAwait(false)
             ?? await ReportRestAsync().ConfigureAwait(false);
@@ -876,6 +1017,16 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
             : null;
 
     /// <summary>
+    /// Ends the download with exit 63 when the <c>SIZE</c> count, the whole file's whatever
+    /// <c>-C</c> or <c>-r</c> asks for, is larger than <c>--max-filesize</c>: <c>ABOR</c> for
+    /// a range, then <c>QUIT</c>, and no <c>REST</c> or <c>RETR</c>, as curl 8.21.0 does.
+    /// </summary>
+    private async ValueTask<TransferResult?> RefuseOversizedFileAsync() =>
+        fileSize > maxFileSize
+            ? await EndAndFailAsync(CurlExitCode.FilesizeExceeded, FtpTransferMessages.MaxFileSizeExceeded).ConfigureAwait(false)
+            : null;
+
+    /// <summary>
     /// Applies the window before <c>RETR</c>: works out how many bytes to expect and, for
     /// a non-zero offset, sends <c>REST</c>, failing with exit 31 and no <c>QUIT</c> when
     /// it is answered with anything but <c>350</c>.
@@ -942,7 +1093,6 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
                 return notReady;
             }
 
-            context.Progress.ReportTransferStarted();
             return await CopyDataAsync().ConfigureAwait(false)
                 ?? await (window.MaxDownload is null ? ReadTransferCompleteAsync() : EndRangeAsync()).ConfigureAwait(false);
         }
@@ -988,22 +1138,52 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
             }
 
             int wanted = CountWithinWindow(read);
-            try
+            int allowed = CountWithinMaxFileSize(wanted);
+            if (await WriteOutputAsync(buffer.AsMemory(0, allowed)).ConfigureAwait(false) is { } writeFailed)
             {
-                await context.Output.WriteAsync(buffer.AsMemory(0, wanted), context.CancellationToken).ConfigureAwait(false);
-            }
-            catch (IOException exception)
-            {
-                int accepted = exception is OutputWriteFailedException failed ? failed.BytesAccepted : 0;
-                return TransferResult.Failure(CurlExitCode.WriteError, FtpTransferMessages.OutputWriteFailed(wanted, accepted), bytesTransferred);
+                return writeFailed;
             }
 
-            bytesTransferred += wanted;
+            bytesTransferred += allowed;
             context.Progress.ReportDownloaded(bytesTransferred, expectedSize);
+            if (allowed < wanted)
+            {
+                return TransferResult.Failure(CurlExitCode.FilesizeExceeded, FtpTransferMessages.MaxFileSizeExceededWhileReading(maxFileSize!.Value, bytesTransferred), bytesTransferred);
+            }
         }
 
         return null;
     }
+
+    /// <summary>
+    /// Writes <paramref name="bytes" /> to the output: nothing at all, not an empty write,
+    /// when there are none; exit 23 when the output refuses them.
+    /// </summary>
+    private async ValueTask<TransferResult?> WriteOutputAsync(ReadOnlyMemory<byte> bytes)
+    {
+        if (bytes.IsEmpty)
+        {
+            return null;
+        }
+
+        try
+        {
+            await context.Output.WriteAsync(bytes, context.CancellationToken).ConfigureAwait(false);
+            return null;
+        }
+        catch (IOException exception)
+        {
+            int accepted = exception is OutputWriteFailedException failed ? failed.BytesAccepted : 0;
+            return TransferResult.Failure(CurlExitCode.WriteError, FtpTransferMessages.OutputWriteFailed(bytes.Length, accepted), bytesTransferred);
+        }
+    }
+
+    /// <summary>
+    /// The bytes of <paramref name="count" /> that still fit under <c>--max-filesize</c>,
+    /// counted from this transfer's first byte: the whole count when there is no limit.
+    /// </summary>
+    private int CountWithinMaxFileSize(int count) =>
+        maxFileSize is { } max ? (int)Math.Min(count, max - bytesTransferred) : count;
 
     /// <summary>
     /// Gets whether the window's byte limit has been written, so curl stops reading the

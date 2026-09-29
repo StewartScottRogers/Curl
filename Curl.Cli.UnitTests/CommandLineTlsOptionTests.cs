@@ -650,6 +650,144 @@ public sealed class CommandLineTlsOptionTests
             result.WarningLines.ToArray());
     }
 
+    [TestMethod]
+    public void Parse_NoRevocationOrPinningOptions_LeavesThemNotGiven()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsNull(result.Options.CertificateRevocationListFile);
+        Assert.IsNull(result.Options.PinnedPublicKey);
+        Assert.IsFalse(result.Options.RequireCertificateStatus);
+        Assert.IsFalse(result.Options.AutoClientCertificate);
+    }
+
+    [TestMethod]
+    public void Parse_CrlfileThatExists_RecordsCertificateRevocationListFile()
+    {
+        string? checkedPath = null;
+
+        CommandLineParseResult result = CommandLineParser.Parse(
+            ["--crlfile", "revoked.crl", Url],
+            path =>
+            {
+                checkedPath = path;
+                return true;
+            });
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("revoked.crl", result.Options.CertificateRevocationListFile);
+        Assert.AreEqual("revoked.crl", checkedPath);
+    }
+
+    [TestMethod]
+    [DataRow("nosuch.crl")]
+    [DataRow("")]
+    public void Parse_CrlfileThatDoesNotExist_RefusesNamingCrlfile(string file)
+    {
+        // curl --crlfile '' file:///nonexist -> exit 2 with these lines (curl 8.21.0, 2026-09-28).
+        CommandLineParseResult result = CommandLineParser.Parse(["--crlfile", file, Url], NoPathExists);
+
+        AssertRefused(
+            result,
+            $"curl: The file '{file}' provided to --crlfile does not exist",
+            "curl: option --crlfile: is badly used here");
+    }
+
+    [TestMethod]
+    public void Parse_CrlfileGivenFlagLikeValue_WarnsBeforeRefusing()
+    {
+        // curl --crlfile -zz file:///nonexist warns, then refuses with exit 2 (curl 8.21.0, 2026-09-28).
+        CommandLineParseResult result = CommandLineParser.Parse(["--crlfile", "-zz", Url], NoPathExists);
+
+        AssertRefused(
+            result,
+            "curl: The file '-zz' provided to --crlfile does not exist",
+            "curl: option --crlfile: is badly used here");
+        CollectionAssert.AreEqual(
+            new[] { "Warning: The filename argument '-zz' looks like a flag." },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_NoCrlfile_RefusesAsNotReversible()
+    {
+        // curl --no-crlfile x file:///nonexist -> exit 2 (curl 8.21.0, 2026-09-28).
+        CommandLineParseResult result = CommandLineParser.Parse(["--no-crlfile", "x", Url], EveryPathExists);
+
+        AssertRefused(result, "curl: option --no-crlfile: the given option cannot be reversed with a --no- prefix");
+    }
+
+    [TestMethod]
+    [DataRow("sha256//YhKJKSzoTt2b5FP18fvpHo7fJYqQCjAa3HWY3tvRMwE=")]
+    [DataRow("sha256//YhKJKSzoTt2b5FP18fvpHo7fJYqQCjAa3HWY3tvRMwE=;sha256//t62CeU2tQiqkexU74Gxa2eg7fRbEgoChTociMee9wno=")]
+    [DataRow("server.pub.pem")]
+    [DataRow("-zz")]
+    public void Parse_Pinnedpubkey_RecordsPinnedPublicKeyVerbatimWithoutWarning(string pins)
+    {
+        // curl --pinnedpubkey -zz file:///nonexist -> no warning, exit 37 from the file URL (curl 8.21.0, 2026-09-28).
+        CommandLineParseResult result = CommandLineParser.Parse(["--pinnedpubkey", pins, Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(pins, result.Options.PinnedPublicKey);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    public void Parse_EmptyPinnedpubkey_RefusesAsBlank()
+    {
+        // curl --pinnedpubkey '' file:///nonexist -> exit 2 (curl 8.21.0, 2026-09-28).
+        CommandLineParseResult result = CommandLineParser.Parse(["--pinnedpubkey", "", Url], NoPathExists);
+
+        AssertRefused(result, "curl: option --pinnedpubkey: blank argument where content is expected");
+    }
+
+    [TestMethod]
+    public void Parse_NoPinnedpubkey_RefusesAsNotReversible()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--no-pinnedpubkey", "x", Url], NoPathExists);
+
+        AssertRefused(result, "curl: option --no-pinnedpubkey: the given option cannot be reversed with a --no- prefix");
+    }
+
+    [TestMethod]
+    public void Parse_CertStatus_SetsRequireCertificateStatus()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--cert-status", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.RequireCertificateStatus);
+    }
+
+    [TestMethod]
+    public void Parse_CertStatusThenNoCertStatus_DoesNotRequireCertificateStatus()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--cert-status", "--no-cert-status", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.RequireCertificateStatus);
+    }
+
+    [TestMethod]
+    public void Parse_SslAutoClientCert_SetsAutoClientCertificate()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ssl-auto-client-cert", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.AutoClientCertificate);
+    }
+
+    [TestMethod]
+    public void Parse_SslAutoClientCertThenNoSslAutoClientCert_PicksNoClientCertificate()
+    {
+        // curl --cert-status --no-cert-status --ssl-auto-client-cert --no-ssl-auto-client-cert file:///nonexist
+        // parses all four and exits 37 from the file URL (curl 8.21.0, 2026-09-28).
+        CommandLineParseResult result = CommandLineParser.Parse(["--ssl-auto-client-cert", "--no-ssl-auto-client-cert", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.AutoClientCertificate);
+    }
+
     private static void AssertRefused(CommandLineParseResult result, params string[] expectedLinesBeforeTryHelp)
     {
         Assert.IsFalse(result.IsAccepted);

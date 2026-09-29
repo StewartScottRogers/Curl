@@ -16,9 +16,29 @@ public sealed class ParallelRunTests
     private static readonly TransferResult Missing = TransferResult.Failure(CurlExitCode.FileCouldntReadFile, "missing");
 
     [TestMethod]
+    public async Task WaitForFreeSlotAsync_NoSlotFreeWithAMeter_DrawsTheMeterBeforeWaiting()
+    {
+        System.Text.StringBuilder written = new();
+        ParallelRun run = new(1, 0, true)
+        {
+            ProgressMeter = new ParallelProgressMeter(new ManualTimerTimeProvider(), new WriteGate(), text => written.Append(text)),
+        };
+        TaskCompletionSource running = new();
+        run.Queue.Add(running.Task);
+
+        Task wait = run.WaitForFreeSlotAsync();
+        string drawnBeforeTheSlotFreed = written.ToString();
+        running.SetResult();
+        await wait;
+
+        StringAssert.StartsWith(drawnBeforeTheSlotFreed, "DL% UL%  Dled  Uled  Xfers  Live");
+        run.ProgressMeter.Dispose();
+    }
+
+    [TestMethod]
     public void ExitCode_NothingFailed_IsOk()
     {
-        ParallelRun run = new(2);
+        ParallelRun run = new(2, 0, true);
 
         run.RecordEnd(TransferResult.Success(1), endsTheRun: false, failEarly: false);
 
@@ -31,7 +51,7 @@ public sealed class ParallelRunTests
     [TestMethod]
     public void ExitCode_TwoFailures_IsTheFirstToEnd()
     {
-        ParallelRun run = new(2);
+        ParallelRun run = new(2, 0, true);
 
         run.RecordEnd(Missing, endsTheRun: false, failEarly: false);
         run.RecordEnd(Refused, endsTheRun: false, failEarly: false);
@@ -43,7 +63,7 @@ public sealed class ParallelRunTests
     [TestMethod]
     public void RecordEnd_RunEndingWithoutFailEarly_StopsFurtherStartsWithoutAborting()
     {
-        ParallelRun run = new(2);
+        ParallelRun run = new(2, 0, true);
 
         run.RecordEnd(Refused, endsTheRun: true, failEarly: false);
 
@@ -54,7 +74,7 @@ public sealed class ParallelRunTests
     [TestMethod]
     public void RecordEnd_RunEndingUnderFailEarly_AbortsTheRun()
     {
-        ParallelRun run = new(2);
+        ParallelRun run = new(2, 0, true);
 
         run.RecordEnd(Refused, endsTheRun: true, failEarly: true);
 
@@ -66,7 +86,7 @@ public sealed class ParallelRunTests
     [TestMethod]
     public async Task EndAsync_WritesDeferredReportsInTransferOrderThenClosesTheDispatches()
     {
-        ParallelRun run = new(2);
+        ParallelRun run = new(2, 0, true);
         List<string> written = [];
         run.DeferReport(2, () => Record(written, "2"));
         run.DeferReport(0, () => Record(written, "0"));
@@ -83,7 +103,7 @@ public sealed class ParallelRunTests
     [TestMethod]
     public async Task EndAsync_NothingStarted_Ends()
     {
-        ParallelRun run = new(1);
+        ParallelRun run = new(1, 0, true);
 
         await run.EndAsync();
 
@@ -93,7 +113,7 @@ public sealed class ParallelRunTests
     [TestMethod]
     public async Task EndAsync_ATransferFaulted_Rethrows()
     {
-        ParallelRun run = new(1);
+        ParallelRun run = new(1, 0, true);
         run.Queue.Add(Task.FromException(new IOException("broken")));
 
         await Assert.ThrowsExactlyAsync<IOException>(run.EndAsync);

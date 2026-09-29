@@ -101,4 +101,19 @@ internal static class ImapSessionMessages
     /// <returns>The message to report.</returns>
     internal static string OutputWriteFailed(int passed, int returned) =>
         string.Create(CultureInfo.InvariantCulture, $"Failure writing output to destination, passed {passed} returned {returned}");
+
+    /// <summary>
+    /// Tells whether curl 8.21.0's <c>-v</c> writes <paramref name="message" /> as a <c>*</c>
+    /// line when the transfer fails with it (BL-559). It does for every message it formats
+    /// itself, a TLS failure's included, and not for <see cref="MalformedUrl" />,
+    /// <see cref="LoginDenied" />, <see cref="RemoteFileNotFound" />,
+    /// <see cref="QuoteCommandFailed" />, <see cref="WeirdServerReply" />,
+    /// <see cref="ResponseLineTooLarge" /> and <see cref="UploadFailed" />, which are only the
+    /// exit code's own text.
+    /// </summary>
+    /// <param name="message">The failure's message.</param>
+    /// <returns><see langword="true" /> when the message is written.</returns>
+    internal static bool IsWrittenByVerbose(string message) =>
+        message is not (MalformedUrl or LoginDenied or RemoteFileNotFound or QuoteCommandFailed
+            or WeirdServerReply or ResponseLineTooLarge or UploadFailed);
 }

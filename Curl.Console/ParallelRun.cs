@@ -9,7 +9,9 @@ namespace Curl.Console;
 /// holding the run's <see cref="WriteGate" />, or from the one flow that starts the transfers.
 /// </summary>
 /// <param name="maxRunning">The <c>--parallel-max</c> limit.</param>
-internal sealed class ParallelRun(int maxRunning)
+/// <param name="maxPerHost">The <c>--parallel-max-host</c> limit; zero for none.</param>
+/// <param name="parallelImmediate">Whether <c>--parallel-immediate</c> was given.</param>
+internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelImmediate)
 {
     /// <summary>
     /// The message of a transfer <c>--fail-early</c> aborted because another failed, with exit
@@ -31,6 +33,15 @@ internal sealed class ParallelRun(int maxRunning)
 
     /// <summary>Gets the queue the run's transfers wait in for a free slot.</summary>
     internal ParallelTransferQueue Queue { get; } = new(maxRunning);
+
+    /// <summary>Gets the queue the run's transfers wait in, holding their slot, for a busy host.</summary>
+    internal ParallelHostQueue Hosts { get; } = new(maxPerHost, parallelImmediate);
+
+    /// <summary>
+    /// Gets or sets the run's combined progress meter (BL-521), or <see langword="null" /> when the run
+    /// shows none.
+    /// </summary>
+    internal ParallelProgressMeter? ProgressMeter { get; set; }
 
     /// <summary>Gets the token every transfer of the run is aborted through.</summary>
     internal CancellationToken AbortToken => abort.Token;
@@ -96,26 +107,48 @@ internal sealed class ParallelRun(int maxRunning)
         }
     }
 
+    /// <summary>
+    /// Waits until fewer than <c>--parallel-max</c> transfers are running; when none is free, the runner
+    /// has started every transfer it can for now, and the meter draws when due, as curl's loop does
+    /// once it has added what it can.
+    /// </summary>
+    /// <returns>A task that completes when a transfer may start.</returns>
+    internal Task WaitForFreeSlotAsync()
+    {
+        if (!Queue.HasFreeSlot)
+        {
+            ProgressMeter?.DrawIfDue();
+        }
+
+        return Queue.WaitForFreeSlotAsync();
+    }
+
     /// <summary>Keeps an option group's dispatch open until <see cref="EndAsync" />.</summary>
     /// <param name="dispatch">The dispatch.</param>
     internal void CloseAtEnd(TransferDispatch dispatch) => dispatches.Add(dispatch);
 
     /// <summary>
-    /// Waits for every started transfer to end, writes the deferred reports in command-line order,
-    /// then closes the option groups' dispatches.
+    /// Waits for every started transfer to end, writes the deferred reports in command-line order and
+    /// the meter's final line, then closes the option groups' dispatches. Every transfer has been
+    /// started when it is called, so the meter first draws when due.
     /// </summary>
     /// <returns>A task that completes when the run has ended.</returns>
     /// <remarks>
     /// A transfer that faulted, which no handler failure does, ends the run with its exception at
-    /// once, as it does without <c>-Z</c>; the dispatches are then left to the process's exit.
+    /// once, as it does without <c>-Z</c>; the meter stops without a final line, and the dispatches
+    /// are left to the process's exit.
     /// </remarks>
     internal async Task EndAsync()
     {
+        using ParallelProgressMeter? meter = ProgressMeter;
+        meter?.DrawIfDue();
         await Queue.WhenAllEndedAsync().ConfigureAwait(false);
         foreach ((_, Func<Task> report) in deferredReports.OrderBy(deferred => deferred.TransferId))
         {
             await report().ConfigureAwait(false);
         }
+
+        meter?.DrawFinal();
 
         foreach (TransferDispatch dispatch in dispatches)
         {

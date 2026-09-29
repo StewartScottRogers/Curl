@@ -50,7 +50,7 @@ public sealed class Pop3SessionTests
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(replies));
         var context = new TransferContext { Url = CurlUrl.Parse("pop3://127.0.0.1/"), Output = Stream.Null };
         var session = new Pop3Session(
-            new Pop3ControlChannel(connection, CancellationToken.None), new QueuedTlsProvider(), context, implicitTls: false);
+            new Pop3ControlChannel(connection, NoTransferEvents.Instance, CancellationToken.None), new QueuedTlsProvider(), context, implicitTls: false);
 
         Assert.AreEqual(TransferResult.Success(0), await session.RunAsync());
         return session;

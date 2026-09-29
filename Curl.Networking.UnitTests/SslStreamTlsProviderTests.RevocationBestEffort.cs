@@ -80,7 +80,7 @@ public sealed partial class SslStreamTlsProviderTests
     {
         X509ChainStatus[] statuses = [new() { Status = flags }, new() { Status = X509ChainStatusFlags.OfflineRevocation }];
 
-        Assert.IsTrue(SslStreamTlsProvider.HasOnlyUnavailableRevocationStatus(statuses));
+        Assert.IsTrue(ServerCertificateVerification.HasOnlyUnavailableRevocationStatus(statuses));
     }
 
     [TestMethod]
@@ -91,12 +91,12 @@ public sealed partial class SslStreamTlsProviderTests
     {
         X509ChainStatus[] statuses = [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }, new() { Status = flags }];
 
-        Assert.IsFalse(SslStreamTlsProvider.HasOnlyUnavailableRevocationStatus(statuses));
+        Assert.IsFalse(ServerCertificateVerification.HasOnlyUnavailableRevocationStatus(statuses));
     }
 
     [TestMethod]
     public void HasOnlyUnavailableRevocationStatus_WithNoFault_IsFalse()
     {
-        Assert.IsFalse(SslStreamTlsProvider.HasOnlyUnavailableRevocationStatus([]));
+        Assert.IsFalse(ServerCertificateVerification.HasOnlyUnavailableRevocationStatus([]));
     }
 }

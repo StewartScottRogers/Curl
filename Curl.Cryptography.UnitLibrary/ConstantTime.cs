@@ -22,6 +22,22 @@ internal static class ConstantTime
         (whenSet & mask) | (whenClear & ~mask);
 
     /// <summary>
+    /// Returns all ones when <paramref name="left" /> is less than <paramref name="right" />
+    /// and zero otherwise, without a branch. Both must be below 2^31.
+    /// </summary>
+    public static uint LessThanMask(uint left, uint right) => (uint)((int)(left - right) >> 31);
+
+    /// <summary>
+    /// Returns all ones when <paramref name="left" /> equals <paramref name="right" /> and
+    /// zero otherwise, without a branch.
+    /// </summary>
+    public static uint EqualMask(uint left, uint right)
+    {
+        uint difference = left ^ right;
+        return ~(uint)((int)(difference | (0u - difference)) >> 31);
+    }
+
+    /// <summary>
     /// Swaps the contents of <paramref name="left" /> and <paramref name="right" /> when
     /// the lowest bit of <paramref name="bit" /> is <c>1</c> and leaves both unchanged when
     /// it is <c>0</c>, touching every element either way (the Montgomery ladder's

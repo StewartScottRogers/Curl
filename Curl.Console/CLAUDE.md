@@ -20,6 +20,10 @@ end, whatever their outcome (ADR-0050, BL-334). It also holds the `TcpConnector`
 `LoadResolveEntries`, which the runner calls at the start of every URL's transfer, just before
 the `-b` files load, so `-v` prints the `--resolve` entries' `Added ... to DNS cache` lines for
 each URL; a `--retry` attempt and a followed redirect reload nothing, as in curl 8.21.0 (BL-486).
+The origin's and the HTTPS proxy's TLS providers come from `CurlComposition.CreateTlsProvider`,
+which builds `HandBuiltTlsProvider` when `TlsClientRouting.Choose` routes the options to the
+hand-built client (a `--tls-max` of 1.0 or 1.1 today) and `SslStreamTlsProvider` otherwise
+(ADR-0140, ADR-0162, BL-708).
 
 `CurlComposition.CreateProtocolHandlers` gives every handler an `EndPointRecordingConnector` and
 an `EndPointRecordingDatagramConnector` sharing one `ConnectionEndPointRecorder`, and wraps
@@ -72,6 +76,26 @@ lower case, the authority as typed, and the path as curl sends it - `/` when emp
 segments removed unless `--path-as-is` - before the query and fragment; a URL curl rejects
 prints as typed, as curl 8.21.0 does (BL-371 and BL-444 Notes).
 
+Before each transfer connects, `--etag-compare` reads its file through the `IFileSystem` (every CR
+and LF dropped; `""` for a missing or empty file, after `Warning: Failed to open <file>: <reason>`)
+and adds an `If-None-Match` line to its option group, sent after every `-H` and `--json` header;
+the lines pile up, one per transfer of the group, as curl's do. `--etag-save` then creates its
+file for appending (kept as it is) or chooses standard output for `-`; `EtagSaveStream` watches the
+header lines and replaces the file with the value of each `ETag` of a 200-399 response. A save file
+that cannot be created skips the transfer - no report, no `-w` - and a run whose every transfer was
+skipped ends with `curl: no transfer performed` and exit 26 (BL-619 Notes).
+
+Under `--alt-svc <file>` each `http` or `https` transfer gets its own `AltSvcTransferCache` (an
+`AltSvcCache` from `Curl.Core`, ADR-0175), as curl gives each transfer's handle one: the file is read
+just after the `-b` files, a missing one as empty, and written back after the `-c` jar, created if
+missing and silently left alone if it cannot be written; no other scheme reads or writes it, and
+`--alt-svc ""` does neither. `TransferContextFactory` puts it on `HttpRequestOptions.AltSvcStore`, so
+the HTTP handler learns each `Alt-Svc` header of an `https` response and prints `* Added alt-svc`,
+and sets `AltSvcRoute` to the first unexpired `h1` alternative for an `https` origin, unless a
+`--connect-to` mapping matches it or the entry names the origin itself; the TCP connector dials it
+and the handler sends `Alt-Used`. `h2` and `h3` alternatives are skipped until BL-733, and a redirect
+to another origin drops the route (`RedirectFollower`). Measured on curl 8.21.0 (ADR-0214, BL-623 Notes).
+
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
 segment, still percent-encoded; none gives `curl_response` and curl's
@@ -100,10 +124,19 @@ that name (case-insensitive), and a body is a `BytesBody` sent as
 the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` and
 `https` are served by `HttpProtocolHandler`, registered in `CurlComposition` with a
 `RankedHttpAuthenticator` (Basic and Bearer, and Digest with a random client nonce, all in the
-platform's credential encoding), which answers the scheme `-u`, `--basic`, `--digest`,
-`--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`).
+platform's credential encoding, and Negotiate), which answers the scheme `-u`, `--basic`, `--digest`,
+`--negotiate`, `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`).
+Negotiate's contexts come from `CurlComposition.CreateSecurityContextFactory`, ADR-0142's router:
+SSPI on Windows, elsewhere the system GSS-API with the hand-built SPNEGO and Kerberos behind it,
+reaching KDCs through `Curl.Networking`'s `KerberosKdcSocketTransport` over the run's connectors
+and finding them through `KerberosDnsSrvLookup`. `HandBuiltKerberosSources` reads `krb5.conf`
+and the credential cache from disk (`KerberosDiskFileReader`) only when a hand-built context first
+asks, with the `<uid>` of `/tmp/krb5cc_<uid>` from `ProcessUserId` (BL-527, ADR-0176). The same
+factory goes to `CreateSaslAuthenticator`, so SMTP, IMAP and POP3 answer SASL `GSSAPI` and `NTLM`
+on it (ADR-0184, BL-852). Tests pass their own `ISecurityContextFactory` to `CreateRunner`.
 `-0` / `--http1.0` and `--http1.1` set `HttpRequestOptions.Version` (the last one wins, HTTP/1.1
-when neither is given), and `--compressed`, `--tr-encoding`, `--raw` and `--ignore-content-length`
+when neither is given), as do `--http3` and `--http3-only`, for which the TCP connector hands
+QUIC connects to the group's `QuicDialer` (ADR-0182, BL-732), and `--compressed`, `--tr-encoding`, `--raw` and `--ignore-content-length`
 are copied as they are (BL-236); `CurlCommandRunnerTransferEncodingTests` pins each one's request
 bytes and output as BL-177, BL-180 and BL-315 measured them.
 With `-b` or `-c` the handler also gets the option group's `CookieEngine`: one `CookieStore`
@@ -153,6 +186,15 @@ in command-line order after the run's other transfers. A result that ends a seri
 `--fail-early` (a bad glob, a `-T` or `-D` file that cannot be opened) stops further starts and lets
 the running transfers finish. Without `-Z` nothing changes.
 
+Under `-Z` no transfer draws its own meter or `-#` bar: `ParallelRun`'s `ParallelProgressMeter` draws
+curl 8.21.0's combined meter to standard error (ADR-0155, BL-521). Its header line and status lines
+come from `Curl.Output`'s `ParallelProgressMeterText`, drawn when a handler reports bytes (each
+transfer's `TransferProgressRecorder` passes them to its `ParallelTransferProgress`), when a transfer
+ends, when the runner has started every transfer it can, and after a second without a draw. A line
+is drawn only if more than 500 ms have passed since the last. The final line and its line ending
+come once the run's reports are written. `-s` and `--no-progress-meter` in the first option group
+hide the meter, and `-#` is ignored, as in curl.
+
 The Nth `-T` / `--upload-file` value uploads to the Nth URL (ADR-0051). Its URL is resolved
 by `UploadTransferUrl` before anything else of that transfer: one it cannot parse is exit 3
 with no warning lines. The `-T` file is opened through the runner's `IFileSystem` after the
@@ -167,11 +209,31 @@ Each transfer's proxy is chosen by `TransferProxySelection`, after the URL, rang
 body are checked: `Curl.Core`'s `ProxySelector` (held by `TransferDispatch`, reading the
 process's proxy environment variables in production and none in tests unless given) picks it
 from `-x` or a `--socks` option, `--noproxy` and the variables; `-U` replaces its credential;
-it goes into `HttpRequestOptions.ForwardProxy` with `-p` as `ProxyTunnel`. Proxy text curl
+it goes into `HttpRequestOptions.ForwardProxy` with `-p` as `ProxyTunnel`. A CONNECT tunnel
+authenticates with the scheme `--proxy-basic`, `--proxy-digest` and `--proxy-anyauth` pick,
+through the same `RankedHttpAuthenticator` the origin uses (`CreateProxyTunnelOptions`, ADR-0186),
+and a forward proxy's `407` is answered with the same pick, which `CreateProtocolHandlers` hands
+the HTTP handler (ADR-0187). Under
+`--unix-socket` or `--abstract-unix-socket` no proxy is chosen or even parsed, and the group's
+`TcpConnector` dials that socket (`CurlComposition.UnixSocketOf`), as curl 8.21.0 does (ADR-0149, BL-507). Proxy text curl
 cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy, or an HTTPS
 proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with exit 4 until the connector opens those tunnels
 (ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep
 the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
+
+`TransferCredentialLookup` then chooses the transfer's credentials, once per URL. When `-u` gives
+no user name, the URL's percent-decoded user name and password are sent (`http://zz@host/` sends
+`zz:`, `http://:x@host/` sends `:x`, `http://@host/` nothing), replacing a `-u :pw` whole (BL-791).
+Under `-n`, `--netrc-file` or `--netrc-optional` the netrc file has its say too, and the runner keeps them as the running transfer's
+`LookedUpCredentials`, which `TransferContextFactory` puts on every attempt's context in place of
+`-u`'s. A `-u` with a user name wins and no file is read. The file is the `--netrc-file` one, else
+`.netrc` in `HOME` (on Windows `_netrc` after it, and `USERPROFILE` when `HOME` is not set), read
+through the runner's `IDataFileReader` and environment. The URL's percent-decoded user name picks
+the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; with no entry the
+URL's user and password are sent. A required file that is missing or malformed fails each URL with
+`curl: (26) .netrc error: no such file` or `syntax error` before anything is sent;
+`--netrc-optional` ignores both. A redirect keeps the credentials to the same host and drops them
+to another; curl's per-hop lookup is BL-790. Measured on curl 8.21.0 (BL-505 Notes).
 An `ftp` or `ftps` URL is claimed by `RoutingFtpProtocolHandler`, which hands an `ftp` one to
 the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
@@ -217,7 +279,10 @@ as a glob and closes after the last transfer (ADR-0046): `-v` is `Curl.Output`'s
 output is a terminal; a trace is its `TraceTransferEventWriter`, stamped under `--trace-time`, into
 the named file (opened once per run, truncated), standard output for `-`, standard error for `%`,
 and standard error, with no warning, for a file that cannot be opened. On Windows each is text
-mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). The lines are only as complete as what the
+mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). Under `--trace-ids` (or `-vv`) each transfer
+reports through a `TraceIdsTransferEvents` view, so its lines carry `[<xfer>-<conn>] ` after the
+stamp, `[<xfer>-x] ` for the `--resolve` and `-b` lines before it connects (ADR-0202, BL-648).
+The lines are only as complete as what the
 handler and connector report (BL-242 Notes name the follow-ups).
 
 `--stderr <file>` replaces the runner's standard error where it stands among the parser's

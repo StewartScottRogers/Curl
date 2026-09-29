@@ -4,8 +4,8 @@ using System.Net.Sockets;
 namespace Curl.Networking;
 
 /// <summary>
-/// Pins <see cref="TcpDialer" />. The loopback test opens real sockets and is the one
-/// <c>Integration</c> test in this project; the argument check needs none.
+/// Pins <see cref="TcpDialer" />. The loopback tests open real sockets and are this project's
+/// <c>Integration</c> dialer tests; the argument checks need none.
 /// </summary>
 [TestClass]
 public sealed class TcpDialerTests
@@ -17,6 +17,54 @@ public sealed class TcpDialerTests
             async () => await new TcpDialer().DialAsync(null!, CancellationToken.None));
 
         Assert.AreEqual("endPoint", exception.ParamName);
+    }
+
+    [TestMethod]
+    public async Task DialUnixSocketAsync_WithNullAddress_ThrowsArgumentNullException()
+    {
+        var exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(
+            async () => await new TcpDialer().DialUnixSocketAsync(null!, CancellationToken.None));
+
+        Assert.AreEqual("address", exception.ParamName);
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    public async Task DialUnixSocketAsync_ToAListeningSocket_ConnectsAndCarriesBytes()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"bl507-{Guid.NewGuid():N}.sock");
+        using var listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        listener.Bind(new UnixDomainSocketEndPoint(path));
+        listener.Listen(1);
+        try
+        {
+            var accepting = listener.AcceptAsync();
+
+            await using var connection = await new TcpDialer().DialUnixSocketAsync(new UnixSocketAddress(path, IsAbstract: false), CancellationToken.None);
+            using var accepted = await accepting;
+            await connection.WriteAsync("hi"u8.ToArray(), CancellationToken.None);
+            await connection.FlushAsync(CancellationToken.None);
+            var received = new byte[2];
+            var count = await accepted.ReceiveAsync(received, SocketFlags.None);
+
+            Assert.AreEqual(2, count);
+            CollectionAssert.AreEqual("hi"u8.ToArray(), received);
+            Assert.AreEqual(path, connection.RemoteEndPoint!.ToString());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    public async Task DialUnixSocketAsync_ToAMissingSocket_ThrowsSocketException()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"bl507-missing-{Guid.NewGuid():N}.sock");
+
+        await Assert.ThrowsExactlyAsync<SocketException>(
+            async () => await new TcpDialer().DialUnixSocketAsync(new UnixSocketAddress(path, IsAbstract: false), CancellationToken.None));
     }
 
     [TestMethod]
@@ -44,6 +92,43 @@ public sealed class TcpDialerTests
         Assert.AreNotEqual(0, (int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive)!);
         Assert.AreEqual(60, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime)!);
         Assert.AreEqual(60, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval)!);
+        Assert.AreEqual(9, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount)!);
+    }
+
+    [TestMethod]
+    public void ApplySocketOptions_WithKeepAliveTimeAndCount_SetsTheTimersToThem()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        new TcpDialer(new TcpSocketOptions(KeepAliveSeconds: 5, KeepAliveProbeCount: 3)).ApplySocketOptions(socket);
+
+        Assert.AreEqual(5, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime)!);
+        Assert.AreEqual(5, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval)!);
+        Assert.AreEqual(3, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount)!);
+    }
+
+    [TestMethod]
+    public void ApplySocketOptions_WithAProbeCountThePlatformRefuses_KeepsKeepAliveAndTheTimesItAccepts()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        new TcpDialer(new TcpSocketOptions(KeepAliveSeconds: 5, KeepAliveProbeCount: -1)).ApplySocketOptions(socket);
+
+        Assert.AreNotEqual(0, (int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive)!);
+        Assert.AreEqual(5, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime)!);
+        Assert.AreNotEqual(-1, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount)!);
+    }
+
+    [TestMethod]
+    public void ApplySocketOptions_WithNoKeepAlive_SetsNoneOfTheTimers()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        new TcpDialer(new TcpSocketOptions(KeepAlive: false, KeepAliveSeconds: 5, KeepAliveProbeCount: 3)).ApplySocketOptions(socket);
+
+        Assert.AreNotEqual(5, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime)!);
+        Assert.AreNotEqual(5, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval)!);
+        Assert.AreNotEqual(3, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount)!);
     }
 
     [TestMethod]

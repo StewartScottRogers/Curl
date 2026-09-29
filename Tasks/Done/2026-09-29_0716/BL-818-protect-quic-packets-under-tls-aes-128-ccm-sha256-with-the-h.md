@@ -1,0 +1,41 @@
+---
+id: BL-818
+title: Protect QUIC packets under TLS_AES_128_CCM_SHA256 with the hand-built AES-CCM
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: [BL-723, BL-738]
+touches: [Curl.Quic.UnitLibrary, Curl.Quic.UnitTests]
+requirement: none
+created: 2026-09-28
+completed: 2026-09-29
+---
+# BL-818 — Protect QUIC packets under TLS_AES_128_CCM_SHA256 with the hand-built AES-CCM
+
+## Goal
+
+`QuicPacketProtection.CanProtect(0x1304)` is true and `QuicPacketProtection` protects and unprotects packets under `TLS_AES_128_CCM_SHA256` (`AEAD_AES_128_CCM`, 16-byte tag, AES-ECB header protection) with the hand-built AES-CCM of BL-738.
+
+## Context
+
+- BL-723 built QUIC packet protection for `0x1301`, `0x1302` and `0x1303` and refuses the CCM suites with an `ArgumentException` until an AES-CCM exists on every platform (the BCL's `AesCcm` is missing on macOS, ADR-0118).
+- RFC 9001 section 5.3 allows `AEAD_AES_128_CCM`; `TLS_AES_128_CCM_8_SHA256` (8-byte tag) is not used with QUIC and stays refused.
+- Start at `Curl.Quic.UnitLibrary/QuicPayloadProtection.cs` (the AEAD choice) and `QuicPacketProtection.CanProtect`; add an `IQuicPacketAead` over the BL-738 primitive.
+
+## Acceptance criteria
+
+- [x] `Curl.Quic.UnitTests` round-trips an Initial-style long-header packet and a short-header packet under `Tls13CipherSuite.Aes128CcmSha256`, and a tampered one is dropped as `DroppedAuthenticationFailed`.
+- [x] `QuicPacketProtection.CanProtect(0x1304)` is true and `CanProtect(0x1305)` is still false.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Quic.UnitLibrary` reports 100% line and branch coverage and no failing member.
+
+## Notes
+
+- Delivered directly rather than through the full `/feature` agent stages: the change is one adapter (`AesCcmQuicPacketAead` over `Curl.Cryptography.AeadAesCcm`), one switch arm in `QuicPayloadProtection.Create` and `0x1304` in `QuicPacketProtection.CanProtect`. Header protection needed no change: `QuicHeaderProtection` already uses AES-ECB for every non-ChaCha suite, which is what RFC 9001 section 5.4.3 gives AEAD_AES_128_CCM.
+- No ADR: RFC 9001 section 5.3 fixes the choice (CCM with a 16-byte tag allowed, `0x1305` excluded), so nothing was left to decide.
+- Tests: `ProtectThenUnprotect_Aes128CcmLongHeader_RoundTrips`, `ProtectThenUnprotect_Aes128CcmShortHeader_RoundTrips`, `Unprotect_TamperedAes128CcmPacket_IsDroppedAsAuthenticationFailed`; `Create_SuiteWithoutQuicProtection_Throws` now refuses `0x1305`. Curl.Quic.UnitTests 402 passing; Measure-CodeQuality: 100% line and branch, 0 failing members.
+
+## Log
+
+- 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. QUIC packets are protected and unprotected under TLS_AES_128_CCM_SHA256 with the hand-built AES-CCM

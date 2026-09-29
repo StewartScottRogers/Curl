@@ -11,16 +11,53 @@ namespace Curl.Protocol.Http;
 internal static class HttpConnectionInfoLines
 {
     /// <summary>
-    /// The line for a reused connection that failed before any byte of the response arrived,
-    /// written before it is closed and the request is sent again on a fresh connection.
+    /// Formats the line for a reused connection that failed before any byte of the response
+    /// arrived, or an HTTP/3 stream the server refused (ADR-0187), written before the
+    /// connection is closed and the request is sent again on a fresh one.
     /// </summary>
-    internal const string ConnectionDiedRetrying = "Connection died, retrying a fresh connect (retry count: 1)";
+    /// <param name="retryCount">The transfer's retries so far, this one included.</param>
+    /// <returns>The line.</returns>
+    internal static string ConnectionDiedRetrying(int retryCount) =>
+        string.Create(CultureInfo.InvariantCulture, $"Connection died, retrying a fresh connect (retry count: {retryCount})");
+
+    /// <summary>
+    /// The line written when an HTTP/3 stream the server refused before any byte of its
+    /// response is sent again, or given up on (<c>Curl_retry_request</c>, ADR-0187).
+    /// </summary>
+    internal const string RefusedStreamRetrying = "REFUSED_STREAM, retrying a fresh connect";
 
     /// <summary>
     /// The line written before the first request on a connection this transfer opened, not on
     /// one it reuses (measured, BL-407 Notes).
     /// </summary>
     internal const string UsingHttp1 = "using HTTP/1.x";
+
+    /// <summary>
+    /// The line written in place of <see cref="UsingHttp1" /> when the connection speaks
+    /// HTTP/2 (measured, ADR-0141).
+    /// </summary>
+    internal const string UsingHttp2 = "using HTTP/2";
+
+    /// <summary>
+    /// The line written in place of <see cref="UsingHttp1" /> when the connection is QUIC and
+    /// speaks HTTP/3 (measured, ADR-0144).
+    /// </summary>
+    internal const string UsingHttp3 = "using HTTP/3";
+
+    /// <summary>
+    /// The line written after the head of the <c>101</c> an h2c upgrade request is answered
+    /// with, as the connection switches to HTTP/2 (measured, BL-716 Notes).
+    /// </summary>
+    internal const string SwitchingToHttp2 = "Received 101, Switching to HTTP/2";
+
+    /// <summary>
+    /// The line written after <see cref="SwitchingToHttp2" /> when HTTP/2 bytes arrived with the
+    /// <c>101</c>'s head (measured, BL-716 Notes).
+    /// </summary>
+    /// <param name="length">How many bytes arrived after the head.</param>
+    /// <returns>The line.</returns>
+    internal static string CopiedHttp2DataAfterUpgrade(int length) =>
+        string.Create(CultureInfo.InvariantCulture, $"Copied HTTP/2 data in stream buffer to connection buffer after upgrade: len={length}");
 
     /// <summary>
     /// The line written once a request without a body has been sent.
@@ -81,6 +118,26 @@ internal static class HttpConnectionInfoLines
     /// <returns>The line, such as <c>Connection #0 to host 127.0.0.1:18231 left intact</c>.</returns>
     internal static string LeftIntact(long connectionNumber, string host, int port) =>
         string.Create(CultureInfo.InvariantCulture, $"Connection #{connectionNumber} to host {host}:{port} left intact");
+
+    /// <summary>
+    /// Formats the line for a connection through a Unix domain socket left open for another
+    /// transfer: curl 8.21.0 names the socket's whole path, its ASCII letters lower-cased, with
+    /// port <c>0</c> (measured, BL-794 Notes).
+    /// </summary>
+    /// <param name="connectionNumber">curl's number for the connection.</param>
+    /// <param name="socketPath">The path of the socket the connection was dialled through.</param>
+    /// <returns>The line, such as <c>Connection #0 to host c:\users\public\s.sock:0 left intact</c>.</returns>
+    internal static string LeftIntactOverUnixSocket(long connectionNumber, string socketPath) =>
+        LeftIntact(connectionNumber, LowerAsciiLetters(socketPath), 0);
+
+    private static string LowerAsciiLetters(string text) =>
+        string.Create(text.Length, text, static (lowered, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                lowered[index] = char.IsAsciiLetterUpper(source[index]) ? (char)(source[index] | 0x20) : source[index];
+            }
+        });
 
     /// <summary>
     /// Formats the line for a connection closed because its response did not let it persist.

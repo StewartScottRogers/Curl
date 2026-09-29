@@ -85,6 +85,20 @@ internal sealed class HttpResponseHeadReader
     internal Func<HttpResponseHead, HttpHeadRefusal?> FindRefusal { get; init; } = static _ => null;
 
     /// <summary>
+    /// Gets a value indicating whether the heads are an HTTP/2 or HTTP/3 stream's, as
+    /// <see cref="Http2StreamConnection" /> and <see cref="Http3StreamConnection" /> write them, whose status lines are parsed with
+    /// <see cref="HttpStatusLine.ParseHttp2OrHttp3" /> rather than as HTTP/1.x.
+    /// </summary>
+    internal bool IsHttp2OrHttp3 { get; init; }
+
+    /// <summary>
+    /// Gets what tells, before each status line is parsed, whether the connection has switched
+    /// to HTTP/2 after an h2c upgrade's <c>101</c> (<see cref="HttpH2cUpgradeConnection.IsUpgraded" />),
+    /// so the line is an HTTP/2 stream's as for <see cref="IsHttp2OrHttp3" />. By default it never has.
+    /// </summary>
+    internal Func<bool> IsSwitchedToHttp2 { get; init; } = static () => false;
+
+    /// <summary>
     /// Gets the refused header of the final head <see cref="ReadAsync" /> read, as
     /// <see cref="FindRefusal" /> found it, or <see langword="null" /> when none was refused.
     /// </summary>
@@ -268,7 +282,7 @@ internal sealed class HttpResponseHeadReader
     {
         byte[] bytes = await lines.ReadLineAsync(true, cancellationToken).ConfigureAwait(false) ?? throw EmptyReply();
         HttpLine line = HttpLine.Split(bytes);
-        HttpStatusLine statusLine = HttpStatusLine.Parse(line.Content);
+        HttpStatusLine statusLine = IsHttp2OrHttp3 || IsSwitchedToHttp2() ? HttpStatusLine.ParseHttp2OrHttp3(line.Content) : HttpStatusLine.Parse(line.Content);
         SwitchedProtocols |= statusLine.StatusCode == 101;
         builder.StartHead(line);
         if (line.Content.StartsWith("HTTP/1.0", StringComparison.Ordinal))

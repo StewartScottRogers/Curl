@@ -13,8 +13,8 @@ namespace Curl.Authentication;
 /// </param>
 /// <param name="answers">
 /// The answers to the challenges that follow the initial response; once they run out,
-/// <see cref="Respond" /> answers <see langword="null" />, as curl fails a challenge it does
-/// not expect.
+/// <see cref="RespondAsync" /> answers <see langword="null" />, as curl fails a challenge it
+/// does not expect.
 /// </param>
 internal sealed class ScriptedSaslExchange(string mechanism, byte[] initialResponse, params byte[][] answers) : ISaslExchange
 {
@@ -24,9 +24,10 @@ internal sealed class ScriptedSaslExchange(string mechanism, byte[] initialRespo
     public string Mechanism => mechanism;
 
     /// <inheritdoc />
-    public byte[]? InitialResponse => initialResponse;
+    public ValueTask<byte[]?> GetInitialResponseAsync(CancellationToken cancellationToken) =>
+        ValueTask.FromResult<byte[]?>(initialResponse);
 
     /// <inheritdoc />
-    public byte[]? Respond(ReadOnlySpan<byte> challenge) =>
-        answersGiven < answers.Length ? answers[answersGiven++] : null;
+    public ValueTask<byte[]?> RespondAsync(ReadOnlyMemory<byte> challenge, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(answersGiven < answers.Length ? answers[answersGiven++] : null);
 }

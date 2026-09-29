@@ -298,6 +298,12 @@ function renderLanes(status) {
     section.append(element('p', 'banner',
       `The status has not been updated since ${utcTime(publishedAt)}; the shift may have stopped.`));
   }
+  // The -Lanes Auto count and its last change's reason (BL-770); null on a fixed-lane shift.
+  const auto = status.autoLanes;
+  if (auto) {
+    section.append(element('p', 'auto-lanes',
+      `Auto lanes: ${auto.lanes} - ${auto.reason}, ${utcTime(new Date(auto.changedAt))}`));
+  }
   const cards = element('div', 'lane-cards');
   const lanes = [...(status.lanes || [])].sort((a, b) => a.lane - b.lane);
   for (const lane of lanes) {

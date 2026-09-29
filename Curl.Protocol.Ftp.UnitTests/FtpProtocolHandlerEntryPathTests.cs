@@ -24,7 +24,7 @@ public sealed class FtpProtocolHandlerEntryPathTests
     [DataRow("257 \"/home/u\" is cwd", "/home/u", DisplayName = "257 \"/home/u\" prints /home/u")]
     [DataRow("257 \"/a \"\"b\"\"\" is cwd", "/a \"b\"", DisplayName = "doubled quotes print one each")]
     [DataRow("257 rubbish \"/r\" x", "/r", DisplayName = "text before the first quote is skipped")]
-    [DataRow("257 \"home\" is cwd", "home", DisplayName = "a relative directory is printed as given")]
+    [DataRow("257 \"home\" is cwd\r\n502 Command not implemented", "home", DisplayName = "a relative directory is printed as given")]
     [DataRow("257 /home/u is cwd", null, DisplayName = "no quote prints nothing")]
     [DataRow("257 \"\"", null, DisplayName = "an empty quoted name prints nothing")]
     [DataRow("550 no", null, DisplayName = "a refused PWD prints nothing")]

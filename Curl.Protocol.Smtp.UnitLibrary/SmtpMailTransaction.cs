@@ -34,7 +34,8 @@ namespace Curl.Protocol.Smtp;
 /// upload's length, or against nothing when the upload cannot seek.</item>
 /// </list>
 /// </remarks>
-internal sealed class SmtpMailTransaction(SmtpControlChannel channel, ITransferContext context, SmtpMailExtensions extensions)
+internal sealed class SmtpMailTransaction(
+    SmtpControlChannel channel, ITransferContext context, SmtpMailExtensions extensions, SmtpCommandLineText commandLineText)
 {
     private const int ReadBufferSize = 65536;
 
@@ -94,14 +95,15 @@ internal sealed class SmtpMailTransaction(SmtpControlChannel channel, ITransferC
     private string MailCommand(MailRequestOptions mail, long? size)
     {
         string? auth = extensions.Authenticated ? mail.Auth : null;
-        return "MAIL FROM:" + SmtpMailbox.Bracketed(mail.From)
-            + (auth is null ? string.Empty : " AUTH=" + SmtpMailbox.Bracketed(auth))
+        return "MAIL FROM:" + SmtpMailbox.Bracketed(mail.From, commandLineText)
+            + (auth is null ? string.Empty : " AUTH=" + SmtpMailbox.Bracketed(auth, commandLineText))
             + SizeParameter(size)
             + (extensions.SmtpUtf8Advertised && NeedsSmtpUtf8(mail, auth) ? " SMTPUTF8" : string.Empty);
     }
 
-    private static bool NeedsSmtpUtf8(MailRequestOptions mail, string? auth) =>
-        SmtpMailbox.NeedsSmtpUtf8(mail.From) || SmtpMailbox.NeedsSmtpUtf8(auth) || mail.Recipients.Any(SmtpMailbox.NeedsSmtpUtf8);
+    private bool NeedsSmtpUtf8(MailRequestOptions mail, string? auth) =>
+        SmtpMailbox.NeedsSmtpUtf8(mail.From, commandLineText) || SmtpMailbox.NeedsSmtpUtf8(auth, commandLineText)
+        || mail.Recipients.Any(recipient => SmtpMailbox.NeedsSmtpUtf8(recipient, commandLineText));
 
     private string SizeParameter(long? size) =>
         extensions.SizeAdvertised && size is > 0 and long known
@@ -136,7 +138,7 @@ internal sealed class SmtpMailTransaction(SmtpControlChannel channel, ITransferC
         int lastRefusal = 0;
         foreach (string recipient in mail.Recipients)
         {
-            SmtpReply reply = await ExchangeAsync("RCPT TO:" + SmtpMailbox.Bracketed(recipient)).ConfigureAwait(false);
+            SmtpReply reply = await ExchangeAsync("RCPT TO:" + SmtpMailbox.Bracketed(recipient, commandLineText)).ConfigureAwait(false);
             if (reply.IsCompletion)
             {
                 anyAccepted = true;
@@ -158,15 +160,24 @@ internal sealed class SmtpMailTransaction(SmtpControlChannel channel, ITransferC
 
     private async ValueTask<TransferResult> SendMessageAsync(Stream upload, long? expected)
     {
+        // The last piece goes out with the end-of-data mark, one send and one data event, as
+        // curl sends a message that fits its buffer (measured, BL-546).
         var stuffer = new SmtpDotStuffer();
         byte[] buffer = new byte[ReadBufferSize];
+        byte[] pending = [];
         int read;
         while ((read = await upload.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false)) > 0)
         {
-            await SendMessageBytesAsync(stuffer.Encode(buffer.AsSpan(0, read)), expected).ConfigureAwait(false);
+            if (pending.Length > 0)
+            {
+                await SendMessageBytesAsync(pending, expected).ConfigureAwait(false);
+            }
+
+            pending = stuffer.Encode(buffer.AsSpan(0, read));
         }
 
-        await SendMessageBytesAsync(stuffer.EndOfData, expected).ConfigureAwait(false);
+        await SendMessageBytesAsync([.. pending, .. stuffer.EndOfData], expected).ConfigureAwait(false);
+        context.Events.ReportInfo(SmtpConnectionInfoLines.UploadSent(uploaded));
 
         // Measured: curl reports response code 000 when the server closes instead of answering the message.
         responseCode = 0;

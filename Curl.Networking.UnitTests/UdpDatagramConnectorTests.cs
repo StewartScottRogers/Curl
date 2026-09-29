@@ -41,6 +41,40 @@ public sealed class UdpDatagramConnectorTests
     }
 
     [TestMethod]
+    public async Task OpenAsync_WhenTheResolverExplainsTheFailure_AddsTheReason()
+    {
+        // curl --dns-servers <nxdomain> tftp://bl694.example/x -> curl: (6) Could not resolve host: bl694.example (Domain name not found)
+        var connector = CreateConnector(new ReasoningDnsResolver(new DnsResolution([], DnsLookupFailure.NotFound)), OpenFake([]));
+
+        var result = await connector.OpenAsync("bl694.example", 69, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.AreEqual("Could not resolve host: bl694.example (Domain name not found)", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WhenTheDnsConfigurationDoesNotParse_FailsWithExit43()
+    {
+        var connector = CreateConnector(new ReasoningDnsResolver(new DnsResolution([], DnsLookupFailure.BadConfiguration)), OpenFake([]));
+
+        var result = await connector.OpenAsync("bl694.example", 69, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
+        Assert.AreEqual("Error 43 resolving bl694.example:69", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WhenTheExplainingResolverResolves_OpensItsAddress()
+    {
+        var opened = new List<IPEndPoint>();
+        var connector = CreateConnector(new ReasoningDnsResolver(new DnsResolution([IPAddress.Loopback], DnsLookupFailure.None)), OpenFake(opened));
+
+        await connector.OpenAsync("bl694.example", 69, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Loopback, 69) }, opened);
+    }
+
+    [TestMethod]
     public async Task OpenAsync_WhenOpenSucceeds_ReportsTheFirstResolvedAddressWithTheRequestedPort()
     {
         var first = IPAddress.Parse("192.0.2.1");
@@ -255,12 +289,54 @@ public sealed class UdpDatagramConnectorTests
         Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 7000), channel.ServerEndPoint);
     }
 
+    [TestMethod]
+    public async Task OpenAsync_UnderIPv4ToANameWithBothFamilies_OpensItsIPv4Address()
+    {
+        var opened = new List<IPEndPoint>();
+        var connector = CreateConnector(new FakeDnsResolver(IPAddress.IPv6Loopback, IPAddress.Loopback), OpenFake(opened), addressFamily: AddressFamily.InterNetwork);
+
+        var result = await connector.OpenAsync("tftp.example", 69, CancellationToken.None);
+
+        Assert.IsNotNull(result.Channel);
+        CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Loopback, 69) }, opened);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_UnderIPv6WithAResolveEntryOfOnlyIPv4_FailsWithCouldntResolveHostAndOpensNothing()
+    {
+        // curl -6 -v --resolve foo:47501:127.0.0.1 tftp://foo:47501/x -> curl: (6) Could not resolve host: foo
+        // (curl 8.21.0, 2026-09-28, BL-500).
+        var opened = new List<IPEndPoint>();
+        var connector = CreateConnector(
+            new FakeDnsResolver(IPAddress.Loopback), OpenFake(opened), ResolveOverrides.Parse(["foo:47501:127.0.0.1"]), addressFamily: AddressFamily.InterNetworkV6);
+
+        var result = await connector.OpenAsync("foo", 47501, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.AreEqual("Could not resolve host: foo", result.ErrorMessage);
+        Assert.IsEmpty(opened);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_UnderIPv6ToAnIPv4Literal_OpensTheLiteral()
+    {
+        // curl -6 -v tftp://127.0.0.1:47501/x -> *   Trying 127.0.0.1:47501... (curl 8.21.0, BL-500).
+        var opened = new List<IPEndPoint>();
+        var connector = CreateConnector(new FakeDnsResolver(IPAddress.Loopback), OpenFake(opened), addressFamily: AddressFamily.InterNetworkV6);
+
+        var result = await connector.OpenAsync("127.0.0.1", 47501, CancellationToken.None);
+
+        Assert.IsNotNull(result.Channel);
+        CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Loopback, 47501) }, opened);
+    }
+
     private static UdpDatagramConnector CreateConnector(
         IDnsResolver resolver,
         Func<IPEndPoint, IDatagramChannel> openChannel,
         ResolveOverrides? resolveOverrides = null,
-        ConnectToMappings? connectToMappings = null) =>
-        new(resolver, new ManualTimeProvider(), openChannel, resolveOverrides, connectToMappings);
+        ConnectToMappings? connectToMappings = null,
+        AddressFamily addressFamily = AddressFamily.Unspecified) =>
+        new(resolver, new ManualTimeProvider(), openChannel, resolveOverrides, connectToMappings, addressFamily);
 
     private static Func<IPEndPoint, IDatagramChannel> OpenFake(List<IPEndPoint> opened) =>
         endPoint =>

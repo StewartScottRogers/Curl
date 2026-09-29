@@ -67,6 +67,9 @@ REM ----------------------------------------------------------------------------
 if not defined CLAUDE_MODEL set "CLAUDE_MODEL=opus"
 set "REPO_URL=https://github.com/StewartScottRogers/Curl.git"
 set "DEFAULT_REPO_DIR=%USERPROFILE%\Curl"
+REM  The herdr workspace Claude always opens in. Step 7 reuses the workspace with
+REM  this label, or creates it when none exists yet.
+set "HERDR_WORKSPACE_LABEL=Curl"
 
 REM  Decide which checkout to use. %~dp0 is the folder this script lives in (with a
 REM  trailing backslash, which we strip so the path quotes cleanly later). If that
@@ -308,8 +311,14 @@ REM  the launch flow: `agent start` now attaches to an EXISTING pane by id, and 
 REM  cwd/env options moved onto pane/tab creation. So we create a labelled tab
 REM  anchored to the repo (with CLAUDE_MODEL forwarded into its environment) and
 REM  read the new pane's id out of the JSON response.
+REM
+REM  The tab always goes into the workspace labelled HERDR_WORKSPACE_LABEL
+REM  ("Curl"), never into whichever workspace happens to be focused. If that
+REM  workspace does not exist yet it is created, and its own first tab hosts
+REM  Claude (renamed to the agent label) so no empty tab is left behind. Either
+REM  way the workspace is then focused so Claude is on screen.
 set "PANE_ID="
-for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "(& $env:HERDR tab create --cwd $env:REPO_DIR --env ('CLAUDE_MODEL=' + $env:CLAUDE_MODEL) --label $env:AGENT_LABEL --focus | ConvertFrom-Json).result.root_pane.pane_id"`) do set "PANE_ID=%%P"
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$ws = @((& $env:HERDR workspace list | ConvertFrom-Json).result.workspaces | Where-Object { $_.label -eq $env:HERDR_WORKSPACE_LABEL })[0]; if ($ws) { $r = (& $env:HERDR tab create --workspace $ws.workspace_id --cwd $env:REPO_DIR --env ('CLAUDE_MODEL=' + $env:CLAUDE_MODEL) --label $env:AGENT_LABEL --focus | ConvertFrom-Json).result } else { $r = (& $env:HERDR workspace create --cwd $env:REPO_DIR --env ('CLAUDE_MODEL=' + $env:CLAUDE_MODEL) --label $env:HERDR_WORKSPACE_LABEL --focus | ConvertFrom-Json).result; & $env:HERDR tab rename $r.tab.tab_id $env:AGENT_LABEL | Out-Null }; & $env:HERDR workspace focus $r.root_pane.workspace_id | Out-Null; $r.root_pane.pane_id"`) do set "PANE_ID=%%P"
 if not defined PANE_ID (
     set "ERRMSG=herdr could not create a pane for Claude."
     goto :die

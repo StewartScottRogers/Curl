@@ -50,4 +50,28 @@ public sealed class SshWireReaderTests
     {
         Assert.ThrowsExactly<InvalidDataException>(() => new SshWireReader(payload).ReadString());
     }
+
+    [TestMethod]
+    [DataRow("00000000", "", DisplayName = "zero")]
+    [DataRow("000000020080", "80", DisplayName = "the sign byte is dropped")]
+    [DataRow("0000000300000A", "0A", DisplayName = "redundant leading zeros are dropped")]
+    [DataRow("000000020000", "", DisplayName = "zeros alone are zero")]
+    public void ReadMpint_ReturnsTheMagnitude(string encoded, string expected)
+    {
+        SshWireReader reader = new(Convert.FromHexString(encoded));
+
+        Assert.AreEqual(expected, Convert.ToHexString(reader.ReadMpint().Span));
+    }
+
+    [TestMethod]
+    public void ReadMpint_Negative_ThrowsInvalidData()
+    {
+        Assert.ThrowsExactly<InvalidDataException>(() => new SshWireReader(Convert.FromHexString("00000001FF")).ReadMpint());
+    }
+
+    [TestMethod]
+    public void ReadName_ReadsAnAsciiString()
+    {
+        Assert.AreEqual("ssh-rsa", new SshWireReader(Convert.FromHexString("000000077373682D727361")).ReadName());
+    }
 }

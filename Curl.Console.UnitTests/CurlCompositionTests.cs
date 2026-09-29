@@ -11,9 +11,15 @@ using Curl.Protocol.File;
 using Curl.Protocol.Ftp;
 using Curl.Protocol.Gopher;
 using Curl.Protocol.Http;
+using Curl.Protocol.Imap;
+using Curl.Protocol.Ldap;
 using Curl.Protocol.Mqtt;
+using Curl.Protocol.Pop3;
+using Curl.Protocol.Rtsp;
+using Curl.Protocol.Smtp;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
+using Curl.Protocol.Ws;
 
 namespace Curl.Console;
 
@@ -57,6 +63,17 @@ public sealed class CurlCompositionTests
             ["tftp"] = typeof(TftpProtocolHandler),
             ["mqtt"] = typeof(MqttProtocolHandler),
             ["mqtts"] = typeof(MqttProtocolHandler),
+            ["imap"] = typeof(ImapProtocolHandler),
+            ["imaps"] = typeof(ImapProtocolHandler),
+            ["ldap"] = typeof(LdapProtocolHandler),
+            ["ldaps"] = typeof(LdapProtocolHandler),
+            ["pop3"] = typeof(Pop3ProtocolHandler),
+            ["pop3s"] = typeof(Pop3ProtocolHandler),
+            ["rtsp"] = typeof(RtspProtocolHandler),
+            ["smtp"] = typeof(SmtpProtocolHandler),
+            ["smtps"] = typeof(SmtpProtocolHandler),
+            ["ws"] = typeof(WsProtocolHandler),
+            ["wss"] = typeof(WsProtocolHandler),
             ["http"] = typeof(HttpProtocolHandler),
             ["https"] = typeof(HttpProtocolHandler),
             ["ftp"] = typeof(RoutingFtpProtocolHandler),
@@ -69,6 +86,16 @@ public sealed class CurlCompositionTests
     [TestMethod]
     [DataRow("gophers://h/", 70, true, null)]
     [DataRow("mqtts://h/", 8883, true, null)]
+    [DataRow("imaps://h/", 993, true, null)]
+    [DataRow("imap://h/", 143, false, null)]
+    [DataRow("ldap://h/", 389, false, null)]
+    [DataRow("ldaps://h/", 636, true, null)]
+    [DataRow("pop3s://h/", 995, true, null)]
+    [DataRow("pop3://h/", 110, false, null)]
+    [DataRow("smtps://h/", 465, true, null)]
+    [DataRow("smtp://h/", 25, false, null)]
+    [DataRow("ws://h/", 80, false, null)]
+    [DataRow("wss://h/", 443, true, null)]
     [DataRow("gopher://h/", 70, false, null)]
     [DataRow("mqtt://h/", 1883, false, null)]
     [DataRow("dict://h/d:x", 2628, false, null)]
@@ -260,6 +287,34 @@ public sealed class CurlCompositionTests
         Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(transports.UdpDatagramConnector));
     }
 
+    // ADR-0140: SslStream for every option set it can honour, the hand-built client for a
+    // --tls-max of TLS 1.0 or 1.1 (the legacy-versions row), origin and proxy alike.
+    [TestMethod]
+    [DataRow(TlsVersion.SystemDefault, typeof(SslStreamTlsProvider))]
+    [DataRow(TlsVersion.Tls12, typeof(SslStreamTlsProvider))]
+    [DataRow(TlsVersion.Tls13, typeof(SslStreamTlsProvider))]
+    [DataRow(TlsVersion.Tls10, typeof(HandBuiltTlsProvider))]
+    [DataRow(TlsVersion.Tls11, typeof(HandBuiltTlsProvider))]
+    public void CreateTlsProvider_ByTheCeiling_IsTheProviderTheRoutingRuleChooses(TlsVersion maximumVersion, Type expected)
+    {
+        var options = new TlsClientOptions(MaximumVersion: maximumVersion);
+
+        var provider = CurlComposition.CreateTlsProvider(options, TimeProvider.System);
+
+        Assert.IsInstanceOfType(provider, expected);
+        Assert.AreSame(options, CapturedDependency<TlsClientOptions>(provider));
+    }
+
+    [TestMethod]
+    public void CreateTransports_WithTlsMax10_UpgradesTheOriginWithTheHandBuiltClientAndTheProxyWithSslStream()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(Parse("--tls-max", "1.0", "https://example.com/"));
+
+        Assert.IsInstanceOfType<HandBuiltTlsProvider>(transports.TlsProvider);
+        Assert.IsInstanceOfType<SslStreamTlsProvider>(transports.ProxyTlsProvider);
+        Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "<tlsProvider>"));
+    }
+
     [TestMethod]
     public void CreateTransports_TcpConnector_ReceivesTcpDialerAndSecureSslStreamTlsProvider()
     {
@@ -386,7 +441,7 @@ public sealed class CurlCompositionTests
         IConnector[] connectors = [.. handlers.SelectMany(ConnectorsOf)];
         string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => Unwrapped(handler).GetType().Name).Order()];
         CollectionAssert.AreEqual(
-            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "MqttProtocolHandler", "RoutingFtpProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler" },
+            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "ImapProtocolHandler", "LdapProtocolHandler", "MqttProtocolHandler", "Pop3ProtocolHandler", "RoutingFtpProtocolHandler", "RtspProtocolHandler", "SmtpProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler", "WsProtocolHandler" },
             connectingHandlers);
         Assert.IsTrue(connectors.All(connector => ReferenceEquals(connector, transports.PoolingConnector)));
         Assert.AreSame(transports.PoolingConnector, dispatch.ConnectionPool);

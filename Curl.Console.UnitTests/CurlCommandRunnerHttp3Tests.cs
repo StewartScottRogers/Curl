@@ -1,0 +1,135 @@
+using System.Net;
+using System.Text;
+using Curl.Http2;
+using Curl.Http3;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Console;
+
+/// <summary>
+/// Pins <c>--http3</c> and <c>--http3-only</c> end to end through the production composition
+/// over <see cref="ScriptedQuicConnector" /> (BL-732, ADR-0144): a transfer over HTTP/3, the
+/// fallback to TCP when the QUIC connect fails, and the failures curl.se's ngtcp2 build reports,
+/// on every platform. The QUIC failure text is the one measured on Windows; the connector
+/// supplies it, so the test is the same everywhere.
+/// </summary>
+[TestClass]
+public sealed class CurlCommandRunnerHttp3Tests
+{
+    private const string HttpsUrl = "https://localhost:18443/q";
+
+    private const string QuicRecvError = "QUIC: recvfrom() unexpectedly returned -1 (errno=10054; Connection was reset)";
+
+    private static readonly MultiplexedConnectResult QuicRefused = MultiplexedConnectResult.Failed(CurlExitCode.RecvError, QuicRecvError);
+
+    [TestMethod]
+    [DataRow("--http3")]
+    [DataRow("--http3-only")]
+    public async Task RunAsync_Http3OptionAndQuicConnects_RunsTheTransferOverHttp3(string option)
+    {
+        ScriptedMultiplexedStream stream = new(0, Http3Response("hello"));
+        ScriptedMultiplexedConnection quic = new(stream) { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 18443) };
+        ScriptedQuicConnector connector = new(MultiplexedConnectResult.Connected(quic, null), new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
+
+        (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, "-sS", "-i", "-w", "|%{http_version}", option, HttpsUrl);
+
+        Assert.AreEqual(0, exitCode, standardError);
+        Assert.AreEqual("HTTP/3 200 \r\ncontent-length: 5\r\n\r\nhello|3", standardOutput);
+        Assert.AreEqual(new ConnectTarget("localhost", 18443, true) { PoolScheme = "https" }, connector.QuicTargets.Single());
+        Assert.AreEqual(0, connector.TcpConnectCount);
+        Assert.AreEqual(0x100L, quic.CloseCode, "closed with H3_NO_ERROR");
+        Assert.IsGreaterThan(0L, stream.Written.Length, "the request went out on the QUIC stream");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http3AndQuicFails_FallsBackToTcp()
+    {
+        ScriptedConnector tcp = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")]);
+        ScriptedQuicConnector connector = new(QuicRefused, tcp);
+
+        (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, "-sS", "--http3", HttpsUrl);
+
+        Assert.AreEqual(0, exitCode, standardError);
+        Assert.AreEqual("hello", standardOutput);
+        Assert.HasCount(1, connector.QuicTargets);
+        Assert.AreEqual(1, connector.TcpConnectCount);
+        StringAssert.StartsWith(Encoding.Latin1.GetString(tcp.Written), "GET /q HTTP/1.1\r\n");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http3AndBothConnectsFail_FailsWithTheQuicAttemptsExitAndMessage()
+    {
+        ScriptedQuicConnector connector = new(QuicRefused, new RecordingConnector(CurlExitCode.CouldntConnect, "Failed to connect to localhost port 18443 after 0 ms: Could not connect to server"));
+
+        (int exitCode, _, string standardError) = await RunAsync(connector, "-sS", "--http3", HttpsUrl);
+
+        Assert.AreEqual((int)CurlExitCode.RecvError, exitCode);
+        Assert.AreEqual($"curl: (56) {QuicRecvError}\n", NormalizedNewLines(standardError));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http3OnlyAndQuicFails_FailsWithoutTryingTcp()
+    {
+        ScriptedQuicConnector connector = new(QuicRefused, new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
+
+        (int exitCode, _, string standardError) = await RunAsync(connector, "-sS", "--http3-only", HttpsUrl);
+
+        Assert.AreEqual((int)CurlExitCode.RecvError, exitCode);
+        Assert.AreEqual($"curl: (56) {QuicRecvError}\n", NormalizedNewLines(standardError));
+        Assert.AreEqual(0, connector.TcpConnectCount);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http3OnlyWithAnHttpUrl_FailsWithExit3BeforeConnecting()
+    {
+        ScriptedQuicConnector connector = new(QuicRefused, new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
+
+        (int exitCode, _, string standardError) = await RunAsync(connector, "-sS", "--http3-only", "http://localhost:18080/");
+
+        Assert.AreEqual((int)CurlExitCode.UrlMalformat, exitCode);
+        Assert.AreEqual("curl: (3) HTTP/3 requested for non-HTTPS URL\n", NormalizedNewLines(standardError));
+        Assert.IsEmpty(connector.QuicTargets);
+        Assert.AreEqual(0, connector.TcpConnectCount);
+    }
+
+    [TestMethod]
+    [DataRow("--http3", "http://localhost:18080/")]
+    [DataRow("--http1.1", HttpsUrl)]
+    [DataRow("--http2", HttpsUrl)]
+    public async Task RunAsync_NoQuicAsked_ConnectsOverTcpOnly(string option, string url)
+    {
+        ScriptedConnector tcp = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")]);
+        ScriptedQuicConnector connector = new(QuicRefused, tcp);
+
+        (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, "-sS", "--http3", option, url);
+
+        Assert.AreEqual(0, exitCode, standardError);
+        Assert.AreEqual("hello", standardOutput);
+        Assert.IsEmpty(connector.QuicTargets);
+        Assert.AreEqual(1, connector.TcpConnectCount);
+    }
+
+    /// <summary>A response on the request stream: a 200 head with the body's length, then the body.</summary>
+    private static byte[] Http3Response(string body)
+    {
+        byte[] head = new QpackEncoder(0, 0).EncodeFieldSection(
+            0,
+            [new HeaderField(":status", "200"), new HeaderField("content-length", body.Length.ToString(System.Globalization.CultureInfo.InvariantCulture))]);
+        return [.. new Http3HeadersFrame(head).ToBytes(), .. new Http3DataFrame(Encoding.Latin1.GetBytes(body)).ToBytes()];
+    }
+
+    private static string NormalizedNewLines(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(IConnector connector, params string[] arguments)
+    {
+        using MemoryStream standardOutput = new();
+        using MemoryStream standardError = new();
+        using MemoryStream standardInput = new();
+
+        int exitCode = await CurlComposition
+            .CreateRunner(standardOutput, standardError, standardInput, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"))
+            .RunAsync(arguments);
+
+        return (exitCode, Encoding.Latin1.GetString(standardOutput.ToArray()), Encoding.Latin1.GetString(standardError.ToArray()));
+    }
+}

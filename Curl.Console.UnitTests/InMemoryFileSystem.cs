@@ -8,7 +8,8 @@ namespace Curl.Console;
 /// <see cref="ReadContent" /> for any other path, and fail with <c>NotFound</c> for a path in
 /// <see cref="UnreadablePaths" />; writes land in <see cref="Written" />, appending to the
 /// path's <see cref="ExistingContent" /> under <see cref="FileWriteMode.Append" />, and a path
-/// in <see cref="UnwritablePaths" /> fails to open for writing with <see cref="UnwritableStatus" />.
+/// in <see cref="UnwritablePaths" /> fails to open for writing with <see cref="UnwritableStatus" />, and so does a
+/// path in <see cref="UntruncatablePaths" /> opened with <see cref="FileWriteMode.Truncate" />.
 /// Each last-write time set is recorded in <see cref="LastWriteTimesSet" />, with whether the
 /// path's written stream was still open at the time; setting one fails with
 /// <see cref="FileTimeErrorCode" /> when that is not zero. A <see cref="FileWriteMode.CreateNew" />
@@ -44,6 +45,8 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
     public HashSet<string> UnwritablePaths { get; } = [];
 
     public HashSet<string> WriteFailingPaths { get; } = [];
+
+    public HashSet<string> UntruncatablePaths { get; } = [];
 
     public FileAccessStatus UnwritableStatus { get; init; } = FileAccessStatus.NotFound;
 
@@ -81,7 +84,7 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
         CreateModes.Add(createMode);
         WriteModes.Add(mode);
 
-        if (UnwritablePaths.Contains(path))
+        if (UnwritablePaths.Contains(path) || (mode == FileWriteMode.Truncate && UntruncatablePaths.Contains(path)))
         {
             return ValueTask.FromResult(FileOpenResult.Failed(UnwritableStatus));
         }

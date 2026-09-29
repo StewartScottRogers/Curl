@@ -115,12 +115,101 @@ public sealed class CurlCommandRunnerTransferEventTests
     }
 
     [TestMethod]
-    public async Task RunAsync_DoubleVerbose_StampsTheVerboseLines()
+    public async Task RunAsync_DoubleVerbose_StampsAndMarksTheVerboseLines()
     {
+        // curl 8.21.0's -vv writes the stamp and then the IDs (measured 2026-09-29, BL-648 Notes).
         await RunAsync(["-s", "-vv", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116, clock));
 
-        StringAssert.StartsWith(StandardErrorText, "11:54:11.571000 *   Trying 127.0.0.1:18441..." + InfoEnd);
+        StringAssert.StartsWith(StandardErrorText, "11:54:11.571000 [0-0] *   Trying 127.0.0.1:18441..." + InfoEnd);
     }
+
+    [TestMethod]
+    public async Task RunAsync_VerboseWithTraceIdsForTwoUrls_MarksEachTransfersLinesWithItsIds()
+    {
+        // As curl 8.21.0 marked -v --trace-ids for two URLs, each on its own connection:
+        // [0-0] on the first transfer's lines, [1-1] on the second's (measured 2026-09-29, BL-648 Notes).
+        int exitCode = await RunAsync(
+            ["-s", "-v", "--trace-ids", "http://127.0.0.1:18441/f.txt", "http://127.0.0.1:18441/f.txt", "-o", "o", "-o", "p"],
+            MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(MeasuredVerboseLines("[0-0] ") + MeasuredVerboseLines("[1-1] "), StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceIdsAndConnId_PrintTheSameConnectionNumbers()
+    {
+        await RunAsync(
+            ["-s", "-v", "--trace-ids", "-w", "%{xfer_id}-%{conn_id} ", "http://127.0.0.1:18441/f.txt", "http://127.0.0.1:18441/f.txt", "-o", "o", "-o", "p"],
+            MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual("0-0 1-1 ", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceIdsWithResolveEntry_MarksTheLineBeforeTheConnectionWithAnX()
+    {
+        // curl 8.21.0 wrote "[0-x] * Added a.test:1:127.0.0.1 to DNS cache", then [0-0] (measured 2026-09-29, BL-648 Notes).
+        RecordingProtocolHandler handler = MeasuredExchange(18441, 55116);
+
+        await new CurlCommandRunner(
+                _ => new TransferDispatch(
+                    new ProtocolDispatcher([handler]),
+                    [],
+                    loadResolveEntries: events => events.ReportInfo("Added a.test:1:127.0.0.1 to DNS cache")),
+                files,
+                files,
+                standardOutput,
+                standardError,
+                standardInput,
+                runsOnWindows: true,
+                standardOutputIsTerminal: false,
+                timeProvider: clock)
+            .RunAsync(["-s", "-v", "--trace-ids", "http://127.0.0.1:18441/f.txt", "-o", "o"]);
+
+        StringAssert.StartsWith(
+            StandardErrorText,
+            "[0-x] * Added a.test:1:127.0.0.1 to DNS cache" + InfoEnd + "[0-0] *   Trying 127.0.0.1:18441..." + InfoEnd);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceAsciiWithTraceIdsAndTraceTime_WritesTheStampThenTheIds()
+    {
+        // As curl 8.21.0 wrote --trace - --trace-ids --trace-time: "04:09:58.738000 [0-0] => Send header",
+        // with the dumped bytes' lines unmarked (measured 2026-09-29, BL-648 Notes).
+        await RunAsync(
+            ["-s", "--trace-ascii", "-", "--trace-ids", "--trace-time", "http://127.0.0.1:18442/f.txt", "-o", "o"],
+            MeasuredExchange(18442, 55117, clock));
+
+        StringAssert.StartsWith(
+            StandardOutputText,
+            "11:54:11.571000 [0-0] *   Trying 127.0.0.1:18442..." + InfoEnd
+            + "11:54:11.572000 [0-0] * Established connection to 127.0.0.1 (127.0.0.1 port 18442) from 127.0.0.1 port 55117 " + InfoEnd
+            + "11:54:11.572000 [0-0] * using HTTP/1.x" + InfoEnd
+            + "11:54:11.572000 [0-0] => Send header, 84 bytes (0x54)" + InfoEnd
+            + "0000: GET /f.txt HTTP/1.1" + InfoEnd);
+    }
+
+    /// <summary>
+    /// The <c>-v</c> lines curl 8.21.0 wrote for the measured exchange on port 18441, each that
+    /// starts an event marked with <paramref name="ids" />.
+    /// </summary>
+    private static string MeasuredVerboseLines(string ids) =>
+        ids + "*   Trying 127.0.0.1:18441..." + InfoEnd
+        + ids + "* Established connection to 127.0.0.1 (127.0.0.1 port 18441) from 127.0.0.1 port 55116 " + InfoEnd
+        + ids + "* using HTTP/1.x" + InfoEnd
+        + ids + "> GET /f.txt HTTP/1.1" + HeaderEnd
+        + ids + "> Host: 127.0.0.1:18441" + HeaderEnd
+        + ids + "> User-Agent: curl/8.21.0" + HeaderEnd
+        + ids + "> Accept: */*" + HeaderEnd
+        + ids + "> " + HeaderEnd
+        + ids + "* Request completely sent off" + InfoEnd
+        + ids + "< HTTP/1.1 200 OK" + HeaderEnd
+        + ids + "< Content-Type: text/plain" + HeaderEnd
+        + ids + "< Content-Length: 6" + HeaderEnd
+        + ids + "< " + HeaderEnd
+        + ids + "{ [6 bytes data]" + InfoEnd
+        + ids + "* Connection #0 to host 127.0.0.1:18441 left intact" + InfoEnd;
 
     [TestMethod]
     public async Task RunAsync_TraceFile_WritesTheMeasuredDumpToTheFile()

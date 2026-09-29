@@ -1,0 +1,2 @@
+# The reference corpus frames are bytes, never text: no line-ending conversion.
+*.zst binary

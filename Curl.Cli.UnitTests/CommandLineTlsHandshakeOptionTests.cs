@@ -1,0 +1,303 @@
+using System.Text;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Cli;
+
+/// <summary>
+/// Pins how the parser records the ten TLS options of ADR-0151: <c>--curves</c>, <c>--sigalgs</c>,
+/// <c>--tls-earlydata</c>, <c>--ech</c>, <c>--ssl-sessions</c>, <c>--engine</c>, <c>--dump-ca-embed</c>,
+/// <c>--tlsuser</c>, <c>--tlspassword</c> and <c>--tlsauthtype</c>, with curl 8.21.0's value checks
+/// (<c>src/tool_getparam.c</c>, tag <c>curl-8_21_0</c>): blank values refused where curl denies them,
+/// <c>--tlsauthtype</c> refused for anything but <c>SRP</c> as the OpenSSL build measured, and
+/// <c>--engine list</c> and <c>--dump-ca-embed</c> ending the command line as <c>-V</c> does.
+/// </summary>
+[TestClass]
+public sealed class CommandLineTlsHandshakeOptionTests
+{
+    private const string Url = "https://127.0.0.1:1/";
+
+    private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
+
+    [TestMethod]
+    public void Parse_NoneOfTheOptions_LeavesThemNotGiven()
+    {
+        CommandLineOptions options = CommandLineParser.Parse([Url]).Options!;
+
+        Assert.IsNull(options.Curves);
+        Assert.IsNull(options.SignatureAlgorithms);
+        Assert.IsFalse(options.TlsEarlyData);
+        Assert.IsNull(options.Ech);
+        Assert.IsNull(options.EchPublicName);
+        Assert.IsNull(options.EchConfigList);
+        Assert.IsNull(options.SslSessionsFile);
+        Assert.IsNull(options.Engine);
+        Assert.IsFalse(options.EngineListRequested);
+        Assert.IsFalse(options.CaEmbedDumpRequested);
+        Assert.IsNull(options.TlsUser);
+        Assert.IsNull(options.TlsPassword);
+        Assert.IsNull(options.TlsAuthType);
+    }
+
+    [TestMethod]
+    public void Parse_EveryValueOption_RecordsTheLastValueVerbatim()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(
+        [
+            "--curves", "P-256", "--curves", "X25519:P-384",
+            "--sigalgs", "x", "--sigalgs", "rsa_pss_rsae_sha256:ECDSA+SHA256",
+            "--ssl-sessions", "old.bin", "--ssl-sessions", "sess.bin",
+            "--engine", "first", "--engine", "pkcs11",
+            "--tlsuser", "u1", "--tlsuser", "user",
+            "--tlspassword", "p1", "--tlspassword", "secret",
+            "--tlsauthtype", "SRP",
+            Url,
+        ]);
+
+        Assert.IsTrue(result.IsAccepted);
+        CommandLineOptions options = result.Options;
+        Assert.AreEqual("X25519:P-384", options.Curves);
+        Assert.AreEqual("rsa_pss_rsae_sha256:ECDSA+SHA256", options.SignatureAlgorithms);
+        Assert.AreEqual("sess.bin", options.SslSessionsFile);
+        Assert.AreEqual("pkcs11", options.Engine);
+        Assert.IsFalse(options.EngineListRequested);
+        Assert.AreEqual("user", options.TlsUser);
+        Assert.AreEqual("secret", options.TlsPassword);
+        Assert.AreEqual("SRP", options.TlsAuthType);
+    }
+
+    [TestMethod]
+    [DataRow("--curves")]
+    [DataRow("--sigalgs")]
+    [DataRow("--ech")]
+    [DataRow("--ssl-sessions")]
+    [DataRow("--engine")]
+    [DataRow("--tlsuser")]
+    [DataRow("--tlsauthtype")]
+    public void Parse_EmptyValue_RefusesAsBlank(string spelledOption)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, string.Empty, Url]);
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { $"curl: option {spelledOption}: blank argument where content is expected", TryHelp },
+            result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_EmptyTlsPassword_IsAccepted()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--tlspassword", string.Empty, Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(string.Empty, result.Options.TlsPassword);
+    }
+
+    [TestMethod]
+    [DataRow("bogus")]
+    [DataRow("srp")]
+    [DataRow("SRP ")]
+    public void Parse_TlsAuthTypeOtherThanSrp_RefusesAsUnsupported(string value)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--tlsauthtype", value, Url]);
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "curl: option --tlsauthtype: the installed libcurl version does not support this", TryHelp },
+            result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "--tls-earlydata" }, true)]
+    [DataRow(new[] { "--tls-earlydata", "--no-tls-earlydata" }, false)]
+    [DataRow(new[] { "--no-tls-earlydata", "--tls-earlydata" }, true)]
+    public void Parse_TlsEarlyData_TheLastSpellingWins(string[] arguments, bool expected)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(expected, result.Options.TlsEarlyData);
+    }
+
+    [TestMethod]
+    [DataRow("--no-curves")]
+    [DataRow("--no-sigalgs")]
+    [DataRow("--no-ech")]
+    [DataRow("--no-ssl-sessions")]
+    [DataRow("--no-engine")]
+    [DataRow("--no-dump-ca-embed")]
+    [DataRow("--no-tlsuser")]
+    [DataRow("--no-tlspassword")]
+    [DataRow("--no-tlsauthtype")]
+    public void Parse_NegatedValueOption_CannotBeReversed(string spelledOption)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+
+        CollectionAssert.AreEqual(
+            new[] { $"curl: option {spelledOption}: the given option cannot be reversed with a --no- prefix", TryHelp },
+            result.Refusal!.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_SslSessionsFileLikeAFlag_WarnsAndKeepsIt()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ssl-sessions", "-x", Url]);
+
+        Assert.AreEqual("-x", result.Options!.SslSessionsFile);
+        CollectionAssert.AreEqual(new[] { "Warning: The filename argument '-x' looks like a flag." }, result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_SslSessions_IsSharedByEveryGroup()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([Url, "--next", "--ssl-sessions", "sess.bin", Url]);
+
+        Assert.AreEqual("sess.bin", result.Groups[0].SslSessionsFile);
+        Assert.AreEqual("sess.bin", result.Groups[1].SslSessionsFile);
+    }
+
+    [TestMethod]
+    [DataRow("true")]
+    [DataRow("hard")]
+    [DataRow("grease")]
+    [DataRow("false")]
+    [DataRow("bogus")]
+    [DataRow("pn:x")]
+    [DataRow("ecl:")]
+    [DataRow("ecl:x")]
+    public void Parse_EchKeyword_RecordsTheModeUnchecked(string value)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ech", value, Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(value, result.Options.Ech);
+        Assert.IsNull(result.Options.EchPublicName);
+        Assert.IsNull(result.Options.EchConfigList);
+    }
+
+    [TestMethod]
+    [DataRow("pn:example.com", "example.com")]
+    [DataRow("PN:ab", "ab")]
+    public void Parse_EchPublicName_RecordsTheNameWithoutItsPrefix(string value, string expected)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ech", "true", "--ech", value, Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(expected, result.Options.EchPublicName);
+        Assert.AreEqual("true", result.Options.Ech);
+    }
+
+    [TestMethod]
+    [DataRow("ecl:AEX+DQ==", "AEX+DQ==")]
+    [DataRow("ECL:ab", "ab")]
+    public void Parse_EchConfigList_RecordsTheListWithoutItsPrefix(string value, string expected)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ech", value, Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(expected, result.Options.EchConfigList);
+        Assert.IsNull(result.Options.Ech);
+    }
+
+    [TestMethod]
+    public void Parse_EchConfigListFromFile_ReadsItUpToANulWithoutLineBreaks()
+    {
+        RecordingDataFileReader reader = new();
+        reader.Files["ech.txt"] = Encoding.UTF8.GetBytes("AEX+\r\nDQ==\n\0ignored");
+
+        CommandLineParseResult result = Parse(["--ech", "ecl:@ech.txt", Url], reader);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("AEX+DQ==", result.Options!.EchConfigList);
+        CollectionAssert.AreEqual(new[] { "ech.txt" }, reader.Reads);
+    }
+
+    [TestMethod]
+    public void Parse_EchConfigListFromStandardInput_ReadsStandardInput()
+    {
+        RecordingDataFileReader reader = new() { StandardInput = Encoding.UTF8.GetBytes("AEX+DQ==\n") };
+
+        CommandLineParseResult result = Parse(["--ech", "ecl:@-", Url], reader);
+
+        Assert.AreEqual("AEX+DQ==", result.Options!.EchConfigList);
+        CollectionAssert.AreEqual(new[] { "-" }, reader.Reads);
+    }
+
+    [TestMethod]
+    public void Parse_EchConfigListFromUnreadableFile_WarnsAndRefusesAsBadlyUsed()
+    {
+        CommandLineParseResult result = Parse(["--ech", "ecl:@missing.txt", Url], new RecordingDataFileReader());
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "Warning: Could not read file \"missing.txt\" specified for \"--ech ecl:\" option" },
+            result.WarningLines.ToArray());
+        CollectionAssert.AreEqual(
+            new[] { "curl: option --ech: is badly used here", TryHelp },
+            result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_EchConfigListFromUnreadableFileUnderSilent_RefusesWithoutTheWarning()
+    {
+        CommandLineParseResult result = Parse(["-s", "--ech", "ecl:@missing.txt", Url], new RecordingDataFileReader());
+
+        Assert.IsFalse(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    [DataRow("--engine", "list")]
+    [DataRow("--engine=list", null)]
+    public void Parse_EngineList_EndsTheCommandLineAsARequestForInformation(string option, string? value)
+    {
+        string[] arguments = value is null ? [option, "--bogus"] : [option, value, "--bogus"];
+
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.EngineListRequested);
+        Assert.AreEqual("list", result.Options.Engine);
+    }
+
+    [TestMethod]
+    public void Parse_EngineListCased_IsAnEngineName()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--engine", "LIST", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.EngineListRequested);
+        Assert.AreEqual("LIST", result.Options.Engine);
+    }
+
+    [TestMethod]
+    public void Parse_DumpCaEmbed_EndsTheCommandLineAsARequestForInformation()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--dump-ca-embed", "--bogus"]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.CaEmbedDumpRequested);
+    }
+
+    [TestMethod]
+    [DataRow("engine list")]
+    [DataRow("dump-ca-embed")]
+    public void Parse_InformationRequestInConfigFile_IsIgnored(string line)
+    {
+        RecordingDataFileReader reader = new();
+        reader.Files["k.txt"] = Encoding.UTF8.GetBytes(line + "\n");
+
+        CommandLineParseResult result = Parse(["-K", "k.txt", Url], reader);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.EngineListRequested);
+        Assert.IsFalse(result.Options.CaEmbedDumpRequested);
+    }
+
+    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader) =>
+        CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+
+    private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
+    {
+        public string ReadPassword(string prompt) => throw new AssertFailedException("No password prompt was expected.");
+    }
+}

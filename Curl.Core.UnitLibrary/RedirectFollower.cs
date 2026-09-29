@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Net;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
@@ -18,8 +19,11 @@ namespace Curl.Core;
 /// whether the target parses (exit 3, <c>The redirect target URL could not be parsed:
 /// Bad IPv6 address</c>, <c>Bad hostname</c> or the port reason), then the target's scheme: one this curl build cannot parse fails with exit 1,
 /// <c>The redirect target URL could not be parsed: Unsupported URL scheme</c>, and one
-/// <see cref="RedirectPolicy.AllowedSchemes" /> does not allow with exit 1,
-/// <c>Protocol "file" is disabled (in redirect)</c>.
+/// <see cref="RedirectPolicy.AllowedSchemes" /> (<c>--proto-redir</c>) or
+/// <see cref="RedirectPolicy.AllowedTransferSchemes" /> (<c>--proto</c>) does not allow with exit 1,
+/// <c>Protocol "file" is disabled (in redirect)</c>. The first URL's scheme is checked against
+/// <see cref="RedirectPolicy.AllowedTransferSchemes" /> by <see cref="ProtocolDispatcher" />, with or
+/// without <c>-L</c> (measured, BL-523 Notes).
 /// </para>
 /// <para>
 /// A POST body is dropped, making the request a GET, on 301 and 302 unless
@@ -39,6 +43,14 @@ namespace Curl.Core;
 /// A hop whose host, port or scheme differs from the first URL's gets no
 /// <see cref="ITransferContext.Credentials" />, no bearer token and no <c>-H</c>
 /// <c>Authorization:</c> or <c>Cookie:</c> header, unless <c>--location-trusted</c>.
+/// </para>
+/// <para>
+/// Credentials written in a URL belong to that URL, as curl 8.21.0's do (measured, BL-814
+/// Notes): each hop sends its own URL's user name and password - a relative <c>Location</c>
+/// keeps the first URL's, an absolute one brings its own or none - unless the first hop's
+/// <see cref="ITransferContext.Credentials" /> came from elsewhere (<c>-u</c>, netrc) and are
+/// sent to this hop, in which case they win. First-hop credentials equal to the first URL's
+/// own are taken as the URL's.
 /// </para>
 /// <para>
 /// Every hop after the first goes through the proxy <see cref="HopProxySelector" /> chooses for
@@ -113,7 +125,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
 
         return context.Http is { FollowRedirects: true } http
             ? FollowChainAsync(context, http, policy)
-            : dispatcher.DispatchAsync(context);
+            : dispatcher.DispatchAsync(context, policy.AllowedTransferSchemes);
     }
 
     private async ValueTask<TransferResult> FollowChainAsync(
@@ -130,7 +142,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         bool bodyDropped = false;
         while (true)
         {
-            TransferResult result = await dispatcher.DispatchAsync(hop);
+            TransferResult result = await dispatcher.DispatchAsync(hop, policy.AllowedTransferSchemes);
             chain.Add(result.Report, hop.Http!.Referer);
             if (RedirectTarget(result) is not { } target)
             {
@@ -265,7 +277,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false);
         }
 
-        return policy.AllowedSchemes.Contains(scheme)
+        return policy.AllowedSchemes.Contains(scheme) && policy.AllowedTransferSchemes?.Contains(scheme) != false
             ? null
             : (CurlExitCode.UnsupportedProtocol, $"Protocol \"{scheme}\" is disabled (in redirect)", false);
     }
@@ -380,7 +392,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             TimeCondition = first.TimeCondition,
             HeaderOutput = first.HeaderOutput,
             PostData = bodyDropped ? null : first.PostData,
-            Credentials = sendCredentials ? first.Credentials : null,
+            Credentials = HopCredentials(first, url, sendCredentials),
             TelnetOptions = first.TelnetOptions,
             TftpBlockSize = first.TftpBlockSize,
             TftpNoOptions = first.TftpNoOptions,
@@ -391,12 +403,52 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             MaxTime = first.MaxTime,
             OperationStarted = operationStarted,
             Proxy = hopProxy.Proxy,
-            Http = HopHttp(previousUrl, http, hopProxy.ForwardProxy, bodyDropped, sendCredentials),
+            Http = HopHttp(previousUrl, http, hopProxy.ForwardProxy, bodyDropped, sendCredentials) with { AltSvcRoute = IsSameOrigin(first.Url, url) ? http.AltSvcRoute : null },
             TimeProvider = first.TimeProvider,
             CancellationToken = first.CancellationToken,
             Progress = first.Progress,
             Events = first.Events,
         };
+
+    /// <summary>
+    /// The credentials a hop sends: the first hop's command-line (<c>-u</c> or netrc)
+    /// credentials when <paramref name="sendCommandLineCredentials" />, else those written in the
+    /// hop's own URL, as curl 8.21.0 sends <c>c:d</c> after a 302 to <c>http://c:d@localhost/b</c>
+    /// from <c>-u q:r</c>, and <c>q:r</c> after one to <c>http://c:d@</c> the same host (BL-814 Notes).
+    /// </summary>
+    private static NetworkCredential? HopCredentials(ITransferContext first, CurlUrl url, bool sendCommandLineCredentials) =>
+        sendCommandLineCredentials && CommandLineCredentials(first) is { } commandLine
+            ? commandLine
+            : CredentialsWrittenIn(url);
+
+    /// <summary>
+    /// The first hop's credentials when they did not come from its URL's user information:
+    /// credentials equal to the URL's own are taken as the URL's.
+    /// </summary>
+    private static NetworkCredential? CommandLineCredentials(ITransferContext first) =>
+        first.Credentials is { } credentials && !AreEqual(credentials, CredentialsWrittenIn(first.Url))
+            ? credentials
+            : null;
+
+    private static bool AreEqual(NetworkCredential credentials, NetworkCredential? other) =>
+        other is not null
+        && string.Equals(credentials.UserName, other.UserName, StringComparison.Ordinal)
+        && string.Equals(credentials.Password, other.Password, StringComparison.Ordinal);
+
+    /// <summary>
+    /// The percent-decoded user name and password written in <paramref name="url" />, either one
+    /// empty when absent, or <see langword="null" /> when it gives neither, as curl 8.21.0 sends
+    /// <c>c:</c> for <c>http://c@host/</c> and nothing for <c>http://@host/</c>.
+    /// </summary>
+    private static NetworkCredential? CredentialsWrittenIn(CurlUrl url)
+    {
+        string? user = DecodedUserInformation(url.User);
+        string? password = DecodedUserInformation(url.Password);
+        return user is null && password is null ? null : new NetworkCredential(user ?? string.Empty, password ?? string.Empty);
+    }
+
+    private static string? DecodedUserInformation(string? encoded) =>
+        string.IsNullOrEmpty(encoded) ? null : Uri.UnescapeDataString(encoded);
 
     /// <summary>
     /// The proxy one hop connects through (<see cref="ITransferContext.Proxy" />) and the one its

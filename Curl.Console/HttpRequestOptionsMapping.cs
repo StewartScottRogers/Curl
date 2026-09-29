@@ -49,11 +49,16 @@ internal static class HttpRequestOptionsMapping
     /// The platform curl's argument encoding the <c>-H</c>, <c>--proxy-header</c>, <c>-A</c> and
     /// <c>-e</c> text is sent in (ADR-0067), or <see langword="null" /> for Latin-1.
     /// </param>
+    /// <param name="ifNoneMatchHeaders">
+    /// The <c>If-None-Match</c> lines <c>--etag-compare</c> added to the option group so far, one per
+    /// transfer, as curl 8.21.0 adds them to its header list (BL-619 Notes); <see langword="null" /> for none.
+    /// </param>
     /// <returns>
     /// The options: <see cref="CommandLineOptions.RequestMethod" />,
     /// <see cref="CommandLineOptions.RequestTarget" />,
     /// <see cref="CommandLineOptions.UserAgent" />, <see cref="CommandLineOptions.Referer" /> and
-    /// <see cref="CommandLineOptions.AutoReferer" /> verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds; and
+    /// <see cref="CommandLineOptions.AutoReferer" /> verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds
+    /// and then <paramref name="ifNoneMatchHeaders" />; and
     /// <see cref="CommandLineOptions.ProxyHeaders" /> verbatim; and
     /// <paramref name="formBody" /> when given, otherwise
     /// <see cref="CommandLineOptions.PostData" /> as a <see cref="BytesBody" />, unless
@@ -62,8 +67,8 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />; and
     /// <see cref="CommandLineOptions.MaxRedirects" /> as <see cref="HttpRequestOptions.MaxRedirects" />; and
     /// <see cref="CommandLineOptions.AuthSchemes" /> and <see cref="CommandLineOptions.BearerToken" /> verbatim; and
-    /// <see cref="CommandLineOptions.HttpVersion" /> as <see cref="HttpRequestOptions.Version" />, HTTP/1.1 when
-    /// neither <c>-0</c> nor <c>--http1.1</c> was given; and <see cref="CommandLineOptions.Compressed" />,
+    /// <see cref="CommandLineOptions.HttpVersion" /> as <see cref="HttpRequestOptions.Version" />, as
+    /// <see cref="HttpVersionMapping.ToHttpVersionPreference" /> maps it; and <see cref="CommandLineOptions.Compressed" />,
     /// <see cref="CommandLineOptions.TransferEncoding" />, <see cref="CommandLineOptions.Raw" /> and
     /// <see cref="CommandLineOptions.IgnoreContentLength" /> verbatim; and
     /// <paramref name="proxy" /> as <see cref="HttpRequestOptions.ForwardProxy" /> with
@@ -74,12 +79,13 @@ internal static class HttpRequestOptionsMapping
         CommandLineOptions options,
         HttpRequestBody? formBody = null,
         ProxyEndpoint? proxy = null,
-        Encoding? commandLineTextEncoding = null) =>
+        Encoding? commandLineTextEncoding = null,
+        IReadOnlyList<string>? ifNoneMatchHeaders = null) =>
         new()
         {
             CustomMethod = options.RequestMethod,
             RequestTarget = options.RequestTarget,
-            Headers = HeadersOf(options),
+            Headers = [.. HeadersOf(options), .. ifNoneMatchHeaders ?? []],
             ProxyHeaders = options.ProxyHeaders,
             CommandLineTextEncoding = commandLineTextEncoding ?? Encoding.Latin1,
             UserAgent = options.UserAgent,
@@ -91,7 +97,7 @@ internal static class HttpRequestOptionsMapping
             MaxRedirects = options.MaxRedirects,
             AuthSchemes = options.AuthSchemes,
             BearerToken = options.BearerToken,
-            Version = options.HttpVersion ?? HttpVersionPreference.Http11,
+            Version = HttpVersionMapping.ToHttpVersionPreference(options.HttpVersion),
             Compressed = options.Compressed,
             TransferEncoding = options.TransferEncoding,
             Raw = options.Raw,

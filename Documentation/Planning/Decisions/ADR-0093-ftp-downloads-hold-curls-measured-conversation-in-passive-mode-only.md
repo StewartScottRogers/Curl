@@ -247,3 +247,37 @@ then starts with `/`, and one `CWD` per non-empty segment after that.
 | `//abs/f.txt`, `///abs/f.txt`, `/%2Fabs/f.txt`, `//abs/` | `CWD /`, `CWD abs` |
 | `//f.txt` | `CWD /` |
 | `/a//b/f.txt`, `/a%2Fb/f.txt`, `/a/%2Fb/f.txt` | `CWD a`, `CWD b` |
+
+## Addendum (BL-637, 2026-09-29): `-z` and `-R`
+
+Measured with curl 8.21.0 (Schannel build) and `Record-CurlExchange.ps1 -Ftp -FtpData
+hello`, `MDTM` answered `213 20260927123456`, and pinned in
+`FtpProtocolHandlerTimeConditionTests`. Decided by Claude under Stewart's delegation.
+
+- `-z`, `-R` or `-I` sends `MDTM <file>` straight after the `CWD`s (and the plain `-Q`
+  quotes), before `EPSV` - for a download, an `-l` listing of a file URL and a `-T` upload
+  alike. A directory URL sends none. `-I` sends it once, its `Last-Modified` line coming
+  from the same reply.
+- The `213` reply's first fourteen digits, `YYYYMMDDHHMMSS`, are the time in UTC; a
+  fraction after them is ignored. A short or impossible timestamp, a time at or before the
+  Unix epoch, a `-z` date at or before it, or any other reply leaves the time unknown, and
+  `-z` then transfers with the `-v` line `Skipping time comparison`. A `550` adds
+  `MDTM failed: file does not exist or permission problem, continuing`, anything else but
+  `213` `unsupported MDTM reply format`; neither fails the transfer.
+- An if-modified-since `-z` goes on only for a strictly newer file (the `MDTM` time itself
+  is `The requested document is not new enough`); an if-unmodified-since `-z` goes on for
+  a file no newer than it, equality included (otherwise `... not old enough`). Unlike
+  `file://`, equality therefore transfers for `-z -date`.
+- An unmet `-z` sends no `+` quotes and opens no data connection: the `-` quotes, then
+  `QUIT`, and exit 0 with no body (`TransferResult.TimeConditionNotMet`, so no `-o` file),
+  `%{response_code}` 213. A refused `-` quote is still exit 21.
+- `-R` reports the `MDTM` time as `TransferResult.SourceLastWriteTimeUtc` on a success, an
+  unmet `-z` included; curl stamped `-o out` with `2026-09-27T12:34:56Z`. The handler learns
+  that `-R` was given from the new `ITransferContext.RemoteTime`, because curl sends
+  `MDTM` only when asked and a plain download must keep its measured conversation. Only
+  under `-R` is the time reported, so every other result stays as it was.
+- Not measured, taken from the same rule: a `213` time before 1970 is unknown, as curl's
+  `filetime > 0` test makes it.
+
+`Curl.Console` passing `-R` into `TransferContext.RemoteTime` is its own task, since
+another lane held `Curl.Console` when this landed.

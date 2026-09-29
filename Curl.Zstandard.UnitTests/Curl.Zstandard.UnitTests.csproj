@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="GoldenDecompression\*.zst;GoldenDecompressionErrors\*.zst;LibzstdFrames\*.zst" LogicalName="%(Filename)%(Extension)" WithCulture="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Zstandard.UnitLibrary\Curl.Zstandard.UnitLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,5 +1,3 @@
-using System.Buffers;
-
 namespace Curl.Protocol.Pop3;
 
 /// <summary>
@@ -40,9 +38,9 @@ internal sealed class Pop3BodyDecoder
     /// Decodes one received chunk, writing to <paramref name="output" /> what curl writes for it.
     /// </summary>
     /// <param name="chunk">The bytes one read returned.</param>
-    /// <param name="output">Receives the body bytes.</param>
+    /// <param name="output">Receives the body bytes, one piece for each write curl makes.</param>
     /// <returns><see langword="true" /> when the chunk ended with the terminator, which ends the body.</returns>
-    public bool Decode(ReadOnlySpan<byte> chunk, IBufferWriter<byte> output)
+    public bool Decode(ReadOnlySpan<byte> chunk, Pop3BodyPieces output)
     {
         int written = 0;
         for (int index = 0; index < chunk.Length; index++)
@@ -57,12 +55,12 @@ internal sealed class Pop3BodyDecoder
     /// Takes the byte at <paramref name="index" />, writing what it lets go of.
     /// </summary>
     /// <returns>Where the bytes still to be written start.</returns>
-    private int DecodeByte(ReadOnlySpan<byte> chunk, int index, int written, IBufferWriter<byte> output)
+    private int DecodeByte(ReadOnlySpan<byte> chunk, int index, int written, Pop3BodyPieces output)
     {
         int previous = matched;
         if (chunk[index] == (byte)'\r' && matched == 0)
         {
-            output.Write(chunk[written..index]);
+            output.Add(chunk[written..index]);
             written = index;
         }
 
@@ -76,18 +74,18 @@ internal sealed class Pop3BodyDecoder
     /// Ends the chunk: the terminator ends the body with its first CRLF written; otherwise the
     /// rest is written unless it might begin the terminator.
     /// </summary>
-    private bool Finish(ReadOnlySpan<byte> rest, IBufferWriter<byte> output)
+    private bool Finish(ReadOnlySpan<byte> rest, Pop3BodyPieces output)
     {
         if (matched == EndOfBody.Length)
         {
-            output.Write(EndOfBody[..LineEndMatched]);
+            output.Add(EndOfBody[..LineEndMatched]);
             matched = 0;
             return true;
         }
 
         if (matched == 0)
         {
-            output.Write(rest);
+            output.Add(rest);
         }
 
         return false;
@@ -124,7 +122,7 @@ internal sealed class Pop3BodyDecoder
     /// CRLF at the start, and not the dot of a stuffed line.
     /// </summary>
     /// <returns><see langword="true" /> when something was held back, so writing resumes at the current byte.</returns>
-    private bool WriteAbandonedMatch(int previous, bool dotStripped, IBufferWriter<byte> output)
+    private bool WriteAbandonedMatch(int previous, bool dotStripped, Pop3BodyPieces output)
     {
         int skipped = Math.Min(previous, unwrittenStart);
         previous -= skipped;
@@ -134,7 +132,7 @@ internal sealed class Pop3BodyDecoder
             return false;
         }
 
-        output.Write(EndOfBody[..(dotStripped ? previous - 1 : previous)]);
+        output.Add(EndOfBody[..(dotStripped ? previous - 1 : previous)]);
         return true;
     }
 }

@@ -4,9 +4,9 @@ using System.Net.Sockets;
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Every failure message sending an HTTP/1.x request body or reading a response head or
+/// Every failure message sending an HTTP/1.x or HTTP/2 request body or reading a response head or
 /// body reports, as curl 8.21.0 prints it. Each was measured against a loopback server
-/// (BL-169, BL-170, BL-171, BL-174, BL-175, BL-176, BL-178, BL-180) except <see cref="ReceiveFailed" /> and
+/// (BL-169, BL-170, BL-171, BL-174, BL-175, BL-176, BL-178, BL-180, BL-658) except <see cref="ReceiveFailed" /> and
 /// <see cref="SendFailed" />, which are the texts <c>curl_easy_strerror</c> gives exits 56 and
 /// 55.
 /// </summary>
@@ -66,6 +66,129 @@ internal static class HttpTransferMessages
     /// The exit 56 message curl falls back to for any other failed read.
     /// </summary>
     internal const string ReceiveFailed = "Failure when receiving data from the peer";
+
+    /// <summary>
+    /// The exit 16 message for an HTTP/2 connection the peer closed before a response head
+    /// arrived (measured, BL-658 Notes).
+    /// </summary>
+    internal const string Http2FramingError = "Error in the HTTP2 framing layer";
+
+    /// <summary>
+    /// The exit 18 message for an HTTP/2 connection the peer closed part way through a
+    /// response body (measured, BL-658 Notes).
+    /// </summary>
+    internal const string PartialFile = "Transferred a partial file";
+
+    /// <summary>
+    /// Formats the exit 92 message for an HTTP/2 stream the peer reset, or that this client
+    /// reset for a malformed response: <c>HTTP/2 stream 1 was not closed cleanly:
+    /// INTERNAL_ERROR (err 2)</c> (measured, BL-658 Notes).
+    /// </summary>
+    /// <param name="streamId">The stream.</param>
+    /// <param name="errorCode">The RST_STREAM's error code.</param>
+    /// <returns>The message.</returns>
+    internal static string Http2StreamNotClosedCleanly(int streamId, Curl.Http2.Http2ErrorCode errorCode) =>
+        string.Create(CultureInfo.InvariantCulture, $"HTTP/2 stream {streamId} was not closed cleanly: {Http2ErrorName(errorCode)} (err {(uint)errorCode})");
+
+    /// <summary>
+    /// Formats the exit 16 message for an HTTP/2 connection ended by a protocol error:
+    /// <c>nghttp2 shuts down connection with error 1: PROTOCOL_ERROR</c> (measured, BL-658 Notes).
+    /// </summary>
+    /// <param name="errorCode">The error code of the GOAWAY sent.</param>
+    /// <returns>The message.</returns>
+    internal static string Http2ShutsDownConnection(Curl.Http2.Http2ErrorCode errorCode) =>
+        string.Create(CultureInfo.InvariantCulture, $"nghttp2 shuts down connection with error {(uint)errorCode}: {Http2ErrorName(errorCode)}");
+
+    /// <summary>
+    /// The exit 3 message for <c>--http3-only</c> with a URL that is not <c>https://</c>
+    /// (measured, ADR-0144).
+    /// </summary>
+    internal const string Http3NeedsHttps = "HTTP/3 requested for non-HTTPS URL";
+
+    /// <summary>
+    /// Formats the message for an HTTP/3 request stream the server reset, exit 95 before any
+    /// body byte arrived and exit 18 after: <c>HTTP/3 stream 0 reset by server (error 0x10c
+    /// REQUEST_CANCELLED)</c> (<c>cf-ngtcp2.c</c> at <c>curl-8_21_0</c>, ADR-0187).
+    /// </summary>
+    /// <param name="streamId">The QUIC stream ID.</param>
+    /// <param name="errorCode">The application error code the reset carried.</param>
+    /// <returns>The message.</returns>
+    internal static string Http3StreamReset(long streamId, long errorCode) =>
+        string.Create(CultureInfo.InvariantCulture, $"HTTP/3 stream {streamId} reset by server (error 0x{errorCode:x} {Http3ErrorName(errorCode)})");
+
+    /// <summary>
+    /// Formats the <c>-v</c> line for an HTTP/3 request stream the server reset with
+    /// <c>H3_REQUEST_REJECTED</c>: <c>HTTP/3 stream 0 refused by server, try again on a new
+    /// connection</c> (<c>cf-ngtcp2.c</c> at <c>curl-8_21_0</c>, ADR-0187).
+    /// </summary>
+    /// <param name="streamId">The QUIC stream ID.</param>
+    /// <returns>The line.</returns>
+    internal static string Http3StreamRefused(long streamId) =>
+        string.Create(CultureInfo.InvariantCulture, $"HTTP/3 stream {streamId} refused by server, try again on a new connection");
+
+    /// <summary>
+    /// Formats the exit 56 message for a request refused once more after curl's own retries on
+    /// a new connection ran out: <c>Connection died, tried 5 times before giving up</c>
+    /// (<c>Curl_retry_request</c>, ADR-0187).
+    /// </summary>
+    /// <param name="retries">The retries run.</param>
+    /// <returns>The message.</returns>
+    internal static string ConnectionDiedGivingUp(int retries) =>
+        string.Create(CultureInfo.InvariantCulture, $"Connection died, tried {retries} times before giving up");
+
+    /// <summary>
+    /// Gives an HTTP/3 error code's name as <c>vquic_h3_err_str</c> gives it at
+    /// <c>curl-8_21_0</c>: the RFC 9114 name without its <c>H3_</c> prefix, <c>NO_ERROR</c> for
+    /// a reserved greasing code (<c>0x21 + 0x1f * N</c>) and <c>unknown</c> for any other.
+    /// </summary>
+    private static string Http3ErrorName(long errorCode) =>
+        errorCode switch
+        {
+            >= 0x100 and <= 0x110 => Http3ErrorNames[errorCode - 0x100],
+            >= 0x21 when (errorCode - 0x21) % 0x1f == 0 => Http3ErrorNames[0],
+            _ => "unknown",
+        };
+
+    private static readonly string[] Http3ErrorNames =
+    [
+        "NO_ERROR", "GENERAL_PROTOCOL_ERROR", "INTERNAL_ERROR", "STREAM_CREATION_ERROR", "CLOSED_CRITICAL_STREAM",
+        "FRAME_UNEXPECTED", "FRAME_ERROR", "EXCESSIVE_LOAD", "ID_ERROR", "SETTINGS_ERROR", "MISSING_SETTINGS",
+        "REQUEST_REJECTED", "REQUEST_CANCELLED", "REQUEST_INCOMPLETE", "MESSAGE_ERROR", "CONNECT_ERROR",
+        "VERSION_FALLBACK",
+    ];
+
+    /// <summary>
+    /// Formats the exit 95 message for an HTTP/3 request stream that ended before the final
+    /// response head (<c>curl_ngtcp2.c</c>, ADR-0144 section 7).
+    /// </summary>
+    /// <param name="streamId">The QUIC stream ID.</param>
+    /// <returns>The message.</returns>
+    internal static string Http3StreamClosedBeforeHead(long streamId) =>
+        string.Create(CultureInfo.InvariantCulture, $"HTTP/3 stream {streamId} was closed cleanly, but before getting all response header fields, treated as error");
+
+    /// <summary>
+    /// Formats the exit 56 message for HTTP/3 or QPACK bytes the server sent that break RFC 9114
+    /// or RFC 9204, as curl reports nghttp3's refusal: <c>nghttp3_conn_read_stream returned
+    /// error: ERR_H3_FRAME_UNEXPECTED</c> (<c>curl_ngtcp2.c</c>, ADR-0172).
+    /// </summary>
+    /// <param name="errorName">nghttp3's name for the error, such as <c>ERR_H3_FRAME_ERROR</c>.</param>
+    /// <returns>The message.</returns>
+    internal static string Http3ReadStreamFailed(string errorName) =>
+        $"nghttp3_conn_read_stream returned error: {errorName}";
+
+    /// <summary>
+    /// Gives an HTTP/2 error code's name as nghttp2's <c>nghttp2_http2_strerror</c> gives it,
+    /// <c>unknown</c> for a code RFC 9113 does not list.
+    /// </summary>
+    private static string Http2ErrorName(Curl.Http2.Http2ErrorCode errorCode) =>
+        (uint)errorCode < Http2ErrorNames.Length ? Http2ErrorNames[(uint)errorCode] : "unknown";
+
+    private static readonly string[] Http2ErrorNames =
+    [
+        "NO_ERROR", "PROTOCOL_ERROR", "INTERNAL_ERROR", "FLOW_CONTROL_ERROR", "SETTINGS_TIMEOUT",
+        "STREAM_CLOSED", "FRAME_SIZE_ERROR", "REFUSED_STREAM", "CANCEL", "COMPRESSION_ERROR",
+        "CONNECT_ERROR", "ENHANCE_YOUR_CALM", "INADEQUATE_SECURITY", "HTTP_1_1_REQUIRED",
+    ];
 
     /// <summary>
     /// The exit 100 message for one head line, or one header with its continuation lines

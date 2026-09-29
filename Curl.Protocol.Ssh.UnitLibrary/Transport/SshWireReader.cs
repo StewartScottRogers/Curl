@@ -58,6 +58,30 @@ internal sealed class SshWireReader(ReadOnlyMemory<byte> payload)
     internal ReadOnlyMemory<byte> ReadString() => ReadBytes(ReadUInt32());
 
     /// <summary>
+    /// Reads a <c>string</c> holding a US-ASCII name, such as a key or signature type.
+    /// </summary>
+    /// <returns>The name.</returns>
+    /// <exception cref="InvalidDataException">The length runs past the payload's end.</exception>
+    internal string ReadName() => Encoding.ASCII.GetString(ReadString().Span);
+
+    /// <summary>
+    /// Reads a non-negative <c>mpint</c>: a two's-complement big-endian <c>string</c>.
+    /// </summary>
+    /// <returns>The magnitude, big-endian, without leading zero bytes (empty for zero).</returns>
+    /// <exception cref="InvalidDataException">The length runs past the payload's end, or the value is negative.</exception>
+    internal ReadOnlyMemory<byte> ReadMpint()
+    {
+        ReadOnlyMemory<byte> bytes = ReadString();
+        if (!bytes.IsEmpty && bytes.Span[0] >= 0x80)
+        {
+            throw new InvalidDataException("The SSH message holds a negative mpint where only a non-negative one is valid.");
+        }
+
+        int firstNonZero = bytes.Span.IndexOfAnyExcept((byte)0);
+        return firstNonZero < 0 ? ReadOnlyMemory<byte>.Empty : bytes[firstNonZero..];
+    }
+
+    /// <summary>
     /// Reads a <c>name-list</c>: a <c>string</c> of comma-separated US-ASCII names. An
     /// empty string is an empty list.
     /// </summary>

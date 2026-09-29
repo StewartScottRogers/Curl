@@ -103,6 +103,13 @@ public sealed record HttpRequestOptions
     public HttpVersionPreference Version { get; init; }
 
     /// <summary>
+    /// Gets the happy-eyeballs timeout from <c>--happy-eyeballs-timeout-ms</c>: how long a
+    /// <c>--http3</c> transfer waits for the QUIC handshake before it also starts a TCP
+    /// connect (ADR-0144 section 4); curl's default of 200 milliseconds when not given.
+    /// </summary>
+    public TimeSpan HappyEyeballsTimeout { get; init; } = TimeSpan.FromMilliseconds(200);
+
+    /// <summary>
     /// Gets a value indicating whether <c>--compressed</c> was given: ask for and decode a
     /// compressed body.
     /// </summary>
@@ -156,4 +163,21 @@ public sealed record HttpRequestOptions
     /// through an HTTP-kind proxy with CONNECT even for an <c>http://</c> URL.
     /// </summary>
     public bool ProxyTunnel { get; init; }
+
+    /// <summary>
+    /// Gets the alternative service this transfer connects to in place of its origin
+    /// (<c>--alt-svc</c>), or <see langword="null" />, the default, to connect to the origin.
+    /// </summary>
+    /// <remarks>
+    /// The handler puts it on the <see cref="ConnectTarget" /> for the connector to dial and
+    /// sends <c>Alt-Used: &lt;host&gt;:&lt;port&gt;</c> naming the alternative, unless an
+    /// <c>-H</c> value names <c>Alt-Used</c>.
+    /// </remarks>
+    public AltSvcRoute? AltSvcRoute { get; init; }
+
+    /// <summary>
+    /// Gets the store each <c>Alt-Svc</c> header of an HTTPS response is handed to
+    /// (<c>--alt-svc</c>), or <see langword="null" />, the default, to learn none.
+    /// </summary>
+    public IAltSvcStore? AltSvcStore { get; init; }
 }

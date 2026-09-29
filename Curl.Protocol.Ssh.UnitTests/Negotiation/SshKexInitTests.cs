@@ -46,14 +46,29 @@ public sealed class SshKexInitTests
     }
 
     [TestMethod]
-    public void ForClient_TodaysCatalogue_OffersOnlyTheSignalsAndNoCompression()
+    public void ForClient_TodaysCatalogue_OffersCurve25519NistAndFiniteFieldExchangesEcdsaEd25519RsaHostKeysAesAndSha2Macs()
     {
         SshKexInit kexInit = SshKexInit.ForClient(SshAlgorithmPreferences.OpenSslReference, SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0));
 
-        CollectionAssert.AreEqual(new[] { "ext-info-c", "kex-strict-c-v00@openssh.com" }, kexInit.KeyExchange.ToArray());
-        Assert.AreEqual(0, kexInit.ServerHostKey.Count);
-        Assert.AreEqual(0, kexInit.CipherClientToServer.Count);
-        Assert.AreEqual(0, kexInit.MacClientToServer.Count);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "curve25519-sha256", "curve25519-sha256@libssh.org", "ecdh-sha2-nistp256", "ecdh-sha2-nistp384", "ecdh-sha2-nistp521",
+                "diffie-hellman-group-exchange-sha256",
+                "diffie-hellman-group16-sha512", "diffie-hellman-group18-sha512", "diffie-hellman-group14-sha256",
+                "diffie-hellman-group14-sha1", "diffie-hellman-group1-sha1", "diffie-hellman-group-exchange-sha1",
+                "ext-info-c", "kex-strict-c-v00@openssh.com",
+            },
+            kexInit.KeyExchange.ToArray());
+        CollectionAssert.AreEqual(
+            new[] { "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521", "ssh-ed25519", "rsa-sha2-512", "rsa-sha2-256", "ssh-rsa" },
+            kexInit.ServerHostKey.ToArray());
+        string[] ciphers = ["aes256-gcm@openssh.com", "aes128-gcm@openssh.com", "aes256-ctr", "aes192-ctr", "aes128-ctr"];
+        CollectionAssert.AreEqual(ciphers, kexInit.CipherClientToServer.ToArray());
+        CollectionAssert.AreEqual(ciphers, kexInit.CipherServerToClient.ToArray());
+        string[] macs = ["hmac-sha2-256", "hmac-sha2-256-etm@openssh.com", "hmac-sha2-512", "hmac-sha2-512-etm@openssh.com"];
+        CollectionAssert.AreEqual(macs, kexInit.MacClientToServer.ToArray());
+        CollectionAssert.AreEqual(macs, kexInit.MacServerToClient.ToArray());
         CollectionAssert.AreEqual(new[] { "none" }, kexInit.CompressionClientToServer.ToArray());
     }
 

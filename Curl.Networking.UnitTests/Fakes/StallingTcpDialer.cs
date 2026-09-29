@@ -21,4 +21,12 @@ public sealed class StallingTcpDialer : ITcpDialer
         await Task.Delay(Timeout.Infinite, cancellationToken);
         throw new InvalidOperationException("An infinite delay ended without being cancelled.");
     }
+
+    /// <inheritdoc />
+    public async ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken)
+    {
+        OnStalled();
+        await Task.Delay(Timeout.Infinite, cancellationToken);
+        throw new InvalidOperationException("An infinite delay ended without being cancelled.");
+    }
 }

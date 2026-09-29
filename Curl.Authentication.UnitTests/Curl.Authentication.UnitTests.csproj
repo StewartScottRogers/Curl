@@ -12,4 +12,15 @@
     <ProjectReference Include="..\Curl.Authentication.UnitLibrary\Curl.Authentication.UnitLibrary.csproj" />
   </ItemGroup>
 
+  <!-- The in-memory KDC and GSS-API acceptor Curl.Kerberos.UnitTests built (BL-690, BL-691), shared rather than copied, so the hand-built Negotiate route runs against the same fakes (BL-527). -->
+  <ItemGroup>
+    <Compile Include="..\Curl.Kerberos.UnitTests\FakeKdc.cs" Link="KerberosFakes\FakeKdc.cs" />
+    <Compile Include="..\Curl.Kerberos.UnitTests\FakeKdcStream.cs" Link="KerberosFakes\FakeKdcStream.cs" />
+    <Compile Include="..\Curl.Kerberos.UnitTests\FakeGssAcceptor.cs" Link="KerberosFakes\FakeGssAcceptor.cs" />
+    <Compile Include="..\Curl.Kerberos.UnitTests\FakeSrvLookup.cs" Link="KerberosFakes\FakeSrvLookup.cs" />
+    <Compile Include="..\Curl.Kerberos.UnitTests\FixedKerberosRandomSource.cs" Link="KerberosFakes\FixedKerberosRandomSource.cs" />
+    <Compile Include="..\Curl.Kerberos.UnitTests\FixedTimeProvider.cs" Link="KerberosFakes\FixedTimeProvider.cs" />
+    <Compile Include="..\Curl.Kerberos.UnitTests\InMemoryKerberosFiles.cs" Link="KerberosFakes\InMemoryKerberosFiles.cs" />
+  </ItemGroup>
+
 </Project>

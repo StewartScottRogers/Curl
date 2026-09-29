@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Tls.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Cryptography.UnitLibrary\Curl.Cryptography.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Zstandard.UnitLibrary\Curl.Zstandard.UnitLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

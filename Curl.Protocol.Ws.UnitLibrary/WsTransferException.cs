@@ -12,4 +12,11 @@ internal sealed class WsTransferException(CurlExitCode exitCode, string message)
 {
     /// <summary>Gets the exit code the transfer ends with.</summary>
     internal CurlExitCode ExitCode { get; } = exitCode;
+
+    /// <summary>
+    /// Gets a value indicating whether a received frame broke the protocol, which curl 8.21.0's
+    /// <c>-v</c> follows with its <c>[WS] decode frame error</c> and <c>[WS] decode payload
+    /// error</c> lines (BL-813).
+    /// </summary>
+    internal bool IsFrameViolation { get; init; }
 }

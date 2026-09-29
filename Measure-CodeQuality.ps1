@@ -125,9 +125,35 @@ if (-not $SkipTestRun) {
     if (-not $IncludeIntegration) { $testArguments += @('--filter', 'TestCategory!=Integration') }
 
     Write-Host "Running tests with coverage into $ResultsDirectory ..." -ForegroundColor Cyan
-    & dotnet @testArguments | Write-Host
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet test failed with exit code $LASTEXITCODE. Fix the tests before measuring quality."
+    $testOutput = New-Object System.Collections.Generic.List[string]
+    & dotnet @testArguments | ForEach-Object {
+        $line = [string]$_
+        $testOutput.Add($line)
+        Write-Host $line
+    }
+    $testExitCode = $LASTEXITCODE
+    if ($testExitCode -ne 0) {
+        # A scaffolded .UnitTests project with no tests yet prints "No test matches the
+        # given testcase filter" and can make dotnet test exit non-zero although nothing
+        # failed. Measure anyway, but only when the output shows no real failure: no
+        # "Failed!" summary (it can land mid-line when projects' output interleaves), no
+        # aborted run and no build error.
+        $realFailurePatterns = @(
+            'Failed!\s+-\s+Failed:',
+            'Test Run Aborted',
+            'test run was aborted',
+            ':\s+error\s+[A-Za-z]+\d+',
+            'Build FAILED'
+        )
+        $realFailure = $testOutput | Where-Object {
+            $line = $_
+            @($realFailurePatterns | Where-Object { $line -match $_ }).Count -gt 0
+        } | Select-Object -First 1
+        $emptyTestProject = $testOutput | Where-Object { $_ -match 'No test matches the given testcase filter' } | Select-Object -First 1
+        if ($null -ne $realFailure -or $null -eq $emptyTestProject) {
+            throw "dotnet test failed with exit code $testExitCode. Fix the tests before measuring quality."
+        }
+        Write-Warning "dotnet test exited with code $testExitCode, but no test failed: a test project has no tests matching the filter yet. Measuring anyway."
     }
 }
 

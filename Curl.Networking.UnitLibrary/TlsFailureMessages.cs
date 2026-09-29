@@ -5,11 +5,13 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 
+using Curl.Tls;
+
 namespace Curl.Networking;
 
 /// <summary>
 /// The one place the message for a failed TLS handshake is written: the text curl prints
-/// after <c>curl: (NN) </c> for exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77, in the two builds ADR-0009
+/// after <c>curl: (NN) </c> for exit 35, exit 43, exit 58, exit 59, exit 60, exit 77, exit 82 and exit 90, in the two builds ADR-0009
 /// reproduces, the Schannel build of curl on Windows and the OpenSSL build elsewhere.
 /// </summary>
 /// <remarks>
@@ -91,6 +93,90 @@ internal static class TlsFailureMessages
     {
         [SocketError.ConnectionReset] = "Connection reset by peer",
     }.ToFrozenDictionary();
+
+    // OpenSSL's X509_verify_cert_error_string for each --crlfile refusal. 3, 8 and 23 were
+    // measured with curl 8.18.0's OpenSSL 3.5.5 build (BL-609); the others are OpenSSL's table.
+    private static readonly FrozenDictionary<long, string> OpenSslRevocationListErrorTexts = new Dictionary<long, string>
+    {
+        [OpenSslVerifyResult.UnableToGetCertificateRevocationList] = "unable to get certificate CRL",
+        [OpenSslVerifyResult.CertificateRevocationListSignatureFailure] = "CRL signature failure",
+        [OpenSslVerifyResult.CertificateRevocationListNotYetValid] = "CRL is not yet valid",
+        [OpenSslVerifyResult.CertificateRevocationListHasExpired] = "CRL has expired",
+        [OpenSslVerifyResult.CertificateRevoked] = "certificate revoked",
+        [OpenSslVerifyResult.KeyUsageDoesNotIncludeCrlSigning] = "key usage does not include CRL signing",
+    }.ToFrozenDictionary();
+
+    // What curl's Schannel build reports when the server sends a fatal alert during the
+    // handshake (measured against a handshake_failure alert, ADR-0140).
+    private const string SchannelFatalAlertReceived =
+        "schannel: next InitializeSecurityContext failed: SEC_E_ILLEGAL_MESSAGE (0x80090326) - This error usually occurs when a fatal SSL/TLS alert is received (e.g. handshake failed). More detail may be available in the Windows System event log.";
+
+    // OpenSSL 3's reason strings for an alert, each its reason code 1000 plus the alert
+    // (ssl/ssl_err.c): handshake_failure (ADR-0140) and protocol_version (BL-502) measured.
+    private static readonly FrozenDictionary<TlsAlertDescription, string> OpenSslAlertReasons = new Dictionary<TlsAlertDescription, string>
+    {
+        [TlsAlertDescription.UnexpectedMessage] = "sslv3 alert unexpected message",
+        [TlsAlertDescription.BadRecordMac] = "sslv3 alert bad record mac",
+        [TlsAlertDescription.RecordOverflow] = "tlsv1 alert record overflow",
+        [TlsAlertDescription.HandshakeFailure] = "ssl/tls alert handshake failure",
+        [TlsAlertDescription.BadCertificate] = "ssl/tls alert bad certificate",
+        [TlsAlertDescription.UnsupportedCertificate] = "sslv3 alert unsupported certificate",
+        [TlsAlertDescription.CertificateRevoked] = "sslv3 alert certificate revoked",
+        [TlsAlertDescription.CertificateExpired] = "sslv3 alert certificate expired",
+        [TlsAlertDescription.CertificateUnknown] = "sslv3 alert certificate unknown",
+        [TlsAlertDescription.IllegalParameter] = "sslv3 alert illegal parameter",
+        [TlsAlertDescription.UnknownCa] = "tlsv1 alert unknown ca",
+        [TlsAlertDescription.AccessDenied] = "tlsv1 alert access denied",
+        [TlsAlertDescription.DecodeError] = "tlsv1 alert decode error",
+        [TlsAlertDescription.DecryptError] = "tlsv1 alert decrypt error",
+        [TlsAlertDescription.ProtocolVersion] = "tlsv1 alert protocol version",
+        [TlsAlertDescription.InsufficientSecurity] = "tlsv1 alert insufficient security",
+        [TlsAlertDescription.InternalError] = "tlsv1 alert internal error",
+        [TlsAlertDescription.InappropriateFallback] = "tlsv1 alert inappropriate fallback",
+        [TlsAlertDescription.UserCanceled] = "tlsv1 alert user cancelled",
+        [TlsAlertDescription.MissingExtension] = "tlsv13 alert missing extension",
+        [TlsAlertDescription.UnsupportedExtension] = "tlsv1 unsupported extension",
+        [TlsAlertDescription.UnrecognizedName] = "tlsv1 unrecognized name",
+        [TlsAlertDescription.BadCertificateStatusResponse] = "tlsv1 bad certificate status response",
+        [TlsAlertDescription.CertificateRequired] = "tlsv13 alert certificate required",
+        [TlsAlertDescription.NoApplicationProtocol] = "tlsv1 alert no application protocol",
+    }.ToFrozenDictionary();
+
+    /// <summary>
+    /// The Schannel build's message for exit 35 when the hand-built client's handshake fails
+    /// for a reason other than verification (ADR-0140, "Failures and text"): the server
+    /// closing, or any range of only TLS 1.0 and 1.1 (as <see cref="SchannelSslConnectError(Exception, bool)" />
+    /// reports it), is <c>failed to receive handshake</c>; an alert either side sent is the
+    /// line Schannel's curl prints for a fatal alert.
+    /// </summary>
+    /// <param name="failure">Why the hand-built handshake failed.</param>
+    /// <param name="offersOnlyVersionsBelowTls12"><see langword="true" /> when the ceiling was TLS 1.0 or TLS 1.1.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string SchannelHandBuiltHandshakeFailure(TlsHandshakeFailure failure, bool offersOnlyVersionsBelowTls12) =>
+        failure.Origin == TlsHandshakeFailureOrigin.TransportClosed || offersOnlyVersionsBelowTls12
+            ? SchannelHandshakeNotReceived
+            : SchannelFatalAlertReceived;
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 35 when the hand-built client's handshake fails
+    /// for a reason other than verification: the server closing is OpenSSL's unexpected-EOF
+    /// error string, and an alert is OpenSSL's error string for it, reason code 1000 plus the
+    /// alert, named as OpenSSL 3 names it, or <c>reason(N)</c> as OpenSSL prints a reason it
+    /// has no string for.
+    /// </summary>
+    /// <param name="failure">Why the hand-built handshake failed.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslHandBuiltHandshakeFailure(TlsHandshakeFailure failure)
+    {
+        if (failure.Origin == TlsHandshakeFailureOrigin.TransportClosed)
+        {
+            return $"TLS connect error: {OpenSslUnexpectedEof}";
+        }
+
+        var reason = 1000 + (int)failure.Alert;
+        var text = OpenSslAlertReasons.GetValueOrDefault(failure.Alert, $"reason({reason})");
+        return $"TLS connect error: error:{0x0A000000 | reason:X8}:SSL routines::{text}";
+    }
 
     /// <summary>
     /// The Schannel build's message for exit 60: the server certificate or its host name
@@ -289,6 +375,25 @@ internal static class TlsFailureMessages
         $"error adding trust anchors from file: {caCertificateFile}";
 
     /// <summary>
+    /// The OpenSSL build's message for exit 82: the <c>--crlfile</c> could not be read, or
+    /// holds no PEM certificate revocation list, or one that does not decode (measured with
+    /// curl 8.18.0's OpenSSL build for garbage, an empty file, a DER list and a directory, BL-609).
+    /// </summary>
+    /// <param name="revocationListFile">The path given to <c>--crlfile</c>.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslRevocationListFileUnusable(string revocationListFile) =>
+        $"error loading CRL file: {revocationListFile}";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 60 when a <c>--crlfile</c> check refuses the chain,
+    /// e.g. <c>SSL certificate OpenSSL verify result: certificate revoked (23)</c> (BL-609).
+    /// </summary>
+    /// <param name="verifyResult">The refusal's <see cref="OpenSslVerifyResult" /> code.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslRevocationListRefusal(long verifyResult) =>
+        $"SSL certificate OpenSSL verify result: {OpenSslRevocationListErrorTexts[verifyResult]} ({verifyResult})";
+
+    /// <summary>
     /// The Schannel build's message for exit 58 when the <c>--cert</c> file cannot be opened:
     /// it is missing, or is a directory.
     /// </summary>
@@ -312,6 +417,13 @@ internal static class TlsFailureMessages
     /// <c>--cert</c> store path's thumbprint, measured 2026-09-27.
     /// </summary>
     public const string SchannelClientCertificateNotInStore = "schannel: client cert not found in cert store";
+
+    /// <summary>
+    /// Every build's message for exit 90, when the server's public key does not match
+    /// <c>--pinnedpubkey</c>, the key file cannot be read or holds no key: measured with curl
+    /// 8.21.0's Schannel build and curl 8.18.0's OpenSSL build, 2026-09-29 (BL-608).
+    /// </summary>
+    public const string PinnedPublicKeyMismatch = "SSL: public key does not match pinned public key";
 
     /// <summary>
     /// curl's own text for exit 58, printed when the failure has no message of its own, as

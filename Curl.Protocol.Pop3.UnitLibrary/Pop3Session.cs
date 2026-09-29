@@ -1,4 +1,3 @@
-using System.Buffers;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Pop3;
@@ -71,6 +70,13 @@ internal sealed class Pop3Session(
     public Pop3Capabilities? Capabilities { get; private set; }
 
     /// <summary>
+    /// Gets whether the session got as far as logging in, after which curl 8.21.0 ends a failed
+    /// transfer with <c>shutting down connection</c> rather than <c>closing connection</c>
+    /// (BL-552).
+    /// </summary>
+    public bool IsOpen { get; private set; }
+
+    /// <summary>
     /// Opens the session, lists or retrieves, and closes the session again with <c>QUIT</c>.
     /// </summary>
     /// <returns>
@@ -91,6 +97,7 @@ internal sealed class Pop3Session(
                 return failure;
             }
 
+            IsOpen = true;
             result = await TransferAsync().ConfigureAwait(false);
         }
         catch (Pop3ReplyMissingException)
@@ -100,6 +107,11 @@ internal sealed class Pop3Session(
         catch (InvalidDataException)
         {
             return TransferResult.Failure(CurlExitCode.TooLarge, Pop3SessionMessages.ResponseLineTooLarge);
+        }
+        catch (SaslAuthenticationFailedException failure)
+        {
+            // Nothing more is sent, not even QUIT, as curl's Schannel build does (BL-781).
+            return TransferResult.Failure(failure.ExitCode, failure.Message);
         }
 
         if (!bodyCutOff)
@@ -224,14 +236,16 @@ internal sealed class Pop3Session(
     /// <summary>
     /// Writes the body chunk by chunk through a <see cref="Pop3BodyDecoder" /> until a chunk
     /// ends with the terminator, or the server closes the connection, which curl also counts
-    /// as success, writing what it had and sending no <c>QUIT</c>.
+    /// as success, writing what it had and sending no <c>QUIT</c>. Each piece the decoder lets
+    /// go of is reported as data received just before it is written, as curl's
+    /// <c>--trace</c> shows it (BL-552).
     /// </summary>
     /// <returns>How many body bytes were written.</returns>
     private async ValueTask<long> ReceiveBodyAsync()
     {
         context.Progress.ReportTransferStarted();
         var decoder = new Pop3BodyDecoder();
-        var decoded = new ArrayBufferWriter<byte>();
+        var pieces = new Pop3BodyPieces();
         long written = 0;
         bool ended = false;
         while (!ended)
@@ -243,18 +257,29 @@ internal sealed class Pop3Session(
                 return written;
             }
 
-            ended = decoder.Decode(chunk.Span, decoded);
-            await context.Output.WriteAsync(decoded.WrittenMemory, context.CancellationToken).ConfigureAwait(false);
-            written += decoded.WrittenCount;
-            decoded.ResetWrittenCount();
+            ended = decoder.Decode(chunk.Span, pieces);
+            await WritePiecesAsync(pieces).ConfigureAwait(false);
+            written += pieces.Length;
+            pieces.Clear();
             context.Progress.ReportDownloaded(written, null);
         }
 
         return written;
     }
 
+    private async ValueTask WritePiecesAsync(Pop3BodyPieces pieces)
+    {
+        for (int index = 0; index < pieces.Count; index++)
+        {
+            ReadOnlyMemory<byte> piece = pieces[index];
+            context.Events.ReportDataReceived(piece.Span);
+            await context.Output.WriteAsync(piece, context.CancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private async ValueTask QuitAsync()
     {
+        channel.StopReporting();
         await channel.SendAsync("QUIT").ConfigureAwait(false);
         try
         {

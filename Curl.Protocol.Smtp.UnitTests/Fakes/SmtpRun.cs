@@ -15,6 +15,10 @@ public sealed record SmtpRun(
     /// <summary>The host name the handler is told the local machine has.</summary>
     public const string LocalHostName = "local-machine";
 
+    /// <summary>The argv of an English Windows system, which every recording was made on.</summary>
+    internal static SmtpCommandLineText Windows1252 { get; } =
+        SmtpCommandLineText.ForPlatform(isWindows: true, CodePagesEncodingProvider.Instance.GetEncoding(1252));
+
     /// <summary>
     /// The reply the scripted server gives <c>HELP</c>, which a session with no message to
     /// send asks for once it is open (BL-543).
@@ -41,16 +45,30 @@ public sealed record SmtpRun(
         params ConnectResult[] handshakes) =>
         ExecuteAsync(context, connection, saslAuthenticator: null, handshakes);
 
-    public static async Task<SmtpRun> ExecuteAsync(
+    public static Task<SmtpRun> ExecuteAsync(
         TransferContext context,
         ScriptedConnection connection,
         ISaslAuthenticator? saslAuthenticator,
+        params ConnectResult[] handshakes) =>
+        ExecuteAsync(context, connection, saslAuthenticator, Windows1252, handshakes);
+
+    /// <summary>
+    /// Runs the transfer with the handler sending command-line text in
+    /// <paramref name="commandLineText" />'s argv bytes. The other overloads use Windows-1252,
+    /// the argv of the Windows curl every recording was made with, so they pin the same bytes
+    /// on every host.
+    /// </summary>
+    internal static async Task<SmtpRun> ExecuteAsync(
+        TransferContext context,
+        ScriptedConnection connection,
+        ISaslAuthenticator? saslAuthenticator,
+        SmtpCommandLineText commandLineText,
         params ConnectResult[] handshakes)
     {
         var connector = new QueuedConnector(ConnectResult.Connected(connection));
         var tls = new QueuedTlsProvider(handshakes);
 
-        TransferResult result = await new SmtpProtocolHandler(connector, tls, saslAuthenticator, () => LocalHostName).ExecuteAsync(context);
+        TransferResult result = await new SmtpProtocolHandler(connector, tls, saslAuthenticator, () => LocalHostName, commandLineText).ExecuteAsync(context);
 
         return new SmtpRun(result, connection, connector, tls);
     }

@@ -19,16 +19,19 @@ public static class CurlVersionText
     /// <summary>
     /// The third line: the schemes the registered handlers serve, in curl's alphabetical order —
     /// <c>file</c>, <c>dict</c>, <c>ftp</c>/<c>ftps</c>, <c>gopher</c>/<c>gophers</c>, <c>telnet</c>, <c>tftp</c>,
-    /// <c>mqtt</c>/<c>mqtts</c> and <c>http</c>/<c>https</c>.
+    /// <c>imap</c>/<c>imaps</c>, <c>mqtt</c>/<c>mqtts</c>, <c>pop3</c>/<c>pop3s</c>, <c>rtsp</c>, <c>smtp</c>/<c>smtps</c>, <c>ws</c>/<c>wss</c> and <c>http</c>/<c>https</c>.
     /// </summary>
-    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https mqtt mqtts telnet tftp";
+    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ldap ldaps mqtt mqtts pop3 pop3s rtsp smtp smtps telnet tftp ws wss";
 
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
     /// ignoring case). ADR-0021's four, plus <c>brotli</c> and <c>libz</c> now that the registered
-    /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies.
+    /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c> on every
+    /// platform now that <c>--http2</c> is accepted (ADR-0141, Decision 5), and <c>GSS-API</c>,
+    /// <c>Kerberos</c> and <c>SPNEGO</c> on every platform now that <c>--negotiate</c> is answered
+    /// (ADR-0142, ADR-0176), and <c>NTLM</c> on every platform now that <c>--ntlm</c> is (ADR-0181).
     /// </summary>
-    public const string FeaturesLine = "Features: AsynchDNS brotli IPv6 Largefile libz SSL";
+    public const string FeaturesLine = "Features: AsynchDNS brotli GSS-API HTTP2 IPv6 Kerberos Largefile libz NTLM SPNEGO SSL";
 
     /// <summary>Returns the four lines for the platform described, without line terminators.</summary>
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>

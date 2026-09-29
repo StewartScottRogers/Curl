@@ -26,6 +26,12 @@ internal static class SmtpSessionMessages
     /// </summary>
     internal const string LoginDenied = "Login denied";
 
+    /// <summary>
+    /// Every mechanism tried was cancelled with <c>*</c> over a challenge that was not base64,
+    /// and none is left to try (exit 67, BL-774).
+    /// </summary>
+    internal const string AuthenticationCancelled = "Authentication cancelled";
+
     /// <summary>The reply to the end of the message was not 250 (exit 8, BL-542).</summary>
     internal const string WeirdServerReply = "Weird server reply";
 

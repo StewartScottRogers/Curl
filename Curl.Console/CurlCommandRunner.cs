@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Net;
 using System.Text;
 using Curl.Authentication;
 using Curl.Cli;
@@ -267,6 +268,25 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private IDataFileReader DataFileReader => configFileReader ?? DiskDataFileReader.ForProcess;
 
+    /// <summary>
+    /// Gets what chooses each transfer's credentials from the URL and the netrc file, reading it with
+    /// <see cref="DataFileReader" /> and the home directory from the runner's environment (BL-505, BL-791).
+    /// </summary>
+    private TransferCredentialLookup CredentialLookup =>
+        new(DataFileReader, EnvironmentVariables, runsOnWindows);
+
+    /// <summary>
+    /// Reads no environment variable, created once with <see langword="new" /> so no use of it carries
+    /// the compiler's method-group cache.
+    /// </summary>
+    private static readonly Func<string, string?> NoEnvironmentVariables = new(ReadNoEnvironmentVariable);
+
+    /// <summary>
+    /// Gets what reads an environment variable: the function the runner was given, else
+    /// <see cref="NoEnvironmentVariables" />.
+    /// </summary>
+    private Func<string, string?> EnvironmentVariables => readEnvironmentVariable ?? NoEnvironmentVariables;
+
     /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
     private const string StandardOutputHeaderFile = "-";
 
@@ -352,6 +372,21 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private static readonly TransferResult CannotCreateDirectoryFailure =
         TransferResult.Failure(CurlExitCode.WriteError, WriteReceivedDataFailedMessage);
+
+    /// <summary>
+    /// The result of a transfer skipped because its <c>--etag-save</c> file could not be created. It is
+    /// compared by reference: the transfer is not reported, and a run whose every transfer was skipped
+    /// ends with <see cref="NoTransferPerformedLine" /> and exit 26, as curl 8.21.0 does (measured
+    /// 2026-09-29, BL-619 Notes).
+    /// </summary>
+    private static readonly TransferResult EtagSaveFileSkippedTransfer =
+        TransferResult.Failure(CurlExitCode.ReadError, "no transfer performed");
+
+    /// <summary>What curl 8.21.0 prints when every transfer of the run was skipped, unless <c>-s</c> was given without <c>-S</c>.</summary>
+    private const string NoTransferPerformedLine = "curl: no transfer performed";
+
+    /// <summary>The <c>If-None-Match</c> line <c>--etag-compare</c> sends for a file that is missing or empty.</summary>
+    private const string EmptyIfNoneMatchHeader = "If-None-Match: \"\"";
 
     /// <summary>
     /// The result of a <c>-T</c> transfer whose URL <see cref="UploadTransferUrl" /> cannot parse:
@@ -459,6 +494,25 @@ internal sealed class CurlCommandRunner(
     /// before the first.
     /// </summary>
     private TransferResult? previousTransferResult;
+
+    /// <summary>
+    /// The <c>If-None-Match</c> lines <c>--etag-compare</c> has added to each option group, one per
+    /// transfer started, as curl 8.21.0 adds them to the group's header list (BL-619 Notes). Locked
+    /// while read or changed, as <c>-Z</c> transfers start at once.
+    /// </summary>
+    private readonly Dictionary<CommandLineOptions, List<string>> ifNoneMatchHeadersByGroup = [];
+
+    /// <summary>
+    /// Whether any transfer of the run has been reported (<see cref="ReportAsync" />); a run with none
+    /// whose transfers were skipped ends with <see cref="NoTransferPerformedLine" />.
+    /// </summary>
+    private bool anyTransferReported;
+
+    /// <summary>
+    /// The option group of the run's last transfer skipped for its <c>--etag-save</c> file
+    /// (<see cref="EtagSaveFileSkippedTransfer" />); <see langword="null" /> while none was.
+    /// </summary>
+    private CommandLineOptions? lastSkippedTransferGroup;
 
     /// <summary>
     /// The failure <see cref="CannotOpenUploadFileResult" /> made from a failed earlier transfer,
@@ -694,7 +748,9 @@ internal sealed class CurlCommandRunner(
     /// (<see cref="EndParallelRunAsync" />), or <see cref="CurlExitCode.Ok" /> when there was none; or
     /// <see langword="null" /> when a group's request methods conflict
     /// (<see cref="RequestMethodConflictLines" />), whose lines are written and whose group and those
-    /// after it are not run, as curl 8.21.0 refuses it once the groups before it have run.
+    /// after it are not run, as curl 8.21.0 refuses it once the groups before it have run. A run whose
+    /// every transfer was skipped for its <c>--etag-save</c> file ends with
+    /// <see cref="CurlExitCode.ReadError" /> instead (<see cref="ReportNoTransferPerformedAsync" />).
     /// </returns>
     /// <remarks>
     /// No group runs after one that ends the run (<see cref="EndsTheRun" />, <c>--fail-early</c>
@@ -704,17 +760,67 @@ internal sealed class CurlCommandRunner(
     private async Task<CurlExitCode?> TransferAllGroupsAsync(IReadOnlyList<CommandLineOptions> groups)
     {
         standardError = writeGate.Guard(standardError);
-        parallelRun = groups[0].Parallel ? new ParallelRun(groups[0].ParallelMax) : null;
+        parallelRun = groups[0].Parallel ? NewParallelRun(groups[0]) : null;
         try
         {
             CurlExitCode? exitCode = await TransferGroupsInOrderAsync(groups).ConfigureAwait(false);
+            exitCode = parallelRun is { } run ? await EndParallelRunAsync(run, exitCode).ConfigureAwait(false) : exitCode;
 
-            return parallelRun is { } run ? await EndParallelRunAsync(run, exitCode).ConfigureAwait(false) : exitCode;
+            return await ReportNoTransferPerformedAsync(exitCode).ConfigureAwait(false);
         }
         finally
         {
             await transferEventOutput.DisposeAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Ends a run whose every transfer was skipped for its <c>--etag-save</c> file as curl 8.21.0 does:
+    /// <see cref="NoTransferPerformedLine" />, unless <c>-s</c> was given without <c>-S</c> in the last
+    /// skipped transfer's group, and exit 26 (measured 2026-09-29, BL-619 Notes).
+    /// </summary>
+    /// <param name="exitCode">The run's exit code so far.</param>
+    /// <returns><see cref="CurlExitCode.ReadError" /> when no transfer ran and one was skipped; otherwise <paramref name="exitCode" />.</returns>
+    private async Task<CurlExitCode?> ReportNoTransferPerformedAsync(CurlExitCode? exitCode)
+    {
+        if (anyTransferReported || lastSkippedTransferGroup is not { } skippedGroup)
+        {
+            return exitCode;
+        }
+
+        if (ShowsErrors(skippedGroup))
+        {
+            await WriteErrorLineAsync(NoTransferPerformedLine).ConfigureAwait(false);
+        }
+
+        return CurlExitCode.ReadError;
+    }
+
+    /// <summary>
+    /// Makes the state of a <c>-Z</c> run from its first option group, with the combined progress meter
+    /// curl 8.21.0 draws in place of each transfer's own (<see cref="ParallelProgressMeter" />, BL-521)
+    /// unless this runner writes no meter or <c>-s</c> or <c>--no-progress-meter</c> hides it; <c>-#</c>
+    /// changes nothing, as curl ignores it under <c>-Z</c>.
+    /// </summary>
+    /// <param name="options">The first option group.</param>
+    /// <returns>The run.</returns>
+    private ParallelRun NewParallelRun(CommandLineOptions options) =>
+        new(options.ParallelMax, options.ParallelMaxHost, options.ParallelImmediate)
+        {
+            ProgressMeter = writesProgressMeter && !options.Silent && !options.ProgressMeterOff
+                ? new ParallelProgressMeter(timeProvider, writeGate, WriteParallelProgressMeter)
+                : null,
+        };
+
+    /// <summary>
+    /// Writes text of a <c>-Z</c> run's combined progress meter to standard error and flushes it, holding
+    /// the run's <see cref="writeGate" />.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    private void WriteParallelProgressMeter(string text)
+    {
+        standardError.Write(Encoding.UTF8.GetBytes(text));
+        standardError.Flush();
     }
 
     /// <summary>
@@ -915,7 +1021,7 @@ internal sealed class CurlCommandRunner(
             {
                 eventStandardError = new HoldableStream(standardError);
                 transferEventOutput = await TransferEventOutput
-                    .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider)
+                    .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider, () => standardOutputSwitchedToBinary)
                     .ConfigureAwait(false);
             }
 
@@ -1066,7 +1172,9 @@ internal sealed class CurlCommandRunner(
 
         TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
 
-        return (result.ExitCode, EndsTheRun(options, result));
+        return ReferenceEquals(result, EtagSaveFileSkippedTransfer)
+            ? (exitCode, false)
+            : (result.ExitCode, EndsTheRun(options, result));
     }
 
     /// <summary>
@@ -1088,7 +1196,7 @@ internal sealed class CurlCommandRunner(
         CommandLineOptions options,
         UrlTransfer transfer)
     {
-        await run.Queue.WaitForFreeSlotAsync().ConfigureAwait(false);
+        await run.WaitForFreeSlotAsync().ConfigureAwait(false);
         if (run.HasEnded)
         {
             return true;
@@ -1100,6 +1208,8 @@ internal sealed class CurlCommandRunner(
             run.DeferReport(transfer.TransferId, () => ReportSkippedAsync(dispatch, options, transfer, state, run.FirstFailure!));
             return false;
         }
+
+        state.ParallelProgress = run.ProgressMeter?.AddTransfer();
 
         run.Queue.Add(TransferInParallelAsync(run, dispatch, options, transfer, state));
         return false;
@@ -1127,15 +1237,46 @@ internal sealed class CurlCommandRunner(
         (TransferResult Result, string GivenUrl, string TransferUrl) ended;
         try
         {
-            ended = await TransferUrlAsync(dispatch, options, transfer).ConfigureAwait(false);
+            ended = await TransferOnceHostIsFreeAsync(run, dispatch, options, transfer, state.AbortToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (state.AbortToken.IsCancellationRequested)
         {
-            ended = (ParallelRun.AbortedResult, transfer.Url, UrlSchemeGuesser.AddGuessedScheme(transfer.Url));
+            ended = (ParallelRun.AbortedResult, transfer.Url, UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol));
         }
 
         await writeGate.RunExclusiveAsync(() => EndParallelTransferAsync(run, dispatch, options, transfer, state, ended))
             .ConfigureAwait(false);
+        state.ParallelProgress?.End();
+    }
+
+    /// <summary>
+    /// Performs one transfer of a <c>-Z</c> run once its host is free (<see cref="ParallelHostQueue" />:
+    /// <c>--parallel-max-host</c> and <c>--parallel-immediate</c>), counting it at the host until it ends.
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="abortToken">Ends the wait for the host when <c>--fail-early</c> aborts the run.</param>
+    /// <returns>The transfer's result and URLs, as <see cref="TransferUrlAsync" /> gives them.</returns>
+    private async Task<(TransferResult Result, string GivenUrl, string TransferUrl)> TransferOnceHostIsFreeAsync(
+        ParallelRun run,
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        CancellationToken abortToken)
+    {
+        string url = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
+        await run.Hosts.WaitForHostAsync(url, abortToken).ConfigureAwait(false);
+        Running.ParallelProgress?.MarkLive();
+        try
+        {
+            return await TransferUrlAsync(dispatch, options, transfer).ConfigureAwait(false);
+        }
+        finally
+        {
+            run.Hosts.Leave(url);
+        }
     }
 
     /// <summary>
@@ -1160,6 +1301,11 @@ internal sealed class CurlCommandRunner(
         RunningTransferState state,
         (TransferResult Result, string GivenUrl, string TransferUrl) ended)
     {
+        if (NotesSkippedTransfer(options, ended.Result))
+        {
+            return Task.CompletedTask;
+        }
+
         if (run.IsAborted)
         {
             run.DeferReport(
@@ -1193,7 +1339,7 @@ internal sealed class CurlCommandRunner(
     {
         TransferResult skipped = TransferResult.Failure(firstFailure.ExitCode, CurlEasyErrorText.Of(firstFailure.ExitCode));
 
-        return ReportAsync(dispatch, options, transfer, state, skipped, transfer.Url, UrlSchemeGuesser.AddGuessedScheme(transfer.Url));
+        return ReportAsync(dispatch, options, transfer, state, skipped, transfer.Url, UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol));
     }
 
     /// <summary>
@@ -1236,9 +1382,32 @@ internal sealed class CurlCommandRunner(
         runningTransfer.Value = state;
         (TransferResult result, string givenUrl, string transferUrl) = await TransferUrlAsync(dispatch, options, transfer)
             .ConfigureAwait(false);
+        if (NotesSkippedTransfer(options, result))
+        {
+            return result;
+        }
+
         await ReportAsync(dispatch, options, transfer, state, result, givenUrl, transferUrl).ConfigureAwait(false);
 
         return result;
+    }
+
+    /// <summary>
+    /// Tells whether <paramref name="result" /> is a transfer skipped for its <c>--etag-save</c> file, which is
+    /// not reported, and remembers its group for <see cref="ReportNoTransferPerformedAsync" /> when it is.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for <see cref="EtagSaveFileSkippedTransfer" />.</returns>
+    private bool NotesSkippedTransfer(CommandLineOptions options, TransferResult result)
+    {
+        if (!ReferenceEquals(result, EtagSaveFileSkippedTransfer))
+        {
+            return false;
+        }
+
+        lastSkippedTransferGroup = options;
+        return true;
     }
 
     /// <summary>
@@ -1263,6 +1432,7 @@ internal sealed class CurlCommandRunner(
         string transferUrl)
     {
         runningTransfer.Value = state;
+        anyTransferReported = true;
         if (ShowsErrors(options) && result.ErrorMessage is not null && !IsIpfsGatewayFailure(result))
         {
             await WriteFailureLinesAsync(result).ConfigureAwait(false);
@@ -1279,7 +1449,7 @@ internal sealed class CurlCommandRunner(
         bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
             options, transfer.UrlIndex, standardOutputSwitchedToBinary, endsTheRun);
         await WriteOutAsync(options, transfer, givenUrl, transferUrl, result, standardOutputIsBinary).ConfigureAwait(false);
-        await WriteCookieJarAsync(dispatch, options, transferUrl, standardOutputIsBinary).ConfigureAwait(false);
+        await WriteCookieJarAndAltSvcFileAsync(dispatch, options, transferUrl, standardOutputIsBinary, state).ConfigureAwait(false);
 
         previousTransferResult = result;
     }
@@ -1317,7 +1487,7 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Performs one transfer: rewrites an <c>ipfs://</c> or <c>ipns://</c> URL to its gateway URL,
-    /// gives a URL typed without a scheme the one <see cref="UrlSchemeGuesser" /> guesses, and
+    /// gives a URL typed without a scheme the <c>--proto-default</c> scheme or the one <see cref="UrlSchemeGuesser" /> guesses, and
     /// resolves the URL of a <c>-T</c> upload with <see cref="UploadTransferUrl" />, then loads
     /// the <c>--resolve</c> entries and the <c>-b</c> cookie files, in curl 8.21.0's order, before
     /// the transfer itself.
@@ -1348,17 +1518,180 @@ internal sealed class CurlCommandRunner(
         }
 
         string? uploadFile = transfer.UploadFile;
-        string transferUrl = UrlSchemeGuesser.AddGuessedScheme(givenUrl);
+        string transferUrl = UrlSchemeGuesser.AddScheme(givenUrl, options.DefaultProtocol);
         if (uploadFile is not null && !UploadTransferUrl.TryResolve(transferUrl, uploadFile, out transferUrl))
         {
             return (UploadUrlMalformedFailure, givenUrl, transferUrl);
         }
 
-        dispatch.LoadResolveEntries(transferEventOutput.Events);
-        await LoadCookieFilesAsync(dispatch, options, transferUrl).ConfigureAwait(false);
+        if (await PrepareEtagFilesAsync(options).ConfigureAwait(false) is { } etagFailure)
+        {
+            return (etagFailure, givenUrl, transferUrl);
+        }
+
+        ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(transfer);
+        dispatch.LoadResolveEntries(eventsBeforeConnecting);
+        await LoadCookieFilesAsync(dispatch, options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
+        await OpenAltSvcCacheAsync(options, transferUrl).ConfigureAwait(false);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
+    }
+
+    /// <summary>
+    /// Sets the transfer up for <c>--etag-compare</c> and <c>--etag-save</c>, in that order, as curl 8.21.0
+    /// does before it connects: the compare file's <c>If-None-Match</c> line joins the group's
+    /// (<see cref="AddIfNoneMatchHeader" />), and the save file is created, or kept as it is, and chosen as
+    /// where the transfer's ETag goes (measured 2026-09-29, BL-619 Notes).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <returns>
+    /// <see langword="null" /> when the transfer goes ahead; <see cref="CannotCreateDirectoryFailure" /> when a
+    /// <c>--create-dirs</c> directory of the save file cannot be made, or <see cref="EtagSaveFileSkippedTransfer" />
+    /// when the save file cannot be created.
+    /// </returns>
+    private async Task<TransferResult?> PrepareEtagFilesAsync(CommandLineOptions options)
+    {
+        if (options.EtagCompareFile is { } compareFile)
+        {
+            string header = await ReadIfNoneMatchHeaderAsync(options, compareFile).ConfigureAwait(false);
+            Running.IfNoneMatchHeaders = AddIfNoneMatchHeader(options, header);
+        }
+
+        return options.EtagSaveFile is { } saveFile
+            ? await PrepareEtagSaveFileAsync(options, saveFile).ConfigureAwait(false)
+            : null;
+    }
+
+    /// <summary>
+    /// Reads the <c>--etag-compare</c> file into the <c>If-None-Match</c> line curl 8.21.0 sends: its bytes with
+    /// every carriage return and line feed dropped, so several lines run together, or <c>""</c> when the file is
+    /// empty or cannot be opened, after <c>Warning: Failed to open &lt;file&gt;: &lt;reason&gt;</c> unless <c>-s</c>
+    /// was given (measured 2026-09-29, BL-619 Notes). The bytes are read as the platform's command-line text,
+    /// which is what the header is sent in.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="compareFile">The <c>--etag-compare</c> value.</param>
+    /// <returns>The header line.</returns>
+    private async Task<string> ReadIfNoneMatchHeaderAsync(CommandLineOptions options, string compareFile)
+    {
+        FileOpenResult opened = await fileSystem.OpenForReadAsync(compareFile, CancellationToken.None).ConfigureAwait(false);
+        if (opened.Content is not { } content)
+        {
+            await WriteWarningUnlessSilentAsync(options, $"Warning: Failed to open {compareFile}: {OutputFileOpenWarning.ReasonFor(opened.Status)}")
+                .ConfigureAwait(false);
+            return EmptyIfNoneMatchHeader;
+        }
+
+        using MemoryStream read = new();
+        await using (content.ConfigureAwait(false))
+        {
+            await content.CopyToAsync(read).ConfigureAwait(false);
+        }
+
+        byte[] etag = [.. read.ToArray().Where(value => value is not ((byte)'\r' or (byte)'\n'))];
+        return etag.Length == 0
+            ? EmptyIfNoneMatchHeader
+            : "If-None-Match: " + CredentialEncoding.ForPlatform(runsOnWindows).GetString(etag);
+    }
+
+    /// <summary>
+    /// Adds <paramref name="header" /> to the <c>If-None-Match</c> lines of <paramref name="options" />'s group.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="header">The line this transfer adds.</param>
+    /// <returns>Every line the group has added so far, this one last.</returns>
+    private IReadOnlyList<string> AddIfNoneMatchHeader(CommandLineOptions options, string header)
+    {
+        lock (ifNoneMatchHeadersByGroup)
+        {
+            if (!ifNoneMatchHeadersByGroup.TryGetValue(options, out List<string>? headers))
+            {
+                headers = [];
+                ifNoneMatchHeadersByGroup[options] = headers;
+            }
+
+            headers.Add(header);
+            return [.. headers];
+        }
+    }
+
+    /// <summary>
+    /// Chooses where the transfer's ETag goes: standard output for <c>-</c>; otherwise the file, which is
+    /// created now if it is missing, its <c>--create-dirs</c> directories first, and otherwise kept as it
+    /// is until an ETag arrives, as curl 8.21.0 opens it for appending before it connects. A file that cannot
+    /// be created skips the transfer, after
+    /// <c>Warning: Failed creating file for saving etags: "&lt;file&gt;". Skip this transfer</c> unless
+    /// <c>-s</c> was given (measured 2026-09-29, BL-619 Notes).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="saveFile">The <c>--etag-save</c> value.</param>
+    /// <returns>
+    /// <see langword="null" /> when the transfer goes ahead; otherwise <see cref="CannotCreateDirectoryFailure" />
+    /// or <see cref="EtagSaveFileSkippedTransfer" />.
+    /// </returns>
+    private async Task<TransferResult?> PrepareEtagSaveFileAsync(CommandLineOptions options, string saveFile)
+    {
+        if (saveFile == StandardOutputHeaderFile)
+        {
+            Running.SaveEtag = SaveEtagToStandardOutputAsync;
+            return null;
+        }
+
+        if (options.CreateDirectories
+            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, saveFile, runsOnWindows) is { } directory)
+        {
+            return await ReportCannotCreateDirectoryAsync(options, directory).ConfigureAwait(false);
+        }
+
+        FileOpenResult opened = await fileSystem
+            .OpenForWriteAsync(saveFile, FileWriteMode.Append, DeferredOutputFileStream.CreateMode, CancellationToken.None)
+            .ConfigureAwait(false);
+        if (opened.Content is not { } created)
+        {
+            await WriteWarningUnlessSilentAsync(options, $"Warning: Failed creating file for saving etags: \"{saveFile}\". Skip this transfer")
+                .ConfigureAwait(false);
+            return EtagSaveFileSkippedTransfer;
+        }
+
+        await created.DisposeAsync().ConfigureAwait(false);
+        Running.SaveEtag = (etagLine, cancellationToken) => SaveEtagToFileAsync(saveFile, etagLine, cancellationToken);
+        return null;
+    }
+
+    /// <summary>Writes an <c>--etag-save -</c> ETag line to standard output, among the header and body bytes.</summary>
+    /// <param name="etagLine">The ETag and its line feed.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the line is flushed.</returns>
+    private async ValueTask SaveEtagToStandardOutputAsync(byte[] etagLine, CancellationToken cancellationToken)
+    {
+        await GatedStandardOutput.WriteAsync(etagLine, cancellationToken).ConfigureAwait(false);
+        await GatedStandardOutput.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Replaces what the <c>--etag-save</c> file holds with an ETag line, as curl 8.21.0 truncates the file
+    /// before each one it writes.
+    /// </summary>
+    /// <param name="saveFile">The <c>--etag-save</c> file.</param>
+    /// <param name="etagLine">The ETag and its line feed.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the file is closed.</returns>
+    /// <exception cref="IOException">The file could not be opened again, which fails the transfer's header write.</exception>
+    private async ValueTask SaveEtagToFileAsync(string saveFile, byte[] etagLine, CancellationToken cancellationToken)
+    {
+        FileOpenResult opened = await fileSystem
+            .OpenForWriteAsync(saveFile, FileWriteMode.Truncate, DeferredOutputFileStream.CreateMode, cancellationToken)
+            .ConfigureAwait(false);
+        if (opened.Content is not { } saved)
+        {
+            throw new IOException($"Could not write the ETag to {saveFile}.");
+        }
+
+        await using (saved.ConfigureAwait(false))
+        {
+            await saved.WriteAsync(etagLine, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -1411,7 +1744,7 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
-        IpfsGatewayRewriter rewriter = new(readEnvironmentVariable ?? ReadNoEnvironmentVariable, ReadGatewayFileText);
+        IpfsGatewayRewriter rewriter = new(EnvironmentVariables, ReadGatewayFileText);
         if (!rewriter.TryRewrite(parsed, options.IpfsGateway, out string? gatewayUrl, out failure))
         {
             return false;
@@ -1693,6 +2026,7 @@ internal sealed class CurlCommandRunner(
             OutputFileName = Running.OutputFileName,
             ConnectionId = connectionId,
             TransferId = HasNoTransferNumber(result) ? NoTransferId : transfer.TransferId,
+            RetryCount = Running.RetryCount,
         };
     }
 
@@ -1722,6 +2056,30 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Writes the <c>-c</c> jar (<see cref="WriteCookieJarAsync" />) and then the transfer's <c>--alt-svc</c>
+    /// file, when it has one (<see cref="RunningTransferState.AltSvc" />).
+    /// </summary>
+    /// <param name="dispatch">What the run transfers through, with its cookies.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transferUrl">The URL transferred.</param>
+    /// <param name="standardOutputIsBinary">Whether standard output is in binary mode for <c>-c -</c>.</param>
+    /// <param name="state">The transfer's state, with its alt-svc cache.</param>
+    /// <returns>A task that completes when both are written.</returns>
+    private async Task WriteCookieJarAndAltSvcFileAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        string transferUrl,
+        bool standardOutputIsBinary,
+        RunningTransferState state)
+    {
+        await WriteCookieJarAsync(dispatch, options, transferUrl, standardOutputIsBinary).ConfigureAwait(false);
+        if (state.AltSvc is { } altSvc)
+        {
+            await altSvc.WriteAsync(fileSystem).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
     /// Loads the run's <c>-b</c> files before its first <c>http</c> or <c>https</c> transfer and
     /// not before any other: curl 8.21.0 reads <c>-b -</c> from standard input only then, so a
     /// <c>telnet</c> transfer or <c>file</c> upload before it gets standard input and the
@@ -1731,12 +2089,29 @@ internal sealed class CurlCommandRunner(
     /// <param name="dispatch">What the run transfers through, with its cookies.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="transferUrl">The URL about to be transferred.</param>
+    /// <param name="events">Where the files' <c>-v</c> lines go.</param>
     /// <returns>A task that completes when the files are loaded.</returns>
-    private async Task LoadCookieFilesAsync(TransferDispatch dispatch, CommandLineOptions options, string transferUrl)
+    private async Task LoadCookieFilesAsync(TransferDispatch dispatch, CommandLineOptions options, string transferUrl, ITransferEvents events)
     {
         if (dispatch.Cookies is { } cookies && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
         {
-            await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow(), transferEventOutput.Events).ConfigureAwait(false);
+            await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow(), events).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Gives an <c>http</c> or <c>https</c> transfer of a group with <c>--alt-svc</c> its own alt-svc cache,
+    /// its file read now, as curl 8.21.0 gives each transfer's handle one; any other transfer gets none, and
+    /// its file is neither read nor written (measured 2026-09-29, BL-623 Notes).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transferUrl">The URL transferred.</param>
+    /// <returns>A task that completes when the file is read.</returns>
+    private async Task OpenAltSvcCacheAsync(CommandLineOptions options, string transferUrl)
+    {
+        if (options.AltSvcFile is { } file && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
+        {
+            Running.AltSvc = await AltSvcTransferCache.OpenAsync(file, fileSystem, timeProvider).ConfigureAwait(false);
         }
     }
 
@@ -1777,7 +2152,24 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns>The number <c>%{conn_id}</c> prints.</returns>
     private long TakeConnectionId(TransferResult result) =>
-        UsedAConnection(result) ? nextConnectionId++ : NoConnectionId;
+        UsedAConnection(result) ? Running.ConnectionId ?? nextConnectionId++ : NoConnectionId;
+
+    /// <summary>
+    /// Sets the running transfer's <see cref="RunningTransferState.Events" />, whose lines under
+    /// <c>--trace-ids</c> carry <c>[&lt;xfer&gt;-&lt;conn&gt;] </c>, the transfer taking its
+    /// <c>%{conn_id}</c> at its first event; and returns the sink for what comes before it
+    /// connects, whose lines carry <c>[&lt;xfer&gt;-x] </c>, as curl 8.21.0 marked
+    /// <c>Added a.test:1:127.0.0.1 to DNS cache</c> <c>[0-x]</c> and the lines after it <c>[0-0]</c>
+    /// (measured 2026-09-29, BL-648 Notes).
+    /// </summary>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns>The sink for the <c>--resolve</c> entries and <c>-b</c> files the transfer loads.</returns>
+    private ITransferEvents SetUpTransferEvents(UrlTransfer transfer)
+    {
+        RunningTransferState state = Running;
+        state.Events = transferEventOutput.EventsFor(transfer.TransferId, () => state.ConnectionId ??= nextConnectionId++);
+        return transferEventOutput.EventsFor(transfer.TransferId, () => null);
+    }
 
     /// <summary>
     /// The scheme <c>%{scheme}</c> prints: the URL's, in lower case, or <see langword="null" />
@@ -2065,7 +2457,8 @@ internal sealed class CurlCommandRunner(
     /// </param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <returns>
-    /// The transfer's result; <see cref="ByteRangeParser.NotDeliveredFailure" />, with nothing
+    /// The transfer's result; <see cref="NoCryptoEngines.LoadFailure" />'s failure, before any upload
+    /// file is opened or the URL parsed, for an <c>--engine</c> off Windows; <see cref="ByteRangeParser.NotDeliveredFailure" />, with nothing
     /// transferred, when the <c>-r</c> text names no range, as curl 8.21.0 reports it; the
     /// <c>-F</c> body's build failure, with nothing transferred, when a form file cannot be opened;
     /// <see cref="CannotOpenUploadFileResult" />, with nothing transferred, when the <c>-T</c> file
@@ -2080,11 +2473,38 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer,
         Stream? headerOutput)
     {
+        // curl switches standard output to binary mode as the transfer starts, so the transfer's
+        // own --trace - lines already end in a bare line feed (measured, BL-546 Notes).
+        standardOutputSwitchedToBinary |= !transfer.WritesToFile;
         if (!options.Silent)
         {
             await WriteErrorLinesAsync(dispatch.WarningLinesBeforeEachTransfer).ConfigureAwait(false);
         }
 
+        Stream? etagWatchedHeaderOutput = Running.SaveEtag is { } saveEtag ? new EtagSaveStream(saveEtag, headerOutput) : headerOutput;
+        return NoCryptoEngines.LoadFailure(options.Engine, runsOnWindows)
+            ?? await TransferOpeningUploadFileAsync(dispatch, options, url, uploadFile, transfer, etagWatchedHeaderOutput).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Performs one transfer for <see cref="TransferAsync" /> once its warning lines are written,
+    /// opening the <c>-T</c> file first when it names one other than standard input.
+    /// </summary>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="url">The URL to transfer.</param>
+    /// <param name="uploadFile">The URL's <c>-T</c> file, or <see langword="null" /> when it uploads nothing.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
+    /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
+    /// <returns>The transfer's result, as <see cref="TransferAsync" /> describes it.</returns>
+    private async Task<TransferResult> TransferOpeningUploadFileAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        string url,
+        string? uploadFile,
+        UrlTransfer transfer,
+        Stream? headerOutput)
+    {
         if (uploadFile is null || UploadUrl.IsStandardInput(uploadFile))
         {
             Stream? standardInputUpload = uploadFile is null ? null : standardInput;
@@ -2180,12 +2600,41 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Chooses the transfer's proxy with <see cref="TransferProxySelection" />, then its credentials
+    /// with <see cref="TransferCredentialLookup" />, which it keeps as the running transfer's
+    /// <see cref="RunningTransferState.LookedUpCredentials" /> for every attempt's context.
+    /// </summary>
+    /// <param name="proxySelector">Chooses the transfer's proxy.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="url">The transfer's URL.</param>
+    /// <param name="proxy">The proxy chosen, or <see langword="null" /> to connect directly.</param>
+    /// <param name="failure">The proxy's or the netrc file's failure, when either refuses the transfer.</param>
+    /// <returns><see langword="false" /> when the transfer ends before it starts.</returns>
+    private bool TrySelectProxyAndCredentials(
+        ProxySelector proxySelector,
+        CommandLineOptions options,
+        CurlUrl url,
+        out ProxyEndpoint? proxy,
+        [NotNullWhen(false)] out TransferResult? failure)
+    {
+        if (!TransferProxySelection.TrySelect(proxySelector, options, url, out proxy, out failure))
+        {
+            return false;
+        }
+
+        bool looked = CredentialLookup.TryLookUp(options, url, out NetworkCredential? lookedUpCredentials, out failure);
+        Running.LookedUpCredentials = lookedUpCredentials;
+        return looked;
+    }
+
+    /// <summary>
     /// Performs one checked transfer, sending <paramref name="formBody" /> when given, to the file
     /// <see cref="ResolveOutputFileAsync" /> names when it names one, nowhere under <c>--out-null</c>
     /// (<see cref="Stream.Null" />, with the progress meter drawn as for a file) and to standard
     /// output otherwise, and writes the progress meter after it. The transfer goes through the proxy
-    /// <see cref="TransferProxySelection" /> chooses; when it refuses one, the transfer ends with
-    /// its failure and nothing is sent.
+    /// <see cref="TransferProxySelection" /> chooses, with the credentials
+    /// <see cref="TransferCredentialLookup" /> chooses; when either fails, the transfer ends with its
+    /// failure and nothing is sent (<see cref="TrySelectProxyAndCredentials" />).
     /// </summary>
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="proxySelector">Chooses the transfer's proxy from <c>-x</c>, <c>--noproxy</c> and the proxy environment variables.</param>
@@ -2221,7 +2670,7 @@ internal sealed class CurlCommandRunner(
             return unstarted;
         }
 
-        if (!TransferProxySelection.TrySelect(proxySelector, options, url, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
+        if (!TrySelectProxyAndCredentials(proxySelector, options, url, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
             return proxyFailure;
         }
@@ -2241,10 +2690,13 @@ internal sealed class CurlCommandRunner(
                 upload,
                 proxy,
                 progress: Running.Progress,
-                events: transferEventOutput.Events,
+                events: Running.Events,
                 lowSpeedWatchdog: StartLowSpeedWatchdog(options),
                 abortToken: Running.AbortToken,
-                maxTimeWatchdog: StartMaxTimeWatchdog(options));
+                maxTimeWatchdog: StartMaxTimeWatchdog(options),
+                lookedUpCredentials: Running.LookedUpCredentials,
+                ifNoneMatchHeaders: Running.IfNoneMatchHeaders,
+                altSvc: Running.AltSvc);
             TransferResult result = toStandardOutput
                 ? await TransferToStandardOutputAsync(follower, options, createAttemptContext).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null).ConfigureAwait(false);
@@ -2424,7 +2876,8 @@ internal sealed class CurlCommandRunner(
             timeProvider,
             state.ProgressBar,
             ShowsProgressMeter(options, toStandardOutput) ? statusText => WriteProgressMeterLive(state, resumeFrom, statusText) : null,
-            eventStandardError);
+            eventStandardError,
+            state.ParallelProgress);
     }
 
     /// <summary>
@@ -2558,14 +3011,16 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Tells whether a transfer shows progress, the meter or the <c>-#</c> bar: only when this
-    /// runner writes it, never under <c>-s</c> or <c>--no-progress-meter</c>, and not for a body
-    /// written to standard output when that is a terminal, as curl 8.21.0 does.
+    /// runner writes it, never under <c>-s</c> or <c>--no-progress-meter</c>, not for a body
+    /// written to standard output when that is a terminal, and never under <c>-Z</c>, whose run draws
+    /// one combined meter instead (<see cref="ParallelProgressMeter" />), as curl 8.21.0 does.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="toStandardOutput">Whether the transfer writes its body to standard output.</param>
     /// <returns><see langword="true" /> when progress is shown.</returns>
     private bool ShowsProgress(CommandLineOptions options, bool toStandardOutput) =>
         writesProgressMeter
+        && parallelRun is null
         && !options.Silent
         && !options.ProgressMeterOff
         && !(toStandardOutput && standardOutputIsTerminal);
@@ -2791,10 +3246,13 @@ internal sealed class CurlCommandRunner(
                         proxy,
                         watchHeaderOutput,
                         Running.Progress,
-                        transferEventOutput.Events,
+                        Running.Events,
                         StartLowSpeedWatchdog(options),
                         Running.AbortToken,
-                        StartMaxTimeWatchdog(options)),
+                        StartMaxTimeWatchdog(options),
+                        Running.LookedUpCredentials,
+                        Running.IfNoneMatchHeaders,
+                        Running.AltSvc),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
@@ -2894,7 +3352,11 @@ internal sealed class CurlCommandRunner(
             .RunAsync(
                 firstContext,
                 RetryPolicyMapping.FromCommandLine(options),
-                (attempt, warning) => retryLinesWritten = WriteRetryLinesAsync(options, attempt, warning, resumeFrom, outputFile),
+                (attempt, warning) =>
+                {
+                    Running.RetryCount++;
+                    retryLinesWritten = WriteRetryLinesAsync(options, attempt, warning, resumeFrom, outputFile);
+                },
                 (_, warning) => retryLinesWritten = WriteWarningUnlessSilentAsync(options, warning))
             .ConfigureAwait(false);
         await retryLinesWritten.ConfigureAwait(false);
@@ -3038,7 +3500,8 @@ internal sealed class CurlCommandRunner(
     /// <see cref="CurlVersionText" />'s for the running system for <c>-V</c> / <c>--version</c>,
     /// <see cref="CurlManual" />'s for <c>-M</c> / <c>--manual</c>, and <see cref="CurlHelpText" />'s at
     /// <c>terminalColumns</c> for <c>-h</c> / <c>--help</c> with no subject, a category, <c>all</c> or
-    /// <c>category</c>. Parsing ends at the first of these options, so at most one is set.
+    /// <c>category</c>, and <see cref="TlsBuildInformation" />'s for <c>--engine list</c> and
+    /// <c>--dump-ca-embed</c>. Parsing ends at the first of these options, so at most one is set.
     /// </summary>
     /// <param name="options">The parsed options.</param>
     /// <returns>
@@ -3051,7 +3514,7 @@ internal sealed class CurlCommandRunner(
         { ManualRequested: true } => CurlManual.Lines(),
         { HelpRequested: true, HelpSubject: var subject } when !CurlHelpText.IsOptionSubject(subject) =>
             CurlHelpText.Lines(subject, terminalColumns),
-        _ => null,
+        _ => TlsBuildInformation.Lines(options),
     };
 
     /// <summary>

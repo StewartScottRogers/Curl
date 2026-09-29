@@ -123,7 +123,8 @@
     for the reply sent after RETR's or LIST's data, or STORDONE for the reply sent after
     STOR's or APPE's data. An overridden EPSV, PASV, RETR, LIST, NLST, STOR or APPE sends
     only the reply: no data connection is offered. The reply CLOSE closes the control
-    connection instead of answering, e.g. 'PWD=CLOSE'. Several overrides for one VERB are
+    connection instead of answering, e.g. 'PWD=CLOSE', and the reply STALL sends nothing and
+    waits for curl's next command, e.g. 'USER=STALL' or 'GREETING=STALL' (BL-512). Several overrides for one VERB are
     answered in the order given, one per command, the last repeating for the rest, e.g.
     'CWD=550 No such directory' 'CWD=250 OK' (BL-436). In a reply, {DATAPORT} stands for
     the data listener's port and {DATAPORT_HI} and {DATAPORT_LO} for its two PASV numbers,
@@ -133,6 +134,11 @@
     The file served by RETR, and the listing served by LIST, in -Ftp mode, with the
     same backslash escapes as Response.
     Default empty.
+
+.PARAMETER FtpDataHoldMilliseconds
+    How long, in -Ftp mode, the server keeps a RETR, LIST or NLST data connection open after
+    sending FtpData, before it closes it and sends the 226. Default 0. With a SIZE override
+    larger than FtpData it stalls a download midway, to measure -m mid-RETR (BL-512).
 
 .PARAMETER Smtp
     Serve one SMTP session instead of HTTP responses (BL-529): send a greeting, then read
@@ -265,6 +271,55 @@
     How long, in -Pop3 mode, the server waits for curl's next line before it hangs up.
     Default 5000.
 
+.PARAMETER Script
+    Serve one connection from a script of steps instead of HTTP responses, for binary
+    request-reply protocols that no line-at-a-time mode speaks, such as LDAP's BER
+    messages or SMB's frames (BL-532). The value is the path of a text file with one step
+    per line, run in order; blank lines and lines starting with # are skipped:
+
+      read        wait up to ScriptIdleMilliseconds for curl's first byte, then keep
+                  reading until curl is silent for ScriptGapMilliseconds
+      read <N>    read until N bytes have arrived
+      read ber    read one whole BER element (X.690 8.1), such as one LDAP message,
+                  from its identifier and definite length octets
+      send <b>    send the bytes <b>, with the same backslash escapes as Response
+      close       close the connection and end the session
+      reset       reset the connection (RST, not FIN) and end the session, so curl's
+                  next receive or send fails with an I/O error (BL-845)
+
+    A read takes only the bytes it asked for; any curl sent beyond them wait for the next
+    read. A read that gets no byte for ScriptIdleMilliseconds, or during which curl closes
+    its end, ends the session with a line saying so in transcript.txt, instead of
+    hanging. When the steps run out, the connection is closed. When the first step is a
+    read, every connection curl opens is accepted and the session is served on the first
+    one curl writes to: the Windows build's WinLDAP opens a connection of its own beside
+    the one curl opened, and speaks only on its own. The others are closed when the
+    session ends, and transcript.txt notes how many there were. Once the session ends the
+    listener stops, so a connection curl opens afterwards is refused at once. request.bin then holds
+    every byte curl sent, and transcript.txt one line per step: "> " and the bytes a read
+    took, or "< " and the bytes sent, as lowercase hex pairs separated by spaces, and "= "
+    lines for how the session ended. Response, Connections, ResponseDelayMilliseconds and
+    Reset are ignored. With -Tls it serves TLS from the first byte, as ldaps:// expects.
+
+    For example, this script answers curl's LDAP simple bind with success and records
+    the search request that follows it:
+
+      # BindRequest from curl
+      read ber
+      # BindResponse, message ID 1, resultCode success (RFC 4511 4.2.2)
+      send \x30\x0c\x02\x01\x01\x61\x07\x0a\x01\x00\x04\x00\x04\x00
+      # SearchRequest from curl
+      read ber
+      close
+
+.PARAMETER ScriptIdleMilliseconds
+    How long, in -Script mode, a read waits for a byte from curl before it ends the
+    session. Default 5000.
+
+.PARAMETER ScriptGapMilliseconds
+    How long, in -Script mode, a bare read waits for more bytes after the last that
+    arrived before it takes what it has. Default 250.
+
 .PARAMETER Tls
     Answer each connection over TLS 1.2 instead of plain TCP, so the recorder can stand
     in for an HTTPS server or an HTTPS proxy (BL-398, BL-442). The certificate served
@@ -277,14 +332,34 @@
     before any handshake. With -Ftp it serves implicit FTPS: the control connection is TLS
     from its first byte, as ftps:// expects (BL-437); with -Smtp, implicit SMTPS, as
     smtps:// expects (BL-529); with -Imap, implicit IMAPS, as imaps:// expects (BL-531);
-    with -Pop3, implicit POP3S, as pop3s:// expects (BL-530).
+    with -Pop3, implicit POP3S, as pop3s:// expects (BL-530); with -Script, TLS from the
+    first byte, as ldaps:// expects (BL-532).
 
 .PARAMETER TlsRootCertificateFile
     With -Tls, serve a certificate issued by a throwaway private root CA in place of the
     self-signed one, and write that root's PEM to this path so curl can be given
-    --cacert <path> (BL-490). Neither certificate names a revocation endpoint, so the
-    Schannel build's revocation check of the leaf ends "status unknown", as ADR-0086
-    describes. The root's key is never written; the file is left for the caller to delete.
+    --cacert <path> (BL-490); the root may sign certificates and CRLs. Neither certificate
+    names a revocation endpoint, so the Schannel build's revocation check of the leaf ends
+    "status unknown", as ADR-0086 describes. The root's key is never written; the file is left for the caller to delete.
+
+.PARAMETER TlsEmptyCrlFile
+    With -TlsRootCertificateFile, also write a PEM "X509 CRL" signed by the throwaway root
+    that revokes nothing, so curl can be given --crlfile <path> (BL-609). It is a version 1
+    list (no extensions), valid from five minutes ago for one day. Left for the caller to
+    delete.
+
+.PARAMETER TlsRevokingCrlFile
+    With -TlsRootCertificateFile, also write a PEM "X509 CRL" signed by the throwaway root
+    that revokes the served certificate by its serial number, otherwise as TlsEmptyCrlFile
+    (BL-609). Left for the caller to delete.
+
+.PARAMETER TlsPublicKeyFile
+    With -Tls, write the served certificate's public key (its SubjectPublicKeyInfo) to this
+    path as a PEM "PUBLIC KEY" block, and the same key as DER to this path with ".der"
+    appended, before curl runs, so curl can be given --pinnedpubkey <path> (BL-608). With
+    -Tls, whether or not this is given, every "{TlsPublicKeySha256}" in CurlArgs is replaced
+    by the base64 SHA-256 of that SubjectPublicKeyInfo, the hash --pinnedpubkey sha256//
+    names. The files are left for the caller to delete.
 
 .PARAMETER FtpIdleMilliseconds
     How long, in -Ftp mode, the server waits for curl's next command before it hangs up.
@@ -309,8 +384,51 @@
     Response, Connections, ResponseDelayMilliseconds, Reset, HoldOpenMilliseconds,
     RespondAfterBodyBytes, FtpReply, FtpData, FtpIdleMilliseconds, SmtpReply,
     SmtpIdleMilliseconds, ImapReply, ImapMessage, ImapIdleMilliseconds, Pop3Reply,
-    Pop3Message, Pop3IdleMilliseconds and ListenAddress are ignored, and Port need not be given.
-    Combining it with a server mode, -Ftp, -Smtp, -Imap, -Pop3 or -Tls, is refused. StandardInput and Curl work as in every other mode.
+    Pop3Message, Pop3IdleMilliseconds, ScriptIdleMilliseconds, ScriptGapMilliseconds and
+    ListenAddress are ignored, and Port need not be given.
+    Combining it with a server mode, -Ftp, -Smtp, -Imap, -Pop3, -Script or -Tls, is refused. StandardInput and Curl work as in every other mode.
+
+.PARAMETER UdpSink
+    Also bind UDP on ListenAddress and Port, and take every datagram curl sends there
+    without ever answering, so a QUIC attempt (--http3, --http3-only) meets a silent
+    peer rather than an ICMP port unreachable (BL-718). After curl exits, datagrams.txt
+    holds one line per datagram in the order received, its bytes as lowercase hex. A
+    client's first QUIC Initial can be decrypted from it offline (RFC 9001 section 5.2),
+    which is how curl's transport parameters are read. Works in every mode, -NoServer
+    included; Port must then be given.
+
+.PARAMETER DnsPort
+    Also run a DNS responder (BL-694) on ListenAddress, UDP and TCP, on each of these ports,
+    for measuring curl's c-ares resolver with --dns-servers. Each query is answered with
+    the query's ID and question, flags 0x8180 (a response, RD and RA set, NOERROR), and one
+    answer record per DnsAnswerAddress of the asked family (A or AAAA; any other type gets
+    none), TTL 60. After curl exits, dns.txt holds one line per query, in the order
+    received: the milliseconds since the responder started (just before curl), the transport (udp or tcp), the port it
+    arrived on, and the query bytes as lowercase hex (a TCP query without its two-byte
+    length prefix). Works in every mode, -NoServer included.
+
+.PARAMETER DnsSilentPort
+    DnsPort ports that record each UDP query and never answer, so a server that does not
+    reply can be measured beside one that does (BL-694). Give each port in DnsPort too.
+
+.PARAMETER DnsAnswerAddress
+    The addresses the DNS responder answers with. Default 127.0.0.1.
+
+.PARAMETER DnsTruncate
+    Answer every UDP query with the TC (truncated) flag set and no answer records, so the
+    resolver has to ask again over TCP, which is answered in full (BL-694).
+
+.PARAMETER DnsResponseCode
+    The RCODE every DNS answer carries, e.g. 3 (NXDOMAIN) or 2 (SERVFAIL); any value but 0
+    sends no answer records. Default 0 (NOERROR).
+
+.PARAMETER UnixSocket
+    Listen on a Unix domain socket at this path instead of TCP, for --unix-socket (BL-507).
+    Any file already at the path is deleted first, and the socket file is deleted at the
+    end. Only the HTTP mode serves over it: combining it with -Ftp, -Smtp, -Imap, -Pop3, -Script,
+    -Tls, -NoServer or -UdpSink is refused. Port need not be given. Windows PowerShell 5.1
+    runs on .NET Framework, which has no UnixDomainSocketEndPoint, so the socket is bound
+    through a small C# EndPoint compiled with Add-Type; Windows 10 1803 or later has AF_UNIX.
 
 .EXAMPLE
     .\Record-CurlExchange.ps1 -Port 18081 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello' -CurlArgs 'http://127.0.0.1:18081/a?b' -OutDirectory fixtures\default-get
@@ -343,6 +461,13 @@
 
     Serves one POP3 session; transcript.txt shows CAPA, AUTH PLAIN, RETR 1 with the
     dot-stuffed message and QUIT, and stdout.bin the message curl printed.
+
+.EXAMPLE
+    .\Record-CurlExchange.ps1 -Port 18389 -Script ldap-bind-search.txt -CurlArgs 'ldap://127.0.0.1:18389/dc=example' -OutDirectory fixtures\ldap-search
+
+    Runs the steps in ldap-bind-search.txt (the example under .PARAMETER Script);
+    request.bin then holds curl's BindRequest and SearchRequest, and transcript.txt both
+    directions as hex.
 #>
 [CmdletBinding()]
 param(
@@ -360,6 +485,7 @@ param(
     [string[]] $FtpReply = @(),
     [string] $FtpData = '',
     [ValidateRange(1, 600000)] [int] $FtpIdleMilliseconds = 5000,
+    [ValidateRange(0, 600000)] [int] $FtpDataHoldMilliseconds = 0,
     [switch] $Smtp,
     [string[]] $SmtpReply = @(),
     [ValidateRange(1, 600000)] [int] $SmtpIdleMilliseconds = 5000,
@@ -371,11 +497,24 @@ param(
     [string[]] $Pop3Reply = @(),
     [string] $Pop3Message = 'From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n.A line that starts with a dot.\r\n',
     [ValidateRange(1, 600000)] [int] $Pop3IdleMilliseconds = 5000,
+    [string] $Script,
+    [ValidateRange(1, 600000)] [int] $ScriptIdleMilliseconds = 5000,
+    [ValidateRange(1, 600000)] [int] $ScriptGapMilliseconds = 250,
     [switch] $Tls,
     [string] $TlsRootCertificateFile,
+    [string] $TlsEmptyCrlFile,
+    [string] $TlsRevokingCrlFile,
+    [string] $TlsPublicKeyFile,
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
-    [switch] $NoServer
+    [switch] $NoServer,
+    [switch] $UdpSink,
+    [int[]] $DnsPort = @(),
+    [int[]] $DnsSilentPort = @(),
+    [System.Net.IPAddress[]] $DnsAnswerAddress = @([System.Net.IPAddress]::Loopback),
+    [switch] $DnsTruncate,
+    [ValidateRange(0, 15)] [int] $DnsResponseCode = 0,
+    [string] $UnixSocket
 )
 
 Set-StrictMode -Version Latest
@@ -384,9 +523,12 @@ $ErrorActionPreference = 'Stop'
 # powershell -File binds '-sS','http://...' as the one string "-sS,http://..."; only then
 # is the invocation line empty, so only then is that string split back into its elements.
 if ([string]::IsNullOrEmpty($MyInvocation.Line) -and $CurlArgs.Count -eq 1) { $CurlArgs = $CurlArgs[0].Split(',') }
-if ($NoServer -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3 or -Tls.' }
-if (@($Ftp, $Smtp, $Imap, $Pop3 | Where-Object { $_ }).Count -gt 1) { throw '-Ftp, -Smtp, -Imap and -Pop3 each serve a whole session; give one of them.' }
-if (-not $NoServer -and $Port -eq 0) { throw '-Port is required unless -NoServer is given: the URL in CurlArgs must name the port the server listens on.' }
+if ($NoServer -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script or -Tls.' }
+if (@($Ftp, $Smtp, $Imap, $Pop3, [bool] $Script | Where-Object { $_ }).Count -gt 1) { throw '-Ftp, -Smtp, -Imap, -Pop3 and -Script each serve a whole session; give one of them.' }
+if ($UnixSocket -and ($NoServer -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls -or $UdpSink)) { throw '-UnixSocket serves HTTP only, so it cannot be combined with -NoServer, -Ftp, -Smtp, -Imap, -Pop3, -Script, -Tls or -UdpSink.' }
+if (-not $NoServer -and -not $UnixSocket -and $Port -eq 0) { throw '-Port is required unless -NoServer is given: the URL in CurlArgs must name the port the server listens on.' }
+if ($UdpSink -and $Port -eq 0) { throw '-UdpSink binds UDP on -Port, so -Port is required with it.' }
+if (@($DnsSilentPort | Where-Object { $DnsPort -notcontains $_ }).Count -gt 0) { throw '-DnsSilentPort names a port -DnsPort does not; give each silent port in -DnsPort too.' }
 
 function Get-ReferenceCurlPath {
     $git = Get-Command git.exe -ErrorAction SilentlyContinue
@@ -597,7 +739,7 @@ $sessionHelpers = {
 # one array, writes the two-way transcript into $Transcript, and the bytes uploaded on
 # STOR and APPE data connections into $UploadedData.
 $serveFtpSession = {
-    param($Listener, [hashtable] $Overrides, [byte[]] $DataBytes, [System.Text.StringBuilder] $Transcript, [System.IO.MemoryStream] $UploadedData, $TlsCertificate, [bool] $ImplicitTls, [int] $ControlIdleMilliseconds, [System.Net.IPAddress] $ListenAddress, [string] $SessionHelpers)
+    param($Listener, [hashtable] $Overrides, [byte[]] $DataBytes, [System.Text.StringBuilder] $Transcript, [System.IO.MemoryStream] $UploadedData, $TlsCertificate, [bool] $ImplicitTls, [int] $ControlIdleMilliseconds, [System.Net.IPAddress] $ListenAddress, [string] $SessionHelpers, [int] $DataHoldMilliseconds)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -663,7 +805,7 @@ $serveFtpSession = {
             if ($ImplicitTls) { $stream = Wrap-Tls -Stream $stream }
             $stream.ReadTimeout = $ControlIdleMilliseconds
             $greeting = if ($Overrides.ContainsKey('GREETING')) { Get-Override -Verb 'GREETING' } else { '220 Recorder ready' }
-            Send-Reply -Stream $stream -Reply $greeting
+            if ($greeting -cne 'STALL') { Send-Reply -Stream $stream -Reply $greeting }
             $line = New-Object System.IO.MemoryStream
             while ($true) {
                 try {
@@ -683,6 +825,7 @@ $serveFtpSession = {
                 if ($Overrides.ContainsKey($verb)) {
                     $override = Get-Override -Verb $verb
                     if ($override -ceq 'CLOSE') { break }  # Hang up instead of replying.
+                    if ($override -ceq 'STALL') { continue }  # Answer nothing; curl waits (BL-512).
                     Send-Reply -Stream $stream -Reply $override
                     if ($verb -eq 'QUIT') { break }
                     # A refused PROT leaves the data connections in plaintext.
@@ -730,6 +873,8 @@ $serveFtpSession = {
                             $start = [int] [Math]::Max(0, [Math]::Min($restOffset, $DataBytes.Length))
                             $dataStream.Write($DataBytes, $start, $DataBytes.Length - $start)
                             $dataStream.Flush()
+                            # Stall the download midway, as a server that stops sending does (BL-512).
+                            if ($DataHoldMilliseconds -gt 0) { [System.Threading.Thread]::Sleep($DataHoldMilliseconds) }
                             # A TLS data connection ends with close_notify, so curl reads a clean end.
                             if ($dataStream -is [System.Net.Security.SslStream]) { $dataStream.ShutdownAsync().Wait() }
                         } catch [System.IO.IOException] {
@@ -1315,6 +1460,238 @@ $servePop3Session = {
     return , @(, $received.ToArray())
 }
 
+# The -Script server: one connection, served by the steps of a script, for binary
+# request-reply protocols such as LDAP's BER messages (BL-532). It returns every byte curl
+# sent, as one array, and writes a hex transcript of both directions into $Transcript.
+$serveScriptedSession = {
+    param($Listener, [object[]] $Steps, [System.Text.StringBuilder] $Transcript, $TlsCertificate, [bool] $ImplicitTls, [int] $IdleMilliseconds, [int] $GapMilliseconds, [string] $SessionHelpers)
+
+    Set-StrictMode -Version Latest
+    $ErrorActionPreference = 'Stop'
+    . ([scriptblock]::Create($SessionHelpers))
+    $received = New-Object System.IO.MemoryStream
+    $unconsumed = New-Object System.Collections.Generic.List[byte]
+    $buffer = New-Object byte[] 65536
+    # A read that timed out stays pending, so the next wait picks up its bytes instead of
+    # starting a second read on the same stream.
+    $reader = @{ Pending = $null }
+
+    function ConvertTo-Hex {
+        param([byte[]] $Bytes)
+        return ([System.BitConverter]::ToString($Bytes) -replace '-', ' ').ToLowerInvariant()
+    }
+
+    # Waits up to TimeoutMilliseconds for bytes from curl, records them and appends them
+    # to $unconsumed. Returns how many arrived, 0 when curl closed its end, -1 on timeout.
+    function Receive-Bytes {
+        param($Stream, [int] $TimeoutMilliseconds)
+        if ($null -eq $reader.Pending) { $reader.Pending = $Stream.ReadAsync($buffer, 0, $buffer.Length) }
+        try {
+            if (-not $reader.Pending.Wait($TimeoutMilliseconds)) { return -1 }
+            $count = $reader.Pending.Result
+        } catch [System.AggregateException] {
+            $count = 0  # The connection was reset: the same as curl closing its end.
+        }
+        $reader.Pending = $null
+        if ($count -gt 0) {
+            $received.Write($buffer, 0, $count)
+            for ($index = 0; $index -lt $count; $index++) { $unconsumed.Add($buffer[$index]) }
+        }
+        return $count
+    }
+
+    # The length of the whole BER element at the start of $unconsumed (X.690 8.1), or -1
+    # while its identifier and length octets have not all arrived. An indefinite length,
+    # which LDAP forbids, is refused.
+    function Get-BerElementLength {
+        $index = 1
+        if ($unconsumed.Count -lt 1) { return -1 }
+        if (($unconsumed[0] -band 0x1F) -eq 0x1F) {
+            while ($index -lt $unconsumed.Count -and ($unconsumed[$index] -band 0x80) -ne 0) { $index++ }
+            $index++
+        }
+        if ($unconsumed.Count -le $index) { return -1 }
+        $first = [int] $unconsumed[$index]
+        if ($first -lt 0x80) { return $index + 1 + $first }
+        $octets = $first -band 0x7F
+        if ($octets -eq 0) { throw 'The read ber step met an indefinite length, which it does not support.' }
+        if ($unconsumed.Count -le $index + $octets) { return -1 }
+        [long] $length = 0
+        for ($offset = 1; $offset -le $octets; $offset++) { $length = $length * 256 + $unconsumed[$index + $offset] }
+        return $index + 1 + $octets + $length
+    }
+
+    # Runs one read step. Returns $true to go on, $false when the session has ended.
+    function Invoke-ReadStep {
+        param($Stream, $Step)
+        $wanted = -1
+        while ($true) {
+            if ($Step.Framing -eq 'ber') { $wanted = Get-BerElementLength } elseif ($Step.Framing -eq 'count') { $wanted = $Step.ByteCount }
+            if ($Step.Framing -eq 'gap') {
+                $timeout = if ($unconsumed.Count -eq 0) { $IdleMilliseconds } else { $GapMilliseconds }
+            } elseif ($wanted -ge 0 -and $unconsumed.Count -ge $wanted) {
+                break
+            } else {
+                $timeout = $IdleMilliseconds
+            }
+            $arrived = Receive-Bytes -Stream $Stream -TimeoutMilliseconds $timeout
+            if ($arrived -gt 0) { continue }
+            if ($Step.Framing -eq 'gap' -and $arrived -lt 0 -and $unconsumed.Count -gt 0) { break }
+            if ($unconsumed.Count -gt 0) { [void] $Transcript.Append("> $(ConvertTo-Hex -Bytes $unconsumed.ToArray())`r`n") }
+            $expected = if ($wanted -ge 0) { " of the $wanted expected" } else { '' }
+            if ($arrived -lt 0) {
+                [void] $Transcript.Append("= $($Step.Text) timed out after $IdleMilliseconds ms with $($unconsumed.Count) bytes$expected; session ended`r`n")
+            } else {
+                [void] $Transcript.Append("= curl closed the connection during $($Step.Text) with $($unconsumed.Count) bytes$expected; session ended`r`n")
+            }
+            return $false
+        }
+        if ($wanted -lt 0) { $wanted = $unconsumed.Count }
+        $message = $unconsumed.GetRange(0, $wanted).ToArray()
+        $unconsumed.RemoveRange(0, $wanted)
+        [void] $Transcript.Append("> $(ConvertTo-Hex -Bytes $message)`r`n")
+        return $true
+    }
+
+    # WinLDAP opens two connections at once and writes on only one of them, so when the
+    # script starts with a read, every connection curl opens is accepted and the session
+    # is served on the first that has bytes waiting; the others are held open until it ends.
+    function Select-SpokenConnection {
+        param([System.Collections.Generic.List[object]] $Accepted)
+        $clock = [System.Diagnostics.Stopwatch]::StartNew()
+        while ($clock.ElapsedMilliseconds -lt $IdleMilliseconds) {
+            # curl can exit without writing on any connection, as the Windows build does for
+            # an LDAP URL it refuses after connecting (BL-587); the listener is then stopped.
+            try {
+                while ($Listener.Pending()) { $Accepted.Add($Listener.AcceptTcpClient()) }
+            } catch [System.InvalidOperationException] {
+                return $null
+            }
+            foreach ($candidate in $Accepted) {
+                if ($candidate.Client.Available -gt 0) { return $candidate }
+            }
+            Start-Sleep -Milliseconds 10
+        }
+        return $null
+    }
+
+    $accepted = New-Object System.Collections.Generic.List[object]
+    try {
+        $accepted.Add($Listener.AcceptTcpClient())
+    } catch {
+        return , @(, $received.ToArray())
+    }
+    try {
+        $client = $accepted[0]
+        if ($Steps.Count -gt 0 -and $Steps[0].Kind -eq 'read') {
+            $client = Select-SpokenConnection -Accepted $accepted
+            if ($accepted.Count -gt 1) { [void] $Transcript.Append("= curl opened $($accepted.Count) connections; the session is served on the first to send`r`n") }
+            if ($null -eq $client) {
+                [void] $Transcript.Append("= $($Steps[0].Text) timed out after $IdleMilliseconds ms with 0 bytes; session ended`r`n")
+                return , @(, $received.ToArray())
+            }
+        }
+        $stream = $client.GetStream()
+        if ($ImplicitTls) {
+            $stream = Wrap-Tls -Stream $stream
+            [void] $Transcript.Append("= TLS handshake completed`r`n")
+        }
+        $ended = $false
+        foreach ($step in $Steps) {
+            if ($step.Kind -eq 'read') {
+                if (-not (Invoke-ReadStep -Stream $stream -Step $step)) { $ended = $true; break }
+            } elseif ($step.Kind -eq 'send') {
+                $stream.Write($step.Bytes, 0, $step.Bytes.Length)
+                $stream.Flush()
+                [void] $Transcript.Append("< $(ConvertTo-Hex -Bytes $step.Bytes)`r`n")
+            } elseif ($step.Kind -eq 'reset') {
+                # A zero linger time makes Close send RST instead of FIN.
+                $client.LingerState = New-Object System.Net.Sockets.LingerOption($true, 0)
+                $client.Close()
+                [void] $Transcript.Append("= server reset the connection`r`n")
+                $ended = $true
+                break
+            } else {
+                [void] $Transcript.Append("= server closed the connection`r`n")
+                $ended = $true
+                break
+            }
+        }
+        if (-not $ended) { [void] $Transcript.Append("= script ended; server closed the connection`r`n") }
+    } catch [System.IO.IOException] {
+        [void] $Transcript.Append("= curl closed the connection mid-send; session ended`r`n")
+    } finally {
+        foreach ($connection in $accepted) { $connection.Close() }
+        # The session is over, so a reconnect is refused rather than left in the backlog,
+        # where WinLDAP would wait minutes for an answer before curl could exit.
+        $Listener.Stop()
+    }
+    return , @(, $received.ToArray())
+}
+
+function ConvertFrom-ExchangeScript {
+    # The -Script file as a list of steps; see .PARAMETER Script.
+    param([string] $Path)
+    $steps = New-Object System.Collections.Generic.List[object]
+    $lineNumber = 0
+    foreach ($line in [System.IO.File]::ReadAllLines([System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $Path)))) {
+        $lineNumber++
+        $text = $line.Trim()
+        if ($text.Length -eq 0 -or $text.StartsWith('#')) { continue }
+        $verb = ($text -split '\s+', 2)[0]
+        $argument = if ($text -match '^\S+\s+(.*)$') { $Matches[1] } else { '' }
+        if ($verb -ceq 'send') {
+            $steps.Add(@{ Kind = 'send'; Bytes = [byte[]] (ConvertFrom-EscapedResponse -Text $argument); Text = $text })
+        } elseif ($verb -ceq 'close' -and $argument -eq '') {
+            $steps.Add(@{ Kind = 'close'; Text = $text })
+        } elseif ($verb -ceq 'reset' -and $argument -eq '') {
+            $steps.Add(@{ Kind = 'reset'; Text = $text })
+        } elseif ($verb -ceq 'read' -and $argument -eq '') {
+            $steps.Add(@{ Kind = 'read'; Framing = 'gap'; Text = $text })
+        } elseif ($verb -ceq 'read' -and $argument -ceq 'ber') {
+            $steps.Add(@{ Kind = 'read'; Framing = 'ber'; Text = $text })
+        } elseif ($verb -ceq 'read' -and $argument -match '^\d+$' -and [int] $argument -gt 0) {
+            $steps.Add(@{ Kind = 'read'; Framing = 'count'; ByteCount = [int] $argument; Text = $text })
+        } else {
+            throw "Script line ${lineNumber} is not a step: $text"
+        }
+    }
+    return , $steps.ToArray()
+}
+
+function ConvertTo-DerElement {
+    # One DER element: Tag, the definite length of Content, then Content.
+    param([byte] $Tag, [byte[]] $Content)
+    $length = $Content.Length
+    $lengthBytes = if ($length -lt 0x80) { , [byte] $length }
+        elseif ($length -lt 0x100) { [byte[]] (0x81, $length) }
+        else { [byte[]] (0x82, ($length -shr 8), ($length -band 0xFF)) }
+    return , ([byte[]] (@($Tag) + $lengthBytes + $Content))
+}
+
+function Write-ThrowawayCrl {
+    # Writes a version 1 CRL issued and signed (SHA-256 with RSA) by Root, revoking
+    # RevokedSerial when given and nothing otherwise, to Path as PEM. .NET Framework has no
+    # CertificateRevocationListBuilder, so the DER is put together here.
+    param([string] $Path, $Root, $RootKey, [byte[]] $RevokedSerial)
+    $ascii = New-Object System.Text.ASCIIEncoding
+    $now = [System.DateTime]::UtcNow
+    $thisUpdate = ConvertTo-DerElement -Tag 0x17 -Content $ascii.GetBytes($now.AddMinutes(-5).ToString('yyMMddHHmmss') + 'Z')
+    $nextUpdate = ConvertTo-DerElement -Tag 0x17 -Content $ascii.GetBytes($now.AddDays(1).ToString('yyMMddHHmmss') + 'Z')
+    $sha256WithRsa = ConvertTo-DerElement -Tag 0x30 -Content ([byte[]] ((ConvertTo-DerElement -Tag 0x06 -Content ([byte[]] (0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x0B))) + [byte[]] (0x05, 0x00)))
+    $tbsContent = [byte[]] ($sha256WithRsa + $Root.SubjectName.RawData + $thisUpdate + $nextUpdate)
+    if ($null -ne $RevokedSerial) {
+        $entry = ConvertTo-DerElement -Tag 0x30 -Content ([byte[]] ((ConvertTo-DerElement -Tag 0x02 -Content $RevokedSerial) + $thisUpdate))
+        $tbsContent = [byte[]] ($tbsContent + (ConvertTo-DerElement -Tag 0x30 -Content $entry))
+    }
+    $tbs = ConvertTo-DerElement -Tag 0x30 -Content $tbsContent
+    $signature = $RootKey.SignData($tbs, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+    $signatureBits = ConvertTo-DerElement -Tag 0x03 -Content ([byte[]] (@([byte] 0) + $signature))
+    $crl = ConvertTo-DerElement -Tag 0x30 -Content ([byte[]] ($tbs + $sha256WithRsa + $signatureBits))
+    $pem = "-----BEGIN X509 CRL-----`n" + [System.Convert]::ToBase64String($crl, [System.Base64FormattingOptions]::InsertLineBreaks).Replace("`r`n", "`n") + "`n-----END X509 CRL-----`n"
+    [System.IO.File]::WriteAllText([System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $Path)), $pem, $ascii)
+}
+
 function New-IssuedByThrowawayRoot {
     # Signs Request with a throwaway root CA named by no store and writes the root's PEM
     # to RootCertificateFile. Neither certificate names a CRL or OCSP endpoint.
@@ -1323,7 +1700,7 @@ function New-IssuedByThrowawayRoot {
     try {
         $rootRequest = New-Object System.Security.Cryptography.X509Certificates.CertificateRequest('CN=Record-CurlExchange throwaway root', $rootKey, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
         $rootRequest.CertificateExtensions.Add((New-Object System.Security.Cryptography.X509Certificates.X509BasicConstraintsExtension($true, $false, 0, $true)))
-        $rootRequest.CertificateExtensions.Add((New-Object System.Security.Cryptography.X509Certificates.X509KeyUsageExtension([System.Security.Cryptography.X509Certificates.X509KeyUsageFlags]::KeyCertSign, $true)))
+        $rootRequest.CertificateExtensions.Add((New-Object System.Security.Cryptography.X509Certificates.X509KeyUsageExtension(([System.Security.Cryptography.X509Certificates.X509KeyUsageFlags]::KeyCertSign -bor [System.Security.Cryptography.X509Certificates.X509KeyUsageFlags]::CrlSign), $true)))
         $root = $rootRequest.CreateSelfSigned($NotBefore.AddMinutes(-5), $NotAfter.AddDays(1))
         try {
             $pem = "-----BEGIN CERTIFICATE-----`n" + [System.Convert]::ToBase64String($root.RawData, [System.Base64FormattingOptions]::InsertLineBreaks) + "`n-----END CERTIFICATE-----`n"
@@ -1332,6 +1709,8 @@ function New-IssuedByThrowawayRoot {
             [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($serial)
             $serial[0] = $serial[0] -band 0x7F
             $issued = $Request.Create($root, $NotBefore, $NotAfter, $serial)
+            if ($TlsEmptyCrlFile) { Write-ThrowawayCrl -Path $TlsEmptyCrlFile -Root $root -RootKey $rootKey -RevokedSerial $null }
+            if ($TlsRevokingCrlFile) { Write-ThrowawayCrl -Path $TlsRevokingCrlFile -Root $root -RootKey $rootKey -RevokedSerial $serial }
             try {
                 return [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::CopyWithPrivateKey($issued, $Key)
             } finally {
@@ -1343,6 +1722,26 @@ function New-IssuedByThrowawayRoot {
     } finally {
         $rootKey.Dispose()
     }
+}
+
+function Get-SubjectPublicKeyInfo {
+    # The DER SubjectPublicKeyInfo of Certificate's key: SEQUENCE { SEQUENCE { algorithm OID,
+    # parameters }, BIT STRING key }. .NET Framework has no ExportSubjectPublicKeyInfo, so
+    # it is put together from the parts PublicKey exposes.
+    param($Certificate)
+    function ConvertTo-Der {
+        param([byte] $Tag, [byte[]] $Content)
+        $length = $Content.Length
+        $lengthBytes = if ($length -lt 0x80) { , [byte] $length }
+            elseif ($length -lt 0x100) { [byte[]] (0x81, $length) }
+            else { [byte[]] (0x82, ($length -shr 8), ($length -band 0xFF)) }
+        return , ([byte[]] (@($Tag) + $lengthBytes + $Content))
+    }
+    $publicKey = $Certificate.PublicKey
+    $oid = ConvertTo-Der -Tag 0x06 -Content ([System.Security.Cryptography.CryptoConfig]::EncodeOID($publicKey.Oid.Value) | Select-Object -Skip 2)
+    $algorithm = ConvertTo-Der -Tag 0x30 -Content ([byte[]] ($oid + $publicKey.EncodedParameters.RawData))
+    $key = ConvertTo-Der -Tag 0x03 -Content ([byte[]] (@([byte] 0) + $publicKey.EncodedKeyValue.RawData))
+    return , (ConvertTo-Der -Tag 0x30 -Content ([byte[]] ($algorithm + $key)))
 }
 
 function New-ThrowawayTlsCertificate {
@@ -1394,31 +1793,265 @@ $ftpOverrides = ConvertTo-ReplyOverrides -Entries $FtpReply -ParameterName 'FtpR
 $smtpOverrides = ConvertTo-ReplyOverrides -Entries $SmtpReply -ParameterName 'SmtpReply'
 $imapOverrides = ConvertTo-ReplyOverrides -Entries $ImapReply -ParameterName 'ImapReply'
 $pop3Overrides = ConvertTo-ReplyOverrides -Entries $Pop3Reply -ParameterName 'Pop3Reply'
+$scriptSteps = if ($Script) { ConvertFrom-ExchangeScript -Path $Script } else { $null }
 $transcript = New-Object System.Text.StringBuilder
 $uploadedData = New-Object System.IO.MemoryStream
 $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $OutDirectory))
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
 $tlsCertificate = if ($Tls -or $Ftp -or $Smtp -or $Imap -or $Pop3) { New-ThrowawayTlsCertificate -RootCertificateFile $TlsRootCertificateFile } else { $null }
+if ($null -ne $tlsCertificate) {
+    $publicKeyInfo = Get-SubjectPublicKeyInfo -Certificate $tlsCertificate
+    $publicKeySha256 = [System.Convert]::ToBase64String([System.Security.Cryptography.SHA256]::Create().ComputeHash($publicKeyInfo))
+    $CurlArgs = @($CurlArgs | ForEach-Object { $_.Replace('{TlsPublicKeySha256}', $publicKeySha256) })
+    if ($TlsPublicKeyFile) {
+        $TlsPublicKeyFile = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $TlsPublicKeyFile))
+        $pem = "-----BEGIN PUBLIC KEY-----`n" + [System.Convert]::ToBase64String($publicKeyInfo, [System.Base64FormattingOptions]::InsertLineBreaks).Replace("`r`n", "`n") + "`n-----END PUBLIC KEY-----`n"
+        [System.IO.File]::WriteAllText($TlsPublicKeyFile, $pem, (New-Object System.Text.ASCIIEncoding))
+        [System.IO.File]::WriteAllBytes($TlsPublicKeyFile + '.der', $publicKeyInfo)
+    }
+}
 # -NoServer binds nothing: the caller's own server answers curl.
 $listener = $null
 $server = $null
-if (-not $NoServer) {
+if ($UnixSocket) {
+    # AcceptTcpClient hands back a TcpClient over the accepted Unix socket, so the HTTP
+    # server serves it unchanged. C#, not a PowerShell class, so no method needs this
+    # runspace, which is busy waiting for curl.
+    Add-Type -TypeDefinition @'
+using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+
+public sealed class RecorderUnixEndPoint : EndPoint
+{
+    private readonly string _path;
+    public RecorderUnixEndPoint(string path) { _path = path; }
+    public override AddressFamily AddressFamily { get { return AddressFamily.Unix; } }
+    public override SocketAddress Serialize()
+    {
+        byte[] path = Encoding.UTF8.GetBytes(_path);
+        var address = new SocketAddress(AddressFamily.Unix, 2 + 108);
+        for (int i = 0; i < path.Length; i++) { address[2 + i] = path[i]; }
+        return address;
+    }
+    public override EndPoint Create(SocketAddress socketAddress) { return this; }
+}
+
+public sealed class RecorderUnixSocketListener
+{
+    private readonly Socket _socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+    public RecorderUnixSocketListener(string path)
+    {
+        _socket.Bind(new RecorderUnixEndPoint(path));
+        _socket.Listen(16);
+    }
+    public TcpClient AcceptTcpClient()
+    {
+        Socket accepted = _socket.Accept();
+        var client = new TcpClient();
+        client.Client.Dispose();
+        client.Client = accepted;
+        return client;
+    }
+    public void Stop() { _socket.Close(); }
+}
+'@
+    $UnixSocket = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $UnixSocket))
+    if (Test-Path -LiteralPath $UnixSocket) { Remove-Item -LiteralPath $UnixSocket -Force }
+    $listener = New-Object RecorderUnixSocketListener($UnixSocket)
+    $server = [System.Management.Automation.PowerShell]::Create()
+} elseif (-not $NoServer) {
     $listener = New-Object System.Net.Sockets.TcpListener($ListenAddress, $Port)
     $listener.Start()
     $server = [System.Management.Automation.PowerShell]::Create()
+}
+$dnsResponder = $null
+if ($DnsPort.Count -gt 0) {
+    # C#, not a PowerShell class, so its threads need no runspace; Windows PowerShell 5.1
+    # compiles it as C# 5.
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+
+public sealed class RecorderDnsResponder
+{
+    private readonly List<Socket> _sockets = new List<Socket>();
+    private readonly List<TcpListener> _listeners = new List<TcpListener>();
+    private readonly StringBuilder _log = new StringBuilder();
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private readonly IPAddress[] _answers;
+    private readonly bool _truncate;
+    private int _responseCode;
+
+    public RecorderDnsResponder(IPAddress address, int[] ports, int[] silentPorts, IPAddress[] answers, bool truncate, int responseCode)
+    {
+        _responseCode = responseCode;
+        _answers = answers;
+        _truncate = truncate;
+        foreach (int port in ports)
+        {
+            var udp = new Socket(address.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            udp.Bind(new IPEndPoint(address, port));
+            _sockets.Add(udp);
+            bool silent = Array.IndexOf(silentPorts, port) >= 0;
+            int boundPort = port;
+            new Thread(delegate() { ServeUdp(udp, boundPort, silent); }) { IsBackground = true }.Start();
+            var tcp = new TcpListener(address, port);
+            tcp.Start();
+            _listeners.Add(tcp);
+            new Thread(delegate() { ServeTcp(tcp, boundPort); }) { IsBackground = true }.Start();
+        }
+    }
+
+    public string Log { get { lock (_log) { return _log.ToString(); } } }
+
+    public void Stop()
+    {
+        foreach (Socket socket in _sockets) { socket.Close(); }
+        foreach (TcpListener listener in _listeners) { listener.Stop(); }
+    }
+
+    private void Record(string transport, int port, byte[] query, int length)
+    {
+        lock (_log)
+        {
+            _log.Append(_clock.ElapsedMilliseconds).Append(' ').Append(transport).Append(' ').Append(port).Append(' ');
+            _log.Append(BitConverter.ToString(query, 0, length).Replace("-", string.Empty).ToLowerInvariant()).Append('\n');
+        }
+    }
+
+    private void ServeUdp(Socket udp, int port, bool silent)
+    {
+        var buffer = new byte[65535];
+        try
+        {
+            while (true)
+            {
+                EndPoint sender = new IPEndPoint(udp.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any, 0);
+                int length = udp.ReceiveFrom(buffer, ref sender);
+                Record("udp", port, buffer, length);
+                if (!silent)
+                {
+                    byte[] reply = Answer(buffer, length, _truncate);
+                    udp.SendTo(reply, sender);
+                }
+            }
+        }
+        catch (SocketException) { }
+        catch (ObjectDisposedException) { }
+    }
+
+    private void ServeTcp(TcpListener listener, int port)
+    {
+        try
+        {
+            while (true)
+            {
+                TcpClient client = listener.AcceptTcpClient();
+                new Thread(delegate() { ServeTcpClient(client, port); }) { IsBackground = true }.Start();
+            }
+        }
+        catch (SocketException) { }
+        catch (ObjectDisposedException) { }
+        catch (InvalidOperationException) { }
+    }
+
+    private void ServeTcpClient(TcpClient client, int port)
+    {
+        try
+        {
+            using (client)
+            {
+                NetworkStream stream = client.GetStream();
+                while (true)
+                {
+                    byte[] prefix = ReadExactly(stream, 2);
+                    if (prefix == null) { return; }
+                    byte[] query = ReadExactly(stream, (prefix[0] << 8) | prefix[1]);
+                    if (query == null) { return; }
+                    Record("tcp", port, query, query.Length);
+                    byte[] reply = Answer(query, query.Length, false);
+                    stream.Write(new byte[] { (byte)(reply.Length >> 8), (byte)reply.Length }, 0, 2);
+                    stream.Write(reply, 0, reply.Length);
+                }
+            }
+        }
+        catch (System.IO.IOException) { }
+        catch (ObjectDisposedException) { }
+    }
+
+    private static byte[] ReadExactly(NetworkStream stream, int count)
+    {
+        var bytes = new byte[count];
+        int read = 0;
+        while (read < count)
+        {
+            int n = stream.Read(bytes, read, count - read);
+            if (n == 0) { return null; }
+            read += n;
+        }
+        return bytes;
+    }
+
+    /// The query's header and question, then one answer record per address of the asked family.
+    private byte[] Answer(byte[] query, int length, bool truncate)
+    {
+        int end = 12;
+        while (end < length && query[end] != 0) { end += 1 + query[end]; }
+        end += 1 + 4;
+        int type = (query[end - 4] << 8) | query[end - 3];
+        var reply = new List<byte>();
+        for (int i = 0; i < end; i++) { reply.Add(query[i]); }
+        reply[2] = (byte)(truncate ? 0x83 : 0x81);
+        reply[3] = (byte)(0x80 | _responseCode);
+        for (int i = 6; i < 12; i++) { reply[i] = 0; }
+        int answers = 0;
+        if (!truncate && _responseCode == 0)
+        {
+            foreach (IPAddress address in _answers)
+            {
+                bool wanted = (type == 1 && address.AddressFamily == AddressFamily.InterNetwork)
+                    || (type == 28 && address.AddressFamily == AddressFamily.InterNetworkV6);
+                if (!wanted) { continue; }
+                byte[] data = address.GetAddressBytes();
+                reply.AddRange(new byte[] { 0xC0, 0x0C, (byte)(type >> 8), (byte)type, 0, 1, 0, 0, 0, 60, 0, (byte)data.Length });
+                reply.AddRange(data);
+                answers++;
+            }
+        }
+        reply[7] = (byte)answers;
+        return reply.ToArray();
+    }
+}
+'@
+    $dnsResponder = New-Object RecorderDnsResponder($ListenAddress, $DnsPort, $DnsSilentPort, $DnsAnswerAddress, [bool] $DnsTruncate, $DnsResponseCode)
+}
+# The sink never answers; the datagrams wait in its receive buffer until curl exits.
+$udpSinkClient = $null
+if ($UdpSink) {
+    $udpSinkClient = New-Object System.Net.Sockets.UdpClient(New-Object System.Net.IPEndPoint($ListenAddress, $Port))
+    $udpSinkClient.Client.ReceiveBufferSize = 8MB
 }
 try {
     if ($NoServer) {
         $serverRun = $null
     } elseif ($Ftp) {
-        [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress).AddArgument($sessionHelpers.ToString())
+        [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress).AddArgument($sessionHelpers.ToString()).AddArgument($FtpDataHoldMilliseconds)
     } elseif ($Smtp) {
         [void] $server.AddScript($serveSmtpSession).AddArgument($listener).AddArgument($smtpOverrides).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($SmtpIdleMilliseconds).AddArgument($sessionHelpers.ToString())
     } elseif ($Imap) {
         [void] $server.AddScript($serveImapSession).AddArgument($listener).AddArgument($imapOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $ImapMessage)).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ImapIdleMilliseconds).AddArgument($sessionHelpers.ToString())
     } elseif ($Pop3) {
         [void] $server.AddScript($servePop3Session).AddArgument($listener).AddArgument($pop3Overrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $Pop3Message)).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($Pop3IdleMilliseconds).AddArgument($sessionHelpers.ToString())
+    } elseif ($Script) {
+        [void] $server.AddScript($serveScriptedSession).AddArgument($listener).AddArgument($scriptSteps).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ScriptIdleMilliseconds).AddArgument($ScriptGapMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
         [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds)
     }
@@ -1470,8 +2103,20 @@ try {
         $requests = $server.EndInvoke($serverRun)
         if ($server.Streams.Error.Count -gt 0) { throw $server.Streams.Error[0] }
     }
+
+    $udpDatagrams = New-Object System.Text.StringBuilder
+    if ($null -ne $udpSinkClient) {
+        $sender = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Any, 0)
+        while ($udpSinkClient.Available -gt 0) {
+            $datagram = $udpSinkClient.Receive([ref] $sender)
+            [void] $udpDatagrams.Append(([System.BitConverter]::ToString($datagram) -replace '-', '').ToLowerInvariant()).Append("`n")
+        }
+    }
 } finally {
+    if ($null -ne $udpSinkClient) { $udpSinkClient.Close() }
+    if ($null -ne $dnsResponder) { $dnsResponder.Stop() }
     if ($null -ne $listener) { $listener.Stop() }
+    if ($UnixSocket -and (Test-Path -LiteralPath $UnixSocket)) { Remove-Item -LiteralPath $UnixSocket -Force }
     if ($null -ne $server) { $server.Dispose() }
     # Reset deletes the key container the PFX import created.
     if ($null -ne $tlsCertificate) { $tlsCertificate.Reset() }
@@ -1490,7 +2135,13 @@ if ($Ftp) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
     [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'upload.bin'), $uploadedData.ToArray())
 }
-if ($Smtp -or $Imap -or $Pop3) {
+if ($UdpSink) {
+    [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'datagrams.txt'), $udpDatagrams.ToString(), [System.Text.Encoding]::ASCII)
+}
+if ($null -ne $dnsResponder) {
+    [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'dns.txt'), $dnsResponder.Log, [System.Text.Encoding]::ASCII)
+}
+if ($Smtp -or $Imap -or $Pop3 -or $Script) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
 }
 

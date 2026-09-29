@@ -14,6 +14,24 @@ internal static class OpenSslVerifyResult
     /// <summary><c>X509_V_OK</c>.</summary>
     internal const long Ok = 0;
 
+    /// <summary><c>X509_V_ERR_UNABLE_TO_GET_CRL</c>: no <c>--crlfile</c> list is from the certificate's issuer.</summary>
+    internal const long UnableToGetCertificateRevocationList = 3;
+
+    /// <summary><c>X509_V_ERR_CRL_SIGNATURE_FAILURE</c>.</summary>
+    internal const long CertificateRevocationListSignatureFailure = 8;
+
+    /// <summary><c>X509_V_ERR_CRL_NOT_YET_VALID</c>.</summary>
+    internal const long CertificateRevocationListNotYetValid = 11;
+
+    /// <summary><c>X509_V_ERR_CRL_HAS_EXPIRED</c>.</summary>
+    internal const long CertificateRevocationListHasExpired = 12;
+
+    /// <summary><c>X509_V_ERR_CERT_REVOKED</c>.</summary>
+    internal const long CertificateRevoked = 23;
+
+    /// <summary><c>X509_V_ERR_KEYUSAGE_NO_CRL_SIGN</c>.</summary>
+    internal const long KeyUsageDoesNotIncludeCrlSigning = 35;
+
     /// <summary><c>X509_V_ERR_CERT_NOT_YET_VALID</c>.</summary>
     internal const long CertificateNotYetValid = 9;
 

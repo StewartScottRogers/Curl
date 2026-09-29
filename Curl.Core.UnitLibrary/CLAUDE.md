@@ -30,7 +30,8 @@ never parse range text.
 successful 3xx hop's `TransferReport.RedirectUrl` under a `RedirectPolicy`
 (`--max-redirs`, `--post301/302/303`, `--location-trusted`, allowed redirect schemes),
 rewriting POST to GET and dropping credentials to another host, port or scheme as curl
-8.21.0 does, and returns the last hop's result with one merged report (redirect count,
+8.21.0 does - except that each hop sends its own URL's user information unless `-u`
+credentials go to it (ADR-0193, BL-814) - and returns the last hop's result with one merged report (redirect count,
 effective URL, summed header/request/connection counts, timings from the first hop with
 `RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. Given a
 `HopProxySelector`, it chooses each hop's proxy again from that hop's own URL, as curl
@@ -102,3 +103,24 @@ constructed with. No gateway is `IpfsGatewayFailure.GatewayDetectionFailed` (exi
 `MalformedTargetUrl` (exit 3, `malformed target URL`); both are tool messages, printed as
 `curl: <message>` with no `(<code>)`. It is not yet wired into `Curl.Console` (BL-240), and
 `--ipfs-gateway` is not yet parsed (BL-353).
+
+`AltSvc\AltSvcCache` is the `--alt-svc` cache (ADR-0175, BL-622): `ReadFile` takes curl
+8.21.0's alt-svc file text (lines read strictly by `AltSvcFileLineParser`, expired entries
+skipped), `ApplyHeader` learns from one `Alt-Svc` value as `AltSvcHeaderParser` reads it
+(`clear`; `ma` and `persist` per alternative, 24 hours by default; the first known
+alternative replaces the origin's entries), `Find` gives the first unexpired entry for an
+origin and allowed versions, removing the expired ones it passes, and `FormatFile` writes
+curl's file byte for byte with the line ending the caller passes (`Environment.NewLine`:
+curl's Windows build writes CR LF). Time comes from the injected `TimeProvider`; it touches
+no file. It is not yet wired into `Curl.Console` (BL-623).
+
+`Hsts\HstsCache` is the `--hsts` cache (ADR-0179, BL-620): `ReadFile` takes curl 8.21.0's HSTS
+file text (`[.]host "date"` lines read by `HstsFileLineParser`, dates by `CurlDateParser` or
+`unlimited`, expired lines skipped, a repeated host merged), `ApplyHeader` learns from one
+`Strict-Transport-Security` value as `HstsHeaderParser` reads it (nothing from an IP address;
+`max-age=0` removes the host's own entry; an entry held is updated in place), `Find` gives the
+host's entry or its longest `includeSubDomains` parent, removing expired entries it passes,
+and `FormatFile` writes curl's file byte for byte with the caller's line ending, or `null`
+when an expiry is past the platform's `gmtime` limit and curl would leave the file as it was.
+Time comes from the injected `TimeProvider`; it touches no file. It is not yet wired into
+`Curl.Console` (BL-621).

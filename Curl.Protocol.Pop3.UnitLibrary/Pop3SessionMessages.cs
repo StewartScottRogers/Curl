@@ -43,4 +43,16 @@ internal static class Pop3SessionMessages
     /// (exit 67, BL-548).
     /// </summary>
     internal const string AuthenticationFailed = "Authentication failed: {0}";
+
+    /// <summary>
+    /// Tells whether curl 8.21.0's <c>-v</c> writes <paramref name="message" /> as a <c>*</c>
+    /// line when the transfer fails with it (BL-552). It does for every message it formats
+    /// itself, a TLS failure's included, and not for <see cref="WeirdServerReply" />,
+    /// <see cref="UrlMalformed" />, <see cref="LoginDenied" /> and
+    /// <see cref="ResponseLineTooLarge" />, which are only the exit code's own text.
+    /// </summary>
+    /// <param name="message">The failure's message.</param>
+    /// <returns><see langword="true" /> when the message is written.</returns>
+    internal static bool IsWrittenByVerbose(string message) =>
+        message is not (WeirdServerReply or UrlMalformed or LoginDenied or ResponseLineTooLarge);
 }

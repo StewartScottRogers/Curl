@@ -41,7 +41,8 @@ internal sealed class SmtpSession(
     ISaslAuthenticator? saslAuthenticator,
     ITransferContext context,
     string domain,
-    bool implicitTls) : IAsyncDisposable
+    bool implicitTls,
+    SmtpCommandLineText commandLineText) : IAsyncDisposable
 {
     private const int StartTlsAccepted = 220;
 
@@ -83,6 +84,11 @@ internal sealed class SmtpSession(
         {
             return TransferResult.Failure(CurlExitCode.TooLarge, SmtpSessionMessages.ReplyLineTooLarge);
         }
+        catch (SaslAuthenticationFailedException failure)
+        {
+            // Nothing more is sent, not even QUIT, as curl's Schannel build does (BL-781).
+            return TransferResult.Failure(failure.ExitCode, failure.Message);
+        }
 
         return await SendMailOrCommandsAsync().ConfigureAwait(false);
     }
@@ -105,10 +111,10 @@ internal sealed class SmtpSession(
         if (context.Upload is { } upload && context.Mail is { Recipients.Count: > 0 } mail)
         {
             var extensions = new SmtpMailExtensions(authenticated, Advertises(SizeKeyword), Advertises(SmtpUtf8Keyword));
-            return new SmtpMailTransaction(channel, context, extensions).SendAsync(upload, mail);
+            return new SmtpMailTransaction(channel, context, extensions, commandLineText).SendAsync(upload, mail);
         }
 
-        return new SmtpCommandTransfer(channel, context, Advertises(SmtpUtf8Keyword)).SendAsync(context.Mail ?? new MailRequestOptions());
+        return new SmtpCommandTransfer(channel, context, Advertises(SmtpUtf8Keyword), commandLineText).SendAsync(context.Mail ?? new MailRequestOptions());
     }
 
     /// <summary>Whether the last accepted <c>EHLO</c> advertised <paramref name="keyword" />; never after <c>HELO</c>.</summary>

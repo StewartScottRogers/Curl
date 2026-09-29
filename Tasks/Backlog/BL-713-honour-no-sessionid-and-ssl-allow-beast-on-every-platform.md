@@ -29,6 +29,8 @@ completed:
 
 ## Notes
 
+- 2026-09-28 (BL-702): the split curl's LibreSSL and OpenSSL builds make is an empty application data record before each TLS 1.0 CBC write, not 1/n-1 (Schannel's); `Tls12RecordWriteState.Create(..., insertEmptyFragment: false)` is the `--ssl-allow-beast` switch. See ADR-0150; measure and pin that shape.
+
 ## Log
 
 - 2026-09-28: Created.

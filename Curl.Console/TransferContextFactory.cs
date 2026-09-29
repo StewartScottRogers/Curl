@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 
 using Curl.Cli;
@@ -80,6 +81,18 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <paramref name="progress" />, and whose token also cancels
     /// <see cref="TransferContext.CancellationToken" />; <see langword="null" /> without a positive <c>-m</c>.
     /// </param>
+    /// <param name="lookedUpCredentials">
+    /// The credentials <see cref="TransferCredentialLookup" /> chose, which the context carries in place
+    /// of <c>-u</c>'s; <see langword="null" /> to carry <c>-u</c>'s.
+    /// </param>
+    /// <param name="ifNoneMatchHeaders">
+    /// The <c>If-None-Match</c> lines <c>--etag-compare</c> added to the option group so far, sent after every
+    /// other header; <see langword="null" /> for none.
+    /// </param>
+    /// <param name="altSvc">
+    /// The transfer's <c>--alt-svc</c> cache, which the HTTP handler stores <c>Alt-Svc</c> headers in and whose
+    /// <see cref="AltSvcTransferCache.RouteFor" /> gives the alternative it connects to; <see langword="null" /> for none.
+    /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, its
     /// <see cref="TransferContext.ResumeUploadFromUnknownOffset" /> is <c>-C -</c> with a
@@ -102,14 +115,17 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         ITransferEvents? events = null,
         LowSpeedWatchdog? lowSpeedWatchdog = null,
         CancellationToken abortToken = default,
-        MaxTimeWatchdog? maxTimeWatchdog = null) =>
+        MaxTimeWatchdog? maxTimeWatchdog = null,
+        NetworkCredential? lookedUpCredentials = null,
+        IReadOnlyList<string>? ifNoneMatchHeaders = null,
+        AltSvcTransferCache? altSvc = null) =>
         new()
         {
             Url = url,
             Output = WatchedOutput(output, lowSpeedWatchdog),
             HeaderOutput = watchHeaderOutput is null
-                ? HeaderOutputOf(options, output, headerOutput)
-                : watchHeaderOutput(HeaderOutputOf(options, output, headerOutput)),
+                ? HeaderOutputOf(options, url, output, headerOutput)
+                : watchHeaderOutput(HeaderOutputOf(options, url, output, headerOutput)),
             NoBody = options.NoBody,
             Range = range,
             RangeText = options.Range,
@@ -118,7 +134,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             MaxFileSize = options.MaxFileSize,
             Upload = UploadOf(url, upload),
             PostData = options.PostData,
-            Credentials = options.Credentials,
+            Credentials = lookedUpCredentials ?? options.Credentials,
             TelnetOptions = options.TelnetOptions,
             TftpBlockSize = options.TftpBlockSize,
             TftpNoOptions = options.TftpNoOptions,
@@ -139,7 +155,11 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             OperationStarted = OperationStartedOf(maxTimeWatchdog),
             TimeCondition = options.TimeCondition,
             Proxy = proxy,
-            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding),
+            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
+            {
+                AltSvcStore = altSvc,
+                AltSvcRoute = altSvc?.RouteFor(url, options.ConnectToEntries),
+            },
             Mail = MailRequestOptionsMapping.FromCommandLine(options, url.Scheme),
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
             Events = EventsOrNone(events),
@@ -233,23 +253,31 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
 
     /// <summary>
     /// Chooses where a transfer's header lines go. <c>-i</c> and <c>-I</c> send them to the
-    /// body output as well as to any <c>-D</c> output, as curl 8.21.0 does.
+    /// body output as well as to any <c>-D</c> output, as curl 8.21.0 does, except on a
+    /// <c>ws</c> or <c>wss</c> transfer, where curl writes the upgrade reply head only to
+    /// <c>-D</c> (ADR-0128 row 5; <c>-I</c> measured the same, BL-583).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
+    /// <param name="url">The URL to transfer.</param>
     /// <param name="output">Where the transfer's body goes.</param>
     /// <param name="dumpHeaderOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <returns>
-    /// <paramref name="dumpHeaderOutput" /> without <c>-i</c> or <c>-I</c>; with either,
-    /// <paramref name="output" /> when there is no <c>-D</c>, otherwise a
+    /// <paramref name="dumpHeaderOutput" /> without <c>-i</c> or <c>-I</c>, or for a WebSocket URL;
+    /// otherwise <paramref name="output" /> when there is no <c>-D</c>, or a
     /// <see cref="HeaderLineTeeStream" /> writing each line to both.
     /// </returns>
-    private static Stream? HeaderOutputOf(CommandLineOptions options, Stream output, Stream? dumpHeaderOutput)
+    private static Stream? HeaderOutputOf(CommandLineOptions options, CurlUrl url, Stream output, Stream? dumpHeaderOutput)
     {
-        if (!options.ShowHeaders && !options.NoBody)
+        if ((!options.ShowHeaders && !options.NoBody) || IsWebSocket(url))
         {
             return dumpHeaderOutput;
         }
 
         return dumpHeaderOutput is null ? output : new HeaderLineTeeStream(dumpHeaderOutput, output);
     }
+
+    /// <summary>Whether <paramref name="url" /> is a <c>ws</c> or <c>wss</c> URL.</summary>
+    /// <param name="url">The URL to transfer.</param>
+    /// <returns><see langword="true" /> for either WebSocket scheme.</returns>
+    private static bool IsWebSocket(CurlUrl url) => url.Scheme is "ws" or "wss";
 }

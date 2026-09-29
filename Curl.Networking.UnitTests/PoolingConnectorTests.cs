@@ -204,6 +204,7 @@ public sealed class PoolingConnectorTests
     [DataRow("proxy password")]
     [DataRow("proxy domain")]
     [DataRow("proxy credential")]
+    [DataRow("alt-svc")]
     public async Task ConnectAsync_ForADifferentKey_OpensANewConnection(string difference)
     {
         await using var pool = CreatePool();
@@ -215,6 +216,19 @@ public sealed class PoolingConnectorTests
         Assert.IsFalse(other.IsReused);
         Assert.AreEqual(1L, other.ConnectionNumber);
         Assert.HasCount(2, _inner.Targets);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ToTheSameAltSvcAlternativeInAnotherCase_ReusesTheConnection()
+    {
+        await using var pool = CreatePool();
+        await ReturnToPoolAsync(pool, Target() with { AltSvcRoute = new AltSvcRoute("h1", new AltSvcAlternative("h1", "alt.example", 443)) });
+
+        var reused = await pool.ConnectAsync(
+            Target() with { AltSvcRoute = new AltSvcRoute("h1", new AltSvcAlternative("h1", "ALT.example", 443)) },
+            CancellationToken.None);
+
+        Assert.IsTrue(reused.IsReused);
     }
 
     [TestMethod]
@@ -428,6 +442,73 @@ public sealed class PoolingConnectorTests
         Assert.IsTrue(_inner.Opened[1].IsDisposed);
     }
 
+    [TestMethod]
+    public async Task ConnectAsync_ReusingAConnectionThatHoldsASession_HandsTheSameSessionOnWithoutShuttingItDown()
+    {
+        await using var pool = CreatePool();
+        var session = await ReturnWithSessionAsync(pool, Target());
+
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreSame(session, reused.Connection!.Session);
+        Assert.AreEqual(0, session.ShutDownCount);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfAConnectionNotMarkedReusable_ShutsItsSessionDownBeforeClosingIt()
+    {
+        await using var pool = CreatePool();
+        var first = await pool.ConnectAsync(Target(), CancellationToken.None);
+        var session = new RecordingConnectionSession(_inner.Opened[0]);
+        _ = first.Connection!.TryHoldSession(session);
+
+        await first.Connection.DisposeAsync();
+
+        Assert.AreEqual(1, session.ShutDownCount);
+        Assert.IsTrue(session.WasConnectionOpenAtShutDown);
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfThePool_ShutsDownTheSessionOfEveryIdleConnectionBeforeClosingIt()
+    {
+        var pool = CreatePool();
+        var session = await ReturnWithSessionAsync(pool, Target());
+
+        await pool.DisposeAsync();
+
+        Assert.AreEqual(1, session.ShutDownCount);
+        Assert.IsTrue(session.WasConnectionOpenAtShutDown);
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfTheSixthIdleConnection_ShutsDownTheEvictedOnesSession()
+    {
+        await using var pool = CreatePool();
+        var session = await ReturnWithSessionAsync(pool, Target(port: 1));
+        for (var port = 2; port <= 6; port++)
+        {
+            await ReturnToPoolAsync(pool, Target(port: port));
+        }
+
+        Assert.AreEqual(1, session.ShutDownCount);
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_AfterAConnectionHoldingASessionExpired_ShutsItsSessionDown()
+    {
+        await using var pool = CreatePool();
+        var session = await ReturnWithSessionAsync(pool, Target());
+        _time.Advance(118_001);
+
+        _ = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.AreEqual(1, session.ShutDownCount);
+    }
+
     private static ConnectTarget Target(
         string host = "origin.example",
         int port = 80,
@@ -455,6 +536,7 @@ public sealed class PoolingConnectorTests
             "proxy user" => pooled with { Proxy = Proxy("proxy.example", "other", "secret") },
             "proxy password" => pooled with { Proxy = Proxy("proxy.example", "user", "other") },
             "proxy domain" => pooled with { Proxy = Proxy("proxy.example", "user", "secret", domain: "CORP") },
+            "alt-svc" => pooled with { AltSvcRoute = new AltSvcRoute("h1", new AltSvcAlternative("h1", "alt.example", 443)) },
             _ => pooled with { Proxy = pooled.Proxy! with { Credential = null } },
         };
 
@@ -468,6 +550,16 @@ public sealed class PoolingConnectorTests
 
         result.Connection!.MarkReusable();
         await result.Connection.DisposeAsync();
+    }
+
+    private async Task<RecordingConnectionSession> ReturnWithSessionAsync(PoolingConnector pool, ConnectTarget target)
+    {
+        var result = await pool.ConnectAsync(target, CancellationToken.None);
+        var session = new RecordingConnectionSession(_inner.Opened[^1]);
+        Assert.IsTrue(result.Connection!.TryHoldSession(session));
+        result.Connection.MarkReusable();
+        await result.Connection.DisposeAsync();
+        return session;
     }
 
     private PoolingConnector CreatePool() => new(_inner, _time);

@@ -166,10 +166,28 @@ public sealed class TransferWriteOutVariablesJsonTests
     }
 
     [TestMethod]
-    public void TryGetVariableText_SizeDelivered_IsTheDownloadSize()
+    public void TryGetVariableText_SizeDeliveredWithoutADeliveredSize_IsTheDownloadSize()
     {
         // With no --compressed, curl printed size_delivered equal to size_download: 5 for a 5-byte body.
         Assert.AreEqual("5", Get(WithReport(new TransferReport { DownloadSize = 5 }), "size_delivered"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_SizesOfADecodedBody_ComeFromTheirOwnCounts()
+    {
+        // curl --compressed -w '%{size_download} %{size_delivered}' printed 51 501 for a 51-byte gzip body of 501 bytes (BL-516).
+        TransferWriteOutVariables variables = WithReport(new TransferReport { DownloadSize = 51, DeliveredSize = 501 });
+
+        Assert.AreEqual("51", Get(variables, "size_download"));
+        Assert.AreEqual("501", Get(variables, "size_delivered"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_SizeDeliveredWithoutAReport_IsTheBytesTransferred()
+    {
+        TransferWriteOutVariables variables = new(TransferResult.Success(7), "http://h/", 0, "http://h/", "http", Clock);
+
+        Assert.AreEqual("7", Get(variables, "size_delivered"));
     }
 
     [TestMethod]

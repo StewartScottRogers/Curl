@@ -41,4 +41,16 @@ public sealed class HttpChallengeSchemesTests
     {
         Assert.AreEqual(HttpAuthSchemes.None, HttpChallengeSchemes.Offered([]));
     }
+
+    [TestMethod]
+    [DataRow(new[] { "NTLM" }, "", DisplayName = "Bare NTLM")]
+    [DataRow(new[] { "ntlm  TlRM=  " }, "TlRM=", DisplayName = "Any case, blanks around the token")]
+    [DataRow(new[] { "Basic realm=\"r\", NTLM TlRM" }, "TlRM", DisplayName = "After another challenge in one value")]
+    [DataRow(new[] { "Basic realm=\"r\"", "NTLM A", "NTLM B" }, "A", DisplayName = "The first of several")]
+    [DataRow(new[] { "NTLMX abc", "Basic realm=\"r\"" }, null, DisplayName = "No NTLM challenge")]
+    [DataRow(new string[0], null, DisplayName = "No challenges")]
+    public void NtlmTokenOf_Challenges_ReturnsTheFirstNtlmToken(string[] challenges, string? expected)
+    {
+        Assert.AreEqual(expected, HttpChallengeSchemes.NtlmTokenOf(challenges));
+    }
 }
