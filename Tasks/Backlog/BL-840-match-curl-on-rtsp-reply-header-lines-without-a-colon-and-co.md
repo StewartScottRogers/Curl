@@ -1,5 +1,5 @@
 ---
-id: BL-833
+id: BL-840
 title: Match curl on RTSP reply header lines without a colon and Content-Length lists
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-833 — Match curl on RTSP reply header lines without a colon and Content-Length lists
+# BL-840 — Match curl on RTSP reply header lines without a colon and Content-Length lists
 
 ## Goal
 

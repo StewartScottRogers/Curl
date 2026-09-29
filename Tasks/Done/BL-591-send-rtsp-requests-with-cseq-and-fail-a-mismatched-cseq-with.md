@@ -73,7 +73,7 @@ An `RtspProtocolHandler` sends the requests BL-590's ADR says the curl tool send
   at close (only timing differs). A head is capped at 102400 bytes with exit 100, as the HTTP
   and Ws libraries do (unmeasured for RTSP). A reply with no `Content-Length` has no body.
 - Header lines with no colon, a CR inside a line, and `Content-Length` lists are unmeasured
-  and filed as BL-833.
+  and filed as BL-840.
 - Tests: 85 in `Curl.Protocol.Rtsp.UnitTests`, data rows included. Review done
   in-session against ADR-0169 and the measurements rather than through a separate agent.
 
