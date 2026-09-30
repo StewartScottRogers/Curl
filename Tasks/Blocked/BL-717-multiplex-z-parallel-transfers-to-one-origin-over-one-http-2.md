@@ -34,3 +34,4 @@ With `-Z`, transfers to the same HTTP/2 origin share one connection as concurren
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-717-20260929-191003-L1.jsonl
