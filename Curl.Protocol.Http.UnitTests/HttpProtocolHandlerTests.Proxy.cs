@@ -307,6 +307,22 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.IsTrue(result.Report!.UsedProxy);
     }
 
+    [TestMethod]
+    [DataRow(ProxyKind.Http, "::1", "http://[::1]:18183/", DisplayName = "an IPv6 literal goes in brackets")]
+    [DataRow(ProxyKind.Http, "[::1]", "http://[::1]:18183/", DisplayName = "a bracketed IPv6 literal stays as it is")]
+    [DataRow(ProxyKind.Https, "proxy.example", "https://proxy.example:18183/", DisplayName = "an HTTPS proxy's URL is https")]
+    public async Task ExecuteAsync_ProxyCredential_AsksTheAuthenticatorAboutTheProxysOwnUrl(ProxyKind kind, string host, string expectedUrl)
+    {
+        ScriptedAuthenticator authenticator = new("Basic dTpw", null);
+        HttpRequestOptions options = new() { ForwardProxy = new ProxyEndpoint(kind, host, 18183, new NetworkCredential("u", "p")) };
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(new TurnTakingConnection(65536, ProxyOkHead + "ok")), authenticator)
+            .ExecuteAsync(ProxyContext("http://example.com/", new MemoryStream(), options));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(expectedUrl, authenticator.Calls.Single(call => call.Request.IsProxy).Request.Url.OriginalString);
+    }
+
     private static TransferContext ProxyContext(string url, Stream output, HttpRequestOptions options) =>
         new() { Url = CurlUrl.Parse(url), Output = output, Http = options };
 }
