@@ -42,3 +42,4 @@ The TCP connector binds the socket to the address `--interface` names (an interf
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
