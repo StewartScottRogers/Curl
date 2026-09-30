@@ -12,7 +12,9 @@ namespace Curl.Conformance;
 [TestClass]
 public sealed class UpstreamConformanceTests
 {
-    private static readonly TimeSpan TimeLimit = TimeSpan.FromSeconds(10);
+    // Every case passes in well under a second; the headroom is for a cold, busy CI runner
+    // compiling curl's code paths for the first time while other test assemblies run (BL-1056).
+    private static readonly TimeSpan TimeLimit = TimeSpan.FromSeconds(20);
     private const string UpstreamTestFileExtension = ".rawhttp";
 
     // The runner fails a slow curl run itself after TimeLimit; this bounds the rest of the case

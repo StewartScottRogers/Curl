@@ -124,12 +124,21 @@ public sealed class UpstreamCaseRunner(
     // the thread pool: against the in-memory server every await can complete at once, so a run
     // that loops would otherwise never return its task, and the time limit would never start.
     // Past the limit the server is abandoned, which stops such a loop at its next exchange.
+    // The limit starts when curl starts running, not when its work item is queued: with every
+    // case running at once on a busy machine, the queue alone can outlast the limit (BL-1056).
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Whatever curl throws is reported as the case's failure.")]
     private async Task<(int ExitCode, string? Failure)> RunCurlAsync(UpstreamCurlInvocation invocation, SwsHttpServerConnector server)
     {
+        TaskCompletionSource curlStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<int> curlRun = Task.Run(() =>
+        {
+            curlStarted.SetResult();
+            return runCurl(invocation);
+        });
+        await curlStarted.Task.ConfigureAwait(false);
         try
         {
-            return (await Task.Run(() => runCurl(invocation)).WaitAsync(timeLimit, timeProvider).ConfigureAwait(false), null);
+            return (await curlRun.WaitAsync(timeLimit, timeProvider).ConfigureAwait(false), null);
         }
         catch (TimeoutException)
         {

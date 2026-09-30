@@ -142,7 +142,7 @@ public sealed class UpstreamCaseRunnerTests
         UpstreamCaseRunner runner = new(_ => new TaskCompletionSource<int>().Task, UpstreamCurlPlatform.Unix, time, TimeSpan.FromMilliseconds(1));
 
         Task<UpstreamCaseOutcome> running = RunAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n");
-        time.ExpireEveryTimer();
+        await time.ExpireTheTimeLimitAsync();
         UpstreamCaseOutcome outcome = await running;
 
         Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
@@ -157,7 +157,7 @@ public sealed class UpstreamCaseRunnerTests
         UpstreamCaseRunner runner = new(invocation => LoopUntilTheServerFails(invocation.Connector, loopEnded), UpstreamCurlPlatform.Unix, time, TimeSpan.FromMilliseconds(1));
 
         Task<UpstreamCaseOutcome> running = RunAsync(runner, HttpCase);
-        time.ExpireEveryTimer();
+        await time.ExpireTheTimeLimitAsync();
         UpstreamCaseOutcome outcome = await running;
 
         Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
@@ -255,20 +255,20 @@ public sealed class UpstreamCaseRunnerTests
     // A clock that never moves on its own: every timer made from it fires when the test says so.
     private sealed class ExpiringTimeProvider : TimeProvider
     {
-        private readonly List<(TimerCallback Callback, object? State)> timers = [];
+        private readonly TaskCompletionSource<(TimerCallback Callback, object? State)> firstTimer = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
-            timers.Add((callback, state));
+            firstTimer.TrySetResult((callback, state));
             return new InertTimer();
         }
 
-        public void ExpireEveryTimer()
+        // The runner starts its time limit only once curl is running, on another thread, so this
+        // waits for the timer to exist before firing it.
+        public async Task ExpireTheTimeLimitAsync()
         {
-            foreach ((TimerCallback callback, object? state) in timers.ToArray())
-            {
-                callback(state);
-            }
+            (TimerCallback callback, object? state) = await firstTimer.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            callback(state);
         }
     }
 
