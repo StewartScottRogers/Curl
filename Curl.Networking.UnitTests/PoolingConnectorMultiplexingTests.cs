@@ -238,6 +238,17 @@ public sealed class PoolingConnectorMultiplexingTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ForANewConnectionThatAgreedH2_GivesTheAgreedProtocol()
+    {
+        await using var pool = CreatePool(waits: false);
+        _inner.ApplicationProtocol = "h2";
+
+        var connect = await pool.ConnectAsync(Target(useTls: true), CancellationToken.None);
+
+        Assert.AreEqual("h2", connect.ApplicationProtocol);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WaitingForATlsConnectionThatAgreedH2_WaitsForItsSession()
     {
         await using var pool = CreatePool(waits: true);

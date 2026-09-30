@@ -1156,7 +1156,7 @@ public sealed class TcpConnector(
 
         if (!target.UseTls)
         {
-            return Opened(dialed, target.Events, dialed.Connection, timings, proxyConnectResponseCode, peerCertificates: null);
+            return Opened(dialed, target.Events, dialed.Connection, timings, proxyConnectResponseCode, peerCertificates: null, applicationProtocol: null);
         }
 
         var secured = await AuthenticateTargetAsync(dialed.Connection, target, cancellationToken).ConfigureAwait(false);
@@ -1174,7 +1174,8 @@ public sealed class TcpConnector(
             securedConnection,
             timings with { TlsHandshakeCompleted = handshakeCompleted },
             proxyConnectResponseCode,
-            secured.PeerCertificates);
+            secured.PeerCertificates,
+            secured.ApplicationProtocol);
     }
 
     /// <summary>
@@ -1188,7 +1189,8 @@ public sealed class TcpConnector(
         IConnection connection,
         ConnectTimings timings,
         int proxyConnectResponseCode,
-        IReadOnlyList<ReadOnlyMemory<byte>>? peerCertificates)
+        IReadOnlyList<ReadOnlyMemory<byte>>? peerCertificates,
+        string? applicationProtocol)
     {
         var connectionNumber = TakeConnectionNumber();
         events.ReportConnectionOpened(new ConnectionOpenedEvent
@@ -1208,6 +1210,7 @@ public sealed class TcpConnector(
             peerCertificates,
             isReused: false,
             connectionNumber,
+            applicationProtocol,
             unixSocketPath: dialed.UnixSocketPath);
     }
 

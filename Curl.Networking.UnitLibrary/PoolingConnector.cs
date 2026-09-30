@@ -457,6 +457,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
             connect.PeerCertificates,
             isReused: false,
             entry.ConnectionNumber,
+            applicationProtocol: connect.ApplicationProtocol,
             unixSocketPath: entry.UnixSocketPath);
     }
 
