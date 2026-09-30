@@ -9,7 +9,7 @@ touches: [Audit/Tools/Invoke-DifferentialConformance.ps1]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1006 — Build a differential conformance runner comparing real curl and Curl on generated command lines
 
@@ -54,15 +54,23 @@ Design:
 
 ## Acceptance criteria
 
-- [ ] `-Count 10 -Seed 1` produces `summary.json` with 10 cases, the reference curl's version string, and a `repro.ps1` for each differing case.
-- [ ] Two runs with the same seed generate the same 10 argument lists.
-- [ ] `-Candidate` set to the reference curl itself reports 0 differences for `-Count 20` (the normalisations are sufficient and no more).
-- [ ] No generated case contacts a host other than 127.0.0.1 (the exclusion list covers proxies, `--resolve`, `--connect-to` and similar, each with a reason).
-- [ ] Header help documents parameters, the generator, the normalisations and the output; ASCII only; runs under PowerShell 7 and Windows PowerShell 5.1.
+- [x] `-Count 10 -Seed 1` produces `summary.json` with 10 cases, the reference curl's version string, and a `repro.ps1` for each differing case.
+- [x] Two runs with the same seed generate the same 10 argument lists.
+- [x] `-Candidate` set to the reference curl itself reports 0 differences for `-Count 20` (the normalisations are sufficient and no more).
+- [x] No generated case contacts a host other than 127.0.0.1 (the exclusion list covers proxies, `--resolve`, `--connect-to` and similar, each with a reason).
+- [x] Header help documents parameters, the generator, the normalisations and the output; ASCII only; runs under PowerShell 7 and Windows PowerShell 5.1.
 
 ## Notes
+
+- On the audit branch (worktree Z:/repos/Curl.auditbranch), commit 4fc86399, pull request https://github.com/StewartScottRogers/Curl/pull/34.
+- -Count 10 -Seed 1 -ListOnly: the same 10 argument lists on two runs and under Windows PowerShell 5.1 and PowerShell 7.6.6 (cases are generated with a placeholder port, filled in after). 500 generated cases (seed 7) name only http://127.0.0.1.
+- Reference against itself, -Count 20 -Seed 1: first 18 same / 2 different, which exposed two things that vary between runs of the same binary beyond the spec's list: --haproxy-protocol's PROXY line carries curl's ephemeral source port, and progress-meter rows made only of numbers. Both normalised and documented; rerun: 20 same, 0 different.
+- Reference curl 8.21.0 (Schannel) against Curl.Console Release at f2e90587, -Count 10 -Seed 1: 8 same, 2 different, each with case-<n>/repro.ps1. Findings for BL-1012 to raise: (case 2) Curl refuses --libcurl as unsupported by the installed libcurl, where curl accepts it and refuses the blank --proto-default instead; (case 10) with --http2-prior-knowledge Curl sends the HTTP/2 preface and exits 16, where the reference build has no HTTP/2 and exits 2.
+- Normalisations beyond the spec's three (program name, Date, port): multipart boundary, --haproxy-protocol source port, progress-meter lines. Each changes only what two runs of the same binary produce differently; the reference-against-itself run is the check.
+- ASCII only. The candidate defaults to Curl.Console built -c Release in this repository (curl.exe).
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. Invoke-DifferentialConformance.ps1 compares real curl and Curl on seeded loopback cases, 0 differences reference-against-itself; in PR #34, awaiting Stewart's merge.
