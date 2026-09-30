@@ -39,3 +39,4 @@ ADR numbers 0222, 0228, 0232 and 0246 each name exactly one record in `Documenta
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
