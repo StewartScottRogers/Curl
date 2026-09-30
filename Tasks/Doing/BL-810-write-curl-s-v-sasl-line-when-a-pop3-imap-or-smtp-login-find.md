@@ -38,3 +38,4 @@ When a POP3 login ends exit 67 because no way of logging in is possible, `-v` wr
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-30: Backlog -> Doing.
