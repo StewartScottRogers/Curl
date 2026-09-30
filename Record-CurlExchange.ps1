@@ -125,6 +125,15 @@
     PROT 200, and after PROT P (or with -Tls, until a PROT C or a refused PROT) every data
     connection is TLS too, ended with close_notify when the server sends.
 
+    CCC (BL-636) is answered 200, and the server then clears TLS from the control
+    connection: it sends close_notify, reads curl's close_notify if that is what curl sends
+    next, and reads the rest of the session in plain text, with a "= TLS cleared from the
+    control connection" line in transcript.txt (or "= TLS cleared from the control
+    connection without curl's close_notify" when curl went straight on in plain text, as
+    --ftp-ssl-ccc-mode passive does, or hung up). An overridden CCC whose reply is below
+    500 is cleared the same way, as curl clears it; a 5xx leaves the control connection
+    in TLS.
+
 .PARAMETER FtpReply
     Overrides for the FTP reply table, each 'VERB=reply' with the same backslash escapes
     as Response, e.g. 'PASS=430 Access denied'. The reply is sent as given with CRLF
@@ -823,6 +832,33 @@ $serveFtpSession = {
     # Set by PROT P, and by implicit TLS until a PROT C: data connections are TLS (BL-437).
     $protectData = $ImplicitTls
 
+    # Answers CCC's acceptance: sends close_notify and hands back the plain network stream
+    # the TLS layer ran over, with the first byte curl sends next (BL-636). A TLS alert
+    # record there (0x15) is curl's close_notify, read and dropped; anything else is the
+    # first byte of a plain command, handed back to be read as one. -1 when curl sent
+    # nothing within the idle time or hung up.
+    function Clear-ControlTls {
+        param($Secure, $Plain)
+        $Secure.ShutdownAsync().Wait()
+        $Plain.ReadTimeout = $ControlIdleMilliseconds
+        $first = -1
+        try { $first = $Plain.ReadByte() } catch [System.IO.IOException] { }
+        $suffix = " without curl's close_notify"
+        if ($first -eq 0x15) {
+            $header = New-Object byte[] 4
+            $read = 0
+            while ($read -lt 4) { $read += $Plain.Read($header, $read, 4 - $read) }
+            $length = $header[2] * 256 + $header[3]
+            $alert = New-Object byte[] $length
+            $read = 0
+            while ($read -lt $length) { $read += $Plain.Read($alert, $read, $length - $read) }
+            $suffix = ''
+            $first = -1
+        }
+        [void] $Transcript.Append("= TLS cleared from the control connection$suffix`r`n")
+        return @($Plain, $first)
+    }
+
     # Opens the data connection: dials curl's EPRT/PORT address in active mode, otherwise
     # accepts on the passive listener; either way wrapped in TLS once PROT P was accepted.
     function Open-DataConnection {
@@ -869,14 +905,18 @@ $serveFtpSession = {
         }
         try {
             $stream = $client.GetStream()
+            $plainStream = $stream
             if ($ImplicitTls) { $stream = Wrap-Tls -Stream $stream }
             $stream.ReadTimeout = $ControlIdleMilliseconds
             $greeting = if ($Overrides.ContainsKey('GREETING')) { Get-Override -Verb 'GREETING' } else { '220 Recorder ready' }
             if ($greeting -cne 'STALL') { Send-Reply -Stream $stream -Reply $greeting }
             $line = New-Object System.IO.MemoryStream
+            # The first plain byte Clear-ControlTls read after CCC, or -1.
+            $pendingByte = -1
             while ($true) {
                 try {
-                    $next = $stream.ReadByte()
+                    $next = if ($pendingByte -ge 0) { $pendingByte } else { $stream.ReadByte() }
+                    $pendingByte = -1
                 } catch [System.IO.IOException] {
                     break  # FtpIdleMilliseconds without a byte: curl is done with us.
                 }
@@ -902,6 +942,10 @@ $serveFtpSession = {
                         $stream.ReadTimeout = $ControlIdleMilliseconds
                         [void] $Transcript.Append("= TLS handshake completed on the control connection`r`n")
                     }
+                    # curl clears TLS after any CCC reply below 500.
+                    if ($verb -eq 'CCC' -and $override -match '^[1-4]' -and $stream -is [System.Net.Security.SslStream]) {
+                        $stream, $pendingByte = Clear-ControlTls -Secure $stream -Plain $plainStream
+                    }
                     continue
                 }
                 switch ($verb) {
@@ -912,6 +956,10 @@ $serveFtpSession = {
                         [void] $Transcript.Append("= TLS handshake completed on the control connection`r`n")
                     }
                     'PBSZ' { Send-Reply -Stream $stream -Reply '200 PBSZ=0' }
+                    'CCC' {
+                        Send-Reply -Stream $stream -Reply '200 CCC command successful'
+                        if ($stream -is [System.Net.Security.SslStream]) { $stream, $pendingByte = Clear-ControlTls -Secure $stream -Plain $plainStream }
+                    }
                     'PROT' {
                         $protectData = $argument -ceq 'P'
                         Send-Reply -Stream $stream -Reply "200 Protection level set to $argument"
