@@ -44,6 +44,22 @@ public sealed class TransferContextTests
     }
 
     [TestMethod]
+    public void FtpCommandChannelClearing_WhenNotSet_IsOff()
+    {
+        var context = new TransferContext { Url = AnyUrl, Output = Stream.Null };
+
+        Assert.AreEqual(FtpCommandChannelClearing.Off, context.FtpCommandChannelClearing);
+    }
+
+    [TestMethod]
+    public void FtpCommandChannelClearing_WhenSet_ReadsBackUnchanged()
+    {
+        var context = new TransferContext { Url = AnyUrl, Output = Stream.Null, FtpCommandChannelClearing = FtpCommandChannelClearing.Active };
+
+        Assert.AreEqual(FtpCommandChannelClearing.Active, context.FtpCommandChannelClearing);
+    }
+
+    [TestMethod]
     public void RemoteTime_WhenSet_ReadsBackTrue()
     {
         var context = new TransferContext { Url = AnyUrl, Output = Stream.Null, RemoteTime = true };

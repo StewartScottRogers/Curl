@@ -330,6 +330,16 @@ public interface ITransferContext
     bool FtpSslControlOnly { get; }
 
     /// <summary>
+    /// Gets whether an FTPS session clears TLS from its control connection with <c>CCC</c>
+    /// after <c>PROT</c>, and how, per <c>--ftp-ssl-ccc</c> and <c>--ftp-ssl-ccc-mode</c>;
+    /// <see cref="FtpCommandChannelClearing.Off" /> when neither was given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> and <c>ftps://</c> are to read it (BL-636, ADR-0279).
+    /// </remarks>
+    FtpCommandChannelClearing FtpCommandChannelClearing { get; }
+
+    /// <summary>
     /// Gets every <c>-Q</c>/<c>--quote</c> value, verbatim and in command-line order; empty
     /// when none was given.
     /// </summary>

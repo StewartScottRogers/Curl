@@ -96,4 +96,23 @@ public interface IConnection : IAsyncDisposable
     /// disposing the connection. Only a pooled connection, which outlives a transfer, holds one.
     /// </returns>
     bool TryHoldSession(IConnectionSession session) => false;
+
+    /// <summary>
+    /// Shuts TLS down on this connection and hands back the plaintext connection it ran over,
+    /// as FTP's <c>CCC</c> clears the control connection (BL-636, ADR-0279).
+    /// </summary>
+    /// <param name="sendCloseNotifyFirst">
+    /// <see langword="true" /> to send <c>close_notify</c> and then read the server's, as
+    /// <c>--ftp-ssl-ccc-mode active</c> does; <see langword="false" /> to read the server's
+    /// <c>close_notify</c> and send none, as <c>passive</c> does.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the shutdown.</param>
+    /// <returns>
+    /// The plaintext connection to carry on over, which is still disposed with this one; or
+    /// <see langword="null" />, the default, when TLS could not be cleared: the connection is
+    /// not TLS, the TLS build this one matches fails the shutdown as curl's Schannel build
+    /// does, or the server ended the connection or sent data instead of <c>close_notify</c>.
+    /// </returns>
+    ValueTask<IConnection?> ClearTlsAsync(bool sendCloseNotifyFirst, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IConnection?>(null);
 }

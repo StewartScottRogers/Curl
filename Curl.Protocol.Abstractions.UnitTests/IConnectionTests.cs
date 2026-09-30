@@ -50,6 +50,18 @@ public sealed class IConnectionTests
         Assert.IsNull(connection.Session);
     }
 
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task ClearTlsAsync_WhenNotOverridden_ReturnsNull(bool sendCloseNotifyFirst)
+    {
+        IConnection connection = new MinimalConnection();
+
+        var plaintext = await connection.ClearTlsAsync(sendCloseNotifyFirst, CancellationToken.None);
+
+        Assert.IsNull(plaintext);
+    }
+
     private sealed class UnusedSession : IConnectionSession
     {
         public ValueTask ShutDownAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
