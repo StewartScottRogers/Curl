@@ -233,6 +233,29 @@ public sealed class HttpProxyTunnelTests
     }
 
     [TestMethod]
+    [DataRow("HTTP/1.1 200 Connection established\r\nX-Proxy: yes\r\n\r\n")]
+    [DataRow("HTTP/1.0 200 OK\n\n")]
+    public async Task ReadReplyAsync_ReturnsTheHeadExactlyAsReadAndNothingAfterIt(string head)
+    {
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(head + "HTTP/1.1 200 OK\r\n"));
+
+        var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+
+        Assert.AreEqual(head, Encoding.Latin1.GetString(result.Head.Span));
+    }
+
+    [TestMethod]
+    public async Task ReadReplyAsync_WhenTheProxyClosesBeforeTheHeadEnds_ReturnsNoHead()
+    {
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n"));
+
+        var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+
+        Assert.AreEqual("Proxy CONNECT aborted", result.RecvErrorMessage);
+        Assert.IsTrue(result.Head.IsEmpty);
+    }
+
+    [TestMethod]
     public async Task ReadReplyAsync_ReturnsEveryProxyAuthenticateValueInOrder()
     {
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(

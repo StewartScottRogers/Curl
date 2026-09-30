@@ -20,7 +20,7 @@ namespace Curl.Console;
 /// HTTPS-proxy CONNECT bytes inside the proxy's TLS by BL-266 (BL-328 Notes).
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionProxyTests
+public sealed partial class CurlCompositionProxyTests
 {
     private const string Hello = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello";
 

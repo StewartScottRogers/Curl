@@ -44,6 +44,12 @@ internal readonly record struct HttpProxyTunnelReply(int StatusCode, string? Rec
     public long ContentLength { get; init; }
 
     /// <summary>
+    /// Gets the reply's head exactly as read, from its status line to the blank line that
+    /// ends it; empty for a reply curl gives up on.
+    /// </summary>
+    public ReadOnlyMemory<byte> Head { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether another CONNECT can follow on the same connection once
     /// <see cref="ContentLength" /> body bytes are read: no <c>Connection: close</c> or
     /// <c>Proxy-Connection: close</c>, as curl 8.21.0 closes on either, and no chunked body.
