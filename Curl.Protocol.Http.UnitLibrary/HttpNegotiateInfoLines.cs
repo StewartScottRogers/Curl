@@ -1,27 +1,17 @@
-using System.Net;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Http;
 
 /// <summary>
 /// Where curl 8.21.0 writes the <c>-v</c> lines of a Negotiate request (ADR-0231):
-/// <c>Server auth using Negotiate with user '...'</c> before each request Negotiate is picked
-/// for, after the context's failure line if any, and a 401's failure line just before the
+/// <c>Server auth using Negotiate with user '...'</c> (<see cref="HttpAuthUsingLines" />) before
+/// each request Negotiate is picked for, after the context's failure line if any, and a 401's failure line just before the
 /// <c>WWW-Authenticate</c> header that offers Negotiate (measured, BL-843 Notes).
 /// </summary>
 internal static class HttpNegotiateInfoLines
 {
     /// <summary>What an <c>Authorization</c> value made by Negotiate starts with.</summary>
     private const string SchemePrefix = "Negotiate ";
-
-    /// <summary>
-    /// Formats the line curl writes before a request it picked Negotiate for: the <c>-u</c>
-    /// user name as given, a domain included, or nothing when there is no <c>-u</c>.
-    /// </summary>
-    /// <param name="credential">The request's credential, or <see langword="null" />.</param>
-    /// <returns>The line.</returns>
-    internal static string ServerAuthUsing(NetworkCredential? credential) =>
-        $"Server auth using Negotiate with user '{credential?.UserName}'";
 
     /// <summary>
     /// Decides whether curl picks Negotiate for a request to the origin: one sending a

@@ -109,7 +109,7 @@ public sealed partial class HttpProtocolHandlerTests
 
         await NegotiateHandler(QueueConnector.For(connection), new ScriptedTokenSource()).ExecuteAsync(context);
 
-        Assert.IsFalse(events.Info.Any(line => line.StartsWith("Server auth", StringComparison.Ordinal)));
+        Assert.AreEqual("Server auth using Basic with user 'u'", events.Info.Single(line => line.StartsWith("Server auth", StringComparison.Ordinal)));
     }
 
     private const string NegotiateVerboseRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";

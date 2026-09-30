@@ -1,4 +1,3 @@
-using System.Net;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Http;
@@ -11,17 +10,6 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpNegotiateInfoLinesTests
 {
-    [TestMethod]
-    [DataRow("u", "Server auth using Negotiate with user 'u'", DisplayName = "-u u:p")]
-    [DataRow("", "Server auth using Negotiate with user ''", DisplayName = "-u :")]
-    [DataRow(null, "Server auth using Negotiate with user ''", DisplayName = "no -u")]
-    public void ServerAuthUsing_Credential_NamesTheUserAsGiven(string? user, string expected)
-    {
-        NetworkCredential? credential = user is null ? null : new NetworkCredential(user, "p");
-
-        Assert.AreEqual(expected, HttpNegotiateInfoLines.ServerAuthUsing(credential));
-    }
-
     [TestMethod]
     [DataRow("Negotiate YII=", false, HttpAuthSchemes.Any, true, DisplayName = "Negotiate value sent")]
     [DataRow("Basic dTpw", false, HttpAuthSchemes.Negotiate, false, DisplayName = "Another scheme's value")]

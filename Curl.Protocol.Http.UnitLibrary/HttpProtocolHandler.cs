@@ -999,17 +999,30 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Reports, just before the request is sent, the lines the authenticator reported while it
-    /// made the request's <c>Authorization</c> value before any challenge, then
-    /// <c>Server auth using Negotiate with user '...'</c> when the request is sent with
-    /// Negotiate picked, as curl 8.21.0 does (measured, BL-843 Notes).
+    /// Reports, just before the request is sent, what curl 8.21.0 writes while it picks the
+    /// request's auth (measured, BL-843 and BL-954 Notes): <c>Proxy auth using ...</c> for a
+    /// forward proxy, then the lines the authenticator reported while it made the request's
+    /// <c>Authorization</c> value before any challenge, then <c>Server auth using ...</c>
+    /// (<see cref="HttpAuthUsingLines" />).
     /// </summary>
     private static void ReportAuthorizationLines(HttpRequestPlan plan)
     {
-        ReportInfoLines(plan.Context.Events, plan.AuthorizationInfoLines);
-        if (HttpNegotiateInfoLines.PicksNegotiate(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge))
+        bool headerNamesAuthorization = HttpRequestHeadFormatter.CustomHeadersOf(plan.Options.Headers, plan.Options).Any(header => header.Names("Authorization"));
+        if (plan.ProxyAuthRequest is { } proxyRequest)
         {
-            plan.Context.Events.ReportInfo(HttpNegotiateInfoLines.ServerAuthUsing(plan.AuthRequest.Credential));
+            ReportAuthUsing(plan.Context.Events, HttpAuthUsingLines.AuthUsing(proxyRequest, plan.ProxyAuthorization, plan.ProxyAuthorizationAnswersChallenge, headerNamesAuthorization));
+        }
+
+        ReportInfoLines(plan.Context.Events, plan.AuthorizationInfoLines);
+        ReportAuthUsing(plan.Context.Events, HttpAuthUsingLines.AuthUsing(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge, headerNamesAuthorization));
+    }
+
+    /// <summary>Reports <paramref name="line" />, or nothing when it is <see langword="null" />.</summary>
+    private static void ReportAuthUsing(ITransferEvents events, string? line)
+    {
+        if (line is not null)
+        {
+            events.ReportInfo(line);
         }
     }
 
