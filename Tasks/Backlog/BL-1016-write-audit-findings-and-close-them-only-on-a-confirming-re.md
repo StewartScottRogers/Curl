@@ -54,6 +54,7 @@ every rule above.
 
 ## Acceptance criteria
 
+- [ ] A report key that matches a `rejected` finding is not filed again: the finding gains a Re-audits line saying it is still reported, and its status stays `rejected` (Decided by Claude, 2026-09-30, raised while writing the BL-1001 formats: otherwise every audit re-files what Stewart already turned down).
 - [ ] `-SelfTest` prints `PASS` and no `FAIL` for: a new finding filed as `proposed` with the next ID; a repeated key appends a re-audit line and files nothing; a planted-defect match is skipped and appears in `catches.json`; `reproduces: false` from a reliable auditor closes the finding with `closed-by`; `reproduces: false` from an unreliable auditor does not close it; a finding whose task is Done but has no re-audit stays open; a `rejected` finding is untouched; a key matching a closed finding files a new one that names it.
 - [ ] Output files match `FINDING-TEMPLATE.md`'s front matter and section order exactly.
 - [ ] Header help documents parameters and rules; ASCII only; runs under PowerShell 7 and Windows PowerShell 5.1.
