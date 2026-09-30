@@ -45,7 +45,7 @@ Measured 2026-09-29, `sftp://127.0.0.1:2281/…` with `-u <user>:wrong` against 
    builds.
 4. **Every platform reads them**, the Windows build included, as ADR-0122 decided for the
    superset. The `-v` reason for an unreadable key stays WinCNG's `Reason unknown (-1)`; the
-   OpenSSL build's reason is BL-989's.
+   OpenSSL build's reason is BL-990's.
 
 ## Alternatives considered
 
@@ -60,4 +60,4 @@ Measured 2026-09-29, `sftp://127.0.0.1:2281/…` with `-u <user>:wrong` against 
 - `Curl.Protocol.Ssh.UnitTests` hold the keys `ssh-keygen` wrote as throwaway test data
   (`TestUserKeys`), pin the Ed25519 signature blob over a fixed session identifier, and drive
   an encrypted Ed25519 key end to end through `InMemorySshServer`.
-- BL-989 makes the unreadable key's `-v` reason follow the backend.
+- BL-990 makes the unreadable key's `-v` reason follow the backend.

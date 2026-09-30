@@ -1,5 +1,5 @@
 ---
-id: BL-989
+id: BL-990
 title: Report the OpenSSL build's publickey denial reason for an unreadable SSH key off Windows
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-989 — Report the OpenSSL build's publickey denial reason for an unreadable SSH key off Windows
+# BL-990 — Report the OpenSSL build's publickey denial reason for an unreadable SSH key off Windows
 
 ## Goal
 

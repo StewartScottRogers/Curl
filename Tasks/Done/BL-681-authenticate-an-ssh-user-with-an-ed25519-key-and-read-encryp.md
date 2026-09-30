@@ -71,7 +71,7 @@ completed: 2026-09-29
     failed: Callback returned error`, exit 67 `Authentication failure`.
   - With `KbdInteractiveAuthentication` left on, each failure was exit 67 `curl: (67) Login
     denied`, as BL-568 measured.
-- **Follow-up filed:** BL-989 — the unreadable key's `-v` reason off Windows is the OpenSSL
+- **Follow-up filed:** BL-990 — the unreadable key's `-v` reason off Windows is the OpenSSL
   build's `Unable to extract public key ...`, not WinCNG's `Reason unknown (-1)`.
 - **Test data:** the existing Ed25519 test key re-encrypted by `ssh-keygen -p -a 16 -Z
   <cipher>` under all ten OpenSSH ciphers, and the P-256 test key under
