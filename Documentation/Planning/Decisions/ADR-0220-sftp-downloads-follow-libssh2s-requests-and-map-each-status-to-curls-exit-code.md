@@ -74,7 +74,8 @@ the server's.
   `Timeout waiting for response from SFTP subsystem`, all exit 2. Packets that are not a
   `VERSION` of at least 5 bytes are skipped, and any version is accepted.
 - **`Sftp.SftpFileDownload`** sends `REALPATH .`, resolves a leading `/~/` against its
-  answer (`SftpRemotePath`, after percent-decoding to raw bytes), opens with `READ` and the
+  answer (`SftpRemotePath`, after percent-decoding to raw bytes; extended by ADR-0277 to
+  `/~` itself, a home directory ending with `/`, and exit 3 for a `%00`), opens with `READ` and the
   permissions attribute `S_IFREG | --create-file-mode`, asks `STAT` for the size (0, a
   failure, no size flag or cut-short attributes are an unknown size), reads, writes each
   answer to the output and reports progress, and closes the handle, ignoring how the

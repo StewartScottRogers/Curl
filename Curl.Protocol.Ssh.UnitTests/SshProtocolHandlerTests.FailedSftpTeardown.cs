@@ -9,7 +9,7 @@ namespace Curl.Protocol.Ssh;
 /// <c>OPEN</c> or <c>-Q</c> command: the channel's <c>EOF</c> and <c>CLOSE</c> before
 /// <c>DISCONNECT</c>, as OpenSSH's <c>sshd -ddd</c> log showed curl 8.21.0 sending them,
 /// measured 2026-09-30 (BL-973); and after a <c>%00</c> in the path, refused after
-/// <c>REALPATH</c> with exit 3 (BL-974, ADR-0275).
+/// <c>REALPATH</c> with exit 3 (BL-974, ADR-0277).
 /// </summary>
 public sealed partial class SshProtocolHandlerTests
 {
