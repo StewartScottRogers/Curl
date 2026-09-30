@@ -33,3 +33,4 @@ With `--compressed-ssh`, the `KEXINIT` offers the compression methods curl 8.21.
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
