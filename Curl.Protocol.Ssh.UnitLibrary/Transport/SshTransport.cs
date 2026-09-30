@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Compression;
 using Curl.Protocol.Ssh.HostKeys;
 using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
@@ -10,8 +11,9 @@ namespace Curl.Protocol.Ssh.Transport;
 /// <summary>
 /// The client side of the SSH transport layer (RFC 4253) up to the new keys: the
 /// identification exchange, the unencrypted binary packets, the two <c>KEXINIT</c>
-/// messages, the key exchange, the host key's signature and <c>NEWKEYS</c>; and a key
-/// re-exchange the server starts later.
+/// messages, the key exchange, the host key's signature and <c>NEWKEYS</c>; a key
+/// re-exchange the server starts later; and the compression the first exchange agreed,
+/// which lasts the session as OpenSSH keeps it across re-exchanges.
 /// </summary>
 internal sealed class SshTransport
 {
@@ -32,6 +34,8 @@ internal sealed class SshTransport
     private string? serverIdentification;
 
     private bool isStrictKeyExchange;
+
+    private SshNegotiatedAlgorithms? sessionCompression;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SshTransport" /> class.
@@ -117,7 +121,9 @@ internal sealed class SshTransport
     /// key exchange each direction's sequence number restarts at 0 after its
     /// <c>NEWKEYS</c>. The first exchange's hash becomes the session identifier. Each
     /// direction takes the new keys into use at its <c>NEWKEYS</c>: the client's packets
-    /// once its own is sent, the server's once the server's arrives.
+    /// once its own is sent, the server's once the server's arrives. The first exchange's
+    /// <c>zlib</c> starts compressing a direction at the same point; its
+    /// <c>zlib@openssh.com</c> waits for <see cref="StartDelayedCompression" />.
     /// </summary>
     /// <param name="handshake">What <see cref="NegotiateAlgorithmsAsync" /> agreed.</param>
     /// <param name="cancellationToken">Cancels the exchange.</param>
@@ -200,6 +206,25 @@ internal sealed class SshTransport
         return await ExchangeKeysAsync(handshake, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Starts each direction's <c>zlib@openssh.com</c> the first exchange agreed, as the
+    /// client must once <c>SSH_MSG_USERAUTH_SUCCESS</c> arrives: the packets after it are
+    /// compressed both ways (OpenSSH's <c>PROTOCOL</c>, "delayed compression"). A direction with
+    /// another method, and a transport before its first exchange, is left as it is.
+    /// </summary>
+    internal void StartDelayedCompression()
+    {
+        if (sessionCompression?.CompressionClientToServer == SshCompressionMethods.DelayedZlib)
+        {
+            PacketWriter.StartCompression();
+        }
+
+        if (sessionCompression?.CompressionServerToClient == SshCompressionMethods.DelayedZlib)
+        {
+            PacketReader.StartDecompression();
+        }
+    }
+
     private static SshTransferException KeyExchangeMethodFailed() =>
         SshTransferException.SessionEstablishmentFailed(Libssh2ErrorCode.KeyExchangeMethodFailure, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
 
@@ -226,18 +251,41 @@ internal sealed class SshTransport
     {
         ISshPacketProtection clientToServer = SshPacketProtections.ForClientToServer(algorithms, keys);
         ISshPacketProtection serverToClient = SshPacketProtections.ForServerToClient(algorithms, keys);
+        bool startsCompression = sessionCompression is null;
+        sessionCompression ??= algorithms;
         await messages.SendAsync([SshMessageNumber.NewKeys], cancellationToken).ConfigureAwait(false);
+        TakeClientKeysIntoUse(clientToServer, startsCompression && algorithms.CompressionClientToServer == SshCompressionMethods.Zlib);
+        await messages.ReadAsync(SshMessageNumber.NewKeys, cancellationToken).ConfigureAwait(false);
+        TakeServerKeysIntoUse(serverToClient, startsCompression && algorithms.CompressionServerToClient == SshCompressionMethods.Zlib);
+    }
+
+    // After the client's NEWKEYS is sent.
+    private void TakeClientKeysIntoUse(ISshPacketProtection clientToServer, bool startsCompression)
+    {
         PacketWriter.ChangeProtection(clientToServer);
         if (isStrictKeyExchange)
         {
             PacketWriter.ResetSequenceNumber();
         }
 
-        await messages.ReadAsync(SshMessageNumber.NewKeys, cancellationToken).ConfigureAwait(false);
+        if (startsCompression)
+        {
+            PacketWriter.StartCompression();
+        }
+    }
+
+    // After the server's NEWKEYS arrives.
+    private void TakeServerKeysIntoUse(ISshPacketProtection serverToClient, bool startsDecompression)
+    {
         PacketReader.ChangeProtection(serverToClient);
         if (isStrictKeyExchange)
         {
             PacketReader.ResetSequenceNumber();
+        }
+
+        if (startsDecompression)
+        {
+            PacketReader.StartDecompression();
         }
     }
 

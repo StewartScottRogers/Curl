@@ -1,3 +1,4 @@
+using Curl.Protocol.Ssh.Compression;
 using Curl.Protocol.Ssh.PacketProtection;
 
 namespace Curl.Protocol.Ssh.Transport;
@@ -19,6 +20,8 @@ internal sealed class SshPacketReader(SshConnectionReader reader)
     internal const int MaximumPacketSize = 40000;
 
     private ISshPacketProtection protection = new SshPlainPacketProtection();
+
+    private SshZlibDecompressor? decompressor;
 
     /// <summary>
     /// Gets the sequence number the next packet read carries: 0 for the first, wrapping
@@ -45,7 +48,13 @@ internal sealed class SshPacketReader(SshConnectionReader reader)
     }
 
     /// <summary>
-    /// Reads one packet and returns its payload.
+    /// Inflates every payload from now on with one zlib stream that lasts the session, the
+    /// agreed server-to-client <c>zlib</c> or <c>zlib@openssh.com</c> taking effect.
+    /// </summary>
+    internal void StartDecompression() => decompressor = new SshZlibDecompressor();
+
+    /// <summary>
+    /// Reads one packet and returns its payload, inflated once decompression has started.
     /// </summary>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The payload, starting with its message number.</returns>
@@ -53,7 +62,8 @@ internal sealed class SshPacketReader(SshConnectionReader reader)
     /// <exception cref="InvalidDataException">
     /// The packet is larger than <see cref="MaximumPacketSize" />, not a multiple of the
     /// protection's block size, has fewer than <see cref="SshPacketWriter.MinimumPadding" />
-    /// padding bytes, or has no payload.
+    /// padding bytes, or has no payload; or its payload does not inflate
+    /// (<see cref="SshZlibDecompressor.Decompress" />).
     /// </exception>
     /// <exception cref="SshPacketAuthenticationException">The packet's MAC or tag does not match.</exception>
     internal async ValueTask<byte[]> ReadAsync(CancellationToken cancellationToken)
@@ -73,7 +83,8 @@ internal sealed class SshPacketReader(SshConnectionReader reader)
         }
 
         SequenceNumber = unchecked(SequenceNumber + 1);
-        return packet.AsSpan(1, payloadLength).ToArray();
+        byte[] payload = packet.AsSpan(1, payloadLength).ToArray();
+        return decompressor is null ? payload : decompressor.Decompress(payload);
     }
 
     private void RejectBadLength(uint packetLength)

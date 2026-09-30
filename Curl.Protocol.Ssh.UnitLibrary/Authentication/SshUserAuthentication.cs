@@ -473,12 +473,18 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
     }
 
     // The first message of a wanted type, or a disconnect; every other message is skipped,
-    // and a KEXINIT is answered with a key re-exchange first.
+    // and a KEXINIT is answered with a key re-exchange first. A success starts the delayed
+    // compression the transport agreed before the next packet either way.
     private async ValueTask<byte[]> ReadAnswerAsync(byte[] wanted, CancellationToken cancellationToken)
     {
         while (true)
         {
             byte[] payload = await transport.PacketReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            if (payload[0] == SshAuthenticationMessageNumber.Success)
+            {
+                transport.StartDelayedCompression();
+            }
+
             if (payload[0] == SshMessageNumber.Disconnect || wanted.AsSpan().Contains(payload[0]))
             {
                 return payload;

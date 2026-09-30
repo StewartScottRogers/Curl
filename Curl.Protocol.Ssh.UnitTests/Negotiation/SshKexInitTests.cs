@@ -86,6 +86,21 @@ public sealed class SshKexInitTests
     }
 
     [TestMethod]
+    [DataRow("Windows", false, "none")]
+    [DataRow("Windows", true, "zlib,zlib@openssh.com,none")]
+    [DataRow("OpenSSL", false, "none")]
+    [DataRow("OpenSSL", true, "zlib,zlib@openssh.com,none")]
+    public void ForClient_TodaysCatalogue_OffersTheCompressionListsMeasuredWithAndWithoutCompressedSsh(string platform, bool compressedSsh, string expected)
+    {
+        SshAlgorithmPreferences preset = platform == "Windows" ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference;
+
+        SshKexInit kexInit = SshKexInit.ForClient(preset.WithCompression(compressedSsh), SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0));
+
+        Assert.AreEqual(expected, string.Join(',', kexInit.CompressionClientToServer));
+        Assert.AreEqual(expected, string.Join(',', kexInit.CompressionServerToClient));
+    }
+
+    [TestMethod]
     public void Parse_ReadsWhatToPayloadWrote()
     {
         SshKexInit sent = SshServerScript.OpenSshKexInit(kexInit => kexInit with

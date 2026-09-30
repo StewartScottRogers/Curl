@@ -64,6 +64,20 @@ public sealed partial class SshTransportTests
     }
 
     [TestMethod]
+    public async Task StartDelayedCompression_BeforeAnyKeyExchange_LeavesPacketsUncompressed()
+    {
+        ScriptedConnection connection = new([]);
+        SshTransport transport = new(connection, SshAlgorithmPreferences.OpenSslReference, EverythingImplemented, new RepeatingRandomSource(0), new SystemSshEphemeralKeySource());
+
+        transport.StartDelayedCompression();
+        await transport.PacketWriter.WriteAsync(new byte[] { 2 }, CancellationToken.None);
+
+        ScriptedConnection expected = new([]);
+        await new SshPacketWriter(expected, new RepeatingRandomSource(0)).WriteAsync(new byte[] { 2 }, CancellationToken.None);
+        CollectionAssert.AreEqual(expected.Written, connection.Written);
+    }
+
+    [TestMethod]
     public async Task NegotiateAlgorithmsAsync_IgnoreDebugAndUnimplementedBeforeKexInit_AreSkippedWithoutStrictKex()
     {
         SshKexInit server = SshServerScript.OpenSshKexInit(kexInit => kexInit with { KeyExchange = ["curve25519-sha256"] });

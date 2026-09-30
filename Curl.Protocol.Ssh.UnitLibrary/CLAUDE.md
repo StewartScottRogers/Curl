@@ -34,7 +34,11 @@ implemented names; `KeyExchange` holds one `ISshKeyExchange` per method family a
 `KnownHostsFile` and `SshHostKeyChecker`, which accept or refuse the host key (ADR-0213);
 `PacketProtection` holds one `ISshPacketProtection` per cipher family, which the packet
 reader and writer switch to at each `NEWKEYS` (ADR-0212) - `ChaCha20Poly1305PacketProtection`
-(ADR-0259), `AesGcmPacketProtection` and `CipherAndMacPacketProtection`; `Authentication` holds
+(ADR-0259), `AesGcmPacketProtection` and `CipherAndMacPacketProtection`; `Compression` holds
+`SshZlibCompressor` and `SshZlibDecompressor`, one BCL `ZLibStream` per direction for the
+session, which the writer and reader start at the first `NEWKEYS` for `zlib` and, through
+`SshTransport.StartDelayedCompression`, after `SSH_MSG_USERAUTH_SUCCESS` for
+`zlib@openssh.com` (ADR-0264); `Authentication` holds
 `SshUserAuthentication`, which requests the `ssh-userauth` service and authenticates the
 user with `none`, `publickey`, `password` and `keyboard-interactive` in curl's order
 (ADR-0215, ADR-0230); `Keys` holds `SshUserKeySource`, which finds `--key` (or curl's
@@ -62,7 +66,7 @@ commands through `SftpQuoteCommands`: those with no prefix after `REALPATH .`, t
 `-` after a successful transfer's `CLOSE`. `SftpQuoteCommand` reads each command as curl's
 `sftp_quote` does, and `SftpAttributes` carries what `STAT` and `SETSTAT` exchange
 (ADR-0247). A new algorithm registers in
-`SshKeyExchangeMethods`, `SshSignatureVerifiers` or `SshPacketProtections`, and
+`SshKeyExchangeMethods`, `SshSignatureVerifiers`, `SshPacketProtections` or `SshCompressionMethods`, and
 `SshAlgorithmCatalogue.Implemented` offers it from then on. Failure messages and
 their libssh2 codes are ADR-0122's, ADR-0206's and ADR-0212's, measured from the
 reference builds.

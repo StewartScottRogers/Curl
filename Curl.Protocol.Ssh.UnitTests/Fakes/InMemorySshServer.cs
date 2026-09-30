@@ -81,6 +81,13 @@ public sealed class InMemorySshServer(string userName, string password) : IConne
     /// </summary>
     public string Mac { get; init; } = "hmac-sha2-256";
 
+    /// <summary>
+    /// Gets the one compression method the server offers in both directions: <c>none</c> by
+    /// default, or <c>zlib</c> from its <c>NEWKEYS</c> or <c>zlib@openssh.com</c> from its
+    /// <c>SSH_MSG_USERAUTH_SUCCESS</c>, as OpenSSH compresses.
+    /// </summary>
+    public string Compression { get; init; } = "none";
+
     /// <summary>Gets the server's host key blob, <c>K_S</c>, an <c>ssh-rsa</c> key.</summary>
     public byte[] HostKeyBlob => HostKey.Blob;
 

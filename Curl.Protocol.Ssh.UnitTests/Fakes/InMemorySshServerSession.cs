@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Curl.Cryptography;
 using Curl.Protocol.Ssh.Authentication;
+using Curl.Protocol.Ssh.Compression;
 using Curl.Protocol.Ssh.Connection;
 using Curl.Protocol.Ssh.HostKeys;
 using Curl.Protocol.Ssh.KeyExchange;
@@ -53,6 +54,8 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
     private uint clientChannel;
 
     private bool closeSent;
+
+    private bool isCompressionDelayed;
 
     private SshPacketReader Reader => packetReader!;
 
@@ -111,7 +114,7 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         packetReader = new SshPacketReader(connectionReader);
         packetWriter = new SshPacketWriter(connection, new SystemSshRandomSource());
         byte[] serverKexInit = new SshKexInit(
-            RandomNumberGenerator.GetBytes(16), [KeyExchangeMethod], [server.HostKey.Algorithm], [server.Cipher], [server.Cipher], [server.Mac], [server.Mac], ["none"], ["none"], [], [], FirstKexPacketFollows: false).ToPayload();
+            RandomNumberGenerator.GetBytes(16), [KeyExchangeMethod], [server.HostKey.Algorithm], [server.Cipher], [server.Cipher], [server.Mac], [server.Mac], [server.Compression], [server.Compression], [], [], FirstKexPacketFollows: false).ToPayload();
         await SendAsync(serverKexInit).ConfigureAwait(false);
         byte[] clientKexInit = await Reader.ReadAsync(CancellationToken.None).ConfigureAwait(false);
         SshNegotiatedAlgorithms algorithms = SshAlgorithmNegotiator.Negotiate(SshKexInit.Parse(clientKexInit), SshKexInit.Parse(serverKexInit))!;
@@ -133,6 +136,12 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         await Reader.ReadAsync(CancellationToken.None).ConfigureAwait(false);
         Reader.ChangeProtection(SshPacketProtections.ForClientToServer(algorithms, keys));
         sessionIdentifier = h;
+        if (server.Compression == SshCompressionMethods.Zlib)
+        {
+            StartCompression();
+        }
+
+        isCompressionDelayed = server.Compression == SshCompressionMethods.DelayedZlib;
     }
 
     private async Task<bool> AnswerNextMessageAsync()
@@ -196,7 +205,19 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         {
             server.Record($"auth {method} {Encoding.UTF8.GetString(user)} {(outcome ? "ok" : "refused")}");
             await SendAsync(outcome ? [SshAuthenticationMessageNumber.Success] : [SshAuthenticationMessageNumber.Failure, .. Name("publickey,password"), 0]).ConfigureAwait(false);
+            if (outcome && isCompressionDelayed)
+            {
+                StartCompression();
+            }
         }
+    }
+
+    // Both directions at once: the server's packets after this point, and the client's,
+    // which it compresses from the same point.
+    private void StartCompression()
+    {
+        Writer.StartCompression();
+        Reader.StartDecompression();
     }
 
     // Null once PK_OK has answered the question; the signature's verdict otherwise.
