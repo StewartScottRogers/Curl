@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: docs
 depends-on: []
-touches: [Documentation/Planning/Decisions]
+touches: [Documentation/Planning/Decisions, Curl.Networking.UnitLibrary, Curl.Quic.UnitLibrary, Curl.Console, Curl.Kerberos.UnitLibrary, Tasks/Backlog/BL-940-check-ml-dsa-ed448-brainpool-tls-1-3-and-sha-224-signatures.md, Tasks/Backlog/BL-941-send-the-tls-1-2-only-hand-built-clienthello-in-the-platform.md]
 requirement: none
 created: 2026-09-29
 completed:
@@ -36,7 +36,17 @@ ADR numbers 0222, 0228, 0232 and 0246 each name exactly one record in `Documenta
 
 ## Notes
 
+- Plan (lane 2, 2026-09-29), from `git grep` of each number outside `Tasks/Done/<timestamp>/`:
+  - 0222: the diagnostic log is cited ~80 times and keeps 0222; the TCP-client hello (BL-820) becomes **0235**. Its references: `Curl.Networking.UnitLibrary/CLAUDE.md` line 30 ("Per ADR-0222 (BL-820)"; line 297 is the log and stays), `Curl.Quic.UnitLibrary/QuicClientSettings.cs` line 106 (comment), `Tasks/Backlog/BL-940-…` and `BL-941-…` (each "ADR-0222 (BL-820)" twice).
+  - 0228: the WebSocket 401 record keeps 0228 (Ws handler and tests, ADR-0231, BL-953); the runner's diagnostic-log record becomes **0236**. Its references: `Curl.Console/CLAUDE.md` line 422 ("ADR-0222, ADR-0228, BL-919"), and its README row below `## Template`.
+  - 0232: the empty-`Authorization` record keeps 0232; the Kerberos des3-cbc-sha1 record becomes **0237**. Its references: `Curl.Kerberos.UnitLibrary/CLAUDE.md` line 29, `Curl.Kerberos.UnitLibrary/Des3CbcSha1KerberosEncryption.cs` line 18.
+  - 0246: styled output keeps 0246 (Console, Output); the kept-Digest record becomes **0238**. Its references: `ADR-0187` line 51 ("superseded by ADR-0246 … (BL-869)"), `Tasks/Backlog/BL-979-…` line 21. Neither 0246 record has a README row yet; add both.
+- New numbers are the lowest free ones, 0235–0238: no branch, lane worktree or task cites them, and lanes numbering a new ADR take the highest plus one, so the gap avoids a fresh collision.
+- `touches` widened to the folders above that cite the renumbered records. `Curl.Networking.UnitLibrary` and `Curl.Console` are in BL-717's `touches` (in Doing, lane 1), so the task went back to Backlog until BL-717 is done.
+- Also duplicated, outside this task: 0248 (Negotiate 2xx / SSH known hosts) and 0254 (TcpConnector happy eyeballs / TLS 1.2 byte stream). Worth their own task.
+
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Backlog. Needs Curl.Networking.UnitLibrary and Curl.Console, both in BL-717's touches (Doing, lane 1); renumbering plan is in Notes
