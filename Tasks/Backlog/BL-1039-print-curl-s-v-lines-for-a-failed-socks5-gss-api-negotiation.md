@@ -18,7 +18,7 @@ Under `-v`, a SOCKS5 proxy that picks GSS-API and whose negotiation fails prints
 
 ## Context
 
-- Found in BL-615 (ADR-0274): `Socks5GssapiNegotiation` returns the exit 97 message but reports no `-v` line. Measured there (BL-615 Notes): Windows prints `* SSPI error: InitializeSecurityContext failed: ...`, `* Failed to initialize security context.`, `* Unable to negotiate SOCKS5 GSS-API context.`; Linux prints `* GSS-API error: gss_init_sec_context failed: ...` (two lines), `* Failed to initial GSS-API token.`, `* Unable to negotiate SOCKS5 GSS-API context.`.
+- Found in BL-615 (ADR-0276): `Socks5GssapiNegotiation` returns the exit 97 message but reports no `-v` line. Measured there (BL-615 Notes): Windows prints `* SSPI error: InitializeSecurityContext failed: ...`, `* Failed to initialize security context.`, `* Unable to negotiate SOCKS5 GSS-API context.`; Linux prints `* GSS-API error: gss_init_sec_context failed: ...` (two lines), `* Failed to initial GSS-API token.`, `* Unable to negotiate SOCKS5 GSS-API context.`.
 - Code: `Curl.Networking.UnitLibrary/Socks5GssapiNegotiation.cs`, `Socks5Handshake.cs`; the target's `Events` is how `TcpConnector` reports `-v` lines (ADR-0100). BL-1038 adds the `Opened SOCKS connection` line; look at how it reaches the SOCKS code first.
 
 ## Acceptance criteria

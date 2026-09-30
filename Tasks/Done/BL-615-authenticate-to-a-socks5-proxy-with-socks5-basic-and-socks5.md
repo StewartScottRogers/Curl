@@ -46,7 +46,7 @@ server (`read 3|4|5`, `send \x05\x00`, `read 10`, `send \x05\x00\x00\x01\x7f\x00
 No KDC was available, so a successful RFC 1961 exchange could not be recorded; it follows curl's
 `socks_sspi.c`/`socks_gssapi.c` and is pinned with `Fakes/ScriptedSecurityContextFactory`.
 
-Decisions (ADR-0274, decided by Claude under Stewart's delegation):
+Decisions (ADR-0276, decided by Claude under Stewart's delegation):
 - `Socks5AuthenticationOptions` is a `TcpConnector` constructor argument per option group, built by `Curl.Console`'s `Socks5AuthenticationMapping`, so no Abstractions contract changes.
 - GSS-API uses the proxy tunnel's `LateBoundSecurityContextFactory` (ADR-0142's router): Kerberos, default credential, `EncryptAndSign`; service `--socks5-gssapi-service`, else `--proxy-service-name`, else `rcmd` (curl's default); a service with `/` is the whole target, split at the first `/`.
 - Protection: curl offers level 0 (wrapped without encryption, bare under `--socks5-gssapi-nec`) and fails a proxy granting more with `SOCKS5 GSS-API protection not yet implemented.`; Curl does the same.
@@ -56,7 +56,7 @@ Decisions (ADR-0274, decided by Claude under Stewart's delegation):
 
 Follow-up filed: BL-1039 (the `-v` lines of a failed GSS-API negotiation).
 
-`touches` gained `Documentation/Planning/Decisions` for ADR-0274 and its index row; the only other
+`touches` gained `Documentation/Planning/Decisions` for ADR-0276 and its index row; the only other
 task in Doing (BL-973) touches only the SSH projects.
 
 Quality: `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 100% line, 100% branch,
