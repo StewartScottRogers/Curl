@@ -32,6 +32,7 @@ public sealed class TransferReportTests
         Assert.AreEqual(0, report.ConnectionCount);
         Assert.IsNull(report.LocalEndPoint);
         Assert.IsNull(report.RemoteEndPoint);
+        Assert.IsNull(report.UnixSocketRemoteIp);
         Assert.IsNull(report.Timings);
         Assert.IsEmpty(report.PeerCertificates);
     }
@@ -101,6 +102,14 @@ public sealed class TransferReportTests
         Assert.AreSame(localEndPoint, report.LocalEndPoint);
         Assert.AreSame(remoteEndPoint, report.RemoteEndPoint);
         Assert.AreSame(timings, report.Timings);
+    }
+
+    [TestMethod]
+    public void New_WithUnixSocketRemoteIp_CarriesIt()
+    {
+        var report = new TransferReport { UnixSocketRemoteIp = "/tmp/curl.sock" };
+
+        Assert.AreEqual("/tmp/curl.sock", report.UnixSocketRemoteIp);
     }
 
     [TestMethod]

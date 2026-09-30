@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Sockets;
+using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -11,23 +13,40 @@ namespace Curl.Console;
 /// </summary>
 /// <remarks>
 /// The first connection is the one curl 8.21.0 reports: for FTP the control connection, not
-/// the data connection opened after it (measured, BL-515 Notes). One recorder serves the
-/// run's transfers one at a time; <see cref="EndPointReportingProtocolHandler" /> clears it
-/// before each.
+/// the data connection opened after it (measured, BL-515 Notes). A connection through a Unix
+/// domain socket has no address or ports, so it is reported as
+/// <see cref="TransferReport.UnixSocketRemoteIp" /> alone (measured, BL-793 Notes). One
+/// recorder serves the run's transfers one at a time; <see cref="EndPointReportingProtocolHandler" />
+/// clears it before each.
 /// </remarks>
 internal sealed class ConnectionEndPointRecorder
 {
+    // A sockaddr_un holds its path from byte 2, after the address family; an abstract name's
+    // path starts with a NUL byte.
+    private const int UnixSocketPathOffset = 2;
+
+    /// <summary>Whether the transfer's first connection has been recorded.</summary>
+    private bool connectionRecorded;
+
     /// <summary>The local end of the first connection, or <see langword="null" /> when unknown.</summary>
     private IPEndPoint? localEndPoint;
 
-    /// <summary>The remote end of the first connection, or <see langword="null" /> before one opened.</summary>
+    /// <summary>The remote end of the first connection, or <see langword="null" /> when it is not an IP end point.</summary>
     private IPEndPoint? remoteEndPoint;
+
+    /// <summary>
+    /// The <c>%{remote_ip}</c> text of the first connection when it went through a Unix domain
+    /// socket, or <see langword="null" />.
+    /// </summary>
+    private string? unixSocketRemoteIp;
 
     /// <summary>Forgets what the previous transfer recorded.</summary>
     internal void Clear()
     {
+        connectionRecorded = false;
         localEndPoint = null;
         remoteEndPoint = null;
+        unixSocketRemoteIp = null;
     }
 
     /// <summary>
@@ -38,18 +57,31 @@ internal sealed class ConnectionEndPointRecorder
     /// report, as a UDP channel curl never connects has none.
     /// </param>
     /// <param name="remote">
-    /// The peer's address and port; <see langword="null" /> records nothing, as a connection
-    /// with no known peer has nothing to report.
+    /// The peer's address and port, or the Unix domain socket the connection went through; any
+    /// other end point, or <see langword="null" />, records nothing, as a connection with no
+    /// known peer has nothing to report.
     /// </param>
-    internal void Record(IPEndPoint? local, IPEndPoint? remote)
+    internal void Record(IPEndPoint? local, EndPoint? remote)
     {
-        if (remote is null || remoteEndPoint is not null)
+        if (connectionRecorded)
         {
             return;
         }
 
+        switch (remote)
+        {
+            case IPEndPoint ip:
+                remoteEndPoint = ip;
+                break;
+            case UnixDomainSocketEndPoint unixSocket:
+                unixSocketRemoteIp = RemoteIpOf(unixSocket);
+                break;
+            default:
+                return;
+        }
+
         localEndPoint = local;
-        remoteEndPoint = remote;
+        connectionRecorded = true;
     }
 
     /// <summary>
@@ -67,17 +99,32 @@ internal sealed class ConnectionEndPointRecorder
     /// </returns>
     internal TransferResult ReportOn(TransferResult result)
     {
-        if (remoteEndPoint is null)
+        if (!connectionRecorded)
         {
             return result;
         }
 
         TransferReport report = result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred };
-        if (report.LocalEndPoint is not null || report.RemoteEndPoint is not null)
+        if (report.LocalEndPoint is not null || report.RemoteEndPoint is not null || report.UnixSocketRemoteIp is not null)
         {
             return result;
         }
 
-        return result with { Report = report with { LocalEndPoint = localEndPoint, RemoteEndPoint = remoteEndPoint } };
+        return result with
+        {
+            Report = report with { LocalEndPoint = localEndPoint, RemoteEndPoint = remoteEndPoint, UnixSocketRemoteIp = unixSocketRemoteIp },
+        };
+    }
+
+    /// <summary>
+    /// Returns the text curl 8.21.0 prints as <c>%{remote_ip}</c> for a connection through
+    /// <paramref name="unixSocket" />: <see cref="UnixSocketAddress.RemoteIpText" />.
+    /// </summary>
+    /// <param name="unixSocket">The socket the connection went through.</param>
+    /// <returns>The path cut to 45 characters, or empty for an abstract name.</returns>
+    private static string RemoteIpOf(UnixDomainSocketEndPoint unixSocket)
+    {
+        var isAbstract = unixSocket.Serialize()[UnixSocketPathOffset] == 0;
+        return new UnixSocketAddress(unixSocket.ToString(), isAbstract).RemoteIpText;
     }
 }

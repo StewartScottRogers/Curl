@@ -157,7 +157,8 @@ public sealed class TransferWriteOutVariables(
             variables.report.ResponseHeaders.Count + variables.report.PseudoHeaders.Count),
         ["local_ip"] = variables => WriteOutValue.FromText(FormatAddress(variables.report.LocalEndPoint)),
         ["local_port"] = variables => WriteOutValue.FromNumber(FindLocalPort(variables.report)),
-        ["remote_ip"] = variables => WriteOutValue.FromText(FormatAddress(variables.report.RemoteEndPoint)),
+        ["remote_ip"] = variables => WriteOutValue.FromText(
+            variables.report.UnixSocketRemoteIp ?? FormatAddress(variables.report.RemoteEndPoint)),
         ["remote_port"] = variables => WriteOutValue.FromNumber(FindPort(variables.report.RemoteEndPoint)),
         ["exitcode"] = variables => WriteOutValue.FromNumber((int)variables.result.ExitCode),
         ["errormsg"] = variables => WriteOutValue.FromText(variables.result.ErrorMessage),

@@ -148,6 +148,15 @@ public sealed record TransferReport
     public IPEndPoint? RemoteEndPoint { get; init; }
 
     /// <summary>
+    /// Gets the text curl 8.21.0 prints as <c>%{remote_ip}</c> for a connection made through a
+    /// Unix domain socket, in place of <see cref="RemoteEndPoint" />, which such a connection
+    /// leaves <see langword="null" />: the socket's path cut to 45 characters, or empty for an
+    /// abstract name (measured, BL-793); <see langword="null" /> for any other connection.
+    /// The composition fills it in, as it does the end points (ADR-0119).
+    /// </summary>
+    public string? UnixSocketRemoteIp { get; init; }
+
+    /// <summary>
     /// Gets the transfer's timestamps, the source of the <c>%{time_*}</c> variables;
     /// <see langword="null" /> when the handler recorded none.
     /// </summary>

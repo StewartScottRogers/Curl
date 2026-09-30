@@ -31,12 +31,12 @@ internal sealed class EndPointScriptedConnector(params EndPointScriptedConnector
     }
 
     /// <summary>One scripted connection.</summary>
-    /// <param name="Local">The local end point the connect reports.</param>
-    /// <param name="Remote">The connection's remote end point.</param>
+    /// <param name="Local">The local end point the connect reports, or <see langword="null" /> for none.</param>
+    /// <param name="Remote">The connection's remote end point: an IP end point, or a Unix domain socket.</param>
     /// <param name="Reads">The chunks the connection reads, in order.</param>
-    internal sealed record Script(IPEndPoint Local, IPEndPoint Remote, params byte[][] Reads);
+    internal sealed record Script(IPEndPoint? Local, EndPoint Remote, params byte[][] Reads);
 
-    private sealed class ScriptedConnection(IPEndPoint remote, Queue<byte[]> reads) : IConnection
+    private sealed class ScriptedConnection(EndPoint remote, Queue<byte[]> reads) : IConnection
     {
         private byte[] remainder = [];
 

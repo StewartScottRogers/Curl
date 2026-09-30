@@ -24,7 +24,7 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
         ConnectResult connect = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
         if (connect.Connection is { } connection)
         {
-            recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint as IPEndPoint);
+            recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint);
         }
 
         return connect;
