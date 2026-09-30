@@ -401,7 +401,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
             });
             return ConnectResult.Connected(
-                new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild)),
+                new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), clearsTls: !_matchesSchannelBuild),
                 new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
                 peerCertificates: peerCertificates,
                 applicationProtocol: NegotiatedApplicationProtocol(sslStream.NegotiatedApplicationProtocol));

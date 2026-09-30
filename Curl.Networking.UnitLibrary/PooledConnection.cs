@@ -21,6 +21,7 @@ public sealed class PooledConnection : IConnection
     private readonly ITransferEvents _events;
     private bool _isReusable;
     private bool _isDisposed;
+    private bool _tlsClearingAsked;
 
     internal PooledConnection(PoolingConnector pool, PoolEntry underlying, ITransferEvents events)
     {
@@ -104,10 +105,21 @@ public sealed class PooledConnection : IConnection
         return true;
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Asks the underlying connection. Once asked, the connection is never pooled again,
+    /// whether TLS was cleared or not: its pool key names a TLS connection it no longer is.
+    /// </remarks>
+    public ValueTask<IConnection?> ClearTlsAsync(bool sendCloseNotifyFirst, CancellationToken cancellationToken)
+    {
+        _tlsClearingAsked = true;
+        return _underlying.Connection.ClearTlsAsync(sendCloseNotifyFirst, cancellationToken);
+    }
+
     /// <summary>
-    /// Returns the underlying connection to the pool when it was marked reusable and its
-    /// target is pooled, and closes it otherwise, shutting down any session it holds first. A
-    /// second call does nothing.
+    /// Returns the underlying connection to the pool when it was marked reusable, its target
+    /// is pooled and TLS clearing was never asked of it, and closes it otherwise, shutting
+    /// down any session it holds first. A second call does nothing.
     /// </summary>
     /// <returns>A task that completes when the connection is pooled or closed.</returns>
     public ValueTask DisposeAsync()
@@ -119,7 +131,7 @@ public sealed class PooledConnection : IConnection
 
         _isDisposed = true;
 
-        return _isReusable && _underlying.Key is not null
+        return _isReusable && !_tlsClearingAsked && _underlying.Key is not null
             ? _pool.ReturnAsync(_underlying, _events)
             : _underlying.CloseAsync();
     }
