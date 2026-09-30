@@ -1,5 +1,5 @@
 ---
-id: BL-1041
+id: BL-1042
 title: Clear TLS for FTP CCC on the hand-built TLS connection
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-30
 completed:
 ---
-# BL-1041 — Clear TLS for FTP CCC on the hand-built TLS connection
+# BL-1042 — Clear TLS for FTP CCC on the hand-built TLS connection
 
 ## Goal
 

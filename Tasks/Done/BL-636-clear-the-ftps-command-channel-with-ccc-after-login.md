@@ -84,7 +84,7 @@ curl 8.18.0 OpenSSL (Linux, through WSL with `-ListenAddress 172.26.96.1`):
 
 ### Follow-up
 
-- BL-1041: `HandBuiltTlsConnection.ClearTlsAsync` (the `--tls-max 1.0`/`1.1` and `--cert-status`
+- BL-1042: `HandBuiltTlsConnection.ClearTlsAsync` (the `--tls-max 1.0`/`1.1` and `--cert-status`
   route still ends `CCC` with exit 81).
 
 ### Gates
