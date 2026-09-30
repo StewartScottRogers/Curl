@@ -18,7 +18,7 @@ On Linux, `--interface <name>`, `if!<name>` and `ifhost!<name>!<host>` first try
 
 ## Context
 
-- Follow-up from BL-600 (ADR-0268, Consequences). libcurl 8.21.0's `bindlocal` (`lib/cf-socket.c`)
+- Follow-up from BL-600 (ADR-0269, Consequences). libcurl 8.21.0's `bindlocal` (`lib/cf-socket.c`)
   calls `setsockopt(SO_BINDTODEVICE)` for an interface name under 255 characters; without privilege it
   fails and curl carries on as BL-600 does; with privilege (root or `CAP_NET_RAW`) a plain or `if!` name
   returns bound to the device without binding an address, and `ifhost!` goes on to bind the host.

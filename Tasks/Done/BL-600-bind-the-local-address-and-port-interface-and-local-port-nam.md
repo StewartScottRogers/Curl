@@ -65,7 +65,7 @@ The TCP connector binds the socket to the address `--interface` names (an interf
 `Could not bind to 'nosuch.invalid' with errno 0: No error`, `connect to ::1 port 47599 from  port 0 failed: No error`, and then
 `Failed to connect to localhost:47599 after 91 ms: Failed binding local connection end`: a bind failure moves on to the next address,
 and the last address's failure decides the exit. `--interface 127.0.0.1` to `localhost` fails `::1` (family) and connects `127.0.0.1`.
-Other `-v` lines measured, not yet written (BL-1023): `Name '127.0.0.1' family 2 resolved to '127.0.0.1' family 2`, `Local port: N`,
+Other `-v` lines measured, not yet written (BL-1027): `Name '127.0.0.1' family 2 resolved to '127.0.0.1' family 2`, `Local port: N`,
 `Bind to local port 40000 failed, trying next`, `bind failed with errno 10048: Address already in use`, `Could not bind to interface 'Ethernet' with errno 0: No error`.
 
 Linux (curl 8.18.0 OpenSSL under WSL Ubuntu, older than the reference, measured for the platform answer only): `--interface lo` and
@@ -73,7 +73,7 @@ Linux (curl 8.18.0 OpenSSL under WSL Ubuntu, older than the reference, measured 
 (`Could not bind to interface 'bogus0' with errno 19: No such device`), `bogus0` exit 45. So interface names are looked up off
 Windows and never found on Windows, as `SystemNetworkInterfaceLookup` already answers (ADR-0110).
 
-### Decisions (ADR-0268, decided by Claude under Stewart's delegation)
+### Decisions (ADR-0269, decided by Claude under Stewart's delegation)
 
 - Seam: `ITcpDialer.DialFromAsync(endPoint, localEndPoint, localPortCount)`; `TcpDialer.BindLocalEnd` walks the port range
   (unit tested over real unconnected sockets, like `TcpConnectionListenerTests`); `TcpConnector` takes `LocalBinding` and
@@ -83,11 +83,11 @@ Windows and never found on Windows, as `SystemNetworkInterfaceLookup` already an
 - `LocalBinding` mapping in `CurlComposition.LocalBindingOf`: plain name = interface then host; `if!` interface only; `host!`
   host only; `ifhost!` host plus device name (length check only; `SO_BINDTODEVICE` is BL-1026).
 - `localhost` in a bind resolves to `::1` first whatever `-4` says (measured exit 7 with `-4`).
-- Off Windows the `from  port 0 failed:` reason is glibc's `Success` for errno 0 - not measured on 8.21.0 (BL-1023 measures it).
-- Added `Documentation/Planning/Decisions` to `touches` for ADR-0268 and its README row; no task in Doing names it (BL-888 touches SSH only).
+- Off Windows the `from  port 0 failed:` reason is glibc's `Success` for errno 0 - not measured on 8.21.0 (BL-1027 measures it).
+- Added `Documentation/Planning/Decisions` to `touches` for ADR-0269 and its README row; no task in Doing names it (BL-888 touches SSH only).
 - `--ai-help`: no option was added or renamed (parsing is BL-599), so its text is unchanged.
 
-Follow-ups filed: BL-1023 (`-v` bind lines), BL-1024 (forward-proxy `over proxy` in exit 7/45 messages, pre-existing),
+Follow-ups filed: BL-1027 (`-v` bind lines), BL-1024 (forward-proxy `over proxy` in exit 7/45 messages, pre-existing),
 BL-1025 (QUIC's UDP socket), BL-1026 (`SO_BINDTODEVICE` on Linux).
 
 ## Log

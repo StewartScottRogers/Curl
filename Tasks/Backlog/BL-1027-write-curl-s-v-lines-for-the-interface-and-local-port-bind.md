@@ -1,5 +1,5 @@
 ---
-id: BL-1023
+id: BL-1027
 title: Write curl's -v lines for the --interface and --local-port bind
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-1023 — Write curl's -v lines for the --interface and --local-port bind
+# BL-1027 — Write curl's -v lines for the --interface and --local-port bind
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Follow-up from BL-600 (ADR-0268, Consequences). BL-600 binds and fails with the right exit codes and
+- Follow-up from BL-600 (ADR-0269, Consequences). BL-600 binds and fails with the right exit codes and
   the `connect to ... from  port 0 failed:` line, but not these lines. Code: `LocalBindingTcpDialer`,
   `TcpDialer.BindLocalEnd`, `AddressFamilyRace` in `Curl.Networking.UnitLibrary`; the dialer has no
   `ITransferEvents` today, so the lines need a way out (return them with the dial, or pass the events).

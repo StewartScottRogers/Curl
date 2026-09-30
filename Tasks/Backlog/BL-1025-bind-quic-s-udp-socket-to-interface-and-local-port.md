@@ -18,7 +18,7 @@ An `--http3` or `--http3-only` transfer binds its UDP socket as `--interface` an
 
 ## Context
 
-- Follow-up from BL-600 (ADR-0268, Consequences): `TcpConnector` binds TCP dials through
+- Follow-up from BL-600 (ADR-0269, Consequences): `TcpConnector` binds TCP dials through
   `LocalBindingTcpDialer`, but `ConnectMultiplexedAsync` hands addresses to `QuicDialer`, whose
   `IUdpChannelOpener` (`UdpChannelOpener`) binds its own local address and port.
 - Reuse `LocalBinding` and the address choice in `LocalBindingTcpDialer` (extract it if both need it).
