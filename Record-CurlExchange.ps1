@@ -16,12 +16,21 @@
       2. records the raw request bytes;
       3. sends that connection's canned response and closes the connection.
 
-    It then writes four files to OutDirectory:
+    It then writes five files to OutDirectory:
 
       request.bin   the raw request bytes, every connection's in the order accepted
       stdout.bin    curl's standard output, byte for byte
       stderr.txt    curl's standard error, byte for byte
       exitcode.txt  curl's exit code, as decimal digits with no line ending
+      timing.json   one UTF-8 JSON object: "executable" (the full path of the curl
+                    run), "elapsedMilliseconds" (wall clock from start to exit),
+                    "peakWorkingSetBytes" and "samples", so the same exchange can be
+                    timed for real curl and for Curl
+
+    The peak working set is sampled every 10 ms while curl runs, because it cannot be
+    read after the process exits on every platform; the largest reading is kept. Very
+    short runs can under-report it, and a run that ends before the first sample
+    reports 0 bytes and 0 samples.
 
     A connection curl never opens is not waited for: once curl exits, the listener is
     stopped. The script exits 0 when the fixtures were written, whatever curl's own
@@ -115,6 +124,15 @@
     overridden AUTH whose reply starts 234 is upgraded the same way. PBSZ is answered 200,
     PROT 200, and after PROT P (or with -Tls, until a PROT C or a refused PROT) every data
     connection is TLS too, ended with close_notify when the server sends.
+
+    CCC (BL-636) is answered 200, and the server then clears TLS from the control
+    connection: it sends close_notify, reads curl's close_notify if that is what curl sends
+    next, and reads the rest of the session in plain text, with a "= TLS cleared from the
+    control connection" line in transcript.txt (or "= TLS cleared from the control
+    connection without curl's close_notify" when curl went straight on in plain text, as
+    --ftp-ssl-ccc-mode passive does, or hung up). An overridden CCC whose reply is below
+    500 is cleared the same way, as curl clears it; a 5xx leaves the control connection
+    in TLS.
 
 .PARAMETER FtpReply
     Overrides for the FTP reply table, each 'VERB=reply' with the same backslash escapes
@@ -427,8 +445,8 @@
 .PARAMETER NoServer
     Bind no port and serve nothing: run curl against a server the caller started, such
     as a local OpenSSH sshd, an LDAP server or an SMB share, which a PowerShell loopback
-    server cannot speak (BL-528). Only stdout.bin, stderr.txt and exitcode.txt are
-    written; there is no request.bin, since the script sees none of the traffic. Port,
+    server cannot speak (BL-528). Only stdout.bin, stderr.txt, exitcode.txt and timing.json
+    are written; there is no request.bin, since the script sees none of the traffic. Port,
     Response, Connections, ResponseDelayMilliseconds, Reset, HoldOpenMilliseconds,
     RespondAfterBodyBytes, FtpReply, FtpData, FtpIdleMilliseconds, SmtpReply,
     SmtpIdleMilliseconds, ImapReply, ImapMessage, ImapIdleMilliseconds, Pop3Reply,
@@ -814,6 +832,33 @@ $serveFtpSession = {
     # Set by PROT P, and by implicit TLS until a PROT C: data connections are TLS (BL-437).
     $protectData = $ImplicitTls
 
+    # Answers CCC's acceptance: sends close_notify and hands back the plain network stream
+    # the TLS layer ran over, with the first byte curl sends next (BL-636). A TLS alert
+    # record there (0x15) is curl's close_notify, read and dropped; anything else is the
+    # first byte of a plain command, handed back to be read as one. -1 when curl sent
+    # nothing within the idle time or hung up.
+    function Clear-ControlTls {
+        param($Secure, $Plain)
+        $Secure.ShutdownAsync().Wait()
+        $Plain.ReadTimeout = $ControlIdleMilliseconds
+        $first = -1
+        try { $first = $Plain.ReadByte() } catch [System.IO.IOException] { }
+        $suffix = " without curl's close_notify"
+        if ($first -eq 0x15) {
+            $header = New-Object byte[] 4
+            $read = 0
+            while ($read -lt 4) { $read += $Plain.Read($header, $read, 4 - $read) }
+            $length = $header[2] * 256 + $header[3]
+            $alert = New-Object byte[] $length
+            $read = 0
+            while ($read -lt $length) { $read += $Plain.Read($alert, $read, $length - $read) }
+            $suffix = ''
+            $first = -1
+        }
+        [void] $Transcript.Append("= TLS cleared from the control connection$suffix`r`n")
+        return @($Plain, $first)
+    }
+
     # Opens the data connection: dials curl's EPRT/PORT address in active mode, otherwise
     # accepts on the passive listener; either way wrapped in TLS once PROT P was accepted.
     function Open-DataConnection {
@@ -860,14 +905,18 @@ $serveFtpSession = {
         }
         try {
             $stream = $client.GetStream()
+            $plainStream = $stream
             if ($ImplicitTls) { $stream = Wrap-Tls -Stream $stream }
             $stream.ReadTimeout = $ControlIdleMilliseconds
             $greeting = if ($Overrides.ContainsKey('GREETING')) { Get-Override -Verb 'GREETING' } else { '220 Recorder ready' }
             if ($greeting -cne 'STALL') { Send-Reply -Stream $stream -Reply $greeting }
             $line = New-Object System.IO.MemoryStream
+            # The first plain byte Clear-ControlTls read after CCC, or -1.
+            $pendingByte = -1
             while ($true) {
                 try {
-                    $next = $stream.ReadByte()
+                    $next = if ($pendingByte -ge 0) { $pendingByte } else { $stream.ReadByte() }
+                    $pendingByte = -1
                 } catch [System.IO.IOException] {
                     break  # FtpIdleMilliseconds without a byte: curl is done with us.
                 }
@@ -893,6 +942,10 @@ $serveFtpSession = {
                         $stream.ReadTimeout = $ControlIdleMilliseconds
                         [void] $Transcript.Append("= TLS handshake completed on the control connection`r`n")
                     }
+                    # curl clears TLS after any CCC reply below 500.
+                    if ($verb -eq 'CCC' -and $override -match '^[1-4]' -and $stream -is [System.Net.Security.SslStream]) {
+                        $stream, $pendingByte = Clear-ControlTls -Secure $stream -Plain $plainStream
+                    }
                     continue
                 }
                 switch ($verb) {
@@ -903,6 +956,10 @@ $serveFtpSession = {
                         [void] $Transcript.Append("= TLS handshake completed on the control connection`r`n")
                     }
                     'PBSZ' { Send-Reply -Stream $stream -Reply '200 PBSZ=0' }
+                    'CCC' {
+                        Send-Reply -Stream $stream -Reply '200 CCC command successful'
+                        if ($stream -is [System.Net.Security.SslStream]) { $stream, $pendingByte = Clear-ControlTls -Secure $stream -Plain $plainStream }
+                    }
                     'PROT' {
                         $protectData = $argument -ceq 'P'
                         Send-Reply -Stream $stream -Reply "200 Protection level set to $argument"
@@ -2465,8 +2522,22 @@ try {
         # Both pipes drain at once, so curl never blocks on a full one.
         $stdoutCopy = $curlProcess.StandardOutput.BaseStream.CopyToAsync($stdout)
         $stderrCopy = $curlProcess.StandardError.BaseStream.CopyToAsync($stderr)
-        $curlProcess.WaitForExit()
+        # PeakWorkingSet64 cannot be read once the process has exited on every platform,
+        # so sample it every 10 ms while waiting and keep the largest reading.
+        $peakWorkingSetBytes = [long] 0
+        $peakSamples = 0
+        while (-not $curlProcess.WaitForExit(10)) {
+            try {
+                $curlProcess.Refresh()
+                $peakWorkingSetBytes = [System.Math]::Max($peakWorkingSetBytes, $curlProcess.PeakWorkingSet64)
+                $peakSamples++
+            } catch [System.InvalidOperationException] {
+                # The process finished between the wait and the read.
+            }
+        }
         $curlClock.Stop()
+        # WaitForExit(int) can return before the redirected pipes reach end of stream.
+        $curlProcess.WaitForExit()
         [System.Threading.Tasks.Task]::WaitAll(@($stdoutCopy, $stderrCopy))
         $exitCode = $curlProcess.ExitCode
     } finally {
@@ -2530,5 +2601,19 @@ if ($null -ne $dnsResponder) {
 if ($Smtp -or $Imap -or $Pop3 -or $Script) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
 }
+$curlExecutable = $Curl
+if (Test-Path -LiteralPath $Curl -PathType Leaf) {
+    $curlExecutable = (Resolve-Path -LiteralPath $Curl).ProviderPath
+} else {
+    $curlCommand = Get-Command $Curl -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -ne $curlCommand) { $curlExecutable = $curlCommand.Source }
+}
+$timing = [ordered] @{
+    executable = $curlExecutable
+    elapsedMilliseconds = [long] $curlClock.ElapsedMilliseconds
+    peakWorkingSetBytes = [long] $peakWorkingSetBytes
+    samples = [int] $peakSamples
+}
+[System.IO.File]::WriteAllText((Join-Path $OutDirectory 'timing.json'), (ConvertTo-Json -InputObject $timing -Compress), (New-Object System.Text.UTF8Encoding($false)))
 
 Write-Host "curl exited $exitCode after $($curlClock.ElapsedMilliseconds) ms; fixtures written to $OutDirectory"

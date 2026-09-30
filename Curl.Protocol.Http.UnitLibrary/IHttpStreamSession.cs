@@ -37,6 +37,9 @@ internal interface IHttpStreamSession
     /// <see langword="true" /> when no response body is wanted (<c>-I</c>): an HTTP/3 stream then
     /// takes a reset after the final head as its end (ADR-0187).
     /// </param>
+    /// <param name="openedLines">
+    /// Reports curl's <c>-v</c> lines for the stream once its head is sent, or <see langword="null" /> for none.
+    /// </param>
     /// <returns>The stream.</returns>
-    IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody);
+    IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null);
 }

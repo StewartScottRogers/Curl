@@ -98,6 +98,22 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     /// <inheritdoc />
     public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
+    /// <summary>
+    /// Gets the plaintext connection <see cref="ClearTlsAsync" /> hands back;
+    /// <see langword="null" />, the default, for a TLS shutdown that fails.
+    /// </summary>
+    public IConnection? ClearedTo { get; init; }
+
+    /// <summary>Gets each <c>sendCloseNotifyFirst</c> <see cref="ClearTlsAsync" /> was called with, in order.</summary>
+    public List<bool> ClearTlsRequests { get; } = [];
+
+    /// <inheritdoc />
+    public ValueTask<IConnection?> ClearTlsAsync(bool sendCloseNotifyFirst, CancellationToken cancellationToken)
+    {
+        ClearTlsRequests.Add(sendCloseNotifyFirst);
+        return ValueTask.FromResult(ClearedTo);
+    }
+
     /// <inheritdoc />
     public ValueTask DisposeAsync()
     {

@@ -109,8 +109,22 @@ internal static class TlsClientOptionsMapping
     /// <c>--capath</c> for the proxy, and <see cref="CommandLineOptions.ProxyMinimumTlsVersion" />
     /// (<c>--proxy-tlsv1</c>) as <see cref="TlsClientOptions.MinimumVersion" />, and
     /// <see cref="CommandLineOptions.ProxyAutoClientCertificate" /> (<c>--proxy-ssl-auto-client-cert</c>) as
-    /// <see cref="TlsClientOptions.AutoClientCertificate" /> (ADR-0191); every other setting is
-    /// its default. Neither the target's minimum nor <c>--tls-max</c> reaches the proxy: curl 8.21.0
+    /// <see cref="TlsClientOptions.AutoClientCertificate" /> (ADR-0191), and the proxy's client certificate
+    /// and cipher lists as the target's counterparts map (BL-606):
+    /// <see cref="CommandLineOptions.ProxyClientCertificate" /> (<c>--proxy-cert</c>),
+    /// <see cref="CommandLineOptions.ProxyPrivateKey" /> (<c>--proxy-key</c>),
+    /// <see cref="CommandLineOptions.ProxyClientCertificateType" /> (<c>--proxy-cert-type</c>, as
+    /// <see cref="TlsClientOptions.CertificateType" />),
+    /// <see cref="CommandLineOptions.ProxyPrivateKeyType" /> (<c>--proxy-key-type</c>),
+    /// <see cref="CommandLineOptions.ProxyPassphrase" /> (<c>--proxy-pass</c>),
+    /// <see cref="CommandLineOptions.ProxyCiphers" /> (<c>--proxy-ciphers</c>) and
+    /// <see cref="CommandLineOptions.ProxyTls13Ciphers" /> (<c>--proxy-tls13-ciphers</c>), each verbatim;
+    /// and, as the target's counterparts map (BL-611), <see cref="CommandLineOptions.ProxyPinnedPublicKey" />
+    /// (<c>--proxy-pinnedpubkey</c>) as <see cref="TlsClientOptions.PinnedPublicKey" /> and
+    /// <see cref="CommandLineOptions.ProxyCertificateRevocationListFile" /> (<c>--proxy-crlfile</c>) as
+    /// <see cref="TlsClientOptions.CertificateRevocationListFile" />, verbatim. <c>--proxy-ca-native</c> and
+    /// <c>--proxy-ssl-allow-beast</c> map to nothing, as <c>--ca-native</c> (ADR-0124) and <c>--ssl-allow-beast</c> do;
+    /// every other setting is its default. Neither the target's minimum nor <c>--tls-max</c> reaches the proxy: curl 8.21.0
     /// completes the handshake with a TLS 1.2-only HTTPS proxy under <c>--tlsv1.3</c> and under
     /// <c>--tls-max 1.1</c> (measured, BL-502).
     /// </returns>
@@ -120,7 +134,16 @@ internal static class TlsClientOptionsMapping
             MinimumVersion: ToTlsVersion(options.ProxyMinimumTlsVersion),
             CaCertificateFile: options.ProxyCaCertificateFile,
             CaCertificateDirectory: options.ProxyCaCertificateDirectory ?? options.CaCertificateDirectory,
-            AutoClientCertificate: options.ProxyAutoClientCertificate);
+            ClientCertificate: options.ProxyClientCertificate,
+            PrivateKey: options.ProxyPrivateKey,
+            Ciphers: options.ProxyCiphers,
+            Tls13Ciphers: options.ProxyTls13Ciphers,
+            CertificateType: options.ProxyClientCertificateType,
+            PrivateKeyType: options.ProxyPrivateKeyType,
+            Passphrase: options.ProxyPassphrase,
+            AutoClientCertificate: options.ProxyAutoClientCertificate,
+            PinnedPublicKey: options.ProxyPinnedPublicKey,
+            CertificateRevocationListFile: options.ProxyCertificateRevocationListFile);
 
     /// <summary>
     /// Maps the TLS options that reach the DNS-over-HTTPS server onto the <see cref="TlsClientOptions" />

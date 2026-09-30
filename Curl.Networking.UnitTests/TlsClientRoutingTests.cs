@@ -46,6 +46,20 @@ public sealed class TlsClientRoutingTests
         [new TlsClientOptions(Insecure: true, MaximumVersion: TlsVersion.Tls11)],
     ];
 
+    // ADR-0151's row: --curves or --sigalgs, whose lists SslStream leaves to the operating system.
+    public static IEnumerable<object[]> CurvesAndSigalgsOptionSets =>
+    [
+        [new TlsClientOptions(Curves: "X25519")],
+        [new TlsClientOptions(SignatureAlgorithms: "ECDSA+SHA256")],
+        [new TlsClientOptions(Curves: "P-384", SignatureAlgorithms: "rsa_pss_rsae_sha256")],
+        [new TlsClientOptions(Insecure: true, MaximumVersion: TlsVersion.Tls12, Curves: "bogus")],
+    ];
+
+    [TestMethod]
+    [DynamicData(nameof(CurvesAndSigalgsOptionSets))]
+    public void Choose_WithCurvesOrSigalgs_IsTheHandBuiltClient(TlsClientOptions options) =>
+        Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(options));
+
     [TestMethod]
     [DynamicData(nameof(PlainOptionSets))]
     public void Choose_WithAPlainOptionSet_IsSslStream(TlsClientOptions options) =>

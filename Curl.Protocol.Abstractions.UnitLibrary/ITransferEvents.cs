@@ -74,6 +74,19 @@ public interface ITransferEvents
     }
 
     /// <summary>
+    /// Reports the OpenSSL <c>X509_V_</c> code a TLS connection's certificate check ended
+    /// with, whether the handshake went on or not: the source of <c>%{ssl_verify_result}</c>
+    /// and <c>%{proxy_ssl_verify_result}</c> in the OpenSSL build (BL-661). The Schannel
+    /// build reports none, so those print <c>0</c>.
+    /// </summary>
+    /// <param name="verifyResult">The code, such as <c>0</c> for verified or <c>18</c> for a self-signed certificate.</param>
+    /// <param name="isProxy">Whether the connection was to an HTTPS proxy rather than the origin.</param>
+    /// <remarks>Does nothing by default.</remarks>
+    void ReportCertificateVerifyResult(long verifyResult, bool isProxy)
+    {
+    }
+
+    /// <summary>
     /// Reports request head bytes exactly as written (<c>CURLINFO_HEADER_OUT</c>), CRLFs
     /// included, one call per write of a head.
     /// </summary>

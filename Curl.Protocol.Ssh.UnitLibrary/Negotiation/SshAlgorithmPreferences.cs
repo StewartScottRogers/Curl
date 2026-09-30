@@ -21,6 +21,9 @@ public sealed record SshAlgorithmPreferences(
     IReadOnlyList<string> Mac,
     IReadOnlyList<string> Compression)
 {
+    /// <summary>The <see cref="CryptographyBackend" /> of <see cref="OpenSslReference" />.</summary>
+    internal const string OpenSslBackend = "OpenSSL";
+
     private const string SignalNames = ",ext-info-c,kex-strict-c-v00@openssh.com";
 
     private const string FiniteFieldKeyExchanges =
@@ -118,7 +121,7 @@ public sealed record SshAlgorithmPreferences(
         Split(OpenSslCiphers),
         Split(OpenSslMacs),
         [SshAlgorithmCatalogue.NoCompression])
-    { CryptographyBackend = "OpenSSL", HostKeysNeverAgreed = Split(EcdsaCertificateHostKeys + "," + RsaCertificateHostKeys) };
+    { CryptographyBackend = OpenSslBackend, HostKeysNeverAgreed = Split(EcdsaCertificateHostKeys + "," + RsaCertificateHostKeys) };
 
     /// <summary>
     /// Gets every algorithm libssh2 1.11.1 or libssh 0.12.2 offers, in ADR-0122's full-set

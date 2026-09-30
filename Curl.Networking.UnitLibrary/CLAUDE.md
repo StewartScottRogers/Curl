@@ -14,9 +14,13 @@ answers SRV lookups through `DnsServerResolver.ResolveServiceAsync` (BL-527, ADR
 
 Per ADR-0140 and ADR-0162 (BL-708) there are two TLS providers, and `TlsClientRouting.Choose`
 picks one from a `TlsClientOptions` as one pure function: `HandBuiltTlsProvider` when a row of
-ADR-0140's table holds (today a `MaximumVersion` of TLS 1.0 or 1.1, and `RequireCertificateStatus`
-for `--cert-status` by ADR-0191; each option task adds its row and a data row in
-`TlsClientRoutingTests`), `SslStreamTlsProvider` otherwise. With `--cert-status` the hand-built
+ADR-0140's table holds (today a `MaximumVersion` of TLS 1.0 or 1.1, `RequireCertificateStatus`
+for `--cert-status` by ADR-0191, and `Curves` or `SignatureAlgorithms` by ADR-0151; each option task
+adds its row and a data row in `TlsClientRoutingTests`), `SslStreamTlsProvider` otherwise. Per
+ADR-0284 (BL-709) `CurvesAndSignatureAlgorithms.Apply` reads `--curves` through `OpenSslGroupList`
+and `--sigalgs` through `OpenSslSignatureAlgorithmList` (OpenSSL 3.5's syntax on every platform)
+and swaps the result into the profile's `supported_groups`, `key_share` and `signature_algorithms`;
+a refused value is exit 59 and an empty list exit 35, with OpenSSL's text. With `--cert-status` the hand-built
 client asks for the stapled OCSP response and a rejected one is exit 91 with
 `CertificateStatusFailureMessages`' text on every platform. Per ADR-0191 `--ssl-auto-client-cert`
 (`TlsClientOptions.AutoClientCertificate`) without `--cert` makes `ClientCertificateLoader.Load`
@@ -113,6 +117,10 @@ and `TcpConnector` passes them on. Per ADR-0085's BL-404 amendment a successful 
 also reported as a `TlsHandshakeEvent` through the provider's four-argument overload
 (`IHandshakeReportingTlsProvider`), to which `TcpConnector` passes the target's `Events`; the
 event's `CertificateVerifyResult` is OpenSSL's `X509_V_` code as `OpenSslVerifyResult` maps it.
+Per ADR-0282 (BL-661) the OpenSSL build also reports that code through
+`ITransferEvents.ReportCertificateVerifyResult` once the certificate was judged, the handshake
+failing or not (`PeerVerification.ReportVerifyResult`), `1` for a host name refused without `-k`;
+the Schannel build reports none. A trust error beats a date error in `OfChainStatus`.
 Per BL-452 the provider reports a `TlsTrustEvent` before each handshake, once the cipher suites
 and client certificate are ready (`-k`, the `--cacert` file or else the reference build's
 default bundle name `/cacert.pem`, which is named but never read, and `--capath`), sets the
@@ -163,19 +171,35 @@ comes from `HttpProxyTunnelOptions.ProxyAuthenticator` (`PreemptiveBasicProxyAut
 when none is given) for `ProxyAuthSchemes`: asked first with no challenge, and after a `407` to a
 CONNECT that sent none with its `Proxy-Authenticate` values, the answer sent on the same
 connection after the `Content-Length` body unless the reply closes it or is chunked, else on a
-newly dialled one. A `407` to a CONNECT that sent a credential is exit 7. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
+newly dialled one. A `407` to a CONNECT that sent a credential goes on through `ContinueAuthorizationAsync`, which only NTLM (Type 3 for the Type 2) and Negotiate (the next token) answer (ADR-0270, BL-604); otherwise it is exit 7, or the authenticator's exit code (94) when it fails. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
 `Socks5Hostname`) `SocksProxyTunnel` runs curl 8.21.0's handshake, measured byte for byte
 (BL-213): `Socks4Handshake` resolves the target locally and sends its first IPv4 address,
 SOCKS4a sends the host as written; `Socks5Handshake` offers no authentication and GSSAPI (and
 user name and password with a credential), resolves locally for SOCKS5 and sends the name for
 SOCKS5h. Every read takes exactly the reply's bytes, so the tunnel's bytes stay on the
-connection. A refused or cut-short handshake is exit 97 with curl's message; GSSAPI is offered
-but not implemented, so a proxy that picks it fails with the message the reference build's SSPI
-printed. ADR-0084 records these choices (first address, literals, UTF-8, disposal). Through an HTTPS proxy (`Https`, BL-266) TLS runs to the proxy host first, then the same CONNECT
+connection. A refused or cut-short handshake is exit 97 with curl's message. ADR-0084 records
+these choices (first address, literals, UTF-8, disposal). Per ADR-0276 (BL-615) `TcpConnector`
+takes optional `Socks5AuthenticationOptions` (`--socks5-basic`, `--socks5-gssapi`, and the
+GSS-API service, NEC mode, delegation and `ISecurityContextFactory`): the greeting offers only
+the methods allowed and a proxy picking another fails with curl's message, and a proxy picking
+GSSAPI gets `Socks5GssapiNegotiation`, RFC 1961's Kerberos token exchange and its protection-level
+message offering none, in the platform build's texts (`Socks5GssapiFailureText`). Tests script
+the context with `Fakes/ScriptedSecurityContextFactory`. Through an HTTPS proxy (`Https`, BL-266) TLS runs to the proxy host first, then the same CONNECT
 over it, then TLS to the target inside that; each handshake failure is the TLS provider's result.
 The handshake to the proxy runs through the proxy's `ITlsProvider` (the `--proxy-*` TLS options,
 ADR-0095), and so does the handshake to an HTTPS forward proxy (`ConnectTarget.IsForwardProxy`
 with `UseTls`), which curl 8.21.0 verifies with `--proxy-insecure` and never `-k` (measured, BL-441).
+Per ADR-0273 (BL-614) `TcpConnector` takes an optional `preProxy` (`--preproxy`, a SOCKS proxy):
+an `Http`, `Http10` or `Https` proxy, and a forward-proxy target, are then reached through it -
+the pre-proxy resolved (exit 5 names it) and dialled (exit 7 names the HTTP proxy `over proxy`
+the pre-proxy), its SOCKS handshake opened to the HTTP proxy, and the CONNECT, proxy TLS or
+forwarded request run inside. A SOCKS `ConnectTarget.Proxy` and a direct target never use it.
+Per BL-616 `TcpConnector` takes an optional `HaproxyProtocolHeader` (`--haproxy-protocol`,
+`--haproxy-clientip`) and writes its PROXY protocol v1 line first on every new connection, once any
+tunnel is open and before the target's TLS handshake, from the socket's own ends (the proxy's through
+a proxy): `PROXY TCP4|TCP6 <local> <remote> <local port> <remote port>`, the client IP verbatim for both
+addresses (`TCP4` only for a strict dotted quad), `PROXY UNKNOWN` over a Unix domain socket, all
+measured against curl 8.21.0.
 
 `TcpConnector` applies `--resolve` through `ResolveOverrides` and `--connect-to` through
 `ConnectToMappings`, both built from the verbatim option values and parsed as curl 8.21.0
@@ -224,6 +248,18 @@ included (ADR-0109), and returns a reused one with
 connection is reported `with proxy` (`ConnectionReusedEvent.IsProxy`) when the target is a
 forward proxy (`ConnectTarget.IsForwardProxy`) or tunnels through one, naming the proxy's host
 and port for a tunnel, as curl 8.21.0 prints it (BL-360).
+
+Per BL-717 a pooled connection whose `IConnectionSession` multiplexes (HTTP/2) is shared, not
+checked out: while its session's `ConcurrentTransferLimit` has streams to spare, a transfer with the
+same key gets another `PooledConnection` lease on it (`* Multiplexed connection found`), and once
+the limit is taken the next opens its own after `* MAX_CONCURRENT_STREAMS reached, skip (N)`.
+`IConnection.IsSharedWithAnotherTransfer` tells the handler whether another lease still holds it,
+so only the last one to end reports it left intact; the connection goes back to the pool (or
+closes) when the last lease ends, pooled only if every lease marked it reusable and none asked
+`ClearTlsAsync`. With `WaitsForMultiplexing` (`-Z` without `--parallel-immediate`, curl's
+`CURLOPT_PIPEWAIT`) a transfer that finds a connection with its key still being opened waits
+(`MultiplexingNegotiation`) until it holds a session or turns out not to multiplex, as curl 8.18.0
+does (measured, BL-717 Notes).
 
 Per ADR-0269 (BL-600) `TcpConnector` takes an optional `LocalBinding` (`--interface`, `--local-port`)
 and dials every TCP address, a proxy's included, through the internal `LocalBindingTcpDialer`, which

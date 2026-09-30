@@ -14,6 +14,12 @@ internal static class OpenSslVerifyResult
     /// <summary><c>X509_V_OK</c>.</summary>
     internal const long Ok = 0;
 
+    /// <summary>
+    /// <c>X509_V_ERR_UNSPECIFIED</c>: what curl's OpenSSL build reports once its own host name
+    /// check refused a certificate, whatever the chain's code (measured 2026-09-30, BL-661).
+    /// </summary>
+    internal const long Unspecified = 1;
+
     /// <summary><c>X509_V_ERR_UNABLE_TO_GET_CRL</c>: no <c>--crlfile</c> list is from the certificate's issuer.</summary>
     internal const long UnableToGetCertificateRevocationList = 3;
 
@@ -89,9 +95,11 @@ internal static class OpenSslVerifyResult
     }
 
     /// <summary>
-    /// Returns the code for a chain's combined status. OpenSSL checks validity dates after it
-    /// builds the chain, and keeps the last error it saw, so a date error wins over a trust
-    /// error.
+    /// Returns the code for a chain's combined status. OpenSSL reports a chain it cannot trust
+    /// before it checks validity dates, so a trust error wins over a date error: curl 8.18.0's
+    /// OpenSSL build printed 18 for an expired self-signed certificate and 20 for an expired
+    /// leaf of an untrusted issuer, and 10 only once <c>--cacert</c> trusted them (measured
+    /// 2026-09-30, BL-661 Notes; BL-150 measured the same).
     /// </summary>
     /// <param name="status">Every status flag of the chain, combined.</param>
     /// <param name="chainLength">How many certificates the chain holds.</param>
@@ -99,17 +107,19 @@ internal static class OpenSslVerifyResult
     /// <returns>The code, or <see langword="null" /> when the status has no known code.</returns>
     internal static long? OfChainStatus(X509ChainStatusFlags status, int chainLength, bool anyNotYetValid)
     {
-        if ((status & X509ChainStatusFlags.NotTimeValid) != 0)
-        {
-            return anyNotYetValid ? CertificateNotYetValid : CertificateHasExpired;
-        }
-
         if ((status & X509ChainStatusFlags.UntrustedRoot) != 0)
         {
             return chainLength == 1 ? DepthZeroSelfSignedCertificate : SelfSignedCertificateInChain;
         }
 
-        return (status & X509ChainStatusFlags.PartialChain) != 0 ? UnableToGetIssuerCertificateLocally : null;
+        if ((status & X509ChainStatusFlags.PartialChain) != 0)
+        {
+            return UnableToGetIssuerCertificateLocally;
+        }
+
+        return (status & X509ChainStatusFlags.NotTimeValid) != 0
+            ? anyNotYetValid ? CertificateNotYetValid : CertificateHasExpired
+            : null;
     }
 
     private static bool IsAnyNotYetValid(X509Chain chain, DateTimeOffset now)

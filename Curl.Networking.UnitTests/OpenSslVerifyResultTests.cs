@@ -42,8 +42,8 @@ public sealed class OpenSslVerifyResultTests
     }
 
     [TestMethod]
-    [DataRow(-10, -5, OpenSslVerifyResult.CertificateHasExpired)]
-    [DataRow(5, 10, OpenSslVerifyResult.CertificateNotYetValid)]
+    [DataRow(-10, -5, OpenSslVerifyResult.DepthZeroSelfSignedCertificate)]
+    [DataRow(5, 10, OpenSslVerifyResult.DepthZeroSelfSignedCertificate)]
     [DataRow(-1, 1, OpenSslVerifyResult.DepthZeroSelfSignedCertificate)]
     public void Of_SelfSignedChain_ReturnsTheCodeForItsStatus(int notBeforeDays, int notAfterDays, long expected)
     {
@@ -61,7 +61,9 @@ public sealed class OpenSslVerifyResultTests
     }
 
     [TestMethod]
-    [DataRow(X509ChainStatusFlags.NotTimeValid | X509ChainStatusFlags.UntrustedRoot, 1, false, OpenSslVerifyResult.CertificateHasExpired)]
+    [DataRow(X509ChainStatusFlags.NotTimeValid | X509ChainStatusFlags.UntrustedRoot, 1, false, OpenSslVerifyResult.DepthZeroSelfSignedCertificate)]
+    [DataRow(X509ChainStatusFlags.NotTimeValid | X509ChainStatusFlags.PartialChain, 1, false, OpenSslVerifyResult.UnableToGetIssuerCertificateLocally)]
+    [DataRow(X509ChainStatusFlags.NotTimeValid, 1, false, OpenSslVerifyResult.CertificateHasExpired)]
     [DataRow(X509ChainStatusFlags.NotTimeValid, 2, true, OpenSslVerifyResult.CertificateNotYetValid)]
     [DataRow(X509ChainStatusFlags.UntrustedRoot, 1, false, OpenSslVerifyResult.DepthZeroSelfSignedCertificate)]
     [DataRow(X509ChainStatusFlags.UntrustedRoot, 2, false, OpenSslVerifyResult.SelfSignedCertificateInChain)]

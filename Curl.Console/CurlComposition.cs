@@ -363,10 +363,16 @@ internal static class CurlComposition
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(proxyTlsClientOptions, timeProvider);
-        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options);
+        LateBoundSecurityContextFactory proxyContexts = new();
+        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts);
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider);
-        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer);
+        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts);
+        UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider);
+        PoolingConnector poolingConnector = new(tcpConnector, timeProvider) { WaitsForMultiplexing = WaitsForMultiplexing(options) };
 
+        // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
+        // contexts come from, which can only be made once the connectors exist (BL-604).
+        proxyContexts.Bind(CreateSecurityContextFactory(poolingConnector, udpDatagramConnector));
         return new CurlTransports(
             dnsResolver,
             timeProvider,
@@ -378,9 +384,18 @@ internal static class CurlComposition
             proxyTunnelOptions,
             quicDialer,
             tcpConnector,
-            CreateUdpDatagramConnector(options, dnsResolver, timeProvider),
-            new PoolingConnector(tcpConnector, timeProvider));
+            udpDatagramConnector,
+            poolingConnector);
     }
+
+    /// <summary>
+    /// Tells whether a transfer waits for a connection to its origin that may yet multiplex rather
+    /// than open one of its own: curl sets <c>CURLOPT_PIPEWAIT</c> on every <c>-Z</c> transfer unless
+    /// <c>--parallel-immediate</c> is given (measured, BL-717 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> for <c>-Z</c> without <c>--parallel-immediate</c>.</returns>
+    internal static bool WaitsForMultiplexing(CommandLineOptions options) => options.Parallel && !options.ParallelImmediate;
 
     /// <summary>
     /// Creates the run's <see cref="TcpConnector" /> over the given pieces, with the
@@ -406,6 +421,10 @@ internal static class CurlComposition
     /// Opens the QUIC connections <c>--http3</c> and <c>--http3-only</c> ask for (ADR-0144, BL-732);
     /// <see langword="null" /> for a connector with no QUIC.
     /// </param>
+    /// <param name="socks5SecurityContexts">
+    /// Makes the Kerberos contexts SOCKS5 GSS-API runs on, with the <c>--socks5-*</c> options of
+    /// <see cref="Socks5AuthenticationMapping.FromCommandLine" /> (BL-615); <see langword="null" /> for none.
+    /// </param>
     /// <returns>The connector.</returns>
     internal static TcpConnector CreateTcpConnector(
         CommandLineOptions options,
@@ -415,7 +434,8 @@ internal static class CurlComposition
         TimeProvider timeProvider,
         HttpProxyTunnelOptions proxyTunnelOptions,
         ITlsProvider? proxyTlsProvider = null,
-        QuicDialer? quicDialer = null) =>
+        QuicDialer? quicDialer = null,
+        ISecurityContextFactory? socks5SecurityContexts = null) =>
         new(
             dnsResolver,
             tcpDialer,
@@ -430,7 +450,38 @@ internal static class CurlComposition
             UnixSocketOf(options),
             HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion),
             quicDialer,
-            localBinding: LocalBindingOf(options));
+            localBinding: LocalBindingOf(options),
+            preProxy: PreProxyOf(options),
+            socks5Authentication: Socks5AuthenticationMapping.FromCommandLine(options, socks5SecurityContexts, OperatingSystem.IsWindows()),
+            haproxyProtocol: HaproxyProtocolOf(options));
+
+    /// <summary>
+    /// The SOCKS proxy the connector reaches an HTTP or HTTPS proxy through: the <c>--preproxy</c>
+    /// value, with no scheme as SOCKS4 as curl 8.21.0 reads it (BL-614), or <see langword="null" />
+    /// when it is absent, empty, does not parse or is not a SOCKS proxy. The last three fail each
+    /// transfer in <see cref="TransferProxySelection" /> before anything connects.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The pre-proxy, or <see langword="null" />.</returns>
+    internal static ProxyEndpoint? PreProxyOf(CommandLineOptions options) =>
+        !string.IsNullOrEmpty(options.PreProxy)
+        && ProxyUrlParser.TryParse(options.PreProxy, ProxyKind.Socks4, out ProxyEndpoint? preProxy, out _)
+        && preProxy.Kind is not (ProxyKind.Http or ProxyKind.Https)
+            ? preProxy
+            : null;
+
+    /// <summary>
+    /// The HAProxy PROXY protocol v1 line the TCP connector sends first on each connection:
+    /// with <c>--haproxy-protocol</c>, or with <c>--haproxy-clientip</c> alone, which turns it on
+    /// even after <c>--no-haproxy-protocol</c> as curl 8.21.0's libcurl does (measured, BL-616
+    /// Notes); <see langword="null" /> for neither.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The header, or <see langword="null" />.</returns>
+    internal static HaproxyProtocolHeader? HaproxyProtocolOf(CommandLineOptions options) =>
+        options.HaproxyProtocol || options.HaproxyClientIp is not null
+            ? new HaproxyProtocolHeader(options.HaproxyClientIp)
+            : null;
 
     /// <summary>
     /// What the TCP connector binds each connection's local end to, from <c>--interface</c> and
@@ -547,14 +598,15 @@ internal static class CurlComposition
     /// and the proxy authenticated with the scheme the <c>--proxy-*</c> auth switches pick
     /// (<see cref="CommandLineOptions.ProxyAuthSchemes" />), answered by the same
     /// <see cref="CreateHttpAuthenticator" /> the origin uses: Basic up front, Digest and
-    /// <c>--proxy-anyauth</c> after a <c>407</c> (ADR-0186). Its Negotiate and NTLM contexts come
-    /// from a <see cref="SystemSecurityContextFactory" />, with the <c>--proxy-service-name</c> and
-    /// <c>--delegation</c> of <see cref="NegotiateOptionsMapping.FromCommandLine" />, though the
-    /// authenticator answers neither for a proxy yet (BL-604).
+    /// <c>--proxy-anyauth</c> after a <c>407</c> (ADR-0186), NTLM's Type 1 and Type 3 and
+    /// Negotiate's tokens on the same connection (ADR-0270). Its Negotiate and NTLM contexts come
+    /// from <paramref name="securityContexts" />, with the <c>--proxy-service-name</c> and
+    /// <c>--delegation</c> of <see cref="NegotiateOptionsMapping.FromCommandLine" />.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
+    /// <param name="securityContexts">Makes the proxy's NTLM and Negotiate contexts: <see cref="CreateSecurityContextFactory" />'s router in production.</param>
     /// <returns>The tunnel's options.</returns>
-    internal static HttpProxyTunnelOptions CreateProxyTunnelOptions(CommandLineOptions options) =>
+    internal static HttpProxyTunnelOptions CreateProxyTunnelOptions(CommandLineOptions options, ISecurityContextFactory securityContexts) =>
         new(
             options.UserAgent switch
             {
@@ -567,7 +619,7 @@ internal static class CurlComposition
             ProxyHeaders = options.ProxyHeaders,
             CommandLineTextEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()),
             ProxyAuthSchemes = options.ProxyAuthSchemes,
-            ProxyAuthenticator = CreateHttpAuthenticator(new SystemSecurityContextFactory(), NegotiateOptionsMapping.FromCommandLine(options)),
+            ProxyAuthenticator = CreateHttpAuthenticator(securityContexts, NegotiateOptionsMapping.FromCommandLine(options)),
         };
 
     /// <summary>

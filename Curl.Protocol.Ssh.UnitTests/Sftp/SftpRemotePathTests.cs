@@ -37,14 +37,52 @@ public sealed class SftpRemotePathTests
     }
 
     [TestMethod]
-    [DataRow("/~/f", "/home/fake/f", DisplayName = "home prefix")]
-    [DataRow("/~/", "/home/fake/", DisplayName = "home prefix alone")]
-    [DataRow("/~", "/~", DisplayName = "tilde without a slash")]
-    [DataRow("/x/~/f", "/x/~/f", DisplayName = "tilde further in")]
-    public void Resolve_Path_ReplacesOnlyALeadingHomePrefix(string path, string expected)
+    [DataRow("/~", true, DisplayName = "tilde alone, the home directory")]
+    [DataRow("/%7E", true, DisplayName = "escaped tilde alone")]
+    [DataRow("/~x", false, DisplayName = "tilde and a name")]
+    [DataRow("~", false, DisplayName = "tilde without the slash")]
+    public void NamesDirectory_TildePath_IsTrueOnlyForTheHomeDirectory(string urlPath, bool expected)
     {
-        byte[] resolved = SftpRemotePath.Resolve(Encoding.UTF8.GetBytes(path), Encoding.UTF8.GetBytes("/home/fake"));
+        Assert.AreEqual(expected, SftpRemotePath.NamesDirectory(urlPath));
+    }
+
+    [TestMethod]
+    [DataRow("/~/f", "/home/fake", "/home/fake/f", DisplayName = "home prefix")]
+    [DataRow("/~/", "/home/fake", "/home/fake/", DisplayName = "home prefix alone")]
+    [DataRow("/~", "/home/fake", "/home/fake/", DisplayName = "tilde alone, as measured")]
+    [DataRow("/~/f", "/home/fake/", "/home/fake/f", DisplayName = "home ending with a slash gains no second one")]
+    [DataRow("/~/", "/", "/", DisplayName = "root home prefix alone")]
+    [DataRow("/~", "/", "//", DisplayName = "root home, tilde alone")]
+    [DataRow("/~/f", "", "f", DisplayName = "empty home")]
+    [DataRow("/~x", "/home/fake", "/~x", DisplayName = "tilde and a name")]
+    [DataRow("/x/~/f", "/home/fake", "/x/~/f", DisplayName = "tilde further in")]
+    public void Resolve_Path_ReplacesALeadingHomeDirectoryAsCurlDoes(string path, string homeDirectory, string expected)
+    {
+        byte[] resolved = SftpRemotePath.Resolve(Encoding.UTF8.GetBytes(path), Encoding.UTF8.GetBytes(homeDirectory));
 
         Assert.AreEqual(expected, Encoding.UTF8.GetString(resolved));
+    }
+
+    [TestMethod]
+    [DataRow("/%7E/a%20b", "/home/fake/a b", DisplayName = "escaped tilde and space")]
+    [DataRow("/~", "/home/fake/", DisplayName = "tilde alone")]
+    public void ResolveUrlPath_UrlPath_DecodesThenResolves(string urlPath, string expected)
+    {
+        byte[] resolved = SftpRemotePath.ResolveUrlPath(urlPath, Encoding.UTF8.GetBytes("/home/fake"));
+
+        Assert.AreEqual(expected, Encoding.UTF8.GetString(resolved));
+    }
+
+    [TestMethod]
+    [DataRow("/~/bl572/files/a%00.txt", DisplayName = "as measured")]
+    [DataRow("/%00", DisplayName = "zero byte alone")]
+    public void ResolveUrlPath_ZeroByte_ThrowsExit3AsMeasured(string urlPath)
+    {
+        SshTransferException failure = Assert.ThrowsExactly<SshTransferException>(
+            () => SftpRemotePath.ResolveUrlPath(urlPath, Encoding.UTF8.GetBytes("/home/fake")));
+
+        Assert.AreEqual(Curl.Protocol.Abstractions.CurlExitCode.UrlMalformat, failure.ExitCode);
+        Assert.AreEqual("URL using bad/illegal format or missing URL", failure.Message);
+        Assert.IsFalse(failure.IsVerboseLine);
     }
 }

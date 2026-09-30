@@ -171,6 +171,7 @@ internal static class HttpProxyTunnel
             ProxyAuthenticate = proxyAuthenticate,
             ContentLength = contentLength,
             LeavesConnectionReusable = reusable,
+            Head = header.ToArray(),
         };
     }
 

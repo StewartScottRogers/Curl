@@ -98,7 +98,7 @@ curl's `sftp_quote`, `sftp_quote_stat` and `Curl_get_pathname`:
 ## Consequences
 
 - Real curl closes the channel after a failed quote command or a failed open, before
-  `DISCONNECT`. This library still leaves it open for either. BL-973 aligns both.
+  `DISCONNECT`. BL-973 aligned both (ADR-0274).
 - The working path `pwd` prints is the one the transfer opens (`SftpRemotePath.Resolve`). A
   URL path of `/~` alone, which curl lists as the home directory, is BL-974's.
 - `--ai-help` is unchanged: no option was added or changed.

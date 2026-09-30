@@ -213,7 +213,6 @@ public sealed class RankedHttpAuthenticatorTests
 
     [TestMethod]
     [DataRow(HttpAuthSchemes.Any, false, "Negotiate", DisplayName = "--anyauth: no pick before the challenge")]
-    [DataRow(HttpAuthSchemes.Negotiate, true, "Negotiate", DisplayName = "proxy")]
     [DataRow(HttpAuthSchemes.Negotiate, false, "Basic realm=\"r\"", DisplayName = "Negotiate not offered")]
     public async Task CreateAuthorizationAsync_NegotiateNotTheOnePickWithoutCredential_StepsNoContext(HttpAuthSchemes allowed, bool isProxy, string challenge)
     {
@@ -240,15 +239,74 @@ public sealed class RankedHttpAuthenticatorTests
     }
 
     [TestMethod]
-    public async Task CreateAuthorizationAsync_ProxyOfferingNegotiate_LeavesItToTheProxyTask()
+    public async Task CreateAuthorizationAsync_ProxyOfferingNegotiate_AnswersForHttpOnTheProxysHost()
     {
-        ScriptedSecurityContextFactory contexts = new();
-        HttpAuthRequest request = Request(HttpAuthSchemes.Negotiate) with { IsProxy = true };
+        ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01])));
+
+        string? value = await WithContexts(contexts).CreateAuthorizationAsync(ProxyRequest(HttpAuthSchemes.Negotiate), ["Negotiate"], CancellationToken.None);
+
+        Assert.AreEqual("Negotiate AQ==", value);
+        Assert.AreEqual(SecurityMechanism.Negotiate, contexts.Requests.Single().Mechanism);
+        Assert.AreEqual("HTTP", contexts.Requests.Single().ServiceName);
+        Assert.AreEqual("proxy.test", contexts.Requests.Single().HostName);
+    }
+
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_ProxyNegotiateAloneBeforeAnyChallenge_TriesIt()
+    {
+        ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.NoCredentials, [])));
+        HttpAuthRequest request = ProxyRequest(HttpAuthSchemes.Negotiate) with { Credential = null };
+
+        string? value = await WithContexts(contexts).CreateAuthorizationAsync(request, [], CancellationToken.None);
+
+        Assert.IsNull(value);
+        Assert.HasCount(1, contexts.Requests);
+    }
+
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_Proxy407NegotiateWithoutCredential_StepsAContextAndSendsNothing()
+    {
+        ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.NoCredentials, [])));
+        HttpAuthRequest request = ProxyRequest(HttpAuthSchemes.Negotiate) with { Credential = null };
 
         string? value = await WithContexts(contexts).CreateAuthorizationAsync(request, ["Negotiate"], CancellationToken.None);
 
         Assert.IsNull(value);
-        Assert.IsEmpty(contexts.Requests);
+        Assert.HasCount(1, contexts.Requests);
+    }
+
+    [TestMethod]
+    public async Task ContinueAuthorizationAsync_ProxyNegotiateTokenInThe407_SendsTheContextsNextToken()
+    {
+        ScriptedSecurityContext context = new(
+            new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]),
+            new SecurityContextStep(SecurityContextStatus.Completed, [0x02]));
+        RankedHttpAuthenticator authenticator = WithContexts(new ScriptedSecurityContextFactory(context));
+        HttpAuthRequest request = ProxyRequest(HttpAuthSchemes.Negotiate);
+        string? sent = await authenticator.CreateAuthorizationAsync(request, [], CancellationToken.None);
+
+        string? value = await authenticator.ContinueAuthorizationAsync(request, sent!, sentBeforeAnyChallenge: true, ["Negotiate BA=="], CancellationToken.None);
+
+        Assert.AreEqual("Negotiate Ag==", value);
+    }
+
+    [TestMethod]
+    public async Task ProxyNtlm_Type1ThenType2_SendsType3ForHttpOnTheProxysHost()
+    {
+        ScriptedSecurityContextFactory contexts = new(
+            new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01])),
+            new ScriptedSecurityContext(
+                new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]),
+                new SecurityContextStep(SecurityContextStatus.Completed, [0x03])));
+        RankedHttpAuthenticator authenticator = WithContexts(contexts);
+        HttpAuthRequest request = ProxyRequest(HttpAuthSchemes.Ntlm);
+
+        string? type1 = await authenticator.CreateAuthorizationAsync(request, [], CancellationToken.None);
+        string? type3 = await authenticator.ContinueAuthorizationAsync(request, type1!, sentBeforeAnyChallenge: true, ["NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredChallenge], CancellationToken.None);
+
+        Assert.AreEqual("NTLM AQ==", type1);
+        Assert.AreEqual("NTLM Aw==", type3);
+        Assert.IsTrue(contexts.Requests.All(sent => sent is { Mechanism: SecurityMechanism.Ntlm, ServiceName: "HTTP", HostName: "proxy.test" }));
     }
 
     [TestMethod]
@@ -289,7 +347,6 @@ public sealed class RankedHttpAuthenticatorTests
     [TestMethod]
     [DataRow(HttpAuthSchemes.Ntlm, new string[0], false, true, DisplayName = "--ntlm without -u, before any challenge")]
     [DataRow(HttpAuthSchemes.Any, new[] { "NTLM" }, false, true, DisplayName = "--anyauth without -u, NTLM")]
-    [DataRow(HttpAuthSchemes.Ntlm, new[] { "NTLM" }, true, false, DisplayName = "Proxy offering NTLM: the proxy task's")]
     [DataRow(HttpAuthSchemes.Any, new string[0], false, false, DisplayName = "--anyauth, before any challenge")]
     public async Task CreateAuthorizationAsync_NtlmDoesNotAnswer_SendsNothing(HttpAuthSchemes allowed, string[] challenges, bool isProxy, bool withoutCredential)
     {
@@ -319,7 +376,6 @@ public sealed class RankedHttpAuthenticatorTests
     [DataRow(HttpAuthSchemes.Basic, "Basic dTpw", new[] { Basic }, false, DisplayName = "Basic refused")]
     [DataRow(HttpAuthSchemes.Any, "Digest x", new[] { Digest, "NTLM" }, false, DisplayName = "Digest refused, Digest still the pick")]
     [DataRow(HttpAuthSchemes.Ntlm, "NTLM AQ==", new string[0], false, DisplayName = "No challenge")]
-    [DataRow(HttpAuthSchemes.Ntlm, "NTLM AQ==", new[] { "NTLM" }, true, DisplayName = "A proxy's")]
     public async Task ContinueAuthorizationAsync_NotAnNtlmLeg_SendsNothing(HttpAuthSchemes allowed, string sent, string[] challenges, bool isProxy)
     {
         ScriptedSecurityContextFactory contexts = new();
@@ -346,7 +402,6 @@ public sealed class RankedHttpAuthenticatorTests
     }
 
     [TestMethod]
-    [DataRow(false, true, DisplayName = "A proxy's")]
     [DataRow(true, false, DisplayName = "No -u")]
     public async Task ContinueAuthorizationAsync_NotANegotiateLeg_SendsNothing(bool withoutCredential, bool isProxy)
     {
@@ -379,4 +434,7 @@ public sealed class RankedHttpAuthenticatorTests
 
     private static HttpAuthRequest Request(HttpAuthSchemes allowed) =>
         new("GET", CurlUrl.Parse("http://127.0.0.1:18218/a"), "/a", new NetworkCredential("u", "p"), null, allowed, IsProxy: false);
+
+    private static HttpAuthRequest ProxyRequest(HttpAuthSchemes allowed) =>
+        new("CONNECT", CurlUrl.Parse("http://proxy.test:3128/"), "example.test:80", new NetworkCredential("u", "p"), null, allowed, IsProxy: true);
 }

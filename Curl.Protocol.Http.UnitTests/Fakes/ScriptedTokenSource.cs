@@ -21,9 +21,13 @@ public sealed class ScriptedTokenSource(params SecurityContextStep[] steps) : IS
     /// <summary>Gets every incoming token the contexts were stepped with, in order.</summary>
     public List<byte[]> IncomingTokens { get; } = [];
 
+    /// <summary>Gets every request a context was made for, in order.</summary>
+    public List<SecurityContextRequest> Requests { get; } = [];
+
     /// <inheritdoc />
     public ISecurityContext Create(SecurityContextRequest request)
     {
+        Requests.Add(request);
         ContextsMade++;
         return new Context(this);
     }

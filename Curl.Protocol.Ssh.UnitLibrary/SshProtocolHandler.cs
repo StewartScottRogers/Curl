@@ -58,10 +58,12 @@ public sealed class SshProtocolHandler : IProtocolHandler
 
     private readonly Func<string, string?> readEnvironmentVariable;
 
+    private readonly ISshAgentConnector agentConnector;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="SshProtocolHandler" /> class that draws
-    /// its random bytes and ephemeral keys from the system and reads <c>HOME</c> from the
-    /// process's environment.
+    /// its random bytes and ephemeral keys from the system, reads <c>HOME</c> from the
+    /// process's environment, and finds the ssh-agent where this platform's curl looks.
     /// </summary>
     /// <param name="connector">Supplies the connection to the URL's host and port.</param>
     /// <param name="fileSystem">Where the known-hosts file and the user's key files are opened.</param>
@@ -76,7 +78,15 @@ public sealed class SshProtocolHandler : IProtocolHandler
     /// </param>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null" />.</exception>
     public SshProtocolHandler(IConnector connector, IFileSystem fileSystem, SshAlgorithmPreferences preferences, Encoding credentialEncoding)
-        : this(connector, fileSystem, preferences, credentialEncoding, new SystemSshRandomSource(), new SystemSshEphemeralKeySource(), Environment.GetEnvironmentVariable)
+        : this(
+            connector,
+            fileSystem,
+            preferences,
+            credentialEncoding,
+            new SystemSshRandomSource(),
+            new SystemSshEphemeralKeySource(),
+            Environment.GetEnvironmentVariable,
+            new SystemSshAgentConnector(Environment.GetEnvironmentVariable, OperatingSystem.IsWindows()))
     {
     }
 
@@ -91,6 +101,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     /// <param name="randomSource">Where cookies and padding come from.</param>
     /// <param name="ephemeralKeySource">Where the key exchange's ephemeral keys come from.</param>
     /// <param name="readEnvironmentVariable">Reads <c>HOME</c> for curl's default key files.</param>
+    /// <param name="agentConnector">Opens the connection to the user's ssh-agent.</param>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null" />.</exception>
     internal SshProtocolHandler(
         IConnector connector,
@@ -99,7 +110,8 @@ public sealed class SshProtocolHandler : IProtocolHandler
         Encoding credentialEncoding,
         ISshRandomSource randomSource,
         ISshEphemeralKeySource ephemeralKeySource,
-        Func<string, string?> readEnvironmentVariable)
+        Func<string, string?> readEnvironmentVariable,
+        ISshAgentConnector agentConnector)
     {
         this.connector = connector ?? throw new ArgumentNullException(nameof(connector));
         this.fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
@@ -108,6 +120,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         this.randomSource = randomSource;
         this.ephemeralKeySource = ephemeralKeySource;
         this.readEnvironmentVariable = readEnvironmentVariable;
+        this.agentConnector = agentConnector;
     }
 
     /// <inheritdoc />
@@ -214,7 +227,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     {
         ITransferEvents events = context.Events;
         SshUserKeySource userKeys = new(fileSystem, readEnvironmentVariable, target.Options, credentialEncoding);
-        SshUserAuthentication authentication = new(transport, credentialEncoding, userKeys, events);
+        SshUserAuthentication authentication = new(transport, credentialEncoding, userKeys, events, agentConnector);
         await authentication.RequestServiceAsync(context.CancellationToken).ConfigureAwait(false);
         SshHostKeyChecker.Check(hostKey, target.Host, target.Port, target.Options, target.KnownHosts, events);
         await authentication.AuthenticateAsync(context.Credentials, context.CancellationToken).ConfigureAwait(false);

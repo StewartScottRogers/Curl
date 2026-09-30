@@ -32,8 +32,9 @@ when a packet fails its tag.
 - **A failed tag is `LIBSSH2_ERROR_DECRYPT`, -12**, the AES-GCM code: libssh2 1.11.1's
   `decrypt()` returns it whenever an integrated-MAC cipher refuses a packet. Not measured:
   the Windows reference build offers the name but reaching it needs a server built from
-  these classes, as ADR-0212's run was, and BL-897 measures the AEAD codes on the OpenSSL
-  build. If it finds another code, one constant and its tests change.
+  these classes, as ADR-0212's run was. BL-897 (2026-09-30) confirmed -12 for AES-GCM on the
+  OpenSSL build, but there a chacha20-poly1305 packet with its tag or ciphertext altered
+  left curl printing nothing and not exiting; BL-1032 measures that case.
 - **A corrupted length** decrypts to a different `packet_length`. One off the block size or
   over the maximum is the framing failure ADR-0206 maps (`-8`, exit 2); one that happens to
   frame fails its tag (`-12`) or runs out of bytes, as the peer would see it.

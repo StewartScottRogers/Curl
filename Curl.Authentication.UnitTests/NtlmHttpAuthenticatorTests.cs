@@ -14,7 +14,7 @@ namespace Curl.Authentication;
 /// failing with exit 100 on curl's own NTLM (BL-849).
 /// </summary>
 [TestClass]
-public sealed class NtlmHttpAuthenticatorTests
+public sealed partial class NtlmHttpAuthenticatorTests
 {
     private static readonly byte[] Type1 = Convert.FromBase64String(HandBuiltNtlmSecurityContextTests.CurlType1);
 
@@ -27,7 +27,7 @@ public sealed class NtlmHttpAuthenticatorTests
     /// </summary>
     private const int LargestFittingUserLength = 414;
 
-    private static readonly string Type2Challenge ="NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredChallenge;
+    private static readonly string Type2Challenge = "NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredChallenge;
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_BeforeAnyChallenge_SendsType1()

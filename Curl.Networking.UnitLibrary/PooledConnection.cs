@@ -21,6 +21,8 @@ public sealed class PooledConnection : IConnection
     private readonly ITransferEvents _events;
     private bool _isReusable;
     private bool _isDisposed;
+    private bool _tlsClearingAsked;
+    private bool _wasSharedAtEnd;
 
     internal PooledConnection(PoolingConnector pool, PoolEntry underlying, ITransferEvents events)
     {
@@ -101,15 +103,38 @@ public sealed class PooledConnection : IConnection
     public bool TryHoldSession(IConnectionSession session)
     {
         _underlying.Session = session;
+        _pool.SessionHeld(_underlying);
         return true;
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Asks the underlying connection. Once asked, the connection is never pooled again,
+    /// whether TLS was cleared or not: its pool key names a TLS connection it no longer is.
+    /// </remarks>
+    public ValueTask<IConnection?> ClearTlsAsync(bool sendCloseNotifyFirst, CancellationToken cancellationToken)
+    {
+        _tlsClearingAsked = true;
+        return _underlying.Connection.ClearTlsAsync(sendCloseNotifyFirst, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// True while the pool has handed the underlying connection to another transfer as well,
+    /// because its session multiplexes (BL-717); once this lease is disposed, whether another
+    /// transfer still held it when this one handed it back, so of transfers ending together
+    /// only the last reports it left intact.
+    /// </remarks>
+    public bool IsSharedWithAnotherTransfer => _isDisposed ? _wasSharedAtEnd : _pool.IsShared(_underlying);
+
     /// <summary>
-    /// Returns the underlying connection to the pool when it was marked reusable and its
-    /// target is pooled, and closes it otherwise, shutting down any session it holds first. A
-    /// second call does nothing.
+    /// Ends this lease. While another transfer shares the underlying connection it stays open
+    /// for that one (BL-717); after the last lease it returns to the pool when every lease
+    /// marked it reusable, its target is pooled and TLS clearing was never asked of it, and
+    /// closes otherwise, shutting down any
+    /// session it holds first. A second call does nothing.
     /// </summary>
-    /// <returns>A task that completes when the connection is pooled or closed.</returns>
+    /// <returns>A task that completes when the connection is pooled or closed, or at once while it is still shared.</returns>
     public ValueTask DisposeAsync()
     {
         if (_isDisposed)
@@ -118,9 +143,10 @@ public sealed class PooledConnection : IConnection
         }
 
         _isDisposed = true;
+        _wasSharedAtEnd = _pool.EndLease(_underlying, _isReusable && !_tlsClearingAsked);
 
-        return _isReusable && _underlying.Key is not null
-            ? _pool.ReturnAsync(_underlying, _events)
-            : _underlying.CloseAsync();
+        return _wasSharedAtEnd
+            ? ValueTask.CompletedTask
+            : _pool.HandBackAsync(_underlying, _events);
     }
 }

@@ -43,6 +43,24 @@ public sealed class CurlCompositionNtlmTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ProxyNtlmThroughAForwardProxy_SendsType1ThenType3OnOneConnection()
+    {
+        // Measured (BL-604 Notes): curl -x http://127.0.0.1:18605 --proxy-ntlm -U u:p http://example.test/.
+        const string proxyRequest = "GET http://example.test/ HTTP/1.1\r\nHost: example.test\r\nProxy-Authorization: NTLM {0}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        TokenSource tokens = new();
+        ScriptedConnector server = Server("HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: NTLM " + Type2 + "\r\nContent-Length: 0\r\n\r\n", Ok);
+
+        CurlRun run = await RunAsync(server, tokens, "-x", "http://127.0.0.1:18605", "--proxy-ntlm", "-U", "u:p", "http://example.test/");
+
+        Assert.AreEqual(0, run.ExitCode);
+        Assert.AreEqual(string.Format(null, proxyRequest, "AQ==") + string.Format(null, proxyRequest, "Aw=="), Latin1(server.Written));
+        Assert.AreEqual("ok", run.StandardOutput);
+        Assert.HasCount(1, server.Targets);
+        CollectionAssert.AreEqual(Convert.FromBase64String(Type2), tokens.Contexts[1].IncomingTokens[1]);
+        Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1") { UserName = "u", Password = "p" }, tokens.Requests[1]);
+    }
+
+    [TestMethod]
     public async Task RunAsync_AnyauthOfferedBasicAndNtlm_AnswersNtlmInThreeLegs()
     {
         TokenSource tokens = new();

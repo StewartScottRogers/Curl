@@ -27,6 +27,12 @@ public sealed class CurlCompositionSshVerboseTests
 
     private static readonly string Start = $"* SSH: libssh2 cryptography backend: {Backend}\n* SSH: user 'tester'\n";
 
+    // WinCNG's libssh2 cannot say why the public key was not derived; OpenSSL's says the
+    // missing private key file did not open (BL-990).
+    private static readonly string MissingKeyDenied = OperatingSystem.IsWindows()
+        ? "Reason unknown (-1)"
+        : "Unable to extract public key from private key file: Unable to open private key file";
+
     [TestMethod]
     public async Task CreateRunner_SftpDownloadWithAPassword_WritesCurlsVerboseLines()
     {
@@ -41,7 +47,7 @@ public sealed class CurlCompositionSshVerboseTests
             + "* SSH: no knownhosts file configured\n"
             + "* SSH: host offers authentication via: publickey,password\n"
             + $"* SSH: trying private key file '{key}'\n"
-            + "* SSH: publickey authentication denied: Reason unknown (-1)\n"
+            + $"* SSH: publickey authentication denied: {MissingKeyDenied}\n"
             + "* SSH: initialized password authentication\n"
             + "* SSH: authentication complete\n"
             + "{ [11 bytes data]\n"

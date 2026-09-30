@@ -395,13 +395,14 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         {
             var handshakeStarted = _timeProvider.GetTimestamp();
             await AuthenticateSslStreamAsClientAsync(sslStream, authenticationOptions, cancellationToken).ConfigureAwait(false);
+            peerVerification.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
             events.ReportTlsHandshake(DescribeHandshake(sslStream, peerVerification, offeredApplicationProtocols) with
             {
                 IsProxy = isProxy,
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
             });
             return ConnectResult.Connected(
-                new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild)),
+                new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), clearsTls: !_matchesSchannelBuild),
                 new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
                 peerCertificates: peerCertificates,
                 applicationProtocol: NegotiatedApplicationProtocol(sslStream.NegotiatedApplicationProtocol));
@@ -414,6 +415,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         clientCertificate?.Dispose();
         await DisposeAfterFailedHandshakeAsync(sslStream, plaintext).ConfigureAwait(false);
         RethrowIfCancellation(failure);
+        peerVerification.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
 
         return verificationFailure is { } rejected
             ? ConnectResult.Failed(rejected.ExitCode, rejected.Message)

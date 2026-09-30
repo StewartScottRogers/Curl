@@ -38,6 +38,8 @@ internal sealed class ForwardingTransferContext(ITransferContext inner) : ITrans
     public bool FtpUseEprt => inner.FtpUseEprt;
     public TransportSecurityLevel SslLevel => inner.SslLevel;
     public bool FtpSslControlOnly => inner.FtpSslControlOnly;
+
+    public FtpCommandChannelClearing FtpCommandChannelClearing => inner.FtpCommandChannelClearing;
     public IReadOnlyList<string> QuoteCommands => inner.QuoteCommands;
     public bool ConvertLineEndings => inner.ConvertLineEndings;
     public UnixFileMode CreateFileMode => inner.CreateFileMode;

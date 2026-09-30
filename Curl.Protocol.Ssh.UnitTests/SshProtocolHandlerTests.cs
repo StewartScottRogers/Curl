@@ -3,7 +3,9 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
 
 namespace Curl.Protocol.Ssh;
@@ -79,6 +81,22 @@ public sealed partial class SshProtocolHandlerTests
             server,
             "service ssh-userauth", $"auth none {User} refused", $"auth password {User} ok", "channel open session", "subsystem sftp",
             "sftp 16 .", "sftp 11 /data/", "sftp 12 /data/", "sftp 12 /data/", "sftp 4 /data/", "channel eof", "channel close", "disconnect 11 Shutdown");
+    }
+
+    [TestMethod]
+    [DataRow("/~", DisplayName = "tilde alone, as measured")]
+    [DataRow("/~/", DisplayName = "home prefix alone, as measured")]
+    public async Task ExecuteAsync_SftpHomeDirectoryPath_ListsTheHomeDirectoryAsMeasured(string path)
+    {
+        InMemorySshServer server = Server();
+        server.Files[InMemorySshServer.DefaultHomeDirectory + "/notes.txt"] = Hello;
+        byte[] expected = Encoding.UTF8.GetBytes(string.Format(CultureInfo.InvariantCulture, "-rw-r--r--    1 {0} {0}       11 Jan  1  2026 notes.txt\n", User));
+
+        Outcome outcome = await RunAsync(server, $"sftp://{Host}{path}");
+
+        Assert.AreEqual(TransferResult.Success(expected.Length), outcome.Result);
+        CollectionAssert.AreEqual(expected, outcome.Output);
+        CollectionAssert.Contains(server.Events.ToList(), "sftp 11 /home/fake/");
     }
 
     [TestMethod]
@@ -432,6 +450,20 @@ public sealed partial class SshProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("sftp", "", "-43, Failed getting banner", DisplayName = "sftp, reset before the banner")]
+    [DataRow("scp", "", "-43, Failed getting banner", DisplayName = "scp, reset before the banner")]
+    [DataRow("sftp", "SSH-2.0-OpenSSH_9.6\r\n", "-1, Unable to exchange encryption keys", DisplayName = "sftp, reset after the banner")]
+    public async Task ExecuteAsync_ServerResetsTheConnection_FailsWithExit2AsMeasured(string scheme, string sentBeforeTheReset, string expectedReason)
+    {
+        SshProtocolHandler handler = new(new ResettingConnector(Encoding.ASCII.GetBytes(sentBeforeTheReset)), new InMemoryKeyFileSystem(new Dictionary<string, string>()), SshAlgorithmPreferences.WindowsReference, Encoding.UTF8);
+
+        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse($"{scheme}://{Host}/f"), Output = new MemoryStream(), Credentials = new NetworkCredential(User, Password) });
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+        Assert.AreEqual($"Failure establishing ssh session: {expectedReason}", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_SftpQuoteCommands_RunsThemAroundTheDownloadAndDropsThosePrefixedWithPlus()
     {
         InMemorySshServer server = Server();
@@ -554,8 +586,17 @@ public sealed partial class SshProtocolHandlerTests
 
     private static InMemorySshServer Server() => new(User, Password);
 
-    private static SshProtocolHandler Handler(InMemorySshServer server, Dictionary<string, string>? files = null, SshAlgorithmPreferences? preferences = null) =>
-        new(server, new InMemoryKeyFileSystem(files ?? []), preferences ?? SshAlgorithmPreferences.OpenSslReference, Encoding.UTF8);
+    // No agent, whatever the machine running the tests has, unless the test gives one.
+    private static SshProtocolHandler Handler(InMemorySshServer server, Dictionary<string, string>? files = null, SshAlgorithmPreferences? preferences = null, ISshAgentConnector? agent = null) =>
+        new(
+            server,
+            new InMemoryKeyFileSystem(files ?? []),
+            preferences ?? SshAlgorithmPreferences.OpenSslReference,
+            Encoding.UTF8,
+            new SystemSshRandomSource(),
+            new SystemSshEphemeralKeySource(),
+            Environment.GetEnvironmentVariable,
+            agent ?? new UnreachableSshAgent());
 
     private static async Task<Outcome> RunAsync(
         InMemorySshServer server,
@@ -597,5 +638,11 @@ public sealed partial class SshProtocolHandlerTests
     {
         public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
             ValueTask.FromResult(ConnectResult.Refused("Failed to connect"));
+    }
+
+    private sealed class ResettingConnector(byte[] sentBeforeTheReset) : IConnector
+    {
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(ConnectResult.Connected(new ResettingConnection(false, sentBeforeTheReset)));
     }
 }

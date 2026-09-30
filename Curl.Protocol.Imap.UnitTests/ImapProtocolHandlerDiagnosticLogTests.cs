@@ -69,7 +69,10 @@ public sealed class ImapProtocolHandlerDiagnosticLogTests
         var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
         var context = new TransferContext
         {
-            Url = CurlUrl.Parse(Url), Output = Stream.Null, SslLevel = TransportSecurityLevel.Required, DiagnosticLog = log,
+            Url = CurlUrl.Parse(Url),
+            Output = Stream.Null,
+            SslLevel = TransportSecurityLevel.Required,
+            DiagnosticLog = log,
         };
         var secured = new ScriptedConnection(Latin1("* CAPABILITY IMAP4rev1\r\nA003 OK done\r\nA004 OK LIST completed\r\n* BYE\r\nA005 OK bye\r\n"));
 
@@ -118,7 +121,10 @@ public sealed class ImapProtocolHandlerDiagnosticLogTests
         var log = new RecordingDiagnosticLog();
         var context = new TransferContext
         {
-            Url = CurlUrl.Parse(Url), Output = Stream.Null, DiagnosticLog = log, TimeProvider = new SteppingTimeProvider(9),
+            Url = CurlUrl.Parse(Url),
+            Output = Stream.Null,
+            DiagnosticLog = log,
+            TimeProvider = new SteppingTimeProvider(9),
         };
         string replies = Greeting + Caps("IMAP4rev1") + "* LIST () \"/\" INBOX\r\nA002 OK LIST completed\r\n* BYE\r\nA003 OK bye\r\n";
 
@@ -195,7 +201,11 @@ public sealed class ImapProtocolHandlerDiagnosticLogTests
     {
         var context = new TransferContext
         {
-            Url = CurlUrl.Parse(Url), Output = Stream.Null, Credentials = new NetworkCredential("u", Secret), Mail = mail, DiagnosticLog = log,
+            Url = CurlUrl.Parse(Url),
+            Output = Stream.Null,
+            Credentials = new NetworkCredential("u", Secret),
+            Mail = mail,
+            DiagnosticLog = log,
         };
         return ImapRun.ExecuteAsync(context, new ScriptedConnection(Latin1(replies)), sasl);
     }

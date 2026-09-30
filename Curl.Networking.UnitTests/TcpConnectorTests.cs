@@ -214,6 +214,24 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    [DataRow("h2")]
+    [DataRow(null)]
+    public async Task ConnectAsync_OverTls_GivesTheProtocolTheServerAcceptedThroughAlpn(string? accepted)
+    {
+        // curl -v --http2 https://example.com/ says ALPN: server accepted h2, then using HTTP/2 (BL-660 Notes).
+        var connector = new TcpConnector(
+            new FakeDnsResolver(Loopback),
+            new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
+            new FakeTlsProvider { ApplicationProtocolToReturn = accepted },
+            TimeProvider.System,
+            httpOverTlsApplicationProtocols: HttpApplicationProtocols.H2ThenHttp11);
+
+        var connect = await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
+
+        Assert.AreEqual(accepted, connect.ApplicationProtocol);
+    }
+
+    [TestMethod]
     public void HttpOverTlsApplicationProtocols_NotGiven_IsHttp11Only()
     {
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), new FakeTcpDialer(), new FakeTlsProvider(), TimeProvider.System);

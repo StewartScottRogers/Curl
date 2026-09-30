@@ -500,6 +500,36 @@ internal sealed class SftpSession
         }
     }
 
+    /// <summary>
+    /// Runs <paramref name="transfer" />, and when it fails - a failed <c>REALPATH</c>,
+    /// <c>OPEN</c>, <c>OPENDIR</c> or <c>-Q</c> command - closes the channel with
+    /// <c>EOF</c> and <c>CLOSE</c> before passing the failure on, as curl's disconnect
+    /// shuts the SFTP session down before its <c>DISCONNECT</c>, measured 2026-09-30
+    /// (BL-973, ADR-0220). A connection already broken is left as it is.
+    /// </summary>
+    /// <typeparam name="T">What the transfer returns.</typeparam>
+    /// <param name="transfer">The transfer, from <c>REALPATH</c> on.</param>
+    /// <param name="cancellationToken">Cancels the close.</param>
+    /// <returns>What the transfer returned.</returns>
+    /// <exception cref="SshTransferException">The transfer's failure, passed on once the channel is closed.</exception>
+    internal async ValueTask<T> CloseChannelOnFailureAsync<T>(Func<ValueTask<T>> transfer, CancellationToken cancellationToken)
+    {
+        // The close is awaited after the catch, not inside it: an await inside a catch that
+        // rethrows makes the compiler add a rethrow branch no exception can take.
+        SshTransferException failure;
+        try
+        {
+            return await transfer().ConfigureAwait(false);
+        }
+        catch (SshTransferException caught)
+        {
+            failure = caught;
+        }
+
+        await FinishIgnoringFailureAsync(null, () => ValueTask.CompletedTask, cancellationToken).ConfigureAwait(false);
+        throw failure;
+    }
+
     // A refusal, a close, a disconnect, broken framing or a failed packet check all fail
     // the step with libssh2's description for it.
     private static async ValueTask RequireAsync(Func<ValueTask<bool>> step, string failure)

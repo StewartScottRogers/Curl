@@ -1,4 +1,3 @@
-using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 
@@ -6,9 +5,10 @@ namespace Curl.Protocol.Ws;
 
 /// <summary>
 /// Where curl 8.21.0 writes the <c>-v</c> lines of a Negotiate upgrade (ADR-0231, BL-955):
-/// <c>Server auth using Negotiate with user '...'</c> before the upgrade request when Negotiate
-/// is picked, after the context's failure line if any, and a 401's failure line just before the
-/// <c>WWW-Authenticate</c> header that offers Negotiate, as the HTTP handler writes them.
+/// <c>Server auth using Negotiate with user '...'</c> (<see cref="WsAuthUsingLines" />) before the
+/// upgrade request when Negotiate is picked, after the context's failure line if any, and a 401's
+/// failure line just before the <c>WWW-Authenticate</c> header that offers Negotiate, as the
+/// HTTP handler writes them.
 /// </summary>
 internal static class WsNegotiateInfoLines
 {
@@ -17,15 +17,6 @@ internal static class WsNegotiateInfoLines
 
     /// <summary>The challenge header's name and colon.</summary>
     private const string ChallengeHeader = "WWW-Authenticate:";
-
-    /// <summary>
-    /// Formats the line curl writes before a request it picked Negotiate for: the <c>-u</c>
-    /// user name as given, a domain included, or nothing when there is no <c>-u</c>.
-    /// </summary>
-    /// <param name="credential">The request's credential, or <see langword="null" />.</param>
-    /// <returns>The line.</returns>
-    internal static string ServerAuthUsing(NetworkCredential? credential) =>
-        $"Server auth using Negotiate with user '{credential?.UserName}'";
 
     /// <summary>
     /// Decides whether curl picks Negotiate for the upgrade request: one sending a Negotiate

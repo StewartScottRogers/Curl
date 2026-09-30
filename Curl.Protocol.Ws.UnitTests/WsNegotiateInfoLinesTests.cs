@@ -1,4 +1,3 @@
-using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 
@@ -46,12 +45,5 @@ public sealed class WsNegotiateInfoLinesTests
         var request = new HttpAuthRequest("GET", CurlUrl.Parse("ws://h/"), "/", null, null, schemes, IsProxy: false);
 
         Assert.AreEqual(expected, WsNegotiateInfoLines.PicksNegotiate(request, authorization));
-    }
-
-    [TestMethod]
-    public void ServerAuthUsing_Credential_NamesTheUserOrNobody()
-    {
-        Assert.AreEqual("Server auth using Negotiate with user 'D\\u'", WsNegotiateInfoLines.ServerAuthUsing(new NetworkCredential("D\\u", "p")));
-        Assert.AreEqual("Server auth using Negotiate with user ''", WsNegotiateInfoLines.ServerAuthUsing(null));
     }
 }

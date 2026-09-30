@@ -167,6 +167,16 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
         new(Sftp.SftpStatusCode.ExitCodeFor(status), Sftp.SftpStatusCode.ExitCodeTextFor(status));
 
     /// <summary>
+    /// Creates the failure curl 8.21.0 reports when an <c>sftp://</c> URL's path decodes to
+    /// a zero byte, which its <c>Curl_getworkingpath</c> refuses after <c>REALPATH</c>: exit 3
+    /// with no message of its own, so curl prints the exit code's text, measured 2026-09-30
+    /// for <c>/~/bl572/files/a%00.txt</c> (BL-974).
+    /// </summary>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException UrlPathHoldsZeroByte() =>
+        new(CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL") { IsVerboseLine = false };
+
+    /// <summary>
     /// Creates the failure curl 8.21.0 reports for an SFTP <c>-Q</c> command that cannot be
     /// read or that the server refuses: exit 21 and curl's message, such as <c>rm
     /// "/f" failed: No such file or directory</c>, measured 2026-09-29 (BL-572, ADR-0247).

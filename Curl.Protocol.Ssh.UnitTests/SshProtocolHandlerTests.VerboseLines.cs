@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Protocol.Ssh.Negotiation;
 
@@ -18,9 +19,13 @@ public sealed partial class SshProtocolHandlerTests
 {
     private const string Start = "* SSH: libssh2 cryptography backend: OpenSSL | * SSH: user 'tester'";
 
+    // No key in HOME hands libssh2 the empty path, which OpenSSL's backend cannot open (BL-990).
+    private const string NoKeyDenied =
+        "* SSH: publickey authentication denied: Unable to extract public key from private key file: Unable to open private key file";
+
     private const string PasswordLogin =
         "* SSH: host offers authentication via: publickey,password | * SSH: trying private key file '' | "
-        + "* SSH: publickey authentication denied: Reason unknown (-1) | * SSH: initialized password authentication | "
+        + NoKeyDenied + " | * SSH: initialized password authentication | "
         + "* SSH: authentication complete";
 
     [TestMethod]
@@ -137,8 +142,26 @@ public sealed partial class SshProtocolHandlerTests
 
         StringAssert.EndsWith(
             lines,
-            "* SSH: publickey authentication denied: Reason unknown (-1) | * SSH: trying publickey authentication via agent | "
+            NoKeyDenied + " | * SSH: trying publickey authentication via agent | "
             + "* SSH: failure connecting to agent | * Authentication failure | * closing connection #0");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WrongPasswordAndTheKeyInTheAgent_AuthenticatesThroughTheAgentAsMeasured()
+    {
+        byte[] publicKey = Convert.FromBase64String(TestUserKeys.RsaPublicKeyFile.Split(' ')[1]);
+        InMemorySshServer server = new(User, Password) { AuthorizedPublicKey = publicKey };
+        server.Files["/f"] = Hello;
+        InMemorySshAgent agent = new InMemorySshAgent().Add(TestUserKeys.RsaPkcs1, "k1-comment");
+
+        string lines = await RunRecordingLinesAsync(server, "sftp://files.example/f", credentials: new NetworkCredential(User, "wrong"), agent: agent);
+
+        StringAssert.EndsWith(
+            lines,
+            NoKeyDenied + " | * SSH: trying publickey authentication via agent | "
+            + "* SSH: agent authenticated user 'tester' with key 'k1-comment' | * SSH: authentication complete | <= hello world | "
+            + "* Connection #0 to host files.example:22 left intact");
+        CollectionAssert.Contains(server.Events.ToList(), "auth publickey tester ok", "the server verified the agent's signature");
     }
 
     [TestMethod]
@@ -183,7 +206,7 @@ public sealed partial class SshProtocolHandlerTests
         TranscriptTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse("sftp://files.example/f"), Output = new MemoryStream(), Events = events };
 
-        await new SshProtocolHandler(server, new InMemoryKeyFileSystem(new Dictionary<string, string>()), SshAlgorithmPreferences.Full, Encoding.UTF8).ExecuteAsync(context);
+        await Handler(server, preferences: SshAlgorithmPreferences.Full).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
         Assert.AreEqual("* SSH: user ''", events.Transcript[0]);
@@ -214,7 +237,8 @@ public sealed partial class SshProtocolHandlerTests
         string url,
         SshOptions? options = null,
         Dictionary<string, string>? files = null,
-        NetworkCredential? credentials = null)
+        NetworkCredential? credentials = null,
+        ISshAgentConnector? agent = null)
     {
         TranscriptTransferEvents events = new();
         TransferContext context = new()
@@ -226,7 +250,7 @@ public sealed partial class SshProtocolHandlerTests
             Events = events,
         };
 
-        await new SshProtocolHandler(server, new InMemoryKeyFileSystem(files ?? []), SshAlgorithmPreferences.OpenSslReference, Encoding.UTF8).ExecuteAsync(context);
+        await Handler(server, files, agent: agent).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
         return string.Join(" | ", events.Transcript);
     }

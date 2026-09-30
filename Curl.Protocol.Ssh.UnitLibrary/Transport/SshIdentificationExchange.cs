@@ -32,16 +32,29 @@ internal static class SshIdentificationExchange
     /// <returns>The server's identification string, without its line ending.</returns>
     /// <exception cref="SshTransferException">
     /// The peer closed, or sent an over-long line, before a line starting <c>SSH-</c>:
-    /// exit 2, <c>Failure establishing ssh session: -13, Failed getting banner</c>.
+    /// exit 2, <c>Failure establishing ssh session: -13, Failed getting banner</c>. The
+    /// connection failed - the peer reset or aborted it - before that line: the same with
+    /// <c>-43</c> in place of <c>-13</c> (ADR-0283).
     /// </exception>
     internal static async ValueTask<string> ExchangeAsync(
         IConnection connection,
         SshConnectionReader reader,
         CancellationToken cancellationToken)
     {
-        await connection.WriteAsync(Encoding.ASCII.GetBytes(ClientIdentification + "\r\n"), cancellationToken).ConfigureAwait(false);
-        await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await connection.WriteAsync(Encoding.ASCII.GetBytes(ClientIdentification + "\r\n"), cancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            return await ReadServerIdentificationAsync(reader, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            throw SshTransferException.SessionEstablishmentFailed(Libssh2ErrorCode.SocketReceive, Libssh2ErrorCode.FailedGettingBanner);
+        }
+    }
 
+    private static async ValueTask<string> ReadServerIdentificationAsync(SshConnectionReader reader, CancellationToken cancellationToken)
+    {
         while (true)
         {
             string? line = await reader.ReadLineAsync(MaximumLineLength, cancellationToken).ConfigureAwait(false)

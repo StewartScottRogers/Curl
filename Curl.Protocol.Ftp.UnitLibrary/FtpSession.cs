@@ -30,7 +30,9 @@ namespace Curl.Protocol.Ftp;
 /// <c>PBSZ 0</c> (its reply ignored) and <c>PROT P</c> (<c>PROT C</c> under
 /// <c>--ftp-ssl-control</c>) are sent before <c>PWD</c>; an accepted <c>PROT P</c> upgrades
 /// every data connection once the transfer command is answered, and a refused one is exit 64
-/// with no <c>QUIT</c> under <c>--ssl-reqd</c>, plaintext data otherwise.
+/// with no <c>QUIT</c> under <c>--ssl-reqd</c>, plaintext data otherwise. Under
+/// <c>--ftp-ssl-ccc</c>, <c>CCC</c> follows <c>PROT</c> and clears TLS from the control
+/// connection, or is exit 81 where the TLS build cannot (BL-636, ADR-0280).
 /// </para>
 /// <para>
 /// Active mode (<c>-P</c>) takes the place of <c>EPSV</c>: a port is bound on the
@@ -291,6 +293,7 @@ internal sealed class FtpSession(
         {
             return await GreetAndLogInAsync().ConfigureAwait(false)
                 ?? await ProtectDataAsync().ConfigureAwait(false)
+                ?? await ClearControlTlsAsync().ConfigureAwait(false)
                 ?? await ReadEntryPathAsync().ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (connectPhase.HasPassed)
@@ -434,6 +437,42 @@ internal sealed class FtpSession(
         return prot.IsCompletion || tlsRequirement != FtpTlsRequirement.AllConnections
             ? null
             : TransferResult.Failure(CurlExitCode.UseSslFailed, FtpTransferMessages.RequestedSslLevelFailed);
+    }
+
+    /// <summary>
+    /// Under <c>--ftp-ssl-ccc</c>, once <c>PBSZ</c> and <c>PROT</c> went out over TLS, sends
+    /// <c>CCC</c>: a reply of 500 or more leaves the control connection in TLS, as curl 8.21.0
+    /// ignores it; any other clears TLS, sending <c>close_notify</c> first only under
+    /// <c>--ftp-ssl-ccc-mode active</c>, and carries on in plain text (BL-636, ADR-0280).
+    /// </summary>
+    /// <returns>
+    /// <see langword="null" /> to go on to <c>PWD</c>; exit 81 with no <c>QUIT</c> when TLS
+    /// could not be cleared, as it never can on curl's Schannel build.
+    /// </returns>
+    private async ValueTask<TransferResult?> ClearControlTlsAsync()
+    {
+        if (!controlSecured || context.FtpCommandChannelClearing == FtpCommandChannelClearing.Off)
+        {
+            return null;
+        }
+
+        FtpReply ccc = await ExchangeAsync("CCC").ConfigureAwait(false);
+        if (ccc.Code >= 500)
+        {
+            log.ControlClearingRefused(ccc.Code);
+            return null;
+        }
+
+        bool sendCloseNotifyFirst = context.FtpCommandChannelClearing == FtpCommandChannelClearing.Active;
+        if (await control.Connection.ClearTlsAsync(sendCloseNotifyFirst, control.CancellationToken).ConfigureAwait(false) is not { } plaintext)
+        {
+            context.Events.ReportInfo(FtpTransferMessages.ClearCommandChannelFailed);
+            return TransferResult.Failure(CurlExitCode.Again, FtpTransferMessages.ClearCommandChannelFailed);
+        }
+
+        control.SwitchTo(plaintext);
+        log.ControlCleared();
+        return null;
     }
 
     private async ValueTask<TransferResult?> LogInAsync()

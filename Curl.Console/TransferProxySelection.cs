@@ -57,6 +57,11 @@ internal static class TransferProxySelection
             return true;
         }
 
+        if (!string.IsNullOrEmpty(options.PreProxy))
+        {
+            return TrySelectBehindPreProxy(selector, options, options.PreProxy, url, out proxy, out failure);
+        }
+
         if (!selector.TrySelect(url, options.Proxy?.Address, KindWithoutSchemeOf(options.Proxy), options.NoProxy, out ProxyEndpoint? selected, out failure))
         {
             return false;
@@ -65,6 +70,98 @@ internal static class TransferProxySelection
         proxy = WithProxyUser(selected, options.ProxyCredentials);
         return true;
     }
+
+    /// <summary>
+    /// Chooses the proxy when <c>--preproxy</c> names one, as curl 8.21.0 does (measured, BL-614):
+    /// <c>--noproxy</c> matching the host drops both; the pre-proxy text is read first, with no scheme
+    /// as SOCKS4, and an <c>http</c> or <c>https</c> one is exit 5 <c>Unsupported pre-proxy type for
+    /// '&lt;text&gt;'</c>; with no <c>-x</c> (the environment is not read) the pre-proxy is the SOCKS
+    /// proxy itself; a SOCKS <c>-x</c> is exit 5 <c>Having a SOCKS pre-proxy and proxy is not supported
+    /// with '&lt;-x&gt;'</c>; an HTTP or HTTPS <c>-x</c> is the proxy, which the connector reaches
+    /// through the pre-proxy (<see cref="CurlComposition.PreProxyOf" />).
+    /// </summary>
+    private static bool TrySelectBehindPreProxy(
+        ProxySelector selector,
+        CommandLineOptions options,
+        string preProxyText,
+        CurlUrl url,
+        out ProxyEndpoint? proxy,
+        [NotNullWhen(false)] out TransferResult? failure)
+    {
+        proxy = null;
+        if (!TrySelectPreProxy(selector, options, preProxyText, url, out ProxyEndpoint? preProxy, out failure)
+            || preProxy is null
+            || !TrySelectProxyBehindPreProxy(selector, options, url, out ProxyEndpoint? selected, out failure))
+        {
+            return failure is null;
+        }
+
+        proxy = WithProxyUser(selected ?? preProxy, options.ProxyCredentials);
+        return true;
+    }
+
+    /// <summary>
+    /// Reads the <c>--preproxy</c> text, with no scheme as SOCKS4: <see langword="null" /> when
+    /// <c>--noproxy</c> matches the host, and exit 5 for an HTTP or HTTPS pre-proxy.
+    /// </summary>
+    private static bool TrySelectPreProxy(
+        ProxySelector selector,
+        CommandLineOptions options,
+        string preProxyText,
+        CurlUrl url,
+        out ProxyEndpoint? preProxy,
+        [NotNullWhen(false)] out TransferResult? failure)
+    {
+        if (!selector.TrySelect(url, preProxyText, ProxyKind.Socks4, options.NoProxy, out preProxy, out failure))
+        {
+            return false;
+        }
+
+        if (preProxy is not null && IsHttpKind(preProxy.Kind))
+        {
+            failure = TransferResult.Failure(CurlExitCode.CouldntResolveProxy, $"Unsupported pre-proxy type for '{preProxyText}'");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Reads the <c>-x</c> or <c>--socks</c> proxy behind a pre-proxy: <see langword="null" /> when
+    /// none was given or it is empty, and exit 5 for a SOCKS one.
+    /// </summary>
+    private static bool TrySelectProxyBehindPreProxy(
+        ProxySelector selector,
+        CommandLineOptions options,
+        CurlUrl url,
+        out ProxyEndpoint? selected,
+        [NotNullWhen(false)] out TransferResult? failure)
+    {
+        selected = null;
+        failure = null;
+        if (options.Proxy is not { } proxyOption)
+        {
+            return true;
+        }
+
+        if (!selector.TrySelect(url, proxyOption.Address, KindWithoutSchemeOf(proxyOption), options.NoProxy, out selected, out failure))
+        {
+            return false;
+        }
+
+        if (selected is not null && !IsHttpKind(selected.Kind))
+        {
+            failure = TransferResult.Failure(
+                CurlExitCode.CouldntResolveProxy,
+                $"Having a SOCKS pre-proxy and proxy is not supported with '{proxyOption.Address}'");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Whether <paramref name="kind" /> is an HTTP or HTTPS proxy, which a pre-proxy can lead to.</summary>
+    private static bool IsHttpKind(ProxyKind kind) => kind is ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https;
 
     /// <summary>The kind proxy option text with no scheme names: the option's own, or HTTP when none was given.</summary>
     private static ProxyKind KindWithoutSchemeOf(CommandLineProxy? proxyOption) =>

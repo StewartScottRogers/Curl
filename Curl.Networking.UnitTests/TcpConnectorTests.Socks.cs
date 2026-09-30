@@ -355,9 +355,6 @@ public sealed partial class TcpConnectorTests
     [DataRow(new byte[] { 0x04, 0x01 }, "Received invalid version in initial SOCKS5 response.")]
     [DataRow(new byte[] { 0x05, 0xFF }, "No authentication method was acceptable.")]
     [DataRow(new byte[] { 0x05, 0x03 }, "Unknown SOCKS5 mode attempted to be used by server.")]
-    [DataRow(
-        new byte[] { 0x05, 0x01 },
-        "SSPI error: InitializeSecurityContext failed: SEC_E_TARGET_UNKNOWN (0x80090303) - The specified target is unknown or unreachable")]
     public async Task ConnectAsync_WhenTheSocks5ProxyPicksNoUsableMethod_FailsWithProxy(byte[] choice, string message)
     {
         // The proxy answered 05 ff -> curl: (97) No authentication method was acceptable.
@@ -549,7 +546,8 @@ public sealed partial class TcpConnectorTests
         byte[] proxyReply,
         NetworkCredential? credential = null,
         string? resolveEntry = null,
-        FakeDnsResolver? resolver = null)
+        FakeDnsResolver? resolver = null,
+        Socks5AuthenticationOptions? socks5Authentication = null)
     {
         var proxyConnection = new ScriptedConnection(proxyReply);
         string[] entries = resolveEntry is null ? ["socks.example:1080:192.0.2.10"] : ["socks.example:1080:192.0.2.10", resolveEntry];
@@ -558,7 +556,8 @@ public sealed partial class TcpConnectorTests
             new FakeTcpDialer { DialOutcome = _ => proxyConnection },
             new FakeTlsProvider(),
             new ManualTimeProvider(),
-            resolveOverrides: resolver is null ? ResolveOverrides.Parse(entries) : null);
+            resolveOverrides: resolver is null ? ResolveOverrides.Parse(entries) : null,
+            socks5Authentication: socks5Authentication);
 
         var result = await connector.ConnectAsync(
             new ConnectTarget(host, 8080, UseTls: false) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, credential) },

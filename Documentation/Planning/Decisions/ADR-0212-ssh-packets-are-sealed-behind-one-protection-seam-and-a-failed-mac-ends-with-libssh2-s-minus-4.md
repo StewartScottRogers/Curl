@@ -36,6 +36,29 @@ All twelve CTR pairs interoperate with libssh2 in both directions. The Windows b
 no AES-GCM, and the OpenSSL build could not be reached the same day (WSL's curl could not
 connect to the Windows listener; Docker was down).
 
+### Measured 2026-09-30 (BL-897)
+
+The OpenSSL reference build (`curlimages/curl:8.21.0` under Docker Desktop: `curl 8.21.0
+(x86_64-pc-linux-musl) ... OpenSSL/3.5.7 ... libssh2/1.11.1`), run as
+`curl -sS -k -u u:p sftp://host.docker.internal:<port>/x` against a throwaway MSTest
+method that bridged a `TcpListener` to `Fakes.InMemorySshServer` (the same group14-sha256
+and `rsa-sha2-256` session) and altered one byte of the server's first packet after
+`NEWKEYS` on its way out (deleted after the run):
+
+| Server's first packet after `NEWKEYS` (`SERVICE_ACCEPT`) | Exit | stderr |
+| --- | --- | --- |
+| Correct, `aes256-gcm@openssh.com` | 78 | `curl: (78) Could not open remote file for reading: No such file or directory` (the session ran to the SFTP open) |
+| Last tag byte flipped, `aes256-gcm@openssh.com` | 2 | `curl: (2) Failure establishing ssh session: -12, Failed to get response to ssh-userauth request` |
+| One ciphertext byte flipped, `aes256-gcm@openssh.com` | 2 | same |
+| Last tag byte flipped, `aes128-gcm@openssh.com` | 2 | same |
+| One ciphertext byte flipped, `aes128-gcm@openssh.com` | 2 | same |
+| Last MAC byte flipped, `aes128-ctr` + `hmac-sha2-256` | 2 | `curl: (2) Failure establishing ssh session: -4, Failed to get response to ssh-userauth request` |
+
+The GCM code, -12, is confirmed, and the OpenSSL build agrees with the Windows build's -4
+for a failed MAC. `chacha20-poly1305@openssh.com` (ADR-0259) interoperated unaltered, but
+with its tag or ciphertext altered curl printed nothing and did not exit until the
+container was killed; BL-1032 measures that case.
+
 ## Decision
 
 - **One seam, `ISshPacketProtection`,** per direction: `Seal` a framed packet;
@@ -63,8 +86,8 @@ connect to the Windows listener; Docker was down).
   compared with `CryptographicOperations.FixedTimeEquals`, and under encrypt-then-MAC the
   MAC is checked before anything is decrypted. The -4 is measured; the -12 is taken from
   libssh2 1.11.1's `transport.c` (`decrypt()` returns `LIBSSH2_ERROR_DECRYPT` when the
-  cipher refuses, and its OpenSSL AES-GCM refuses a bad tag), and BL-897 measures it on
-  the OpenSSL build.
+  cipher refuses, and its OpenSSL AES-GCM refuses a bad tag), and BL-897 measured it on
+  the OpenSSL build, which prints -12 for a bad tag and for altered ciphertext alike.
 - **libssh2 keeps the failed read's code and names the step in the description.** The
   first packet the server protects answers the `ssh-userauth` service request, so curl
   prints `-4, Failed to get response to ssh-userauth request`
@@ -78,8 +101,8 @@ connect to the Windows listener; Docker was down).
 
 - Real curl decrypts what this library encrypts and the reverse, for every CTR pair, so
   BL-567 onwards can be measured against a server built from these classes.
-- The GCM exit is the one unmeasured value; if BL-897 finds another code, one constant and
-  its tests change.
+- The GCM exit is measured (BL-897) and matches the constant, so `Libssh2ErrorCode.Decrypt`
+  and its tests stand unchanged.
 - A packet that fails its check is not counted, and the session is over: nothing reads
   from the connection after the exception.
 

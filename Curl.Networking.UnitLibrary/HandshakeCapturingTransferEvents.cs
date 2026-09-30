@@ -39,6 +39,10 @@ internal sealed class HandshakeCapturingTransferEvents(ITransferEvents inner) : 
     public void ReportTlsTrust(TlsTrustEvent trust) => inner.ReportTlsTrust(trust);
 
     /// <inheritdoc />
+    public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) =>
+        inner.ReportCertificateVerifyResult(verifyResult, isProxy);
+
+    /// <inheritdoc />
     public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => inner.ReportRequestHeader(bytes);
 
     /// <inheritdoc />

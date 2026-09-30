@@ -63,7 +63,10 @@ public sealed class SmtpProtocolHandlerDiagnosticLogTests
         var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
         var context = new TransferContext
         {
-            Url = CurlUrl.Parse(Url), Output = Stream.Null, SslLevel = TransportSecurityLevel.Required, DiagnosticLog = log,
+            Url = CurlUrl.Parse(Url),
+            Output = Stream.Null,
+            SslLevel = TransportSecurityLevel.Required,
+            DiagnosticLog = log,
         };
         var secured = new ScriptedConnection(Encoding.Latin1.GetBytes("250 OK\r\n" + HelpReplyAndBye));
 
@@ -112,7 +115,10 @@ public sealed class SmtpProtocolHandlerDiagnosticLogTests
         var log = new RecordingDiagnosticLog();
         var context = new TransferContext
         {
-            Url = CurlUrl.Parse(Url), Output = Stream.Null, DiagnosticLog = log, TimeProvider = new SteppingTimeProvider(12),
+            Url = CurlUrl.Parse(Url),
+            Output = Stream.Null,
+            DiagnosticLog = log,
+            TimeProvider = new SteppingTimeProvider(12),
         };
 
         await SmtpRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + EhloReply + HelpReplyAndBye)));

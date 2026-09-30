@@ -238,28 +238,31 @@ public sealed class TcpDialerTests
         Assert.AreEqual(SocketError.Success, exception.SocketErrorCode);
     }
 
-    /// <summary>Binds a loopback port whose next port is free, and returns the port and the socket holding it.</summary>
+    /// <summary>
+    /// Binds a loopback port whose next port is free, and returns the port and the socket holding it.
+    /// </summary>
+    /// <remarks>
+    /// The pair is taken below 32768, under the ephemeral range of Windows (49152 up), Linux
+    /// (32768 up) and macOS (49152 up). An ephemeral pair raced: Windows hands out ephemeral ports
+    /// in order, so a test running in parallel that bound port 0 could take the next port in the
+    /// moment between the probe letting it go and the dialer binding it.
+    /// </remarks>
     private static (int Port, Socket Holder) HoldAPortWithTheNextFree()
     {
-        while (true)
+        for (var port = Random.Shared.Next(20000, 30000); ; port = port >= 32766 ? 20000 : port + 2)
         {
             var holder = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            holder.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-            // Listening, so the port is in use on Linux too, where .NET sets SO_REUSEADDR
-            // and a merely bound port can be bound again.
-            holder.Listen();
-            var port = ((IPEndPoint)holder.LocalEndPoint!).Port;
             using var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             try
             {
+                holder.Bind(new IPEndPoint(IPAddress.Loopback, port));
+                // Listening, so the port is in use on Linux too, where .NET sets SO_REUSEADDR
+                // and a merely bound port can be bound again.
+                holder.Listen();
                 probe.Bind(new IPEndPoint(IPAddress.Loopback, port + 1));
                 return (port, holder);
             }
             catch (SocketException)
-            {
-                holder.Dispose();
-            }
-            catch (ArgumentOutOfRangeException)
             {
                 holder.Dispose();
             }

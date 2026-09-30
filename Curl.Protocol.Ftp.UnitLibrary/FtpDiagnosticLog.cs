@@ -90,6 +90,14 @@ internal sealed class FtpDiagnosticLog(IDiagnosticLog log)
         }
     }
 
+    /// <summary>Logs, at <c>info</c>, that <c>CCC</c> cleared TLS from the control connection.</summary>
+    public void ControlCleared() => Info("CCC: the control connection is plaintext");
+
+    /// <summary>Logs, at <c>warning</c>, that <c>CCC</c> was refused and the control connection stays TLS.</summary>
+    /// <param name="code">The refusing reply's code, 500 or above.</param>
+    public void ControlClearingRefused(int code) =>
+        Warning(string.Create(CultureInfo.InvariantCulture, $"CCC refused with {code}; the control connection stays TLS"));
+
     /// <summary>Logs, at <c>info</c>, that the data connection is TLS.</summary>
     public void DataSecured() => Info("TLS on the data connection");
 

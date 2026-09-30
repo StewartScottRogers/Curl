@@ -44,6 +44,24 @@ internal static class HttpUrlText
     internal static string Query(CurlUrl url) => url.Query is null ? string.Empty : "?" + url.Query;
 
     /// <summary>
+    /// Gives the URL as curl 8.21.0 prints it for <c>%{url_effective}</c> and names it in the
+    /// <c>OPENED stream for</c> line of an HTTP/2 or HTTP/3 stream: the scheme in lower case,
+    /// the authority as typed (user and password included), then the path, the query and the
+    /// fragment. curl printed <c>https://EXAMPLE.com:443/?x</c> for <c>https://EXAMPLE.com:443?x</c>
+    /// and kept <c>A:B@</c> and <c>#frag</c> (measured, BL-660 Notes).
+    /// </summary>
+    internal static string Effective(CurlUrl url)
+    {
+        string typed = url.OriginalString;
+        int start = typed.StartsWith(url.Scheme + ":", StringComparison.OrdinalIgnoreCase) ? url.Scheme.Length + 1 : 0;
+        string rest = typed[start..].TrimStart('/');
+        int end = rest.IndexOfAny(['/', '?', '#']);
+        string authority = end < 0 ? rest : rest[..end];
+        string fragment = url.Fragment is null ? string.Empty : "#" + url.Fragment;
+        return url.Scheme + "://" + authority + url.AbsolutePath + Query(url) + fragment;
+    }
+
+    /// <summary>
     /// Gives the host as written, bracketed if IPv6, with <c>:</c> and the port unless it is
     /// the scheme's default.
     /// </summary>

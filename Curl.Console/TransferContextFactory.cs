@@ -137,14 +137,16 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         IReadOnlyList<string>? ifNoneMatchHeaders = null,
         AltSvcTransferCache? altSvc = null,
         StyledHeaderLines? bodyHeaderStyles = null,
-        SshOptions? ssh = null) =>
-        new()
+        SshOptions? ssh = null)
+    {
+        Stream? transferHeaderOutput = watchHeaderOutput is null
+            ? HeaderOutputOf(options, url, output, headerOutput, bodyHeaderStyles)
+            : watchHeaderOutput(HeaderOutputOf(options, url, output, headerOutput, bodyHeaderStyles));
+        return new()
         {
             Url = url,
             Output = WatchedOutput(output, lowSpeedWatchdog),
-            HeaderOutput = watchHeaderOutput is null
-                ? HeaderOutputOf(options, url, output, headerOutput, bodyHeaderStyles)
-                : watchHeaderOutput(HeaderOutputOf(options, url, output, headerOutput, bodyHeaderStyles)),
+            HeaderOutput = transferHeaderOutput,
             NoBody = options.NoBody,
             Range = range,
             RangeText = options.Range,
@@ -168,6 +170,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             FtpUseEprt = options.FtpUseEprt,
             SslLevel = options.SslLevel,
             FtpSslControlOnly = options.FtpSslControlOnly,
+            FtpCommandChannelClearing = CommandChannelClearingOf(options.FtpClearCommandChannel),
             ListOnly = options.ListOnly,
             UseAscii = options.UseAscii,
             Append = options.Append,
@@ -187,11 +190,12 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Mail = MailRequestOptionsMapping.FromCommandLine(options, url.Scheme),
             Ssh = ssh,
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
-            Events = EventsOrNone(events),
+            Events = EventsWritingConnectReplyHeads(options, proxy, EventsOrNone(events), transferHeaderOutput),
             TimeProvider = clock,
             DiagnosticLog = DiagnosticLog,
             CancellationToken = TokenOf(abortToken, lowSpeedWatchdog, maxTimeWatchdog),
         };
+    }
 
     /// <summary>
     /// Gets <paramref name="output" /> counted by <paramref name="lowSpeedWatchdog" />, or as it is
@@ -283,11 +287,41 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         options.ResumeFromOutputSize && upload is not null;
 
     /// <summary>
+    /// Gets the <c>CCC</c> behaviour the FTP handler reads for the command line's
+    /// <c>--ftp-ssl-ccc</c> and <c>--ftp-ssl-ccc-mode</c> (BL-636).
+    /// </summary>
+    /// <param name="clearing">What the parsed command line chose.</param>
+    /// <returns>The same choice in the handler's terms.</returns>
+    private static FtpCommandChannelClearing CommandChannelClearingOf(FtpClearCommandChannel clearing) => clearing switch
+    {
+        FtpClearCommandChannel.Active => FtpCommandChannelClearing.Active,
+        FtpClearCommandChannel.Passive => FtpCommandChannelClearing.Passive,
+        _ => FtpCommandChannelClearing.Off,
+    };
+
+    /// <summary>
     /// Gets <paramref name="events" />, or <see cref="NoTransferEvents.Instance" /> when it is <see langword="null" />.
     /// </summary>
     /// <param name="events">The sink given to <see cref="Create" />.</param>
     /// <returns>The sink the context carries.</returns>
     private static ITransferEvents EventsOrNone(ITransferEvents? events) => events ?? NoTransferEvents.Instance;
+
+    /// <summary>
+    /// Gets <paramref name="events" /> writing each CONNECT reply head a tunnelling proxy sends to
+    /// <paramref name="headerOutput" /> as well, as curl 8.21.0 writes it to <c>-i</c>, <c>-I</c> and
+    /// <c>-D</c>; or <paramref name="events" /> as it is when there is no HTTP or HTTPS proxy to
+    /// send CONNECT to, no header output, or <c>--suppress-connect-headers</c> leaves the heads
+    /// out (measured 2026-09-30, BL-613 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="proxy">The transfer's proxy, or <see langword="null" /> for none.</param>
+    /// <param name="events">The transfer's events.</param>
+    /// <param name="headerOutput">The transfer's header output, or <see langword="null" /> for none.</param>
+    /// <returns>The events the context carries.</returns>
+    private static ITransferEvents EventsWritingConnectReplyHeads(CommandLineOptions options, ProxyEndpoint? proxy, ITransferEvents events, Stream? headerOutput) =>
+        proxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https } && headerOutput is not null && !options.SuppressConnectHeaders
+            ? new ConnectReplyHeadWritingEvents(events, headerOutput)
+            : events;
 
     /// <summary>
     /// Chooses where a transfer's header lines go. <c>-i</c> and <c>-I</c> send them to the

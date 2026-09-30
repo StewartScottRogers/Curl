@@ -108,6 +108,9 @@ public sealed class TransferContext : ITransferContext
     public bool FtpSslControlOnly { get; init; }
 
     /// <inheritdoc />
+    public FtpCommandChannelClearing FtpCommandChannelClearing { get; init; }
+
+    /// <inheritdoc />
     public IReadOnlyList<string> QuoteCommands { get; init; } = [];
 
     /// <inheritdoc />

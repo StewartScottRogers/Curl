@@ -45,8 +45,8 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.IsTrue(result.Report!.UsedProxy, $"Chunk size {chunkSize}");
             HttpAuthRequest proxyRequest = authenticator.Calls.Single(call => call.Request.IsProxy).Request;
             Assert.AreEqual(
-                new HttpAuthRequest("GET", CurlUrl.Parse("http://Example.com/a/b?c=d"), "/a/b?c=d", LoopbackProxy.Credential, null, HttpAuthSchemes.Basic, true),
-                proxyRequest,
+                new HttpAuthRequest("GET", CurlUrl.Parse("http://127.0.0.1:18183/"), "/a/b?c=d", LoopbackProxy.Credential, null, HttpAuthSchemes.Basic, true),
+                proxyRequest with { Events = NoTransferEvents.Instance },
                 $"Chunk size {chunkSize}");
         }
     }
@@ -305,6 +305,22 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
         Assert.IsTrue(result.Report!.UsedProxy);
+    }
+
+    [TestMethod]
+    [DataRow(ProxyKind.Http, "::1", "http://[::1]:18183/", DisplayName = "an IPv6 literal goes in brackets")]
+    [DataRow(ProxyKind.Http, "[::1]", "http://[::1]:18183/", DisplayName = "a bracketed IPv6 literal stays as it is")]
+    [DataRow(ProxyKind.Https, "proxy.example", "https://proxy.example:18183/", DisplayName = "an HTTPS proxy's URL is https")]
+    public async Task ExecuteAsync_ProxyCredential_AsksTheAuthenticatorAboutTheProxysOwnUrl(ProxyKind kind, string host, string expectedUrl)
+    {
+        ScriptedAuthenticator authenticator = new("Basic dTpw", null);
+        HttpRequestOptions options = new() { ForwardProxy = new ProxyEndpoint(kind, host, 18183, new NetworkCredential("u", "p")) };
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(new TurnTakingConnection(65536, ProxyOkHead + "ok")), authenticator)
+            .ExecuteAsync(ProxyContext("http://example.com/", new MemoryStream(), options));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(expectedUrl, authenticator.Calls.Single(call => call.Request.IsProxy).Request.Url.OriginalString);
     }
 
     private static TransferContext ProxyContext(string url, Stream output, HttpRequestOptions options) =>

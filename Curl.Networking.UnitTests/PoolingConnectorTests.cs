@@ -287,6 +287,22 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task DisposeAsync_OfAConnectionAskedToClearTls_ClosesItThoughMarkedReusable()
+    {
+        await using var pool = CreatePool();
+        var first = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        var plaintext = await first.Connection!.ClearTlsAsync(sendCloseNotifyFirst: true, CancellationToken.None);
+        first.Connection.MarkReusable();
+        await first.Connection.DisposeAsync();
+        var second = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.IsNull(plaintext, "The fake underneath is not TLS, so it cannot be cleared.");
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+        Assert.IsFalse(second.IsReused);
+    }
+
+    [TestMethod]
     public async Task DisposeAsync_OfAPooledConnectionTwice_ReturnsItOnlyOnce()
     {
         await using var pool = CreatePool();

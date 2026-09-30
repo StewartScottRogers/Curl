@@ -266,6 +266,10 @@ public sealed class HttpProtocolHandler(
         HttpAuthRequest? proxyAuthRequest = forwardProxy is null ? null : ProxyAuthRequestOf(authRequest, forwardProxy);
         using HttpTransferDeadline deadline = new(context);
         HttpInfoLineRecorder authorizationLines = new();
+        HttpInfoLineRecorder proxyAuthorizationLines = new();
+        string? proxyAuthorization = proxyAuthRequest is null
+            ? null
+            : await Authenticator.CreateAuthorizationAsync(proxyAuthRequest with { Events = proxyAuthorizationLines }, [], context.CancellationToken).ConfigureAwait(false);
         (string? authorization, HttpTransferException? authorizationFailure) = await CreateFirstAuthorizationAsync(authRequest with { Events = authorizationLines }, context.CancellationToken).ConfigureAwait(false);
         HttpRequestPlan plan = new(context, options, framing, authRequest, authorization)
         {
@@ -276,7 +280,8 @@ public sealed class HttpProtocolHandler(
             Progress = new HttpTransferProgress(context.Progress),
             ForwardProxy = forwardProxy,
             ProxyAuthRequest = proxyAuthRequest,
-            ProxyAuthorization = proxyAuthRequest is null ? null : Authenticator.CreateAuthorization(proxyAuthRequest, []),
+            ProxyAuthorization = proxyAuthorization,
+            ProxyAuthorizationInfoLines = proxyAuthorizationLines.Lines,
             RedirectsFollowed = options.RedirectsFollowed,
         };
         return Http3ProxyRefusalOf(plan) is { } refusal
@@ -362,13 +367,25 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Makes the request the authenticator is asked about for the forward proxy: the origin's
-    /// method, URL and request target (Digest's <c>uri</c> is the origin form, as curl 8.21.0
-    /// sends it), the proxy's credential, no bearer token, and <see cref="ProxyAuthSchemes" />.
-    /// Answered with no challenges it gives the pre-emptive <c>Proxy-Authorization</c>, which
-    /// only Basic sends.
+    /// method and request target (Digest's <c>uri</c> is the origin form, as curl 8.21.0
+    /// sends it), the proxy's own URL (NTLM and Negotiate ask for <c>HTTP</c> on the proxy's
+    /// host, as curl's Type 3 names <c>HTTP/&lt;proxy&gt;</c>, BL-604 Notes), the proxy's
+    /// credential, no bearer token, and <see cref="ProxyAuthSchemes" />. Answered with no
+    /// challenges it gives the pre-emptive <c>Proxy-Authorization</c>: Basic's, or NTLM's Type 1
+    /// or Negotiate's first token when that is the one scheme allowed (ADR-0270).
     /// </summary>
     private HttpAuthRequest ProxyAuthRequestOf(HttpAuthRequest originRequest, ProxyEndpoint proxy) =>
-        originRequest with { Credential = proxy.Credential, BearerToken = null, AllowedSchemes = ProxyAuthSchemes, IsProxy = true, AwsSigV4 = null };
+        originRequest with { Url = ProxyUrlOf(proxy), Credential = proxy.Credential, BearerToken = null, AllowedSchemes = ProxyAuthSchemes, IsProxy = true, AwsSigV4 = null };
+
+    /// <summary>
+    /// Gives <paramref name="proxy" />'s own URL, <c>http://host:port/</c> (<c>https</c> for an
+    /// HTTPS proxy), an IPv6 literal in brackets.
+    /// </summary>
+    private static CurlUrl ProxyUrlOf(ProxyEndpoint proxy)
+    {
+        string host = proxy.Host.Contains(':', StringComparison.Ordinal) && !proxy.Host.StartsWith('[') ? $"[{proxy.Host}]" : proxy.Host;
+        return CurlUrl.Parse($"{(proxy.Kind == ProxyKind.Https ? "https" : "http")}://{host}:{proxy.Port}/");
+    }
 
     /// <summary>
     /// Gives what signing the request with <c>--aws-sigv4</c> needs, or <see langword="null" />
@@ -425,12 +442,12 @@ public sealed class HttpProtocolHandler(
     /// </param>
     private async ValueTask<TransferResult> ConnectAndExchangeAsync(HttpRequestPlan plan, TransferReport? earlier)
     {
-        ConnectTarget target = TargetOf(plan);
-        if (plan.Options.Version == HttpVersionPreference.Http3Only && plan.Context.Url.Scheme != "https")
+        if (FailureBeforeConnecting(plan, earlier) is { } failure)
         {
-            return Http3NeedsHttps(plan);
+            return failure;
         }
 
+        ConnectTarget target = TargetOf(plan);
         ConnectResult connect = await ConnectAsync(plan, target).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
@@ -459,6 +476,21 @@ public sealed class HttpProtocolHandler(
         return outcome.Retry is { } reconnect
             ? await ConnectAndExchangeAsync(reconnect, outcome.Result.Report).ConfigureAwait(false)
             : outcome.Result;
+    }
+
+    /// <summary>
+    /// Gives the failure a request meets before it connects: <c>--http3-only</c> with a URL that
+    /// is not <c>https://</c> (<see cref="Http3NeedsHttps" />), or a resend whose <c>-T</c> upload
+    /// cannot be rewound (<see cref="UploadRewindFailed" />); <see langword="null" /> for none.
+    /// </summary>
+    private static TransferResult? FailureBeforeConnecting(HttpRequestPlan plan, TransferReport? earlier)
+    {
+        if (plan.Options.Version == HttpVersionPreference.Http3Only && plan.Context.Url.Scheme != "https")
+        {
+            return Http3NeedsHttps(plan);
+        }
+
+        return plan.UploadCannotRewind ? UploadRewindFailed(plan, earlier) : null;
     }
 
     /// <summary>
@@ -769,10 +801,18 @@ public sealed class HttpProtocolHandler(
     /// Reports what became of the connection once it is disposed, as curl 8.21.0's <c>-v</c>
     /// does (ADR-0050): left intact when marked reusable, closed when the transfer failed, and
     /// shut down otherwise - its response did not persist, or it died before its response, in
-    /// which case the line that the request goes out again follows.
+    /// which case the line that the request goes out again follows. A connection left intact
+    /// that another transfer still shares, on a stream of its own, is reported by the last
+    /// transfer on it, not this one (BL-717).
     /// </summary>
     private static void ReportConnectionEnd(ITransferContext context, ConnectTarget target, ConnectResult connect, HttpAttemptOutcome outcome)
     {
+        if (outcome.ReportsLeftIntact && connect.Connection!.IsSharedWithAnotherTransfer)
+        {
+            // curl 8.21.0 reports a multiplexed connection left intact only when its last transfer ends (measured, BL-717 Notes).
+            return;
+        }
+
         context.Events.ReportInfo(ConnectionEndLine(target, connect, outcome));
         if (outcome.DiedBeforeResponse)
         {
@@ -868,7 +908,7 @@ public sealed class HttpProtocolHandler(
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
             IsHttp2OrHttp3 = requestStream is not null,
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
-            DefersFrom = (statusLine, header) => framing.Body is not StreamBody && HttpNegotiateInfoLines.IsNegotiateChallenge(plan.AuthRequest, statusLine, header),
+            DefersFrom = (statusLine, header) => framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };
         HttpRequestPlan? retry = null;
         HttpResponseHead? actedOn = null;
@@ -911,7 +951,7 @@ public sealed class HttpProtocolHandler(
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
             { Report = exchange.Report(body) };
-            return FailedOutcome(plan, connect, headReader, failure, failed);
+            return FailedOutcome(plan, connect, upload, headReader, failure, failed);
         }
         catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
         {
@@ -957,10 +997,15 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Creates the HTTP/2 or HTTP/3 stream the exchange runs on, with the request body's length (0 for
-    /// none), or gives <see langword="null" /> when the connection speaks HTTP/1.x.
+    /// none), reporting curl's <c>OPENED stream</c> lines once it is opened (<see cref="HttpStreamOpenedLines" />),
+    /// or gives <see langword="null" /> when the connection speaks HTTP/1.x.
     /// </summary>
     private static IHttpStreamConnection? CreateRequestStream(HttpRequestPlan plan, IHttpStreamSession? streams) =>
-        streams?.CreateStream(plan.Context.Url.Scheme, plan.Framing.Body is null ? 0 : plan.Framing.KnownLength, plan.Context.NoBody);
+        streams?.CreateStream(
+            plan.Context.Url.Scheme,
+            plan.Framing.Body is null ? 0 : plan.Framing.KnownLength,
+            plan.Context.NoBody,
+            new HttpStreamOpenedLines(plan.Context.Events, HttpUrlText.Effective(plan.Context.Url)));
 
     /// <summary>
     /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one;
@@ -1033,12 +1078,24 @@ public sealed class HttpProtocolHandler(
         bool headerNamesAuthorization = HttpRequestHeadFormatter.CustomHeadersOf(plan.Options.Headers, plan.Options).Any(header => header.Names("Authorization"));
         if (plan.ProxyAuthRequest is { } proxyRequest)
         {
+            ReportInfoLines(plan.Context.Events, plan.ProxyAuthorizationInfoLines);
             ReportAuthUsing(plan.Context.Events, HttpAuthUsingLines.AuthUsing(proxyRequest, plan.ProxyAuthorization, plan.ProxyAuthorizationAnswersChallenge, headerNamesAuthorization));
         }
 
         ReportInfoLines(plan.Context.Events, plan.AuthorizationInfoLines);
         ReportAuthUsing(plan.Context.Events, HttpAuthUsingLines.AuthUsing(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge, headerNamesAuthorization));
     }
+
+    /// <summary>
+    /// Decides whether <paramref name="header" /> of a final head is a challenge the lines the
+    /// authenticator reports while it answers are written before: a Negotiate one
+    /// (<see cref="HttpNegotiateInfoLines.IsNegotiateChallenge" />), or an NTLM one to the origin's
+    /// or the proxy's request (<see cref="HttpNtlmInfoLines.IsNtlmChallenge" />, BL-848).
+    /// </summary>
+    private static bool IsAuthChallenge(HttpRequestPlan plan, HttpStatusLine statusLine, HttpResponseHeader header) =>
+        HttpNegotiateInfoLines.IsNegotiateChallenge(plan.AuthRequest, statusLine, header)
+            || HttpNtlmInfoLines.IsNtlmChallenge(plan.AuthRequest, statusLine, header)
+            || (plan.ProxyAuthRequest is { } proxyRequest && HttpNtlmInfoLines.IsNtlmChallenge(proxyRequest, statusLine, header));
 
     /// <summary>Reports <paramref name="line" />, or nothing when it is <see langword="null" />.</summary>
     private static void ReportAuthUsing(ITransferEvents events, string? line)
@@ -1144,20 +1201,55 @@ public sealed class HttpProtocolHandler(
     /// arrived, the request is sent again on a new connection up to
     /// <see cref="MaximumStreamRefusedRetries" /> times, and the refusal after that fails with
     /// <c>Connection died, tried 5 times before giving up</c>; once the response had begun it
-    /// fails at once with curl's text for exit 56. A body read from a stream is not sent again,
-    /// as none of this handler's retries sends one again, and fails as a begun response does.
+    /// fails at once with curl's text for exit 56. A <c>-T</c> upload is rewound for the retry
+    /// as curl's <c>Curl_creader_set_rewind</c> does (BL-885, ADR-0279): a seekable one to where
+    /// <paramref name="upload" /> began reading it, and one that cannot seek makes the retry fail
+    /// with exit 65 before it connects (<see cref="HttpRequestPlan.UploadCannotRewind" />).
     /// </summary>
-    private static HttpAttemptOutcome StreamRefusedOutcome(HttpRequestPlan plan, TransferResult refused, bool responseBegan)
+    private static HttpAttemptOutcome StreamRefusedOutcome(HttpRequestPlan plan, HttpRequestBodyWriter upload, TransferResult refused, bool responseBegan)
     {
-        if (responseBegan || plan.Framing.Body is StreamBody)
+        if (responseBegan)
         {
             return new HttpAttemptOutcome(refused with { ErrorMessage = HttpTransferMessages.ReceiveFailed }, null, KeepsAlive: false);
         }
 
         plan.Context.Events.ReportInfo(HttpConnectionInfoLines.RefusedStreamRetrying);
         return plan.StreamRefusedRetries < MaximumStreamRefusedRetries
-            ? new HttpAttemptOutcome(refused, plan.AfterStreamRefused(), KeepsAlive: false) { DiedBeforeResponse = true, RetryCount = plan.StreamRefusedRetries + 1 }
+            ? new HttpAttemptOutcome(refused, plan.AfterStreamRefused(!TryRewindUpload(plan.Framing.Body, upload)), KeepsAlive: false) { DiedBeforeResponse = true, RetryCount = plan.StreamRefusedRetries + 1 }
             : new HttpAttemptOutcome(refused with { ErrorMessage = HttpTransferMessages.ConnectionDiedGivingUp(MaximumStreamRefusedRetries) }, null, KeepsAlive: false);
+    }
+
+    /// <summary>
+    /// Rewinds a <c>-T</c> upload read from a seekable stream to where <paramref name="upload" />
+    /// began reading it, so it is sent again whole; gives <see langword="false" /> for one that
+    /// cannot seek, such as stdin, and <see langword="true" /> for a body of bytes or none.
+    /// </summary>
+    private static bool TryRewindUpload(HttpRequestBody? body, HttpRequestBodyWriter upload)
+    {
+        if (body is not StreamBody stream)
+        {
+            return true;
+        }
+
+        if (!stream.Content.CanSeek)
+        {
+            return false;
+        }
+
+        upload.Rewound(stream);
+        return true;
+    }
+
+    /// <summary>
+    /// Fails a retry whose <c>-T</c> upload cannot be rewound before it connects, with exit 65
+    /// <c>seek callback returned error 2</c> after the <c>-v</c> lines curl 8.21.0's
+    /// <c>cr_in_rewind</c> and <c>Curl_client_start</c> write for it (ADR-0279).
+    /// </summary>
+    private static TransferResult UploadRewindFailed(HttpRequestPlan plan, TransferReport? earlier)
+    {
+        plan.Context.Events.ReportInfo(HttpTransferMessages.UploadSeekFailed);
+        plan.Context.Events.ReportInfo(HttpTransferMessages.UploadReaderRewindFailed);
+        return TransferResult.Failure(CurlExitCode.SendFailRewind, HttpTransferMessages.UploadSeekFailed) with { Report = earlier };
     }
 
     /// <summary>
@@ -1166,11 +1258,11 @@ public sealed class HttpProtocolHandler(
     /// again once on a fresh connection when its pooled connection died before the response
     /// (<see cref="DiedBeforeResponse" />); and final otherwise.
     /// </summary>
-    private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, ConnectResult connect, HttpResponseHeadReader headReader, HttpTransferException failure, TransferResult failed)
+    private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, ConnectResult connect, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpTransferException failure, TransferResult failed)
     {
         if (failure.IsStreamRefused)
         {
-            return StreamRefusedOutcome(plan, failed, headReader.HasReceived);
+            return StreamRefusedOutcome(plan, upload, failed, headReader.HasReceived);
         }
 
         return DiedBeforeResponse(plan, connect, headReader, failure)
@@ -1556,24 +1648,24 @@ public sealed class HttpProtocolHandler(
     /// answers goes where curl 8.21.0 writes it (ADR-0232): before the retry when the request
     /// that drew the 401 was not sent with Negotiate picked, as curl steps that context on the
     /// way out, and else at once, just before the Negotiate challenge header (ADR-0231), as it
-    /// does when there is no retry.
+    /// does when there is no retry. A refusal to answer when Negotiate was not picked fails the
+    /// retry instead, once its lines are written, as curl fails making NTLM's Type 3 message on
+    /// the way out (measured, BL-848 Notes).
     /// </summary>
-    /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
+    /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />) while Negotiate is picked.</exception>
     private async ValueTask<HttpRequestPlan?> RetryWithAuthorizationAsync(HttpRequestPlan plan, HttpResponseHead head, CancellationToken cancellationToken)
     {
         HttpInfoLineRecorder retryLines = new();
-        HttpAuthRequest request = HttpNegotiateInfoLines.PicksNegotiate(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge)
-            ? plan.AuthRequest
-            : plan.AuthRequest with { Events = retryLines };
+        bool picksNegotiate = HttpNegotiateInfoLines.PicksNegotiate(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge);
+        HttpAuthRequest request = picksNegotiate ? plan.AuthRequest : plan.AuthRequest with { Events = retryLines };
         string? authorization;
         try
         {
             authorization = await RetryAuthorizationAsync(plan, request, head, cancellationToken).ConfigureAwait(false);
         }
-        catch (HttpTransferException)
+        catch (HttpTransferException failure) when (!picksNegotiate)
         {
-            ReportInfoLines(plan.Context.Events, retryLines.Lines);
-            throw;
+            return plan.WithAuthorizationFailure(failure, retryLines.Lines, RepeatProxyAuthorization(plan));
         }
 
         if (authorization is null)
@@ -1994,6 +2086,15 @@ public sealed class HttpProtocolHandler(
         public bool ProxyAuthorizationAnswersChallenge { get; init; }
 
         /// <summary>
+        /// Gets the <c>-v</c> lines the authenticator reported while it made the
+        /// <see cref="ProxyAuthorization" /> value before any challenge, written just before
+        /// <c>Proxy auth using ...</c> each time that value is sent, as curl 8.21.0 writes a
+        /// <c>--proxy-negotiate</c> context's failure there (measured, BL-604 Notes); empty for
+        /// a value that answers a 407.
+        /// </summary>
+        public IReadOnlyList<string> ProxyAuthorizationInfoLines { get; init; } = [];
+
+        /// <summary>
         /// Gets a value indicating whether the request is being sent again on a fresh connection
         /// because a pooled one died before its response, which happens at most once.
         /// </summary>
@@ -2005,6 +2106,13 @@ public sealed class HttpProtocolHandler(
         /// <see cref="MaximumStreamRefusedRetries" />.
         /// </summary>
         public int StreamRefusedRetries { get; private set; }
+
+        /// <summary>
+        /// Gets a value indicating whether this resend's <c>-T</c> upload cannot seek back to where
+        /// the refused request began reading it, as stdin cannot, so the resend fails with exit 65
+        /// before it connects, as curl 8.21.0's <c>cr_in_rewind</c> fails it (ADR-0279).
+        /// </summary>
+        public bool UploadCannotRewind { get; private set; }
 
         /// <summary>
         /// Gets how many redirects the transfer has followed before this request: the chain's
@@ -2048,6 +2156,18 @@ public sealed class HttpProtocolHandler(
             With(Framing, authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true, keptProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines);
 
         /// <summary>
+        /// Makes the retry that answers a challenge the authenticator refused to answer: it
+        /// writes <paramref name="infoLines" /> and then fails with <paramref name="failure" />
+        /// before it is sent (<see cref="AuthorizationFailure" />, BL-848).
+        /// </summary>
+        /// <param name="failure">The refusal the retry fails with.</param>
+        /// <param name="infoLines">The lines the authenticator reported while it refused, written just before the failure.</param>
+        /// <param name="keptProxyAuthorization">The <c>Proxy-Authorization</c> value the retry keeps.</param>
+        /// <returns>The retry's plan.</returns>
+        public HttpRequestPlan WithAuthorizationFailure(HttpTransferException failure, IReadOnlyList<string> infoLines, string? keptProxyAuthorization) =>
+            With(Framing, authorization: null, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true, keptProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines, failure);
+
+        /// <summary>
         /// Makes the same request sent with <paramref name="proxyAuthorization" /> instead, in
         /// answer to a 407's challenge, keeping its <c>Authorization</c> value.
         /// </summary>
@@ -2086,11 +2206,16 @@ public sealed class HttpProtocolHandler(
         /// Makes the same request, sent again on a new connection because the server refused its
         /// HTTP/3 stream, with <see cref="StreamRefusedRetries" /> one higher.
         /// </summary>
+        /// <param name="uploadCannotRewind">
+        /// <see langword="true" /> when its <c>-T</c> upload cannot seek back to its start, so the
+        /// resend fails before it connects (<see cref="UploadCannotRewind" />).
+        /// </param>
         /// <returns>The resent request's plan.</returns>
-        public HttpRequestPlan AfterStreamRefused()
+        public HttpRequestPlan AfterStreamRefused(bool uploadCannotRewind)
         {
             HttpRequestPlan retry = With(Framing, Authorization);
             retry.StreamRefusedRetries = StreamRefusedRetries + 1;
+            retry.UploadCannotRewind = uploadCannotRewind;
             return retry;
         }
 
@@ -2108,7 +2233,8 @@ public sealed class HttpProtocolHandler(
             bool authorizationAnswersChallenge,
             string? proxyAuthorization,
             bool proxyAuthorizationAnswersChallenge,
-            IReadOnlyList<string>? authorizationInfoLines = null) =>
+            IReadOnlyList<string>? authorizationInfoLines = null,
+            HttpTransferException? authorizationFailure = null) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
                 Started = Started,
@@ -2118,11 +2244,12 @@ public sealed class HttpProtocolHandler(
                 ProxyAuthRequest = ProxyAuthRequest,
                 ProxyAuthorization = proxyAuthorization,
                 ProxyAuthorizationAnswersChallenge = proxyAuthorizationAnswersChallenge,
+                ProxyAuthorizationInfoLines = proxyAuthorizationAnswersChallenge ? [] : ProxyAuthorizationInfoLines,
                 SentOnFreshConnection = sentOnFreshConnection,
                 RedirectsFollowed = redirectsFollowed,
                 AuthorizationAnswersChallenge = authorizationAnswersChallenge,
                 AuthorizationInfoLines = authorizationInfoLines ?? AuthorizationInfoLines,
-                AuthorizationFailure = AuthorizationFailure,
+                AuthorizationFailure = authorizationFailure ?? AuthorizationFailure,
                 StreamRefusedRetries = StreamRefusedRetries,
             };
     }

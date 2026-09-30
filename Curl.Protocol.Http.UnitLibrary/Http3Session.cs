@@ -123,7 +123,8 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection
     public EndPoint? LocalEndPoint => Connection.LocalEndPoint;
 
     /// <inheritdoc />
-    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody) => new Http3StreamConnection(this, scheme, bodyLength, ignoresBody);
+    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null) =>
+        new Http3StreamConnection(this, scheme, bodyLength, ignoresBody, openedLines);
 
     /// <summary>
     /// Opens the client's control stream with curl's <c>SETTINGS</c> and its QPACK encoder

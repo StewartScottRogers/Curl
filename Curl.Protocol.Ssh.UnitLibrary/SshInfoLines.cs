@@ -30,11 +30,17 @@ internal static class SshInfoLines
     /// <summary>The line after <c>password</c> authenticated the user.</summary>
     internal const string PasswordAuthenticated = "SSH: initialized password authentication";
 
-    /// <summary>The first of the two lines curl writes for its agent attempt when the method list names <c>publickey</c>.</summary>
+    /// <summary>The first line of curl's agent attempt, written when the method list names <c>publickey</c>.</summary>
     internal const string TryingAgent = "SSH: trying publickey authentication via agent";
 
-    /// <summary>The second agent line: no agent answers, so curl goes on to <c>keyboard-interactive</c>.</summary>
+    /// <summary>The agent line when no agent answers, so curl goes on to <c>keyboard-interactive</c>.</summary>
     internal const string AgentConnectFailed = "SSH: failure connecting to agent";
+
+    /// <summary>The agent line when the agent's identities cannot be read (ADR-0271).</summary>
+    internal const string AgentIdentitiesFailed = "SSH: failure requesting identities to agent";
+
+    /// <summary>The agent line when no identity authenticated the user, the agent holding none included (ADR-0271).</summary>
+    internal const string NoAgentIdentityMatched = "SSH: no agent identity would match";
 
     /// <summary>The line after <c>keyboard-interactive</c> authenticated the user.</summary>
     internal const string KeyboardInteractiveAuthenticated = "SSH: initialized keyboard interactive authentication";
@@ -45,8 +51,21 @@ internal static class SshInfoLines
     /// <summary>The <c>scp</c> line after <see cref="AuthenticationComplete" />.</summary>
     internal const string ConnectionEstablished = "SSH: connection established";
 
-    /// <summary>The <c>publickey</c> denial reason when the public key cannot be read.</summary>
+    /// <summary>The <c>publickey</c> denial reason when the public key cannot be read, as the WinCNG build gives it.</summary>
     internal const string ReasonUnknown = "Reason unknown (-1)";
+
+    /// <summary>
+    /// The OpenSSL build's <c>publickey</c> denial reason when, with no <c>--pubkey</c>, the
+    /// private key file does not open (ADR-0262).
+    /// </summary>
+    internal const string PrivateKeyFileUnopened = "Unable to extract public key from private key file: Unable to open private key file";
+
+    /// <summary>
+    /// The OpenSSL build's <c>publickey</c> denial reason when, with no <c>--pubkey</c>, the
+    /// private key file opens but cannot be read: a missing or wrong passphrase, a cipher
+    /// libssh2 cannot decrypt, or an unknown format (ADR-0262).
+    /// </summary>
+    internal const string PrivateKeyFileUnrecognized = "Unable to extract public key from private key file: Wrong passphrase or invalid/unrecognized private key file format";
 
     /// <summary>The <c>publickey</c> denial reason when the server refuses the unsigned question.</summary>
     internal const string PublicKeyCombinationInvalid = "Username/PublicKey combination invalid";
@@ -126,6 +145,12 @@ internal static class SshInfoLines
     /// <param name="methods">The server's list, as sent.</param>
     /// <returns>The line.</returns>
     internal static string OffersAuthentication(string methods) => $"SSH: host offers authentication via: {methods}";
+
+    /// <summary>The agent line when one of its identities authenticated the user (ADR-0271).</summary>
+    /// <param name="user">The user name.</param>
+    /// <param name="comment">The identity's comment.</param>
+    /// <returns>The line.</returns>
+    internal static string AgentAuthenticated(string user, string comment) => $"SSH: agent authenticated user '{user}' with key '{comment}'";
 
     /// <summary>The line naming the <c>--pubkey</c> file.</summary>
     /// <param name="path">The file's path.</param>

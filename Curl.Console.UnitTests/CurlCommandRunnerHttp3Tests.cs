@@ -35,7 +35,7 @@ public sealed class CurlCommandRunnerHttp3Tests
 
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual("HTTP/3 200 \r\ncontent-length: 5\r\n\r\nhello|3", standardOutput);
-        Assert.AreEqual(new ConnectTarget("localhost", 18443, true) { PoolScheme = "https" }, connector.QuicTargets.Single());
+        Assert.AreEqual(new ConnectTarget("localhost", 18443, true) { PoolScheme = "https" }, connector.QuicTargets.Single() with { Events = NoTransferEvents.Instance });
         Assert.AreEqual(0, connector.TcpConnectCount);
         Assert.AreEqual(0x100L, quic.CloseCode, "closed with H3_NO_ERROR");
         Assert.IsGreaterThan(0L, stream.Written.Length, "the request went out on the QUIC stream");

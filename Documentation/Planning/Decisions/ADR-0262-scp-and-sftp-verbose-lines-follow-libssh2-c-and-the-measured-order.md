@@ -1,6 +1,6 @@
 # ADR-0262 — `scp` and `sftp` `-v` lines follow `lib/vssh/libssh2.c` and the measured order
 
-- **Status:** Accepted
+- **Status:** Accepted; decision 4 superseded by ADR-0271
 - **Date:** 2026-09-29
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-578.
@@ -59,6 +59,7 @@ each block received, before the block itself on standard output.
 4. **The agent always fails.** This client has no SSH agent, and the reference machine had
    none running, so when the list names `publickey` and neither `publickey` nor `password`
    authenticated, the two agent lines are written before `keyboard-interactive`, as measured.
+   (Superseded by ADR-0271, which asks a real agent and writes its outcome's lines.)
 5. **`publickey`'s reason is libssh2's text for the step that failed**: the public key
    unreadable or no signature algorithm the server accepts, `Reason unknown (-1)`; the question
    refused, `Username/PublicKey combination invalid`; the private key unreadable or of another

@@ -23,7 +23,9 @@ namespace Curl.Authentication;
 /// though without it the context is still stepped so <c>-v</c> shows its failure;
 /// NTLM answers only when <c>-u</c> was given, and <c>--ntlm</c> alone sends its Type 1 message
 /// on the first request. Only NTLM, and Negotiate when the 401 carries the acceptor's token
-/// (ADR-0227), go on after a request that sent a credential.
+/// (ADR-0227), go on after a request that sent a credential. A proxy's request is answered on
+/// the same terms, <c>--proxy-ntlm</c> and <c>--proxy-negotiate</c> for a <c>407</c> as
+/// <c>--ntlm</c> and <c>--negotiate</c> for a 401 (ADR-0270).
 /// </remarks>
 public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAndBearer, DigestAuthenticator digest, NegotiateHttpAuthenticator negotiate, NtlmHttpAuthenticator ntlm) : IHttpAuthenticator
 {
@@ -115,28 +117,27 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
         negotiate.EndAuthorization(sentAuthorization);
 
     /// <summary>
-    /// Decides whether the continuation is Negotiate's: for the origin only, when the request
-    /// sent a Negotiate value, which only <see cref="NegotiateHttpAuthenticator" /> makes, and
-    /// <c>-u</c> was given, as libcurl answers no 401 without a user (ADR-0227).
+    /// Decides whether the continuation is Negotiate's: when the request sent a Negotiate value,
+    /// which only <see cref="NegotiateHttpAuthenticator" /> makes, and <c>-u</c> (or <c>-U</c>
+    /// for a proxy) was given, as libcurl answers no 401 or 407 without a user (ADR-0227,
+    /// ADR-0270).
     /// </summary>
     private static bool ContinuesNegotiate(HttpAuthRequest request, string sentAuthorization) =>
-        !request.IsProxy
-            && request.Credential is not null
+        request.Credential is not null
             && sentAuthorization.StartsWith(NegotiateHttpAuthenticator.SchemePrefix, StringComparison.Ordinal);
 
     private static HttpAuthSchemes PickOf(HttpAuthRequest request, IReadOnlyList<string> challenges) =>
         HttpAuthSchemeRanking.PickFirst(request.AllowedSchemes & HttpChallengeSchemes.Offered(challenges));
 
     /// <summary>
-    /// Decides whether Negotiate answers: for the origin only (proxy Negotiate is another
-    /// task's), before a challenge when it is the one scheme allowed, and after one when it is
-    /// the pick and a credential was given.
+    /// Decides whether Negotiate answers, for the origin and for a proxy alike (ADR-0270):
+    /// before a challenge when it is the one scheme allowed, and after one when it is the pick
+    /// and a credential was given.
     /// </summary>
     private static bool AnswersWithNegotiate(HttpAuthRequest request, IReadOnlyList<string> challenges) =>
-        !request.IsProxy
-            && (challenges.Count == 0
-                ? request.AllowedSchemes == HttpAuthSchemes.Negotiate
-                : request.Credential is not null && PickOf(request, challenges) == HttpAuthSchemes.Negotiate);
+        challenges.Count == 0
+            ? request.AllowedSchemes == HttpAuthSchemes.Negotiate
+            : request.Credential is not null && PickOf(request, challenges) == HttpAuthSchemes.Negotiate;
 
     /// <summary>
     /// Decides whether Negotiate is picked only now, for the request that answers
@@ -149,26 +150,25 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
         challenges.Count != 0 && request.AllowedSchemes != HttpAuthSchemes.Negotiate;
 
     /// <summary>
-    /// Decides whether a challenge is Negotiate's to step but not to answer: for the origin,
-    /// when <c>--negotiate</c> is the one scheme allowed, the challenges offer it, and no
-    /// <c>-u</c> was given, as libcurl's <c>Curl_input_negotiate</c> still steps a context for
-    /// the 401 - so <c>-v</c> shows its failure - but sends nothing (measured, BL-843 Notes).
+    /// Decides whether a challenge is Negotiate's to step but not to answer: when
+    /// <c>--negotiate</c> (or <c>--proxy-negotiate</c>) is the one scheme allowed, the challenges
+    /// offer it, and no credential was given, as libcurl's <c>Curl_input_negotiate</c> still
+    /// steps a context for the 401 or 407 - so <c>-v</c> shows its failure - but sends nothing
+    /// (measured, BL-843 and BL-604 Notes).
     /// </summary>
     private static bool StepsNegotiateWithoutAnswering(HttpAuthRequest request, IReadOnlyList<string> challenges) =>
-        !request.IsProxy
-            && challenges.Count != 0
+        challenges.Count != 0
             && request.Credential is null
             && request.AllowedSchemes == HttpAuthSchemes.Negotiate
             && PickOf(request, challenges) == HttpAuthSchemes.Negotiate;
 
     /// <summary>
-    /// Decides whether NTLM answers: for the origin only (proxy NTLM is another task's), when a
+    /// Decides whether NTLM answers, for the origin and for a proxy alike (ADR-0270): when a
     /// credential was given, before a challenge when it is the one scheme allowed, and after one
     /// when it is the pick.
     /// </summary>
     private static bool AnswersWithNtlm(HttpAuthRequest request, IReadOnlyList<string> challenges) =>
-        !request.IsProxy
-            && request.Credential is not null
+        request.Credential is not null
             && (challenges.Count == 0
                 ? request.AllowedSchemes == HttpAuthSchemes.Ntlm
                 : PickOf(request, challenges) == HttpAuthSchemes.Ntlm);

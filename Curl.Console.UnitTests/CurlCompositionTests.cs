@@ -30,7 +30,7 @@ namespace Curl.Console;
 /// transfer end to end. No test here opens a socket.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionTests
+public sealed partial class CurlCompositionTests
 {
     private const string ConnectFailure = "Failed to connect to h:2628 after 0 ms: Could not connect to server";
 
@@ -318,6 +318,19 @@ public sealed class CurlCompositionTests
         Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "<tlsProvider>"));
     }
 
+    // ADR-0151 (BL-709): --curves and --sigalgs run the origin's TLS on the hand-built client
+    // on every platform; the proxy's handshake does not carry them.
+    [TestMethod]
+    [DataRow("--curves", "X25519")]
+    [DataRow("--sigalgs", "ECDSA+SHA256")]
+    public void CreateTransports_WithCurvesOrSigalgs_UpgradesTheOriginWithTheHandBuiltClient(string option, string value)
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(Parse(option, value, "https://example.com/"));
+
+        Assert.IsInstanceOfType<HandBuiltTlsProvider>(transports.TlsProvider);
+        Assert.IsInstanceOfType<SslStreamTlsProvider>(transports.ProxyTlsProvider);
+    }
+
     [TestMethod]
     public void CreateTransports_TcpConnector_ReceivesTcpDialerAndSecureSslStreamTlsProvider()
     {
@@ -420,6 +433,17 @@ public sealed class CurlCompositionTests
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(CurlComposition.CreateTransports(NoOptions()), cookies);
 
         Assert.AreSame(cookies, dispatch.Cookies);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-Z", "http://example.com/" }, true)]
+    [DataRow(new[] { "-Z", "--parallel-immediate", "http://example.com/" }, false)]
+    [DataRow(new[] { "http://example.com/" }, false)]
+    public void CreateTransports_PoolingConnector_WaitsForMultiplexingUnderParallelWithoutParallelImmediate(string[] arguments, bool waits)
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(Parse(arguments));
+
+        Assert.AreEqual(waits, transports.PoolingConnector.WaitsForMultiplexing);
     }
 
     [TestMethod]

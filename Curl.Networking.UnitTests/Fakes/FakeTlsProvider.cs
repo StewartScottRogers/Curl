@@ -39,6 +39,9 @@ public sealed class FakeTlsProvider : IHandshakeReportingTlsProvider
     /// <summary>Gets or sets the peer certificates a successful handshake reports.</summary>
     public IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificatesToReturn { get; init; } = [];
 
+    /// <summary>Gets the protocol a successful handshake says the server accepted through ALPN; <see langword="null" /> means none.</summary>
+    public string? ApplicationProtocolToReturn { get; init; }
+
     /// <summary>Gets the plaintext connection last passed in, if any.</summary>
     public IConnection? ReceivedPlaintext { get; private set; }
 
@@ -96,6 +99,7 @@ public sealed class FakeTlsProvider : IHandshakeReportingTlsProvider
         return ValueTask.FromResult(FailureToReturn ?? ConnectResult.Connected(
             SecuredConnection,
             TimingsToReturn,
-            peerCertificates: PeerCertificatesToReturn));
+            peerCertificates: PeerCertificatesToReturn,
+            applicationProtocol: ApplicationProtocolToReturn));
     }
 }

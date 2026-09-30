@@ -159,6 +159,19 @@ internal static class HttpTransferMessages
         string.Create(CultureInfo.InvariantCulture, $"Connection died, tried {retries} times before giving up");
 
     /// <summary>
+    /// The exit 65 message for a <c>-T</c> upload that must be sent again but cannot seek back to
+    /// its start, such as stdin: curl 8.21.0's <c>cr_in_rewind</c> (<c>lib/sendf.c</c>) fails with
+    /// it when the tool's seek callback answers <c>CURL_SEEKFUNC_CANTSEEK</c>, which is 2 (ADR-0279).
+    /// </summary>
+    internal const string UploadSeekFailed = "seek callback returned error 2";
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.21.0's <c>Curl_client_start</c> (<c>lib/sendf.c</c>) writes after
+    /// <see cref="UploadSeekFailed" />, naming its file reader and exit 65 (ADR-0279).
+    /// </summary>
+    internal const string UploadReaderRewindFailed = "rewind of client reader 'cr-in' failed: 65";
+
+    /// <summary>
     /// Gives an HTTP/3 error code's name as <c>vquic_h3_err_str</c> gives it at
     /// <c>curl-8_21_0</c>: the RFC 9114 name without its <c>H3_</c> prefix, <c>NO_ERROR</c> for
     /// a reserved greasing code (<c>0x21 + 0x1f * N</c>) and <c>unknown</c> for any other.

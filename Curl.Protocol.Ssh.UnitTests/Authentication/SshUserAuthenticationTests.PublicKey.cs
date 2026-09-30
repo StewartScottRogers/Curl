@@ -87,6 +87,74 @@ public sealed partial class SshUserAuthenticationTests
     }
 
     [TestMethod]
+    [DataRow(null, DisplayName = "no --pass, as measured")]
+    [DataRow("nope", DisplayName = "a wrong --pass, as measured")]
+    public async Task AuthenticateAsync_EncryptedKeyNotOpenedOnWinCng_ReportsReasonUnknownAsMeasured(string? passphrase)
+    {
+        KeyedPeer peer = await ConnectWithBackendAsync(
+            "WinCNG", Keys(TestUserKeys.Ed25519OpenSshEncrypted["aes256-ctr"], passphrase: passphrase), Failure("publickey,password"), Failure("publickey,password"));
+
+        await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
+
+        CollectionAssert.Contains(peer.Events.Transcript, "* SSH: publickey authentication denied: Reason unknown (-1)");
+    }
+
+    [TestMethod]
+    [DataRow(null, DisplayName = "no --pass, as measured")]
+    [DataRow("nope", DisplayName = "a wrong --pass, as measured")]
+    public async Task AuthenticateAsync_EncryptedKeyNotOpenedOnOpenSsl_ReportsTheUnrecognizedKeyFileAsMeasured(string? passphrase)
+    {
+        KeyedPeer peer = await ConnectWithBackendAsync(
+            "OpenSSL", Keys(TestUserKeys.Ed25519OpenSshEncrypted["aes256-ctr"], passphrase: passphrase), Failure("publickey,password"), Failure("publickey,password"));
+
+        SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
+            async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
+
+        AssertAuthenticationFailure(failure);
+        AssertMethods(await AuthenticationMessagesAsync(peer), "none", "password");
+        CollectionAssert.Contains(
+            peer.Events.Transcript,
+            "* SSH: publickey authentication denied: Unable to extract public key from private key file: Wrong passphrase or invalid/unrecognized private key file format");
+    }
+
+    [TestMethod]
+    [DataRow("chacha20-poly1305@openssh.com", DisplayName = "a chacha20-poly1305 key with its passphrase, as measured")]
+    [DataRow(null, DisplayName = "a file of no known format")]
+    public async Task AuthenticateAsync_KeyFileUnreadableOnOpenSsl_ReportsTheUnrecognizedKeyFile(string? cipher)
+    {
+        SshUserKeySource keys = cipher is null ? Keys("not a key\n") : Keys(TestUserKeys.Ed25519OpenSshEncrypted[cipher], passphrase: TestUserKeys.Passphrase);
+        KeyedPeer peer = await ConnectWithBackendAsync("OpenSSL", keys, Failure("publickey,password"), Failure("publickey,password"));
+
+        await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
+
+        CollectionAssert.Contains(
+            peer.Events.Transcript,
+            "* SSH: publickey authentication denied: Unable to extract public key from private key file: Wrong passphrase or invalid/unrecognized private key file format");
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsync_KeyFileMissingOnOpenSsl_ReportsTheUnopenedKeyFile()
+    {
+        KeyedPeer peer = await ConnectWithBackendAsync("OpenSSL", Keys(null), Failure("publickey,password"), Failure("publickey,password"));
+
+        await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
+
+        CollectionAssert.Contains(
+            peer.Events.Transcript,
+            "* SSH: publickey authentication denied: Unable to extract public key from private key file: Unable to open private key file");
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsync_PubkeyUnreadableOnOpenSsl_KeepsReasonUnknown()
+    {
+        KeyedPeer peer = await ConnectWithBackendAsync("OpenSSL", Keys(TestUserKeys.RsaPkcs1, "not a public key\n"), Failure("publickey,password"), Failure("publickey,password"));
+
+        await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
+
+        CollectionAssert.Contains(peer.Events.Transcript, "* SSH: publickey authentication denied: Reason unknown (-1)");
+    }
+
+    [TestMethod]
     [DataRow(MeasuredSignatureAlgorithms, "rsa-sha2-512", DisplayName = "OpenSSH's list: rsa-sha2-512, as measured")]
     [DataRow("rsa-sha2-256", "rsa-sha2-256", DisplayName = "rsa-sha2-256 alone, as measured")]
     [DataRow("rsa-sha2-256,rsa-sha2-512", "rsa-sha2-512", DisplayName = "libssh2's order, not the server's, as measured")]
@@ -375,7 +443,16 @@ public sealed partial class SshUserAuthenticationTests
 
     // After a key exchange with the scripted server the client's messages are sealed, so the
     // transcript opens them with the client-to-server keys.
-    private static async Task<KeyedPeer> ConnectAsync(SshUserKeySource keys, params byte[][] payloads)
+    private static Task<KeyedPeer> ConnectAsync(SshUserKeySource keys, params byte[][] payloads) => ConnectWithAgentAsync(null, keys, payloads);
+
+    private static Task<KeyedPeer> ConnectWithAgentAsync(ISshAgentConnector? agent, SshUserKeySource? keys, params byte[][] payloads) =>
+        ConnectWithPresetAsync(SshAlgorithmPreferences.Full, agent, keys, payloads);
+
+    // Full's lists with a reference build's backend keep the scripted key exchange and name the backend.
+    private static Task<KeyedPeer> ConnectWithBackendAsync(string backend, SshUserKeySource keys, params byte[][] payloads) =>
+        ConnectWithPresetAsync(SshAlgorithmPreferences.Full with { CryptographyBackend = backend }, null, keys, payloads);
+
+    private static async Task<KeyedPeer> ConnectWithPresetAsync(SshAlgorithmPreferences preferences, ISshAgentConnector? agent, SshUserKeySource? keys, byte[][] payloads)
     {
         TestHostKey hostKey = TestHostKey.Ecdsa("nistp256", TestHostKey.FixedNistP256);
         SshKexInit serverKexInit = ServerKexInit("ecdh-sha2-nistp256", hostKey.Algorithm);
@@ -391,10 +468,10 @@ public sealed partial class SshUserAuthenticationTests
         }
 
         ScriptedConnection connection = new(script.Bytes);
-        SshTransport transport = new(connection, SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33), ephemeralKeys);
+        SshTransport transport = new(connection, preferences, EverythingImplemented, new RepeatingRandomSource(0x33), ephemeralKeys);
         await transport.ExchangeKeysAsync(await transport.NegotiateAlgorithmsAsync(CancellationToken.None), CancellationToken.None);
         TranscriptTransferEvents events = new();
-        return new KeyedPeer(new SshUserAuthentication(transport, Encoding.UTF8, keys, events), connection, exchange.ExchangeHash, SshPacketProtections.ForClientToServer(ctr, exchange.Keys(exchange.ExchangeHash)), events);
+        return new KeyedPeer(new SshUserAuthentication(transport, Encoding.UTF8, keys, events, agent), connection, exchange.ExchangeHash, SshPacketProtections.ForClientToServer(ctr, exchange.Keys(exchange.ExchangeHash)), events);
     }
 
     // The client's messages after its KEXINIT, key-exchange message and NEWKEYS.
