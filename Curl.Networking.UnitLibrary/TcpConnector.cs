@@ -66,6 +66,17 @@ namespace Curl.Networking;
 /// before the other is dialled beside it (<see cref="AddressFamilyRace" />, ADR-0254);
 /// <see langword="null" /> for curl's default of 200 milliseconds.
 /// </param>
+/// <param name="localBinding">
+/// What the local end of every TCP connection, to a host or a proxy, is bound to before it connects
+/// (<c>--interface</c>, <c>--local-port</c>, BL-600); <see langword="null" /> to leave it to the system.
+/// A dial that cannot bind moves on to the next address, and when the last one failed so the connect
+/// is exit 45 <c>Failed binding local connection end</c>, or exit 43 for an <c>ifhost!</c> interface
+/// part too long. Unix domain sockets are never bound.
+/// </param>
+/// <param name="networkInterfaceLookup">
+/// Finds the interface <paramref name="localBinding" /> names; <see langword="null" /> for
+/// <see cref="SystemNetworkInterfaceLookup" />, which finds none on Windows, as the Schannel build does.
+/// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -80,7 +91,9 @@ public sealed class TcpConnector(
     UnixSocketAddress? unixSocket = null,
     IReadOnlyList<string>? httpOverTlsApplicationProtocols = null,
     QuicDialer? quicDialer = null,
-    TimeSpan? happyEyeballsTimeout = null) : IConnector
+    TimeSpan? happyEyeballsTimeout = null,
+    LocalBinding? localBinding = null,
+    INetworkInterfaceLookup? networkInterfaceLookup = null) : IConnector
 {
     private const string AnyHost = "*";
 
@@ -110,6 +123,17 @@ public sealed class TcpConnector(
     private static readonly IPEndPoint UnspecifiedEndPoint = new(IPAddress.Any, 0);
 
     private readonly TimeSpan _connectTimeout = ConnectTimeoutOrDefault(connectTimeout);
+
+    /// <summary>
+    /// Gets what the local end of every TCP connection is bound to (<c>--interface</c>,
+    /// <c>--local-port</c>), or <see langword="null" /> to leave it to the system.
+    /// </summary>
+    public LocalBinding? LocalBinding => localBinding;
+
+    // Every TCP dial goes through this one: bound as localBinding asks, or the dialer as given.
+    private ITcpDialer BindingDialer() => localBinding is null
+        ? tcpDialer
+        : new LocalBindingTcpDialer(tcpDialer, localBinding, networkInterfaceLookup ?? new SystemNetworkInterfaceLookup(), dnsResolver);
 
     /// <summary>
     /// Gets the Unix domain socket every connect dials in place of the target's host, port and
@@ -454,7 +478,7 @@ public sealed class TcpConnector(
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, destination.Port, destination.Host, target, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError, lastBindFailure) = await DialFirstReachableAsync(addresses, destination.Port, destination.Host, target, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
@@ -462,8 +486,9 @@ public sealed class TcpConnector(
             return DialFailure(
                 target.Events,
                 lastDialError,
+                lastBindFailure,
                 new ConnectTimings(started, nameResolved, null, null),
-                $"Failed to connect to {target.Host}:{target.Port}{via} after {elapsedMilliseconds} ms: Could not connect to server");
+                $"Failed to connect to {target.Host}:{target.Port}{via} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}");
         }
 
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
@@ -510,6 +535,7 @@ public sealed class TcpConnector(
             return DialFailure(
                 target.Events,
                 exception.SocketErrorCode,
+                null,
                 new ConnectTimings(started, nameResolved, null, null),
                 CurlErrorBuffer.Truncate($"Failed to connect to {target.Host}:{target.Port} over unix://{unixSocket.Path} after {elapsedMilliseconds} ms: Could not connect to server"));
         }
@@ -733,15 +759,16 @@ public sealed class TcpConnector(
         string? proxyAuthorization,
         CancellationToken cancellationToken)
     {
-        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, proxy.Port, proxy.Host, target, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError, lastBindFailure) = await DialFirstReachableAsync(addresses, proxy.Port, proxy.Host, target, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
             return (DialFailure(
                 target.Events,
                 lastDialError,
+                lastBindFailure,
                 new ConnectTimings(started, nameResolved, null, null),
-                $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: Could not connect to server"), null);
+                $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}"), null);
         }
 
         var tunnel = new TunnelRequest(target, destination, proxy, started, nameResolved);
@@ -1099,35 +1126,53 @@ public sealed class TcpConnector(
     /// Races the address families of <paramref name="addresses" /> through an
     /// <see cref="AddressFamilyRace" /> and returns the first connection, or <see langword="null" />
     /// with the <see cref="SocketError" /> of the attempt that failed last, which curl keeps as
-    /// <c>CURLINFO_OS_ERRNO</c>.
+    /// <c>CURLINFO_OS_ERRNO</c>, and its <see cref="LocalBindFailure" /> when its local end could not be bound.
     /// </summary>
-    private async ValueTask<(DialedSocket? Dialed, SocketError LastError)> DialFirstReachableAsync(
+    private async ValueTask<(DialedSocket? Dialed, SocketError LastError, LocalBindFailure? LastBindFailure)> DialFirstReachableAsync(
         IReadOnlyList<IPAddress> addresses,
         int port,
         string hostName,
         ConnectTarget target,
         CancellationToken cancellationToken)
     {
-        var race = new AddressFamilyRace(tcpDialer, timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog));
-        var (dialed, remoteEndPoint, lastError) = await race.DialAsync(addresses, port, cancellationToken).ConfigureAwait(false);
+        var race = new AddressFamilyRace(BindingDialer(), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog));
+        var (dialed, remoteEndPoint, lastError, lastBindFailure) = await race.DialAsync(addresses, port, cancellationToken).ConfigureAwait(false);
         return dialed is null
-            ? (null, lastError)
-            : (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint), SocketError.Success);
+            ? (null, lastError, lastBindFailure)
+            : (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint), SocketError.Success, null);
     }
 
     /// <summary>
-    /// The exit 7 for a dial that reached no address, its message also reported on
-    /// <paramref name="events" /> as curl's <c>-v</c> repeats it: marked refused when the last
+    /// The reason that ends a failed connect's message: curl's text for <c>CURLE_INTERFACE_FAILED</c> or
+    /// <c>CURLE_BAD_FUNCTION_ARGUMENT</c> when the last address failed to bind its local end with
+    /// one of them, <c>Could not connect to server</c> otherwise (measured, BL-600 Notes).
+    /// </summary>
+    private static string DialFailureText(LocalBindFailure? lastBindFailure) => lastBindFailure switch
+    {
+        LocalBindFailure.InterfaceFailed => "Failed binding local connection end",
+        LocalBindFailure.BadArgument => "A libcurl function was given a bad argument",
+        _ => "Could not connect to server",
+    };
+
+    /// <summary>
+    /// The failure for a dial that reached no address, its message also reported on
+    /// <paramref name="events" /> as curl's <c>-v</c> repeats it: exit 45 or exit 43 when the last
+    /// address failed to bind its local end with <see cref="LocalBindFailure.InterfaceFailed" /> or
+    /// <see cref="LocalBindFailure.BadArgument" />, else exit 7, marked refused when the last
     /// attempt was refused, as <c>--retry-connrefused</c> reads curl's <c>CURLINFO_OS_ERRNO</c>.
     /// It carries the start and lookup timestamps, as curl 8.21.0 still reports
     /// <c>%{time_namelookup}</c> after a refused connect (measured, ADR-0091).
     /// </summary>
-    private static ConnectResult DialFailure(ITransferEvents events, SocketError lastError, ConnectTimings timings, string errorMessage)
+    private static ConnectResult DialFailure(ITransferEvents events, SocketError lastError, LocalBindFailure? lastBindFailure, ConnectTimings timings, string errorMessage)
     {
         events.ReportInfo(errorMessage);
-        return lastError == SocketError.ConnectionRefused
-            ? ConnectResult.Refused(errorMessage, timings)
-            : ConnectResult.Failed(CurlExitCode.CouldntConnect, errorMessage, timings);
+        return lastBindFailure switch
+        {
+            LocalBindFailure.InterfaceFailed => ConnectResult.Failed(CurlExitCode.InterfaceFailed, errorMessage, timings),
+            LocalBindFailure.BadArgument => ConnectResult.Failed(CurlExitCode.BadFunctionArgument, errorMessage, timings),
+            _ when lastError == SocketError.ConnectionRefused => ConnectResult.Refused(errorMessage, timings),
+            _ => ConnectResult.Failed(CurlExitCode.CouldntConnect, errorMessage, timings),
+        };
     }
 
     /// <summary>

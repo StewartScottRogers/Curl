@@ -45,6 +45,10 @@ public sealed class GatedTcpDialer(TimeProvider timeProvider) : ITcpDialer
     }
 
     /// <inheritdoc />
+    public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    /// <inheritdoc />
     public ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
 

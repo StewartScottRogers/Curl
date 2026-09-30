@@ -32,6 +32,7 @@ internal sealed class AddressFamilyRace(
 {
     private readonly List<Attempt> _running = [];
     private SocketError _lastError = SocketError.Success;
+    private LocalBindFailure? _lastBindFailure;
 
     /// <summary>
     /// Races the families of <paramref name="addresses" /> on <paramref name="port" />.
@@ -40,11 +41,12 @@ internal sealed class AddressFamilyRace(
     /// <param name="port">The port to dial on each.</param>
     /// <param name="cancellationToken">Cancels every attempt.</param>
     /// <returns>
-    /// The winning connection and the end point it was dialled at, or no connection and the
+    /// The winning connection and the end point it was dialled at, or no connection, the
     /// <see cref="SocketError" /> of the attempt that failed last, which curl keeps as
-    /// <c>CURLINFO_OS_ERRNO</c>.
+    /// <c>CURLINFO_OS_ERRNO</c>, and that attempt's <see cref="LocalBindFailure" /> when its local end
+    /// could not be bound.
     /// </returns>
-    public async ValueTask<(DialedTcpConnection? Dialed, IPEndPoint? RemoteEndPoint, SocketError LastError)> DialAsync(
+    public async ValueTask<(DialedTcpConnection? Dialed, IPEndPoint? RemoteEndPoint, SocketError LastError, LocalBindFailure? LastBindFailure)> DialAsync(
         IReadOnlyList<IPAddress> addresses,
         int port,
         CancellationToken cancellationToken)
@@ -73,7 +75,7 @@ internal sealed class AddressFamilyRace(
                 _running.Remove(attempt);
                 if (await OutcomeOfAsync(attempt).ConfigureAwait(false) is { } dialed)
                 {
-                    return (dialed, attempt.RemoteEndPoint, SocketError.Success);
+                    return (dialed, attempt.RemoteEndPoint, SocketError.Success, null);
                 }
 
                 StartNext(attempt.Family, race.Token);
@@ -85,7 +87,7 @@ internal sealed class AddressFamilyRace(
                 }
             }
 
-            return (null, null, _lastError);
+            return (null, null, _lastError, _lastBindFailure);
         }
         finally
         {
@@ -142,6 +144,7 @@ internal sealed class AddressFamilyRace(
         {
             // curl moves on to the next address; only when every one fails is it exit 7.
             _lastError = exception.SocketErrorCode;
+            _lastBindFailure = (exception as LocalBindException)?.Failure;
             events.ReportInfo(ConnectFailedLine(attempt.RemoteEndPoint, exception));
             log.DialFailed(attempt.RemoteEndPoint, exception);
             return null;
@@ -170,10 +173,17 @@ internal sealed class AddressFamilyRace(
     /// <summary>
     /// curl 8.21.0's line for one failed dial, such as <c>connect to 127.0.0.1 port 1 from
     /// 0.0.0.0 port 56585 failed: Connection refused</c>. A failed dial reports no local end
-    /// point, so it names the unspecified address of the family and port <c>0</c> (ADR-0100).
+    /// point, so it names the unspecified address of the family and port <c>0</c> (ADR-0100). A dial
+    /// whose local end could not be bound names no local address at all and errno 0's reason, as in
+    /// <c>connect to 127.0.0.1 port 47599 from  port 0 failed: No error</c> (measured, BL-600 Notes).
     /// </summary>
     private static string ConnectFailedLine(IPEndPoint remoteEndPoint, SocketException exception)
     {
+        if (exception is LocalBindException)
+        {
+            return $"connect to {remoteEndPoint.Address} port {remoteEndPoint.Port} from  port 0 failed: {LocalBindException.ReasonText(OperatingSystem.IsWindows())}";
+        }
+
         var unspecified = remoteEndPoint.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any;
         var reason = ConnectFailureReason.Describe(exception, OperatingSystem.IsWindows());
         return $"connect to {remoteEndPoint.Address} port {remoteEndPoint.Port} from {unspecified} port 0 failed: {reason}";

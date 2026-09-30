@@ -192,4 +192,71 @@ public sealed class TcpDialerTests
         await Assert.ThrowsAsync<SocketException>(
             async () => await dialer.DialAsync(endPoint, cancellation.Token));
     }
+
+    [TestMethod]
+    public void BindLocalEnd_WithAFreePort_BindsIt()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        TcpDialer.BindLocalEnd(socket, new IPEndPoint(IPAddress.Loopback, 0), 0);
+
+        var bound = (IPEndPoint)socket.LocalEndPoint!;
+        Assert.AreEqual(IPAddress.Loopback, bound.Address);
+        Assert.AreNotEqual(0, bound.Port);
+    }
+
+    [TestMethod]
+    public void BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext()
+    {
+        // curl --local-port 40000-40005 with 40000-40002 in use -> %{local_port} 40003.
+        var (busy, holder) = HoldAPortWithTheNextFree();
+        using (holder)
+        {
+            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            TcpDialer.BindLocalEnd(socket, new IPEndPoint(IPAddress.Loopback, busy), 2);
+
+            Assert.AreEqual(busy + 1, ((IPEndPoint)socket.LocalEndPoint!).Port);
+        }
+    }
+
+    [TestMethod]
+    public void BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed()
+    {
+        using var holder = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        holder.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        var busy = ((IPEndPoint)holder.LocalEndPoint!).Port;
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        var exception = Assert.ThrowsExactly<LocalBindException>(
+            () => TcpDialer.BindLocalEnd(socket, new IPEndPoint(IPAddress.Loopback, busy), 1));
+
+        Assert.AreEqual(LocalBindFailure.InterfaceFailed, exception.Failure);
+        Assert.AreEqual(SocketError.Success, exception.SocketErrorCode);
+    }
+
+    /// <summary>Binds a loopback port whose next port is free, and returns the port and the socket holding it.</summary>
+    private static (int Port, Socket Holder) HoldAPortWithTheNextFree()
+    {
+        while (true)
+        {
+            var holder = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            holder.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            var port = ((IPEndPoint)holder.LocalEndPoint!).Port;
+            using var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            try
+            {
+                probe.Bind(new IPEndPoint(IPAddress.Loopback, port + 1));
+                return (port, holder);
+            }
+            catch (SocketException)
+            {
+                holder.Dispose();
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                holder.Dispose();
+            }
+        }
+    }
 }

@@ -225,6 +225,16 @@ connection is reported `with proxy` (`ConnectionReusedEvent.IsProxy`) when the t
 forward proxy (`ConnectTarget.IsForwardProxy`) or tunnels through one, naming the proxy's host
 and port for a tunnel, as curl 8.21.0 prints it (BL-360).
 
+Per ADR-0268 (BL-600) `TcpConnector` takes an optional `LocalBinding` (`--interface`, `--local-port`)
+and dials every TCP address, a proxy's included, through the internal `LocalBindingTcpDialer`, which
+picks the local address for the family dialled (an interface `INetworkInterfaceLookup` finds, none on
+Windows; else a host, `localhost` as `::1` first; else the unspecified address) and calls
+`ITcpDialer.DialFromAsync`, whose `TcpDialer.BindLocalEnd` tries each port of the range. A bind that
+fails throws `LocalBindException`, a `SocketException`, so `AddressFamilyRace` moves on to the next
+address with curl's `from  port 0 failed:` line and returns the last `LocalBindFailure`:
+`InterfaceFailed` is exit 45 `Failed binding local connection end`, `BadArgument` (an `ifhost!`
+interface part over 254 characters) exit 43, `AddressFamilyMismatch` the usual exit 7.
+
 Per ADR-0149 (BL-507) `TcpConnector` takes an optional `UnixSocketAddress` (`--unix-socket`,
 `--abstract-unix-socket`, whose name starts with a NUL). With one, every connect dials it through
 `ITcpDialer.DialUnixSocketAsync` in place of the host, port and proxy, resolving nothing, then runs
@@ -321,8 +331,8 @@ the test, so TLS is tested without a socket. `TcpConnectionListenerTests` and
 `TcpPendingConnectionTests` bind local TCP sockets without connecting to them. The tests that
 connect or send bytes are the loopback tests in `TcpDialerTests` (TCP and Unix socket), `UdpDatagramChannelTests`,
 `TcpConnectorTests.LocalEndPoint` (plain and over TLS) and the accepting test in `TcpConnectionListenerTests`, tagged
-`[TestCategory("Integration")]`, as is `DnsSocketOpenerTests`' TCP connect. Per ADR-0083 the six members only those tests can reach,
-`TcpDialer.DialAsync`, `TcpDialer.DialUnixSocketAsync`, `TcpPendingConnection.AcceptStreamConnectionAsync` (behind the internal
+`[TestCategory("Integration")]`, as is `DnsSocketOpenerTests`' TCP connect. Per ADR-0083 the members only those tests can reach,
+`TcpDialer.DialAsync`, `TcpDialer.DialFromAsync` with the `DialBoundAsync` both run, `TcpDialer.DialUnixSocketAsync`, `TcpPendingConnection.AcceptStreamConnectionAsync` (behind the internal
 `AcceptConnectionAsync` seam), `UdpDatagramChannel.SendAsync`, `UdpDatagramChannel.ReceiveAsync` and `DnsSocketOpener.ConnectStreamAsync`,
 carry `[ExcludeFromCodeCoverage]`, so the fast-run coverage gate holds without the network.
 Keep them thin: logic added there is not measured.

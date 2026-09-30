@@ -23,6 +23,10 @@ public sealed class StallingTcpDialer : ITcpDialer
     }
 
     /// <inheritdoc />
+    public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken) =>
+        DialAsync(endPoint, cancellationToken);
+
+    /// <inheritdoc />
     public async ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken)
     {
         OnStalled();
