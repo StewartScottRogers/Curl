@@ -361,6 +361,32 @@ public sealed partial class HttpRequestHeadFormatterTests
     }
 
     /// <summary>
+    /// Measured (BL-986 Notes): beside an <c>-H Authorization</c> value, curl still sends its
+    /// Digest and NTLM values after <c>Host</c>, and Negotiate too as libcurl's
+    /// <c>output_auth_headers</c> checks the custom headers for Basic and Bearer alone; Basic,
+    /// Bearer and an <c>--aws-sigv4</c> value are dropped.
+    /// </summary>
+    [TestMethod]
+    [DataRow("Digest username=\"u\"", true, DisplayName = "Digest")]
+    [DataRow("NTLM dHlwZTE=", true, DisplayName = "NTLM")]
+    [DataRow("Negotiate dG9rZW4=", true, DisplayName = "Negotiate")]
+    [DataRow("Basic dTpw", false, DisplayName = "Basic")]
+    [DataRow("Bearer tok", false, DisplayName = "Bearer")]
+    [DataRow("AWS4-HMAC-SHA256 Credential=k", false, DisplayName = "AWS SigV4")]
+    [DataRow("NTLMish", false, DisplayName = "Scheme only starting NTLM")]
+    public void Format_AuthorizationBesideAnAuthorizationHeader_SendsOnlyDigestNtlmAndNegotiate(string authorization, bool sent)
+    {
+        HttpRequestOptions options = new() { Headers = ["Authorization: x"] };
+
+        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://127.0.0.1:18181/a"), options, authorization: authorization);
+
+        string ownLine = sent ? $"Authorization: {authorization}\r\n" : string.Empty;
+        Assert.AreEqual(
+            $"GET /a HTTP/1.1\r\nHost: 127.0.0.1:18181\r\n{ownLine}User-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
+            Encoding.Latin1.GetString(head));
+    }
+
+    /// <summary>
     /// Measured (BL-182 Notes): with a cookie jar, curl sends <c>Cookie</c> after
     /// <c>Referer</c> and before the <c>-H</c> values and the body's headers, and still sends
     /// it when an <c>-H</c> value names <c>Cookie</c>. The <c>--compressed</c> row sends

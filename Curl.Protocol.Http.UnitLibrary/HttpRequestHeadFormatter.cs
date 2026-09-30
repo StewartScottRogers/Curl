@@ -122,7 +122,7 @@ internal static class HttpRequestHeadFormatter
         }
 
         AppendAlways(head, "Proxy-Authorization", proxyAuthorization);
-        AppendUnlessOverridden(head, customHeaders, "Authorization", authorization);
+        AppendAuthorization(head, customHeaders, authorization);
         AppendUnlessOverridden(head, customHeaders, "Range", range);
         AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
         AppendClientHeaders(head, customHeaders, options);
@@ -249,6 +249,32 @@ internal static class HttpRequestHeadFormatter
     /// and port as the <c>Host</c> line has them, then the path and query.
     /// </summary>
     private static string AbsoluteForm(CurlUrl url) => $"{url.Scheme}://{HttpUrlText.HostAndPort(url)}{HttpUrlText.RequestTarget(url)}";
+
+    /// <summary>
+    /// Appends the authenticator's <c>Authorization</c> value as curl 8.21.0 does: a Digest, NTLM
+    /// or Negotiate value always, before any <c>-H</c> one, and any other (Basic, Bearer,
+    /// <c>--aws-sigv4</c>) only when no <c>-H</c> value names <c>Authorization</c>, because
+    /// libcurl's <c>output_auth_headers</c> checks the custom headers for Basic and Bearer alone
+    /// (measured, BL-986 Notes).
+    /// </summary>
+    private static void AppendAuthorization(StringBuilder head, HttpCustomHeader[] customHeaders, string? authorization)
+    {
+        if (IsSentBesideAuthorizationHeader(authorization))
+        {
+            AppendAlways(head, "Authorization", authorization);
+        }
+        else
+        {
+            AppendUnlessOverridden(head, customHeaders, "Authorization", authorization);
+        }
+    }
+
+    /// <summary>
+    /// Tells whether curl sends an <c>Authorization</c> value even when an <c>-H</c> value names
+    /// <c>Authorization</c>: when its scheme is Digest, NTLM or Negotiate.
+    /// </summary>
+    private static bool IsSentBesideAuthorizationHeader(string? authorization) =>
+        authorization?.Split(' ', 2)[0] is "Digest" or "NTLM" or "Negotiate";
 
     private static void AppendUnlessOverridden(StringBuilder head, HttpCustomHeader[] customHeaders, string name, string? value)
     {
