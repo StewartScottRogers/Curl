@@ -176,6 +176,11 @@ over it, then TLS to the target inside that; each handshake failure is the TLS p
 The handshake to the proxy runs through the proxy's `ITlsProvider` (the `--proxy-*` TLS options,
 ADR-0095), and so does the handshake to an HTTPS forward proxy (`ConnectTarget.IsForwardProxy`
 with `UseTls`), which curl 8.21.0 verifies with `--proxy-insecure` and never `-k` (measured, BL-441).
+Per ADR-0272 (BL-614) `TcpConnector` takes an optional `preProxy` (`--preproxy`, a SOCKS proxy):
+an `Http`, `Http10` or `Https` proxy, and a forward-proxy target, are then reached through it -
+the pre-proxy resolved (exit 5 names it) and dialled (exit 7 names the HTTP proxy `over proxy`
+the pre-proxy), its SOCKS handshake opened to the HTTP proxy, and the CONNECT, proxy TLS or
+forwarded request run inside. A SOCKS `ConnectTarget.Proxy` and a direct target never use it.
 
 `TcpConnector` applies `--resolve` through `ResolveOverrides` and `--connect-to` through
 `ConnectToMappings`, both built from the verbatim option values and parsed as curl 8.21.0

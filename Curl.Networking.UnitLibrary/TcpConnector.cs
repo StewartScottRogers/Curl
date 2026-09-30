@@ -77,6 +77,12 @@ namespace Curl.Networking;
 /// Finds the interface <paramref name="localBinding" /> names; <see langword="null" /> for
 /// <see cref="SystemNetworkInterfaceLookup" />, which finds none on Windows, as the Schannel build does.
 /// </param>
+/// <param name="preProxy">
+/// The SOCKS proxy <c>--preproxy</c> names, which every connection to an HTTP or HTTPS proxy - a
+/// tunnelling <see cref="ConnectTarget.Proxy" /> or a <see cref="ConnectTarget.IsForwardProxy" />
+/// target - is opened through (BL-614); <see langword="null" /> for none. A SOCKS
+/// <see cref="ConnectTarget.Proxy" /> and a direct target never pass through it.
+/// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -93,7 +99,8 @@ public sealed class TcpConnector(
     QuicDialer? quicDialer = null,
     TimeSpan? happyEyeballsTimeout = null,
     LocalBinding? localBinding = null,
-    INetworkInterfaceLookup? networkInterfaceLookup = null) : IConnector
+    INetworkInterfaceLookup? networkInterfaceLookup = null,
+    ProxyEndpoint? preProxy = null) : IConnector
 {
     private const string AnyHost = "*";
 
@@ -140,6 +147,12 @@ public sealed class TcpConnector(
     /// proxy (<c>--unix-socket</c>, <c>--abstract-unix-socket</c>), or <see langword="null" /> to dial TCP.
     /// </summary>
     public UnixSocketAddress? UnixSocket { get; } = unixSocket;
+
+    /// <summary>
+    /// Gets the SOCKS proxy every connection to an HTTP or HTTPS proxy is opened through
+    /// (<c>--preproxy</c>), or <see langword="null" /> for none.
+    /// </summary>
+    public ProxyEndpoint? PreProxy { get; } = preProxy;
 
     /// <summary>
     /// Gets what the handshake for HTTP over TLS to the origin offers through ALPN (ADR-0141).
@@ -205,6 +218,15 @@ public sealed class TcpConnector(
     /// (<see cref="CurlExitCode.Proxy" />) and curl's message. The proxy connection is
     /// disposed on every failure. <see cref="ConnectResult.ProxyConnectResponseCode" /> is
     /// <c>0</c>.
+    /// </para>
+    /// <para>
+    /// With a <see cref="PreProxy" />, an HTTP or HTTPS <see cref="ConnectTarget.Proxy" /> and an
+    /// <see cref="ConnectTarget.IsForwardProxy" /> target are reached through it, as curl 8.21.0
+    /// does for <c>--preproxy</c> (measured, BL-614): the pre-proxy is resolved (exit 5
+    /// <c>Could not resolve proxy: &lt;pre-proxy&gt;</c>) and dialled (exit 7 <c>Failed to connect
+    /// to &lt;proxy&gt;:&lt;port&gt; over proxy &lt;pre-proxy&gt; after &lt;n&gt; ms: ...</c>), its SOCKS
+    /// handshake opens a tunnel to the HTTP proxy with the SOCKS failures above, and the CONNECT,
+    /// the HTTPS proxy's TLS or the forwarded request then run inside that tunnel.
     /// </para>
     /// <para>
     /// Before anything is resolved, a <c>--resolve</c> entry that did not parse, or a
@@ -414,7 +436,7 @@ public sealed class TcpConnector(
         using var limited = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         try
         {
-            return (UnixSocket, target.Proxy) switch
+            return (UnixSocket, TunnelProxyOf(target)) switch
             {
                 ({ } unixSocketAddress, _) => await ConnectOverUnixSocketAsync(target, unixSocketAddress, started, limited.Token).ConfigureAwait(false),
                 (null, { } proxy) => await ConnectThroughProxyAsync(target, destination, proxy, started, limited.Token).ConfigureAwait(false),
@@ -719,10 +741,11 @@ public sealed class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        var (addresses, failure) = await ResolveWithFailureReasonAsync(proxy.Host, proxy.Port, target, cancellationToken).ConfigureAwait(false);
+        var firstHop = FirstHopTo(proxy);
+        var (addresses, failure) = await ResolveWithFailureReasonAsync(firstHop.Host, firstHop.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
-            var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveProxy, "proxy", proxy.Host, proxy.Port, failure);
+            var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveProxy, "proxy", firstHop.Host, firstHop.Port, failure);
             return ConnectResult.Failed(exitCode, message);
         }
 
@@ -758,16 +781,25 @@ public sealed class TcpConnector(
         CancellationToken cancellationToken)
     {
         var (target, destination, proxy, started, nameResolved, _) = tunnel;
-        var (dialed, lastDialError, lastBindFailure) = await DialFirstReachableAsync(addresses, proxy.Port, proxy.Host, target, cancellationToken).ConfigureAwait(false);
+        var firstHop = FirstHopTo(proxy);
+        var (dialed, lastDialError, lastBindFailure) = await DialFirstReachableAsync(addresses, firstHop.Port, firstHop.Host, target, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
+            // Through a pre-proxy curl 8.21.0 names the HTTP proxy as what it failed to reach (measured, BL-614).
+            var reached = ReferenceEquals(firstHop, proxy) ? $"{target.Host}:{target.Port}" : $"{proxy.Host}:{proxy.Port}";
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
             return (DialFailure(
                 target.Events,
                 lastDialError,
                 lastBindFailure,
                 new ConnectTimings(started, nameResolved, null, null),
-                $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}"), null);
+                $"Failed to connect to {reached} over proxy {firstHop.Host} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}"), null);
+        }
+
+        if (!ReferenceEquals(firstHop, proxy)
+            && await OpenSocksHopAsync(dialed.Connection, target, new ConnectDestination(proxy.Host, proxy.Port, IsMapped: false, ParseError: null), firstHop, cancellationToken).ConfigureAwait(false) is { } preProxyFailure)
+        {
+            return (preProxyFailure, null);
         }
 
         return proxy.Kind switch
@@ -851,10 +883,45 @@ public sealed class TcpConnector(
         ConnectTimings timings,
         CancellationToken cancellationToken)
     {
-        var connection = dialed.Connection;
+        if (await OpenSocksHopAsync(dialed.Connection, target, destination, proxy, cancellationToken).ConfigureAwait(false) is { } failure)
+        {
+            return failure;
+        }
+
+        // As through an HTTP proxy, %{time_connect} is when the tunnel is open.
+        return await SecureWhenAskedAsync(dialed, target, timings with { Connected = timeProvider.GetTimestamp() }, 0, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The proxy a connect to <paramref name="target" /> tunnels through: its own
+    /// <see cref="ConnectTarget.Proxy" />, else the <see cref="PreProxy" /> for a forward proxy,
+    /// which is opened as a SOCKS tunnel to the forward proxy (BL-614), else none.
+    /// </summary>
+    private ProxyEndpoint? TunnelProxyOf(ConnectTarget target) =>
+        target.Proxy ?? (target.IsForwardProxy ? PreProxy : null);
+
+    /// <summary>
+    /// The proxy <paramref name="proxy" /> is reached through: the <see cref="PreProxy" /> for an
+    /// HTTP or HTTPS proxy when there is one, as curl 8.21.0 opens the SOCKS connection first and
+    /// speaks to the HTTP proxy inside it (measured, BL-614); else the proxy itself.
+    /// </summary>
+    private ProxyEndpoint FirstHopTo(ProxyEndpoint proxy) =>
+        PreProxy is { } socks && proxy.Kind is ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https ? socks : proxy;
+
+    /// <summary>
+    /// Runs the SOCKS handshake to <paramref name="destination" /> over <paramref name="connection" />:
+    /// <see langword="null" /> once the tunnel is open, else the failure, with the connection disposed.
+    /// </summary>
+    private async ValueTask<ConnectResult?> OpenSocksHopAsync(
+        IConnection connection,
+        ConnectTarget target,
+        ConnectDestination destination,
+        ProxyEndpoint socks,
+        CancellationToken cancellationToken)
+    {
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);
-        log.SocksHandshakeStarting(proxy, destination.Host, destination.Port);
-        var (failure, exception) = await RunSocksHandshakeAsync(connection, destination, proxy, target, cancellationToken).ConfigureAwait(false);
+        log.SocksHandshakeStarting(socks, destination.Host, destination.Port);
+        var (failure, exception) = await RunSocksHandshakeAsync(connection, destination, socks, target, cancellationToken).ConfigureAwait(false);
         if (exception is not null || failure is not null)
         {
             // The proxy connection is disposed whether the handshake failed or could not be sent or read.
@@ -863,9 +930,8 @@ public sealed class TcpConnector(
             return failure!;
         }
 
-        // As through an HTTP proxy, %{time_connect} is when the tunnel is open.
-        log.TunnelEstablished(proxy, destination.Host, destination.Port, statusCode: 0);
-        return await SecureWhenAskedAsync(dialed, target, timings with { Connected = timeProvider.GetTimestamp() }, 0, cancellationToken).ConfigureAwait(false);
+        log.TunnelEstablished(socks, destination.Host, destination.Port, statusCode: 0);
+        return null;
     }
 
     /// <summary>
