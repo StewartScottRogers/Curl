@@ -244,7 +244,7 @@ HTTP pre-proxy or a SOCKS `-x` beside one is exit 5, a lone pre-proxy is the tra
 and an HTTP `-x` is reached through the pre-proxy the group's `TcpConnector` gets from
 `CurlComposition.PreProxyOf`. The `--socks5-*` options reach the same connector through
 `Socks5AuthenticationMapping`, with the tunnel's `LateBoundSecurityContextFactory` for GSS-API
-(ADR-0274, BL-615). Proxy text curl
+(ADR-0276, BL-615). Proxy text curl
 cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy, or an HTTPS
 proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with exit 4 until the connector opens those tunnels
 (ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep

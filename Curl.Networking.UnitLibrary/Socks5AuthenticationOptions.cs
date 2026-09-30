@@ -14,7 +14,7 @@ namespace Curl.Networking;
 /// <param name="AllowGssapi">Whether GSS-API (RFC 1961) is offered and answered.</param>
 /// <remarks>
 /// curl 8.21.0 allows both unless <c>--socks5-basic</c> or <c>--socks5-gssapi</c> names one:
-/// then only the ones named (measured; BL-615's Notes). ADR-0274 records the choices.
+/// then only the ones named (measured; BL-615's Notes). ADR-0276 records the choices.
 /// </remarks>
 public sealed record Socks5AuthenticationOptions(bool AllowUserNameAndPassword, bool AllowGssapi)
 {
@@ -61,7 +61,7 @@ public sealed record Socks5AuthenticationOptions(bool AllowUserNameAndPassword, 
     /// <summary>
     /// The cache MIT's <c>krb5_cc_default_name</c> gives: <c>KRB5CCNAME</c> as it is, else
     /// <c>FILE:/tmp/krb5cc_&lt;uid&gt;</c> with the real user ID from <c>/proc/self/status</c>,
-    /// or 0 where that file is absent (ADR-0274).
+    /// or 0 where that file is absent (ADR-0276).
     /// </summary>
     /// <param name="getEnvironmentVariable">Reads an environment variable.</param>
     /// <param name="readFile">Reads a whole file, or gives <see langword="null" /> when it cannot.</param>

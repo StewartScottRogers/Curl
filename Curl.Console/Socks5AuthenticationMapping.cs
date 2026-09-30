@@ -6,7 +6,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Maps the command line to the <see cref="Socks5AuthenticationOptions" /> the SOCKS5 greeting
-/// and its GSS-API exchange follow (BL-615, ADR-0274).
+/// and its GSS-API exchange follow (BL-615, ADR-0276).
 /// </summary>
 internal static class Socks5AuthenticationMapping
 {

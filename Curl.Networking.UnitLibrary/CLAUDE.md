@@ -170,7 +170,7 @@ SOCKS4a sends the host as written; `Socks5Handshake` offers no authentication an
 user name and password with a credential), resolves locally for SOCKS5 and sends the name for
 SOCKS5h. Every read takes exactly the reply's bytes, so the tunnel's bytes stay on the
 connection. A refused or cut-short handshake is exit 97 with curl's message. ADR-0084 records
-these choices (first address, literals, UTF-8, disposal). Per ADR-0274 (BL-615) `TcpConnector`
+these choices (first address, literals, UTF-8, disposal). Per ADR-0276 (BL-615) `TcpConnector`
 takes optional `Socks5AuthenticationOptions` (`--socks5-basic`, `--socks5-gssapi`, and the
 GSS-API service, NEC mode, delegation and `ISecurityContextFactory`): the greeting offers only
 the methods allowed and a proxy picking another fails with curl's message, and a proxy picking

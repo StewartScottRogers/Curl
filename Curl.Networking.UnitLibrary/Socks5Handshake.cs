@@ -18,7 +18,7 @@ namespace Curl.Networking;
 /// SOCKS5 resolves the host locally and sends its first address; SOCKS5h sends the host
 /// name for the proxy to resolve. Both send an address literal as an address. A proxy that
 /// picks a method that was not allowed fails with curl's message for it. ADR-0084 and
-/// ADR-0274 record these choices.
+/// ADR-0276 record these choices.
 /// </remarks>
 internal static class Socks5Handshake
 {

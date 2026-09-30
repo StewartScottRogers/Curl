@@ -5,7 +5,7 @@ namespace Curl.Networking;
 /// <summary>
 /// The exit 97 messages of SOCKS5 GSS-API authentication (RFC 1961) in the words of the
 /// platform's curl: its SSPI build on Windows, its GSS-API build with MIT Kerberos elsewhere
-/// (BL-615, ADR-0274). The context-failure texts for a missing credential were measured; the
+/// (BL-615, ADR-0276). The context-failure texts for a missing credential were measured; the
 /// rest follow curl's <c>socks_sspi.c</c> and <c>socks_gssapi.c</c>.
 /// </summary>
 /// <param name="usesSspi">Whether to word them as the SSPI build does.</param>

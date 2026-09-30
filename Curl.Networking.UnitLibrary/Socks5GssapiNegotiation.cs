@@ -6,7 +6,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// SOCKS5 GSS-API authentication (RFC 1961) as curl 8.21.0 runs it once the proxy picks
-/// method 1 (BL-615, ADR-0274): Kerberos context tokens in authentication messages (version 1,
+/// method 1 (BL-615, ADR-0276): Kerberos context tokens in authentication messages (version 1,
 /// type 1, a two-byte length) until the context is established, then the protection-level
 /// message (type 2) offering no per-message protection - wrapped with the context, or bare
 /// under <c>--socks5-gssapi-nec</c> - and the proxy's level read back. A proxy that grants
