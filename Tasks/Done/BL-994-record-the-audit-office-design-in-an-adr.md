@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-994 — Record the audit office design in an ADR
 
@@ -80,15 +80,18 @@ stops "task Done" from standing in for "defect gone".
 
 ## Acceptance criteria
 
-- [ ] A new `ADR-NNNN-*.md` (next free number in `Documentation/Planning/Decisions/README.md`'s index) exists with status Accepted, dated 2026-09-29 or later, and the line "Decided by Claude under Stewart's delegation".
-- [ ] It states each of the six numbered points above, naming the audit paths exactly as `Audit/` and `.claude/agents/audit-*`, the environment variable `CURL_DARK_FACTORY_LANE`, and the `audit` branch.
-- [ ] It says a finding closes only on a confirming re-audit, and that an auditor missing a defect planted for it is flagged unreliable.
-- [ ] It names the models: Opus for security and conformance, Sonnet for quality, performance, truthfulness, process and the seeder.
-- [ ] The `README.md` index lists it.
+- [x] A new `ADR-NNNN-*.md` (next free number in `Documentation/Planning/Decisions/README.md`'s index) exists with status Accepted, dated 2026-09-29 or later, and the line "Decided by Claude under Stewart's delegation".
+- [x] It states each of the six numbered points above, naming the audit paths exactly as `Audit/` and `.claude/agents/audit-*`, the environment variable `CURL_DARK_FACTORY_LANE`, and the `audit` branch.
+- [x] It says a finding closes only on a confirming re-audit, and that an auditor missing a defect planted for it is flagged unreliable.
+- [x] It names the models: Opus for security and conformance, Sonnet for quality, performance, truthfulness, process and the seeder.
+- [x] The `README.md` index lists it.
 
 ## Notes
+
+- Recorded as ADR-0267 (next free number; 0266 was the highest in the index). Written directly rather than through align-and-document: the task is one new document whose content the task fixes verbatim, and no `.cs` or project file changed, so `verify` is not needed beyond the build and fast tests run anyway.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. ADR-0267 records the audit office design and the index lists it
