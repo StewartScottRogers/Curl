@@ -226,7 +226,7 @@ function Measure-Process([string]$Root, [datetime]$From, [object[]]$CiRuns) {
 if ($SelfTest) {
     $fixture = Join-Path $PSScriptRoot 'Fixtures\process'
     $ci = Get-Content -LiteralPath (Join-Path $fixture 'ci-runs.json') -Raw | ConvertFrom-Json
-    $m = Measure-Process (Join-Path $fixture 'logs') ([datetime]'2026-01-01') @($ci)
+    $m = Measure-Process (Join-Path $fixture 'lane-output') ([datetime]'2026-01-01') @($ci)
     $expected = [ordered]@{
         tasksDone = 4; medianTaskMinutes = 30; p90TaskMinutes = 45; tasksClaimedMoreThanOnce = 1; requeues = 1; resumedRuns = 1
         ciRedMinutes = 120; laneIdleMinutes = 30; waitOverlapMinutes = 20; waitNothingReadyMinutes = 10; waitOtherMinutes = 0
