@@ -77,8 +77,8 @@ BL-567 (ADR-0215) built none/password/keyboard-interactive and measured that wit
   public constructor.
 - **Touches:** added `Documentation/Planning/Decisions` for ADR-0270, its index row and the
   note on ADR-0262 decision 4; no task in `Doing` names it.
-- **Follow-ups filed:** BL-1033 (Pageant, which libssh2 tries before the OpenSSH pipe on
-  Windows), BL-1034 (libssh2's upgrade of an RSA certificate's signature method).
+- **Follow-ups filed:** BL-1035 (Pageant, which libssh2 tries before the OpenSSH pipe on
+  Windows), BL-1036 (libssh2's upgrade of an RSA certificate's signature method).
 - **Quality:** `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary`: 100% line,
   100% branch, 787 members, 0 failing, worst CRAP 10.
 

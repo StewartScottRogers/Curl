@@ -75,7 +75,7 @@ of reading the next key's type, so it fails the same way.
   `failure connecting to agent`.
 - **Not built here: Pageant.** libssh2 on Windows tries PuTTY's Pageant (a window found with
   `FindWindowA` and `WM_COPYDATA`) before the OpenSSH pipe. That is Win32 messaging, not
-  BCL I/O, so it is its own task, BL-1033.
+  BCL I/O, so it is its own task, BL-1035.
 - The connector's two I/O methods are excluded from coverage under ADR-0083 and measured by
   Integration tests against a pipe and a Unix socket the test serves.
 
@@ -88,4 +88,4 @@ of reading the next key's type, so it fails the same way.
 - Handler tests use `Fakes.UnreachableSshAgent`, so a developer's own agent cannot change
   their outcome.
 - An RSA certificate identity signs as its own type: libssh2's upgrade of
-  `ssh-rsa-cert-v01@openssh.com` to `rsa-sha2-*-cert-v01@openssh.com` is BL-1034.
+  `ssh-rsa-cert-v01@openssh.com` to `rsa-sha2-*-cert-v01@openssh.com` is BL-1036.

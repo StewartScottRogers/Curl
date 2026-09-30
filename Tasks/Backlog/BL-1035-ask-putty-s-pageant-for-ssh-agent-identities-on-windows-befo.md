@@ -1,5 +1,5 @@
 ---
-id: BL-1033
+id: BL-1035
 title: Ask PuTTY's Pageant for SSH agent identities on Windows before the OpenSSH pipe
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-30
 completed:
 ---
-# BL-1033 — Ask PuTTY's Pageant for SSH agent identities on Windows before the OpenSSH pipe
+# BL-1035 — Ask PuTTY's Pageant for SSH agent identities on Windows before the OpenSSH pipe
 
 ## Goal
 

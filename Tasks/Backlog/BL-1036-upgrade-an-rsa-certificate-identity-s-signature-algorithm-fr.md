@@ -1,5 +1,5 @@
 ---
-id: BL-1034
+id: BL-1036
 title: Upgrade an RSA certificate identity's signature algorithm from server-sig-algs as libssh2 does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-30
 completed:
 ---
-# BL-1034 — Upgrade an RSA certificate identity's signature algorithm from server-sig-algs as libssh2 does
+# BL-1036 — Upgrade an RSA certificate identity's signature algorithm from server-sig-algs as libssh2 does
 
 ## Goal
 
