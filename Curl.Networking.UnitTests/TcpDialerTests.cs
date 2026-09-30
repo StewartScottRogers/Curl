@@ -225,6 +225,9 @@ public sealed class TcpDialerTests
     {
         using var holder = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         holder.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        // Listening, so the port is in use on Linux too, where .NET
+        // sets SO_REUSEADDR and a merely bound port can be bound again.
+        holder.Listen();
         var busy = ((IPEndPoint)holder.LocalEndPoint!).Port;
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
@@ -242,6 +245,9 @@ public sealed class TcpDialerTests
         {
             var holder = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             holder.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            // Listening, so the port is in use on Linux too, where .NET sets SO_REUSEADDR
+            // and a merely bound port can be bound again.
+            holder.Listen();
             var port = ((IPEndPoint)holder.LocalEndPoint!).Port;
             using var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             try
