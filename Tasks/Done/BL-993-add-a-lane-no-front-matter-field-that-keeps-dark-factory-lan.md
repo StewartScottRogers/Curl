@@ -8,7 +8,7 @@ depends-on: []
 touches: [.claude/skills/task-board, .claude/commands/task-run.md]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-993 — Add a lane: no front-matter field that keeps dark factory lanes off a task
 
@@ -56,19 +56,26 @@ every command without touching the real board.
 
 ## Acceptance criteria
 
-- [ ] On a scratch board holding ready tasks BL-001 (`lane: no`, High) and BL-002 (no `lane` field, Normal), `next` prints a line starting `BL-002` and `capacity` prints `Capacity 1: 0 in Doing, 1 more can start (BL-002).`
-- [ ] On the same board, `status` shows BL-001 with `[ready, interactive only]` and BL-002 with `[ready, #1 in queue]`.
-- [ ] On the same board, `move -Id BL-001 -To Doing` succeeds.
-- [ ] `new -Title "x" -NoLane` writes a file whose front matter contains the line `lane: no`; without `-NoLane` the file has no `lane` line.
-- [ ] `task-admin.ps1 check` reports a task with `lane: maybe` and reports nothing for `lane: no` or `lane: yes`.
-- [ ] `SKILL.md`'s front-matter table documents `lane` (values `yes`, `no`; absent means `yes`), `new`'s options list `-NoLane`, and `ADMIN.md` mentions the new `check` rule.
-- [ ] `.claude/commands/task-run.md` step 1 says an interactive-only task must be named by ID.
-- [ ] `task-board.ps1` and `task-admin.ps1` contain only ASCII characters.
-- [ ] Run against the real board, `task-board.ps1 next` never prints any of BL-995 to BL-1002 or BL-1004 to BL-1022.
+- [x] On a scratch board holding ready tasks BL-001 (`lane: no`, High) and BL-002 (no `lane` field, Normal), `next` prints a line starting `BL-002` and `capacity` prints `Capacity 1: 0 in Doing, 1 more can start (BL-002).`
+- [x] On the same board, `status` shows BL-001 with `[ready, interactive only]` and BL-002 with `[ready, #1 in queue]`.
+- [x] On the same board, `move -Id BL-001 -To Doing` succeeds.
+- [x] `new -Title "x" -NoLane` writes a file whose front matter contains the line `lane: no`; without `-NoLane` the file has no `lane` line.
+- [x] `task-admin.ps1 check` reports a task with `lane: maybe` and reports nothing for `lane: no` or `lane: yes`.
+- [x] `SKILL.md`'s front-matter table documents `lane` (values `yes`, `no`; absent means `yes`), `new`'s options list `-NoLane`, and `ADMIN.md` mentions the new `check` rule.
+- [x] `.claude/commands/task-run.md` step 1 says an interactive-only task must be named by ID.
+- [x] `task-board.ps1` and `task-admin.ps1` contain only ASCII characters.
+- [x] Run against the real board, `task-board.ps1 next` never prints any of BL-995 to BL-1002 or BL-1004 to BL-1022.
 
 ## Notes
+
+- Both scripts gained `Get-LaneReadyTasks` (`Get-ReadyTasks` minus `lane: no`); `next`, `capacity`, `status` queue numbers and `task-admin list`/`show` queue numbers use it, while `Get-ReadyTasks` itself is unchanged.
+- `task-admin show` prints a `lane` row and `ready yes, interactive only` for such a task.
+- `check` accepts an absent or empty `lane` (both mean `yes`); only a non-empty value other than `yes`/`no` (case-insensitive) is reported.
+- Verified on a scratch board under `%TEMP%` via `CLAUDE_PROJECT_DIR`: every scratch-board criterion passed as written. On the real board a `next -Skip` sweep offered 12 tasks (BL-994, BL-992, BL-750, ...) and none of BL-995..BL-1002 or BL-1004..BL-1022; all of those carry `lane: no`.
+- Seen in passing, not touched: `next` warns of a duplicate BL-806 (one live in Backlog, one archived in Done\2026-09-28_1849).
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. A task with lane: no is never offered by next or counted by capacity; interactive sessions still run it by ID
