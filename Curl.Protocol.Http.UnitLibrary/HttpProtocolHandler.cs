@@ -442,12 +442,12 @@ public sealed class HttpProtocolHandler(
     /// </param>
     private async ValueTask<TransferResult> ConnectAndExchangeAsync(HttpRequestPlan plan, TransferReport? earlier)
     {
-        ConnectTarget target = TargetOf(plan);
-        if (plan.Options.Version == HttpVersionPreference.Http3Only && plan.Context.Url.Scheme != "https")
+        if (FailureBeforeConnecting(plan, earlier) is { } failure)
         {
-            return Http3NeedsHttps(plan);
+            return failure;
         }
 
+        ConnectTarget target = TargetOf(plan);
         ConnectResult connect = await ConnectAsync(plan, target).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
@@ -476,6 +476,21 @@ public sealed class HttpProtocolHandler(
         return outcome.Retry is { } reconnect
             ? await ConnectAndExchangeAsync(reconnect, outcome.Result.Report).ConfigureAwait(false)
             : outcome.Result;
+    }
+
+    /// <summary>
+    /// Gives the failure a request meets before it connects: <c>--http3-only</c> with a URL that
+    /// is not <c>https://</c> (<see cref="Http3NeedsHttps" />), or a resend whose <c>-T</c> upload
+    /// cannot be rewound (<see cref="UploadRewindFailed" />); <see langword="null" /> for none.
+    /// </summary>
+    private static TransferResult? FailureBeforeConnecting(HttpRequestPlan plan, TransferReport? earlier)
+    {
+        if (plan.Options.Version == HttpVersionPreference.Http3Only && plan.Context.Url.Scheme != "https")
+        {
+            return Http3NeedsHttps(plan);
+        }
+
+        return plan.UploadCannotRewind ? UploadRewindFailed(plan, earlier) : null;
     }
 
     /// <summary>
@@ -928,7 +943,7 @@ public sealed class HttpProtocolHandler(
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
             { Report = exchange.Report(body) };
-            return FailedOutcome(plan, connect, headReader, failure, failed);
+            return FailedOutcome(plan, connect, upload, headReader, failure, failed);
         }
         catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
         {
@@ -1173,20 +1188,55 @@ public sealed class HttpProtocolHandler(
     /// arrived, the request is sent again on a new connection up to
     /// <see cref="MaximumStreamRefusedRetries" /> times, and the refusal after that fails with
     /// <c>Connection died, tried 5 times before giving up</c>; once the response had begun it
-    /// fails at once with curl's text for exit 56. A body read from a stream is not sent again,
-    /// as none of this handler's retries sends one again, and fails as a begun response does.
+    /// fails at once with curl's text for exit 56. A <c>-T</c> upload is rewound for the retry
+    /// as curl's <c>Curl_creader_set_rewind</c> does (BL-885, ADR-0278): a seekable one to where
+    /// <paramref name="upload" /> began reading it, and one that cannot seek makes the retry fail
+    /// with exit 65 before it connects (<see cref="HttpRequestPlan.UploadCannotRewind" />).
     /// </summary>
-    private static HttpAttemptOutcome StreamRefusedOutcome(HttpRequestPlan plan, TransferResult refused, bool responseBegan)
+    private static HttpAttemptOutcome StreamRefusedOutcome(HttpRequestPlan plan, HttpRequestBodyWriter upload, TransferResult refused, bool responseBegan)
     {
-        if (responseBegan || plan.Framing.Body is StreamBody)
+        if (responseBegan)
         {
             return new HttpAttemptOutcome(refused with { ErrorMessage = HttpTransferMessages.ReceiveFailed }, null, KeepsAlive: false);
         }
 
         plan.Context.Events.ReportInfo(HttpConnectionInfoLines.RefusedStreamRetrying);
         return plan.StreamRefusedRetries < MaximumStreamRefusedRetries
-            ? new HttpAttemptOutcome(refused, plan.AfterStreamRefused(), KeepsAlive: false) { DiedBeforeResponse = true, RetryCount = plan.StreamRefusedRetries + 1 }
+            ? new HttpAttemptOutcome(refused, plan.AfterStreamRefused(!TryRewindUpload(plan.Framing.Body, upload)), KeepsAlive: false) { DiedBeforeResponse = true, RetryCount = plan.StreamRefusedRetries + 1 }
             : new HttpAttemptOutcome(refused with { ErrorMessage = HttpTransferMessages.ConnectionDiedGivingUp(MaximumStreamRefusedRetries) }, null, KeepsAlive: false);
+    }
+
+    /// <summary>
+    /// Rewinds a <c>-T</c> upload read from a seekable stream to where <paramref name="upload" />
+    /// began reading it, so it is sent again whole; gives <see langword="false" /> for one that
+    /// cannot seek, such as stdin, and <see langword="true" /> for a body of bytes or none.
+    /// </summary>
+    private static bool TryRewindUpload(HttpRequestBody? body, HttpRequestBodyWriter upload)
+    {
+        if (body is not StreamBody stream)
+        {
+            return true;
+        }
+
+        if (!stream.Content.CanSeek)
+        {
+            return false;
+        }
+
+        upload.Rewound(stream);
+        return true;
+    }
+
+    /// <summary>
+    /// Fails a retry whose <c>-T</c> upload cannot be rewound before it connects, with exit 65
+    /// <c>seek callback returned error 2</c> after the <c>-v</c> lines curl 8.21.0's
+    /// <c>cr_in_rewind</c> and <c>Curl_client_start</c> write for it (ADR-0278).
+    /// </summary>
+    private static TransferResult UploadRewindFailed(HttpRequestPlan plan, TransferReport? earlier)
+    {
+        plan.Context.Events.ReportInfo(HttpTransferMessages.UploadSeekFailed);
+        plan.Context.Events.ReportInfo(HttpTransferMessages.UploadReaderRewindFailed);
+        return TransferResult.Failure(CurlExitCode.SendFailRewind, HttpTransferMessages.UploadSeekFailed) with { Report = earlier };
     }
 
     /// <summary>
@@ -1195,11 +1245,11 @@ public sealed class HttpProtocolHandler(
     /// again once on a fresh connection when its pooled connection died before the response
     /// (<see cref="DiedBeforeResponse" />); and final otherwise.
     /// </summary>
-    private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, ConnectResult connect, HttpResponseHeadReader headReader, HttpTransferException failure, TransferResult failed)
+    private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, ConnectResult connect, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpTransferException failure, TransferResult failed)
     {
         if (failure.IsStreamRefused)
         {
-            return StreamRefusedOutcome(plan, failed, headReader.HasReceived);
+            return StreamRefusedOutcome(plan, upload, failed, headReader.HasReceived);
         }
 
         return DiedBeforeResponse(plan, connect, headReader, failure)
@@ -2045,6 +2095,13 @@ public sealed class HttpProtocolHandler(
         public int StreamRefusedRetries { get; private set; }
 
         /// <summary>
+        /// Gets a value indicating whether this resend's <c>-T</c> upload cannot seek back to where
+        /// the refused request began reading it, as stdin cannot, so the resend fails with exit 65
+        /// before it connects, as curl 8.21.0's <c>cr_in_rewind</c> fails it (ADR-0278).
+        /// </summary>
+        public bool UploadCannotRewind { get; private set; }
+
+        /// <summary>
         /// Gets how many redirects the transfer has followed before this request: the chain's
         /// count (<see cref="HttpRequestOptions.RedirectsFollowed" />) and one for each resend
         /// after a 417, as curl 8.21.0 counts them (BL-396 Notes).
@@ -2136,11 +2193,16 @@ public sealed class HttpProtocolHandler(
         /// Makes the same request, sent again on a new connection because the server refused its
         /// HTTP/3 stream, with <see cref="StreamRefusedRetries" /> one higher.
         /// </summary>
+        /// <param name="uploadCannotRewind">
+        /// <see langword="true" /> when its <c>-T</c> upload cannot seek back to its start, so the
+        /// resend fails before it connects (<see cref="UploadCannotRewind" />).
+        /// </param>
         /// <returns>The resent request's plan.</returns>
-        public HttpRequestPlan AfterStreamRefused()
+        public HttpRequestPlan AfterStreamRefused(bool uploadCannotRewind)
         {
             HttpRequestPlan retry = With(Framing, Authorization);
             retry.StreamRefusedRetries = StreamRefusedRetries + 1;
+            retry.UploadCannotRewind = uploadCannotRewind;
             return retry;
         }
 

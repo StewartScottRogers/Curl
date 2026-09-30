@@ -294,28 +294,71 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
-    [DataRow("head", DisplayName = "after the response head")]
-    [DataRow("stream-body", DisplayName = "with a body read from a stream")]
-    public async Task ExecuteAsync_Http3StreamRefusedOnceTheResponseBeganOrWithAStreamBody_FailsWithExit56WithoutRetrying(string kind)
+    public async Task ExecuteAsync_Http3StreamRefusedOnceTheResponseBegan_FailsWithExit56WithoutRetrying()
     {
-        FakeMultiplexedStream refused = new(0, kind == "head" ? Http3Response(Http3Head("200", ("content-length", "5"))) : [])
+        FakeMultiplexedStream refused = new(0, Http3Response(Http3Head("200", ("content-length", "5"))))
         {
             EndException = new MultiplexedStreamResetException(0x10b, "refused"),
         };
         QueueConnector connector = QuicConnector(new FakeMultiplexedConnection(refused));
         RecordingTransferEvents events = new();
 
-        TransferResult result = await Handler(connector).ExecuteAsync(Http3Context(
-            "https://example.com/",
-            new MemoryStream(),
-            upload: kind == "head" ? null : new UnseekableStream("abc"u8.ToArray()),
-            events: events));
+        TransferResult result = await Handler(connector).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), events: events));
 
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
         Assert.HasCount(1, connector.MultiplexedTargets);
         CollectionAssert.Contains(events.Info, "HTTP/3 stream 0 refused by server, try again on a new connection");
         CollectionAssert.DoesNotContain(events.Info, "REFUSED_STREAM, retrying a fresh connect");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http3StreamRefusedWithASeekableUpload_RewindsItAndSendsItWholeOnANewQuicConnection()
+    {
+        // Curl_retry_request sets the client reader to rewind, and cr_in_rewind seeks the -T file
+        // back (curl-8_21_0, ADR-0278): the resend carries the whole upload from where the
+        // transfer began reading it, here two bytes in.
+        FakeMultiplexedStream refused = new(0, []) { EndException = new MultiplexedStreamResetException(0x10b, "refused") };
+        FakeMultiplexedStream answered = new(0, Http3Response(Http3Head("201", ("content-length", "0"))));
+        QueueConnector connector = QuicConnector(new FakeMultiplexedConnection(refused), new FakeMultiplexedConnection(answered));
+        MemoryStream upload = new("--hello"u8.ToArray()) { Position = 2 };
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), upload: upload, events: events));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(2, connector.MultiplexedTargets);
+        Assert.AreEqual("hello", Latin1(((Http3DataFrame)(await RequestFramesAsync(refused))[1]).Payload.ToArray()));
+        Assert.AreEqual("hello", Latin1(((Http3DataFrame)(await RequestFramesAsync(answered))[1]).Payload.ToArray()), "the upload is sent again whole");
+        Assert.AreEqual(2, events.Info.Count(line => line == "upload completely sent off: 5 bytes"));
+        CollectionAssert.Contains(events.Info, "Connection died, retrying a fresh connect (retry count: 1)");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http3StreamRefusedWithAnUnseekableUpload_FailsWithExit65BeforeConnectingAgain()
+    {
+        // cr_in_rewind at curl-8_21_0 (lib/sendf.c): the tool's seek callback cannot lseek stdin
+        // and answers CURL_SEEKFUNC_CANTSEEK (2), so the retry fails with CURLE_SEND_FAIL_REWIND
+        // before its connection is opened (ADR-0278).
+        FakeMultiplexedStream refused = new(0, []) { EndException = new MultiplexedStreamResetException(0x10b, "refused") };
+        FakeMultiplexedConnection first = new(refused);
+        QueueConnector connector = QuicConnector(first);
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Http3Context(
+            "https://example.com/",
+            new MemoryStream(),
+            upload: new UnseekableStream("abc"u8.ToArray()),
+            events: events));
+
+        Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual("seek callback returned error 2", result.ErrorMessage);
+        Assert.HasCount(1, connector.MultiplexedTargets, "no second connection is opened");
+        Assert.IsTrue(first.IsDisposed);
+        Assert.IsNotNull(result.Report);
+        CollectionAssert.AreEqual(
+            new[] { "REFUSED_STREAM, retrying a fresh connect", "Connection died, retrying a fresh connect (retry count: 1)", "seek callback returned error 2", "rewind of client reader 'cr-in' failed: 65" },
+            events.Info.Where(line => line.Contains("retrying", StringComparison.Ordinal) || line.Contains("seek", StringComparison.Ordinal) || line.Contains("rewind", StringComparison.Ordinal)).ToArray());
     }
 
     [TestMethod]
