@@ -9,7 +9,7 @@ touches: [Audit/Tools/Get-AuditorFingerprint.ps1]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1002 — Fingerprint the auditor definitions with Get-AuditorFingerprint.ps1
 
@@ -41,16 +41,23 @@ Design:
 
 ## Acceptance criteria
 
-- [ ] Two runs on an unchanged tree print the same 64-character lowercase hex string.
-- [ ] Editing `.claude/agents/audit-quality.md` (or, before it exists, adding a scratch `.claude/agents/audit-probe.md`) changes the output; reverting restores it.
-- [ ] Adding a file under `Audit/Findings/` or `Audit/Scorecards/`, or editing `.claude/agents/code-reviewer.md`, leaves the output unchanged.
-- [ ] Converting an included file between CRLF and LF line endings leaves the output unchanged.
-- [ ] `-List` prints the included paths in ordinal order and then the hash.
-- [ ] The same tree gives the same hash under `powershell` and `pwsh`.
+- [x] Two runs on an unchanged tree print the same 64-character lowercase hex string.
+- [x] Editing `.claude/agents/audit-quality.md` (or, before it exists, adding a scratch `.claude/agents/audit-probe.md`) changes the output; reverting restores it.
+- [x] Adding a file under `Audit/Findings/` or `Audit/Scorecards/`, or editing `.claude/agents/code-reviewer.md`, leaves the output unchanged.
+- [x] Converting an included file between CRLF and LF line endings leaves the output unchanged.
+- [x] `-List` prints the included paths in ordinal order and then the hash.
+- [x] The same tree gives the same hash under `powershell` and `pwsh`.
 
 ## Notes
+
+- On the audit branch (worktree Z:/repos/Curl.audit), commit f0e5e56e, pull request https://github.com/StewartScottRogers/Curl/pull/30.
+- CRLF -> LF uses a Latin-1 round trip (each byte one char and back unchanged), so it is one string replace, not a per-byte PowerShell loop, and works on any file, text or not.
+- Tests against a scratch copy, 8 PASS / 0 FAIL: stable 64-char lowercase hex; adding .claude/agents/audit-probe.md changes it and removing restores it; Audit/Findings, Audit/Scorecards and code-reviewer.md do not; CRLF and LF agree; -List ordinal and auditor-only, then the hash; Windows PowerShell 5.1 and PowerShell 7.6.6 agree; ASCII only.
+- PowerShell 7 was not on this PC: installed as a .NET global tool (dotnet tool install --global PowerShell, 7.6.6; remove with dotnet tool uninstall --global PowerShell). Machine-local, not a solution dependency.
+- Fingerprint of the audit branch today: 2663c411beee12b0f9b99131a7c73c21ed19d221cf945579e38991cae5dcaf4a.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. Get-AuditorFingerprint.ps1 prints one stable SHA-256 of the auditors; in PR #30, awaiting Stewart's merge.
