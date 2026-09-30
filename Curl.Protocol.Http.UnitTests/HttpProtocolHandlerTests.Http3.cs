@@ -316,7 +316,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_Http3StreamRefusedWithASeekableUpload_RewindsItAndSendsItWholeOnANewQuicConnection()
     {
         // Curl_retry_request sets the client reader to rewind, and cr_in_rewind seeks the -T file
-        // back (curl-8_21_0, ADR-0278): the resend carries the whole upload from where the
+        // back (curl-8_21_0, ADR-0279): the resend carries the whole upload from where the
         // transfer began reading it, here two bytes in.
         FakeMultiplexedStream refused = new(0, []) { EndException = new MultiplexedStreamResetException(0x10b, "refused") };
         FakeMultiplexedStream answered = new(0, Http3Response(Http3Head("201", ("content-length", "0"))));
@@ -339,7 +339,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         // cr_in_rewind at curl-8_21_0 (lib/sendf.c): the tool's seek callback cannot lseek stdin
         // and answers CURL_SEEKFUNC_CANTSEEK (2), so the retry fails with CURLE_SEND_FAIL_REWIND
-        // before its connection is opened (ADR-0278).
+        // before its connection is opened (ADR-0279).
         FakeMultiplexedStream refused = new(0, []) { EndException = new MultiplexedStreamResetException(0x10b, "refused") };
         FakeMultiplexedConnection first = new(refused);
         QueueConnector connector = QuicConnector(first);

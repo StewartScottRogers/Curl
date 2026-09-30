@@ -1189,7 +1189,7 @@ public sealed class HttpProtocolHandler(
     /// <see cref="MaximumStreamRefusedRetries" /> times, and the refusal after that fails with
     /// <c>Connection died, tried 5 times before giving up</c>; once the response had begun it
     /// fails at once with curl's text for exit 56. A <c>-T</c> upload is rewound for the retry
-    /// as curl's <c>Curl_creader_set_rewind</c> does (BL-885, ADR-0278): a seekable one to where
+    /// as curl's <c>Curl_creader_set_rewind</c> does (BL-885, ADR-0279): a seekable one to where
     /// <paramref name="upload" /> began reading it, and one that cannot seek makes the retry fail
     /// with exit 65 before it connects (<see cref="HttpRequestPlan.UploadCannotRewind" />).
     /// </summary>
@@ -1230,7 +1230,7 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Fails a retry whose <c>-T</c> upload cannot be rewound before it connects, with exit 65
     /// <c>seek callback returned error 2</c> after the <c>-v</c> lines curl 8.21.0's
-    /// <c>cr_in_rewind</c> and <c>Curl_client_start</c> write for it (ADR-0278).
+    /// <c>cr_in_rewind</c> and <c>Curl_client_start</c> write for it (ADR-0279).
     /// </summary>
     private static TransferResult UploadRewindFailed(HttpRequestPlan plan, TransferReport? earlier)
     {
@@ -2097,7 +2097,7 @@ public sealed class HttpProtocolHandler(
         /// <summary>
         /// Gets a value indicating whether this resend's <c>-T</c> upload cannot seek back to where
         /// the refused request began reading it, as stdin cannot, so the resend fails with exit 65
-        /// before it connects, as curl 8.21.0's <c>cr_in_rewind</c> fails it (ADR-0278).
+        /// before it connects, as curl 8.21.0's <c>cr_in_rewind</c> fails it (ADR-0279).
         /// </summary>
         public bool UploadCannotRewind { get; private set; }
 
