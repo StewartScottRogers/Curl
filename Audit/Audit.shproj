@@ -1,0 +1,40 @@
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!--
+    Audit - a Visual Studio Shared Project (.shproj) holding the audit office: the
+    independent AI auditors that audit the dark factory and the code it produced
+    (ADR-0267). See README.md.
+
+    Audit is outside the dark factory's reach: its files change only in interactive
+    sessions and reach master only through the audit branch's pull request.
+
+    A shared project produces no build output; it is a browsable container that
+    surfaces the office as a first-class node in Solution Explorer. The actual file
+    list lives in Audit.projitems.
+
+    Every CodeSharing import below is guarded with Condition="Exists(...)" for the
+    same reason as in Documentation.shproj: those .props/.targets ship with Visual
+    Studio, not with the .NET SDK, so an unguarded import fails on a machine that
+    only has the SDK installed.
+  -->
+
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{422A221E-CC14-4F14-A6E7-A3A64623E59D}</ProjectGuid>
+    <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props"
+          Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\CodeSharing\Microsoft.CodeSharing.Common.Default.props"
+          Condition="Exists('$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\CodeSharing\Microsoft.CodeSharing.Common.Default.props')" />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\CodeSharing\Microsoft.CodeSharing.Common.props"
+          Condition="Exists('$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\CodeSharing\Microsoft.CodeSharing.Common.props')" />
+
+  <PropertyGroup />
+
+  <Import Project="Audit.projitems" Label="Shared" />
+
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\CodeSharing\Microsoft.CodeSharing.CSharp.targets"
+          Condition="Exists('$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\CodeSharing\Microsoft.CodeSharing.CSharp.targets')" />
+
+</Project>
