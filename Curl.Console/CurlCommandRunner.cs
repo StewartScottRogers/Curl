@@ -1837,7 +1837,7 @@ internal sealed class CurlCommandRunner(
             return (etagFailure, givenUrl, transferUrl);
         }
 
-        ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(transfer);
+        ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(options, transfer);
         if (RefuseMalformedInterface(options, eventsBeforeConnecting) is { } setoptFailure)
         {
             return (setoptFailure, givenUrl, transferUrl);
@@ -2341,6 +2341,8 @@ internal sealed class CurlCommandRunner(
             ConnectionId = connectionId,
             TransferId = HasNoTransferNumber(result) ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
             RetryCount = Running.RetryCount,
+            SslVerifyResult = Running.SslVerifyResult,
+            ProxySslVerifyResult = Running.ProxySslVerifyResult,
         };
     }
 
@@ -2508,14 +2510,18 @@ internal sealed class CurlCommandRunner(
     /// <c>%{conn_id}</c> at its first event; and returns the sink for what comes before it
     /// connects, whose lines carry <c>[&lt;xfer&gt;-x] </c>, as curl 8.21.0 marked
     /// <c>Added a.test:1:127.0.0.1 to DNS cache</c> <c>[0-x]</c> and the lines after it <c>[0-0]</c>
-    /// (measured 2026-09-29, BL-648 Notes).
+    /// (measured 2026-09-29, BL-648 Notes). With <c>-w</c> the events also record the certificate
+    /// verify codes <c>%{ssl_verify_result}</c> and <c>%{proxy_ssl_verify_result}</c> print
+    /// (<see cref="VerifyResultRecordingTransferEvents" />, BL-661); nothing else reads them.
     /// </summary>
+    /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
     /// <returns>The sink for the <c>--resolve</c> entries and <c>-b</c> files the transfer loads.</returns>
-    private ITransferEvents SetUpTransferEvents(UrlTransfer transfer)
+    private ITransferEvents SetUpTransferEvents(CommandLineOptions options, UrlTransfer transfer)
     {
         RunningTransferState state = Running;
-        state.Events = transferEventOutput.EventsFor(transfer.TransferId, () => state.ConnectionId ??= nextConnectionId++);
+        ITransferEvents events = transferEventOutput.EventsFor(transfer.TransferId, () => state.ConnectionId ??= nextConnectionId++);
+        state.Events = options.WriteOut is null ? events : new VerifyResultRecordingTransferEvents(events, state);
         return transferEventOutput.EventsFor(transfer.TransferId, () => null);
     }
 

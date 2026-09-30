@@ -258,9 +258,16 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
                 : peerCertificates;
         return new PeerVerification(
             anchoredErrors == SslPolicyErrors.None,
-            OpenSslVerifyResult.Of(anchoredErrors, chain, timeProvider.GetUtcNow()),
+            RefusesTheName(anchoredErrors)
+                ? OpenSslVerifyResult.Unspecified
+                : OpenSslVerifyResult.Of(anchoredErrors, chain, timeProvider.GetUtcNow()),
             reportedChain);
     }
+
+    // curl checks the name before the chain and, when the name fails, reports
+    // X509_V_ERR_UNSPECIFIED whatever the chain's code; -k checks no name (BL-661).
+    private bool RefusesTheName(SslPolicyErrors anchoredErrors) =>
+        !options.Insecure && (anchoredErrors & SslPolicyErrors.RemoteCertificateNameMismatch) != 0;
 
     private static ReadOnlyMemory<byte>[] ListChainElements(X509Chain chain)
     {

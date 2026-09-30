@@ -275,6 +275,7 @@ public sealed class QuicDialer
     {
         var handshakeCompleted = _timeProvider.GetTimestamp();
         var events = request.Target.Events;
+        verifier.Observed.ReportVerifyResult(events, isProxy: false, _matchesSchannelBuild);
         events.ReportTlsHandshake(new TlsHandshakeEvent
         {
             ProtocolVersion = SslProtocols.Tls13,

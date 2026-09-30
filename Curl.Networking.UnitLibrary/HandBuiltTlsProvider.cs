@@ -179,6 +179,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
         var handshakeStarted = _timeProvider.GetTimestamp();
         var (handshake, thrown) = await TryHandshakeAsync(plaintext, prepared, cancellationToken).ConfigureAwait(false);
+        prepared.Verifier.Observed.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
         if (handshake is not { Failure: null })
         {
             return await FailAsync(plaintext, prepared, handshake?.Failure, thrown).ConfigureAwait(false);

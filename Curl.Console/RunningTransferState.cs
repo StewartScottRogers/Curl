@@ -155,6 +155,18 @@ internal sealed class RunningTransferState(
     internal long? ConnectionId { get; set; }
 
     /// <summary>
+    /// Gets or sets the OpenSSL verify code of the origin's last certificate check, which
+    /// <c>%{ssl_verify_result}</c> prints; <c>0</c> until one is reported (task BL-661).
+    /// </summary>
+    internal long SslVerifyResult { get; set; }
+
+    /// <summary>
+    /// Gets or sets the OpenSSL verify code of the HTTPS proxy's last certificate check, which
+    /// <c>%{proxy_ssl_verify_result}</c> prints; <c>0</c> until one is reported (task BL-661).
+    /// </summary>
+    internal long ProxySslVerifyResult { get; set; }
+
+    /// <summary>
     /// Gets or sets the <c>If-None-Match</c> lines <c>--etag-compare</c> has added to the transfer's option
     /// group, this transfer's last; <see langword="null" /> without <c>--etag-compare</c> (task BL-619).
     /// </summary>

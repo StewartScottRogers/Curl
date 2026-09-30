@@ -55,6 +55,12 @@ public sealed class RecordingTransferEvents : ITransferEvents
     /// <inheritdoc />
     public void ReportTlsTrust(TlsTrustEvent trust) => TlsEvents.Add(trust);
 
+    /// <summary>Gets every <see cref="ReportCertificateVerifyResult" /> code with whether it was the proxy's, in order.</summary>
+    public List<(long VerifyResult, bool IsProxy)> VerifyResults { get; } = [];
+
+    /// <inheritdoc />
+    public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) => VerifyResults.Add((verifyResult, isProxy));
+
     /// <inheritdoc />
     public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)
     {

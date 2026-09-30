@@ -418,6 +418,25 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    public void TryGetVariableText_VerifyResultsGiven_PrintsThemAsTheOpenSslBuild()
+    {
+        // curl 8.18.0 (OpenSSL) -k -x https://localhost:18443 --proxy-insecure against self-signed
+        // certificates printed ssl_verify_result 18 and proxy_ssl_verify_result 18 (BL-661 Notes).
+        TransferWriteOutVariables variables = new(
+            TransferResult.Failure(CurlExitCode.PeerFailedVerification, "SSL certificate problem"),
+            "https://localhost/", 0, "https://localhost/", "https", Clock)
+        {
+            SslVerifyResult = 18,
+            ProxySslVerifyResult = 20,
+        };
+
+        Assert.AreEqual("18", Get(variables, "ssl_verify_result"));
+        Assert.AreEqual("20", Get(variables, "proxy_ssl_verify_result"));
+        Assert.Contains("\"ssl_verify_result\":18,", Get(variables, "json"));
+        Assert.Contains("\"proxy_ssl_verify_result\":20,", Get(variables, "json"));
+    }
+
+    [TestMethod]
     public void TryGetVariableText_TimeQueueWithTimings_PrintsOneMicrosecond()
     {
         // curl printed 0.000083 and 0.000038: the queue is left as the transfer starts, which is the handler's start here.

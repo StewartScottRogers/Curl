@@ -72,10 +72,12 @@ namespace Curl.Output;
 /// </para>
 /// <para>
 /// <c>time_queue</c> is the handler's start, the moment the transfer left the queue, so
-/// one microsecond with timings and <c>0.000000</c> without. The next three print the
-/// fixed text curl 8.21.0 (Schannel) prints for every transfer this tool can run: a
-/// verify result of <c>0</c>, which Schannel reports even for a failed verification; and
-/// <c>0</c> early-data bytes, which Schannel never sends. See ADR-0043. <c>num_retries</c>
+/// one microsecond with timings and <c>0.000000</c> without. <c>ssl_verify_result</c> and
+/// <c>proxy_ssl_verify_result</c> are <see cref="SslVerifyResult"/> and
+/// <see cref="ProxySslVerifyResult"/>, set by the caller: <c>0</c> in the Schannel build,
+/// which reports it even for a failed verification (ADR-0043), and OpenSSL's verify code in
+/// the OpenSSL build (BL-661). <c>tls_earlydata</c> prints the <c>0</c> early-data bytes
+/// Schannel never sends. <c>num_retries</c>
 /// is <see cref="RetryCount"/>, set by the caller (BL-513). <c>ftp_entry_path</c> is
 /// <see cref="TransferReport.FtpEntryPath"/>: nothing, and <c>null</c> in <c>json</c>,
 /// for a transfer that is not FTP or whose <c>PWD</c> reply named no directory (BL-514).
@@ -173,8 +175,8 @@ public sealed class TransferWriteOutVariables(
         ["time_total"] = variables => FormatSeconds(variables.TotalMicroseconds),
         ["speed_download"] = variables => WriteOutValue.FromNumber(ComputeBytesPerSecond(variables.DownloadSize, variables.TotalMicroseconds)),
         ["speed_upload"] = variables => WriteOutValue.FromNumber(ComputeBytesPerSecond(variables.report.UploadSize, variables.TotalMicroseconds)),
-        ["ssl_verify_result"] = _ => WriteOutValue.FromNumber(0),
-        ["proxy_ssl_verify_result"] = _ => WriteOutValue.FromNumber(0),
+        ["ssl_verify_result"] = variables => WriteOutValue.FromNumber(variables.SslVerifyResult),
+        ["proxy_ssl_verify_result"] = variables => WriteOutValue.FromNumber(variables.ProxySslVerifyResult),
         ["tls_earlydata"] = _ => WriteOutValue.FromNumber(0),
         ["num_retries"] = variables => WriteOutValue.FromNumber(variables.RetryCount),
         ["ftp_entry_path"] = variables => WriteOutValue.FromText(variables.report.FtpEntryPath),
@@ -231,6 +233,22 @@ public sealed class TransferWriteOutVariables(
     /// (measured 2026-09-28, BL-513).
     /// </summary>
     public int RetryCount { get; init; }
+
+    /// <summary>
+    /// Gets the OpenSSL <c>X509_V_</c> code the origin's certificate check ended with,
+    /// printed by <c>%{ssl_verify_result}</c>; <c>0</c>, the default, without TLS and in the
+    /// Schannel build. curl 8.18.0's OpenSSL build printed <c>18</c> under <c>-k</c> for a
+    /// self-signed certificate and <c>0</c> once <c>--cacert</c> trusted it (measured
+    /// 2026-09-30, BL-661).
+    /// </summary>
+    public long SslVerifyResult { get; init; }
+
+    /// <summary>
+    /// Gets the OpenSSL <c>X509_V_</c> code an HTTPS proxy's certificate check ended with,
+    /// printed by <c>%{proxy_ssl_verify_result}</c>; <c>0</c>, the default, without an HTTPS
+    /// proxy and in the Schannel build (BL-661).
+    /// </summary>
+    public long ProxySslVerifyResult { get; init; }
 
     /// <summary>
     /// Gets the library version <c>%{json}</c> prints last, as <c>curl_version</c>; by

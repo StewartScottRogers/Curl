@@ -172,7 +172,8 @@ public sealed partial class SslStreamTlsProviderTests
     private static async Task<ConnectResult> ReportingHandshakeAsync(
         TlsClientOptions options,
         RecordingTransferEvents events,
-        bool isProxy = false)
+        bool isProxy = false,
+        string targetHost = CertificateHost)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunEchoServerAsync(server, SslProtocols.None);
@@ -180,9 +181,9 @@ public sealed partial class SslStreamTlsProviderTests
 
         var result = isProxy
             ? await provider.AuthenticateAsClientAsync(
-                new StreamConnection(client, ServerEndPoint), CertificateHost, events, isProxy: true, CancellationToken.None)
+                new StreamConnection(client, ServerEndPoint), targetHost, events, isProxy: true, CancellationToken.None)
             : await provider.AuthenticateAsClientAsync(
-                new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);
+                new StreamConnection(client, ServerEndPoint), targetHost, events, CancellationToken.None);
 
         if (result.Connection is null)
         {

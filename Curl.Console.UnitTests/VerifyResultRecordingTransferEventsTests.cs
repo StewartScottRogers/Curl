@@ -1,35 +1,44 @@
-using System.Text;
-
+using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
 
 /// <summary>
-/// Pins <see cref="ConnectReplyHeadWritingEvents" />: a CONNECT reply head goes to the header
-/// output byte for byte, and every other event goes on to the transfer's own events unchanged.
+/// Pins <see cref="VerifyResultRecordingTransferEvents" />: each certificate verify code lands on
+/// the running transfer, the origin's and the proxy's apart, and every event goes on to the
+/// transfer's own events unchanged (BL-661).
 /// </summary>
 [TestClass]
-public sealed class ConnectReplyHeadWritingEventsTests
+public sealed class VerifyResultRecordingTransferEventsTests
 {
     [TestMethod]
-    public async Task WriteConnectReplyHeadAsync_WritesTheHeadToTheHeaderOutput()
+    public void ReportCertificateVerifyResult_OriginsAndProxys_RecordsEachOnTheRunningTransfer()
     {
-        using MemoryStream headerOutput = new();
-        CallRecordingEvents inner = new();
-        ConnectReplyHeadWritingEvents events = new(inner, headerOutput);
+        RunningTransferState state = NewState();
+        ITransferEvents events = new VerifyResultRecordingTransferEvents(NoTransferEvents.Instance, state);
 
-        await events.WriteConnectReplyHeadAsync(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n\r\n"), CancellationToken.None);
+        events.ReportCertificateVerifyResult(20, isProxy: true);
+        events.ReportCertificateVerifyResult(18, isProxy: false);
 
-        Assert.AreEqual("HTTP/1.1 200 OK\r\n\r\n", Encoding.Latin1.GetString(headerOutput.ToArray()));
-        Assert.IsEmpty(inner.Calls);
+        Assert.AreEqual(18L, state.SslVerifyResult);
+        Assert.AreEqual(20L, state.ProxySslVerifyResult);
     }
 
     [TestMethod]
-    public void EveryOtherEvent_GoesOnToTheInnerEvents()
+    public void NoCodeReported_LeavesBothZero()
     {
-        using MemoryStream headerOutput = new();
+        RunningTransferState state = NewState();
+        _ = new VerifyResultRecordingTransferEvents(NoTransferEvents.Instance, state);
+
+        Assert.AreEqual(0L, state.SslVerifyResult);
+        Assert.AreEqual(0L, state.ProxySslVerifyResult);
+    }
+
+    [TestMethod]
+    public void EveryEvent_GoesOnToTheInnerEvents()
+    {
         CallRecordingEvents inner = new();
-        ITransferEvents events = new ConnectReplyHeadWritingEvents(inner, headerOutput);
+        ITransferEvents events = new VerifyResultRecordingTransferEvents(inner, NewState());
 
         events.ReportInfo("text");
         events.ReportConnectionOpened(null!);
@@ -38,7 +47,7 @@ public sealed class ConnectReplyHeadWritingEventsTests
         events.ReportTlsData([1], sent: true);
         events.ReportTlsMessage(null!);
         events.ReportTlsTrust(null!);
-        events.ReportCertificateVerifyResult(18, isProxy: true);
+        events.ReportCertificateVerifyResult(18, isProxy: false);
         events.ReportRequestHeader([2]);
         events.ReportResponseHeader([3]);
         events.ReportDataSent([4]);
@@ -47,11 +56,16 @@ public sealed class ConnectReplyHeadWritingEventsTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "Info text", "Opened", "Reused", "Handshake", "TlsData 1 True", "TlsMessage", "TlsTrust", "VerifyResult 18 True",
-                "RequestHeader 2", "ResponseHeader 3", "DataSent 4", "DataReceived 5",
+                "Info text", "Opened", "Reused", "Handshake", "TlsData 1 True", "TlsMessage", "TlsTrust",
+                "VerifyResult 18 False", "RequestHeader 2", "ResponseHeader 3", "DataSent 4", "DataReceived 5",
             },
             inner.Calls);
-        Assert.AreEqual(0, headerOutput.Length);
+    }
+
+    private static RunningTransferState NewState()
+    {
+        StandardOutputFailureDeferringStream standardOutput = new(new MemoryStream());
+        return new RunningTransferState(0, Array.Empty<CommandLineOptions>(), CancellationToken.None, standardOutput, standardOutput);
     }
 
     /// <summary>Records each event it is given as one line naming it and its payload.</summary>

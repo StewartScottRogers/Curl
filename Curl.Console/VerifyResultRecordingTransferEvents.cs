@@ -1,21 +1,31 @@
-using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
 
 /// <summary>
-/// Passes every event on to <paramref name="inner" /> unchanged and writes each CONNECT reply
-/// head a tunnelling proxy sends to <paramref name="headerOutput" />, the transfer's
-/// <c>-i</c>, <c>-I</c> or <c>-D</c> output, as curl 8.21.0 does without
-/// <c>--suppress-connect-headers</c> (measured 2026-09-30, BL-613 Notes).
+/// Passes every event on to <paramref name="inner" /> unchanged and records each reported
+/// certificate verify code on <paramref name="state" />, the origin's as
+/// <see cref="RunningTransferState.SslVerifyResult" /> and an HTTPS proxy's as
+/// <see cref="RunningTransferState.ProxySslVerifyResult" />, for <c>-w</c> to print (BL-661).
 /// </summary>
 /// <param name="inner">The transfer's own events.</param>
-/// <param name="headerOutput">The transfer's header output; it belongs to the caller and is neither flushed nor closed here.</param>
-internal sealed class ConnectReplyHeadWritingEvents(ITransferEvents inner, Stream headerOutput) : IConnectReplyHeadWritingEvents
+/// <param name="state">The running transfer the codes belong to.</param>
+internal sealed class VerifyResultRecordingTransferEvents(ITransferEvents inner, RunningTransferState state) : ITransferEvents
 {
     /// <inheritdoc />
-    public ValueTask WriteConnectReplyHeadAsync(ReadOnlyMemory<byte> head, CancellationToken cancellationToken) =>
-        headerOutput.WriteAsync(head, cancellationToken);
+    public void ReportCertificateVerifyResult(long verifyResult, bool isProxy)
+    {
+        if (isProxy)
+        {
+            state.ProxySslVerifyResult = verifyResult;
+        }
+        else
+        {
+            state.SslVerifyResult = verifyResult;
+        }
+
+        inner.ReportCertificateVerifyResult(verifyResult, isProxy);
+    }
 
     /// <inheritdoc />
     public void ReportInfo(string text) => inner.ReportInfo(text);
@@ -37,10 +47,6 @@ internal sealed class ConnectReplyHeadWritingEvents(ITransferEvents inner, Strea
 
     /// <inheritdoc />
     public void ReportTlsTrust(TlsTrustEvent trust) => inner.ReportTlsTrust(trust);
-
-    /// <inheritdoc />
-    public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) =>
-        inner.ReportCertificateVerifyResult(verifyResult, isProxy);
 
     /// <inheritdoc />
     public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => inner.ReportRequestHeader(bytes);

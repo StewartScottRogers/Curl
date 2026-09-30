@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
@@ -51,6 +52,37 @@ public sealed partial class CurlCompositionTests
     }
 
     [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task CreateTransports_SelfSignedProxyUnderProxyInsecure_RecordsProxySslVerifyResult18OffWindows()
+    {
+        // curl -s -o /dev/null --proxy-insecure -x https://localhost:18443 -w '%{ssl_verify_result} %{proxy_ssl_verify_result}'
+        // http://example.invalid/ -> "0 18" (curl 8.18.0, OpenSSL 3.5.5, 2026-09-30, BL-661 Notes).
+        RunningTransferState state = NewRunningTransferState();
+
+        ConnectResult result = await LoopbackProxyHandshakeAsync(_ => [], new VerifyResultRecordingTransferEvents(NoTransferEvents.Instance, state));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.AreEqual(18L, state.ProxySslVerifyResult);
+        Assert.AreEqual(0L, state.SslVerifyResult);
+        await result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task CreateTransports_SelfSignedProxyUnderProxyInsecure_RecordsProxySslVerifyResult0OnWindows()
+    {
+        // curl 8.21.0 (Schannel) prints 0 for both, whatever it found (ADR-0043).
+        RunningTransferState state = NewRunningTransferState();
+
+        ConnectResult result = await LoopbackProxyHandshakeAsync(_ => [], new VerifyResultRecordingTransferEvents(NoTransferEvents.Instance, state));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.AreEqual(0L, state.ProxySslVerifyResult);
+        Assert.AreEqual(0L, state.SslVerifyResult);
+        await result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
     public void CreateTransports_ProxyPinnedpubkeyAndProxyCrlfile_ReachTheProxysOptionsOnly()
     {
         CurlTransports transports = CurlComposition.CreateTransports(
@@ -76,7 +108,9 @@ public sealed partial class CurlCompositionTests
     }
 
     // Runs the HTTPS proxy's handshake against a loopback TLS server with a throwaway self-signed key.
-    private static async Task<ConnectResult> LoopbackProxyHandshakeAsync(Func<byte[], string[]> proxyTlsArguments)
+    private static async Task<ConnectResult> LoopbackProxyHandshakeAsync(
+        Func<byte[], string[]> proxyTlsArguments,
+        ITransferEvents? events = null)
     {
         using RSA key = RSA.Create(2048);
         CertificateRequest request = new("CN=127.0.0.1", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -90,8 +124,8 @@ public sealed partial class CurlCompositionTests
             Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments(key.ExportSubjectPublicKeyInfo()), ProxiedUrl]));
         TcpClient client = new();
         await client.ConnectAsync((IPEndPoint)listener.LocalEndpoint);
-        ConnectResult result = await transports.ProxyTlsProvider.AuthenticateAsClientAsync(
-            new StreamConnection(client.GetStream(), listener.LocalEndpoint), "127.0.0.1", CancellationToken.None);
+        ConnectResult result = await ((SslStreamTlsProvider)transports.ProxyTlsProvider).AuthenticateAsClientAsync(
+            new StreamConnection(client.GetStream(), listener.LocalEndpoint), "127.0.0.1", events ?? NoTransferEvents.Instance, isProxy: true, CancellationToken.None);
 
         if (result.Connection is null)
         {
@@ -108,6 +142,12 @@ public sealed partial class CurlCompositionTests
         }
 
         return result;
+    }
+
+    private static RunningTransferState NewRunningTransferState()
+    {
+        StandardOutputFailureDeferringStream standardOutput = new(new MemoryStream());
+        return new RunningTransferState(0, Array.Empty<CommandLineOptions>(), CancellationToken.None, standardOutput, standardOutput);
     }
 
     private static async Task ServeOneHandshakeAsync(TcpListener listener, X509Certificate2 certificate)

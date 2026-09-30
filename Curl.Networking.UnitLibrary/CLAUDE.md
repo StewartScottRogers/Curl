@@ -113,6 +113,10 @@ and `TcpConnector` passes them on. Per ADR-0085's BL-404 amendment a successful 
 also reported as a `TlsHandshakeEvent` through the provider's four-argument overload
 (`IHandshakeReportingTlsProvider`), to which `TcpConnector` passes the target's `Events`; the
 event's `CertificateVerifyResult` is OpenSSL's `X509_V_` code as `OpenSslVerifyResult` maps it.
+Per ADR-0282 (BL-661) the OpenSSL build also reports that code through
+`ITransferEvents.ReportCertificateVerifyResult` once the certificate was judged, the handshake
+failing or not (`PeerVerification.ReportVerifyResult`), `1` for a host name refused without `-k`;
+the Schannel build reports none. A trust error beats a date error in `OfChainStatus`.
 Per BL-452 the provider reports a `TlsTrustEvent` before each handshake, once the cipher suites
 and client certificate are ready (`-k`, the `--cacert` file or else the reference build's
 default bundle name `/cacert.pem`, which is named but never read, and `--capath`), sets the

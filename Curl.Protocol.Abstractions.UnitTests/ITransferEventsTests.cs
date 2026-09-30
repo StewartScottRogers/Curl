@@ -48,6 +48,16 @@ public sealed class ITransferEventsTests
     }
 
     [TestMethod]
+    public void ReportCertificateVerifyResult_NotOverridden_DoesNothing()
+    {
+        var sink = new TlsDataRecordingEvents();
+
+        ((ITransferEvents)sink).ReportCertificateVerifyResult(18, isProxy: true);
+
+        Assert.IsNull(sink.Bytes);
+    }
+
+    [TestMethod]
     public void TlsTrustEvent_OnlyVerificationGiven_HasNoTrustAnchorSource()
     {
         TlsTrustEvent trust = new() { VerifiesPeer = false };

@@ -59,7 +59,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual("hello|3", StandardOutputText);
-        Assert.AreEqual(new ConnectTarget("localhost", 18443, true) { PoolScheme = "https" }, secondServer.QuicTargets.Single());
+        Assert.AreEqual(new ConnectTarget("localhost", 18443, true) { PoolScheme = "https" }, secondServer.QuicTargets.Single() with { Events = NoTransferEvents.Instance });
         Assert.AreEqual(0, secondServer.TcpConnectCount);
     }
 
