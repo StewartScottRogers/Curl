@@ -96,6 +96,11 @@ internal static class CurlComposition
     /// The clock <c>--aws-sigv4</c> signs with (<see cref="AwsSigV4HttpAuthenticator" />, which
     /// the HTTP handler alone is given); <see cref="TimeProvider.System" /> when not given.
     /// </param>
+    /// <param name="ftpDataConnector">
+    /// Opens FTP's passive data connections, recorded like <paramref name="connector" />'s:
+    /// <see cref="FtpDataConnectorOf" />'s in production, which does not hold them to
+    /// <c>--connect-timeout</c> (BL-797); <paramref name="connector" /> when not given.
+    /// </param>
     /// <returns>Every registered handler.</returns>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
@@ -106,7 +111,8 @@ internal static class CurlComposition
         ISecurityContextFactory? securityContexts = null,
         HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic,
         NegotiateOptions? negotiateOptions = null,
-        TimeProvider? signingClock = null)
+        TimeProvider? signingClock = null,
+        IConnector? ftpDataConnector = null)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
@@ -136,26 +142,42 @@ internal static class CurlComposition
                 OperatingSystem.IsWindows() ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference,
                 CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
             http,
-            new RoutingFtpProtocolHandler(http, CreateFtpProtocolHandler(recordingConnector, tlsProvider, dnsResolver)),
+            new RoutingFtpProtocolHandler(
+                http,
+                CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver)),
         ];
 
         return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(handler, recorder))];
     }
 
     /// <summary>
-    /// Creates the FTP handler for <c>ftp</c> and <c>ftps</c> (ADR-0102): passive data
-    /// connections through <paramref name="connector" />, active ones (<c>-P</c>) on a
+    /// Creates the FTP handler for <c>ftp</c> and <c>ftps</c> (ADR-0102): the control connection
+    /// through <paramref name="connector" />, passive data
+    /// connections through <paramref name="dataConnector" />, active ones (<c>-P</c>) on a
     /// <see cref="TcpConnectionListener" />, a <c>-P</c> interface name looked up with
     /// <see cref="SystemNetworkInterfaceLookup" /> (ADR-0110) and a <c>-P</c> host name
     /// resolved with <paramref name="dnsResolver" /> (ADR-0108), and TLS from
     /// <paramref name="tlsProvider" />.
     /// </summary>
-    /// <param name="connector">Supplies the control connection and the passive data connection.</param>
+    /// <param name="connector">Supplies the control connection.</param>
+    /// <param name="dataConnector">Supplies the passive data connection.</param>
     /// <param name="tlsProvider">Upgrades a connection after an accepted <c>AUTH</c> or <c>PROT P</c>.</param>
     /// <param name="dnsResolver">Resolves a host name given to <c>-P</c>.</param>
     /// <returns>The handler.</returns>
-    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, ITlsProvider tlsProvider, IDnsResolver dnsResolver) =>
-        new(connector, new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup());
+    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, IConnector dataConnector, ITlsProvider tlsProvider, IDnsResolver dnsResolver) =>
+        new(connector, dataConnector, new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup());
+
+    /// <summary>
+    /// The connector FTP's passive data connections go through: the option group's pooling
+    /// connector over its TCP connector's <see cref="TcpConnector.WithoutConnectTimeout" />, so
+    /// they share the pool's numbering and the connector's DNS cache, <c>--resolve</c> and
+    /// <c>--connect-to</c>, but only <c>-m</c> or the system's own connect timeout ends one, as
+    /// curl 8.21.0 does not hold it to <c>--connect-timeout</c> (measured, ADR-0286, BL-797).
+    /// </summary>
+    /// <param name="transports">The option group's connectors.</param>
+    /// <returns>The connector.</returns>
+    internal static IConnector FtpDataConnectorOf(CurlTransports transports) =>
+        transports.PoolingConnector.Over(transports.TcpConnector.WithoutConnectTimeout());
 
     /// <summary>
     /// Creates the HTTP authenticator: a <see cref="RankedHttpAuthenticator" /> that answers the
@@ -792,7 +814,7 @@ internal static class CurlComposition
     /// <param name="transports">The run's connectors.</param>
     /// <returns>The dispatcher.</returns>
     internal static ProtocolDispatcher CreateDispatcher(CurlTransports transports) =>
-        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes));
+        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, ftpDataConnector: FtpDataConnectorOf(transports)));
 
     /// <summary>
     /// Creates what one run transfers through: the production handler set, every TCP handler
@@ -814,7 +836,7 @@ internal static class CurlComposition
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions)),
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports))),
             transports.ProxyTlsProvider.Warnings,
             cookies,
             new ProxySelector(Environment.GetEnvironmentVariable),
