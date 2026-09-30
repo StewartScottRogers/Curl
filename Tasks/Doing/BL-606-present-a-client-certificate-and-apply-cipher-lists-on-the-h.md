@@ -32,3 +32,4 @@ The TLS handshake with an `https://` proxy presents `--proxy-cert`/`--proxy-key`
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-30: Backlog -> Doing.
