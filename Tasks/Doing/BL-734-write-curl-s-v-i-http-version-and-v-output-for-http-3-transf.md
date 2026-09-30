@@ -32,3 +32,4 @@ An HTTP/3 transfer writes what curl's official build writes: `-i` status line `H
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-30: Backlog -> Doing.
