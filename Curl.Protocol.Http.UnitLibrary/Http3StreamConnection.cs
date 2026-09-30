@@ -40,7 +40,8 @@ namespace Curl.Protocol.Http;
 /// <see langword="true" /> when no response body is wanted (<c>-I</c>), so a reset after the
 /// final head ends the stream instead of failing it.
 /// </param>
-internal sealed class Http3StreamConnection(Http3Session session, string scheme, long? bodyLength, bool ignoresBody) : IHttpStreamConnection
+/// <param name="openedLines">Reports curl's <c>-v</c> lines for the stream once it is opened, or <see langword="null" /> for none.</param>
+internal sealed class Http3StreamConnection(Http3Session session, string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null) : IHttpStreamConnection
 {
     /// <summary>
     /// The longest payload of a frame other than <c>DATA</c> read off a request stream, which
@@ -199,7 +200,9 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         }
 
         frames = new Http3FrameReader(new MultiplexedStreamAdapter(stream), MaximumFramePayloadLength);
-        byte[] section = session.Encoder.EncodeFieldSection(stream.StreamId, Http2RequestHeaders.Of(head.Span, scheme));
+        List<HeaderField> fields = Http2RequestHeaders.Of(head.Span, scheme);
+        openedLines?.Report(session.VersionName, stream.StreamId, fields);
+        byte[] section = session.Encoder.EncodeFieldSection(stream.StreamId, fields);
         await WriteOnStreamAsync(new Http3HeadersFrame(section).ToBytes(), isRequestEnded, cancellationToken).ConfigureAwait(false);
     }
 

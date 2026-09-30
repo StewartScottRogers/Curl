@@ -997,10 +997,15 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Creates the HTTP/2 or HTTP/3 stream the exchange runs on, with the request body's length (0 for
-    /// none), or gives <see langword="null" /> when the connection speaks HTTP/1.x.
+    /// none), reporting curl's <c>OPENED stream</c> lines once it is opened (<see cref="HttpStreamOpenedLines" />),
+    /// or gives <see langword="null" /> when the connection speaks HTTP/1.x.
     /// </summary>
     private static IHttpStreamConnection? CreateRequestStream(HttpRequestPlan plan, IHttpStreamSession? streams) =>
-        streams?.CreateStream(plan.Context.Url.Scheme, plan.Framing.Body is null ? 0 : plan.Framing.KnownLength, plan.Context.NoBody);
+        streams?.CreateStream(
+            plan.Context.Url.Scheme,
+            plan.Framing.Body is null ? 0 : plan.Framing.KnownLength,
+            plan.Context.NoBody,
+            new HttpStreamOpenedLines(plan.Context.Events, HttpUrlText.Effective(plan.Context.Url)));
 
     /// <summary>
     /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one;

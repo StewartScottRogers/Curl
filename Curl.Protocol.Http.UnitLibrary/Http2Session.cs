@@ -118,8 +118,10 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// unknown.
     /// </param>
     /// <param name="ignoresBody">Not used: HTTP/2 fails a reset stream whatever the request wanted.</param>
+    /// <param name="openedLines">Reports curl's <c>-v</c> lines for the stream once its HEADERS are sent, or <see langword="null" /> for none.</param>
     /// <returns>The stream.</returns>
-    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody) => new Http2StreamConnection(this, scheme, bodyLength);
+    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null) =>
+        new Http2StreamConnection(this, scheme, bodyLength, openedLines);
 
     /// <summary>
     /// Sends GOAWAY with NO_ERROR, last stream 0 and debug data <c>shutdown</c> and a NUL, as

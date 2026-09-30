@@ -26,7 +26,8 @@ namespace Curl.Protocol.Http;
 /// <param name="session">The connection's HTTP/2 session.</param>
 /// <param name="scheme">The URL's scheme, sent as <c>:scheme</c>.</param>
 /// <param name="bodyLength">The request body's length, 0 when there is none, or <see langword="null" /> when unknown.</param>
-internal sealed class Http2StreamConnection(Http2Session session, string scheme, long? bodyLength) : IHttpStreamConnection
+/// <param name="openedLines">Reports curl's <c>-v</c> lines for the stream once its HEADERS are sent, or <see langword="null" /> for none.</param>
+internal sealed class Http2StreamConnection(Http2Session session, string scheme, long? bodyLength, HttpStreamOpenedLines? openedLines = null) : IHttpStreamConnection
 {
     private readonly Queue<ReadOnlyMemory<byte>> received = new();
 
@@ -189,7 +190,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         isRequestEnded = bodyLength == 0;
         try
         {
-            streamId = await session.StartStreamAsync(this, Http2RequestHeaders.Of(head.Span, scheme), isRequestEnded, cancellationToken).ConfigureAwait(false);
+            List<HeaderField> fields = Http2RequestHeaders.Of(head.Span, scheme);
+            streamId = await session.StartStreamAsync(this, fields, isRequestEnded, cancellationToken).ConfigureAwait(false);
+            openedLines?.Report(session.VersionName, streamId, fields);
         }
         catch (InvalidOperationException)
         {

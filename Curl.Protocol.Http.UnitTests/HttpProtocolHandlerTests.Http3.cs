@@ -53,6 +53,33 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Http3Stream_ReportsItOpenedAndEachHeaderBeforeTheRequestHead()
+    {
+        // curl -v --http3-only https://cloudflare-quic.com/ with curl.se's ngtcp2 build (BL-660 Notes).
+        FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("204")), 65536);
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
+            .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), new MemoryStream(), events: events));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        int opened = events.Events.IndexOf("* [HTTP/3] [0] OPENED stream for https://example.com/");
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "* [HTTP/3] [0] OPENED stream for https://example.com/",
+                "* [HTTP/3] [0] [:method: GET]",
+                "* [HTTP/3] [0] [:scheme: https]",
+                "* [HTTP/3] [0] [:authority: example.com]",
+                "* [HTTP/3] [0] [:path: /]",
+                "* [HTTP/3] [0] [user-agent: curl/8.18.0]",
+                "* [HTTP/3] [0] [accept: */*]",
+            },
+            events.Events.Skip(opened).Take(7).ToArray());
+        StringAssert.StartsWith(events.Events[opened + 7], "> GET / HTTP/3\r\n");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Http3GetHeaders_PinsTheEncodedFieldSection()
     {
         // A HEADERS frame of 27 bytes: the prefix (no dynamic table), then :method GET (static
@@ -234,19 +261,35 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.HasCount(2, connector.MultiplexedTargets);
         Assert.IsTrue(first.IsDisposed, "the refusing connection is closed");
         Assert.AreEqual("a=b", Latin1(((Http3DataFrame)(await RequestFramesAsync(answered))[1]).Payload.ToArray()), "the body is sent again");
+        string[] openedLines =
+        [
+            "[HTTP/3] [0] OPENED stream for https://example.com/",
+            "[HTTP/3] [0] [:method: POST]",
+            "[HTTP/3] [0] [:scheme: https]",
+            "[HTTP/3] [0] [:authority: example.com]",
+            "[HTTP/3] [0] [:path: /]",
+            "[HTTP/3] [0] [user-agent: curl/8.18.0]",
+            "[HTTP/3] [0] [accept: */*]",
+            "[HTTP/3] [0] [content-length: 3]",
+            "[HTTP/3] [0] [content-type: application/x-www-form-urlencoded]",
+        ];
         Assert.AreEqual(
             string.Join(
                 "\n",
-                "using HTTP/3",
-                "upload completely sent off: 3 bytes",
-                "HTTP/3 stream 0 refused by server, try again on a new connection",
-                "REFUSED_STREAM, retrying a fresh connect",
-                "Connection died, retrying a fresh connect (retry count: 1)",
-                "shutting down connection #0",
-                "Issue another request to this URL: 'https://example.com/'",
-                "using HTTP/3",
-                "upload completely sent off: 3 bytes",
-                "Connection #0 to host example.com:443 left intact"),
+                [
+                    "using HTTP/3",
+                    .. openedLines,
+                    "upload completely sent off: 3 bytes",
+                    "HTTP/3 stream 0 refused by server, try again on a new connection",
+                    "REFUSED_STREAM, retrying a fresh connect",
+                    "Connection died, retrying a fresh connect (retry count: 1)",
+                    "shutting down connection #0",
+                    "Issue another request to this URL: 'https://example.com/'",
+                    "using HTTP/3",
+                    .. openedLines,
+                    "upload completely sent off: 3 bytes",
+                    "Connection #0 to host example.com:443 left intact",
+                ]),
             string.Join("\n", events.Info));
     }
 

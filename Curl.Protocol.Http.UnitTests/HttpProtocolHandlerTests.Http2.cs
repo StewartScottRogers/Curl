@@ -325,6 +325,35 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Http2Stream_ReportsItOpenedAndEachHeaderBeforeTheRequestHead()
+    {
+        // curl -v --http2 https://example.com/ with curl.se's nghttp2 build (BL-660 Notes).
+        HpackEncoder server = new();
+        byte[] response = Http2Response(Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "204")]), isEndStream: true, isEndHeaders: true));
+        RecordingTransferEvents events = new();
+        TransferContext context = new() { Url = CurlUrl.Parse("HTTPS://example.com?x#frag"), Output = new MemoryStream(), Events = events };
+
+        TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(new ScriptedConnection(response, 65536), null, applicationProtocol: "h2")))
+            .ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        int opened = events.Events.IndexOf("* [HTTP/2] [1] OPENED stream for https://example.com/?x#frag");
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "* [HTTP/2] [1] OPENED stream for https://example.com/?x#frag",
+                "* [HTTP/2] [1] [:method: GET]",
+                "* [HTTP/2] [1] [:scheme: https]",
+                "* [HTTP/2] [1] [:authority: example.com]",
+                "* [HTTP/2] [1] [:path: /?x]",
+                "* [HTTP/2] [1] [user-agent: curl/8.21.0]",
+                "* [HTTP/2] [1] [accept: */*]",
+                "> GET /?x HTTP/2\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            },
+            events.Events.Skip(opened).Take(8).ToArray());
+    }
+
+    [TestMethod]
     [DataRow(true, false)]
     [DataRow(false, true)]
     public async Task ExecuteAsync_Http2ConnectionLeftIntact_ReportsItOnlyWhenNoOtherTransferSharesIt(bool isShared, bool reportsLeftIntact)

@@ -44,6 +44,16 @@ public sealed class HttpUrlTextTests
     }
 
     [TestMethod]
+    [DataRow("https://EXAMPLE.com:443?x", "https://EXAMPLE.com:443/?x", DisplayName = "authority as typed, path added")]
+    [DataRow("https://A:B@example.com/p?q=1#frag", "https://A:B@example.com/p?q=1#frag", DisplayName = "credentials and fragment kept")]
+    [DataRow("HTTPS://example.com/a/../b", "https://example.com/b", DisplayName = "scheme lower-cased, dot segments removed")]
+    [DataRow("example.com", "http://example.com/", DisplayName = "guessed scheme")]
+    public void Effective_GivesTheUrlCurlNamesForUrlEffective(string url, string expected)
+    {
+        Assert.AreEqual(expected, HttpUrlText.Effective(CurlUrl.Parse(url)));
+    }
+
+    [TestMethod]
     [DataRow("http://h/", "h", DisplayName = "http default port dropped")]
     [DataRow("https://h:443/", "h", DisplayName = "https default port dropped")]
     [DataRow("http://h:8080/", "h:8080", DisplayName = "http other port kept")]
