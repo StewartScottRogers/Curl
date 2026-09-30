@@ -33,3 +33,4 @@ The SSH transport accepts and verifies every host-key algorithm in ADR-0122's li
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
