@@ -1,0 +1,7 @@
+10:00:05 L2 -   shift   start  branch=work/dark-factory model=opus until 18:00
+10:00:05 L2 BL-003 claim   Fixture task three
+10:45:05 L2 BL-003 DONE    2026-01-01: Doing -> Done. Fixture task three works.
+10:46:00 L2 -   wait    No task is ready.
+10:56:00 L2 BL-004 claim   Fixture task four, still running when the logs end
+23:50:00 L2 BL-005 claim   Fixture task five, done after midnight
+00:20:00 L2 BL-005 DONE    2026-01-02: Doing -> Done. Fixture task five works.

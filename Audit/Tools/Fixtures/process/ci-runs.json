@@ -1,0 +1,10 @@
+[
+  {"databaseId":1,"status":"completed","conclusion":"success","headSha":"a1","createdAt":"2026-01-01T09:00:00Z","updatedAt":"2026-01-01T09:10:00Z"},
+  {"databaseId":2,"status":"completed","conclusion":"failure","headSha":"a2","createdAt":"2026-01-01T10:00:00Z","updatedAt":"2026-01-01T10:10:00Z"},
+  {"databaseId":3,"status":"completed","conclusion":"failure","headSha":"a3","createdAt":"2026-01-01T10:20:00Z","updatedAt":"2026-01-01T10:30:00Z"},
+  {"databaseId":4,"status":"completed","conclusion":"cancelled","headSha":"a4","createdAt":"2026-01-01T10:40:00Z","updatedAt":"2026-01-01T10:41:00Z"},
+  {"databaseId":5,"status":"completed","conclusion":"success","headSha":"a5","createdAt":"2026-01-01T11:00:00Z","updatedAt":"2026-01-01T11:10:00Z"},
+  {"databaseId":6,"status":"completed","conclusion":"failure","headSha":"a6","createdAt":"2026-01-01T12:00:00Z","updatedAt":"2026-01-01T12:05:00Z"},
+  {"databaseId":7,"status":"in_progress","conclusion":"","headSha":"a7","createdAt":"2026-01-01T12:30:00Z","updatedAt":"2026-01-01T12:31:00Z"},
+  {"databaseId":8,"status":"completed","conclusion":"success","headSha":"a8","createdAt":"2026-01-01T13:00:00Z","updatedAt":"2026-01-01T13:05:00Z"}
+]
