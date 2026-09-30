@@ -28,7 +28,9 @@ server-side session over `Fakes.InMemoryDuplexConnection`.
 
 Folders follow ADR-0122's structure. `Transport` frames packets and runs the
 handshake (`SshTransport`: identification, `KEXINIT`, key exchange, `NEWKEYS`, a
-server's re-exchange); `Negotiation` holds the presets and the catalogue of
+server's re-exchange); `Negotiation` holds the presets - each with the prime sizes group
+exchange asks for, (2048, 4096, 4096) on Windows and (2048, 4096, 8192) on OpenSSL
+(ADR-0268) - and the catalogue of
 implemented names; `KeyExchange` holds one `ISshKeyExchange` per method family - the hybrid post-quantum
 methods in `HybridKemSshKeyExchange`, which pairs two `ISshKeyShare`s (ML-KEM or sntrup761
 with X25519 or a NIST curve) and hashes K as a `string` (ADR-0265) - and `SshKeyDerivation`; `HostKeys` holds one `ISshSignatureVerifier` per host-key type - a certificate checked with its certified key alone by `OpenSshCertificateSshSignatureVerifier`, as libssh2 does, and the `sk-` keys over `SecurityKeySignedData` (ADR-0266) - and

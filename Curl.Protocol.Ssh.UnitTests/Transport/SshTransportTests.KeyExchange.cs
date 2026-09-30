@@ -15,7 +15,7 @@ public sealed partial class SshTransportTests
     private const string StrictServer = "kex-strict-s-v00@openssh.com";
 
     private static byte[] ClientKexInit =>
-        SshKexInit.ForClient(SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33)).ToPayload();
+        ClientKexInitFor(SshAlgorithmPreferences.Full);
 
     [TestMethod]
     [DataRow("mlkem768x25519-sha256")]
@@ -407,19 +407,48 @@ public sealed partial class SshTransportTests
     }
 
     [TestMethod]
-    [DataRow("small", DisplayName = "a 1024-bit prime, under the 2048 asked for")]
-    [DataRow("large", DisplayName = "an 8192-bit prime, over the 4096 asked for")]
-    [DataRow("generator", DisplayName = "generator 1")]
-    public async Task ExchangeKeysAsync_UnusableGroupExchangeGroup_FailsWithMinus8(string defect)
+    [DataRow("Windows", "small", DisplayName = "Windows: a 1024-bit prime, under the 2048 asked for")]
+    [DataRow("Windows", "large", DisplayName = "Windows: an 8192-bit prime, over the 4096 asked for")]
+    [DataRow("OpenSSL", "small", DisplayName = "OpenSSL: a 1024-bit prime, under the 2048 asked for")]
+    [DataRow("OpenSSL", "larger", DisplayName = "OpenSSL: an 8193-bit number, over the 8192 asked for")]
+    [DataRow("OpenSSL", "generator", DisplayName = "OpenSSL: generator 1")]
+    public async Task ExchangeKeysAsync_UnusableGroupExchangeGroup_FailsWithMinus8(string platform, string defect)
     {
-        byte[] group = defect switch
+        byte[] prime = defect switch
         {
-            "small" => [31, .. Mpint(Cryptography.FiniteFieldDiffieHellmanGroup.Group2.Prime.ToArray()), .. Mpint([2])],
-            "large" => [31, .. Mpint(Cryptography.FiniteFieldDiffieHellmanGroup.Group18.Prime.ToArray()), .. Mpint([2])],
-            _ => [31, .. Mpint(Cryptography.FiniteFieldDiffieHellmanGroup.Group14.Prime.ToArray()), .. Mpint([1])],
+            "small" => Cryptography.FiniteFieldDiffieHellmanGroup.Group2.Prime.ToArray(),
+            "large" => Cryptography.FiniteFieldDiffieHellmanGroup.Group18.Prime.ToArray(),
+            "larger" => [0x01, .. Enumerable.Repeat((byte)0xFF, 1024)],
+            _ => Cryptography.FiniteFieldDiffieHellmanGroup.Group14.Prime.ToArray(),
         };
+        byte[] group = [31, .. Mpint(prime), .. Mpint(defect == "generator" ? [1] : [2])];
 
-        await AssertKeyExchangeFailsAsync(Script("diffie-hellman-group-exchange-sha256", TestHostKey.Dsa(), tamper: payloads => [group, payloads[1]]));
+        await AssertKeyExchangeFailsAsync(Script(
+            "diffie-hellman-group-exchange-sha256",
+            TestHostKey.For("rsa-sha2-256"),
+            tamper: payloads => [group, payloads[1]],
+            preferences: Preset(platform)));
+    }
+
+    [TestMethod]
+    [DataRow("Windows", "diffie-hellman-group-exchange-sha256", "22000008000000100000001000", DisplayName = "Windows, -sha256: (2048, 4096, 4096), measured (BL-564)")]
+    [DataRow("Windows", "diffie-hellman-group-exchange-sha1", "22000008000000100000001000", DisplayName = "Windows, -sha1: (2048, 4096, 4096), measured (BL-564)")]
+    [DataRow("OpenSSL", "diffie-hellman-group-exchange-sha256", "22000008000000100000002000", DisplayName = "OpenSSL, -sha256: (2048, 4096, 8192), measured (BL-888)")]
+    [DataRow("OpenSSL", "diffie-hellman-group-exchange-sha1", "22000008000000100000002000", DisplayName = "OpenSSL, -sha1: (2048, 4096, 8192), measured (BL-888)")]
+    public async Task ExchangeKeysAsync_GroupExchangeOnEachPreset_AsksForThePresetsSizesAndAcceptsAPrimeAtItsMaximum(string platform, string method, string request)
+    {
+        SshAlgorithmPreferences preset = Preset(platform);
+        Cryptography.FiniteFieldDiffieHellmanGroup largest = platform == "Windows"
+            ? Cryptography.FiniteFieldDiffieHellmanGroup.Group16
+            : Cryptography.FiniteFieldDiffieHellmanGroup.Group18;
+        ScriptedExchange run = Script(method, TestHostKey.For("rsa-sha2-256"), preferences: preset, exchangedGroup: largest);
+
+        SshKeyExchangeResult result = await ExchangeAsync(run);
+
+        List<byte[]> written = WrittenPayloads(run.Connection.Written);
+        Assert.AreEqual(request, Convert.ToHexString(written[1]), "the client's SSH_MSG_KEX_DH_GEX_REQUEST");
+        Assert.AreEqual((int)preset.GroupExchangeSizes.MaximumBits / 8, largest.PrimeLength, "the server's prime is at the preset's maximum");
+        CollectionAssert.AreEqual(run.Server.ExchangeHash, result.ExchangeHash);
     }
 
     [TestMethod]
@@ -581,7 +610,7 @@ public sealed partial class SshTransportTests
     [TestMethod]
     public void Create_MethodNotImplemented_ThrowsNotSupported()
     {
-        Assert.ThrowsExactly<NotSupportedException>(() => SshKeyExchangeMethods.Create("unknown-kex@example.com", new TestEphemeralKeys()));
+        Assert.ThrowsExactly<NotSupportedException>(() => SshKeyExchangeMethods.Create("unknown-kex@example.com", new TestEphemeralKeys(), SshGroupExchangeSizes.OpenSslReference));
     }
 
     [TestMethod]
@@ -626,6 +655,12 @@ public sealed partial class SshTransportTests
 
     private const string PinnedGroup14ExchangeHash = "E00B7ACDC1E39CF85CCB4C1A94907F329E83EB15471197304BA94883DC661243";
 
+    private static SshAlgorithmPreferences Preset(string platform) =>
+        platform == "Windows" ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference;
+
+    private static byte[] ClientKexInitFor(SshAlgorithmPreferences preferences) =>
+        SshKexInit.ForClient(preferences, EverythingImplemented, new RepeatingRandomSource(0x33)).ToPayload();
+
     private static SshKexInit ServerKexInit(string method, string hostKey, bool strict) =>
         SshServerScript.OpenSshKexInit(kexInit => kexInit with
         {
@@ -644,11 +679,14 @@ public sealed partial class SshTransportTests
         string? offeredHostKey = null,
         Func<List<byte[]>, List<byte[]>>? tamper = null,
         bool newKeys = true,
-        SshKexInit? serverKexInit = null)
+        SshKexInit? serverKexInit = null,
+        SshAlgorithmPreferences? preferences = null,
+        Cryptography.FiniteFieldDiffieHellmanGroup? exchangedGroup = null)
     {
         TestEphemeralKeys keys = new();
         SshKexInit server = serverKexInit ?? ServerKexInit(method, offeredHostKey ?? hostKey.Algorithm, strict);
-        TestKeyExchangeServer answer = TestKeyExchangeServer.Answer(method, hostKey, keys, ClientKexInit, server.ToPayload());
+        SshAlgorithmPreferences preset = preferences ?? SshAlgorithmPreferences.Full;
+        TestKeyExchangeServer answer = TestKeyExchangeServer.Answer(method, hostKey, keys, ClientKexInitFor(preset), server.ToPayload(), preset.GroupExchangeSizes, exchangedGroup);
         SshServerScript script = new SshServerScript().Line(TestKeyExchangeServer.ServerIdentification).KexInit(server);
         List<byte[]> payloads = [.. answer.ServerPayloads.Select(payload => payload.ToArray())];
         (tamper is null ? payloads : tamper(payloads)).ForEach(payload => script.Packet(payload));
@@ -658,7 +696,7 @@ public sealed partial class SshTransportTests
         }
 
         ScriptedConnection connection = new(script.Bytes);
-        SshTransport transport = new(connection, SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33), keys);
+        SshTransport transport = new(connection, preset, EverythingImplemented, new RepeatingRandomSource(0x33), keys);
         return new ScriptedExchange(transport, connection, answer);
     }
 

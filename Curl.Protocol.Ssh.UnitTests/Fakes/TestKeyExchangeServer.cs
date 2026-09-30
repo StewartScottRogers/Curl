@@ -37,7 +37,9 @@ internal sealed record TestKeyExchangeServer(
         TestHostKey hostKey,
         TestEphemeralKeys keys,
         byte[] clientKexInit,
-        byte[] serverKexInit)
+        byte[] serverKexInit,
+        SshGroupExchangeSizes? groupExchangeSizes = null,
+        FiniteFieldDiffieHellmanGroup? exchangedGroup = null)
     {
         byte[] common = Join(Name(ClientIdentification), Name(ServerIdentification), String(clientKexInit), String(serverKexInit), String(hostKey.Blob));
         return method switch
@@ -55,8 +57,8 @@ internal sealed record TestKeyExchangeServer(
             "diffie-hellman-group14-sha256" => FiniteField(FiniteFieldDiffieHellmanGroup.Group14, HashAlgorithmName.SHA256, hostKey, common),
             "diffie-hellman-group16-sha512" => FiniteField(FiniteFieldDiffieHellmanGroup.Group16, HashAlgorithmName.SHA512, hostKey, common),
             "diffie-hellman-group18-sha512" => FiniteField(FiniteFieldDiffieHellmanGroup.Group18, HashAlgorithmName.SHA512, hostKey, common),
-            "diffie-hellman-group-exchange-sha1" => GroupExchange(HashAlgorithmName.SHA1, hostKey, common),
-            _ => GroupExchange(HashAlgorithmName.SHA256, hostKey, common),
+            "diffie-hellman-group-exchange-sha1" => GroupExchange(HashAlgorithmName.SHA1, groupExchangeSizes, exchangedGroup, hostKey, common),
+            _ => GroupExchange(HashAlgorithmName.SHA256, groupExchangeSizes, exchangedGroup, hostKey, common),
         };
     }
 
@@ -183,11 +185,17 @@ internal sealed record TestKeyExchangeServer(
             hash);
     }
 
-    private static TestKeyExchangeServer GroupExchange(HashAlgorithmName hash, TestHostKey hostKey, byte[] common)
+    private static TestKeyExchangeServer GroupExchange(
+        HashAlgorithmName hash,
+        SshGroupExchangeSizes? requested,
+        FiniteFieldDiffieHellmanGroup? exchangedGroup,
+        TestHostKey hostKey,
+        byte[] common)
     {
-        FiniteFieldDiffieHellmanGroup group = FiniteFieldDiffieHellmanGroup.Group14;
+        FiniteFieldDiffieHellmanGroup group = exchangedGroup ?? FiniteFieldDiffieHellmanGroup.Group14;
+        SshGroupExchangeSizes sizesAsked = requested ?? SshGroupExchangeSizes.OpenSslReference;
         (byte[] e, byte[] f, byte[] k) = Round(group);
-        byte[] sizes = Join(UInt32(2048), UInt32(4096), UInt32(4096));
+        byte[] sizes = Join(UInt32(sizesAsked.MinimumBits), UInt32(sizesAsked.PreferredBits), UInt32(sizesAsked.MaximumBits));
         byte[] p = group.Prime.ToArray();
         byte[] g = group.Generator.ToArray();
         byte[] h = CryptographicOperations.HashData(hash, Join(common, sizes, Mpint(p), Mpint(g), Mpint(e), Mpint(f), Mpint(k)));

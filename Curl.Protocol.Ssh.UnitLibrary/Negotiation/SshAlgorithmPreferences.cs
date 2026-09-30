@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.KeyExchange;
 
 namespace Curl.Protocol.Ssh.Negotiation;
 
@@ -79,6 +80,14 @@ public sealed record SshAlgorithmPreferences(
     public IReadOnlyCollection<string> HostKeysNeverAgreed { get; init; } = [];
 
     /// <summary>
+    /// Gets the prime sizes <c>diffie-hellman-group-exchange-*</c> asks for and accepts:
+    /// libssh2 1.11.1's own (2048, 4096, 8192), as the OpenSSL build sends them, unless a
+    /// preset says otherwise; <see cref="WindowsReference" /> sends WinCNG's (2048, 4096,
+    /// 4096) (ADR-0206, ADR-0268).
+    /// </summary>
+    internal SshGroupExchangeSizes GroupExchangeSizes { get; init; } = SshGroupExchangeSizes.OpenSslReference;
+
+    /// <summary>
     /// Gets what curl 8.21.0's Windows build (libssh2 1.11.1 on WinCNG) offers, byte for byte
     /// and in its order.
     /// </summary>
@@ -90,7 +99,11 @@ public sealed record SshAlgorithmPreferences(
             + "aes192-cbc,aes128-cbc,arcfour128,arcfour,3des-cbc"),
         Split(WindowsMacs),
         [SshAlgorithmCatalogue.NoCompression])
-    { CryptographyBackend = "WinCNG", HostKeysNeverAgreed = Split(RsaCertificateHostKeys) };
+    {
+        CryptographyBackend = "WinCNG",
+        HostKeysNeverAgreed = Split(RsaCertificateHostKeys),
+        GroupExchangeSizes = SshGroupExchangeSizes.WindowsReference,
+    };
 
     /// <summary>
     /// Gets what curl 8.21.0's OpenSSL build (libssh2 1.11.1 on OpenSSL, Linux and macOS)

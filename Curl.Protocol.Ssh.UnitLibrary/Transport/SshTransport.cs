@@ -142,7 +142,7 @@ internal sealed class SshTransport
         bool isFirstExchange = sessionIdentifier is null;
         isStrictKeyExchange = isFirstExchange ? handshake.Algorithms.IsStrictKeyExchange : isStrictKeyExchange;
         SshKeyExchangeMessages messages = new(PacketReader, PacketWriter, isStrictKeyExchange && isFirstExchange);
-        ISshKeyExchange method = SshKeyExchangeMethods.Create(handshake.Algorithms.KeyExchange, ephemeralKeySource);
+        ISshKeyExchange method = SshKeyExchangeMethods.Create(handshake.Algorithms.KeyExchange, ephemeralKeySource, preferences.GroupExchangeSizes);
         ISshSignatureVerifier verifier = SshSignatureVerifiers.For(handshake.Algorithms.ServerHostKey);
         try
         {
