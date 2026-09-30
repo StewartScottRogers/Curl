@@ -32,3 +32,4 @@ The SOCKS5 greeting offers the methods `--socks5-basic` and `--socks5-gssapi` se
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-30: Backlog -> Doing.
