@@ -241,6 +241,18 @@ connection is reported `with proxy` (`ConnectionReusedEvent.IsProxy`) when the t
 forward proxy (`ConnectTarget.IsForwardProxy`) or tunnels through one, naming the proxy's host
 and port for a tunnel, as curl 8.21.0 prints it (BL-360).
 
+Per BL-717 a pooled connection whose `IConnectionSession` multiplexes (HTTP/2) is shared, not
+checked out: while its session's `ConcurrentTransferLimit` has streams to spare, a transfer with the
+same key gets another `PooledConnection` lease on it (`* Multiplexed connection found`), and once
+the limit is taken the next opens its own after `* MAX_CONCURRENT_STREAMS reached, skip (N)`.
+`IConnection.IsSharedWithAnotherTransfer` tells the handler whether another lease still holds it,
+so only the last one to end reports it left intact; the connection goes back to the pool (or
+closes) when the last lease ends, pooled only if every lease marked it reusable and none asked
+`ClearTlsAsync`. With `WaitsForMultiplexing` (`-Z` without `--parallel-immediate`, curl's
+`CURLOPT_PIPEWAIT`) a transfer that finds a connection with its key still being opened waits
+(`MultiplexingNegotiation`) until it holds a session or turns out not to multiplex, as curl 8.18.0
+does (measured, BL-717 Notes).
+
 Per ADR-0269 (BL-600) `TcpConnector` takes an optional `LocalBinding` (`--interface`, `--local-port`)
 and dials every TCP address, a proxy's included, through the internal `LocalBindingTcpDialer`, which
 picks the local address for the family dialled (an interface `INetworkInterfaceLookup` finds, none on
