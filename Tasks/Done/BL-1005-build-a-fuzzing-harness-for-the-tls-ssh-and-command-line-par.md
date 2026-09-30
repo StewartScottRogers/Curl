@@ -65,7 +65,7 @@ seed, iteration). Exit 0 when nothing was found, 1 when something was.
 
 ## Notes
 
-- On the audit branch (worktree Z:/repos/Curl.auditbranch), commit c23d8535, pull request https://github.com/StewartScottRogers/Curl/pull/32.
+- On the audit branch (worktree Z:/repos/Curl.auditbranch), commit c23d8535, pull request https://github.com/StewartScottRogers/Curl/pull/33.
 - ssh: Curl.Protocol.Ssh.UnitLibrary exposes no public reader or decoder of raw bytes; its only public types are SshProtocolHandler, SshAlgorithmPreferences, ISshRandomSource and SystemSshRandomSource, and every packet and message reader is internal (visible only to its tests). The target prints that and exits 2. For BL-1010 to raise as a finding: the SSH parsers cannot be fuzzed from outside the library.
 - --self-test: 9 PASS, 0 FAIL, including checks that every TLS seed reads as a complete handshake message and that the ServerHello and ECHConfigList seeds decode (an ECHConfigList seed missing maximum_name_length was caught this way and fixed: without it the ECH decoder would only have seen garbage).
 - 20,000 iterations, seed 1, run twice per target: tls-handshake 0 crashes, 0 hangs (about 340-380k inputs/s); cli 0 crashes, 0 hangs (about 90-140k inputs/s); identical counts across runs (inputs/s varies with the machine). Exit 0 for both, 2 for ssh.
@@ -77,4 +77,4 @@ seed, iteration). Exit 0 when nothing was found, 1 when something was.
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
-- 2026-09-30: Doing -> Done. Fuzz.cs fuzzes the TLS handshake decoders and the CLI parser and saves replayable crashes and hangs; in PR #32, awaiting Stewart's merge.
+- 2026-09-30: Doing -> Done. Fuzz.cs fuzzes the TLS handshake decoders and the CLI parser and saves replayable crashes and hangs; in PR #33, awaiting Stewart's merge.
