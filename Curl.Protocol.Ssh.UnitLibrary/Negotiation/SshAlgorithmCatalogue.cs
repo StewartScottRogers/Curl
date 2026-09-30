@@ -34,9 +34,9 @@ internal sealed class SshAlgorithmCatalogue(IEnumerable<string> implementedNames
 
     /// <summary>
     /// Gets what this build implements so far: the Curve25519, NIST-curve and finite-field key
-    /// exchanges, the RSA, ECDSA, DSA and Ed25519 host keys, the ChaCha20-Poly1305, AES-GCM and AES-CTR
-    /// ciphers, the SHA-2 MACs, the two key-exchange signals and no compression. BL-575 and
-    /// BL-680 each add their algorithms until the
+    /// exchanges, the RSA, ECDSA, DSA and Ed25519 host keys, every cipher and MAC of the presets
+    /// (ADR-0122), the two key-exchange signals and no compression. BL-575 adds
+    /// its algorithms until the
     /// <c>KEXINIT</c> offers the presets' full lists.
     /// </summary>
     internal static SshAlgorithmCatalogue Implemented { get; } =

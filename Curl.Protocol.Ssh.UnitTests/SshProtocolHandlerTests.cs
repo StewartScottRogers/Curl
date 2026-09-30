@@ -107,6 +107,36 @@ public sealed partial class SshProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("aes256-cbc", "hmac-sha2-256")]
+    [DataRow("rijndael-cbc@lysator.liu.se", "hmac-sha2-512")]
+    [DataRow("aes192-cbc", "hmac-sha2-256-etm@openssh.com")]
+    [DataRow("aes128-cbc", "hmac-sha2-256")]
+    [DataRow("3des-cbc", "hmac-sha2-256")]
+    [DataRow("blowfish-cbc", "hmac-sha2-256")]
+    [DataRow("cast128-cbc", "hmac-sha2-256")]
+    [DataRow("arcfour", "hmac-sha2-256")]
+    [DataRow("arcfour128", "hmac-sha2-256")]
+    [DataRow("aes128-ctr", "hmac-sha1")]
+    [DataRow("aes128-ctr", "hmac-sha1-etm@openssh.com")]
+    [DataRow("aes128-ctr", "hmac-sha1-96")]
+    [DataRow("aes128-ctr", "hmac-md5")]
+    [DataRow("aes128-ctr", "hmac-md5-96")]
+    [DataRow("aes128-ctr", "hmac-ripemd160")]
+    [DataRow("aes128-ctr", "hmac-ripemd160@openssh.com")]
+    public async Task ExecuteAsync_ServerOffersOnlyALegacyCipherOrMac_TransfersOverIt(string cipher, string mac)
+    {
+        InMemorySshServer server = new(User, Password) { Cipher = cipher, Mac = mac };
+        byte[] large = [.. Enumerable.Range(0, 70000).Select(index => (byte)(index * 7))];
+        server.Files["/data/large.bin"] = large;
+
+        Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/large.bin", preferences: SshAlgorithmPreferences.OpenSslReference);
+
+        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result);
+        CollectionAssert.AreEqual(large, outcome.Output);
+        Assert.AreEqual("disconnect 11 Shutdown", server.Events[^1]);
+    }
+
+    [TestMethod]
     [DynamicData(nameof(Presets))]
     public async Task ExecuteAsync_ScpDownload_WritesTheFileAndEndsTheSessionAsCurlDoes(string platform, SshAlgorithmPreferences preferences)
     {

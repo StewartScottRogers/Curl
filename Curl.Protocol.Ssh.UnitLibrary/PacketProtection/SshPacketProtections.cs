@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Curl.Cryptography;
 using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
 
@@ -6,7 +7,7 @@ namespace Curl.Protocol.Ssh.PacketProtection;
 
 /// <summary>
 /// The ciphers and MACs this library implements, by the name <c>KEXINIT</c> offers them
-/// under (ADR-0122's cipher and MAC tables; the legacy rows join with BL-680), and how each direction's protection is built
+/// under (every row of ADR-0122's cipher and MAC tables), and how each direction's protection is built
 /// from the negotiated names and the keys <c>NEWKEYS</c> hands out.
 /// </summary>
 internal static class SshPacketProtections
@@ -19,14 +20,31 @@ internal static class SshPacketProtections
         ["aes256-ctr"] = new(32, 16, (key, iv, mac) => new CipherAndMacPacketProtection(new AesCtrSshCipher(key, iv), mac!)),
         ["aes192-ctr"] = new(24, 16, (key, iv, mac) => new CipherAndMacPacketProtection(new AesCtrSshCipher(key, iv), mac!)),
         ["aes128-ctr"] = new(16, 16, (key, iv, mac) => new CipherAndMacPacketProtection(new AesCtrSshCipher(key, iv), mac!)),
+        ["aes256-cbc"] = new(32, 16, (key, iv, mac) => new CipherAndMacPacketProtection(CbcSshCipher.ForAes(key, iv), mac!)),
+        ["rijndael-cbc@lysator.liu.se"] = new(32, 16, (key, iv, mac) => new CipherAndMacPacketProtection(CbcSshCipher.ForAes(key, iv), mac!)),
+        ["aes192-cbc"] = new(24, 16, (key, iv, mac) => new CipherAndMacPacketProtection(CbcSshCipher.ForAes(key, iv), mac!)),
+        ["aes128-cbc"] = new(16, 16, (key, iv, mac) => new CipherAndMacPacketProtection(CbcSshCipher.ForAes(key, iv), mac!)),
+        ["blowfish-cbc"] = new(16, 8, (key, iv, mac) => new CipherAndMacPacketProtection(CbcSshCipher.ForBlowfish(key, iv), mac!)),
+        ["arcfour128"] = new(16, 8, (key, _, mac) => new CipherAndMacPacketProtection(new Rc4SshCipher(key, Rc4.Rfc4345DiscardLength), mac!)),
+        ["arcfour"] = new(16, 8, (key, _, mac) => new CipherAndMacPacketProtection(new Rc4SshCipher(key, 0), mac!)),
+        ["cast128-cbc"] = new(16, 8, (key, iv, mac) => new CipherAndMacPacketProtection(CbcSshCipher.ForCast128(key, iv), mac!)),
+        ["3des-cbc"] = new(24, 8, (key, iv, mac) => new CipherAndMacPacketProtection(CbcSshCipher.ForTripleDes(key, iv), mac!)),
     };
 
     private static readonly Dictionary<string, SshMacAlgorithm> Macs = new()
     {
-        ["hmac-sha2-256"] = new(HashAlgorithmName.SHA256, 32, 32, IsEncryptThenMac: false),
-        ["hmac-sha2-256-etm@openssh.com"] = new(HashAlgorithmName.SHA256, 32, 32, IsEncryptThenMac: true),
-        ["hmac-sha2-512"] = new(HashAlgorithmName.SHA512, 64, 64, IsEncryptThenMac: false),
-        ["hmac-sha2-512-etm@openssh.com"] = new(HashAlgorithmName.SHA512, 64, 64, IsEncryptThenMac: true),
+        ["hmac-sha2-256"] = new(key => new BclSshHmac(HashAlgorithmName.SHA256, key), 32, 32, IsEncryptThenMac: false),
+        ["hmac-sha2-256-etm@openssh.com"] = new(key => new BclSshHmac(HashAlgorithmName.SHA256, key), 32, 32, IsEncryptThenMac: true),
+        ["hmac-sha2-512"] = new(key => new BclSshHmac(HashAlgorithmName.SHA512, key), 64, 64, IsEncryptThenMac: false),
+        ["hmac-sha2-512-etm@openssh.com"] = new(key => new BclSshHmac(HashAlgorithmName.SHA512, key), 64, 64, IsEncryptThenMac: true),
+        ["hmac-sha1"] = new(key => new BclSshHmac(HashAlgorithmName.SHA1, key), 20, 20, IsEncryptThenMac: false),
+        ["hmac-sha1-etm@openssh.com"] = new(key => new BclSshHmac(HashAlgorithmName.SHA1, key), 20, 20, IsEncryptThenMac: true),
+        ["hmac-sha1-96"] = new(key => new BclSshHmac(HashAlgorithmName.SHA1, key), 20, 12, IsEncryptThenMac: false),
+        ["hmac-md5"] = new(key => new BclSshHmac(HashAlgorithmName.MD5, key), 16, 16, IsEncryptThenMac: false),
+        ["hmac-md5-etm@openssh.com"] = new(key => new BclSshHmac(HashAlgorithmName.MD5, key), 16, 16, IsEncryptThenMac: true),
+        ["hmac-md5-96"] = new(key => new BclSshHmac(HashAlgorithmName.MD5, key), 16, 12, IsEncryptThenMac: false),
+        ["hmac-ripemd160"] = new(key => new Ripemd160SshHmac(key), 20, 20, IsEncryptThenMac: false),
+        ["hmac-ripemd160@openssh.com"] = new(key => new Ripemd160SshHmac(key), 20, 20, IsEncryptThenMac: false),
     };
 
     /// <summary>Gets the names of the implemented ciphers and MACs.</summary>
@@ -84,7 +102,7 @@ internal static class SshPacketProtections
         SshMacAlgorithm mac = Macs.TryGetValue(macName, out SshMacAlgorithm? found)
             ? found
             : throw new NotSupportedException($"The SSH MAC {macName} is not implemented.");
-        return new SshMac(mac.Hash, keys.DeriveKey(integrityPurpose, mac.KeyLength), mac.Length, mac.IsEncryptThenMac);
+        return new SshMac(mac.CreateHmac(keys.DeriveKey(integrityPurpose, mac.KeyLength)), mac.Length, mac.IsEncryptThenMac);
     }
 
     /// <summary>A cipher's key and IV lengths and how its protection is built.</summary>
@@ -93,10 +111,10 @@ internal static class SshPacketProtections
     /// <param name="Create">Builds the protection from the key, the IV and the MAC, which an AEAD cipher ignores.</param>
     private sealed record SshCipherAlgorithm(int KeyLength, int IvLength, Func<byte[], byte[], SshMac?, ISshPacketProtection> Create);
 
-    /// <summary>A MAC's hash, key length, MAC length and order.</summary>
-    /// <param name="Hash">The HMAC's hash.</param>
+    /// <summary>A MAC's HMAC, key length, MAC length and order.</summary>
+    /// <param name="CreateHmac">Keys the HMAC with the derived integrity key.</param>
     /// <param name="KeyLength">The integrity key's length in bytes.</param>
-    /// <param name="Length">How many MAC bytes follow each packet.</param>
+    /// <param name="Length">How many MAC bytes follow each packet: fewer than the HMAC's for the <c>-96</c> MACs.</param>
     /// <param name="IsEncryptThenMac">Whether the MAC covers the encrypted packet.</param>
-    private sealed record SshMacAlgorithm(HashAlgorithmName Hash, int KeyLength, int Length, bool IsEncryptThenMac);
+    private sealed record SshMacAlgorithm(Func<byte[], ISshHmac> CreateHmac, int KeyLength, int Length, bool IsEncryptThenMac);
 }

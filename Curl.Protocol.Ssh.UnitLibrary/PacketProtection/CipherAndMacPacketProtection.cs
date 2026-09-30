@@ -33,13 +33,13 @@ internal sealed class CipherAndMacPacketProtection(ISshCipher cipher, SshMac mac
         if (mac.IsEncryptThenMac)
         {
             packet[..sizeof(uint)].CopyTo(body);
-            cipher.Transform(packet[sizeof(uint)..], body[sizeof(uint)..]);
+            cipher.Encrypt(packet[sizeof(uint)..], body[sizeof(uint)..]);
             mac.Compute(sequenceNumber, body, []).CopyTo(sealedPacket, packet.Length);
         }
         else
         {
             mac.Compute(sequenceNumber, packet, []).CopyTo(sealedPacket, packet.Length);
-            cipher.Transform(packet, body);
+            cipher.Encrypt(packet, body);
         }
 
         return sealedPacket;
@@ -50,7 +50,7 @@ internal sealed class CipherAndMacPacketProtection(ISshCipher cipher, SshMac mac
     {
         if (!mac.IsEncryptThenMac)
         {
-            cipher.Transform(lengthBlock, lengthBlock);
+            cipher.Decrypt(lengthBlock, lengthBlock);
         }
 
         return BinaryPrimitives.ReadUInt32BigEndian(lengthBlock);
@@ -64,11 +64,11 @@ internal sealed class CipherAndMacPacketProtection(ISshCipher cipher, SshMac mac
         if (mac.IsEncryptThenMac)
         {
             mac.Verify(sequenceNumber, lengthBlock, rest, received);
-            cipher.Transform(rest, rest);
+            cipher.Decrypt(rest, rest);
         }
         else
         {
-            cipher.Transform(rest, rest);
+            cipher.Decrypt(rest, rest);
             mac.Verify(sequenceNumber, lengthBlock, rest, received);
         }
 

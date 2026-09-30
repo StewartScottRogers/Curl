@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Curl.Cryptography;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Transport;
@@ -28,6 +29,25 @@ public sealed class SshPacketProtectionsTests
     [DataRow("aes128-ctr", "hmac-sha2-256-etm@openssh.com")]
     [DataRow("aes128-ctr", "hmac-sha2-512")]
     [DataRow("aes128-ctr", "hmac-sha2-512-etm@openssh.com")]
+    [DataRow("aes256-cbc", "hmac-sha2-256")]
+    [DataRow("rijndael-cbc@lysator.liu.se", "hmac-sha2-256")]
+    [DataRow("aes192-cbc", "hmac-sha2-256")]
+    [DataRow("aes128-cbc", "hmac-sha2-512-etm@openssh.com")]
+    [DataRow("3des-cbc", "hmac-sha2-256")]
+    [DataRow("blowfish-cbc", "hmac-sha2-256")]
+    [DataRow("cast128-cbc", "hmac-sha2-512")]
+    [DataRow("arcfour", "hmac-sha2-256")]
+    [DataRow("arcfour128", "hmac-sha2-256-etm@openssh.com")]
+    [DataRow("aes128-ctr", "hmac-sha1")]
+    [DataRow("aes128-ctr", "hmac-sha1-etm@openssh.com")]
+    [DataRow("aes128-ctr", "hmac-sha1-96")]
+    [DataRow("aes128-ctr", "hmac-md5")]
+    [DataRow("aes128-ctr", "hmac-md5-etm@openssh.com")]
+    [DataRow("aes128-ctr", "hmac-md5-96")]
+    [DataRow("aes128-ctr", "hmac-ripemd160")]
+    [DataRow("aes128-ctr", "hmac-ripemd160@openssh.com")]
+    [DataRow("3des-cbc", "hmac-md5-96")]
+    [DataRow("arcfour", "hmac-sha1-96")]
     public async Task ForClientToServer_EachPair_RoundTripsPacketsOfSeveralLengthsInOrder(string cipher, string? mac)
     {
         ScriptedConnection connection = new();
@@ -122,7 +142,7 @@ public sealed class SshPacketProtectionsTests
 
     [TestMethod]
     [DataRow("serpent256-cbc", null, DisplayName = "cipher not implemented")]
-    [DataRow("aes128-ctr", "hmac-sha1", DisplayName = "MAC not implemented")]
+    [DataRow("aes128-ctr", "hmac-sha2-384", DisplayName = "MAC not implemented")]
     public void Create_NameNotImplemented_ThrowsNotSupported(string cipher, string? mac)
     {
         Assert.ThrowsExactly<NotSupportedException>(
@@ -130,14 +150,81 @@ public sealed class SshPacketProtectionsTests
     }
 
     [TestMethod]
-    public void Names_AreTheChaCha20AndAesCiphersAndSha2Macs()
+    [DataRow("aes256-cbc", 32, 16)]
+    [DataRow("rijndael-cbc@lysator.liu.se", 32, 16)]
+    [DataRow("aes192-cbc", 24, 16)]
+    [DataRow("aes128-cbc", 16, 16)]
+    [DataRow("3des-cbc", 24, 8)]
+    [DataRow("blowfish-cbc", 16, 8)]
+    [DataRow("cast128-cbc", 16, 8)]
+    [DataRow("arcfour", 16, 0)]
+    [DataRow("arcfour128", 16, Rc4.Rfc4345DiscardLength)]
+    public void Create_LegacyCipher_TakesTheKeyAndIvLengthsItNeeds(string cipher, int keyLength, int ivLengthOrDiscard)
+    {
+        using ISshPacketProtection protection = SshPacketProtections.ForClientToServer(SshTestAlgorithms.With(cipher, "hmac-sha2-256"), Keys);
+        byte[] key = Keys.DeriveKey(SshKeyPurpose.EncryptionKeyClientToServer, keyLength);
+        ISshCipher expectedCipher = cipher switch
+        {
+            "3des-cbc" => CbcSshCipher.ForTripleDes(key, Keys.DeriveKey(SshKeyPurpose.InitialIvClientToServer, 8)),
+            "blowfish-cbc" => CbcSshCipher.ForBlowfish(key, Keys.DeriveKey(SshKeyPurpose.InitialIvClientToServer, 8)),
+            "cast128-cbc" => CbcSshCipher.ForCast128(key, Keys.DeriveKey(SshKeyPurpose.InitialIvClientToServer, 8)),
+            "arcfour" or "arcfour128" => new Rc4SshCipher(key, ivLengthOrDiscard),
+            _ => CbcSshCipher.ForAes(key, Keys.DeriveKey(SshKeyPurpose.InitialIvClientToServer, ivLengthOrDiscard)),
+        };
+        using CipherAndMacPacketProtection expected = new(
+            expectedCipher,
+            new SshMac(HashAlgorithmName.SHA256, Keys.DeriveKey(SshKeyPurpose.IntegrityKeyClientToServer, 32), 32, isEncryptThenMac: false));
+        byte[] packet = [0, 0, 0, 44, 10, .. new byte[33], .. Enumerable.Repeat((byte)0xEE, 10)];
+
+        CollectionAssert.AreEqual(expected.Seal(3, packet), protection.Seal(3, packet));
+        Assert.AreEqual(Math.Max(8, expectedCipher.BlockSize), protection.BlockSize);
+    }
+
+    [TestMethod]
+    [DataRow("hmac-sha1", 20, 20)]
+    [DataRow("hmac-sha1-96", 20, 12)]
+    [DataRow("hmac-md5", 16, 16)]
+    [DataRow("hmac-md5-96", 16, 12)]
+    [DataRow("hmac-ripemd160", 20, 20)]
+    [DataRow("hmac-ripemd160@openssh.com", 20, 20)]
+    public void Create_LegacyMac_SendsTheFirstBytesOfItsHmacUnderTheIntegrityKey(string mac, int keyLength, int macLength)
+    {
+        using ISshPacketProtection protection = SshPacketProtections.ForServerToClient(SshTestAlgorithms.With("aes128-ctr", mac), Keys);
+        byte[] integrityKey = Keys.DeriveKey(SshKeyPurpose.IntegrityKeyServerToClient, keyLength);
+        byte[] packet = [0, 0, 0, 28, 10, .. new byte[17], .. Enumerable.Repeat((byte)0xEE, 10)];
+        byte[] macInput = [0, 0, 0, 4, .. packet];
+        byte[] fullHmac = mac switch
+        {
+            "hmac-sha1" or "hmac-sha1-96" => HMACSHA1.HashData(integrityKey, macInput),
+            "hmac-md5" or "hmac-md5-96" => HMACMD5.HashData(integrityKey, macInput),
+            _ => RipemdHmac(integrityKey, macInput),
+        };
+
+        byte[] sealedPacket = protection.Seal(4, packet);
+
+        Assert.AreEqual(macLength, protection.TagLength);
+        CollectionAssert.AreEqual(fullHmac[..macLength], sealedPacket[packet.Length..]);
+    }
+
+    [TestMethod]
+    public void Names_AreEveryCipherAndMacOfTheFullPreset()
     {
         CollectionAssert.AreEquivalent(
             new[]
             {
                 "chacha20-poly1305@openssh.com", "aes256-gcm@openssh.com", "aes128-gcm@openssh.com", "aes256-ctr", "aes192-ctr", "aes128-ctr",
-                "hmac-sha2-256", "hmac-sha2-256-etm@openssh.com", "hmac-sha2-512", "hmac-sha2-512-etm@openssh.com",
+                "aes256-cbc", "rijndael-cbc@lysator.liu.se", "aes192-cbc", "aes128-cbc", "blowfish-cbc", "arcfour128", "arcfour", "cast128-cbc", "3des-cbc",
+                "hmac-sha2-256", "hmac-sha2-256-etm@openssh.com", "hmac-sha2-512", "hmac-sha2-512-etm@openssh.com", "hmac-sha1",
+                "hmac-sha1-etm@openssh.com", "hmac-sha1-96", "hmac-md5", "hmac-md5-etm@openssh.com", "hmac-md5-96", "hmac-ripemd160",
+                "hmac-ripemd160@openssh.com",
             },
             SshPacketProtections.Names.ToArray());
+    }
+
+    private static byte[] RipemdHmac(byte[] key, byte[] message)
+    {
+        byte[] result = new byte[HmacRipemd160.HashSize];
+        HmacRipemd160.HashData(key, message, result);
+        return result;
     }
 }

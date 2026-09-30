@@ -66,6 +66,10 @@ public sealed class SshPacketReaderTests
     [TestMethod]
     [DataRow("aes128-ctr", "hmac-sha2-256", -4, DisplayName = "MAC-then-encrypt")]
     [DataRow("aes128-ctr", "hmac-sha2-256-etm@openssh.com", -4, DisplayName = "encrypt-then-MAC")]
+    [DataRow("3des-cbc", "hmac-sha1-96", -4, DisplayName = "3des-cbc, hmac-sha1-96")]
+    [DataRow("aes128-ctr", "hmac-md5-96", -4, DisplayName = "hmac-md5-96")]
+    [DataRow("arcfour128", "hmac-ripemd160", -4, DisplayName = "arcfour128, hmac-ripemd160")]
+    [DataRow("blowfish-cbc", "hmac-sha1-etm@openssh.com", -4, DisplayName = "blowfish-cbc, hmac-sha1-etm")]
     [DataRow("aes128-gcm@openssh.com", null, -12, DisplayName = "AES-GCM")]
     [DataRow("chacha20-poly1305@openssh.com", null, -12, DisplayName = "ChaCha20-Poly1305")]
     public async Task ReadAsync_ProtectedPacketAltered_ThrowsWithLibssh2sCode(string cipher, string? mac, int expectedCode)

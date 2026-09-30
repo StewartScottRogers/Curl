@@ -26,6 +26,23 @@ public sealed class SshMacTests
     }
 
     [TestMethod]
+    [DataRow("SHA1", 20, "EFFCDF6AE5EB2FA2D27416D5F184DF9C259A7C79", DisplayName = "RFC 2202 test case 2, hmac-sha1")]
+    [DataRow("SHA1", 12, "EFFCDF6AE5EB2FA2D27416D5", DisplayName = "RFC 2202 test case 2, hmac-sha1-96: its first 12 bytes")]
+    [DataRow("MD5", 16, "750C783E6AB0B503EAA86E310A5DB738", DisplayName = "RFC 2202 test case 2, hmac-md5")]
+    [DataRow("MD5", 12, "750C783E6AB0B503EAA86E31", DisplayName = "RFC 2202 test case 2, hmac-md5-96: its first 12 bytes")]
+    [DataRow("RIPEMD160", 20, "DDA6C0213A485A9E24F4742064A7F033B43C4069", DisplayName = "RFC 2286 test case 2, hmac-ripemd160")]
+    public void Compute_LegacyHmacVector_HashesTheSequenceNumberThenThePacket(string hash, int length, string expected)
+    {
+        byte[] key = Encoding.ASCII.GetBytes("Jefe");
+        ISshHmac hmac = hash == "RIPEMD160" ? new Ripemd160SshHmac(key) : new BclSshHmac(new HashAlgorithmName(hash), key);
+        using SshMac mac = new(hmac, length, isEncryptThenMac: false);
+
+        Assert.AreEqual(expected, Convert.ToHexString(mac.Compute(What, RestOfTestCase2.AsSpan(0, 9), RestOfTestCase2.AsSpan(9))));
+        Assert.AreEqual(expected, Convert.ToHexString(mac.Compute(What, RestOfTestCase2, [])), "the hash resets after each packet");
+        mac.Verify(What, RestOfTestCase2, [], Convert.FromHexString(expected));
+    }
+
+    [TestMethod]
     public void Compute_ShorterLength_SendsTheFirstBytes()
     {
         using SshMac mac = new(HashAlgorithmName.SHA256, Encoding.ASCII.GetBytes("Jefe"), 12, isEncryptThenMac: true);
