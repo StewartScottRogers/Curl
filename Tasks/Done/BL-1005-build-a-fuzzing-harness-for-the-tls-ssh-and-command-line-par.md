@@ -9,7 +9,7 @@ touches: [Audit/Tools/Fuzz]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1005 — Build a fuzzing harness for the TLS, SSH and command-line parsers
 
@@ -56,16 +56,25 @@ seed, iteration). Exit 0 when nothing was found, 1 when something was.
 
 ## Acceptance criteria
 
-- [ ] `dotnet run Audit/Tools/Fuzz/Fuzz.cs -- --target tls-handshake --iterations 20000 --seed 1 --out <tmp>` completes and prints a summary line with iterations, inputs per second, crashes and hangs.
-- [ ] The same for `--target cli` and `--target ssh` (or, for `ssh`, the documented exit 2 and message).
-- [ ] `--self-test` proves detection: a built-in fake target that throws `IndexOutOfRangeException` on inputs starting `0xFF` produces a saved `.bin` that starts `0xFF` and a `.txt` naming the exception, and a fake target that sleeps 2 s is reported as a hang.
-- [ ] `--replay <file.bin> --target <name>` reruns one saved input and prints the outcome.
-- [ ] The same seed and iteration count give the same summary numbers on a second run.
-- [ ] `dotnet build Curl.slnx -warnaserror` is unaffected (the app is not in the solution) and no `PackageReference` is added anywhere.
+- [x] `dotnet run Audit/Tools/Fuzz/Fuzz.cs -- --target tls-handshake --iterations 20000 --seed 1 --out <tmp>` completes and prints a summary line with iterations, inputs per second, crashes and hangs.
+- [x] The same for `--target cli` and `--target ssh` (or, for `ssh`, the documented exit 2 and message).
+- [x] `--self-test` proves detection: a built-in fake target that throws `IndexOutOfRangeException` on inputs starting `0xFF` produces a saved `.bin` that starts `0xFF` and a `.txt` naming the exception, and a fake target that sleeps 2 s is reported as a hang.
+- [x] `--replay <file.bin> --target <name>` reruns one saved input and prints the outcome.
+- [x] The same seed and iteration count give the same summary numbers on a second run.
+- [x] `dotnet build Curl.slnx -warnaserror` is unaffected (the app is not in the solution) and no `PackageReference` is added anywhere.
 
 ## Notes
+
+- On the audit branch (worktree Z:/repos/Curl.auditbranch), commit c23d8535, pull request https://github.com/StewartScottRogers/Curl/pull/32.
+- ssh: Curl.Protocol.Ssh.UnitLibrary exposes no public reader or decoder of raw bytes; its only public types are SshProtocolHandler, SshAlgorithmPreferences, ISshRandomSource and SystemSshRandomSource, and every packet and message reader is internal (visible only to its tests). The target prints that and exits 2. For BL-1010 to raise as a finding: the SSH parsers cannot be fuzzed from outside the library.
+- --self-test: 9 PASS, 0 FAIL, including checks that every TLS seed reads as a complete handshake message and that the ServerHello and ECHConfigList seeds decode (an ECHConfigList seed missing maximum_name_length was caught this way and fixed: without it the ECH decoder would only have seen garbage).
+- 20,000 iterations, seed 1, run twice per target: tls-handshake 0 crashes, 0 hangs (about 340-380k inputs/s); cli 0 crashes, 0 hangs (about 90-140k inputs/s); identical counts across runs (inputs/s varies with the machine). Exit 0 for both, 2 for ssh.
+- --replay works on a saved input; an unreadable replay file prints a message and exits 2 instead of throwing.
+- A worker that never returns is left running after its hang is recorded, so a real infinite loop keeps one core busy until the run ends.
+- dotnet build Curl.slnx -warnaserror: 0 warnings, 0 errors; no PackageReference under Audit; the app is not in the solution.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. Fuzz.cs fuzzes the TLS handshake decoders and the CLI parser and saves replayable crashes and hangs; in PR #32, awaiting Stewart's merge.
