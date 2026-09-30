@@ -1,5 +1,5 @@
 ---
-id: BL-1032
+id: BL-1033
 title: Fail a CONNECT tunnel with the proxy Negotiate context's failure as curl's error message
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-30
 completed:
 ---
-# BL-1032 — Fail a CONNECT tunnel with the proxy Negotiate context's failure as curl's error message
+# BL-1033 — Fail a CONNECT tunnel with the proxy Negotiate context's failure as curl's error message
 
 ## Goal
 
