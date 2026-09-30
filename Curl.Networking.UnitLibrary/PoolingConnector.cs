@@ -21,10 +21,16 @@ namespace Curl.Networking;
 /// Connections are numbered from <c>0</c> in the order the inner connector opens them, or
 /// fails to (ADR-0109).
 /// </para>
+/// <para>
+/// The idle and leased connections, their numbering and the clock live in a
+/// <see cref="ConnectionCache" />. Each <c>-:</c>/<c>--next</c> option group has a connector of
+/// its own over the run's one cache, with its own inner connector and its
+/// <c>configuration</c>, so a later group reuses an earlier group's connection only when their
+/// configurations are equal, as curl 8.21.0 shares its connection cache between groups and
+/// reuses a connection only for matching TLS and proxy settings (ADR-0285, BL-754).
+/// </para>
 /// </remarks>
-/// <param name="innerConnector">Opens a connection when the pool has none for the key.</param>
-/// <param name="timeProvider">Measures how long each connection has been idle.</param>
-public sealed class PoolingConnector(IConnector innerConnector, TimeProvider timeProvider) : IConnector, IAsyncDisposable
+public sealed class PoolingConnector : IConnector, IAsyncDisposable
 {
     /// <summary>
     /// The most idle connections the pool holds, across all keys: curl 8.21.0's
@@ -32,12 +38,40 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
     /// </summary>
     public const int MaximumIdleConnections = 5;
 
-    private readonly Lock _gate = new();
-    private readonly List<PoolEntry> _idle = [];
-    private readonly List<PoolEntry> _leased = [];
-    private readonly List<MultiplexingNegotiation> _negotiations = [];
-    private long _nextConnectionNumber;
-    private bool _isDisposed;
+    private readonly IConnector _innerConnector;
+    private readonly ConnectionCache _cache;
+    private readonly object? _configuration;
+    private readonly bool _ownsCache;
+
+    /// <summary>
+    /// Creates a pool of its own, which <see cref="DisposeAsync" /> closes.
+    /// </summary>
+    /// <param name="innerConnector">Opens a connection when the pool has none for the key.</param>
+    /// <param name="timeProvider">Measures how long each connection has been idle.</param>
+    public PoolingConnector(IConnector innerConnector, TimeProvider timeProvider)
+        : this(innerConnector, new ConnectionCache(timeProvider), configuration: null)
+    {
+        _ownsCache = true;
+    }
+
+    /// <summary>
+    /// Creates a connector over <paramref name="cache" />, which other connectors may share and
+    /// whose owner closes it; <see cref="DisposeAsync" /> leaves it open.
+    /// </summary>
+    /// <param name="innerConnector">Opens a connection when the cache has none for the key.</param>
+    /// <param name="cache">The connections this connector shares with the others over it.</param>
+    /// <param name="configuration">
+    /// What else a connection must have been opened with to be handed to this connector's
+    /// transfers, compared with <see cref="object.Equals(object?)" />; <see langword="null" /> for nothing.
+    /// </param>
+    public PoolingConnector(IConnector innerConnector, ConnectionCache cache, object? configuration)
+    {
+        ArgumentNullException.ThrowIfNull(innerConnector);
+        ArgumentNullException.ThrowIfNull(cache);
+        _innerConnector = innerConnector;
+        _cache = cache;
+        _configuration = configuration;
+    }
 
     /// <summary>
     /// Gets a value indicating whether a transfer waits for a connection with its key that is
@@ -87,7 +121,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
         ArgumentNullException.ThrowIfNull(target);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var key = ConnectionPoolKey.Of(target);
+        var key = ConnectionPoolKey.Of(target, _configuration);
         var shared = await ShareAsync(key, target.Events, cancellationToken);
         if (shared is not null)
         {
@@ -110,29 +144,17 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
     /// for later transfers and <c>-Z</c> streams is BL-735's.
     /// </remarks>
     public ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken) =>
-        innerConnector.ConnectMultiplexedAsync(target, cancellationToken);
+        _innerConnector.ConnectMultiplexedAsync(target, cancellationToken);
 
     /// <summary>
-    /// Closes every idle connection without reporting anything; a connection returned
-    /// afterwards is closed instead of pooled. Wherever the pool closes a connection - here,
-    /// evicted, expired or found dead - the protocol session it holds is shut down first
-    /// (<see cref="IConnectionSession.ShutDownAsync" />), as curl sends HTTP/2's GOAWAY
-    /// (BL-817).
+    /// Closes the pool when this connector made it (<see cref="ConnectionCache.DisposeAsync" />);
+    /// does nothing to a <see cref="ConnectionCache" /> it was given, which its owner closes.
+    /// Wherever the pool closes a connection - there, evicted, expired or found dead - the
+    /// protocol session it holds is shut down first (<see cref="IConnectionSession.ShutDownAsync" />),
+    /// as curl sends HTTP/2's GOAWAY (BL-817).
     /// </summary>
     /// <returns>A task that completes when every idle connection is closed.</returns>
-    public async ValueTask DisposeAsync()
-    {
-        List<PoolEntry> closing;
-
-        lock (_gate)
-        {
-            _isDisposed = true;
-            closing = [.. _idle];
-            _idle.Clear();
-        }
-
-        await CloseAllAsync(closing);
-    }
+    public ValueTask DisposeAsync() => _ownsCache ? _cache.DisposeAsync() : ValueTask.CompletedTask;
 
     /// <summary>
     /// Puts <paramref name="entry" /> back in the pool, closing the oldest idle connection
@@ -148,18 +170,18 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
         PoolEntry? evicted = null;
         var heldCount = 0;
 
-        lock (_gate)
+        lock (_cache.Gate)
         {
-            if (_isDisposed)
+            if (_cache.IsDisposed)
             {
                 closing = [entry];
             }
             else
             {
                 closing = RemoveExpired();
-                entry.IdleSince = timeProvider.GetTimestamp();
-                _idle.Add(entry);
-                heldCount = _idle.Count;
+                entry.IdleSince = _cache.TimeProvider.GetTimestamp();
+                _cache.Idle.Add(entry);
+                heldCount = _cache.Idle.Count;
                 evicted = heldCount > MaximumIdleConnections ? RemoveOldest() : null;
             }
         }
@@ -171,7 +193,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
             closing.Add(evicted);
         }
 
-        await CloseAllAsync(closing);
+        await ConnectionCache.CloseAllAsync(closing);
     }
 
     /// <summary>
@@ -185,7 +207,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
     /// <returns><see langword="true" /> while another transfer still holds a lease of it.</returns>
     internal bool EndLease(PoolEntry entry, bool isReusable)
     {
-        lock (_gate)
+        lock (_cache.Gate)
         {
             entry.IsShareBarred |= !isReusable;
             entry.LeaseCount--;
@@ -194,7 +216,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
                 return true;
             }
 
-            _leased.Remove(entry);
+            _cache.Leased.Remove(entry);
             return false;
         }
     }
@@ -211,7 +233,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
     {
         MultiplexingNegotiation? negotiation;
 
-        lock (_gate)
+        lock (_cache.Gate)
         {
             negotiation = entry.Negotiation;
             entry.Negotiation = null;
@@ -233,7 +255,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
     {
         MultiplexingNegotiation? negotiation;
 
-        lock (_gate)
+        lock (_cache.Gate)
         {
             negotiation = entry.Negotiation;
             entry.Negotiation = null;
@@ -247,7 +269,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
     /// <returns><see langword="true" /> while another transfer shares it.</returns>
     internal bool IsShared(PoolEntry entry)
     {
-        lock (_gate)
+        lock (_cache.Gate)
         {
             return entry.LeaseCount > 1;
         }
@@ -288,10 +310,10 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
 
     private (PoolEntry? Shared, int? FullLeaseCount, MultiplexingNegotiation? Negotiation) FindShareable(ConnectionPoolKey key)
     {
-        lock (_gate)
+        lock (_cache.Gate)
         {
             int? fullLeaseCount = null;
-            foreach (var entry in _leased)
+            foreach (var entry in _cache.Leased)
             {
                 var limit = ConcurrentTransferLimitOf(entry, key);
                 if (limit > entry.LeaseCount)
@@ -303,19 +325,19 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
                 fullLeaseCount = limit > 0 ? entry.LeaseCount : fullLeaseCount;
             }
 
-            var negotiation = WaitsForMultiplexing ? _negotiations.Find(pending => key.Equals(pending.Key)) : null;
+            var negotiation = WaitsForMultiplexing ? _cache.Negotiations.Find(pending => key.Equals(pending.Key)) : null;
             return (null, fullLeaseCount, negotiation);
         }
     }
 
     private PoolEntry Lease(PoolEntry entry)
     {
-        lock (_gate)
+        lock (_cache.Gate)
         {
             entry.LeaseCount = 1;
             if (entry.Key is not null)
             {
-                _leased.Add(entry);
+                _cache.Leased.Add(entry);
             }
         }
 
@@ -330,9 +352,9 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
         }
 
         var negotiation = new MultiplexingNegotiation(key);
-        lock (_gate)
+        lock (_cache.Gate)
         {
-            _negotiations.Add(negotiation);
+            _cache.Negotiations.Add(negotiation);
         }
 
         return negotiation;
@@ -340,7 +362,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
 
     private void KeepNegotiating(PoolEntry entry, MultiplexingNegotiation? negotiation)
     {
-        lock (_gate)
+        lock (_cache.Gate)
         {
             entry.Negotiation = negotiation;
         }
@@ -353,20 +375,12 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
             return;
         }
 
-        lock (_gate)
+        lock (_cache.Gate)
         {
-            _negotiations.Remove(negotiation);
+            _cache.Negotiations.Remove(negotiation);
         }
 
         negotiation.Decide();
-    }
-
-    private static async ValueTask CloseAllAsync(List<PoolEntry> entries)
-    {
-        foreach (var entry in entries)
-        {
-            await entry.CloseAsync();
-        }
     }
 
     private async ValueTask<PoolEntry?> TakeIdleAsync(ConnectionPoolKey? key, ITransferEvents events)
@@ -393,18 +407,18 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
         List<PoolEntry> expired;
         PoolEntry? match;
 
-        lock (_gate)
+        lock (_cache.Gate)
         {
             expired = RemoveExpired();
-            match = _idle.Find(entry => key.Equals(entry.Key));
+            match = _cache.Idle.Find(entry => key.Equals(entry.Key));
 
             if (match is not null)
             {
-                _idle.Remove(match);
+                _cache.Idle.Remove(match);
             }
         }
 
-        await CloseAllAsync(expired);
+        await ConnectionCache.CloseAllAsync(expired);
 
         return match;
     }
@@ -418,7 +432,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
         ConnectResult connect;
         try
         {
-            connect = await innerConnector.ConnectAsync(target, cancellationToken);
+            connect = await _innerConnector.ConnectAsync(target, cancellationToken);
         }
         catch
         {
@@ -426,7 +440,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
             throw;
         }
 
-        var connectionNumber = Interlocked.Increment(ref _nextConnectionNumber) - 1;
+        var connectionNumber = _cache.NumberNextConnection();
         if (connect.Connection is null)
         {
             Decide(negotiation);
@@ -485,16 +499,16 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
 
     private List<PoolEntry> RemoveExpired()
     {
-        var expired = _idle.FindAll(entry => timeProvider.GetElapsedTime(entry.IdleSince) > MaximumIdleTime);
-        _idle.RemoveAll(expired.Contains);
+        var expired = _cache.Idle.FindAll(entry => _cache.TimeProvider.GetElapsedTime(entry.IdleSince) > MaximumIdleTime);
+        _cache.Idle.RemoveAll(expired.Contains);
 
         return expired;
     }
 
     private PoolEntry RemoveOldest()
     {
-        var oldest = _idle[0];
-        _idle.RemoveAt(0);
+        var oldest = _cache.Idle[0];
+        _cache.Idle.RemoveAt(0);
 
         return oldest;
     }
