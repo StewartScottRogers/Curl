@@ -21,4 +21,13 @@ public interface IConnectionSession
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the bytes are written, or when there is nothing to write.</returns>
     ValueTask ShutDownAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets how many transfers the connection can carry at once, each on a stream of its own,
+    /// such as an HTTP/2 peer's <c>SETTINGS_MAX_CONCURRENT_STREAMS</c>; 0 once it can carry no
+    /// new one; or <see langword="null" />, the default, for a protocol that carries one
+    /// transfer at a time. A pool shares a connection whose session gives a number between the
+    /// transfers to its origin, as curl multiplexes <c>-Z</c> transfers (BL-717).
+    /// </summary>
+    int? ConcurrentTransferLimit => null;
 }

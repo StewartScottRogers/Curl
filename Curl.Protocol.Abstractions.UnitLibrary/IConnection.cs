@@ -96,4 +96,13 @@ public interface IConnection : IAsyncDisposable
     /// disposing the connection. Only a pooled connection, which outlives a transfer, holds one.
     /// </returns>
     bool TryHoldSession(IConnectionSession session) => false;
+
+    /// <summary>
+    /// Gets a value indicating whether another transfer is carried on the connection beside
+    /// this one, on a stream of its own (<see cref="IConnectionSession.ConcurrentTransferLimit" />):
+    /// curl 8.21.0 reports a connection left intact only when the last transfer on it ends
+    /// (measured, BL-717). The default is <see langword="false" />: only a pooled connection
+    /// is shared.
+    /// </summary>
+    bool IsSharedWithAnotherTransfer => false;
 }

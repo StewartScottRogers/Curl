@@ -204,6 +204,15 @@ internal sealed class NetworkDiagnosticLog(IDiagnosticLog log)
         }
     }
 
+    /// <summary>
+    /// Logs, at <c>verbose</c>, that the pool is carrying a transfer on a connection another
+    /// transfer is using, on a stream of its own (BL-717).
+    /// </summary>
+    /// <param name="target">The target the connection was asked for.</param>
+    /// <param name="connectionNumber">curl's number for the shared connection.</param>
+    public void PoolShare(ConnectTarget target, long connectionNumber) =>
+        Write(DiagnosticLogLevel.Verbose, DiagnosticLogComponents.Connect, string.Create(CultureInfo.InvariantCulture, $"pool {target.PoolScheme}://{target.Host}:{target.Port}: sharing multiplexed connection #{connectionNumber}"));
+
     /// <summary>Logs, at <c>verbose</c>, a QUIC dial about to run.</summary>
     /// <param name="host">The host.</param>
     /// <param name="port">The port.</param>

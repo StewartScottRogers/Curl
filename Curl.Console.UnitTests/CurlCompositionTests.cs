@@ -423,6 +423,17 @@ public sealed class CurlCompositionTests
     }
 
     [TestMethod]
+    [DataRow(new[] { "-Z", "http://example.com/" }, true)]
+    [DataRow(new[] { "-Z", "--parallel-immediate", "http://example.com/" }, false)]
+    [DataRow(new[] { "http://example.com/" }, false)]
+    public void CreateTransports_PoolingConnector_WaitsForMultiplexingUnderParallelWithoutParallelImmediate(string[] arguments, bool waits)
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(Parse(arguments));
+
+        Assert.AreEqual(waits, transports.PoolingConnector.WaitsForMultiplexing);
+    }
+
+    [TestMethod]
     public void CreateTransports_PoolingConnector_WrapsTheTcpConnectorOnTheSameClock()
     {
         TimeProvider timeProvider = new ReplacementTimeProvider();

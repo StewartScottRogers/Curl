@@ -23,7 +23,20 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
     /// <param name="url">The transfer's URL, with its scheme.</param>
     /// <param name="abortToken">Ends the wait, which then throws, without counting the transfer.</param>
     /// <returns>A task that completes when the transfer may start.</returns>
-    internal Task WaitForHostAsync(string url, CancellationToken abortToken)
+    internal Task WaitForHostAsync(string url, CancellationToken abortToken) =>
+        WaitForHostAsync(url, speaksHttp2FromTheStart: false, abortToken);
+
+    /// <summary>
+    /// Waits as <see cref="WaitForHostAsync(string, CancellationToken)" /> does, except that a transfer
+    /// that speaks HTTP/2 from its first byte (<c>--http2-prior-knowledge</c>) never waits for the host's
+    /// first to end: its connection shows at once that it multiplexes, and the connection pool holds it
+    /// until then instead (<c>PoolingConnector.WaitsForMultiplexing</c>, BL-717).
+    /// </summary>
+    /// <param name="url">The transfer's URL, with its scheme.</param>
+    /// <param name="speaksHttp2FromTheStart">Whether the transfer speaks HTTP/2 with prior knowledge.</param>
+    /// <param name="abortToken">Ends the wait, which then throws, without counting the transfer.</param>
+    /// <returns>A task that completes when the transfer may start.</returns>
+    internal Task WaitForHostAsync(string url, bool speaksHttp2FromTheStart, CancellationToken abortToken)
     {
         if (DestinationOf(url) is not { } destination)
         {
@@ -33,7 +46,7 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
         lock (hosts)
         {
             HostTransfers transfers = TransfersTo(destination.Host);
-            WaitingTransfer transfer = new(destination.WaitsForFirstToEnd);
+            WaitingTransfer transfer = new(destination.WaitsForFirstToEnd && !speaksHttp2FromTheStart);
             if (transfers.MayStart(transfer, maxPerHost))
             {
                 transfers.Running++;
@@ -49,7 +62,7 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
     /// Counts the transfer of <paramref name="url" /> as no longer running at its host, and starts the
     /// transfers waiting for it that may now start.
     /// </summary>
-    /// <param name="url">The URL <see cref="WaitForHostAsync" /> was given.</param>
+    /// <param name="url">The URL <see cref="WaitForHostAsync(string, CancellationToken)" /> was given.</param>
     internal void Leave(string url)
     {
         if (DestinationOf(url) is not { } destination)

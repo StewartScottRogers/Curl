@@ -379,8 +379,17 @@ internal static class CurlComposition
             quicDialer,
             tcpConnector,
             CreateUdpDatagramConnector(options, dnsResolver, timeProvider),
-            new PoolingConnector(tcpConnector, timeProvider));
+            new PoolingConnector(tcpConnector, timeProvider) { WaitsForMultiplexing = WaitsForMultiplexing(options) });
     }
+
+    /// <summary>
+    /// Tells whether a transfer waits for a connection to its origin that may yet multiplex rather
+    /// than open one of its own: curl sets <c>CURLOPT_PIPEWAIT</c> on every <c>-Z</c> transfer unless
+    /// <c>--parallel-immediate</c> is given (measured, BL-717 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> for <c>-Z</c> without <c>--parallel-immediate</c>.</returns>
+    internal static bool WaitsForMultiplexing(CommandLineOptions options) => options.Parallel && !options.ParallelImmediate;
 
     /// <summary>
     /// Creates the run's <see cref="TcpConnector" /> over the given pieces, with the
