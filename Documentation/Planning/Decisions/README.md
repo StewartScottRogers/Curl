@@ -1,3 +1,4 @@
+| [0265](ADR-0265-hybrid-post-quantum-ssh-key-exchanges-hash-k-as-a-string.md) | `mlkem768x25519-sha256`, `mlkem768nistp256-sha256`, `mlkem1024nistp384-sha384` and `sntrup761x25519-sha512` (both names) run in one `HybridKemSshKeyExchange`: KEM share then classical share each way, K = HASH(KEM secret || raw classical secret) hashed into H and the keys as a `string`, not an `mpint`; a server share of the wrong length fails with -8 | Accepted | 2026-09-29 |
 # Architecture Decision Records
 
 One file per decision, named `ADR-NNNN-short-slug.md`. Numbers are assigned in
