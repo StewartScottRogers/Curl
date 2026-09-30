@@ -85,8 +85,7 @@ public sealed partial class HttpProtocolHandlerTests
 
     /// <summary>
     /// Runs <c>--anyauth -u : -v</c> against two <c>401 Negotiate</c> responses, every context
-    /// step failing for want of a ticket, and gives the events, less the connection's end,
-    /// which the connection fake does not report.
+    /// step failing for want of a ticket, and gives the events.
     /// </summary>
     private static async Task<List<string>> AnyAuthWithoutATicketEventsAsync()
     {
@@ -96,15 +95,14 @@ public sealed partial class HttpProtocolHandlerTests
         TransferResult result = await NegotiateHandler(QueueConnector.For(connection), NoTicketTokens()).ExecuteAsync(AnyAuthContext(new MemoryStream(), events));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        return [.. events.Events.Where(line => !line.StartsWith("* Connection #", StringComparison.Ordinal))];
+        return events.Events;
     }
 
     /// <summary>
-    /// Gives curl's <c>-v</c> lines for the exchange, less the connection's end and the
-    /// <c>Issue another request</c> and <c>Reusing existing</c> lines curl writes before the
-    /// retry, which no authentication retry writes yet (BL-956): no failure after the first
-    /// 401, the failure and <c>Server auth</c> before the second request, and the failure
-    /// again just before the second 401's Negotiate challenge.
+    /// Gives curl's <c>-v</c> lines for the exchange: no failure after the first 401; the
+    /// connection left intact, <c>Issue another request</c> and <c>Reusing existing</c> (BL-959),
+    /// then the failure and <c>Server auth</c> before the second request; the failure again just
+    /// before the second 401's Negotiate challenge; and the connection left intact.
     /// </summary>
     private static string[] ExpectedAnyAuthWithoutATicketEvents(string failure) =>
     [
@@ -117,6 +115,9 @@ public sealed partial class HttpProtocolHandlerTests
         "* Ignoring the response-body",
         "* setting size while ignoring",
         "< \r\n",
+        "* Connection #0 to host 127.0.0.1:18183 left intact",
+        "* Issue another request to this URL: '" + AuthUrl + "'",
+        "* Reusing existing http: connection with host 127.0.0.1",
         failure,
         "* Server auth using Negotiate with user ''",
         "> " + AnyAuthRequest,
@@ -127,5 +128,6 @@ public sealed partial class HttpProtocolHandlerTests
         "< Content-Length: 4\r\n",
         "< \r\n",
         "{ deny",
+        "* Connection #0 to host 127.0.0.1:18183 left intact",
     ];
 }

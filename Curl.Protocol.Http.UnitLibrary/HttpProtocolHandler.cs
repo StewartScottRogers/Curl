@@ -699,11 +699,34 @@ public sealed class HttpProtocolHandler(
         streams ??= upgradedSession;
         while (outcome.Retry is { } retry && outcome.KeepsAlive)
         {
+            ReportRetryOnSameConnection(retry, connect);
             HttpRequestPlan next = streams is null ? retry : retry.ForHttp2OrHttp3();
             outcome = await ExchangeAsync(next, connect, connection, outcome.Result.Report, newConnection: false, streams).ConfigureAwait(false);
         }
 
         return (outcome, upgradedSession);
+    }
+
+    /// <summary>
+    /// Reports what curl 8.21.0 writes between a response it answers with another request and
+    /// that request, sent on the same connection (measured, BL-959 Notes): the connection left
+    /// intact, <c>Issue another request to this URL: '...'</c>, then the connection reused, which
+    /// the console writes as <c>Reusing existing http: connection with host ...</c>.
+    /// </summary>
+    private static void ReportRetryOnSameConnection(HttpRequestPlan retry, ConnectResult connect)
+    {
+        ConnectTarget target = TargetOf(retry);
+        ITransferEvents events = retry.Context.Events;
+        events.ReportInfo(LeftIntactLine(target, connect));
+        events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(retry.Context.Url));
+        events.ReportConnectionReused(new ConnectionReusedEvent
+        {
+            Scheme = target.PoolScheme!,
+            IsProxy = target.IsForwardProxy || target.Proxy is not null,
+            HostName = target.Proxy?.Host ?? target.Host,
+            Port = target.Proxy?.Port ?? target.Port,
+            ConnectionNumber = connect.ConnectionNumber,
+        });
     }
 
     /// <summary>
