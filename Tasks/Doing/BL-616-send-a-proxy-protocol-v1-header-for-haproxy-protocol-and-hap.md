@@ -33,3 +33,4 @@ With `--haproxy-protocol`, the first bytes on the connection are the HAProxy PRO
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-30: Backlog -> Doing.
