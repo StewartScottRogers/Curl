@@ -24,7 +24,7 @@ description: Rules and tooling for Curl's task board — the Tasks shared projec
 | `pipeline` | `feature`, `protocol`, `docs`, `direct` | How `/task-run` delivers it (below). |
 | `depends-on` | `[BL-###, …]` | Tasks that must be in `Done` or its archive before this one can start. |
 | `touches` | `[path, …]` | Every project folder, folder or file the task will change, e.g. `[Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]`. Two tasks whose `touches` overlap never run at the same time. Empty or `*` means it may change anything, so it runs alone. |
-| `lane` | `yes`, `no` (optional; absent means `yes`) | `no` means interactive only: `next` never offers the task and `capacity` never counts it, so no dark factory lane claims it. An interactive session still runs it by naming it, `/task-run BL-###`, and `move -To Doing` accepts it. Written by `new -NoLane`, on the line after `touches`. |
+| `lane` | `yes`, `no` (optional; absent means `yes`) | `no` means interactive only (as does any audit path in `touches`): `next` never offers the task and `capacity` never counts it, so no dark factory lane claims it. An interactive session still runs it by naming it, `/task-run BL-###`, and `move -To Doing` accepts it. Written by `new -NoLane`, on the line after `touches`. |
 | `requirement` | requirement ID or `none` | From `Documentation/Product/Requirements.md`. |
 | `created` | `yyyy-MM-dd` | Set by the script. |
 | `completed` | `yyyy-MM-dd` | Set by the script when the task moves to `Done`. |
@@ -101,6 +101,17 @@ The script refuses:
 - moving to `Done` while any `- [ ]` box is unticked
 - touching an archived task
 - acting on an ID that names more than one live task (run `dedupe` first)
+- inside a dark factory shift only (`CURL_DARK_FACTORY_LANE` set, BL-995): filing with
+  `new` a task whose `touches` name an audit path, unless `-NoLane` is given; and
+  claiming with `move -To Doing` a task that is interactive only
+
+An **audit path** belongs to the audit office, outside the factory's reach (ADR-0267):
+`Audit`, anything under `Audit/`, or an auditor agent `.claude/agents/audit-*`, in any
+letter case. A task is **interactive only** when it says `lane: no` or any of its
+`touches` is an audit path; `next` and `capacity` never offer it to anyone, and
+`status` shows it as interactive only. An ancestor such as `.claude` or `*` is not an
+audit path here; the PreToolUse hook (BL-997) and CI (BL-998) catch real writes.
+Interactive sessions, where the variable is absent, are never refused any of this.
 
 Do not work around a refusal. It is telling you something about the task.
 

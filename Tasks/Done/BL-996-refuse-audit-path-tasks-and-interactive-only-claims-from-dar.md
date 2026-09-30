@@ -9,7 +9,7 @@ touches: [.claude/skills/task-board]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-996 — Refuse audit-path tasks and interactive-only claims from dark factory lanes in task-board.ps1
 
@@ -54,15 +54,21 @@ case.
 
 ## Acceptance criteria
 
-- [ ] With `CURL_DARK_FACTORY_LANE=2`: `new -Title x -Touches Audit/Findings` fails with a message naming `Audit/Findings`; `new -Title x -Touches .claude/agents/audit-quality.md` fails; `new -Title x -Touches Audit/Findings -NoLane` succeeds; `new -Title x -Touches Curl.Core.UnitLibrary` succeeds.
-- [ ] With `CURL_DARK_FACTORY_LANE=2`: `move -Id <a lane: no task> -To Doing` fails naming the task; `move -Id <a task touching Audit/Tools> -To Doing` fails; `move -Id <an ordinary ready task> -To Doing` succeeds.
-- [ ] With the variable absent, all six of the operations above succeed.
-- [ ] Whatever the variable, `next` and `capacity` never print a ready task whose touches include `audit/scorecards` (lower case) and no `lane` field.
-- [ ] `SKILL.md` lists the new refusals under "The script refuses" and defines audit paths.
-- [ ] `task-board.ps1` contains only ASCII characters.
+- [x] With `CURL_DARK_FACTORY_LANE=2`: `new -Title x -Touches Audit/Findings` fails with a message naming `Audit/Findings`; `new -Title x -Touches .claude/agents/audit-quality.md` fails; `new -Title x -Touches Audit/Findings -NoLane` succeeds; `new -Title x -Touches Curl.Core.UnitLibrary` succeeds.
+- [x] With `CURL_DARK_FACTORY_LANE=2`: `move -Id <a lane: no task> -To Doing` fails naming the task; `move -Id <a task touching Audit/Tools> -To Doing` fails; `move -Id <an ordinary ready task> -To Doing` succeeds.
+- [x] With the variable absent, all six of the operations above succeed.
+- [x] Whatever the variable, `next` and `capacity` never print a ready task whose touches include `audit/scorecards` (lower case) and no `lane` field.
+- [x] `SKILL.md` lists the new refusals under "The script refuses" and defines audit paths.
+- [x] `task-board.ps1` contains only ASCII characters.
 
 ## Notes
+
+- `Test-AuditPath` and `Test-DarkFactoryLane` are new; `ConvertTo-Task` now sets `LaneAllowed` false for `lane: no` or any audit-path touch, so `next`, `capacity` and `status` treat audit-path tasks as interactive only with no further change. `new` (without `-NoLane`) and `move -To Doing` refuse only while `CURL_DARK_FACTORY_LANE` is set.
+- Scratch-board acceptance run (21 checks, all PASS): the six operations refused/allowed as specified with the variable at 2 and all succeeding with it absent; `next` and `capacity` never offer a `touches: [audit/scorecards]` task, including when it is the only ready task; the script is ASCII only.
+- verify: build 0 warnings; 21032 fast tests passed, 0 failed.
 
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. Inside a shift the board refuses audit-path tasks without -NoLane and interactive-only claims; next and capacity never offer an audit-path task.

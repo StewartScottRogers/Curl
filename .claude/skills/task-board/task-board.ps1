@@ -15,8 +15,12 @@
       next     The task /task-run should take next, or "No task is ready.". A ready
                task whose touches overlap a task in Doing is not offered, so lanes
                of the dark factory never work on the same files at once. A task
-               whose front matter says 'lane: no' is never offered either: it is
-               interactive only, run by naming it (/task-run BL-###).
+               whose front matter says 'lane: no', or whose touches name an audit
+               path (Audit, Audit/..., .claude/agents/audit-*), is never offered
+               either: it is interactive only, run by naming it (/task-run BL-###).
+               Inside a dark factory shift (CURL_DARK_FACTORY_LANE set), 'new'
+               refuses an audit-path task without -NoLane and 'move -To Doing'
+               refuses an interactive-only task (ADR-0267).
       capacity How many tasks the board could have running at once right now: the
                tasks in Doing, plus the ready tasks that could start beside them,
                picked in 'next' order so no two overlap in touches. One line,
@@ -160,8 +164,10 @@ function ConvertTo-Task([IO.FileInfo] $File) {
     $taskPriority = [string]$fields['priority']
     if (-not $PriorityRank.ContainsKey($taskPriority)) { $taskPriority = 'Normal' }
 
-    # 'lane: no' means interactive only; absent, empty or 'yes' means any runner.
-    $laneAllowed = ([string]$fields['lane']).Trim() -ine 'no'
+    # 'lane: no' means interactive only; absent, empty or 'yes' means any runner. A task
+    # that touches an audit path is interactive only whatever it says (ADR-0267).
+    $laneAllowed = ([string]$fields['lane']).Trim() -ine 'no' -and
+        @($touched | Where-Object { Test-AuditPath $_ }).Count -eq 0
 
     return [pscustomobject]@{
         Id        = $taskId
@@ -183,6 +189,23 @@ function ConvertTo-Task([IO.FileInfo] $File) {
 
 function ConvertTo-TouchPath([string] $Item) {
     return $Item.Trim().Trim('"', "'").Replace([string][char]92, '/').TrimEnd('/')
+}
+
+# An audit path is the audit office's, outside the dark factory's reach (ADR-0267):
+# Audit or anything under it, or an auditor agent .claude/agents/audit-*, in any case.
+# Takes a path ConvertTo-TouchPath has normalised. An ancestor such as .claude or * is
+# not one: the hook and CI catch real writes, and refusing * would refuse every task
+# filed without touches.
+function Test-AuditPath([string] $TouchPath) {
+    return $TouchPath -ieq 'Audit' -or
+        $TouchPath.StartsWith('Audit/', [StringComparison]::OrdinalIgnoreCase) -or
+        $TouchPath -ilike '.claude/agents/audit-*'
+}
+
+# True while this process runs inside a dark factory shift (RunDarkFactory.ps1's LANE
+# MARKER, BL-995).
+function Test-DarkFactoryLane {
+    return -not [string]::IsNullOrEmpty($env:CURL_DARK_FACTORY_LANE)
 }
 
 # Two tasks overlap when either may touch anything, or one names a path equal to or
@@ -402,6 +425,12 @@ switch ($Command) {
         }
 
         $touchList = @($Touches | ForEach-Object { $_ -split ',' } | ForEach-Object { ConvertTo-TouchPath $_ } | Where-Object { $_ })
+        if ((Test-DarkFactoryLane) -and -not $NoLane) {
+            $auditTouch = @($touchList | Where-Object { Test-AuditPath $_ }) | Select-Object -First 1
+            if ($auditTouch) {
+                throw "Dark factory lanes may not file a task that touches ${auditTouch}: the audit office is outside the factory's reach (ADR-0267). File it with -NoLane for an interactive session."
+            }
+        }
 
         $slug = ($Title.ToLowerInvariant() -replace '[^a-z0-9]+', '-').Trim('-')
         if ($slug.Length -gt 60) { $slug = $slug.Substring(0, 60).TrimEnd('-') }
@@ -441,6 +470,7 @@ switch ($Command) {
         }
         if ($To -eq 'Doing') {
             if ($task.Assignee -ne 'Claude') { throw "$($task.Id) is assigned to $($task.Assignee); Claude does not claim it." }
+            if ((Test-DarkFactoryLane) -and -not $task.LaneAllowed) { throw "$($task.Id) is interactive only; a dark factory lane does not claim it." }
             $missing = @(Get-MissingDependencies $task (Get-DoneIds $tasks))
             if ($missing.Count -gt 0) { throw "$($task.Id) is waiting on $($missing -join ', ')." }
         }
