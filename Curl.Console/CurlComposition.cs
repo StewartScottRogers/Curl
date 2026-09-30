@@ -436,7 +436,23 @@ internal static class CurlComposition
             UnixSocketOf(options),
             HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion),
             quicDialer,
-            localBinding: LocalBindingOf(options));
+            localBinding: LocalBindingOf(options),
+            preProxy: PreProxyOf(options));
+
+    /// <summary>
+    /// The SOCKS proxy the connector reaches an HTTP or HTTPS proxy through: the <c>--preproxy</c>
+    /// value, with no scheme as SOCKS4 as curl 8.21.0 reads it (BL-614), or <see langword="null" />
+    /// when it is absent, empty, does not parse or is not a SOCKS proxy. The last three fail each
+    /// transfer in <see cref="TransferProxySelection" /> before anything connects.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The pre-proxy, or <see langword="null" />.</returns>
+    internal static ProxyEndpoint? PreProxyOf(CommandLineOptions options) =>
+        !string.IsNullOrEmpty(options.PreProxy)
+        && ProxyUrlParser.TryParse(options.PreProxy, ProxyKind.Socks4, out ProxyEndpoint? preProxy, out _)
+        && preProxy.Kind is not (ProxyKind.Http or ProxyKind.Https)
+            ? preProxy
+            : null;
 
     /// <summary>
     /// What the TCP connector binds each connection's local end to, from <c>--interface</c> and
