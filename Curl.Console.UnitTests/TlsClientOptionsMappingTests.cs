@@ -312,6 +312,53 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
+    public void ProxyFromCommandLine_ProxyClientCertificateOptions_ReachTheProxyVerbatim()
+    {
+        Assert.AreEqual(
+            new TlsClientOptions(
+                ClientCertificate: @"proxy\:name.pem:se\:cret",
+                PrivateKey: "proxy-key.pem",
+                CertificateType: "P12",
+                PrivateKeyType: "DER",
+                Passphrase: "secret"),
+            MapProxy(
+                "--proxy-cert", @"proxy\:name.pem:se\:cret", "--proxy-key", "proxy-key.pem", "--proxy-cert-type", "P12",
+                "--proxy-key-type", "DER", "--proxy-pass", "secret", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_ProxyClientCertificateOptions_NeverReachTheTarget()
+    {
+        Assert.AreEqual(
+            new TlsClientOptions(),
+            Map("--proxy-cert", "proxy.pem", "--proxy-key", "proxy-key.pem", "--proxy-cert-type", "P12",
+                "--proxy-key-type", "DER", "--proxy-pass", "secret", Url));
+    }
+
+    [TestMethod]
+    public void ProxyFromCommandLine_ProxyCipherLists_ReachTheProxyVerbatim()
+    {
+        Assert.AreEqual(
+            new TlsClientOptions(Ciphers: "ECDHE-RSA-AES128-GCM-SHA256", Tls13Ciphers: "TLS_AES_128_GCM_SHA256"),
+            MapProxy("--proxy-ciphers", "ECDHE-RSA-AES128-GCM-SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_ProxyCipherLists_NeverReachTheTarget()
+    {
+        Assert.AreEqual(new TlsClientOptions(), Map("--proxy-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", Url));
+    }
+
+    [TestMethod]
+    public void ProxyFromCommandLine_TargetClientCertificateAndCipherOptions_NeverReachTheProxy()
+    {
+        Assert.AreEqual(
+            new TlsClientOptions(),
+            MapProxy("--cert", "client.pem", "--key", "key.pem", "--cert-type", "P12", "--key-type", "DER", "--pass", "secret",
+                "--ciphers", "BOGUS", "--tls13-ciphers", "BOGUS", Url));
+    }
+
+    [TestMethod]
     public void ProxyFromCommandLine_CertStatusAndSslAutoClientCert_NeverReachTheProxy()
     {
         Assert.AreEqual(new TlsClientOptions(), MapProxy("--cert-status", "--ssl-auto-client-cert", Url));

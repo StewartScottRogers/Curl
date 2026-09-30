@@ -30,7 +30,7 @@ namespace Curl.Console;
 /// transfer end to end. No test here opens a socket.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionTests
+public sealed partial class CurlCompositionTests
 {
     private const string ConnectFailure = "Failed to connect to h:2628 after 0 ms: Could not connect to server";
 
