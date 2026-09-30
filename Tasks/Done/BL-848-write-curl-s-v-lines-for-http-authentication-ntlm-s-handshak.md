@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-526]
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-30
 ---
 # BL-848 — Write curl's -v lines for HTTP authentication, NTLM's handshake lines included
 
@@ -56,26 +56,26 @@ project and its `.UnitTests` twin to `touches` before editing it and note why he
 
 ## Acceptance criteria
 
-- [ ] The Basic, Digest and Negotiate `Server auth using ...` lines are measured with
+- [x] The Basic, Digest and Negotiate `Server auth using ...` lines are measured with
       `Record-CurlExchange.ps1` (`-v`, 401 then 200) against curl 8.21.0 on Windows, and
       the stderr lines and their position relative to `> ` request lines are recorded in
       Notes with the curl version.
-- [ ] Tests in `Curl.Protocol.Http.UnitTests` pin, for each measured case, the exact
+- [x] Tests in `Curl.Protocol.Http.UnitTests` pin, for each measured case, the exact
       line text and its position in the `-v` sequence (before the request header lines
       it precedes): `Server auth using NTLM with user 'u'` on both NTLM legs, the
       measured Basic/Digest/Negotiate lines, `NTLM handshake rejected` followed by
       `NTLM authentication problem, ignoring.`, `NTLM handshake failure (internal error)`,
       `NTLM handshake failure (bad type-2 message)` and
       `NTLM authentication problem, ignoring.` for non-base64.
-- [ ] Tests in `Curl.Authentication.UnitTests` cover each outcome the authenticator
+- [x] Tests in `Curl.Authentication.UnitTests` cover each outcome the authenticator
       reports to the handler.
-- [ ] The lines reach stderr through `ITransferEvents.ReportInfo` (the seam the handler
+- [x] The lines reach stderr through `ITransferEvents.ReportInfo` (the seam the handler
       already uses for `-v`), not a new writer.
-- [ ] No line is written without `-v` (an existing `-sS` test of the NTLM exchange still
+- [x] No line is written without `-v` (an existing `-sS` test of the NTLM exchange still
       shows empty stderr).
-- [ ] `dotnet build -warnaserror` is clean and
+- [x] `dotnet build -warnaserror` is clean and
       `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and branch
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and branch
       coverage for `Curl.Protocol.Http.UnitLibrary` and `Curl.Authentication.UnitLibrary`.
 
 ## Notes
@@ -85,7 +85,53 @@ project and its `.UnitTests` twin to `touches` before editing it and note why he
 - Record-CurlExchange's `-Script` mode answers several requests on one connection; BL-526
   used it for the NTLM legs.
 
+### Measured 2026-09-30
+
+`Record-CurlExchange.ps1 -Script`, `-v --ntlm -u u:p`, curl 8.21.0 (x86_64-w64-mingw32,
+Schannel, SSPI) on Windows 11 and, with `-Curl wsl.exe -ListenAddress 172.26.96.1`, curl
+8.18.0 (OpenSSL, its own NTLM) on Ubuntu. Every line below sits between the 401's status
+line and its `WWW-Authenticate` header, on both builds, unless noted:
+
+- 401 Type 2, 401 bare `NTLM`: `* NTLM handshake rejected`, `* NTLM authentication problem, ignoring.`
+- 401 bare `NTLM` twice: on the second, `* NTLM handshake failure (internal error)`,
+  `* NTLM authentication problem, ignoring.` (the second line was missing from BL-526's Notes).
+- 401 `NTLM @@@notbase64`: `* NTLM authentication problem, ignoring.`
+- 401 `NTLM TlRMTVNTUAACAAAA`, Ubuntu: `* NTLM handshake failure (bad type-2 message)`,
+  `* NTLM authentication problem, ignoring.`, exit 0.
+- 401 `NTLM TlRMTVNTUAACAAAA`, Windows: *not* no line, as the task presumed. The 401 body is
+  ignored, then `* Connection #0 ... left intact`, `* Issue another request ...`,
+  `* Reusing existing http: connection ...`, `* NTLM handshake failure (type-3 message):
+  Status=0x80090308` followed by an empty line, `* Connection #0 ... left intact`,
+  `curl: (94) ...`. No request is sent and no `Server auth using` line is written.
+- Type 2 then 200: `* Server auth using NTLM with user 'u'` before both requests, no other line.
+
+The Basic, Digest and Negotiate `Server auth using ...` lines and their places were already
+measured against curl 8.21.0 on Windows and pinned by BL-954 (its Notes, 2026-09-29) and
+BL-843; `HttpAuthUsingLines` writes them just before each `> ` request head, and
+`HttpProtocolHandlerTests.AuthUsingVerbose`/`AuthRetryVerbose` pin them, NTLM's on both legs
+included. This task did not re-measure them.
+
+### What was built (ADR-0275)
+
+- `Curl.Authentication.UnitLibrary`: `NtlmHandshakeLines` holds the texts;
+  `NtlmHttpAuthenticator` reports them to `HttpAuthRequest.Events`, the seam Negotiate uses,
+  so no member was added to `IHttpAuthenticator` and Abstractions was not touched.
+- `Curl.Protocol.Http.UnitLibrary`: `HttpNtlmInfoLines.IsNtlmChallenge` defers a 401's
+  headers from its NTLM `WWW-Authenticate` (and a 407's `Proxy-Authenticate` for a proxy's
+  request, by the same curl code, unmeasured), so the lines land before it. A refusal to
+  answer when Negotiate was not picked now becomes a retry plan that fails before sending
+  (`WithAuthorizationFailure`), matching curl's placement of the Type 3 line and exit 94.
+- Choices with a default taken: SSPI statuses other than the measured `SEC_E_INVALID_TOKEN`
+  use `NegotiateFailureLines`' codes; any failure of curl's own NTLM to answer a Type 2
+  other than the too-large refusal reports the bad type-2 lines.
+
+### Touches added
+
+`Documentation/Planning/Decisions` for ADR-0275 and its README row. No task in Doing
+(BL-615, BL-974) names it.
+
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. curl -v writes NTLM's handshake rejected/failure/problem lines before the challenge header and SSPI's type-3 failure line before exit 94, as curl 8.21.0 and 8.18.0 measured
