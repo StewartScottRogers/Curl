@@ -2323,7 +2323,7 @@ internal sealed class CurlCommandRunner(
             Referer = result.Report?.Referer ?? options.Referer,
             OutputFileName = Running.OutputFileName,
             ConnectionId = connectionId,
-            TransferId = HasNoTransferNumber(result) ? NoTransferId : transfer.TransferId,
+            TransferId = HasNoTransferNumber(result) ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
             RetryCount = Running.RetryCount,
         };
     }
@@ -3808,7 +3808,9 @@ internal sealed class CurlCommandRunner(
             await retryLinesWritten.ConfigureAwait(false);
             TransferContext context = firstContext ?? createAttemptContext();
             firstContext = null;
-            return await FollowWatchingSpeedAsync(follower, context, redirectPolicy).ConfigureAwait(false);
+            TransferResult attemptResult = await FollowWatchingSpeedAsync(follower, context, redirectPolicy).ConfigureAwait(false);
+            KeepRetriedConnectionIdWhenReused(context, attemptResult);
+            return attemptResult;
         });
 
         TransferResult result = await retrier
@@ -3818,6 +3820,7 @@ internal sealed class CurlCommandRunner(
                 (attempt, warning) =>
                 {
                     Running.RetryCount++;
+                    TakeNextAttemptIds();
                     retryLinesWritten = WriteRetryLinesAsync(options, attempt, warning, resumeFrom, outputFile);
                 },
                 (_, warning) => retryLinesWritten = WriteWarningUnlessSilentAsync(options, warning))
@@ -3826,6 +3829,54 @@ internal sealed class CurlCommandRunner(
 
         return result;
     }
+
+    /// <summary>
+    /// Numbers the attempt <c>--retry</c> is about to run as a transfer of its own, as curl 8.21.0
+    /// does: it takes the next <c>%{xfer_id}</c>, and the retried attempt keeps the <c>%{conn_id}</c>
+    /// it connected with, so the next attempt takes a new one unless it reuses that connection
+    /// (<see cref="KeepRetriedConnectionIdWhenReused" />). Against 503, 503, 200 on connections the
+    /// server closed, curl printed <c>xfer_id</c> 2 and <c>conn_id</c> 2 (measured 2026-09-29, BL-799 Notes).
+    /// </summary>
+    private void TakeNextAttemptIds()
+    {
+        RunningTransferState state = Running;
+        state.RetriedConnectionId = state.ConnectionId ?? nextConnectionId++;
+        state.ConnectionId = null;
+        state.RetryTransferId = nextTransferId++;
+    }
+
+    /// <summary>
+    /// Gives a <c>--retry</c> attempt that reused the retried attempt's connection that attempt's
+    /// <c>%{conn_id}</c>, as curl 8.21.0 printed <c>conn_id</c> 0 after three attempts over one
+    /// kept-alive connection (measured 2026-09-29, BL-799 Notes). Only an <c>http</c> or
+    /// <c>https</c> attempt says whether it opened a connection (<see cref="TransferReport.ConnectionCount" />);
+    /// any other is taken to have opened one.
+    /// </summary>
+    /// <param name="context">The attempt's context.</param>
+    /// <param name="attempt">The attempt's result.</param>
+    private void KeepRetriedConnectionIdWhenReused(TransferContext context, TransferResult attempt)
+    {
+        RunningTransferState state = Running;
+        if (state.RetriedConnectionId is { } retriedConnectionId && ReportsNoConnectionOpened(context, attempt))
+        {
+            state.ConnectionId = retriedConnectionId;
+        }
+    }
+
+    /// <summary>
+    /// Tells whether an attempt said it opened no connection: an <c>http</c> or <c>https</c> one
+    /// whose report counts none.
+    /// </summary>
+    /// <param name="context">The attempt's context.</param>
+    /// <param name="attempt">The attempt's result.</param>
+    /// <returns><see langword="true" /> when the attempt reused a connection.</returns>
+    private static bool ReportsNoConnectionOpened(TransferContext context, TransferResult attempt) =>
+        IsHttpScheme(context.Url.Scheme) && attempt.Report is { ConnectionCount: 0 };
+
+    /// <summary>Tells whether <paramref name="scheme" /> is <c>http</c> or <c>https</c>.</summary>
+    /// <param name="scheme">The scheme, in lower case.</param>
+    /// <returns><see langword="true" /> for <c>http</c> and <c>https</c>.</returns>
+    private static bool IsHttpScheme(string scheme) => scheme is "http" or "https";
 
     /// <summary>
     /// Starts the <c>-Y</c>/<c>-y</c> watchdog for the attempt whose context is being created, on

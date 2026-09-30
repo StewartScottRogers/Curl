@@ -24,10 +24,17 @@ internal sealed class ScriptedConnector(IEnumerable<byte[]> reads) : IConnector
     /// <summary>Gets the protocol each connection's TLS handshake agreed with ALPN; <see langword="null" />, the default, for none.</summary>
     public string? ApplicationProtocol { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether every connect after the first reports the connection reused
+    /// from a pool, as a kept-alive connection is; <see langword="false" />, the default, for a new one each time.
+    /// </summary>
+    public bool ReusesTheFirstConnection { get; init; }
+
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         Targets.Add(target);
-        return ValueTask.FromResult(ConnectResult.Connected(new ScriptedConnection(pendingReads, written), null, applicationProtocol: ApplicationProtocol));
+        bool isReused = ReusesTheFirstConnection && Targets.Count > 1;
+        return ValueTask.FromResult(ConnectResult.Connected(new ScriptedConnection(pendingReads, written), null, isReused: isReused, applicationProtocol: ApplicationProtocol));
     }
 
     private sealed class ScriptedConnection(Queue<byte[]> pendingReads, MemoryStream written) : IConnection

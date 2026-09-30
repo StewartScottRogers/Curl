@@ -276,6 +276,12 @@ hop writes to the same body and header outputs, so `-L -i` prints every response
 only the last body, and one redirect past `--max-redirs` exits 47 with
 `curl: (47) Maximum (N) redirects followed`, as measured on curl 8.21.0 (BL-234).
 
+Each attempt `--retry` runs again is a transfer of its own, as in curl 8.21.0: it takes the next
+`%{xfer_id}` (`RunningTransferState.RetryTransferId`) and a new `%{conn_id}`, unless an `http` or
+`https` attempt reports it opened no connection, when it keeps the retried attempt's; so 503, 503,
+200 prints `2 2` on closed connections and `2 0` on one kept alive, and the next URL counts on from
+there (BL-799). The `--trace-ids` markers keep the first attempt's `xfer_id`.
+
 Under `-Y`/`--speed-limit` or `-y`/`--speed-time` each attempt gets a `Curl.Core`
 `LowSpeedWatchdog` on the runner's clock: `TransferContextFactory` wraps the output and the
 progress sink so it counts the bytes moved, and gives the context its token. An attempt it

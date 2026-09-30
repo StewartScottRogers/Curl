@@ -105,6 +105,18 @@ internal sealed class RunningTransferState(
     internal int RetryCount { get; set; }
 
     /// <summary>
+    /// Gets or sets the <c>%{xfer_id}</c> of the latest attempt <c>--retry</c> ran, which curl
+    /// 8.21.0 makes a transfer of its own; <see langword="null" /> until the first retry (task BL-799).
+    /// </summary>
+    internal long? RetryTransferId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the <c>%{conn_id}</c> of the attempt <c>--retry</c> last ran again, which the next
+    /// attempt keeps when it reuses that connection; <see langword="null" /> until the first retry (task BL-799).
+    /// </summary>
+    internal long? RetriedConnectionId { get; set; }
+
+    /// <summary>
     /// Gets or sets the <see cref="TimeProvider.GetTimestamp" /> the transfer started at, which the
     /// diagnostic log's end line measures its elapsed milliseconds from (ADR-0222).
     /// </summary>
