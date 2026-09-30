@@ -33,3 +33,4 @@ An HTTP/2 transfer writes what curl 8.21.0 writes on each platform (the OpenSSL 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-30: Backlog -> Doing.
