@@ -31,3 +31,4 @@ BL-567 (ADR-0215) built none/password/keyboard-interactive and measured that wit
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
