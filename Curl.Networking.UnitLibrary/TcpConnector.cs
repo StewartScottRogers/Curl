@@ -728,18 +728,20 @@ public sealed class TcpConnector(
 
         var nameResolved = timeProvider.GetTimestamp();
         var proxyAuthorization = await CreateProxyAuthorizationAsync(destination, proxy, [], cancellationToken).ConfigureAwait(false);
+        var answersChallenge = false;
         while (true)
         {
             // A 407 answered on a connection the proxy closes is sent again on a new one, as
             // curl 8.21.0 connects again ("Connect me again please", BL-602 Notes).
             var (result, redialAuthorization) = await DialAndOpenThroughProxyAsync(
-                addresses, target, destination, proxy, started, nameResolved, proxyAuthorization, cancellationToken).ConfigureAwait(false);
+                addresses, new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge), proxyAuthorization, cancellationToken).ConfigureAwait(false);
             if (result is not null)
             {
                 return result;
             }
 
             proxyAuthorization = redialAuthorization;
+            answersChallenge = true;
         }
     }
 
@@ -751,14 +753,11 @@ public sealed class TcpConnector(
     /// </summary>
     private async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> DialAndOpenThroughProxyAsync(
         IReadOnlyList<IPAddress> addresses,
-        ConnectTarget target,
-        ConnectDestination destination,
-        ProxyEndpoint proxy,
-        long started,
-        long nameResolved,
+        TunnelRequest tunnel,
         string? proxyAuthorization,
         CancellationToken cancellationToken)
     {
+        var (target, destination, proxy, started, nameResolved, _) = tunnel;
         var (dialed, lastDialError, lastBindFailure) = await DialFirstReachableAsync(addresses, proxy.Port, proxy.Host, target, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
@@ -771,7 +770,6 @@ public sealed class TcpConnector(
                 $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}"), null);
         }
 
-        var tunnel = new TunnelRequest(target, destination, proxy, started, nameResolved);
         return proxy.Kind switch
         {
             ProxyKind.Http or ProxyKind.Http10 => await OpenTunnelAsync(dialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false),
@@ -789,20 +787,32 @@ public sealed class TcpConnector(
         ConnectDestination destination,
         ProxyEndpoint proxy,
         IReadOnlyList<string> challenges,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        ProxyAuthenticator.CreateAuthorizationAsync(ProxyAuthRequestOf(destination, proxy), challenges, cancellationToken);
+
+    /// <summary>
+    /// The authenticator that answers the proxy: <see cref="HttpProxyTunnelOptions.ProxyAuthenticator" />,
+    /// or pre-emptive Basic without one.
+    /// </summary>
+    private IHttpAuthenticator ProxyAuthenticator =>
+        _proxyTunnelOptions.ProxyAuthenticator ?? new PreemptiveBasicProxyAuthenticator(_proxyTunnelOptions.CredentialEncoding);
+
+    /// <summary>
+    /// The request the authenticator is asked about for a CONNECT to <paramref name="destination" />:
+    /// the proxy's own URL, so NTLM and Negotiate ask for <c>HTTP</c> on the proxy's host as
+    /// curl 8.21.0 does (BL-604 Notes), and the CONNECT's authority as the request target.
+    /// </summary>
+    private HttpAuthRequest ProxyAuthRequestOf(ConnectDestination destination, ProxyEndpoint proxy)
     {
-        var authority = HttpProxyTunnel.FormatAuthority(destination.Host, destination.Port);
         var scheme = proxy.Kind == ProxyKind.Https ? "https" : "http";
-        var request = new HttpAuthRequest(
+        return new HttpAuthRequest(
             "CONNECT",
             CurlUrl.Parse($"{scheme}://{HttpProxyTunnel.FormatAuthority(proxy.Host, proxy.Port)}/"),
-            authority,
+            HttpProxyTunnel.FormatAuthority(destination.Host, destination.Port),
             proxy.Credential,
             null,
             _proxyTunnelOptions.ProxyAuthSchemes,
             IsProxy: true);
-        var authenticator = _proxyTunnelOptions.ProxyAuthenticator ?? new PreemptiveBasicProxyAuthenticator(_proxyTunnelOptions.CredentialEncoding);
-        return authenticator.CreateAuthorizationAsync(request, challenges, cancellationToken);
     }
 
     private async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> OpenTunnelOverTlsAsync(
@@ -860,10 +870,11 @@ public sealed class TcpConnector(
 
     /// <summary>
     /// Sends CONNECT with <paramref name="proxyAuthorization" /> and, when the proxy answers
-    /// <c>407</c> to one that sent none and the authenticator answers its challenge, sends it
-    /// again with that answer, as curl 8.21.0 does (BL-602): on this connection when the reply
-    /// leaves it reusable, else by returning the answer for a new one. A <c>407</c> to a CONNECT
-    /// that sent a credential is the tunnel's failure.
+    /// <c>407</c> and the authenticator answers its challenge, sends it again with that answer,
+    /// as curl 8.21.0 does (BL-602): on this connection when the reply leaves it reusable, else
+    /// by returning the answer for a new one. A <c>407</c> to a CONNECT that sent a credential
+    /// is answered only by a handshake of more than one leg - NTLM's Type 3 for its Type 2, a
+    /// Negotiate context's next token (BL-604, ADR-0270) - and is else the tunnel's failure.
     /// </summary>
     private async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> OpenTunnelAsync(
         DialedSocket dialed,
@@ -873,27 +884,50 @@ public sealed class TcpConnector(
     {
         var connection = dialed.Connection;
         var log = new NetworkDiagnosticLog(tunnel.Target.DiagnosticLog);
+        var answersChallenge = tunnel.AuthorizationAnswersChallenge;
         while (true)
         {
             log.TunnelRequested(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port);
             var (reply, exception) = await RequestTunnelAsync(connection, tunnel.Destination, tunnel.Proxy, proxyAuthorization, cancellationToken).ConfigureAwait(false);
             if (exception is null && reply.OpensTunnel)
             {
+                EndProxyAuthorization(proxyAuthorization);
+
                 // For a tunnel, %{time_connect} is when the tunnel is open (ConnectTimings.Connected).
                 var timings = new ConnectTimings(tunnel.Started, tunnel.NameResolved, timeProvider.GetTimestamp(), null);
                 log.TunnelEstablished(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port, reply.StatusCode);
                 return (await SecureWhenAskedAsync(dialed, tunnel.Target, timings, reply.StatusCode, cancellationToken).ConfigureAwait(false), null);
             }
 
-            var (answer, onThisConnection) = exception is null
-                ? await AnswerProxyChallengeAsync(connection, reply, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false)
-                : (null, false);
+            var (answer, onThisConnection, failure) = exception is null
+                ? await AnswerProxyChallengeAsync(connection, reply, tunnel, proxyAuthorization, answersChallenge, cancellationToken).ConfigureAwait(false)
+                : (null, false, null);
+            if (failure is not null)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+                return (failure, null);
+            }
+
             if (!onThisConnection)
             {
                 return await CloseUnopenedTunnelAsync(connection, reply, exception, answer).ConfigureAwait(false);
             }
 
             proxyAuthorization = answer;
+            answersChallenge = true;
+        }
+    }
+
+    /// <summary>
+    /// Tells the authenticator the handshake behind <paramref name="sentAuthorization" /> is
+    /// over because the tunnel opened, so a Negotiate context kept for its next leg is disposed
+    /// of, as the HTTP handler does for a response that is not a <c>407</c> (ADR-0248).
+    /// </summary>
+    private void EndProxyAuthorization(string? sentAuthorization)
+    {
+        if (sentAuthorization is not null)
+        {
+            ProxyAuthenticator.EndAuthorization(sentAuthorization);
         }
     }
 
@@ -915,25 +949,47 @@ public sealed class TcpConnector(
 
     /// <summary>
     /// The <c>Proxy-Authorization</c> that answers <paramref name="reply" />, and whether it goes
-    /// on the same connection, its body discarded: none unless the reply is a <c>407</c> to a
-    /// CONNECT that sent none, as curl 8.21.0 gives up on a credential sent and challenged again.
+    /// on the same connection, its body discarded: none unless the reply is a <c>407</c> the
+    /// authenticator answers - afresh when the CONNECT sent nothing, and through
+    /// <see cref="IHttpAuthenticator.ContinueAuthorizationAsync" /> when it sent a credential, which
+    /// only NTLM and Negotiate go on from, so curl 8.21.0's giving up on Basic or Digest sent and
+    /// challenged again stays. An empty answer (<c>--proxy-anyauth</c> picking a Negotiate
+    /// context that makes no token) sends nothing more. A failure the authenticator reports,
+    /// such as an NTLM Type 2 SSPI cannot answer, is the tunnel's failure with its exit code.
     /// </summary>
-    private async ValueTask<(string? Answer, bool OnThisConnection)> AnswerProxyChallengeAsync(
+    private async ValueTask<(string? Answer, bool OnThisConnection, ConnectResult? Failure)> AnswerProxyChallengeAsync(
         IConnection connection,
         HttpProxyTunnelReply reply,
         TunnelRequest tunnel,
         string? sentAuthorization,
+        bool sentAnswersChallenge,
         CancellationToken cancellationToken)
     {
-        if (sentAuthorization is not null || reply.StatusCode != 407)
+        if (reply.StatusCode != 407)
         {
-            return (null, false);
+            EndProxyAuthorization(sentAuthorization);
+            return (null, false, null);
         }
 
-        var answer = await CreateProxyAuthorizationAsync(tunnel.Destination, tunnel.Proxy, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false);
-        return (answer, answer is not null
-            && reply.LeavesConnectionReusable
-            && await HttpProxyTunnel.DiscardBodyAsync(connection, reply.ContentLength, cancellationToken).ConfigureAwait(false));
+        string? answer;
+        try
+        {
+            answer = sentAuthorization is null
+                ? await CreateProxyAuthorizationAsync(tunnel.Destination, tunnel.Proxy, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false)
+                : await ProxyAuthenticator.ContinueAuthorizationAsync(ProxyAuthRequestOf(tunnel.Destination, tunnel.Proxy), sentAuthorization, !sentAnswersChallenge, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpAuthenticationFailedException failure)
+        {
+            return (null, false, ConnectResult.Failed(failure.ExitCode, failure.Message));
+        }
+
+        if (string.IsNullOrEmpty(answer))
+        {
+            return (null, false, null);
+        }
+
+        return (answer, reply.LeavesConnectionReusable
+            && await HttpProxyTunnel.DiscardBodyAsync(connection, reply.ContentLength, cancellationToken).ConfigureAwait(false), null);
     }
 
     private async ValueTask<(HttpProxyTunnelReply Reply, ExceptionDispatchInfo? Exception)> RequestTunnelAsync(
@@ -1195,14 +1251,17 @@ public sealed class TcpConnector(
 
     /// <summary>
     /// What a CONNECT tunnel is opened for: the target, the destination named in the CONNECT,
-    /// the proxy, and the connect's start and lookup timestamps.
+    /// the proxy, the connect's start and lookup timestamps, and whether the first CONNECT's
+    /// <c>Proxy-Authorization</c> answers a <c>407</c> the proxy sent on a connection it closed,
+    /// rather than being the value made before any challenge.
     /// </summary>
     private sealed record TunnelRequest(
         ConnectTarget Target,
         ConnectDestination Destination,
         ProxyEndpoint Proxy,
         long Started,
-        long NameResolved);
+        long NameResolved,
+        bool AuthorizationAnswersChallenge);
 
     /// <summary>
     /// One key of curl's DNS cache: the host as it was cached (the name looked up, or a

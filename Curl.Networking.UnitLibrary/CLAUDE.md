@@ -163,7 +163,7 @@ comes from `HttpProxyTunnelOptions.ProxyAuthenticator` (`PreemptiveBasicProxyAut
 when none is given) for `ProxyAuthSchemes`: asked first with no challenge, and after a `407` to a
 CONNECT that sent none with its `Proxy-Authenticate` values, the answer sent on the same
 connection after the `Content-Length` body unless the reply closes it or is chunked, else on a
-newly dialled one. A `407` to a CONNECT that sent a credential is exit 7. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
+newly dialled one. A `407` to a CONNECT that sent a credential goes on through `ContinueAuthorizationAsync`, which only NTLM (Type 3 for the Type 2) and Negotiate (the next token) answer (ADR-0270, BL-604); otherwise it is exit 7, or the authenticator's exit code (94) when it fails. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
 `Socks5Hostname`) `SocksProxyTunnel` runs curl 8.21.0's handshake, measured byte for byte
 (BL-213): `Socks4Handshake` resolves the target locally and sends its first IPv4 address,
 SOCKS4a sends the host as written; `Socks5Handshake` offers no authentication and GSSAPI (and
