@@ -16,12 +16,21 @@
       2. records the raw request bytes;
       3. sends that connection's canned response and closes the connection.
 
-    It then writes four files to OutDirectory:
+    It then writes five files to OutDirectory:
 
       request.bin   the raw request bytes, every connection's in the order accepted
       stdout.bin    curl's standard output, byte for byte
       stderr.txt    curl's standard error, byte for byte
       exitcode.txt  curl's exit code, as decimal digits with no line ending
+      timing.json   one UTF-8 JSON object: "executable" (the full path of the curl
+                    run), "elapsedMilliseconds" (wall clock from start to exit),
+                    "peakWorkingSetBytes" and "samples", so the same exchange can be
+                    timed for real curl and for Curl
+
+    The peak working set is sampled every 10 ms while curl runs, because it cannot be
+    read after the process exits on every platform; the largest reading is kept. Very
+    short runs can under-report it, and a run that ends before the first sample
+    reports 0 bytes and 0 samples.
 
     A connection curl never opens is not waited for: once curl exits, the listener is
     stopped. The script exits 0 when the fixtures were written, whatever curl's own
@@ -427,8 +436,8 @@
 .PARAMETER NoServer
     Bind no port and serve nothing: run curl against a server the caller started, such
     as a local OpenSSH sshd, an LDAP server or an SMB share, which a PowerShell loopback
-    server cannot speak (BL-528). Only stdout.bin, stderr.txt and exitcode.txt are
-    written; there is no request.bin, since the script sees none of the traffic. Port,
+    server cannot speak (BL-528). Only stdout.bin, stderr.txt, exitcode.txt and timing.json
+    are written; there is no request.bin, since the script sees none of the traffic. Port,
     Response, Connections, ResponseDelayMilliseconds, Reset, HoldOpenMilliseconds,
     RespondAfterBodyBytes, FtpReply, FtpData, FtpIdleMilliseconds, SmtpReply,
     SmtpIdleMilliseconds, ImapReply, ImapMessage, ImapIdleMilliseconds, Pop3Reply,
@@ -2465,8 +2474,22 @@ try {
         # Both pipes drain at once, so curl never blocks on a full one.
         $stdoutCopy = $curlProcess.StandardOutput.BaseStream.CopyToAsync($stdout)
         $stderrCopy = $curlProcess.StandardError.BaseStream.CopyToAsync($stderr)
-        $curlProcess.WaitForExit()
+        # PeakWorkingSet64 cannot be read once the process has exited on every platform,
+        # so sample it every 10 ms while waiting and keep the largest reading.
+        $peakWorkingSetBytes = [long] 0
+        $peakSamples = 0
+        while (-not $curlProcess.WaitForExit(10)) {
+            try {
+                $curlProcess.Refresh()
+                $peakWorkingSetBytes = [System.Math]::Max($peakWorkingSetBytes, $curlProcess.PeakWorkingSet64)
+                $peakSamples++
+            } catch [System.InvalidOperationException] {
+                # The process finished between the wait and the read.
+            }
+        }
         $curlClock.Stop()
+        # WaitForExit(int) can return before the redirected pipes reach end of stream.
+        $curlProcess.WaitForExit()
         [System.Threading.Tasks.Task]::WaitAll(@($stdoutCopy, $stderrCopy))
         $exitCode = $curlProcess.ExitCode
     } finally {
@@ -2530,5 +2553,19 @@ if ($null -ne $dnsResponder) {
 if ($Smtp -or $Imap -or $Pop3 -or $Script) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
 }
+$curlExecutable = $Curl
+if (Test-Path -LiteralPath $Curl -PathType Leaf) {
+    $curlExecutable = (Resolve-Path -LiteralPath $Curl).ProviderPath
+} else {
+    $curlCommand = Get-Command $Curl -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -ne $curlCommand) { $curlExecutable = $curlCommand.Source }
+}
+$timing = [ordered] @{
+    executable = $curlExecutable
+    elapsedMilliseconds = [long] $curlClock.ElapsedMilliseconds
+    peakWorkingSetBytes = [long] $peakWorkingSetBytes
+    samples = [int] $peakSamples
+}
+[System.IO.File]::WriteAllText((Join-Path $OutDirectory 'timing.json'), (ConvertTo-Json -InputObject $timing -Compress), (New-Object System.Text.UTF8Encoding($false)))
 
 Write-Host "curl exited $exitCode after $($curlClock.ElapsedMilliseconds) ms; fixtures written to $OutDirectory"

@@ -8,7 +8,7 @@ depends-on: [BL-992, BL-996, BL-997, BL-998]
 touches: [Record-CurlExchange.ps1]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1003 — Record curl's elapsed time and peak memory in Record-CurlExchange.ps1
 
@@ -39,15 +39,19 @@ sample; say in the help that very short runs can under-report.
 
 ## Acceptance criteria
 
-- [ ] A run with the default response and `-CurlArgs '-s','http://127.0.0.1:<port>/'` writes `timing.json` beside the other four files; it parses with `ConvertFrom-Json` and has the four fields, `elapsedMilliseconds` > 0.
-- [ ] The same run with `-ResponseDelayMilliseconds 500` reports `elapsedMilliseconds` of at least 500 and `samples` greater than 10.
-- [ ] `request.bin`, `stdout.bin`, `stderr.txt` and `exitcode.txt` are byte-identical to a run of the script before this change for the same arguments (compare with `git stash` or a copy of the old script).
-- [ ] The comment-based help's `.DESCRIPTION` lists `timing.json` with the other files, and states the sampling limitation.
-- [ ] The script still runs under Windows PowerShell 5.1 and contains only ASCII characters.
+- [x] A run with the default response and `-CurlArgs '-s','http://127.0.0.1:<port>/'` writes `timing.json` beside the other four files; it parses with `ConvertFrom-Json` and has the four fields, `elapsedMilliseconds` > 0.
+- [x] The same run with `-ResponseDelayMilliseconds 500` reports `elapsedMilliseconds` of at least 500 and `samples` greater than 10.
+- [x] `request.bin`, `stdout.bin`, `stderr.txt` and `exitcode.txt` are byte-identical to a run of the script before this change for the same arguments (compare with `git stash` or a copy of the old script).
+- [x] The comment-based help's `.DESCRIPTION` lists `timing.json` with the other files, and states the sampling limitation.
+- [x] The script still runs under Windows PowerShell 5.1 and contains only ASCII characters.
 
 ## Notes
+
+- Implemented as specified: `WaitForExit(10)` loop samples `PeakWorkingSet64` after `Refresh()`, then a bare `WaitForExit()` so the redirected pipes reach end of stream before `ExitCode` is read. `executable` is `-Curl` resolved to a full path (`Resolve-Path` for a file, `Get-Command` for a bare name, else as given). JSON written with `ConvertTo-Json -Compress`, UTF-8 without BOM, on every mode (including `-NoServer`, whose help now lists it).
+- Verified 2026-09-30 on Windows PowerShell 5.1.26100: default run 349 ms, 7 samples, 8.8 MB peak; `-ResponseDelayMilliseconds 500` run 707 ms, 14 samples; request.bin, stdout.bin, stderr.txt and exitcode.txt byte-identical to the pre-change script for the same port and response; script is pure ASCII. dotnet build clean, fast tests green.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. Record-CurlExchange.ps1 writes timing.json with elapsed ms and sampled peak working set
