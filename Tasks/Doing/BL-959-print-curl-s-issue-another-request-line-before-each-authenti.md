@@ -33,3 +33,4 @@ Under `-v`, every request `HttpProtocolHandler` sends again in answer to a 401 o
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
