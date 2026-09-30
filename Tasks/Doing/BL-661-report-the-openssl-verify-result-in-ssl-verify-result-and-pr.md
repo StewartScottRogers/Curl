@@ -33,3 +33,4 @@ Off Windows, `%{ssl_verify_result}` and `%{proxy_ssl_verify_result}` print the X
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-30: Backlog -> Doing.
