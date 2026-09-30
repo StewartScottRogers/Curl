@@ -196,6 +196,20 @@
     <repo>.lanes\machine-lanes.json (marked incomplete when -ProbeMaxLanes cut it short)
     and the probe folder is deleted. Run it only when no shift is building.
 
+    LANE MARKER (CURL_DARK_FACTORY_LANE)
+
+    Every process a shift runs work in sets the environment variable CURL_DARK_FACTORY_LANE
+    once, at shift start: the lane's number in a lane (-Lane N), 0 in the coordinator or a
+    single-runner shift. Children inherit it - every claude -p run, every task-board.ps1
+    call, every git and dotnet - so the audit guards can tell the factory from an
+    interactive session: task-board.ps1 refuses audit-path and interactive-only work while
+    it is set (BL-996), and the PreToolUse hook guard-audit-paths.ps1 blocks lanes from audit
+    paths (BL-997). A -NewTab or -Restart launcher, which only starts another shift and
+    exits, is not marked; nor is a -Test* self-test, so running one from an interactive
+    session never marks that session's children. A lane cannot unmark itself: hooks are
+    started by the Claude Code process, whose environment the lane's Bash tool cannot
+    change. -TestLaneMarker proves the values and that a claude -p run inherits them.
+
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Hours 4 -MaxTasks 3
@@ -261,6 +275,9 @@ param(
     # Prove that task IDs of three digits or more (BL-992, BL-1003) are read from next output,
     # -Reason text, status lines and file names, and exit.
     [switch]$TestTaskIds,
+    # Prove the CURL_DARK_FACTORY_LANE marker's value for a lane, a coordinator and a
+    # launcher, and that a claude -p run inherits it, and exit.
+    [switch]$TestLaneMarker,
     # How often, in minutes, the lanes' heartbeats are published as status.json on the
     # force-pushed board branch, plus once at shift end. 0 = never publish.
     [ValidateRange(0, 60)][int]$HeartbeatMinutes = 3,
@@ -649,6 +666,57 @@ function Close-HerdrTab {
     Write-Trace '-' 'herdr' "closing tab $Tab ($Why)"
     & $herdr tab close $Tab 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0 -and $DoneLabel) { Set-HerdrTabLabel $Tab "$DoneLabel $Dot done, close" }
+}
+
+function Get-LaneMarker {
+    # The CURL_DARK_FACTORY_LANE value for this process (see LANE MARKER in the header): the
+    # lane number, 0 for a coordinator or single runner, '' for a launcher that only starts
+    # another shift and exits.
+    param([int]$ForLane, [switch]$Launcher)
+    if ($Launcher) { return '' }
+    return "$ForLane"
+}
+
+function New-ClaudeRunStartInfo {
+    # The process start info Invoke-TaskRun runs claude -p with: cmd.exe in this checkout,
+    # inheriting this process's environment (so CURL_DARK_FACTORY_LANE) plus the Bash
+    # tool's time limits.
+    param([string]$Arguments)
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $env:ComSpec
+    $psi.Arguments = $Arguments
+    $psi.WorkingDirectory = $Root
+    $psi.EnvironmentVariables['BASH_DEFAULT_TIMEOUT_MS'] = '1800000'
+    $psi.EnvironmentVariables['BASH_MAX_TIMEOUT_MS'] = '3600000'
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardInput = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    return $psi
+}
+
+if ($TestLaneMarker) {
+    $results = @(
+        @('lane 3 is marked 3', (Get-LaneMarker -ForLane 3), '3'),
+        @('a coordinator or single-lane shift is marked 0', (Get-LaneMarker -ForLane 0), '0'),
+        @('a -NewTab or -Restart launcher is not marked', (Get-LaneMarker -ForLane 0 -Launcher), '')
+    )
+    $saved = $env:CURL_DARK_FACTORY_LANE
+    try {
+        $env:CURL_DARK_FACTORY_LANE = Get-LaneMarker -ForLane 3
+        $probe = [System.Diagnostics.Process]::Start((New-ClaudeRunStartInfo '/d /c echo %CURL_DARK_FACTORY_LANE%'))
+        $probe.StandardInput.Close()
+        $seen = $probe.StandardOutput.ReadToEnd().Trim()
+        $probe.WaitForExit()
+        $results += , @('a claude -p run started like Invoke-TaskRun sees the marker', $seen, '3')
+    } finally { $env:CURL_DARK_FACTORY_LANE = $saved }
+    $failed = 0
+    foreach ($r in $results) {
+        $ok = $r[1] -ceq $r[2]
+        if (-not $ok) { $failed++ }
+        Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) $($r[0]): '$($r[1])'" -ForegroundColor $(if ($ok) { 'Green' } else { 'Red' })
+    }
+    exit $(if ($failed) { 1 } else { 0 })
 }
 
 function Close-OwnHerdrTab {
@@ -2379,20 +2447,12 @@ function Invoke-TaskRun {
     $script:LimitResetAt = $null
     $script:ToolLabels = @{}
 
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $env:ComSpec
     $denied = ($Deny | ForEach-Object { "`"Bash($_`:*)`" `"PowerShell($_`:*)`"" }) -join ' '
-    $psi.Arguments = "/d /c claude -p --model $Model --dangerously-skip-permissions --output-format stream-json --verbose --disallowedTools $denied 2>`"$err`""
-    $psi.WorkingDirectory = $Root
-    # A tool call past its timeout is moved to the background, and a headless run that then
-    # ends its reply to wait for it exits with the task still in Doing (BL-855): give Bash
-    # calls room for a build and the fast tests while six lanes build at once.
-    $psi.EnvironmentVariables['BASH_DEFAULT_TIMEOUT_MS'] = '1800000'
-    $psi.EnvironmentVariables['BASH_MAX_TIMEOUT_MS'] = '3600000'
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardInput = $true
-    $psi.RedirectStandardOutput = $true
-    $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    # New-ClaudeRunStartInfo gives Bash calls room for a build and the fast tests while six
+    # lanes build at once: a tool call past its timeout is moved to the background, and a
+    # headless run that then ends its reply to wait for it exits with the task still in
+    # Doing (BL-855). It inherits CURL_DARK_FACTORY_LANE.
+    $psi = New-ClaudeRunStartInfo "/d /c claude -p --model $Model --dangerously-skip-permissions --output-format stream-json --verbose --disallowedTools $denied 2>`"$err`""
     $p = [System.Diagnostics.Process]::Start($psi)
     $p.StandardInput.Write($Text)
     $p.StandardInput.Close()
@@ -2941,6 +3001,11 @@ if ($Restart) {
 
 # ---------------------------------------------------------------------------- shift
 
+# Every launcher and self-test has exited by now, so this process runs work: mark it and
+# everything it starts (LANE MARKER in the header).
+$env:CURL_DARK_FACTORY_LANE = Get-LaneMarker -ForLane $Lane
+$LaneMarkerTrace = "lane-marker=CURL_DARK_FACTORY_LANE=$env:CURL_DARK_FACTORY_LANE"
+
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 # Logs used to be written to logs\ inside the checkout. Move them beside it, where the
 # next shift looks for the lanes it adopts - but never while a lane still writes there.
@@ -3029,7 +3094,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $shiftEnd = (Get-Date).AddHours($Hours)
 
     Set-OwnTabLabel ''
-    Write-Trace '-' 'shift' "start  $LaneCount lanes$(if ($AutoLanes) { ' (auto)' })  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
+    Write-Trace '-' 'shift' "start  $LaneCount lanes$(if ($AutoLanes) { ' (auto)' })  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))  $LaneMarkerTrace" 'Cyan'
     New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $LogDir "lanes-$Stamp") | Out-Null
     # A lane gets the time left in the shift, not a fresh -Hours: -Lanes Auto adds and
@@ -3309,7 +3374,7 @@ if ($Lane) {
     if ($stuck.Count) { Write-Trace '-' 'refuse' "task already in Doing: $($stuck[0].Name)" 'Red'; exit 1 }
 }
 
-Write-Trace '-' 'shift' "start  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
+Write-Trace '-' 'shift' "start  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))  $LaneMarkerTrace" 'Cyan'
 
 $done = 0; $blocked = 0; $requeued = 0; $stalls = @(); $failStreak = 0; $attempted = @{}
 $stopWhy = ''
