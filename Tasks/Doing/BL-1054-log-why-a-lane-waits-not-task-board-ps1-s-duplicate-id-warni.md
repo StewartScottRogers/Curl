@@ -32,3 +32,4 @@ Two fixes, both needed: the lane should log the line that answers the question (
 ## Log
 
 - 2026-09-30: Created.
+- 2026-09-30: Backlog -> Doing.
