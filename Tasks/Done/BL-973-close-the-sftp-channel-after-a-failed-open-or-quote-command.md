@@ -30,7 +30,7 @@ When an SFTP download's `OPEN`, a listing's `OPENDIR`, an upload's `OPEN` or a `
 
 ## Notes
 
-- **touches:** added `Documentation/Planning/Decisions` for ADR-0273 and the notes on
+- **touches:** added `Documentation/Planning/Decisions` for ADR-0274 and the notes on
   ADR-0220 and ADR-0247; no task in `Doing` names it.
 - **Measured 2026-09-30:** curl 8.21.0 (Git for Windows' mingw build, Schannel, libssh2
   1.11.1) against OpenSSH 10.2 in WSL (`~/bl572`, `sshd -ddd`, `sftp-server -l DEBUG3`).
@@ -59,4 +59,4 @@ When an SFTP download's `OPEN`, a listing's `OPENDIR`, an upload's `OPEN` or a `
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
-- 2026-09-30: Doing -> Done. A failed SFTP REALPATH, OPEN, OPENDIR, upload OPEN or -Q command closes the channel with EOF and CLOSE before DISCONNECT, as curl 8.21.0 does (ADR-0273)
+- 2026-09-30: Doing -> Done. A failed SFTP REALPATH, OPEN, OPENDIR, upload OPEN or -Q command closes the channel with EOF and CLOSE before DISCONNECT, as curl 8.21.0 does (ADR-0274)
