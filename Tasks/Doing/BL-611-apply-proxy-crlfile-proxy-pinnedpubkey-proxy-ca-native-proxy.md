@@ -31,3 +31,4 @@ The five proxy options act on the HTTPS proxy's handshake exactly as their origi
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-30: Backlog -> Doing.
