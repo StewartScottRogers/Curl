@@ -225,7 +225,7 @@ connection is reported `with proxy` (`ConnectionReusedEvent.IsProxy`) when the t
 forward proxy (`ConnectTarget.IsForwardProxy`) or tunnels through one, naming the proxy's host
 and port for a tunnel, as curl 8.21.0 prints it (BL-360).
 
-Per ADR-0268 (BL-600) `TcpConnector` takes an optional `LocalBinding` (`--interface`, `--local-port`)
+Per ADR-0269 (BL-600) `TcpConnector` takes an optional `LocalBinding` (`--interface`, `--local-port`)
 and dials every TCP address, a proxy's included, through the internal `LocalBindingTcpDialer`, which
 picks the local address for the family dialled (an interface `INetworkInterfaceLookup` finds, none on
 Windows; else a host, `localhost` as `::1` first; else the unspecified address) and calls
