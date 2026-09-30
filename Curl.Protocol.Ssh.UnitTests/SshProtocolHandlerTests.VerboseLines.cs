@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Protocol.Ssh.Negotiation;
 
@@ -142,6 +143,24 @@ public sealed partial class SshProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_WrongPasswordAndTheKeyInTheAgent_AuthenticatesThroughTheAgentAsMeasured()
+    {
+        byte[] publicKey = Convert.FromBase64String(TestUserKeys.RsaPublicKeyFile.Split(' ')[1]);
+        InMemorySshServer server = new(User, Password) { AuthorizedPublicKey = publicKey };
+        server.Files["/f"] = Hello;
+        InMemorySshAgent agent = new InMemorySshAgent().Add(TestUserKeys.RsaPkcs1, "k1-comment");
+
+        string lines = await RunRecordingLinesAsync(server, "sftp://files.example/f", credentials: new NetworkCredential(User, "wrong"), agent: agent);
+
+        StringAssert.EndsWith(
+            lines,
+            "* SSH: publickey authentication denied: Reason unknown (-1) | * SSH: trying publickey authentication via agent | "
+            + "* SSH: agent authenticated user 'tester' with key 'k1-comment' | * SSH: authentication complete | <= hello world | "
+            + "* Connection #0 to host files.example:22 left intact");
+        CollectionAssert.Contains(server.Events.ToList(), "auth publickey tester ok", "the server verified the agent's signature");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_SftpFileMissing_WritesTheFailureAndLeavesTheConnectionIntactAsMeasured()
     {
         string lines = await RunRecordingLinesAsync(ServerWithAFile(), "sftp://files.example/missing.txt");
@@ -183,7 +202,7 @@ public sealed partial class SshProtocolHandlerTests
         TranscriptTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse("sftp://files.example/f"), Output = new MemoryStream(), Events = events };
 
-        await new SshProtocolHandler(server, new InMemoryKeyFileSystem(new Dictionary<string, string>()), SshAlgorithmPreferences.Full, Encoding.UTF8).ExecuteAsync(context);
+        await Handler(server, preferences: SshAlgorithmPreferences.Full).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
         Assert.AreEqual("* SSH: user ''", events.Transcript[0]);
@@ -214,7 +233,8 @@ public sealed partial class SshProtocolHandlerTests
         string url,
         SshOptions? options = null,
         Dictionary<string, string>? files = null,
-        NetworkCredential? credentials = null)
+        NetworkCredential? credentials = null,
+        ISshAgentConnector? agent = null)
     {
         TranscriptTransferEvents events = new();
         TransferContext context = new()
@@ -226,7 +246,7 @@ public sealed partial class SshProtocolHandlerTests
             Events = events,
         };
 
-        await new SshProtocolHandler(server, new InMemoryKeyFileSystem(files ?? []), SshAlgorithmPreferences.OpenSslReference, Encoding.UTF8).ExecuteAsync(context);
+        await Handler(server, files, agent: agent).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
         return string.Join(" | ", events.Transcript);
     }

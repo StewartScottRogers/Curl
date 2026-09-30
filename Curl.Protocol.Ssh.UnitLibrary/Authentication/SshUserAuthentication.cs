@@ -13,8 +13,8 @@ namespace Curl.Protocol.Ssh.Authentication;
 /// libssh2 1.11.1 through it (ADR-0215): the <c>ssh-userauth</c> service request, which
 /// libssh2 sends as the last step of starting the session, before the host key is
 /// checked; then, after the check, a <c>none</c> request for the server's method list,
-/// <c>publickey</c> (ADR-0230), <c>password</c> and <c>keyboard-interactive</c>, in that
-/// order.
+/// <c>publickey</c> (ADR-0230), <c>password</c>, the identities of the user's ssh-agent
+/// (ADR-0270) and <c>keyboard-interactive</c>, in that order.
 /// </summary>
 /// <remarks>
 /// While it waits for an answer it skips every other message, as libssh2 queues them, and
@@ -33,7 +33,15 @@ namespace Curl.Protocol.Ssh.Authentication;
 /// <param name="events">
 /// Where curl's <c>-v</c> lines for each method go (ADR-0262), or <see langword="null" /> for nowhere.
 /// </param>
-internal sealed class SshUserAuthentication(SshTransport transport, Encoding credentialEncoding, SshUserKeySource? userKeys = null, ITransferEvents? events = null)
+/// <param name="agentConnector">
+/// Opens the connection to the user's ssh-agent, or <see langword="null" /> for no agent.
+/// </param>
+internal sealed class SshUserAuthentication(
+    SshTransport transport,
+    Encoding credentialEncoding,
+    SshUserKeySource? userKeys = null,
+    ITransferEvents? events = null,
+    ISshAgentConnector? agentConnector = null)
 {
     private readonly ITransferEvents events = events ?? NoTransferEvents.Instance;
 
@@ -63,8 +71,31 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
 
     private const string ServerSignatureAlgorithmsExtension = "server-sig-algs";
 
+    // What libssh2 1.11.1 names each certificate method in a signature, and in the method
+    // an agent's signature may carry instead of the one asked for.
+    private static readonly Dictionary<string, string> PlainMethods = new(StringComparer.Ordinal)
+    {
+        ["ssh-rsa-cert-v01@openssh.com"] = "ssh-rsa",
+        ["rsa-sha2-256-cert-v01@openssh.com"] = "rsa-sha2-256",
+        ["rsa-sha2-512-cert-v01@openssh.com"] = "rsa-sha2-512",
+        ["ecdsa-sha2-nistp256-cert-v01@openssh.com"] = "ecdsa-sha2-nistp256",
+        ["ecdsa-sha2-nistp384-cert-v01@openssh.com"] = "ecdsa-sha2-nistp384",
+        ["ecdsa-sha2-nistp521-cert-v01@openssh.com"] = "ecdsa-sha2-nistp521",
+        ["ssh-ed25519-cert-v01@openssh.com"] = "ssh-ed25519",
+        ["sk-ecdsa-sha2-nistp256-cert-v01@openssh.com"] = SkEcdsaMethod,
+        ["sk-ssh-ed25519-cert-v01@openssh.com"] = SkEd25519Method,
+    };
+
+    private const string SkEcdsaMethod = "sk-ecdsa-sha2-nistp256@openssh.com";
+
+    private const string SkEd25519Method = "sk-ssh-ed25519@openssh.com";
+
     // The last server-sig-algs value an SSH_MSG_EXT_INFO carried, or null before one did.
     private string? serverSignatureAlgorithms;
+
+    // The method an RSA key found no signature algorithm for. libssh2 keeps it, and every
+    // later agent identity starts from it instead of its own key type (ADR-0270).
+    private string? leftoverMethod;
 
     /// <summary>
     /// Sends <c>SSH_MSG_SERVICE_REQUEST</c> for <c>ssh-userauth</c> and waits for the
@@ -91,11 +122,13 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
 
     /// <summary>
     /// Authenticates <paramref name="credentials" />' user: asks for the method list with
-    /// <c>none</c>, then tries <c>publickey</c>, <c>password</c> and
+    /// <c>none</c>, then tries <c>publickey</c>, <c>password</c>, the agent's identities and
     /// <c>keyboard-interactive</c> when the list names them, as curl matches it, by
-    /// substring. A partial success counts as a failure, and the list is never read again.
-    /// A key that cannot be read, has no signature algorithm the server accepts, or is
-    /// refused fails <c>publickey</c> alone, and curl goes on to <c>password</c>.
+    /// substring; the agent is asked when the list names <c>publickey</c>. A partial success
+    /// counts as a failure, and the list is never read again. A key that cannot be read, has
+    /// no signature algorithm the server accepts, or is refused fails <c>publickey</c> alone,
+    /// and curl goes on to <c>password</c>; an agent that cannot be reached, or whose every
+    /// identity fails, goes on to <c>keyboard-interactive</c>.
     /// </summary>
     /// <param name="credentials">The user and password, or <see langword="null" /> for curl's empty user and password.</param>
     /// <param name="cancellationToken">Cancels the authentication.</param>
@@ -107,7 +140,8 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
     /// </exception>
     internal async ValueTask AuthenticateAsync(NetworkCredential? credentials, CancellationToken cancellationToken)
     {
-        byte[] user = credentialEncoding.GetBytes(credentials?.UserName ?? string.Empty);
+        string userName = credentials?.UserName ?? string.Empty;
+        byte[] user = credentialEncoding.GetBytes(userName);
         byte[] password = credentialEncoding.GetBytes(credentials?.Password ?? string.Empty);
         string? methods = await ListMethodsAsync(user, cancellationToken).ConfigureAwait(false);
         if (methods is null)
@@ -117,7 +151,7 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
         }
 
         events.ReportInfo(SshInfoLines.OffersAuthentication(methods));
-        await AuthenticateWithMethodsAsync(methods, user, password, cancellationToken).ConfigureAwait(false);
+        await AuthenticateWithMethodsAsync(methods, new UserCredentials(userName, user, password), cancellationToken).ConfigureAwait(false);
     }
 
     private static SshTransferException ServiceRequestFailed(int libssh2ErrorCode) =>
@@ -136,29 +170,170 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
         return promptCount is null ? (null, false) : (InfoResponse(promptCount.Value, password), false);
     }
 
-    private async ValueTask AuthenticateWithMethodsAsync(string methods, byte[] user, byte[] password, CancellationToken cancellationToken)
+    private async ValueTask AuthenticateWithMethodsAsync(string methods, UserCredentials credentials, CancellationToken cancellationToken)
     {
         bool offersPublicKey = methods.Contains(PublicKeyMethod, StringComparison.Ordinal);
-        if (offersPublicKey && await TryPublicKeyAsync(user, cancellationToken).ConfigureAwait(false))
+        if (offersPublicKey && await TryPublicKeyAsync(credentials.User, cancellationToken).ConfigureAwait(false))
         {
             return;
         }
 
-        if (methods.Contains(PasswordMethod, StringComparison.Ordinal) && await TryPasswordAsync(user, password, cancellationToken).ConfigureAwait(false))
+        if (methods.Contains(PasswordMethod, StringComparison.Ordinal) && await TryPasswordAsync(credentials.User, credentials.Password, cancellationToken).ConfigureAwait(false))
         {
             events.ReportInfo(SshInfoLines.PasswordAuthenticated);
             return;
         }
 
-        // curl then asks the SSH agent, which this client never finds, as the reference
-        // machine found none (ADR-0262).
-        if (offersPublicKey)
+        if (offersPublicKey && await TryAgentAsync(credentials, cancellationToken).ConfigureAwait(false))
         {
-            events.ReportInfo(SshInfoLines.TryingAgent);
-            events.ReportInfo(SshInfoLines.AgentConnectFailed);
+            return;
         }
 
-        await RequireKeyboardInteractiveAsync(methods, user, password, cancellationToken).ConfigureAwait(false);
+        await RequireKeyboardInteractiveAsync(methods, credentials.User, credentials.Password, cancellationToken).ConfigureAwait(false);
+    }
+
+    // curl's agent step (ADR-0270): connect, list the identities, then try each in the
+    // agent's order until one authenticates the user. Each outcome has its -v line.
+    private async ValueTask<bool> TryAgentAsync(UserCredentials credentials, CancellationToken cancellationToken)
+    {
+        events.ReportInfo(SshInfoLines.TryingAgent);
+        Stream? connection = agentConnector is null ? null : await agentConnector.ConnectAsync(cancellationToken).ConfigureAwait(false);
+        if (connection is null)
+        {
+            events.ReportInfo(SshInfoLines.AgentConnectFailed);
+            return false;
+        }
+
+        SshAgentClient agent = new(connection);
+        await using (agent.ConfigureAwait(false))
+        {
+            IReadOnlyList<SshAgentIdentity>? identities = await agent.RequestIdentitiesAsync(cancellationToken).ConfigureAwait(false);
+            if (identities is null)
+            {
+                events.ReportInfo(SshInfoLines.AgentIdentitiesFailed);
+                return false;
+            }
+
+            return await TryAgentIdentitiesAsync(agent, identities, credentials, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask<bool> TryAgentIdentitiesAsync(SshAgentClient agent, IReadOnlyList<SshAgentIdentity> identities, UserCredentials credentials, CancellationToken cancellationToken)
+    {
+        foreach (SshAgentIdentity identity in identities)
+        {
+            if (await TryAgentIdentityAsync(agent, credentials.User, identity.Blob, cancellationToken).ConfigureAwait(false))
+            {
+                events.ReportInfo(SshInfoLines.AgentAuthenticated(credentials.UserName, identity.DisplayComment));
+                return true;
+            }
+        }
+
+        events.ReportInfo(SshInfoLines.NoAgentIdentityMatched);
+        return false;
+    }
+
+    // libssh2 refuses a blob too short for a length, and takes the method from the blob
+    // unless an earlier attempt left one behind; a blob whose key type overruns it fails.
+    private ValueTask<bool> TryAgentIdentityAsync(SshAgentClient agent, byte[] user, byte[] blob, CancellationToken cancellationToken) =>
+        TryAgentKeyAsync(agent, user, blob, blob.Length < 4 ? null : leftoverMethod ?? KeyTypeOf(blob), firstAttempt: true, cancellationToken);
+
+    // The same question and signed request as a key file's, with the agent signing. Only
+    // the first attempt upgrades an RSA method from server-sig-algs. No method, no request.
+    private async ValueTask<bool> TryAgentKeyAsync(SshAgentClient agent, byte[] user, byte[] blob, string? method, bool firstAttempt, CancellationToken cancellationToken)
+    {
+        string? algorithm = firstAttempt && method is not null ? ChooseSignatureAlgorithm(method) : method;
+        if (algorithm is null)
+        {
+            return false;
+        }
+
+        byte[]? answer = await TryExchangeAsync(
+            PublicKeyRequest(user, algorithm, blob, signed: false),
+            [SshAuthenticationMessageNumber.Success, SshAuthenticationMessageNumber.Failure, SshAuthenticationMessageNumber.PublicKeyOk],
+            cancellationToken).ConfigureAwait(false);
+        byte answerType = MessageTypeOf(answer);
+        return answerType == SshAuthenticationMessageNumber.PublicKeyOk
+            ? await SendAgentSignedRequestAsync(agent, user, blob, algorithm, firstAttempt, cancellationToken).ConfigureAwait(false)
+            : answerType == SshAuthenticationMessageNumber.Success;
+    }
+
+    // A signature by another method than the one asked for is retried once, from the key's
+    // own type without an upgrade, question and all; a sign that fails fails the identity.
+    private async ValueTask<bool> SendAgentSignedRequestAsync(SshAgentClient agent, byte[] user, byte[] blob, string algorithm, bool firstAttempt, CancellationToken cancellationToken)
+    {
+        byte[] request = PublicKeyRequest(user, algorithm, blob, signed: true);
+        SshAgentSignature? response = await agent.SignAsync(blob, SignedData(request), SignFlagsFor(algorithm), cancellationToken).ConfigureAwait(false);
+        string plainMethod = PlainMethodOf(algorithm);
+        if (response is not null && !IsAgentMethod(response.Method, algorithm, plainMethod))
+        {
+            return firstAttempt && await TryAgentKeyAsync(agent, user, blob, KeyTypeOf(blob), firstAttempt: false, cancellationToken).ConfigureAwait(false);
+        }
+
+        return response?.Signature is { } signature && await SendAgentSignatureAsync(request, plainMethod, signature, cancellationToken).ConfigureAwait(false);
+    }
+
+    // libssh2 accepts the method it asked for, or its plain form, and names the plain form
+    // in the signature it sends.
+    private static bool IsAgentMethod(byte[] name, string algorithm, string plainMethod) => IsMethod(name, algorithm) || IsMethod(name, plainMethod);
+
+    private async ValueTask<bool> SendAgentSignatureAsync(byte[] request, string plainMethod, byte[] signature, CancellationToken cancellationToken)
+    {
+        SshWireWriter message = new();
+        message.WriteBytes(request);
+        message.WriteString(SignatureField(plainMethod, signature));
+        byte[]? answer = await TryExchangeAsync(
+            message.ToArray(),
+            [SshAuthenticationMessageNumber.Success, SshAuthenticationMessageNumber.Failure],
+            cancellationToken).ConfigureAwait(false);
+        return answer?[0] == SshAuthenticationMessageNumber.Success;
+    }
+
+    // The key type a public key blob names first, or null when its length overruns the blob.
+    private static string? KeyTypeOf(byte[] blob)
+    {
+        uint length = BinaryPrimitives.ReadUInt32BigEndian(blob);
+        return length > blob.Length - 4 ? null : Encoding.Latin1.GetString(blob, 4, (int)length);
+    }
+
+    private static bool IsMethod(byte[] name, string method) => name.AsSpan().SequenceEqual(Encoding.Latin1.GetBytes(method));
+
+    private static string PlainMethodOf(string method) => PlainMethods.GetValueOrDefault(method, method);
+
+    // libssh2 asks the agent for an RSA SHA-2 signature by the flag for the exact method.
+    private static uint SignFlagsFor(string algorithm) => algorithm switch
+    {
+        "rsa-sha2-512" => SshAgentMessageNumber.RsaSha2512Flag,
+        "rsa-sha2-256" => SshAgentMessageNumber.RsaSha2256Flag,
+        _ => 0,
+    };
+
+    // The signature string's content: the method, then the signature as a string, or, for a
+    // security key, the signature bytes as they came, since they carry their own fields.
+    private static byte[] SignatureField(string method, byte[] signature)
+    {
+        SshWireWriter field = new();
+        field.WriteString(Encoding.Latin1.GetBytes(method));
+        if (method is SkEcdsaMethod or SkEd25519Method)
+        {
+            field.WriteBytes(signature);
+        }
+        else
+        {
+            field.WriteString(signature);
+        }
+
+        return field.ToArray();
+    }
+
+    // RFC 4252 section 7: the session identifier as a string, then the request up to and
+    // including the public key blob.
+    private byte[] SignedData(byte[] request)
+    {
+        SshWireWriter signedData = new();
+        signedData.WriteString(transport.SessionIdentifier);
+        signedData.WriteBytes(request);
+        return signedData.ToArray();
     }
 
     private async ValueTask RequireKeyboardInteractiveAsync(string methods, byte[] user, byte[] password, CancellationToken cancellationToken)
@@ -301,7 +476,7 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
     private async ValueTask<string?> DenyPublicKeyAsync(byte[] user, SshUserKeyFiles files, CancellationToken cancellationToken)
     {
         SshPublicKey? publicKey = await userKeys!.ReadPublicKeyAsync(files, cancellationToken).ConfigureAwait(false);
-        string? algorithm = publicKey is null ? null : SignatureAlgorithmFor(publicKey.KeyType);
+        string? algorithm = publicKey is null ? null : ChooseSignatureAlgorithm(publicKey.KeyType);
         return algorithm is null
             ? SshInfoLines.ReasonUnknown
             : await AskPublicKeyQuestionAsync(user, algorithm, publicKey!, files, cancellationToken).ConfigureAwait(false);
@@ -337,12 +512,9 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
         }
 
         byte[] request = PublicKeyRequest(user, algorithm, publicKey.Blob, signed: true);
-        SshWireWriter signedData = new();
-        signedData.WriteString(transport.SessionIdentifier);
-        signedData.WriteBytes(request);
         SshWireWriter message = new();
         message.WriteBytes(request);
-        message.WriteString(privateKey!.Sign(algorithm, signedData.ToArray()));
+        message.WriteString(privateKey!.Sign(algorithm, SignedData(request)));
         byte[]? answer = await TryExchangeAsync(
             message.ToArray(),
             [SshAuthenticationMessageNumber.Success, SshAuthenticationMessageNumber.Failure],
@@ -352,16 +524,20 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
 
     // libssh2 upgrades only an ssh-rsa key: once the server has sent server-sig-algs, the
     // first of its own RSA algorithms the server names, compared whole, and none when it
-    // names none of them; before, ssh-rsa itself. Other key types sign as their type.
-    private string? SignatureAlgorithmFor(string keyType)
+    // names none of them; before, ssh-rsa itself. Other key types sign as their type. A
+    // method that found none is left behind for the agent's identities (ADR-0270).
+    private string? ChooseSignatureAlgorithm(string method)
     {
-        if (keyType != RsaSshPrivateKey.RsaKeyType || serverSignatureAlgorithms is null)
+        if (method != RsaSshPrivateKey.RsaKeyType || serverSignatureAlgorithms is null)
         {
-            return keyType;
+            leftoverMethod = null;
+            return method;
         }
 
         string[] accepted = serverSignatureAlgorithms.Split(',');
-        return RsaSshPrivateKey.SignatureAlgorithms.FirstOrDefault(accepted.Contains);
+        string? algorithm = RsaSshPrivateKey.SignatureAlgorithms.FirstOrDefault(accepted.Contains);
+        leftoverMethod = algorithm is null ? method : null;
+        return algorithm;
     }
 
     // The publickey request: the signature flag, the algorithm and the public key blob; the
@@ -501,4 +677,7 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
             }
         }
     }
+
+    // The user's name as curl prints it, and the user and password as the requests carry them.
+    private sealed record UserCredentials(string UserName, byte[] User, byte[] Password);
 }

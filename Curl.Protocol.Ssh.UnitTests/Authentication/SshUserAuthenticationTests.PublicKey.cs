@@ -375,7 +375,9 @@ public sealed partial class SshUserAuthenticationTests
 
     // After a key exchange with the scripted server the client's messages are sealed, so the
     // transcript opens them with the client-to-server keys.
-    private static async Task<KeyedPeer> ConnectAsync(SshUserKeySource keys, params byte[][] payloads)
+    private static Task<KeyedPeer> ConnectAsync(SshUserKeySource keys, params byte[][] payloads) => ConnectWithAgentAsync(null, keys, payloads);
+
+    private static async Task<KeyedPeer> ConnectWithAgentAsync(ISshAgentConnector? agent, SshUserKeySource? keys, params byte[][] payloads)
     {
         TestHostKey hostKey = TestHostKey.Ecdsa("nistp256", TestHostKey.FixedNistP256);
         SshKexInit serverKexInit = ServerKexInit("ecdh-sha2-nistp256", hostKey.Algorithm);
@@ -394,7 +396,7 @@ public sealed partial class SshUserAuthenticationTests
         SshTransport transport = new(connection, SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33), ephemeralKeys);
         await transport.ExchangeKeysAsync(await transport.NegotiateAlgorithmsAsync(CancellationToken.None), CancellationToken.None);
         TranscriptTransferEvents events = new();
-        return new KeyedPeer(new SshUserAuthentication(transport, Encoding.UTF8, keys, events), connection, exchange.ExchangeHash, SshPacketProtections.ForClientToServer(ctr, exchange.Keys(exchange.ExchangeHash)), events);
+        return new KeyedPeer(new SshUserAuthentication(transport, Encoding.UTF8, keys, events, agent), connection, exchange.ExchangeHash, SshPacketProtections.ForClientToServer(ctr, exchange.Keys(exchange.ExchangeHash)), events);
     }
 
     // The client's messages after its KEXINIT, key-exchange message and NEWKEYS.

@@ -3,7 +3,9 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
 
 namespace Curl.Protocol.Ssh;
@@ -554,8 +556,17 @@ public sealed partial class SshProtocolHandlerTests
 
     private static InMemorySshServer Server() => new(User, Password);
 
-    private static SshProtocolHandler Handler(InMemorySshServer server, Dictionary<string, string>? files = null, SshAlgorithmPreferences? preferences = null) =>
-        new(server, new InMemoryKeyFileSystem(files ?? []), preferences ?? SshAlgorithmPreferences.OpenSslReference, Encoding.UTF8);
+    // No agent, whatever the machine running the tests has, unless the test gives one.
+    private static SshProtocolHandler Handler(InMemorySshServer server, Dictionary<string, string>? files = null, SshAlgorithmPreferences? preferences = null, ISshAgentConnector? agent = null) =>
+        new(
+            server,
+            new InMemoryKeyFileSystem(files ?? []),
+            preferences ?? SshAlgorithmPreferences.OpenSslReference,
+            Encoding.UTF8,
+            new SystemSshRandomSource(),
+            new SystemSshEphemeralKeySource(),
+            Environment.GetEnvironmentVariable,
+            agent ?? new UnreachableSshAgent());
 
     private static async Task<Outcome> RunAsync(
         InMemorySshServer server,
