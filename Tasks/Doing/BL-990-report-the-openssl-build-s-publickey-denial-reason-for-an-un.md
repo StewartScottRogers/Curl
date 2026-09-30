@@ -34,3 +34,4 @@ On Linux and macOS, `-v` on an `scp`/`sftp` transfer whose `--key` cannot be rea
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
