@@ -33,8 +33,8 @@ completed: 2026-09-30
 Filed by BL-954.
 
 - Measured 2026-09-30, curl 8.21.0 Schannel, `Record-CurlExchange.ps1`: `--digest -u u:p -H "Authorization: x"` against a Digest 401 sends `Authorization: x` alone, then `Authorization: Digest username="u",...` after `Host` and `Authorization: x` last. `--ntlm -u u:p -H "Authorization: x"` (served with `-Script`: read, 401 with a Type 2, read, 200, so both legs share one connection) sends `Authorization: NTLM <Type 1>` then `Authorization: NTLM <Type 3>`, each after `Host` and before `Authorization: x`. A two-connection `-Connections 2` NTLM run hangs the recorder; use `-Script`.
-- `HttpRequestHeadFormatter.AppendAuthorization` sends a Digest, NTLM or Negotiate value always and any other value (Basic, Bearer, `--aws-sigv4`) only without an `-H Authorization`. Negotiate follows libcurl's source (`output_auth_headers` checks the custom headers for Basic and Bearer alone), not a measurement: recorded as ADR-0271.
-- Added `Documentation/Planning/Decisions` to `touches` for ADR-0271 and its index row; no task in Doing names it.
+- `HttpRequestHeadFormatter.AppendAuthorization` sends a Digest, NTLM or Negotiate value always and any other value (Basic, Bearer, `--aws-sigv4`) only without an `-H Authorization`. Negotiate follows libcurl's source (`output_auth_headers` checks the custom headers for Basic and Bearer alone), not a measurement: recorded as ADR-0272.
+- Added `Documentation/Planning/Decisions` to `touches` for ADR-0272 and its index row; no task in Doing names it.
 - Tests: `HttpProtocolHandlerTests.AuthorizationBesideHeader.cs` (Digest, NTLM and Basic through the handler) and `Format_AuthorizationBesideAnAuthorizationHeader_SendsOnlyDigestNtlmAndNegotiate`. `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary`: 100% line, 100% branch, 0 failing members.
 
 ## Log
