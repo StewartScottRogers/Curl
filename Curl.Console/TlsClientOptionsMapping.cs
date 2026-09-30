@@ -119,6 +119,11 @@ internal static class TlsClientOptionsMapping
     /// <see cref="CommandLineOptions.ProxyPassphrase" /> (<c>--proxy-pass</c>),
     /// <see cref="CommandLineOptions.ProxyCiphers" /> (<c>--proxy-ciphers</c>) and
     /// <see cref="CommandLineOptions.ProxyTls13Ciphers" /> (<c>--proxy-tls13-ciphers</c>), each verbatim;
+    /// and, as the target's counterparts map (BL-611), <see cref="CommandLineOptions.ProxyPinnedPublicKey" />
+    /// (<c>--proxy-pinnedpubkey</c>) as <see cref="TlsClientOptions.PinnedPublicKey" /> and
+    /// <see cref="CommandLineOptions.ProxyCertificateRevocationListFile" /> (<c>--proxy-crlfile</c>) as
+    /// <see cref="TlsClientOptions.CertificateRevocationListFile" />, verbatim. <c>--proxy-ca-native</c> and
+    /// <c>--proxy-ssl-allow-beast</c> map to nothing, as <c>--ca-native</c> (ADR-0124) and <c>--ssl-allow-beast</c> do;
     /// every other setting is its default. Neither the target's minimum nor <c>--tls-max</c> reaches the proxy: curl 8.21.0
     /// completes the handshake with a TLS 1.2-only HTTPS proxy under <c>--tlsv1.3</c> and under
     /// <c>--tls-max 1.1</c> (measured, BL-502).
@@ -136,7 +141,9 @@ internal static class TlsClientOptionsMapping
             CertificateType: options.ProxyClientCertificateType,
             PrivateKeyType: options.ProxyPrivateKeyType,
             Passphrase: options.ProxyPassphrase,
-            AutoClientCertificate: options.ProxyAutoClientCertificate);
+            AutoClientCertificate: options.ProxyAutoClientCertificate,
+            PinnedPublicKey: options.ProxyPinnedPublicKey,
+            CertificateRevocationListFile: options.ProxyCertificateRevocationListFile);
 
     /// <summary>
     /// Maps the TLS options that reach the DNS-over-HTTPS server onto the <see cref="TlsClientOptions" />

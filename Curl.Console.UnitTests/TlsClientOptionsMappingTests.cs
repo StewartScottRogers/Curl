@@ -364,6 +364,22 @@ public sealed class TlsClientOptionsMappingTests
         Assert.AreEqual(new TlsClientOptions(), MapProxy("--cert-status", "--ssl-auto-client-cert", Url));
     }
 
+    [TestMethod]
+    public void ProxyFromCommandLine_ProxyPinnedpubkeyAndProxyCrlfile_ReachTheProxyVerbatim()
+    {
+        Assert.AreEqual(
+            new TlsClientOptions(PinnedPublicKey: "sha256//a=;sha256//b=", CertificateRevocationListFile: "proxy.crl"),
+            MapProxy("--proxy-pinnedpubkey", "sha256//a=;sha256//b=", "--proxy-crlfile", "proxy.crl", Url));
+        Assert.AreEqual(new TlsClientOptions(), Map("--proxy-pinnedpubkey", "sha256//a=", "--proxy-crlfile", "proxy.crl", Url));
+    }
+
+    [TestMethod]
+    public void ProxyFromCommandLine_ProxyCaNativeAndProxySslAllowBeast_ChangeNothing()
+    {
+        Assert.AreEqual(new TlsClientOptions(), MapProxy("--proxy-ca-native", "--proxy-ssl-allow-beast", Url));
+        Assert.AreEqual(new TlsClientOptions(), Map("--proxy-ca-native", "--proxy-ssl-allow-beast", Url));
+    }
+
     private static TlsClientOptions Map(params string[] arguments) =>
         TlsClientOptionsMapping.FromCommandLine(Parse(arguments));
 
