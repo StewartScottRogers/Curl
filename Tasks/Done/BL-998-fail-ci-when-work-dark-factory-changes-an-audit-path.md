@@ -9,7 +9,7 @@ touches: [.github/workflows/ci.yml, Audit/Guard]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-998 — Fail CI when work/dark-factory changes an audit path
 
@@ -72,6 +72,8 @@ folder and checks the cases below, printing `PASS`/`FAIL` per case.
 
 ## Notes
 
+- 2026-09-30: PR #25 merged work/dark-factory to master (2c2acd98), PR #24 merged this to master (8daea3fe), master merged into work/dark-factory (eda8bf69). First live run on the factory branch, https://github.com/StewartScottRogers/Curl/actions/runs/36689231593: `Audit paths untouched by the dark factory` success, printing `Audit guard: no audit path changed`; all three test jobs green.
+
 - Built on the `audit` branch (worktree `Z:/repos/Curl.audit`, cut from `origin/master` a22bfe21), commit 6d61b13c, draft pull request https://github.com/StewartScottRogers/Curl/pull/24. Not on `work/dark-factory`: the guard lives in `Audit/` and guards `ci.yml`, so it must reach the factory branch from `master`.
 - `Audit/Guard/Test-AuditPathsUntouched.ps1`: offending = guarded paths in both `git diff --name-only --no-renames B...H` and `git diff --name-only --no-renames B H`. `-SelfTest` under Windows PowerShell 5.1: cases a-g and the four (h) guard files, 11 PASS, 0 FAIL. ASCII only. pwsh is not installed on this PC; CI runs the script under pwsh.
 - `ci.yml`: `audit-guard` job with the `if:` condition, `fetch-depth: 0`, the pull request head commit, and `git show origin/master:...` with the checked-out fallback; `test` job unchanged. CI run on `audit` https://github.com/StewartScottRogers/Curl/actions/runs/36674287139: all three test jobs green, `Audit paths untouched by the dark factory` skipped by its condition, no workflow syntax error.
@@ -83,3 +85,6 @@ folder and checks the cases below, printing `PASS`/`FAIL` per case.
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Blocked. Stewart: built and CI-proven on the audit branch (draft PR #24); needs work/dark-factory merged to master first, then PR #24 merged, then master merged into work/dark-factory.
+- 2026-09-30: Blocked -> Backlog. Unblocked: merges done
+- 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. CI fails when work/dark-factory changes an audit path or a guard; live on the factory branch, first run green.
