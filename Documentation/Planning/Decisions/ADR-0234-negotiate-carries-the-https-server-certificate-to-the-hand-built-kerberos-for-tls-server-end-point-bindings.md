@@ -85,5 +85,36 @@ This is curl's `ossl_get_channel_binding`: OpenSSL pairs PSS, Ed25519 and Ed448 
   2.16.840.1.101.3.4.3.1) take SHA-224, hand-built as `Sha224` in `Curl.Authentication` since
   the BCL has none; tests pin it to NIST's examples and to OpenSSL's hash of the measured
   certificate.
-- Other signatures OpenSSL pairs with a digest the table lacks (the SHA-3 family) still fall
-  to the unknown-OID failure until BL-980 measures and matches them.
+- The SHA-3 signatures, which OpenSSL pairs with their own SHA-3 digest, were measured and
+  matched later: see the amendment (BL-980) below.
+
+## Amendment (BL-980): SHA-3 signatures bind with their SHA-3
+
+Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-980 and
+recorded here by BL-985.
+
+**Measured** 2026-09-29 as for BL-965: WSL Ubuntu's curl 8.18.0 (OpenSSL 3.5.5,
+`mit-krb5/1.22.1`) against `openssl s_server -HTTP` serving a 401 `WWW-Authenticate: Negotiate`,
+`curl -v -k --negotiate -u : https://server.example.test:18980/neg` with a ticket from the
+user-space MIT KDC. The certificates came from `openssl req -x509 -newkey rsa:2048 -sha3-N` and
+`-newkey ec -pkeyopt ec_paramgen_curve:P-256 -sha3-N`; nothing was committed.
+
+| Server certificate's signature | curl 8.18.0 |
+| --- | --- |
+| RSA-SHA3-224, -256, -384, -512 (2.16.840.1.101.3.4.3.13-16) | The Negotiate token is sent; the transfer ends on the 401 with exit 0. |
+| ecdsa_with_SHA3-224, -256, -384, -512 (2.16.840.1.101.3.4.3.9-12) | The same, exit 0. |
+
+So OpenSSL pairs each with its SHA-3 digest and curl binds with it, as RFC 5929 asks for the
+signature's own hash.
+
+**Decision.**
+
+- The eight OIDs 2.16.840.1.101.3.4.3.9-16 take SHA3-224, SHA3-256, SHA3-384 or SHA3-512 in
+  `TlsServerEndPointChannelBindings.Of`, from `Curl.Cryptography`'s hand-built `Sha3` (Keccak,
+  already there for ML-KEM; `SHA3_256.IsSupported` is false on macOS, so the BCL's cannot be
+  used). `Sha3` gained `HashData224` and `HashData384` beside `HashData256` and `HashData512`,
+  pinned to NIST's SHA-3 examples in `Sha3Tests`, and `Curl.Authentication.UnitLibrary` now
+  references `Curl.Cryptography.UnitLibrary` directly rather than growing a second Keccak.
+- `TlsServerEndPointChannelBindingsTests` pins the bindings to OpenSSL's hashes of two measured
+  certificates: `openssl dgst -sha3-256` of the RSA SHA3-256 one and `-sha3-512` of the ECDSA
+  SHA3-512 one.
