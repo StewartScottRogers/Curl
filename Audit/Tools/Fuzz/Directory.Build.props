@@ -1,0 +1,22 @@
+<Project>
+
+  <!--
+    Build settings for the audit fuzzer, the C# file-based app Fuzz.cs (BL-1005). Because
+    this file exists, MSBuild stops here and never imports the repository root's
+    Directory.Build.props, whose gates (CA1502 via CodeMetricsConfig.txt, XML
+    documentation, the AOT check) are written for the product's projects, not for audit
+    tools. The same arrangement as .github/gource/. The libraries Fuzz.cs references with
+    #:project still build with the root's settings, from their own folders.
+
+    No project in Curl.slnx lives under Audit/Tools, so nothing here reaches the solution.
+  -->
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- An audit tool, never published: no native AOT compile on first run. -->
+    <PublishAot>false</PublishAot>
+  </PropertyGroup>
+
+</Project>
