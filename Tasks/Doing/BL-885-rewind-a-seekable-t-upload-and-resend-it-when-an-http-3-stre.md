@@ -33,3 +33,4 @@ A `-T` upload whose body is a seekable file (`StreamBody` over a stream with `Ca
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
