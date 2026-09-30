@@ -368,7 +368,7 @@ internal static class CurlComposition
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider);
         TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts);
         UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider);
-        PoolingConnector poolingConnector = new(tcpConnector, timeProvider);
+        PoolingConnector poolingConnector = new(tcpConnector, timeProvider) { WaitsForMultiplexing = WaitsForMultiplexing(options) };
 
         // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
         // contexts come from, which can only be made once the connectors exist (BL-604).
@@ -387,6 +387,15 @@ internal static class CurlComposition
             udpDatagramConnector,
             poolingConnector);
     }
+
+    /// <summary>
+    /// Tells whether a transfer waits for a connection to its origin that may yet multiplex rather
+    /// than open one of its own: curl sets <c>CURLOPT_PIPEWAIT</c> on every <c>-Z</c> transfer unless
+    /// <c>--parallel-immediate</c> is given (measured, BL-717 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> for <c>-Z</c> without <c>--parallel-immediate</c>.</returns>
+    internal static bool WaitsForMultiplexing(CommandLineOptions options) => options.Parallel && !options.ParallelImmediate;
 
     /// <summary>
     /// Creates the run's <see cref="TcpConnector" /> over the given pieces, with the

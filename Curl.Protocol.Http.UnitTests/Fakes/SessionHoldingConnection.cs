@@ -27,6 +27,9 @@ public sealed class SessionHoldingConnection(ScriptedConnection inner) : IConnec
     /// <summary>Gets how many transfers returned the connection marked reusable.</summary>
     public int ReturnedReusableCount { get; private set; }
 
+    /// <summary>Gets a value indicating whether the connection reports another transfer sharing it.</summary>
+    public bool IsSharedWithAnotherTransfer { get; init; }
+
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) => inner.ReadAsync(buffer, cancellationToken);
 

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using Curl.Http2;
 using Curl.Protocol.Abstractions;
@@ -31,6 +32,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     private readonly MemoryStream trailers = new();
 
+    /// <summary>The frames and resets the session has handed this stream and it has not yet taken.</summary>
+    private readonly ConcurrentQueue<ReceivedFrame> inbox = new();
+
     private ReadOnlyMemory<byte> unread;
 
     private int streamId;
@@ -56,6 +60,15 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// them, empty until the trailing header block has been read.
     /// </summary>
     public ReadOnlyMemory<byte> TrailerBytes => trailers.ToArray();
+
+    /// <summary>
+    /// Gets a value indicating whether the session has handed this stream a frame or a reset
+    /// it has not yet taken.
+    /// </summary>
+    internal bool HasReceived => !inbox.IsEmpty;
+
+    /// <summary>Gets the stream's identifier, 0 until its head is written.</summary>
+    internal int StreamId => streamId;
 
     /// <inheritdoc />
     /// <exception cref="HttpTransferException">The stream failed (exit 16, 18, 56 or 92).</exception>
@@ -112,7 +125,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             return;
         }
 
-        _ = await session.Frames.WriteDataAsync(streamId, ReadOnlyMemory<byte>.Empty, isEndStream: true, cancellationToken).ConfigureAwait(false);
+        _ = await session.WriteDataAsync(streamId, ReadOnlyMemory<byte>.Empty, isEndStream: true, cancellationToken).ConfigureAwait(false);
         isRequestEnded = true;
         await GrowReceiveWindowOnceAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -145,7 +158,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <returns>A task that completes when the preface is written.</returns>
     public async ValueTask StartUpgradedAsync(CancellationToken cancellationToken)
     {
-        streamId = await session.StartUpgradedStreamAsync(cancellationToken).ConfigureAwait(false);
+        streamId = await session.StartUpgradedStreamAsync(this, cancellationToken).ConfigureAwait(false);
         isRequestEnded = true;
         isReceiveWindowGrown = true;
     }
@@ -156,16 +169,35 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <returns>A completed task.</returns>
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
+    /// <summary>
+    /// Hands the stream a frame the session read for it, with the header block's fields when it
+    /// is HEADERS; the stream takes it on its next read.
+    /// </summary>
+    /// <param name="frame">The DATA frame or completed header block.</param>
+    /// <param name="fields">The decoded header block, or <see langword="null" /> for DATA.</param>
+    internal void Take(Http2StreamFrame frame, IReadOnlyList<HeaderField>? fields) => inbox.Enqueue(new ReceivedFrame(frame, fields, null));
+
+    /// <summary>
+    /// Hands the stream the peer's reset of it, read while another stream was reading; the
+    /// stream's next read fails with it (exit 92).
+    /// </summary>
+    /// <param name="reset">The reset.</param>
+    internal void TakeReset(Http2StreamResetException reset) => inbox.Enqueue(new ReceivedFrame(null, null, reset));
+
     private async ValueTask StartAsync(ReadOnlyMemory<byte> head, CancellationToken cancellationToken)
     {
         isRequestEnded = bodyLength == 0;
         try
         {
-            streamId = await session.StartStreamAsync(Http2RequestHeaders.Of(head.Span, scheme), isRequestEnded, cancellationToken).ConfigureAwait(false);
+            streamId = await session.StartStreamAsync(this, Http2RequestHeaders.Of(head.Span, scheme), isRequestEnded, cancellationToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException)
         {
             throw new HttpTransferException(CurlExitCode.Http2, HttpTransferMessages.Http2FramingError);
+        }
+        catch (Exception exception) when (FailureOf(exception) is { } failure)
+        {
+            throw failure;
         }
 
         if (isRequestEnded)
@@ -179,7 +211,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         while (!data.IsEmpty && !isResponseEnded)
         {
             bool isLast = bodyBytesSent + data.Length == bodyLength;
-            int sent = await session.Frames.WriteDataAsync(streamId, data, isLast, cancellationToken).ConfigureAwait(false);
+            int sent = await session.WriteDataAsync(streamId, data, isLast, cancellationToken).ConfigureAwait(false);
             bodyBytesSent += sent;
             data = data[sent..];
             isRequestEnded = isLast && data.IsEmpty;
@@ -213,48 +245,68 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         await session.GrowStreamReceiveWindowAsync(streamId, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Takes the next frame the session handed this stream, reading one from the connection
+    /// first when none is waiting; a frame read for another stream goes to that stream and
+    /// leaves this one to call again.
+    /// </summary>
     private async ValueTask ReceiveFrameAsync(CancellationToken cancellationToken)
     {
         await GrowReceiveWindowOnceAsync(cancellationToken).ConfigureAwait(false);
-        Http2StreamFrame? frame = await ReadFrameAsync(cancellationToken).ConfigureAwait(false);
-        if (frame is null)
+        if (!inbox.TryDequeue(out ReceivedFrame? next))
         {
-            ThrowIfClosed();
+            await ReadFrameAsync(cancellationToken).ConfigureAwait(false);
+            if (!inbox.TryDequeue(out next))
+            {
+                ThrowIfClosed();
+                return;
+            }
         }
-        else if (frame.Type == Http2FrameType.Headers)
+
+        await TakeAsync(next, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask TakeAsync(ReceivedFrame next, CancellationToken cancellationToken)
+    {
+        if (next.Reset is { } reset)
         {
-            await ReceiveHeadersAsync(frame, cancellationToken).ConfigureAwait(false);
+            throw FailureOf(reset)!;
+        }
+
+        if (next.Frame!.Type == Http2FrameType.Headers)
+        {
+            await ReceiveHeadersAsync(next.Frame, next.Fields!, cancellationToken).ConfigureAwait(false);
         }
         else
         {
-            // The frame layer returns DATA only for a stream still open, and this is the only one.
-            await ReceiveDataAsync(frame, cancellationToken).ConfigureAwait(false);
+            await ReceiveDataAsync(next.Frame, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private async ValueTask<Http2StreamFrame?> ReadFrameAsync(CancellationToken cancellationToken)
+    private async ValueTask ReadFrameAsync(CancellationToken cancellationToken)
     {
         try
         {
-            return await session.Frames.ReadFrameAsync(cancellationToken).ConfigureAwait(false);
+            await session.ReceiveAsync(this, cancellationToken).ConfigureAwait(false);
         }
-        catch (Http2StreamResetException reset)
+        catch (Exception exception) when (FailureOf(exception) is { } failure)
         {
-            throw new HttpTransferException(CurlExitCode.Http2Stream, HttpTransferMessages.Http2StreamNotClosedCleanly(reset.StreamId, reset.ErrorCode));
-        }
-        catch (Http2ProtocolException error)
-        {
-            throw new HttpTransferException(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(error.ErrorCode));
-        }
-        catch (Http2GoAwayException)
-        {
-            throw new HttpTransferException(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailed);
-        }
-        catch (EndOfStreamException)
-        {
-            throw Closed();
+            throw failure;
         }
     }
+
+    /// <summary>
+    /// Gives the transfer failure curl reports for a failure of the stream or its connection,
+    /// or <see langword="null" /> for one that passes through, such as an <see cref="IOException" />.
+    /// </summary>
+    private HttpTransferException? FailureOf(Exception exception) => exception switch
+    {
+        Http2StreamResetException reset => new(CurlExitCode.Http2Stream, HttpTransferMessages.Http2StreamNotClosedCleanly(reset.StreamId, reset.ErrorCode)),
+        Http2ProtocolException error => new(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(error.ErrorCode)),
+        Http2GoAwayException => new(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailed),
+        EndOfStreamException => Closed(),
+        _ => null,
+    };
 
     private void ThrowIfClosed()
     {
@@ -269,17 +321,11 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         : new(CurlExitCode.Http2, HttpTransferMessages.Http2FramingError);
 
     /// <summary>
-    /// Takes a header block: decoded on every stream, as HPACK requires; on this stream a
-    /// response head until the final one, then trailers.
+    /// Takes a header block of this stream, decoded by the session: a response head until the
+    /// final one, then trailers.
     /// </summary>
-    private async ValueTask ReceiveHeadersAsync(Http2StreamFrame frame, CancellationToken cancellationToken)
+    private async ValueTask ReceiveHeadersAsync(Http2StreamFrame frame, IReadOnlyList<HeaderField> fields, CancellationToken cancellationToken)
     {
-        IReadOnlyList<HeaderField> fields = Decode(frame.Content);
-        if (frame.StreamId != streamId)
-        {
-            return;
-        }
-
         if (isFinalHeadReceived)
         {
             trailers.Write(Http2ResponseHead.FormatTrailers(fields));
@@ -305,18 +351,6 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         isResponseEnded = frame.IsEndStream;
     }
 
-    private IReadOnlyList<HeaderField> Decode(ReadOnlyMemory<byte> block)
-    {
-        try
-        {
-            return session.Decoder.Decode(block.Span);
-        }
-        catch (HpackDecodingException)
-        {
-            throw new HttpTransferException(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.CompressionError));
-        }
-    }
-
     /// <summary>
     /// Resets the stream with PROTOCOL_ERROR for a malformed response - a head with no valid
     /// <c>:status</c>, or DATA before the head - as nghttp2 does, and gives the exit 92 failure
@@ -324,7 +358,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// </summary>
     private async ValueTask<HttpTransferException> ResetMalformedAsync(CancellationToken cancellationToken)
     {
-        await session.Frames.ResetStreamAsync(streamId, Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+        await session.ResetStreamAsync(streamId, Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
         return new HttpTransferException(CurlExitCode.Http2Stream, HttpTransferMessages.Http2StreamNotClosedCleanly(streamId, Http2ErrorCode.ProtocolError));
     }
 }

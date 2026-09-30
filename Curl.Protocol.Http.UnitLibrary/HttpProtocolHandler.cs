@@ -801,10 +801,18 @@ public sealed class HttpProtocolHandler(
     /// Reports what became of the connection once it is disposed, as curl 8.21.0's <c>-v</c>
     /// does (ADR-0050): left intact when marked reusable, closed when the transfer failed, and
     /// shut down otherwise - its response did not persist, or it died before its response, in
-    /// which case the line that the request goes out again follows.
+    /// which case the line that the request goes out again follows. A connection left intact
+    /// that another transfer still shares, on a stream of its own, is reported by the last
+    /// transfer on it, not this one (BL-717).
     /// </summary>
     private static void ReportConnectionEnd(ITransferContext context, ConnectTarget target, ConnectResult connect, HttpAttemptOutcome outcome)
     {
+        if (outcome.ReportsLeftIntact && connect.Connection!.IsSharedWithAnotherTransfer)
+        {
+            // curl 8.21.0 reports a multiplexed connection left intact only when its last transfer ends (measured, BL-717 Notes).
+            return;
+        }
+
         context.Events.ReportInfo(ConnectionEndLine(target, connect, outcome));
         if (outcome.DiedBeforeResponse)
         {

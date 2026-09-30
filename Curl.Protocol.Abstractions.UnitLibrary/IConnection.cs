@@ -98,6 +98,7 @@ public interface IConnection : IAsyncDisposable
     bool TryHoldSession(IConnectionSession session) => false;
 
     /// <summary>
+<<<<<<< HEAD
     /// Shuts TLS down on this connection and hands back the plaintext connection it ran over,
     /// as FTP's <c>CCC</c> clears the control connection (BL-636, ADR-0280).
     /// </summary>
@@ -115,4 +116,14 @@ public interface IConnection : IAsyncDisposable
     /// </returns>
     ValueTask<IConnection?> ClearTlsAsync(bool sendCloseNotifyFirst, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IConnection?>(null);
+
+    /// <summary>
+    /// Gets a value indicating whether another transfer is carried on the connection beside
+    /// this one, on a stream of its own (<see cref="IConnectionSession.ConcurrentTransferLimit" />):
+    /// curl 8.21.0 reports a connection left intact only when the last transfer on it ends
+    /// (measured, BL-717). The default is <see langword="false" />: only a pooled connection
+    /// is shared.
+    /// </summary>
+    bool IsSharedWithAnotherTransfer => false;
+>>>>>>> bb9a17be(wip(http2): BL-717's unfinished work from lane 1, saved when it timed out on 2026-09-29)
 }

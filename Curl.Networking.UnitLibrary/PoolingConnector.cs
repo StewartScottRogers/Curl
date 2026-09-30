@@ -34,8 +34,20 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
 
     private readonly Lock _gate = new();
     private readonly List<PoolEntry> _idle = [];
+    private readonly List<PoolEntry> _leased = [];
+    private readonly List<MultiplexingNegotiation> _negotiations = [];
     private long _nextConnectionNumber;
     private bool _isDisposed;
+
+    /// <summary>
+    /// Gets a value indicating whether a transfer waits for a connection with its key that is
+    /// being opened, or may yet multiplex, instead of opening one of its own: curl's
+    /// <c>CURLOPT_PIPEWAIT</c>, which <c>-Z</c> sets unless <c>--parallel-immediate</c> is given
+    /// (measured, BL-717 Notes). A connection may multiplex until its session is known when it
+    /// agreed <c>h2</c> with ALPN, or when it is plain TCP straight to the origin, which may
+    /// speak HTTP/2 with prior knowledge.
+    /// </summary>
+    public bool WaitsForMultiplexing { get; init; }
 
     /// <summary>
     /// Gets the longest a connection may sit idle and still be reused: 118 seconds, curl's
@@ -60,6 +72,15 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
     /// read found the server's close is not handed out: it is reported with curl 8.21.0's
     /// <c>Connection N seems to be dead</c> and <c>shutting down connection #N</c>, closed,
     /// and the next idle one with the key is tried (ADR-0112).
+    /// <para>
+    /// Before any of that, a connection in use with the key whose session carries several
+    /// transfers at once (<see cref="IConnectionSession.ConcurrentTransferLimit" />) and has a
+    /// stream to spare is shared: curl 8.21.0's <c>Multiplexed connection found</c> is reported
+    /// and the reuse as above. One whose streams are all taken is reported as curl's
+    /// <c>MAX_CONCURRENT_STREAMS reached, skip (N)</c>, N the transfers on it, and passed over.
+    /// With <see cref="WaitsForMultiplexing" />, a connection with the key that is still being
+    /// opened, or that may multiplex and has no session yet, is waited for first (BL-717).
+    /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -67,12 +88,20 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
         cancellationToken.ThrowIfCancellationRequested();
 
         var key = ConnectionPoolKey.Of(target);
+        var shared = await ShareAsync(key, target.Events, cancellationToken);
+        if (shared is not null)
+        {
+            new NetworkDiagnosticLog(target.DiagnosticLog).PoolShare(target, shared.ConnectionNumber);
+            target.Events.ReportInfo("Multiplexed connection found");
+            return Reuse(target, shared);
+        }
+
         var idle = await TakeIdleAsync(key, target.Events);
         new NetworkDiagnosticLog(target.DiagnosticLog).PoolDecision(target, idle?.ConnectionNumber);
 
         return idle is null
             ? await OpenAsync(target, key, cancellationToken)
-            : Reuse(target, idle);
+            : Reuse(target, Lease(idle));
     }
 
     /// <inheritdoc />
@@ -145,6 +174,193 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
         await CloseAllAsync(closing);
     }
 
+    /// <summary>
+    /// Ends one lease of <paramref name="entry" />, one that did not mark it reusable stopping
+    /// any new transfer from sharing it. While other transfers still hold leases the connection
+    /// stays with them; after the last it is no longer in use, and the caller hands it back
+    /// with <see cref="HandBackAsync" />.
+    /// </summary>
+    /// <param name="entry">The connection a <see cref="PooledConnection" /> is handing back.</param>
+    /// <param name="isReusable">Whether the lease marked it reusable.</param>
+    /// <returns><see langword="true" /> while another transfer still holds a lease of it.</returns>
+    internal bool EndLease(PoolEntry entry, bool isReusable)
+    {
+        lock (_gate)
+        {
+            entry.IsShareBarred |= !isReusable;
+            entry.LeaseCount--;
+            if (entry.LeaseCount > 0)
+            {
+                return true;
+            }
+
+            _leased.Remove(entry);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Hands back a connection whose last lease has ended (<see cref="EndLease" />): it returns
+    /// to the pool when every lease marked it reusable and it has a key, and closes otherwise.
+    /// Transfers waiting to learn whether it multiplexes are woken once it is back in the pool.
+    /// </summary>
+    /// <param name="entry">The connection.</param>
+    /// <param name="events">The events of the transfer handing it back.</param>
+    /// <returns>A task that completes when the connection is pooled or closed.</returns>
+    internal async ValueTask HandBackAsync(PoolEntry entry, ITransferEvents events)
+    {
+        MultiplexingNegotiation? negotiation;
+
+        lock (_gate)
+        {
+            negotiation = entry.Negotiation;
+            entry.Negotiation = null;
+        }
+
+        var handingBack = entry.IsShareBarred || entry.Key is null
+            ? entry.CloseAsync()
+            : ReturnAsync(entry, events);
+        Decide(negotiation);
+        await handingBack;
+    }
+
+    /// <summary>
+    /// Records that a transfer handed <paramref name="entry" /> its session, which tells
+    /// whether it multiplexes, and wakes the transfers waiting to learn it.
+    /// </summary>
+    /// <param name="entry">The connection now holding a session.</param>
+    internal void SessionHeld(PoolEntry entry)
+    {
+        MultiplexingNegotiation? negotiation;
+
+        lock (_gate)
+        {
+            negotiation = entry.Negotiation;
+            entry.Negotiation = null;
+        }
+
+        Decide(negotiation);
+    }
+
+    /// <summary>Tells whether more than one transfer holds a lease of <paramref name="entry" />.</summary>
+    /// <param name="entry">A leased connection.</param>
+    /// <returns><see langword="true" /> while another transfer shares it.</returns>
+    internal bool IsShared(PoolEntry entry)
+    {
+        lock (_gate)
+        {
+            return entry.LeaseCount > 1;
+        }
+    }
+
+    private static bool MayMultiplex(ConnectTarget target, ConnectResult connect) =>
+        connect.ApplicationProtocol == "h2"
+            || (!target.UseTls && !target.IsForwardProxy && target.Proxy is null);
+
+    private static int? ConcurrentTransferLimitOf(PoolEntry entry, ConnectionPoolKey key) =>
+        key.Equals(entry.Key) && !entry.IsShareBarred && !entry.HasReadPeerClose
+            ? entry.Session?.ConcurrentTransferLimit
+            : null;
+
+    private async ValueTask<PoolEntry?> ShareAsync(ConnectionPoolKey? key, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        if (key is null)
+        {
+            return null;
+        }
+
+        while (true)
+        {
+            var (shared, fullLeaseCount, negotiation) = FindShareable(key);
+            if (fullLeaseCount is { } leaseCount)
+            {
+                events.ReportInfo($"MAX_CONCURRENT_STREAMS reached, skip ({leaseCount})");
+            }
+
+            if (shared is not null || negotiation is null)
+            {
+                return shared;
+            }
+
+            await negotiation.Decided.WaitAsync(cancellationToken);
+        }
+    }
+
+    private (PoolEntry? Shared, int? FullLeaseCount, MultiplexingNegotiation? Negotiation) FindShareable(ConnectionPoolKey key)
+    {
+        lock (_gate)
+        {
+            int? fullLeaseCount = null;
+            foreach (var entry in _leased)
+            {
+                var limit = ConcurrentTransferLimitOf(entry, key);
+                if (limit > entry.LeaseCount)
+                {
+                    entry.LeaseCount++;
+                    return (entry, null, null);
+                }
+
+                fullLeaseCount = limit > 0 ? entry.LeaseCount : fullLeaseCount;
+            }
+
+            var negotiation = WaitsForMultiplexing ? _negotiations.Find(pending => key.Equals(pending.Key)) : null;
+            return (null, fullLeaseCount, negotiation);
+        }
+    }
+
+    private PoolEntry Lease(PoolEntry entry)
+    {
+        lock (_gate)
+        {
+            entry.LeaseCount = 1;
+            if (entry.Key is not null)
+            {
+                _leased.Add(entry);
+            }
+        }
+
+        return entry;
+    }
+
+    private MultiplexingNegotiation? StartNegotiation(ConnectionPoolKey? key)
+    {
+        if (key is null)
+        {
+            return null;
+        }
+
+        var negotiation = new MultiplexingNegotiation(key);
+        lock (_gate)
+        {
+            _negotiations.Add(negotiation);
+        }
+
+        return negotiation;
+    }
+
+    private void KeepNegotiating(PoolEntry entry, MultiplexingNegotiation? negotiation)
+    {
+        lock (_gate)
+        {
+            entry.Negotiation = negotiation;
+        }
+    }
+
+    private void Decide(MultiplexingNegotiation? negotiation)
+    {
+        if (negotiation is null)
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            _negotiations.Remove(negotiation);
+        }
+
+        negotiation.Decide();
+    }
+
     private static async ValueTask CloseAllAsync(List<PoolEntry> entries)
     {
         foreach (var entry in entries)
@@ -198,21 +414,40 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
         ConnectionPoolKey? key,
         CancellationToken cancellationToken)
     {
-        var connect = await innerConnector.ConnectAsync(target, cancellationToken);
+        var negotiation = StartNegotiation(key);
+        ConnectResult connect;
+        try
+        {
+            connect = await innerConnector.ConnectAsync(target, cancellationToken);
+        }
+        catch
+        {
+            Decide(negotiation);
+            throw;
+        }
 
         var connectionNumber = Interlocked.Increment(ref _nextConnectionNumber) - 1;
         if (connect.Connection is null)
         {
+            Decide(negotiation);
             return NumberedConnectFailure.Of(connect, connectionNumber);
         }
 
-        var entry = new PoolEntry(
+        var entry = Lease(new PoolEntry(
             key,
             connect.Connection,
             connectionNumber,
             connect.LocalEndPoint,
             connect.PeerCertificates,
-            connect.UnixSocketPath);
+            connect.UnixSocketPath));
+        if (MayMultiplex(target, connect))
+        {
+            KeepNegotiating(entry, negotiation);
+        }
+        else
+        {
+            Decide(negotiation);
+        }
 
         return ConnectResult.Connected(
             new PooledConnection(this, entry, target.Events),

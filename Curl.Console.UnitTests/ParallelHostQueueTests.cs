@@ -39,6 +39,17 @@ public sealed class ParallelHostQueueTests
     }
 
     [TestMethod]
+    public async Task WaitForHostAsync_HttpSpeakingHttp2FromTheStart_DoesNotWaitForTheHostsFirstToEnd()
+    {
+        ParallelHostQueue queue = new(0, parallelImmediate: false);
+
+        await queue.WaitForHostAsync("http://h/1", speaksHttp2FromTheStart: true, CancellationToken.None);
+        Task second = queue.WaitForHostAsync("http://h/2", speaksHttp2FromTheStart: true, CancellationToken.None);
+
+        Assert.IsTrue(second.IsCompleted);
+    }
+
+    [TestMethod]
     public async Task WaitForHostAsync_HttpWithoutParallelImmediate_DoesNotHoldBackOtherHostsOrPorts()
     {
         ParallelHostQueue queue = new(0, parallelImmediate: false);

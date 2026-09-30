@@ -46,6 +46,24 @@ internal sealed record PoolEntry(
     public IConnectionSession? Session { get; set; }
 
     /// <summary>
+    /// Gets or sets how many transfers hold a lease of the connection: one, or more while its
+    /// <see cref="Session" /> multiplexes them (BL-717). Read and written under the pool's lock.
+    /// </summary>
+    public int LeaseCount { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a lease ended without marking the connection
+    /// reusable: no new transfer shares it, and it closes when its last lease ends.
+    /// </summary>
+    public bool IsShareBarred { get; set; }
+
+    /// <summary>
+    /// Gets or sets what transfers waiting to learn whether the connection multiplexes wait on,
+    /// or <see langword="null" /> once that is known (BL-717).
+    /// </summary>
+    public MultiplexingNegotiation? Negotiation { get; set; }
+
+    /// <summary>
     /// Closes the connection, first letting its <see cref="Session" />, if any, write what
     /// its protocol sends before a connection closes, such as HTTP/2's GOAWAY.
     /// </summary>

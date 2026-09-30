@@ -62,6 +62,26 @@ public sealed class IConnectionTests
         Assert.IsNull(plaintext);
     }
 
+    [TestMethod]
+    public void IsSharedWithAnotherTransfer_WhenNotOverridden_ReturnsFalse()
+    {
+        IConnection connection = new MinimalConnection();
+
+        var isShared = connection.IsSharedWithAnotherTransfer;
+
+        Assert.IsFalse(isShared);
+    }
+
+    [TestMethod]
+    public void ConcurrentTransferLimit_WhenNotOverridden_ReturnsNull()
+    {
+        IConnectionSession session = new UnusedSession();
+
+        var limit = session.ConcurrentTransferLimit;
+
+        Assert.IsNull(limit);
+    }
+
     private sealed class UnusedSession : IConnectionSession
     {
         public ValueTask ShutDownAsync(CancellationToken cancellationToken) => throw new NotSupportedException();

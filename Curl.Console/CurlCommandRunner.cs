@@ -1526,7 +1526,7 @@ internal sealed class CurlCommandRunner(
         CancellationToken abortToken)
     {
         string url = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
-        await run.Hosts.WaitForHostAsync(url, abortToken).ConfigureAwait(false);
+        await run.Hosts.WaitForHostAsync(url, options.HttpVersion == RequestedHttpVersion.Http2PriorKnowledge, abortToken).ConfigureAwait(false);
         Running.ParallelProgress?.MarkLive();
         try
         {

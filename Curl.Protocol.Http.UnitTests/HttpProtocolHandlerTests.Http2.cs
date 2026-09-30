@@ -325,6 +325,24 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    public async Task ExecuteAsync_Http2ConnectionLeftIntact_ReportsItOnlyWhenNoOtherTransferSharesIt(bool isShared, bool reportsLeftIntact)
+    {
+        // curl -Z --http2-prior-knowledge -v with three URLs printed one "left intact", when the last stream ended (BL-717 Notes).
+        HpackEncoder server = new();
+        byte[] response = Http2Response(Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "204")]), isEndStream: true, isEndHeaders: true));
+        SessionHoldingConnection connection = new(new ScriptedConnection(response, 65536)) { IsSharedWithAnotherTransfer = isShared };
+        RecordingTransferEvents events = new();
+        TransferContext context = new() { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), Events = events, Http = new HttpRequestOptions { Version = HttpVersionPreference.Http2PriorKnowledge } };
+
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(reportsLeftIntact, events.Info.Contains("Connection #0 to host example.com:80 left intact"));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Http11AgreedWithAlpn_SpeaksHttp11()
     {
         ScriptedConnection connection = Connection(NoContent, 65536, RootRequest);
