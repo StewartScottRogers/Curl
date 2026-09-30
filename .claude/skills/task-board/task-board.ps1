@@ -14,14 +14,17 @@
                its dependencies, or needing Stewart.
       next     The task /task-run should take next, or "No task is ready.". A ready
                task whose touches overlap a task in Doing is not offered, so lanes
-               of the dark factory never work on the same files at once.
+               of the dark factory never work on the same files at once. A task
+               whose front matter says 'lane: no' is never offered either: it is
+               interactive only, run by naming it (/task-run BL-###).
       capacity How many tasks the board could have running at once right now: the
                tasks in Doing, plus the ready tasks that could start beside them,
                picked in 'next' order so no two overlap in touches. One line,
                parseable with '^Capacity (\d+):'. The dark factory's -Lanes Auto
-               caps its lane count with it.
+               caps its lane count with it. Interactive-only tasks do not count.
       next-id  The next free task ID.
-      new      Create a task in Backlog from TASK-TEMPLATE.md.
+      new      Create a task in Backlog from TASK-TEMPLATE.md. -NoLane writes
+               'lane: no' so no dark factory lane is offered it.
       move     Move a task to another state, appending a Log line.
       archive  Move finished tasks into Done\<yyyy-MM-dd_HHmm>\. With -WhenDoneIsLong,
                move all of them, but only once Done holds more than 20.
@@ -76,6 +79,10 @@ param(
     # Projects, folders or files the task will change; '*' or nothing means it may
     # change anything, so it never runs beside another task.
     [string[]] $Touches = @(),
+
+    # For 'new': write 'lane: no', so 'next' and 'capacity' never offer the task to a
+    # dark factory lane; an interactive session runs it by naming it.
+    [switch] $NoLane,
 
     # Task IDs 'next' must not offer, e.g. ones a lane already tried this shift.
     [string[]] $Skip = @(),
@@ -153,6 +160,9 @@ function ConvertTo-Task([IO.FileInfo] $File) {
     $taskPriority = [string]$fields['priority']
     if (-not $PriorityRank.ContainsKey($taskPriority)) { $taskPriority = 'Normal' }
 
+    # 'lane: no' means interactive only; absent, empty or 'yes' means any runner.
+    $laneAllowed = ([string]$fields['lane']).Trim() -ine 'no'
+
     return [pscustomobject]@{
         Id        = $taskId
         Number    = [int]($taskId -replace '\D', '')
@@ -162,6 +172,7 @@ function ConvertTo-Task([IO.FileInfo] $File) {
         Pipeline  = [string]$fields['pipeline']
         DependsOn = $dependencies
         Touches   = $touched
+        LaneAllowed = $laneAllowed
         Completed = [string]$fields['completed']
         State     = $state
         Archived  = ($state -eq 'Done') -and ($File.DirectoryName -ne $DoneFolder)
@@ -264,6 +275,12 @@ function Get-ReadyTasks([object[]] $Tasks) {
         @{ Expression = { $waiting[$_.Id] }; Descending = $true }, Number)
 }
 
+# The ready tasks a dark factory lane may be offered: every ready task but the
+# interactive-only ones ('lane: no'), in the same order.
+function Get-LaneReadyTasks([object[]] $Tasks) {
+    return , @((Get-ReadyTasks $Tasks) | Where-Object { $_.LaneAllowed })
+}
+
 # The Doing task a ready task would collide with, or $null if it can start now.
 function Get-Collision($Task, [object[]] $Tasks) {
     foreach ($busy in @($Tasks | Where-Object { $_.State -eq 'Doing' })) {
@@ -297,7 +314,7 @@ switch ($Command) {
     'status' {
         $tasks = Get-Tasks
         $doneIds = Get-DoneIds $tasks
-        $readyIds = @((Get-ReadyTasks $tasks) | ForEach-Object { $_.Id })
+        $readyIds = @((Get-LaneReadyTasks $tasks) | ForEach-Object { $_.Id })
 
         foreach ($state in $States) {
             $inState = @($tasks | Where-Object { $_.State -eq $state -and -not $_.Archived } | Sort-Object Number)
@@ -308,6 +325,7 @@ switch ($Command) {
                     $missing = @(Get-MissingDependencies $task $doneIds)
                     if ($task.Assignee -ne 'Claude') { $flag = "needs $($task.Assignee)" }
                     elseif ($missing.Count -gt 0) { $flag = 'waiting on ' + ($missing -join ', ') }
+                    elseif (-not $task.LaneAllowed) { $flag = 'ready, interactive only' }
                     else {
                         $flag = 'ready, #' + ([array]::IndexOf($readyIds, $task.Id) + 1) + ' in queue'
                         $collision = Get-Collision $task $tasks
@@ -331,7 +349,7 @@ switch ($Command) {
     'next' {
         $tasks = Get-Tasks
         $skipIds = @($Skip | ForEach-Object { $_ -split '[,\s]+' } | Where-Object { $_ } | ForEach-Object { $_.ToUpperInvariant() })
-        $ready = @((Get-ReadyTasks $tasks) | Where-Object { $skipIds -notcontains $_.Id })
+        $ready = @((Get-LaneReadyTasks $tasks) | Where-Object { $skipIds -notcontains $_.Id })
         if ($ready.Count -eq 0) { Write-Output 'No task is ready.'; break }
         $free = @($ready | Where-Object { -not (Get-Collision $_ $tasks) })
         if ($free.Count -eq 0) {
@@ -350,7 +368,7 @@ switch ($Command) {
         $doing = @($tasks | Where-Object { $_.State -eq 'Doing' })
         $claimed = @($doing | ForEach-Object { , $_.Touches })
         $picked = @()
-        foreach ($task in (Get-ReadyTasks $tasks)) {
+        foreach ($task in (Get-LaneReadyTasks $tasks)) {
             $overlaps = $false
             foreach ($touches in $claimed) {
                 if (Test-Overlap $task.Touches $touches) { $overlaps = $true; break }
@@ -401,6 +419,7 @@ switch ($Command) {
             Replace('{{TOUCHES}}', ($touchList -join ', ')).
             Replace('{{REQUIREMENT}}', $Requirement).
             Replace('{{DATE}}', $Today)
+        if ($NoLane) { $text = [regex]::new('(?m)^(touches:[^\r\n]*)(\r?\n)').Replace($text, "`$1`$2lane: no`$2", 1) }
         Write-Text $path $text
         Write-Output "$newId  Tasks\Backlog\$fileName"
     }
