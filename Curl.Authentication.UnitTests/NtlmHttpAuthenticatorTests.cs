@@ -14,7 +14,7 @@ namespace Curl.Authentication;
 /// failing with exit 100 on curl's own NTLM (BL-849).
 /// </summary>
 [TestClass]
-public sealed class NtlmHttpAuthenticatorTests
+public sealed partial class NtlmHttpAuthenticatorTests
 {
     private static readonly byte[] Type1 = Convert.FromBase64String(HandBuiltNtlmSecurityContextTests.CurlType1);
 

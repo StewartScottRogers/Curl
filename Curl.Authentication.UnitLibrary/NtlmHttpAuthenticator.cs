@@ -43,7 +43,14 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
     /// <c>Curl_input_ntlm</c> and <c>Curl_output_ntlm</c> do: nothing after Type 3; Type 3 for a
     /// challenge carrying a Type 2 message; Type 1 before any challenge, for a bare <c>NTLM</c>
     /// challenge to a request that sent none, and once more for one to the Type 1 sent before
-    /// any challenge; after that, nothing.
+    /// any challenge; after that, nothing. What curl writes under <c>-v</c> when the handshake
+    /// goes wrong is reported to the request's <see cref="HttpAuthRequest.Events" />
+    /// (<see cref="NtlmHandshakeLines" />, BL-848): <c>NTLM handshake rejected</c> for a bare
+    /// <c>NTLM</c> after Type 3, <c>NTLM handshake failure (internal error)</c> for one after a
+    /// Type 1 that answered a challenge, <c>NTLM handshake failure (bad type-2 message)</c> for
+    /// a Type 2 curl's own NTLM cannot read, each followed by <c>NTLM authentication problem,
+    /// ignoring.</c>, which a challenge that is not base64 gets alone; and SSPI's Type 3 failure
+    /// line before the exit 94.
     /// </summary>
     /// <param name="request">The request being authorised.</param>
     /// <param name="sentAuthorization">The <c>NTLM</c> value the request that drew the challenges sent, or <see langword="null" />.</param>
@@ -60,18 +67,31 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(challenges);
+        string? token = HttpChallengeSchemes.NtlmTokenOf(challenges);
         if (sentAuthorization is not null && CarriesAuthenticateMessage(sentAuthorization))
         {
+            ReportRefusedIfBare(request.Events, token, NtlmHandshakeLines.Rejected);
             return null;
         }
 
-        string? token = HttpChallengeSchemes.NtlmTokenOf(challenges);
         if (string.IsNullOrEmpty(token))
         {
-            return sentAuthorization is null || sentBeforeAnyChallenge ? await CreateNegotiateAsync(request, cancellationToken).ConfigureAwait(false) : null;
+            if (sentAuthorization is null || sentBeforeAnyChallenge)
+            {
+                return await CreateNegotiateAsync(request, cancellationToken).ConfigureAwait(false);
+            }
+
+            ReportRefusedIfBare(request.Events, token, NtlmHandshakeLines.InternalError);
+            return null;
         }
 
-        return DecodeBase64(token) is { } challenge ? await CreateAuthenticateAsync(request, challenge, cancellationToken).ConfigureAwait(false) : null;
+        if (DecodeBase64(token) is { } challenge)
+        {
+            return await CreateAuthenticateAsync(request, challenge, cancellationToken).ConfigureAwait(false);
+        }
+
+        request.Events.ReportInfo(NtlmHandshakeLines.ProblemIgnored);
+        return null;
     }
 
     /// <summary>Gets the security context request <paramref name="request" /> comes to.</summary>
@@ -92,6 +112,26 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
         (string domain, string user) = NtlmUserName.SplitDomain(credential.UserName);
         string? credentialDomain = credential.Domain.Length == 0 ? null : credential.Domain;
         return defaults with { UserName = user, Password = credential.Password, Domain = domain.Length == 0 ? credentialDomain : domain };
+    }
+
+    /// <summary>
+    /// Reports <paramref name="line" /> and then <see cref="NtlmHandshakeLines.ProblemIgnored" />
+    /// when the response's NTLM challenge is a bare <c>NTLM</c> (<paramref name="token" /> empty);
+    /// nothing when no challenge is NTLM, as curl reads none then.
+    /// </summary>
+    private static void ReportRefusedIfBare(ITransferEvents events, string? token, string line)
+    {
+        if (token is { Length: 0 })
+        {
+            ReportRefused(events, line);
+        }
+    }
+
+    /// <summary>Reports <paramref name="line" />, then <see cref="NtlmHandshakeLines.ProblemIgnored" />.</summary>
+    private static void ReportRefused(ITransferEvents events, string line)
+    {
+        events.ReportInfo(line);
+        events.ReportInfo(NtlmHandshakeLines.ProblemIgnored);
     }
 
     private static bool CarriesAuthenticateMessage(string authorization)
@@ -131,16 +171,23 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
             ? await context.NextTokenAsync(challenge, cancellationToken).ConfigureAwait(false)
             : negotiate;
         string? header = HeaderOf(authenticate);
-        if (header is null && refusedChallengeFailsTransfer)
+        if (header is not null)
         {
+            return header;
+        }
+
+        if (refusedChallengeFailsTransfer)
+        {
+            request.Events.ReportInfo(NtlmHandshakeLines.Type3Failure(authenticate.Status));
             throw new HttpAuthenticationFailedException(CurlExitCode.AuthError, AuthErrorMessage);
         }
 
-        if (header is null && authenticate.Status == SecurityContextStatus.Refused)
+        if (authenticate.Status == SecurityContextStatus.Refused)
         {
             throw new HttpAuthenticationFailedException(CurlExitCode.TooLarge, Type3TooLargeMessage);
         }
 
-        return header;
+        ReportRefused(request.Events, NtlmHandshakeLines.BadType2);
+        return null;
     }
 }
