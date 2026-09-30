@@ -1,0 +1,12 @@
+<Project>
+
+  <!--
+    Stops MSBuild importing the repository root's Directory.Packages.props into the
+    file-based app here (Fuzz.cs). It uses the base class library only and references no package.
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+</Project>
