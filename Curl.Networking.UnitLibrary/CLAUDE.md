@@ -186,6 +186,12 @@ an `Http`, `Http10` or `Https` proxy, and a forward-proxy target, are then reach
 the pre-proxy resolved (exit 5 names it) and dialled (exit 7 names the HTTP proxy `over proxy`
 the pre-proxy), its SOCKS handshake opened to the HTTP proxy, and the CONNECT, proxy TLS or
 forwarded request run inside. A SOCKS `ConnectTarget.Proxy` and a direct target never use it.
+Per BL-616 `TcpConnector` takes an optional `HaproxyProtocolHeader` (`--haproxy-protocol`,
+`--haproxy-clientip`) and writes its PROXY protocol v1 line first on every new connection, once any
+tunnel is open and before the target's TLS handshake, from the socket's own ends (the proxy's through
+a proxy): `PROXY TCP4|TCP6 <local> <remote> <local port> <remote port>`, the client IP verbatim for both
+addresses (`TCP4` only for a strict dotted quad), `PROXY UNKNOWN` over a Unix domain socket, all
+measured against curl 8.21.0.
 
 `TcpConnector` applies `--resolve` through `ResolveOverrides` and `--connect-to` through
 `ConnectToMappings`, both built from the verbatim option values and parsed as curl 8.21.0

@@ -88,6 +88,11 @@ namespace Curl.Networking;
 /// <c>--socks5-gssapi</c>, <c>--socks5-gssapi-service</c>, <c>--socks5-gssapi-nec</c>, BL-615);
 /// <see langword="null" /> for <see cref="Socks5AuthenticationOptions.Default" />.
 /// </param>
+/// <param name="haproxyProtocol">
+/// The HAProxy PROXY protocol v1 line <c>--haproxy-protocol</c> or <c>--haproxy-clientip</c> asks for,
+/// written first on every new connection once it is dialled and any proxy tunnel is open, before the
+/// target's TLS handshake, from the socket's own ends (BL-616); <see langword="null" /> to send none.
+/// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -106,7 +111,8 @@ public sealed class TcpConnector(
     LocalBinding? localBinding = null,
     INetworkInterfaceLookup? networkInterfaceLookup = null,
     ProxyEndpoint? preProxy = null,
-    Socks5AuthenticationOptions? socks5Authentication = null) : IConnector
+    Socks5AuthenticationOptions? socks5Authentication = null,
+    HaproxyProtocolHeader? haproxyProtocol = null) : IConnector
 {
     private const string AnyHost = "*";
 
@@ -148,6 +154,12 @@ public sealed class TcpConnector(
     /// <see cref="Socks5AuthenticationOptions.Default" /> when none were given.
     /// </summary>
     public Socks5AuthenticationOptions Socks5Authentication => socks5Authentication ?? Socks5AuthenticationOptions.Default;
+
+    /// <summary>
+    /// Gets the HAProxy PROXY protocol v1 line written first on every new connection, or
+    /// <see langword="null" /> for none (<c>--haproxy-protocol</c>, <c>--haproxy-clientip</c>, BL-616).
+    /// </summary>
+    public HaproxyProtocolHeader? HaproxyProtocol => haproxyProtocol;
 
     // Every TCP dial goes through this one: bound as localBinding asks, or the dialer as given.
     private ITcpDialer BindingDialer() => localBinding is null
@@ -1136,6 +1148,12 @@ public sealed class TcpConnector(
         int proxyConnectResponseCode,
         CancellationToken cancellationToken)
     {
+        if (haproxyProtocol is { } header)
+        {
+            // curl 8.21.0 writes the line after any tunnel and before TLS, from the socket's own ends (BL-616).
+            await dialed.Connection.WriteAsync(header.Build(dialed.LocalEndPoint, dialed.RemoteEndPoint), cancellationToken).ConfigureAwait(false);
+        }
+
         if (!target.UseTls)
         {
             return Opened(dialed, target.Events, dialed.Connection, timings, proxyConnectResponseCode, peerCertificates: null);
