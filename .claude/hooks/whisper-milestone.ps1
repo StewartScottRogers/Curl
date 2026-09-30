@@ -1,15 +1,17 @@
 <#
 .SYNOPSIS
-    Whispers to Stewart when a task reaches Done, a commit is made, or a branch is deleted.
+    Whispers to Stewart when a task reaches Done, a CI failure is filed, a commit is made, or a branch is deleted.
 
 .DESCRIPTION
     A PostToolUse hook for Bash and PowerShell tool calls, in every Claude Code session in
     this repository - the interactive one and every dark factory lane. It reads the hook's
-    JSON from standard input, recognises three milestones from the command and its output,
+    JSON from standard input, recognises four milestones from the command and its output,
     and speaks one short phrase very quietly in Windows' Zira voice:
 
       task-board.ps1 move ... -To Done        "Task done. B L 199, expand variable references in config files."
                                               (the task's whole file name, never shortened)
+      task-board.ps1 new, a "Fix CI" task     "CI failure filed. B L 990, fix ci failure ..."
+                                              (the dark factory's CI watch, BL-987)
       git commit (that made a commit)         "Committed. Parse the proxy text."
       git branch -d/-D, git push --delete     "Branch factory BL 147 wip, deleted."
 
@@ -42,6 +44,14 @@ try {
         foreach ($m in [regex]::Matches($output, '(BL-\d+)\s+\w+\s+->\s+Done\s+\S*?\1-([a-z0-9-]+)\.md')) {
             # The whole file name, never a shortened one: Stewart asked to hear all of it.
             $phrases += "Task done. $($m.Groups[1].Value), $($m.Groups[2].Value -replace '-', ' ')."
+        }
+    }
+
+    # A CI failure filed by the dark factory's CI watch (BL-987), whose task titles start
+    # "Fix CI" or "Fix flaky CI": "BL-990  Tasks\Backlog\BL-990-fix-ci-failure-<test>.md".
+    if ($command -match 'task-board\.ps1' -and $command -match '\bnew\b') {
+        foreach ($m in [regex]::Matches($output, '(BL-\d+)\s+\S*?\1-(fix-(?:flaky-)?ci-[a-z0-9-]+)\.md')) {
+            $phrases += "CI failure filed. $($m.Groups[1].Value), $($m.Groups[2].Value -replace '-', ' ')."
         }
     }
 
