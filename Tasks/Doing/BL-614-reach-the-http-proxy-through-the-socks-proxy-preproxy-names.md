@@ -33,3 +33,4 @@ With `--preproxy socks5://...` and `-x http://...`, the connector reaches the HT
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-30: Backlog -> Doing.
