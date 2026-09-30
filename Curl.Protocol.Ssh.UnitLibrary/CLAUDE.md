@@ -8,7 +8,7 @@ File transfer over SSH.
 
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and the
 hand-built libraries ADR-0120 lists; it references `Curl.Cryptography.UnitLibrary`
-for `FiniteFieldDiffieHellman`, `DsaSignature`, `Des`, `X25519` and `Ed25519`. Referencing another protocol
+for `FiniteFieldDiffieHellman`, `DsaSignature`, `Des`, `X25519`, `Ed25519`, `ChaCha20` and `Poly1305`. Referencing another protocol
 library is a build break, and `Curl.Protocol.Abstractions.UnitTests` fails if one
 appears.
 
@@ -31,7 +31,8 @@ implemented names; `KeyExchange` holds one `ISshKeyExchange` per method family a
 `SshKeyDerivation`; `HostKeys` holds one `ISshSignatureVerifier` per host-key type and
 `KnownHostsFile` and `SshHostKeyChecker`, which accept or refuse the host key (ADR-0213);
 `PacketProtection` holds one `ISshPacketProtection` per cipher family, which the packet
-reader and writer switch to at each `NEWKEYS` (ADR-0212); `Authentication` holds
+reader and writer switch to at each `NEWKEYS` (ADR-0212) - `ChaCha20Poly1305PacketProtection`
+(ADR-0259), `AesGcmPacketProtection` and `CipherAndMacPacketProtection`; `Authentication` holds
 `SshUserAuthentication`, which requests the `ssh-userauth` service and authenticates the
 user with `none`, `publickey`, `password` and `keyboard-interactive` in curl's order
 (ADR-0215, ADR-0230); `Keys` holds `SshUserKeySource`, which finds `--key` (or curl's

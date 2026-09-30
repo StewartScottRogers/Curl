@@ -11,7 +11,8 @@ namespace Curl.Protocol.Ssh.Fakes;
 /// <see cref="InMemorySshServerSession" /> over an <see cref="InMemoryDuplexConnection" />.
 /// It runs a real session, built from the library's own transport and packet protection in
 /// the server role: <c>diffie-hellman-group14-sha256</c> with an <c>rsa-sha2-256</c> host key
-/// (both in the Windows and the OpenSSL presets), <c>aes128-ctr</c> and <c>hmac-sha2-256</c>;
+/// (both in the Windows and the OpenSSL presets), <see cref="Cipher" /> (<c>aes128-ctr</c>
+/// unless set) and <c>hmac-sha2-256</c>;
 /// <c>password</c> and <c>publickey</c> authentication; one <c>session</c> channel running
 /// either the <c>sftp</c> subsystem or <c>scp -pf</c>, serving <see cref="Files" /> and, over
 /// SFTP, listing the files directly under a directory path that ends with a slash and
@@ -68,6 +69,12 @@ public sealed class InMemorySshServer(string userName, string password) : IConne
     /// before answering it.
     /// </summary>
     public bool HangsUpOnChannelOpen { get; init; }
+
+    /// <summary>
+    /// Gets the one cipher the server offers in both directions, beside
+    /// <c>hmac-sha2-256</c>, which an AEAD cipher leaves unused: <c>aes128-ctr</c> by default.
+    /// </summary>
+    public string Cipher { get; init; } = "aes128-ctr";
 
     /// <summary>Gets the server's host key blob, <c>K_S</c>, an <c>ssh-rsa</c> key.</summary>
     public byte[] HostKeyBlob => HostKey.Blob;

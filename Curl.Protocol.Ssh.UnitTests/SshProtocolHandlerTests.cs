@@ -93,6 +93,21 @@ public sealed class SshProtocolHandlerTests
 
     [TestMethod]
     [DynamicData(nameof(Presets))]
+    public async Task ExecuteAsync_ServerOffersOnlyChaCha20Poly1305_TransfersOverIt(string platform, SshAlgorithmPreferences preferences)
+    {
+        InMemorySshServer server = new(User, Password) { Cipher = "chacha20-poly1305@openssh.com" };
+        byte[] large = [.. Enumerable.Range(0, 70000).Select(index => (byte)(index * 13))];
+        server.Files["/data/large.bin"] = large;
+
+        Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/large.bin", preferences: preferences);
+
+        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result, platform);
+        CollectionAssert.AreEqual(large, outcome.Output);
+        Assert.AreEqual("disconnect 11 Shutdown", server.Events[^1]);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Presets))]
     public async Task ExecuteAsync_ScpDownload_WritesTheFileAndEndsTheSessionAsCurlDoes(string platform, SshAlgorithmPreferences preferences)
     {
         InMemorySshServer server = Server();

@@ -46,7 +46,7 @@ public sealed class SshKexInitTests
     }
 
     [TestMethod]
-    public void ForClient_TodaysCatalogue_OffersCurve25519NistAndFiniteFieldExchangesEcdsaEd25519RsaHostKeysAesAndSha2Macs()
+    public void ForClient_TodaysCatalogue_OffersCurve25519NistAndFiniteFieldExchangesEcdsaEd25519RsaHostKeysChaCha20AesAndSha2Macs()
     {
         SshKexInit kexInit = SshKexInit.ForClient(SshAlgorithmPreferences.OpenSslReference, SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0));
 
@@ -63,7 +63,7 @@ public sealed class SshKexInitTests
         CollectionAssert.AreEqual(
             new[] { "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521", "ssh-ed25519", "rsa-sha2-512", "rsa-sha2-256", "ssh-rsa" },
             kexInit.ServerHostKey.ToArray());
-        string[] ciphers = ["aes256-gcm@openssh.com", "aes128-gcm@openssh.com", "aes256-ctr", "aes192-ctr", "aes128-ctr"];
+        string[] ciphers = ["chacha20-poly1305@openssh.com", "aes256-gcm@openssh.com", "aes128-gcm@openssh.com", "aes256-ctr", "aes192-ctr", "aes128-ctr"];
         CollectionAssert.AreEqual(ciphers, kexInit.CipherClientToServer.ToArray());
         CollectionAssert.AreEqual(ciphers, kexInit.CipherServerToClient.ToArray());
         string[] macs = ["hmac-sha2-256", "hmac-sha2-256-etm@openssh.com", "hmac-sha2-512", "hmac-sha2-512-etm@openssh.com"];

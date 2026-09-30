@@ -13,6 +13,7 @@ public sealed class SshPacketProtectionsTests
     private static readonly int[] PayloadLengths = [1, 11, 15, 16, 17, 100, 255, 4096, 32000];
 
     [TestMethod]
+    [DataRow("chacha20-poly1305@openssh.com", null)]
     [DataRow("aes256-gcm@openssh.com", null)]
     [DataRow("aes128-gcm@openssh.com", null)]
     [DataRow("aes256-ctr", "hmac-sha2-256")]
@@ -51,6 +52,7 @@ public sealed class SshPacketProtectionsTests
     }
 
     [TestMethod]
+    [DataRow("chacha20-poly1305@openssh.com", null)]
     [DataRow("aes256-gcm@openssh.com", null)]
     [DataRow("aes256-ctr", "hmac-sha2-256")]
     [DataRow("aes256-ctr", "hmac-sha2-512-etm@openssh.com")]
@@ -105,7 +107,21 @@ public sealed class SshPacketProtectionsTests
     }
 
     [TestMethod]
-    [DataRow("chacha20-poly1305@openssh.com", null, DisplayName = "cipher not implemented")]
+    [DataRow(true, 'C')]
+    [DataRow(false, 'D')]
+    public void Create_ChaCha20Poly1305_TakesASixtyFourByteKeyAndNoIvOrMac(bool clientToServer, char encryption)
+    {
+        using ISshPacketProtection protection = clientToServer
+            ? SshPacketProtections.ForClientToServer(SshTestAlgorithms.With("chacha20-poly1305@openssh.com", null), Keys)
+            : SshPacketProtections.ForServerToClient(SshTestAlgorithms.With("chacha20-poly1305@openssh.com", null), Keys);
+        using ChaCha20Poly1305PacketProtection expected = new(Keys.DeriveKey((SshKeyPurpose)encryption, 64));
+        byte[] packet = [0, 0, 0, 28, 10, .. new byte[17], .. Enumerable.Repeat((byte)0xEE, 10)];
+
+        CollectionAssert.AreEqual(expected.Seal(9, packet), protection.Seal(9, packet));
+    }
+
+    [TestMethod]
+    [DataRow("serpent256-cbc", null, DisplayName = "cipher not implemented")]
     [DataRow("aes128-ctr", "hmac-sha1", DisplayName = "MAC not implemented")]
     public void Create_NameNotImplemented_ThrowsNotSupported(string cipher, string? mac)
     {
@@ -114,12 +130,12 @@ public sealed class SshPacketProtectionsTests
     }
 
     [TestMethod]
-    public void Names_AreTheAesCiphersAndSha2Macs()
+    public void Names_AreTheChaCha20AndAesCiphersAndSha2Macs()
     {
         CollectionAssert.AreEquivalent(
             new[]
             {
-                "aes256-gcm@openssh.com", "aes128-gcm@openssh.com", "aes256-ctr", "aes192-ctr", "aes128-ctr",
+                "chacha20-poly1305@openssh.com", "aes256-gcm@openssh.com", "aes128-gcm@openssh.com", "aes256-ctr", "aes192-ctr", "aes128-ctr",
                 "hmac-sha2-256", "hmac-sha2-256-etm@openssh.com", "hmac-sha2-512", "hmac-sha2-512-etm@openssh.com",
             },
             SshPacketProtections.Names.ToArray());

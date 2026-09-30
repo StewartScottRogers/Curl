@@ -116,8 +116,8 @@ public sealed partial class SshTransportTests
     }
 
     [TestMethod]
-    [DataRow(false, "aes256-gcm@openssh.com", null, DisplayName = "OpenSSL preset")]
-    [DataRow(true, "aes256-ctr", "hmac-sha2-256", DisplayName = "Windows preset")]
+    [DataRow(false, "chacha20-poly1305@openssh.com", null, DisplayName = "OpenSSL preset")]
+    [DataRow(true, "chacha20-poly1305@openssh.com", null, DisplayName = "Windows preset")]
     public async Task NegotiateAlgorithmsAsync_TodaysCatalogue_AgreesACipherAndMacWithAnOpenSshServer(bool windows, string cipher, string? mac)
     {
         byte[] serverBytes = new SshServerScript().Line("SSH-2.0-OpenSSH_9.7").KexInit(SshServerScript.OpenSshKexInit()).Bytes;

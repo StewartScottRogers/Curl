@@ -6,14 +6,14 @@ namespace Curl.Protocol.Ssh.PacketProtection;
 
 /// <summary>
 /// The ciphers and MACs this library implements, by the name <c>KEXINIT</c> offers them
-/// under (ADR-0122's cipher and MAC tables; <c>chacha20-poly1305@openssh.com</c> joins with
-/// BL-679, the legacy rows with BL-680), and how each direction's protection is built
+/// under (ADR-0122's cipher and MAC tables; the legacy rows join with BL-680), and how each direction's protection is built
 /// from the negotiated names and the keys <c>NEWKEYS</c> hands out.
 /// </summary>
 internal static class SshPacketProtections
 {
     private static readonly Dictionary<string, SshCipherAlgorithm> Ciphers = new()
     {
+        ["chacha20-poly1305@openssh.com"] = new(ChaCha20Poly1305PacketProtection.KeyLength, 0, (key, _, _) => new ChaCha20Poly1305PacketProtection(key)),
         ["aes256-gcm@openssh.com"] = new(32, AesGcmPacketProtection.NonceLength, (key, iv, _) => new AesGcmPacketProtection(key, iv)),
         ["aes128-gcm@openssh.com"] = new(16, AesGcmPacketProtection.NonceLength, (key, iv, _) => new AesGcmPacketProtection(key, iv)),
         ["aes256-ctr"] = new(32, 16, (key, iv, mac) => new CipherAndMacPacketProtection(new AesCtrSshCipher(key, iv), mac!)),

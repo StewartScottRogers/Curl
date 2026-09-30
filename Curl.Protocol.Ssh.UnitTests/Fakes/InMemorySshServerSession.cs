@@ -28,8 +28,6 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
 
     private const string KeyExchangeMethod = "diffie-hellman-group14-sha256";
 
-    private const string Cipher = "aes128-ctr";
-
     private const string Mac = "hmac-sha2-256";
 
     private const int ScpChunkSize = 16384;
@@ -115,7 +113,7 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         packetReader = new SshPacketReader(connectionReader);
         packetWriter = new SshPacketWriter(connection, new SystemSshRandomSource());
         byte[] serverKexInit = new SshKexInit(
-            RandomNumberGenerator.GetBytes(16), [KeyExchangeMethod], [server.HostKey.Algorithm], [Cipher], [Cipher], [Mac], [Mac], ["none"], ["none"], [], [], FirstKexPacketFollows: false).ToPayload();
+            RandomNumberGenerator.GetBytes(16), [KeyExchangeMethod], [server.HostKey.Algorithm], [server.Cipher], [server.Cipher], [Mac], [Mac], ["none"], ["none"], [], [], FirstKexPacketFollows: false).ToPayload();
         await SendAsync(serverKexInit).ConfigureAwait(false);
         byte[] clientKexInit = await Reader.ReadAsync(CancellationToken.None).ConfigureAwait(false);
         SshNegotiatedAlgorithms algorithms = SshAlgorithmNegotiator.Negotiate(SshKexInit.Parse(clientKexInit), SshKexInit.Parse(serverKexInit))!;
