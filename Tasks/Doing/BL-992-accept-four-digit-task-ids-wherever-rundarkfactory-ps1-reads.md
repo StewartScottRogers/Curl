@@ -45,3 +45,4 @@ in every one, plus a self-test. The script already has self-test switches of the
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
