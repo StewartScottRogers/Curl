@@ -58,6 +58,32 @@ public sealed class CurlCommandRunnerConnectionPoolTests
     }
 
     [TestMethod]
+    public async Task RunAsync_WithARunConnectionCacheAndTwoOptionGroups_ClosesItOnceAfterBoth()
+    {
+        RecordingConnectionPool runConnections = new();
+        int groupsBuilt = 0;
+
+        int exitCode = await new CurlCommandRunner(
+                _ =>
+                {
+                    groupsBuilt++;
+                    return new TransferDispatch(new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(new RecordingConnector(CurlExitCode.CouldntConnect, "Failed to connect"), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())), []);
+                },
+                fileSystem,
+                fileSystem,
+                new MemoryStream(),
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: false,
+                runConnectionCache: runConnections)
+            .RunAsync(["-s", "http://h:18234/", "--next", "-s", "http://h:18234/"]);
+
+        Assert.AreEqual(7, exitCode);
+        Assert.AreEqual(2, groupsBuilt);
+        Assert.AreEqual(1, runConnections.DisposeCount);
+    }
+
+    [TestMethod]
     public async Task DisposeAsync_WithoutAConnectionPool_DoesNothing()
     {
         TransferDispatch dispatch = new(new ProtocolDispatcher([]));

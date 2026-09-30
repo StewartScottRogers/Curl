@@ -244,7 +244,7 @@ internal static class CurlComposition
     /// <paramref name="options" />, and the TCP connector applies the <c>--resolve</c> and
     /// <c>--connect-to</c> values (<see cref="CreateTcpConnector" />), as the UDP connector does
     /// (<see cref="CreateUdpDatagramConnector" />). One
-    /// <see cref="PoolingConnector" /> over the TCP connector, on the same clock, is the run's
+    /// <see cref="PoolingConnector" /> over the TCP connector, on the same clock, is the option group's
     /// connection pool (ADR-0050).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
@@ -355,7 +355,11 @@ internal static class CurlComposition
     /// <param name="options">The parsed command line.</param>
     /// <param name="timeProvider">The clock every transport times on.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
-    internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider)
+    /// <param name="runConnections">
+    /// The run's connection cache, which every option group's pooling connector shares
+    /// (<see cref="CreatePoolingConnector" />); <see langword="null" /> for a pool of the group's own.
+    /// </param>
+    internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider, ConnectionCache? runConnections = null)
     {
         TcpDialer tcpDialer = new(new TcpSocketOptions(options.TcpNoDelay, options.TcpKeepAlive));
         IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer);
@@ -368,7 +372,7 @@ internal static class CurlComposition
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider);
         TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts);
         UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider);
-        PoolingConnector poolingConnector = new(tcpConnector, timeProvider) { WaitsForMultiplexing = WaitsForMultiplexing(options) };
+        PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, timeProvider, runConnections);
 
         // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
         // contexts come from, which can only be made once the connectors exist (BL-604).
@@ -396,6 +400,30 @@ internal static class CurlComposition
     /// <param name="options">The parsed command line.</param>
     /// <returns><see langword="true" /> for <c>-Z</c> without <c>--parallel-immediate</c>.</returns>
     internal static bool WaitsForMultiplexing(CommandLineOptions options) => options.Parallel && !options.ParallelImmediate;
+
+    /// <summary>
+    /// Creates an option group's pooling connector over <paramref name="connector" />, waiting for
+    /// multiplexing as <see cref="WaitsForMultiplexing" /> says: over the run's
+    /// <paramref name="runConnections" /> with the group's <see cref="OptionGroupConnectionSettings" />,
+    /// so a later group reuses an earlier group's connection when their settings are equal, as curl
+    /// 8.21.0 does (ADR-0285, BL-754); or, without one, over a pool of its own.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="connector">Opens a connection when the pool has none to reuse.</param>
+    /// <param name="timeProvider">The clock a pool of its own measures idle time on.</param>
+    /// <param name="runConnections">The run's connection cache, or <see langword="null" />.</param>
+    /// <returns>The pooling connector.</returns>
+    internal static PoolingConnector CreatePoolingConnector(
+        CommandLineOptions options,
+        IConnector connector,
+        TimeProvider timeProvider,
+        ConnectionCache? runConnections)
+    {
+        bool waitsForMultiplexing = WaitsForMultiplexing(options);
+        return runConnections is null
+            ? new PoolingConnector(connector, timeProvider) { WaitsForMultiplexing = waitsForMultiplexing }
+            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(options)) { WaitsForMultiplexing = waitsForMultiplexing };
+    }
 
     /// <summary>
     /// Creates the run's <see cref="TcpConnector" /> over the given pieces, with the
@@ -489,8 +517,9 @@ internal static class CurlComposition
     /// interface and then as a host, <c>if!</c> as an interface only, <c>host!</c> as a host only, and
     /// <c>ifhost!</c> binds its host with its interface part kept as the device name; the port range is
     /// <see cref="LocalPortRange.First" /> and <see cref="LocalPortRange.Count" />, or any port. A value
-    /// libcurl refuses at setopt never reaches a connect, so its empty parts are not looked at. Each option
-    /// group builds its own connector and pool, so a bound connection is never reused unbound.
+    /// libcurl refuses at setopt never reaches a connect, so its empty parts are not looked at. The
+    /// binding is part of each option group's <see cref="OptionGroupConnectionSettings" />, so a bound
+    /// connection is never reused unbound.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The binding, or <see langword="null" />.</returns>
@@ -626,8 +655,11 @@ internal static class CurlComposition
     /// Creates the runner that parses a command line and performs its transfers against
     /// the real disk, the real network and the given standard streams, wrapping warnings at
     /// the width <see cref="TerminalColumns.Resolve()" /> gives. The network
-    /// transports are built by <see cref="CreateTransports(CommandLineOptions)" /> once the
-    /// command line is parsed, because their TLS settings come from it.
+    /// transports are built for each option group by
+    /// <see cref="CreateTransports(CommandLineOptions, TimeProvider, ConnectionCache?)" /> once the
+    /// command line is parsed, because their TLS settings come from it, over one
+    /// <see cref="ConnectionCache" /> the runner closes when the run ends, so a later group reuses
+    /// an earlier group's connection when their settings match (ADR-0285, BL-754).
     /// </summary>
     /// <param name="standardOutput">Where a transfer without <c>-o</c> writes its bytes.</param>
     /// <param name="standardError">Where the <c>curl: (N) message</c> lines go.</param>
@@ -646,9 +678,11 @@ internal static class CurlComposition
         Stream standardError,
         Stream standardInput,
         bool standardOutputIsTerminal,
-        bool terminalRendersStyles = false) =>
-        new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
+        bool terminalRendersStyles = false)
+    {
+        ConnectionCache runConnections = new(TimeProvider.System);
+        return new(
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, TimeProvider.System, runConnections), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -664,7 +698,9 @@ internal static class CurlComposition
             defaultConfigFileSearch: DefaultConfigFileSearch.ForProcess,
             readEnvironmentVariable: name => Environment.GetEnvironmentVariable(name),
             terminalRendersStyles: terminalRendersStyles,
-            accountHomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+            accountHomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            runConnectionCache: runConnections);
+    }
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given
@@ -684,6 +720,11 @@ internal static class CurlComposition
     /// Makes the HTTP handler's Negotiate and NTLM contexts and the mail handlers' GSSAPI and NTLM contexts, or <see langword="null" /> for the production router.
     /// </param>
     /// <param name="signingClock">The clock <c>--aws-sigv4</c> signs with; <see cref="TimeProvider.System" /> when not given.</param>
+    /// <param name="runConnections">
+    /// The run's connection cache, which each option group then reaches <paramref name="connector" />
+    /// through (<see cref="CreatePoolingConnector" />) and the runner closes when the run ends; or
+    /// <see langword="null" /> to connect through <paramref name="connector" /> itself.
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -693,9 +734,10 @@ internal static class CurlComposition
         IDatagramConnector datagramConnector,
         ProxySelector? proxySelector = null,
         ISecurityContextFactory? securityContexts = null,
-        TimeProvider? signingClock = null) =>
+        TimeProvider? signingClock = null,
+        ConnectionCache? runConnections = null) =>
         new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(connector, datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts, options, signingClock)),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(GroupConnectorOf(options, connector, runConnections), datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts, options, signingClock)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -703,7 +745,20 @@ internal static class CurlComposition
             standardInput,
             OperatingSystem.IsWindows(),
             writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
-            outputPaths: new PhysicalOutputPaths());
+            outputPaths: new PhysicalOutputPaths(),
+            runConnectionCache: runConnections);
+
+    /// <summary>
+    /// The connector an option group of a runner over fake connectors connects through:
+    /// <paramref name="connector" /> itself, or, with the run's <paramref name="runConnections" />,
+    /// the group's <see cref="CreatePoolingConnector" /> over it.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="connector">The fake connector.</param>
+    /// <param name="runConnections">The run's connection cache, or <see langword="null" />.</param>
+    /// <returns>The group's connector.</returns>
+    private static IConnector GroupConnectorOf(CommandLineOptions options, IConnector connector, ConnectionCache? runConnections) =>
+        runConnections is null ? connector : CreatePoolingConnector(options, connector, TimeProvider.System, runConnections);
 
     /// <summary>
     /// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows on the

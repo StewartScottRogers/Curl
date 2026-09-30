@@ -119,6 +119,10 @@ namespace Curl.Console;
 /// for <c>.ssh/known_hosts</c> last off Windows (<see cref="SshKnownHostsFileSearch" />); the composition
 /// passes .NET's user profile folder. When not given, only the environment is searched.
 /// </param>
+/// <param name="runConnectionCache">
+/// The connection cache every option group's dispatch shares, closed once the run's transfers end
+/// (ADR-0285, BL-754); <see langword="null" /> when each group's dispatch keeps its own.
+/// </param>
 /// <remarks>
 /// <para>
 /// The command line is parsed after the default config file, so its options apply first and the
@@ -243,7 +247,8 @@ internal sealed class CurlCommandRunner(
     DefaultConfigFileSearch? defaultConfigFileSearch = null,
     Func<string, string?>? readEnvironmentVariable = null,
     bool terminalRendersStyles = false,
-    string? accountHomeDirectory = null)
+    string? accountHomeDirectory = null,
+    IAsyncDisposable? runConnectionCache = null)
 {
     /// <summary>
     /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
@@ -947,6 +952,7 @@ internal sealed class CurlCommandRunner(
         }
         finally
         {
+            await (runConnectionCache?.DisposeAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
             await transferEventOutput.DisposeAsync().ConfigureAwait(false);
         }
     }

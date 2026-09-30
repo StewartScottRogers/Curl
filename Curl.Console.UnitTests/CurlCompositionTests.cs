@@ -454,7 +454,7 @@ public sealed partial class CurlCompositionTests
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions(), timeProvider);
 
         Assert.AreSame(transports.TcpConnector, CapturedDependency<IConnector>(transports.PoolingConnector));
-        Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(transports.PoolingConnector));
+        Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(CapturedDependency<ConnectionCache>(transports.PoolingConnector)));
     }
 
     [TestMethod]

@@ -35,9 +35,10 @@ namespace Curl.Console;
 /// </param>
 /// <param name="UdpDatagramConnector">Opens the UDP channels the datagram protocols use.</param>
 /// <param name="PoolingConnector">
-/// The run's one connection pool over <see cref="TcpConnector" />: every TCP handler connects
+/// The option group's connection pool over <see cref="TcpConnector" />: every TCP handler connects
 /// through it, so a later URL to the same pool key reuses an earlier URL's connection, and the
-/// run disposes it when it ends (ADR-0050).
+/// group's dispatch disposes it when the group ends, which closes a pool of its own and leaves the
+/// run's shared <see cref="ConnectionCache" /> to the runner (ADR-0050, ADR-0285).
 /// </param>
 internal sealed record CurlTransports(
     IDnsResolver DnsResolver,

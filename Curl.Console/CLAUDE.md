@@ -12,11 +12,12 @@ calls - no container, no reflection, no assembly scanning, so native AOT sees ev
 type. `Curl.Core.UnitLibrary` dispatches through the `IProtocolHandler` instances it is
 given and must never reference a protocol library directly.
 
-`CurlComposition.CreateTransports` wraps the run's `TcpConnector` in one `PoolingConnector`,
+`CurlComposition.CreateTransports` wraps an option group's `TcpConnector` in one `PoolingConnector`,
 which every TCP handler connects through, so a later URL to the same pool key reuses an
-earlier URL's connection; `TransferDispatch` holds it as the run's `ConnectionPool`, and the
-runner disposes the dispatch, closing the pool without writing anything, once the transfers
-end, whatever their outcome (ADR-0050, BL-334). It also holds the `TcpConnector`'s
+earlier URL's connection; `TransferDispatch` holds it as its `ConnectionPool`. In production the
+connector shares the run's `ConnectionCache`, which the runner closes without writing anything once
+the run's transfers end, whatever their outcome (ADR-0050, BL-334, ADR-0285); a connector made
+without one owns its pool, which disposing the dispatch closes. It also holds the `TcpConnector`'s
 `LoadResolveEntries`, which the runner calls at the start of every URL's transfer, just before
 the `-b` files load, so `-v` prints the `--resolve` entries' `Added ... to DNS cache` lines for
 each URL; a `--retry` attempt and a followed redirect reload nothing, as in curl 8.21.0 (BL-486).
@@ -185,7 +186,11 @@ in a later option group, once the groups before it have run (BL-509).
 The `-:`/`--next` option groups (`CommandLineParseResult.Groups`) run in order, up to and
 including the first with an output option left over (ADR-0126, BL-509). Each group's URLs use
 that group's options through a `TransferDispatch` the factory builds for the group and the runner
-disposes when the group ends, so connections are not yet reused across groups (BL-754).
+disposes when the group ends. Every group's `PoolingConnector` shares the run's one
+`ConnectionCache` (`CurlComposition.CreatePoolingConnector`), keyed on the group's
+`OptionGroupConnectionSettings`, so a later group reuses an earlier group's connection when their
+TLS, proxy TLS and other connection settings are equal, and the runner closes the cache when the
+run ends (ADR-0285, BL-754).
 `%{urlnum}` (`UrlTransfer.UrlNumber`), `%{xfer_id}` and `%{conn_id}` count on across groups, the
 `-v`/trace output stays open for the whole run, `--fail-early` stops every group, and the exit
 code is the last transfer's. Measured on curl 8.21.0 (BL-509 Notes).
