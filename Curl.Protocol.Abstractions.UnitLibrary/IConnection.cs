@@ -98,7 +98,6 @@ public interface IConnection : IAsyncDisposable
     bool TryHoldSession(IConnectionSession session) => false;
 
     /// <summary>
-<<<<<<< HEAD
     /// Shuts TLS down on this connection and hands back the plaintext connection it ran over,
     /// as FTP's <c>CCC</c> clears the control connection (BL-636, ADR-0280).
     /// </summary>
@@ -125,5 +124,4 @@ public interface IConnection : IAsyncDisposable
     /// is shared.
     /// </summary>
     bool IsSharedWithAnotherTransfer => false;
->>>>>>> bb9a17be(wip(http2): BL-717's unfinished work from lane 1, saved when it timed out on 2026-09-29)
 }
