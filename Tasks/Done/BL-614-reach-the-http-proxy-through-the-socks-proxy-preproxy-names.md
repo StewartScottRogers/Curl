@@ -54,14 +54,14 @@ Measured 2026-09-30 against curl 8.21.0 (Schannel, `/mingw64/bin/curl`) with
 - `--noproxy h` drops both proxies (`Could not resolve host: h`, exit 6).
 - `--preproxy ""`: exit 2, blank argument (the parser's, BL-612).
 
-Decisions (ADR-0272, decided by Claude under Stewart's delegation): the pre-proxy is a `TcpConnector`
+Decisions (ADR-0273, decided by Claude under Stewart's delegation): the pre-proxy is a `TcpConnector`
 constructor argument per option group (`CurlComposition.PreProxyOf`), used only on the way to an HTTP or HTTPS
 proxy or a forward proxy, so neither `ConnectTarget` nor the pool key changes (each group has its own pool, and
 all of it goes through the same pre-proxy). `TransferProxySelection` makes the per-transfer refusals and turns a
 lone pre-proxy into the SOCKS `ConnectTarget.Proxy`. `-U` applies to a lone pre-proxy, as libcurl copies the
 proxy user to the SOCKS proxy.
 
-`touches` gained `Documentation/Planning/Decisions` for ADR-0272 and its index row; no task in Doing names it
+`touches` gained `Documentation/Planning/Decisions` for ADR-0273 and its index row; no task in Doing names it
 (BL-986 touches only the HTTP projects).
 
 Our build replays the measured success, CONNECT and refusal exchanges byte for byte (identical request.bin,

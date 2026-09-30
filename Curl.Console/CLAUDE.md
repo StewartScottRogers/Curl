@@ -239,7 +239,7 @@ and a forward proxy's `407` is answered with the same pick, which `CreateProtoco
 the HTTP handler (ADR-0187). Under
 `--unix-socket` or `--abstract-unix-socket` no proxy is chosen or even parsed, and the group's
 `TcpConnector` dials that socket (`CurlComposition.UnixSocketOf`), as curl 8.21.0 does (ADR-0149, BL-507).
-With `--preproxy` (ADR-0272, BL-614) the environment is not read: `--noproxy` drops both proxies, an
+With `--preproxy` (ADR-0273, BL-614) the environment is not read: `--noproxy` drops both proxies, an
 HTTP pre-proxy or a SOCKS `-x` beside one is exit 5, a lone pre-proxy is the transfer's SOCKS proxy,
 and an HTTP `-x` is reached through the pre-proxy the group's `TcpConnector` gets from
 `CurlComposition.PreProxyOf`. Proxy text curl
