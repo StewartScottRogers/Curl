@@ -30,8 +30,19 @@ written independently from the RFCs.
   `IntegrityCheckFailed`, `BadSequenceNumber`.
 - **Flags.** The caller's requested flags (curl asks for mutual authentication and
   replay detection, the default), with confidentiality and integrity always added, as
-  MIT adds them unless told not to: `0x36` without delegation, `0x37` with it. MIT's local
-  `GSS_C_TRANS_FLAG` is not an RFC 4121 checksum flag and is not sent.
+  MIT adds them unless told not to, and MIT's `GSS_C_TRANS_FLAG` (0x100), which MIT's
+  `gss_init_sec_context` always sets and writes into the checksum although RFC 4121 does
+  not define it: `0x136` without delegation, `0x137` with it, so the checksum's flags word
+  is `36010000` or `37010000`. Measured, not assumed (BL-916, 2026-09-29): curl 8.18.0
+  with `mit-krb5/1.22.1` ran `--negotiate -u :` over plain HTTP against
+  `Record-CurlExchange.ps1 -Curl wsl.exe`, with a ticket from the user-space MIT KDC below;
+  decrypting the AP-REQ's authenticator with the ccache's session key (key usage 11) gave
+  `36010000`, and with `--delegation always` and a forwardable ticket `37010000`, matching
+  BL-832's two HTTPS recordings. `KerberosGssFlags.Transfer` names the bit and
+  `KerberosGssContext.Flags` includes it, as MIT's returned flags do. SASL `GSSAPI` and
+  SOCKS5 GSS-API reach the same `gss_init_sec_context`, so they send it too.
+  (Decided by Claude under Stewart's delegation; this replaces the first version of this
+  bullet, which left the flag out before any MIT machine was at hand.)
 - **Delegation.** `--delegation none` never delegates; `always` delegates; `policy`
   delegates only when the service ticket has `ok-as-delegate` (MIT's
   `GSS_C_DELEG_POLICY_FLAG`). Delegation also needs a forwarded ticket-granting ticket in
@@ -40,8 +51,8 @@ written independently from the RFCs.
   time, and is encrypted in the service ticket's session key (key usage 14), not the
   subkey, as MIT does for Windows' sake. Getting the forwarded TGT from the KDC is the
   caller's (filed as its own task).
-- **Authenticator.** RFC 4121's checksum (type `0x8003`, channel bindings all zero, as
-  when no bindings are passed), a fresh subkey of the session key's type, and a random 30-bit
+- **Authenticator.** RFC 4121's checksum (type `0x8003`; its channel bindings field is the
+  MD5 of RFC 2744's structure when bindings are given, all zero otherwise, as below), a fresh subkey of the session key's type, and a random 30-bit
   initial sequence number, as MIT's `krb5_generate_seq_number` masks it. AP options carry
   `mutual-required` exactly when mutual authentication is requested.
 - **AP-REP.** It must decrypt in the session key (usage 12) and echo the authenticator's
@@ -64,14 +75,31 @@ written independently from the RFCs.
   gap means corruption, so strictness costs nothing and is simpler to verify.
 - **Check order.** Framing and header, then integrity, then padding, then sequence, so a
   token that fails integrity never moves the expected sequence number.
+- **Channel bindings (amended by BL-832, 2026-09-29).** curl with MIT passes TLS channel
+  bindings to GSS-API Negotiate over HTTPS, so the hand-built initiator takes them:
+  `KerberosGssContextOptions.ChannelBindings` is the application data, and the checksum's
+  `Bnd` is the MD5 of RFC 2744's `gss_channel_bindings_struct` as MIT's
+  `kg_checksum_channel_bindings` lays it out (initiator address type and address, acceptor
+  address type and address, application data, each length or type a little-endian 32-bit
+  word), with no addresses. Measured, not assumed: curl 8.18.0 (Ubuntu's OpenSSL build,
+  `mit-krb5/1.22.1`, the only Linux curl at hand; the 8.21.0 named for Linux was not
+  available) ran `--negotiate -u : -k` against `Record-CurlExchange.ps1 -Tls`, with a ticket
+  from a throwaway user-space MIT KDC. Decrypting the recorded AP-REQ's authenticator with
+  the ccache's session key (key usage 11) gave `Bnd` `CCA1946F38023F173903A4E68BDCCCEA`,
+  exactly the MD5 of that structure over `tls-server-end-point:` followed by the SHA-256 of
+  the served sha256RSA certificate (`D7AD5D5F…568B08`), RFC 5929's binding. Plain HTTP
+  passes none, so its `Bnd` stays zero. `KerberosGssContextTests` pin both values. Taking
+  the certificate hash from the HTTPS connection is the caller's (BL-915). The same
+  recording showed MIT's checksum flags as `0x136`, `GSS_C_TRANS_FLAG` included; BL-916
+  re-measured it and the "Flags" bullet above now says so.
 
 ## Consequences
 
 - SASL `GSSAPI` (BL-538), SOCKS5 GSS-API (BL-615) and BL-527's hand-built Negotiate route
   can run the Kerberos mechanism with nothing more than a service ticket.
 - `--delegation` (BL-631) works on the hand-built route once a forwarded TGT is fetched.
-- Channel bindings are not sent yet. Whether curl's GSS-API Negotiate passes TLS channel
-  bindings is to be measured, and taking them is filed as its own task.
+- Channel bindings are sent when the caller gives them (BL-832); the hand-built Negotiate
+  route passing the HTTPS server certificate's is BL-915.
 
 ## Alternatives considered
 

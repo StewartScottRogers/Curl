@@ -25,11 +25,12 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
     /// <param name="shares">The key shares to send.</param>
     /// <param name="cookie">The HelloRetryRequest's cookie, or <see langword="null" />.</param>
     /// <param name="psk">The ticket to offer, or <see langword="null" />.</param>
+    /// <param name="encryptedClientHello">The <c>encrypted_client_hello</c> sent at its place in the order (RFC 9849), or <see langword="null" /> to send none.</param>
     /// <returns>The ClientHello.</returns>
-    public ClientHello Build(IReadOnlyList<KeyShareEntry> shares, byte[]? cookie, Tls13PskOffer? psk = null)
+    public ClientHello Build(IReadOnlyList<KeyShareEntry> shares, byte[]? cookie, Tls13PskOffer? psk = null, TlsExtension? encryptedClientHello = null)
     {
         List<TlsExtension> extensions = [];
-        int paddingIndex = BuildOrderedExtensions(extensions, shares, cookie, psk?.EarlyData == true);
+        int paddingIndex = BuildOrderedExtensions(extensions, shares, cookie, psk?.EarlyData == true, encryptedClientHello);
         extensions.AddRange(LowerVersionExtensions());
         extensions.AddRange(settings.FixedExtensions.Where(fixedExtension => !settings.ExtensionOrder.Contains(fixedExtension.Type)));
         if (psk is not null)
@@ -42,7 +43,7 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
     }
 
     /// <summary>Adds the extensions of <see cref="Tls13ClientSettings.ExtensionOrder" /> in that order, and returns where <c>padding</c> goes, or -1 when it is not in the order.</summary>
-    private int BuildOrderedExtensions(List<TlsExtension> extensions, IReadOnlyList<KeyShareEntry> shares, byte[]? cookie, bool earlyData)
+    private int BuildOrderedExtensions(List<TlsExtension> extensions, IReadOnlyList<KeyShareEntry> shares, byte[]? cookie, bool earlyData, TlsExtension? encryptedClientHello)
     {
         int paddingIndex = -1;
         foreach (TlsExtensionType type in settings.ExtensionOrder)
@@ -53,7 +54,8 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
                 continue;
             }
 
-            if (BuildExtension(type, shares, cookie, earlyData) is { } extension)
+            TlsExtension? extension = type == TlsExtensionType.EncryptedClientHello ? encryptedClientHello : BuildExtension(type, shares, cookie, earlyData);
+            if (extension is not null)
             {
                 extensions.Add(extension);
             }
@@ -85,7 +87,7 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
     }
 
     private ClientHello Create(List<TlsExtension> extensions) =>
-        new(LegacyVersion, random, legacySessionId, [.. settings.CipherSuites, .. settings.LowerVersions?.CipherSuites ?? []], [0], [.. extensions]);
+        new(LegacyVersion, random, legacySessionId, [.. settings.CipherSuites, .. settings.LowerVersions?.OfferedCipherSuites ?? []], [0], [.. extensions]);
 
     /// <summary>TLS 1.3, then with <see cref="Tls13ClientSettings.LowerVersions" /> every version from its ceiling down to its minimum.</summary>
     private ushort[] OfferedVersions()

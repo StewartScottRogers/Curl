@@ -15,9 +15,14 @@ namespace Curl.Protocol.Rtsp;
 /// <c>RTSP/2.0 200 OK</c>). <c>CSeq:</c> is matched in any case and read as C's
 /// <c>sscanf(": %ld")</c> reads it, so <c>cseq:   1 </c> and <c>CSeq: 1x</c> are both 1 and a
 /// later <c>CSeq</c> replaces an earlier one; a value with no number fails with 85,
-/// <c>Unable to read the CSeq header: [&lt;line&gt;]</c>. A <c>Content-Length</c> that is not a
-/// decimal number fails with 8, <c>Invalid Content-Length: value</c>. The line that fails is
-/// not written. A <c>Session</c> header, in any case, is handed to <c>session</c>, which keeps
+/// <c>Unable to read the CSeq header: [&lt;line&gt;]</c>. A <c>Content-Length</c> is a comma list
+/// of equal decimal numbers (<c>2, 2</c>), and a second one must agree with the first; anything
+/// else fails with 8, <c>Invalid Content-Length: value</c>, while a number too large for 64 bits
+/// is accepted and leaves no body (BL-840). A carriage return inside a line fails with 8,
+/// <c>Carriage return found in header</c> (on the status line only once it has passed the
+/// status check), and a header line with no colon with 8, <c>Header without colon</c>; each
+/// header line arrives with its continuation lines already joined (<see cref="RtspHeaderFolding" />).
+/// The line that fails is not written. A <c>Session</c> header, in any case, is handed to <c>session</c>, which keeps
 /// the first ID and fails a different one with 86 as the line is read (BL-592).
 /// </remarks>
 /// <param name="session">The transfer's session state, which reads each <c>Session</c> header.</param>
@@ -29,11 +34,21 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session)
     /// <summary>The exit 8 message for a <c>Content-Length</c> that is not a number.</summary>
     internal const string InvalidContentLength = "Invalid Content-Length: value";
 
+    /// <summary>The exit 8 message for a carriage return inside a line of the head.</summary>
+    internal const string CarriageReturnInHeader = "Carriage return found in header";
+
+    /// <summary>The exit 8 message for a header line with no colon.</summary>
+    internal const string HeaderWithoutColon = "Header without colon";
+
     private const string Version = "RTSP/1.0";
 
     private const int MaximumStatusCode = 999;
 
     private const string WhiteSpace = " \t\r\n\v\f";
+
+    private long? declaredLength;
+
+    private bool lengthTooLarge;
 
     /// <summary>Gets a value indicating whether the status line has been read.</summary>
     internal bool HasStatus { get; private set; }
@@ -47,8 +62,11 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session)
     /// <summary>Gets the reply's <c>CSeq</c>, or 0 when none has been read.</summary>
     internal long SequenceNumber { get; private set; }
 
-    /// <summary>Gets the reply's <c>Content-Length</c>, or 0 when none has been read.</summary>
-    internal long ContentLength { get; private set; }
+    /// <summary>
+    /// Gets the reply's <c>Content-Length</c>, or 0 when none has been read or its number is too
+    /// large for 64 bits.
+    /// </summary>
+    internal long ContentLength => declaredLength ?? 0;
 
     /// <summary>Reads one line of the head.</summary>
     /// <param name="line">The line, with its line ending.</param>
@@ -59,6 +77,7 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session)
         if (!HasStatus)
         {
             StatusCode = ParseStatusCode(text);
+            RefuseCarriageReturn(text);
             HasStatus = true;
         }
         else if (text is "\n" or "\r\n")
@@ -67,7 +86,27 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session)
         }
         else
         {
+            RefuseCarriageReturn(text);
+            RefuseMissingColon(text);
             AcceptHeader(text);
+        }
+    }
+
+    /// <summary>Fails with 8 when a carriage return comes anywhere but just before the line feed.</summary>
+    private static void RefuseCarriageReturn(string line)
+    {
+        ReadOnlySpan<char> content = line.AsSpan(0, line.Length - 1);
+        if (content[..^(content.EndsWith('\r') ? 1 : 0)].Contains('\r'))
+        {
+            throw new RtspTransferException(CurlExitCode.WeirdServerReply, CarriageReturnInHeader);
+        }
+    }
+
+    private static void RefuseMissingColon(string line)
+    {
+        if (!line.Contains(':', StringComparison.Ordinal))
+        {
+            throw new RtspTransferException(CurlExitCode.WeirdServerReply, HeaderWithoutColon);
         }
     }
 
@@ -101,7 +140,7 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session)
         }
         else if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
         {
-            ContentLength = ParseContentLength(line.AsSpan("Content-Length:".Length));
+            AcceptContentLength(line["Content-Length:".Length..]);
         }
         else if (line.StartsWith("Session:", StringComparison.OrdinalIgnoreCase))
         {
@@ -121,8 +160,34 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session)
             : throw new RtspTransferException(CurlExitCode.RtspCseqError, $"Unable to read the CSeq header: [{line}]");
     }
 
-    private static long ParseContentLength(ReadOnlySpan<char> value) =>
-        long.TryParse(value.Trim(WhiteSpace), NumberStyles.None, CultureInfo.InvariantCulture, out long length)
-            ? length
-            : throw new RtspTransferException(CurlExitCode.WeirdServerReply, InvalidContentLength);
+    /// <summary>
+    /// Reads a <c>Content-Length</c> value as a comma list of decimal numbers, each with blanks
+    /// around it, that must all equal every number read before; a number too large for 64 bits
+    /// leaves the length unknown, which ends every check (measured, BL-840).
+    /// </summary>
+    private void AcceptContentLength(string value)
+    {
+        foreach (string item in value.AsSpan().Trim(WhiteSpace).ToString().Split(','))
+        {
+            if (lengthTooLarge)
+            {
+                return;
+            }
+
+            AcceptContentLengthItem(item.AsSpan().Trim(" \t").ToString());
+        }
+    }
+
+    private void AcceptContentLengthItem(string item)
+    {
+        if (item.Length == 0 || item.AsSpan().ContainsAnyExceptInRange('0', '9'))
+        {
+            throw InvalidLength();
+        }
+
+        lengthTooLarge = !long.TryParse(item, NumberStyles.None, CultureInfo.InvariantCulture, out long length);
+        declaredLength = lengthTooLarge || declaredLength is null || declaredLength == length ? length : throw InvalidLength();
+    }
+
+    private static RtspTransferException InvalidLength() => new(CurlExitCode.WeirdServerReply, InvalidContentLength);
 }

@@ -36,6 +36,22 @@ A connection read that fails ends the session with exit 0, a send that fails wit
 exit 55 and an output write that fails with exit 23, as curl 8.21.0 on Windows does
 (measured in BL-077's Notes).
 
+Curl's own diagnostic log (`--log-level`, ADR-0222, BL-928): `TelnetDiagnosticLog`
+writes component `telnet` from `ITransferContext.DiagnosticLog` - the failure that ends
+a session (a failed connect included) as `error` with its `CurlExitCode`, an option
+request or offer refused as `warning`, the session's start (host:port) and end (bytes
+and ms) as `info`, and each `WILL`/`WONT`/`DO`/`DONT` received and sent as `verbose`,
+logged by `TelnetReceiver` and `TelnetOptionSide`. The `ConnectTarget` carries the log
+on. None of it changes a byte sent, written or reported.
+
+`-v` and `--trace` (BL-935): after connecting, `TelnetTraceReporter` reports to
+`ITransferContext.Events` each negotiation received and sent (`RCVD DO TERM TYPE`),
+any other command received (`RCVD IAC NOP`), each subnegotiation received and sent in
+`printsub`'s one-line pieces, each run of output data between commands as data
+received (never anything sent, and no zero-byte block at the close), then the failure's
+message unless curl prints it without `failf`, and `closing connection #N` after exit 23
+or `shutting down connection #N` after anything else.
+
 Every byte these classes send or write was measured against curl 8.21.0; the
 captures are in BL-043's, BL-044's, BL-077's, BL-083's, BL-084's and BL-085's Notes and pinned by `TelnetProtocolHandlerTests`,
 `TelnetProtocolHandlerTelnetOptionTests`, `TelnetProtocolHandlerUserNameTests` and

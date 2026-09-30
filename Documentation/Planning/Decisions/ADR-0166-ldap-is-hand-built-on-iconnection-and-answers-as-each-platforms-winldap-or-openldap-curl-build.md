@@ -318,6 +318,73 @@ recordings on 2026-09-29 (the same two builds), each with `-sS -u cn=u:p`; the s
   entries written so far. Neither build reports exit 55: a send that fails is seen by the next
   read. So an `IOException` from the connection, on a read or a send, is read as the server
   closing, and a later read after a failed send finds it closed.
+
+## Measured by BL-589
+
+BL-589 registered the handler and wrote the `-v` lines (`LdapVerboseLines` in
+`Curl.Protocol.Ldap.UnitLibrary`), from `Record-CurlExchange.ps1 -Script` recordings on
+2026-09-29 of `-sv -u cn=u,dc=x:secret ldap://127.0.0.1:18389/dc=example`: the bind answered
+`success`, one entry `dc=example` with `ou: x`, then SearchResultDone `success`. W is curl
+8.21.0 WinLDAP (Windows), L is curl 8.18.0 OpenLDAP 2.6.10 (WSL). `<port>` marks the varying
+local port; the connector's own lines come from `ConnectTarget.Events`.
+
+W, search (exit 0, stdout `DN: dc=example\n\tou: x\n\n`):
+```
+*   Trying 127.0.0.1:18389...
+* Established connection to 127.0.0.1 (127.0.0.1 port 18389) from 127.0.0.1 port <port> 
+* LDAP local: LDAP Vendor = Microsoft Corporation. ; LDAP Version = 510
+* LDAP local: ldap://127.0.0.1:18389/dc=example
+* LDAP local: trying to establish cleartext connection
+{ [4 bytes data]
+* shutting down connection #0
+```
+
+- W, bind `invalidCredentials` (exit 38): the first five lines,
+  `* LDAP local: bind via ldap_win_bind Invalid Credentials`, `* shutting down connection #0`.
+- W, search `noSuchObject` (exit 39): the first five, `* LDAP remote: No Such Object`,
+  `* shutting down connection #0`.
+- W, `ldap://127.0.0.1:18389/dc=example??bogus` (exit 3): Trying, Established, vendor, URL,
+  `* Bad LDAP URL: Invalid Syntax`, `* shutting down connection #0`.
+- W, `ldaps` with `-k`: Trying, `* schannel: disabled automatic use of client certificate`,
+  `* schannel: using IP address, SNI is not supported by OS.`, Established, vendor, URL,
+  `* LDAP local: trying to establish encrypted connection`; WinLDAP's own TLS then refuses the
+  recorder's self-signed certificate (`-k` does not reach it), exit 38 `bind via ldap_win_bind
+  Server Down`.
+- W, URL line: `LDAP://a:b@127.0.0.1:18389?x??bogus#frag` is written
+  `ldap://a:b@127.0.0.1:18389/?x??bogus#frag`; `ldap://LocalHost:389/%41?x??bogus` as typed.
+
+L, search (exit 0, stdout `DN: dc=example\n\tou: x\n\n\n`):
+```
+*   Trying 172.26.96.1:18389...
+* Established connection to 172.26.96.1 (172.26.96.1 port 18389) from 172.26.99.197 port <port> 
+* LDAP local: ldap://172.26.96.1:18389/dc=example
+{ [4 bytes data]
+* Connection #0 to host 172.26.96.1:18389 left intact
+```
+
+- L writes the URL line only once bound, and `Connection #0 to host ... left intact` only on
+  success; every failure ends `* closing connection #0`.
+- L, bind `invalidCredentials` (exit 67): Trying, Established, `* closing connection #0`; no
+  message line.
+- L, search `noSuchObject` (exit 39): Trying, Established, URL,
+  `* LDAP remote: search failed No such object `, `* closing connection #0`.
+- L, `ldap://127.0.0.1:1/dc=x?a?bogus` (exit 3), refused before connecting:
+  `* LDAP local: bad or missing scope`, `* closing connection #-1`, nothing else.
+
+Decided by Claude under Stewart's delegation, in BL-589, where it could not measure:
+
+- **WinLDAP `ldaps` success.** A successful `ldaps` search could not be recorded, so its lines
+  are the `ldap` ones with `encrypted` in place of `cleartext`, as `lib/ldap.c` words it.
+- **URL line.** The typed URL with the scheme in lower case and `/` inserted when the path is
+  empty (measured); `ldap://` is prefixed to a scheme-less URL (not measured; curl's URL API
+  adds the guessed scheme).
+- **Failure messages that are not `-v` lines.** A failure's message is written as a `-v` line
+  except `Login denied`, `LDAP: cannot bind` and `Failure when receiving data from the peer`:
+  those are curl's `curl_easy_strerror` texts, returned without `failf`, as the measured 67
+  shows.
+- **Received data.** Each entry piece is reported as received before it is written, so `-v`
+  shows `{ [N bytes data]` once (the writer collapses the rest).
+
 ## Consequences
 
 - BL-586: the BER reader and writer, the message types, and the bind with both dialects,
@@ -327,8 +394,8 @@ recordings on 2026-09-29 (the same two builds), each with `-sS -u cn=u:p`; the s
 - BL-588: the output writer for entries, referrals and SearchResultDone in both dialects.
 - BL-830 and BL-853: the WinLDAP bind without `-u`, then the SASL security layer that signs
   and seals the rest of its session.
-- BL-589: registration in `Curl.Console` for `ldap` (389) and `ldaps` (636), the dialect
-  chosen from the platform, the `-v` lines, and `ldap ldaps` in `-V`.
+- BL-589: `Curl.Console` registers the handler for `ldap` (389) and `ldaps` (636), chooses
+  the dialect from the platform, writes the `-v` lines above, and lists `ldap ldaps` in `-V`.
 - Tests pin WinLDAP and OpenLDAP bytes on every operating system, because the dialect is
   a constructor argument, not a runtime check.
 - Windows' anonymous bind needs the NTLM exchange under the logged-on user's

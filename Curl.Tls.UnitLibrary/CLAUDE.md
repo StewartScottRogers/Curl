@@ -13,10 +13,11 @@ Namespace `Curl.Tls`. What is here so far: the handshake message codecs (BL-698)
 TLS 1.3 key schedule (BL-697), the TLS 1.3 client handshake (BL-699, ADR-0146), the
 TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
 1.1 and 1.0 client handshake (BL-703, ADR-0154), TLS 1.3 over a byte stream
-(BL-700, ADR-0157), TLS 1.2, 1.1 and 1.0 over a byte stream (BL-815, ADR-0158), and
+(BL-700, ADR-0157), TLS 1.2, 1.1 and 1.0 over a byte stream (BL-815, ADR-0254), and
 the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173), TLS 1.3
 certificate decompression (BL-786, ADR-0199), TLS 1.3 and TLS 1.2 offered in one
-ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880).
+ClientHello (BL-821, ADR-0205), post-handshake client authentication (BL-880),
+TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -76,11 +77,18 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
 - `Tls13ClientSettings`: suites, groups, key share groups, signature algorithms, ALPN,
   legacy session ID on or off, the ClientHello extension order and verbatim extra
   extensions (`padding` in the order pads a 256-to-511-byte hello to 512).
-- Key shares: `X25519KeyShare`, `EcdhKeyShare` (NIST curves, points checked by
-  `NistCurve`), `FfdheKeyShare` (RFC 7919 groups); `TlsNamedGroup` names them.
+- Key shares: `X25519KeyShare`, `X448KeyShare`, `EcdhKeyShare` (NIST curves, points
+  checked by `NistCurve`), `BrainpoolKeyShare` (TLS 1.2's brainpool curves over
+  `Curl.Cryptography`'s `BrainpoolEcdh`, BL-803), `FfdheKeyShare` (RFC 7919 groups) and
+  `X25519MlKem768KeyShare` (BL-879: the ML-KEM-768 encapsulation key then the X25519
+  key out, the 1088-byte ciphertext then the server's X25519 key in, the ML-KEM secret
+  then the X25519 secret as the shared secret); `TlsNamedGroup` names them. A server
+  share of the wrong length is `illegal_parameter`. The server's encapsulation lives in
+  the tests (`X25519MlKem768ServerShare`), since the client never needs it.
 - TLS 1.3 over a byte stream (ADR-0157): `Tls13RecordProtection` is one direction under
   one traffic secret (RFC 8446 section 5.2 nonces, no padding sent, peer padding removed,
-  the GCM and ChaCha20-Poly1305 suites; CCM is BL-811's). The internal
+  every TLS 1.3 suite: GCM, ChaCha20-Poly1305, CCM, and CCM8 with its 8-byte tag,
+  BL-811). The internal
   `Tls13RecordLayer` reads whole records off the caller's `Stream` and holds a protection
   per level. `Tls13ClientConnection.ConnectAsync` runs `Tls13ClientHandshake` over it
   (middlebox compatibility `change_cipher_spec` included) and returns a
@@ -92,7 +100,7 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
   returns 0 at `close_notify` or a bare transport end (`CloseNotifyReceived` tells them
   apart), and throws `TlsAlertException` for any other alert. The AEADs behind
   `ITlsAead` (`AesGcmTlsAead`, `AriaGcmTlsAead`, `ChaCha20Poly1305TlsAead`) serve both
-  TLS 1.2 and 1.3; `AesCcmTlsAead` (over `Curl.Cryptography`'s `AeadAesCcm`) serves TLS 1.2.
+  TLS 1.2 and 1.3; `AesCcmTlsAead` (over `Curl.Cryptography`'s `AeadAesCcm`) serves both too.
 - `TlsPrf` (`Md5Sha1` for TLS 1.0 and 1.1, `Sha256`, `Sha384`): the PRF of RFC 2246 and
   RFC 5246, the master secret, the extended master secret (RFC 7627), the key block and
   both Finished `verify_data`s. `Tls12KeyBlock.Partition` divides the key block into each
@@ -118,8 +126,9 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
   the client's ChangeCipherSpec, in order), completion, or a `TlsHandshakeFailure`. It
   exposes `RecordProtection` and `KeyBlock`: the caller switches its write state after
   sending the ChangeCipherSpec and its read state after the server's is accepted. Key
-  exchanges: ECDHE (X25519, P-256/384/521), DHE with the server's group (1024 bits at
-  least, authenticated by RSA or DSA), RSA and anonymous; `Tls12CipherSuite` holds the 86
+  exchanges: ECDHE (X25519, P-256/384/521, and x448 and brainpoolP256r1/384r1/512r1 when
+  offered, ADR-0219), DHE with the server's group (1024 bits at
+  least, authenticated by RSA or DSA), RSA, anonymous and SRP; `Tls12CipherSuite` holds the 113
   suites the record layer can protect (`Tls12KeyExchange`, `Tls12Authentication`, bulk
   cipher, MAC, PRF). Covers the ServerKeyExchange signature (TLS 1.2 schemes, and TLS
   1.0/1.1's MD5+SHA-1 RSA and SHA-1 ECDSA and DSA; DSA is checked with
@@ -134,10 +143,19 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
 - `Tls12ClientSettings`: version range, suites (and the renegotiation SCSV), ECDHE
   groups, TLS 1.2 signature algorithms, ALPN, `status_request`, whether to offer
   `session_ticket`, `extended_master_secret` and `encrypt_then_mac`, the session to
-  resume, the client certificate, and TLS 1.0 CBC's empty fragment
-  (`InsertEmptyFragment`, off for `--ssl-allow-beast`). The ClientHello's extensions
-  follow OpenSSL's order.
-- TLS 1.2 and below over a byte stream (ADR-0158): the internal `Tls12RecordLayer` reads
+  resume, the client certificate, TLS 1.0 CBC's empty fragment
+  (`InsertEmptyFragment`, off for `--ssl-allow-beast`), and `SrpCredentials`. The
+  ClientHello's extensions follow OpenSSL's order.
+- TLS-SRP (RFC 5054, ADR-0229): `SrpGroup` holds Appendix A's seven groups (`Find` by N
+  and g), `SrpClient` SRP-6a's pure functions (k, x, v, A, u and the premaster secret S,
+  SHA-1 over `BigInteger`). With `Tls12ClientSettings.SrpCredentials`
+  (`TlsSrpCredentials`) the hello carries `srp` after `server_name` and the nine SRP
+  suites (`Tls12KeyExchange.Srp`; plain SRP is `Tls12Authentication.Anonymous`, the others
+  RSA or DSS); without it they are left out. `Tls12SrpParameters` is the ServerKeyExchange's
+  N, g, s and B: a group outside Appendix A is `insufficient_security`, a B of 0 or not
+  below N `illegal_parameter`, and a wrong password fails the server's Finished with
+  `decrypt_error`.
+- TLS 1.2 and below over a byte stream (ADR-0254): the internal `Tls12RecordLayer` reads
   whole records off the caller's `Stream`, removes their protection with the read state in
   force and writes under the write state in force; the ClientHello record carries TLS 1.0,
   later records the negotiated version, and a record read with another is
@@ -157,8 +175,25 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
   `supported_versions` continues in `Tls12ClientHandshake.StartFrom(sent)` (either
   downgrade sentinel is `illegal_parameter`), anything else in the TLS 1.3 client. It returns
   a `TlsConnectResult` with a `Tls13ClientStream` or a `Tls12ClientStream`, or the failure.
-- `ITlsRandomSource` supplies the random, session ID, key shares, DHE exponent and RSA
-  pre-master secret; `SystemTlsRandomSource` is the production one.
+- Encrypted Client Hello (RFC 9849, ADR-0233): `EchConfigList.Decode` reads an
+  `ECHConfigList` (malformed is `decode_error`, other versions skipped) into `EchConfig`s
+  with their `EchCipherSuite`s; `SupportedConfig` is the first one HPKE can seal to.
+  With `Tls13ClientSettings.EncryptedClientHelloConfigs` holding one (and
+  `encrypted_client_hello` in the order), the internal `EchClientHello` builds the inner
+  hello (real SNI, TLS 1.3 alone, section 6.1.3 padding) and seals it with
+  `Curl.Cryptography`'s `Hpke` into the outer hello (the public name, the same key shares);
+  the handshake checks the confirmation in the HelloRetryRequest and ServerHello, runs on
+  the inner hello when accepted (`EncryptedClientHelloAccepted`), and on a rejection
+  verifies the chain for the public name, keeps `EncryptedClientHelloRetryConfigs` and
+  fails with `EchRequired` after the server's Finished. `SendEncryptedClientHelloGrease`
+  sends GREASE when no config is supported. An ECH offer resumes (BL-960): the ticket and
+  its binder (over the inner transcript) go in the inner hello, a GREASE `pre_shared_key`
+  of the same lengths in the outer one, `early_data` in both or neither, and early data
+  under the inner hello's early secret; a `pre_shared_key` in a ServerHello that rejected
+  ECH is `illegal_parameter`. `EncryptedClientHelloExtension` is the extension codec.
+- `ITlsRandomSource` supplies the random, session ID, key shares, DHE exponent, SRP private value, RSA
+  pre-master secret and ECH's inner random, HPKE ephemeral key and GREASE bytes;
+  `SystemTlsRandomSource` is the production one.
 - `IServerCertificateVerifier` gets the chain as a `ServerCertificateChain` (DER
   certificates, SNI name, stapled OCSP response) and answers a `ServerCertificateVerdict`.
 - OCSP stapling (ADR-0173): `OcspStapleVerifier.Verify(response, chain, now)` checks a
@@ -174,12 +209,15 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
   1.2 adds `rsa_pkcs1_*`, `ecdsa_sha1` and the five `dsa_*` (verify only) and binds
   `ecdsa_*` to no curve - TLS 1.0/1.1's
   legacy signatures, and the CertificateVerify content), `TlsCertificatePublicKey` (a
-  certificate's `SubjectPublicKeyInfo`, the signature checks, and the RSA pre-master
+  certificate's `SubjectPublicKeyInfo`, the signature checks - a brainpool ECDSA key with
+  `Curl.Cryptography`'s `BrainpoolEcdsa`, ADR-0219 - and the RSA pre-master
   secret encryption), `TlsSigningKey` with `RsaTlsSigningKey`, `EcdsaTlsSigningKey` and
   `Ed25519TlsSigningKey`.
 - Tests: `Tls13TestServer` and `Tls12TestServer` in `Curl.Tls.UnitTests` are in-memory
   servers built from these codecs; `Tls12TestServer` resumes from a shared
   `Tls12TestSessionCache` and signs TLS 1.0/1.1 RSA with `BigInteger` (test code only).
+  `Tls13TestServer.ConfirmEch` makes it an ECH backend, and `EchTestFrontEnd` (with
+  `EchTestConfig`) is the client-facing server that opens the outer hello for it.
   `Tls13RecordTestServer` and `Tls12RecordTestServer` put them on the server end of an
   `InMemoryPipe`.
 

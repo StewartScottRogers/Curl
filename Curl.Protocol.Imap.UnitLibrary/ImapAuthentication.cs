@@ -54,6 +54,7 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
             return await AuthenticateWithSaslAsync(chosen.Mechanism, chosen.Request, capabilities.Contains("SASL-IR")).ConfigureAwait(false);
         }
 
+        WarnOfNoUsableMechanism(offered);
         return MayLogIn(request, options, capabilities)
             ? await LoginAsync(request.Credential!).ConfigureAwait(false)
             : TransferResult.Failure(CurlExitCode.LoginDenied, ImapSessionMessages.LoginDenied);
@@ -149,7 +150,7 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
                 return false;
             }
 
-            await channel.SendLineAsync(Encode(answer)).ConfigureAwait(false);
+            await channel.SendLineAsync(Encode(answer), ImapDiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
             messageSent = true;
         }
     }
@@ -162,7 +163,10 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     private async ValueTask<bool> SendAuthenticateAsync(ISaslExchange exchange, bool initialResponseFirst)
     {
         byte[]? initialResponse = initialResponseFirst ? await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false) : null;
-        await channel.SendCommandAsync("AUTHENTICATE " + exchange.Mechanism + (initialResponse is null ? string.Empty : " " + Encode(initialResponse)))
+        string command = "AUTHENTICATE " + exchange.Mechanism;
+        await (initialResponse is null
+            ? channel.SendCommandAsync(command)
+            : channel.SendCommandAsync(command + " " + Encode(initialResponse), command + " " + ImapDiagnosticLogLines.SaslResponseNotLogged))
             .ConfigureAwait(false);
         return initialResponse is not null;
     }
@@ -179,18 +183,39 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     /// <summary>Runs the exchange for <paramref name="mechanism" />; refused is exit 67 <c>Login denied</c>.</summary>
     private async ValueTask<TransferResult?> AuthenticateWithSaslAsync(string mechanism, SaslRequest request, bool serverTakesInitialResponse) =>
         await ExchangeAsync(authenticator!.Begin(mechanism, request), serverTakesInitialResponse).ConfigureAwait(false)
-            ? null
+            ? LoggedIn("SASL " + mechanism)
             : TransferResult.Failure(CurlExitCode.LoginDenied, ImapSessionMessages.LoginDenied);
 
     /// <summary>Sends <c>LOGIN</c>; other than <c>OK</c> is exit 67 <c>Access denied. </c>.</summary>
     private async ValueTask<TransferResult?> LoginAsync(System.Net.NetworkCredential credential)
     {
-        await channel.SendCommandAsync("LOGIN " + ImapQuoting.AtomOrQuoted(credential.UserName) + " " + ImapQuoting.AtomOrQuoted(credential.Password))
+        string user = "LOGIN " + ImapQuoting.AtomOrQuoted(credential.UserName) + " ";
+        await channel.SendCommandAsync(user + ImapQuoting.AtomOrQuoted(credential.Password), user + ImapDiagnosticLogLines.PasswordNotLogged)
             .ConfigureAwait(false);
         ImapResponse response = await channel.ReadResponseAsync(NoUntagged).ConfigureAwait(false)
             ?? throw new ImapResponseMissingException();
         return response.Status == ImapResponseStatus.Ok
-            ? null
+            ? LoggedIn("LOGIN")
             : TransferResult.Failure(CurlExitCode.LoginDenied, ImapSessionMessages.AccessDenied(response.Status));
+    }
+
+    /// <summary>
+    /// Logs a warning when the server offered SASL mechanisms and the authenticator could use
+    /// none of them.
+    /// </summary>
+    private void WarnOfNoUsableMechanism(IReadOnlyList<string> offered)
+    {
+        if (authenticator is not null && offered.Count > 0)
+        {
+            ImapDiagnosticLogLines.NoUsableMechanism(context.DiagnosticLog, offered);
+        }
+    }
+
+    /// <summary>Logs the login that succeeded by <paramref name="method" />.</summary>
+    /// <returns><see langword="null" />, to carry on.</returns>
+    private TransferResult? LoggedIn(string method)
+    {
+        ImapDiagnosticLogLines.LoggedIn(context.DiagnosticLog, method);
+        return null;
     }
 }

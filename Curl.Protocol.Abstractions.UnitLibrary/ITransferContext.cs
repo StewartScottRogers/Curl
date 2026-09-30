@@ -230,6 +230,36 @@ public interface ITransferContext
     bool FtpCreateDirectories { get; }
 
     /// <summary>
+    /// Gets the <c>--ftp-account</c> value verbatim, the account an FTP login sends with
+    /// <c>ACCT</c> when the server answers its password with <c>332</c>;
+    /// <see langword="null" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it.
+    /// </remarks>
+    string? FtpAccount { get; }
+
+    /// <summary>
+    /// Gets the <c>--ftp-alternative-to-user</c> value verbatim, the command an FTP login
+    /// sends in place of <c>USER</c> when the server refuses <c>USER</c>;
+    /// <see langword="null" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it.
+    /// </remarks>
+    string? FtpAlternativeToUser { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--ftp-pret</c> was given, which makes a passive-mode
+    /// FTP transfer send <c>PRET</c> before <c>EPSV</c> or <c>PASV</c>;
+    /// <see langword="false" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it.
+    /// </remarks>
+    bool FtpSendPret { get; }
+
+    /// <summary>
     /// Gets a value indicating whether <c>-l</c>/<c>--list-only</c> was given, which lists a
     /// directory by name only (<c>NLST</c> rather than <c>LIST</c>); <see langword="false" />
     /// when not given.
@@ -238,6 +268,27 @@ public interface ITransferContext
     /// <c>ftp://</c> is to read it (ADR-0006).
     /// </remarks>
     bool ListOnly { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>-B</c>/<c>--use-ascii</c> was given, which
+    /// transfers the file as ASCII text (FTP <c>TYPE A</c> rather than <c>TYPE I</c>);
+    /// <see langword="false" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it; an FTP URL's <c>;type=A</c> asks for the same.
+    /// </remarks>
+    bool UseAscii { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>-a</c>/<c>--append</c> was given, which makes an
+    /// upload append to the remote file instead of overwriting it; <see langword="false" />
+    /// when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> (<c>APPE</c> rather than <c>STOR</c>) and <c>sftp://</c> are to read
+    /// it; a download ignores it.
+    /// </remarks>
+    bool Append { get; }
 
     /// <summary>
     /// Gets the <c>-P</c>/<c>--ftp-port</c> value verbatim, which makes an FTP transfer use
@@ -284,7 +335,8 @@ public interface ITransferContext
     /// </summary>
     /// <remarks>
     /// A value keeps its <c>-</c> (after the transfer), <c>+</c> (before the transfer) or
-    /// <c>*</c> (failure ignored) prefix: <c>ftp://</c> is to interpret them (ADR-0006).
+    /// <c>*</c> (failure ignored) prefix: <c>ftp://</c> interprets them (ADR-0006), and so
+    /// does <c>sftp://</c>, which drops a <c>+</c> value as curl does (ADR-0247).
     /// </remarks>
     IReadOnlyList<string> QuoteCommands { get; }
 
@@ -424,6 +476,17 @@ public interface ITransferContext
     /// connects passes it on as <see cref="ConnectTarget.Events" /> (ADR-0046).
     /// </remarks>
     ITransferEvents Events { get; }
+
+    /// <summary>
+    /// Gets where the handler and its connector write Curl's own diagnostic log for
+    /// <c>--log-level</c>. Never <see langword="null" />.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="NoDiagnosticLog.Instance" /> at <c>--log-level none</c>, and by default,
+    /// so an implementation that does not override it writes nothing. A handler that
+    /// connects passes it on as <see cref="ConnectTarget.DiagnosticLog" /> (ADR-0222).
+    /// </remarks>
+    IDiagnosticLog DiagnosticLog => NoDiagnosticLog.Instance;
 
     /// <summary>
     /// Gets where the handler reports how far the transfer has got, for the progress meter.

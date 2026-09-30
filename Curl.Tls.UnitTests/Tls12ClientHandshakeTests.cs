@@ -70,6 +70,40 @@ public sealed class Tls12ClientHandshakeTests
     }
 
     [TestMethod]
+    [DataRow(TlsProtocolVersion.Tls12, (ushort)0xc0ac, "ecdsa", DisplayName = "TLS_ECDHE_ECDSA_WITH_AES_128_CCM")]
+    [DataRow(TlsProtocolVersion.Tls12, (ushort)0xc0af, "ecdsa", DisplayName = "TLS_ECDHE_ECDSA_WITH_AES_256_CCM_8")]
+    [DataRow(TlsProtocolVersion.Tls12, (ushort)0xc0a0, "rsa", DisplayName = "TLS_RSA_WITH_AES_128_CCM_8")]
+    [DataRow(TlsProtocolVersion.Tls12, (ushort)0xc09f, "rsa", DisplayName = "TLS_DHE_RSA_WITH_AES_256_CCM")]
+    [DataRow(TlsProtocolVersion.Tls12, (ushort)0xc011, "rsa", DisplayName = "TLS_ECDHE_RSA_WITH_RC4_128_SHA")]
+    [DataRow(TlsProtocolVersion.Tls11, (ushort)0x0004, "rsa", DisplayName = "TLS_RSA_WITH_RC4_128_MD5 in TLS 1.1")]
+    [DataRow(TlsProtocolVersion.Tls10, (ushort)0xc016, "none", DisplayName = "TLS_ECDH_anon_WITH_RC4_128_SHA in TLS 1.0")]
+    public void CcmCcm8AndRc4SuitesCompleteAndTheirKeysProtectRecords(TlsProtocolVersion version, int cipherSuite, string credential)
+    {
+        Tls12TestServer server = new(Credential(credential)) { Version = version, CipherSuite = (ushort)cipherSuite };
+        Tls12ClientHandshake client = Client(EverySuite with { MinimumVersion = TlsProtocolVersion.Tls10 });
+
+        Tls12HandshakeOutput output = Run(client, server);
+
+        AssertCompletesWithServerKeys(client, server, output);
+        Assert.AreEqual(cipherSuite, client.CipherSuite!.Code);
+        Assert.AreEqual(version, client.Version);
+        using Tls12RecordWriteState write = Tls12RecordWriteState.Create(client.RecordProtection!, client.KeyBlock!.ClientWrite, SystemTlsRandomSource.Instance);
+        using Tls12RecordReadState read = Tls12RecordReadState.Create(client.RecordProtection!, server.KeyBlock.ClientWrite);
+        byte[] record = write.Protect(TlsContentType.ApplicationData, "GET / HTTP/1.1"u8);
+        CollectionAssert.AreEqual("GET / HTTP/1.1"u8.ToArray(), read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value);
+    }
+
+    [TestMethod]
+    public void AClientCappedBelowTlsOneTwoLeavesOutTheSuitesThatNeedIt()
+    {
+        Tls12ClientHandshake client = Client(EverySuite with { MinimumVersion = TlsProtocolVersion.Tls10, MaximumVersion = TlsProtocolVersion.Tls11, CipherSuites = [0xc0ac, 0xc0a0, 0xc02b, 0xc011, Tls12CipherSuite.EmptyRenegotiationInfoScsv] });
+
+        ClientHello decoded = ClientHello.Decode(Body(client.Start().MessagesToSend[0])).Value;
+
+        CollectionAssert.AreEqual(new ushort[] { 0xc011, Tls12CipherSuite.EmptyRenegotiationInfoScsv }, decoded.CipherSuites.ToArray());
+    }
+
+    [TestMethod]
     [DataRow(TlsProtocolVersion.Tls12, (ushort)0x00a2)]
     [DataRow(TlsProtocolVersion.Tls11, (ushort)0x0032)]
     [DataRow(TlsProtocolVersion.Tls10, (ushort)0x0032)]
@@ -119,6 +153,42 @@ public sealed class Tls12ClientHandshakeTests
 
         AssertCompletesWithServerKeys(client, server, output);
         Assert.AreEqual<ushort?>((ushort)group, client.NegotiatedGroup);
+    }
+
+    [TestMethod]
+    [DataRow(TlsNamedGroup.X448)]
+    [DataRow(TlsNamedGroup.BrainpoolP256r1)]
+    [DataRow(TlsNamedGroup.BrainpoolP384r1)]
+    [DataRow(TlsNamedGroup.BrainpoolP512r1)]
+    public void HandshakeCompletesOnX448AndEachBrainpoolCurveAndItsKeysProtectRecordsBothWays(int group)
+    {
+        Tls12TestServer server = new(TestServerCredential.Rsa(TlsSignatureScheme.RsaPkcs1Sha256)) { CipherSuite = 0xc02f, EcdheGroup = (ushort)group };
+        Tls12ClientHandshake client = Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.X25519, (ushort)group] });
+
+        Tls12HandshakeOutput output = Run(client, server);
+
+        AssertCompletesWithServerKeys(client, server, output);
+        Assert.AreEqual<ushort?>((ushort)group, client.NegotiatedGroup);
+        AssertProtects(client.RecordProtection!, client.KeyBlock!.ClientWrite, server.KeyBlock.ClientWrite, "GET / HTTP/1.1"u8);
+        AssertProtects(server.RecordProtection, server.KeyBlock.ServerWrite, client.KeyBlock.ServerWrite, "HTTP/1.1 200 OK"u8);
+    }
+
+    [TestMethod]
+    [DataRow(TlsProtocolVersion.Tls12, "brainpoolP256r1", TlsSignatureScheme.EcdsaSecp256r1Sha256, (ushort)0xc02b)]
+    [DataRow(TlsProtocolVersion.Tls12, "brainpoolP256r1", TlsSignatureScheme.EcdsaSha1, (ushort)0xc02b)]
+    [DataRow(TlsProtocolVersion.Tls12, "brainpoolP384r1", TlsSignatureScheme.EcdsaSecp384r1Sha384, (ushort)0xc02c)]
+    [DataRow(TlsProtocolVersion.Tls12, "brainpoolP512r1", TlsSignatureScheme.EcdsaSecp521r1Sha512, (ushort)0xc02c)]
+    [DataRow(TlsProtocolVersion.Tls11, "brainpoolP256r1", (ushort)0, (ushort)0xc009)]
+    [DataRow(TlsProtocolVersion.Tls10, "brainpoolP256r1", (ushort)0, (ushort)0xc00a)]
+    public void ABrainpoolEcdsaServerKeyExchangeVerifiesOnAnEcdheEcdsaSuite(TlsProtocolVersion version, string credential, int scheme, int cipherSuite)
+    {
+        Tls12TestServer server = new(Credential(credential)) { Version = version, CipherSuite = (ushort)cipherSuite, SignatureScheme = scheme == 0 ? null : (ushort)scheme };
+        Tls12ClientHandshake client = Client(EverySuite with { MinimumVersion = TlsProtocolVersion.Tls10 });
+
+        Tls12HandshakeOutput output = Run(client, server);
+
+        AssertCompletesWithServerKeys(client, server, output);
+        Assert.AreEqual(version, client.Version);
     }
 
     [TestMethod]
@@ -514,8 +584,20 @@ public sealed class Tls12ClientHandshakeTests
         "ed25519" => TestServerCredential.Ed25519(),
         "rsa" => TestServerCredential.Rsa(TlsSignatureScheme.RsaPkcs1Sha256),
         "rsa-pss" => TestServerCredential.RsaPss(TlsSignatureScheme.RsaPssPssSha256),
+        "brainpoolP256r1" => TestServerCredential.Brainpool(BrainpoolCurve.BrainpoolP256r1, TlsSignatureScheme.BrainpoolP256r1Oid, TlsSignatureScheme.EcdsaSecp256r1Sha256),
+        "brainpoolP384r1" => TestServerCredential.Brainpool(BrainpoolCurve.BrainpoolP384r1, TlsSignatureScheme.BrainpoolP384r1Oid, TlsSignatureScheme.EcdsaSecp384r1Sha384),
+        "brainpoolP512r1" => TestServerCredential.Brainpool(BrainpoolCurve.BrainpoolP512r1, TlsSignatureScheme.BrainpoolP512r1Oid, TlsSignatureScheme.EcdsaSecp521r1Sha512),
         _ => null!,
     };
+
+    /// <summary>Protects <paramref name="content" /> under one side's write keys and checks the other side's read state recovers it.</summary>
+    private static void AssertProtects(Tls12RecordProtectionParameters protection, Tls12WriteKeys writeKeys, Tls12WriteKeys peerReadKeys, ReadOnlySpan<byte> content)
+    {
+        using Tls12RecordWriteState write = Tls12RecordWriteState.Create(protection, writeKeys, SystemTlsRandomSource.Instance);
+        using Tls12RecordReadState read = Tls12RecordReadState.Create(protection, peerReadKeys);
+        byte[] record = write.Protect(TlsContentType.ApplicationData, content);
+        CollectionAssert.AreEqual(content.ToArray(), read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value);
+    }
 
     private static void AssertCompletesWithServerKeys(Tls12ClientHandshake client, Tls12TestServer server, Tls12HandshakeOutput output)
     {

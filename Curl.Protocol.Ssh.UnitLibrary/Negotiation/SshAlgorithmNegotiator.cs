@@ -11,17 +11,18 @@ internal static class SshAlgorithmNegotiator
     /// </summary>
     /// <param name="client">The client's <c>KEXINIT</c>.</param>
     /// <param name="server">The server's <c>KEXINIT</c>.</param>
+    /// <param name="hostKeysNeverAgreed">Host-key names the client offers but passes over, as libssh2 passes over the certificate forms it cannot verify (ADR-0266).</param>
     /// <returns>
     /// The agreed algorithms, or <see langword="null" /> when one list shares no name with
     /// its counterpart. Key-exchange signals are never chosen as a method, and the MAC
     /// lists are not consulted beside an AEAD cipher.
     /// </returns>
-    internal static SshNegotiatedAlgorithms? Negotiate(SshKexInit client, SshKexInit server)
+    internal static SshNegotiatedAlgorithms? Negotiate(SshKexInit client, SshKexInit server, IReadOnlyCollection<string> hostKeysNeverAgreed)
     {
         string? keyExchange = FirstShared(
             [.. client.KeyExchange.Where(name => !SshAlgorithmCatalogue.IsKeyExchangeSignal(name))],
             server.KeyExchange);
-        string? hostKey = FirstShared(client.ServerHostKey, server.ServerHostKey);
+        string? hostKey = FirstShared([.. client.ServerHostKey.Where(name => !hostKeysNeverAgreed.Contains(name))], server.ServerHostKey);
         DirectionAlgorithms? outbound = NegotiateDirection(
             client.CipherClientToServer, server.CipherClientToServer,
             client.MacClientToServer, server.MacClientToServer,

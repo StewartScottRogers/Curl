@@ -11,7 +11,7 @@ public sealed class QuicClientConnectorTests
     {
         using QuicTestServer server = new();
         QuicTestChannel channel = new(server);
-        using QuicClientHandshake handshake = QuicHandshakeTest.Client();
+        using QuicClientConnectionState handshake = QuicClientConnectionStateTest.Client();
 
         QuicHandshakeFailure? failure = await new QuicClientConnector(new ManualTimerTimeProvider()).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
 
@@ -27,7 +27,7 @@ public sealed class QuicClientConnectorTests
     {
         ManualTimerTimeProvider clock = new();
         QuicTestChannel channel = new(null);
-        using QuicClientHandshake handshake = QuicHandshakeTest.Client(clock: clock);
+        using QuicClientConnectionState handshake = QuicClientConnectionStateTest.Client(clock: clock);
 
         Task<QuicHandshakeFailure?> run = new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
         clock.Advance(9999);
@@ -46,7 +46,7 @@ public sealed class QuicClientConnectorTests
     {
         ManualTimerTimeProvider clock = new();
         QuicTestChannel channel = new(null);
-        using QuicClientHandshake handshake = QuicHandshakeTest.Client(clock: clock);
+        using QuicClientConnectionState handshake = QuicClientConnectionStateTest.Client(clock: clock);
         List<int> sentBeforeEachProbe = [];
 
         Task<QuicHandshakeFailure?> run = new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
@@ -78,7 +78,7 @@ public sealed class QuicClientConnectorTests
     {
         ManualTimerTimeProvider clock = new();
         QuicTestChannel channel = new(null);
-        using QuicClientHandshake handshake = QuicHandshakeTest.Client();
+        using QuicClientConnectionState handshake = QuicClientConnectionStateTest.Client();
 
         Task<QuicHandshakeFailure?> run = new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, TimeSpan.FromSeconds(1), CancellationToken.None);
         clock.Advance(1008);
@@ -94,7 +94,7 @@ public sealed class QuicClientConnectorTests
     {
         using QuicTestServer server = new() { VersionNegotiation = [0xff00001d] };
         QuicTestChannel channel = new(server);
-        using QuicClientHandshake handshake = QuicHandshakeTest.Client();
+        using QuicClientConnectionState handshake = QuicClientConnectionStateTest.Client();
 
         QuicHandshakeFailure? failure = await new QuicClientConnector(new ManualTimerTimeProvider()).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
 
@@ -108,7 +108,7 @@ public sealed class QuicClientConnectorTests
         using QuicTestServer server = new();
         QuicTestChannel channel = new(server);
         channel.Enqueue(new byte[1200], new IPEndPoint(IPAddress.Loopback, 9));
-        using QuicClientHandshake handshake = QuicHandshakeTest.Client();
+        using QuicClientConnectionState handshake = QuicClientConnectionStateTest.Client();
 
         QuicHandshakeFailure? failure = await new QuicClientConnector(new ManualTimerTimeProvider()).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
 
@@ -120,7 +120,7 @@ public sealed class QuicClientConnectorTests
     {
         using CancellationTokenSource cancellation = new();
         await cancellation.CancelAsync();
-        using QuicClientHandshake handshake = QuicHandshakeTest.Client();
+        using QuicClientConnectionState handshake = QuicClientConnectionStateTest.Client();
         QuicClientConnector connector = new(new ManualTimerTimeProvider());
 
         await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => connector.RunHandshakeAsync(handshake, new QuicTestChannel(null), null, cancellation.Token));

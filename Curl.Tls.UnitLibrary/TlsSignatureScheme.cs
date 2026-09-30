@@ -78,6 +78,9 @@ public static class TlsSignatureScheme
     internal const string Secp256r1Oid = "1.2.840.10045.3.1.7";
     internal const string Secp384r1Oid = "1.3.132.0.34";
     internal const string Secp521r1Oid = "1.3.132.0.35";
+    internal const string BrainpoolP256r1Oid = "1.3.36.3.3.2.8.1.1.7";
+    internal const string BrainpoolP384r1Oid = "1.3.36.3.3.2.8.1.1.11";
+    internal const string BrainpoolP512r1Oid = "1.3.36.3.3.2.8.1.1.13";
 
     private static readonly Dictionary<ushort, TlsSignatureRule> Rules = new()
     {

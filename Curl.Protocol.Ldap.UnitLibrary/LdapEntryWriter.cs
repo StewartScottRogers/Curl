@@ -28,6 +28,9 @@ internal sealed class LdapEntryWriter(LdapDialect dialect, ITransferContext cont
     /// <summary>Gets how many bytes have been written to the output.</summary>
     public long BytesWritten { get; private set; }
 
+    /// <summary>Gets how many entries have been added, written or held.</summary>
+    public int EntryCount { get; private set; }
+
     /// <summary>Gets the exit 23 failure the output ended the writing with; <see langword="null" /> while it accepts every byte.</summary>
     public TransferResult? WriteFailure { get; private set; }
 
@@ -37,6 +40,7 @@ internal sealed class LdapEntryWriter(LdapDialect dialect, ITransferContext cont
     public ValueTask<bool> AddAsync(LdapSearchEntry entry)
     {
         IReadOnlyList<byte[]> pieces = LdapEntryFormatter.FormatPieces(dialect, entry);
+        EntryCount++;
         if (dialect == LdapDialect.WinLdap)
         {
             held.AddRange(pieces);

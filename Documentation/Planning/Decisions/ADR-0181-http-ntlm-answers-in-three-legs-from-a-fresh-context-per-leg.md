@@ -101,6 +101,8 @@ answered `NoMechanism` before), over `NtlmChallengeAnswerer` with the injected
   machine would answer again; curl's loop there is unbounded, this one ends on the 401.
 - A Type 3 that would pass curl's 1024-byte `NTLM_BUFSIZE` (a user or domain of hundreds
   of characters) ends on the 401 off Windows, where curl fails with `CURLE_TOO_LARGE`.
+  Superseded by BL-849 (2026-09-29): off Windows it now fails with exit 100, `user + domain
+  + hostname too big for NTLM`, as curl 8.18.0 on Ubuntu was measured to.
 - Proxy NTLM (BL-604) and SASL `NTLM` (BL-538) reuse `NtlmHttpAuthenticator`'s approach
   or the same contexts; `Proxy-Authenticate` needs the same continuation for proxies.
 - The `-v` lines curl writes for NTLM (`Server auth using NTLM with user 'u'`, `NTLM

@@ -21,6 +21,14 @@ internal sealed class AesSha1KerberosEncryption : KerberosEncryption
     {
     }
 
+    /// <summary>Gives <c>aes128-cts-hmac-sha1-96</c> for <see cref="KerberosEncryptionType.Aes128CtsHmacSha196" />, <c>aes256-cts-hmac-sha1-96</c> otherwise.</summary>
+    /// <param name="encryptionType">One of the two RFC 3962 encryption types.</param>
+    /// <param name="randomSource">Where the confounders come from.</param>
+    public static AesSha1KerberosEncryption ForType(KerberosEncryptionType encryptionType, IKerberosRandomSource randomSource) =>
+        encryptionType == KerberosEncryptionType.Aes128CtsHmacSha196
+            ? new(encryptionType, 15, 16, randomSource)
+            : new(encryptionType, 16, 32, randomSource);
+
     /// <summary>
     /// RFC 3961 section 5.1's <c>DK(key, constant)</c> for AES, whose random-to-key is the
     /// identity: the n-fold of the constant to one block, encrypted again and again, the

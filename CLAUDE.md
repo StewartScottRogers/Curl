@@ -123,9 +123,17 @@ carry on when tokens return - nobody needs to restart them. The lanes' heartbeat
 published as `status.json` on the `board` branch every `-HeartbeatMinutes` (default 3)
 for the live board page.
 
+Lanes test only on Windows, so the coordinator of a lane shift watches CI for them
+(BL-987): on each heartbeat it reads the finished `CI` runs on the shift's branch
+(cancelled ones ignored) and, for every new failing test or build error in
+`gh run view <id> --log-failed`, files and pushes a High task - "Fix CI failure <test> on
+Linux and macOS", or "Fix flaky CI test <test> ..." for one that failed once between
+passing runs - with the run, platforms, first failing commit, error message and the test's
+project and library as `touches`. A test a live task already names is not filed again.
+
 Every session, lanes included, whispers milestones to Stewart through the PostToolUse hook
-`.claude/hooks/whisper-milestone.ps1`: a task moved to Done, a commit made, a branch
-deleted - quietly, in Windows' Zira voice, one phrase at a time.
+`.claude/hooks/whisper-milestone.ps1`: a task moved to Done, a CI failure filed, a commit
+made, a branch deleted - quietly, in Windows' Zira voice, one phrase at a time.
 ## Repository layout
 Flat and linear. Every project is a directory immediately under the repository root.
 There is no `src/` and no `tests/`; do not create them.
@@ -189,6 +197,11 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
   drive-less URL such as `file:///dir/x` unless the drive letter is what the test is
   about. Where curl's answer differs by platform, pin each platform's answer in its own
   test (`[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]` for the other).
+- **`--ai-help` keeps pace with the options.** `curl --ai-help` is Markdown help for AI
+  agents beside the human `--help` (BL-911): a short index by default,
+  `--ai-help <category>` or `all` for the full reference. Every task that adds or
+  changes a command-line option also keeps `--ai-help` right, and says so in its
+  acceptance criteria.
 - Nullable reference types enabled, warnings treated as errors.
 - File-scoped namespaces; namespace matches folder path.
 - Central package management through `Directory.Packages.props`; never put a `Version` attribute on a `PackageReference` in a project file.

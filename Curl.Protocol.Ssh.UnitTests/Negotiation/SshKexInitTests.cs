@@ -46,7 +46,7 @@ public sealed class SshKexInitTests
     }
 
     [TestMethod]
-    public void ForClient_TodaysCatalogue_OffersCurve25519NistAndFiniteFieldExchangesEcdsaEd25519RsaHostKeysAesAndSha2Macs()
+    public void ForClient_TodaysCatalogue_OffersCurve25519NistAndFiniteFieldExchangesEveryMeasuredHostKeyCipherAndMac()
     {
         SshKexInit kexInit = SshKexInit.ForClient(SshAlgorithmPreferences.OpenSslReference, SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0));
 
@@ -61,15 +61,43 @@ public sealed class SshKexInitTests
             },
             kexInit.KeyExchange.ToArray());
         CollectionAssert.AreEqual(
-            new[] { "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521", "ssh-ed25519", "rsa-sha2-512", "rsa-sha2-256", "ssh-rsa" },
+            SshAlgorithmPreferences.OpenSslReference.ServerHostKey.ToArray(),
             kexInit.ServerHostKey.ToArray());
-        string[] ciphers = ["aes256-gcm@openssh.com", "aes128-gcm@openssh.com", "aes256-ctr", "aes192-ctr", "aes128-ctr"];
+        string[] ciphers = "chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr,aes256-cbc,rijndael-cbc@lysator.liu.se,aes192-cbc,aes128-cbc,blowfish-cbc,arcfour128,arcfour,cast128-cbc,3des-cbc".Split(',');
         CollectionAssert.AreEqual(ciphers, kexInit.CipherClientToServer.ToArray());
         CollectionAssert.AreEqual(ciphers, kexInit.CipherServerToClient.ToArray());
-        string[] macs = ["hmac-sha2-256", "hmac-sha2-256-etm@openssh.com", "hmac-sha2-512", "hmac-sha2-512-etm@openssh.com"];
+        string[] macs = "hmac-sha2-256,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-512-etm@openssh.com,hmac-sha1,hmac-sha1-etm@openssh.com,hmac-sha1-96,hmac-md5,hmac-md5-96,hmac-ripemd160,hmac-ripemd160@openssh.com".Split(',');
         CollectionAssert.AreEqual(macs, kexInit.MacClientToServer.ToArray());
         CollectionAssert.AreEqual(macs, kexInit.MacServerToClient.ToArray());
         CollectionAssert.AreEqual(new[] { "none" }, kexInit.CompressionClientToServer.ToArray());
+    }
+
+    [TestMethod]
+    public void ForClient_TodaysCatalogueOnWindows_OffersTheMeasuredWinCngCiphersAndMacs()
+    {
+        SshKexInit kexInit = SshKexInit.ForClient(SshAlgorithmPreferences.WindowsReference, SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0));
+
+        string[] ciphers = "chacha20-poly1305@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr,aes256-cbc,rijndael-cbc@lysator.liu.se,aes192-cbc,aes128-cbc,arcfour128,arcfour,3des-cbc".Split(',');
+        CollectionAssert.AreEqual(ciphers, kexInit.CipherClientToServer.ToArray());
+        CollectionAssert.AreEqual(ciphers, kexInit.CipherServerToClient.ToArray());
+        string[] macs = "hmac-sha2-256,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-512-etm@openssh.com,hmac-sha1,hmac-sha1-etm@openssh.com,hmac-sha1-96,hmac-md5,hmac-md5-96".Split(',');
+        CollectionAssert.AreEqual(macs, kexInit.MacClientToServer.ToArray());
+        CollectionAssert.AreEqual(macs, kexInit.MacServerToClient.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("Windows", false, "none")]
+    [DataRow("Windows", true, "zlib,zlib@openssh.com,none")]
+    [DataRow("OpenSSL", false, "none")]
+    [DataRow("OpenSSL", true, "zlib,zlib@openssh.com,none")]
+    public void ForClient_TodaysCatalogue_OffersTheCompressionListsMeasuredWithAndWithoutCompressedSsh(string platform, bool compressedSsh, string expected)
+    {
+        SshAlgorithmPreferences preset = platform == "Windows" ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference;
+
+        SshKexInit kexInit = SshKexInit.ForClient(preset.WithCompression(compressedSsh), SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0));
+
+        Assert.AreEqual(expected, string.Join(',', kexInit.CompressionClientToServer));
+        Assert.AreEqual(expected, string.Join(',', kexInit.CompressionServerToClient));
     }
 
     [TestMethod]

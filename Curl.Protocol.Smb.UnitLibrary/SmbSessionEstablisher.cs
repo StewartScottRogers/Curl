@@ -10,8 +10,18 @@ namespace Curl.Protocol.Smb;
 /// <param name="connection">The connection to the server, already open (and in TLS for <c>smbs</c>).</param>
 /// <param name="reader">Reads the server's messages from <paramref name="connection" />.</param>
 /// <param name="operatingSystem">curl's host triple, sent in the session setup.</param>
-internal sealed class SmbSessionEstablisher(IConnection connection, SmbMessageReader reader, string operatingSystem)
+/// <param name="transferLog">
+/// Where the negotiate and session setup are logged; <see langword="null" />, the default, for
+/// nowhere.
+/// </param>
+internal sealed class SmbSessionEstablisher(
+    IConnection connection,
+    SmbMessageReader reader,
+    string operatingSystem,
+    SmbTransferLog? transferLog = null)
 {
+    private readonly SmbTransferLog log = transferLog ?? SmbTransferLog.None;
+
     /// <summary>
     /// Negotiates and sets up the session.
     /// </summary>
@@ -38,9 +48,11 @@ internal sealed class SmbSessionEstablisher(IConnection connection, SmbMessageRe
 
         if (!SmbNegotiateResponse.TryRead(negotiate.Bytes, out SmbNegotiateResponse? response))
         {
+            log.Refused("negotiate", SmbMessageHeader.ReadStatus(negotiate.Bytes));
             return (0, TransferResult.Failure(CurlExitCode.CouldntConnect, SmbMessages.NegotiateFailed));
         }
 
+        log.Negotiated();
         byte[]? setup = SmbSessionSetupRequest.Encode(password, identity, operatingSystem, response!);
         if (setup is null)
         {
@@ -62,12 +74,16 @@ internal sealed class SmbSessionEstablisher(IConnection connection, SmbMessageRe
             return (0, ReceiveFailure(setupResponse));
         }
 
-        if (SmbMessageHeader.ReadStatus(setupResponse.Bytes) != 0)
+        uint status = SmbMessageHeader.ReadStatus(setupResponse.Bytes);
+        if (status != 0)
         {
+            log.Refused("session setup", status);
             return (0, TransferResult.Failure(CurlExitCode.LoginDenied, SmbMessages.LoginDenied));
         }
 
-        return (SmbMessageHeader.ReadUserId(setupResponse.Bytes), null);
+        ushort userId = SmbMessageHeader.ReadUserId(setupResponse.Bytes);
+        log.SessionSetUp(userId);
+        return (userId, null);
     }
 
     private async ValueTask SendAsync(byte[] message, CancellationToken cancellationToken)

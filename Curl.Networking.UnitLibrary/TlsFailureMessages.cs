@@ -56,6 +56,30 @@ internal static class TlsFailureMessages
     // .NET sees the end of the stream before OpenSSL does, so no exception carries it.
     private const string OpenSslUnexpectedEof = "error:0A000126:SSL routines::unexpected eof while reading";
 
+    /// <summary>
+    /// The Schannel build's exit 56 message for a read that finds the connection ended
+    /// without <c>close_notify</c> (BL-819, measured; ADR-0221).
+    /// </summary>
+    internal const string SchannelMissingCloseNotify = "schannel: server closed abruptly (missing close_notify)";
+
+    /// <summary>
+    /// The OpenSSL build's exit 56 message for a read that finds the connection ended
+    /// without <c>close_notify</c>: <c>SSL_read</c>'s error string, which curl prefixes
+    /// with the OpenSSL version of the reference build, <c>curlimages/curl:8.21.0</c>
+    /// (BL-819; ADR-0221).
+    /// </summary>
+    internal const string OpenSslMissingCloseNotify =
+        "OpenSSL SSL_read: OpenSSL/3.5.7: " + OpenSslUnexpectedEof + ", errno 0";
+
+    /// <summary>
+    /// The exit 56 message of the build being matched for a read that finds the connection
+    /// ended without <c>close_notify</c>.
+    /// </summary>
+    /// <param name="matchesSchannelBuild"><see langword="true" /> for curl's Schannel build.</param>
+    /// <returns><see cref="SchannelMissingCloseNotify" /> or <see cref="OpenSslMissingCloseNotify" />.</returns>
+    internal static string MissingCloseNotify(bool matchesSchannelBuild) =>
+        matchesSchannelBuild ? SchannelMissingCloseNotify : OpenSslMissingCloseNotify;
+
     // The SEC_E_* names curl's Schannel build prints for a security status; any other is
     // "Unknown error", as curl's own table falls back to.
     private static readonly FrozenDictionary<int, string> SecurityStatusNames = new Dictionary<int, string>

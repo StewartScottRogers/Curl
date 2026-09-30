@@ -25,6 +25,9 @@ namespace Curl.Networking;
 /// </remarks>
 public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings
 {
+    /// <inheritdoc />
+    TlsClientRoute IHandshakeReportingTlsProvider.Route => TlsClientRoute.SslStream;
+
     // The one warning curl 8.21.0's Schannel build writes for --capath (ADR-0009), unwrapped:
     // the console wraps it at the terminal width, into two lines at curl's default 79 columns.
     private static readonly string[] SchannelCaCertificateDirectoryWarnings =
@@ -385,7 +388,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             },
         };
 
-        var sslStream = new SslStream(new ConnectionStream(plaintext), leaveInnerStreamOpen: true);
+        var transport = new ConnectionStream(plaintext);
+        var sslStream = new SslStream(transport, leaveInnerStreamOpen: true);
         Exception failure;
         try
         {
@@ -397,9 +401,10 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
             });
             return ConnectResult.Connected(
-                new SslStreamConnection(sslStream, plaintext, clientCertificate),
+                new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild)),
                 new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
-                peerCertificates: peerCertificates);
+                peerCertificates: peerCertificates,
+                applicationProtocol: NegotiatedApplicationProtocol(sslStream.NegotiatedApplicationProtocol));
         }
         catch (Exception exception)
         {

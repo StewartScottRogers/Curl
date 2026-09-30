@@ -44,6 +44,12 @@ namespace Curl.Protocol.Telnet;
 /// <c>USER</c>, a non-ASCII one ends the transfer with exit 43, and a bad option with
 /// exit 48 or 49, before a byte is sent.
 /// </para>
+/// <para>
+/// After connecting, <see cref="ITransferContext.Events" /> gets what curl 8.21.0's
+/// <c>-v</c> and <c>--trace</c> show (measured, BL-935), through
+/// <see cref="TelnetTraceReporter" />: each negotiation and subnegotiation received and
+/// sent, each run of output data as data received, and the line the connection ends with.
+/// </para>
 /// </remarks>
 public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandler
 {
@@ -103,36 +109,45 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        long startedAt = context.OperationStarted ?? context.TimeProvider.GetTimestamp();
+        long sessionStarted = context.TimeProvider.GetTimestamp();
+        long startedAt = context.OperationStarted ?? sessionStarted;
+        var log = new TelnetDiagnosticLog(context.DiagnosticLog);
         CurlUrl url = context.Url;
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false)
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
+            var failed = new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
+            log.Failed(failed);
+            return failed;
         }
 
+        log.SessionStarted(target.Host, target.Port);
         context.Progress.ReportTransferStarted();
+        var trace = new TelnetTraceReporter(context.Events);
         await using (connection.ConfigureAwait(false))
         {
             var optionValues = new TelnetOptionValues();
-            TransferResult? optionFailure = TelnetOptionParser.Parse(
+            TransferResult result = TelnetOptionParser.Parse(
                 context.Credentials?.UserName,
                 context.TelnetOptions,
-                optionValues);
-            return optionFailure
-                ?? await RunSessionAsync(connection, context, optionValues, startedAt).ConfigureAwait(false);
+                optionValues)
+                ?? await RunSessionAsync(connection, context, new TelnetReceiver(optionValues, log, trace), startedAt).ConfigureAwait(false);
+            log.SessionEnded(result, context.TimeProvider.GetElapsedTime(sessionStarted));
+            trace.ConnectionEnded(result, connect.ConnectionNumber);
+            return result;
         }
     }
 
     private static async Task<TransferResult> RunSessionAsync(
         IConnection connection,
         ITransferContext context,
-        TelnetOptionValues optionValues,
+        TelnetReceiver receiver,
         long startedAt)
     {
         var sendLock = new SemaphoreSlim(1, 1);
@@ -144,7 +159,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
         try
         {
-            return await ReceiveUntilClosedAsync(connection, context, optionValues, sendLock, uploadSendFailed.Task, startedAt)
+            return await ReceiveUntilClosedAsync(connection, context, receiver, sendLock, uploadSendFailed.Task, startedAt)
                 .ConfigureAwait(false);
         }
         finally
@@ -168,13 +183,12 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     private static async Task<TransferResult> ReceiveUntilClosedAsync(
         IConnection connection,
         ITransferContext context,
-        TelnetOptionValues optionValues,
+        TelnetReceiver receiver,
         SemaphoreSlim sendLock,
         Task uploadSendFailed,
         long startedAt)
     {
         CancellationToken cancellationToken = context.CancellationToken;
-        var receiver = new TelnetReceiver(optionValues);
         var buffer = new byte[ReceiveBufferSize];
         var data = new List<byte>();
         var replies = new List<byte>();

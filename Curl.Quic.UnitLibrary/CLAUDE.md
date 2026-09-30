@@ -39,13 +39,16 @@ Packet protection (BL-723, RFC 9001 sections 5 and 6):
 
 The handshake (BL-724, RFC 9000 sections 5 to 8, 17 and 18, RFC 9001 section 4, ADR-0165):
 
-- `QuicClientHandshake`: I/O-free. `Start()` returns the first Initial (curl's ClientHello
+- `QuicClientConnectionState`: the whole I/O-free client connection - its handshake, its
+  streams and flow control, its loss recovery and congestion control, and its idle timer
+  (renamed from `QuicClientHandshake` by BL-841, because since BL-726 it carries all of
+  them). `Start()` returns the first Initial (curl's ClientHello
   in one CRYPTO frame, padded to 1200 bytes), `Receive(datagram)` returns what to send,
   `Abandon` returns the CONNECTION_CLOSE datagrams. It drives `Tls13ClientHandshake` at the
   Initial, Handshake and 1-RTT levels, follows one Retry, fails on Version Negotiation
   without version 1, checks the server's transport parameters, discards Initial keys at the
   first Handshake packet and Handshake keys at HANDSHAKE_DONE, and keeps NEW_TOKEN tokens.
-  `QuicClientSettings` (with `CreateCurlTlsSettings`), `QuicHandshakeFailure` and the
+  `QuicClientSettings` (with `CreateLibreSslTlsSettings` and `CreateOpenSslTlsSettings`), `QuicHandshakeFailure` and the
   internal `QuicHandshakeFailures` hold the settings and the exit mapping.
 - `QuicClientConnector`: runs a handshake over `IDatagramChannel` with the injected
   `TimeProvider`; 10 s without `--connect-timeout` is exit 55, the timeout exit 28.
@@ -72,10 +75,10 @@ Loss detection and congestion control (BL-725, RFC 9002, RFC 9438):
 - HyStart++ and application-limited sending (BL-833, ADR-0198): CUBIC's first slow start
   runs HyStart++ (RFC 9406) with ngtcp2's constants, rounds by send time, one RTT sample
   per acknowledgement, Conservative Slow Start at a quarter growth for five rounds.
-  `QuicClientHandshake` marks every packet of a flush that left window unused
+  `QuicClientConnectionState` marks every packet of a flush that left window unused
   `QuicSentPacket.IsApplicationLimited`; neither controller grows the window for them
   (RFC 9002 section 7.8), and CUBIC moves its epoch on by the time spent limited.
-- `QuicClientHandshake` records each packet the assembler builds, resends the data of lost
+- `QuicClientConnectionState` records each packet the assembler builds, resends the data of lost
   packets in new packets (`QuicPacketNumberSpace.RequeueLost`: CRYPTO by range, other
   frames as they were, never ACK, PADDING, PING, CONNECTION_CLOSE or path frames), sends
   one probe per probe timeout (the oldest unacknowledged data, else a PING) and exposes
@@ -87,7 +90,7 @@ Loss detection and congestion control (BL-725, RFC 9002, RFC 9438):
 
 Streams and flow control (BL-726, RFC 9000 sections 2 to 4, ADR-0174):
 
-- `QuicStreamSet` (`QuicClientHandshake.Streams`): opens client bidirectional and
+- `QuicStreamSet` (`QuicClientConnectionState.Streams`): opens client bidirectional and
   unidirectional streams up to the server's MAX_STREAMS (STREAMS_BLOCKED once per limit),
   creates the server's streams with every lower-numbered one of their type, routes the
   stream frames of sections 19.4 to 19.14, holds the server's MAX_DATA and MAX_STREAM_DATA
@@ -100,7 +103,7 @@ Streams and flow control (BL-726, RFC 9000 sections 2 to 4, ADR-0174):
 - The internal `QuicSendCredit` and `QuicReceiveCredit` hold one limit each way.
   `QuicPacketNumberSpace.Streams` puts the streams' frames in 1-RTT packets; a lost STREAM
   frame goes again unless its stream was reset. A short header packet ends its datagram.
-- `QuicClientHandshake.TakeDatagramsToSend` and `CloseWithApplicationError` send what the
+- `QuicClientConnectionState.TakeDatagramsToSend` and `CloseWithApplicationError` send what the
   streams queued and an application CONNECTION_CLOSE.
 - `QuicConnection` implements `IMultiplexedConnection` over a completed handshake and its
   `IDatagramChannel`: one loop sends, receives and runs the loss detection timer; streams
@@ -115,7 +118,7 @@ Close, idle timeout and stateless reset (BL-727, RFC 9000 section 10, ADR-0177):
   server's frame. During the handshake the mapping of ADR-0165 stands.
 - The client sends CONNECTION_CLOSE once, with no closing period, and after the server's
   close or a stateless reset drains: it sends nothing more.
-- `QuicClientHandshake.TimeUntilIdleTimer` and `OnIdleTimer`: once complete, a PING at half
+- `QuicClientConnectionState.TimeUntilIdleTimer` and `OnIdleTimer`: once complete, a PING at half
   the idle timeout (the smaller non-zero `max_idle_timeout`, at least three probe timeouts),
   and at the timeout a silent close, exit 55 `ngtcp2_conn_handle_expiry returned error:
   ERR_IDLE_CLOSE`. `QuicConnection`'s loop runs it beside the loss detection timer.

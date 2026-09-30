@@ -52,13 +52,48 @@ public sealed class KerberosGssContextTests
         CollectionAssert.AreEqual(RandomBytes[..acceptor.SessionKey.Length], authenticator.Subkey.Value.ToArray());
         Assert.AreEqual(0x01020304u, authenticator.SequenceNumber);
         Assert.AreEqual(KerberosGssContext.GssChecksumType, authenticator.Checksum!.ChecksumType);
-        CollectionAssert.AreEqual(Hex.Bytes("10000000 00000000000000000000000000000000 36000000"), authenticator.Checksum.Value);
+        CollectionAssert.AreEqual(Hex.Bytes("10000000 00000000000000000000000000000000 36010000"), authenticator.Checksum.Value);
         Assert.AreEqual(
-            KerberosGssFlags.MutualAuthentication | KerberosGssFlags.ReplayDetection | KerberosGssFlags.Confidentiality | KerberosGssFlags.Integrity,
+            KerberosGssFlags.MutualAuthentication | KerberosGssFlags.ReplayDetection | KerberosGssFlags.Confidentiality | KerberosGssFlags.Integrity
+                | KerberosGssFlags.Transfer,
             context.Flags);
 
         Assert.IsEmpty(context.NextToken(acceptor.Reply()));
         Assert.IsTrue(context.IsCompleted);
+    }
+
+    /// <summary>
+    /// Recorded from curl 8.18.0 with MIT krb5 1.22.1 (BL-832, ADR-0171): over HTTPS its
+    /// Negotiate authenticator's <c>Bnd</c> was CCA1946F…, the MD5 of RFC 2744's structure
+    /// with no addresses and the application data <c>tls-server-end-point:</c> followed by
+    /// the SHA-256 of the server's sha256RSA certificate, D7AD5D5F….
+    /// </summary>
+    [TestMethod]
+    public void NextToken_ChannelBindings_PutsTheirMd5InTheChecksumAsCurlWithMitDoes()
+    {
+        FakeGssAcceptor acceptor = new(KerberosEncryptionType.Aes256CtsHmacSha196);
+        byte[] bindings = [.. Encoding.ASCII.GetBytes("tls-server-end-point:"), .. Hex.Bytes("D7AD5D5F7333F5332C51F833B068391457CDCBDDA165F9F5545DDF5E3C568B08")];
+        using KerberosGssContext context = NewContext(acceptor, new KerberosGssContextOptions { ChannelBindings = bindings });
+
+        acceptor.Accept(context.NextToken([]));
+
+        CollectionAssert.AreEqual(Hex.Bytes("10000000 CCA1946F38023F173903A4E68BDCCCEA 36010000"), acceptor.Authenticator!.Checksum!.Value);
+    }
+
+    /// <summary>
+    /// Hand-computed from RFC 2744 section 3.11 as MIT lays it out: four zero words for the
+    /// two empty addresses, the length 3 little-endian, then "abc": the MD5 of
+    /// 00×16 03000000 616263 is 420B92DA….
+    /// </summary>
+    [TestMethod]
+    public void NextToken_ChannelBindings_HashesTheRfc2744StructureWithNoAddresses()
+    {
+        FakeGssAcceptor acceptor = new(KerberosEncryptionType.Aes256CtsHmacSha196);
+        using KerberosGssContext context = NewContext(acceptor, new KerberosGssContextOptions { ChannelBindings = Encoding.ASCII.GetBytes("abc") });
+
+        acceptor.Accept(context.NextToken([]));
+
+        CollectionAssert.AreEqual(Hex.Bytes("420B92DA63953711D03790FC6A20013D"), acceptor.Authenticator!.Checksum!.Value[4..20]);
     }
 
     [TestMethod]
@@ -85,16 +120,16 @@ public sealed class KerberosGssContextTests
 
         Assert.IsTrue(context.IsCompleted);
         Assert.AreEqual(KerberosApOptions.None, acceptor.Request!.Options);
-        Assert.AreEqual(0x34u, BinaryPrimitives.ReadUInt32LittleEndian(acceptor.Authenticator!.Checksum!.Value.AsSpan(20)));
+        Assert.AreEqual(0x134u, BinaryPrimitives.ReadUInt32LittleEndian(acceptor.Authenticator!.Checksum!.Value.AsSpan(20)));
         CollectionAssert.AreEqual(Message, context.Unwrap(acceptor.Rfc4121Wrap(Message, 0x01020304, encrypt: true)).Message);
     }
 
     [TestMethod]
-    [DataRow(KerberosDelegation.None, KerberosTicketFlags.OkAsDelegate, true, 0x36u)]
-    [DataRow(KerberosDelegation.Policy, KerberosTicketFlags.None, true, 0x36u)]
-    [DataRow(KerberosDelegation.Policy, KerberosTicketFlags.OkAsDelegate, true, 0x37u)]
-    [DataRow(KerberosDelegation.Always, KerberosTicketFlags.None, true, 0x37u)]
-    [DataRow(KerberosDelegation.Always, KerberosTicketFlags.None, false, 0x36u)]
+    [DataRow(KerberosDelegation.None, KerberosTicketFlags.OkAsDelegate, true, 0x136u)]
+    [DataRow(KerberosDelegation.Policy, KerberosTicketFlags.None, true, 0x136u)]
+    [DataRow(KerberosDelegation.Policy, KerberosTicketFlags.OkAsDelegate, true, 0x137u)]
+    [DataRow(KerberosDelegation.Always, KerberosTicketFlags.None, true, 0x137u)]
+    [DataRow(KerberosDelegation.Always, KerberosTicketFlags.None, false, 0x136u)]
     public void NextToken_Delegation_SetsTheChecksumFlagsForEachLevel(KerberosDelegation delegation, KerberosTicketFlags ticketFlags, bool forwardable, uint expectedFlags)
     {
         FakeGssAcceptor acceptor = new(KerberosEncryptionType.Aes256CtsHmacSha196);

@@ -107,8 +107,8 @@ public sealed partial class HttpProtocolHandlerTests
         };
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
-        await time.TimerCreatedAsync(HttpContinueWaitConnection.ContinueWait);
-        time.Advance(HttpContinueWaitConnection.ContinueWait);
+        await time.TimerCreatedAsync(HttpRequestOptions.DefaultContinueWait);
+        time.Advance(HttpRequestOptions.DefaultContinueWait);
         TransferResult result = await transfer;
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);

@@ -20,8 +20,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/ta
 
 | Command | Options | Does |
 | --- | --- | --- |
-| `list` | `-Folder`, `-Assignee`, `-Priority`, `-Pipeline`, `-Id`, `-NoArchive` | Tasks in one state folder, or all of them. `-Folder All` groups by state. Backlog rows carry the same ready / waiting / needs-Stewart marks and queue positions that `task-board.ps1 next` computes from. |
-| `show` | `-Id` (required) | One task in full, preceded by what the file does not itself say: which dependencies are not yet `Done`, which tasks wait on this one, how many acceptance boxes are ticked, and its queue position if it is ready. |
+| `list` | `-Folder`, `-Assignee`, `-Priority`, `-Pipeline`, `-Id`, `-NoArchive` | Tasks in one state folder, or all of them. `-Folder All` groups by state. Backlog rows carry the same ready / waiting / needs-Stewart / interactive-only marks and queue positions that `task-board.ps1 next` computes from. |
+| `show` | `-Id` (required) | One task in full, preceded by what the file does not itself say: which dependencies are not yet `Done`, which tasks wait on this one, how many acceptance boxes are ticked, whether it is interactive only (`lane: no`), and its queue position if it is ready. |
 | `find` | `-Text` (required), plus any `list` filter | Tasks whose title or body contains the text, with the matching line numbers. Case-insensitive substring. |
 | `deps` | `-Id` (required) | What the task waits on and what waits on it, both transitively, each with its current state. Names a dependency that is not on the board. |
 | `check` | `-FailOnProblem` | Validates the whole board. See below. |
@@ -33,7 +33,8 @@ Slash commands wrap the four used most: `/task-list`, `/task-show`, `/task-find`
 ### What `check` validates
 
 Duplicate IDs, and an `id` that disagrees with its file name. A missing `title`. Unknown
-`priority`, `assignee` or `pipeline`. A missing `requirement` — write `none` rather than
+`priority`, `assignee` or `pipeline`. A `lane` other than `yes` or `no` (no `lane` field
+at all is fine and means `yes`). A missing `requirement` — write `none` rather than
 leaving it blank. A `created` that is not `yyyy-MM-dd`. A dependency that is not on the
 board, and a task depending on itself. Dependency cycles, reported as the path round the
 loop. A `Done` task with an unticked acceptance box or a malformed completion date. An
@@ -63,7 +64,7 @@ Three edits, all in `task-admin.ps1`:
 1. Add the name to the `ValidateSet` on `$Command`.
 2. Write `function Invoke-<Name>([object[]] $Tasks)`. Every task is already parsed —
    `Get-Tasks` gives you `Id`, `Number`, `Title`, `Priority`, `Assignee`, `Pipeline`,
-   `Requirement`, `DependsOn`, `Created`, `Completed`, `State`, `Archived`, `BoxesTotal`,
+   `Requirement`, `Lane`, `LaneAllowed`, `DependsOn`, `Created`, `Completed`, `State`, `Archived`, `BoxesTotal`,
    `BoxesOpen`, `HasHeader`, `Path`, `Relative` and the full `Text`.
 3. Add one row to the `$Verbs` table at the foot of the file.
 

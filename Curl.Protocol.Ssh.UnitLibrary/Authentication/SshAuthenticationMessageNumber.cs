@@ -19,6 +19,13 @@ internal static class SshAuthenticationMessageNumber
     internal const byte Banner = 53;
 
     /// <summary>
+    /// <c>SSH_MSG_USERAUTH_PK_OK</c> (RFC 4252 section 7): the server would accept a
+    /// signature by the key the request named. It shares its number with
+    /// <see cref="PasswordChangeRequest" /> and <see cref="InfoRequest" />.
+    /// </summary>
+    internal const byte PublicKeyOk = 60;
+
+    /// <summary>
     /// <c>SSH_MSG_USERAUTH_PASSWD_CHANGEREQ</c> (RFC 4252 section 8): the password is
     /// expired. It shares its number with <see cref="InfoRequest" />.
     /// </summary>

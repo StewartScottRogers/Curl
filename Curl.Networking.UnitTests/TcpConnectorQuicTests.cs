@@ -17,7 +17,7 @@ namespace Curl.Networking;
 /// timings and exit codes (ADR-0144, ADR-0180).
 /// </summary>
 [TestClass]
-public sealed class TcpConnectorQuicTests
+public sealed partial class TcpConnectorQuicTests
 {
     private static readonly IPAddress SecondAddress = IPAddress.Parse("127.0.0.2");
 
@@ -30,6 +30,8 @@ public sealed class TcpConnectorQuicTests
         {
             server.Dispose();
         }
+
+        DeleteCertificateFiles();
     }
 
     [TestMethod]
@@ -459,9 +461,14 @@ public sealed class TcpConnectorQuicTests
             connectTimeout: connectTimeout,
             quicDialer: new QuicDialer(opener, options ?? new TlsClientOptions(Insecure: true), matchesSchannelBuild, clock, SystemTlsRandomSource.Instance));
 
-    private QuicTestServer Server(ulong? closeAfterClientHello = null)
+    private QuicTestServer Server(ulong? closeAfterClientHello = null, bool requestClientCertificate = false, ushort cipherSuite = 0x1301)
     {
-        var server = new QuicTestServer { CloseAfterClientHello = closeAfterClientHello };
+        var server = new QuicTestServer
+        {
+            CloseAfterClientHello = closeAfterClientHello,
+            RequestClientCertificate = requestClientCertificate,
+            CipherSuite = cipherSuite,
+        };
         lock (_servers)
         {
             _servers.Add(server);

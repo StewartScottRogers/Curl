@@ -17,7 +17,8 @@ public static class CurlHelpText
     /// <summary>The terminal width curl uses when neither <c>COLUMNS</c> nor a console gives one.</summary>
     public const int DefaultColumns = 79;
 
-    private static readonly (string Name, string Description, CurlHelpCategories Category)[] Categories =
+    /// <summary>The categories <c>--help category</c> lists, in its order, each with its name and one-line description.</summary>
+    internal static readonly (string Name, string Description, CurlHelpCategories Category)[] Categories =
     [
         ("auth", "Authentication methods", CurlHelpCategories.Auth),
         ("connection", "Manage connections", CurlHelpCategories.Connection),

@@ -205,9 +205,9 @@ public sealed partial class HandBuiltTlsProviderTests
         await IgnoreFailureAsync(serverTask);
     }
 
-    // With no TLS 1.3 suite the client can run, the range offers TLS 1.2 alone.
+    // A CCM-only --tls13-ciphers still offers TLS 1.2 beside it, and a TLS 1.2 server takes that.
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithOnlyTls13CiphersTheClientCannotRunAndNoCeiling_ConnectsOverTls12()
+    public async Task AuthenticateAsClientAsync_WithOnlyACcmTls13CipherAndATls12Server_ConnectsOverTls12()
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunEchoServerAsync(server, SslProtocols.Tls12);
@@ -242,6 +242,25 @@ public sealed partial class HandBuiltTlsProviderTests
         await IgnoreFailureAsync(serverTask);
     }
 
+    // A TLS 1.3 minimum leaves the --ciphers suites out and offers the default TLS 1.3 ones.
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)]
+    public async Task AuthenticateAsClientAsync_WithTls12CiphersAndATls13Minimum_ConnectsOverTls13()
+    {
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var serverTask = RunEchoServerAsync(server, SslProtocols.Tls13);
+        var events = new RecordingTransferEvents();
+        var options = new TlsClientOptions(Insecure: true, Ciphers: "ECDHE-RSA-AES128-GCM-SHA256", MinimumVersion: TlsVersion.Tls13);
+
+        var result = await Provider(options, OpenSslBuild).AuthenticateAsClientAsync(
+            new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.AreEqual(SslProtocols.Tls13, Assert.ContainsSingle(events.Handshakes).ProtocolVersion);
+        await result.Connection!.DisposeAsync();
+        await IgnoreFailureAsync(serverTask);
+    }
+
     [TestMethod]
     public async Task AuthenticateAsClientAsync_Tls12_ReportsTheTrustAndTheHandshakeAsTheSslStreamProviderDoes()
     {
@@ -260,6 +279,7 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.AreEqual(SslProtocols.Tls12, handshake.ProtocolVersion);
         Assert.AreEqual(TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, handshake.CipherSuite);
         Assert.AreEqual("http/1.1", handshake.NegotiatedApplicationProtocol);
+        Assert.AreEqual("http/1.1", result.ApplicationProtocol);
         CollectionAssert.AreEqual(Http11, handshake.OfferedApplicationProtocols.ToArray());
         CollectionAssert.AreEqual(s_serverCertificate.RawData, handshake.ServerCertificate!.RawData);
         Assert.IsFalse(handshake.CertificateVerified);
@@ -286,6 +306,7 @@ public sealed partial class HandBuiltTlsProviderTests
         var handshake = Assert.ContainsSingle(events.Handshakes);
         Assert.IsEmpty(handshake.OfferedApplicationProtocols);
         Assert.IsNull(handshake.NegotiatedApplicationProtocol);
+        Assert.IsNull(result.ApplicationProtocol);
         await result.Connection!.DisposeAsync();
         await IgnoreFailureAsync(serverTask);
     }
@@ -369,8 +390,8 @@ public sealed partial class HandBuiltTlsProviderTests
 
     [TestMethod]
     [DataRow("nonsense", null, TlsVersion.SystemDefault, TlsVersion.Tls12)]
-    [DataRow(null, "TLS_AES_128_CCM_SHA256", TlsVersion.Tls13, TlsVersion.SystemDefault)]
     [DataRow("ECDHE-ECDSA-AES128-CCM", null, TlsVersion.SystemDefault, TlsVersion.Tls12)]
+    [DataRow("TLS_PSK_WITH_AES_128_GCM_SHA256", null, TlsVersion.SystemDefault, TlsVersion.Tls12)]
     public async Task AuthenticateAsClientAsync_WithCiphersTheOpenSslBuildCannotOffer_FailsWithExit59(string? ciphers, string? tls13Ciphers, TlsVersion minimumVersion, TlsVersion maximumVersion)
     {
         var (plaintext, plaintextStream) = Unanswered();

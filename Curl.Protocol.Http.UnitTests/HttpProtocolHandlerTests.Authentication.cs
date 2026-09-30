@@ -58,7 +58,8 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(BasicRequest, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             (HttpAuthRequest request, IReadOnlyList<string> challenges) = authenticator.Calls.Single();
-            Assert.AreEqual(new HttpAuthRequest("GET", CurlUrl.Parse(AuthUrl), "/a", credential, null, HttpAuthSchemes.Basic, false), request);
+            Assert.AreEqual(new HttpAuthRequest("GET", CurlUrl.Parse(AuthUrl), "/a", credential, null, HttpAuthSchemes.Basic, false), request with { Events = NoTransferEvents.Instance });
+            Assert.IsInstanceOfType<HttpInfoLineRecorder>(request.Events, $"Chunk size {chunkSize}");
             Assert.IsEmpty(challenges, $"Chunk size {chunkSize}");
         }
     }

@@ -25,7 +25,9 @@ its realm and locates a realm's KDCs from the file or from DNS SRV records throu
 `KerberosConfiguration`, `KerberosKdcLocator`; BL-689, ADR-0160). It encrypts,
 decrypts, checksums and makes keys from passwords with `aes128`/`aes256-cts-hmac-sha1-96`
 (RFC 3962), `aes128-cts-hmac-sha256-128`, `aes256-cts-hmac-sha384-192` (RFC 8009),
-`rc4-hmac` (RFC 4757) and `camellia128-cts-cmac`, `camellia256-cts-cmac` (RFC 6803):
+`rc4-hmac` (RFC 4757), `camellia128-cts-cmac`, `camellia256-cts-cmac` (RFC 6803) and
+`des3-cbc-sha1` (RFC 3961 section 6.3; `Des3CbcSha1KerberosEncryption`, BL-894, ADR-0232,
+its zero padding dropped before a decrypted value is decoded, `KerberosAsn1.WithoutPadding`):
 `KerberosEncryption.Create` gives one per `KerberosEncryptionType`,
 confounders come from `IKerberosRandomSource`, and a failed integrity check throws
 `KerberosCryptographyException` (`KerberosNFold`, `KerberosAesCts`,
@@ -47,7 +49,7 @@ TCP and frames TCP) and, for an `https://` KDC, the optional `IKerberosKdcProxyT
 with the request wrapped in MS-KKDCP's `KerberosKdcProxyMessage` as MIT does (BL-827;
 without one, `https://` KDCs are skipped); every refusal is a `KerberosKdcException` with a `KerberosKdcError`
 (BL-690, ADR-0168), and follows the KDCs' cross-realm referrals (`krbtgt/OTHER@REALM`) to
-OTHER's KDCs up to `MaximumReferralHops` times (BL-826, ADR-0200); given a
+OTHER's KDCs up to `MaximumReferralHops` times (BL-826, ADR-0256); given a
 `CredentialCacheStore` and a cache name instead, it stores a ticket got by a TGS exchange
 back in a `FILE:` or `DIR:` cache by appending it through the injected
 `IKerberosFileWriter`, as MIT's `cc_file.c` does, ignoring a failed store as MIT does
@@ -62,12 +64,17 @@ forwarded one by a TGS-REQ with `forwarded`, as MIT's `krb5_fwd_tgt_creds` does,
 refuses one without `forwardable` as `KerberosKdcError.TicketNotForwardable` (BL-831,
 ADR-0210). It is the initiator of the GSS-API Kerberos V5 mechanism:
 `KerberosGssContext` makes the initial context token (an AP-REQ whose authenticator
-carries RFC 4121's checksum with the context flags and, for `--delegation`, a KRB-CRED of
-a forwarded ticket-granting ticket), checks the acceptor's AP-REP, and then makes and
-reads Wrap and MIC tokens, RFC 4121's for AES keys and RFC 4757's for `rc4-hmac`
+carries RFC 4121's checksum with the context flags, MIT's `GSS_C_TRANS_FLAG` among them as
+measured (BL-916), the MD5 of the caller's channel
+bindings when given (RFC 2744's structure, as curl with MIT sends `tls-server-end-point`
+over HTTPS; BL-832) and, for `--delegation`, a KRB-CRED of a forwarded ticket-granting
+ticket), checks the acceptor's AP-REP, and then makes and
+reads Wrap and MIC tokens, RFC 4121's for AES and Camellia keys, RFC 4757's for
+`rc4-hmac`, and RFC 1964's DES3 tokens as MIT's `k5seal.c` makes them for `des3-cbc-sha1`
 (`KerberosGssContextOptions`, `KerberosGssFlags`, `KerberosDelegation`,
 `KerberosGssToken` for RFC 2743's framing, `Rfc4121GssMessageProtection`,
-`Rc4HmacGssMessageProtection`, `KerberosCredentialMessage`); every refusal is a
+`Rc4HmacGssMessageProtection`, `Des3CbcSha1GssMessageProtection` (BL-962),
+`KerberosCredentialMessage`); every refusal is a
 `KerberosGssException` with a `KerberosGssError` (BL-691, ADR-0171).
 
 ## Rules

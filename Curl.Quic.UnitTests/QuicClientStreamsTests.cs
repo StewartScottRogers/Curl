@@ -11,7 +11,7 @@ public sealed class QuicClientStreamsTests
     public void Receive_ReorderedAndDuplicatedStreamFrames_ReassemblesTheServersStreamInOrder()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
 
         Deliver(client, server, new QuicStreamFrame(3, 5, "world"u8.ToArray(), false));
         Deliver(client, server, new QuicStreamFrame(3, 0, "hello"u8.ToArray(), false), new QuicStreamFrame(3, 0, "hel"u8.ToArray(), false));
@@ -32,7 +32,7 @@ public sealed class QuicClientStreamsTests
         {
             ConfigureTransportParameters = parameters => GenerousServerLimits(parameters) with { InitialMaxStreamDataBidiRemote = 10, InitialMaxData = 15 },
         };
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
         QuicStream stream = client.Streams.OpenBidirectional()!;
 
         stream.Write(Bytes(30), endStream: true);
@@ -56,12 +56,12 @@ public sealed class QuicClientStreamsTests
     public void TakeDatagramsToSend_MoreThanOnePacketOfData_SendsEach1RttPacketInItsOwnDatagram()
     {
         using QuicTestServer server = new() { ConfigureTransportParameters = GenerousServerLimits };
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
         QuicStream stream = client.Streams.OpenBidirectional()!;
 
         stream.Write(Bytes(3000), endStream: true);
         IReadOnlyList<byte[]> datagrams = client.TakeDatagramsToSend();
-        QuicClientHandshakeTests.Exchange(client, server, datagrams);
+        QuicClientConnectionStateTests.Exchange(client, server, datagrams);
 
         Assert.HasCount(3, datagrams);
         CollectionAssert.AreEqual(Bytes(3000), Sent<QuicStreamFrame>(server).SelectMany(frame => frame.Data.ToArray()).ToArray());
@@ -71,14 +71,14 @@ public sealed class QuicClientStreamsTests
     public void TakeDatagramsToSend_LessDataThanTheWindow_MarksThePacketsApplicationLimitedAndTheirAcknowledgementLeavesTheWindow()
     {
         using QuicTestServer server = new() { ConfigureTransportParameters = GenerousServerLimits };
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
         client.Streams.OpenBidirectional()!.Write(Bytes(3000), endStream: true);
 
         IReadOnlyList<byte[]> datagrams = client.TakeDatagramsToSend();
 
         // RFC 9002 section 7.8: 3000 bytes leave most of the 12000-byte window unused.
         Assert.IsTrue(SentStreamPackets(client).All(packet => packet.IsApplicationLimited));
-        QuicClientHandshakeTests.Exchange(client, server, datagrams);
+        QuicClientConnectionStateTests.Exchange(client, server, datagrams);
         Assert.AreEqual(12000, client.Recovery.Congestion.CongestionWindow);
     }
 
@@ -89,7 +89,7 @@ public sealed class QuicClientStreamsTests
         {
             ConfigureTransportParameters = parameters => GenerousServerLimits(parameters) with { InitialMaxData = 15 },
         };
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
         client.Streams.OpenBidirectional()!.Write(Bytes(30000), endStream: true);
 
         client.TakeDatagramsToSend();
@@ -101,7 +101,7 @@ public sealed class QuicClientStreamsTests
     public void TakeDatagramsToSend_MoreDataThanTheWindow_FillsItWithPacketsThatAreNotApplicationLimitedAndGrowIt()
     {
         using QuicTestServer server = new() { ConfigureTransportParameters = GenerousServerLimits };
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
         client.Streams.OpenBidirectional()!.Write(Bytes(30000), endStream: true);
 
         IReadOnlyList<byte[]> datagrams = client.TakeDatagramsToSend();
@@ -109,7 +109,7 @@ public sealed class QuicClientStreamsTests
         List<QuicSentPacket> sent = SentStreamPackets(client);
         Assert.IsTrue(sent.All(packet => !packet.IsApplicationLimited));
         Assert.IsGreaterThanOrEqualTo(12000, client.Recovery.Congestion.BytesInFlight);
-        QuicClientHandshakeTests.Exchange(client, server, datagrams);
+        QuicClientConnectionStateTests.Exchange(client, server, datagrams);
         Assert.IsGreaterThan(12000, client.Recovery.Congestion.CongestionWindow);
     }
 
@@ -117,7 +117,7 @@ public sealed class QuicClientStreamsTests
     public void Read_HalfTheWindowConsumed_RaisesMaxStreamDataAndMaxData()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
 
         Deliver(client, server, new QuicStreamFrame(3, 0, Bytes(60), false));
         QuicStream stream = client.Streams.AcceptUnidirectional()!;
@@ -135,7 +135,7 @@ public sealed class QuicClientStreamsTests
     public void Receive_ResetStream_DropsUnreadBytesAndReportsTheCode()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
 
         Deliver(client, server, new QuicStreamFrame(3, 0, Bytes(3), false), new QuicResetStreamFrame(3, 0x10c, 50));
         QuicStream stream = client.Streams.AcceptUnidirectional()!;
@@ -150,7 +150,7 @@ public sealed class QuicClientStreamsTests
     public void Receive_StopSending_AnswersWithResetStreamAtTheSentOffset()
     {
         using QuicTestServer server = new() { ConfigureTransportParameters = GenerousServerLimits };
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
         QuicStream stream = client.Streams.OpenBidirectional()!;
         stream.Write(Bytes(7), endStream: false);
         Flush(client, server);
@@ -166,7 +166,7 @@ public sealed class QuicClientStreamsTests
     public void OpenUnidirectional_PastTheServersMaxStreams_RefusesSendsStreamsBlockedAndOpensAfterMaxStreams()
     {
         using QuicTestServer server = new() { ConfigureTransportParameters = parameters => GenerousServerLimits(parameters) with { InitialMaxStreamsUni = 1 } };
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
 
         Assert.AreEqual(2UL, client.Streams.OpenUnidirectional()!.Id);
         Assert.IsNull(client.Streams.OpenUnidirectional());
@@ -183,7 +183,7 @@ public sealed class QuicClientStreamsTests
     public void Receive_ServerStreamPastTheClientsMaxStreams_ClosesWithStreamLimitError()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
 
         Deliver(client, server, new QuicStreamFrame(11, 0, Bytes(1), false));
 
@@ -195,7 +195,7 @@ public sealed class QuicClientStreamsTests
     public void Receive_MoreThanTheStreamLimit_ClosesWithFlowControlErrorAndExit56()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
 
         Deliver(client, server, new QuicStreamFrame(3, 0, Bytes(101), false));
 
@@ -208,7 +208,7 @@ public sealed class QuicClientStreamsTests
     public void Receive_MoreThanTheConnectionLimitAcrossStreams_ClosesWithFlowControlError()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
 
         Deliver(client, server, new QuicStreamFrame(3, 0, Bytes(60), false), new QuicStreamFrame(7, 0, Bytes(41), false));
 
@@ -220,8 +220,8 @@ public sealed class QuicClientStreamsTests
     {
         ManualTimerTimeProvider clock = new();
         using QuicTestServer server = new() { ConfigureTransportParameters = GenerousServerLimits };
-        using QuicClientHandshake client = QuicHandshakeTest.Client(QuicHandshakeTest.CurlSettings with { TransportParameters = SmallClientLimits }, clock: clock);
-        QuicClientHandshakeTests.Run(client, server);
+        using QuicClientConnectionState client = QuicClientConnectionStateTest.Client(QuicClientConnectionStateTest.CurlSettings with { TransportParameters = SmallClientLimits }, clock: clock);
+        QuicClientConnectionStateTests.Run(client, server);
         QuicStream kept = client.Streams.OpenBidirectional()!;
         QuicStream reset = client.Streams.OpenBidirectional()!;
         kept.Write(Bytes(4), endStream: true);
@@ -231,7 +231,7 @@ public sealed class QuicClientStreamsTests
 
         clock.Advance((long)client.TimeUntilLossDetectionTimeout.TotalMilliseconds);
         Flush(client, server);
-        QuicClientHandshakeTests.Exchange(client, server, client.OnLossDetectionTimeout());
+        QuicClientConnectionStateTests.Exchange(client, server, client.OnLossDetectionTimeout());
 
         Assert.AreEqual(0UL, Sent<QuicStreamFrame>(server).Single().StreamId);
         Assert.AreEqual(new QuicResetStreamFrame(4, 9, 5), Sent<QuicResetStreamFrame>(server).Single());
@@ -241,16 +241,16 @@ public sealed class QuicClientStreamsTests
     public void CloseWithApplicationError_SendsAnApplicationConnectionClose()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake client = Connect(server);
+        using QuicClientConnectionState client = Connect(server);
 
-        QuicClientHandshakeTests.Exchange(client, server, client.CloseWithApplicationError(0x100));
+        QuicClientConnectionStateTests.Exchange(client, server, client.CloseWithApplicationError(0x100));
 
         QuicConnectionCloseFrame close = Sent<QuicConnectionCloseFrame>(server).Single();
         Assert.AreEqual((0x100UL, (ulong?)null), (close.ErrorCode, close.FrameType));
     }
 
     // The 1-RTT packets the client has sent with stream data and the server has not acknowledged yet.
-    private static List<QuicSentPacket> SentStreamPackets(QuicClientHandshake client)
+    private static List<QuicSentPacket> SentStreamPackets(QuicClientConnectionState client)
     {
         List<QuicSentPacket> sent = [.. client.Recovery.GetUnacknowledgedPackets(QuicPacketNumberSpaceId.ApplicationData).Where(packet => packet.Frames.OfType<QuicStreamFrame>().Any())];
         Assert.IsNotEmpty(sent);

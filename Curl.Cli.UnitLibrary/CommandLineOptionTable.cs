@@ -36,7 +36,7 @@ namespace Curl.Cli;
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
 /// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-ntlm</c>, <c>--no-negotiate</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
-/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-clobber</c> (measured 2026-09-28), <c>--no-skip-existing</c> and <c>--no-remove-on-error</c> (measured 2026-09-28), <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-trace-ids</c> (measured 2026-09-29, BL-648), <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) <c>--no-buffer</c> (measured 2026-09-28; <c>-N</c> is <c>--no-buffer</c>), <c>--no-parallel</c> and <c>--no-parallel-immediate</c> (measured 2026-09-28), <c>--no-socks5-basic</c>, <c>--no-socks5-gssapi</c>, <c>--no-socks5-gssapi-nec</c>, <c>--no-haproxy-protocol</c> and <c>--no-suppress-connect-headers</c> (measured 2026-09-28, BL-612), <c>--no-proxy-ca-native</c>, <c>--no-proxy-ssl-auto-client-cert</c> and <c>--no-proxy-ssl-allow-beast</c> (measured 2026-09-28, BL-605), <c>--no-use-ascii</c>, <c>--no-crlf</c> and <c>--no-append</c> (measured 2026-09-29, BL-632) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-clobber</c> (measured 2026-09-28), <c>--no-skip-existing</c> and <c>--no-remove-on-error</c> (measured 2026-09-28), <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-trace-ids</c> (measured 2026-09-29, BL-648), <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) <c>--no-buffer</c> (measured 2026-09-28; <c>-N</c> is <c>--no-buffer</c>), <c>--no-parallel</c> and <c>--no-parallel-immediate</c> (measured 2026-09-28), <c>--no-socks5-basic</c>, <c>--no-socks5-gssapi</c>, <c>--no-socks5-gssapi-nec</c>, <c>--no-haproxy-protocol</c> and <c>--no-suppress-connect-headers</c> (measured 2026-09-28, BL-612), <c>--no-proxy-ca-native</c>, <c>--no-proxy-ssl-auto-client-cert</c> and <c>--no-proxy-ssl-allow-beast</c> (measured 2026-09-28, BL-605), <c>--no-use-ascii</c>, <c>--no-crlf</c> and <c>--no-append</c> (measured 2026-09-29, BL-632), <c>--no-form-escape</c> (measured 2026-09-29, BL-625) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-out-null</c> is accepted and, as in curl 8.21.0, discards its URL's body just as <c>--out-null</c> does
 /// (measured 2026-09-28, BL-495 Notes).
@@ -75,6 +75,8 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("trace-time", null, (options, on) => options.TraceTime = on),
         CommandLineOption.NegatableFlag("trace-ids", null, (options, on) => options.TraceIds = on),
         CommandLineOption.Value("stderr", null, SetStandardErrorFile),
+        CommandLineOption.Value("log-level", null, SetDiagnosticLogLevel),
+        CommandLineOption.FileName("log-file", null, (options, file) => options.DiagnosticLogFile = file),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
         CommandLineOption.Value("upload-file", 'T', AddUploadFile),
         CommandLineOption.NegatableFlag("remote-name", 'O', (options, on) => options.PairRemoteName(on)),
@@ -95,12 +97,15 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("json", null, AppendJsonData),
         CommandLineOption.Value("form", 'F', (options, value, spelledOption, _, dataFileReader) => MultipartFormField.Apply(options, value, literal: false, spelledOption, dataFileReader)),
         CommandLineOption.Value("form-string", null, (options, value, spelledOption, _, dataFileReader) => MultipartFormField.Apply(options, value, literal: true, spelledOption, dataFileReader)),
+        CommandLineOption.NegatableFlag("form-escape", null, (options, on) => options.FormEscape = on),
+        CommandLineOption.NegatableFlag("disallow-username-in-url", null, (options, on) => options.DisallowUsernameInUrl = on),
         CommandLineOption.NegatableFlag("get", 'G', (options, on) => options.DataInQuery = on),
         CommandLineOption.Value("url-query", null, AppendUrlQuery),
         CommandLineOption.FileName("dump-header", 'D', (options, file) => options.DumpHeaderFile = file),
         CommandLineOption.Value("etag-save", null, SetEtagFile((options, file) => options.EtagSaveFile = file)),
         CommandLineOption.Value("etag-compare", null, SetEtagFile((options, file) => options.EtagCompareFile = file)),
         CommandLineOption.Value("alt-svc", null, AcceptingEmpty((options, file) => options.AltSvcFile = file)),
+        CommandLineOption.Value("hsts", null, AcceptingEmpty((options, file) => options.HstsFile = file)),
         CommandLineOption.Value("user", 'u', AcceptingEmpty((options, user) => options.SetCredentials(user))),
         CommandLineOption.NegatableFlag("basic", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Basic, on)),
         CommandLineOption.NegatableFlag("digest", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Digest, on)),
@@ -110,6 +115,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("delegation", null, AcceptingEmpty(SetGssApiDelegation)),
         CommandLineOption.Text("service-name", null, (options, service) => options.ServiceName = service),
         CommandLineOption.Text("oauth2-bearer", null, (options, token) => options.SetBearerToken(token)),
+        CommandLineOption.Value("aws-sigv4", null, AcceptingEmpty((options, parameter) => options.AwsSigV4 = parameter)),
         CommandLineOption.NegatableFlag("netrc", 'n', (options, on) => options.NetrcRequested = on),
         CommandLineOption.NegatableFlag("netrc-optional", null, (options, on) => options.NetrcOptionalRequested = on),
         CommandLineOption.Value("netrc-file", null, SettingExistingFile("--netrc-file", (options, file) => options.NetrcFile = file)),
@@ -154,6 +160,9 @@ public static class CommandLineOptionTable
         CommandLineOption.Text("dns-interface", null, (options, name) => options.DnsInterface = name),
         CommandLineOption.Text("dns-ipv4-addr", null, (options, address) => options.DnsIPv4Address = address),
         CommandLineOption.Text("dns-ipv6-addr", null, (options, address) => options.DnsIPv6Address = address),
+        CommandLineOption.Value("doh-url", null, AcceptingEmpty((options, url) => options.DohUrl = url.Length == 0 ? null : url)),
+        CommandLineOption.NegatableFlag("doh-insecure", null, (options, on) => options.DohInsecure = on),
+        CommandLineOption.NegatableFlag("doh-cert-status", null, (options, on) => options.DohCertificateStatus = on),
         CommandLineOption.FileName("unix-socket", null, (options, path) => options.SetUnixSocket(path, isAbstract: false)),
         CommandLineOption.FileName("abstract-unix-socket", null, (options, path) => options.SetUnixSocket(path, isAbstract: true)),
         CommandLineOption.NegatableFlag("tftp-no-options", null, (options, on) => options.TftpNoOptions = on),
@@ -251,13 +260,16 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("continue-at", 'C', SetResumeFrom),
         CommandLineOption.Value("max-filesize", null, SetMaxFileSize),
         CommandLineOption.Value("connect-timeout", null, SetConnectTimeout),
+        CommandLineOption.Value("happy-eyeballs-timeout-ms", null, SetHappyEyeballsTimeout),
         CommandLineOption.Value("max-time", 'm', SetMaxTime),
+        CommandLineOption.Value("expect100-timeout", null, SetExpect100Timeout),
         CommandLineOption.Value("retry", null, SetRetryCount),
         CommandLineOption.Value("retry-delay", null, SetRetryDelay),
         CommandLineOption.Value("retry-max-time", null, SetRetryMaxTime),
         CommandLineOption.NegatableFlag("retry-all-errors", null, (options, on) => options.RetryAllErrors = on),
         CommandLineOption.NegatableFlag("retry-connrefused", null, (options, on) => options.RetryConnectionRefused = on),
         CommandLineOption.Value("limit-rate", null, SetLimitRate),
+        CommandLineOption.Value("rate", null, SetTransferStartRate),
         CommandLineOption.Value("speed-limit", 'Y', SetSpeedLimit),
         CommandLineOption.Value("speed-time", 'y', SetSpeedTime),
         CommandLineOption.NegatableFlag("remote-time", 'R', (options, on) => options.RemoteTime = on),
@@ -270,7 +282,8 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie))),
         CommandLineOption.Text("cookie-jar", 'c', (options, file) => options.CookieJar = file),
         CommandLineOption.NegatableFlag("junk-session-cookies", 'j', (options, on) => options.JunkSessionCookies = on),
-        CommandLineOption.NegatableFlag("location", 'L', (options, on) => options.FollowRedirects = on),
+        CommandLineOption.NegatableFlag("follow", null, SetFollow),
+        CommandLineOption.NegatableFlag("location", 'L', SetLocation),
         CommandLineOption.NegatableFlag("location-trusted", null, SetLocationTrusted),
         CommandLineOption.Value("max-redirs", null, SetMaxRedirects),
         CommandLineOption.NegatableFlag("post301", null, (options, on) => options.KeepPostAfter301 = on),
@@ -293,6 +306,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("version", 'V', (options, on) => options.VersionRequested = on),
         CommandLineOption.Subject("help", 'h', (options, subject) => options.RequestHelp(subject)),
         CommandLineOption.NegatableFlag("manual", 'M', (options, on) => options.ManualRequested = on),
+        CommandLineOption.Subject("ai-help", null, (options, subject) => options.RequestAiHelp(subject)),
         CommandLineOption.NegatableFlag("compressed", null, (options, on) => options.Compressed = on),
         CommandLineOption.NegatableFlag("raw", null, (options, on) => options.Raw = on),
         CommandLineOption.NegatableFlag("tr-encoding", null, (options, on) => options.TransferEncoding = on),
@@ -362,7 +376,7 @@ public static class CommandLineOptionTable
     /// <remarks>
     /// curl 8.21.0's manual marks <c>--fail-early</c>, <c>-#</c>, <c>--progress-meter</c>, <c>-S</c>,
     /// <c>--stderr</c>, <c>--styled-output</c>, <c>--trace</c>, <c>--trace-ascii</c>,
-    /// <c>--trace-time</c>, <c>--trace-ids</c>, <c>-v</c>, <c>-Z</c>, <c>--parallel-immediate</c>, <c>--parallel-max</c> and <c>--parallel-max-host</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
+    /// <c>--trace-time</c>, <c>--trace-ids</c>, <c>-v</c>, <c>-Z</c>, <c>--parallel-immediate</c>, <c>--parallel-max</c>, <c>--parallel-max-host</c> and <c>--rate</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
     /// and <c>-M</c> are global in its tool (<c>struct GlobalConfig</c>) without the mark, as is
     /// <c>--ssl-sessions</c> (<c>global-&gt;ssl_sessions</c>); <c>--dump-ca-embed</c>, like <c>-V</c>, ends
     /// the command line rather than setting anything of one group. Measured
@@ -381,21 +395,36 @@ public static class CommandLineOptionTable
         "trace-time",
         "trace-ids",
         "stderr",
+        "log-level",
+        "log-file",
         "styled-output",
         "fail-early",
         "parallel",
         "parallel-immediate",
         "parallel-max",
         "parallel-max-host",
+        "rate",
         "variable",
         "version",
         "help",
         "manual",
+        "ai-help",
         "dump-ca-embed",
         "ssl-sessions",
         "config",
         "next",
         "disable");
+
+    /// <summary>The <c>--log-level</c> values, matched ignoring case, and the level each names.</summary>
+    private static readonly FrozenDictionary<string, DiagnosticLogLevel> DiagnosticLogLevelsByName =
+        new Dictionary<string, DiagnosticLogLevel>
+        {
+            ["none"] = DiagnosticLogLevel.None,
+            ["error"] = DiagnosticLogLevel.Error,
+            ["warning"] = DiagnosticLogLevel.Warning,
+            ["info"] = DiagnosticLogLevel.Info,
+            ["verbose"] = DiagnosticLogLevel.Verbose,
+        }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Does nothing: <c>-q</c> / <c>--disable</c> acts only as the first argument, where
@@ -426,6 +455,22 @@ public static class CommandLineOptionTable
     {
         CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, file);
         options.RedirectStandardError(file);
+        return null;
+    }
+
+    /// <summary>
+    /// Sets the <c>--log-level</c> of Curl's own diagnostic log (ADR-0222): <c>none</c>, <c>error</c>,
+    /// <c>warning</c>, <c>info</c> or <c>verbose</c>, in any case. Any other value, an empty one included,
+    /// is refused with <see cref="CommandLineRefusal.BadlyUsedHere"/>.
+    /// </summary>
+    private static CommandLineRefusal? SetDiagnosticLogLevel(CommandLineOptions options, string level, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (!DiagnosticLogLevelsByName.TryGetValue(level, out DiagnosticLogLevel parsed))
+        {
+            return CommandLineRefusal.BadlyUsedHere(spelledOption);
+        }
+
+        options.SetDiagnosticLogLevel(parsed);
         return null;
     }
 
@@ -1269,6 +1314,32 @@ public static class CommandLineOptionTable
         return refusal;
     }
 
+    /// <summary>
+    /// Records <c>--happy-eyeballs-timeout-ms</c>: whole milliseconds, zero or more, at most the platform's
+    /// C <c>LONG_MAX</c>, as curl 8.21.0 reads it (measured 2026-09-29, BL-644 Notes).
+    /// </summary>
+    private static CommandLineRefusal? SetHappyEyeballsTimeout(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseMilliseconds(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out TimeSpan duration);
+        if (refusal is null)
+        {
+            options.HappyEyeballsTimeout = duration;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetExpect100Timeout(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out TimeSpan duration);
+        if (refusal is null)
+        {
+            options.Expect100Timeout = duration;
+        }
+
+        return refusal;
+    }
+
     private static CommandLineRefusal? SetMaxTime(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out TimeSpan duration);
@@ -1356,6 +1427,17 @@ public static class CommandLineOptionTable
         if (refusal is null)
         {
             options.LimitRate = bytesPerSecond;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetTransferStartRate(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = TransferStartRate.Parse(spelledOption, value, options.ErrorsHidden, out long milliseconds);
+        if (refusal is null)
+        {
+            options.MillisecondsBetweenTransferStarts = milliseconds;
         }
 
         return refusal;
@@ -1461,11 +1543,34 @@ public static class CommandLineOptionTable
     /// <summary>
     /// Turns <c>--location-trusted</c> on or off: it follows redirects and sends credentials to every
     /// host they lead to, and its <c>--no-</c> spelling turns off both, as curl 8.21.0's tool does.
+    /// Like <c>-L</c>, either spelling ends an earlier <c>--follow</c>'s per-specification method changes.
     /// </summary>
     private static void SetLocationTrusted(CommandLineOptions options, bool on)
     {
         options.SendCredentialsToRedirectHosts = on;
+        SetLocation(options, on);
+    }
+
+    /// <summary>
+    /// Turns <c>-L</c> / <c>--location</c> on or off. curl 8.21.0 keeps one follow switch for
+    /// <c>-L</c> and <c>--follow</c>, the last given winning, so either spelling also ends an
+    /// earlier <c>--follow</c>'s per-specification method changes (measured, BL-627 Notes).
+    /// </summary>
+    private static void SetLocation(CommandLineOptions options, bool on)
+    {
         options.FollowRedirects = on;
+        options.FollowRedirectsPerSpec = false;
+    }
+
+    /// <summary>
+    /// Turns <c>--follow</c> on or off: it follows redirects as <c>-L</c> does, and also drops a
+    /// <c>-X</c> method whenever a redirect switches the request to GET; <c>--no-follow</c> stops
+    /// following altogether, as <c>--no-location</c> does (curl 8.21.0, measured, BL-627 Notes).
+    /// </summary>
+    private static void SetFollow(CommandLineOptions options, bool on)
+    {
+        options.FollowRedirects = on;
+        options.FollowRedirectsPerSpec = on;
     }
 
     private static CommandLineRefusal? SetMaxRedirects(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)

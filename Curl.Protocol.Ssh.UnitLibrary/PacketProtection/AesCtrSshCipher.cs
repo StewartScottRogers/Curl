@@ -18,7 +18,11 @@ internal sealed class AesCtrSshCipher(byte[] key, byte[] initialCounter) : ISshC
     public int BlockSize => AesCtr.BlockSize;
 
     /// <inheritdoc />
-    public void Transform(ReadOnlySpan<byte> source, Span<byte> destination) =>
+    public void Encrypt(ReadOnlySpan<byte> source, Span<byte> destination) =>
+        aesCtr.ApplyKeyStream(source, destination);
+
+    /// <inheritdoc />
+    public void Decrypt(ReadOnlySpan<byte> source, Span<byte> destination) =>
         aesCtr.ApplyKeyStream(source, destination);
 
     /// <inheritdoc />

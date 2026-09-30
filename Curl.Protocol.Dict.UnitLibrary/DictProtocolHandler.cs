@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Dict;
@@ -18,6 +20,12 @@ namespace Curl.Protocol.Dict;
 /// connection is tunnelled through it, <c>-p</c> or not; the connector opens the tunnel
 /// (ADR-0056). A connect failure is returned as the connector reported it. A path that decodes to a control character is refused after connecting,
 /// with exit 3 (<see cref="CurlExitCode.UrlMalformat" />), nothing sent and nothing written.
+/// Each transfer writes Curl's own diagnostic log from <see cref="ITransferContext.DiagnosticLog" />
+/// through <see cref="DictDiagnosticLog" />, and the connect target carries that log on (BL-928).
+/// After connecting, <see cref="ITransferContext.Events" /> gets what curl 8.21.0's <c>-v</c>
+/// and <c>--trace</c> show (measured, BL-934): the whole request as one block of data sent,
+/// each read as data received, the server's close as a zero-byte block, and then
+/// <c>shutting down connection #N</c>, which a refused path reports too.
 /// </remarks>
 public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
 {
@@ -52,11 +60,21 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        var log = new DictDiagnosticLog(context.DiagnosticLog);
+        long started = context.TimeProvider.GetTimestamp();
+        TransferResult result = await TransferAsync(context, log).ConfigureAwait(false);
+        log.TransferEnded(result, context.TimeProvider.GetElapsedTime(started));
+        return result;
+    }
+
+    private async Task<TransferResult> TransferAsync(ITransferContext context, DictDiagnosticLog log)
+    {
         CurlUrl url = context.Url;
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false)
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
@@ -65,17 +83,28 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
         }
 
         context.Progress.ReportTransferStarted();
+        TransferResult result;
         await using (connection.ConfigureAwait(false))
         {
-            if (!DictRequest.TryEncode(url.AbsolutePath, out byte[] request))
-            {
-                return TransferResult.Failure(CurlExitCode.UrlMalformat, UrlMalformatMessage);
-            }
-
-            await connection.WriteAsync(request, context.CancellationToken).ConfigureAwait(false);
-            await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
-            return await CopyReplyAsync(connection, context).ConfigureAwait(false);
+            result = await ExchangeAsync(connection, context, log).ConfigureAwait(false);
         }
+
+        context.Events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"shutting down connection #{connect.ConnectionNumber}"));
+        return result;
+    }
+
+    private static async Task<TransferResult> ExchangeAsync(IConnection connection, ITransferContext context, DictDiagnosticLog log)
+    {
+        if (!DictRequest.TryEncode(context.Url.AbsolutePath, out byte[] request))
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, UrlMalformatMessage);
+        }
+
+        await connection.WriteAsync(request, context.CancellationToken).ConfigureAwait(false);
+        await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
+        context.Events.ReportDataSent(request);
+        log.CommandSent(request);
+        return await CopyReplyAsync(connection, context).ConfigureAwait(false);
     }
 
     private static async Task<TransferResult> CopyReplyAsync(IConnection connection, ITransferContext context)
@@ -85,11 +114,13 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
         int read;
         while ((read = await connection.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false)) > 0)
         {
+            context.Events.ReportDataReceived(buffer.AsSpan(0, read));
             await context.Output.WriteAsync(buffer.AsMemory(0, read), context.CancellationToken).ConfigureAwait(false);
             bytesWritten += read;
             context.Progress.ReportDownloaded(bytesWritten, null);
         }
 
+        context.Events.ReportDataReceived([]);
         return TransferResult.Success(bytesWritten);
     }
 }

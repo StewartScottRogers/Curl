@@ -59,6 +59,28 @@ public sealed class ConnectionStreamTests
     }
 
     [TestMethod]
+    public async Task TransportEnded_IsSetOnlyByANonEmptyReadThatReturnsZero()
+    {
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        await using var stream = new ConnectionStream(new StreamConnection(client, null));
+
+        await server.WriteAsync(new byte[] { 1 });
+        var readOne = await stream.ReadAsync(new byte[1].AsMemory());
+        var endedAfterData = stream.TransportEnded;
+        await server.DisposeAsync();
+        var readNothing = await stream.ReadAsync(Memory<byte>.Empty);
+        var endedAfterEmptyRead = stream.TransportEnded;
+        var readAtEnd = await stream.ReadAsync(new byte[1].AsMemory());
+
+        Assert.AreEqual(1, readOne);
+        Assert.IsFalse(endedAfterData);
+        Assert.AreEqual(0, readNothing);
+        Assert.IsFalse(endedAfterEmptyRead);
+        Assert.AreEqual(0, readAtEnd);
+        Assert.IsTrue(stream.TransportEnded);
+    }
+
+    [TestMethod]
     public async Task DisposeAsync_LeavesTheConnectionOpen()
     {
         var (client, _) = InMemoryDuplexStream.CreatePair();

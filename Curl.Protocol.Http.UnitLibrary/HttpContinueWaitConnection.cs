@@ -1,5 +1,6 @@
 using System.Net;
 using Curl.Protocol.Abstractions;
+using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Protocol.Http;
 
@@ -20,9 +21,18 @@ namespace Curl.Protocol.Http;
 internal sealed class HttpContinueWaitConnection(IConnection connection) : IConnection
 {
     /// <summary>
-    /// How long curl 8.21.0 waits for <c>100 Continue</c> before sending the body anyway.
+    /// The longest wait a .NET timer accepts, about 49.7 days; a longer
+    /// <see cref="ContinueWait" /> is waited out without a timer, as it would outlast any
+    /// transfer.
     /// </summary>
-    internal static readonly TimeSpan ContinueWait = TimeSpan.FromSeconds(1);
+    internal static readonly TimeSpan LongestTimedWait = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+
+    /// <summary>
+    /// Gets how long to wait for <c>100 Continue</c> before sending the body anyway: the
+    /// <c>--expect100-timeout</c> value, or curl 8.21.0's one second
+    /// (<see cref="HttpRequestOptions.DefaultContinueWait" />) when none was given.
+    /// </summary>
+    internal TimeSpan ContinueWait { get; init; } = HttpRequestOptions.DefaultContinueWait;
 
     private readonly byte[] received = new byte[HttpLineReader.MaximumLineLength];
 
@@ -55,7 +65,7 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     {
         statusLineRead = ReadStatusLineAsync(cancellationToken);
         using CancellationTokenSource waitEnded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        Task wait = Task.Delay(ContinueWait, timeProvider, waitEnded.Token);
+        Task wait = Task.Delay(ContinueWait > LongestTimedWait ? Timeout.InfiniteTimeSpan : ContinueWait, timeProvider, waitEnded.Token);
         Task first = await Task.WhenAny(statusLineRead, wait).ConfigureAwait(false);
         await waitEnded.CancelAsync().ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();

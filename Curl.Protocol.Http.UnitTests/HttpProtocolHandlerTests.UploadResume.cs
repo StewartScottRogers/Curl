@@ -105,8 +105,8 @@ public sealed partial class HttpProtocolHandlerTests
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection))
             .ExecuteAsync(ResumedUploadContext("http://127.0.0.1:18337/up", StandardInput(Encoding.Latin1.GetBytes(ResumeUploadFile)), 3, time)).AsTask();
-        await time.TimerCreatedAsync(HttpContinueWaitConnection.ContinueWait);
-        time.Advance(HttpContinueWaitConnection.ContinueWait);
+        await time.TimerCreatedAsync(HttpRequestOptions.DefaultContinueWait);
+        time.Advance(HttpRequestOptions.DefaultContinueWait);
         TransferResult result = await transfer;
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -157,8 +157,8 @@ public sealed partial class HttpProtocolHandlerTests
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection))
             .ExecuteAsync(UnknownOffsetUploadContext("http://127.0.0.1:18354/up", StandardInput(Encoding.Latin1.GetBytes(ResumeUploadFile)), null, time)).AsTask();
-        await time.TimerCreatedAsync(HttpContinueWaitConnection.ContinueWait);
-        time.Advance(HttpContinueWaitConnection.ContinueWait);
+        await time.TimerCreatedAsync(HttpRequestOptions.DefaultContinueWait);
+        time.Advance(HttpRequestOptions.DefaultContinueWait);
         TransferResult result = await transfer;
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);

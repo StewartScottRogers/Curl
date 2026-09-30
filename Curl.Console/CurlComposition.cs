@@ -21,6 +21,8 @@ using Curl.Protocol.Mqtt;
 using Curl.Protocol.Pop3;
 using Curl.Protocol.Rtsp;
 using Curl.Protocol.Smtp;
+using Curl.Protocol.Ssh;
+using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
 using Curl.Protocol.Ws;
@@ -49,7 +51,9 @@ internal static class CurlComposition
     /// <c>Sec-WebSocket-Key</c> and frame mask from <see cref="SystemWebSocketRandomSource" />
     /// (ADR-0128); <c>rtsp</c> over <paramref name="connector" />, sending one <c>OPTIONS *</c>
     /// request per transfer with a pre-emptive <c>Authorization</c> from the same authenticator
-    /// (ADR-0169); and <c>tftp</c> over
+    /// (ADR-0169); <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
+    /// and key files from the disk and offering the Windows curl's libssh2 algorithms on Windows and the
+    /// OpenSSL build's elsewhere (ADR-0122); and <c>tftp</c> over
     /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS
     /// proxy over <paramref name="connector" /> with the proxy credential in the platform's
     /// encoding (ADR-0056, rule 4); and <c>ftp</c> and <c>ftps</c>, which
@@ -88,6 +92,10 @@ internal static class CurlComposition
     /// handler's Negotiate answers with (<see cref="NegotiateOptionsMapping.FromCommandLine" />);
     /// <see cref="NegotiateOptions.Default" /> when not given.
     /// </param>
+    /// <param name="signingClock">
+    /// The clock <c>--aws-sigv4</c> signs with (<see cref="AwsSigV4HttpAuthenticator" />, which
+    /// the HTTP handler alone is given); <see cref="TimeProvider.System" /> when not given.
+    /// </param>
     /// <returns>Every registered handler.</returns>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
@@ -97,14 +105,16 @@ internal static class CurlComposition
         ICookieStore? cookieStore = null,
         ISecurityContextFactory? securityContexts = null,
         HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic,
-        NegotiateOptions? negotiateOptions = null)
+        NegotiateOptions? negotiateOptions = null,
+        TimeProvider? signingClock = null)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
         EndPointRecordingDatagramConnector recordingDatagramConnector = new(datagramConnector, recorder);
         ISecurityContextFactory contexts = securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector);
         RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(contexts, negotiateOptions);
-        HttpProtocolHandler http = new(recordingConnector, httpAuthenticator, cookieStore, proxyAuthSchemes);
+        AwsSigV4Signer signer = new(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
+        HttpProtocolHandler http = new(recordingConnector, new AwsSigV4HttpAuthenticator(httpAuthenticator, signer), cookieStore, proxyAuthSchemes);
 
         IProtocolHandler[] handlers =
         [
@@ -120,6 +130,11 @@ internal static class CurlComposition
             new LdapProtocolHandler(recordingConnector, OperatingSystem.IsWindows() ? LdapDialect.WinLdap : LdapDialect.OpenLdap),
             new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()),
             new RtspProtocolHandler(recordingConnector, httpAuthenticator),
+            new SshProtocolHandler(
+                recordingConnector,
+                new PhysicalFileSystem(),
+                OperatingSystem.IsWindows() ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference,
+                CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
             http,
             new RoutingFtpProtocolHandler(http, CreateFtpProtocolHandler(recordingConnector, tlsProvider, dnsResolver)),
         ];
@@ -238,16 +253,25 @@ internal static class CurlComposition
         CreateTransports(options, TimeProvider.System);
 
     /// <summary>
-    /// Creates the run's resolver: the hand-built <see cref="DnsServerResolver" /> when any of
+    /// Creates the run's resolver: the <see cref="CreateDohResolver" /> one when <c>--doh-url</c> is
+    /// given, since curl asks the DoH server whichever resolver it was built with (BL-642); otherwise
+    /// the hand-built <see cref="DnsServerResolver" /> when any of
     /// <c>--dns-servers</c>, <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and <c>--dns-ipv6-addr</c>
     /// is given, as curl's c-ares build resolves then (ADR-0170, BL-694), asking only the
     /// <c>-4</c> or <c>-6</c> family's records; otherwise the <see cref="SystemDnsResolver" />.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
-    /// <param name="timeProvider">The clock the hand-built resolver times its attempts on.</param>
+    /// <param name="timeProvider">The clock the hand-built resolver and the DoH connections time on.</param>
+    /// <param name="tcpDialer">Opens the plaintext TCP connections to the DoH server.</param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDnsResolver(CommandLineOptions options, TimeProvider timeProvider)
+    internal static IDnsResolver CreateDnsResolver(CommandLineOptions options, TimeProvider timeProvider, ITcpDialer tcpDialer)
     {
+        if (options.DohUrl is { } dohUrl)
+        {
+            return CreateDohResolver(dohUrl, CreateDohConnector(options, tcpDialer, timeProvider));
+        }
+
+
         DnsServerResolverOptions resolverOptions = new(
             options.DnsServers,
             options.DnsInterface,
@@ -258,6 +282,55 @@ internal static class CurlComposition
             ? new DnsServerResolver(resolverOptions, timeProvider)
             : new SystemDnsResolver();
     }
+
+    /// <summary>
+    /// Creates the resolver <c>--doh-url</c> asks for: a <see cref="DohDnsResolver" /> over
+    /// <paramref name="connector" /> for the URL <see cref="DohUrlOf" /> makes of the value, or, when it
+    /// makes none, an <see cref="UnusableDohUrlResolver" />, so every name fails to resolve with exit 6
+    /// as curl 8.21.0 fails <c>--doh-url bogus</c> and an <c>ftp://</c> DoH URL (measured, BL-642).
+    /// </summary>
+    /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
+    /// <param name="connector">Opens each DoH connection: <see cref="CreateDohConnector" />'s in production.</param>
+    /// <returns>The resolver.</returns>
+    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector) =>
+        DohUrlOf(dohUrl) is { } url ? new DohDnsResolver(connector, url) : new UnusableDohUrlResolver();
+
+    /// <summary>
+    /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
+    /// and with <c>http://</c> in front when it does not, as curl guesses the scheme of any URL (a
+    /// scheme-less DoH URL was measured to reach its server as plain HTTP, BL-642).
+    /// </summary>
+    /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
+    /// <returns>
+    /// The absolute <c>http</c> or <c>https</c> URL, or <see langword="null" /> when the value does not
+    /// parse as one.
+    /// </returns>
+    internal static Uri? DohUrlOf(string dohUrl)
+    {
+        string withScheme = dohUrl.Contains("://", StringComparison.Ordinal) ? dohUrl : "http://" + dohUrl;
+        return Uri.TryCreate(withScheme, UriKind.Absolute, out Uri? url)
+            && (url.Scheme == Uri.UriSchemeHttp || url.Scheme == Uri.UriSchemeHttps)
+            ? url
+            : null;
+    }
+
+    /// <summary>
+    /// Creates the connector the DoH queries are sent through (ADR-0152): a <see cref="TcpConnector" />
+    /// of its own over the <see cref="SystemDnsResolver" /> (the DoH server's own name is resolved as any
+    /// host is), <paramref name="tcpDialer" />, and a TLS provider routed as
+    /// <see cref="CreateTlsProvider" /> routes the options <see cref="TlsClientOptionsMapping.DohFromCommandLine" />
+    /// maps. No <c>--resolve</c>, <c>--connect-to</c>, proxy or <c>-4</c>/<c>-6</c> applies to it.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="tcpDialer">Opens each plaintext connection.</param>
+    /// <param name="timeProvider">The clock the connector and its TLS provider time on.</param>
+    /// <returns>The connector.</returns>
+    internal static TcpConnector CreateDohConnector(CommandLineOptions options, ITcpDialer tcpDialer, TimeProvider timeProvider) =>
+        new(
+            new SystemDnsResolver(),
+            tcpDialer,
+            CreateTlsProvider(TlsClientOptionsMapping.DohFromCommandLine(options), timeProvider),
+            timeProvider);
 
     /// <summary>
     /// Creates the TLS provider for handshakes run with <paramref name="options" />: the
@@ -284,8 +357,8 @@ internal static class CurlComposition
     /// <returns>The connectors and the pieces they were built from.</returns>
     internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider)
     {
-        IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider);
         TcpDialer tcpDialer = new(new TcpSocketOptions(options.TcpNoDelay, options.TcpKeepAlive));
+        IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);
@@ -356,7 +429,52 @@ internal static class CurlComposition
             AddressFamilyOf(options),
             UnixSocketOf(options),
             HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion),
-            quicDialer);
+            quicDialer,
+            localBinding: LocalBindingOf(options));
+
+    /// <summary>
+    /// What the TCP connector binds each connection's local end to, from <c>--interface</c> and
+    /// <c>--local-port</c>, or <see langword="null" /> for neither (BL-600): a plain name is tried as an
+    /// interface and then as a host, <c>if!</c> as an interface only, <c>host!</c> as a host only, and
+    /// <c>ifhost!</c> binds its host with its interface part kept as the device name; the port range is
+    /// <see cref="LocalPortRange.First" /> and <see cref="LocalPortRange.Count" />, or any port. A value
+    /// libcurl refuses at setopt never reaches a connect, so its empty parts are not looked at. Each option
+    /// group builds its own connector and pool, so a bound connection is never reused unbound.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The binding, or <see langword="null" />.</returns>
+    internal static LocalBinding? LocalBindingOf(CommandLineOptions options)
+    {
+        if (options.Interface is null && options.LocalPorts is null)
+        {
+            return null;
+        }
+
+        LocalPortRange ports = options.LocalPorts ?? new LocalPortRange(0, 0);
+        (string? interfaceName, string? hostName, string? deviceName) = LocalBindingNamesOf(options.Interface);
+        return new LocalBinding(interfaceName, hostName, deviceName, ports.First, ports.Count);
+    }
+
+    /// <summary>
+    /// The names <see cref="LocalBindingOf" /> binds for a <c>--interface</c> value: a plain name as both
+    /// interface and host, <c>ifhost!</c>'s parts as device and host, <c>if!</c> and <c>host!</c> as given.
+    /// </summary>
+    private static (string? InterfaceName, string? HostName, string? DeviceName) LocalBindingNamesOf(InterfaceBinding? named)
+    {
+        if (named is null)
+        {
+            return (null, null, null);
+        }
+
+        if (named.InterfaceOrHostName is { } name)
+        {
+            return (name, name, null);
+        }
+
+        return named.InterfaceName is not null && named.HostName is not null
+            ? (null, named.HostName, named.InterfaceName)
+            : (named.InterfaceName, named.HostName, null);
+    }
 
     /// <summary>
     /// The Unix domain socket the TCP connector dials in place of each URL's host: the last of
@@ -466,12 +584,17 @@ internal static class CurlComposition
     /// Whether standard output is a terminal, where the progress meter of a transfer with no
     /// <c>-o</c> is hidden, as curl hides it.
     /// </param>
+    /// <param name="terminalRendersStyles">
+    /// Whether that terminal renders bold, so <c>-i</c> and <c>-I</c> header lines are styled under
+    /// <c>--styled-output</c> (<see cref="StandardOutputVirtualTerminal.RendersStyles" />, ADR-0246).
+    /// </param>
     /// <returns>The runner, which writes curl's progress meter, opens the <c>-w</c> <c>%output{file}</c> targets on disk (<see cref="DiskWriteOutFileOpener" />), reads the default config file (<c>.curlrc</c>) where <see cref="DefaultConfigFileSearch.ForProcess" /> finds it, and reads the process's environment for the IPFS gateway.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
         Stream standardError,
         Stream standardInput,
-        bool standardOutputIsTerminal) =>
+        bool standardOutputIsTerminal,
+        bool terminalRendersStyles = false) =>
         new(
             SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
             new PhysicalFileSystem(),
@@ -487,7 +610,9 @@ internal static class CurlComposition
             writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths(),
             defaultConfigFileSearch: DefaultConfigFileSearch.ForProcess,
-            readEnvironmentVariable: name => Environment.GetEnvironmentVariable(name));
+            readEnvironmentVariable: name => Environment.GetEnvironmentVariable(name),
+            terminalRendersStyles: terminalRendersStyles,
+            accountHomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given
@@ -506,6 +631,7 @@ internal static class CurlComposition
     /// <param name="securityContexts">
     /// Makes the HTTP handler's Negotiate and NTLM contexts and the mail handlers' GSSAPI and NTLM contexts, or <see langword="null" /> for the production router.
     /// </param>
+    /// <param name="signingClock">The clock <c>--aws-sigv4</c> signs with; <see cref="TimeProvider.System" /> when not given.</param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -514,9 +640,10 @@ internal static class CurlComposition
         IConnector connector,
         IDatagramConnector datagramConnector,
         ProxySelector? proxySelector = null,
-        ISecurityContextFactory? securityContexts = null) =>
+        ISecurityContextFactory? securityContexts = null,
+        TimeProvider? signingClock = null) =>
         new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(connector, datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts, options)),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(connector, datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts, options, signingClock)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -603,6 +730,7 @@ internal static class CurlComposition
     /// forward proxy with, and its <c>--service-name</c>, <c>--proxy-service-name</c> and
     /// <c>--delegation</c> shape its Negotiate answers.
     /// </param>
+    /// <param name="signingClock">The clock <c>--aws-sigv4</c> signs with; <see cref="TimeProvider.System" /> when <see langword="null" />.</param>
     /// <returns>The dispatcher, no warning lines, the cookies and the proxy selector.</returns>
     private static TransferDispatch CreateTransferDispatch(
         IConnector connector,
@@ -611,9 +739,10 @@ internal static class CurlComposition
         CookieEngine? cookies,
         ProxySelector? proxySelector,
         ISecurityContextFactory? securityContexts,
-        CommandLineOptions options) =>
+        CommandLineOptions options,
+        TimeProvider? signingClock) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, options.ProxyAuthSchemes, NegotiateOptionsMapping.FromCommandLine(options))),
+            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, options.ProxyAuthSchemes, NegotiateOptionsMapping.FromCommandLine(options), signingClock)),
             [],
             cookies,
             proxySelector);

@@ -123,6 +123,35 @@ internal static class TlsClientOptionsMapping
             AutoClientCertificate: options.ProxyAutoClientCertificate);
 
     /// <summary>
+    /// Maps the TLS options that reach the DNS-over-HTTPS server onto the <see cref="TlsClientOptions" />
+    /// its handshakes apply (ADR-0152, BL-642): the ones curl 8.21.0's <c>lib/doh.c</c> copies onto each
+    /// DoH transfer, of which <c>--cacert</c> and <c>--ssl-no-revoke</c> were measured to reach it, and
+    /// the two DoH options themselves. <c>-k</c> and <c>--cert-status</c> never reach it (measured).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>
+    /// <see cref="CommandLineOptions.DohInsecure" /> as <see cref="TlsClientOptions.Insecure" />,
+    /// <see cref="CommandLineOptions.DohCertificateStatus" /> as
+    /// <see cref="TlsClientOptions.RequireCertificateStatus" />, and
+    /// <see cref="CommandLineOptions.CaCertificateFile" />, <see cref="CommandLineOptions.CaCertificateDirectory" />,
+    /// <see cref="CommandLineOptions.CertificateRevocationListFile" />, <see cref="CommandLineOptions.Curves" />,
+    /// <see cref="CommandLineOptions.SkipRevocationCheck" />, <see cref="CommandLineOptions.RevocationCheckBestEffort" />
+    /// and <see cref="CommandLineOptions.AutoClientCertificate" /> verbatim; every other setting is its
+    /// default, so ALPN offers <c>http/1.1</c> only.
+    /// </returns>
+    internal static TlsClientOptions DohFromCommandLine(CommandLineOptions options) =>
+        new(
+            Insecure: options.DohInsecure,
+            CaCertificateFile: options.CaCertificateFile,
+            CaCertificateDirectory: options.CaCertificateDirectory,
+            SkipRevocationCheck: options.SkipRevocationCheck,
+            RevocationCheckBestEffort: options.RevocationCheckBestEffort,
+            Curves: options.Curves,
+            RequireCertificateStatus: options.DohCertificateStatus,
+            AutoClientCertificate: options.AutoClientCertificate,
+            CertificateRevocationListFile: options.CertificateRevocationListFile);
+
+    /// <summary>
     /// Maps a TLS version from the command line, a minimum or a ceiling, onto the one the TLS
     /// provider applies.
     /// </summary>

@@ -31,6 +31,8 @@ completed:
 
 ## Notes
 
+- `doh` (BL-850): `DohDnsResolver`'s four-argument constructor takes the sink (`ITransferEvents`) and a `Func<CurlExitCode, string>` for the `DoH request <text>` lines; `CurlComposition.CreateDohResolver` should pass the transfer's events and `CurlEasyErrorText` under `-v --trace-config doh` (measure whether `dns` and `all` also turn them on), `NoTransferEvents` otherwise. Measured lines: BL-850's Notes and ADR-0152's BL-850 amendment.
+
 ## Log
 
 - 2026-09-28: Created.

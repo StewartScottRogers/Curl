@@ -173,11 +173,37 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
         return rsa.VerifyData(content, signature, hash, padding);
     }
 
-    private bool VerifyEcdsa(HashAlgorithmName hash, byte[] content, byte[] signature)
+    private bool VerifyEcdsa(HashAlgorithmName hash, byte[] content, byte[] signature) => CurveOid switch
+    {
+        TlsSignatureScheme.BrainpoolP256r1Oid => VerifyBrainpoolEcdsa(Cryptography.BrainpoolCurve.BrainpoolP256r1, hash, content, signature),
+        TlsSignatureScheme.BrainpoolP384r1Oid => VerifyBrainpoolEcdsa(Cryptography.BrainpoolCurve.BrainpoolP384r1, hash, content, signature),
+        TlsSignatureScheme.BrainpoolP512r1Oid => VerifyBrainpoolEcdsa(Cryptography.BrainpoolCurve.BrainpoolP512r1, hash, content, signature),
+        _ => VerifyBclEcdsa(hash, content, signature),
+    };
+
+    private bool VerifyBclEcdsa(HashAlgorithmName hash, byte[] content, byte[] signature)
     {
         using ECDsa ecdsa = ECDsa.Create();
         ecdsa.ImportSubjectPublicKeyInfo(SubjectPublicKeyInfo, out _);
         return ecdsa.VerifyData(content, signature, hash, DSASignatureFormat.Rfc3279DerSequence);
+    }
+
+    /// <summary>
+    /// Checks an ECDSA signature by a brainpool key (RFC 7027) with the hand-built
+    /// <see cref="Cryptography.BrainpoolEcdsa" /> of <c>Curl.Cryptography</c>, since the BCL has no
+    /// brainpool curve on every platform. A key that is not an uncompressed point of the
+    /// curve's length is a bad certificate; the signature is the DER <c>ECDSA-Sig-Value</c>
+    /// of r and s (RFC 8422 section 5.4), and one that does not decode does not verify.
+    /// </summary>
+    private bool VerifyBrainpoolEcdsa(Cryptography.BrainpoolCurve curve, HashAlgorithmName hash, byte[] content, byte[] signature)
+    {
+        if (KeyBits.Length != Cryptography.BrainpoolEcdh.GetPublicKeyLength(curve))
+        {
+            throw new CryptographicException("A brainpool public key is an uncompressed point of the curve's length.");
+        }
+
+        byte[]? rs = DecodeDerSignature(signature, Cryptography.BrainpoolEcdsa.GetSignatureLength(curve) / 2);
+        return rs is not null && Cryptography.BrainpoolEcdsa.VerifyHash(curve, KeyBits, CryptographicOperations.HashData(hash, content), rs);
     }
 
     /// <summary>
@@ -200,7 +226,7 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
         AsnReader keyBits = new(KeyBits, AsnEncodingRules.DER);
         byte[] publicKey = ReadPositiveInteger(keyBits);
         keyBits.ThrowIfNotEmpty();
-        byte[]? rs = DecodeDssSignature(signature, subprime.Length);
+        byte[]? rs = DecodeDerSignature(signature, subprime.Length);
         return rs is not null && Cryptography.DsaSignature.VerifyHash(prime, subprime, generator, publicKey, Cryptography.DsaSignature.HashData(content, hash), rs);
     }
 
@@ -212,8 +238,8 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
             : throw new CryptographicException("A DSA key's p, q, g and y are positive.");
     }
 
-    /// <summary>Returns r || s, each <paramref name="subprimeLength" /> bytes, from a DER <c>Dss-Sig-Value</c>, or <see langword="null" /> when it does not decode or a value is negative or longer than q.</summary>
-    private static byte[]? DecodeDssSignature(byte[] signature, int subprimeLength)
+    /// <summary>Returns r || s, each <paramref name="subprimeLength" /> bytes, from a DER <c>Dss-Sig-Value</c> or <c>ECDSA-Sig-Value</c> (the same SEQUENCE of two INTEGERs), or <see langword="null" /> when it does not decode or a value is negative or longer than q.</summary>
+    private static byte[]? DecodeDerSignature(byte[] signature, int subprimeLength)
     {
         try
         {

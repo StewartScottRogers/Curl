@@ -4,8 +4,8 @@ namespace Curl.Kerberos;
 /// An established initiator context's per-message protection: Wrap and MIC tokens made in
 /// the context key and numbered from the initiator's sequence number, and the acceptor's
 /// tokens checked against the key and the acceptor's sequence number. <see cref="Create" />
-/// picks RFC 4757 section 7's tokens for an <c>rc4-hmac</c> key and RFC 4121 section 4.2's
-/// for every other. <see cref="Dispose" /> zeroes the key.
+/// picks RFC 4757 section 7's tokens for an <c>rc4-hmac</c> key, RFC 1964's DES3 tokens as
+/// MIT makes them for a <c>des3-cbc-sha1</c> key, and RFC 4121 section 4.2's for every other. <see cref="Dispose" /> zeroes the key.
 /// </summary>
 /// <remarks>
 /// Every acceptor token must carry exactly the next sequence number: a replayed, reordered
@@ -36,14 +36,17 @@ internal abstract class KerberosGssMessageProtection : IDisposable
     /// <returns>The protection; the caller disposes it.</returns>
     /// <exception cref="KerberosCryptographyException">The key's encryption type is not one this library has.</exception>
     public static KerberosGssMessageProtection Create(KerberosKey contextKey, bool acceptorSubkey, ulong sendSequence, ulong receiveSequence, IKerberosRandomSource randomSource) =>
-        contextKey.EncryptionType == (int)KerberosEncryptionType.Rc4Hmac
-            ? new Rc4HmacGssMessageProtection(contextKey, sendSequence, receiveSequence, randomSource)
-            : new Rfc4121GssMessageProtection(
+        (KerberosEncryptionType)contextKey.EncryptionType switch
+        {
+            KerberosEncryptionType.Rc4Hmac => new Rc4HmacGssMessageProtection(contextKey, sendSequence, receiveSequence, randomSource),
+            KerberosEncryptionType.Des3CbcSha1 => new Des3CbcSha1GssMessageProtection(contextKey, sendSequence, receiveSequence, randomSource),
+            _ => new Rfc4121GssMessageProtection(
                 KerberosEncryption.Create((KerberosEncryptionType)contextKey.EncryptionType, randomSource),
                 contextKey,
                 acceptorSubkey,
                 sendSequence,
-                receiveSequence);
+                receiveSequence),
+        };
 
     /// <summary>Makes a Wrap token for <paramref name="message" />.</summary>
     /// <param name="message">The message.</param>

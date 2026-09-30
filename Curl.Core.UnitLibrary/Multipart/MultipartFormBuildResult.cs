@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Core.Multipart;
 
 /// <summary>
-/// What <see cref="MultipartFormBodyBuilder.BuildAsync" /> produced: the request body, or the
+/// What <see cref="MultipartFormBodyBuilder.BuildAsync(IReadOnlyList{MultipartFormPart}, MultipartNameEscaping, CancellationToken)" /> produced: the request body, or the
 /// failure curl reports before it sends anything.
 /// </summary>
 /// <param name="Body">

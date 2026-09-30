@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
+using Curl.Core.Hsts;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
@@ -88,10 +89,34 @@ namespace Curl.Core;
 /// than as the Linux and macOS build does (exit 65); <see langword="null" /> for
 /// <see cref="OperatingSystem.IsWindows" />.
 /// </param>
-public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySelector? selectHopProxy = null, bool? runsOnWindows = null)
+/// <param name="hsts">
+/// The run's HSTS cache, which learns from every hop's response and switches every <c>http</c>
+/// redirect target it knows to <c>https</c> before the target's scheme is checked, reporting
+/// <see cref="HstsTransferPolicy.SwitchedMessagePrefix" /> and the URL to the hop's events, as
+/// curl 8.21.0 does after <c>Issue another request to this URL</c> (BL-621 Notes);
+/// <see langword="null" /> for none.
+/// </param>
+/// <param name="selectHopAltSvc">
+/// Looks up each hop's <c>--alt-svc</c> alternative and HTTP version from the hop's own URL, as
+/// curl 8.21.0 looks it up for each connection; <see langword="null" /> to keep the first hop's
+/// <see cref="HttpRequestOptions.AltSvcRoute" /> for a hop to the first URL's origin and drop it
+/// for any other.
+/// </param>
+public sealed class RedirectFollower(
+    ProtocolDispatcher dispatcher,
+    HopProxySelector? selectHopProxy = null,
+    bool? runsOnWindows = null,
+    HstsTransferPolicy? hsts = null,
+    HopAltSvcSelector? selectHopAltSvc = null)
 {
     /// <summary>The Linux and macOS build's message for a multipart body it cannot rewind for the next hop.</summary>
     public const string CannotRewindMessage = "Cannot rewind mime/post data";
+
+    /// <summary>
+    /// curl 8.21.0's message, with exit 67, for a URL with user information under
+    /// <c>--disallow-username-in-url</c> (BL-626 Notes).
+    /// </summary>
+    public const string CredentialsInUrlMessage = "URL rejected: Credentials was passed in the URL when prohibited";
 
     private readonly bool rewindFailsAsReadError = runsOnWindows ?? OperatingSystem.IsWindows();
 
@@ -125,7 +150,15 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
 
         return context.Http is { FollowRedirects: true } http
             ? FollowChainAsync(context, http, policy)
-            : dispatcher.DispatchAsync(context, policy.AllowedTransferSchemes);
+            : DispatchAsync(context, policy);
+    }
+
+    /// <summary>Performs one hop and teaches the HSTS cache from its response.</summary>
+    private async ValueTask<TransferResult> DispatchAsync(ITransferContext hop, RedirectPolicy policy)
+    {
+        TransferResult result = await dispatcher.DispatchAsync(hop, policy.AllowedTransferSchemes);
+        hsts?.LearnFrom(hop.Url, result.Report);
+        return result;
     }
 
     private async ValueTask<TransferResult> FollowChainAsync(
@@ -140,18 +173,21 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         long? bodyStart = SeekableStart(bodyContent);
         ITransferContext hop = context;
         bool bodyDropped = false;
+        bool methodDropped = false;
         while (true)
         {
-            TransferResult result = await dispatcher.DispatchAsync(hop, policy.AllowedTransferSchemes);
+            TransferResult result = await DispatchAsync(hop, policy);
             chain.Add(result.Report, hop.Http!.Referer);
             if (RedirectTarget(result) is not { } target)
             {
                 return chain.Merge(result);
             }
 
-            bodyDropped |= DropsBody(result.Report!.ResponseCode, hop, policy);
+            int responseCode = result.Report!.ResponseCode;
+            bodyDropped |= DropsBody(responseCode, hop, policy);
+            methodDropped |= DropsCustomMethod(responseCode, hop, policy, bodyDropped);
             bool bodyCannotBeResent = CannotBeResent(bodyContent, bodyDropped);
-            if (StopBeforeHop(context, http, target, chain, policy, result, bodyCannotBeResent, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
+            if (StopBeforeHop(context, http, ref target, chain, policy, result, bodyCannotBeResent, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
             {
                 return chain.Merge(stop);
             }
@@ -160,7 +196,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             Rewind(bodyContent, bodyStart, bodyDropped);
             chain.Followed(target);
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, http with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc);
         }
     }
 
@@ -170,11 +206,12 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
     /// <paramref name="bodyCannotBeResent" /> - curl's failure for a multipart body it cannot
     /// rewind, which counts the redirect as followed; <see langword="null" />, with
     /// <paramref name="next" /> and <paramref name="hopProxy" /> set, when the hop goes ahead.
+    /// A target the HSTS cache switches to <c>https</c> comes back switched in <paramref name="target" />.
     /// </summary>
     private TransferResult? StopBeforeHop(
         ITransferContext first,
         HttpRequestOptions http,
-        string target,
+        ref string target,
         RedirectChain chain,
         RedirectPolicy policy,
         TransferResult result,
@@ -183,19 +220,57 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         out HopProxy hopProxy)
     {
         hopProxy = default;
-        if (Refusal(target, first.PathAsIs, chain.RedirectCount, policy, out next) is { } refusal)
+        if (Refusal(ref target, first, chain.RedirectCount, policy, out next) is { } refusal)
         {
             chain.Refused(refusal.KeepsRedirectUrl);
             return TransferResult.Failure(refusal.ExitCode, refusal.Message, result.BytesTransferred);
         }
 
         // No refusal means the target parsed, so next is set.
-        if (!TrySelectHopProxy(first, http, next!, out hopProxy, out TransferResult? failure))
+        return UserInUrlFailure(target, next!, chain, policy, result)
+            ?? HopProxyOrRewindFailure(first, http, target, next!, chain, result, bodyCannotBeResent, out hopProxy);
+    }
+
+    /// <summary>
+    /// <see cref="CredentialsInUrlFailure" /> when <c>--disallow-username-in-url</c> meets a
+    /// target with user information; <see langword="null" /> otherwise.
+    /// </summary>
+    private static TransferResult? UserInUrlFailure(string target, CurlUrl next, RedirectChain chain, RedirectPolicy policy, TransferResult result) =>
+        policy.DisallowsUserInUrl && next.User is not null ? CredentialsInUrlFailure(target, chain, result) : null;
+
+    /// <summary>
+    /// The hop proxy selector's failure, else <see cref="BodyRewindFailure" /> when
+    /// <paramref name="bodyCannotBeResent" />; <see langword="null" />, with <paramref name="hopProxy" />
+    /// set, when the hop goes ahead.
+    /// </summary>
+    private TransferResult? HopProxyOrRewindFailure(
+        ITransferContext first,
+        HttpRequestOptions http,
+        string target,
+        CurlUrl next,
+        RedirectChain chain,
+        TransferResult result,
+        bool bodyCannotBeResent,
+        out HopProxy hopProxy)
+    {
+        if (!TrySelectHopProxy(first, http, next, out hopProxy, out TransferResult? failure))
         {
             return failure;
         }
 
         return bodyCannotBeResent ? BodyRewindFailure(target, chain, result) : null;
+    }
+
+    /// <summary>
+    /// curl's failure for a redirect target with user information under
+    /// <c>--disallow-username-in-url</c>: the redirect counts as followed, <c>%{url_effective}</c> is the
+    /// target, <c>%{redirect_url}</c> is empty, and nothing more is sent (measured, BL-626 Notes).
+    /// </summary>
+    private static TransferResult CredentialsInUrlFailure(string target, RedirectChain chain, TransferResult result)
+    {
+        chain.Followed(target);
+        chain.Refused(keepsRedirectUrl: false);
+        return TransferResult.Failure(CurlExitCode.LoginDenied, CredentialsInUrlMessage, result.BytesTransferred);
     }
 
     /// <summary>
@@ -247,11 +322,13 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
     /// Why <paramref name="target" /> is not followed, or <see langword="null" /> when it is.
     /// Only the limit refusal keeps <see cref="TransferReport.RedirectUrl" />: curl 8.21.0 writes
     /// an empty <c>%{redirect_url}</c> after refusing a target that does not parse or whose
-    /// scheme it refuses (measured, BL-289).
+    /// scheme it refuses (measured, BL-289). A target that parses is switched to <c>https</c>
+    /// (<see cref="SwitchedToHttps" />) before its scheme is checked, as curl switches it before
+    /// looking the scheme up.
     /// </summary>
-    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? Refusal(
-        string target,
-        bool pathAsIs,
+    private (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? Refusal(
+        ref string target,
+        ITransferContext first,
         int followed,
         RedirectPolicy policy,
         out CurlUrl? next)
@@ -262,12 +339,29 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed", true);
         }
 
-        if (!CurlUrl.TryParse(target, pathAsIs, out next))
+        if (!CurlUrl.TryParse(target, first.PathAsIs, out next))
         {
             return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false);
         }
 
+        next = SwitchedToHttps(ref target, next, first);
         return SchemeRefusal(next.Scheme, policy);
+    }
+
+    /// <summary>
+    /// The redirect target the HSTS cache switches to <c>https</c>, reported to the hop's events
+    /// as curl's <c>-v</c> line, or <paramref name="url" /> unchanged.
+    /// </summary>
+    private CurlUrl SwitchedToHttps(ref string target, CurlUrl url, ITransferContext first)
+    {
+        if (hsts is null || !hsts.TrySwitchToHttps(target, url, out string? httpsUrl))
+        {
+            return url;
+        }
+
+        first.Events.ReportInfo(HstsTransferPolicy.SwitchedMessagePrefix + httpsUrl);
+        target = httpsUrl;
+        return CurlUrl.Parse(httpsUrl, first.PathAsIs);
     }
 
     private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? SchemeRefusal(string scheme, RedirectPolicy policy)
@@ -315,6 +409,18 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         };
     }
 
+    /// <summary>
+    /// Whether <c>--follow</c> drops the <c>-X</c> method for the next hop: when the request switches
+    /// to GET, as it does once the body is dropped and on a 303 to a request without a body, as curl
+    /// 8.21.0 sends <c>GET</c> after <c>--follow -X DELETE</c> meets a 303 but <c>DELETE</c> after a
+    /// 301 or 302 (measured, BL-627 Notes).
+    /// </summary>
+    private static bool DropsCustomMethod(int responseCode, ITransferContext hop, RedirectPolicy policy, bool bodyDropped) =>
+        policy.DropsCustomMethodOnSwitchToGet && (bodyDropped || (responseCode == 303 && hop.Http!.Body is null));
+
+    private static HttpRequestOptions HopMethod(HttpRequestOptions http, bool methodDropped) =>
+        methodDropped ? http with { CustomMethod = null } : http;
+
     private static long? SeekableStart(Stream? upload) =>
         upload is { CanSeek: true } ? upload.Position : null;
 
@@ -333,6 +439,16 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         string.Equals(first.Scheme, next.Scheme, StringComparison.Ordinal)
         && string.Equals(first.Host, next.Host, StringComparison.OrdinalIgnoreCase)
         && first.Port == next.Port;
+
+    /// <summary>
+    /// The hop's HTTP options with its <c>--alt-svc</c> route: the selector's lookup for
+    /// <paramref name="url" />, or, without one, the first hop's route for a hop to the first
+    /// URL's origin and none for any other.
+    /// </summary>
+    private static HttpRequestOptions HopAltSvc(CurlUrl first, CurlUrl url, HttpRequestOptions http, HopAltSvcSelector? selectHopAltSvc) =>
+        selectHopAltSvc is null
+            ? http with { AltSvcRoute = IsSameOrigin(first, url) ? http.AltSvcRoute : null }
+            : selectHopAltSvc(url, http);
 
     private static HttpRequestOptions HopHttp(CurlUrl previousUrl, HttpRequestOptions http, ProxyEndpoint? forwardProxy, bool bodyDropped, bool sendCredentials)
     {
@@ -377,7 +493,8 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         HopProxy hopProxy,
         bool bodyDropped,
         bool sendCredentials,
-        long operationStarted) =>
+        long operationStarted,
+        HopAltSvcSelector? selectHopAltSvc) =>
         new()
         {
             Url = url,
@@ -403,7 +520,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             MaxTime = first.MaxTime,
             OperationStarted = operationStarted,
             Proxy = hopProxy.Proxy,
-            Http = HopHttp(previousUrl, http, hopProxy.ForwardProxy, bodyDropped, sendCredentials) with { AltSvcRoute = IsSameOrigin(first.Url, url) ? http.AltSvcRoute : null },
+            Http = HopAltSvc(first.Url, url, HopHttp(previousUrl, http, hopProxy.ForwardProxy, bodyDropped, sendCredentials), selectHopAltSvc),
             TimeProvider = first.TimeProvider,
             CancellationToken = first.CancellationToken,
             Progress = first.Progress,

@@ -35,4 +35,12 @@ public sealed record SecurityContextRequest(SecurityMechanism Mechanism, string 
     /// negotiates no signing key, so its wrapped messages do not verify.
     /// </summary>
     public ProtectionLevel MessageProtection { get; init; }
+
+    /// <summary>
+    /// Gets the DER of the TLS server certificate the exchange runs over, from which the
+    /// hand-built Kerberos makes RFC 5929's <c>tls-server-end-point</c> channel bindings as curl
+    /// with MIT sends them (BL-915); empty, the default, over a connection without TLS, which
+    /// sends no bindings.
+    /// </summary>
+    public ReadOnlyMemory<byte> ServerCertificate { get; init; }
 }

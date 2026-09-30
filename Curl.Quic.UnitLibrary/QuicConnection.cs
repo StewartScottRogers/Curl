@@ -9,14 +9,14 @@ namespace Curl.Quic;
 /// loop owns the channel: it sends what the connection has queued, receives the server's
 /// datagrams and runs the loss detection timer, and wakes whenever a stream is written,
 /// read or aborted so what that queued goes out, and runs the idle timer (keep-alive PING, idle timeout). Readers, writers and openers never touch
-/// the channel; they change the <see cref="QuicClientHandshake" />'s streams under one lock
+/// the channel; they change the <see cref="QuicClientConnectionState" />'s streams under one lock
 /// and wait for the loop to report that something arrived.
 /// </summary>
 public sealed class QuicConnection : IMultiplexedConnection
 {
     private const int ReceiveBufferLength = (int)QuicTransportParameters.DefaultMaxUdpPayloadSize;
 
-    private readonly QuicClientHandshake handshake;
+    private readonly QuicClientConnectionState state;
 
     private readonly IDatagramChannel channel;
 
@@ -41,7 +41,7 @@ public sealed class QuicConnection : IMultiplexedConnection
     /// <param name="channel">The channel the handshake ran over, which the connection now owns and disposes.</param>
     /// <param name="timeProvider">The clock the handshake runs on, for the loss detection timer and pacing.</param>
     /// <exception cref="ArgumentException">The handshake is not complete.</exception>
-    public QuicConnection(QuicClientHandshake handshake, IDatagramChannel channel, TimeProvider timeProvider)
+    public QuicConnection(QuicClientConnectionState handshake, IDatagramChannel channel, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(handshake);
         ArgumentNullException.ThrowIfNull(channel);
@@ -51,7 +51,7 @@ public sealed class QuicConnection : IMultiplexedConnection
             throw new ArgumentException("Only a QUIC handshake that has completed can carry a connection.", nameof(handshake));
         }
 
-        this.handshake = handshake;
+        this.state = handshake;
         this.channel = channel;
         this.timeProvider = timeProvider;
         loop = RunAsync();
@@ -64,7 +64,7 @@ public sealed class QuicConnection : IMultiplexedConnection
     public EndPoint? LocalEndPoint => channel.LocalEndPoint;
 
     /// <inheritdoc />
-    public string ApplicationProtocol => handshake.Tls.ApplicationProtocol!;
+    public string ApplicationProtocol => state.Tls.ApplicationProtocol!;
 
     /// <inheritdoc />
     public ValueTask<IMultiplexedStream> OpenBidirectionalStreamAsync(CancellationToken cancellationToken) =>
@@ -86,7 +86,7 @@ public sealed class QuicConnection : IMultiplexedConnection
         {
             ObjectDisposedException.ThrowIf(closed, this);
             closed = true;
-            datagrams = failure is null ? handshake.CloseWithApplicationError((ulong)applicationErrorCode) : [];
+            datagrams = failure is null ? state.CloseWithApplicationError((ulong)applicationErrorCode) : [];
         }
 
         await stop.CancelAsync().ConfigureAwait(false);
@@ -98,7 +98,7 @@ public sealed class QuicConnection : IMultiplexedConnection
         }
     }
 
-    /// <summary>Closes the connection with application error 0 unless <see cref="CloseAsync" /> already has, then disposes the handshake and the channel.</summary>
+    /// <summary>Closes the connection with application error 0 unless <see cref="CloseAsync" /> already has, then disposes the connection state and the channel.</summary>
     /// <returns>A task that completes when everything is released.</returns>
     public async ValueTask DisposeAsync()
     {
@@ -113,7 +113,7 @@ public sealed class QuicConnection : IMultiplexedConnection
             await CloseAsync(0, CancellationToken.None).ConfigureAwait(false);
         }
 
-        handshake.Dispose();
+        state.Dispose();
         stop.Dispose();
         await channel.DisposeAsync().ConfigureAwait(false);
     }
@@ -163,7 +163,7 @@ public sealed class QuicConnection : IMultiplexedConnection
 
     private async ValueTask<IMultiplexedStream> WaitForStreamAsync(Func<QuicStreamSet, QuicStream?> take, CancellationToken cancellationToken)
     {
-        var stream = await WaitForAsync(() => take(handshake.Streams) is { } taken ? new StreamHandle(taken) : (StreamHandle?)null, cancellationToken).ConfigureAwait(false);
+        var stream = await WaitForAsync(() => take(state.Streams) is { } taken ? new StreamHandle(taken) : (StreamHandle?)null, cancellationToken).ConfigureAwait(false);
         return new QuicMultiplexedStream(this, stream.Stream);
     }
 
@@ -228,7 +228,7 @@ public sealed class QuicConnection : IMultiplexedConnection
         lock (gate)
         {
             wake = new CancellationTokenSource();
-            datagrams = handshake.TakeDatagramsToSend();
+            datagrams = state.TakeDatagramsToSend();
         }
 
         await SendAsync(datagrams).ConfigureAwait(false);
@@ -241,7 +241,7 @@ public sealed class QuicConnection : IMultiplexedConnection
         CancellationToken wakeToken;
         lock (gate)
         {
-            untilTimeout = Earlier(handshake.TimeUntilLossDetectionTimeout, handshake.TimeUntilIdleTimer);
+            untilTimeout = Earlier(state.TimeUntilLossDetectionTimeout, state.TimeUntilIdleTimer);
             wakeToken = wake.Token;
         }
 
@@ -269,13 +269,13 @@ public sealed class QuicConnection : IMultiplexedConnection
     // keep-alives go out, and an idle timeout fails the connection.
     private Task RunDueTimersAsync() => RunStepAsync(() =>
     {
-        IReadOnlyList<byte[]> probes = handshake.TimeUntilLossDetectionTimeout == TimeSpan.Zero ? handshake.OnLossDetectionTimeout() : [];
-        return [.. probes, .. handshake.OnIdleTimer()];
+        IReadOnlyList<byte[]> probes = state.TimeUntilLossDetectionTimeout == TimeSpan.Zero ? state.OnLossDetectionTimeout() : [];
+        return [.. probes, .. state.OnIdleTimer()];
     });
 
-    private Task ReceiveAsync(ReadOnlyMemory<byte> datagram) => RunStepAsync(() => handshake.Receive(datagram));
+    private Task ReceiveAsync(ReadOnlyMemory<byte> datagram) => RunStepAsync(() => state.Receive(datagram));
 
-    // Runs one step of the handshake under the lock, sends what it returns, then fails the
+    // Runs one step of the connection state under the lock, sends what it returns, then fails the
     // connection when the step failed it or tells the waiters something may have changed.
     private async Task RunStepAsync(Func<IReadOnlyList<byte[]>> step)
     {
@@ -284,7 +284,7 @@ public sealed class QuicConnection : IMultiplexedConnection
         lock (gate)
         {
             datagrams = step();
-            connectionFailure = handshake.Failure;
+            connectionFailure = state.Failure;
         }
 
         await SendAsync(datagrams).ConfigureAwait(false);
@@ -315,13 +315,13 @@ public sealed class QuicConnection : IMultiplexedConnection
             TimeSpan wait;
             lock (gate)
             {
-                wait = handshake.TimeUntilSend(datagram.Length);
+                wait = state.TimeUntilSend(datagram.Length);
             }
 
             await Task.Delay(wait, timeProvider, stop.Token).ConfigureAwait(false);
             lock (gate)
             {
-                handshake.OnDatagramSent(datagram.Length);
+                state.OnDatagramSent(datagram.Length);
             }
 
             await channel.SendAsync(datagram, channel.ServerEndPoint, stop.Token).ConfigureAwait(false);

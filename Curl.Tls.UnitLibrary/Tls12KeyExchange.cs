@@ -11,4 +11,10 @@ public enum Tls12KeyExchange
 
     /// <summary>Elliptic-curve Diffie-Hellman on the named group the server sends in its ServerKeyExchange (RFC 8422).</summary>
     Ecdhe,
+
+    /// <summary>
+    /// SRP-6a (RFC 5054): the server sends N, g, the salt and B in its ServerKeyExchange,
+    /// the client its A, and the premaster secret derives from the password.
+    /// </summary>
+    Srp,
 }

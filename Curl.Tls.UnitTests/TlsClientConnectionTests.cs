@@ -31,7 +31,7 @@ public sealed class TlsClientConnectionTests
             new ushort[] { 0x0304, 0x0303, 0x0302, 0x0301 },
             SupportedVersionsExtension.DecodeOffered(Find(hello, TlsExtensionType.SupportedVersions)).Value.ToArray());
         CollectionAssert.AreEqual(
-            Tls13PipeDriver.DefaultSettings.CipherSuites.Concat(Tls12Offer.CipherSuites).ToArray(),
+            Tls13PipeDriver.DefaultSettings.CipherSuites.Concat(Tls12Offer.OfferedCipherSuites).ToArray(),
             hello.CipherSuites.ToArray());
         CollectionAssert.AreEqual(
             Tls13PipeDriver.DefaultSettings.SignatureAlgorithms.Union(Tls12Offer.SignatureAlgorithms).ToArray(),

@@ -73,3 +73,19 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   neither to the proxy nor to the server, and the transfer ends with exit 97
   `Send failure: Socket is not connected`, before the file name is checked (ADR-0096;
   measured by BL-398).
+- Diagnostic log (`--log-level`, ADR-0222, BL-927): `TftpTransferLog` writes under the
+  `tftp` component - a download's read request and its options and the options an OACK
+  agreed (`info`), each packet received (`verbose`), a retransmission and a `blksize` the
+  server changed or ignored (`warning`), an ERROR packet's code and text (`error`) - and,
+  for every transfer, its end: bytes and milliseconds at `info`, or its `CurlExitCode`
+  at `error`.
+- `-v` and `--trace` (BL-933): `TftpTransferEvents` reports curl 8.21.0's lines to
+  `ITransferContext.Events` once the channel opens - `  Trying <ip>:<port>...`,
+  `Established connection to <host> (<ip> port <port>) from  port 0 `, `set timeouts for
+  state 0|1|2; Total <ms left, 0 for none>, retry R maxtry M`, each OACK option as
+  `got option=(n) value=(v)` with `blksize parsed from OACK (A) requested (R)` and, for a
+  download only, `tsize parsed from OACK (N)`, `Connected for receive|transmit`, `Timeout
+  waiting for block N ACK. Retries = R` for a re-send once the server has answered,
+  `TFTP error: <text>` for an ERROR packet whose text ends in a NUL, and `shutting down
+  connection #0` - and each downloaded block's bytes as data received. An upload reports
+  no data sent, as curl reports none.

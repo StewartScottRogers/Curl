@@ -24,6 +24,7 @@ description: Rules and tooling for Curl's task board — the Tasks shared projec
 | `pipeline` | `feature`, `protocol`, `docs`, `direct` | How `/task-run` delivers it (below). |
 | `depends-on` | `[BL-###, …]` | Tasks that must be in `Done` or its archive before this one can start. |
 | `touches` | `[path, …]` | Every project folder, folder or file the task will change, e.g. `[Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]`. Two tasks whose `touches` overlap never run at the same time. Empty or `*` means it may change anything, so it runs alone. |
+| `lane` | `yes`, `no` (optional; absent means `yes`) | `no` means interactive only (as does any audit path in `touches`): `next` never offers the task and `capacity` never counts it, so no dark factory lane claims it. An interactive session still runs it by naming it, `/task-run BL-###`, and `move -To Doing` accepts it. Written by `new -NoLane`, on the line after `touches`. |
 | `requirement` | requirement ID or `none` | From `Documentation/Product/Requirements.md`. |
 | `created` | `yyyy-MM-dd` | Set by the script. |
 | `completed` | `yyyy-MM-dd` | Set by the script when the task moves to `Done`. |
@@ -84,11 +85,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/ta
 
 | Command | Options | Does |
 | --- | --- | --- |
-| `status` | | Every state, with each Backlog task marked ready (and its queue position), waiting on named tasks, or needing Stewart. |
-| `next` | `-Skip BL-001,BL-002` | The task `/task-run` takes next: highest priority, then the one the most unfinished tasks wait on, then lowest ID, skipping any whose `touches` overlap a task in `Doing`. Prints `No task is ready.`, or `No task can start yet: …` when every ready task overlaps work in progress. |
-| `capacity` | | How many tasks the board could have running at once right now, as one line parseable with `^Capacity (\d+):`: the tasks in `Doing`, plus the ready tasks that could start beside them, picked greedily in `next` order so no two overlap in `touches`. E.g. `Capacity 7: 3 in Doing, 4 more can start (BL-499, BL-503, BL-504, BL-506).` The dark factory's `-Lanes Auto` caps its lane count with it. |
+| `status` | | Every state, with each Backlog task marked ready (and its queue position, which counts only lane-eligible tasks), ready but interactive only (`lane: no`), waiting on named tasks, or needing Stewart. |
+| `next` | `-Skip BL-001,BL-002` | The task `/task-run` takes next: highest priority, then the one the most unfinished tasks wait on, then lowest ID, skipping any whose `touches` overlap a task in `Doing` and any marked `lane: no`. Prints `No task is ready.`, or `No task can start yet: …` when every ready task overlaps work in progress. |
+| `capacity` | | How many tasks the board could have running at once right now, as one line parseable with `^Capacity (\d+):`: the tasks in `Doing`, plus the ready tasks that could start beside them, picked greedily in `next` order so no two overlap in `touches` (so `lane: no` tasks never count). E.g. `Capacity 7: 3 in Doing, 4 more can start (BL-499, BL-503, BL-504, BL-506).` The dark factory's `-Lanes Auto` caps its lane count with it. |
 | `next-id` | | The next free ID. |
-| `new` | `-Title` (required), `-Priority`, `-Assignee`, `-Pipeline`, `-DependsOn BL-001,BL-002`, `-Requirement` | Creates the task in `Backlog` from `TASK-TEMPLATE.md` and prints its path. Fill in the body with an edit afterwards. |
+| `new` | `-Title` (required), `-Priority`, `-Assignee`, `-Pipeline`, `-DependsOn BL-001,BL-002`, `-Touches`, `-Requirement`, `-NoLane` | Creates the task in `Backlog` from `TASK-TEMPLATE.md` and prints its path. `-NoLane` writes `lane: no`, making it interactive only. Fill in the body with an edit afterwards. |
 | `move` | `-Id`, `-To`, `-Reason` | Validates the transition, appends the `Log` line, and moves the file. `-Reason` is required for every destination except `Doing`. |
 | `dedupe` | `-Since <git ref>` | Renumbers tasks that share an ID: files present at the ref keep it, the rest get the next free IDs, and the old ID is rewritten in Markdown changed since the ref. Parallel lanes number tasks from their own copy of the board, so each lane runs this after rebasing, before it pushes. |
 | `archive` | `-OlderThanDays` (default 7; 0 for all), or `-WhenDoneIsLong` | Moves finished tasks into a new `Done/<yyyy-MM-dd_HHmm>/` folder. `-WhenDoneIsLong` moves all of them, but only once `Done` holds more than 20, so Stewart can always read `Done` at a glance. Each dark factory lane runs it while integrating; an interactive session runs it after moving a task to `Done`. |
@@ -100,6 +101,17 @@ The script refuses:
 - moving to `Done` while any `- [ ]` box is unticked
 - touching an archived task
 - acting on an ID that names more than one live task (run `dedupe` first)
+- inside a dark factory shift only (`CURL_DARK_FACTORY_LANE` set, BL-995): filing with
+  `new` a task whose `touches` name an audit path, unless `-NoLane` is given; and
+  claiming with `move -To Doing` a task that is interactive only
+
+An **audit path** belongs to the audit office, outside the factory's reach (ADR-0267):
+`Audit`, anything under `Audit/`, or an auditor agent `.claude/agents/audit-*`, in any
+letter case. A task is **interactive only** when it says `lane: no` or any of its
+`touches` is an audit path; `next` and `capacity` never offer it to anyone, and
+`status` shows it as interactive only. An ancestor such as `.claude` or `*` is not an
+audit path here; the PreToolUse hook (BL-997) and CI (BL-998) catch real writes.
+Interactive sessions, where the variable is absent, are never refused any of this.
 
 Do not work around a refusal. It is telling you something about the task.
 

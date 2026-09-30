@@ -53,10 +53,16 @@ public abstract class KerberosEncryption
     /// </exception>
     public static KerberosEncryption Create(KerberosEncryptionType encryptionType, IKerberosRandomSource randomSource) => encryptionType switch
     {
-        KerberosEncryptionType.Aes128CtsHmacSha196 => new AesSha1KerberosEncryption(encryptionType, 15, 16, randomSource),
-        KerberosEncryptionType.Aes256CtsHmacSha196 => new AesSha1KerberosEncryption(encryptionType, 16, 32, randomSource),
-        KerberosEncryptionType.Aes128CtsHmacSha256128 or KerberosEncryptionType.Aes256CtsHmacSha384192 => AesSha2KerberosEncryption.ForType(encryptionType, randomSource),
+        KerberosEncryptionType.Des3CbcSha1 => new Des3CbcSha1KerberosEncryption(randomSource),
         KerberosEncryptionType.Rc4Hmac => new Rc4HmacKerberosEncryption(randomSource),
+        KerberosEncryptionType.Aes128CtsHmacSha196 or KerberosEncryptionType.Aes256CtsHmacSha196 => AesSha1KerberosEncryption.ForType(encryptionType, randomSource),
+        _ => CreateNewerThanRfc3962(encryptionType, randomSource),
+    };
+
+    /// <summary>Gives the RFC 8009 AES or RFC 6803 Camellia encryption type numbered <paramref name="encryptionType" />.</summary>
+    private static KerberosEncryption CreateNewerThanRfc3962(KerberosEncryptionType encryptionType, IKerberosRandomSource randomSource) => encryptionType switch
+    {
+        KerberosEncryptionType.Aes128CtsHmacSha256128 or KerberosEncryptionType.Aes256CtsHmacSha384192 => AesSha2KerberosEncryption.ForType(encryptionType, randomSource),
         KerberosEncryptionType.Camellia128CtsCmac or KerberosEncryptionType.Camellia256CtsCmac => CamelliaCmacKerberosEncryption.ForType(encryptionType, randomSource),
         _ => throw new KerberosCryptographyException(KerberosCryptographyError.UnsupportedEncryptionType),
     };
@@ -94,7 +100,8 @@ public abstract class KerberosEncryption
     /// <returns>The plaintext, confounder removed.</returns>
     /// <exception cref="ArgumentException"><paramref name="key" /> is not <see cref="KeySize" /> bytes.</exception>
     /// <exception cref="KerberosCryptographyException">
-    /// <see cref="KerberosCryptographyError.CiphertextTooShort" /> or
+    /// <see cref="KerberosCryptographyError.CiphertextTooShort" />,
+    /// <see cref="KerberosCryptographyError.CiphertextNotWholeBlocks" /> or
     /// <see cref="KerberosCryptographyError.IntegrityCheckFailed" />.
     /// </exception>
     public byte[] Decrypt(ReadOnlySpan<byte> key, int usage, ReadOnlySpan<byte> ciphertext)

@@ -86,4 +86,7 @@ public enum TlsAlertDescription : byte
 
     /// <summary><c>no_application_protocol</c>: no ALPN protocol in common.</summary>
     NoApplicationProtocol = 120,
+
+    /// <summary><c>ech_required</c> (RFC 9849 section 11.2): the server rejected Encrypted Client Hello, so the client ends the connection it authenticated under the public name.</summary>
+    EchRequired = 121,
 }

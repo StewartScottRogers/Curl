@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Net.Sockets;
 
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Protocol.Http;
 
 /// <summary>
@@ -106,6 +108,19 @@ internal static class HttpTransferMessages
     internal const string Http3NeedsHttps = "HTTP/3 requested for non-HTTPS URL";
 
     /// <summary>
+    /// Why <c>--http3</c> or <c>--http3-only</c> gives up HTTP/3 for an <c>https://</c> URL
+    /// through a SOCKS proxy (measured on curl.se's 8.18.0 build, BL-837; unchanged in
+    /// 8.21.0, ADR-0187).
+    /// </summary>
+    internal const string Http3NotOverSocksProxy = "HTTP/3 is not supported over a SOCKS proxy";
+
+    /// <summary>
+    /// Why <c>--http3</c> or <c>--http3-only</c> gives up HTTP/3 for an <c>https://</c> URL
+    /// through an HTTP or HTTPS proxy (measured on curl.se's 8.18.0 build, BL-837, ADR-0223).
+    /// </summary>
+    internal const string Http3NotOverHttpProxy = "HTTP/3 is not supported over an HTTP proxy";
+
+    /// <summary>
     /// Formats the message for an HTTP/3 request stream the server reset, exit 95 before any
     /// body byte arrived and exit 18 after: <c>HTTP/3 stream 0 reset by server (error 0x10c
     /// REQUEST_CANCELLED)</c> (<c>cf-ngtcp2.c</c> at <c>curl-8_21_0</c>, ADR-0187).
@@ -115,6 +130,13 @@ internal static class HttpTransferMessages
     /// <returns>The message.</returns>
     internal static string Http3StreamReset(long streamId, long errorCode) =>
         string.Create(CultureInfo.InvariantCulture, $"HTTP/3 stream {streamId} reset by server (error 0x{errorCode:x} {Http3ErrorName(errorCode)})");
+
+    /// <summary>
+    /// The exit 55 message for an HTTP/3 request stream the QUIC connection cannot open, as
+    /// <c>h3_stream_open</c> in <c>cf-ngtcp2.c</c> at <c>curl-8_21_0</c> reports a failing
+    /// <c>ngtcp2_conn_open_bidi_stream</c> (ADR-0187, ADR-0245).
+    /// </summary>
+    internal const string Http3CannotOpenBidiStreams = "cannot open bidi streams";
 
     /// <summary>
     /// Formats the <c>-v</c> line for an HTTP/3 request stream the server reset with
@@ -382,15 +404,18 @@ internal static class HttpTransferMessages
             $"Too large response headers: {headSize} > {HttpResponseHeadBuilder.MaximumHeadSize}");
 
     /// <summary>
-    /// Chooses the exit 56 message for a failed read: <see cref="ConnectionReset" /> when the
-    /// peer reset the connection, and <see cref="ReceiveFailed" /> for anything else.
+    /// Chooses the exit 56 message for a failed read: the TLS build's own text when the
+    /// connection ended without <c>close_notify</c> (ADR-0221), <see cref="ConnectionReset" />
+    /// when the peer reset the connection, and <see cref="ReceiveFailed" /> for anything else.
     /// </summary>
     /// <param name="exception">The failure the read threw.</param>
     /// <returns>The message.</returns>
     internal static string ReceiveFailure(IOException exception) =>
-        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
-            ? ConnectionReset
-            : ReceiveFailed;
+        exception is MissingCloseNotifyException
+            ? exception.Message
+            : exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
+                ? ConnectionReset
+                : ReceiveFailed;
 
     /// <summary>
     /// The exit 55 message for a write the peer reset (measured, BL-174 Notes).

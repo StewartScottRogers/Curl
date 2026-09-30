@@ -136,9 +136,13 @@ internal sealed class SmtpSession(
     private async ValueTask<TransferResult?> OpenAsync()
     {
         SmtpReply greeting = await ReadReplyAsync().ConfigureAwait(false);
-        return greeting.IsCompletion
-            ? await GreetAsync().ConfigureAwait(false)
-            : TransferResult.Failure(CurlExitCode.WeirdServerReply, SmtpSessionMessages.UnexpectedResponse(greeting.Code));
+        if (!greeting.IsCompletion)
+        {
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, SmtpSessionMessages.UnexpectedResponse(greeting.Code));
+        }
+
+        SmtpDiagnosticLogLines.GreetingReceived(context.DiagnosticLog, greeting.Code);
+        return await GreetAsync().ConfigureAwait(false);
     }
 
     private async ValueTask<TransferResult?> GreetAsync()
@@ -214,6 +218,7 @@ internal sealed class SmtpSession(
         securedConnection = connection;
         channel.SwitchTo(connection);
         secure = true;
+        SmtpDiagnosticLogLines.TlsUpgraded(context.DiagnosticLog);
         return await GreetAsync().ConfigureAwait(false);
     }
 

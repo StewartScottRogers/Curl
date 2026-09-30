@@ -96,7 +96,12 @@ public sealed class TransferContextTests
         Assert.IsTrue(context.FtpSkipPasvIp);
         Assert.AreEqual(FtpFileMethod.MultiCwd, context.FtpFileMethod);
         Assert.IsFalse(context.FtpCreateDirectories);
+        Assert.IsNull(context.FtpAccount);
+        Assert.IsNull(context.FtpAlternativeToUser);
+        Assert.IsFalse(context.FtpSendPret);
         Assert.IsFalse(context.ListOnly);
+        Assert.IsFalse(context.UseAscii);
+        Assert.IsFalse(context.Append);
         Assert.IsEmpty(context.QuoteCommands);
         Assert.IsFalse(context.ConvertLineEndings);
         Assert.IsFalse(context.PathAsIs);
@@ -159,7 +164,12 @@ public sealed class TransferContextTests
             FtpSkipPasvIp = false,
             FtpFileMethod = FtpFileMethod.SingleCwd,
             FtpCreateDirectories = true,
+            FtpAccount = "billing",
+            FtpAlternativeToUser = "SITE AUTH",
+            FtpSendPret = true,
             ListOnly = true,
+            UseAscii = true,
+            Append = true,
             QuoteCommands = quoteCommands,
             ConvertLineEndings = true,
             PathAsIs = true,
@@ -198,7 +208,12 @@ public sealed class TransferContextTests
         Assert.IsFalse(context.FtpSkipPasvIp);
         Assert.AreEqual(FtpFileMethod.SingleCwd, context.FtpFileMethod);
         Assert.IsTrue(context.FtpCreateDirectories);
+        Assert.AreEqual("billing", context.FtpAccount);
+        Assert.AreEqual("SITE AUTH", context.FtpAlternativeToUser);
+        Assert.IsTrue(context.FtpSendPret);
         Assert.IsTrue(context.ListOnly);
+        Assert.IsTrue(context.UseAscii);
+        Assert.IsTrue(context.Append);
         Assert.AreSame(quoteCommands, context.QuoteCommands);
         Assert.IsTrue(context.ConvertLineEndings);
         Assert.IsTrue(context.PathAsIs);

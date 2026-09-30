@@ -15,9 +15,14 @@ public sealed partial class SshTransportTests
     private const string StrictServer = "kex-strict-s-v00@openssh.com";
 
     private static byte[] ClientKexInit =>
-        SshKexInit.ForClient(SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33)).ToPayload();
+        ClientKexInitFor(SshAlgorithmPreferences.Full);
 
     [TestMethod]
+    [DataRow("mlkem768x25519-sha256")]
+    [DataRow("mlkem768nistp256-sha256")]
+    [DataRow("mlkem1024nistp384-sha384")]
+    [DataRow("sntrup761x25519-sha512")]
+    [DataRow("sntrup761x25519-sha512@openssh.com")]
     [DataRow("curve25519-sha256")]
     [DataRow("curve25519-sha256@libssh.org")]
     [DataRow("ecdh-sha2-nistp256")]
@@ -38,6 +43,7 @@ public sealed partial class SshTransportTests
 
         CollectionAssert.AreEqual(run.Server.ExchangeHash, result.ExchangeHash);
         CollectionAssert.AreEqual(run.Server.ExchangeHash, result.SessionIdentifier, "the first exchange's hash is the session identifier");
+        CollectionAssert.AreEqual(run.Server.ExchangeHash, run.Transport.SessionIdentifier, "the transport keeps it for publickey signatures");
         CollectionAssert.AreEqual(TestHostKey.Ecdsa("nistp256", TestHostKey.FixedNistP256).Blob, result.HostKey, "the host key is kept for SshHostKeyChecker");
         Assert.AreEqual(method, result.Algorithms.KeyExchange);
         foreach (SshKeyPurpose purpose in Enum.GetValues<SshKeyPurpose>())
@@ -66,6 +72,17 @@ public sealed partial class SshTransportTests
     [DataRow("ssh-rsa")]
     [DataRow("ssh-dss")]
     [DataRow("ssh-ed25519")]
+    [DataRow("ecdsa-sha2-nistp256-cert-v01@openssh.com")]
+    [DataRow("ecdsa-sha2-nistp384-cert-v01@openssh.com")]
+    [DataRow("ecdsa-sha2-nistp521-cert-v01@openssh.com")]
+    [DataRow("rsa-sha2-512-cert-v01@openssh.com")]
+    [DataRow("rsa-sha2-256-cert-v01@openssh.com")]
+    [DataRow("ssh-rsa-cert-v01@openssh.com")]
+    [DataRow("ssh-ed25519-cert-v01@openssh.com")]
+    [DataRow("sk-ecdsa-sha2-nistp256@openssh.com")]
+    [DataRow("sk-ssh-ed25519@openssh.com")]
+    [DataRow("sk-ecdsa-sha2-nistp256-cert-v01@openssh.com")]
+    [DataRow("sk-ssh-ed25519-cert-v01@openssh.com")]
     public async Task ExchangeKeysAsync_EachHostKeyAlgorithm_VerifiesTheServersSignature(string hostKeyAlgorithm)
     {
         ScriptedExchange run = Script("ecdh-sha2-nistp256", TestHostKey.For(hostKeyAlgorithm));
@@ -74,6 +91,14 @@ public sealed partial class SshTransportTests
 
         Assert.AreEqual(hostKeyAlgorithm, result.Algorithms.ServerHostKey);
         CollectionAssert.AreEqual(run.Server.ExchangeHash, result.ExchangeHash);
+    }
+
+    [TestMethod]
+    public void SessionIdentifier_BeforeTheFirstExchange_Throws()
+    {
+        ScriptedExchange run = Script("ecdh-sha2-nistp256", TestHostKey.Ecdsa("nistp256", TestHostKey.FixedNistP256));
+
+        Assert.ThrowsExactly<InvalidOperationException>(() => run.Transport.SessionIdentifier);
     }
 
     [TestMethod]
@@ -147,6 +172,48 @@ public sealed partial class SshTransportTests
     }
 
     [TestMethod]
+    [DataRow("mlkem768x25519-sha256", 1088 + 32)]
+    [DataRow("mlkem768nistp256-sha256", 1088 + 65)]
+    [DataRow("mlkem1024nistp384-sha384", 1568 + 97)]
+    [DataRow("sntrup761x25519-sha512", 1039 + 32)]
+    [DataRow("sntrup761x25519-sha512@openssh.com", 1039 + 32)]
+    public async Task ExchangeKeysAsync_HybridServerShareOfTheWrongLength_FailsWithMinus8(string method, int length)
+    {
+        TestHostKey hostKey = TestHostKey.Ed25519();
+
+        foreach (int wrongLength in new[] { length - 1, length + 1, 0 })
+        {
+            await AssertKeyExchangeFailsAsync(Script(method, hostKey, tamper: _ => [TestKeyExchangeServer.EcdhReply(hostKey.Blob, new byte[wrongLength], hostKey.Sign([]))]));
+        }
+    }
+
+    [TestMethod]
+    [DataRow("mlkem768x25519-sha256", 1088, 32, DisplayName = "an X25519 key giving an all-zero secret")]
+    [DataRow("mlkem768nistp256-sha256", 1088, 65, DisplayName = "a P-256 point off the curve")]
+    [DataRow("sntrup761x25519-sha512", 1039, 32, DisplayName = "an sntrup761 exchange's all-zero X25519 key")]
+    public async Task ExchangeKeysAsync_HybridServerShareWithAnUnusableClassicalKey_FailsWithMinus8(string method, int ciphertextLength, int classicalLength)
+    {
+        TestHostKey hostKey = TestHostKey.Ed25519();
+        byte[] classical = new byte[classicalLength];
+        classical[0] = (byte)(classicalLength == 65 ? 0x04 : 0x00);
+
+        await AssertKeyExchangeFailsAsync(Script(method, hostKey, tamper: _ => [TestKeyExchangeServer.EcdhReply(hostKey.Blob, [.. new byte[ciphertextLength], .. classical], hostKey.Sign([]))]));
+    }
+
+    [TestMethod]
+    [DataRow("mlkem768x25519-sha256")]
+    [DataRow("sntrup761x25519-sha512")]
+    public async Task ExchangeKeysAsync_HybridCiphertextAltered_FailsWithMinus8BecauseTheSignatureNoLongerVerifies(string method)
+    {
+        await AssertKeyExchangeFailsAsync(Script(method, TestHostKey.Ed25519(), tamper: payloads =>
+        {
+            byte[] reply = payloads[0];
+            reply[reply.Length - 200] ^= 0x01;
+            return payloads;
+        }));
+    }
+
+    [TestMethod]
     [DataRow("key", DisplayName = "a 31-byte public key")]
     [DataRow("truncated", DisplayName = "no public key after the name")]
     [DataRow("signature", DisplayName = "a 63-byte signature")]
@@ -204,6 +271,17 @@ public sealed partial class SshTransportTests
     [DataRow("ssh-rsa")]
     [DataRow("ssh-dss")]
     [DataRow("ssh-ed25519")]
+    [DataRow("ecdsa-sha2-nistp256-cert-v01@openssh.com")]
+    [DataRow("ecdsa-sha2-nistp384-cert-v01@openssh.com")]
+    [DataRow("ecdsa-sha2-nistp521-cert-v01@openssh.com")]
+    [DataRow("rsa-sha2-512-cert-v01@openssh.com")]
+    [DataRow("rsa-sha2-256-cert-v01@openssh.com")]
+    [DataRow("ssh-rsa-cert-v01@openssh.com")]
+    [DataRow("ssh-ed25519-cert-v01@openssh.com")]
+    [DataRow("sk-ecdsa-sha2-nistp256@openssh.com")]
+    [DataRow("sk-ssh-ed25519@openssh.com")]
+    [DataRow("sk-ecdsa-sha2-nistp256-cert-v01@openssh.com")]
+    [DataRow("sk-ssh-ed25519-cert-v01@openssh.com")]
     public async Task ExchangeKeysAsync_BadSignature_FailsWithMinus8AsMeasured(string hostKeyAlgorithm)
     {
         ScriptedExchange run = Script("ecdh-sha2-nistp256", TestHostKey.For(hostKeyAlgorithm), tamper: payloads =>
@@ -329,19 +407,48 @@ public sealed partial class SshTransportTests
     }
 
     [TestMethod]
-    [DataRow("small", DisplayName = "a 1024-bit prime, under the 2048 asked for")]
-    [DataRow("large", DisplayName = "an 8192-bit prime, over the 4096 asked for")]
-    [DataRow("generator", DisplayName = "generator 1")]
-    public async Task ExchangeKeysAsync_UnusableGroupExchangeGroup_FailsWithMinus8(string defect)
+    [DataRow("Windows", "small", DisplayName = "Windows: a 1024-bit prime, under the 2048 asked for")]
+    [DataRow("Windows", "large", DisplayName = "Windows: an 8192-bit prime, over the 4096 asked for")]
+    [DataRow("OpenSSL", "small", DisplayName = "OpenSSL: a 1024-bit prime, under the 2048 asked for")]
+    [DataRow("OpenSSL", "larger", DisplayName = "OpenSSL: an 8193-bit number, over the 8192 asked for")]
+    [DataRow("OpenSSL", "generator", DisplayName = "OpenSSL: generator 1")]
+    public async Task ExchangeKeysAsync_UnusableGroupExchangeGroup_FailsWithMinus8(string platform, string defect)
     {
-        byte[] group = defect switch
+        byte[] prime = defect switch
         {
-            "small" => [31, .. Mpint(Cryptography.FiniteFieldDiffieHellmanGroup.Group2.Prime.ToArray()), .. Mpint([2])],
-            "large" => [31, .. Mpint(Cryptography.FiniteFieldDiffieHellmanGroup.Group18.Prime.ToArray()), .. Mpint([2])],
-            _ => [31, .. Mpint(Cryptography.FiniteFieldDiffieHellmanGroup.Group14.Prime.ToArray()), .. Mpint([1])],
+            "small" => Cryptography.FiniteFieldDiffieHellmanGroup.Group2.Prime.ToArray(),
+            "large" => Cryptography.FiniteFieldDiffieHellmanGroup.Group18.Prime.ToArray(),
+            "larger" => [0x01, .. Enumerable.Repeat((byte)0xFF, 1024)],
+            _ => Cryptography.FiniteFieldDiffieHellmanGroup.Group14.Prime.ToArray(),
         };
+        byte[] group = [31, .. Mpint(prime), .. Mpint(defect == "generator" ? [1] : [2])];
 
-        await AssertKeyExchangeFailsAsync(Script("diffie-hellman-group-exchange-sha256", TestHostKey.Dsa(), tamper: payloads => [group, payloads[1]]));
+        await AssertKeyExchangeFailsAsync(Script(
+            "diffie-hellman-group-exchange-sha256",
+            TestHostKey.For("rsa-sha2-256"),
+            tamper: payloads => [group, payloads[1]],
+            preferences: Preset(platform)));
+    }
+
+    [TestMethod]
+    [DataRow("Windows", "diffie-hellman-group-exchange-sha256", "22000008000000100000001000", DisplayName = "Windows, -sha256: (2048, 4096, 4096), measured (BL-564)")]
+    [DataRow("Windows", "diffie-hellman-group-exchange-sha1", "22000008000000100000001000", DisplayName = "Windows, -sha1: (2048, 4096, 4096), measured (BL-564)")]
+    [DataRow("OpenSSL", "diffie-hellman-group-exchange-sha256", "22000008000000100000002000", DisplayName = "OpenSSL, -sha256: (2048, 4096, 8192), measured (BL-888)")]
+    [DataRow("OpenSSL", "diffie-hellman-group-exchange-sha1", "22000008000000100000002000", DisplayName = "OpenSSL, -sha1: (2048, 4096, 8192), measured (BL-888)")]
+    public async Task ExchangeKeysAsync_GroupExchangeOnEachPreset_AsksForThePresetsSizesAndAcceptsAPrimeAtItsMaximum(string platform, string method, string request)
+    {
+        SshAlgorithmPreferences preset = Preset(platform);
+        Cryptography.FiniteFieldDiffieHellmanGroup largest = platform == "Windows"
+            ? Cryptography.FiniteFieldDiffieHellmanGroup.Group16
+            : Cryptography.FiniteFieldDiffieHellmanGroup.Group18;
+        ScriptedExchange run = Script(method, TestHostKey.For("rsa-sha2-256"), preferences: preset, exchangedGroup: largest);
+
+        SshKeyExchangeResult result = await ExchangeAsync(run);
+
+        List<byte[]> written = WrittenPayloads(run.Connection.Written);
+        Assert.AreEqual(request, Convert.ToHexString(written[1]), "the client's SSH_MSG_KEX_DH_GEX_REQUEST");
+        Assert.AreEqual((int)preset.GroupExchangeSizes.MaximumBits / 8, largest.PrimeLength, "the server's prime is at the preset's maximum");
+        CollectionAssert.AreEqual(run.Server.ExchangeHash, result.ExchangeHash);
     }
 
     [TestMethod]
@@ -431,10 +538,14 @@ public sealed partial class SshTransportTests
     }
 
     [TestMethod]
-    [DataRow("aes128-ctr", "hmac-sha2-256", "Failure establishing ssh session: -4, Unable to exchange encryption keys", DisplayName = "MAC-then-encrypt")]
-    [DataRow("aes256-ctr", "hmac-sha2-512-etm@openssh.com", "Failure establishing ssh session: -4, Unable to exchange encryption keys", DisplayName = "encrypt-then-MAC")]
-    [DataRow("aes256-gcm@openssh.com", null, "Failure establishing ssh session: -12, Unable to exchange encryption keys", DisplayName = "AES-GCM")]
-    public async Task ReExchangeKeysAsync_ServerPacketFailsItsCheck_EndsTheSessionWithLibssh2sCode(string cipher, string? mac, string expectedMessage)
+    [DataRow("aes128-ctr", "hmac-sha2-256", -1, "Failure establishing ssh session: -4, Unable to exchange encryption keys", DisplayName = "MAC-then-encrypt")]
+    [DataRow("aes256-ctr", "hmac-sha2-512-etm@openssh.com", -1, "Failure establishing ssh session: -4, Unable to exchange encryption keys", DisplayName = "encrypt-then-MAC")]
+    [DataRow("aes128-ctr", "hmac-sha1-etm@openssh.com", -1, "Failure establishing ssh session: -4, Unable to exchange encryption keys", DisplayName = "hmac-sha1-etm")]
+    [DataRow("aes128-ctr", "hmac-md5-etm@openssh.com", -1, "Failure establishing ssh session: -4, Unable to exchange encryption keys", DisplayName = "hmac-md5-etm")]
+    [DataRow("aes256-gcm@openssh.com", null, -1, "Failure establishing ssh session: -12, Unable to exchange encryption keys", DisplayName = "AES-GCM")]
+    [DataRow("chacha20-poly1305@openssh.com", null, -1, "Failure establishing ssh session: -12, Unable to exchange encryption keys", DisplayName = "ChaCha20-Poly1305 tag")]
+    [DataRow("chacha20-poly1305@openssh.com", null, 3, KeyExchangeMethodFailed, DisplayName = "ChaCha20-Poly1305 length, off the block size")]
+    public async Task ReExchangeKeysAsync_ServerPacketFailsItsCheck_EndsTheSessionWithLibssh2sCode(string cipher, string? mac, int alteredByte, string expectedMessage)
     {
         TestHostKey hostKey = TestHostKey.Dsa();
         SshKexInit serverKexInit = ServerKexInit("ecdh-sha2-nistp256", hostKey.Algorithm, strict: true) with
@@ -450,7 +561,7 @@ public sealed partial class SshTransportTests
         first.ServerPayloads.ForEach(payload => script.Packet(payload));
         script.Packet(SshMessageNumber.NewKeys)
             .Protect(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With(cipher, mac), first.Keys(first.ExchangeHash)), resetSequenceNumber: true)
-            .Packet([SshMessageNumber.Ignore, 0, 0, 0, 0], sealedPacket => sealedPacket[^1] ^= 0x10);
+            .Packet([SshMessageNumber.Ignore, 0, 0, 0, 0], sealedPacket => sealedPacket[alteredByte < 0 ? sealedPacket.Length - 1 : alteredByte] ^= 0x01);
         SshTransport transport = new(new ScriptedConnection(script.Bytes), SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33), keys);
         await transport.ExchangeKeysAsync(await transport.NegotiateAlgorithmsAsync(CancellationToken.None), CancellationToken.None);
         byte[] secondServerKexInit = ServerKexInit("diffie-hellman-group14-sha256", hostKey.Algorithm, strict: false).ToPayload();
@@ -497,14 +608,20 @@ public sealed partial class SshTransportTests
     }
 
     [TestMethod]
-    public async Task ExchangeKeysAsync_MethodOrHostKeyNotImplemented_ThrowsNotSupported()
+    public void Create_MethodNotImplemented_ThrowsNotSupported()
     {
-        const string hostCertificate = "ssh-ed25519-cert-v01@openssh.com";
-        SshAlgorithmCatalogue withUnimplemented = new([.. SshAlgorithmPreferences.Full.KeyExchange, "ssh-dss", hostCertificate, "aes128-ctr", "hmac-sha2-256", "none"]);
-        foreach ((string method, string hostKey) in new[] { ("sntrup761x25519-sha512@openssh.com", "ssh-dss"), ("ecdh-sha2-nistp256", hostCertificate) })
+        Assert.ThrowsExactly<NotSupportedException>(() => SshKeyExchangeMethods.Create("unknown-kex@example.com", new TestEphemeralKeys(), SshGroupExchangeSizes.OpenSslReference));
+    }
+
+    [TestMethod]
+    public async Task ExchangeKeysAsync_HostKeyNotImplemented_ThrowsNotSupported()
+    {
+        const string hostKeyName = "unknown-host-key@example.com";
+        SshAlgorithmCatalogue withUnimplemented = new([.. SshAlgorithmPreferences.Full.KeyExchange, "ssh-dss", hostKeyName, "aes128-ctr", "hmac-sha2-256", "none"]);
+        foreach ((string method, string hostKey) in new[] { ("ecdh-sha2-nistp256", hostKeyName) })
         {
             byte[] serverBytes = new SshServerScript().Line(TestKeyExchangeServer.ServerIdentification).KexInit(ServerKexInit(method, hostKey, strict: false)).Bytes;
-            SshTransport transport = new(new ScriptedConnection(serverBytes), SshAlgorithmPreferences.Full, withUnimplemented, new RepeatingRandomSource(0), new TestEphemeralKeys());
+            SshTransport transport = new(new ScriptedConnection(serverBytes), SshAlgorithmPreferences.Full with { ServerHostKey = [hostKeyName] }, withUnimplemented, new RepeatingRandomSource(0), new TestEphemeralKeys());
             SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(CancellationToken.None);
 
             await Assert.ThrowsExactlyAsync<NotSupportedException>(
@@ -538,6 +655,12 @@ public sealed partial class SshTransportTests
 
     private const string PinnedGroup14ExchangeHash = "E00B7ACDC1E39CF85CCB4C1A94907F329E83EB15471197304BA94883DC661243";
 
+    private static SshAlgorithmPreferences Preset(string platform) =>
+        platform == "Windows" ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference;
+
+    private static byte[] ClientKexInitFor(SshAlgorithmPreferences preferences) =>
+        SshKexInit.ForClient(preferences, EverythingImplemented, new RepeatingRandomSource(0x33)).ToPayload();
+
     private static SshKexInit ServerKexInit(string method, string hostKey, bool strict) =>
         SshServerScript.OpenSshKexInit(kexInit => kexInit with
         {
@@ -556,11 +679,14 @@ public sealed partial class SshTransportTests
         string? offeredHostKey = null,
         Func<List<byte[]>, List<byte[]>>? tamper = null,
         bool newKeys = true,
-        SshKexInit? serverKexInit = null)
+        SshKexInit? serverKexInit = null,
+        SshAlgorithmPreferences? preferences = null,
+        Cryptography.FiniteFieldDiffieHellmanGroup? exchangedGroup = null)
     {
         TestEphemeralKeys keys = new();
         SshKexInit server = serverKexInit ?? ServerKexInit(method, offeredHostKey ?? hostKey.Algorithm, strict);
-        TestKeyExchangeServer answer = TestKeyExchangeServer.Answer(method, hostKey, keys, ClientKexInit, server.ToPayload());
+        SshAlgorithmPreferences preset = preferences ?? SshAlgorithmPreferences.Full;
+        TestKeyExchangeServer answer = TestKeyExchangeServer.Answer(method, hostKey, keys, ClientKexInitFor(preset), server.ToPayload(), preset.GroupExchangeSizes, exchangedGroup);
         SshServerScript script = new SshServerScript().Line(TestKeyExchangeServer.ServerIdentification).KexInit(server);
         List<byte[]> payloads = [.. answer.ServerPayloads.Select(payload => payload.ToArray())];
         (tamper is null ? payloads : tamper(payloads)).ForEach(payload => script.Packet(payload));
@@ -570,7 +696,7 @@ public sealed partial class SshTransportTests
         }
 
         ScriptedConnection connection = new(script.Bytes);
-        SshTransport transport = new(connection, SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33), keys);
+        SshTransport transport = new(connection, preset, EverythingImplemented, new RepeatingRandomSource(0x33), keys);
         return new ScriptedExchange(transport, connection, answer);
     }
 

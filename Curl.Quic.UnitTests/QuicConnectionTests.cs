@@ -237,7 +237,7 @@ public sealed class QuicConnectionTests
     [TestMethod]
     public void Constructor_IncompleteHandshakeOrMissingArguments_Throws()
     {
-        using QuicClientHandshake handshake = QuicHandshakeTest.Client();
+        using QuicClientConnectionState handshake = QuicClientConnectionStateTest.Client();
         QuicTestChannel channel = new(null);
 
         Assert.ThrowsExactly<ArgumentException>(() => new QuicConnection(handshake, channel, TimeProvider.System));
@@ -250,7 +250,7 @@ public sealed class QuicConnectionTests
     public void Constructor_FailedHandshake_Throws()
     {
         using QuicTestServer server = new();
-        using QuicClientHandshake handshake = Connect(server);
+        using QuicClientConnectionState handshake = Connect(server);
         handshake.Abandon(QuicTransportErrorCode.InternalError, new QuicHandshakeFailure(CurlExitCode.SendError, "gone"));
 
         Assert.ThrowsExactly<ArgumentException>(() => new QuicConnection(handshake, new QuicTestChannel(null), TimeProvider.System));
@@ -263,7 +263,7 @@ public sealed class QuicConnectionTests
         ManualTimerTimeProvider clock = new();
         QuicTestServer server = new() { ConfigureTransportParameters = serverLimits ?? GenerousServerLimits };
         QuicTestLiveChannel channel = new(server);
-        QuicClientHandshake handshake = QuicHandshakeTest.Client(QuicHandshakeTest.CurlSettings with { TransportParameters = SmallClientLimits }, clock: clock);
+        QuicClientConnectionState handshake = QuicClientConnectionStateTest.Client(QuicClientConnectionStateTest.CurlSettings with { TransportParameters = SmallClientLimits }, clock: clock);
         Assert.IsNull(await new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, CancellationToken.None));
         return (new QuicConnection(handshake, channel, clock), channel, clock);
     }

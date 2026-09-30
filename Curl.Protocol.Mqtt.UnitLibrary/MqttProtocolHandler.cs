@@ -40,6 +40,11 @@ namespace Curl.Protocol.Mqtt;
 /// CONNACK as in curl. A failure of the connection, or an <see cref="IOException" /> from
 /// the output, is returned rather than thrown; cancellation leaves as an exception.
 /// </para>
+/// <para>
+/// Each step is written to <see cref="ITransferContext.DiagnosticLog" />, component
+/// <c>mqtt</c>, which the <see cref="ConnectTarget" /> carries on to the connector
+/// (ADR-0222, BL-928); see <see cref="MqttDiagnosticLog" />.
+/// </para>
 /// </remarks>
 public sealed class MqttProtocolHandler : IProtocolHandler
 {
@@ -107,34 +112,11 @@ public sealed class MqttProtocolHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        ConnectResult connected = await connector
-            .ConnectAsync(CreateTarget(context), context.CancellationToken)
-            .ConfigureAwait(false);
-        if (connected.Connection is not { } connection)
-        {
-            return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused };
-        }
-
-        context.Progress.ReportTransferStarted();
-        await using (connection.ConfigureAwait(false))
-        {
-            MqttSession session = new(connection, context.Output, context.Progress, context.CancellationToken);
-            try
-            {
-                await session
-                    .RunAsync(
-                        context.Url,
-                        ClientIdentifierPrefix + clientIdentifierSuffixSource(),
-                        context.Credentials,
-                        context.PostData)
-                    .ConfigureAwait(false);
-                return TransferResult.Success(session.BytesWritten);
-            }
-            catch (MqttTransferException failure)
-            {
-                return new TransferResult(failure.ExitCode, session.BytesWritten, failure.Message);
-            }
-        }
+        long started = context.TimeProvider.GetTimestamp();
+        MqttDiagnosticLog log = new(context.DiagnosticLog);
+        TransferResult result = await TransferAsync(context, log).ConfigureAwait(false);
+        log.TransferEnded(result, context.TimeProvider.GetElapsedTime(started));
+        return result;
     }
 
     private static ConnectTarget CreateTarget(ITransferContext context)
@@ -147,9 +129,67 @@ public sealed class MqttProtocolHandler : IProtocolHandler
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
         };
     }
 
     private static string CreateRandomClientIdentifierSuffix() =>
         RandomNumberGenerator.GetString(ClientIdentifierAlphabet, ClientIdentifierSuffixLength);
+
+    /// <summary>
+    /// Connects, then runs the session over the connection and disposes it.
+    /// </summary>
+    private async ValueTask<TransferResult> TransferAsync(ITransferContext context, MqttDiagnosticLog log)
+    {
+        ConnectResult connected = await connector
+            .ConnectAsync(CreateTarget(context), context.CancellationToken)
+            .ConfigureAwait(false);
+        if (connected.Connection is not { } connection)
+        {
+            return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused };
+        }
+
+        context.Progress.ReportTransferStarted();
+        TransferResult result;
+        await using (connection.ConfigureAwait(false))
+        {
+            MqttSession session = new(connection, context.Output, context.Progress, context.Events, log, context.CancellationToken);
+            try
+            {
+                await session
+                    .RunAsync(
+                        context.Url,
+                        ClientIdentifierPrefix + clientIdentifierSuffixSource(),
+                        context.Credentials,
+                        context.PostData)
+                    .ConfigureAwait(false);
+                result = TransferResult.Success(session.BytesWritten);
+            }
+            catch (MqttTransferException failure)
+            {
+                result = new TransferResult(failure.ExitCode, session.BytesWritten, failure.Message);
+            }
+        }
+
+        ReportConnectionEnd(context.Events, result, connected.ConnectionNumber);
+        return result;
+    }
+
+    /// <summary>
+    /// Reports how the transfer ended, as curl 8.21.0's <c>-v</c> does (measured, BL-935):
+    /// the failure's message unless curl prints it without <c>failf</c>, then
+    /// <c>closing connection #N</c> after an output write failure and
+    /// <c>shutting down connection #N</c> after anything else.
+    /// </summary>
+    private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, long connectionNumber)
+    {
+        if (result.ErrorMessage is { } message && !MqttTransferMessages.IsStrerrorText(message))
+        {
+            events.ReportInfo(message);
+        }
+
+        events.ReportInfo(result.ExitCode == CurlExitCode.WriteError
+            ? MqttTransferMessages.ClosingConnection(connectionNumber)
+            : MqttTransferMessages.ShuttingDownConnection(connectionNumber));
+    }
 }

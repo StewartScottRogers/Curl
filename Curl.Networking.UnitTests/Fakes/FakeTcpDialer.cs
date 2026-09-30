@@ -32,6 +32,24 @@ public sealed class FakeTcpDialer : ITcpDialer
     }
 
     /// <summary>
+    /// Gets or sets what one bound dial does before it connects: nothing by default, or throw, as a
+    /// bind that fails does.
+    /// </summary>
+    public Action<IPEndPoint, int> BindOutcome { get; init; } = (_, _) => { };
+
+    /// <summary>Gets each bound dial, in order: where it went, the local end point asked for and the port count.</summary>
+    public List<(IPEndPoint EndPoint, IPEndPoint LocalEndPoint, int LocalPortCount)> BoundDials { get; } = [];
+
+    /// <inheritdoc />
+    public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken)
+    {
+        BoundDials.Add((endPoint, localEndPoint, localPortCount));
+        BindOutcome(localEndPoint, localPortCount);
+
+        return DialAsync(endPoint, cancellationToken);
+    }
+
+    /// <summary>
     /// Gets or sets what one Unix socket dial does: return a connection, or throw. Defaults to
     /// refusing.
     /// </summary>

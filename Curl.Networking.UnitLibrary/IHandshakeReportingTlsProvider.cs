@@ -12,6 +12,12 @@ namespace Curl.Networking;
 internal interface IHandshakeReportingTlsProvider : ITlsProvider
 {
     /// <summary>
+    /// Gets which TLS client this provider is, as <see cref="TlsClientRouting.Choose" /> names
+    /// it, for the diagnostic log's handshake line (BL-920).
+    /// </summary>
+    TlsClientRoute Route { get; }
+
+    /// <summary>
     /// Performs the client handshake as
     /// <see cref="ITlsProvider.AuthenticateAsClientAsync(IConnection, string, CancellationToken)" />
     /// does, reporting the trust it is set up with to <paramref name="events" /> and, when it

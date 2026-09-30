@@ -35,14 +35,39 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// options it sets are <see cref="ApplySocketOptions" />'s, which unit tests measure.
     /// </remarks>
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
-    public async ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
+    public ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(endPoint);
 
+        return DialBoundAsync(endPoint, null, 0, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Excluded from coverage per ADR-0083, as <see cref="DialAsync" /> is. The bind is
+    /// <see cref="BindLocalEnd" />'s, which unit tests measure.
+    /// </remarks>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(endPoint);
+        ArgumentNullException.ThrowIfNull(localEndPoint);
+
+        return DialBoundAsync(endPoint, localEndPoint, localPortCount, cancellationToken);
+    }
+
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    private async ValueTask<DialedTcpConnection> DialBoundAsync(IPEndPoint endPoint, IPEndPoint? bindTo, int localPortCount, CancellationToken cancellationToken)
+    {
         var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         try
         {
             ApplySocketOptions(socket);
+            if (bindTo is not null)
+            {
+                BindLocalEnd(socket, bindTo, localPortCount);
+            }
+
             await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
         }
         catch
@@ -85,7 +110,38 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     }
 
     /// <summary>
-    /// Sets <see cref="SocketOptions" /> on <paramref name="socket" />: <see cref="Socket.NoDelay" />
+    /// Binds <paramref name="socket" /> to <paramref name="localEndPoint" />'s address on the first
+    /// port from <paramref name="localEndPoint" />'s port that binds, trying at most
+    /// <paramref name="portCount" /> ports and never past 65535, as libcurl's <c>bindlocal</c> does.
+    /// </summary>
+    /// <param name="socket">A TCP socket not yet bound or connected.</param>
+    /// <param name="localEndPoint">The local address and the first port.</param>
+    /// <param name="portCount">How many ports to try; fewer than 1 is taken as 1.</param>
+    /// <exception cref="LocalBindException">
+    /// No port bound (<see cref="LocalBindFailure.InterfaceFailed" />): each was in use, not
+    /// permitted, or the address is not local.
+    /// </exception>
+    internal static void BindLocalEnd(Socket socket, IPEndPoint localEndPoint, int portCount)
+    {
+        var lastPort = Math.Min(localEndPoint.Port + Math.Max(portCount, 1) - 1, IPEndPoint.MaxPort);
+        for (var port = localEndPoint.Port; port <= lastPort; port++)
+        {
+            try
+            {
+                socket.Bind(new IPEndPoint(localEndPoint.Address, port));
+                return;
+            }
+            catch (SocketException)
+            {
+                // libcurl moves on to the next port of the range.
+            }
+        }
+
+        throw new LocalBindException(LocalBindFailure.InterfaceFailed);
+    }
+
+    /// <summary>
+    /// Sets <see cref="SocketOptions" /> on <paramref name="socket" />:<see cref="Socket.NoDelay" />
     /// from <see cref="TcpSocketOptions.NoDelay" />, and <c>SO_KEEPALIVE</c> from
     /// <see cref="TcpSocketOptions.KeepAlive" />, with the probe time and interval
     /// <see cref="TcpSocketOptions.KeepAliveSeconds" /> and the probe count

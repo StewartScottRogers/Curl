@@ -34,6 +34,10 @@ in a directory that does not exist is silently not written.
 5. **Failures are silent.** A missing or unreadable file reads as empty; a file that cannot be
    written is left as it is, with nothing on standard error, as measured.
 
+*Amended by BL-733 (2026-09-29):* [ADR-0226](ADR-0226-alt-svc-uses-h2-and-h3-alternatives-as-curl-se-s-build-looks-them-up.md)
+widens decision 2 to `h2` and `h3` alternatives chosen by the version option, and replaces decision 4:
+each redirect hop now looks its alternative up afresh.
+
 ## Consequences
 
 The `* Connection #0 to host <host>:<port> left intact` line still names the origin where curl

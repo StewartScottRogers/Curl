@@ -14,7 +14,8 @@
       show    One task in full, with its dependency and readiness position.
       find    Tasks whose title or body contains a string.
       deps    What a task waits on, and what waits on it, both transitively.
-      check   Validate the board: duplicate or missing IDs, unknown field values,
+      check   Validate the board: duplicate or missing IDs, unknown field values
+              (a lane other than yes or no among them),
               dependencies that do not exist, dependency cycles, finished tasks
               with unticked boxes, missing sections, non-ASCII bytes.
       report  Counts by state, assignee, pipeline and priority, and completions
@@ -125,6 +126,9 @@ function ConvertTo-Task([IO.FileInfo] $File) {
         Assignee    = [string]$fields['assignee']
         Pipeline    = [string]$fields['pipeline']
         Requirement = [string]$fields['requirement']
+        # 'lane: no' means interactive only; absent, empty or 'yes' means any runner.
+        Lane        = [string]$fields['lane']
+        LaneAllowed = ([string]$fields['lane']).Trim() -ine 'no'
         DependsOn   = $dependencies
         Created     = [string]$fields['created']
         Completed   = [string]$fields['completed']
@@ -175,12 +179,19 @@ function Get-ReadyTasks([object[]] $Tasks) {
     return , @($ready | Sort-Object -Property @{ Expression = { $PriorityRank[$_.Priority] } }, Number)
 }
 
+# The ready tasks a dark factory lane may be offered, as 'next' and 'capacity' count
+# them: every ready task but the interactive-only ones ('lane: no').
+function Get-LaneReadyTasks([object[]] $Tasks) {
+    return , @((Get-ReadyTasks $Tasks) | Where-Object { $_.LaneAllowed })
+}
+
 function Format-Row($Task, [string[]] $ReadyIds, [string[]] $DoneIds) {
     $note = ''
     if ($Task.State -eq 'Backlog') {
         $missing = Get-MissingDependencies $Task $DoneIds
         if ($missing.Count -gt 0) { $note = "  [waiting on $($missing -join ', ')]" }
         elseif ($Task.Assignee -eq 'Stewart') { $note = '  [needs Stewart]' }
+        elseif (-not $Task.LaneAllowed) { $note = '  [ready, interactive only]' }
         else {
             $position = [array]::IndexOf($ReadyIds, $Task.Id)
             if ($position -ge 0) { $note = "  [ready, #$($position + 1) in queue]" }
@@ -211,7 +222,7 @@ function Select-Filtered([object[]] $Tasks) {
 }
 
 function Invoke-List([object[]] $Tasks) {
-    $readyIds = @(Get-ReadyTasks $Tasks | ForEach-Object { $_.Id })
+    $readyIds = @(Get-LaneReadyTasks $Tasks | ForEach-Object { $_.Id })
     $doneIds = Get-DoneIds $Tasks
     $selected = Select-Filtered $Tasks
 
@@ -255,6 +266,7 @@ function Invoke-Show([object[]] $Tasks) {
     Write-Output "  priority    $($task.Priority)"
     Write-Output "  assignee    $($task.Assignee)"
     Write-Output "  pipeline    $($task.Pipeline)"
+    if (-not $task.LaneAllowed) { Write-Output '  lane        no (interactive only; run it with /task-run <ID>)' }
     Write-Output "  requirement $($task.Requirement)"
     Write-Output "  created     $($task.Created)"
     if ($task.Completed) { Write-Output "  completed   $($task.Completed)" }
@@ -267,8 +279,11 @@ function Invoke-Show([object[]] $Tasks) {
         Write-Output "  criteria    $($task.BoxesTotal - $task.BoxesOpen) of $($task.BoxesTotal) ticked"
     }
     if ($task.State -eq 'Backlog' -and $task.Assignee -eq 'Claude' -and $missing.Count -eq 0) {
-        $readyIds = @(Get-ReadyTasks $Tasks | ForEach-Object { $_.Id })
-        Write-Output "  ready       yes, #$([array]::IndexOf($readyIds, $task.Id) + 1) in queue"
+        if ($task.LaneAllowed) {
+            $readyIds = @(Get-LaneReadyTasks $Tasks | ForEach-Object { $_.Id })
+            Write-Output "  ready       yes, #$([array]::IndexOf($readyIds, $task.Id) + 1) in queue"
+        }
+        else { Write-Output '  ready       yes, interactive only' }
     }
     Write-Output ''
     Write-Output $task.Text.TrimEnd()
@@ -407,6 +422,9 @@ function Invoke-Check([object[]] $Tasks) {
         }
         if ($Pipelines -notcontains $task.Pipeline) {
             $problems += "$at has pipeline '$($task.Pipeline)'; expected feature, protocol, docs or direct."
+        }
+        if ($task.Lane -and @('yes', 'no') -notcontains $task.Lane) {
+            $problems += "$at has lane '$($task.Lane)'; expected yes or no (or no lane field, which means yes)."
         }
         if (-not $task.Requirement) { $problems += "$at has no requirement field; use 'none' when there is none." }
         if ($task.Created -notmatch '^\d{4}-\d{2}-\d{2}$') {

@@ -44,11 +44,53 @@ public sealed class OpenSslCipherSuitesTests
     }
 
     [TestMethod]
+    [DataRow("DHE-DSS-AES128-SHA", (ushort)0x0032)]
+    [DataRow("DHE-DSS-AES256-SHA", (ushort)0x0038)]
+    [DataRow("DHE-DSS-AES128-SHA256", (ushort)0x0040)]
+    [DataRow("DHE-DSS-AES256-SHA256", (ushort)0x006a)]
+    [DataRow("DHE-DSS-AES128-GCM-SHA256", (ushort)0x00a2)]
+    [DataRow("DHE-DSS-AES256-GCM-SHA384", (ushort)0x00a3)]
+    [DataRow("DHE-DSS-CAMELLIA128-SHA", (ushort)0x0044)]
+    [DataRow("DHE-DSS-CAMELLIA256-SHA", (ushort)0x0087)]
+    [DataRow("DHE-DSS-CAMELLIA128-SHA256", (ushort)0x00bd)]
+    [DataRow("DHE-DSS-CAMELLIA256-SHA256", (ushort)0x00c3)]
+    [DataRow("DHE-DSS-ARIA128-GCM-SHA256", (ushort)0xc056)]
+    [DataRow("DHE-DSS-ARIA256-GCM-SHA384", (ushort)0xc057)]
+    [DataRow("DHE-DSS-DES-CBC3-SHA", (ushort)0x0013)]
+    public void Find_WithADheDssName_ReturnsItsCodePoint(string openSslName, ushort expectedCodePoint)
+    {
+        Assert.AreEqual((TlsCipherSuite)expectedCodePoint, OpenSslCipherSuites.Find(openSslName));
+    }
+
+    [TestMethod]
     public void DefaultTls12Suites_AreEveryOpenSslNamedSuiteOnce()
     {
         Assert.HasCount(27, OpenSslCipherSuites.DefaultTls12Suites);
         Assert.HasCount(27, OpenSslCipherSuites.DefaultTls12Suites.Distinct());
         Assert.AreEqual(TlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, OpenSslCipherSuites.DefaultTls12Suites[0]);
+    }
+
+    [TestMethod]
+    public void DefaultTls12Suites_WhenCiphersIsAbsent_HaveNoDheDssSuite()
+    {
+        Assert.IsFalse(OpenSslCipherSuites.DefaultTls12Suites.Any(suite => suite.ToString().StartsWith("TLS_DHE_DSS_", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void Select_WithADheDssName_OffersItAfterTheDefaultTls13Suites()
+    {
+        var (suites, failureMessage) = OpenSslCipherSuites.Select("DHE-DSS-AES128-GCM-SHA256", null);
+
+        Assert.IsNull(failureMessage);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                TlsCipherSuite.TLS_AES_256_GCM_SHA384,
+                TlsCipherSuite.TLS_CHACHA20_POLY1305_SHA256,
+                TlsCipherSuite.TLS_AES_128_GCM_SHA256,
+                TlsCipherSuite.TLS_DHE_DSS_WITH_AES_128_GCM_SHA256,
+            },
+            suites!.ToArray());
     }
 
     [TestMethod]

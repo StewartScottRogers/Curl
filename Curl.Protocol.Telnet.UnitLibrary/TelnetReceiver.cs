@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Curl.Protocol.Telnet;
@@ -68,13 +69,26 @@ internal sealed class TelnetReceiver
 
     private readonly TelnetOptionSide remoteOptions;
 
+    private readonly TelnetDiagnosticLog log;
+
+    private readonly TelnetTraceReporter trace;
+
     private readonly List<byte> subnegotiation = [];
+
+    /// <summary>
+    /// Where in the current read's data the run not yet reported begins: curl passes each
+    /// run of data between commands to its writer, and traces it, separately.
+    /// </summary>
+    private int runStart;
 
     private TelnetReceiveState state;
 
     private bool serverNegotiated;
 
     private bool optionsOffered;
+
+    /// <summary>The <c>WILL</c>, <c>WONT</c>, <c>DO</c> or <c>DONT</c> byte whose option is awaited.</summary>
+    private byte negotiationCommand;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TelnetReceiver" /> class.
@@ -84,9 +98,16 @@ internal sealed class TelnetReceiver
     /// <c>NEW-ENVIRON</c> that has a value is one more option this side performs and offers,
     /// and a refused <c>BINARY</c> is neither offered nor accepted.
     /// </param>
-    public TelnetReceiver(TelnetOptionValues optionValues)
+    /// <param name="log">Where each option negotiation received and sent is logged.</param>
+    /// <param name="trace">
+    /// Where each negotiation, command and subnegotiation received and sent, and each run of
+    /// data, is reported for <c>-v</c> and <c>--trace</c>.
+    /// </param>
+    public TelnetReceiver(TelnetOptionValues optionValues, TelnetDiagnosticLog log, TelnetTraceReporter trace)
     {
         this.optionValues = optionValues;
+        this.log = log;
+        this.trace = trace;
         optionsOfferedBothWays = optionValues.BinaryRefused
             ? [TelnetByte.SuppressGoAheadOption]
             : [TelnetByte.BinaryOption, TelnetByte.SuppressGoAheadOption];
@@ -94,11 +115,15 @@ internal sealed class TelnetReceiver
         localOptions = new TelnetOptionSide(
             TelnetByte.Will,
             TelnetByte.Wont,
-            [.. localOptionsOffered, TelnetByte.WindowSizeOption]);
+            [.. localOptionsOffered, TelnetByte.WindowSizeOption],
+            log,
+            trace);
         remoteOptions = new TelnetOptionSide(
             TelnetByte.Do,
             TelnetByte.Dont,
-            [.. optionsOfferedBothWays, TelnetByte.EchoOption]);
+            [.. optionsOfferedBothWays, TelnetByte.EchoOption],
+            log,
+            trace);
     }
 
     /// <summary>
@@ -114,6 +139,7 @@ internal sealed class TelnetReceiver
     /// </returns>
     public TelnetReceiveError Receive(ReadOnlySpan<byte> received, List<byte> data, List<byte> replies)
     {
+        runStart = data.Count;
         foreach (byte value in received)
         {
             TelnetReceiveError error = ReceiveByte(value, data, replies);
@@ -123,8 +149,22 @@ internal sealed class TelnetReceiver
             }
         }
 
+        ReportRun(data);
         OfferOptionsOnce(replies);
         return TelnetReceiveError.None;
+    }
+
+    /// <summary>
+    /// Reports the data added since the last run ended, if any, as one run; an error can
+    /// only arise inside a subnegotiation, after the run before it was reported.
+    /// </summary>
+    private void ReportRun(List<byte> data)
+    {
+        if (data.Count > runStart)
+        {
+            trace.DataReceived(CollectionsMarshal.AsSpan(data)[runStart..]);
+            runStart = data.Count;
+        }
     }
 
     private TelnetReceiveError ReceiveByte(byte value, List<byte> data, List<byte> replies)
@@ -162,13 +202,16 @@ internal sealed class TelnetReceiver
             if (value != TelnetByte.Nul)
             {
                 data.Add(value);
+                return;
             }
 
+            ReportRun(data);
             return;
         }
 
         if (value == TelnetByte.InterpretAsCommand)
         {
+            ReportRun(data);
             state = TelnetReceiveState.Command;
             return;
         }
@@ -192,15 +235,22 @@ internal sealed class TelnetReceiver
             _ => TelnetReceiveState.Data,
         };
 
+        negotiationCommand = value;
         if (value == TelnetByte.InterpretAsCommand)
         {
             data.Add(value);
+        }
+        else if (state == TelnetReceiveState.Data)
+        {
+            trace.CommandReceived(value);
         }
     }
 
     private void ReceiveNegotiation(byte option, List<byte> replies)
     {
         serverNegotiated = true;
+        log.OptionReceived(negotiationCommand, option);
+        trace.OptionReceived(negotiationCommand, option);
         switch (state)
         {
             case TelnetReceiveState.Will:
@@ -262,6 +312,7 @@ internal sealed class TelnetReceiver
             return TelnetReceiveError.None;
         }
 
+        trace.SubnegotiationReceived(CollectionsMarshal.AsSpan(subnegotiation));
         switch (subnegotiation[0])
         {
             case TelnetByte.TerminalTypeOption:
@@ -284,7 +335,7 @@ internal sealed class TelnetReceiver
         }
     }
 
-    private static TelnetReceiveError AnswerWithValue(
+    private TelnetReceiveError AnswerWithValue(
         byte option,
         string? value,
         TelnetReceiveError tooLong,
@@ -300,8 +351,10 @@ internal sealed class TelnetReceiver
             return tooLong;
         }
 
+        int start = replies.Count;
         AppendSubnegotiationStart(option, replies);
         replies.AddRange(Encoding.ASCII.GetBytes(value));
+        ReportSubnegotiationSent(replies, start);
         AppendSubnegotiationEnd(replies);
         return TelnetReceiveError.None;
     }
@@ -318,8 +371,17 @@ internal sealed class TelnetReceiver
             }
         }
 
+        ReportSubnegotiationSent(replies, start);
         AppendSubnegotiationEnd(replies);
     }
+
+    /// <summary>
+    /// Reports the subnegotiation appended to <paramref name="replies" /> from
+    /// <paramref name="start" />, less its opening <c>IAC SB</c>; its <c>IAC SE</c> is not
+    /// appended yet.
+    /// </summary>
+    private void ReportSubnegotiationSent(List<byte> replies, int start) =>
+        trace.SubnegotiationSent(CollectionsMarshal.AsSpan(replies)[(start + 2)..]);
 
     private static void AppendEnvironmentVariable(string variable, List<byte> replies)
     {
@@ -339,6 +401,14 @@ internal sealed class TelnetReceiver
     private void AppendWindowSize(List<byte> replies)
     {
         TelnetWindowSize size = optionValues.WindowSize ?? new TelnetWindowSize(0, 0);
+        trace.SubnegotiationSent(
+        [
+            TelnetByte.WindowSizeOption,
+            (byte)(size.Columns >> 8),
+            (byte)size.Columns,
+            (byte)(size.Rows >> 8),
+            (byte)size.Rows,
+        ]);
         replies.Add(TelnetByte.InterpretAsCommand);
         replies.Add(TelnetByte.SubnegotiationBegin);
         replies.Add(TelnetByte.WindowSizeOption);

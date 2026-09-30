@@ -66,14 +66,15 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="CommandLineOptions.FailMode" /> as <see cref="HttpRequestOptions.Fail" />; and
     /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />; and
     /// <see cref="CommandLineOptions.MaxRedirects" /> as <see cref="HttpRequestOptions.MaxRedirects" />; and
-    /// <see cref="CommandLineOptions.AuthSchemes" /> and <see cref="CommandLineOptions.BearerToken" /> verbatim; and
+    /// <see cref="CommandLineOptions.AuthSchemes" />, <see cref="CommandLineOptions.BearerToken" /> and <see cref="CommandLineOptions.AwsSigV4" /> verbatim; and
     /// <see cref="CommandLineOptions.HttpVersion" /> as <see cref="HttpRequestOptions.Version" />, as
     /// <see cref="HttpVersionMapping.ToHttpVersionPreference" /> maps it; and <see cref="CommandLineOptions.Compressed" />,
     /// <see cref="CommandLineOptions.TransferEncoding" />, <see cref="CommandLineOptions.Raw" /> and
     /// <see cref="CommandLineOptions.IgnoreContentLength" /> verbatim; and
     /// <paramref name="proxy" /> as <see cref="HttpRequestOptions.ForwardProxy" /> with
     /// <see cref="CommandLineOptions.ProxyTunnel" /> as <see cref="HttpRequestOptions.ProxyTunnel" />; and
-    /// <paramref name="commandLineTextEncoding" /> as <see cref="HttpRequestOptions.CommandLineTextEncoding" />.
+    /// <paramref name="commandLineTextEncoding" /> as <see cref="HttpRequestOptions.CommandLineTextEncoding" />; and
+    /// <see cref="CommandLineOptions.Expect100Timeout" /> as <see cref="HttpRequestOptions.ContinueWait" /> (<see cref="ContinueWaitOf" />).
     /// </returns>
     internal static HttpRequestOptions FromCommandLine(
         CommandLineOptions options,
@@ -97,6 +98,7 @@ internal static class HttpRequestOptionsMapping
             MaxRedirects = options.MaxRedirects,
             AuthSchemes = options.AuthSchemes,
             BearerToken = options.BearerToken,
+            AwsSigV4 = options.AwsSigV4,
             Version = HttpVersionMapping.ToHttpVersionPreference(options.HttpVersion),
             Compressed = options.Compressed,
             TransferEncoding = options.TransferEncoding,
@@ -104,7 +106,19 @@ internal static class HttpRequestOptionsMapping
             IgnoreContentLength = options.IgnoreContentLength,
             ForwardProxy = proxy,
             ProxyTunnel = options.ProxyTunnel,
+            ContinueWait = ContinueWaitOf(options),
         };
+
+    /// <summary>
+    /// The wait for <c>100 Continue</c>: the <c>--expect100-timeout</c> value, or curl's one
+    /// second (<see cref="HttpRequestOptions.DefaultContinueWait" />) when none or 0 was given,
+    /// as curl 8.21.0 waits one second for <c>--expect100-timeout 0</c> and <c>0.0001</c>
+    /// (measured, BL-624 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>How long to wait before the body is sent anyway.</returns>
+    internal static TimeSpan ContinueWaitOf(CommandLineOptions options) =>
+        options.Expect100Timeout is { } given && given > TimeSpan.Zero ? given : HttpRequestOptions.DefaultContinueWait;
 
     /// <summary>
     /// The <c>-d</c> family body, or <see langword="null" /> when there is none or <c>-G</c> moved it into the query.

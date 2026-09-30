@@ -55,6 +55,10 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
 
     private readonly TftpTimeLimits limits = new(context, startTimestamp);
 
+    private readonly TftpTransferLog log = new(context.DiagnosticLog);
+
+    private readonly TftpTransferEvents events = new(context.Events);
+
     private int blockSize = TftpPackets.DefaultBlockSize;
     private ushort expectedBlock = 1;
     private long bytesTransferred;
@@ -75,10 +79,13 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     internal async ValueTask<TransferResult> RunAsync(string fileName)
     {
         schedule = limits.RequestSchedule();
+        events.TimeoutsSet(TftpTransferEvents.StartState, schedule);
+        int? requestedBlockSize = TftpPackets.RequestedBlockSize(context);
         await SendAsync(
-                TftpPackets.BuildReadRequest(fileName, TftpPackets.RequestedBlockSize(context), schedule.RetrySeconds),
+                TftpPackets.BuildReadRequest(fileName, requestedBlockSize, schedule.RetrySeconds),
                 channel.ServerEndPoint)
             .ConfigureAwait(false);
+        log.RequestSent("read", fileName, requestedBlockSize, schedule.RetrySeconds);
         retries = 1;
 
         while (true)
@@ -105,6 +112,11 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         if (limits.FailureIfMaxTimePassed(bytesTransferred, bytesTransferred) is { } timedOut)
         {
             return timedOut;
+        }
+
+        if (answered)
+        {
+            events.TimedOut(expectedBlock, retries + 1);
         }
 
         if (!await ResendAsync().ConfigureAwait(false))
@@ -134,11 +146,11 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
             return AnswerTooShortAsync();
         }
 
+        log.Received(buffer.AsSpan(0, received.Length));
         return TftpPackets.ReadField(buffer, 0) switch
         {
             TftpPackets.DataOpcode => AcceptDataAsync(received),
-            TftpPackets.ErrorOpcode => ValueTask.FromResult<TransferResult?>(
-                TftpErrorMapping.ToTransferResult(TftpPackets.ReadField(buffer, 2))),
+            TftpPackets.ErrorOpcode => ValueTask.FromResult<TransferResult?>(FailWithErrorPacket(received)),
             TftpPackets.OptionAcknowledgementOpcode => AcceptOptionAcknowledgementAsync(received),
             _ => ValueTask.FromResult<TransferResult?>(null),
         };
@@ -161,9 +173,21 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     /// </summary>
     /// <param name="received">The OACK datagram's length and source.</param>
     /// <returns><see langword="null" />, since an OACK never ends the transfer.</returns>
+    private TransferResult FailWithErrorPacket(DatagramReceived received)
+    {
+        log.ErrorPacket(buffer.AsSpan(0, received.Length));
+        events.ErrorPacket(buffer.AsSpan(0, received.Length));
+        return TftpErrorMapping.ToTransferResult(TftpPackets.ReadField(buffer, 2));
+    }
+
     private async ValueTask<TransferResult?> AcceptOptionAcknowledgementAsync(DatagramReceived received)
     {
         blockSize = TftpPackets.ReadAcknowledgedBlockSize(buffer.AsSpan(2, received.Length - 2));
+        log.OptionsAgreed(buffer.AsSpan(2, received.Length - 2), TftpPackets.RequestedBlockSize(context), blockSize);
+        events.OptionsAcknowledged(
+            buffer.AsSpan(2, received.Length - 2),
+            isDownload: true,
+            TftpPackets.RequestedBlockSize(context) ?? TftpPackets.DefaultBlockSize);
         await AcknowledgeNewAsync(0, received.RemoteEndPoint).ConfigureAwait(false);
         return null;
     }
@@ -187,6 +211,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
             await context.Output
                 .WriteAsync(buffer.AsMemory(TftpPackets.DataHeaderLength, payloadLength), context.CancellationToken)
                 .ConfigureAwait(false);
+            events.DataReceived(buffer.AsSpan(TftpPackets.DataHeaderLength, payloadLength));
             bytesTransferred += payloadLength;
             expectedBlock = unchecked((ushort)(block + 1));
             await AcknowledgeNewAsync(block, received.RemoteEndPoint).ConfigureAwait(false);
@@ -217,6 +242,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         {
             answered = true;
             schedule = limits.AnsweredSchedule();
+            events.Answered(isDownload: true, schedule);
         }
 
         retries = 0;
@@ -247,6 +273,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         }
 
         retries++;
+        log.Retransmitting(retries, schedule.RetryLimit);
         await channel.SendAsync(lastPacket, lastDestination, context.CancellationToken).ConfigureAwait(false);
         return true;
     }

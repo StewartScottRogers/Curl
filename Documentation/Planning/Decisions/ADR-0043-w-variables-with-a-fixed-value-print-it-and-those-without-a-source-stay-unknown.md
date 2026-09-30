@@ -76,3 +76,45 @@ variable per run, `curl -s -o out.bin -w "%{<name>}" <url>`, for
   measured; the wiring belongs with BL-235's.
 - **Parse `url.<part>` with `System.Uri`.** It splits file URLs, user info and default
   ports differently from curl's URL API; BL-292 exists to fix exactly that.
+
+## Amendment, 2026-09-29 (BL-664): what each variable prints now
+
+Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions").
+
+The Decision above was true on 2026-09-26. Since then `--retry` has been parsed and run
+(`Curl.Core.UnitLibrary/TransferRetrier.cs`), the FTP handler has been built, and every
+variable left unknown has gained a source. The original text stands as the record of that
+day; this is what `Curl.Output.UnitLibrary/TransferWriteOutVariables.cs` prints as of this
+amendment. Every variable this ADR names is now known, so none prints curl's
+unknown-variable warning.
+
+Still fixed, on every platform:
+
+- `ssl_verify_result` and `proxy_ssl_verify_result` print `0`, curl 8.21.0's Schannel
+  value, even for a failed verification. That matches the Windows build only; BL-661
+  reports the OpenSSL verify code off Windows.
+- `tls_earlydata` prints `0`. `--tls-earlydata` is now parsed
+  (`CommandLineOptions.TlsEarlyData`) and passed on as `TlsClientOptions.AllowEarlyData`,
+  but no TLS provider applies it yet (BL-710), so no early data is sent and `0` is still
+  true. BL-906, after BL-710, reports the bytes sent.
+- `time_queue` is still measured from `TransferTimings.Started` to itself, as decided.
+
+Now given a source:
+
+- `num_retries` prints `RetryCount`, which `Curl.Console` sets to the retries
+  `TransferRetrier` announced for the transfer; `0` when it ran once (BL-513).
+- `ftp_entry_path` prints `TransferReport.FtpEntryPath`, the directory the FTP server's
+  `257` reply to `PWD` names; nothing, and `null` in `%{json}`, for a transfer that is not
+  FTP or whose reply named none (BL-514).
+- `url.<part>` and `urle.<part>` are read with `CurlUrl` from the URL as given and from
+  the effective URL; a missing part or an unparsable URL prints nothing (BL-304).
+- `referer`, `filename_effective`, `conn_id` and `xfer_id` are set by `Curl.Console`
+  through the `Referer`, `OutputFileName`, `ConnectionId` and `TransferId` properties
+  (BL-305); `conn_id` is `-1` when no connection was used.
+- `proxy_used` prints `1` when `TransferReport.UsedProxy` is set, else `0` (BL-302,
+  ADR-0058).
+- `certs` and `num_certs` print and count `TransferReport.PeerCertificates`, the chain
+  the TLS provider captured; nothing and `0` without TLS (BL-303, ADR-0054).
+
+The warning in Consequences still holds for the three fixed values: BL-661 and BL-906
+must replace the constant in `TransferWriteOutVariables` when they land.

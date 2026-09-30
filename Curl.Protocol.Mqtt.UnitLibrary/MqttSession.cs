@@ -16,6 +16,13 @@ namespace Curl.Protocol.Mqtt;
 /// PUBLISH body's length as the expected size, as curl's <c>Curl_pgrsSetDownloadSize</c> sets it
 /// (so <c>-m</c> reports <c>with 5 out of 5 bytes received</c>, BL-511 Notes).
 /// </param>
+/// <param name="events">
+/// Where the session is reported as curl 8.21.0's <c>-v</c> and <c>--trace</c> show it
+/// (measured, BL-935): the client identifier, each packet sent as a header block, each
+/// header byte and CONNACK or SUBACK body received as a header block, each PUBLISH body
+/// slice as data, and each <c>mqtt_doing: state [N]</c> line curl's state machine writes.
+/// </param>
+/// <param name="log">Where each packet sent and received and each step is logged (ADR-0222, BL-928).</param>
 /// <param name="cancellationToken">Cancels every read and write.</param>
 /// <remarks>
 /// <para>
@@ -39,15 +46,27 @@ namespace Curl.Protocol.Mqtt;
 /// code and message; <see cref="BytesWritten" /> still says how much reached the output.
 /// </para>
 /// </remarks>
-internal sealed class MqttSession(IConnection connection, Stream output, ITransferProgress progress, CancellationToken cancellationToken)
+internal sealed class MqttSession(
+    IConnection connection,
+    Stream output,
+    ITransferProgress progress,
+    ITransferEvents events,
+    MqttDiagnosticLog log,
+    CancellationToken cancellationToken)
 {
+    /// <summary><c>MQTT_FIRST</c>: awaiting a packet's first byte.</summary>
+    private const int FirstState = 0;
+
+    /// <summary><c>MQTT_PUB_REMAIN</c>: reading the rest of a PUBLISH body.</summary>
+    private const int PublishRemainState = 6;
+
     /// <summary>
     /// The most bytes one write to the output carries: the size of the buffer curl 8.21.0's
     /// <c>mqtt_read_publish</c> reads a PUBLISH body into, one read per write.
     /// </summary>
     private const int OutputWriteSize = 4096;
 
-    private readonly MqttPacketReader reader = new(connection, cancellationToken);
+    private readonly MqttPacketReader reader = new(connection, events, log, cancellationToken);
 
     /// <summary>The body length of the PUBLISH being written, reported as the expected download size.</summary>
     private long publishLength;
@@ -79,10 +98,16 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
         NetworkCredential? credentials,
         ReadOnlyMemory<byte>? postData)
     {
+        events.ReportInfo(MqttTransferMessages.UsingClientId(clientIdentifier));
         await SendAsync(MqttPackets.BuildConnect(clientIdentifier, credentials)).ConfigureAwait(false);
+
+        // curl runs mqtt_doing once straight after the CONNECT, before any reply can have
+        // arrived, and finds nothing to read (measured every time on loopback, BL-935).
+        ReportDoingState(FirstState);
         SessionState state = SessionState.AwaitingConnack;
         while (state != SessionState.Done)
         {
+            ReportDoingState(FirstState);
             MqttFixedHeader header = await reader.ReadFixedHeaderAsync().ConfigureAwait(false);
             state = header.RemainingLength == 0
                 ? StateAfterEmptyPacket(header)
@@ -95,12 +120,21 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
     /// sets it: a DISCONNECT ends the transfer, a PINGRESP awaits a PUBLISH or SUBACK even
     /// before the CONNACK has come, and any other empty packet drops whatever was awaited.
     /// </summary>
-    private static SessionState StateAfterEmptyPacket(MqttFixedHeader header) => header.PacketType switch
+    private SessionState StateAfterEmptyPacket(MqttFixedHeader header)
     {
-        MqttPackets.DisconnectType => SessionState.Done,
-        MqttPackets.PingResponseType => SessionState.AwaitingPublishOrSuback,
-        _ => SessionState.LeavingBodyUnread,
-    };
+        switch (header.PacketType)
+        {
+            case MqttPackets.DisconnectType:
+                events.ReportInfo(MqttTransferMessages.GotDisconnect);
+                return SessionState.Done;
+            case MqttPackets.PingResponseType:
+                events.ReportInfo(MqttTransferMessages.ReceivedPingResponse);
+                return SessionState.AwaitingPublish;
+            default:
+                log.EmptyPacketIgnored(header);
+                return SessionState.LeavingBodyUnread;
+        }
+    }
 
     /// <summary>
     /// Handles a packet that has a body according to the state the session is in, and
@@ -110,13 +144,55 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
         SessionState state,
         MqttFixedHeader header,
         CurlUrl url,
-        ReadOnlyMemory<byte>? postData) => state switch
+        ReadOnlyMemory<byte>? postData)
+    {
+        ReportDoingStateUnlessFirst(state);
+        return state switch
         {
             SessionState.AwaitingConnack => await AcceptConnackAsync(header, url, postData).ConfigureAwait(false),
-            SessionState.AwaitingPublishOrSuback => await ReceivePublishOrSubackAsync(header).ConfigureAwait(false),
-            SessionState.LeavingBodyUnread => SessionState.StateNotHandled,
-            _ => SessionState.Done,
+            SessionState.AwaitingSuback or SessionState.AwaitingPublish => await ReceivePublishOrSubackAsync(header).ConfigureAwait(false),
+            SessionState.LeavingBodyUnread => LeaveBodyUnread(header),
+            _ => EndUnhandled(header),
         };
+    }
+
+    /// <summary>
+    /// Reports the <c>mqtt_doing</c> line of the run that handles a body in
+    /// <paramref name="state" />; curl's <c>MQTT_FIRST</c> handles none, so its line is the
+    /// one before the next fixed header.
+    /// </summary>
+    private void ReportDoingStateUnlessFirst(SessionState state)
+    {
+        int number = state switch
+        {
+            SessionState.AwaitingConnack => 2,
+            SessionState.AwaitingSuback => 3,
+            SessionState.AwaitingPublish => 5,
+            SessionState.LeavingBodyUnread => FirstState,
+            _ => 7,
+        };
+        if (number != FirstState)
+        {
+            ReportDoingState(number);
+        }
+    }
+
+    private void ReportDoingState(int state) => events.ReportInfo(MqttTransferMessages.DoingState(state));
+
+    /// <summary>Passes over a packet's body, as an empty packet before it made curl do.</summary>
+    private SessionState LeaveBodyUnread(MqttFixedHeader header)
+    {
+        log.BodyLeftUnread(header);
+        return SessionState.StateNotHandled;
+    }
+
+    /// <summary>Ends the transfer with exit 0, as curl's <c>State not handled yet</c> does.</summary>
+    private SessionState EndUnhandled(MqttFixedHeader header)
+    {
+        log.StateNotHandled(header);
+        events.ReportInfo(MqttTransferMessages.StateNotHandled);
+        return SessionState.Done;
+    }
 
     /// <summary>
     /// Checks the CONNACK, then either publishes and disconnects, ending the transfer, or
@@ -131,13 +207,17 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
         byte[] topic = MqttTopic.Decode(url);
         if (postData is { } payload)
         {
-            await SendAsync(MqttPackets.BuildPublish(topic, payload)).ConfigureAwait(false);
+            byte[] publish = MqttPackets.BuildPublish(topic, payload);
+            log.Publishing(topic, payload.Length);
+            await SendAsync(publish).ConfigureAwait(false);
             await SendAsync(MqttPackets.BuildDisconnect()).ConfigureAwait(false);
+            log.PublishDone();
             return SessionState.Done;
         }
 
+        log.Subscribing(topic);
         await SendAsync(MqttPackets.BuildSubscribe(topic)).ConfigureAwait(false);
-        return SessionState.AwaitingPublishOrSuback;
+        return SessionState.AwaitingSuback;
     }
 
     private async ValueTask<SessionState> ReceivePublishOrSubackAsync(MqttFixedHeader header)
@@ -154,7 +234,7 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
                 throw new MqttTransferException(CurlExitCode.WeirdServerReply, MqttTransferMessages.WeirdServerReply);
         }
 
-        return SessionState.AwaitingPublishOrSuback;
+        return SessionState.AwaitingPublish;
     }
 
     /// <summary>
@@ -170,13 +250,24 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
                 MqttTransferMessages.ConnackLengthUnexpected(header.RemainingLength));
         }
 
+        WarnIfNotConnack(header);
         byte[] body = await reader.ReadBodyAsync(2, CurlExitCode.RecvError, MqttTransferMessages.ReceiveFailed)
             .ConfigureAwait(false);
+        events.ReportResponseHeader(body);
+        log.ConnackReceived(body[1]);
         if (body[0] != 0 || body[1] != 0)
         {
             throw new MqttTransferException(
                 CurlExitCode.WeirdServerReply,
                 MqttTransferMessages.ConnackRefused(body[0], body[1]));
+        }
+    }
+
+    private void WarnIfNotConnack(MqttFixedHeader header)
+    {
+        if (header.PacketType != MqttPackets.ConnackType)
+        {
+            log.TakenAsConnack(header);
         }
     }
 
@@ -191,10 +282,13 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
 
         byte[] body = await reader.ReadBodyAsync(3, CurlExitCode.RecvError, MqttTransferMessages.ReceiveFailed)
             .ConfigureAwait(false);
+        events.ReportResponseHeader(body);
         if (!AcknowledgesSubscribe(body))
         {
             throw new MqttTransferException(CurlExitCode.WeirdServerReply, MqttTransferMessages.WeirdServerReply);
         }
+
+        log.SubscribeDone();
     }
 
     /// <summary>
@@ -210,6 +304,7 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
     private async ValueTask WritePublishAsync(MqttFixedHeader header)
     {
         publishLength = header.RemainingLength;
+        events.ReportInfo(MqttTransferMessages.RemainingLength(header.RemainingLength));
         using MemoryStream body = new();
         while (body.Length < header.RemainingLength)
         {
@@ -219,6 +314,7 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
             if (chunk.IsEmpty)
             {
                 await WriteOutputAsync(body.ToArray()).ConfigureAwait(false);
+                ReportServerDisconnected(body.Length);
                 throw new MqttTransferException(CurlExitCode.PartialFile, MqttTransferMessages.PartialFile);
             }
 
@@ -236,6 +332,11 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
     {
         for (int offset = 0; offset < bytes.Length; offset += OutputWriteSize)
         {
+            if (offset > 0)
+            {
+                ReportDoingState(PublishRemainState);
+            }
+
             await WriteOutputSliceAsync(bytes.AsMemory(offset, Math.Min(OutputWriteSize, bytes.Length - offset)))
                 .ConfigureAwait(false);
         }
@@ -248,6 +349,7 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
     /// </summary>
     private async ValueTask WriteOutputSliceAsync(ReadOnlyMemory<byte> slice)
     {
+        events.ReportDataReceived(slice.Span);
         try
         {
             await output.WriteAsync(slice, cancellationToken).ConfigureAwait(false);
@@ -269,8 +371,24 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
         progress.ReportDownloaded(BytesWritten, publishLength);
     }
 
+    /// <summary>
+    /// Reports the peer closing inside a PUBLISH body as curl does: after the run that read
+    /// part of it, one more run (<c>MQTT_PUB_REMAIN</c>) finds the close.
+    /// </summary>
+    private void ReportServerDisconnected(long bytesRead)
+    {
+        if (bytesRead > 0)
+        {
+            ReportDoingState(PublishRemainState);
+        }
+
+        events.ReportInfo(MqttTransferMessages.ServerDisconnected);
+    }
+
     private async ValueTask SendAsync(byte[] packet)
     {
+        log.PacketSent(packet);
+        events.ReportRequestHeader(packet);
         try
         {
             await connection.WriteAsync(packet, cancellationToken).ConfigureAwait(false);
@@ -291,8 +409,17 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
         /// <summary>The CONNECT is sent; the next packet with a body is taken as the CONNACK.</summary>
         AwaitingConnack,
 
-        /// <summary>The next packet with a body must be a PUBLISH or a SUBACK.</summary>
-        AwaitingPublishOrSuback,
+        /// <summary>
+        /// The SUBSCRIBE is sent (curl's <c>MQTT_SUBACK</c>): the next packet with a body
+        /// must be a PUBLISH or a SUBACK.
+        /// </summary>
+        AwaitingSuback,
+
+        /// <summary>
+        /// Subscribed (curl's <c>MQTT_PUBWAIT</c>): the next packet with a body must be a
+        /// PUBLISH or a SUBACK, as in <see cref="AwaitingSuback" />.
+        /// </summary>
+        AwaitingPublish,
 
         /// <summary>
         /// An empty packet dropped what was awaited (curl's <c>MQTT_FIRST</c> as next

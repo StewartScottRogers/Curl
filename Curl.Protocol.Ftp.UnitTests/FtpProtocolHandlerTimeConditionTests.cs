@@ -52,7 +52,7 @@ public sealed class FtpProtocolHandlerTimeConditionTests
         Assert.AreEqual(MdtmSent + RetrieveSent, run.Sent);
         Assert.AreEqual(Hello, run.OutputText);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
-        Assert.IsEmpty(events.Info);
+        Assert.IsEmpty(BeforeDataConnection(events));
     }
 
     [TestMethod]
@@ -69,7 +69,7 @@ public sealed class FtpProtocolHandlerTimeConditionTests
         Assert.IsTrue(run.Result.TimeConditionUnmet);
         Assert.AreEqual(213, run.Report!.ResponseCode);
         Assert.HasCount(1, run.Connector.Targets);
-        CollectionAssert.AreEqual(new[] { "The requested document is not new enough" }, events.Info);
+        CollectionAssert.AreEqual(new[] { "The requested document is not new enough" }, events.InfoPastTheEntryPath);
     }
 
     [TestMethod]
@@ -93,7 +93,7 @@ public sealed class FtpProtocolHandlerTimeConditionTests
 
         Assert.AreEqual(MdtmSent + "QUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.TimeConditionNotMet(), run.Result);
-        CollectionAssert.AreEqual(new[] { "The requested document is not old enough" }, events.Info);
+        CollectionAssert.AreEqual(new[] { "The requested document is not old enough" }, events.InfoPastTheEntryPath);
     }
 
     [TestMethod]
@@ -125,7 +125,7 @@ public sealed class FtpProtocolHandlerTimeConditionTests
 
         Assert.AreEqual(MdtmSent + RetrieveSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
-        Assert.IsEmpty(events.Info);
+        Assert.IsEmpty(BeforeDataConnection(events));
     }
 
     [TestMethod]
@@ -147,7 +147,7 @@ public sealed class FtpProtocolHandlerTimeConditionTests
 
         Assert.AreEqual(MdtmSent + RetrieveSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
-        CollectionAssert.AreEqual(new[] { "MDTM failed: file does not exist or permission problem, continuing" }, events.Info);
+        CollectionAssert.AreEqual(new[] { "MDTM failed: file does not exist or permission problem, continuing" }, BeforeDataConnection(events));
     }
 
     [TestMethod]
@@ -178,7 +178,7 @@ public sealed class FtpProtocolHandlerTimeConditionTests
         Assert.AreEqual(Hello, run.OutputText);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
         string[] expected = replyLine is null ? ["Skipping time comparison"] : [replyLine, "Skipping time comparison"];
-        CollectionAssert.AreEqual(expected, events.Info);
+        CollectionAssert.AreEqual(expected, BeforeDataConnection(events));
     }
 
     [TestMethod]
@@ -189,7 +189,7 @@ public sealed class FtpProtocolHandlerTimeConditionTests
         FtpRun run = await RunAsync(InDirectory + Modified + Retrieved, c => With(c, IfModifiedSince(DateTimeOffset.UnixEpoch), events: events));
 
         Assert.AreEqual(TransferResult.Success(5), run.Result);
-        CollectionAssert.AreEqual(new[] { "Skipping time comparison" }, events.Info);
+        CollectionAssert.AreEqual(new[] { "Skipping time comparison" }, BeforeDataConnection(events));
     }
 
     [TestMethod]
@@ -286,6 +286,14 @@ public sealed class FtpProtocolHandlerTimeConditionTests
         Assert.AreEqual(MdtmSent + "NOOP\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.QuoteError, "QUOT string not accepted: NOOP"), run.Result);
     }
+
+    /// <summary>
+    /// The <c>-v</c> lines reported before the data connection's own, which
+    /// <see cref="FtpProtocolHandlerDataConnectionEventTests" /> pins (BL-931): the ones
+    /// <c>MDTM</c> and <c>-z</c> write.
+    /// </summary>
+    private static string[] BeforeDataConnection(RecordingTransferEvents events) =>
+        [.. events.InfoPastTheEntryPath.TakeWhile(line => line != "Connect data stream passively")];
 
     private static TimeCondition IfModifiedSince(DateTimeOffset value) => new(value, TimeConditionKind.IfModifiedSince);
 

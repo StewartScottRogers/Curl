@@ -37,6 +37,31 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WithAUnixSocket_ReturnsTheWholePathForTheLeftIntactLine()
+    {
+        // * Connection #0 to host <path, lower-cased>:0 left intact names the whole path, not
+        // the 45 characters of Trying (measured, BL-794 Notes); the HTTP handler lower-cases it.
+        const string path = @"C:\Users\Stewart Rogers\AppData\Local\Temp\bl507.sock";
+        var dialer = new FakeTcpDialer { UnixSocketDialOutcome = _ => new FakeConnection() };
+        var connector = CreateUnixSocketConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new UnixSocketAddress(path, IsAbstract: false));
+
+        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 8080, UseTls: false), CancellationToken.None);
+
+        Assert.AreEqual(path, result.UnixSocketPath);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithAnAbstractUnixSocket_ReturnsTheNameAsGiven()
+    {
+        var dialer = new FakeTcpDialer { UnixSocketDialOutcome = _ => new FakeConnection() };
+        var connector = CreateUnixSocketConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new UnixSocketAddress("app", IsAbstract: true));
+
+        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 80, UseTls: false), CancellationToken.None);
+
+        Assert.AreEqual("app", result.UnixSocketPath);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WithAUnixSocket_ReportsTryingAndTheConnectionOpenedAsCurlDoes()
     {
         // *   Trying C:\Users\Public\s.sock:0...
@@ -218,6 +243,7 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual("example.com", tls.ReceivedTargetHost);
         Assert.IsNotNull(result.Timings!.TlsHandshakeCompleted);
         Assert.AreEqual("/run/app.sock", events.Opened.Single().HostName);
+        Assert.AreEqual("/run/app.sock", result.UnixSocketPath);
     }
 
     [TestMethod]

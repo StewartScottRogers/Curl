@@ -15,6 +15,9 @@ means
 - **Empty or `all`:** `$TB next`. If it prints `No task is ready.`, run `$TB status`,
   report why nothing is ready (waiting on dependencies, waiting on Stewart, or
   blocked, and on what), and stop.
+- **An interactive-only task** (`lane: no`, marked `[ready, interactive only]` by
+  `$TB status`) is never picked by `next`, so it must be named by ID:
+  `/task-run BL-###`. No dark factory lane is offered one.
 
 ## 2. Claim
 If the task is already in `Doing` because a dark factory lane claimed it for this run,

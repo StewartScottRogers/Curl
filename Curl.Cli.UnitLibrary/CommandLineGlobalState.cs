@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -29,6 +31,10 @@ internal sealed class CommandLineGlobalState
 
     public bool ManualRequested { get; set; }
 
+    public bool AiHelpRequested { get; set; }
+
+    public string? AiHelpSubject { get; set; }
+
     public bool EngineListRequested { get; set; }
 
     public bool CaEmbedDumpRequested { get; set; }
@@ -55,6 +61,11 @@ internal sealed class CommandLineGlobalState
 
     public string? StandardErrorFile { get; set; }
 
+    /// <summary>The level the last <c>--log-level</c> named; <see langword="null"/> when none was given.</summary>
+    public DiagnosticLogLevel? DiagnosticLogLevelGiven { get; set; }
+
+    public string? DiagnosticLogFile { get; set; }
+
     public bool StyledOutput { get; set; } = true;
 
     public bool FailEarly { get; set; }
@@ -66,6 +77,8 @@ internal sealed class CommandLineGlobalState
     public int ParallelMax { get; set; } = CommandLineOptions.DefaultParallelMax;
 
     public int ParallelMaxHost { get; set; }
+
+    public long? MillisecondsBetweenTransferStarts { get; set; }
 
     public string? DefaultConfigFile { get; set; }
 

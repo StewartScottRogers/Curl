@@ -46,8 +46,8 @@ The OpenSSL build could not be measured the same day (the Docker engine was down
 - **Group exchange asks for (2048, 4096, 4096) and accepts a prime of 2048 to 4096
   bits**, on every preset, as the Windows build asks. A prime outside the range it asked
   for is refused rather than used: RFC 4419 lets the client refuse it, and a server that
-  honours the request never sends one. BL-888 measures the OpenSSL build's request and
-  splits the sizes by preset if they differ.
+  honours the request never sends one. **Amended by ADR-0268:** the OpenSSL build asks for
+  (2048, 4096, 8192), so the sizes now belong to the preset.
 - **A NIST point is checked by hand** (`SshNistCurve.DecodePublicPoint`: uncompressed,
   coordinates below p, y^2 = x^3 - 3x + b) before the BCL sees it, so every platform
   refuses the same points instead of leaving it to each platform's key import.

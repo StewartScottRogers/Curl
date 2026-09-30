@@ -5,23 +5,30 @@ internal static class HandshakeDriver
 {
     public static readonly Tls13ClientSettings DefaultSettings = new() { ServerName = "localhost" };
 
-    /// <summary>Runs a whole handshake and returns the client's last output; the server checks the client's final flight when there is one.</summary>
+    /// <summary>
+    /// Runs a whole handshake and returns the client's last output; the server checks the
+    /// client's final flight when there is one. <paramref name="forwardClientHello" /> turns
+    /// each ClientHello into what the server is given (an ECH front end's inner hello).
+    /// </summary>
     public static Tls13HandshakeOutput Run(
         Tls13ClientHandshake client,
         Tls13TestServer server,
         Func<byte[], byte[]>? replaceServerHello = null,
-        Func<List<byte[]>, List<byte[]>>? replaceFlight = null)
+        Func<List<byte[]>, List<byte[]>>? replaceFlight = null,
+        Func<byte[], byte[]>? forwardClientHello = null,
+        Func<byte[], byte[]>? replaceRetryRequest = null)
     {
-        TestServerFlight flight = server.Answer(client.Start().BytesToSend[0].Bytes);
+        Func<byte[], byte[]> forward = forwardClientHello ?? (hello => hello);
+        TestServerFlight flight = server.Answer(forward(client.Start().BytesToSend[0].Bytes));
         if (flight.IsHelloRetryRequest)
         {
-            Tls13HandshakeOutput retry = client.Receive(TlsEncryptionLevel.Initial, flight.ServerHello);
+            Tls13HandshakeOutput retry = client.Receive(TlsEncryptionLevel.Initial, (replaceRetryRequest ?? (request => request))(flight.ServerHello));
             if (retry.Failure is not null)
             {
                 return retry;
             }
 
-            flight = server.Answer(retry.BytesToSend[0].Bytes);
+            flight = server.Answer(forward(retry.BytesToSend[0].Bytes));
         }
 
         Tls13HandshakeOutput keys = client.Receive(TlsEncryptionLevel.Initial, (replaceServerHello ?? (hello => hello))(flight.ServerHello));

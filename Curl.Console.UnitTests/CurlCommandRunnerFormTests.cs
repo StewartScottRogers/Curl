@@ -76,6 +76,23 @@ public sealed class CurlCommandRunnerFormTests
         Assert.AreEqual("hello", Encoding.Latin1.GetString(standardOutput.ToArray()));
     }
 
+    /// <summary>
+    /// Measured on 2026-09-29 with curl 8.21.0 (mingw, Schannel) as <c>curl -F 'a"b=1' [--form-escape]</c>
+    /// (BL-625 Notes): the name's quote goes as <c>%22</c>, or as <c>\"</c> under <c>--form-escape</c>.
+    /// </summary>
+    [TestMethod]
+    [DataRow(false, "name=\"a%22b\"")]
+    [DataRow(true, "name=\"a\\\"b\"")]
+    public async Task RunAsync_FormEscape_EscapesThePartNameAsCurlDoes(bool formEscape, string sentName)
+    {
+        string[] arguments = formEscape ? ["-sS", "--form-escape", "-F", "a\"b=1", Url] : ["-sS", "-F", "a\"b=1", Url];
+
+        int exitCode = await RunAsync(arguments);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.Contains($"Content-Disposition: form-data; {sentName}\r\n", Encoding.Latin1.GetString(server.Written));
+    }
+
     [TestMethod]
     public async Task RunAsync_FormWithOutputFile_SendsTheMultipartRequestAndWritesTheFile()
     {

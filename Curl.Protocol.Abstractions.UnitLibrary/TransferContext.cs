@@ -78,7 +78,22 @@ public sealed class TransferContext : ITransferContext
     public bool FtpCreateDirectories { get; init; }
 
     /// <inheritdoc />
+    public string? FtpAccount { get; init; }
+
+    /// <inheritdoc />
+    public string? FtpAlternativeToUser { get; init; }
+
+    /// <inheritdoc />
+    public bool FtpSendPret { get; init; }
+
+    /// <inheritdoc />
     public bool ListOnly { get; init; }
+
+    /// <inheritdoc />
+    public bool UseAscii { get; init; }
+
+    /// <inheritdoc />
+    public bool Append { get; init; }
 
     /// <inheritdoc />
     public string? FtpPort { get; init; }
@@ -130,6 +145,9 @@ public sealed class TransferContext : ITransferContext
 
     /// <inheritdoc />
     public ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
+
+    /// <inheritdoc />
+    public IDiagnosticLog DiagnosticLog { get; init; } = NoDiagnosticLog.Instance;
 
     /// <inheritdoc />
     public ITransferProgress Progress { get; init; } = NoTransferProgress.Instance;

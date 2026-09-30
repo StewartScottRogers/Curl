@@ -10,7 +10,7 @@ public sealed class Tls12CipherSuiteTests
     [TestMethod]
     public void TheTableHoldsEveryFamilyAndNothingElse()
     {
-        Assert.HasCount(86, Tls12CipherSuite.All);
+        Assert.HasCount(113, Tls12CipherSuite.All);
         Assert.IsNull(Tls12CipherSuite.Find(0x1301));
         Assert.IsNull(Tls12CipherSuite.Find(Tls12CipherSuite.EmptyRenegotiationInfoScsv));
         Assert.AreEqual(new Tls12CipherSuite(0xc030, Tls12KeyExchange.Ecdhe, Tls12Authentication.Rsa, Tls12BulkCipher.Aes256Gcm, Tls12MacAlgorithm.None, true), Tls12CipherSuite.Find(0xc030));
@@ -37,6 +37,44 @@ public sealed class Tls12CipherSuiteTests
 
         Assert.AreEqual(expected, Tls12CipherSuite.Find((ushort)code));
         Assert.AreEqual(macAlgorithm is not Tls12MacAlgorithm.HmacSha1, expected.RequiresTls12);
+    }
+
+    [TestMethod]
+    [DataRow((ushort)0xc09c, Tls12KeyExchange.Rsa, Tls12Authentication.Rsa, Tls12BulkCipher.Aes128Ccm, DisplayName = "TLS_RSA_WITH_AES_128_CCM")]
+    [DataRow((ushort)0xc09d, Tls12KeyExchange.Rsa, Tls12Authentication.Rsa, Tls12BulkCipher.Aes256Ccm, DisplayName = "TLS_RSA_WITH_AES_256_CCM")]
+    [DataRow((ushort)0xc09e, Tls12KeyExchange.Dhe, Tls12Authentication.Rsa, Tls12BulkCipher.Aes128Ccm, DisplayName = "TLS_DHE_RSA_WITH_AES_128_CCM")]
+    [DataRow((ushort)0xc09f, Tls12KeyExchange.Dhe, Tls12Authentication.Rsa, Tls12BulkCipher.Aes256Ccm, DisplayName = "TLS_DHE_RSA_WITH_AES_256_CCM")]
+    [DataRow((ushort)0xc0a0, Tls12KeyExchange.Rsa, Tls12Authentication.Rsa, Tls12BulkCipher.Aes128Ccm8, DisplayName = "TLS_RSA_WITH_AES_128_CCM_8")]
+    [DataRow((ushort)0xc0a1, Tls12KeyExchange.Rsa, Tls12Authentication.Rsa, Tls12BulkCipher.Aes256Ccm8, DisplayName = "TLS_RSA_WITH_AES_256_CCM_8")]
+    [DataRow((ushort)0xc0a2, Tls12KeyExchange.Dhe, Tls12Authentication.Rsa, Tls12BulkCipher.Aes128Ccm8, DisplayName = "TLS_DHE_RSA_WITH_AES_128_CCM_8")]
+    [DataRow((ushort)0xc0a3, Tls12KeyExchange.Dhe, Tls12Authentication.Rsa, Tls12BulkCipher.Aes256Ccm8, DisplayName = "TLS_DHE_RSA_WITH_AES_256_CCM_8")]
+    [DataRow((ushort)0xc0ac, Tls12KeyExchange.Ecdhe, Tls12Authentication.Ecdsa, Tls12BulkCipher.Aes128Ccm, DisplayName = "TLS_ECDHE_ECDSA_WITH_AES_128_CCM")]
+    [DataRow((ushort)0xc0ad, Tls12KeyExchange.Ecdhe, Tls12Authentication.Ecdsa, Tls12BulkCipher.Aes256Ccm, DisplayName = "TLS_ECDHE_ECDSA_WITH_AES_256_CCM")]
+    [DataRow((ushort)0xc0ae, Tls12KeyExchange.Ecdhe, Tls12Authentication.Ecdsa, Tls12BulkCipher.Aes128Ccm8, DisplayName = "TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8")]
+    [DataRow((ushort)0xc0af, Tls12KeyExchange.Ecdhe, Tls12Authentication.Ecdsa, Tls12BulkCipher.Aes256Ccm8, DisplayName = "TLS_ECDHE_ECDSA_WITH_AES_256_CCM_8")]
+    public void EachCcmSuiteIsPinnedAndNeedsTlsOneTwoWithASha256Prf(int code, Tls12KeyExchange keyExchange, Tls12Authentication authentication, Tls12BulkCipher bulkCipher)
+    {
+        Tls12CipherSuite suite = Tls12CipherSuite.Find((ushort)code)!;
+
+        Assert.AreEqual(new Tls12CipherSuite((ushort)code, keyExchange, authentication, bulkCipher, Tls12MacAlgorithm.None, false), suite);
+        Assert.IsTrue(suite.RequiresTls12);
+        Assert.AreSame(TlsPrf.Sha256, suite.PrfFor(TlsProtocolVersion.Tls12));
+    }
+
+    [TestMethod]
+    [DataRow((ushort)0x0004, Tls12KeyExchange.Rsa, Tls12Authentication.Rsa, Tls12MacAlgorithm.HmacMd5, DisplayName = "TLS_RSA_WITH_RC4_128_MD5")]
+    [DataRow((ushort)0x0005, Tls12KeyExchange.Rsa, Tls12Authentication.Rsa, Tls12MacAlgorithm.HmacSha1, DisplayName = "TLS_RSA_WITH_RC4_128_SHA")]
+    [DataRow((ushort)0xc011, Tls12KeyExchange.Ecdhe, Tls12Authentication.Rsa, Tls12MacAlgorithm.HmacSha1, DisplayName = "TLS_ECDHE_RSA_WITH_RC4_128_SHA")]
+    [DataRow((ushort)0xc007, Tls12KeyExchange.Ecdhe, Tls12Authentication.Ecdsa, Tls12MacAlgorithm.HmacSha1, DisplayName = "TLS_ECDHE_ECDSA_WITH_RC4_128_SHA")]
+    [DataRow((ushort)0x0018, Tls12KeyExchange.Dhe, Tls12Authentication.Anonymous, Tls12MacAlgorithm.HmacMd5, DisplayName = "TLS_DH_anon_WITH_RC4_128_MD5")]
+    [DataRow((ushort)0xc016, Tls12KeyExchange.Ecdhe, Tls12Authentication.Anonymous, Tls12MacAlgorithm.HmacSha1, DisplayName = "TLS_ECDH_anon_WITH_RC4_128_SHA")]
+    public void EachRc4SuiteIsPinnedAndRunsFromTlsOneZero(int code, Tls12KeyExchange keyExchange, Tls12Authentication authentication, Tls12MacAlgorithm macAlgorithm)
+    {
+        Tls12CipherSuite suite = Tls12CipherSuite.Find((ushort)code)!;
+
+        Assert.AreEqual(new Tls12CipherSuite((ushort)code, keyExchange, authentication, Tls12BulkCipher.Rc4128, macAlgorithm, false), suite);
+        Assert.IsFalse(suite.RequiresTls12);
+        Assert.AreSame(TlsPrf.Md5Sha1, suite.PrfFor(TlsProtocolVersion.Tls10));
     }
 
     [TestMethod]

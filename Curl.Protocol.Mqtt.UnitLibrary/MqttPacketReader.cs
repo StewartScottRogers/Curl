@@ -8,8 +8,13 @@ namespace Curl.Protocol.Mqtt;
 /// several.
 /// </summary>
 /// <param name="connection">The connection to read from.</param>
+/// <param name="events">
+/// Where each fixed header byte is reported as a one-byte header block received, as curl
+/// 8.21.0's <c>--trace</c> shows it reading them one at a time (measured, BL-935).
+/// </param>
+/// <param name="log">Where each fixed header read is logged (ADR-0222, BL-928).</param>
 /// <param name="cancellationToken">Cancels every read.</param>
-internal sealed class MqttPacketReader(IConnection connection, CancellationToken cancellationToken)
+internal sealed class MqttPacketReader(IConnection connection, ITransferEvents events, MqttDiagnosticLog log, CancellationToken cancellationToken)
 {
     private const int MaximumLengthBytes = 4;
 
@@ -38,6 +43,7 @@ internal sealed class MqttPacketReader(IConnection connection, CancellationToken
         }
 
         MqttFixedHeader header = new((byte)firstByte, await ReadRemainingLengthAsync().ConfigureAwait(false));
+        log.PacketReceived(header);
         RejectMalformedControlPacket(header);
 
         return header;
@@ -123,6 +129,10 @@ internal sealed class MqttPacketReader(IConnection connection, CancellationToken
         throw new MqttTransferException(CurlExitCode.WeirdServerReply, MqttTransferMessages.WeirdServerReply);
     }
 
+    /// <summary>
+    /// Reads one fixed header byte, reporting it as a header block received, or returns -1
+    /// once the peer has closed.
+    /// </summary>
     private async ValueTask<int> ReadByteAsync()
     {
         if (start == end && !await FillAsync().ConfigureAwait(false))
@@ -130,6 +140,7 @@ internal sealed class MqttPacketReader(IConnection connection, CancellationToken
             return -1;
         }
 
+        events.ReportResponseHeader(buffer.AsSpan(start, 1));
         return buffer[start++];
     }
 

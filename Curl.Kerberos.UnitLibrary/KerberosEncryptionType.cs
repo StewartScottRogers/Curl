@@ -6,6 +6,9 @@ namespace Curl.Kerberos;
 /// </summary>
 public enum KerberosEncryptionType
 {
+    /// <summary><c>des3-cbc-sha1</c>, RFC 3961's <c>des3-cbc-hmac-sha1-kd</c> (section 6.3).</summary>
+    Des3CbcSha1 = 16,
+
     /// <summary><c>aes128-cts-hmac-sha1-96</c> (RFC 3962).</summary>
     Aes128CtsHmacSha196 = 17,
 

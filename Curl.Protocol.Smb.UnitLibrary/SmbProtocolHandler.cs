@@ -22,7 +22,9 @@ namespace Curl.Protocol.Smb;
 /// <see cref="SmbFileTransfer" />'s. The port
 /// defaults to 445 for both schemes. A server that closes the connection mid-exchange is
 /// waited on until <see cref="ITransferContext.CancellationToken" /> ends the transfer, as
-/// curl waits for <c>-m</c>.
+/// curl waits for <c>-m</c>. Each step is written to
+/// <see cref="ITransferContext.DiagnosticLog" /> under the <c>smb</c> component
+/// (<see cref="SmbTransferLog" />).
 /// </remarks>
 public sealed class SmbProtocolHandler : IProtocolHandler
 {
@@ -73,6 +75,14 @@ public sealed class SmbProtocolHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        long started = context.TimeProvider.GetTimestamp();
+        TransferResult result = await ConnectAndTransferAsync(context).ConfigureAwait(false);
+        new SmbTransferLog(context.DiagnosticLog).Ended(result, context.TimeProvider.GetElapsedTime(started));
+        return result;
+    }
+
+    private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context)
+    {
         CurlUrl url = context.Url;
         if (SmbUrlPath.TryParse(url.AbsolutePath, out SmbUrlPath? path) is { } pathError)
         {
@@ -83,6 +93,7 @@ public sealed class SmbProtocolHandler : IProtocolHandler
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
@@ -103,8 +114,9 @@ public sealed class SmbProtocolHandler : IProtocolHandler
             return TransferResult.Failure(CurlExitCode.LoginDenied, SmbMessages.LoginDenied);
         }
 
-        var reader = new SmbMessageReader(connection, context.TimeProvider);
-        var establisher = new SmbSessionEstablisher(connection, reader, operatingSystem);
+        var transferLog = new SmbTransferLog(context.DiagnosticLog);
+        var reader = new SmbMessageReader(connection, context.TimeProvider, transferLog);
+        var establisher = new SmbSessionEstablisher(connection, reader, operatingSystem, transferLog);
         (ushort userId, TransferResult? failure) = await establisher.EstablishAsync(
             credentials.Password,
             SmbIdentity.Split(credentials.UserName, context.Url.IdnHost),

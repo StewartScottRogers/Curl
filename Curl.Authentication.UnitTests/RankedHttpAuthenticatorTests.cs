@@ -34,6 +34,36 @@ public sealed class RankedHttpAuthenticatorTests
     }
 
     [TestMethod]
+    public void RepeatAuthorization_DigestAnswer_CountsItsNonceOn()
+    {
+        string sent = Authenticator.CreateAuthorization(Request(HttpAuthSchemes.Digest), [Digest + ", qop=\"auth\""])!;
+
+        string value = Authenticator.RepeatAuthorization(Request(HttpAuthSchemes.Digest), sent);
+
+        StringAssert.Contains(sent, "cnonce=\"c\", nc=00000001", StringComparison.Ordinal);
+        StringAssert.Contains(value, "cnonce=\"c\", nc=00000002", StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public async Task EndAuthorization_NegotiateContextKeptForTheNextLeg_DisposesOfItWithoutSteppingIt()
+    {
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]));
+        RankedHttpAuthenticator authenticator = WithContexts(new ScriptedSecurityContextFactory(context));
+        string? sent = await authenticator.CreateAuthorizationAsync(Request(HttpAuthSchemes.Negotiate), [], CancellationToken.None);
+
+        authenticator.EndAuthorization(sent!);
+
+        Assert.IsTrue(context.IsDisposed);
+        Assert.HasCount(1, context.IncomingTokens);
+    }
+
+    [TestMethod]
+    public void RepeatAuthorization_BasicAnswer_SendsItAsSent()
+    {
+        Assert.AreEqual("Basic dTpw", Authenticator.RepeatAuthorization(Request(HttpAuthSchemes.Basic), "Basic dTpw"));
+    }
+
+    [TestMethod]
     [DataRow(HttpAuthSchemes.Any, DisplayName = "--anyauth, Basic only")]
     [DataRow(HttpAuthSchemes.Basic | HttpAuthSchemes.Digest, DisplayName = "--basic --digest, Basic only")]
     public void CreateAuthorization_OnlyBasicOfferedAndAllowed_AnswersBasic(HttpAuthSchemes allowed)
@@ -114,12 +144,83 @@ public sealed class RankedHttpAuthenticatorTests
     }
 
     [TestMethod]
-    public async Task CreateAuthorizationAsync_NegotiatePickedWithoutCredential_SendsNothing()
+    [DataRow(HttpAuthSchemes.Any, DisplayName = "--anyauth")]
+    [DataRow(HttpAuthSchemes.Negotiate | HttpAuthSchemes.Basic, DisplayName = "--negotiate --basic")]
+    public async Task CreateAuthorizationAsync_NegotiatePickedAfterTheChallengeWithNoTicket_AsksForTheRequestAgainWithoutAHeader(HttpAuthSchemes allowed)
+    {
+        ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.NoCredentials, [])));
+        RecordingInfoEvents events = new();
+
+        string? value = await WithContexts(contexts).CreateAuthorizationAsync(Request(allowed) with { Events = events }, ["Negotiate"], CancellationToken.None);
+
+        Assert.AreEqual(string.Empty, value);
+        Assert.HasCount(1, events.Info);
+    }
+
+    [TestMethod]
+    public async Task ContinueAuthorizationAsync_401ToTheRequestSentAgainWithoutAHeader_StepsAContextAndTakesTheResponse()
+    {
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
+        ScriptedSecurityContextFactory contexts = new(context);
+        RecordingInfoEvents events = new();
+
+        string? value = await WithContexts(contexts).ContinueAuthorizationAsync(Request(HttpAuthSchemes.Any) with { Events = events }, string.Empty, sentBeforeAnyChallenge: false, ["Negotiate"], CancellationToken.None);
+
+        Assert.IsNull(value);
+        Assert.HasCount(1, events.Info);
+        Assert.IsTrue(context.IsDisposed);
+    }
+
+    [TestMethod]
+    [DataRow(false, "Basic realm=\"r\"", DisplayName = "Negotiate no longer offered")]
+    [DataRow(true, "Negotiate", DisplayName = "No -u")]
+    public async Task ContinueAuthorizationAsync_401ToTheRequestSentAgainWithoutAHeaderNotNegotiates_StepsNoContext(bool withoutCredential, string challenge)
     {
         ScriptedSecurityContextFactory contexts = new();
+        HttpAuthRequest request = Request(HttpAuthSchemes.Any) with { Credential = withoutCredential ? null : new NetworkCredential("u", "p") };
+
+        string? value = await WithContexts(contexts).ContinueAuthorizationAsync(request, string.Empty, sentBeforeAnyChallenge: false, [challenge], CancellationToken.None);
+
+        Assert.IsNull(value);
+        Assert.IsEmpty(contexts.Requests);
+    }
+
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_NegotiateAloneWithoutCredential_StepsAContextButSendsNothing()
+    {
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.Completed, [0x01]));
+        ScriptedSecurityContextFactory contexts = new(context);
         HttpAuthRequest request = Request(HttpAuthSchemes.Negotiate) with { Credential = null };
 
         string? value = await WithContexts(contexts).CreateAuthorizationAsync(request, ["Negotiate"], CancellationToken.None);
+
+        Assert.IsNull(value);
+        Assert.HasCount(1, contexts.Requests);
+        Assert.IsTrue(context.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_NegotiateAloneWithoutCredentialAndNoTicket_ReportsTheFailure()
+    {
+        ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.NoCredentials, [])));
+        RecordingInfoEvents events = new();
+        HttpAuthRequest request = Request(HttpAuthSchemes.Negotiate) with { Credential = null, Events = events };
+
+        await WithContexts(contexts).CreateAuthorizationAsync(request, ["Negotiate"], CancellationToken.None);
+
+        Assert.HasCount(1, events.Info);
+    }
+
+    [TestMethod]
+    [DataRow(HttpAuthSchemes.Any, false, "Negotiate", DisplayName = "--anyauth: no pick before the challenge")]
+    [DataRow(HttpAuthSchemes.Negotiate, true, "Negotiate", DisplayName = "proxy")]
+    [DataRow(HttpAuthSchemes.Negotiate, false, "Basic realm=\"r\"", DisplayName = "Negotiate not offered")]
+    public async Task CreateAuthorizationAsync_NegotiateNotTheOnePickWithoutCredential_StepsNoContext(HttpAuthSchemes allowed, bool isProxy, string challenge)
+    {
+        ScriptedSecurityContextFactory contexts = new();
+        HttpAuthRequest request = Request(allowed) with { Credential = null, IsProxy = isProxy };
+
+        string? value = await WithContexts(contexts).CreateAuthorizationAsync(request, [challenge], CancellationToken.None);
 
         Assert.IsNull(value);
         Assert.IsEmpty(contexts.Requests);
@@ -227,6 +328,37 @@ public sealed class RankedHttpAuthenticatorTests
 
         Assert.IsNull(value);
         Assert.IsEmpty(contexts.Requests);
+    }
+
+    [TestMethod]
+    public async Task ContinueAuthorizationAsync_NegotiateTokenInThe401_SendsTheContextsNextToken()
+    {
+        ScriptedSecurityContext context = new(
+            new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]),
+            new SecurityContextStep(SecurityContextStatus.Completed, [0x02]));
+        RankedHttpAuthenticator authenticator = WithContexts(new ScriptedSecurityContextFactory(context));
+        HttpAuthRequest request = Request(HttpAuthSchemes.Negotiate);
+        string? sent = await authenticator.CreateAuthorizationAsync(request, [], CancellationToken.None);
+
+        string? value = await authenticator.ContinueAuthorizationAsync(request, sent!, sentBeforeAnyChallenge: true, ["Negotiate BA=="], CancellationToken.None);
+
+        Assert.AreEqual("Negotiate Ag==", value);
+    }
+
+    [TestMethod]
+    [DataRow(false, true, DisplayName = "A proxy's")]
+    [DataRow(true, false, DisplayName = "No -u")]
+    public async Task ContinueAuthorizationAsync_NotANegotiateLeg_SendsNothing(bool withoutCredential, bool isProxy)
+    {
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]));
+        RankedHttpAuthenticator authenticator = WithContexts(new ScriptedSecurityContextFactory(context));
+        HttpAuthRequest request = Request(HttpAuthSchemes.Negotiate) with { Credential = withoutCredential ? null : new NetworkCredential("u", "p") };
+        string? sent = await authenticator.CreateAuthorizationAsync(request, [], CancellationToken.None);
+
+        string? value = await authenticator.ContinueAuthorizationAsync(request with { IsProxy = isProxy }, sent!, sentBeforeAnyChallenge: true, ["Negotiate BA=="], CancellationToken.None);
+
+        Assert.IsNull(value);
+        Assert.HasCount(1, context.IncomingTokens);
     }
 
     [TestMethod]

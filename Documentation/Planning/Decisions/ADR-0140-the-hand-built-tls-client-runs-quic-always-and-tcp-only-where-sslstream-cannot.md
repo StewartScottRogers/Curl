@@ -89,7 +89,7 @@ session ID, legacy version `0x0303`, the null compression method only, and
   (23), `post_handshake_auth` (49), `signature_algorithms` (13), `supported_versions`
   (43), `psk_key_exchange_modes` (45: `psk_dhe_ke`), `key_share` (51: `11ec`
   X25519MLKEM768 1216 bytes, `001d` 32 bytes), `compress_certificate` (27: zlib,
-  brotli, zstd).
+  zstd).
 - `supported_groups`: `11ec 001d 0017 001e 0018 0019 0100 0101` (X25519MLKEM768,
   x25519, secp256r1, x448, secp384r1, secp521r1, ffdhe2048, ffdhe3072).
 - `signature_algorithms`: `0905 0906 0904 0403 0503 0603 0807 0808 081a 081b 081c 0809

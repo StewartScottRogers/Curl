@@ -17,11 +17,28 @@ namespace Curl.Console;
 /// Cancelled when <c>--fail-early</c> aborts the transfer because another failed;
 /// <see cref="CancellationToken.None" /> outside <c>-Z</c>.
 /// </param>
+/// <param name="standardOutput">
+/// Standard output, deferring a write failure as curl's stdio buffer does: the run's one without
+/// <c>-Z</c>, and one of the transfer's own under it, so that one transfer's failure is never
+/// another's (task BL-773).
+/// </param>
+/// <param name="gatedStandardOutput"><paramref name="standardOutput" /> through the run's <see cref="WriteGate" />.</param>
 internal sealed class RunningTransferState(
     long firstTransferIdOfGroup,
     IReadOnlyList<CommandLineOptions> laterGroups,
-    CancellationToken abortToken)
+    CancellationToken abortToken,
+    StandardOutputFailureDeferringStream standardOutput,
+    Stream gatedStandardOutput)
 {
+    /// <summary>
+    /// Gets standard output as the transfer writes it, which records the transfer's write failure:
+    /// the run's without <c>-Z</c>, the transfer's own under it.
+    /// </summary>
+    internal StandardOutputFailureDeferringStream StandardOutput { get; } = standardOutput;
+
+    /// <summary>Gets <see cref="StandardOutput" /> through the run's <see cref="WriteGate" />.</summary>
+    internal Stream GatedStandardOutput { get; } = gatedStandardOutput;
+
     /// <summary>Gets the <c>%{xfer_id}</c> of the transfer's option group's first transfer.</summary>
     internal long FirstTransferIdOfGroup { get; } = firstTransferIdOfGroup;
 
@@ -88,6 +105,24 @@ internal sealed class RunningTransferState(
     internal int RetryCount { get; set; }
 
     /// <summary>
+    /// Gets or sets the <c>%{xfer_id}</c> of the latest attempt <c>--retry</c> ran, which curl
+    /// 8.21.0 makes a transfer of its own; <see langword="null" /> until the first retry (task BL-799).
+    /// </summary>
+    internal long? RetryTransferId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the <c>%{conn_id}</c> of the attempt <c>--retry</c> last ran again, which the next
+    /// attempt keeps when it reuses that connection; <see langword="null" /> until the first retry (task BL-799).
+    /// </summary>
+    internal long? RetriedConnectionId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the <see cref="TimeProvider.GetTimestamp" /> the transfer started at, which the
+    /// diagnostic log's end line measures its elapsed milliseconds from (ADR-0222).
+    /// </summary>
+    internal long StartTimestamp { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the transfer is a <c>-T</c> upload under <c>-C -</c>,
     /// whose meter curl 8.21.0 heads with <c>** Resuming transfer from byte position -1</c> whatever
     /// the <c>-o</c> file holds (task BL-416).
@@ -100,6 +135,12 @@ internal sealed class RunningTransferState(
     /// (tasks BL-505, BL-791).
     /// </summary>
     internal System.Net.NetworkCredential? LookedUpCredentials { get; set; }
+
+    /// <summary>
+    /// Gets or sets the SSH options of an <c>scp</c> or <c>sftp</c> transfer, with the known-hosts file the
+    /// runner resolved (task BL-576); <see langword="null" /> for any other scheme.
+    /// </summary>
+    internal SshOptions? Ssh { get; set; }
 
     /// <summary>
     /// Gets or sets where the transfer's <c>-v</c> and trace events go once it is set up to connect:

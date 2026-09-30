@@ -57,10 +57,12 @@ namespace Curl.Protocol.File;
 /// <see cref="ITransferContext.CreateFileMode" />, and the upload path ignores
 /// <see cref="ITransferContext.Range" />, <see cref="ITransferContext.NoBody" />,
 /// <see cref="ITransferContext.TimeCondition" />, <see cref="ITransferContext.HeaderOutput" />
-/// and <see cref="ITransferContext.MaxFileSize" />. Both ignore
-/// <see cref="ITransferContext.TimeProvider" />, deliberately: nothing in a local file
-/// transfer is timed or retried, and <c>-z</c> compares against the timestamp the open
-/// reported rather than against now. Both also ignore the options that belong to other
+/// and <see cref="ITransferContext.MaxFileSize" />. Both read
+/// <see cref="ITransferContext.TimeProvider" /> only to time the diagnostic log's
+/// transfer-end line: nothing in a local file transfer is timed out or retried, and
+/// <c>-z</c> compares against the timestamp the open reported rather than against now.
+/// Each step is written to <see cref="ITransferContext.DiagnosticLog" /> under the
+/// <c>file</c> component (<see cref="FileTransferLog" />). Both also ignore the options that belong to other
 /// protocols. The table "Transfer options, per direction" in
 /// <c>Curl.Protocol.File.UnitLibrary\CLAUDE.md</c> gives every member, per direction,
 /// with the method that reads it.
@@ -130,6 +132,19 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
         context.CancellationToken.ThrowIfCancellationRequested();
 
+        long started = context.TimeProvider.GetTimestamp();
+        TransferResult result = await TransferAsync(context).ConfigureAwait(false);
+        new FileTransferLog(context.DiagnosticLog).Ended(result, context.TimeProvider.GetElapsedTime(started));
+        return result;
+    }
+
+    /// <summary>
+    /// Parses the URL's path, refuses a negative resume offset, then uploads or downloads.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <returns>The outcome of the transfer.</returns>
+    private async ValueTask<TransferResult> TransferAsync(ITransferContext context)
+    {
         if (!FileUrlPath.TryParse(context.Url, out var path))
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, FileTransferMessages.BadUrl);
@@ -159,12 +174,16 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             .OpenForReadAsync(path.OsPath, context.CancellationToken)
             .ConfigureAwait(false);
 
+        var transferLog = new FileTransferLog(context.DiagnosticLog);
         if (!opened.IsOpen || opened.Content is null)
         {
+            transferLog.OpenFailed(path.OsPath, "reading", opened);
             return TransferResult.Failure(
                 CurlExitCode.FileCouldntReadFile,
                 FileTransferMessages.CouldNotOpenForReading(path.UrlPath));
         }
+
+        transferLog.OpenedForReading(path.OsPath, opened.Length);
 
         // curl 8.21.0 draws its meter for a download that got past the open and failed
         // later (exit 63, exit 36) and never for one whose open failed (exit 37), measured
@@ -375,12 +394,16 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             .OpenForWriteAsync(path.OsPath, mode, context.CreateFileMode, context.CancellationToken)
             .ConfigureAwait(false);
 
+        var transferLog = new FileTransferLog(context.DiagnosticLog);
         if (!opened.IsOpen || opened.Content is null)
         {
+            transferLog.OpenFailed(path.OsPath, "writing", opened);
             return TransferResult.Failure(
                 CurlExitCode.WriteError,
                 FileTransferMessages.CannotOpenForWriting(path.OsPath));
         }
+
+        transferLog.OpenedForWriting(path.OsPath, mode);
 
         Stream destination = opened.Content;
 

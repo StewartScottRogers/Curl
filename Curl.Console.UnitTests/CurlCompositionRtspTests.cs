@@ -180,13 +180,13 @@ public sealed class CurlCompositionRtspTests
     }
 
     [TestMethod]
-    public async Task CreateRunner_Version_ListsRtspBetweenPop3sAndSmtp()
+    public async Task CreateRunner_Version_ListsRtspBetweenPop3sAndScp()
     {
         (int exitCode, string standardOutput, _) = await RunAsync(new ScriptedConnector([]), ["-V"]);
 
         string protocols = standardOutput.Split(Environment.NewLine).Single(line => line.StartsWith("Protocols:", StringComparison.Ordinal));
         Assert.AreEqual(CurlVersionText.ProtocolsLine, protocols);
-        StringAssert.Contains(protocols, " pop3 pop3s rtsp smtp smtps ");
+        StringAssert.Contains(protocols, " pop3 pop3s rtsp scp ");
         Assert.AreEqual(0, exitCode);
     }
 

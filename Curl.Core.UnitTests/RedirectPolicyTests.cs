@@ -19,6 +19,8 @@ public sealed class RedirectPolicyTests
         Assert.IsFalse(policy.KeepPostOn302);
         Assert.IsFalse(policy.KeepPostOn303);
         Assert.IsFalse(policy.LocationTrusted);
+        Assert.IsFalse(policy.DropsCustomMethodOnSwitchToGet);
+        Assert.IsFalse(policy.DisallowsUserInUrl);
         CollectionAssert.AreEquivalent(
             new[] { "http", "https", "ftp", "ftps" },
             policy.AllowedSchemes.ToArray());

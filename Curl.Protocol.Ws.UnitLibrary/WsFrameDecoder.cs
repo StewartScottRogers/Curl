@@ -16,7 +16,11 @@ namespace Curl.Protocol.Ws;
 /// exit 56 and curl 8.21.0's message, checked in curl's order: reserved bits and opcode on the
 /// first byte, the mask bit on the second, then the length.
 /// </remarks>
-internal sealed class WsFrameDecoder
+/// <param name="diagnosticLog">
+/// Receives each frame's opcode, FIN bit and length, and a close frame with an unexpected code
+/// (<see cref="WsTransferLog" />); nothing is written when it is <see langword="null" />.
+/// </param>
+internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null)
 {
     private const byte FinalFragment = 0x80;
 
@@ -38,7 +42,10 @@ internal sealed class WsFrameDecoder
 
     private readonly byte[] head = new byte[LongestHead];
 
-    private readonly ArrayBufferWriter<byte> pingPayload = new(Longest7BitLength);
+    private readonly WsTransferLog log = new(diagnosticLog ?? NoDiagnosticLog.Instance);
+
+    // A ping's payload, echoed in a pong, or a close frame's, whose code is logged.
+    private readonly ArrayBufferWriter<byte> controlPayload = new(Longest7BitLength);
 
     private int headCount;
 
@@ -99,7 +106,13 @@ internal sealed class WsFrameDecoder
     private ReadOnlySpan<byte> ConsumePayload(ReadOnlySpan<byte> received, ArrayBufferWriter<byte> payload)
     {
         int length = (int)Math.Min(received.Length, payloadRemaining);
-        (opcode == WsOpcode.Ping ? pingPayload : payload).Write(received[..length]);
+        ReadOnlySpan<byte> chunk = received[..length];
+        (opcode == WsOpcode.Ping ? controlPayload : payload).Write(chunk);
+        if (opcode == WsOpcode.Close)
+        {
+            controlPayload.Write(chunk);
+        }
+
         payloadRemaining -= length;
         if (payloadRemaining == 0)
         {
@@ -195,9 +208,10 @@ internal sealed class WsFrameDecoder
     {
         opcode = (WsOpcode)(head[0] & OpcodeBits);
         payloadRemaining = PayloadLength();
+        log.Frame("received", opcode, (head[0] & FinalFragment) != 0, payloadRemaining);
         headCount = 0;
         isFrameOpen = true;
-        pingPayload.ResetWrittenCount();
+        controlPayload.ResetWrittenCount();
         if (payloadRemaining == 0)
         {
             CloseFrame();
@@ -228,7 +242,11 @@ internal sealed class WsFrameDecoder
         isFrameOpen = false;
         if (opcode == WsOpcode.Ping)
         {
-            lastPing = pingPayload.WrittenSpan.ToArray();
+            lastPing = controlPayload.WrittenSpan.ToArray();
+        }
+        else if (opcode == WsOpcode.Close)
+        {
+            log.CloseReceived(controlPayload.WrittenSpan);
         }
     }
 

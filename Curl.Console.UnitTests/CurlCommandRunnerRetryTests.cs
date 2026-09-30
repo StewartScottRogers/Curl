@@ -27,6 +27,8 @@ public sealed class CurlCommandRunnerRetryTests
 
     private const string EmptyBusy = "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n";
 
+    private const string EmptyOk = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+
     private const string OkOk = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok";
 
     private static readonly string NewLine = Environment.NewLine;
@@ -146,6 +148,81 @@ public sealed class CurlCommandRunnerRetryTests
     }
 
     [TestMethod]
+    public async Task RunAsync_XferIdAndConnIdAfterTwoRetriesThatSucceed_CountEveryAttempt()
+    {
+        // curl -s --retry 2 --retry-delay 1 -w '%{xfer_id} %{conn_id}\n' against 503, 503, 200,
+        // each closing its connection, printed "2 2" (BL-799 Notes).
+        int exitCode = await RunAsync([EmptyBusy, EmptyBusy, EmptyOk], "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{xfer_id} %{conn_id}\\n", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("2 2\n", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_XferIdAndConnIdAfterRetriesRunOut_CountEveryAttempt()
+    {
+        // The same against three 503s printed "2 2" (BL-799 Notes).
+        int exitCode = await RunAsync([EmptyBusy, EmptyBusy, EmptyBusy], "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{xfer_id} %{conn_id}\\n", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("2 2\n", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_XferIdAndConnIdOfAUrlAfterARetriedOne_CountOnFromTheLastAttempt()
+    {
+        // A second URL after the first's 503, 503, 200 printed "2 2" then "3 3" (BL-799 Notes).
+        int exitCode = await RunAsync(
+            [EmptyBusy, EmptyBusy, EmptyOk, EmptyOk],
+            "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{xfer_id} %{conn_id}\\n", Url, Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("2 2\n3 3\n", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ConnIdAfterRetriesOverOneKeptAliveConnection_KeepsTheFirstConnectionsNumber()
+    {
+        // Against 503, 503, 200 on one kept-alive connection curl printed "2 0" (BL-799 Notes).
+        ScriptedConnector server = new(new[] { EmptyBusy, EmptyBusy, EmptyOk }.Select(Encoding.Latin1.GetBytes)) { ReusesTheFirstConnection = true };
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{xfer_id} %{conn_id}\\n", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("2 0\n", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ConnIdAfterARetriedAttemptThatReportsNothing_TakesANewNumber()
+    {
+        // An HTTP attempt with no report cannot say it reused a connection, so it is taken to have opened one.
+        ScriptedResultHandler handler = new(
+            "http",
+            TransferResult.Failure(CurlExitCode.CouldntResolveHost, "Could not resolve host: a"),
+            TransferResult.Success(0));
+
+        int exitCode = await RunAsync(handler, writesProgressMeter: false, "-s", "--retry", "1", "--retry-delay", "1", "-w", "%{xfer_id} %{conn_id}", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("1 1", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ConnIdAfterARetriedFtpAttempt_TakesANewNumber()
+    {
+        // Only HTTP counts the connections it opened, so an FTP report's zero says nothing about reuse.
+        ScriptedResultHandler handler = new(
+            "ftp",
+            TransferResult.Failure(CurlExitCode.OperationTimedOut, "Operation timed out"),
+            TransferResult.Success(0) with { Report = new TransferReport() });
+
+        int exitCode = await RunAsync(handler, writesProgressMeter: false, "-s", "--retry", "1", "--retry-delay", "1", "-w", "%{xfer_id} %{conn_id}", "ftp://127.0.0.1:18241/a");
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("1 1", StandardOutputText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_NumRetriesWithoutRetry_PrintsZero()
     {
         int exitCode = await RunAsync([EmptyBusy], "-s", "-w", "%{num_retries}", Url);
@@ -182,13 +259,22 @@ public sealed class CurlCommandRunnerRetryTests
     /// <see cref="ScriptedConnector" /> serving <paramref name="responses" />, one per
     /// connection, on <see cref="clock" />.
     /// </summary>
-    private Task<int> RunAsync(string[] responses, bool writesProgressMeter, params string[] arguments)
-    {
-        ScriptedConnector server = new(responses.Select(Encoding.Latin1.GetBytes));
-        HttpProtocolHandler http = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
+    private Task<int> RunAsync(string[] responses, bool writesProgressMeter, params string[] arguments) =>
+        RunAsync(new ScriptedConnector(responses.Select(Encoding.Latin1.GetBytes)), writesProgressMeter, arguments);
 
-        return new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([http])),
+    /// <summary>
+    /// Runs <paramref name="arguments" /> with <see cref="HttpProtocolHandler" /> over
+    /// <paramref name="server" />, on <see cref="clock" />.
+    /// </summary>
+    private Task<int> RunAsync(ScriptedConnector server, bool writesProgressMeter, params string[] arguments) =>
+        RunAsync(new HttpProtocolHandler(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false))), writesProgressMeter, arguments);
+
+    /// <summary>
+    /// Runs <paramref name="arguments" /> with <paramref name="handler" />, on <see cref="clock" />.
+    /// </summary>
+    private Task<int> RunAsync(IProtocolHandler handler, bool writesProgressMeter, params string[] arguments) =>
+        new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([handler])),
                 outputFiles,
                 outputFiles,
                 standardOutput,
@@ -198,5 +284,4 @@ public sealed class CurlCommandRunnerRetryTests
                 writesProgressMeter: writesProgressMeter,
                 timeProvider: clock)
             .RunAsync(arguments);
-    }
 }

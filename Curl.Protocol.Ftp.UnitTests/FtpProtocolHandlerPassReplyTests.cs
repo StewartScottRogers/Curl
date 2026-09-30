@@ -76,7 +76,9 @@ public sealed class FtpProtocolHandlerPassReplyTests
             out QueuedConnector connector);
 
         Assert.AreEqual(new ConnectTarget("10.255.255.1", 56902, false), connector.Targets[1]);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.OperationTimedOut, message), result with { Report = null });
+        Assert.AreEqual(
+            TransferResult.Failure(CurlExitCode.OperationTimedOut, "Failed to connect to 127.0.0.1:47663 via 10.255.255.1:56902 after 21066 ms: Could not connect to server"),
+            result with { Report = null });
     }
 
     [TestMethod]

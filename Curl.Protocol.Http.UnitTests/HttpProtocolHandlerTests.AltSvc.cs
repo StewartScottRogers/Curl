@@ -32,6 +32,34 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// Measured (BL-623 Notes, case 1): with the entry <c>h1 localhost 18499 h1 localhost 18443</c>,
+    /// curl 8.21.0 ends <c>* Connection #0 to host localhost:18443 left intact</c>, naming the alternative.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_KeptAliveWithAnAltSvcRoute_ReportsTheAlternativeLeftIntact()
+    {
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(EmptyOkHead, 65536)))
+            .ExecuteAsync(CookieContext(AltSvcHttpsUrl, new HttpRequestOptions { AltSvcRoute = new("h1", AltSvcAlternative18443) }, events));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("Connection #0 to host localhost:18443 left intact", events.Info[^1]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_KeptAliveWithoutAnAltSvcRoute_ReportsTheOriginLeftIntact()
+    {
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(EmptyOkHead, 65536)))
+            .ExecuteAsync(CookieContext(AltSvcHttpsUrl, new HttpRequestOptions(), events));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("Connection #0 to host localhost:18499 left intact", events.Info[^1]);
+    }
+
+    /// <summary>
     /// Measured: <c>Alt-Svc: h2=":8443"; ma=60, h1="a.example:1", h3=":443"</c> prints one
     /// <c>Added alt-svc</c> line per alternative, after the status line and before the header line.
     /// </summary>

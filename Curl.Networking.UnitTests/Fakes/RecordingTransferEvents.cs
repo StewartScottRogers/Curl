@@ -17,8 +17,18 @@ public sealed class RecordingTransferEvents : ITransferEvents
     /// <summary>Gets every <see cref="ReportTlsHandshake" /> event, in order.</summary>
     public List<TlsHandshakeEvent> Handshakes { get; } = [];
 
+    /// <summary>
+    /// Gets or sets what runs with each <see cref="ReportInfo" /> text as it is reported, so a
+    /// test can see what else had happened at that moment; <see langword="null" /> runs nothing.
+    /// </summary>
+    public Action<string>? OnInfo { get; init; }
+
     /// <inheritdoc />
-    public void ReportInfo(string text) => Info.Add(text);
+    public void ReportInfo(string text)
+    {
+        Info.Add(text);
+        OnInfo?.Invoke(text);
+    }
 
     /// <summary>Gets every <see cref="ReportConnectionOpened" /> event, in order.</summary>
     public List<ConnectionOpenedEvent> Opened { get; } = [];

@@ -12,8 +12,9 @@ namespace Curl.Protocol.Rtsp;
 /// arrived, or when it is the blank line that ends the head: a server that closes after
 /// <c>RTSP/1.0 200 OK\r\nCSeq: 1\r\n</c> leaves the <c>CSeq</c> line unread, so the reply's
 /// <c>CSeq</c> is 0, while one that closes after <c>…CSeq: 1\r\nPubl</c> has sent a <c>CSeq</c>
-/// of 1. The bytes still unread when the server closes are written to the header output as
-/// they are. A reply whose first bytes are not <c>RTSP/</c>, exactly, fails with 52,
+/// of 1. A header line followed by continuation lines (a space or tab first) is read as one line
+/// with them joined, once a byte after the last has arrived (BL-840). The bytes still unread
+/// when the server closes are written to the header output unchecked, continuation lines joined. A reply whose first bytes are not <c>RTSP/</c>, exactly, fails with 52,
 /// <c>Empty reply from server</c>, nothing written; so does a connection closed before any
 /// byte. A head longer than <see cref="MaximumHeadLength" /> fails with 100, as the HTTP
 /// library's does. A failed read fails with 56, a failed header write with 23.
@@ -42,10 +43,12 @@ internal static class RtspReplyReader
     /// <param name="headerOutput">Where the head is written, or <see langword="null" /> for nowhere.</param>
     /// <param name="events">Where each head line is reported.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
+    /// <param name="log">Receives each header line's name, or nothing when <see langword="null" />.</param>
     /// <returns>What was read of the head.</returns>
     /// <exception cref="RtspTransferException">The reply is refused, or a read or write failed.</exception>
-    internal static async ValueTask<RtspReplyHead> ReadHeadAsync(IConnection connection, RtspSessionState session, Stream? headerOutput, ITransferEvents events, CancellationToken cancellationToken)
+    internal static async ValueTask<RtspReplyHead> ReadHeadAsync(IConnection connection, RtspSessionState session, Stream? headerOutput, ITransferEvents events, CancellationToken cancellationToken, RtspTransferLog? log = null)
     {
+        log ??= new RtspTransferLog(NoDiagnosticLog.Instance);
         RtspReplyHeadParser parser = new(session);
         byte[] buffer = new byte[BufferSize];
         int received = 0;
@@ -56,14 +59,16 @@ internal static class RtspReplyReader
             int lineEnd;
             while ((lineEnd = ReadableLineEnd(parser, buffer.AsSpan(0, received), processed)) > 0)
             {
-                parser.Accept(buffer.AsSpan(processed, lineEnd - processed));
-                await WriteAsync(headerOutput, buffer.AsMemory(processed, lineEnd - processed), cancellationToken).ConfigureAwait(false);
+                byte[] line = RtspHeaderFolding.Unfold(buffer.AsSpan(processed, lineEnd - processed));
+                parser.Accept(line);
+                await WriteAsync(headerOutput, line, cancellationToken).ConfigureAwait(false);
                 if (parser.IsComplete)
                 {
-                    return Head(parser, lineEnd, buffer[processed..lineEnd], buffer[lineEnd..received]);
+                    return Head(parser, lineEnd, line, buffer[lineEnd..received]);
                 }
 
-                events.ReportResponseHeader(buffer.AsSpan(processed, lineEnd - processed));
+                events.ReportResponseHeader(line);
+                log.HeaderRead(line);
                 processed = lineEnd;
             }
 
@@ -138,20 +143,46 @@ internal static class RtspReplyReader
     }
 
     /// <summary>
-    /// Finds the end of the next line that can be read: one a byte has arrived after, or the
-    /// blank line that ends the head.
+    /// Finds the end of the next line that can be read: the blank line that ends the head, or a
+    /// line a byte has arrived after that does not begin a continuation line. A header line's
+    /// continuation lines are part of it, so it ends where its last continuation line ends.
     /// </summary>
-    /// <returns>The offset just past the line's line feed, or 0 when no line can be read yet.</returns>
+    /// <returns>The offset just past the line's last line feed, or 0 when no line can be read yet.</returns>
     private static int ReadableLineEnd(RtspReplyHeadParser parser, ReadOnlySpan<byte> received, int processed)
     {
-        int lineFeed = received[processed..].IndexOf((byte)'\n');
-        if (lineFeed < 0)
+        int lineEnd = LineEnd(received, processed);
+        if (lineEnd > 0 && IsBlankLine(parser, received[processed..lineEnd]))
         {
-            return 0;
+            return lineEnd;
         }
 
-        int lineEnd = processed + lineFeed + 1;
-        return IsBlankLine(parser, received[processed..lineEnd]) || lineEnd < received.Length ? lineEnd : 0;
+        lineEnd = parser.HasStatus ? EndOfContinuations(received, lineEnd) : lineEnd;
+        return lineEnd < received.Length ? lineEnd : 0;
+    }
+
+    /// <summary>
+    /// Follows a header line's continuation lines, each starting with a space or a tab, to the
+    /// end of the last one received whole.
+    /// </summary>
+    /// <param name="received">The bytes received so far.</param>
+    /// <param name="lineEnd">The end of the header line, or 0 when it has not been received whole.</param>
+    /// <returns>The end of the last continuation line, or 0 when one has not been received whole.</returns>
+    private static int EndOfContinuations(ReadOnlySpan<byte> received, int lineEnd)
+    {
+        while (lineEnd > 0 && lineEnd < received.Length && RtspHeaderFolding.IsBlank(received[lineEnd]))
+        {
+            lineEnd = LineEnd(received, lineEnd);
+        }
+
+        return lineEnd;
+    }
+
+    /// <summary>Finds the end of the line that starts at <paramref name="start" />.</summary>
+    /// <returns>The offset just past the first line feed at or after <paramref name="start" />, or 0 when there is none.</returns>
+    private static int LineEnd(ReadOnlySpan<byte> received, int start)
+    {
+        int lineFeed = received[start..].IndexOf((byte)'\n');
+        return lineFeed < 0 ? 0 : start + lineFeed + 1;
     }
 
     /// <summary>Determines whether <paramref name="line" /> is the blank line that ends the head.</summary>
@@ -160,8 +191,9 @@ internal static class RtspReplyReader
 
     /// <summary>
     /// Ends a head the server closed before its blank line: 52 when nothing, or nothing that can
-    /// begin <c>RTSP/</c>, arrived; otherwise the unread bytes are written as they are and the
-    /// head is returned incomplete. The unread bytes are reported as one head line, as curl
+    /// begin <c>RTSP/</c>, arrived; otherwise the unread bytes are written, a header line's
+    /// continuation lines joined to it (measured, BL-840) but nothing else changed or checked,
+    /// and the head is returned incomplete. The unread bytes are reported as one head line, as curl
     /// 8.21.0's <c>-v</c> writes them.
     /// </summary>
     private static async ValueTask<RtspReplyHead> EndEarlyAsync(
@@ -177,8 +209,9 @@ internal static class RtspReplyReader
             throw new RtspTransferException(CurlExitCode.GotNothing, EmptyReply);
         }
 
-        await WriteAsync(headerOutput, unread, cancellationToken).ConfigureAwait(false);
-        events.ReportResponseHeader(unread.Span);
+        byte[] lines = parser.HasStatus ? RtspHeaderFolding.Unfold(unread.Span) : unread.ToArray();
+        await WriteAsync(headerOutput, lines, cancellationToken).ConfigureAwait(false);
+        events.ReportResponseHeader(lines);
         return Head(parser, received, endLine: null, []);
     }
 

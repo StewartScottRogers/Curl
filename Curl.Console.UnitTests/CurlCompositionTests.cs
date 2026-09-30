@@ -17,6 +17,7 @@ using Curl.Protocol.Mqtt;
 using Curl.Protocol.Pop3;
 using Curl.Protocol.Rtsp;
 using Curl.Protocol.Smtp;
+using Curl.Protocol.Ssh;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
 using Curl.Protocol.Ws;
@@ -70,6 +71,8 @@ public sealed class CurlCompositionTests
             ["pop3"] = typeof(Pop3ProtocolHandler),
             ["pop3s"] = typeof(Pop3ProtocolHandler),
             ["rtsp"] = typeof(RtspProtocolHandler),
+            ["scp"] = typeof(SshProtocolHandler),
+            ["sftp"] = typeof(SshProtocolHandler),
             ["smtp"] = typeof(SmtpProtocolHandler),
             ["smtps"] = typeof(SmtpProtocolHandler),
             ["ws"] = typeof(WsProtocolHandler),
@@ -441,7 +444,7 @@ public sealed class CurlCompositionTests
         IConnector[] connectors = [.. handlers.SelectMany(ConnectorsOf)];
         string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => Unwrapped(handler).GetType().Name).Order()];
         CollectionAssert.AreEqual(
-            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "ImapProtocolHandler", "LdapProtocolHandler", "MqttProtocolHandler", "Pop3ProtocolHandler", "RoutingFtpProtocolHandler", "RtspProtocolHandler", "SmtpProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler", "WsProtocolHandler" },
+            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "ImapProtocolHandler", "LdapProtocolHandler", "MqttProtocolHandler", "Pop3ProtocolHandler", "RoutingFtpProtocolHandler", "RtspProtocolHandler", "SmtpProtocolHandler", "SshProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler", "WsProtocolHandler" },
             connectingHandlers);
         Assert.IsTrue(connectors.All(connector => ReferenceEquals(connector, transports.PoolingConnector)));
         Assert.AreSame(transports.PoolingConnector, dispatch.ConnectionPool);

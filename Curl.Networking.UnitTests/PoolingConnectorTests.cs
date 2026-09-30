@@ -122,6 +122,22 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_OverAUnixSocket_KeepsItsPathOnTheOpenedAndTheReusedResult()
+    {
+        _inner.UnixSocketPath = "/run/app.sock";
+        await using var pool = CreatePool();
+
+        var opened = await pool.ConnectAsync(Target(), CancellationToken.None);
+        opened.Connection!.MarkReusable();
+        await opened.Connection.DisposeAsync();
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.AreEqual("/run/app.sock", opened.UnixSocketPath);
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreEqual("/run/app.sock", reused.UnixSocketPath);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ReusingAForwardProxyConnection_ReportsItWithProxy()
     {
         await using var pool = CreatePool();
@@ -371,6 +387,24 @@ public sealed class PoolingConnectorTests
         Assert.IsTrue(reused.IsReused);
         Assert.AreEqual(1L, reused.ConnectionNumber);
         Assert.HasCount(2, _inner.Targets);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_AfterAReadFoundCloseNotifyMissing_ShutsThatConnectionAndOpensANewOne()
+    {
+        await using var pool = CreatePool();
+        var events = new RecordingTransferEvents();
+        _inner.ReadException = new MissingCloseNotifyException("schannel: server closed abruptly (missing close_notify)");
+        var first = await pool.ConnectAsync(Target(), CancellationToken.None);
+        await Assert.ThrowsExactlyAsync<MissingCloseNotifyException>(
+            () => first.Connection!.ReadAsync(new byte[1], CancellationToken.None).AsTask());
+        first.Connection!.MarkReusable();
+        await first.Connection.DisposeAsync();
+
+        var next = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "Connection 0 seems to be dead", "shutting down connection #0" }, events.Info);
+        Assert.IsFalse(next.IsReused);
     }
 
     [TestMethod]

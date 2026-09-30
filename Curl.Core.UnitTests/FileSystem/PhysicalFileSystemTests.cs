@@ -72,6 +72,16 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
+    public async Task OpenForReadAsync_MissingFile_CarriesTheFileNotFoundException()
+    {
+        using var directory = new TemporaryDirectory();
+
+        var result = await new PhysicalFileSystem().OpenForReadAsync(directory.Combine("missing.txt"), CancellationToken.None);
+
+        Assert.IsInstanceOfType<FileNotFoundException>(result.FailureException);
+    }
+
+    [TestMethod]
     public async Task OpenForReadAsync_Directory_IsIsDirectory()
     {
         using var directory = new TemporaryDirectory();

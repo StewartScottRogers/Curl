@@ -26,6 +26,8 @@ public sealed class HttpRequestOptionsTests
         Assert.AreEqual(HttpFailMode.None, options.Fail);
         Assert.AreEqual(HttpVersionPreference.Http11, options.Version);
         Assert.AreEqual(TimeSpan.FromMilliseconds(200), options.HappyEyeballsTimeout);
+        Assert.AreEqual(TimeSpan.FromSeconds(1), options.ContinueWait);
+        Assert.AreEqual(HttpRequestOptions.DefaultContinueWait, options.ContinueWait);
         Assert.IsFalse(options.Compressed);
         Assert.IsFalse(options.TransferEncoding);
         Assert.IsFalse(options.Raw);
@@ -33,6 +35,7 @@ public sealed class HttpRequestOptionsTests
         Assert.IsNull(options.RequestTarget);
         Assert.AreEqual(HttpAuthSchemes.Basic, options.AuthSchemes);
         Assert.IsNull(options.BearerToken);
+        Assert.IsNull(options.AwsSigV4);
         Assert.IsNull(options.ForwardProxy);
         Assert.IsFalse(options.ProxyTunnel);
     }
@@ -59,6 +62,7 @@ public sealed class HttpRequestOptionsTests
             Fail = HttpFailMode.FailWithBody,
             Version = HttpVersionPreference.Http10,
             HappyEyeballsTimeout = TimeSpan.FromMilliseconds(1000),
+            ContinueWait = TimeSpan.FromMilliseconds(200),
             Compressed = true,
             TransferEncoding = true,
             Raw = true,
@@ -66,6 +70,7 @@ public sealed class HttpRequestOptionsTests
             RequestTarget = "*",
             AuthSchemes = HttpAuthSchemes.Any | HttpAuthSchemes.Bearer,
             BearerToken = "token",
+            AwsSigV4 = "aws:amz",
             ForwardProxy = proxy,
             ProxyTunnel = true,
         };
@@ -82,6 +87,7 @@ public sealed class HttpRequestOptionsTests
         Assert.AreEqual(HttpFailMode.FailWithBody, options.Fail);
         Assert.AreEqual(HttpVersionPreference.Http10, options.Version);
         Assert.AreEqual(TimeSpan.FromMilliseconds(1000), options.HappyEyeballsTimeout);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(200), options.ContinueWait);
         Assert.IsTrue(options.Compressed);
         Assert.IsTrue(options.TransferEncoding);
         Assert.IsTrue(options.Raw);
@@ -89,6 +95,7 @@ public sealed class HttpRequestOptionsTests
         Assert.AreEqual("*", options.RequestTarget);
         Assert.AreEqual(HttpAuthSchemes.Any | HttpAuthSchemes.Bearer, options.AuthSchemes);
         Assert.AreEqual("token", options.BearerToken);
+        Assert.AreEqual("aws:amz", options.AwsSigV4);
         Assert.AreSame(proxy, options.ForwardProxy);
         Assert.IsTrue(options.ProxyTunnel);
     }

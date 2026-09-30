@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-724]
-touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Curl.Quic.UnitLibrary, Curl.Quic.UnitTests]
+touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Curl.Quic.UnitLibrary, Curl.Quic.UnitTests, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-28
 completed:
@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-`QuicClientSettings.CreateCurlTlsSettings` offers cipher suites `1302 1303 1301 00ff`, exactly as ADR-0144 section 5 measured curl.se's ngtcp2 build (LibreSSL 4.2.1) sending, and the pinned first Initial in `Curl.Quic.UnitTests` is re-pinned with it.
+`QuicClientSettings.CreateLibreSslTlsSettings` offers cipher suites `1302 1303 1301 00ff`, exactly as ADR-0144 section 5 measured curl.se's ngtcp2 build (LibreSSL 4.2.1) sending, and the pinned first Initial in `Curl.Quic.UnitTests` is re-pinned with it.
 
 ## Context
 
@@ -29,6 +29,11 @@ completed:
 
 ## Notes
 
+- Design (2026-09-29): `0x00ff` stays out of `Tls13ClientSettings.CipherSuites`, so that list keeps holding only TLS 1.3 suites, which ServerHello checking, resumption and `Tls13ClientConnection` all rely on. A new `bool OfferEmptyRenegotiationInfoScsv` makes `Tls13ClientHelloBuilder` add `00ff` after the TLS 1.3 suites and any `LowerVersions` suites, each code once. A ServerHello that picks `00ff` is still refused with `illegal_parameter`, because `CheckEchoedFields` accepts only suites listed in `CipherSuites`. `CreateLibreSslTlsSettings` turns the flag on. The new first-Initial SHA-256 is `530afe73663df1785920663f9982fc1a0a655bdb7e5574ae2ac6eeb05ec0b8f9`.
+- 2026-09-29: One more project needed. `Curl.Networking.UnitTests` `TcpConnectorQuicTests.TlsOptions.cs:101` (`ConnectMultiplexedAsync_InTheWindowsBuildWithCiphers_OffersTheDefaultTls13SuitesRatherThanRefusing`) pins the LibreSSL QUIC hello's suites as `1302 1303 1301`. It must become `1302 1303 1301 00ff`, so the project is now in `touches`. BL-872 in Doing also touches `Curl.Networking.UnitTests`, so this task goes back to Backlog until BL-872 finishes. When it resumes, redo the code change described above and fix that one assertion. Everything else was green: build clean, Tls 1166 and Quic 405 tests passing.
+
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Backlog. Needs Curl.Networking.UnitTests (a pinned LibreSSL QUIC cipher-suite assertion), which BL-872 in Doing also touches

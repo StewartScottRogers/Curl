@@ -26,7 +26,13 @@ a copy of `Curl.Tls.UnitTests`' in-memory TLS 1.3 server and OCSP response build
 implement `ITlsProviderWithWarnings`. `HandBuiltTlsProvider` runs `TlsClientConnection` (one
 ClientHello offering TLS 1.3 and TLS 1.2, TLS 1.2 the default minimum, ADR-0205) for a range
 spanning both, `Tls13ClientConnection` for a TLS 1.3 minimum and `Tls12ClientConnection` for a
-ceiling below TLS 1.3, over the internal `ConnectionStream`, and returns a `HandBuiltTlsConnection`. Both providers judge the server's certificate with
+ceiling below TLS 1.3, over the internal `ConnectionStream`, and returns a `HandBuiltTlsConnection`.
+Per ADR-0222 (BL-820) its ClientHello is the platform curl's measured profile, `ClientHelloProfile.Schannel`
+for the Schannel build and `ClientHelloProfile.OpenSsl` for the OpenSSL build, turned into the TLS
+settings by `ClientHelloProfileMapping`: the profile's extension order and fixed extensions, its lists
+cut to the signature schemes and groups the client can honour, and the options changing only the lists
+(below a TLS 1.3 ceiling the order stays `Curl.Tls`'s, BL-941). `HandBuiltTlsProviderTests.ClientHello`
+captures the first record and rebuilds it from the profile. Both providers judge the server's certificate with
 `ServerCertificateVerification` (trust anchors, tolerated chain errors, each build's name check,
 exit 60 and 77); the hand-built path reaches it through `HandBuiltCertificateVerifier`, which
 builds the chain and the `SslPolicyErrors` `SslStream` would. Both load `--cert` through
@@ -91,6 +97,11 @@ any security status as `failed to receive handshake`, as curl's did in every mea
 The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 live in
 `TlsFailureMessages` and nowhere else; the `More details here` block after an exit 60 is
 the console's to print. No type here constructs an `HttpClient`.
+
+`TcpConnector` dials a host's or proxy's addresses through `AddressFamilyRace` (ADR-0254): the
+first address's family in turn, the other family beside it once `happyEyeballsTimeout`
+(`--happy-eyeballs-timeout-ms`, 200 ms by default) has passed on its `TimeProvider` or the first
+family has failed on every address; the first connection wins and the rest are cancelled or closed.
 
 `TcpConnector` fills `ConnectResult.Timings` and `LocalEndPoint` per ADR-0030: it takes
 `Started`, `NameResolved` and `Connected` from its `TimeProvider`, the local end point from
@@ -214,6 +225,16 @@ connection is reported `with proxy` (`ConnectionReusedEvent.IsProxy`) when the t
 forward proxy (`ConnectTarget.IsForwardProxy`) or tunnels through one, naming the proxy's host
 and port for a tunnel, as curl 8.21.0 prints it (BL-360).
 
+Per ADR-0269 (BL-600) `TcpConnector` takes an optional `LocalBinding` (`--interface`, `--local-port`)
+and dials every TCP address, a proxy's included, through the internal `LocalBindingTcpDialer`, which
+picks the local address for the family dialled (an interface `INetworkInterfaceLookup` finds, none on
+Windows; else a host, `localhost` as `::1` first; else the unspecified address) and calls
+`ITcpDialer.DialFromAsync`, whose `TcpDialer.BindLocalEnd` tries each port of the range. A bind that
+fails throws `LocalBindException`, a `SocketException`, so `AddressFamilyRace` moves on to the next
+address with curl's `from  port 0 failed:` line and returns the last `LocalBindFailure`:
+`InterfaceFailed` is exit 45 `Failed binding local connection end`, `BadArgument` (an `ifhost!`
+interface part over 254 characters) exit 43, `AddressFamilyMismatch` the usual exit 7.
+
 Per ADR-0149 (BL-507) `TcpConnector` takes an optional `UnixSocketAddress` (`--unix-socket`,
 `--abstract-unix-socket`, whose name starts with a NUL). With one, every connect dials it through
 `ITcpDialer.DialUnixSocketAsync` in place of the host, port and proxy, resolving nothing, then runs
@@ -222,7 +243,10 @@ TLS to the URL's host when asked. `-v` shows curl 8.21.0's Windows lines on ever
 port 0 from  port 0 failed: <reason>` before exit 7 `Failed to connect to <host>:<port> over
 unix://<path> after N ms: Could not connect to server`; `<name>` is `UnixSocketAddress.RemoteIpText`,
 the path cut to 45 characters (empty for an abstract name). A success is reported opened with the
-path as the host and `ConnectionOpenedEvent.UnixSocketRemoteIp`. A path too long for `sun_path`
+path as the host and `ConnectionOpenedEvent.UnixSocketRemoteIp`, and returns the whole path (an
+abstract name as given) as `ConnectResult.UnixSocketPath`, which `PoolingConnector` keeps in its
+`PoolEntry` for the opened and every reused result, so the HTTP handler's left-intact line names
+the socket (BL-884). A path too long for `sun_path`
 (108 bytes, 104 on macOS, with its NUL) is exit 6 `Unix socket path too long: '<path>'`. Pools are
 per option group, so different sockets never share a connection.
 
@@ -268,12 +292,32 @@ Per ADR-0180 (BL-728) `TcpConnector` takes an optional `QuicDialer`, and its
 `QuicDialRequest`, to the dialer. `QuicDialer` opens a UDP channel for each address in turn
 through `IUdpChannelOpener` (`UdpChannelOpener` in production, binding `UdpDatagramChannel` to a
 local address and port), runs `Curl.Quic`'s `QuicClientConnector` with curl's ClientHello and a
-`HandBuiltCertificateVerifier`, and returns a `QuicConnection`; failures print curl's `QUIC connect
+`HandBuiltCertificateVerifier`, and returns a `QuicConnection`. Per BL-847 the ClientHello is
+curl.se's LibreSSL build's (`QuicClientSettings.CreateLibreSslTlsSettings`) for the Windows build and
+the OpenSSL profile's TLS 1.3 parts (`CreateOpenSslTlsSettings`) for the OpenSSL build; both builds
+read `--ciphers`/`--tls13-ciphers` through `OpenSslCipherSuites`, cut to the suites QUIC can protect
+(none left is exit 59 with `HandBuiltTlsProvider`'s text), and load `--cert` through
+`ClientCertificateLoader.LoadAsOpenSslBuild`, the Windows build keeping a drive letter's colon; failures print curl's `QUIC connect
 to` and `Failed to connect to <host> port <port>` lines, and a socket error is exit 56 `QUIC:
 recvfrom() ...`. This project therefore references `Curl.Quic.UnitLibrary`, which lets
 `Curl.Networking.UnitTests` see its internals: `Fakes/QuicTestServer` and `QuicTestTlsServer` are
 copies of `Curl.Quic.UnitTests`' in-memory server, reached through `Fakes/QuicServerChannelOpener`.
 `PoolingConnector.ConnectMultiplexedAsync` passes straight through to its inner connector.
+
+Per ADR-0222 (BL-920) `TcpConnector` and `PoolingConnector` write the connect steps to
+`ConnectTarget.DiagnosticLog` (`--log-level`) through `NetworkDiagnosticLog`, the one place that
+formats them and tests `IsEnabled` first: `dns` the addresses a name resolved to (cache or lookup,
+elapsed ms) at `info` and a name with none at `warning`; `connect` each address dialled at
+`verbose`, each failed dial at `warning`, the connection made at `info`, the pool's reuse decision
+at `verbose`, and every failed connect (with its `CurlExitCode`) or escaping exception (type and
+message) at `error`; `proxy` the CONNECT or SOCKS handshake at `verbose` and the tunnel at `info`;
+`tls` the handshake's version, cipher suite, ALPN and route (`IHandshakeReportingTlsProvider.Route`)
+at `info`, each certificate and the chain verdict at `verbose`, a failed handshake at `error`;
+`quic` the dial at `verbose`, the connection at `info`, a failure at `error`. The handshake's details
+come from the `TlsHandshakeEvent` the provider reports, caught by `HandshakeCapturingTransferEvents`,
+which wraps the target's events only when `info` is on. A proxy is named by kind, host and port and
+no credential, pass phrase or `Proxy-Authorization` reaches the log; `Curl.Tls` and `Curl.Quic`
+log nothing themselves. Tests record lines through `Fakes/RecordingDiagnosticLog`.
 
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in
@@ -287,8 +331,8 @@ the test, so TLS is tested without a socket. `TcpConnectionListenerTests` and
 `TcpPendingConnectionTests` bind local TCP sockets without connecting to them. The tests that
 connect or send bytes are the loopback tests in `TcpDialerTests` (TCP and Unix socket), `UdpDatagramChannelTests`,
 `TcpConnectorTests.LocalEndPoint` (plain and over TLS) and the accepting test in `TcpConnectionListenerTests`, tagged
-`[TestCategory("Integration")]`, as is `DnsSocketOpenerTests`' TCP connect. Per ADR-0083 the six members only those tests can reach,
-`TcpDialer.DialAsync`, `TcpDialer.DialUnixSocketAsync`, `TcpPendingConnection.AcceptStreamConnectionAsync` (behind the internal
+`[TestCategory("Integration")]`, as is `DnsSocketOpenerTests`' TCP connect. Per ADR-0083 the members only those tests can reach,
+`TcpDialer.DialAsync`, `TcpDialer.DialFromAsync` with the `DialBoundAsync` both run, `TcpDialer.DialUnixSocketAsync`, `TcpPendingConnection.AcceptStreamConnectionAsync` (behind the internal
 `AcceptConnectionAsync` seam), `UdpDatagramChannel.SendAsync`, `UdpDatagramChannel.ReceiveAsync` and `DnsSocketOpener.ConnectStreamAsync`,
 carry `[ExcludeFromCodeCoverage]`, so the fast-run coverage gate holds without the network.
 Keep them thin: logic added there is not measured.

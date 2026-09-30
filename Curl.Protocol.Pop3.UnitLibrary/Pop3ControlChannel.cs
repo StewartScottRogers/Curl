@@ -12,6 +12,10 @@ namespace Curl.Protocol.Pop3;
 /// each line read, as a response header.
 /// </param>
 /// <param name="cancellationToken">Cancels every send and read.</param>
+/// <param name="diagnosticLog">
+/// Where each command sent and each status read are logged at <c>verbose</c> (ADR-0222), a
+/// command as its sender says it may be logged; <see langword="null" /> logs nothing.
+/// </param>
 /// <remarks>
 /// Commands and responses are Latin-1. As measured on curl 8.21.0 (BL-547): a line ends at
 /// LF, with a CR before it dropped; a status line starts with <c>+</c> or <c>-ERR</c> and any
@@ -20,7 +24,8 @@ namespace Curl.Protocol.Pop3;
 /// sent is reported with its CRLF and every line read with its line end, skipped or not, until
 /// <see cref="StopReporting" />; a body's bytes are not reported here (BL-552).
 /// </remarks>
-internal sealed class Pop3ControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken)
+internal sealed class Pop3ControlChannel(
+    IConnection connection, ITransferEvents events, CancellationToken cancellationToken, IDiagnosticLog? diagnosticLog = null)
 {
     private const int ReadBufferSize = 4096;
 
@@ -33,6 +38,8 @@ internal sealed class Pop3ControlChannel(IConnection connection, ITransferEvents
     private const string ErrorPrefix = "-ERR";
 
     private const string CapabilitiesEnd = ".";
+
+    private readonly IDiagnosticLog log = diagnosticLog ?? NoDiagnosticLog.Instance;
 
     private readonly byte[] buffer = new byte[ReadBufferSize];
 
@@ -68,9 +75,14 @@ internal sealed class Pop3ControlChannel(IConnection connection, ITransferEvents
     /// read to find closed, and the command is not reported.
     /// </summary>
     /// <param name="command">The command line without its line end, such as <c>CAPA</c>.</param>
+    /// <param name="logged">
+    /// What the diagnostic log says was sent when <paramref name="command" /> carries a
+    /// credential, or <see langword="null" /> to log <paramref name="command" /> itself.
+    /// </param>
     /// <returns>A task that completes once the command is sent or the send has failed.</returns>
-    public async ValueTask SendAsync(string command)
+    public async ValueTask SendAsync(string command, string? logged = null)
     {
+        Pop3DiagnosticLogLines.CommandSent(log, logged ?? command);
         byte[] line = Encoding.Latin1.GetBytes(command + "\r\n");
         try
         {
@@ -98,7 +110,9 @@ internal sealed class Pop3ControlChannel(IConnection connection, ITransferEvents
             string line = await ReadLineAsync().ConfigureAwait(false);
             if (line.StartsWith('+') || line.StartsWith(ErrorPrefix, StringComparison.Ordinal))
             {
-                return new Pop3Response(line);
+                var response = new Pop3Response(line);
+                Pop3DiagnosticLogLines.ResponseRead(log, response);
+                return response;
             }
         }
     }

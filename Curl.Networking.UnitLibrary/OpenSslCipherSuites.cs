@@ -45,8 +45,27 @@ internal static class OpenSslCipherSuites
         ("AES128-SHA", TlsCipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA),
     ];
 
+    // OpenSSL's names for the DHE-DSS suites (openssl ciphers -V): offered only when
+    // --ciphers names them, since OpenSSL's DEFAULT list and its measured hello have none.
+    private static readonly (string OpenSslName, TlsCipherSuite Suite)[] Tls12DssNames =
+    [
+        ("DHE-DSS-AES256-GCM-SHA384", TlsCipherSuite.TLS_DHE_DSS_WITH_AES_256_GCM_SHA384),
+        ("DHE-DSS-ARIA256-GCM-SHA384", TlsCipherSuite.TLS_DHE_DSS_WITH_ARIA_256_GCM_SHA384),
+        ("DHE-DSS-AES128-GCM-SHA256", TlsCipherSuite.TLS_DHE_DSS_WITH_AES_128_GCM_SHA256),
+        ("DHE-DSS-ARIA128-GCM-SHA256", TlsCipherSuite.TLS_DHE_DSS_WITH_ARIA_128_GCM_SHA256),
+        ("DHE-DSS-AES256-SHA256", TlsCipherSuite.TLS_DHE_DSS_WITH_AES_256_CBC_SHA256),
+        ("DHE-DSS-CAMELLIA256-SHA256", TlsCipherSuite.TLS_DHE_DSS_WITH_CAMELLIA_256_CBC_SHA256),
+        ("DHE-DSS-AES128-SHA256", TlsCipherSuite.TLS_DHE_DSS_WITH_AES_128_CBC_SHA256),
+        ("DHE-DSS-CAMELLIA128-SHA256", TlsCipherSuite.TLS_DHE_DSS_WITH_CAMELLIA_128_CBC_SHA256),
+        ("DHE-DSS-AES256-SHA", TlsCipherSuite.TLS_DHE_DSS_WITH_AES_256_CBC_SHA),
+        ("DHE-DSS-CAMELLIA256-SHA", TlsCipherSuite.TLS_DHE_DSS_WITH_CAMELLIA_256_CBC_SHA),
+        ("DHE-DSS-AES128-SHA", TlsCipherSuite.TLS_DHE_DSS_WITH_AES_128_CBC_SHA),
+        ("DHE-DSS-CAMELLIA128-SHA", TlsCipherSuite.TLS_DHE_DSS_WITH_CAMELLIA_128_CBC_SHA),
+        ("DHE-DSS-DES-CBC3-SHA", TlsCipherSuite.TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA),
+    ];
+
     private static readonly FrozenDictionary<string, TlsCipherSuite> Tls12SuitesByOpenSslName =
-        Tls12Names.ToFrozenDictionary(entry => entry.OpenSslName, entry => entry.Suite, StringComparer.Ordinal);
+        Tls12Names.Concat(Tls12DssNames).ToFrozenDictionary(entry => entry.OpenSslName, entry => entry.Suite, StringComparer.Ordinal);
 
     // Every TLS 1.3 suite; OpenSSL names them by their IANA names.
     private static readonly FrozenSet<TlsCipherSuite> Tls13Suites = new[]

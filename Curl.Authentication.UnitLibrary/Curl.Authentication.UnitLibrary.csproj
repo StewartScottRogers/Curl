@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\Curl.Cryptography.UnitLibrary\Curl.Cryptography.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Kerberos.UnitLibrary\Curl.Kerberos.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Ntlm.UnitLibrary\Curl.Ntlm.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />

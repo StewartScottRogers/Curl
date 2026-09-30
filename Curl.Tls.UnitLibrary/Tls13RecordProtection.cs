@@ -25,16 +25,17 @@ public sealed class Tls13RecordProtection : IDisposable
     /// <summary>The <c>legacy_record_version</c> every protected record carries.</summary>
     public const ushort LegacyRecordVersion = 0x0303;
 
-    private const int TagLength = 16;
+    private readonly int tagLength;
 
     private readonly ITlsAead aead;
 
     private readonly byte[] iv;
 
-    private Tls13RecordProtection(ITlsAead aead, byte[] iv)
+    private Tls13RecordProtection(ITlsAead aead, byte[] iv, int tagLength)
     {
         this.aead = aead;
         this.iv = iv;
+        this.tagLength = tagLength;
     }
 
     /// <summary>Gets the sequence number the next record is protected or checked with.</summary>
@@ -42,12 +43,13 @@ public sealed class Tls13RecordProtection : IDisposable
 
     /// <summary>
     /// Returns whether the record layer can protect records of <paramref name="cipherSuite" />:
-    /// <c>TLS_AES_128_GCM_SHA256</c>, <c>TLS_AES_256_GCM_SHA384</c> and
-    /// <c>TLS_CHACHA20_POLY1305_SHA256</c>. The CCM suites wait for the hand-built AES-CCM.
+    /// <c>TLS_AES_128_GCM_SHA256</c>, <c>TLS_AES_256_GCM_SHA384</c>,
+    /// <c>TLS_CHACHA20_POLY1305_SHA256</c>, <c>TLS_AES_128_CCM_SHA256</c> and
+    /// <c>TLS_AES_128_CCM_8_SHA256</c>.
     /// </summary>
     /// <param name="cipherSuite">The cipher suite code point.</param>
     /// <returns>Whether <see cref="Create" /> accepts the suite.</returns>
-    public static bool CanProtect(ushort cipherSuite) => cipherSuite is 0x1301 or 0x1302 or 0x1303;
+    public static bool CanProtect(ushort cipherSuite) => cipherSuite is >= 0x1301 and <= 0x1305;
 
     /// <summary>Creates the protection a traffic secret gives, with the sequence number at zero.</summary>
     /// <param name="cipherSuite">The negotiated suite.</param>
@@ -64,11 +66,17 @@ public sealed class Tls13RecordProtection : IDisposable
         }
 
         Tls13TrafficKeys keys = cipherSuite.KeySchedule.DeriveTrafficKeys(trafficSecret, cipherSuite.KeyLength);
-        ITlsAead aead = cipherSuite.Code == Tls13CipherSuite.ChaCha20Poly1305Sha256.Code
-            ? new ChaCha20Poly1305TlsAead(keys.Key)
-            : new AesGcmTlsAead(keys.Key);
-        return new Tls13RecordProtection(aead, keys.Iv);
+        ITlsAead aead = cipherSuite.Code switch
+        {
+            0x1303 => new ChaCha20Poly1305TlsAead(keys.Key),
+            0x1304 or 0x1305 => new AesCcmTlsAead(keys.Key),
+            _ => new AesGcmTlsAead(keys.Key),
+        };
+        return new Tls13RecordProtection(aead, keys.Iv, TagLengthOf(cipherSuite.Code));
     }
+
+    /// <summary>Returns the AEAD tag length of a suite: 8 bytes for <c>TLS_AES_128_CCM_8_SHA256</c>, 16 for the rest.</summary>
+    private static int TagLengthOf(ushort cipherSuite) => cipherSuite == 0x1305 ? 8 : 16;
 
     /// <summary>
     /// Protects <paramref name="content" /> as records of <paramref name="contentType" />,
@@ -135,24 +143,24 @@ public sealed class Tls13RecordProtection : IDisposable
 
     private byte[]? Open(ReadOnlySpan<byte> header, ReadOnlySpan<byte> fragment)
     {
-        if (fragment.Length < TagLength)
+        if (fragment.Length < tagLength)
         {
             return null;
         }
 
         Span<byte> nonce = stackalloc byte[12];
         WriteNonce(nonce);
-        byte[] plaintext = new byte[fragment.Length - TagLength];
-        return aead.TryDecrypt(nonce, fragment[..^TagLength], fragment[^TagLength..], plaintext, header) ? plaintext : null;
+        byte[] plaintext = new byte[fragment.Length - tagLength];
+        return aead.TryDecrypt(nonce, fragment[..^tagLength], fragment[^tagLength..], plaintext, header) ? plaintext : null;
     }
 
     private void WriteRecord(ArrayBufferWriter<byte> records, TlsContentType contentType, ReadOnlySpan<byte> content)
     {
         int innerLength = content.Length + 1;
-        Span<byte> record = records.GetSpan(RecordHeaderLength + innerLength + TagLength)[..(RecordHeaderLength + innerLength + TagLength)];
+        Span<byte> record = records.GetSpan(RecordHeaderLength + innerLength + tagLength)[..(RecordHeaderLength + innerLength + tagLength)];
         record[0] = (byte)TlsContentType.ApplicationData;
         BinaryPrimitives.WriteUInt16BigEndian(record[1..], LegacyRecordVersion);
-        BinaryPrimitives.WriteUInt16BigEndian(record[3..], (ushort)(innerLength + TagLength));
+        BinaryPrimitives.WriteUInt16BigEndian(record[3..], (ushort)(innerLength + tagLength));
         byte[] inner = [.. content, (byte)contentType];
         Span<byte> nonce = stackalloc byte[12];
         WriteNonce(nonce);

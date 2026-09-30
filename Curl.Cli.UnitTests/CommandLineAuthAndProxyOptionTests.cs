@@ -105,6 +105,32 @@ public sealed class CommandLineAuthAndProxyOptionTests
     }
 
     [TestMethod]
+    public void Parse_NoAwsSigV4_LeavesItNull()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsNull(result.Options.AwsSigV4);
+    }
+
+    /// <summary>
+    /// <c>--aws-sigv4</c> keeps its last value verbatim and leaves <see cref="CommandLineOptions.AuthSchemes" />
+    /// alone: the HTTP handler signs in place of every scheme whenever it is set (BL-629).
+    /// </summary>
+    [TestMethod]
+    [DataRow(new[] { "--aws-sigv4", "aws:amz:us-east-1:s3" }, "aws:amz:us-east-1:s3")]
+    [DataRow(new[] { "--aws-sigv4", "osc", "--aws-sigv4", "aws:amz" }, "aws:amz")]
+    [DataRow(new[] { "--aws-sigv4", "" }, "")]
+    public void Parse_AwsSigV4_RecordsTheLastValueVerbatim(string[] arguments, string expected)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(expected, result.Options.AwsSigV4);
+        Assert.AreEqual(HttpAuthSchemes.Basic, result.Options.AuthSchemes);
+    }
+
+    [TestMethod]
     [DataRow("--oauth2-bearer")]
     [DataRow("--socks4")]
     [DataRow("--socks4a")]

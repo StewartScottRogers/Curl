@@ -137,7 +137,8 @@ internal sealed class Http2Session(IConnection connection) : IHttpStreamSession,
     /// Sends the client preface and opens stream 1 without sending anything on it: the stream
     /// an HTTP/1.1 request upgraded to h2c becomes, half closed by the client, whose response
     /// arrives on it (RFC 7540 section 3.2), as curl sends the preface once the <c>101</c> has
-    /// arrived (measured, BL-716 Notes).
+    /// arrived (measured, BL-716 Notes). Once the response ends the stream is closed, so later
+    /// requests on the session open streams 3, 5, ... within the peer's concurrency limit (BL-866).
     /// </summary>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>The stream's identifier, 1.</returns>
@@ -145,7 +146,7 @@ internal sealed class Http2Session(IConnection connection) : IHttpStreamSession,
     {
         await Frames.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
         isPrefaceSent = true;
-        return Frames.OpenStream();
+        return Frames.OpenUpgradedStream();
     }
 
     /// <summary>

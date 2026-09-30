@@ -39,4 +39,26 @@ public sealed record HttpAuthRequest(
     NetworkCredential? Credential,
     string? BearerToken,
     HttpAuthSchemes AllowedSchemes,
-    bool IsProxy);
+    bool IsProxy)
+{
+    /// <summary>
+    /// Gets where the authenticator reports the <c>-v</c> lines answering the request causes,
+    /// such as a Negotiate context's failure (BL-843); <see cref="NoTransferEvents.Instance" />
+    /// when nobody is listening. The HTTP handler decides where in the transfer's output they
+    /// land.
+    /// </summary>
+    public ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
+
+    /// <summary>
+    /// Gets the DER of the TLS server certificate of the connection the request goes over;
+    /// empty, the default, when it has no TLS. Negotiate turns it into channel bindings (BL-915).
+    /// </summary>
+    public ReadOnlyMemory<byte> ServerCertificate { get; init; }
+
+    /// <summary>
+    /// Gets what signing the request with AWS Signature Version 4 needs, which curl does in
+    /// place of every other scheme when <c>--aws-sigv4</c> is given; <see langword="null" />,
+    /// the default, when it is not, and always for a proxy (BL-629).
+    /// </summary>
+    public AwsSigV4Inputs? AwsSigV4 { get; init; }
+}

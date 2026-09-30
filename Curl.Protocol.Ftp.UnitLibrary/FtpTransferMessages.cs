@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 
 namespace Curl.Protocol.Ftp;
 
@@ -108,7 +109,7 @@ internal static class FtpTransferMessages
     /// </summary>
     internal const string RequestedSslLevelFailed = "Requested SSL level failed";
 
-    /// <summary>The exit 67 message for a <c>332</c> reply to <c>PASS</c>.</summary>
+    /// <summary>The exit 67 message for a <c>332</c> reply to <c>USER</c> or <c>PASS</c> without <c>--ftp-account</c>.</summary>
     internal const string AccountRequested = "ACCT requested but none available";
 
     /// <summary>The exit 9 message for a <c>CWD</c> the server refused.</summary>
@@ -193,6 +194,16 @@ internal static class FtpTransferMessages
     /// <returns>The message to report.</returns>
     internal static string AccessDenied(int code) => Format($"Access denied: {code}");
 
+    /// <summary>The exit 11 message for an <c>ACCT</c> answered with anything but <c>230</c>.</summary>
+    /// <param name="code">The refusing reply's code.</param>
+    /// <returns>The message to report.</returns>
+    internal static string AccountRejected(int code) => Format($"ACCT rejected by server: {code}");
+
+    /// <summary>The exit 84 message for a <c>PRET</c> answered with anything but <c>200</c>.</summary>
+    /// <param name="code">The refusing reply's code.</param>
+    /// <returns>The message to report.</returns>
+    internal static string PretNotAccepted(int code) => Format($"PRET command not accepted: {code}");
+
     /// <summary>
     /// The exit 6 message, and the first of two <c>-v</c> lines, for a <c>-P</c> name that
     /// does not resolve (ADR-0108).
@@ -248,6 +259,113 @@ internal static class FtpTransferMessages
     /// <returns>The message to report.</returns>
     internal static string OutputWriteFailed(int passed, int returned) =>
         Format($"Failure writing output to destination, passed {passed} returned {returned}");
+
+    /// <summary>The <c>-v</c> line after the first <c>EPSV</c> or <c>PASV</c> is sent (BL-931).</summary>
+    internal const string ConnectDataStreamPassively = "Connect data stream passively";
+
+    /// <summary>The <c>-v</c> line after <c>EPRT</c> or <c>PORT</c> is accepted (BL-931).</summary>
+    internal const string ConnectDataStreamActively = "Connect data stream actively";
+
+    /// <summary>The <c>-v</c> line after an <c>EPSV</c> answered with anything but <c>229</c>, before <c>PASV</c> (BL-931).</summary>
+    internal const string EpsvFailed = "Failed EPSV attempt. Disabling EPSV";
+
+    /// <summary>The exit 8 message for an <c>EPSV</c> answered with anything but <c>229</c> over IPv6 (BL-903).</summary>
+    internal const string EpsvFailedOverIPv6 = "Failed EPSV attempt, exiting";
+
+    /// <summary>The first of the <c>-v</c> lines before an active-mode data connection is accepted (BL-931).</summary>
+    internal const string DataConnectionNotAvailable = "Data conn was not available immediately";
+
+    /// <summary>The second of the <c>-v</c> lines before an active-mode data connection is accepted (BL-931).</summary>
+    internal const string ReadyToAccept = "Ready to accept data connection from server";
+
+    /// <summary>The <c>-v</c> line once the server's active-mode data connection is accepted (BL-931).</summary>
+    internal const string ConnectionAccepted = "Connection accepted from server";
+
+    /// <summary>The <c>-v</c> line after the <c>ABOR</c> that ends a ranged download (BL-931).</summary>
+    internal const string PartialDownloadClosing = "partial download completed, closing connection";
+
+    /// <summary>
+    /// The <c>-v</c> line for a <c>227</c> address set aside for the control connection's
+    /// host, as without <c>--no-ftp-skip-pasv-ip</c> (BL-931).
+    /// </summary>
+    /// <param name="passiveAddress">The address the <c>227</c> reply named.</param>
+    /// <param name="urlHost">The URL's host, as given.</param>
+    /// <returns>The line, such as <c>Skip 127.0.0.1 for data connection, reuse localhost instead</c>.</returns>
+    internal static string SkipPassiveAddress(string passiveAddress, string urlHost) =>
+        "Skip " + passiveAddress + " for data connection, reuse " + urlHost + " instead";
+
+    /// <summary>The <c>-v</c> line before a passive data connection is dialled (BL-931).</summary>
+    /// <param name="host">The control connection's address, or the <c>227</c> address under <c>--no-ftp-skip-pasv-ip</c>.</param>
+    /// <param name="port">The data port.</param>
+    /// <returns>The line, such as <c>Connecting to 127.0.0.1 port 55801</c>.</returns>
+    internal static string ConnectingTo(string host, int port) => Format($"Connecting to {host} port {port}");
+
+    /// <summary>The <c>-v</c> line after a download's <c>150</c>: the range's byte count, or -1 for none (BL-931).</summary>
+    /// <param name="maxDownload">The range's byte count, or <see langword="null" /> for none.</param>
+    /// <returns>The line, such as <c>Maxdownload = -1</c>.</returns>
+    internal static string MaxDownload(long? maxDownload) => Format($"Maxdownload = {maxDownload ?? -1}");
+
+    /// <summary>The <c>-v</c> line after a file download's <c>150</c>: the bytes expected, or -1 when unknown (BL-931).</summary>
+    /// <param name="size">The bytes expected, or <see langword="null" /> when unknown.</param>
+    /// <returns>The line, such as <c>Getting file with size: 11</c>.</returns>
+    internal static string GettingFile(long? size) => Format($"Getting file with size: {size ?? -1}");
+
+    /// <summary>The <c>-v</c> line before a download's <c>REST</c> (BL-931).</summary>
+    /// <param name="offset">The offset <c>REST</c> sends.</param>
+    /// <returns>The line, such as <c>Instructs server to resume from offset 3</c>.</returns>
+    internal static string ResumingFrom(long offset) => Format($"Instructs server to resume from offset {offset}");
+
+    /// <summary>The <c>-v</c> line for the server's active-mode data connection, accepted (BL-931).</summary>
+    /// <param name="remote">The server's end.</param>
+    /// <param name="local">The listening end.</param>
+    /// <returns>The line, with curl's trailing space.</returns>
+    internal static string SecondConnectionEstablished(IPEndPoint remote, IPEndPoint local) =>
+        Format($"Established 2nd connection to {remote.Address} ({remote.Address} port {remote.Port}) from {local.Address} port {local.Port} ");
+
+    /// <summary>The <c>-v</c> line once an upload has been written and its data connection closed (BL-931).</summary>
+    /// <param name="bytesSent">The bytes written.</param>
+    /// <returns>The line, such as <c>upload completely sent off: 14 bytes</c>.</returns>
+    internal static string UploadSent(long bytesSent) => Format($"upload completely sent off: {bytesSent} bytes");
+
+    /// <summary>The <c>-v</c> line for a <c>257</c> reply to <c>PWD</c> that names no directory (BL-945).</summary>
+    internal const string FailedToFigureOutPath = "Failed to figure out path";
+
+    /// <summary>
+    /// The <c>-v</c> line before the first command after login when the URL path's
+    /// directory is the entry directory, so no <c>CWD</c> is needed (BL-945).
+    /// </summary>
+    internal const string SamePathAsPreviousTransfer = "Request has same path as previous transfer";
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.21.0 writes for a reply to <c>PWD</c> (BL-945): the
+    /// directory it named, <see cref="FailedToFigureOutPath" /> for a <c>257</c> that names
+    /// none, and none for any other reply.
+    /// </summary>
+    /// <param name="code">The reply's code.</param>
+    /// <param name="entryPath">The directory the reply named, or <see langword="null" />.</param>
+    /// <returns>The line, such as <c>Entry path is '/'</c>, or <see langword="null" /> for none.</returns>
+    internal static string? EntryPathReply(int code, string? entryPath) =>
+        entryPath is not null ? "Entry path is '" + entryPath + "'"
+        : code == 257 ? FailedToFigureOutPath
+        : null;
+
+    /// <summary>The <c>-v</c> line before the end-of-transfer reply is read, or <c>ABOR</c> sent (BL-931).</summary>
+    /// <param name="directory">The URL path's directories, each followed by <c>/</c>; empty for none.</param>
+    /// <returns>The line, such as <c>Remembering we are in directory "dir/"</c>.</returns>
+    internal static string RememberingDirectory(string directory) => "Remembering we are in directory \"" + directory + "\"";
+
+    /// <summary>The <c>-v</c> line for a control connection kept after a transfer that ended with <c>226</c> (BL-931).</summary>
+    /// <param name="connectionNumber">The control connection's number.</param>
+    /// <param name="host">The URL's host.</param>
+    /// <param name="port">The control connection's port.</param>
+    /// <returns>The line, such as <c>Connection #0 to host 127.0.0.1:21 left intact</c>.</returns>
+    internal static string ConnectionLeftIntact(long connectionNumber, string host, int port) =>
+        Format($"Connection #{connectionNumber} to host {host}:{port} left intact");
+
+    /// <summary>The <c>-v</c> line after <see cref="PartialDownloadClosing" /> (BL-931).</summary>
+    /// <param name="connectionNumber">The control connection's number.</param>
+    /// <returns>The line, such as <c>shutting down connection #0</c>.</returns>
+    internal static string ShuttingDownConnection(long connectionNumber) => Format($"shutting down connection #{connectionNumber}");
 
     private static string Format(FormattableString message) => message.ToString(CultureInfo.InvariantCulture);
 }

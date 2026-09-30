@@ -11,21 +11,10 @@ namespace Curl.Protocol.Ssh.KeyExchange;
 /// round follows in that group.
 /// </summary>
 /// <param name="hashAlgorithm">The method's hash.</param>
+/// <param name="sizes">The prime sizes asked for and accepted: the platform preset's (ADR-0206, ADR-0268).</param>
 /// <param name="keySource">Where the client's ephemeral key pair comes from.</param>
-internal sealed class GroupExchangeSshKeyExchange(HashAlgorithmName hashAlgorithm, ISshEphemeralKeySource keySource) : ISshKeyExchange
+internal sealed class GroupExchangeSshKeyExchange(HashAlgorithmName hashAlgorithm, SshGroupExchangeSizes sizes, ISshEphemeralKeySource keySource) : ISshKeyExchange
 {
-    /// <summary>
-    /// The smallest prime, in bits, the client asks for and accepts: measured from the
-    /// Windows reference build's <c>SSH_MSG_KEX_DH_GEX_REQUEST</c> (BL-564).
-    /// </summary>
-    internal const uint MinimumBits = 2048;
-
-    /// <summary>The preferred prime size in bits, measured likewise.</summary>
-    internal const uint PreferredBits = 4096;
-
-    /// <summary>The largest prime, in bits, the client asks for and accepts, measured likewise.</summary>
-    internal const uint MaximumBits = 4096;
-
     /// <inheritdoc />
     public async ValueTask<SshKeyExchangeOutcome> ExchangeAsync(
         SshKeyExchangeMessages messages,
@@ -34,9 +23,7 @@ internal sealed class GroupExchangeSshKeyExchange(HashAlgorithmName hashAlgorith
     {
         SshWireWriter request = new();
         request.WriteByte(SshMessageNumber.GroupExchangeRequest);
-        request.WriteUInt32(MinimumBits);
-        request.WriteUInt32(PreferredBits);
-        request.WriteUInt32(MaximumBits);
+        WriteSizes(request);
         await messages.SendAsync(request.ToArray(), cancellationToken).ConfigureAwait(false);
 
         SshWireReader groupMessage = await messages.ReadAsync(SshMessageNumber.GroupExchangeGroup, cancellationToken).ConfigureAwait(false);
@@ -53,18 +40,23 @@ internal sealed class GroupExchangeSshKeyExchange(HashAlgorithmName hashAlgorith
             cancellationToken).ConfigureAwait(false);
 
         SshExchangeHashInput hashInput = new(handshake, round.HostKey);
-        hashInput.Fields.WriteUInt32(MinimumBits);
-        hashInput.Fields.WriteUInt32(PreferredBits);
-        hashInput.Fields.WriteUInt32(MaximumBits);
+        WriteSizes(hashInput.Fields);
         hashInput.Fields.WriteMpint(prime);
         hashInput.Fields.WriteMpint(generator);
         return round.Finish(hashInput, hashAlgorithm);
     }
 
-    private static FiniteFieldDiffieHellmanGroup CreateGroup(byte[] prime, byte[] generator)
+    private void WriteSizes(SshWireWriter writer)
+    {
+        writer.WriteUInt32(sizes.MinimumBits);
+        writer.WriteUInt32(sizes.PreferredBits);
+        writer.WriteUInt32(sizes.MaximumBits);
+    }
+
+    private FiniteFieldDiffieHellmanGroup CreateGroup(byte[] prime, byte[] generator)
     {
         long bits = new BigInteger(prime, isUnsigned: true, isBigEndian: true).GetBitLength();
-        if (bits < MinimumBits || bits > MaximumBits || !FiniteFieldDiffieHellmanGroup.TryCreate(prime, generator, out FiniteFieldDiffieHellmanGroup? group))
+        if (bits < sizes.MinimumBits || bits > sizes.MaximumBits || !FiniteFieldDiffieHellmanGroup.TryCreate(prime, generator, out FiniteFieldDiffieHellmanGroup? group))
         {
             throw new InvalidDataException($"The SSH server's group-exchange prime of {bits} bits and its generator are not a usable group.");
         }

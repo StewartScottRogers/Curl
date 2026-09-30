@@ -8,16 +8,35 @@ namespace Curl.Protocol.Ftp;
 /// Sends commands on an FTP control connection and reads its replies, a line at a time.
 /// </summary>
 /// <param name="connection">The control connection; the caller owns and disposes it.</param>
+/// <param name="events">
+/// Where <c>-v</c> and <c>--trace</c> learn of each command sent, as a request header, and
+/// each reply line read, as a response header.
+/// </param>
 /// <param name="cancellationToken">Cancels every send and read, until <see cref="CancellationToken" /> is set.</param>
+/// <param name="diagnostics">
+/// Where the diagnostic log learns of each command sent and each reply read, at
+/// <c>verbose</c>, <c>QUIT</c> included (BL-924).
+/// </param>
 /// <remarks>
 /// Commands and replies are Latin-1, so every byte of a percent-decoded path reaches the
 /// server unchanged, as curl sends it. A reply ends at the first line that starts with
 /// three digits and a space; the lines before it, such as the <c>220-</c> lines of a
 /// multi-line greeting or a bare <c>331</c>, are skipped, as curl skips them. A line ends
-/// at LF, with a CR before it dropped.
+/// at LF, with a CR before it dropped. As measured on curl 8.21.0 (BL-930), every command
+/// sent is reported with its CRLF, <c>PASS</c>'s password in clear, and every complete line
+/// read with its line end, skipped or not, until <see cref="StopReporting" />.
 /// </remarks>
-internal sealed class FtpControlChannel(IConnection connection, CancellationToken cancellationToken)
+internal sealed class FtpControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken, FtpDiagnosticLog diagnostics)
 {
+    /// <summary>Where lines are reported: <c>events</c> until <see cref="StopReporting" />, nowhere after.</summary>
+    private ITransferEvents reporting = events;
+
+    /// <summary>
+    /// Reports nothing more: curl sends <c>QUIT</c> as it closes the connection, where
+    /// <c>-v</c> does not see it or its reply.
+    /// </summary>
+    public void StopReporting() => reporting = NoTransferEvents.Instance;
+
     private const int ReadBufferSize = 4096;
 
     /// <summary>
@@ -66,12 +85,15 @@ internal sealed class FtpControlChannel(IConnection connection, CancellationToke
         {
             await connection.WriteAsync(line, CancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(CancellationToken).ConfigureAwait(false);
-            return true;
         }
         catch (IOException)
         {
             return false;
         }
+
+        reporting.ReportRequestHeader(line);
+        diagnostics.CommandSent(command);
+        return true;
     }
 
     /// <summary>
@@ -86,10 +108,13 @@ internal sealed class FtpControlChannel(IConnection connection, CancellationToke
     /// </exception>
     public async ValueTask<FtpReply?> ReadReplyAsync()
     {
+        string? firstLine = null;
         while (await ReadLineAsync().ConfigureAwait(false) is { } line)
         {
+            firstLine ??= line;
             if (TryParseLastLine(line, out int code))
             {
+                diagnostics.ReplyRead(code, firstLine);
                 return new FtpReply(code, line);
             }
         }
@@ -118,7 +143,10 @@ internal sealed class FtpControlChannel(IConnection connection, CancellationToke
             byte next = buffer[bufferStart++];
             if (next == (byte)'\n')
             {
-                return Encoding.Latin1.GetString([.. line]).TrimEnd('\r');
+                line.Add(next);
+                byte[] bytes = [.. line];
+                reporting.ReportResponseHeader(bytes);
+                return Encoding.Latin1.GetString(bytes, 0, bytes.Length - 1).TrimEnd('\r');
             }
 
             line.Add(next);

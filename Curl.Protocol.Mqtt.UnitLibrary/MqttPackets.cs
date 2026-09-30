@@ -10,6 +10,9 @@ namespace Curl.Protocol.Mqtt;
 /// </summary>
 internal static class MqttPackets
 {
+    /// <summary>The packet-type nibble of CONNACK.</summary>
+    internal const byte ConnackType = 0x20;
+
     /// <summary>The packet-type nibble of PUBLISH, whatever its flags.</summary>
     internal const byte PublishType = 0x30;
 

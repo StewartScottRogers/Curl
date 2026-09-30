@@ -18,7 +18,7 @@ public sealed class CurlCompositionDnsServersTests
     [TestMethod]
     public void CreateDnsResolver_WithoutACaresOption_IsTheSystemResolver()
     {
-        Assert.IsInstanceOfType<SystemDnsResolver>(CurlComposition.CreateDnsResolver(Parse(), TimeProvider.System));
+        Assert.IsInstanceOfType<SystemDnsResolver>(CurlComposition.CreateDnsResolver(Parse(), TimeProvider.System, new TcpDialer()));
     }
 
     [TestMethod]
@@ -28,7 +28,7 @@ public sealed class CurlCompositionDnsServersTests
     [DataRow("--dns-ipv6-addr", "::1")]
     public void CreateDnsResolver_WithACaresOption_IsTheHandBuiltResolver(string option, string value)
     {
-        Assert.IsInstanceOfType<DnsServerResolver>(CurlComposition.CreateDnsResolver(Parse(option, value), TimeProvider.System));
+        Assert.IsInstanceOfType<DnsServerResolver>(CurlComposition.CreateDnsResolver(Parse(option, value), TimeProvider.System, new TcpDialer()));
     }
 
     [TestMethod]

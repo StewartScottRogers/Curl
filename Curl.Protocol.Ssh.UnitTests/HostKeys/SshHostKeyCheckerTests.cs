@@ -10,7 +10,7 @@ namespace Curl.Protocol.Ssh.HostKeys;
 /// key's.
 /// </summary>
 [TestClass]
-public sealed class SshHostKeyCheckerTests
+public sealed partial class SshHostKeyCheckerTests
 {
     private const string Md5 = "f844dafd8e0d77290b7d4e8377418b88";
 

@@ -26,7 +26,7 @@ public sealed class Tls13ClientHandshakeFailureTests
     {
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { CipherSuites = [] }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { CipherSuites = [0xc02f] }));
-        Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.X25519, 0x11ec] }));
+        Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.X25519, 0x0016] }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.Secp256r1] }));
     }
 
@@ -284,6 +284,27 @@ public sealed class Tls13ClientHandshakeFailureTests
     [TestMethod]
     public void AServerHelloWithADegenerateKeyShareIsAnIllegalParameter() =>
         AssertServerHelloFails(TlsAlertDescription.IllegalParameter, ServerHelloBytes([Tls13(), KeyShareExtension.EncodeServerShare(new KeyShareEntry(TlsNamedGroup.X25519, new byte[32]))]));
+
+    [TestMethod]
+    [DataRow(TlsNamedGroup.X25519MlKem768, 1088 + 32 - 1)]
+    [DataRow(TlsNamedGroup.X25519MlKem768, 1088 + 32 + 1)]
+    [DataRow(TlsNamedGroup.X25519MlKem768, 32)]
+    [DataRow(TlsNamedGroup.X448, 55)]
+    [DataRow(TlsNamedGroup.X448, 57)]
+    public void AServerShareOfTheWrongLengthIsAnIllegalParameter(int group, int length)
+    {
+        using Tls13ClientHandshake client = Client(DefaultSettings with
+        {
+            CipherSuites = [0x1301],
+            SupportedGroups = [TlsNamedGroup.X25519MlKem768, TlsNamedGroup.X448],
+            KeyShareGroups = [TlsNamedGroup.X25519MlKem768, TlsNamedGroup.X448],
+        });
+        client.Start();
+
+        Tls13HandshakeOutput output = client.Receive(TlsEncryptionLevel.Initial, ServerHelloBytes([Tls13(), KeyShareExtension.EncodeServerShare(new KeyShareEntry((ushort)group, new byte[length]))]));
+
+        AssertFails(TlsAlertDescription.IllegalParameter, output);
+    }
 
     [TestMethod]
     public void MalformedEncryptedExtensionsAreADecodeError() =>

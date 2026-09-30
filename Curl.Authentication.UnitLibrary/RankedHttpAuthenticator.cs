@@ -14,12 +14,16 @@ namespace Curl.Authentication;
 /// <remarks>
 /// There is no fallback, as the reference build has none: when a Negotiate context makes no
 /// token, or a Digest or NTLM challenge cannot be read, it sends nothing rather than answer a
-/// lower-ranked scheme also offered. Negotiate and NTLM need I/O, so only
+/// lower-ranked scheme also offered; when Negotiate was picked only after the challenge, as
+/// under <c>--anyauth</c>, that nothing is the empty value, so the request is sent once more
+/// without a header, and its 401 steps a context without answering (ADR-0232). Negotiate and NTLM need I/O, so only
 /// <see cref="CreateAuthorizationAsync" /> and <see cref="ContinueAuthorizationAsync" /> answer
 /// them (ADR-0176, ADR-0181). As libcurl does, <c>--negotiate</c> alone tries it on the first
-/// request, and after a challenge answers only when <c>-u</c> was given, even as <c>-u :</c>;
+/// request, and after a challenge answers only when <c>-u</c> was given, even as <c>-u :</c>,
+/// though without it the context is still stepped so <c>-v</c> shows its failure;
 /// NTLM answers only when <c>-u</c> was given, and <c>--ntlm</c> alone sends its Type 1 message
-/// on the first request. Only NTLM goes on after a request that sent a credential.
+/// on the first request. Only NTLM, and Negotiate when the 401 carries the acceptor's token
+/// (ADR-0227), go on after a request that sent a credential.
 /// </remarks>
 public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAndBearer, DigestAuthenticator digest, NegotiateHttpAuthenticator negotiate, NtlmHttpAuthenticator ntlm) : IHttpAuthenticator
 {
@@ -43,7 +47,14 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
 
         if (AnswersWithNegotiate(request, challenges))
         {
-            return await negotiate.CreateAuthorizationAsync(request, cancellationToken).ConfigureAwait(false);
+            string? value = await negotiate.CreateAuthorizationAsync(request, cancellationToken).ConfigureAwait(false);
+            return value ?? (PicksNegotiateAfterTheChallenge(request, challenges) ? string.Empty : null);
+        }
+
+        if (StepsNegotiateWithoutAnswering(request, challenges))
+        {
+            await negotiate.StepWithoutAnsweringAsync(request, cancellationToken).ConfigureAwait(false);
+            return null;
         }
 
         return AnswersWithNtlm(request, challenges)
@@ -58,10 +69,60 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
         ArgumentNullException.ThrowIfNull(sentAuthorization);
         ArgumentNullException.ThrowIfNull(challenges);
 
-        return challenges.Count != 0 && AnswersWithNtlm(request, challenges)
+        if (challenges.Count == 0)
+        {
+            return null;
+        }
+
+        if (sentAuthorization.Length == 0)
+        {
+            if (AnswersWithNegotiate(request, challenges))
+            {
+                await negotiate.StepWithoutAnsweringAsync(request, cancellationToken).ConfigureAwait(false);
+            }
+
+            return null;
+        }
+
+        if (ContinuesNegotiate(request, sentAuthorization))
+        {
+            return await negotiate.ContinueAuthorizationAsync(request, sentAuthorization, challenges, cancellationToken).ConfigureAwait(false);
+        }
+
+        return AnswersWithNtlm(request, challenges)
             ? await ntlm.CreateAuthorizationAsync(request, sentAuthorization, sentBeforeAnyChallenge, challenges, cancellationToken).ConfigureAwait(false)
             : null;
     }
+
+    /// <summary>
+    /// Sends an answer already sent once more: a Digest answer counted on to its next nonce
+    /// count by <see cref="DigestAuthenticator.RepeatAuthorization" />, as curl 8.21.0 does
+    /// (BL-869); every other scheme's value as sent.
+    /// </summary>
+    /// <param name="request">The request being authorised.</param>
+    /// <param name="sentAuthorization">The header value the last request sent.</param>
+    /// <returns>The header value to send again.</returns>
+    public string RepeatAuthorization(HttpAuthRequest request, string sentAuthorization) =>
+        digest.RepeatAuthorization(request, sentAuthorization);
+
+    /// <summary>
+    /// Ends the handshake that sent <paramref name="sentAuthorization" />: a Negotiate context
+    /// kept for its next leg is disposed of without being stepped (ADR-0248); the other schemes
+    /// keep nothing between requests.
+    /// </summary>
+    /// <param name="sentAuthorization">The header value the request sent.</param>
+    public void EndAuthorization(string sentAuthorization) =>
+        negotiate.EndAuthorization(sentAuthorization);
+
+    /// <summary>
+    /// Decides whether the continuation is Negotiate's: for the origin only, when the request
+    /// sent a Negotiate value, which only <see cref="NegotiateHttpAuthenticator" /> makes, and
+    /// <c>-u</c> was given, as libcurl answers no 401 without a user (ADR-0227).
+    /// </summary>
+    private static bool ContinuesNegotiate(HttpAuthRequest request, string sentAuthorization) =>
+        !request.IsProxy
+            && request.Credential is not null
+            && sentAuthorization.StartsWith(NegotiateHttpAuthenticator.SchemePrefix, StringComparison.Ordinal);
 
     private static HttpAuthSchemes PickOf(HttpAuthRequest request, IReadOnlyList<string> challenges) =>
         HttpAuthSchemeRanking.PickFirst(request.AllowedSchemes & HttpChallengeSchemes.Offered(challenges));
@@ -76,6 +137,29 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
             && (challenges.Count == 0
                 ? request.AllowedSchemes == HttpAuthSchemes.Negotiate
                 : request.Credential is not null && PickOf(request, challenges) == HttpAuthSchemes.Negotiate);
+
+    /// <summary>
+    /// Decides whether Negotiate is picked only now, for the request that answers
+    /// <paramref name="challenges" />: when it was not the one scheme allowed, so the request
+    /// that drew them picked nothing, as <c>--anyauth</c> does. The request then goes out again
+    /// even when the context makes no token, as curl 8.21.0's <c>Curl_http_auth_act</c> asks for
+    /// it whatever the context will make (measured, ADR-0232).
+    /// </summary>
+    private static bool PicksNegotiateAfterTheChallenge(HttpAuthRequest request, IReadOnlyList<string> challenges) =>
+        challenges.Count != 0 && request.AllowedSchemes != HttpAuthSchemes.Negotiate;
+
+    /// <summary>
+    /// Decides whether a challenge is Negotiate's to step but not to answer: for the origin,
+    /// when <c>--negotiate</c> is the one scheme allowed, the challenges offer it, and no
+    /// <c>-u</c> was given, as libcurl's <c>Curl_input_negotiate</c> still steps a context for
+    /// the 401 - so <c>-v</c> shows its failure - but sends nothing (measured, BL-843 Notes).
+    /// </summary>
+    private static bool StepsNegotiateWithoutAnswering(HttpAuthRequest request, IReadOnlyList<string> challenges) =>
+        !request.IsProxy
+            && challenges.Count != 0
+            && request.Credential is null
+            && request.AllowedSchemes == HttpAuthSchemes.Negotiate
+            && PickOf(request, challenges) == HttpAuthSchemes.Negotiate;
 
     /// <summary>
     /// Decides whether NTLM answers: for the origin only (proxy NTLM is another task's), when a

@@ -73,7 +73,7 @@ password.
 
 - `IKerberosKdcTransport` moves bytes only; `Curl.Networking.UnitLibrary` supplies the
   socket implementation and BL-527 composes it.
-- Cross-realm referrals are not followed (amended by ADR-0200, which follows them): a TGS-REP naming a server other than the one
+- Cross-realm referrals are not followed (amended by ADR-0256, which follows them): a TGS-REP naming a server other than the one
   asked for is refused. MS-KKDCP (amended by ADR-0204), enctype names from `krb5.conf` and writing new tickets
   back to the cache are separate work.
 - Tests drive every path through `FakeKdc` in `Curl.Kerberos.UnitTests`, an in-memory

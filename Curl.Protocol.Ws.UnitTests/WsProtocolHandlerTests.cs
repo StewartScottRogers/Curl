@@ -310,8 +310,36 @@ public sealed class WsProtocolHandlerTests
             "\r\n",
             Encoding.Latin1.GetString(connection.Sent));
         HttpAuthRequest asked = authenticator.Requests.Single();
-        Assert.AreEqual(new HttpAuthRequest("GET", asked.Url, "/p?q=1", credential, "t", HttpAuthSchemes.Basic, false), asked);
+        Assert.AreEqual(new HttpAuthRequest("GET", asked.Url, "/p?q=1", credential, "t", HttpAuthSchemes.Basic, false), asked with { Events = NoTransferEvents.Instance });
         Assert.AreEqual(0, authenticator.Challenges.Single().Count);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Negotiate_SendsTheContextsTokenOnTheUpgradeRequest()
+    {
+        var connection = new ScriptedConnection(Bytes(Head101));
+        var authenticator = new AsynchronousOnlyAuthenticator("Negotiate YIIB");
+        var credential = new NetworkCredential(string.Empty, string.Empty);
+        var options = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Negotiate };
+
+        await new WsProtocolHandler(Connector(connection), authenticator, new FixedRandomSource()).ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47901/"), Output = new MemoryStream(), Http = options, Credentials = credential });
+
+        Assert.AreEqual(
+            "GET / HTTP/1.1\r\n" +
+            "Host: 127.0.0.1:47901\r\n" +
+            "Authorization: Negotiate YIIB\r\n" +
+            "User-Agent: curl/8.21.0\r\n" +
+            "Accept: */*\r\n" +
+            "Upgrade: websocket\r\n" +
+            "Sec-WebSocket-Version: 13\r\n" +
+            "Sec-WebSocket-Key: " + FixedRandomSource.Key + "\r\n" +
+            "Connection: Upgrade\r\n" +
+            "\r\n",
+            Encoding.Latin1.GetString(connection.Sent));
+        HttpAuthRequest asked = authenticator.Requests.Single();
+        Assert.AreEqual(HttpAuthSchemes.Negotiate, asked.AllowedSchemes);
+        Assert.AreSame(credential, asked.Credential);
     }
 
     [TestMethod]
@@ -325,6 +353,45 @@ public sealed class WsProtocolHandlerTests
         StringAssert.StartsWith(Encoding.Latin1.GetString(connection.Sent), "POST / HTTP/1.1\r\n");
         Assert.AreEqual("POST", authenticator.Requests.Single().Method);
         Assert.AreEqual("POST", result.Report!.Method);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NoBody_SendsHeadReadsNoFramesAndFailsWithEmptyReply()
+    {
+        // curl -sS -I -w '%{http_code} %{size_download} %{size_header} %{size_request}' against a
+        // 101 with 81 05 "hello" 88 02 03 e8 (BL-583): HEAD, no output, 101 0 <head> <request>, exit 52.
+        var connection = new ScriptedConnection(Bytes(Head101 + "\x81\x05hello"), Bytes("\x88\x02\x03\xe8"));
+        var output = new MemoryStream();
+        var progress = new RecordingProgress();
+
+        TransferResult result = await Handler(connection).ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47901/chat"), Output = output, NoBody = true, Progress = progress });
+
+        Assert.AreEqual(string.Concat("HEAD", Request.AsSpan(3)), Encoding.Latin1.GetString(connection.Sent));
+        Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
+        Assert.AreEqual("Empty reply from server", result.ErrorMessage);
+        Assert.AreEqual(0L, output.Length);
+        Assert.AreEqual(101, result.Report!.ResponseCode);
+        Assert.AreEqual("HEAD", result.Report.Method);
+        Assert.AreEqual(0L, result.Report.DownloadSize);
+        Assert.AreEqual(Head101.Length, result.Report.HeaderSize);
+        Assert.AreEqual(Request.Length + 1, result.Report.RequestSize);
+        Assert.AreEqual("done", progress.Reports[^1]);
+        Assert.AreEqual(4, await connection.ReadAsync(new byte[16], CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NoBodyWithCustomMethod_KeepsTheCustomMethod()
+    {
+        // curl -I -X POST ws://... sends POST and still ends with 52 (BL-788 Notes).
+        var connection = new ScriptedConnection(Bytes(Head101));
+
+        TransferResult result = await Handler(connection).ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse("ws://h/"), Output = new MemoryStream(), NoBody = true, Http = new HttpRequestOptions { CustomMethod = "POST" } });
+
+        StringAssert.StartsWith(Encoding.Latin1.GetString(connection.Sent), "POST / HTTP/1.1\r\n");
+        Assert.AreEqual("POST", result.Report!.Method);
+        Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
     }
 
     [TestMethod]
@@ -359,6 +426,63 @@ public sealed class WsProtocolHandlerTests
         Assert.AreEqual($"Refused WebSocket upgrade: {statusCode}", result.ErrorMessage);
         Assert.AreEqual(statusCode, result.Report!.ResponseCode);
         Assert.AreEqual(0, output.Length);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DigestChallengeThen101_SendsTheUpgradeOnceAndFailsWithExit22()
+    {
+        // curl --digest -u u:p ws://... against a Digest 401 then a 101 on the same connection
+        // (ADR-0228): one request with no Authorization, exit 22, the 101 never read.
+        var connection = new ScriptedConnection(
+            Bytes("HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"\r\nContent-Length: 0\r\n\r\n"),
+            Bytes(Head101 + "\x81\x02hi"));
+        var authenticator = new RecordingAuthenticator();
+        var output = new MemoryStream();
+
+        TransferResult result = await Handler(Connector(connection), authenticator).ExecuteAsync(new TransferContext
+        {
+            Url = CurlUrl.Parse("ws://127.0.0.1:47901/chat"),
+            Output = output,
+            Credentials = new NetworkCredential("u", "p"),
+            Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest },
+        });
+
+        Assert.AreEqual(Request, Encoding.Latin1.GetString(connection.Sent));
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("Refused WebSocket upgrade: 401", result.ErrorMessage);
+        Assert.AreEqual(401, result.Report!.ResponseCode);
+        Assert.AreEqual(0, output.Length);
+        Assert.AreEqual(0, authenticator.Challenges.Single().Count);
+        Assert.AreEqual(0, authenticator.ContinuationCount);
+        Assert.AreEqual(Head101.Length + 4, await connection.ReadAsync(new byte[256], CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NtlmType2Challenge_AsksNoContinuationAndFailsWithExit22()
+    {
+        // curl --ntlm -u u:p ws://... sends the Type 1 message, and a 401 carrying the Type 2
+        // challenge ends the transfer with exit 22 rather than a second leg (ADR-0228).
+        const string Type1 = "NTLM TlRMTVNTUAABAAAAB4IIogAAAAAAAAAAAAAAAAAAAAAKAPRlAAAADw==";
+        var connection = new ScriptedConnection(
+            Bytes("HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: NTLM TlRMTVNTUAACAAAAAAAAADgAAAAFgomiESIzRFVmd4gAAAAAAAAAAAAAAAAAAAAA\r\nContent-Length: 0\r\n\r\n"),
+            Bytes(Head101));
+        var authenticator = new RecordingAuthenticator(Type1);
+
+        TransferResult result = await Handler(Connector(connection), authenticator).ExecuteAsync(new TransferContext
+        {
+            Url = CurlUrl.Parse("ws://127.0.0.1:47901/chat"),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential("u", "p"),
+            Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Ntlm },
+        });
+
+        Assert.AreEqual(
+            Request.Replace("Host: 127.0.0.1:47901\r\n", "Host: 127.0.0.1:47901\r\nAuthorization: " + Type1 + "\r\n", StringComparison.Ordinal),
+            Encoding.Latin1.GetString(connection.Sent));
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("Refused WebSocket upgrade: 401", result.ErrorMessage);
+        Assert.AreEqual(1, authenticator.Requests.Count);
+        Assert.AreEqual(0, authenticator.ContinuationCount);
     }
 
     [TestMethod]

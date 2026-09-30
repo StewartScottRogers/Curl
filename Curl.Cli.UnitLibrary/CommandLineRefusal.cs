@@ -467,6 +467,32 @@ public sealed class CommandLineRefusal
             "is badly used here");
 
     /// <summary>
+    /// Refuses a <c>--rate</c> period whose unit curl does not know or whose length does not fit a
+    /// <see cref="long"/>: <c>curl: unsupported --rate unit</c> for the first, <c>curl: too large --rate unit</c>
+    /// for the second (both hidden when <paramref name="errorsHidden"/>), then
+    /// <c>curl: option &lt;spelled&gt;: too large number</c> when the length does not fit and
+    /// <c>is badly used here</c> otherwise, and the try-help line.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 (Schannel) on 2026-09-29 (BL-650 Notes): <c>1/x</c> is badly used,
+    /// <c>1/9223372036854776s</c> too large, and <c>1/2562047788016x</c> prints both messages and is too large;
+    /// <c>-s</c> drops the messages and <c>-sS</c> keeps them.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> is in effect.</param>
+    /// <param name="unitUnsupported"><see langword="true"/> when the unit letter is not <c>s</c>, <c>m</c>, <c>h</c> or <c>d</c>.</param>
+    /// <param name="unitTooLarge"><see langword="true"/> when the period's length does not fit a <see cref="long"/>.</param>
+    /// <returns>The refusal.</returns>
+    internal static CommandLineRefusal RequestRateUnitRefused(string spelledOption, bool errorsHidden, bool unitUnsupported, bool unitTooLarge)
+    {
+        string[] messages = errorsHidden
+            ? []
+            : [.. unitUnsupported ? ["curl: unsupported --rate unit"] : Array.Empty<string>(), .. unitTooLarge ? ["curl: too large --rate unit"] : Array.Empty<string>()];
+
+        return new(CurlExitCode.FailedInit, messages, spelledOption, unitTooLarge ? "too large number" : "is badly used here");
+    }
+
+    /// <summary>
     /// Refuses a line of a <c>-K</c> file whose parameter its option did not use (a flag given a
     /// parameter, as in <c>silent foo</c>), with the reason <c>had unsupported trailing garbage</c>.
     /// Only its reason and exit code are ever shown, through <see cref="ConfigFileOptionRefused"/>.

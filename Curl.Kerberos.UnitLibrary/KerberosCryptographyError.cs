@@ -17,4 +17,10 @@ public enum KerberosCryptographyError
     /// 2^24 or more, which MIT Kerberos refuses too (<c>KRB5_ERR_BAD_S2K_PARAMS</c>).
     /// </summary>
     BadStringToKeyParameters,
+
+    /// <summary>
+    /// The encrypted part of a block-cipher ciphertext is not a whole number of blocks, which
+    /// MIT Kerberos refuses too (<c>KRB5_BAD_MSIZE</c>).
+    /// </summary>
+    CiphertextNotWholeBlocks,
 }

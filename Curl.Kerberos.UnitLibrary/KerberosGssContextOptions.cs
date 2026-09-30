@@ -20,4 +20,14 @@ public sealed class KerberosGssContextOptions
     /// is not forwardable. It stays the caller's.
     /// </summary>
     public KerberosCredential? ForwardedTicketGrantingTicket { get; init; }
+
+    /// <summary>
+    /// Gets the channel bindings' application data, as curl with MIT passes it over HTTPS:
+    /// <c>tls-server-end-point:</c> followed by the server certificate's hash (RFC 5929
+    /// section 4.1), with no initiator or acceptor address. The initial token's checksum
+    /// then carries the MD5 of RFC 2744's <c>gss_channel_bindings_struct</c> holding it, as
+    /// MIT computes it (ADR-0171); <see langword="null" /> sends zeros, as with no bindings.
+    /// It stays the caller's.
+    /// </summary>
+    public byte[]? ChannelBindings { get; init; }
 }

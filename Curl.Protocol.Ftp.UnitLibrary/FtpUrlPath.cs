@@ -38,6 +38,14 @@ namespace Curl.Protocol.Ftp;
 internal sealed record FtpUrlPath(IReadOnlyList<string> Directories, string FileName, string? ListArgument = null)
 {
     /// <summary>
+    /// Whether the path's directory is the entry directory, so curl 8.21.0 needs no
+    /// <c>CWD</c> and says <c>Request has same path as previous transfer</c> (BL-945): no
+    /// <c>CWD</c> argument, and under <c>nocwd</c> a decoded path that does not start with
+    /// <c>/</c> (a <c>//</c> URL path is absolute, reached without the line).
+    /// </summary>
+    public bool IsInEntryDirectory => Directories.Count == 0 && ListArgument?.StartsWith('/') != true;
+
+    /// <summary>
     /// Splits and decodes <paramref name="absolutePath" /> for <paramref name="method" />.
     /// </summary>
     /// <param name="absolutePath">The URL's path, still percent-encoded, starting with <c>/</c>.</param>

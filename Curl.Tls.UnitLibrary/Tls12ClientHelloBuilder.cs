@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace Curl.Tls;
 
 /// <summary>
@@ -18,11 +20,17 @@ internal static class Tls12ClientHelloBuilder
             extensions.Add(ServerNameExtension.EncodeHostName(settings.ServerName));
         }
 
+        // OpenSSL sends srp after server_name (and max_fragment_length, which Curl never sends).
+        if (settings.SrpCredentials is not null)
+        {
+            extensions.Add(SrpExtension.Encode(Encoding.UTF8.GetBytes(settings.SrpCredentials.UserName)));
+        }
+
         extensions.Add(UncompressedPointFormat);
         extensions.Add(SupportedGroupsExtension.Encode(settings.SupportedGroups));
         AddSessionAndStatusExtensions(settings, extensions);
         AddNegotiatedExtensions(settings, extensions);
-        return new ClientHello((ushort)settings.MaximumVersion, random, sessionId, settings.CipherSuites, [0], extensions);
+        return new ClientHello((ushort)settings.MaximumVersion, random, sessionId, settings.OfferedCipherSuites, [0], extensions);
     }
 
     private static void AddSessionAndStatusExtensions(Tls12ClientSettings settings, List<TlsExtension> extensions)

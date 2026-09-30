@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Compression;
 using Curl.Protocol.Ssh.PacketProtection;
 
 namespace Curl.Protocol.Ssh.Transport;
@@ -25,6 +26,8 @@ internal sealed class SshPacketWriter(IConnection connection, ISshRandomSource r
 
     private ISshPacketProtection protection = new SshPlainPacketProtection();
 
+    private SshZlibCompressor? compressor;
+
     /// <summary>
     /// Gets the sequence number the next packet written carries: 0 for the first, wrapping
     /// after 2^32 - 1 as RFC 4253 section 6.4 requires.
@@ -48,6 +51,12 @@ internal sealed class SshPacketWriter(IConnection connection, ISshRandomSource r
         protection.Dispose();
         protection = newProtection;
     }
+
+    /// <summary>
+    /// Compresses every payload from now on into one zlib stream that lasts the session, the
+    /// agreed client-to-server <c>zlib</c> or <c>zlib@openssh.com</c> taking effect.
+    /// </summary>
+    internal void StartCompression() => compressor = new SshZlibCompressor();
 
     /// <summary>
     /// Works out how many padding bytes a payload gets before any cipher is in use: the
@@ -75,13 +84,15 @@ internal sealed class SshPacketWriter(IConnection connection, ISshRandomSource r
     }
 
     /// <summary>
-    /// Frames <paramref name="payload" /> as one packet, seals, writes and flushes it.
+    /// Frames <paramref name="message" /> as one packet, compressed once compression has
+    /// started, then seals, writes and flushes it.
     /// </summary>
-    /// <param name="payload">The message, starting with its message number.</param>
+    /// <param name="message">The message, starting with its message number.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the packet has been flushed.</returns>
-    internal async ValueTask WriteAsync(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken)
+    internal async ValueTask WriteAsync(ReadOnlyMemory<byte> message, CancellationToken cancellationToken)
     {
+        ReadOnlyMemory<byte> payload = compressor is null ? message : compressor.Compress(message.Span);
         int paddingLength = PaddingLengthFor(payload.Length, protection.BlockSize, protection.PadsPacketLengthField);
         byte[] packet = new byte[sizeof(uint) + 1 + payload.Length + paddingLength];
         BinaryPrimitives.WriteUInt32BigEndian(packet, (uint)(packet.Length - sizeof(uint)));

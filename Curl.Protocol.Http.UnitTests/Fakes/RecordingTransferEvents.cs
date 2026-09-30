@@ -5,7 +5,8 @@ namespace Curl.Protocol.Http.Fakes;
 
 /// <summary>
 /// An <see cref="ITransferEvents" /> that records the information lines and the header and
-/// data events it is given, and ignores the connection and TLS events.
+/// data events it is given, and the connections reused; it ignores the other connection and
+/// TLS events.
 /// </summary>
 public sealed class RecordingTransferEvents : ITransferEvents
 {
@@ -31,9 +32,18 @@ public sealed class RecordingTransferEvents : ITransferEvents
     {
     }
 
+    /// <summary>Gets every <see cref="ReportConnectionReused" /> event, in order.</summary>
+    public List<ConnectionReusedEvent> Reused { get; } = [];
+
     /// <inheritdoc />
+    /// <remarks>
+    /// Recorded in <see cref="Events" /> as the console writes it for <c>-v</c>:
+    /// <c>* Reusing existing &lt;scheme&gt;: connection with host|proxy &lt;name&gt;</c>.
+    /// </remarks>
     public void ReportConnectionReused(ConnectionReusedEvent reused)
     {
+        Reused.Add(reused);
+        Events.Add($"* Reusing existing {reused.Scheme}: connection with {(reused.IsProxy ? "proxy" : "host")} {reused.HostName}");
     }
 
     /// <inheritdoc />

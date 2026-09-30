@@ -14,17 +14,18 @@ completed:
 
 ## Goal
 
-`curl --http3 --happy-eyeballs-timeout-ms N https://...` races QUIC against TCP with an N ms timeout instead of the 200 ms default, because `Curl.Console/HttpRequestOptionsMapping.cs` copies the parsed option into `HttpRequestOptions.HappyEyeballsTimeout`.
+`curl --http3 --happy-eyeballs-timeout-ms N https://...` races QUIC against TCP with an N ms timeout instead of the 200 ms default, because `Curl.Console/HttpRequestOptionsMapping.cs` copies the parsed option into `HttpRequestOptions.HappyEyeballsTimeout`; and every TCP connect races IPv4 against IPv6 with that timeout, because `CurlComposition.CreateTcpConnector` passes it to `TcpConnector`'s `happyEyeballsTimeout`.
 
 ## Context
 
 - BL-835 added `HttpRequestOptions.HappyEyeballsTimeout` (default 200 ms, curl's default) and the race in `HttpProtocolHandler.RaceQuicAgainstTcpAsync` (ADR-0144 section 4, ADR-0172 as amended). Nothing fills it yet, so every transfer uses 200 ms.
-- BL-644 parses `--happy-eyeballs-timeout-ms` into `CommandLineOptions` in `Curl.Cli.UnitLibrary`; use the member it adds. When the option is not given, leave the default.
+- BL-644 parsed `--happy-eyeballs-timeout-ms` into `CommandLineOptions.HappyEyeballsTimeout` (`TimeSpan?`, `null` when not given) and gave `TcpConnector` a `happyEyeballsTimeout` constructor argument (`null` for 200 ms; exposed as `TcpConnector.HappyEyeballsTimeout`), raced by `AddressFamilyRace` (ADR-0254). `Curl.Console` was outside BL-644's `touches`, so passing it to the connector moved here. When the option is not given, leave the default.
 - ADR-0144 measured `--http3 --happy-eyeballs-timeout-ms 1000` against a silent UDP peer connecting over TCP with `%{time_connect}` 1.007 s (curl.se's Windows build 8.18.0 with ngtcp2 1.21.0).
 
 ## Acceptance criteria
 
 - [ ] `Curl.Console.UnitTests` has a test showing `HttpRequestOptionsMapping` maps `--happy-eyeballs-timeout-ms 1000` to `HappyEyeballsTimeout` of 1000 ms, and a test showing it stays 200 ms when the option is not given.
+- [ ] `Curl.Console.UnitTests` has a test showing `CurlComposition.CreateTcpConnector` gives a connector whose `HappyEyeballsTimeout` is 50 ms for `--happy-eyeballs-timeout-ms 50` and `TcpConnector.DefaultHappyEyeballsTimeout` without it.
 - [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 - [ ] `Measure-CodeQuality.ps1 -Library Curl.Console` reports 100% line and branch coverage and no failing member.
 

@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-839]
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-29
 completed:
@@ -31,6 +31,31 @@ completed:
 
 ## Notes
 
+- 2026-09-29 (lane 5): `touches` widened. `HttpProtocolHandler` cannot tell that
+  `--unix-socket` is in use: the socket lives only on `TcpConnector.UnixSocket`
+  (`Curl.Networking.UnitLibrary`), set by `CurlComposition.UnixSocketOf` in `Curl.Console`;
+  neither `ITransferContext`, `ConnectTarget` nor `HttpRequestOptions` carries it, and
+  curl refuses before connecting, so `ConnectResult.UnixSocketPath` comes too late. Plan:
+  add `bool OverUnixSocket` (init, default false) to `HttpRequestOptions`
+  (`Curl.Protocol.Abstractions.UnitLibrary`, with a test there), set it in
+  `Curl.Console/HttpRequestOptionsMapping.cs` from `options.UnixSocketPath is not null`
+  (test in `Curl.Console.UnitTests`), and in `HttpProtocolHandler` check it first among
+  the HTTP/3 refusals. `Curl.Console` is held by BL-650 in Doing, so the task went back to
+  Backlog until that finishes.
+- What `curl-8_21_0` does, read from the source and to pin in the tests:
+  `Curl_conn_may_http3` (`lib/vquic/vquic.c`) checks the Unix transport first
+  (`failf` "HTTP/3 cannot be used over UNIX domain sockets", `CURLE_QUIC_CONNECT_ERROR`
+  = 96), then the non-HTTPS check (exit 3). `cf-https-connect.c` calls it only when
+  HTTP/3 is wanted: for `--http3-only` the failure ends the transfer before any connect
+  (so exit 96 for both `https://` and `http://` URLs); for `--http3` the failure only drops
+  `h3` from the ALPN list, the connect goes on over TCP (here, the Unix socket), and since
+  `failf` already filled the error buffer, a later failure reports that message with its
+  own exit code - the same shape as `ExchangeWithoutHttp3Async` for the proxy refusals
+  (ADR-0223), but with exit 96 instead of 3 for `--http3-only`. The `-v` line
+  `closing connection #-1` follows the refusal as for the other pre-connect refusals.
+
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Backlog. Needs Curl.Console (HttpRequestOptionsMapping) to pass --unix-socket to the HTTP handler; Curl.Console is held by BL-650 in Doing

@@ -68,6 +68,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
 
         var key = ConnectionPoolKey.Of(target);
         var idle = await TakeIdleAsync(key, target.Events);
+        new NetworkDiagnosticLog(target.DiagnosticLog).PoolDecision(target, idle?.ConnectionNumber);
 
         return idle is null
             ? await OpenAsync(target, key, cancellationToken)
@@ -210,7 +211,8 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
             connect.Connection,
             connectionNumber,
             connect.LocalEndPoint,
-            connect.PeerCertificates);
+            connect.PeerCertificates,
+            connect.UnixSocketPath);
 
         return ConnectResult.Connected(
             new PooledConnection(this, entry, target.Events),
@@ -219,7 +221,8 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
             connect.ProxyConnectResponseCode,
             connect.PeerCertificates,
             isReused: false,
-            entry.ConnectionNumber);
+            entry.ConnectionNumber,
+            unixSocketPath: entry.UnixSocketPath);
     }
 
     private ConnectResult Reuse(ConnectTarget target, PoolEntry entry)
@@ -240,7 +243,8 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
             proxyConnectResponseCode: 0,
             entry.PeerCertificates,
             isReused: true,
-            entry.ConnectionNumber);
+            entry.ConnectionNumber,
+            unixSocketPath: entry.UnixSocketPath);
     }
 
     private List<PoolEntry> RemoveExpired()

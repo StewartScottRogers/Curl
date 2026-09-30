@@ -137,13 +137,25 @@ internal sealed class HandBuiltKerberosSecurityContext(
         }
     }
 
+    /// <summary>
+    /// Gets the service ticket and makes the initial token. The channel bindings come first,
+    /// before any credential is looked at, so a server certificate whose signature names no hash
+    /// fails the transfer (<see cref="HttpAuthenticationFailedException" />, exit 91) even
+    /// without a ticket, as curl 8.18.0 with MIT was measured doing (BL-965).
+    /// </summary>
     private async ValueTask<SecurityContextStep> InitialStepAsync(CancellationToken cancellationToken)
     {
+        byte[]? channelBindings = TlsServerEndPointChannelBindings.Of(request.ServerCertificate);
         try
         {
             serviceTicket = await tickets.GetAsync(request.ServiceName, request.HostName, cancellationToken).ConfigureAwait(false);
             forwardedTicketGrantingTicket = await ForwardedTicketGrantingTicketAsync(serviceTicket, cancellationToken).ConfigureAwait(false);
-            KerberosGssContextOptions options = new() { Delegation = DelegationOf(request.Delegation), ForwardedTicketGrantingTicket = forwardedTicketGrantingTicket };
+            KerberosGssContextOptions options = new()
+            {
+                Delegation = DelegationOf(request.Delegation),
+                ForwardedTicketGrantingTicket = forwardedTicketGrantingTicket,
+                ChannelBindings = channelBindings,
+            };
             gss = new KerberosGssContext(serviceTicket, options, timeProvider, randomSource);
         }
         catch (KerberosFileException)

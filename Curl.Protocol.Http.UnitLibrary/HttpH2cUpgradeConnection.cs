@@ -30,13 +30,23 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
 
     private int switchingHeadLength;
 
-    private Http2StreamConnection? upgradedStream;
-
     /// <summary>
     /// Gets a value indicating whether the connection has switched to HTTP/2, so the heads read
     /// from it now are an HTTP/2 stream's.
     /// </summary>
-    public bool IsUpgraded => upgradedStream is not null;
+    public bool IsUpgraded => UpgradedStream is not null;
+
+    /// <summary>
+    /// Gets stream 1, the upgraded request's, once the connection has switched to HTTP/2, or
+    /// <see langword="null" /> before.
+    /// </summary>
+    public Http2StreamConnection? UpgradedStream { get; private set; }
+
+    /// <summary>
+    /// Gets the HTTP/2 session the connection switched to, which carries the transfer's later
+    /// requests on streams 3, 5, ... (BL-866), or <see langword="null" /> before the switch.
+    /// </summary>
+    public Http2Session? UpgradedSession { get; private set; }
 
     /// <inheritdoc />
     public bool IsSecure => transport.IsSecure;
@@ -51,9 +61,9 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
     /// <exception cref="HttpTransferException">The HTTP/2 stream failed (exit 16, 18, 56 or 92).</exception>
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
-        if (upgradedStream is not null)
+        if (UpgradedStream is not null)
         {
-            return await upgradedStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            return await UpgradedStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         }
 
         if (isWatching)
@@ -68,8 +78,8 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
 
         if (switchingHeadLength > 0)
         {
-            upgradedStream = await SwitchAsync(cancellationToken).ConfigureAwait(false);
-            return await upgradedStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            UpgradedStream = await SwitchAsync(cancellationToken).ConfigureAwait(false);
+            return await UpgradedStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         }
 
         return await transport.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
@@ -165,7 +175,8 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
             events.ReportInfo(HttpConnectionInfoLines.CopiedHttp2DataAfterUpgrade(afterHead.Length));
         }
 
-        Http2StreamConnection stream = new(new Http2Session(new HttpPrefixedConnection(afterHead, transport)), scheme, 0);
+        UpgradedSession = new Http2Session(new HttpPrefixedConnection(afterHead, transport));
+        Http2StreamConnection stream = new(UpgradedSession, scheme, 0);
         await stream.StartUpgradedAsync(cancellationToken).ConfigureAwait(false);
         return stream;
     }

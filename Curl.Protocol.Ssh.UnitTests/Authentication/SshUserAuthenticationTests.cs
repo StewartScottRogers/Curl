@@ -19,7 +19,7 @@ namespace Curl.Protocol.Ssh.Authentication;
 /// (BL-567, ADR-0215).
 /// </summary>
 [TestClass]
-public sealed class SshUserAuthenticationTests
+public sealed partial class SshUserAuthenticationTests
 {
     private const string ServiceRequestFailedPrefix = "Failure establishing ssh session: ";
 

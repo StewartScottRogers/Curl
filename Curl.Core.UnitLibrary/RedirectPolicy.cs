@@ -46,6 +46,14 @@ public sealed record RedirectPolicy
     public bool LocationTrusted { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>--follow</c> was given rather than <c>-L</c>: a <c>-X</c>
+    /// method is dropped whenever a redirect switches the request to GET - a 301 or 302 that drops
+    /// the body, and every 303 unless <c>--post303</c> keeps the body - where <c>-L</c> keeps it
+    /// (curl 8.21.0, measured, BL-627 Notes).
+    /// </summary>
+    public bool DropsCustomMethodOnSwitchToGet { get; init; }
+
+    /// <summary>
     /// Gets the lowercase schemes a redirect may lead to; curl's default, <c>http</c>,
     /// <c>https</c>, <c>ftp</c> and <c>ftps</c>, when not given.
     /// </summary>
@@ -59,4 +67,11 @@ public sealed record RedirectPolicy
     /// (curl 8.21.0, measured, BL-523 Notes).
     /// </summary>
     public IReadOnlySet<string>? AllowedTransferSchemes { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--disallow-username-in-url</c> was given: a redirect
+    /// target with user information is refused with <see cref="RedirectFollower.CredentialsInUrlMessage" />
+    /// after it is counted as followed (curl 8.21.0, measured, BL-626 Notes).
+    /// </summary>
+    public bool DisallowsUserInUrl { get; init; }
 }

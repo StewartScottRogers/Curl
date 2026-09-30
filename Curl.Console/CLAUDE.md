@@ -91,10 +91,21 @@ just after the `-b` files, a missing one as empty, and written back after the `-
 missing and silently left alone if it cannot be written; no other scheme reads or writes it, and
 `--alt-svc ""` does neither. `TransferContextFactory` puts it on `HttpRequestOptions.AltSvcStore`, so
 the HTTP handler learns each `Alt-Svc` header of an `https` response and prints `* Added alt-svc`,
-and sets `AltSvcRoute` to the first unexpired `h1` alternative for an `https` origin, unless a
-`--connect-to` mapping matches it or the entry names the origin itself; the TCP connector dials it
-and the handler sends `Alt-Used`. `h2` and `h3` alternatives are skipped until BL-733, and a redirect
-to another origin drops the route (`RedirectFollower`). Measured on curl 8.21.0 (ADR-0214, BL-623 Notes).
+and `AltSvcTransferCache.ApplyTo` sets `AltSvcRoute` and `Version` for an `https` origin, unless a
+`--connect-to` mapping matches it: the version option decides which `h1`, `h2` and `h3` entries apply,
+as curl.se's build looks them up; an entry for another host or port is dialled (with `Alt-Used`), an
+`h3` one over HTTP/3 alone, an `h1` or `h2` one over TCP with ALPN choosing; an `h3` entry naming the
+origin itself makes a transfer without a version option race HTTP/3 against TCP. `RedirectFollower`
+calls `ApplyTo` again for each hop. Measured (ADR-0214, BL-623 Notes; ADR-0226, BL-733 Notes).
+
+The run holds one HSTS cache, `Curl.Core`'s `HstsTransferPolicy`, shared by every transfer of every
+group with or without `--hsts`. Under `--hsts <file>` each transfer reads the file (`HstsCacheFile`)
+just before it connects, a missing one as empty, and writes the cache back after the `--alt-svc`
+file, whatever the outcome; one that cannot be written is left alone, and `--hsts ""` does neither.
+An `http` URL whose host the cache knows is switched to `https` (the scheme only; an explicit port
+stays), `-v` printing `* Switched from HTTP to HTTPS due to HSTS => <url>`; `RedirectFollower` learns
+every hop's `https` `Strict-Transport-Security` and switches a known `http` redirect target the same
+way before `--proto-redir` checks it. Measured on curl 8.21.0 (ADR-0218, BL-621 Notes).
 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
@@ -125,7 +136,9 @@ the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` 
 `https` are served by `HttpProtocolHandler`, registered in `CurlComposition` with a
 `RankedHttpAuthenticator` (Basic and Bearer, and Digest with a random client nonce, all in the
 platform's credential encoding, and Negotiate), which answers the scheme `-u`, `--basic`, `--digest`,
-`--negotiate`, `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`).
+`--negotiate`, `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`),
+wrapped for the HTTP handler alone in an `AwsSigV4HttpAuthenticator` that signs every request with
+`--aws-sigv4` in place of those schemes (`HttpRequestOptions.AwsSigV4`, ADR-0243).
 Negotiate's contexts come from `CurlComposition.CreateSecurityContextFactory`, ADR-0142's router:
 SSPI on Windows, elsewhere the system GSS-API with the hand-built SPNEGO and Kerberos behind it,
 reaching KDCs through `Curl.Networking`'s `KerberosKdcSocketTransport` over the run's connectors
@@ -153,7 +166,12 @@ and one that cannot be opened prints `curl: Failed to open <file>` and stops the
 exit 23. `-i` and `-I` send the header lines to the body output too (standard output or the
 `-o` file); with `-D` as well, `HeaderLineTeeStream` writes each line to the `-D` output and
 then the body output before the next, so `-i -D -` prints every header line twice in a row,
-as curl 8.21.0 does. `-I` also sets the context's `NoBody`, and `-f` / `--fail-with-body`
+as curl 8.21.0 does. When standard output is a terminal that renders bold (`terminalRendersStyles`:
+true off Windows, and on Windows once `StandardOutputVirtualTerminal` has turned on
+virtual-terminal processing, the mode put back when the run ends) and `--styled-output` is on,
+the `-i`/`-I` lines of an `http`, `https`, `rtsp` or `file` transfer writing to standard output
+go through `Curl.Output`'s `StyledHeaderStream`; the `-D` copy and an `-o` file never do
+(ADR-0246, BL-736). `-I` also sets the context's `NoBody`, and `-f` / `--fail-with-body`
 become `HttpRequestOptions.Fail`. Under `--fail-early` the first failed transfer stops the
 run with its own exit code.
 
@@ -184,7 +202,10 @@ holds the exit code - the first failure's in completion order, not the last's - 
 started and ends with the first failure's code and `CurlEasyErrorText`'s text, and both are reported
 in command-line order after the run's other transfers. A result that ends a serial run without
 `--fail-early` (a bad glob, a `-T` or `-D` file that cannot be opened) stops further starts and lets
-the running transfers finish. Without `-Z` nothing changes.
+the running transfers finish. Each transfer also writes standard output through a
+`StandardOutputFailureDeferringStream` of its own (`RunningTransferState.StandardOutput`), so a write
+failure ends only the transfer whose write failed with exit 23, and the others' bodies and `-w` text
+still reach standard output (BL-773). Without `-Z` nothing changes: every transfer shares the run's one.
 
 Under `-Z` no transfer draws its own meter or `-#` bar: `ParallelRun`'s `ParallelProgressMeter` draws
 curl 8.21.0's combined meter to standard error (ADR-0155, BL-521). Its header line and status lines
@@ -193,7 +214,9 @@ transfer's `TransferProgressRecorder` passes them to its `ParallelTransferProgre
 ends, when the runner has started every transfer it can, and after a second without a draw. A line
 is drawn only if more than 500 ms have passed since the last. The final line and its line ending
 come once the run's reports are written. `-s` and `--no-progress-meter` in the first option group
-hide the meter, and `-#` is ignored, as in curl.
+hide the meter, and `-#` is ignored, as in curl. So under `-Z` no transfer ever holds the `-v`
+`HoldableStream` below: a transfer the handler reported done never delays the `-v` lines of the
+transfers running beside it (BL-773).
 
 The Nth `-T` / `--upload-file` value uploads to the Nth URL (ADR-0051). Its URL is resolved
 by `UploadTransferUrl` before anything else of that transfer: one it cannot parse is exit 3
@@ -246,10 +269,18 @@ copies `-P`, `--disable-eprt`, `--ssl`/`--ssl-reqd` and `--ftp-ssl-control` into
 
 Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
 `HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,
-`--post301`/`--post302`/`--post303` and `--location-trusted` into its `RedirectPolicy`. Every
+`--post301`/`--post302`/`--post303` and `--location-trusted` into its `RedirectPolicy`; `--follow`
+follows as `-L` does but drops a `-X` method whenever a redirect switches the request to GET
+(`RedirectPolicy.DropsCustomMethodOnSwitchToGet`, BL-627). Every
 hop writes to the same body and header outputs, so `-L -i` prints every response's head and
 only the last body, and one redirect past `--max-redirs` exits 47 with
 `curl: (47) Maximum (N) redirects followed`, as measured on curl 8.21.0 (BL-234).
+
+Each attempt `--retry` runs again is a transfer of its own, as in curl 8.21.0: it takes the next
+`%{xfer_id}` (`RunningTransferState.RetryTransferId`) and a new `%{conn_id}`, unless an `http` or
+`https` attempt reports it opened no connection, when it keeps the retried attempt's; so 503, 503,
+200 prints `2 2` on closed connections and `2 0` on one kept alive, and the next URL counts on from
+there (BL-799). The `--trace-ids` markers keep the first attempt's `xfer_id`.
 
 Under `-Y`/`--speed-limit` or `-y`/`--speed-time` each attempt gets a `Curl.Core`
 `LowSpeedWatchdog` on the runner's clock: `TransferContextFactory` wraps the output and the
@@ -387,3 +418,19 @@ body, and any `-i` header lines, to `Stream.Null`: no file is created, even unde
 still gets the head, the progress meter is drawn as for a file (even when standard output is a
 terminal), and the transfer switches standard output to binary as one to standard output does,
 so its `-w` line feeds stay LF on Windows (BL-495 Notes).
+
+Curl's own diagnostic log (ADR-0222, ADR-0228, BL-919) is opened by the runner, not the
+composition, because its level and file come from the command line: after an accepted parse, the
+`--stderr` redirects and the config-file note, `RunDiagnosticLog` builds `NoDiagnosticLog.Instance`
+at `--log-level none` (no file created, no byte changed), otherwise a `Curl.Output`
+`DiagnosticLogWriter` over `StandardErrorLogTarget` (the runner's standard error at each write, so
+it follows `--stderr`) or over the `--log-file`, truncated, UTF-8 without a byte order mark, and
+closed when the run ends. Every line goes through `GatedDiagnosticLog`, which takes the run's
+`WriteGate` before the writer's lock. A `--log-file` that cannot be opened prints
+`Warning: Failed to open the --log-file <path>`, even under `-s`, and the run carries on without a
+log. `TransferContextFactory.DiagnosticLog` puts the log on every transfer's context. The runner
+logs under `cli` the files the parse tried to read (`RecordingDataFileReader`), the parser's
+`Warning: ` lines and the accepted command line, and under `runner` every `Warning: ` line it
+prints, each transfer's start and end (`TransferDiagnosticLines`: never a credential, only
+`credentials given`), a failing exit code with its `CurlExitCode` name, and the `-Z` scheduler
+starting and finishing each transfer.

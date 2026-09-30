@@ -161,7 +161,29 @@ public sealed class CommandLineOptions
     /// <see cref="HelpRequested"/>, <see cref="ManualRequested"/>, <see cref="EngineListRequested"/> or
     /// <see cref="CaEmbedDumpRequested"/>), which ends parsing where it stands.
     /// </summary>
-    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested || EngineListRequested || CaEmbedDumpRequested;
+    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested || AiHelpRequested || EngineListRequested || CaEmbedDumpRequested;
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--ai-help</c> was given on the command line. Parsing stops there, as it
+    /// does for <c>--help</c>; the console prints <see cref="CurlAiHelpText"/>'s Markdown for
+    /// <see cref="AiHelpSubject"/> and exits 0 instead of transferring. An <c>ai-help</c> line in a <c>-K</c>
+    /// file does not set it: it is ignored there (ADR-0224).
+    /// </summary>
+    public bool AiHelpRequested { get => globals.AiHelpRequested; private set => globals.AiHelpRequested = value; }
+
+    /// <summary>
+    /// The subject <c>--ai-help</c> was given, read as <c>--help</c> reads its subject; <see langword="null"/>
+    /// when there was none or it was empty, which asks for the index. Set only with <see cref="AiHelpRequested"/>.
+    /// </summary>
+    public string? AiHelpSubject { get => globals.AiHelpSubject; private set => globals.AiHelpSubject = value; }
+
+    /// <summary>Records <c>--ai-help</c> and its subject, an empty one read as none.</summary>
+    /// <param name="subject">The subject as given, empty when there was none.</param>
+    internal void RequestAiHelp(string subject)
+    {
+        AiHelpRequested = true;
+        AiHelpSubject = subject.Length == 0 ? null : subject;
+    }
 
     /// <summary>Records <c>--help</c> and its subject, an empty one read as none.</summary>
     /// <param name="subject">The subject as given, empty when there was none.</param>
@@ -194,6 +216,8 @@ public sealed class CommandLineOptions
         HelpRequested = false;
         HelpSubject = null;
         ManualRequested = false;
+        AiHelpRequested = false;
+        AiHelpSubject = null;
         EngineListRequested = false;
         CaEmbedDumpRequested = false;
     }
@@ -275,6 +299,24 @@ public sealed class CommandLineOptions
     /// file; empty when none was given. The last one's file is <see cref="StandardErrorFile"/>.
     /// </summary>
     public IReadOnlyList<StandardErrorRedirect> StandardErrorRedirects => globals.StandardErrorRedirects;
+
+    /// <summary>
+    /// How much of Curl's own diagnostic log the run asks for (ADR-0222): the level the last
+    /// <c>--log-level</c> named; <see cref="Protocol.Abstractions.DiagnosticLogLevel.Info"/> when there was none but a
+    /// <c>--log-file</c> was given; otherwise <see cref="Protocol.Abstractions.DiagnosticLogLevel.None"/>. Global: it
+    /// holds across <c>-:</c> / <c>--next</c>.
+    /// </summary>
+    public DiagnosticLogLevel DiagnosticLogLevel =>
+        globals.DiagnosticLogLevelGiven ?? (DiagnosticLogFile is null ? DiagnosticLogLevel.None : DiagnosticLogLevel.Info);
+
+    /// <summary>
+    /// The file the last <c>--log-file</c> names, to which the diagnostic log goes instead of standard
+    /// error; <see langword="null"/> when none was given. Parsing never opens it; the console does.
+    /// </summary>
+    public string? DiagnosticLogFile { get => globals.DiagnosticLogFile; internal set => globals.DiagnosticLogFile = value; }
+
+    /// <summary>Records the level a <c>--log-level</c> named, the last one winning.</summary>
+    internal void SetDiagnosticLogLevel(DiagnosticLogLevel level) => globals.DiagnosticLogLevelGiven = level;
 
     /// <summary>
     /// The <c>-o</c> / <c>--output</c> file name of each entry of <see cref="UrlOutputs"/>, in the same
@@ -412,6 +454,14 @@ public sealed class CommandLineOptions
     public string? AltSvcFile { get; internal set; }
 
     /// <summary>
+    /// The <c>--hsts</c> cache file, verbatim and unchecked; <see langword="null"/> when not given. An
+    /// empty value is accepted and names no file, as curl 8.21.0 accepts it, and a value that looks like a
+    /// flag draws no warning (measured 2026-09-29, BL-621 Notes). The transfer reads and writes the file;
+    /// nothing is opened here. The last value wins.
+    /// </summary>
+    public string? HstsFile { get; internal set; }
+
+    /// <summary>
     /// The <c>-u</c> / <c>--user</c> value split at its first colon into user name and password;
     /// <see langword="null"/> when not given. A value with no colon that does not start with <c>;</c>
     /// is a user name whose password <see cref="CommandLineParser"/> asks for through its
@@ -533,6 +583,14 @@ public sealed class CommandLineOptions
     /// refused as blank. While it is set, a <c>-u</c> user with no password is not prompted for.
     /// </summary>
     public string? BearerToken { get; private set; }
+
+    /// <summary>
+    /// The last <c>--aws-sigv4</c> value, verbatim, the empty string included, which curl 8.21.0
+    /// signs as <c>aws:amz</c> (measured, BL-629 Notes); <see langword="null"/> when not given.
+    /// While it is set, every request to the origin is signed with AWS Signature Version 4 in
+    /// place of <see cref="AuthSchemes"/>.
+    /// </summary>
+    public string? AwsSigV4 { get; internal set; }
 
     /// <summary>
     /// The last <c>-x</c> / <c>--proxy</c>, <c>--proxy1.0</c>, <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c> or
@@ -695,6 +753,27 @@ public sealed class CommandLineOptions
     /// exit code 43.
     /// </summary>
     public string? DnsIPv6Address { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--doh-url</c>, the DNS-over-HTTPS server every host name is resolved through, verbatim
+    /// and unchecked; <see langword="null"/> when not given, or when the last value was empty, which curl
+    /// 8.21.0 accepts and which turns DoH off again (BL-642). A value curl cannot use as a DoH URL fails
+    /// each transfer with exit 6 when it resolves, not the parse.
+    /// </summary>
+    public string? DohUrl { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--doh-insecure</c> was given and no <c>--no-doh-insecure</c> came after
+    /// it: skip verification of the DoH server's certificate. <c>-k</c> never reaches the DoH server.
+    /// </summary>
+    public bool DohInsecure { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--doh-cert-status</c> was given and no <c>--no-doh-cert-status</c> came
+    /// after it: require a good OCSP response stapled to the DoH server's certificate, as
+    /// <see cref="RequireCertificateStatus"/> does for the transfer's server.
+    /// </summary>
+    public bool DohCertificateStatus { get; internal set; }
 
     /// <summary>
     /// The path of the Unix domain socket to connect through, from whichever of <c>--unix-socket</c> and
@@ -1227,6 +1306,14 @@ public sealed class CommandLineOptions
     public TimeSpan? ConnectTimeout { get; internal set; }
 
     /// <summary>
+    /// The last <c>--happy-eyeballs-timeout-ms</c>: how long the connect waits on the first address
+    /// family before it also dials the other, in whole milliseconds (see
+    /// <see cref="CommandLineNumber.ParseMilliseconds"/>); <see langword="null"/> when not given, for
+    /// curl's 200. Zero dials both families at once, as it does to curl.
+    /// </summary>
+    public TimeSpan? HappyEyeballsTimeout { get; internal set; }
+
+    /// <summary>
     /// The <c>-m</c> / <c>--max-time</c> limit on the whole transfer, to the millisecond, at most
     /// about 29,000 years (see <see cref="CommandLineNumber.ParseSeconds"/>); <see langword="null"/>
     /// when not given. Past about 49.7 days it is longer than a .NET timer accepts, so cap it
@@ -1234,6 +1321,15 @@ public sealed class CommandLineOptions
     /// does to curl. The last value wins.
     /// </summary>
     public TimeSpan? MaxTime { get; internal set; }
+
+    /// <summary>
+    /// The <c>--expect100-timeout</c> wait for <c>100 Continue</c> before a request body is sent
+    /// anyway, to the millisecond, read as <c>--connect-timeout</c> is (see
+    /// <see cref="CommandLineNumber.ParseSeconds"/>); <see langword="null"/> when not given.
+    /// Zero is recorded as given and means curl's default one second, as it does to curl
+    /// 8.21.0 (measured, BL-624). The last value wins.
+    /// </summary>
+    public TimeSpan? Expect100Timeout { get; internal set; }
 
     /// <summary>
     /// The <c>--retry</c> count: how many times a transient failure is retried, from 0 to the
@@ -1336,6 +1432,21 @@ public sealed class CommandLineOptions
     public IReadOnlyList<FormPartSpecification> FormParts => formParts;
 
     /// <summary>
+    /// <see langword="true"/> when the last of <c>--form-escape</c> and <c>--no-form-escape</c> was
+    /// <c>--form-escape</c>: <see cref="FormParts"/> names and file names are escaped with backslashes
+    /// (<c>\\</c>, <c>\"</c>) rather than curl 8.21.0's default <c>%22</c>, <c>%0D</c> and <c>%0A</c> (BL-625).
+    /// </summary>
+    public bool FormEscape { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when the last of <c>--disallow-username-in-url</c> and
+    /// <c>--no-disallow-username-in-url</c> was <c>--disallow-username-in-url</c>: a URL with user
+    /// information - an <c>@</c> in its authority, even with an empty user - is refused with exit 67
+    /// before any connection, the first URL and every followed redirect target alike (BL-626).
+    /// </summary>
+    public bool DisallowUsernameInUrl { get; internal set; }
+
+    /// <summary>
     /// The <c>-A</c> / <c>--user-agent</c> value, verbatim; empty when given empty, which curl 8.21.0
     /// sends as no <c>User-Agent</c> header at all; <see langword="null"/> when not given. The last value wins.
     /// </summary>
@@ -1376,10 +1487,19 @@ public sealed class CommandLineOptions
     public bool JunkSessionCookies { get; internal set; }
 
     /// <summary>
-    /// <see langword="true"/> when <c>-L</c> / <c>--location</c> or <c>--location-trusted</c> was
-    /// given and no <c>--no-location</c> or <c>--no-location-trusted</c> came after it: follow redirects.
+    /// <see langword="true"/> when <c>-L</c> / <c>--location</c>, <c>--location-trusted</c> or
+    /// <c>--follow</c> was given and no <c>--no-location</c>, <c>--no-location-trusted</c> or
+    /// <c>--no-follow</c> came after it: follow redirects.
     /// </summary>
     public bool FollowRedirects { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--follow</c> was the last of <c>-L</c>, <c>--location-trusted</c>,
+    /// <c>--follow</c> and their <c>--no-</c> spellings given: redirects are followed with the method
+    /// changed as the HTTP specification says, a <c>-X</c> method dropped whenever a redirect switches
+    /// the request to GET, rather than kept as <c>-L</c> keeps it (curl 8.21.0, measured, BL-627 Notes).
+    /// </summary>
+    public bool FollowRedirectsPerSpec { get; internal set; }
 
     /// <summary>
     /// <see langword="true"/> when <c>--location-trusted</c> was given and no <c>--no-location-trusted</c>
@@ -1472,6 +1592,14 @@ public sealed class CommandLineOptions
     /// most <see cref="LargestParallelLimit"/>.
     /// </summary>
     public int ParallelMaxHost { get => globals.ParallelMaxHost; internal set => globals.ParallelMaxHost = value; }
+
+    /// <summary>
+    /// The least time in milliseconds from one serial transfer's start to the next one's, from the last <c>--rate</c> as
+    /// <see cref="TransferStartRate"/> reads it: <c>--rate 2/s</c> is 500. A <see cref="long"/>, since a period of up to <see cref="long.MaxValue"/> milliseconds is accepted. <see langword="null"/> when
+    /// not given. Global, so it reaches every <c>--next</c> group; a <c>-Z</c> run ignores it, as curl
+    /// 8.21.0 does.
+    /// </summary>
+    public long? MillisecondsBetweenTransferStarts { get => globals.MillisecondsBetweenTransferStarts; internal set => globals.MillisecondsBetweenTransferStarts = value; }
 
     /// <summary>
     /// <see langword="true"/> when <c>--compressed</c> was given and no <c>--no-compressed</c> came after

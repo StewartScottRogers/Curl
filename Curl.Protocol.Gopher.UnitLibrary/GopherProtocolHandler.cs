@@ -23,7 +23,24 @@ namespace Curl.Protocol.Gopher;
 /// returned rather than thrown. The exit 23 message names the size of the read that failed
 /// to write (at most 16384 bytes, as curl 8.21.0 reads gopher) and the bytes of it the
 /// output accepted, from <see cref="OutputWriteFailedException.BytesAccepted" />.
-/// Cancellation leaves as an exception.
+/// Cancellation leaves as an exception. A <c>gophers</c> read that ends without the
+/// server's <c>close_notify</c> is exit 56 with the TLS build's own text.
+/// </para>
+/// <para>
+/// After connecting, <see cref="ITransferContext.Events" /> gets what curl 8.21.0's
+/// <c>-v</c> and <c>--trace</c> show (measured, BL-934): each read as data received, the
+/// server's close as a zero-byte block, and never the selector sent - curl does not trace
+/// it. The connection then ends with <c>shutting down connection #N</c> for a finished
+/// transfer or a malformed selector, and <c>closing connection #N</c> for any other
+/// failure, after the failure's message unless it is curl's fallback text for a failed
+/// send or receive.
+/// </para>
+/// <para>
+/// Each step goes to Curl's own diagnostic log, component <c>gopher</c> (ADR-0222, BL-928):
+/// the selector sent and the bytes and milliseconds of a finished transfer as <c>info</c>,
+/// and the failure that ends a transfer, with its <see cref="CurlExitCode" />, as
+/// <c>error</c>. The log is also handed to the connector in
+/// <see cref="ConnectTarget.DiagnosticLog" />.
 /// </para>
 /// </remarks>
 public sealed class GopherProtocolHandler : IProtocolHandler
@@ -66,6 +83,15 @@ public sealed class GopherProtocolHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        GopherDiagnosticLog log = new(context.DiagnosticLog);
+        long started = context.TimeProvider.GetTimestamp();
+        TransferResult result = await TransferAsync(context, log).ConfigureAwait(false);
+        log.TransferEnded(result, context.TimeProvider.GetElapsedTime(started));
+        return result;
+    }
+
+    private async ValueTask<TransferResult> TransferAsync(ITransferContext context, GopherDiagnosticLog log)
+    {
         ConnectResult connected = await connector
             .ConnectAsync(CreateTarget(context), context.CancellationToken)
             .ConfigureAwait(false);
@@ -75,21 +101,62 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         }
 
         context.Progress.ReportTransferStarted();
+        TransferResult result;
         await using (connection.ConfigureAwait(false))
         {
-            if (GopherSelector.FromUrl(context.Url) is not { } selector)
-            {
-                return TransferResult.Failure(CurlExitCode.UrlMalformat, GopherTransferMessages.SelectorMalformed);
-            }
-
-            if (!await TrySendAsync(connection, selector, context.CancellationToken).ConfigureAwait(false))
-            {
-                return TransferResult.Failure(CurlExitCode.SendError, GopherTransferMessages.SendFailed);
-            }
-
-            return await CopyReplyAsync(connection, context.Output, context.Progress, context.CancellationToken).ConfigureAwait(false);
+            result = await ExchangeAsync(connection, context, log).ConfigureAwait(false);
         }
+
+        ReportConnectionEnd(context.Events, result, connected.ConnectionNumber);
+        return result;
     }
+
+    private static async ValueTask<TransferResult> ExchangeAsync(IConnection connection, ITransferContext context, GopherDiagnosticLog log)
+    {
+        if (GopherSelector.FromUrl(context.Url) is not { } selector)
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, GopherTransferMessages.SelectorMalformed);
+        }
+
+        if (!await TrySendAsync(connection, selector, context.CancellationToken).ConfigureAwait(false))
+        {
+            return TransferResult.Failure(CurlExitCode.SendError, GopherTransferMessages.SendFailed);
+        }
+
+        log.SelectorSent(selector);
+
+        return await CopyReplyAsync(connection, context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reports the line curl 8.21.0 ends a gopher connection with (measured, BL-934 Notes):
+    /// <c>shutting down connection #N</c> after a finished transfer or a malformed selector,
+    /// and otherwise <c>closing connection #N</c>, after the failure's own message when curl
+    /// reports it through <c>failf</c> - every failure but the fallback texts for a failed
+    /// send or receive.
+    /// </summary>
+    private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, long connectionNumber)
+    {
+        if (result.ExitCode is CurlExitCode.Ok or CurlExitCode.UrlMalformat)
+        {
+            events.ReportInfo(GopherTransferMessages.ShuttingDownConnection(connectionNumber));
+            return;
+        }
+
+        if (!IsFallbackText(result.ErrorMessage!))
+        {
+            events.ReportInfo(result.ErrorMessage!);
+        }
+
+        events.ReportInfo(GopherTransferMessages.ClosingConnection(connectionNumber));
+    }
+
+    /// <summary>
+    /// Whether <paramref name="message" /> is the text curl prints for a failed send or
+    /// receive without calling <c>failf</c>, and so without a <c>-v</c> line of its own.
+    /// </summary>
+    private static bool IsFallbackText(string message) =>
+        message == GopherTransferMessages.SendFailed || message == GopherTransferMessages.ReceiveFailed;
 
     private static ConnectTarget CreateTarget(ITransferContext context)
     {
@@ -98,6 +165,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
         };
     }
 
@@ -119,12 +187,13 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         }
     }
 
-    private static async ValueTask<TransferResult> CopyReplyAsync(
-        IConnection connection,
-        Stream output,
-        ITransferProgress progress,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Copies the reply to the output, reporting each read as data received and the
+    /// server's close as a zero-byte block, as curl 8.21.0's <c>--trace</c> shows them.
+    /// </summary>
+    private static async ValueTask<TransferResult> CopyReplyAsync(IConnection connection, ITransferContext context)
     {
+        CancellationToken cancellationToken = context.CancellationToken;
         byte[] buffer = new byte[ReadBufferSize];
         long bytesWritten = 0;
         while (true)
@@ -134,11 +203,12 @@ public sealed class GopherProtocolHandler : IProtocolHandler
             {
                 read = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
             }
-            catch (IOException)
+            catch (IOException exception)
             {
-                return new TransferResult(CurlExitCode.RecvError, bytesWritten, GopherTransferMessages.ReceiveFailed);
+                return new TransferResult(CurlExitCode.RecvError, bytesWritten, ReceiveFailure(exception));
             }
 
+            context.Events.ReportDataReceived(buffer.AsSpan(0, read));
             if (read == 0)
             {
                 return TransferResult.Success(bytesWritten);
@@ -146,7 +216,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
 
             try
             {
-                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                await context.Output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             }
             catch (IOException exception)
             {
@@ -157,9 +227,17 @@ public sealed class GopherProtocolHandler : IProtocolHandler
             }
 
             bytesWritten += read;
-            progress.ReportDownloaded(bytesWritten, null);
+            context.Progress.ReportDownloaded(bytesWritten, null);
         }
     }
+
+    /// <summary>
+    /// The exit 56 message for a failed read: the TLS build's own text when a
+    /// <c>gophers</c> connection ended without <c>close_notify</c> (ADR-0221), and curl's
+    /// fallback text for anything else.
+    /// </summary>
+    private static string ReceiveFailure(IOException exception) =>
+        exception is MissingCloseNotifyException ? exception.Message : GopherTransferMessages.ReceiveFailed;
 
     /// <summary>
     /// How many bytes of a failed write the output accepted: the count an

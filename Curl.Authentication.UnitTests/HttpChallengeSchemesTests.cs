@@ -53,4 +53,14 @@ public sealed class HttpChallengeSchemesTests
     {
         Assert.AreEqual(expected, HttpChallengeSchemes.NtlmTokenOf(challenges));
     }
+
+    [TestMethod]
+    [DataRow(new[] { "Negotiate" }, "", DisplayName = "Bare Negotiate")]
+    [DataRow(new[] { "negotiate  oYG=  " }, "oYG=", DisplayName = "Any case, blanks around the token")]
+    [DataRow(new[] { "NTLM, Negotiate oYG" }, "oYG", DisplayName = "After another challenge in one value")]
+    [DataRow(new[] { "NTLM TlRM", "Basic realm=\"r\"" }, null, DisplayName = "No Negotiate challenge")]
+    public void NegotiateTokenOf_Challenges_ReturnsTheFirstNegotiateToken(string[] challenges, string? expected)
+    {
+        Assert.AreEqual(expected, HttpChallengeSchemes.NegotiateTokenOf(challenges));
+    }
 }

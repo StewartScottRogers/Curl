@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.KeyExchange;
 
 namespace Curl.Protocol.Ssh.Negotiation;
 
@@ -34,6 +35,12 @@ public sealed record SshAlgorithmPreferences(
         "rsa-sha2-512,rsa-sha2-256,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,"
         + "ssh-rsa,ssh-rsa-cert-v01@openssh.com";
 
+    private const string RsaCertificateHostKeys =
+        "rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com";
+
+    private const string EcdsaCertificateHostKeys =
+        "ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com";
+
     private const string OpenSslCiphers =
         "chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,"
         + "aes128-ctr,aes256-cbc,rijndael-cbc@lysator.liu.se,aes192-cbc,aes128-cbc,blowfish-cbc,arcfour128,"
@@ -56,6 +63,31 @@ public sealed record SshAlgorithmPreferences(
     };
 
     /// <summary>
+    /// Gets the libssh2 cryptography backend the platform's curl names in its <c>-v</c> line
+    /// <c>SSH: libssh2 cryptography backend: &lt;name&gt;</c>: <c>WinCNG</c> for
+    /// <see cref="WindowsReference" />, <c>OpenSSL</c> for <see cref="OpenSslReference" />,
+    /// and <see langword="null" />, writing no line, otherwise (ADR-0262).
+    /// </summary>
+    public string? CryptographyBackend { get; init; }
+
+    /// <summary>
+    /// Gets the host-key algorithms this preset offers but never agrees: libssh2 1.11.1 lists
+    /// the RSA and ECDSA certificate forms in its <c>KEXINIT</c> but has no verifier for them,
+    /// so it passes over them when it picks the host-key algorithm and fails with
+    /// <c>-5, Unable to exchange encryption keys</c> when nothing else is shared (measured
+    /// 2026-09-29 on both reference builds, ADR-0266). Empty for <see cref="Full" />.
+    /// </summary>
+    public IReadOnlyCollection<string> HostKeysNeverAgreed { get; init; } = [];
+
+    /// <summary>
+    /// Gets the prime sizes <c>diffie-hellman-group-exchange-*</c> asks for and accepts:
+    /// libssh2 1.11.1's own (2048, 4096, 8192), as the OpenSSL build sends them, unless a
+    /// preset says otherwise; <see cref="WindowsReference" /> sends WinCNG's (2048, 4096,
+    /// 4096) (ADR-0206, ADR-0268).
+    /// </summary>
+    internal SshGroupExchangeSizes GroupExchangeSizes { get; init; } = SshGroupExchangeSizes.OpenSslReference;
+
+    /// <summary>
     /// Gets what curl 8.21.0's Windows build (libssh2 1.11.1 on WinCNG) offers, byte for byte
     /// and in its order.
     /// </summary>
@@ -66,7 +98,12 @@ public sealed record SshAlgorithmPreferences(
             "chacha20-poly1305@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr,aes256-cbc,rijndael-cbc@lysator.liu.se,"
             + "aes192-cbc,aes128-cbc,arcfour128,arcfour,3des-cbc"),
         Split(WindowsMacs),
-        [SshAlgorithmCatalogue.NoCompression]);
+        [SshAlgorithmCatalogue.NoCompression])
+    {
+        CryptographyBackend = "WinCNG",
+        HostKeysNeverAgreed = Split(RsaCertificateHostKeys),
+        GroupExchangeSizes = SshGroupExchangeSizes.WindowsReference,
+    };
 
     /// <summary>
     /// Gets what curl 8.21.0's OpenSSL build (libssh2 1.11.1 on OpenSSL, Linux and macOS)
@@ -80,7 +117,8 @@ public sealed record SshAlgorithmPreferences(
             + "ssh-ed25519-cert-v01@openssh.com," + RsaHostKeys),
         Split(OpenSslCiphers),
         Split(OpenSslMacs),
-        [SshAlgorithmCatalogue.NoCompression]);
+        [SshAlgorithmCatalogue.NoCompression])
+    { CryptographyBackend = "OpenSSL", HostKeysNeverAgreed = Split(EcdsaCertificateHostKeys + "," + RsaCertificateHostKeys) };
 
     /// <summary>
     /// Gets every algorithm libssh2 1.11.1 or libssh 0.12.2 offers, in ADR-0122's full-set
@@ -137,6 +175,15 @@ public sealed record SshAlgorithmPreferences(
                 CurlExitCode.Ssh,
                 $"libssh2 method '{string.Join(',', narrowed)}' failed: The requested method(s) are not currently supported");
     }
+
+    /// <summary>
+    /// Gets the host-key algorithms curl narrows a known-hosts entry's type to, as its
+    /// <c>SSH: set '&lt;names&gt;' as hostkey type</c> line names them (ADR-0262).
+    /// </summary>
+    /// <param name="knownHostKeyType">A key type <see cref="NarrowHostKeysTo" /> recognizes, such as <c>ssh-rsa</c>.</param>
+    /// <returns>The names, comma-separated, such as <c>rsa-sha2-256,rsa-sha2-512,ssh-rsa</c>.</returns>
+    internal static string NarrowedHostKeyNames(string knownHostKeyType) =>
+        string.Join(',', KnownHostNarrowing[knownHostKeyType]);
 
     private static string[] Split(string names) => names.Split(',');
 }

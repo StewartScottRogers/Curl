@@ -33,8 +33,8 @@ public sealed class FakeFileSystem : IFileSystem
     private readonly List<FileSystemCall> calls = [];
     private readonly List<CancellationToken> openCancellationTokens = [];
     private readonly Dictionary<string, FakeFileEntry> entries = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, FileAccessStatus> readFailures = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, FileAccessStatus> writeFailures = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, FileOpenResult> readFailures = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, FileOpenResult> writeFailures = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Stream> writeDestinations = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Stream> openedReadStreams = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TrackedMemoryStream> captures = new(StringComparer.Ordinal);
@@ -118,11 +118,12 @@ public sealed class FakeFileSystem : IFileSystem
     /// </summary>
     /// <param name="path">The operating-system path.</param>
     /// <param name="status">The failure to report.</param>
-    public void FailOpenForRead(string path, FileAccessStatus status)
+    /// <param name="failureException">The exception the failed open carries, if any.</param>
+    public void FailOpenForRead(string path, FileAccessStatus status, Exception? failureException = null)
     {
         ArgumentNullException.ThrowIfNull(path);
 
-        readFailures[path] = status;
+        readFailures[path] = FileOpenResult.Failed(status, failureException);
     }
 
     /// <summary>
@@ -130,11 +131,12 @@ public sealed class FakeFileSystem : IFileSystem
     /// </summary>
     /// <param name="path">The operating-system path.</param>
     /// <param name="status">The failure to report.</param>
-    public void FailOpenForWrite(string path, FileAccessStatus status)
+    /// <param name="failureException">The exception the failed open carries, if any.</param>
+    public void FailOpenForWrite(string path, FileAccessStatus status, Exception? failureException = null)
     {
         ArgumentNullException.ThrowIfNull(path);
 
-        writeFailures[path] = status;
+        writeFailures[path] = FileOpenResult.Failed(status, failureException);
     }
 
     /// <summary>
@@ -208,7 +210,7 @@ public sealed class FakeFileSystem : IFileSystem
 
         if (readFailures.TryGetValue(path, out var forced))
         {
-            return ValueTask.FromResult(FileOpenResult.Failed(forced));
+            return ValueTask.FromResult(forced);
         }
 
         if (!entries.TryGetValue(path, out var entry))
@@ -242,7 +244,7 @@ public sealed class FakeFileSystem : IFileSystem
 
         if (writeFailures.TryGetValue(path, out var forced))
         {
-            return ValueTask.FromResult(FileOpenResult.Failed(forced));
+            return ValueTask.FromResult(forced);
         }
 
         entries.TryGetValue(path, out var existing);

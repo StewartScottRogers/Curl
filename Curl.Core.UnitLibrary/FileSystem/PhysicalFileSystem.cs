@@ -18,7 +18,7 @@ namespace Curl.Core.FileSystem;
 /// A path reaches this class as curl forwards it, which may be one the operating system
 /// rejects (<c>c|/Windows</c>, a literal <c>%</c>). Every exception
 /// <see cref="FileOpenFailure.IsOpenFailure(Exception)" /> names is absorbed into
-/// <see cref="FileOpenResult.Failed(FileAccessStatus)" />; the only exception either open
+/// <see cref="FileOpenResult.Failed(FileAccessStatus, Exception?)" />, which carries it; the only exception either open
 /// lets out is the <see cref="OperationCanceledException" /> of a cancelled token.
 /// </para>
 /// <para>
@@ -210,7 +210,7 @@ public sealed class PhysicalFileSystem : IFileSystem, IFileTimeSetter
         }
         catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
         {
-            return FileOpenResult.Failed(FileOpenFailure.StatusFor(exception, Directory.Exists(path)));
+            return FileOpenResult.Failed(FileOpenFailure.StatusFor(exception, Directory.Exists(path)), exception);
         }
 
         return FileOpenResult.Opened(stream, LengthOf(stream), LastWriteTimeUtcOf(stream));

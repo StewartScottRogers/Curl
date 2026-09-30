@@ -1,4 +1,6 @@
 using System.Net;
+using Curl.Kerberos;
+using Curl.Ntlm;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Authentication;
@@ -8,7 +10,8 @@ namespace Curl.Authentication;
 /// <c>--ntlm -u u:p</c> on 2026-09-28 (BL-526 Notes): Type 1 up front and once more for a bare
 /// <c>NTLM</c>, Type 3 for a Type 2 challenge from a fresh context stepped through Type 1,
 /// nothing after Type 3, and a Type 2 the context cannot answer ending on the 401 for curl's
-/// own NTLM or with exit 94 for the SSPI build.
+/// own NTLM or with exit 94 for the SSPI build, and a Type 3 past curl's 1024-byte buffer
+/// failing with exit 100 on curl's own NTLM (BL-849).
 /// </summary>
 [TestClass]
 public sealed class NtlmHttpAuthenticatorTests
@@ -17,7 +20,14 @@ public sealed class NtlmHttpAuthenticatorTests
 
     private static readonly byte[] Type3 = Convert.FromBase64String(HandBuiltNtlmSecurityContextTests.MeasuredType3);
 
-    private static readonly string Type2Challenge = "NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredChallenge;
+    /// <summary>
+    /// The longest user whose Type 3 answer to <see cref="Type2Challenge" /> fits curl's buffer:
+    /// 64 header, 24 LM, 84 NTLMv2 and 22 workstation bytes, then 2 per user character, to
+    /// 1022 bytes; one character more is 1024, which curl's strict check refuses.
+    /// </summary>
+    private const int LargestFittingUserLength = 414;
+
+    private static readonly string Type2Challenge ="NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredChallenge;
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_BeforeAnyChallenge_SendsType1()
@@ -102,17 +112,54 @@ public sealed class NtlmHttpAuthenticatorTests
     }
 
     [TestMethod]
-    [DataRow(SecurityContextStatus.MalformedToken, DisplayName = "The Type 2 cannot be read")]
-    [DataRow(SecurityContextStatus.Refused, DisplayName = "The answer cannot be made")]
-    public async Task CreateAuthorizationAsync_ContextRefusesType2WithCurlsOwnNtlm_SendsNothing(SecurityContextStatus status)
+    public async Task CreateAuthorizationAsync_Type2CurlsOwnNtlmCannotRead_SendsNothing()
     {
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
-            new SecurityContextStep(status, [])));
+            new SecurityContextStep(SecurityContextStatus.MalformedToken, [])));
 
         string? value = await Authenticator(contexts).CreateAuthorizationAsync(Request("u:p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None);
 
         Assert.IsNull(value);
+    }
+
+    /// <summary>
+    /// Pins curl 8.18.0 on Ubuntu (BL-849 Notes): <c>--ntlm -u &lt;600 a&gt;:p</c> against the
+    /// measured Type 2 sent one request and failed with <c>curl: (100) user + domain + hostname
+    /// too big for NTLM</c>.
+    /// </summary>
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_Type3PastCurlsBufferWithCurlsOwnNtlm_FailsWithExit100()
+    {
+        NtlmHttpAuthenticator authenticator = Authenticator(new HandBuiltNtlmContexts());
+
+        HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
+            () => authenticator.CreateAuthorizationAsync(Request(new string('a', 600) + ":p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
+
+        Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode);
+        Assert.AreEqual("user + domain + hostname too big for NTLM", failure.Message);
+    }
+
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_LargestType3ThatFitsWithCurlsOwnNtlm_AnswersIt()
+    {
+        NtlmHttpAuthenticator authenticator = Authenticator(new HandBuiltNtlmContexts());
+
+        string? value = await authenticator.CreateAuthorizationAsync(Request(new string('a', LargestFittingUserLength) + ":p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None);
+
+        Assert.IsNotNull(value);
+        Assert.HasCount(NtlmAuthenticateMessage.CurlBufferSize - 2, Convert.FromBase64String(value["NTLM ".Length..]));
+    }
+
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_OneCharacterPastTheLargestType3_FailsWithExit100()
+    {
+        NtlmHttpAuthenticator authenticator = Authenticator(new HandBuiltNtlmContexts());
+
+        HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
+            () => authenticator.CreateAuthorizationAsync(Request(new string('a', LargestFittingUserLength + 1) + ":p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
+
+        Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode);
     }
 
     [TestMethod]
@@ -207,12 +254,21 @@ public sealed class NtlmHttpAuthenticatorTests
         Assert.AreEqual("::1", contextRequest.HostName);
     }
 
-    private static NtlmHttpAuthenticator Authenticator(ScriptedSecurityContextFactory contexts) => new(contexts, refusedChallengeFailsTransfer: false);
+    private static NtlmHttpAuthenticator Authenticator(ISecurityContextFactory contexts) => new(contexts, refusedChallengeFailsTransfer: false);
 
     private static HttpAuthRequest Request(string userColonPassword)
     {
         int colon = userColonPassword.IndexOf(':', StringComparison.Ordinal);
         NetworkCredential credential = new(userColonPassword[..colon], userColonPassword[(colon + 1)..]);
         return new("GET", CurlUrl.Parse("http://127.0.0.1:18526/x"), "/x", credential, null, HttpAuthSchemes.Ntlm, IsProxy: false);
+    }
+
+    /// <summary>Makes curl's own NTLM contexts, with the measured client challenge and time.</summary>
+    private sealed class HandBuiltNtlmContexts : ISecurityContextFactory
+    {
+        public ISecurityContext Create(SecurityContextRequest request) =>
+            new HandBuiltNtlmSecurityContext(request, new NtlmChallengeAnswerer(
+                new FixedTimeProvider(HandBuiltNtlmSecurityContextTests.MeasuredTime),
+                new FixedNtlmRandomSource(HandBuiltNtlmSecurityContextTests.MeasuredClientChallenge)));
     }
 }

@@ -16,6 +16,10 @@ namespace Curl.Protocol.Ws;
 /// Receives every read as data received, the empty read that ends the transfer included, as
 /// curl 8.21.0 reports them for <c>-v</c> and <c>--trace</c> (BL-584).
 /// </param>
+/// <param name="diagnosticLog">
+/// Receives each frame received under the <c>ws</c> component (<see cref="WsTransferLog" />),
+/// or nothing when <see langword="null" />.
+/// </param>
 /// <remarks>
 /// Measured against curl 8.21.0 (BL-581): a close frame is neither answered nor the end, so
 /// reading goes on until the connection closes; every ping answered is echoed in one pong,
@@ -23,11 +27,11 @@ namespace Curl.Protocol.Ws;
 /// curl replaces a pong it has not yet sent. A protocol violation fails with 56 after the
 /// payload decoded before it has been handed on, and no pong is sent for that read.
 /// </remarks>
-internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSource randomSource, ITransferProgress progress, ITransferEvents events)
+internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSource randomSource, ITransferProgress progress, ITransferEvents events, IDiagnosticLog? diagnosticLog = null)
 {
     private const int ReadBufferSize = 16384;
 
-    private readonly WsFrameDecoder decoder = new();
+    private readonly WsFrameDecoder decoder = new(diagnosticLog);
 
     /// <summary>
     /// Gets how many frame bytes have been received so far, frame heads included: curl's

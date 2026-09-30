@@ -15,15 +15,17 @@ public sealed class Tls13RecordProtectionTests
     [DataRow((ushort)0x1301, true)]
     [DataRow((ushort)0x1302, true)]
     [DataRow((ushort)0x1303, true)]
-    [DataRow((ushort)0x1304, false)]
-    [DataRow((ushort)0x1305, false)]
-    public void CanProtectNamesTheGcmAndChaChaSuites(int cipherSuite, bool expected) =>
+    [DataRow((ushort)0x1304, true)]
+    [DataRow((ushort)0x1305, true)]
+    [DataRow((ushort)0x1306, false)]
+    [DataRow((ushort)0x1300, false)]
+    public void CanProtectNamesTheFiveTls13Suites(int cipherSuite, bool expected) =>
         Assert.AreEqual(expected, Tls13RecordProtection.CanProtect((ushort)cipherSuite));
 
     [TestMethod]
-    public void CreateRefusesACcmSuiteAndMissingArguments()
+    public void CreateRefusesAnUnknownSuiteAndMissingArguments()
     {
-        Assert.ThrowsExactly<ArgumentException>(() => Tls13RecordProtection.Create(Tls13CipherSuite.Aes128Ccm8Sha256, Secret));
+        Assert.ThrowsExactly<ArgumentException>(() => Tls13RecordProtection.Create(new Tls13CipherSuite(0x1306, Tls13KeySchedule.Sha256, 16), Secret));
         Assert.ThrowsExactly<ArgumentNullException>(() => Tls13RecordProtection.Create(null!, Secret));
         Assert.ThrowsExactly<ArgumentNullException>(() => Tls13RecordProtection.Create(Tls13CipherSuite.Aes128GcmSha256, null!));
     }
@@ -98,6 +100,47 @@ public sealed class Tls13RecordProtectionTests
 
         Assert.AreEqual(TlsAlertDescription.BadRecordMac, result.Alert);
         Assert.AreEqual(1ul, reader.SequenceNumber);
+    }
+
+    [TestMethod]
+    [DataRow((ushort)0x1304, 16)]
+    [DataRow((ushort)0x1305, 8)]
+    public void CcmRecordsCarryTheSuitesTagAndOpenOnTheOtherSide(int cipherSuite, int tagLength)
+    {
+        Tls13CipherSuite suite = Tls13CipherSuite.Find((ushort)cipherSuite)!;
+        using Tls13RecordProtection writer = Tls13RecordProtection.Create(suite, Secret);
+        using Tls13RecordProtection reader = Tls13RecordProtection.Create(suite, Secret);
+
+        byte[] record = writer.Protect(TlsContentType.Handshake, [1, 2, 3]);
+        Tls13RecordContent content = reader.Unprotect(record).Value;
+
+        Assert.HasCount(5 + 3 + 1 + tagLength, record);
+        Assert.AreEqual(TlsContentType.Handshake, content.Type);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, content.Content);
+    }
+
+    [TestMethod]
+    public void Ccm8FragmentShorterThanItsEightByteTagIsABadRecordMac()
+    {
+        using Tls13RecordProtection reader = Tls13RecordProtection.Create(Tls13CipherSuite.Aes128Ccm8Sha256, Secret);
+
+        TlsDecodeResult<Tls13RecordContent> result = reader.Unprotect([0x17, 0x03, 0x03, 0x00, 0x07, .. new byte[7]]);
+
+        Assert.AreEqual(TlsAlertDescription.BadRecordMac, result.Alert);
+        Assert.AreEqual(1ul, reader.SequenceNumber);
+    }
+
+    [TestMethod]
+    public void Ccm8RecordWithACorruptedTagIsABadRecordMac()
+    {
+        using Tls13RecordProtection writer = Tls13RecordProtection.Create(Tls13CipherSuite.Aes128Ccm8Sha256, Secret);
+        using Tls13RecordProtection reader = Tls13RecordProtection.Create(Tls13CipherSuite.Aes128Ccm8Sha256, Secret);
+        byte[] record = writer.Protect(TlsContentType.ApplicationData, [4, 5, 6]);
+        record[^1] ^= 0x01;
+
+        TlsDecodeResult<Tls13RecordContent> result = reader.Unprotect(record);
+
+        Assert.AreEqual(TlsAlertDescription.BadRecordMac, result.Alert);
     }
 
     private static Tls13RecordProtection Create() => Tls13RecordProtection.Create(Tls13CipherSuite.Aes128GcmSha256, Secret);

@@ -118,6 +118,42 @@ neither `Content-Length` nor chunked coding, cut short, or over curl's 3000-byte
 server. The `500` with an empty body of the table above still fails, because the empty body
 decodes as `Too small`. The rest of point 4 stands.
 
+## Amendment (BL-642, 2026-09-29)
+
+Decided by Claude under Stewart's delegation. BL-642 measured the rest of the design with
+`Record-CurlExchange.ps1 -Tls` as the DoH server on `P1`, answering every connection with the
+46-byte A answer for `127.0.0.1`, and a second, plain recorder on `P2` as the transfer's server
+(curl 8.21.0 Schannel; every case is in BL-642's Notes):
+
+| Command | Result |
+| --- | --- |
+| `-sS -v --doh-url https://127.0.0.1:P1/dns-query --doh-insecure http://example.test:P2/` | the two POSTs above, then `Host example.test:P2 was resolved.`, `IPv6: (none)`, `IPv4: 127.0.0.1`, `Trying 127.0.0.1:P2...` and the GET to `P2`, exit 0 |
+| the same with `--resolve example.test:P2:127.0.0.1` | `Added ... to DNS cache`, `Hostname example.test was found in DNS cache`; nothing reached the DoH server |
+| `--doh-url bogus` | exit 6 after about 7 s (curl asked `http://bogus/`, which does not resolve) |
+| `--doh-url ftp://127.0.0.1:P1/` | exit 6, nothing reached the DoH server |
+| `--doh-url 127.0.0.1:P1/dns-query` (no scheme) | plain HTTP to the TLS server, exit 6: the scheme is guessed as `http` |
+| `--ssl-no-revoke --cacert root.pem` (the recorder's root), no `--doh-insecure` | resolved, exit 0: `--cacert` and `--ssl-no-revoke` reach the DoH connections |
+| `-4` / `-6` | only the A / only the AAAA POST is sent (153 bytes) |
+| `--doh-url ''` | accepted, DoH off; `--no-doh-url` cannot be reversed; `--no-doh-insecure` and `--no-doh-cert-status` are accepted |
+
+1. **`--resolve` wins**, as point 2 expected: the DoH resolver is asked only for a name no
+   `--resolve` entry answers.
+2. **The DoH URL.** A value without `://` gets `http://` in front; a value that then is not an
+   absolute `http` or `https` URL resolves every name to nothing (`UnusableDohUrlResolver`), so each
+   transfer fails with exit 6. An empty value turns DoH off. `--doh-url` wins over the c-ares
+   options: curl asks the DoH server whichever resolver it was built with.
+3. **The DoH TLS options.** The DoH connections take the options curl's `lib/doh.c` copies onto each
+   DoH transfer: `--cacert`, `--capath`, `--crlfile`, `--curves`, `--ssl-no-revoke`,
+   `--ssl-revoke-best-effort` and `--ssl-auto-client-cert`, beside `--doh-insecure` (as `Insecure`) and
+   `--doh-cert-status` (as `RequireCertificateStatus`). `-k` and `--cert-status` stay out.
+4. **`--doh-cert-status` replaces point 3's "skipped when `--doh-insecure` is given".** That was
+   measured on the Schannel build, which ignores `--cert-status` altogether. ADR-0191 decided
+   `--cert-status` checks on every platform as the OpenSSL build does, and the OpenSSL build checks
+   the stapled status under `-k` too (BL-610). So `--doh-cert-status` reaches the DoH handshakes as it
+   is, and the TLS provider applies ADR-0191 to them exactly as to the transfer's.
+5. **`-4` and `-6`** keep filtering the returned addresses, so the transfer's output is the same;
+   sending only that family's query is a follow-up task in `Curl.Networking.UnitLibrary`.
+
 ## Consequences
 
 - BL-640 builds the DNS message codec in `Curl.Networking.UnitLibrary` and pins the query
@@ -145,3 +181,28 @@ decodes as `Too small`. The rest of point 4 stands.
   solution already has do the job.
 - **Ask A and AAAA in turn.** Simpler, but curl asks in parallel (measured), and the
   resolve time `-w %{time_namelookup}` reports would differ.
+
+## Amendment (BL-850, 2026-09-29)
+
+Decided by Claude under Stewart's delegation. BL-850 measured the `--trace-config doh` lines with
+`Record-CurlExchange.ps1 -Tls -Connections 2` (every connection given the same response) and
+`-sS -v --trace-config doh D --doh-insecure http://example.test:P2/` (curl 8.21.0 Schannel; every
+case is in BL-850's Notes):
+
+- The lines appear only with `-v`: `--trace-config doh` alone prints nothing. On this build the
+  option turns on the whole `[DNS]` trace; `DohDnsResolver` reports only the DoH lines.
+- After both queries finish, in this order: `[DNS] DoH request <curl_easy_strerror text>` for each
+  query whose connection or exchange failed; `[DNS] DoH: <failure> type A|AAAA for <host>` for each
+  answer that did not decode; and, when at least one query decoded *or failed to exchange* (curl skips
+  the decode of a failed exchange, so its result stays `DOH_OK`), `[DNS] hostname: <host>`,
+  `[DoH] TTL: <smallest TTL read> seconds` (`2147483647` when none), `[DoH] A: <dotted>` and
+  `[DoH] AAAA: <eight four-digit hex groups>` per address, A's first, and `CNAME: <name>` per name.
+- The `DoH request` lines are written by curl as each query completes, interleaved with its other
+  `[DNS]` trace lines; `DohDnsResolver` writes all its lines once both have finished, A's first. Only
+  the DoH lines are reported, so their order among themselves is what matters and is as measured.
+
+The sink is an `ITransferEvents` whose `ReportInfo` receives each line's text after `* `, and the
+`curl_easy_strerror` text comes from a `Func<CurlExitCode, string>` the composition root supplies from
+`Curl.Console`'s table, so Networking keeps no copy of it. The composition root passes a real sink only
+under `-v --trace-config doh`. curl's one shared entry also keeps what a failed decode read before it
+stopped (a CNAME is then printed twice); matching that is BL-958.

@@ -29,7 +29,8 @@ namespace Curl.Protocol.Http;
 /// head is exit 95; frames or field sections that break RFC 9114 or RFC 9204 are exit 56 with
 /// nghttp3's error name, as is a connection error on the server's control or QPACK streams
 /// (<see cref="Http3Session.ConnectionError" />), which fails the next read and any read it
-/// interrupts; and a lost connection is the exit code and message its
+/// interrupts; a request stream the connection cannot open is exit 55 with <c>cannot open
+/// bidi streams</c> (ADR-0245); and a lost connection is the exit code and message its
 /// <see cref="MultiplexedConnectionFailedException" /> carries.
 /// </remarks>
 /// <param name="session">The connection's HTTP/3 session.</param>
@@ -42,10 +43,16 @@ namespace Curl.Protocol.Http;
 internal sealed class Http3StreamConnection(Http3Session session, string scheme, long? bodyLength, bool ignoresBody) : IHttpStreamConnection
 {
     /// <summary>
-    /// The longest frame payload read off a request stream: <c>Curl.Http3</c> reads each
-    /// frame whole, so a <c>DATA</c> frame is held in memory at once (ADR-0172).
+    /// The longest payload of a frame other than <c>DATA</c> read off a request stream, which
+    /// is read whole; <c>DATA</c> of any length streams through <see cref="dataBuffer" />
+    /// (ADR-0172, BL-838).
     /// </summary>
     internal const long MaximumFramePayloadLength = 16 * 1024 * 1024;
+
+    /// <summary>The most <c>DATA</c> payload bytes one read off the stream takes.</summary>
+    internal const int DataBufferLength = 16 * 1024;
+
+    private readonly byte[] dataBuffer = new byte[DataBufferLength];
 
     private readonly Queue<ReadOnlyMemory<byte>> received = new();
 
@@ -145,9 +152,9 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         while (!isResponseEnded)
         {
             await ReceiveFrameAsync(cancellationToken).ConfigureAwait(false);
+            received.Clear();
         }
 
-        received.Clear();
         unread = ReadOnlyMemory<byte>.Empty;
     }
 
@@ -223,16 +230,17 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
 
     private async ValueTask ReceiveFrameAsync(CancellationToken cancellationToken)
     {
-        switch (await ReadFrameAsync(cancellationToken).ConfigureAwait(false))
+        Http3FrameOrData read = await ReadFrameOrDataAsync(cancellationToken).ConfigureAwait(false);
+        switch (read.Frame)
         {
-            case null:
+            case null when read.IsEndOfStream:
                 ReceiveEnd();
+                break;
+            case null:
+                ReceiveData(read.DataLength);
                 break;
             case Http3HeadersFrame headers:
                 ReceiveHeaders(headers);
-                break;
-            case Http3DataFrame data:
-                ReceiveData(data);
                 break;
             default:
                 throw ReadStreamFailed(Nghttp3ErrorName(Http3ErrorCode.FrameUnexpected));
@@ -240,10 +248,11 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     }
 
     /// <summary>
-    /// Reads the next frame, unless a connection error on the server's control or QPACK
-    /// streams failed the whole connection (<see cref="Http3Session.ConnectionError" />).
+    /// Reads the next frame, or the next <c>DATA</c> bytes into <see cref="dataBuffer" />,
+    /// unless a connection error on the server's control or QPACK streams failed the whole
+    /// connection (<see cref="Http3Session.ConnectionError" />).
     /// </summary>
-    private async ValueTask<Http3Frame?> ReadFrameAsync(CancellationToken cancellationToken)
+    private async ValueTask<Http3FrameOrData> ReadFrameOrDataAsync(CancellationToken cancellationToken)
     {
         if (session.ConnectionError is { } failed)
         {
@@ -252,7 +261,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
 
         try
         {
-            return await frames!.ReadFrameAsync(cancellationToken).ConfigureAwait(false);
+            return await frames!.ReadFrameOrDataAsync(dataBuffer, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception) when (session.ConnectionError is { } connectionError)
         {
@@ -266,7 +275,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         }
         catch (MultiplexedStreamResetException reset) when (reset.ApplicationErrorCode == (long)Http3ErrorCode.NoError || (isFinalHeadReceived && ignoresBody))
         {
-            return null;
+            return Http3FrameOrData.EndOfStream;
         }
         catch (MultiplexedStreamResetException reset)
         {
@@ -322,15 +331,19 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         isFinalHeadReceived = statusCode >= 200;
     }
 
-    private void ReceiveData(Http3DataFrame frame)
+    /// <summary>
+    /// Takes <c>DATA</c> bytes just read into <see cref="dataBuffer" />; they are read out
+    /// before the buffer is read into again.
+    /// </summary>
+    private void ReceiveData(int count)
     {
         if (!isFinalHeadReceived)
         {
             throw ReadStreamFailed(Nghttp3ErrorName(Http3ErrorCode.FrameUnexpected));
         }
 
-        received.Enqueue(frame.Payload);
-        bodyBytesReceived += frame.Payload.Length;
+        received.Enqueue(dataBuffer.AsMemory(0, count));
+        bodyBytesReceived += count;
     }
 
     /// <summary>

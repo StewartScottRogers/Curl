@@ -29,6 +29,17 @@ public sealed class HttpAuthRequestTests
     }
 
     [TestMethod]
+    public void ServerCertificate_EmptyByDefaultAndKeptWhenSet()
+    {
+        var request = new HttpAuthRequest(
+            "GET", OriginUrl, "/path?q=1", null, null, HttpAuthSchemes.Negotiate, IsProxy: false);
+        byte[] certificate = [0x30, 0x00];
+
+        Assert.IsTrue(request.ServerCertificate.IsEmpty);
+        CollectionAssert.AreEqual(certificate, (request with { ServerCertificate = certificate }).ServerCertificate.ToArray());
+    }
+
+    [TestMethod]
     public void Equals_ForTheSameRequestToAProxy_ReturnsFalse()
     {
         var toOrigin = new HttpAuthRequest(

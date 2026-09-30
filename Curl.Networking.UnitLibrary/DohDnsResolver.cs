@@ -26,12 +26,19 @@ namespace Curl.Networking;
 /// reach the server, as measured: the literal is returned as it is, and <c>localhost</c> and
 /// every name under <c>.localhost</c> as <c>::1</c> and <c>127.0.0.1</c>.
 /// </para>
+/// <para>
+/// Once both queries have finished, the lines curl prints under <c>-v --trace-config doh</c> go to
+/// the trace sink (<see cref="DohTraceLines" />, BL-850); the composition root passes a real sink
+/// only for that option.
+/// </para>
 /// </remarks>
 public sealed class DohDnsResolver : IDnsResolver
 {
     private readonly IConnector _connector;
     private readonly Uri _dohUrl;
     private readonly ConnectTarget _dohServer;
+    private readonly ITransferEvents _dohTrace;
+    private readonly Func<CurlExitCode, string> _describeExitCode;
 
     /// <summary>Initializes a new instance of the <see cref="DohDnsResolver" /> class.</summary>
     /// <param name="connector">
@@ -41,9 +48,33 @@ public sealed class DohDnsResolver : IDnsResolver
     /// </param>
     /// <param name="dohUrl">The absolute <c>--doh-url</c>, whose scheme says whether TLS is used.</param>
     public DohDnsResolver(IConnector connector, Uri dohUrl)
+        : this(connector, dohUrl, NoTransferEvents.Instance, static _ => string.Empty)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DohDnsResolver" /> class that reports curl's
+    /// <c>--trace-config doh</c> lines.
+    /// </summary>
+    /// <param name="connector">
+    /// Opens each DoH connection: a <see cref="TcpConnector" /> of its own, built with the system
+    /// resolver and a TLS provider built from the DoH TLS options only (ADR-0152).
+    /// </param>
+    /// <param name="dohUrl">The absolute <c>--doh-url</c>, whose scheme says whether TLS is used.</param>
+    /// <param name="dohTrace">
+    /// Receives the <c>--trace-config doh</c> lines as <see cref="ITransferEvents.ReportInfo" /> texts,
+    /// e.g. <c>[DNS] DoH: Too small type A for example.test</c>.
+    /// </param>
+    /// <param name="describeExitCode">
+    /// Gives curl's <c>curl_easy_strerror</c> text for the exit code a DoH connection or exchange
+    /// failed with, the text of its <c>[DNS] DoH request &lt;text&gt;</c> line.
+    /// </param>
+    public DohDnsResolver(IConnector connector, Uri dohUrl, ITransferEvents dohTrace, Func<CurlExitCode, string> describeExitCode)
     {
         ArgumentNullException.ThrowIfNull(connector);
         ArgumentNullException.ThrowIfNull(dohUrl);
+        ArgumentNullException.ThrowIfNull(dohTrace);
+        ArgumentNullException.ThrowIfNull(describeExitCode);
         if (!dohUrl.IsAbsoluteUri)
         {
             throw new ArgumentException("The DoH URL must be absolute.", nameof(dohUrl));
@@ -51,6 +82,8 @@ public sealed class DohDnsResolver : IDnsResolver
 
         _connector = connector;
         _dohUrl = dohUrl;
+        _dohTrace = dohTrace;
+        _describeExitCode = describeExitCode;
         var isHttps = string.Equals(dohUrl.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
         _dohServer = new ConnectTarget(dohUrl.IdnHost, dohUrl.Port, isHttps) { PoolScheme = dohUrl.Scheme };
     }
@@ -70,10 +103,17 @@ public sealed class DohDnsResolver : IDnsResolver
             return [IPAddress.IPv6Loopback, IPAddress.Loopback];
         }
 
-        var ipv4 = QueryAsync(host, DnsRecordType.A, cancellationToken);
-        var ipv6 = QueryAsync(host, DnsRecordType.Aaaa, cancellationToken);
-        await Task.WhenAll(ipv4, ipv6).ConfigureAwait(false);
-        return [.. await ipv6.ConfigureAwait(false), .. await ipv4.ConfigureAwait(false)];
+        var queryA = DnsQueryEncoder.Encode(host, DnsRecordType.A);
+        if (queryA.Failure != DnsMessageFailure.None)
+        {
+            return [];
+        }
+
+        var ipv4 = QueryAsync(queryA.Bytes, DnsRecordType.A, cancellationToken);
+        var ipv6 = QueryAsync(DnsQueryEncoder.Encode(host, DnsRecordType.Aaaa).Bytes, DnsRecordType.Aaaa, cancellationToken);
+        DohQueryResult[] results = await Task.WhenAll(ipv4, ipv6).ConfigureAwait(false);
+        DohTraceLines.Report(_dohTrace, _describeExitCode, host, results);
+        return [.. results[1].Addresses, .. results[0].Addresses];
     }
 
     /// <summary>Builds the POST curl sends for one DNS query.</summary>
@@ -91,29 +131,25 @@ public sealed class DohDnsResolver : IDnsResolver
         return [.. Encoding.Latin1.GetBytes(head), .. query];
     }
 
-    private async Task<IReadOnlyList<IPAddress>> QueryAsync(string host, DnsRecordType recordType, CancellationToken cancellationToken)
+    private async Task<DohQueryResult> QueryAsync(byte[] query, DnsRecordType recordType, CancellationToken cancellationToken)
     {
-        var query = DnsQueryEncoder.Encode(host, recordType);
-        if (query.Failure != DnsMessageFailure.None)
-        {
-            return [];
-        }
-
         var connected = await _connector.ConnectAsync(_dohServer, cancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
-            return [];
+            return new DohQueryResult(recordType, connected.ExitCode, null);
         }
 
         await using (connection.ConfigureAwait(false))
         {
-            var body = await ExchangeAsync(connection, BuildRequest(query.Bytes), cancellationToken).ConfigureAwait(false);
-            return body is null ? [] : DnsAnswerDecoder.Decode(body, recordType).Addresses;
+            var body = await ExchangeAsync(connection, BuildRequest(query), cancellationToken).ConfigureAwait(false);
+            return body is null
+                ? new DohQueryResult(recordType, CurlExitCode.RecvError, null)
+                : new DohQueryResult(recordType, CurlExitCode.Ok, DnsAnswerDecoder.Decode(body, recordType));
         }
     }
 
-    // Writes the POST and reads the answer's body; null when the connection fails mid-exchange,
-    // which curl reports as "Failure when receiving data from the peer".
+    // Writes the POST and reads the answer's body; null when the connection fails mid-exchange or
+    // the response is not read whole, which curl reports as "Failure when receiving data from the peer".
     private static async ValueTask<byte[]?> ExchangeAsync(IConnection connection, byte[] request, CancellationToken cancellationToken)
     {
         try

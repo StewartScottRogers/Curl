@@ -225,9 +225,10 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
             ExchangeOutcome outcome = await ExchangeAsync(authenticator.Begin(mechanism, request)).ConfigureAwait(false);
             if (outcome != ExchangeOutcome.Cancelled)
             {
-                return Finish(outcome);
+                return Finish(outcome, mechanism);
             }
 
+            SmtpDiagnosticLogLines.MechanismCancelled(context.DiagnosticLog, mechanism);
             denial = SmtpSessionMessages.AuthenticationCancelled;
             if (offered.RemoveAll(offer => offer.Equals(mechanism, StringComparison.OrdinalIgnoreCase)) == 0)
             {
@@ -235,14 +236,25 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
             }
         }
 
+        if (denial == SmtpSessionMessages.LoginDenied)
+        {
+            SmtpDiagnosticLogLines.NoUsableMechanism(context.DiagnosticLog, offered);
+        }
+
         return TransferResult.Failure(CurlExitCode.LoginDenied, denial);
     }
 
     /// <summary>Records whether the exchange was accepted, and fails a refused one with <c>Login denied</c>.</summary>
-    private TransferResult? Finish(ExchangeOutcome outcome)
+    private TransferResult? Finish(ExchangeOutcome outcome, string mechanism)
     {
         IsAuthenticated = outcome == ExchangeOutcome.Accepted;
-        return IsAuthenticated ? null : TransferResult.Failure(CurlExitCode.LoginDenied, SmtpSessionMessages.LoginDenied);
+        if (!IsAuthenticated)
+        {
+            return TransferResult.Failure(CurlExitCode.LoginDenied, SmtpSessionMessages.LoginDenied);
+        }
+
+        SmtpDiagnosticLogLines.LoggedIn(context.DiagnosticLog, mechanism);
+        return null;
     }
 
     private static ExchangeOutcome Outcome(SmtpReply reply, bool messageSent) =>
@@ -259,7 +271,10 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     {
         byte[]? initialResponse = context.Mail is { SaslInitialResponse: true } ? await TakeInitialResponseAsync(exchange).ConfigureAwait(false) : null;
         string? inline = InlineInitialResponse(exchange, initialResponse);
-        await channel.SendAsync(AuthKeyword + exchange.Mechanism + (inline is null ? string.Empty : " " + inline)).ConfigureAwait(false);
+        string command = AuthKeyword + exchange.Mechanism;
+        await (inline is null
+            ? channel.SendAsync(command)
+            : channel.SendAsync(command + " " + inline, command + " " + SmtpDiagnosticLogLines.SaslResponseNotLogged)).ConfigureAwait(false);
         return inline is null ? (initialResponse, false) : (null, true);
     }
 
@@ -286,7 +301,7 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
             return ExchangeOutcome.Refused;
         }
 
-        await channel.SendAsync(Encode(response)).ConfigureAwait(false);
+        await channel.SendAsync(Encode(response), SmtpDiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
         return null;
     }
 

@@ -1,5 +1,8 @@
+using System.Formats.Asn1;
+using System.Numerics;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Curl.Cryptography;
 using X509CertificateRequest = System.Security.Cryptography.X509Certificates.CertificateRequest;
 
 namespace Curl.Tls;
@@ -40,9 +43,45 @@ internal sealed record TestServerCredential(byte[] Certificate, TlsSigningKey Si
         return new(WithForeignKey("CN=dsa", publicKey), new Ed25519TlsSigningKey(new byte[32]), scheme) { SignsWithDsa = true };
     }
 
+    /// <summary>Gets the brainpool ECDSA key the server signs with, rather than <see cref="SigningKey" />, which is then a placeholder.</summary>
+    public BrainpoolEcdsa? BrainpoolKey { get; init; }
+
+    /// <summary>A brainpool ECDSA certificate on <paramref name="curve" />, whose signatures the server makes with <c>Curl.Cryptography</c>'s <see cref="BrainpoolEcdsa" />.</summary>
+    public static TestServerCredential Brainpool(BrainpoolCurve curve, string curveOid, ushort scheme)
+    {
+        byte[] privateKey = new byte[BrainpoolEcdh.GetPrivateKeyLength(curve)];
+        BrainpoolEcdh.GeneratePrivateKey(curve, privateKey);
+        BrainpoolEcdsa key = new(curve, privateKey);
+        byte[] point = new byte[BrainpoolEcdh.GetPublicKeyLength(curve)];
+        key.ExportPublicKey(point);
+        AsnWriter parameters = new(AsnEncodingRules.DER);
+        parameters.WriteObjectIdentifier(curveOid);
+        PublicKey publicKey = new(new Oid(TlsSignatureScheme.EcPublicKeyOid), new AsnEncodedData(parameters.Encode()), new AsnEncodedData(point));
+        return new(WithForeignKey("CN=brainpool", publicKey), new Ed25519TlsSigningKey(new byte[32]), scheme) { BrainpoolKey = key };
+    }
+
     /// <summary>Signs <paramref name="content" /> by <paramref name="rule" /> with this credential's key.</summary>
-    public byte[] Sign(TlsSignatureRule rule, byte[] content) =>
-        SignsWithDsa ? TestDsaKey.Sign(rule.Hash, content) : SigningKey.SignByRule(rule, content);
+    public byte[] Sign(TlsSignatureRule rule, byte[] content) => this switch
+    {
+        { SignsWithDsa: true } => TestDsaKey.Sign(rule.Hash, content),
+        { BrainpoolKey: { } brainpool } => SignBrainpool(brainpool, rule.Hash, content),
+        _ => SigningKey.SignByRule(rule, content),
+    };
+
+    /// <summary>Signs with a brainpool key and encodes r and s as the DER <c>ECDSA-Sig-Value</c> TLS carries.</summary>
+    private static byte[] SignBrainpool(BrainpoolEcdsa key, HashAlgorithmName hash, byte[] content)
+    {
+        byte[] rs = new byte[key.SignatureLength];
+        key.SignHash(CryptographicOperations.HashData(hash, content), hash, rs);
+        AsnWriter writer = new(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            writer.WriteInteger(new BigInteger(rs.AsSpan(0, rs.Length / 2), isUnsigned: true, isBigEndian: true));
+            writer.WriteInteger(new BigInteger(rs.AsSpan(rs.Length / 2), isUnsigned: true, isBigEndian: true));
+        }
+
+        return writer.Encode();
+    }
 
     public static TestServerCredential RsaPss(ushort scheme)
     {

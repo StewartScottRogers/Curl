@@ -23,6 +23,16 @@ internal sealed class ScriptedTcpDialer(ScriptedConnector server) : ITcpDialer
         return new DialedTcpConnection(connection, new IPEndPoint(IPAddress.Loopback, 50000));
     }
 
+    /// <summary>Gets each local end point and port count a bound dial asked for (<c>--interface</c>, <c>--local-port</c>), in order.</summary>
+    public List<(IPEndPoint LocalEndPoint, int LocalPortCount)> LocalBinds { get; } = [];
+
+    /// <summary>Records the local end asked for, then connects as <see cref="DialAsync" /> does.</summary>
+    public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken)
+    {
+        LocalBinds.Add((localEndPoint, localPortCount));
+        return DialAsync(endPoint, cancellationToken);
+    }
+
     /// <summary>
     /// Connects as <see cref="DialAsync" /> does, recording the socket as a target whose host is
     /// <c>unix:</c> (or <c>unix-abstract:</c>) and the path, with port 1, since a target needs one.

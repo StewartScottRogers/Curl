@@ -61,16 +61,35 @@ internal static class ClientCertificateLoader
         bool matchesSchannelBuild,
         IClientCertificateStore certificateStore)
     {
+        if (options.ClientCertificate is null || !matchesSchannelBuild)
+        {
+            return LoadAsOpenSslBuild(options, recognisesDriveLetters: false);
+        }
+
+        var (path, splitPassphrase) = ClientCertificateArgument.Split(options.ClientCertificate, recognisesDriveLetters: true);
+        return LoadAsSchannelBuild(path, options.Passphrase ?? splitPassphrase, options.CertificateType, certificateStore);
+    }
+
+    /// <summary>
+    /// Loads the <see cref="TlsClientOptions.ClientCertificate" /> as a build on the OpenSSL
+    /// API does: the OpenSSL build, and curl.se's LibreSSL build, which dials QUIC on Windows
+    /// (BL-847). <c>--pass</c>, when given, is the passphrase in place of the one in <c>--cert</c>.
+    /// </summary>
+    /// <param name="options">The handshake's settings.</param>
+    /// <param name="recognisesDriveLetters"><see langword="true" /> for a Windows build of curl, which keeps a drive letter's colon in the <c>--cert</c> value.</param>
+    /// <returns>
+    /// No certificate and no failure without <c>--cert</c>; otherwise the certificate with its
+    /// key, or the exit 58 or exit 43 failure <see cref="LoadAsOpenSslBuild(string, string?, string?, string?, string?)" /> reports.
+    /// </returns>
+    public static (X509Certificate2? Certificate, ConnectResult? Failure) LoadAsOpenSslBuild(TlsClientOptions options, bool recognisesDriveLetters)
+    {
         if (options.ClientCertificate is null)
         {
             return (null, null);
         }
 
-        var (path, splitPassphrase) = ClientCertificateArgument.Split(options.ClientCertificate, matchesSchannelBuild);
-        var passphrase = options.Passphrase ?? splitPassphrase;
-        return matchesSchannelBuild
-            ? LoadAsSchannelBuild(path, passphrase, options.CertificateType, certificateStore)
-            : LoadAsOpenSslBuild(path, passphrase, options.PrivateKey, options.CertificateType, options.PrivateKeyType);
+        var (path, splitPassphrase) = ClientCertificateArgument.Split(options.ClientCertificate, recognisesDriveLetters);
+        return LoadAsOpenSslBuild(path, options.Passphrase ?? splitPassphrase, options.PrivateKey, options.CertificateType, options.PrivateKeyType);
     }
 
     /// <summary>

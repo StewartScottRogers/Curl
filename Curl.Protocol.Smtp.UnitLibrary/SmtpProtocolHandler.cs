@@ -139,12 +139,24 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        long started = context.TimeProvider.GetTimestamp();
+        TransferResult result = await TransferAsync(context).ConfigureAwait(false);
+        SmtpDiagnosticLogLines.TransferEnded(context.DiagnosticLog, result, context.TimeProvider, started);
+        return result;
+    }
+
+    /// <summary>
+    /// Connects, runs the session and writes the lines <c>-v</c> ends the transfer with.
+    /// </summary>
+    private async ValueTask<TransferResult> TransferAsync(ITransferContext context)
+    {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
         var target = new ConnectTarget(url.IdnHost, url.Port, implicitTls)
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connected = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
@@ -157,7 +169,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            var channel = new SmtpControlChannel(connection, context.Events, context.CancellationToken);
+            var channel = new SmtpControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog);
 
             // curl decodes the path once connected, so a malformed one still costs a connect.
             TransferResult result = SmtpEhloDomain.Read(url, localHostName) is { } domain

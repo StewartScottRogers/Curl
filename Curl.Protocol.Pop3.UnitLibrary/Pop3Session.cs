@@ -143,6 +143,7 @@ internal sealed class Pop3Session(
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, Pop3SessionMessages.UnexpectedResponse);
         }
 
+        Pop3DiagnosticLogLines.GreetingReceived(context.DiagnosticLog);
         ApopTimestamp = Pop3ApopTimestamp.Read(greeting.Line);
         return await ReadCapabilitiesAsync().ConfigureAwait(false)
             ?? await new Pop3Login(channel, saslAuthenticator, context)
@@ -158,6 +159,7 @@ internal sealed class Pop3Session(
     {
         await channel.SendAsync("CAPA").ConfigureAwait(false);
         Capabilities = await channel.ReadCapabilitiesAsync().ConfigureAwait(false);
+        Pop3DiagnosticLogLines.CapabilitiesRead(context.DiagnosticLog, Capabilities);
         if (secure || context.SslLevel == TransportSecurityLevel.None)
         {
             return null;
@@ -209,6 +211,7 @@ internal sealed class Pop3Session(
         securedConnection = connection;
         channel.SwitchTo(connection);
         secure = true;
+        Pop3DiagnosticLogLines.TlsUpgraded(context.DiagnosticLog);
         return await ReadCapabilitiesAsync().ConfigureAwait(false);
     }
 

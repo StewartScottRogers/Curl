@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Formats.Asn1;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace Curl.Kerberos;
@@ -157,6 +158,27 @@ internal static class KerberosAsn1
     /// </exception>
     public static T Decode<T>(ReadOnlyMemory<byte> bytes, int applicationTag, Func<AsnReader, T> readContents) =>
         DecodeValue(bytes, reader => ReadApplication(reader, applicationTag, readContents));
+
+    /// <summary>
+    /// Gives the first value of decrypted <paramref name="plaintext" /> without the bytes after
+    /// it: <c>des3-cbc-sha1</c> pads its plaintext with zeros to a whole block, and MIT's
+    /// <c>k5_asn1_full_decode</c> ignores what follows the value for that reason. The
+    /// plaintext is zeroed when a shorter copy is given; one that is not a value is given back
+    /// as it is, for its decoding to refuse.
+    /// </summary>
+    /// <param name="plaintext">The decrypted bytes; the caller zeroes what comes back.</param>
+    /// <returns>The value's bytes.</returns>
+    public static byte[] WithoutPadding(byte[] plaintext)
+    {
+        if (!AsnDecoder.TryReadEncodedValue(plaintext, AsnEncodingRules.BER, out _, out _, out _, out int valueLength) || valueLength == plaintext.Length)
+        {
+            return plaintext;
+        }
+
+        byte[] value = plaintext[..valueLength];
+        CryptographicOperations.ZeroMemory(plaintext);
+        return value;
+    }
 
     /// <summary>
     /// Reads one value that must fill <paramref name="bytes" />, turning every ASN.1 failure

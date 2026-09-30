@@ -4,8 +4,9 @@ using Curl.Protocol.Http.Fakes;
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Pins <see cref="HttpContinueWaitConnection" />: the 1-second wait for <c>100 Continue</c>
-/// curl 8.21.0 was measured to make, run on <see cref="FakeTimeProvider" />, and the replay of
+/// Pins <see cref="HttpContinueWaitConnection" />: the wait for <c>100 Continue</c> curl 8.21.0
+/// was measured to make (one second, or the <c>--expect100-timeout</c> value), run on
+/// <see cref="FakeTimeProvider" />, and the replay of
 /// whatever the wait read. Every early reply is read with 1-byte reads and with one read.
 /// </summary>
 [TestClass]
@@ -18,8 +19,60 @@ public sealed class HttpContinueWaitConnectionTests
     private static readonly int[] ChunkSizes = [1, 65536];
 
     [TestMethod]
-    public void ContinueWait_IsTheMeasuredOneSecond() =>
-        Assert.AreEqual(TimeSpan.FromSeconds(1), HttpContinueWaitConnection.ContinueWait);
+    public void ContinueWait_NotSet_IsTheMeasuredOneSecond() =>
+        Assert.AreEqual(TimeSpan.FromSeconds(1), new HttpContinueWaitConnection(new ScriptedConnection([], 1)).ContinueWait);
+
+    [TestMethod]
+    [DataRow(200, DisplayName = "--expect100-timeout 0.2")]
+    [DataRow(3000, DisplayName = "--expect100-timeout 3")]
+    public async Task WaitForContinueAsync_ContinueWaitSet_SendsTheBodyWhenThatWaitHasPassed(int milliseconds)
+    {
+        // curl 8.21.0 sent a 2,000,000-byte -d body 200 ms and 3 s after the head (BL-624 Notes).
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        GatedConnection inner = new(Encoding.Latin1.GetBytes(Final), 65536, 1);
+        HttpContinueWaitConnection connection = new(inner) { ContinueWait = TimeSpan.FromMilliseconds(milliseconds) };
+
+        Task<bool> wait = connection.WaitForContinueAsync(time, CancellationToken.None).AsTask();
+        await time.TimerCreatedAsync(TimeSpan.FromMilliseconds(milliseconds));
+        time.Advance(TimeSpan.FromMilliseconds(milliseconds - 1));
+        Assert.IsFalse(wait.IsCompleted, "The wait ended early.");
+        time.Advance(TimeSpan.FromMilliseconds(1));
+
+        Assert.IsTrue(await wait);
+        Assert.IsTrue(connection.WaitRanOut);
+    }
+
+    [TestMethod]
+    public async Task WaitForContinueAsync_ContinueWaitLongerThanATimerTakes_WaitsWithoutATimer()
+    {
+        using CancellationTokenSource cancellation = new();
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        HttpContinueWaitConnection connection = new(new GatedConnection([], 1, 1))
+        {
+            ContinueWait = HttpContinueWaitConnection.LongestTimedWait + TimeSpan.FromMilliseconds(1),
+        };
+
+        Task<bool> wait = connection.WaitForContinueAsync(time, cancellation.Token).AsTask();
+        time.Advance(HttpContinueWaitConnection.LongestTimedWait);
+        Assert.IsFalse(wait.IsCompleted, "The wait ended.");
+        Assert.IsFalse(time.FirstTimerCreated.IsCompleted, "A timer was created.");
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await wait);
+    }
+
+    [TestMethod]
+    public async Task WaitForContinueAsync_ContinueWaitTheLongestATimerTakes_WaitsOnATimer()
+    {
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        HttpContinueWaitConnection connection = new(new GatedConnection([], 1, 1)) { ContinueWait = HttpContinueWaitConnection.LongestTimedWait };
+
+        Task<bool> wait = connection.WaitForContinueAsync(time, CancellationToken.None).AsTask();
+        await time.TimerCreatedAsync(HttpContinueWaitConnection.LongestTimedWait);
+        time.Advance(HttpContinueWaitConnection.LongestTimedWait);
+
+        Assert.IsTrue(await wait);
+    }
 
     [TestMethod]
     public async Task WaitForContinueAsync_NothingArrives_SendsTheBodyWhenOneSecondHasPassed()
@@ -199,7 +252,7 @@ public sealed class HttpContinueWaitConnectionTests
         HttpContinueWaitConnection connection = new(inner);
         Task<bool> wait = connection.WaitForContinueAsync(time, CancellationToken.None).AsTask();
         await time.FirstTimerCreated;
-        time.Advance(HttpContinueWaitConnection.ContinueWait);
+        time.Advance(connection.ContinueWait);
         Assert.IsTrue(await wait);
         return connection;
     }

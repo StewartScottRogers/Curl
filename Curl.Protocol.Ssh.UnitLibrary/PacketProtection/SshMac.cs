@@ -5,24 +5,35 @@ namespace Curl.Protocol.Ssh.PacketProtection;
 
 /// <summary>
 /// One direction's MAC (RFC 4253 section 6.4): an HMAC keyed with the derived integrity
-/// key over the packet's <c>uint32</c> sequence number and then the packet, cut to
+/// key (an <see cref="ISshHmac" />) over the packet's <c>uint32</c> sequence number and then the packet, cut to
 /// <see cref="Length" /> bytes. Under the <c>-etm@openssh.com</c> forms (OpenSSH's
 /// <c>PROTOCOL</c>, section 1.7) the packet it covers is the encrypted one.
 /// </summary>
 internal sealed class SshMac : IDisposable
 {
-    private readonly IncrementalHash hmac;
+    private readonly ISshHmac hmac;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="SshMac" /> class.
+    /// Initializes a new instance of the <see cref="SshMac" /> class over a BCL hash.
     /// </summary>
     /// <param name="hash">The HMAC's hash.</param>
     /// <param name="key">The derived integrity key.</param>
     /// <param name="length">How many bytes of the HMAC are sent.</param>
     /// <param name="isEncryptThenMac">Whether the MAC covers the encrypted packet.</param>
     internal SshMac(HashAlgorithmName hash, byte[] key, int length, bool isEncryptThenMac)
+        : this(new BclSshHmac(hash, key), length, isEncryptThenMac)
     {
-        hmac = IncrementalHash.CreateHMAC(hash, key);
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SshMac" /> class.
+    /// </summary>
+    /// <param name="hmac">The keyed HMAC, which the MAC disposes.</param>
+    /// <param name="length">How many bytes of the HMAC are sent.</param>
+    /// <param name="isEncryptThenMac">Whether the MAC covers the encrypted packet.</param>
+    internal SshMac(ISshHmac hmac, int length, bool isEncryptThenMac)
+    {
+        this.hmac = hmac;
         Length = length;
         IsEncryptThenMac = isEncryptThenMac;
     }

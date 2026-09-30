@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Quic;
 
 /// <summary>
-/// Runs a <see cref="QuicClientHandshake" /> over a datagram channel until it completes,
+/// Runs a <see cref="QuicClientConnectionState" /> over a datagram channel until it completes,
 /// fails or times out: sends its datagrams as the pacer lets them go, hands it every
 /// datagram from the server's endpoint, ignores datagrams from anywhere else, and runs its
 /// loss detection timer (RFC 9002), whose probes resend what was lost. The handshake must
@@ -30,7 +30,7 @@ public sealed class QuicClientConnector(TimeProvider timeProvider)
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns><see langword="null" /> when the handshake completed, otherwise why it failed.</returns>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
-    public async Task<QuicHandshakeFailure?> RunHandshakeAsync(QuicClientHandshake handshake, IDatagramChannel channel, TimeSpan? connectTimeout, CancellationToken cancellationToken)
+    public async Task<QuicHandshakeFailure?> RunHandshakeAsync(QuicClientConnectionState handshake, IDatagramChannel channel, TimeSpan? connectTimeout, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(handshake);
         ArgumentNullException.ThrowIfNull(channel);
@@ -56,7 +56,7 @@ public sealed class QuicClientConnector(TimeProvider timeProvider)
 
     // Each receive waits at most until the loss detection timer is due; when it fires first
     // the handshake declares losses or probes, and what it returns goes out.
-    private async Task ExchangeAsync(QuicClientHandshake handshake, IDatagramChannel channel, CancellationToken cancellationToken)
+    private async Task ExchangeAsync(QuicClientConnectionState handshake, IDatagramChannel channel, CancellationToken cancellationToken)
     {
         var buffer = new byte[ReceiveBufferLength];
         while (!handshake.IsComplete && handshake.Failure is null)
@@ -78,7 +78,7 @@ public sealed class QuicClientConnector(TimeProvider timeProvider)
         }
     }
 
-    private async Task SendAsync(QuicClientHandshake handshake, IDatagramChannel channel, IReadOnlyList<byte[]> datagrams, CancellationToken cancellationToken)
+    private async Task SendAsync(QuicClientConnectionState handshake, IDatagramChannel channel, IReadOnlyList<byte[]> datagrams, CancellationToken cancellationToken)
     {
         foreach (var datagram in datagrams)
         {

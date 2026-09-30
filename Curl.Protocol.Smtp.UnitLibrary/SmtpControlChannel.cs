@@ -12,6 +12,10 @@ namespace Curl.Protocol.Smtp;
 /// line read, as a response header, and each piece of the message, as data sent.
 /// </param>
 /// <param name="cancellationToken">Cancels every send and read.</param>
+/// <param name="diagnosticLog">
+/// Where each command sent and each complete reply's code are logged at <c>verbose</c>
+/// (ADR-0222), a command as its sender says it may be logged.
+/// </param>
 /// <remarks>
 /// Commands and replies are Latin-1, so every byte of a percent-decoded <c>EHLO</c> domain
 /// reaches the server unchanged, as curl sends it. As measured on curl 8.21.0 (BL-540): a
@@ -22,7 +26,8 @@ namespace Curl.Protocol.Smtp;
 /// <c>QUIT</c> and its reply are not reported at all, as curl 8.21.0 sends them once the
 /// transfer is over (BL-546).
 /// </remarks>
-internal sealed class SmtpControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken)
+internal sealed class SmtpControlChannel(
+    IConnection connection, ITransferEvents events, CancellationToken cancellationToken, IDiagnosticLog diagnosticLog)
 {
     private const int ReadBufferSize = 4096;
 
@@ -71,9 +76,14 @@ internal sealed class SmtpControlChannel(IConnection connection, ITransferEvents
     /// closed.
     /// </summary>
     /// <param name="command">The command line without its line end, such as <c>EHLO x</c>.</param>
+    /// <param name="logged">
+    /// What the diagnostic log says was sent when <paramref name="command" /> carries a
+    /// credential, or <see langword="null" /> to log <paramref name="command" /> itself.
+    /// </param>
     /// <returns>A task that completes once the command is sent or the send has failed.</returns>
-    public async ValueTask SendAsync(string command)
+    public async ValueTask SendAsync(string command, string? logged = null)
     {
+        SmtpDiagnosticLogLines.CommandSent(diagnosticLog, logged ?? command);
         byte[] bytes = Encoding.Latin1.GetBytes(command + "\r\n");
         if (await TryWriteAsync(bytes).ConfigureAwait(false))
         {
@@ -138,6 +148,7 @@ internal sealed class SmtpControlChannel(IConnection connection, ITransferEvents
             {
                 lines.Add(line.TrimEnd('\r'));
                 LastReplyCode = int.Parse(line.AsSpan(0, 3), provider: null);
+                SmtpDiagnosticLogLines.ReplyRead(diagnosticLog, LastReplyCode);
                 return new SmtpReply(LastReplyCode, lines) { FinalLine = line + "\n" };
             }
 

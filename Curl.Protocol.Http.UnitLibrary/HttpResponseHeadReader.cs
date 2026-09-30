@@ -99,6 +99,16 @@ internal sealed class HttpResponseHeadReader
     internal Func<bool> IsSwitchedToHttp2 { get; init; } = static () => false;
 
     /// <summary>
+    /// Gets what decides, for each whole header of a final head that curl acts on, whether it
+    /// and every header after it are deferred when the head is released: neither told to
+    /// <see cref="HeaderReceived" /> nor reported until <see cref="ReleaseDeferredHeaders" />
+    /// (or <see cref="ReportHeldLines" />), so the lines answering the head's challenges land
+    /// before the header that caused them, as curl 8.21.0 writes a Negotiate context's failure
+    /// (measured, BL-843 Notes). By default no header is deferred.
+    /// </summary>
+    internal Func<HttpStatusLine, HttpResponseHeader, bool> DefersFrom { get; init; } = static (_, _) => false;
+
+    /// <summary>
     /// Gets the refused header of the final head <see cref="ReadAsync" /> read, as
     /// <see cref="FindRefusal" /> found it, or <see langword="null" /> when none was refused.
     /// </summary>
@@ -107,6 +117,8 @@ internal sealed class HttpResponseHeadReader
     private readonly List<byte[]> heldHeaderLines = [];
 
     private readonly List<HeldHeader> heldHeaders = [];
+
+    private readonly List<HeldHeader> deferredHeaders = [];
 
     private bool heldHeaderKeepsHttp10Alive;
 
@@ -129,6 +141,7 @@ internal sealed class HttpResponseHeadReader
     internal void ReportHeldLines()
     {
         ReleaseHeldHeaders();
+        ReleaseDeferredHeaders();
         ReportHeldHeaderLines();
         if (heldEmptyLine is { } bytes)
         {
@@ -402,15 +415,42 @@ internal sealed class HttpResponseHeadReader
     {
         foreach (HeldHeader held in heldHeaders)
         {
-            if (held.IsActedOn)
+            if (deferredHeaders.Count > 0 || (held.IsActedOn && DefersFrom(headStatusLine!, held.Header)))
             {
-                HeaderReceived(held.Header);
+                deferredHeaders.Add(held);
             }
-
-            ReportHeaderLines(held.Lines, held.KeepsHttp10Alive);
+            else
+            {
+                ReleaseHeader(held);
+            }
         }
 
         heldHeaders.Clear();
+    }
+
+    /// <summary>
+    /// Tells <see cref="HeaderReceived" /> of each header <see cref="DefersFrom" /> deferred
+    /// that curl acts on and reports its lines, in the order they arrived, and defers none
+    /// after. Does nothing when none is deferred.
+    /// </summary>
+    internal void ReleaseDeferredHeaders()
+    {
+        foreach (HeldHeader deferred in deferredHeaders)
+        {
+            ReleaseHeader(deferred);
+        }
+
+        deferredHeaders.Clear();
+    }
+
+    private void ReleaseHeader(HeldHeader held)
+    {
+        if (held.IsActedOn)
+        {
+            HeaderReceived(held.Header);
+        }
+
+        ReportHeaderLines(held.Lines, held.KeepsHttp10Alive);
     }
 
     /// <summary>

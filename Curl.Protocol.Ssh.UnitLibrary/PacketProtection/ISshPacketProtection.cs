@@ -10,7 +10,7 @@ namespace Curl.Protocol.Ssh.PacketProtection;
 /// The packet layer reads <see cref="LengthBlockLength" /> bytes, asks
 /// <see cref="DecryptPacketLength" /> for <c>packet_length</c>, reads the rest of the
 /// packet and the <see cref="TagLength" /> bytes after it, then calls
-/// <see cref="Open" />. A cipher or MAC added later (BL-679, BL-680) is one more
+/// <see cref="Open" />. Another cipher or MAC is one more
 /// implementation, or one more <c>ISshCipher</c> or MAC row, not a new packet layer.
 /// </remarks>
 internal interface ISshPacketProtection : IDisposable

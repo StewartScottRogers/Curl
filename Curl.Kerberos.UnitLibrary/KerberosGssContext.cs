@@ -52,8 +52,8 @@ public sealed class KerberosGssContext : IDisposable
 
     /// <summary>
     /// Gets the flags the initial token's checksum carries: those asked for, with
-    /// <see cref="KerberosGssFlags.Confidentiality" /> and <see cref="KerberosGssFlags.Integrity" />
-    /// always added as MIT adds them, and <see cref="KerberosGssFlags.Delegation" /> when a
+    /// <see cref="KerberosGssFlags.Confidentiality" />, <see cref="KerberosGssFlags.Integrity" /> and
+    /// <see cref="KerberosGssFlags.Transfer" /> always added as MIT adds them, and <see cref="KerberosGssFlags.Delegation" /> when a
     /// ticket-granting ticket was forwarded. <see cref="KerberosGssFlags.None" /> until then.
     /// </summary>
     public KerberosGssFlags Flags { get; private set; }
@@ -142,7 +142,7 @@ public sealed class KerberosGssContext : IDisposable
         (authenticatorTime, authenticatorMicroseconds) = KerberosClock.Now(timeProvider);
         bool delegates = Delegates();
         Flags = (options.RequestedFlags & ~KerberosGssFlags.Delegation) | KerberosGssFlags.Confidentiality | KerberosGssFlags.Integrity
-            | (delegates ? KerberosGssFlags.Delegation : KerberosGssFlags.None);
+            | KerberosGssFlags.Transfer | (delegates ? KerberosGssFlags.Delegation : KerberosGssFlags.None);
 
         KerberosAuthenticator authenticator = new()
         {
@@ -171,8 +171,8 @@ public sealed class KerberosGssContext : IDisposable
     }
 
     /// <summary>
-    /// RFC 4121 section 4.1.1: the length of the channel bindings (16), their MD5 (zeros: none
-    /// are given), the flags, all little-endian, then with delegation the option 1, the
+    /// RFC 4121 section 4.1.1: the length of the channel bindings (16), their MD5 (zeros when
+    /// none are given), the flags, all little-endian, then with delegation the option 1, the
     /// KRB-CRED's length and the KRB-CRED.
     /// </summary>
     private byte[] ChecksumValue(bool delegates)
@@ -181,6 +181,11 @@ public sealed class KerberosGssContext : IDisposable
         int delegationSize = delegates ? (2 * sizeof(ushort)) + credential.Length : 0;
         byte[] value = new byte[sizeof(uint) + ChannelBindingsSize + sizeof(uint) + delegationSize];
         BinaryPrimitives.WriteUInt32LittleEndian(value, ChannelBindingsSize);
+        if (options.ChannelBindings is { } applicationData)
+        {
+            ChannelBindingsHash(applicationData).CopyTo(value, sizeof(uint));
+        }
+
         BinaryPrimitives.WriteUInt32LittleEndian(value.AsSpan(sizeof(uint) + ChannelBindingsSize), (uint)Flags);
         if (delegates)
         {
@@ -191,6 +196,21 @@ public sealed class KerberosGssContext : IDisposable
         }
 
         return value;
+    }
+
+    /// <summary>
+    /// The MD5 of RFC 2744's <c>gss_channel_bindings_struct</c> as MIT's
+    /// <c>kg_checksum_channel_bindings</c> lays it out: the initiator's address type and
+    /// address, the acceptor's, then the application data, each length and type a
+    /// little-endian 32-bit integer; curl passes no addresses, so both are type 0 and empty.
+    /// </summary>
+    private static byte[] ChannelBindingsHash(byte[] applicationData)
+    {
+        const int AddressFieldsSize = 4 * sizeof(uint);
+        byte[] structure = new byte[AddressFieldsSize + sizeof(uint) + applicationData.Length];
+        BinaryPrimitives.WriteUInt32LittleEndian(structure.AsSpan(AddressFieldsSize), (uint)applicationData.Length);
+        applicationData.CopyTo(structure, AddressFieldsSize + sizeof(uint));
+        return MD5.HashData(structure);
     }
 
     /// <summary>The forwarded ticket-granting ticket as a KRB-CRED, its part encrypted in the service ticket's session key (not the subkey), as MIT sends it.</summary>
@@ -238,7 +258,7 @@ public sealed class KerberosGssContext : IDisposable
         byte[] plaintext;
         try
         {
-            plaintext = encryption.Decrypt(serviceTicket.SessionKey.Value, ApReplyUsage, reply.EncryptedPart.Cipher);
+            plaintext = KerberosAsn1.WithoutPadding(encryption.Decrypt(serviceTicket.SessionKey.Value, ApReplyUsage, reply.EncryptedPart.Cipher));
         }
         catch (KerberosCryptographyException)
         {

@@ -52,7 +52,7 @@ root `CLAUDE.md` says to hand-build what the BCL lacks.
   hand-built client, on every platform.
 - A PKCS #12 file the Schannel-build loader opens without `X509KeyStorageFlags.Exportable`
   yields a non-exportable key on Windows, which still cannot sign at TLS 1.0/1.1. That is
-  `Curl.Networking.UnitLibrary`'s to change and is filed as BL-877.
+  `Curl.Networking.UnitLibrary`'s to change and is filed as BL-946.
 - The CRT operation is about four times faster than a plain m^d mod n, and blinding
   doubles it (two CRT exponentiations per signature); one CertificateVerify per handshake
   makes that immaterial.
