@@ -8,7 +8,8 @@ namespace Curl.Protocol.Ssh;
 /// Pins the teardown after a failed <c>REALPATH</c>, <c>OPEN</c>, <c>OPENDIR</c>, upload
 /// <c>OPEN</c> or <c>-Q</c> command: the channel's <c>EOF</c> and <c>CLOSE</c> before
 /// <c>DISCONNECT</c>, as OpenSSH's <c>sshd -ddd</c> log showed curl 8.21.0 sending them,
-/// measured 2026-09-30 (BL-973).
+/// measured 2026-09-30 (BL-973); and after a <c>%00</c> in the path, refused after
+/// <c>REALPATH</c> with exit 3 (BL-974, ADR-0275).
 /// </summary>
 public sealed partial class SshProtocolHandlerTests
 {
@@ -76,6 +77,19 @@ public sealed partial class SshProtocolHandlerTests
         TransferResult result = await RunFailingAsync(server, path, upload);
 
         AssertFailedTeardown(server, result, CurlExitCode.RemoteFileNotFound, "Remote file not found", "sftp 16 .");
+    }
+
+    [TestMethod]
+    [DataRow("/data/a%00.txt", false, DisplayName = "download, as measured")]
+    [DataRow("/data%00/", false, DisplayName = "listing")]
+    [DataRow("/data/a%00.txt", true, DisplayName = "upload")]
+    public async Task ExecuteAsync_SftpPathHoldsZeroByte_IsExit3AfterRealPathAndClosesTheChannel(string path, bool upload)
+    {
+        InMemorySshServer server = Server();
+
+        TransferResult result = await RunFailingAsync(server, path, upload);
+
+        AssertFailedTeardown(server, result, CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL", "sftp 16 .");
     }
 
     [TestMethod]

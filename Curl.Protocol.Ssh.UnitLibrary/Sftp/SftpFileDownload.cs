@@ -58,7 +58,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
             {
                 byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
-                byte[] path = SftpRemotePath.Resolve(SftpRemotePath.Decode(urlPath), homeDirectory);
+                byte[] path = SftpRemotePath.ResolveUrlPath(urlPath, homeDirectory);
                 await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
                 (byte[] handle, long? size) = await SshConnectionFailure.ReportAsSshLayerErrorAsync(async () =>
                 {

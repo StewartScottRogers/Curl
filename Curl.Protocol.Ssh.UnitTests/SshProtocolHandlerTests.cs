@@ -84,6 +84,22 @@ public sealed partial class SshProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("/~", DisplayName = "tilde alone, as measured")]
+    [DataRow("/~/", DisplayName = "home prefix alone, as measured")]
+    public async Task ExecuteAsync_SftpHomeDirectoryPath_ListsTheHomeDirectoryAsMeasured(string path)
+    {
+        InMemorySshServer server = Server();
+        server.Files[InMemorySshServer.DefaultHomeDirectory + "/notes.txt"] = Hello;
+        byte[] expected = Encoding.UTF8.GetBytes(string.Format(CultureInfo.InvariantCulture, "-rw-r--r--    1 {0} {0}       11 Jan  1  2026 notes.txt\n", User));
+
+        Outcome outcome = await RunAsync(server, $"sftp://{Host}{path}");
+
+        Assert.AreEqual(TransferResult.Success(expected.Length), outcome.Result);
+        CollectionAssert.AreEqual(expected, outcome.Output);
+        CollectionAssert.Contains(server.Events.ToList(), "sftp 11 /home/fake/");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_SftpMissingDirectory_IsExit78AsMeasured()
     {
         InMemorySshServer server = Server();
