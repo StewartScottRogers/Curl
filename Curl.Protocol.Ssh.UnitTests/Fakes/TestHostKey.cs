@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using Curl.Cryptography;
 
@@ -33,6 +34,9 @@ internal sealed record TestHostKey(string Algorithm, byte[] Blob, Func<byte[], b
         "5DF5E01DED31D0297E274E1691C192FE5868FEF9E19A84776454B100CF16F65392195A38B90523E2542EE61871C0440CB87C322FC4B4D2EC5E1E7EC766E1BE8D"
         + "4CE935437DC11C3C8FD426338933EBFE739CB3465F4D3668C5E473508253B1E682F65CBDC4FAE93C2EA212390E54905A86E2223170B44EAA7DA5DD9FFCFB7F3B";
 
+    /// <summary>The private key of RFC 8032 section 7.1's first Ed25519 test vector.</summary>
+    internal const string Ed25519PrivateKey = "9D61B19DEFFD5A60BA844AF492EC2CC44449C5697B326919703BAC031CAE7F60";
+
     /// <summary>Gets a fixed P-256 host key.</summary>
     internal static ECParameters FixedNistP256 { get; } = new()
     {
@@ -44,6 +48,9 @@ internal sealed record TestHostKey(string Algorithm, byte[] Blob, Func<byte[], b
             Y = Convert.FromHexString("3DCDF302893BCD925229529F23ADE7A98A0CEAFEB9100C66F6B0151B227A78C4"),
         },
     };
+
+    // The flags byte (user present) and counter every test security-key signature carries.
+    private static readonly byte[] SecurityKeyFlagsAndCounter = [0x01, 0, 0, 0, 7];
 
     // Generated once and shared as parameters: a platform RSA object generates its key on
     // first use, so one object shared by parallel tests could end up with two keys.
@@ -111,7 +118,7 @@ internal sealed record TestHostKey(string Algorithm, byte[] Blob, Func<byte[], b
     /// <summary>RFC 8032 section 7.1's first Ed25519 key as an <c>ssh-ed25519</c> host key; its signatures are deterministic.</summary>
     internal static TestHostKey Ed25519()
     {
-        byte[] privateKey = Convert.FromHexString("9D61B19DEFFD5A60BA844AF492EC2CC44449C5697B326919703BAC031CAE7F60");
+        byte[] privateKey = Convert.FromHexString(Ed25519PrivateKey);
         byte[] publicKey = new byte[Cryptography.Ed25519.PublicKeySize];
         Cryptography.Ed25519.ComputePublicKey(privateKey, publicKey);
         byte[] blob = SshTestEncoding.Join(SshTestEncoding.Name("ssh-ed25519"), SshTestEncoding.String(publicKey));
@@ -123,9 +130,105 @@ internal sealed record TestHostKey(string Algorithm, byte[] Blob, Func<byte[], b
         });
     }
 
+    /// <summary>
+    /// The FIDO application string OpenSSH gives a security key it makes (<c>PROTOCOL.u2f</c>).
+    /// </summary>
+    internal static byte[] SecurityKeyApplication { get; } = "ssh:"u8.ToArray();
+
+    /// <summary>
+    /// The fixed P-256 key as an <c>sk-ecdsa-sha2-nistp256@openssh.com</c> host key: it signs
+    /// SHA256(application) || flags || counter || SHA256(H) and appends the flags and counter.
+    /// </summary>
+    internal static TestHostKey SecurityKeyEcdsa()
+    {
+        const string name = "sk-ecdsa-sha2-nistp256@openssh.com";
+        ECDsa ecdsa = ECDsa.Create(FixedNistP256);
+        byte[] point = [0x04, .. FixedNistP256.Q.X!, .. FixedNistP256.Q.Y!];
+        byte[] blob = SshTestEncoding.Join(SshTestEncoding.Name(name), SshTestEncoding.Name("nistp256"), SshTestEncoding.String(point), SshTestEncoding.String(SecurityKeyApplication));
+        return new TestHostKey(name, blob, h =>
+        {
+            byte[] signature = ecdsa.SignData(SecurityKeySignedData(h), HashAlgorithmName.SHA256);
+            int half = signature.Length / 2;
+            byte[] values = SshTestEncoding.Join(SshTestEncoding.Mpint(signature[..half]), SshTestEncoding.Mpint(signature[half..]));
+            return SshTestEncoding.Join(SshTestEncoding.Name(name), SshTestEncoding.String(values), SecurityKeyFlagsAndCounter);
+        });
+    }
+
+    /// <summary>
+    /// RFC 8032's first Ed25519 key as an <c>sk-ssh-ed25519@openssh.com</c> host key: it signs
+    /// SHA256(application) || flags || counter || SHA256(H) and appends the flags and counter.
+    /// </summary>
+    internal static TestHostKey SecurityKeyEd25519()
+    {
+        const string name = "sk-ssh-ed25519@openssh.com";
+        byte[] privateKey = Convert.FromHexString(Ed25519PrivateKey);
+        byte[] publicKey = new byte[Cryptography.Ed25519.PublicKeySize];
+        Cryptography.Ed25519.ComputePublicKey(privateKey, publicKey);
+        byte[] blob = SshTestEncoding.Join(SshTestEncoding.Name(name), SshTestEncoding.String(publicKey), SshTestEncoding.String(SecurityKeyApplication));
+        return new TestHostKey(name, blob, h =>
+        {
+            byte[] signature = new byte[Cryptography.Ed25519.SignatureSize];
+            Cryptography.Ed25519.Sign(privateKey, SecurityKeySignedData(h), signature);
+            return SshTestEncoding.Join(SshTestEncoding.Name(name), SshTestEncoding.String(signature), SecurityKeyFlagsAndCounter);
+        });
+    }
+
+    /// <summary>
+    /// An OpenSSH host certificate (<c>PROTOCOL.certkeys</c>) of <paramref name="certified" />'s
+    /// key: the certificate name, a nonce, the key's fields, then <paramref name="body" /> (by
+    /// default <see cref="CertificateBody" /> for <c>localhost</c>, valid for ever and signed by
+    /// an Ed25519 CA). It signs H as the certified key does.
+    /// </summary>
+    internal static TestHostKey Certificate(string certificateName, TestHostKey certified, byte[]? body = null)
+    {
+        int keyTypeLength = BinaryPrimitives.ReadInt32BigEndian(certified.Blob);
+        byte[] keyFields = certified.Blob[(4 + keyTypeLength)..];
+        byte[] signed = SshTestEncoding.Join(SshTestEncoding.Name(certificateName), SshTestEncoding.String(new byte[32]), keyFields);
+        return new TestHostKey(certificateName, [.. signed, .. body ?? CertificateBody(signed, ["localhost"], validBefore: ulong.MaxValue)], certified.Sign);
+    }
+
+    /// <summary>
+    /// A host certificate's fields after its key: serial 1, type 2 (host), key ID, the
+    /// principals, valid from 0 to <paramref name="validBefore" />, no options or extensions,
+    /// then an Ed25519 CA key and its signature over everything before it.
+    /// </summary>
+    internal static byte[] CertificateBody(byte[] certificateStart, string[] principals, ulong validBefore)
+    {
+        byte[] caPrivateKey = Convert.FromHexString(Ed25519PrivateKey);
+        byte[] caPublicKey = new byte[Cryptography.Ed25519.PublicKeySize];
+        Cryptography.Ed25519.ComputePublicKey(caPrivateKey, caPublicKey);
+        byte[] validBeforeBytes = new byte[8];
+        BinaryPrimitives.WriteUInt64BigEndian(validBeforeBytes, validBefore);
+        byte[] fields = SshTestEncoding.Join(
+            [0, 0, 0, 0, 0, 0, 0, 1],
+            SshTestEncoding.UInt32(2),
+            SshTestEncoding.Name("host key"),
+            SshTestEncoding.String(SshTestEncoding.Join([.. principals.Select(SshTestEncoding.Name)])),
+            new byte[8],
+            validBeforeBytes,
+            SshTestEncoding.String([]),
+            SshTestEncoding.String([]),
+            SshTestEncoding.String([]),
+            SshTestEncoding.String(SshTestEncoding.Join(SshTestEncoding.Name("ssh-ed25519"), SshTestEncoding.String(caPublicKey))));
+        byte[] signature = new byte[Cryptography.Ed25519.SignatureSize];
+        Cryptography.Ed25519.Sign(caPrivateKey, [.. certificateStart, .. fields], signature);
+        return [.. fields, .. SshTestEncoding.String(SshTestEncoding.Join(SshTestEncoding.Name("ssh-ed25519"), SshTestEncoding.String(signature)))];
+    }
+
     /// <summary>The host key for an algorithm name.</summary>
     internal static TestHostKey For(string algorithm) => algorithm switch
     {
+        "ecdsa-sha2-nistp256-cert-v01@openssh.com" => Certificate(algorithm, Ecdsa("nistp256")),
+        "ecdsa-sha2-nistp384-cert-v01@openssh.com" => Certificate(algorithm, Ecdsa("nistp384")),
+        "ecdsa-sha2-nistp521-cert-v01@openssh.com" => Certificate(algorithm, Ecdsa("nistp521")),
+        "rsa-sha2-512-cert-v01@openssh.com" => Certificate(algorithm, Rsa("rsa-sha2-512", HashAlgorithmName.SHA512)),
+        "rsa-sha2-256-cert-v01@openssh.com" => Certificate(algorithm, Rsa("rsa-sha2-256", HashAlgorithmName.SHA256)),
+        "ssh-rsa-cert-v01@openssh.com" => Certificate(algorithm, Rsa("ssh-rsa", HashAlgorithmName.SHA1)),
+        "ssh-ed25519-cert-v01@openssh.com" => Certificate(algorithm, Ed25519()),
+        "sk-ecdsa-sha2-nistp256@openssh.com" => SecurityKeyEcdsa(),
+        "sk-ssh-ed25519@openssh.com" => SecurityKeyEd25519(),
+        "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com" => Certificate(algorithm, SecurityKeyEcdsa()),
+        "sk-ssh-ed25519-cert-v01@openssh.com" => Certificate(algorithm, SecurityKeyEd25519()),
         "ecdsa-sha2-nistp256" => Ecdsa("nistp256"),
         "ecdsa-sha2-nistp384" => Ecdsa("nistp384"),
         "ecdsa-sha2-nistp521" => Ecdsa("nistp521"),
@@ -135,4 +238,7 @@ internal sealed record TestHostKey(string Algorithm, byte[] Blob, Func<byte[], b
         "ssh-ed25519" => Ed25519(),
         _ => Dsa(),
     };
+
+    private static byte[] SecurityKeySignedData(byte[] h) =>
+        [.. SHA256.HashData(SecurityKeyApplication), .. SecurityKeyFlagsAndCounter, .. SHA256.HashData(h)];
 }

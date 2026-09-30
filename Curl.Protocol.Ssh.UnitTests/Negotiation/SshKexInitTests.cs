@@ -46,7 +46,7 @@ public sealed class SshKexInitTests
     }
 
     [TestMethod]
-    public void ForClient_TodaysCatalogue_OffersCurve25519NistAndFiniteFieldExchangesEcdsaEd25519RsaHostKeysAndEveryMeasuredCipherAndMac()
+    public void ForClient_TodaysCatalogue_OffersCurve25519NistAndFiniteFieldExchangesEveryMeasuredHostKeyCipherAndMac()
     {
         SshKexInit kexInit = SshKexInit.ForClient(SshAlgorithmPreferences.OpenSslReference, SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0));
 
@@ -61,7 +61,7 @@ public sealed class SshKexInitTests
             },
             kexInit.KeyExchange.ToArray());
         CollectionAssert.AreEqual(
-            new[] { "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521", "ssh-ed25519", "rsa-sha2-512", "rsa-sha2-256", "ssh-rsa" },
+            SshAlgorithmPreferences.OpenSslReference.ServerHostKey.ToArray(),
             kexInit.ServerHostKey.ToArray());
         string[] ciphers = "chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr,aes256-cbc,rijndael-cbc@lysator.liu.se,aes192-cbc,aes128-cbc,blowfish-cbc,arcfour128,arcfour,cast128-cbc,3des-cbc".Split(',');
         CollectionAssert.AreEqual(ciphers, kexInit.CipherClientToServer.ToArray());

@@ -117,7 +117,7 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
             RandomNumberGenerator.GetBytes(16), [KeyExchangeMethod], [server.HostKey.Algorithm], [server.Cipher], [server.Cipher], [server.Mac], [server.Mac], [server.Compression], [server.Compression], [], [], FirstKexPacketFollows: false).ToPayload();
         await SendAsync(serverKexInit).ConfigureAwait(false);
         byte[] clientKexInit = await Reader.ReadAsync(CancellationToken.None).ConfigureAwait(false);
-        SshNegotiatedAlgorithms algorithms = SshAlgorithmNegotiator.Negotiate(SshKexInit.Parse(clientKexInit), SshKexInit.Parse(serverKexInit))!;
+        SshNegotiatedAlgorithms algorithms = SshAlgorithmNegotiator.Negotiate(SshKexInit.Parse(clientKexInit), SshKexInit.Parse(serverKexInit), [])!;
         byte[] clientPublicValue = new SshWireReader(await Reader.ReadAsync(CancellationToken.None).ConfigureAwait(false)).Skip(1).ReadMpint().ToArray();
         FiniteFieldDiffieHellmanGroup group = FiniteFieldDiffieHellmanGroup.Group14;
         using FiniteFieldDiffieHellman key = FiniteFieldDiffieHellman.Generate(group);

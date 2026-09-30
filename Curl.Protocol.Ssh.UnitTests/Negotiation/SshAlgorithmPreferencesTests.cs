@@ -47,6 +47,22 @@ public sealed partial class SshAlgorithmPreferencesTests
     }
 
     [TestMethod]
+    [DataRow("Windows", "rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com")]
+    [DataRow("OpenSSL", "ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com")]
+    [DataRow("Full", "")]
+    public void HostKeysNeverAgreed_IsEveryOfferedCertificateButEd25519sOnTheReferenceBuilds_AsMeasured(string preset, string expected)
+    {
+        SshAlgorithmPreferences preferences = preset switch
+        {
+            "Windows" => SshAlgorithmPreferences.WindowsReference,
+            "OpenSSL" => SshAlgorithmPreferences.OpenSslReference,
+            _ => SshAlgorithmPreferences.Full,
+        };
+
+        Assert.AreEqual(expected, string.Join(',', preferences.HostKeysNeverAgreed));
+    }
+
+    [TestMethod]
     public void WithCompression_True_OffersZlibThenZlibOpenSshThenNone_AsMeasured()
     {
         SshAlgorithmPreferences compressed = SshAlgorithmPreferences.WindowsReference.WithCompression(true);

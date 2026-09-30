@@ -34,6 +34,12 @@ public sealed record SshAlgorithmPreferences(
         "rsa-sha2-512,rsa-sha2-256,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,"
         + "ssh-rsa,ssh-rsa-cert-v01@openssh.com";
 
+    private const string RsaCertificateHostKeys =
+        "rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com";
+
+    private const string EcdsaCertificateHostKeys =
+        "ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com";
+
     private const string OpenSslCiphers =
         "chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,"
         + "aes128-ctr,aes256-cbc,rijndael-cbc@lysator.liu.se,aes192-cbc,aes128-cbc,blowfish-cbc,arcfour128,"
@@ -64,6 +70,15 @@ public sealed record SshAlgorithmPreferences(
     public string? CryptographyBackend { get; init; }
 
     /// <summary>
+    /// Gets the host-key algorithms this preset offers but never agrees: libssh2 1.11.1 lists
+    /// the RSA and ECDSA certificate forms in its <c>KEXINIT</c> but has no verifier for them,
+    /// so it passes over them when it picks the host-key algorithm and fails with
+    /// <c>-5, Unable to exchange encryption keys</c> when nothing else is shared (measured
+    /// 2026-09-29 on both reference builds, ADR-0266). Empty for <see cref="Full" />.
+    /// </summary>
+    public IReadOnlyCollection<string> HostKeysNeverAgreed { get; init; } = [];
+
+    /// <summary>
     /// Gets what curl 8.21.0's Windows build (libssh2 1.11.1 on WinCNG) offers, byte for byte
     /// and in its order.
     /// </summary>
@@ -75,7 +90,7 @@ public sealed record SshAlgorithmPreferences(
             + "aes192-cbc,aes128-cbc,arcfour128,arcfour,3des-cbc"),
         Split(WindowsMacs),
         [SshAlgorithmCatalogue.NoCompression])
-    { CryptographyBackend = "WinCNG" };
+    { CryptographyBackend = "WinCNG", HostKeysNeverAgreed = Split(RsaCertificateHostKeys) };
 
     /// <summary>
     /// Gets what curl 8.21.0's OpenSSL build (libssh2 1.11.1 on OpenSSL, Linux and macOS)
@@ -90,7 +105,7 @@ public sealed record SshAlgorithmPreferences(
         Split(OpenSslCiphers),
         Split(OpenSslMacs),
         [SshAlgorithmCatalogue.NoCompression])
-    { CryptographyBackend = "OpenSSL" };
+    { CryptographyBackend = "OpenSSL", HostKeysNeverAgreed = Split(EcdsaCertificateHostKeys + "," + RsaCertificateHostKeys) };
 
     /// <summary>
     /// Gets every algorithm libssh2 1.11.1 or libssh 0.12.2 offers, in ADR-0122's full-set

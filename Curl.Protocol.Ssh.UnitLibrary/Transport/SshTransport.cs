@@ -228,9 +228,9 @@ internal sealed class SshTransport
     private static SshTransferException KeyExchangeMethodFailed() =>
         SshTransferException.SessionEstablishmentFailed(Libssh2ErrorCode.KeyExchangeMethodFailure, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
 
-    private static SshNegotiatedHandshake Negotiate(string serverIdentificationLine, byte[] clientPayload, byte[] serverPayload)
+    private SshNegotiatedHandshake Negotiate(string serverIdentificationLine, byte[] clientPayload, byte[] serverPayload)
     {
-        SshNegotiatedAlgorithms algorithms = SshAlgorithmNegotiator.Negotiate(SshKexInit.Parse(clientPayload), SshKexInit.Parse(serverPayload))
+        SshNegotiatedAlgorithms algorithms = SshAlgorithmNegotiator.Negotiate(SshKexInit.Parse(clientPayload), SshKexInit.Parse(serverPayload), preferences.HostKeysNeverAgreed)
             ?? throw SshTransferException.SessionEstablishmentFailed(Libssh2ErrorCode.KeyExchangeFailure, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
         return new SshNegotiatedHandshake(
             SshIdentificationExchange.ClientIdentification,

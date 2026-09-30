@@ -72,6 +72,17 @@ public sealed partial class SshTransportTests
     [DataRow("ssh-rsa")]
     [DataRow("ssh-dss")]
     [DataRow("ssh-ed25519")]
+    [DataRow("ecdsa-sha2-nistp256-cert-v01@openssh.com")]
+    [DataRow("ecdsa-sha2-nistp384-cert-v01@openssh.com")]
+    [DataRow("ecdsa-sha2-nistp521-cert-v01@openssh.com")]
+    [DataRow("rsa-sha2-512-cert-v01@openssh.com")]
+    [DataRow("rsa-sha2-256-cert-v01@openssh.com")]
+    [DataRow("ssh-rsa-cert-v01@openssh.com")]
+    [DataRow("ssh-ed25519-cert-v01@openssh.com")]
+    [DataRow("sk-ecdsa-sha2-nistp256@openssh.com")]
+    [DataRow("sk-ssh-ed25519@openssh.com")]
+    [DataRow("sk-ecdsa-sha2-nistp256-cert-v01@openssh.com")]
+    [DataRow("sk-ssh-ed25519-cert-v01@openssh.com")]
     public async Task ExchangeKeysAsync_EachHostKeyAlgorithm_VerifiesTheServersSignature(string hostKeyAlgorithm)
     {
         ScriptedExchange run = Script("ecdh-sha2-nistp256", TestHostKey.For(hostKeyAlgorithm));
@@ -260,6 +271,17 @@ public sealed partial class SshTransportTests
     [DataRow("ssh-rsa")]
     [DataRow("ssh-dss")]
     [DataRow("ssh-ed25519")]
+    [DataRow("ecdsa-sha2-nistp256-cert-v01@openssh.com")]
+    [DataRow("ecdsa-sha2-nistp384-cert-v01@openssh.com")]
+    [DataRow("ecdsa-sha2-nistp521-cert-v01@openssh.com")]
+    [DataRow("rsa-sha2-512-cert-v01@openssh.com")]
+    [DataRow("rsa-sha2-256-cert-v01@openssh.com")]
+    [DataRow("ssh-rsa-cert-v01@openssh.com")]
+    [DataRow("ssh-ed25519-cert-v01@openssh.com")]
+    [DataRow("sk-ecdsa-sha2-nistp256@openssh.com")]
+    [DataRow("sk-ssh-ed25519@openssh.com")]
+    [DataRow("sk-ecdsa-sha2-nistp256-cert-v01@openssh.com")]
+    [DataRow("sk-ssh-ed25519-cert-v01@openssh.com")]
     public async Task ExchangeKeysAsync_BadSignature_FailsWithMinus8AsMeasured(string hostKeyAlgorithm)
     {
         ScriptedExchange run = Script("ecdh-sha2-nistp256", TestHostKey.For(hostKeyAlgorithm), tamper: payloads =>
@@ -563,12 +585,12 @@ public sealed partial class SshTransportTests
     [TestMethod]
     public async Task ExchangeKeysAsync_HostKeyNotImplemented_ThrowsNotSupported()
     {
-        const string hostCertificate = "ssh-ed25519-cert-v01@openssh.com";
-        SshAlgorithmCatalogue withUnimplemented = new([.. SshAlgorithmPreferences.Full.KeyExchange, "ssh-dss", hostCertificate, "aes128-ctr", "hmac-sha2-256", "none"]);
-        foreach ((string method, string hostKey) in new[] { ("ecdh-sha2-nistp256", hostCertificate) })
+        const string hostKeyName = "unknown-host-key@example.com";
+        SshAlgorithmCatalogue withUnimplemented = new([.. SshAlgorithmPreferences.Full.KeyExchange, "ssh-dss", hostKeyName, "aes128-ctr", "hmac-sha2-256", "none"]);
+        foreach ((string method, string hostKey) in new[] { ("ecdh-sha2-nistp256", hostKeyName) })
         {
             byte[] serverBytes = new SshServerScript().Line(TestKeyExchangeServer.ServerIdentification).KexInit(ServerKexInit(method, hostKey, strict: false)).Bytes;
-            SshTransport transport = new(new ScriptedConnection(serverBytes), SshAlgorithmPreferences.Full, withUnimplemented, new RepeatingRandomSource(0), new TestEphemeralKeys());
+            SshTransport transport = new(new ScriptedConnection(serverBytes), SshAlgorithmPreferences.Full with { ServerHostKey = [hostKeyName] }, withUnimplemented, new RepeatingRandomSource(0), new TestEphemeralKeys());
             SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(CancellationToken.None);
 
             await Assert.ThrowsExactlyAsync<NotSupportedException>(
