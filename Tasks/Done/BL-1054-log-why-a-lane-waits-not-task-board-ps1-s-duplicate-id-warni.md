@@ -30,10 +30,10 @@ Two fixes, both needed: the lane should log the line that answers the question (
 ## Notes
 
 - New Get-WaitReason in RunDarkFactory.ps1 picks next's 'No task ...' line; with none it drops WARNING: lines and the 'Tasks\...' paths a duplicate-ID warning wraps onto. Invoke-Claim logs that as the wait reason. Three -TestTaskIds cases prove it on recorded next output, including the real wrapped BL-806 warning.
-- The Backlog BL-806 (STARTTLS -v TLS lines) is now BL-1055, the next free ID; the archived Done BL-806 keeps its ID, and ADR-0130's BL-806 references are to that one, so nothing else changed. Touching Tasks/Backlog is board housekeeping the task asks for, not a new project.
+- The Backlog BL-806 (STARTTLS -v TLS lines) is now BL-1058, the next free ID; the archived Done BL-806 keeps its ID, and ADR-0130's BL-806 references are to that one, so nothing else changed. Touching Tasks/Backlog is board housekeeping the task asks for, not a new project.
 
 ## Log
 
 - 2026-09-30: Created.
 - 2026-09-30: Backlog -> Doing.
-- 2026-09-30: Doing -> Done. Lane wait lines give next's reason, not a duplicate-ID warning; Backlog BL-806 renumbered BL-1055
+- 2026-09-30: Doing -> Done. Lane wait lines give next's reason, not a duplicate-ID warning; Backlog BL-806 renumbered BL-1058

@@ -1,5 +1,5 @@
 ---
-id: BL-1055
+id: BL-1058
 title: Write curl's -v TLS lines after an SMTP, IMAP, POP3 or FTP STARTTLS upgrade
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-1055 — Write curl's -v TLS lines after an SMTP, IMAP, POP3 or FTP STARTTLS upgrade
+# BL-1058 — Write curl's -v TLS lines after an SMTP, IMAP, POP3 or FTP STARTTLS upgrade
 
 ## Goal
 
