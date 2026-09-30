@@ -104,6 +104,16 @@
     a coordinator waits for a fresh session before its shift starts, and once more at the
     end of a shift, after the merge has waited for CI on the last commit; that last look
     files a one-platform failure at once instead of waiting 30 minutes (BL-1031).
+
+    The audit guard (BL-998) fails the `audit-guard` job with "Audit guard: <path> changed
+    on work/dark-factory ..." when the factory changed an audit path or a guard. The watch
+    files that from one failed run, as for a broken build (BL-999): a High, direct,
+    interactive-only task (task-board.ps1 new -NoLane, the one way a factory process may
+    file an audit-path task, BL-996) titled "Revert the dark factory's change to <path>",
+    with `touches` set to the path and its Context naming the key "audit guard <path>", so a
+    later run finds it. No lane can take it - the hook refuses a lane that path (BL-997) -
+    so the shift's end report lists every open one as "AUDIT needs an interactive session"
+    and the alarm sounds for it, as for work waiting on Stewart.
     -TestCiWatch proves the log reading, the verdicts, the run tracing and the task text on
     recorded lines. A single-runner shift (-Lanes 1) does not watch CI.
 
@@ -1687,7 +1697,22 @@ function Get-WaitingOnStewart {
         $id = Get-NeedsStewartId $line
         if ($id) { $reasons += "$id DECIDE   $(Get-TaskTitle $id)" }
     }
+    $reasons += @(Get-OpenAuditTaskLines)
     return $reasons
+}
+
+function Get-OpenAuditTaskLines {
+    # One line per open audit-guard task (BL-999): the ones the CI watch filed this shift, and
+    # any still open in Backlog or Doing of this checkout. Each needs an interactive session.
+    $open = [ordered]@{}
+    if ($script:CiWatch -and $script:CiWatch.AuditTasks) { foreach ($id in $script:CiWatch.AuditTasks.Keys) { $open[$id] = $script:CiWatch.AuditTasks[$id] } }
+    foreach ($state in 'Backlog', 'Doing') {
+        foreach ($f in Get-ChildItem (Join-Path $Root "Tasks\$state") -Filter 'BL-*.md' -ErrorAction SilentlyContinue) {
+            $title = "$(Select-String -LiteralPath $f.FullName -Pattern '^title:\s*(.*)$' | Select-Object -First 1 | ForEach-Object { $_.Matches[0].Groups[1].Value })"
+            if ($title -like "Revert the dark factory's change to *") { $open[(Get-TaskIdFromFileName $f.Name)] = $title }
+        }
+    }
+    return @($open.Keys | ForEach-Object { "$_ AUDIT    needs an interactive session: $($open[$_])" })
 }
 
 function Test-TaskDone {
@@ -1841,7 +1866,7 @@ function Invoke-MergeToMaster {
 $CiWatchDir = Join-Path $LanesDir 'ci-watch'
 # Settled maps each pair to what became of it ("filed BL-###", "covered by a task"); Logged
 # holds the last line traced for each run, so a run is traced again only when that changes.
-$script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; Off = $false }
+$script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
 # The shift's branch once the coordinator knows it, so a wait for tokens keeps watching CI.
 $script:CiWatchBranch = ''
 # How many finished runs the flaky and regression verdicts look back over, and how long a
@@ -1878,6 +1903,9 @@ function Get-CiFailures {
             $item = [pscustomobject]@{ Key = $Matches[1]; Kind = 'test'; Platforms = @(); Project = ''; Message = '' }
         } elseif ($text -match '(?:^|\s)(?:[^\s(]*[/\\])?([^\s/\\(]+)\(\d+,\d+\):\s+error\s+(\w+):\s*(.*?)(?:\s+\[(?:[^\]]*[/\\])?([^\]/\\]+)\.\w+proj\])?\s*$') {
             $item = [pscustomobject]@{ Key = "error $($Matches[2]) in $($Matches[1])"; Kind = 'build'; Platforms = @(); Project = "$($Matches[4])"; Message = $Matches[3] }
+        } elseif ($text -match '^Audit guard: (\S+) changed on ') {
+            # The audit guard (BL-998) found the factory's own change to an audit path or a guard.
+            $item = [pscustomobject]@{ Key = "audit guard $($Matches[1])"; Kind = 'audit'; Platforms = @(); Project = ''; Message = $text.Trim() }
         }
         if ($item) {
             if (-not $found.Contains($item.Key)) { $found[$item.Key] = $item }
@@ -1920,7 +1948,7 @@ function Get-CiVerdicts {
         $failure = @($Runs[$at].Failures | Where-Object { $_.Key -ceq $key })[0]
         $verdict = ''
         if ($at -eq 0) {
-            if ($failure.Kind -eq 'build' -or @($failure.Platforms).Count -ge 2 -or $failing -contains 1) { $verdict = 'regression' }
+            if ($failure.Kind -in 'build', 'audit' -or @($failure.Platforms).Count -ge 2 -or $failing -contains 1) { $verdict = 'regression' }
             elseif ($failing.Count -gt 1) { $verdict = 'flaky' }
             elseif (($Now - $Runs[0].FinishedAt).TotalMinutes -ge $ConfirmMinutes) { $verdict = 'regression' }
         } elseif ($failing.Count -eq 1 -and $at -lt $Runs.Count - 1) { $verdict = 'flaky' }
@@ -1946,9 +1974,30 @@ function Get-CiTaskTitle {
     # The task's title; each names the test or error exactly, which is how a later run finds it.
     param($Verdict)
     $on = ($Verdict.Platforms -join ' and ')
+    if ($Verdict.Kind -eq 'audit') { return "Revert the dark factory's change to $(Get-CiAuditPath $Verdict.Key)" }
     if ($Verdict.Kind -eq 'build') { return "Fix CI build $($Verdict.Key) on $on" }
     if ($Verdict.Verdict -eq 'flaky') { return "Fix flaky CI test $($Verdict.Key) that failed once on $on" }
     return "Fix CI failure $($Verdict.Key) on $on"
+}
+
+function Get-CiAuditPath {
+    # The path an audit-guard failure's key names: "audit guard Audit/x.md" -> Audit/x.md.
+    param([string]$Key)
+    return ($Key -replace '^audit guard ', '')
+}
+
+function Get-CiTaskNewArgs {
+    # The task-board.ps1 new arguments that file -Verdict. An audit-guard failure is filed
+    # -NoLane: a lane cannot touch the path (BL-997) and the board lets a factory process file
+    # an audit-path task only that way (BL-996).
+    param($Verdict, [string[]]$Touches)
+    if ($Verdict.Kind -eq 'audit') {
+        return @('new', '-Title', (Get-CiTaskTitle $Verdict), '-Priority', 'High', '-Pipeline', 'direct',
+            '-Touches', (Get-CiAuditPath $Verdict.Key), '-NoLane')
+    }
+    $newArgs = @('new', '-Title', (Get-CiTaskTitle $Verdict), '-Priority', 'High', '-Pipeline', 'feature')
+    if (@($Touches).Count) { $newArgs += @('-Touches', (@($Touches) -join ',')) }
+    return $newArgs
 }
 
 function Get-CiTouches {
@@ -1966,6 +2015,7 @@ function Get-CiTouches {
 function Set-CiTaskBody {
     # Fills the new task file's Goal, Context and Acceptance criteria.
     param([string]$Path, $Verdict, [string]$RunUrl)
+    if ($Verdict.Kind -eq 'audit') { Set-CiAuditTaskBody -Path $Path -Verdict $Verdict -RunUrl $RunUrl; return }
     $on = $Verdict.Platforms -join ' and '
     $what = if ($Verdict.Kind -eq 'build') { "the build ($($Verdict.Key))" } else { "``$($Verdict.Key)``" }
     $goal = if ($Verdict.Verdict -eq 'flaky') {
@@ -1983,6 +2033,28 @@ function Set-CiTaskBody {
     $criteria = if ($Verdict.Verdict -eq 'flaky') {
         "- [ ] What made $what fail intermittently is named under Notes and removed.`n- [ ] $what passes locally, and in the ``CI`` workflow on Windows, Linux and macOS for the commit that lands the fix."
     } else { "- [ ] $what passes locally, and the ``CI`` workflow passes on Windows, Linux and macOS for the commit that lands the fix." }
+    $text = [IO.File]::ReadAllText($Path)
+    $text = $text.Replace('<!-- One sentence: the observable outcome once this task is done. -->', $goal)
+    $text = $text -replace '<!-- Why this matters.*?-->', $context.Replace('$', '$$')
+    $text = $text.Replace('- [ ] <!-- A statement someone else can check from the repository without asking a question. -->', $criteria)
+    [IO.File]::WriteAllText($Path, $text, (New-Object Text.UTF8Encoding $false))
+}
+
+function Set-CiAuditTaskBody {
+    # Fills an audit-guard task's Goal, Context and Acceptance criteria. The Context names the
+    # watch's key, "audit guard <path>", which is how a later run finds the task.
+    param([string]$Path, $Verdict, [string]$RunUrl)
+    $target = Get-CiAuditPath $Verdict.Key
+    $first = if ($Verdict.FirstSha) { "First failing commit: $($Verdict.FirstSha.Substring(0, [math]::Min(8, $Verdict.FirstSha.Length)))." } else { 'First failing commit: not found.' }
+    $goal = "The ``audit-guard`` job passes on work/dark-factory again: ``$target`` there matches master, or its change reaches master through the audit branch."
+    $context = @(
+        "Filed by the dark factory's CI watch (BL-999) for $($Verdict.Key): the ``audit-guard`` job failed in CI run $($Verdict.RunId) ($RunUrl). $first"
+        ''
+        "    $($Verdict.Message)"
+        ''
+        "Audit paths and their guards change only through the audit branch (ADR-0267). Interactive only: a dark factory lane cannot touch ``$target`` (BL-997). Red CI blocks the shift-end merge until this is fixed. Decide whether the change was wanted: if not, restore master's copy on work/dark-factory (``git checkout origin/master -- $target``); if it was, land it on master through the audit branch's pull request, then merge master into work/dark-factory."
+    ) -join "`n"
+    $criteria = "- [ ] The ``audit-guard`` job passes on work/dark-factory for the commit that lands the fix."
     $text = [IO.File]::ReadAllText($Path)
     $text = $text.Replace('<!-- One sentence: the observable outcome once this task is done. -->', $goal)
     $text = $text -replace '<!-- Why this matters.*?-->', $context.Replace('$', '$$')
@@ -2166,14 +2238,14 @@ function New-CiFailureTasks {
                 $sha = @($runs | Where-Object { $_.Id -eq $verdict.RunId })[0].Sha
                 if (Test-CiFailureCovered -Key $verdict.Key -Sha $sha -Repo $CiWatchDir) { $script:CiWatch.Settled["$($verdict.Key)|$($verdict.RunId)"] = 'covered by a task'; continue }
                 $touches = @(Get-CiTouches -Project $verdict.Project -Repo $CiWatchDir)
-                $newArgs = @('new', '-Title', (Get-CiTaskTitle $verdict), '-Priority', 'High', '-Pipeline', 'feature')
-                if ($touches.Count) { $newArgs += @('-Touches', ($touches -join ',')) }
+                $newArgs = Get-CiTaskNewArgs -Verdict $verdict -Touches $touches
                 $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
                 if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Trace '-' 'ci' "cannot file $($verdict.Key): $(Get-Short $out 60)" 'DarkYellow'; continue }
                 $id = $Matches[1]; $line = $Matches[0]
                 $url = "https://github.com/$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>$null)/actions/runs/$($verdict.RunId)"
                 Set-CiTaskBody -Path (Join-Path $CiWatchDir $Matches[2]) -Verdict $verdict -RunUrl $url
                 $filed += [pscustomobject]@{ Id = $id; Line = $line; Verdict = $verdict }
+                if ($verdict.Kind -eq 'audit') { $script:CiWatch.AuditTasks["$id"] = Get-CiTaskTitle $verdict }
             }
             if (-not $filed.Count) { return }
             git -C $CiWatchDir add -A -- Tasks 2>&1 | Out-Null
@@ -2283,7 +2355,7 @@ if ($TestCiWatch) {
     # 36674691490 (two TcpDialerTests failures on Linux) and 36690174792 (one on macOS).
     $traced = New-Object Collections.Generic.List[string]
     function Write-Trace { param($Id, $Kind, $Text, $Color) $traced.Add($Text) }
-    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; Off = $false }
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
     $ubuntu = "Build and test (ubuntu-latest)${t}Fast tests${t}"
     $macos = "Build and test (macos-latest)${t}UNKNOWN STEP${t}"
     $recorded = @{
@@ -2349,6 +2421,41 @@ if ($TestCiWatch) {
     Write-CiRunLine -RunId '8' -Line 'failure on sha8: A waiting'
     Write-CiRunLine -RunId '8' -Line 'failure on sha8: A regression, filed BL-1'
     & $check 'a run is traced once per outcome' 'run 7 success on sha7: nothing to file|run 8 failure on sha8: A waiting|run 8 failure on sha8: A regression, filed BL-1' ($traced -join '|')
+    # BL-999: the audit guard's failure line files one interactive-only task, once.
+    $auditLog = @("audit-guard${t}Run guard${t}2026-09-29T10:00:00.0000000Z Audit guard: Audit/Findings/x.md changed on work/dark-factory since its merge base with master")
+    $audit = @(Get-CiFailures $auditLog)
+    & $check 'audit guard line parsed' 'audit guard Audit/Findings/x.md|audit' (($audit | ForEach-Object { "$($_.Key)|$($_.Kind)" }) -join ';')
+    $auditVerdicts = @(Get-CiVerdicts -Now $now -Runs @((& $run 9 2 $audit)))
+    & $check 'audit guard: one red run files it' 'regression audit guard Audit/Findings/x.md run 9 from sha9 on audit-guard' (& $show $auditVerdicts)
+    & $check 'audit guard title' "Revert the dark factory's change to Audit/Findings/x.md" (Get-CiTaskTitle $auditVerdicts[0])
+    $board = Join-Path ([IO.Path]::GetTempPath()) "df-ci-audit-$PID"
+    foreach ($state in 'Backlog', 'Doing', 'Blocked', 'Done') { New-Item -ItemType Directory -Force -Path (Join-Path $board "Tasks\$state") | Out-Null }
+    $savedDir = $env:CLAUDE_PROJECT_DIR; $savedLane = $env:CURL_DARK_FACTORY_LANE
+    try {
+        $env:CLAUDE_PROJECT_DIR = $board
+        $env:CURL_DARK_FACTORY_LANE = '0'
+        $boardScript = Join-Path $Root '.claude\skills\task-board\task-board.ps1'
+        $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $boardScript @(Get-CiTaskNewArgs -Verdict $auditVerdicts[0] -Touches @()) 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $filedPath = if ($out -match '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Join-Path $board $Matches[2] } else { '' }
+        & $check 'audit task filed with CURL_DARK_FACTORY_LANE=0' 'filed' $(if ($filedPath -and (Test-Path $filedPath)) { 'filed' } else { "not filed: $out" })
+        if ($filedPath -and (Test-Path $filedPath)) {
+            Set-CiTaskBody -Path $filedPath -Verdict $auditVerdicts[0] -RunUrl 'https://github.com/o/r/actions/runs/9'
+            $text = [IO.File]::ReadAllText($filedPath)
+            $fields = @(
+                $(if ($text -match '(?m)^lane: no\s*$') { 'lane: no' })
+                $(if ($text -match '(?m)^priority: High\s*$') { 'High' })
+                $(if ($text -match '(?m)^touches: \[Audit/Findings/x\.md\]\s*$') { 'touches: [Audit/Findings/x.md]' })
+                $(if ($text -notmatch '<!--') { 'no placeholder' })) -join '; '
+            & $check 'audit task fields' 'lane: no; High; touches: [Audit/Findings/x.md]; no placeholder' $fields
+            & $check 'audit guard: a second run files nothing' 'True' "$(Test-CiFailureCovered -Key $auditVerdicts[0].Key -Sha 'sha10' -Repo $board)"
+        }
+    } finally {
+        $env:CLAUDE_PROJECT_DIR = $savedDir; $env:CURL_DARK_FACTORY_LANE = $savedLane
+        Remove-Item -Recurse -Force -Path $board -ErrorAction SilentlyContinue
+    }
+    $script:CiWatch.AuditTasks = @{ 'BL-2001' = "Revert the dark factory's change to Audit/Findings/x.md" }
+    & $check 'end report names an open audit task' "BL-2001 AUDIT    needs an interactive session: Revert the dark factory's change to Audit/Findings/x.md" `
+        ((@(Get-OpenAuditTaskLines) | Where-Object { $_ -like 'BL-2001 *' }) -join '|')
     exit $(if ($script:ciTestFailed) { 1 } else { 0 })
 }
 
