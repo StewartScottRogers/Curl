@@ -30,4 +30,19 @@ internal interface ISshEphemeralKeySource
     /// </summary>
     /// <param name="privateKey">The <see cref="X25519.KeySize" /> bytes to fill.</param>
     void CreateX25519PrivateKey(Span<byte> privateKey);
+
+    /// <summary>
+    /// Creates an ML-KEM key pair (FIPS 203) for the <c>mlkem*</c> hybrid methods.
+    /// </summary>
+    /// <param name="parameterSet">ML-KEM-768 or ML-KEM-1024.</param>
+    /// <returns>The key pair, which the caller disposes.</returns>
+    MlKem CreateMlKemKey(MlKemParameterSet parameterSet);
+
+    /// <summary>
+    /// Fills an sntrup761 key pair for the <c>sntrup761x25519-sha512</c> hybrid method; the
+    /// caller zeroes the secret key when done.
+    /// </summary>
+    /// <param name="publicKey">The <see cref="Sntrup761.PublicKeySize" /> bytes to fill.</param>
+    /// <param name="secretKey">The <see cref="Sntrup761.SecretKeySize" /> bytes to fill.</param>
+    void CreateSntrup761KeyPair(Span<byte> publicKey, Span<byte> secretKey);
 }

@@ -48,6 +48,24 @@ internal sealed class TestEphemeralKeys : ISshEphemeralKeySource
     /// <summary>Gets the server's fixed X25519 private key.</summary>
     internal static byte[] ServerX25519 { get; } = Convert.FromHexString("5DAB087E624A8A4B79E17F8B83800EE66F3BB1292618B6FD1C2F8B27FF88E0EB");
 
+    /// <summary>Gets the client's fixed ML-KEM seed d.</summary>
+    internal static byte[] ClientMlKemSeedD { get; } = Convert.FromHexString("7C9935A0B07694AA0C6D10E4DB6B1ADD2FD81A25CCB148032DCD739936737F2D");
+
+    /// <summary>Gets the client's fixed ML-KEM seed z.</summary>
+    internal static byte[] ClientMlKemSeedZ { get; } = Convert.FromHexString("B505D7CFAD1B497499323C8686325E4792F267AAFA3F87CA60D01CB54F29202A");
+
+    /// <summary>Gets the server's fixed ML-KEM encapsulation message m.</summary>
+    internal static byte[] ServerMlKemMessage { get; } = Convert.FromHexString("147C03F7A5BEBBA406C8FAE1874D7F13C80EFE79A3A9A874CC09FE76F6997615");
+
+    /// <summary>
+    /// Gets the client's fixed sntrup761 key pair, generated from the first seeded
+    /// <see cref="Random" /> stream whose g is invertible, so it is the same on every run.
+    /// </summary>
+    internal static (byte[] PublicKey, byte[] SecretKey) ClientSntrup761 { get; } = FixedSntrup761KeyPair();
+
+    /// <summary>Gets the server's fixed sntrup761 encapsulation randomness.</summary>
+    internal static byte[] ServerSntrup761Random { get; } = SeededBytes(761, Sntrup761.EncapsulationRandomSize);
+
     /// <summary>Gets how many elliptic-curve keys the transport asked for.</summary>
     internal int EllipticCurveKeysCreated { get; private set; }
 
@@ -70,6 +88,37 @@ internal sealed class TestEphemeralKeys : ISshEphemeralKeySource
 
     /// <inheritdoc />
     public void CreateX25519PrivateKey(Span<byte> privateKey) => ClientX25519.CopyTo(privateKey);
+
+    /// <inheritdoc />
+    public MlKem CreateMlKemKey(MlKemParameterSet parameterSet) =>
+        MlKem.GenerateKey(parameterSet, ClientMlKemSeedD, ClientMlKemSeedZ);
+
+    /// <inheritdoc />
+    public void CreateSntrup761KeyPair(Span<byte> publicKey, Span<byte> secretKey)
+    {
+        ClientSntrup761.PublicKey.CopyTo(publicKey);
+        ClientSntrup761.SecretKey.CopyTo(secretKey);
+    }
+
+    private static byte[] SeededBytes(int seed, int length)
+    {
+        byte[] bytes = new byte[length];
+        new Random(seed).NextBytes(bytes);
+        return bytes;
+    }
+
+    private static (byte[] PublicKey, byte[] SecretKey) FixedSntrup761KeyPair()
+    {
+        byte[] publicKey = new byte[Sntrup761.PublicKeySize];
+        byte[] secretKey = new byte[Sntrup761.SecretKeySize];
+        int seed = 0;
+        while (!Sntrup761.TryGenerateKeyPair(SeededBytes(seed, Sntrup761.KeyGenerationRandomSize), publicKey, secretKey))
+        {
+            seed++;
+        }
+
+        return (publicKey, secretKey);
+    }
 
     private static ECParameters Fixed(string d, string x, string y) => new()
     {

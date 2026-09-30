@@ -68,6 +68,7 @@ internal sealed record SshDiffieHellmanRound(
     {
         hashInput.Fields.WriteMpint(ClientPublicValue);
         hashInput.Fields.WriteMpint(ServerPublicValue);
-        return new SshKeyExchangeOutcome(HostKey, Signature, SharedSecret, hashInput.ComputeHash(SharedSecret, hashAlgorithm), hashAlgorithm);
+        byte[] encodedSharedSecret = SshExchangeHashInput.EncodeMpint(SharedSecret);
+        return new SshKeyExchangeOutcome(HostKey, Signature, encodedSharedSecret, hashInput.ComputeHash(encodedSharedSecret, hashAlgorithm), hashAlgorithm);
     }
 }

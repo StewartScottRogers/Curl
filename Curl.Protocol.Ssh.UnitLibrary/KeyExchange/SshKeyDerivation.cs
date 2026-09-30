@@ -10,12 +10,12 @@ namespace Curl.Protocol.Ssh.KeyExchange;
 /// and MAC takes the lengths it needs.
 /// </summary>
 /// <param name="hashAlgorithm">The key-exchange method's hash.</param>
-/// <param name="sharedSecret">K, unsigned big-endian; hashed as an <c>mpint</c>.</param>
+/// <param name="encodedSharedSecret">K in the key-exchange method's encoding, as H hashed it.</param>
 /// <param name="exchangeHash">H of this exchange.</param>
 /// <param name="sessionIdentifier">H of the session's first exchange.</param>
 internal sealed class SshKeyDerivation(
     HashAlgorithmName hashAlgorithm,
-    byte[] sharedSecret,
+    byte[] encodedSharedSecret,
     byte[] exchangeHash,
     byte[] sessionIdentifier)
 {
@@ -28,7 +28,7 @@ internal sealed class SshKeyDerivation(
     internal byte[] DeriveKey(SshKeyPurpose purpose, int length)
     {
         SshWireWriter prefix = new();
-        prefix.WriteMpint(sharedSecret);
+        prefix.WriteBytes(encodedSharedSecret);
         prefix.WriteBytes(exchangeHash);
         byte[] secretAndHash = prefix.ToArray();
 

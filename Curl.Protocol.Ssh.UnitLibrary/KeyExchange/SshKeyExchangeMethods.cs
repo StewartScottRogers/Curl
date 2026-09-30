@@ -5,13 +5,17 @@ namespace Curl.Protocol.Ssh.KeyExchange;
 
 /// <summary>
 /// The key-exchange methods this library implements, by the name <c>KEXINIT</c> offers
-/// them under (ADR-0122's key-exchange table; the hybrid
-/// post-quantum methods join when their tasks land).
+/// them under (ADR-0122's key-exchange table).
 /// </summary>
 internal static class SshKeyExchangeMethods
 {
     private static readonly Dictionary<string, Func<ISshEphemeralKeySource, ISshKeyExchange>> Factories = new()
     {
+        ["mlkem768x25519-sha256"] = HybridKemSshKeyExchange.MlKem768X25519,
+        ["mlkem768nistp256-sha256"] = HybridKemSshKeyExchange.MlKem768NistP256,
+        ["mlkem1024nistp384-sha384"] = HybridKemSshKeyExchange.MlKem1024NistP384,
+        ["sntrup761x25519-sha512"] = HybridKemSshKeyExchange.Sntrup761X25519,
+        ["sntrup761x25519-sha512@openssh.com"] = HybridKemSshKeyExchange.Sntrup761X25519,
         ["curve25519-sha256"] = keys => new Curve25519SshKeyExchange(keys),
         ["curve25519-sha256@libssh.org"] = keys => new Curve25519SshKeyExchange(keys),
         ["ecdh-sha2-nistp256"] = keys => new EcdhSshKeyExchange(SshNistCurve.NistP256, keys),

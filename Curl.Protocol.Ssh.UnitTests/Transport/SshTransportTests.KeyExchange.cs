@@ -18,6 +18,11 @@ public sealed partial class SshTransportTests
         SshKexInit.ForClient(SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33)).ToPayload();
 
     [TestMethod]
+    [DataRow("mlkem768x25519-sha256")]
+    [DataRow("mlkem768nistp256-sha256")]
+    [DataRow("mlkem1024nistp384-sha384")]
+    [DataRow("sntrup761x25519-sha512")]
+    [DataRow("sntrup761x25519-sha512@openssh.com")]
     [DataRow("curve25519-sha256")]
     [DataRow("curve25519-sha256@libssh.org")]
     [DataRow("ecdh-sha2-nistp256")]
@@ -153,6 +158,48 @@ public sealed partial class SshTransportTests
         };
 
         await AssertKeyExchangeFailsAsync(Script("curve25519-sha256", hostKey, tamper: _ => [TestKeyExchangeServer.EcdhReply(hostKey.Blob, serverKey, hostKey.Sign([]))]));
+    }
+
+    [TestMethod]
+    [DataRow("mlkem768x25519-sha256", 1088 + 32)]
+    [DataRow("mlkem768nistp256-sha256", 1088 + 65)]
+    [DataRow("mlkem1024nistp384-sha384", 1568 + 97)]
+    [DataRow("sntrup761x25519-sha512", 1039 + 32)]
+    [DataRow("sntrup761x25519-sha512@openssh.com", 1039 + 32)]
+    public async Task ExchangeKeysAsync_HybridServerShareOfTheWrongLength_FailsWithMinus8(string method, int length)
+    {
+        TestHostKey hostKey = TestHostKey.Ed25519();
+
+        foreach (int wrongLength in new[] { length - 1, length + 1, 0 })
+        {
+            await AssertKeyExchangeFailsAsync(Script(method, hostKey, tamper: _ => [TestKeyExchangeServer.EcdhReply(hostKey.Blob, new byte[wrongLength], hostKey.Sign([]))]));
+        }
+    }
+
+    [TestMethod]
+    [DataRow("mlkem768x25519-sha256", 1088, 32, DisplayName = "an X25519 key giving an all-zero secret")]
+    [DataRow("mlkem768nistp256-sha256", 1088, 65, DisplayName = "a P-256 point off the curve")]
+    [DataRow("sntrup761x25519-sha512", 1039, 32, DisplayName = "an sntrup761 exchange's all-zero X25519 key")]
+    public async Task ExchangeKeysAsync_HybridServerShareWithAnUnusableClassicalKey_FailsWithMinus8(string method, int ciphertextLength, int classicalLength)
+    {
+        TestHostKey hostKey = TestHostKey.Ed25519();
+        byte[] classical = new byte[classicalLength];
+        classical[0] = (byte)(classicalLength == 65 ? 0x04 : 0x00);
+
+        await AssertKeyExchangeFailsAsync(Script(method, hostKey, tamper: _ => [TestKeyExchangeServer.EcdhReply(hostKey.Blob, [.. new byte[ciphertextLength], .. classical], hostKey.Sign([]))]));
+    }
+
+    [TestMethod]
+    [DataRow("mlkem768x25519-sha256")]
+    [DataRow("sntrup761x25519-sha512")]
+    public async Task ExchangeKeysAsync_HybridCiphertextAltered_FailsWithMinus8BecauseTheSignatureNoLongerVerifies(string method)
+    {
+        await AssertKeyExchangeFailsAsync(Script(method, TestHostKey.Ed25519(), tamper: payloads =>
+        {
+            byte[] reply = payloads[0];
+            reply[reply.Length - 200] ^= 0x01;
+            return payloads;
+        }));
     }
 
     [TestMethod]
@@ -508,11 +555,17 @@ public sealed partial class SshTransportTests
     }
 
     [TestMethod]
-    public async Task ExchangeKeysAsync_MethodOrHostKeyNotImplemented_ThrowsNotSupported()
+    public void Create_MethodNotImplemented_ThrowsNotSupported()
+    {
+        Assert.ThrowsExactly<NotSupportedException>(() => SshKeyExchangeMethods.Create("unknown-kex@example.com", new TestEphemeralKeys()));
+    }
+
+    [TestMethod]
+    public async Task ExchangeKeysAsync_HostKeyNotImplemented_ThrowsNotSupported()
     {
         const string hostCertificate = "ssh-ed25519-cert-v01@openssh.com";
         SshAlgorithmCatalogue withUnimplemented = new([.. SshAlgorithmPreferences.Full.KeyExchange, "ssh-dss", hostCertificate, "aes128-ctr", "hmac-sha2-256", "none"]);
-        foreach ((string method, string hostKey) in new[] { ("sntrup761x25519-sha512@openssh.com", "ssh-dss"), ("ecdh-sha2-nistp256", hostCertificate) })
+        foreach ((string method, string hostKey) in new[] { ("ecdh-sha2-nistp256", hostCertificate) })
         {
             byte[] serverBytes = new SshServerScript().Line(TestKeyExchangeServer.ServerIdentification).KexInit(ServerKexInit(method, hostKey, strict: false)).Bytes;
             SshTransport transport = new(new ScriptedConnection(serverBytes), SshAlgorithmPreferences.Full, withUnimplemented, new RepeatingRandomSource(0), new TestEphemeralKeys());

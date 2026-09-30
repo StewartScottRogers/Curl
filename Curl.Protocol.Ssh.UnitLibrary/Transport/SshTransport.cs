@@ -158,7 +158,7 @@ internal sealed class SshTransport
             }
 
             byte[] session = sessionIdentifier ?? outcome.ExchangeHash;
-            SshKeyDerivation keys = new(outcome.HashAlgorithm, outcome.SharedSecret, outcome.ExchangeHash, session);
+            SshKeyDerivation keys = new(outcome.HashAlgorithm, outcome.EncodedSharedSecret, outcome.ExchangeHash, session);
             await SwitchKeysAsync(messages, handshake.Algorithms, keys, cancellationToken).ConfigureAwait(false);
             sessionIdentifier = session;
             serverIdentification = handshake.ServerIdentification;

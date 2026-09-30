@@ -13,13 +13,13 @@ namespace Curl.Protocol.Ssh.Fakes;
 /// </summary>
 /// <param name="ServerPayloads">What the server sends, in order, before its <c>NEWKEYS</c>.</param>
 /// <param name="ClientPayloads">What the client must send, in order, before its <c>NEWKEYS</c>.</param>
-/// <param name="SharedSecret">K, unsigned big-endian.</param>
+/// <param name="EncodedSharedSecret">K as H hashes it: an <c>mpint</c>, or a <c>string</c> for the hybrid methods.</param>
 /// <param name="ExchangeHash">H.</param>
 /// <param name="Hash">The method's hash.</param>
 internal sealed record TestKeyExchangeServer(
     List<byte[]> ServerPayloads,
     List<byte[]> ClientPayloads,
-    byte[] SharedSecret,
+    byte[] EncodedSharedSecret,
     byte[] ExchangeHash,
     HashAlgorithmName Hash)
 {
@@ -42,6 +42,10 @@ internal sealed record TestKeyExchangeServer(
         byte[] common = Join(Name(ClientIdentification), Name(ServerIdentification), String(clientKexInit), String(serverKexInit), String(hostKey.Blob));
         return method switch
         {
+            "mlkem768x25519-sha256" => Hybrid(MlKemShares(MlKemParameterSet.MlKem768), X25519Shares(), HashAlgorithmName.SHA256, hostKey, common),
+            "mlkem768nistp256-sha256" => Hybrid(MlKemShares(MlKemParameterSet.MlKem768), EcdhShares(ECCurve.NamedCurves.nistP256, keys), HashAlgorithmName.SHA256, hostKey, common),
+            "mlkem1024nistp384-sha384" => Hybrid(MlKemShares(MlKemParameterSet.MlKem1024), EcdhShares(ECCurve.NamedCurves.nistP384, keys), HashAlgorithmName.SHA384, hostKey, common),
+            "sntrup761x25519-sha512" or "sntrup761x25519-sha512@openssh.com" => Hybrid(Sntrup761Shares(), X25519Shares(), HashAlgorithmName.SHA512, hostKey, common),
             "curve25519-sha256" or "curve25519-sha256@libssh.org" => Curve25519(hostKey, common),
             "ecdh-sha2-nistp256" => Ecdh(ECCurve.NamedCurves.nistP256, HashAlgorithmName.SHA256, hostKey, keys, common),
             "ecdh-sha2-nistp384" => Ecdh(ECCurve.NamedCurves.nistP384, HashAlgorithmName.SHA384, hostKey, keys, common),
@@ -83,7 +87,7 @@ internal sealed record TestKeyExchangeServer(
         return new TestKeyExchangeServer(
             [EcdhReply(hostKey.Blob, serverPoint, hostKey.Sign(h))],
             [[30, .. String(clientPoint)]],
-            k,
+            Mpint(k),
             h,
             hash);
     }
@@ -102,9 +106,69 @@ internal sealed record TestKeyExchangeServer(
         return new TestKeyExchangeServer(
             [EcdhReply(hostKey.Blob, serverPublic, hostKey.Sign(h))],
             [[30, .. String(clientPublic)]],
-            k,
+            Mpint(k),
             h,
             HashAlgorithmName.SHA256);
+    }
+
+    // draft-ietf-sshm-mlkem-hybrid-kex and draft-josefsson-ntruprime-ssh: the KEM's share
+    // before the classical one each way, K = HASH(KEM secret || classical secret) as a
+    // string, not an mpint.
+    private static TestKeyExchangeServer Hybrid(Shares keyEncapsulation, Shares keyAgreement, HashAlgorithmName hash, TestHostKey hostKey, byte[] common)
+    {
+        byte[] clientShare = Join(keyEncapsulation.Client, keyAgreement.Client);
+        byte[] serverShare = Join(keyEncapsulation.Server, keyAgreement.Server);
+        byte[] k = CryptographicOperations.HashData(hash, Join(keyEncapsulation.Secret, keyAgreement.Secret));
+        byte[] h = CryptographicOperations.HashData(hash, Join(common, String(clientShare), String(serverShare), String(k)));
+        return new TestKeyExchangeServer(
+            [EcdhReply(hostKey.Blob, serverShare, hostKey.Sign(h))],
+            [[30, .. String(clientShare)]],
+            String(k),
+            h,
+            hash);
+    }
+
+    private static Shares MlKemShares(MlKemParameterSet parameterSet)
+    {
+        using MlKem clientKey = MlKem.GenerateKey(parameterSet, TestEphemeralKeys.ClientMlKemSeedD, TestEphemeralKeys.ClientMlKemSeedZ);
+        byte[] encapsulationKey = new byte[MlKem.GetEncapsulationKeySize(parameterSet)];
+        byte[] ciphertext = new byte[MlKem.GetCiphertextSize(parameterSet)];
+        byte[] secret = new byte[MlKem.SharedSecretSize];
+        clientKey.ExportEncapsulationKey(encapsulationKey);
+        MlKem.TryEncapsulate(parameterSet, encapsulationKey, TestEphemeralKeys.ServerMlKemMessage, ciphertext, secret);
+        return new Shares(encapsulationKey, ciphertext, secret);
+    }
+
+    private static Shares Sntrup761Shares()
+    {
+        byte[] ciphertext = new byte[Sntrup761.CiphertextSize];
+        byte[] secret = new byte[Sntrup761.SharedSecretSize];
+        Sntrup761.Encapsulate(TestEphemeralKeys.ClientSntrup761.PublicKey, TestEphemeralKeys.ServerSntrup761Random, ciphertext, secret);
+        return new Shares(TestEphemeralKeys.ClientSntrup761.PublicKey, ciphertext, secret);
+    }
+
+    private static Shares X25519Shares()
+    {
+        byte[] clientPublic = new byte[X25519.KeySize];
+        byte[] serverPublic = new byte[X25519.KeySize];
+        byte[] secret = new byte[X25519.KeySize];
+        X25519.ComputePublicKey(TestEphemeralKeys.ClientX25519, clientPublic);
+        X25519.ComputePublicKey(TestEphemeralKeys.ServerX25519, serverPublic);
+        X25519.TryComputeSharedSecret(TestEphemeralKeys.ServerX25519, clientPublic, secret);
+        return new Shares(clientPublic, serverPublic, secret);
+    }
+
+    // The classical secret is the x-coordinate of the product, fixed-length, not an mpint.
+    private static Shares EcdhShares(ECCurve curve, TestEphemeralKeys keys)
+    {
+        ECParameters clientKey = keys.Client(curve);
+        ECParameters serverKey = keys.Server(curve);
+        using ECDiffieHellman server = ECDiffieHellman.Create(serverKey);
+        using ECDiffieHellman clientPublic = ECDiffieHellman.Create(new ECParameters { Curve = curve, Q = clientKey.Q });
+        return new Shares(
+            [0x04, .. clientKey.Q.X!, .. clientKey.Q.Y!],
+            [0x04, .. serverKey.Q.X!, .. serverKey.Q.Y!],
+            server.DeriveRawSecretAgreement(clientPublic.PublicKey));
     }
 
     private static TestKeyExchangeServer FiniteField(FiniteFieldDiffieHellmanGroup group, HashAlgorithmName hash, TestHostKey hostKey, byte[] common)
@@ -114,7 +178,7 @@ internal sealed record TestKeyExchangeServer(
         return new TestKeyExchangeServer(
             [FiniteFieldReply(31, hostKey.Blob, f, hostKey.Sign(h))],
             [[30, .. Mpint(e)]],
-            k,
+            Mpint(k),
             h,
             hash);
     }
@@ -130,7 +194,7 @@ internal sealed record TestKeyExchangeServer(
         return new TestKeyExchangeServer(
             [[31, .. Mpint(p), .. Mpint(g)], FiniteFieldReply(33, hostKey.Blob, f, hostKey.Sign(h))],
             [[34, .. sizes], [32, .. Mpint(e)]],
-            k,
+            Mpint(k),
             h,
             hash);
     }
@@ -152,14 +216,14 @@ internal sealed record TestKeyExchangeServer(
     /// The library's derivation of this exchange's keys, for building the server's packet
     /// protection; <see cref="DeriveKey" /> checks the derivation itself independently.
     /// </summary>
-    internal SshKeyDerivation Keys(byte[] sessionIdentifier) => new(Hash, SharedSecret, ExchangeHash, sessionIdentifier);
+    internal SshKeyDerivation Keys(byte[] sessionIdentifier) => new(Hash, EncodedSharedSecret, ExchangeHash, sessionIdentifier);
 
     /// <summary>
     /// Derives one key as RFC 4253 section 7.2 defines it.
     /// </summary>
     internal byte[] DeriveKey(char letter, int length, byte[] sessionIdentifier)
     {
-        byte[] prefix = Join(Mpint(SharedSecret), ExchangeHash);
+        byte[] prefix = Join(EncodedSharedSecret, ExchangeHash);
         byte[] key = CryptographicOperations.HashData(Hash, Join(prefix, Encoding.ASCII.GetBytes([letter]), sessionIdentifier));
         while (key.Length < length)
         {
@@ -168,4 +232,7 @@ internal sealed record TestKeyExchangeServer(
 
         return key[..length];
     }
+
+    /// <summary>One component of a hybrid exchange: what each side sends and the secret it gives.</summary>
+    private sealed record Shares(byte[] Client, byte[] Server, byte[] Secret);
 }

@@ -53,4 +53,45 @@ public sealed class SystemSshEphemeralKeySourceTests
         CollectionAssert.AreNotEqual(new byte[X25519.KeySize], first);
         CollectionAssert.AreNotEqual(first, second);
     }
+
+    [TestMethod]
+    public void CreateMlKemKey_GivesAFreshKeyOfTheParameterSet()
+    {
+        SystemSshEphemeralKeySource source = new();
+        byte[] first = new byte[MlKem.GetEncapsulationKeySize(MlKemParameterSet.MlKem1024)];
+        byte[] second = new byte[first.Length];
+
+        using (MlKem key = source.CreateMlKemKey(MlKemParameterSet.MlKem1024))
+        {
+            Assert.AreEqual(MlKemParameterSet.MlKem1024, key.ParameterSet);
+            key.ExportEncapsulationKey(first);
+        }
+
+        using (MlKem key = source.CreateMlKemKey(MlKemParameterSet.MlKem1024))
+        {
+            key.ExportEncapsulationKey(second);
+        }
+
+        CollectionAssert.AreNotEqual(first, second);
+    }
+
+    [TestMethod]
+    public void CreateSntrup761KeyPair_FillsAFreshKeyPairThatDecapsulates()
+    {
+        SystemSshEphemeralKeySource source = new();
+        byte[] publicKey = new byte[Sntrup761.PublicKeySize];
+        byte[] secretKey = new byte[Sntrup761.SecretKeySize];
+        byte[] otherPublicKey = new byte[Sntrup761.PublicKeySize];
+        byte[] ciphertext = new byte[Sntrup761.CiphertextSize];
+        byte[] sent = new byte[Sntrup761.SharedSecretSize];
+        byte[] received = new byte[Sntrup761.SharedSecretSize];
+
+        source.CreateSntrup761KeyPair(publicKey, secretKey);
+        source.CreateSntrup761KeyPair(otherPublicKey, new byte[Sntrup761.SecretKeySize]);
+        Sntrup761.Encapsulate(publicKey, ciphertext, sent);
+        Sntrup761.Decapsulate(secretKey, ciphertext, received);
+
+        CollectionAssert.AreEqual(sent, received);
+        CollectionAssert.AreNotEqual(publicKey, otherPublicKey);
+    }
 }

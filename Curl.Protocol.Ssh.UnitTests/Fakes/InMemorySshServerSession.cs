@@ -130,7 +130,7 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         byte[] h = SHA256.HashData(Join(
             Name(clientIdentification), Name(InMemorySshServer.Identification), String(clientKexInit), String(serverKexInit), String(server.HostKeyBlob), Mpint(e), Mpint(f), Mpint(k)));
         await SendAsync(TestKeyExchangeServer.FiniteFieldReply(31, server.HostKeyBlob, f, server.HostKey.Sign(h))).ConfigureAwait(false);
-        SshKeyDerivation keys = new(HashAlgorithmName.SHA256, k, h, h);
+        SshKeyDerivation keys = new(HashAlgorithmName.SHA256, Mpint(k), h, h);
         await SendAsync([SshMessageNumber.NewKeys]).ConfigureAwait(false);
         Writer.ChangeProtection(SshPacketProtections.ForServerToClient(algorithms, keys));
         await Reader.ReadAsync(CancellationToken.None).ConfigureAwait(false);
