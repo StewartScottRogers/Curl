@@ -44,14 +44,14 @@ completed: 2026-09-30
   - `/~/bl572/files/a.txt`: `hello\n` / empty / 0; `OPEN "/home/stewart_rogers/bl572/files/a.txt"`
   - `/~/bl572/files/a%00.txt`: empty / `curl: (3) URL using bad/illegal format or missing URL` / 3; only `REALPATH .`, then channel `EOF`, `CLOSE`, `DISCONNECT 11 Shutdown` in the `sshd` log
   - `/~bl572`: empty / `curl: (78) Could not open remote file for reading: No such file or directory` / 78; `OPEN "/~bl572"`
-- **Decisions (ADR-0275, decided under Stewart's delegation):** port `Curl_getworkingpath`'s
+- **Decisions (ADR-0277, decided under Stewart's delegation):** port `Curl_getworkingpath`'s
   SFTP branch into `SftpRemotePath.Resolve` (`/~` is home + `/`; `/~/rest` takes the rest
   from index 3 when the home directory is empty or ends with `/`, else from index 2);
   `NamesDirectory` is true for `/~`; `ResolveUrlPath` decodes, refuses a zero byte with
   `SshTransferException.UrlPathHoldsZeroByte` (exit 3, the exit code's text, no `-v` line,
   as curl has no `failf` there), and resolves, inside `CloseChannelOnFailureAsync`, so the
   channel closes before `DISCONNECT` for downloads, listings and uploads. A home of `/` was
-  not measured and follows the source (`/~` becomes `//`). ADR-0220 points at ADR-0275.
+  not measured and follows the source (`/~` becomes `//`). ADR-0220 points at ADR-0277.
 - **Scope.** The ADR, its index line and the one-line pointer in ADR-0220 sit in
   `Documentation`, outside `touches`, as every SSH task's ADR does; BL-615, the only other
   task in `Doing`, does not name `Documentation`. `--ai-help` is unchanged: no option was
@@ -69,4 +69,4 @@ completed: 2026-09-30
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
-- 2026-09-30: Doing -> Done. sftp://host/~ lists the home directory, /~/ joins a home ending in / without a second slash, and a %00 in the path is exit 3 after REALPATH with the channel closed, as curl 8.21.0 does; ADR-0275
+- 2026-09-30: Doing -> Done. sftp://host/~ lists the home directory, /~/ joins a home ending in / without a second slash, and a %00 in the path is exit 3 after REALPATH with the channel closed, as curl 8.21.0 does; ADR-0277
