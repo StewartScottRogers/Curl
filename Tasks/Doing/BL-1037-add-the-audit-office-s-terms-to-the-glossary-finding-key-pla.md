@@ -32,3 +32,4 @@ Definitions from the BL-1001 formats: a finding is one issue an auditor reported
 ## Log
 
 - 2026-09-30: Created.
+- 2026-09-30: Backlog -> Doing.
