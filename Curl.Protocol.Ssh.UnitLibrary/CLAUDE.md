@@ -44,7 +44,7 @@ session, which the writer and reader start at the first `NEWKEYS` for `zlib` and
 `zlib@openssh.com` (ADR-0264); `Authentication` holds
 `SshUserAuthentication`, which requests the `ssh-userauth` service and authenticates the
 user with `none`, `publickey`, `password`, the ssh-agent's identities and
-`keyboard-interactive` in curl's order (ADR-0215, ADR-0230, ADR-0270) - the agent through
+`keyboard-interactive` in curl's order (ADR-0215, ADR-0230, ADR-0271) - the agent through
 `ISshAgentConnector` (`SystemSshAgentConnector`: the Windows pipe or the Unix socket
 `SSH_AUTH_SOCK` names) and `SshAgentClient`, which speaks the agent protocol; `Keys` holds `SshUserKeySource`, which finds `--key` (or curl's
 default files through an injected `HOME` reader), `--pubkey` and `--pass`,
@@ -80,4 +80,4 @@ Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network. The one exception is the local ssh-agent:
 `SystemSshAgentConnector` opens its named pipe or Unix domain socket, behind
-`ISshAgentConnector`, in two methods excluded from coverage under ADR-0083 (ADR-0270).
+`ISshAgentConnector`, in two methods excluded from coverage under ADR-0083 (ADR-0271).

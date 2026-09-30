@@ -6,7 +6,7 @@ namespace Curl.Protocol.Ssh.Authentication;
 
 /// <summary>
 /// The production <see cref="ISshAgentConnector" />, which finds the agent where libssh2
-/// 1.11.1 looks (ADR-0270): on Windows the named pipe <c>SSH_AUTH_SOCK</c> names, or
+/// 1.11.1 looks (ADR-0271): on Windows the named pipe <c>SSH_AUTH_SOCK</c> names, or
 /// Win32-OpenSSH's <c>\\.\pipe\openssh-ssh-agent</c> when it is unset; elsewhere the Unix
 /// domain socket <c>SSH_AUTH_SOCK</c> names, and no agent when it is unset.
 /// </summary>
@@ -39,7 +39,7 @@ internal sealed class SystemSshAgentConnector(Func<string, string?> readEnvironm
     /// <summary>
     /// Splits a Windows pipe path, <c>\\server\pipe\name</c>, into its server and name.
     /// libssh2 hands the path to <c>CreateFileA</c> whatever it is; only a pipe is opened
-    /// here, so any other path is no agent (ADR-0270).
+    /// here, so any other path is no agent (ADR-0271).
     /// </summary>
     /// <param name="path">The path.</param>
     /// <returns>The server and pipe name, or <see langword="null" /> for a path that names no pipe.</returns>

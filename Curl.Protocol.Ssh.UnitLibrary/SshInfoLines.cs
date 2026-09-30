@@ -36,10 +36,10 @@ internal static class SshInfoLines
     /// <summary>The agent line when no agent answers, so curl goes on to <c>keyboard-interactive</c>.</summary>
     internal const string AgentConnectFailed = "SSH: failure connecting to agent";
 
-    /// <summary>The agent line when the agent's identities cannot be read (ADR-0270).</summary>
+    /// <summary>The agent line when the agent's identities cannot be read (ADR-0271).</summary>
     internal const string AgentIdentitiesFailed = "SSH: failure requesting identities to agent";
 
-    /// <summary>The agent line when no identity authenticated the user, the agent holding none included (ADR-0270).</summary>
+    /// <summary>The agent line when no identity authenticated the user, the agent holding none included (ADR-0271).</summary>
     internal const string NoAgentIdentityMatched = "SSH: no agent identity would match";
 
     /// <summary>The line after <c>keyboard-interactive</c> authenticated the user.</summary>
@@ -133,7 +133,7 @@ internal static class SshInfoLines
     /// <returns>The line.</returns>
     internal static string OffersAuthentication(string methods) => $"SSH: host offers authentication via: {methods}";
 
-    /// <summary>The agent line when one of its identities authenticated the user (ADR-0270).</summary>
+    /// <summary>The agent line when one of its identities authenticated the user (ADR-0271).</summary>
     /// <param name="user">The user name.</param>
     /// <param name="comment">The identity's comment.</param>
     /// <returns>The line.</returns>

@@ -6,7 +6,7 @@ using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 namespace Curl.Protocol.Ssh.Authentication;
 
 /// <summary>
-/// Pins the agent step (BL-902, ADR-0270) against a fake agent and the in-memory peer:
+/// Pins the agent step (BL-902, ADR-0271) against a fake agent and the in-memory peer:
 /// after <c>password</c> fails and before <c>keyboard-interactive</c>, curl lists the
 /// agent's identities and tries each with the same question and signed request as a key
 /// file's, the agent signing. The outcomes were measured 2026-09-30 with curl 8.21.0

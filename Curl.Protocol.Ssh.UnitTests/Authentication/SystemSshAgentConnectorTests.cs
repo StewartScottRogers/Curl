@@ -5,7 +5,7 @@ namespace Curl.Protocol.Ssh.Authentication;
 
 /// <summary>
 /// Pins where <see cref="SystemSshAgentConnector" /> looks for the agent, as libssh2 1.11.1
-/// does (ADR-0270): a pipe on Windows, <c>SSH_AUTH_SOCK</c>'s Unix socket elsewhere. The
+/// does (ADR-0271): a pipe on Windows, <c>SSH_AUTH_SOCK</c>'s Unix socket elsewhere. The
 /// connections themselves run in the Integration tests, against a pipe and a socket served
 /// here.
 /// </summary>

@@ -14,7 +14,7 @@ namespace Curl.Protocol.Ssh.Authentication;
 /// libssh2 sends as the last step of starting the session, before the host key is
 /// checked; then, after the check, a <c>none</c> request for the server's method list,
 /// <c>publickey</c> (ADR-0230), <c>password</c>, the identities of the user's ssh-agent
-/// (ADR-0270) and <c>keyboard-interactive</c>, in that order.
+/// (ADR-0271) and <c>keyboard-interactive</c>, in that order.
 /// </summary>
 /// <remarks>
 /// While it waits for an answer it skips every other message, as libssh2 queues them, and
@@ -94,7 +94,7 @@ internal sealed class SshUserAuthentication(
     private string? serverSignatureAlgorithms;
 
     // The method an RSA key found no signature algorithm for. libssh2 keeps it, and every
-    // later agent identity starts from it instead of its own key type (ADR-0270).
+    // later agent identity starts from it instead of its own key type (ADR-0271).
     private string? leftoverMethod;
 
     /// <summary>
@@ -192,7 +192,7 @@ internal sealed class SshUserAuthentication(
         await RequireKeyboardInteractiveAsync(methods, credentials.User, credentials.Password, cancellationToken).ConfigureAwait(false);
     }
 
-    // curl's agent step (ADR-0270): connect, list the identities, then try each in the
+    // curl's agent step (ADR-0271): connect, list the identities, then try each in the
     // agent's order until one authenticates the user. Each outcome has its -v line.
     private async ValueTask<bool> TryAgentAsync(UserCredentials credentials, CancellationToken cancellationToken)
     {
@@ -525,7 +525,7 @@ internal sealed class SshUserAuthentication(
     // libssh2 upgrades only an ssh-rsa key: once the server has sent server-sig-algs, the
     // first of its own RSA algorithms the server names, compared whole, and none when it
     // names none of them; before, ssh-rsa itself. Other key types sign as their type. A
-    // method that found none is left behind for the agent's identities (ADR-0270).
+    // method that found none is left behind for the agent's identities (ADR-0271).
     private string? ChooseSignatureAlgorithm(string method)
     {
         if (method != RsaSshPrivateKey.RsaKeyType || serverSignatureAlgorithms is null)
