@@ -198,7 +198,8 @@ public sealed class TcpConnector(
     /// The messages are curl 8.21.0's, cut to 255 characters as curl cuts them (ADR-0072):
     /// <c>Could not resolve host: &lt;host&gt;</c> for
     /// exit 6, and <c>Failed to connect to &lt;host&gt;:&lt;port&gt; after &lt;n&gt; ms:
-    /// Could not connect to server</c> for exit 7, where <c>n</c> is the time spent
+    /// Could not connect to server</c> for exit 7, or exit 28 when the system timed the last dial
+    /// out, where <c>n</c> is the time spent
     /// dialing as measured by the injected <see cref="TimeProvider" />. When
     /// <see cref="ConnectTarget.UseTls" /> is set, the <see cref="ITlsProvider" />'s result
     /// is returned as it is, so a failed handshake keeps the exit code and message the
@@ -329,7 +330,20 @@ public sealed class TcpConnector(
     /// (<see cref="NameResolutionFailure" />, BL-694).
     /// </para>
     /// </remarks>
-    public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
+    public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+        ConnectWithinAsync(target, _connectTimeout, cancellationToken);
+
+    /// <summary>
+    /// Gives a connector that connects exactly as this one does, through the same DNS cache,
+    /// <c>--resolve</c> entries, <c>--connect-to</c> mappings and connection numbering, but that
+    /// holds no connect to <c>--connect-timeout</c>: only the caller's cancellation, or the
+    /// system giving up on a dial, ends it. It is FTP's passive data connection's connector, which
+    /// curl 8.21.0 does not hold to <c>--connect-timeout</c> (measured, BL-797 Notes).
+    /// </summary>
+    /// <returns>The connector.</returns>
+    public IConnector WithoutConnectTimeout() => new ConnectTimeoutFreeConnector(this);
+
+    private async ValueTask<ConnectResult> ConnectWithinAsync(ConnectTarget target, TimeSpan connectLimit, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(target);
 
@@ -338,7 +352,7 @@ public sealed class TcpConnector(
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);
         try
         {
-            var result = await ConnectAndNumberAsync(target, cancellationToken).ConfigureAwait(false);
+            var result = await ConnectAndNumberAsync(target, connectLimit, cancellationToken).ConfigureAwait(false);
             if (result.Connection is null)
             {
                 log.Failed(DiagnosticLogComponents.Connect, result.ExitCode, result.ErrorMessage);
@@ -353,7 +367,7 @@ public sealed class TcpConnector(
         }
     }
 
-    private async ValueTask<ConnectResult> ConnectAndNumberAsync(ConnectTarget target, CancellationToken cancellationToken)
+    private async ValueTask<ConnectResult> ConnectAndNumberAsync(ConnectTarget target, TimeSpan connectLimit, CancellationToken cancellationToken)
     {
         var started = timeProvider.GetTimestamp();
         LoadResolveEntriesUnlessLoaded(target.Events);
@@ -363,7 +377,7 @@ public sealed class TcpConnector(
             return ConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
         }
 
-        var result = await ConnectWithinTimeoutAsync(target, destination, started, cancellationToken).ConfigureAwait(false);
+        var result = await ConnectWithinTimeoutAsync(target, destination, started, connectLimit, cancellationToken).ConfigureAwait(false);
 
         return result.Connection is null
             ? NumberedConnectFailure.Of(result, TakeConnectionNumber())
@@ -443,8 +457,8 @@ public sealed class TcpConnector(
     }
 
     /// <summary>
-    /// Runs the resolve, dials, any tunnel and any TLS handshake under the connect timeout on the
-    /// injected <see cref="TimeProvider" />, counted from <paramref name="started" /> (ADR-0117).
+    /// Runs the resolve, dials, any tunnel and any TLS handshake under <paramref name="connectLimit" />
+    /// on the injected <see cref="TimeProvider" />, counted from <paramref name="started" /> (ADR-0117).
     /// A cancellation that arrives once the limit has passed on the clock, whoever cancelled, is
     /// curl 8.21.0's exit 28 <c>Connection timed out after &lt;n&gt; milliseconds</c>, also
     /// reported on the target's events as its <c>-v</c> repeats it (measured, BL-510); any
@@ -454,9 +468,10 @@ public sealed class TcpConnector(
         ConnectTarget target,
         ConnectDestination destination,
         long started,
+        TimeSpan connectLimit,
         CancellationToken cancellationToken)
     {
-        using var timeout = new CancellationTokenSource(_connectTimeout, timeProvider);
+        using var timeout = new CancellationTokenSource(connectLimit, timeProvider);
         using var limited = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         try
         {
@@ -467,7 +482,7 @@ public sealed class TcpConnector(
                 _ => await ConnectDirectlyAsync(target, destination, started, limited.Token).ConfigureAwait(false),
             };
         }
-        catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= _connectTimeout)
+        catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= connectLimit)
         {
             var message = $"Connection timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
             target.Events.ReportInfo(message);
@@ -1325,7 +1340,9 @@ public sealed class TcpConnector(
     /// The failure for a dial that reached no address, its message also reported on
     /// <paramref name="events" /> as curl's <c>-v</c> repeats it: exit 45 or exit 43 when the last
     /// address failed to bind its local end with <see cref="LocalBindFailure.InterfaceFailed" /> or
-    /// <see cref="LocalBindFailure.BadArgument" />, else exit 7, marked refused when the last
+    /// <see cref="LocalBindFailure.BadArgument" />, exit 28 when the system gave up on the last
+    /// attempt (<see cref="SocketError.TimedOut" />), as curl 8.21.0 and 8.18.0 end it with the same
+    /// message (measured, BL-797 Notes), else exit 7, marked refused when the last
     /// attempt was refused, as <c>--retry-connrefused</c> reads curl's <c>CURLINFO_OS_ERRNO</c>.
     /// It carries the start and lookup timestamps, as curl 8.21.0 still reports
     /// <c>%{time_namelookup}</c> after a refused connect (measured, ADR-0091).
@@ -1338,8 +1355,19 @@ public sealed class TcpConnector(
             LocalBindFailure.InterfaceFailed => ConnectResult.Failed(CurlExitCode.InterfaceFailed, errorMessage, timings),
             LocalBindFailure.BadArgument => ConnectResult.Failed(CurlExitCode.BadFunctionArgument, errorMessage, timings),
             _ when lastError == SocketError.ConnectionRefused => ConnectResult.Refused(errorMessage, timings),
+            _ when lastError == SocketError.TimedOut => ConnectResult.Failed(CurlExitCode.OperationTimedOut, errorMessage, timings),
             _ => ConnectResult.Failed(CurlExitCode.CouldntConnect, errorMessage, timings),
         };
+    }
+
+    /// <summary>
+    /// <see cref="WithoutConnectTimeout" />'s connector: the owner's connect under the longest
+    /// delay a .NET timer takes, about 49.7 days, in place of the connect timeout.
+    /// </summary>
+    private sealed class ConnectTimeoutFreeConnector(TcpConnector owner) : IConnector
+    {
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            owner.ConnectWithinAsync(target, LongestTimerDelay, cancellationToken);
     }
 
     /// <summary>

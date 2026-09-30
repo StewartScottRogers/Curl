@@ -153,7 +153,12 @@ one limit, the constructor's `connectTimeout` (`CurlComposition.ConnectTimeoutOf
 or a smaller `-m`), else `DefaultConnectTimeout` (300 s), on its `TimeProvider`; when it passes the
 connect fails with exit 28 and `Connection timed out after N milliseconds`, N from the connect's
 start, also reported as a `-v` line. A cancellation arriving once the limit has passed is that
-failure; an earlier one escapes. Tests stall through `Fakes/StallingTcpDialer`,
+failure; an earlier one escapes. Per ADR-0286 (BL-797) `WithoutConnectTimeout()` gives a view of
+the same connector (DNS cache, numbering, every setting) whose connects run under the longest
+timer delay instead, FTP's passive data connector; `PoolingConnector.Over(inner)` gives a pooling
+connector over the same cache, configuration and numbering that opens through `inner`. A dial whose
+last attempt failed with `SocketError.TimedOut` is exit 28 with the usual `Failed to connect to`
+message, as curl 8.21.0 ends a dial the system gave up on. Tests stall through `Fakes/StallingTcpDialer`,
 `StallingTlsProvider` and `StallingConnection` and fire the limit with `ManualTimeProvider.Advance`.
 Per ADR-0143 (BL-500) `TcpConnector` and `UdpDatagramConnector` take the `-4`/`-6` choice as an
 `AddressFamily` (`Unspecified` for either): `AddressFamilyFilter` keeps a name's addresses of that

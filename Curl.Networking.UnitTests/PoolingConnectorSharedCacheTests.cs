@@ -82,6 +82,39 @@ public sealed class PoolingConnectorSharedCacheTests
     }
 
     [TestMethod]
+    public async Task Over_OpensThroughTheGivenConnectorNumberedInTheSamePool()
+    {
+        var inner = new FakeConnector();
+        var otherInner = new FakeConnector();
+        await using var pool = new PoolingConnector(inner, _time) { WaitsForMultiplexing = true };
+        var other = pool.Over(otherInner);
+
+        var first = await pool.ConnectAsync(new ConnectTarget("origin.example", 21, false), CancellationToken.None);
+        var second = await other.ConnectAsync(new ConnectTarget("192.0.2.1", 1025, false), CancellationToken.None);
+
+        Assert.AreEqual(0L, first.ConnectionNumber);
+        Assert.AreEqual(1L, second.ConnectionNumber);
+        Assert.HasCount(1, inner.Targets);
+        Assert.HasCount(1, otherInner.Targets);
+        Assert.IsTrue(other.WaitsForMultiplexing);
+    }
+
+    [TestMethod]
+    public async Task Over_ReusesAConnectionItsOwnerPooledAndLeavesTheCacheOpenWhenDisposed()
+    {
+        var inner = new FakeConnector();
+        await using var pool = new PoolingConnector(inner, _time);
+        var other = pool.Over(new FakeConnector());
+        await ReturnToCacheAsync(pool);
+
+        var reused = await other.ConnectAsync(Target(), CancellationToken.None);
+        await other.DisposeAsync();
+
+        Assert.IsTrue(reused.IsReused);
+        Assert.IsFalse(inner.Opened[0].IsDisposed);
+    }
+
+    [TestMethod]
     public async Task DisposeAsync_OfAConnectorOverAGivenCache_LeavesItsIdleConnectionsOpen()
     {
         var cache = new ConnectionCache(_time);

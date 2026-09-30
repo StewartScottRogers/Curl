@@ -84,6 +84,18 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     public bool WaitsForMultiplexing { get; init; }
 
     /// <summary>
+    /// Gives a connector over the same <see cref="ConnectionCache" />, configuration and
+    /// <see cref="WaitsForMultiplexing" /> that opens new connections through
+    /// <paramref name="innerConnector" /> instead, so what it opens is numbered in this pool's
+    /// sequence; its <see cref="DisposeAsync" /> leaves the cache to this connector's owner. FTP's
+    /// passive data connections go through one over <see cref="TcpConnector.WithoutConnectTimeout" /> (BL-797).
+    /// </summary>
+    /// <param name="innerConnector">Opens a connection when the cache has none for the key.</param>
+    /// <returns>The connector.</returns>
+    public PoolingConnector Over(IConnector innerConnector) =>
+        new(innerConnector, _cache, _configuration) { WaitsForMultiplexing = WaitsForMultiplexing };
+
+    /// <summary>
     /// Gets the longest a connection may sit idle and still be reused: 118 seconds, curl's
     /// <c>CURLOPT_MAXAGE_CONN</c> default.
     /// </summary>
