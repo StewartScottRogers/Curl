@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Wiki/Glossary.md]
 requirement: none
 created: 2026-09-30
-completed:
+completed: 2026-09-30
 ---
 # BL-1037 — Add the audit office's terms to the glossary: finding, key, planted defect, catch rate, reliable, scorecard, re-audit
 
@@ -24,12 +24,17 @@ Definitions from the BL-1001 formats: a finding is one issue an auditor reported
 
 ## Acceptance criteria
 
-- [ ] The glossary has an entry for each term above, one sentence each, matching the formats' wording.
-- [ ] No other document uses a second name for any of these concepts.
+- [x] The glossary has an entry for each term above, one sentence each, matching the formats' wording.
+- [x] No other document uses a second name for any of these concepts.
 
 ## Notes
+
+- Added a section, "The audit office", to `Documentation/Wiki/Glossary.md` with eight entries: auditor fingerprint, catch rate, finding (`AF-####`), key, planted defect, re-audit, reliable, scorecard. Worded from this task's Context and ADR-0267, since the lane's audit guard refuses reading `Audit/`.
+- Severity levels are left out: the Context names them but gives no definition, and the lane cannot read `Audit/Findings/README.md` to take its wording. An interactive session can add them.
+- Second names: searched `Documentation/` and `CLAUDE.md` for seeded/injected defect, report card and similar; none found. ADR-0267 already says finding, re-audit, planted defect, catch rate, unreliable and scorecard.
 
 ## Log
 
 - 2026-09-30: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. The glossary defines the audit office's terms: finding, key, planted defect, catch rate, reliable, scorecard, re-audit, auditor fingerprint
