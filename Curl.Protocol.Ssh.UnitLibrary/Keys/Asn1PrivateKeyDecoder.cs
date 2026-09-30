@@ -5,7 +5,8 @@ namespace Curl.Protocol.Ssh.Keys;
 
 /// <summary>
 /// Decodes the DER private keys of PEM key files: PKCS #8 <c>PrivateKeyInfo</c>
-/// (<c>PRIVATE KEY</c>, RFC 5958) for RSA, ECDSA and DSA, OpenSSL's traditional DSA key
+/// (<c>PRIVATE KEY</c>, RFC 5958) for RSA, ECDSA, DSA and Ed25519 (RFC 8410, the seed as
+/// <c>CurvePrivateKey</c>), OpenSSL's traditional DSA key
 /// (<c>DSA PRIVATE KEY</c>) and SEC 1's <c>ECPrivateKey</c> (<c>EC PRIVATE KEY</c>, RFC
 /// 5915). PKCS #1 RSA is <see cref="RsaSshPrivateKey.FromPkcs1" />'s.
 /// </summary>
@@ -17,6 +18,8 @@ internal static class Asn1PrivateKeyDecoder
 
     private const string Dsa = "1.2.840.10040.4.1";
 
+    private const string Ed25519 = "1.3.101.112";
+
     private static readonly Asn1Tag CurveParametersTag = new(TagClass.ContextSpecific, 0);
 
     private static readonly Asn1Tag PublicKeyTag = new(TagClass.ContextSpecific, 1);
@@ -26,8 +29,8 @@ internal static class Asn1PrivateKeyDecoder
     /// </summary>
     /// <param name="der">The DER encoding.</param>
     /// <returns>
-    /// The key, or <see langword="null" /> for another algorithm, such as Ed25519
-    /// (OID 1.3.101.112), which BL-681 adds, or a curve other than the three NIST curves.
+    /// The key, or <see langword="null" /> for an algorithm other than RSA, ECDSA, DSA and
+    /// Ed25519 (RFC 8410), or a curve other than the three NIST curves.
     /// </returns>
     /// <exception cref="AsnContentException">The structure is malformed.</exception>
     /// <exception cref="CryptographicException">The key's values are invalid.</exception>
@@ -44,6 +47,7 @@ internal static class Asn1PrivateKeyDecoder
             RsaEncryption => RsaSshPrivateKey.FromPkcs1(privateKey),
             EcPublicKey => ReadEcPrivateKey(privateKey, algorithm.ReadObjectIdentifier()),
             Dsa => ReadPkcs8Dsa(algorithm.ReadSequence(), privateKey),
+            Ed25519 => Ed25519SshPrivateKey.FromSeed(new AsnReader(privateKey, AsnEncodingRules.DER).ReadOctetString()),
             _ => null,
         };
     }

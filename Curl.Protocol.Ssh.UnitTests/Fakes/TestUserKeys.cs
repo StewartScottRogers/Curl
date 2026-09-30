@@ -336,7 +336,7 @@ internal static class TestUserKeys
         -----END RSA PRIVATE KEY-----
         """;
 
-    /// <summary>A second RSA key, in <c>openssh-key-v1</c> encrypted with bcrypt and <c>aes256-ctr</c> (passphrase <c>enc</c>): BL-681's to read.</summary>
+    /// <summary>A second RSA key, in <c>openssh-key-v1</c> encrypted with bcrypt and <c>aes256-ctr</c> (passphrase <c>enc</c>).</summary>
     internal const string RsaOpenSshEncrypted = """
         -----BEGIN OPENSSH PRIVATE KEY-----
         b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABBoL1S/Z/
@@ -451,7 +451,7 @@ internal static class TestUserKeys
         -----END EC PRIVATE KEY-----
         """;
 
-    /// <summary>An Ed25519 key in <c>openssh-key-v1</c>: BL-681's to read.</summary>
+    /// <summary>An Ed25519 key in <c>openssh-key-v1</c>, unencrypted.</summary>
     internal const string Ed25519OpenSsh = """
         -----BEGIN OPENSSH PRIVATE KEY-----
         b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
@@ -462,10 +462,148 @@ internal static class TestUserKeys
         -----END OPENSSH PRIVATE KEY-----
         """;
 
-    /// <summary>An Ed25519 key in PKCS #8: BL-681's to read.</summary>
+    /// <summary>A second Ed25519 key, in PKCS #8.</summary>
     internal const string Ed25519Pkcs8 = """
         -----BEGIN PRIVATE KEY-----
         MC4CAQAwBQYDK2VwBCIEIGg6YP+pEjIoQ/aN3n1F+EzXS4wlRWrtBB5VPeSn6Eox
         -----END PRIVATE KEY-----
+        """;
+
+    /// <summary>The Ed25519 key's <c>.pub</c> file.</summary>
+    internal const string Ed25519PublicKeyFile = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJtU/wYM8xD5OT29KYqno+lM9zJt1i+ZEmdbUEcPZEcX test\n";
+
+    /// <summary>
+    /// The Ed25519 key in <c>openssh-key-v1</c>, re-encrypted by <c>ssh-keygen -p -a 16 -Z
+    /// &lt;cipher&gt;</c> (OpenSSH 10.3) with <see cref="Passphrase" /> under each cipher OpenSSH
+    /// offers, by cipher name.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, string> Ed25519OpenSshEncrypted = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["aes128-ctr"] = """
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAACmFlczEyOC1jdHIAAAAGYmNyeXB0AAAAGAAAABBIWMGxLA
+            i9vAluF5ScJZbOAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIJtU/wYM8xD5OT29
+            KYqno+lM9zJt1i+ZEmdbUEcPZEcXAAAAkGGmaS8q5/5AI9eZLDofo5loR8q0+1umLK/DLN
+            k1gJSAQJlZV06q3d37uVDvt8PWUv2OLLMepfled7wG01//IS9cRHBQba97FqQlp70xfSGv
+            y29qtlJwvJfVYVO6B0Rz/PQNRhb2yboyKO9jwGUvOtBRGSKt+TQhKd4jxDIVghXng8lHIs
+            RLL024w5YrQd7LFg==
+            -----END OPENSSH PRIVATE KEY-----
+            """,
+
+        ["aes192-ctr"] = """
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAACmFlczE5Mi1jdHIAAAAGYmNyeXB0AAAAGAAAABAiKpu6Pz
+            OUD80lBPaNmagvAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIJtU/wYM8xD5OT29
+            KYqno+lM9zJt1i+ZEmdbUEcPZEcXAAAAkM2kgq6Tv860g2y/0X++rcT10gN/8Dl4xqaX7m
+            5ToxmNmsr8NIWUQo+ugccYEKcUZqRGafHqtIqnbdztV4rjQhgpPQCjoADhUC/GjxwcfK9F
+            xDKMuLOGhi9lJqww8ebN+fevQtIlFdSfymt6xNXgAei0C3VEJ67CH3VMfJxZ7RHwPZeOqC
+            1i6WlGt7YmcHt4mQ==
+            -----END OPENSSH PRIVATE KEY-----
+            """,
+
+        ["aes256-ctr"] = """
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABAnEIKi9k
+            KzxYKq2MH9T2z6AAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIJtU/wYM8xD5OT29
+            KYqno+lM9zJt1i+ZEmdbUEcPZEcXAAAAkHKJY22xn2d1V0RVrp02UPn+B7fFQkcPTpEJiW
+            JKT3PqkRFXnNN4f04P6dmxmB/emZOiwRpli0bXpnsw2mQ1/ooC69fHYTZjvcMs63RXCfGL
+            KDNEq8AoPN3VAF2k5kY87l/SLzh9y/ywncCTMRkPMT9aXKyij+/24DqVIlAki3KXOyuMyN
+            Q7cQ8XscT8NJe/VA==
+            -----END OPENSSH PRIVATE KEY-----
+            """,
+
+        ["aes128-cbc"] = """
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAACmFlczEyOC1jYmMAAAAGYmNyeXB0AAAAGAAAABDbsbmLpV
+            QeixEYl7eUGI/IAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIJtU/wYM8xD5OT29
+            KYqno+lM9zJt1i+ZEmdbUEcPZEcXAAAAkAbj9HqgqlycWHEAbYP7S0pbIxInfzZjNPgbjk
+            Pf33TBpS4OgjH9NXrnUkSfNC23dXM6aJ59xg+zcuiUEJU6VNXERTZJJeipQmNaR3QnavMK
+            Y9JkD3sUFG1KqntExHWslR7wSyGaCPaATBgKioJ7YXAaxvlLNC3y9BajIYE/mnNa1an/Nu
+            PNKwjaxhuoKoh0RA==
+            -----END OPENSSH PRIVATE KEY-----
+            """,
+
+        ["aes192-cbc"] = """
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAACmFlczE5Mi1jYmMAAAAGYmNyeXB0AAAAGAAAABCyjqk+AI
+            HNxNiyros7YxpBAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIJtU/wYM8xD5OT29
+            KYqno+lM9zJt1i+ZEmdbUEcPZEcXAAAAkNn1Y8qOsnLoWvjmuTDQWRoRjeJTTnw9pjqdqw
+            Qqm68QIRPnUh08UCNkdFWNANjNt5SXGiLI8foAPqgcNbJKCRLYeU10dCOsucfg4w1VheYz
+            EjtUAG5hXLNowJvkbMm6gyuK6pNdZmTyVlKq4ao7MMjC3aC29Q+mqLAE5m132/3wpj1tYC
+            WxeHZNPSCr07yPSg==
+            -----END OPENSSH PRIVATE KEY-----
+            """,
+
+        ["aes256-cbc"] = """
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jYmMAAAAGYmNyeXB0AAAAGAAAABCh0ptRAW
+            8NWPzhlokMpyxEAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIJtU/wYM8xD5OT29
+            KYqno+lM9zJt1i+ZEmdbUEcPZEcXAAAAkILgHf9RMCgnToYwBah2MmNHBajKZUNJ1SWZqF
+            jWX87e4LiAY79kZQfC9lp+MMXYK6L1FRGF5i94/PVAqus2J3PYfaG8mCPwdmGGsNflPxg4
+            h3EOc5vchJlj/2bCXfUcRcp5XdryrITHyb9S4RaTJx2+G1us36p96Zn1NVjK3TmuD0/+pK
+            2QfPWdCJnJ1NGZ2Q==
+            -----END OPENSSH PRIVATE KEY-----
+            """,
+
+        ["3des-cbc"] = """
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAACDNkZXMtY2JjAAAABmJjcnlwdAAAABgAAAAQ3fKaX2Y7Tt
+            EUpf5hndjJOQAAABAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACCbVP8GDPMQ+Tk9vSmK
+            p6PpTPcybdYvmRJnW1BHD2RHFwAAAIgsh+oGzqsCHdc1TCFRJvHNi4iok6ZdjFSXmfQwIU
+            alYoHPU8zIqR0R0KKFrxtoWV1IsLUFbEpK68zDGShURxOgmBScBHGbBsUkZ1Co8ymzwxzj
+            7yl19C0V6zeq8evXHunn7UZvL9WukS5noBwAoHgMZDOrcwhv0ThcuvBYWPSy5S+e/pp5bZ
+            Ts
+            -----END OPENSSH PRIVATE KEY-----
+            """,
+
+        ["aes128-gcm@openssh.com"] = """
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAAFmFlczEyOC1nY21Ab3BlbnNzaC5jb20AAAAGYmNyeXB0AA
+            AAGAAAABBpFQO/6phT3Qw+NRm+5OUkAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAA
+            IJtU/wYM8xD5OT29KYqno+lM9zJt1i+ZEmdbUEcPZEcXAAAAkLbcUK/p4/mSs4BbedA/St
+            jPRv8yCRq0bGY6noaEQKJ62pbwcTMplU0dMRDexK1Ypli5e/c3tLOHmoxiVGyZ5lrJ4e7s
+            yyX6PKWdsmU2WYqu+XVJaLOBUJj+qP2Ss7s8+k3cnZDUnPwflbVPTSwJJI3Ip88XfL6T/Q
+            u9BGYVcJV//1LrnFoEjAL9PV8Cms/4V2FiOb4AHR4NGJOaaF5dTRw=
+            -----END OPENSSH PRIVATE KEY-----
+            """,
+
+        ["aes256-gcm@openssh.com"] = """
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAAFmFlczI1Ni1nY21Ab3BlbnNzaC5jb20AAAAGYmNyeXB0AA
+            AAGAAAABC2XJ8DLEKHWsfAn/3rY/RVAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAA
+            IJtU/wYM8xD5OT29KYqno+lM9zJt1i+ZEmdbUEcPZEcXAAAAkFKSqYhAgYhQ9R1tmmHCoW
+            4y8G6i3GceQrYz/trqbr8/IrJMDCbE6ku5Nl8mVzIFtSEQAjpGC541lWj8mqFwVyXnRN+v
+            F/uI2Ii0MEb9gQKYWefrkActVmAF4k8NLcOf2HFhS9zvWl4i/J01Hk8eW8Wt/6PJcQ6VOI
+            lhy3wmn2K5W+G+5eInSw1Td4whyXkzWt3D4ABqmzwm21i60dwAhA8=
+            -----END OPENSSH PRIVATE KEY-----
+            """,
+
+        ["chacha20-poly1305@openssh.com"] = """
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAAHWNoYWNoYTIwLXBvbHkxMzA1QG9wZW5zc2guY29tAAAABm
+            JjcnlwdAAAABgAAAAQhuXQoitizz82lo48ORqKpwAAABAAAAABAAAAMwAAAAtzc2gtZWQy
+            NTUxOQAAACCbVP8GDPMQ+Tk9vSmKp6PpTPcybdYvmRJnW1BHD2RHFwAAAIgWYFEzHYLDlT
+            oK8zwbZpe641CJvwjxYmHSzeRv4FvlJPXNG+57YRn0XBkPIRVpDu10QBr9FBJdzohYOQht
+            IzHCiVWwkzqQ3SoABbmYOWbmKBufN6+mDazt7DDwSqGQmFUmnbjGv8z7Q28+G8NGDN3R79
+            Me/ZAe4BwQBNNm0Fq1wjVC/cutbSSyDEK4GRyejEKAQjanS/bqkQ==
+            -----END OPENSSH PRIVATE KEY-----
+            """,
+    };
+
+    /// <summary>
+    /// The P-256 key in <c>openssh-key-v1</c>, encrypted by <c>ssh-keygen -p -a 16 -Z
+    /// aes256-gcm@openssh.com</c> with <see cref="Passphrase" />.
+    /// </summary>
+    internal const string EcdsaP256OpenSshAes256Gcm = """
+        -----BEGIN OPENSSH PRIVATE KEY-----
+        b3BlbnNzaC1rZXktdjEAAAAAFmFlczI1Ni1nY21Ab3BlbnNzaC5jb20AAAAGYmNyeXB0AA
+        AAGAAAABDLwIvyRm2CEBzhcu1/8AeNAAAAEAAAAAEAAABoAAAAE2VjZHNhLXNoYTItbmlz
+        dHAyNTYAAAAIbmlzdHAyNTYAAABBBF39/9dTdn+5kk8ioErCAT/PN+g/bNu7PjV6fgZVVY
+        fBDHA5M1aCYardbptBUmRGJKwBO3KwPQM5sMJ0J7de/wIAAACgvc9O4LB5VMT3nURw1TNj
+        HI9iIKAiV4Rj8a1WkFEaAjzhlcD2eh3G1UCFV2oszWe2GbD155KC5tlKr21hi7Iog6sRS0
+        T9kvCvAH5qxTRBd36b/JW7xVni5SLTgLlJLHmT1eJwGvIixZ0qGQ2rMSH1byQXmYYgB6yc
+        AaCXLxhqUdyrcG1welhOIVHmbZWzGghXy20qh25SSBY7xzG/oGpVf/Em8frXD2/leELLvN
+        iRf/g=
+        -----END OPENSSH PRIVATE KEY-----
         """;
 }

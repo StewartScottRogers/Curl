@@ -91,9 +91,6 @@ public sealed class SshPrivateKeyReaderTests
     }
 
     [TestMethod]
-    [DataRow(TestUserKeys.Ed25519OpenSsh, DisplayName = "Ed25519 openssh-key-v1: BL-681")]
-    [DataRow(TestUserKeys.Ed25519Pkcs8, DisplayName = "Ed25519 PKCS #8: BL-681")]
-    [DataRow(TestUserKeys.RsaOpenSshEncrypted, DisplayName = "bcrypt openssh-key-v1: BL-681")]
     [DataRow(TestUserKeys.EcdsaSecp256k1Sec1, DisplayName = "secp256k1")]
     [DataRow("-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n", DisplayName = "another label")]
     [DataRow("PuTTY-User-Key-File-3: ssh-rsa\n", DisplayName = "PuTTY, no PEM block")]
@@ -106,6 +103,76 @@ public sealed class SshPrivateKeyReaderTests
     public void Read_KeyThisDoesNotRead_ReadsNone(string text)
     {
         Assert.IsNull(SshPrivateKeyReader.Read(text, Secret));
+    }
+
+    [TestMethod]
+    [DataRow("aes128-ctr")]
+    [DataRow("aes192-ctr")]
+    [DataRow("aes256-ctr", DisplayName = "aes256-ctr, ssh-keygen's default")]
+    [DataRow("aes128-cbc")]
+    [DataRow("aes192-cbc")]
+    [DataRow("aes256-cbc")]
+    [DataRow("3des-cbc")]
+    [DataRow("aes128-gcm@openssh.com")]
+    [DataRow("aes256-gcm@openssh.com")]
+    public void Read_Ed25519KeyEncryptedWithEachCipher_ReadsTheKeyOfItsPublicKeyFile(string cipher)
+    {
+        SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.Ed25519OpenSshEncrypted[cipher], Secret);
+
+        Assert.IsInstanceOfType<Ed25519SshPrivateKey>(key);
+        Assert.AreEqual("ssh-ed25519", key.KeyType);
+        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile)!.Blob, key.PublicKeyBlob);
+    }
+
+    [TestMethod]
+    [DataRow("aes256-ctr")]
+    [DataRow("aes256-gcm@openssh.com")]
+    public void Read_EncryptedOpenSshKeyWithoutOrWithAWrongPassphrase_ReadsNone(string cipher)
+    {
+        string text = TestUserKeys.Ed25519OpenSshEncrypted[cipher];
+
+        Assert.IsNull(SshPrivateKeyReader.Read(text, []), "no --pass");
+        Assert.IsNull(SshPrivateKeyReader.Read(text, Encoding.UTF8.GetBytes("nope")), "wrong --pass");
+    }
+
+    [TestMethod]
+    public void Read_Ed25519KeyEncryptedWithChaCha20Poly1305_ReadsNoneAsLibssh2Does()
+    {
+        Assert.IsNull(SshPrivateKeyReader.Read(TestUserKeys.Ed25519OpenSshEncrypted["chacha20-poly1305@openssh.com"], Secret));
+    }
+
+    [TestMethod]
+    public void Read_Ed25519OpenSsh_ReadsTheKeyOfItsPublicKeyFile()
+    {
+        SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.Ed25519OpenSsh, []);
+
+        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile)!.Blob, key!.PublicKeyBlob);
+    }
+
+    [TestMethod]
+    public void Read_Ed25519Pkcs8_ReadsTheKeyOpenSslDerives()
+    {
+        SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.Ed25519Pkcs8, []);
+
+        Assert.IsInstanceOfType<Ed25519SshPrivateKey>(key);
+        CollectionAssert.AreEqual(SshPublicKeyFile.Parse("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGX8BTc94jNCFKn//daYyhhor97hE+LfZyYTJxcsfXpY")!.Blob, key.PublicKeyBlob);
+    }
+
+    [TestMethod]
+    public void Read_RsaOpenSshEncrypted_ReadsAnRsaKey()
+    {
+        SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.RsaOpenSshEncrypted, Encoding.UTF8.GetBytes("enc"));
+
+        Assert.IsInstanceOfType<RsaSshPrivateKey>(key);
+        Assert.IsNull(SshPrivateKeyReader.Read(TestUserKeys.RsaOpenSshEncrypted, Secret), "wrong --pass");
+    }
+
+    [TestMethod]
+    public void Read_EcdsaOpenSshEncryptedWithAes256Gcm_ReadsTheKeyOfItsPublicKeyFile()
+    {
+        SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.EcdsaP256OpenSshAes256Gcm, Secret);
+
+        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile)!.Blob, key!.PublicKeyBlob);
     }
 
     [TestMethod]

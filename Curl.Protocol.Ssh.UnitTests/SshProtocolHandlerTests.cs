@@ -284,6 +284,34 @@ public sealed partial class SshProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_EncryptedEd25519KeyTheServerAuthorizes_AuthenticatesWithPublickey()
+    {
+        byte[] publicKey = Convert.FromBase64String(TestUserKeys.Ed25519PublicKeyFile.Split(' ')[1]);
+        InMemorySshServer server = new(User, Password) { AuthorizedPublicKey = publicKey };
+        server.Files["/f"] = Hello;
+        SshOptions options = new() { PrivateKeyPath = "id_test", PrivateKeyPassphrase = TestUserKeys.Passphrase };
+
+        Outcome outcome = await RunAsync(server, $"sftp://{Host}/f", options, new NetworkCredential(User, string.Empty), files: new() { ["id_test"] = TestUserKeys.Ed25519OpenSshEncrypted["aes256-ctr"] });
+
+        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result);
+        CollectionAssert.Contains(server.Events.ToArray(), $"auth publickey {User} ok");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EncryptedKeyWithAWrongPassphrase_IsExit67AsMeasured()
+    {
+        byte[] publicKey = Convert.FromBase64String(TestUserKeys.Ed25519PublicKeyFile.Split(' ')[1]);
+        InMemorySshServer server = new(User, Password) { AuthorizedPublicKey = publicKey };
+        server.Files["/f"] = Hello;
+        SshOptions options = new() { PrivateKeyPath = "id_test", PrivateKeyPassphrase = "nope" };
+
+        Outcome outcome = await RunAsync(server, $"sftp://{Host}/f", options, new NetworkCredential(User, "wrong"), files: new() { ["id_test"] = TestUserKeys.Ed25519OpenSshEncrypted["aes256-ctr"] });
+
+        AssertFailure(outcome, CurlExitCode.LoginDenied, "Authentication failure");
+        CollectionAssert.DoesNotContain(server.Events.ToArray(), $"auth publickey {User} ok");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_HostKeyFingerprintDiffers_IsExit60AsMeasured()
     {
         InMemorySshServer server = Server();

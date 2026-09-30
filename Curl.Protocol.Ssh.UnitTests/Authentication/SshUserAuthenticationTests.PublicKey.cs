@@ -27,6 +27,10 @@ public sealed partial class SshUserAuthenticationTests
 
     private const string PublicKeyPath = "/keys/id.pub";
 
+    // The ssh-ed25519 signature blob the test key writes over ConnectAsync's session identifier:
+    // Ed25519 is deterministic, so it is the same on every run and platform.
+    private const string PinnedEd25519SignatureBlob = "0000000B7373682D6564323535313900000040D991C2DBD80CB4AF4432BE99119A364F8609C88E29E324264CF980170ABE4E24537271D9F4A1C6CE92624BAD3BC4E8494AC95254498413AAFC6D3A30DE35A30D";
+
     private const string MeasuredSignatureAlgorithms = "rsa-sha2-512,rsa-sha2-256,ssh-rsa,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ssh-ed25519,ssh-dss";
 
     private static readonly NetworkCredential WrongPassword = new("tester", "wrong");
@@ -34,6 +38,53 @@ public sealed partial class SshUserAuthenticationTests
     private static readonly byte[] RsaBlob = SshPublicKeyFile.Parse(TestUserKeys.RsaPublicKeyFile)!.Blob;
 
     private static readonly byte[] EcdsaBlob = SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile)!.Blob;
+
+    private static readonly byte[] Ed25519Blob = SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile)!.Blob;
+
+    [TestMethod]
+    public async Task AuthenticateAsync_EncryptedEd25519KeyWithItsPassphrase_AsksThenSignsWithSshEd25519()
+    {
+        KeyedPeer peer = await ConnectAsync(
+            Keys(TestUserKeys.Ed25519OpenSshEncrypted["aes256-ctr"], passphrase: TestUserKeys.Passphrase),
+            ExtensionInfo(("server-sig-algs", MeasuredSignatureAlgorithms)),
+            Failure("publickey,password"),
+            PublicKeyOk("ssh-ed25519", Ed25519Blob),
+            Success);
+
+        await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
+
+        List<byte[]> written = await AuthenticationMessagesAsync(peer);
+        Assert.HasCount(3, written);
+        CollectionAssert.AreEqual(PublicKeyRequest("tester", "ssh-ed25519", Ed25519Blob, signed: false), written[1]);
+        AssertSigned(peer, written[2], "ssh-ed25519", Ed25519Blob);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsync_Ed25519Key_SendsThePinnedSignatureOverTheFixedSessionIdentifier()
+    {
+        KeyedPeer peer = await ConnectAsync(Keys(TestUserKeys.Ed25519OpenSsh), Failure("publickey,password"), PublicKeyOk("ssh-ed25519", Ed25519Blob), Success);
+
+        await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
+
+        byte[] signedRequest = (await AuthenticationMessagesAsync(peer))[2];
+        byte[] signatureBlob = new SshWireReader(signedRequest.AsMemory(PublicKeyRequest("tester", "ssh-ed25519", Ed25519Blob, signed: true).Length)).ReadString().ToArray();
+        Assert.AreEqual(PinnedEd25519SignatureBlob, Convert.ToHexString(signatureBlob));
+    }
+
+    [TestMethod]
+    [DataRow(null, DisplayName = "no --pass, as measured")]
+    [DataRow("nope", DisplayName = "a wrong --pass, as measured")]
+    public async Task AuthenticateAsync_EncryptedOpenSshKeyNotOpened_SendsNoPublicKeyRequestAsMeasured(string? passphrase)
+    {
+        KeyedPeer peer = await ConnectAsync(Keys(TestUserKeys.Ed25519OpenSshEncrypted["aes256-ctr"], passphrase: passphrase), Failure("publickey,password"), Failure("publickey,password"));
+
+        SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
+            async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
+
+        AssertAuthenticationFailure(failure);
+        AssertMethods(await AuthenticationMessagesAsync(peer), "none", "password");
+        CollectionAssert.Contains(peer.Events.Transcript, "* SSH: publickey authentication denied: Reason unknown (-1)");
+    }
 
     [TestMethod]
     [DataRow(MeasuredSignatureAlgorithms, "rsa-sha2-512", DisplayName = "OpenSSH's list: rsa-sha2-512, as measured")]
@@ -142,7 +193,7 @@ public sealed partial class SshUserAuthenticationTests
     [TestMethod]
     [DataRow(null, DisplayName = "missing --key file, as measured")]
     [DataRow(TestUserKeys.RsaPkcs1Aes128, DisplayName = "encrypted key without --pass, as measured")]
-    [DataRow(TestUserKeys.Ed25519OpenSsh, DisplayName = "a key type not read here")]
+    [DataRow(TestUserKeys.EcdsaSecp256k1Sec1, DisplayName = "a key type not read here")]
     public async Task AuthenticateAsync_PrivateKeyUnreadableAndNoPubkey_SendsNoPublicKeyRequestAsMeasured(string? privateKeyText)
     {
         KeyedPeer peer = await ConnectAsync(Keys(privateKeyText), Failure("publickey,password"), Failure("publickey,password"));
@@ -389,6 +440,11 @@ public sealed partial class SshUserAuthenticationTests
                 _ => HashAlgorithmName.SHA1,
             };
             return rsa.VerifyData(data, signature, hash, RSASignaturePadding.Pkcs1);
+        }
+
+        if (keyType == "ssh-ed25519")
+        {
+            return Ed25519.Verify(key.ReadString().Span, data, signature);
         }
 
         if (keyType == "ssh-dss")

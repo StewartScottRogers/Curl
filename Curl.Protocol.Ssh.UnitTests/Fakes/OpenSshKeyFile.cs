@@ -33,6 +33,19 @@ internal static class OpenSshKeyFile
         Join(Encoding.ASCII.GetBytes("openssh-key-v1\0"), Name(cipher), Name(kdf), String([]), UInt32(keyCount), String(publicKeyBlob), String(section));
 
     /// <summary>
+    /// An encrypted body with KDF <c>bcrypt</c>: its options, then the section as given and
+    /// whatever follows it, such as a GCM tag.
+    /// </summary>
+    /// <param name="cipher">The cipher name.</param>
+    /// <param name="salt">The bcrypt salt.</param>
+    /// <param name="rounds">The bcrypt rounds.</param>
+    /// <param name="encryptedSection">The section's bytes.</param>
+    /// <param name="trailer">The bytes after the section.</param>
+    /// <returns>The body.</returns>
+    internal static byte[] Encrypted(string cipher, byte[] salt, uint rounds, byte[] encryptedSection, byte[] trailer) =>
+        Join(Encoding.ASCII.GetBytes("openssh-key-v1\0"), Name(cipher), Name("bcrypt"), String(Join(String(salt), UInt32(rounds))), UInt32(1), String([]), String(encryptedSection), trailer);
+
+    /// <summary>
     /// A private section: the two check integers, the key fields, a comment and padding.
     /// </summary>
     /// <param name="check1">The first check integer.</param>

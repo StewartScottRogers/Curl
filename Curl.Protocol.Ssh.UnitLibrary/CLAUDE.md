@@ -8,7 +8,7 @@ File transfer over SSH.
 
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and the
 hand-built libraries ADR-0120 lists; it references `Curl.Cryptography.UnitLibrary`
-for `FiniteFieldDiffieHellman`, `DsaSignature`, `Des`, `X25519`, `Ed25519`, `ChaCha20` and `Poly1305`. Referencing another protocol
+for `FiniteFieldDiffieHellman`, `DsaSignature`, `Des`, `X25519`, `Ed25519`, `ChaCha20`, `Poly1305`, `BcryptPbkdf` and `AesCtr`. Referencing another protocol
 library is a build break, and `Curl.Protocol.Abstractions.UnitTests` fails if one
 appears.
 
@@ -40,8 +40,9 @@ user with `none`, `publickey`, `password` and `keyboard-interactive` in curl's o
 (ADR-0215, ADR-0230); `Keys` holds `SshUserKeySource`, which finds `--key` (or curl's
 default files through an injected `HOME` reader), `--pubkey` and `--pass`,
 `SshPrivateKeyReader`, which reads every PEM, PKCS #8 and `openssh-key-v1` key file
-ADR-0122 lists but Ed25519 and bcrypt (BL-681), and one `SshPrivateKey` per key type
-(`RsaSshPrivateKey`, `EcdsaSshPrivateKey`, `DsaSshPrivateKey`), which signs;
+ADR-0122 lists, Ed25519 and bcrypt-encrypted `openssh-key-v1` included
+(`OpenSshPrivateSectionDecryption`, ADR-0263), and one `SshPrivateKey` per key type
+(`RsaSshPrivateKey`, `EcdsaSshPrivateKey`, `DsaSshPrivateKey`, `Ed25519SshPrivateKey`), which signs;
 `Connection` holds `SshSessionChannel`, one RFC 4254 `session` channel with libssh2's
 window and packet size, which starts a subsystem or an `exec` command; `Scp` holds
 `ScpFileDownload`, which runs `scp -pf` (`ScpCommand`, `ScpRemotePath`), reads its `T`

@@ -11,10 +11,10 @@ namespace Curl.Protocol.Ssh.Keys;
 /// holds the key's type and fields.
 /// </summary>
 /// <remarks>
-/// This reads the unencrypted form (cipher and KDF <c>none</c>) of RSA, DSA and ECDSA keys.
-/// An encrypted private section (KDF <c>bcrypt</c>) and <c>ssh-ed25519</c> keys are
-/// BL-681's: it decrypts the section where <see cref="Read" /> takes it, and adds a type to
-/// <see cref="ReadKey" />.
+/// This reads RSA, DSA, ECDSA and Ed25519 keys, unencrypted (cipher and KDF <c>none</c>)
+/// or encrypted with KDF <c>bcrypt</c> and a cipher
+/// <see cref="OpenSshPrivateSectionDecryption" /> reads. A wrong passphrase leaves check
+/// integers that differ.
 /// </remarks>
 internal static class OpenSshPrivateKeyDecoder
 {
@@ -27,14 +27,16 @@ internal static class OpenSshPrivateKeyDecoder
     /// Decodes the PEM body of an <c>OPENSSH PRIVATE KEY</c> block.
     /// </summary>
     /// <param name="body">The decoded body.</param>
+    /// <param name="passphrase">The <c>--pass</c> bytes, which open an encrypted private section.</param>
     /// <returns>
-    /// The key, or <see langword="null" /> when the private section is encrypted or the key
-    /// type is not RSA, DSA or ECDSA on a NIST curve.
+    /// The key, or <see langword="null" /> when the cipher and KDF are neither both
+    /// <c>none</c> nor <c>bcrypt</c> with a cipher this reads, or the key type is not RSA,
+    /// DSA, Ed25519 or ECDSA on a NIST curve.
     /// </returns>
-    /// <exception cref="InvalidDataException">The structure is malformed, or it holds other than one key.</exception>
-    /// <exception cref="System.Security.Cryptography.CryptographicException">The key's values are invalid.</exception>
-    /// <exception cref="ArgumentException">A DSA key's values are outside what the signer accepts.</exception>
-    internal static SshPrivateKey? Read(byte[] body)
+    /// <exception cref="InvalidDataException">The structure is malformed, it holds other than one key, or the check integers differ, as a wrong passphrase leaves them.</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException">The key's values are invalid, or a GCM tag fails.</exception>
+    /// <exception cref="ArgumentException">A DSA key's values are outside what the signer accepts, or the passphrase is empty for an encrypted key.</exception>
+    internal static SshPrivateKey? Read(byte[] body, byte[] passphrase)
     {
         if (!body.AsSpan().StartsWith(Magic))
         {
@@ -44,7 +46,7 @@ internal static class OpenSshPrivateKeyDecoder
         SshWireReader reader = new(body.AsMemory(Magic.Length));
         string cipher = reader.ReadName();
         string kdf = reader.ReadName();
-        reader.ReadString();
+        ReadOnlyMemory<byte> kdfOptions = reader.ReadString();
         if (reader.ReadUInt32() != 1)
         {
             throw new InvalidDataException("An openssh-key-v1 file holds exactly one key.");
@@ -52,8 +54,19 @@ internal static class OpenSshPrivateKeyDecoder
 
         reader.ReadString();
         ReadOnlyMemory<byte> privateSection = reader.ReadString();
-        return cipher == "none" && kdf == "none" ? ReadKey(new SshWireReader(privateSection)) : null;
+        byte[]? section = OpenSection(cipher, kdf, kdfOptions, privateSection, reader, passphrase);
+        return section is null ? null : ReadKey(new SshWireReader(section));
     }
+
+    // The private section as it is when unencrypted, decrypted when bcrypt names a cipher,
+    // and null for any other pairing, which libssh2 does not read.
+    private static byte[]? OpenSection(string cipher, string kdf, ReadOnlyMemory<byte> kdfOptions, ReadOnlyMemory<byte> privateSection, SshWireReader afterSection, byte[] passphrase) =>
+        (cipher, kdf) switch
+        {
+            ("none", "none") => privateSection.ToArray(),
+            (not "none", "bcrypt") => OpenSshPrivateSectionDecryption.Decrypt(cipher, kdfOptions, privateSection, afterSection, passphrase),
+            _ => null,
+        };
 
     private static SshPrivateKey? ReadKey(SshWireReader section)
     {
@@ -68,6 +81,7 @@ internal static class OpenSshPrivateKeyDecoder
         {
             RsaSshPrivateKey.RsaKeyType => ReadRsa(section),
             DsaSshPrivateKey.DsaKeyType => ReadDsa(section),
+            Ed25519SshPrivateKey.Ed25519KeyType => ReadEd25519(section),
             _ when keyType.StartsWith(EcdsaKeyTypePrefix, StringComparison.Ordinal) => ReadEcdsa(section),
             _ => null,
         };
@@ -92,6 +106,13 @@ internal static class OpenSshPrivateKeyDecoder
         byte[] generator = section.ReadMpint().ToArray();
         byte[] publicKey = section.ReadMpint().ToArray();
         return DsaSshPrivateKey.Create(prime, subprime, generator, publicKey, section.ReadMpint().ToArray());
+    }
+
+    // The public key, then the seed followed by the public key again.
+    private static Ed25519SshPrivateKey ReadEd25519(SshWireReader section)
+    {
+        ReadOnlySpan<byte> publicKey = section.ReadString().Span;
+        return Ed25519SshPrivateKey.FromOpenSshFields(publicKey, section.ReadString().Span);
     }
 
     // The curve's SSH name, Q, then d.

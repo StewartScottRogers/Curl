@@ -6,8 +6,8 @@ namespace Curl.Protocol.Ssh.Keys;
 /// <summary>
 /// Reads a <c>--key</c> file in every format either of curl's SSH backends reads
 /// (ADR-0122, ADR-0230): PKCS #1 RSA, OpenSSL DSA and SEC 1 EC PEM, each plain or with
-/// legacy PEM encryption; PKCS #8, plain or encrypted; and unencrypted
-/// <c>openssh-key-v1</c>. The file's first PEM block decides.
+/// legacy PEM encryption; PKCS #8, plain or encrypted, for RSA, ECDSA, DSA and Ed25519;
+/// and <c>openssh-key-v1</c>, plain or encrypted with bcrypt. The file's first PEM block decides.
 /// </summary>
 internal static class SshPrivateKeyReader
 {
@@ -19,7 +19,7 @@ internal static class SshPrivateKeyReader
         ["EC PRIVATE KEY"] = (block, passphrase) => Asn1PrivateKeyDecoder.ReadEcPrivateKey(LegacyPemDecryption.Decrypt(block, passphrase), curveOid: null),
         ["PRIVATE KEY"] = (block, _) => Asn1PrivateKeyDecoder.ReadPkcs8(block.Body),
         ["ENCRYPTED PRIVATE KEY"] = (block, passphrase) => Asn1PrivateKeyDecoder.ReadPkcs8(Pkcs8Decryption.Decrypt(block.Body, passphrase)),
-        ["OPENSSH PRIVATE KEY"] = (block, _) => OpenSshPrivateKeyDecoder.Read(block.Body),
+        ["OPENSSH PRIVATE KEY"] = (block, passphrase) => OpenSshPrivateKeyDecoder.Read(block.Body, passphrase),
     };
 
     /// <summary>
