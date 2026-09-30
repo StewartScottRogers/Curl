@@ -345,6 +345,12 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         uint id = request.ReadUInt32();
         string argument = Encoding.UTF8.GetString(request.ReadString().Span);
         server.Record($"sftp {type} {argument}");
+        if (server.RefusedPaths.Contains(argument))
+        {
+            await SendSftpAsync(Status(id, 2)).ConfigureAwait(false);
+            return;
+        }
+
         byte[]? file = FileFor(type, argument, request);
         byte[] answer = type switch
         {

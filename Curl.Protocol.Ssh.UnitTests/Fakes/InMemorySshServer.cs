@@ -49,6 +49,13 @@ public sealed class InMemorySshServer(string userName, string password) : IConne
     /// <summary>Gets the files served, by the absolute path SFTP opens and <c>scp -pf</c> names.</summary>
     public IDictionary<string, byte[]> Files { get; } = new ConcurrentDictionary<string, byte[]>(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Gets the paths every SFTP request naming them is refused for with status 2,
+    /// <c>SSH_FX_NO_SUCH_FILE</c>, as OpenSSH refuses them: <c>.</c> fails
+    /// <c>REALPATH</c>, a file path an upload's <c>OPEN</c> or a <c>-Q</c> command.
+    /// </summary>
+    public ISet<string> RefusedPaths { get; } = new HashSet<string>(StringComparer.Ordinal);
+
     /// <summary>Gets the home directory <c>REALPATH .</c> answers; <see cref="DefaultHomeDirectory" /> by default.</summary>
     public string HomeDirectory { get; init; } = DefaultHomeDirectory;
 

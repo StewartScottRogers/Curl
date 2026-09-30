@@ -52,20 +52,25 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
     {
         quotes ??= SftpQuoteCommands.None;
         SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
-        byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
-            () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
-        byte[] directory = SftpRemotePath.Resolve(SftpRemotePath.Decode(urlPath), homeDirectory);
-        await quotes.RunBeforeTransferAsync(session, homeDirectory, directory, cancellationToken).ConfigureAwait(false);
-        if (noBody)
-        {
-            return await quotes.FinishAsync(session, null, homeDirectory, TransferResult.Success(0), cancellationToken).ConfigureAwait(false);
-        }
+        return await session.CloseChannelOnFailureAsync(
+            async () =>
+            {
+                byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
+                    () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
+                byte[] directory = SftpRemotePath.Resolve(SftpRemotePath.Decode(urlPath), homeDirectory);
+                await quotes.RunBeforeTransferAsync(session, homeDirectory, directory, cancellationToken).ConfigureAwait(false);
+                if (noBody)
+                {
+                    return await quotes.FinishAsync(session, null, homeDirectory, TransferResult.Success(0), cancellationToken).ConfigureAwait(false);
+                }
 
-        byte[] handle = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
-            () => session.OpenDirectoryAsync(directory, cancellationToken)).ConfigureAwait(false);
-        Listing listing = new(session, handle, directory, listOnly, output, progress);
-        TransferResult result = await listing.RunAsync(cancellationToken).ConfigureAwait(false);
-        return await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+                byte[] handle = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
+                    () => session.OpenDirectoryAsync(directory, cancellationToken)).ConfigureAwait(false);
+                Listing listing = new(session, handle, directory, listOnly, output, progress);
+                TransferResult result = await listing.RunAsync(cancellationToken).ConfigureAwait(false);
+                return await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     // curl copies each name into a C string, so a NUL byte ends what it prints.

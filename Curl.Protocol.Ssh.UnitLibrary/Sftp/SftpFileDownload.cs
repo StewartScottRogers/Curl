@@ -10,7 +10,8 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// <c>-r</c> or <c>-C</c> asks for (ADR-0253) - with reads kept in
 /// flight, writes each answer's bytes to the output as it arrives and reports progress,
 /// closes the handle, and closes the channel with <c>EOF</c> and <c>CLOSE</c>, as measured.
-/// A failure before the copy leaves the channel open for the handler's <c>DISCONNECT</c>.
+/// A failure before the copy closes the channel the same way before the handler's
+/// <c>DISCONNECT</c> (BL-973).
 /// </summary>
 /// <param name="transport">The transport, after the user is authenticated.</param>
 internal sealed class SftpFileDownload(SshTransport transport)
@@ -52,17 +53,22 @@ internal sealed class SftpFileDownload(SshTransport transport)
     {
         quotes ??= SftpQuoteCommands.None;
         SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
-        byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
-            () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
-        byte[] path = SftpRemotePath.Resolve(SftpRemotePath.Decode(urlPath), homeDirectory);
-        await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
-        (byte[] handle, long? size) = await SshConnectionFailure.ReportAsSshLayerErrorAsync(async () =>
-        {
-            byte[] opened = await session.OpenForReadingAsync(path, createFileMode, cancellationToken).ConfigureAwait(false);
-            return (opened, await session.StatSizeAsync(path, cancellationToken).ConfigureAwait(false));
-        }).ConfigureAwait(false);
-        TransferResult result = await CopyPartAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
-        return await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+        return await session.CloseChannelOnFailureAsync(
+            async () =>
+            {
+                byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
+                    () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
+                byte[] path = SftpRemotePath.Resolve(SftpRemotePath.Decode(urlPath), homeDirectory);
+                await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
+                (byte[] handle, long? size) = await SshConnectionFailure.ReportAsSshLayerErrorAsync(async () =>
+                {
+                    byte[] opened = await session.OpenForReadingAsync(path, createFileMode, cancellationToken).ConfigureAwait(false);
+                    return (opened, await session.StatSizeAsync(path, cancellationToken).ConfigureAwait(false));
+                }).ConfigureAwait(false);
+                TransferResult result = await CopyPartAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
+                return await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     // Measured: a range or -C offset the file cannot serve reads nothing, and the handle

@@ -12,8 +12,8 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// <c>MKDIR</c> and opens it again. It then reads the source in curl's 64 KiB blocks,
 /// sends each as <c>WRITE</c>s of at most 30000 bytes, waits for their statuses, reports
 /// progress, closes the handle and closes the channel with <c>EOF</c> and <c>CLOSE</c>,
-/// as measured. A failure before the copy leaves the channel open for the handler's
-/// <c>DISCONNECT</c>.
+/// as measured. A failure before the copy closes the channel the same way before the
+/// handler's <c>DISCONNECT</c> (BL-973).
 /// </summary>
 /// <param name="transport">The transport, after the user is authenticated.</param>
 internal sealed class SftpFileUpload(SshTransport transport)
@@ -65,21 +65,26 @@ internal sealed class SftpFileUpload(SshTransport transport)
     {
         quotes ??= SftpQuoteCommands.None;
         SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
-        byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
-            () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
-        byte[] path = SftpRemotePath.Resolve(SftpRemotePath.Decode(urlPath), homeDirectory);
-        await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
-        (byte[] handle, long offset) = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
-            () => OpenAsync(session, path, options, cancellationToken)).ConfigureAwait(false);
+        return await session.CloseChannelOnFailureAsync(
+            async () =>
+            {
+                byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
+                    () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
+                byte[] path = SftpRemotePath.Resolve(SftpRemotePath.Decode(urlPath), homeDirectory);
+                await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
+                (byte[] handle, long offset) = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
+                    () => OpenAsync(session, path, options, cancellationToken)).ConfigureAwait(false);
 
-        // Measured: -a appends the whole source from offset 0 whatever -C says.
-        long writeOffset = options.Append ? 0 : offset;
-        SkipResumedPart(upload, writeOffset);
-        long? expected = upload.CanSeek ? upload.Length - upload.Position : null;
-        Copy copy = new(session, handle, upload, progress, expected);
-        TransferResult result = await copy.RunAsync(writeOffset, cancellationToken).ConfigureAwait(false);
-        result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
-        return result with { Report = new TransferReport { UploadSize = result.BytesTransferred } };
+                // Measured: -a appends the whole source from offset 0 whatever -C says.
+                long writeOffset = options.Append ? 0 : offset;
+                SkipResumedPart(upload, writeOffset);
+                long? expected = upload.CanSeek ? upload.Length - upload.Position : null;
+                Copy copy = new(session, handle, upload, progress, expected);
+                TransferResult result = await copy.RunAsync(writeOffset, cancellationToken).ConfigureAwait(false);
+                result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+                return result with { Report = new TransferReport { UploadSize = result.BytesTransferred } };
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     // Measured: a file source skips the part the offset covers, up to its end; standard

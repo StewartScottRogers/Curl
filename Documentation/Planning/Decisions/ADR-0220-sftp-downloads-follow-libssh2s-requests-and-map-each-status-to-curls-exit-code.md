@@ -78,7 +78,8 @@ the server's.
   permissions attribute `S_IFREG | --create-file-mode`, asks `STAT` for the size (0, a
   failure, no size flag or cut-short attributes are an unknown size), reads, writes each
   answer to the output and reports progress, and closes the handle, ignoring how the
-  close ends. The channel stays open for the handler (BL-576) to shut down.
+  close ends. The channel stays open for the handler (BL-576) to shut down. (Superseded
+  for failures before the copy by ADR-0274: they close the channel first, as measured.)
 - **`Sftp.SftpReadAhead`** keeps 4 × min(remaining, 102400) bytes of reads in flight, in
   reads of min(that, 30000) bytes, rounded up to whole reads: one read of 20 bytes for a 5-byte
   file, 14 of 30000 for an unknown size or 100000 bytes, as measured. A short answer drops
