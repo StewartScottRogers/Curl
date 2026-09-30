@@ -12,7 +12,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Pins <see cref="SslStreamConnection.ClearTlsAsync" />, which FTP's <c>CCC</c> uses (BL-636,
-/// ADR-0279): matching the OpenSSL build it sends <c>close_notify</c> first only when asked,
+/// ADR-0280): matching the OpenSSL build it sends <c>close_notify</c> first only when asked,
 /// reads the server's, and hands back the plaintext connection, over which later bytes travel
 /// unencrypted; matching the Schannel build it sends <c>close_notify</c> and fails; data or an
 /// end in place of the server's <c>close_notify</c> fails it. The server is a server-side

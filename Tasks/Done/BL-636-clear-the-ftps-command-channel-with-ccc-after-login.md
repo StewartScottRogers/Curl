@@ -65,7 +65,7 @@ curl 8.18.0 OpenSSL (Linux, through WSL with `-ListenAddress 172.26.96.1`):
   `close_notify`), then `PWD` and the rest in plain text, exit 0.
 - `CCC` 500: the rest over TLS, exit 0.
 
-### Decisions (ADR-0279, decided by Claude under Stewart's delegation)
+### Decisions (ADR-0280, decided by Claude under Stewart's delegation)
 
 - `IConnection.ClearTlsAsync(sendCloseNotifyFirst, token)`, a default member returning `null`;
   `SslStreamConnection` implements it per matched build (OpenSSL clears, Schannel sends

@@ -335,7 +335,7 @@ public interface ITransferContext
     /// <see cref="FtpCommandChannelClearing.Off" /> when neither was given.
     /// </summary>
     /// <remarks>
-    /// <c>ftp://</c> and <c>ftps://</c> are to read it (BL-636, ADR-0279).
+    /// <c>ftp://</c> and <c>ftps://</c> are to read it (BL-636, ADR-0280).
     /// </remarks>
     FtpCommandChannelClearing FtpCommandChannelClearing { get; }
 

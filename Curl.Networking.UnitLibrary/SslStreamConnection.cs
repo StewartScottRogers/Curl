@@ -26,7 +26,7 @@ namespace Curl.Networking;
 /// <param name="clearsTls">
 /// Whether <see cref="ClearTlsAsync" /> hands back <paramref name="plaintext" /> as curl's
 /// OpenSSL build clears TLS, or, <see langword="false" />, sends <c>close_notify</c> and fails
-/// as curl 8.21.0's Schannel build does (ADR-0279).
+/// as curl 8.21.0's Schannel build does (ADR-0280).
 /// </param>
 internal sealed class SslStreamConnection(
     SslStream sslStream,

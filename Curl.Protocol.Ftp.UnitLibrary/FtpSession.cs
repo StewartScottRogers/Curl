@@ -32,7 +32,7 @@ namespace Curl.Protocol.Ftp;
 /// every data connection once the transfer command is answered, and a refused one is exit 64
 /// with no <c>QUIT</c> under <c>--ssl-reqd</c>, plaintext data otherwise. Under
 /// <c>--ftp-ssl-ccc</c>, <c>CCC</c> follows <c>PROT</c> and clears TLS from the control
-/// connection, or is exit 81 where the TLS build cannot (BL-636, ADR-0279).
+/// connection, or is exit 81 where the TLS build cannot (BL-636, ADR-0280).
 /// </para>
 /// <para>
 /// Active mode (<c>-P</c>) takes the place of <c>EPSV</c>: a port is bound on the
@@ -443,7 +443,7 @@ internal sealed class FtpSession(
     /// Under <c>--ftp-ssl-ccc</c>, once <c>PBSZ</c> and <c>PROT</c> went out over TLS, sends
     /// <c>CCC</c>: a reply of 500 or more leaves the control connection in TLS, as curl 8.21.0
     /// ignores it; any other clears TLS, sending <c>close_notify</c> first only under
-    /// <c>--ftp-ssl-ccc-mode active</c>, and carries on in plain text (BL-636, ADR-0279).
+    /// <c>--ftp-ssl-ccc-mode active</c>, and carries on in plain text (BL-636, ADR-0280).
     /// </summary>
     /// <returns>
     /// <see langword="null" /> to go on to <c>PWD</c>; exit 81 with no <c>QUIT</c> when TLS

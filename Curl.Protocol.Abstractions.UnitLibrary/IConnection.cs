@@ -99,7 +99,7 @@ public interface IConnection : IAsyncDisposable
 
     /// <summary>
     /// Shuts TLS down on this connection and hands back the plaintext connection it ran over,
-    /// as FTP's <c>CCC</c> clears the control connection (BL-636, ADR-0279).
+    /// as FTP's <c>CCC</c> clears the control connection (BL-636, ADR-0280).
     /// </summary>
     /// <param name="sendCloseNotifyFirst">
     /// <see langword="true" /> to send <c>close_notify</c> and then read the server's, as

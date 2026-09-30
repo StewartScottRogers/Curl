@@ -3,7 +3,7 @@ namespace Curl.Protocol.Abstractions;
 /// <summary>
 /// Whether an FTPS session sends <c>CCC</c> after <c>PROT</c> to clear TLS from its control
 /// connection, and which side sends <c>close_notify</c> first when it does, per
-/// <c>--ftp-ssl-ccc</c> and <c>--ftp-ssl-ccc-mode</c> (BL-636, ADR-0279).
+/// <c>--ftp-ssl-ccc</c> and <c>--ftp-ssl-ccc-mode</c> (BL-636, ADR-0280).
 /// </summary>
 public enum FtpCommandChannelClearing
 {

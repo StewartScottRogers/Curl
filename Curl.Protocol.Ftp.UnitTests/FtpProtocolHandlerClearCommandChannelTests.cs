@@ -5,7 +5,7 @@ using Curl.Protocol.Ftp.Fakes;
 namespace Curl.Protocol.Ftp;
 
 /// <summary>
-/// Pins <c>--ftp-ssl-ccc</c> and <c>--ftp-ssl-ccc-mode</c> (BL-636, ADR-0279): after
+/// Pins <c>--ftp-ssl-ccc</c> and <c>--ftp-ssl-ccc-mode</c> (BL-636, ADR-0280): after
 /// <c>PBSZ</c> and <c>PROT</c> over TLS the session sends <c>CCC</c>; a reply of 500 or more
 /// leaves the control connection in TLS; any other asks the TLS connection to clear itself -
 /// sending <c>close_notify</c> first only in active mode - and carries on from <c>PWD</c> over

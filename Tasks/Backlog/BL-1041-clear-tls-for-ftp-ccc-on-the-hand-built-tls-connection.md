@@ -14,11 +14,11 @@ completed:
 
 ## Goal
 
-`HandBuiltTlsConnection` implements `IConnection.ClearTlsAsync` as `SslStreamConnection` does (ADR-0279), so `--ftp-ssl-ccc` clears TLS from the FTP control connection under `--tls-max 1.0`/`1.1` or `--cert-status` too, instead of ending with exit 81 off the Schannel build.
+`HandBuiltTlsConnection` implements `IConnection.ClearTlsAsync` as `SslStreamConnection` does (ADR-0280), so `--ftp-ssl-ccc` clears TLS from the FTP control connection under `--tls-max 1.0`/`1.1` or `--cert-status` too, instead of ending with exit 81 off the Schannel build.
 
 ## Context
 
-- BL-636 added `IConnection.ClearTlsAsync` (default: `null`, cannot clear) and implemented it on `SslStreamConnection` only (ADR-0279, decision 6). `HandBuiltTlsProvider` is chosen by `TlsClientRouting.Choose` for `--tls-max 1.0`/`1.1` and `--cert-status` (ADR-0140).
+- BL-636 added `IConnection.ClearTlsAsync` (default: `null`, cannot clear) and implemented it on `SslStreamConnection` only (ADR-0280, decision 6). `HandBuiltTlsProvider` is chosen by `TlsClientRouting.Choose` for `--tls-max 1.0`/`1.1` and `--cert-status` (ADR-0140).
 - Matching the OpenSSL build (`matchesSchannelBuild: false`): send `close_notify` first only when `sendCloseNotifyFirst` is true, read the server's `close_notify`, hand back the plaintext connection. Matching Schannel: send `close_notify` and return `null`. Data, a bare end or an I/O failure in place of the server's `close_notify` returns `null`.
 - `Tls12ClientStream` and `Tls13ClientStream` (Curl.Tls.UnitLibrary) already track `CloseNotifyReceived`; they may need a way to send `close_notify` on request without closing the transport.
 - Measured behaviour and the recorder (`Record-CurlExchange.ps1 -Ftp` answers `CCC` and clears TLS): BL-636's Notes.

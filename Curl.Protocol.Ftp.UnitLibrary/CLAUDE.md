@@ -24,7 +24,7 @@ refused `USER` or `PASS`) and `--ftp-pret` (`PRET RETR <file>`, `PRET LIST`/`NLS
 `--ssl-reqd` and `--ftp-ssl-control` upgrade `ftp://` with `AUTH`, then `PBSZ` and `PROT`
 (ADR-0102 and its BL-437 addendum); under `--ftp-ssl-ccc` `CCC` follows `PROT`, a 5xx keeps
 TLS, and any other reply clears it through `IConnection.ClearTlsAsync` (plain text after it on
-the OpenSSL build, exit 81 with no `QUIT` on the Schannel build, ADR-0279, BL-636). Time limits (BL-512): the handler reports
+the OpenSSL build, exit 81 with no `QUIT` on the Schannel build, ADR-0280, BL-636). Time limits (BL-512): the handler reports
 `ReportTransferStarted` once the control connection is up, so the runner's `-m` watchdog
 (ADR-0117) ends any later stall with curl's `Operation timed out` message, and
 `FtpConnectPhaseLimit` holds the greeting, login, `PBSZ`, `PROT` and `PWD` to
