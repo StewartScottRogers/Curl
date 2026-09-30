@@ -18,6 +18,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Audit guard layer 3 (ADR-0267): fails when work/dark-factory, pushed or as a pull
+  # request, carries a change of its own to Audit/, an auditor agent, or one of the guards
+  # (the audit hook, .claude/settings.json, this workflow, task-board.ps1). Those reach
+  # master only through the audit branch. It runs master's copy of the guard script, so
+  # the factory cannot weaken it; a red run blocks the shift-end merge to master.
+  audit-guard:
+    name: Audit paths untouched by the dark factory
+    if: github.ref == 'refs/heads/work/dark-factory' || github.head_ref == 'work/dark-factory'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # For a pull request, the branch's head commit, not GitHub's merge commit.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Fetch master
+        run: git fetch origin master
+
+      - name: Check audit paths
+        shell: pwsh
+        run: |
+          $guard = Join-Path $env:RUNNER_TEMP 'Test-AuditPathsUntouched.ps1'
+          git show origin/master:Audit/Guard/Test-AuditPathsUntouched.ps1 > $guard 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host 'master has no guard script yet; running the checked-out copy.'
+            Copy-Item Audit/Guard/Test-AuditPathsUntouched.ps1 $guard
+          }
+          & $guard -Base origin/master -Head HEAD
+          exit $LASTEXITCODE
+
   test:
     name: Build and test (${{ matrix.os }})
     strategy:
