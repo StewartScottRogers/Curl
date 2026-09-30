@@ -103,3 +103,4 @@ previous scorecard" (the same numbers' deltas); links to the new finding files.
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
