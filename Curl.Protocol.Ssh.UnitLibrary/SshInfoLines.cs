@@ -51,8 +51,21 @@ internal static class SshInfoLines
     /// <summary>The <c>scp</c> line after <see cref="AuthenticationComplete" />.</summary>
     internal const string ConnectionEstablished = "SSH: connection established";
 
-    /// <summary>The <c>publickey</c> denial reason when the public key cannot be read.</summary>
+    /// <summary>The <c>publickey</c> denial reason when the public key cannot be read, as the WinCNG build gives it.</summary>
     internal const string ReasonUnknown = "Reason unknown (-1)";
+
+    /// <summary>
+    /// The OpenSSL build's <c>publickey</c> denial reason when, with no <c>--pubkey</c>, the
+    /// private key file does not open (ADR-0262).
+    /// </summary>
+    internal const string PrivateKeyFileUnopened = "Unable to extract public key from private key file: Unable to open private key file";
+
+    /// <summary>
+    /// The OpenSSL build's <c>publickey</c> denial reason when, with no <c>--pubkey</c>, the
+    /// private key file opens but cannot be read: a missing or wrong passphrase, a cipher
+    /// libssh2 cannot decrypt, or an unknown format (ADR-0262).
+    /// </summary>
+    internal const string PrivateKeyFileUnrecognized = "Unable to extract public key from private key file: Wrong passphrase or invalid/unrecognized private key file format";
 
     /// <summary>The <c>publickey</c> denial reason when the server refuses the unsigned question.</summary>
     internal const string PublicKeyCombinationInvalid = "Username/PublicKey combination invalid";

@@ -19,9 +19,13 @@ public sealed partial class SshProtocolHandlerTests
 {
     private const string Start = "* SSH: libssh2 cryptography backend: OpenSSL | * SSH: user 'tester'";
 
+    // No key in HOME hands libssh2 the empty path, which OpenSSL's backend cannot open (BL-990).
+    private const string NoKeyDenied =
+        "* SSH: publickey authentication denied: Unable to extract public key from private key file: Unable to open private key file";
+
     private const string PasswordLogin =
         "* SSH: host offers authentication via: publickey,password | * SSH: trying private key file '' | "
-        + "* SSH: publickey authentication denied: Reason unknown (-1) | * SSH: initialized password authentication | "
+        + NoKeyDenied + " | * SSH: initialized password authentication | "
         + "* SSH: authentication complete";
 
     [TestMethod]
@@ -138,7 +142,7 @@ public sealed partial class SshProtocolHandlerTests
 
         StringAssert.EndsWith(
             lines,
-            "* SSH: publickey authentication denied: Reason unknown (-1) | * SSH: trying publickey authentication via agent | "
+            NoKeyDenied + " | * SSH: trying publickey authentication via agent | "
             + "* SSH: failure connecting to agent | * Authentication failure | * closing connection #0");
     }
 
@@ -154,7 +158,7 @@ public sealed partial class SshProtocolHandlerTests
 
         StringAssert.EndsWith(
             lines,
-            "* SSH: publickey authentication denied: Reason unknown (-1) | * SSH: trying publickey authentication via agent | "
+            NoKeyDenied + " | * SSH: trying publickey authentication via agent | "
             + "* SSH: agent authenticated user 'tester' with key 'k1-comment' | * SSH: authentication complete | <= hello world | "
             + "* Connection #0 to host files.example:22 left intact");
         CollectionAssert.Contains(server.Events.ToList(), "auth publickey tester ok", "the server verified the agent's signature");

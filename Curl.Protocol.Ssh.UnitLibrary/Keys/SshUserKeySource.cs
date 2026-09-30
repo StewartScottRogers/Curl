@@ -79,6 +79,15 @@ internal sealed class SshUserKeySource(
         return text is null ? null : SshPrivateKeyReader.Read(text, passphraseEncoding.GetBytes(options.PrivateKeyPassphrase ?? string.Empty));
     }
 
+    /// <summary>
+    /// Whether the private key file opens for reading, whatever it holds.
+    /// </summary>
+    /// <param name="files">The located files.</param>
+    /// <param name="cancellationToken">Cancels the probe.</param>
+    /// <returns><see langword="true" /> when the file opens and reads.</returns>
+    internal async ValueTask<bool> PrivateKeyFileOpensAsync(SshUserKeyFiles files, CancellationToken cancellationToken) =>
+        await ReadTextAsync(files.PrivateKeyPath, cancellationToken).ConfigureAwait(false) is not null;
+
     // curl joins HOME and the rest with a forward slash on every platform.
     private IEnumerable<string> DefaultPrivateKeyPaths()
     {

@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Keys;
+using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Ssh.PacketProtection;
 using Curl.Protocol.Ssh.Transport;
 
@@ -476,10 +477,29 @@ internal sealed class SshUserAuthentication(
     private async ValueTask<string?> DenyPublicKeyAsync(byte[] user, SshUserKeyFiles files, CancellationToken cancellationToken)
     {
         SshPublicKey? publicKey = await userKeys!.ReadPublicKeyAsync(files, cancellationToken).ConfigureAwait(false);
-        string? algorithm = publicKey is null ? null : ChooseSignatureAlgorithm(publicKey.KeyType);
+        if (publicKey is null)
+        {
+            return await UnreadablePublicKeyReasonAsync(files, cancellationToken).ConfigureAwait(false);
+        }
+
+        string? algorithm = ChooseSignatureAlgorithm(publicKey.KeyType);
         return algorithm is null
             ? SshInfoLines.ReasonUnknown
-            : await AskPublicKeyQuestionAsync(user, algorithm, publicKey!, files, cancellationToken).ConfigureAwait(false);
+            : await AskPublicKeyQuestionAsync(user, algorithm, publicKey, files, cancellationToken).ConfigureAwait(false);
+    }
+
+    // WinCNG's libssh2 fails to derive the public key without a message, which curl writes
+    // as Reason unknown (-1); OpenSSL's says whether the private key file opened (BL-990).
+    private async ValueTask<string> UnreadablePublicKeyReasonAsync(SshUserKeyFiles files, CancellationToken cancellationToken)
+    {
+        if (transport.CryptographyBackend != SshAlgorithmPreferences.OpenSslBackend || files.PublicKeyPath is not null)
+        {
+            return SshInfoLines.ReasonUnknown;
+        }
+
+        return await userKeys!.PrivateKeyFileOpensAsync(files, cancellationToken).ConfigureAwait(false)
+            ? SshInfoLines.PrivateKeyFileUnrecognized
+            : SshInfoLines.PrivateKeyFileUnopened;
     }
 
     private async ValueTask<string?> AskPublicKeyQuestionAsync(byte[] user, string algorithm, SshPublicKey publicKey, SshUserKeyFiles files, CancellationToken cancellationToken)

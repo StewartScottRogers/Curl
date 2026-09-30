@@ -73,6 +73,11 @@ internal sealed class SshTransport
     internal SshPacketWriter PacketWriter { get; }
 
     /// <summary>
+    /// Gets the preset's libssh2 cryptography backend, <see langword="null" /> when it names none.
+    /// </summary>
+    internal string? CryptographyBackend => preferences.CryptographyBackend;
+
+    /// <summary>
     /// Gets the session identifier: the exchange hash of the first key exchange, which a
     /// <c>publickey</c> signature covers (RFC 4252 section 7).
     /// </summary>
