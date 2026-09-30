@@ -35,3 +35,4 @@ Why the coordinator and not each lane: `.github/workflows/ci.yml` has `concurren
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
