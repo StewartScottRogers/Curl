@@ -70,6 +70,13 @@ internal static class WsUpgradeRequestFormatter
         return url.Query is null ? target.ToString() : target.Append('?').Append(Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(url.Query))).ToString();
     }
 
+    /// <summary>Decides whether an <c>-H</c> value names the header <paramref name="name" />, in any case, to set, blank or remove it.</summary>
+    /// <param name="options">The HTTP options whose <c>-H</c> values are looked at.</param>
+    /// <param name="name">The header name.</param>
+    /// <returns><see langword="true" /> when an <c>-H</c> value names the header.</returns>
+    internal static bool HeadersName(HttpRequestOptions options, string name) =>
+        options.Headers.Any(entry => WsCustomHeader.Parse(HeadText(entry, options)).Names(name));
+
     [return: NotNullIfNotNull(nameof(text))]
     private static string? HeadText(string? text, HttpRequestOptions options) =>
         text is null ? null : Encoding.Latin1.GetString(options.CommandLineTextEncoding.GetBytes(text));
