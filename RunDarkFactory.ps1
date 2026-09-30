@@ -210,6 +210,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestMachineProbe
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestHeartbeat
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestCiWatch
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskIds
 #>
 [CmdletBinding()]
 param(
@@ -257,6 +258,9 @@ param(
     [switch]$TestFlakyTests,
     # Prove how the CI watch reads failures from a failed run's log and which it files, and exit.
     [switch]$TestCiWatch,
+    # Prove that task IDs of three digits or more (BL-992, BL-1003) are read from next output,
+    # -Reason text, status lines and file names, and exit.
+    [switch]$TestTaskIds,
     # How often, in minutes, the lanes' heartbeats are published as status.json on the
     # force-pushed board branch, plus once at shift end. 0 = never publish.
     [ValidateRange(0, 60)][int]$HeartbeatMinutes = 3,
@@ -1542,6 +1546,52 @@ function Get-TaskTitle {
     return ''
 }
 
+# Task IDs have three digits or more: task-board.ps1 numbers with 'BL-{0:D3}', so BL-999 is
+# followed by BL-1000 (BL-992). Every reading of an ID goes through these four.
+
+function Get-TaskIdFromFileName {
+    # The ID a task file name starts with: BL-1003-x.md gives BL-1003.
+    param([string]$Name)
+    if ($Name -match '^(BL-\d+)') { return $Matches[1] }
+    return ''
+}
+
+function Get-NextTaskId {
+    # The ID that task-board.ps1 next printed at the start of a line, or '' when it offered none.
+    param([string]$Text)
+    if ($Text -match '(?m)^(BL-\d+)\s') { return $Matches[1] }
+    return ''
+}
+
+function Get-TaskIdsNamed {
+    # Every distinct ID a Log line or -Reason names, in order.
+    param([string]$Text)
+    return @([regex]::Matches($Text, '\bBL-\d+\b') | ForEach-Object { $_.Value } | Select-Object -Unique)
+}
+
+function Get-NeedsStewartId {
+    # The ID on a task-board.ps1 status line marked [needs Stewart], or ''.
+    param([string]$Line)
+    if ($Line -match '^\s+(BL-\d+)\s.*\[needs Stewart\]') { return $Matches[1] }
+    return ''
+}
+
+if ($TestTaskIds) {
+    $cases = @(
+        ,@('next offers a four-digit ID', 'BL-1003', (Get-NextTaskId "BL-1003  pipeline: direct  Tasks\Backlog\BL-1003-x.md"))
+        ,@('next offers a three-digit ID', 'BL-992', (Get-NextTaskId 'BL-992  pipeline: direct  Tasks\Backlog\BL-992-x.md'))
+        ,@('next offers nothing', '', (Get-NextTaskId 'No task is ready.'))
+        ,@('a reason names two IDs', 'BL-1003,BL-999', ((Get-TaskIdsNamed 'Waiting on BL-1003 and BL-999') -join ','))
+        ,@('a needs-Stewart status line', 'BL-1005', (Get-NeedsStewartId '  BL-1005 Normal Stewart Title  [needs Stewart]'))
+        ,@('a file name with a four-digit ID', 'BL-1003', (Get-TaskIdFromFileName 'BL-1003-accept-four-digit-ids.md')))
+    $failed = 0
+    foreach ($case in $cases) {
+        if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
+        else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $($case[2])" -ForegroundColor Red; $failed++ }
+    }
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
 function Get-LastLogLine {
     param([string]$Id)
     $file = Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter "$Id-*.md" | Select-Object -First 1
@@ -1553,13 +1603,12 @@ function Get-LastLogLine {
 function Get-WaitingOnStewart {
     $reasons = @()
     foreach ($f in Get-ChildItem (Join-Path $Root 'Tasks\Blocked') -Filter 'BL-*.md' -ErrorAction SilentlyContinue) {
-        $id = $f.Name.Substring(0, 6)
+        $id = Get-TaskIdFromFileName $f.Name
         $reasons += "$id BLOCKED  $(Get-LastLogLine $id)"
     }
     foreach ($line in Invoke-Board @('status')) {
-        if ($line -match '^\s+(BL-\d{3})\s.*\[needs Stewart\]') {
-            $reasons += "$($Matches[1]) DECIDE   $(Get-TaskTitle $Matches[1])"
-        }
+        $id = Get-NeedsStewartId $line
+        if ($id) { $reasons += "$id DECIDE   $(Get-TaskTitle $id)" }
     }
     return $reasons
 }
@@ -1575,10 +1624,10 @@ function Invoke-Requeue {
     # Stewart. Returns the IDs it moved.
     $moved = @()
     foreach ($f in Get-ChildItem (Join-Path $Root 'Tasks\Blocked') -Filter 'BL-*.md' -ErrorAction SilentlyContinue) {
-        $id = $f.Name.Substring(0, 6)
+        $id = Get-TaskIdFromFileName $f.Name
         $reason = Get-LastLogLine $id
         if ($reason -match 'Stewart') { continue }
-        $waits = @([regex]::Matches($reason, 'BL-\d{3}') | ForEach-Object { $_.Value } | Where-Object { $_ -ne $id } | Select-Object -Unique)
+        $waits = @(Get-TaskIdsNamed $reason | Where-Object { $_ -ne $id })
         if (-not $waits.Count -or @($waits | Where-Object { -not (Test-TaskDone $_) }).Count) { continue }
         Invoke-Board @('move', '-Id', $id, '-To', 'Backlog', '-Reason', "Unblocked: $($waits -join ', ') now Done") | Out-Null
         if ((Get-TaskState $id) -eq 'Backlog') { $moved += $id; Write-Trace $id 'requeue' "unblocked: $($waits -join ', ') Done" 'Cyan' }
@@ -2432,11 +2481,11 @@ function Invoke-Claim {
             $boardArgs = @('next')
             if ($Skip.Count) { $boardArgs += @('-Skip', ($Skip -join ',')) }
             $next = (Invoke-Board $boardArgs) -join "`n"
-            if ($next -notmatch '(?m)^(BL-\d{3})\s') {
+            $id = Get-NextTaskId $next
+            if (-not $id) {
                 if ($next -match 'can start yet' -or (Get-DoingCount) -gt 0) { return @{ Wait = $true; Why = (Get-Short $next 80) } }
                 return @{ None = $true }
             }
-            $id = $Matches[1]
             Invoke-Board @('move', '-Id', $id, '-To', 'Doing') | Out-Null
             if ((Get-TaskState $id) -ne 'Doing') { continue }
             Invoke-Git @('add', '-A', 'Tasks') | Out-Null
@@ -2925,7 +2974,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # Tasks in Doing are only allowed when a previous shift's lane holds each of them and that
     # lane is dead - a shift stopped mid-task, or killed while waiting for tokens. Those lanes
     # are adopted: their worktrees are left as they are and they resume the task.
-    $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | ForEach-Object { $_.Name.Substring(0, 6) })
+    $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | ForEach-Object { Get-TaskIdFromFileName $_.Name })
     $adopt = @{}
     if ($stuck.Count) {
         $previous = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
@@ -3224,7 +3273,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # -Continuous: while the board still has ready work, the next shift starts itself, so
     # the factory keeps going without anyone - Stewart or a Claude session - to restart it.
     $stillReady = (Invoke-Board @('next')) -join "`n"
-    if ($Continuous -and $stillReady -match '(?m)^BL-\d{3}\s') {
+    if ($Continuous -and (Get-NextTaskId $stillReady)) {
         foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
         # An Auto shift hands on Auto, not the count it ended at; the next one starts from
         # the count auto-lanes.json saved.
@@ -3326,8 +3375,8 @@ while ($true) {
             git -C $Root push -q 2>&1 | Out-Null
         }
         $next = (Invoke-Board @('next')) -join "`n"
-        if ($next -notmatch '(?m)^(BL-\d{3})\s') { $stopWhy = 'nothing ready'; break }
-        $id = $Matches[1]
+        $id = Get-NextTaskId $next
+        if (-not $id) { $stopWhy = 'nothing ready'; break }
         if ($attempted.ContainsKey($id)) { $stopWhy = "$id offered twice"; $stalls += "$id offered again after a run"; break }
     }
     $attempted[$id] = $true
