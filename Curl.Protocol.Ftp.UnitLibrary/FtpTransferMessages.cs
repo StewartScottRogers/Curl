@@ -109,6 +109,12 @@ internal static class FtpTransferMessages
     /// </summary>
     internal const string RequestedSslLevelFailed = "Requested SSL level failed";
 
+    /// <summary>
+    /// The exit 81 message, and its <c>-v</c> line, for a <c>CCC</c> answered below 500 whose
+    /// TLS shutdown failed, as it always does on curl 8.21.0's Schannel build (BL-636).
+    /// </summary>
+    internal const string ClearCommandChannelFailed = "Failed to clear the command channel (CCC)";
+
     /// <summary>The exit 67 message for a <c>332</c> reply to <c>USER</c> or <c>PASS</c> without <c>--ftp-account</c>.</summary>
     internal const string AccountRequested = "ACCT requested but none available";
 

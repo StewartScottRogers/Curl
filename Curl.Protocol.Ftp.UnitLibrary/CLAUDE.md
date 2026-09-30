@@ -22,7 +22,9 @@ refused `USER` or `PASS`) and `--ftp-pret` (`PRET RETR <file>`, `PRET LIST`/`NLS
 `PRET STOR <file>` before the first of `EPSV`/`PASV`, never in active mode; anything but
 `200` is exit 84 with no `QUIT`), as curl 8.21.0 was measured to (BL-635). TLS: `ftps://` is TLS from the first byte, and `--ssl`,
 `--ssl-reqd` and `--ftp-ssl-control` upgrade `ftp://` with `AUTH`, then `PBSZ` and `PROT`
-(ADR-0102 and its BL-437 addendum). Time limits (BL-512): the handler reports
+(ADR-0102 and its BL-437 addendum); under `--ftp-ssl-ccc` `CCC` follows `PROT`, a 5xx keeps
+TLS, and any other reply clears it through `IConnection.ClearTlsAsync` (plain text after it on
+the OpenSSL build, exit 81 with no `QUIT` on the Schannel build, ADR-0279, BL-636). Time limits (BL-512): the handler reports
 `ReportTransferStarted` once the control connection is up, so the runner's `-m` watchdog
 (ADR-0117) ends any later stall with curl's `Operation timed out` message, and
 `FtpConnectPhaseLimit` holds the greeting, login, `PBSZ`, `PROT` and `PWD` to
@@ -55,7 +57,7 @@ Measure curl before pinning a new command or message:
 from the last `REST` offset, and for `LIST` and `NLST`), and writes `transcript.txt`, with
 the bytes curl uploads on a `STOR` or `APPE` data connection in `upload.bin`. It dials back
 to the address `EPRT` or `PORT` names, answers `AUTH` by serving TLS (curl needs `-k`),
-serves TLS data after `PROT P`, serves implicit FTPS with `-Tls`, and `-FtpIdleMilliseconds`
+serves TLS data after `PROT P`, clears TLS after a `CCC` reply below 500, serves implicit FTPS with `-Tls`, and `-FtpIdleMilliseconds`
 keeps the control connection open for a long wait. The reply `STALL` (e.g. `USER=STALL`,
 `GREETING=STALL`) answers nothing, and `-FtpDataHoldMilliseconds` holds a download's data
 connection open after its bytes, to measure a stall (BL-512). `-ListenAddress` with `-Curl wsl.exe`

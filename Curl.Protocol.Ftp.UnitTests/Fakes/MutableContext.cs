@@ -39,6 +39,10 @@ public sealed class MutableContext
 
     public bool FtpSslControlOnly { get; set; }
 
+    public FtpCommandChannelClearing FtpCommandChannelClearing { get; set; }
+
+    public IDiagnosticLog DiagnosticLog { get; set; } = NoDiagnosticLog.Instance;
+
     public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
 
     public CancellationToken CancellationToken { get; set; }
@@ -74,6 +78,8 @@ public sealed class MutableContext
             FtpUseEprt = mutable.FtpUseEprt,
             SslLevel = mutable.SslLevel,
             FtpSslControlOnly = mutable.FtpSslControlOnly,
+            FtpCommandChannelClearing = mutable.FtpCommandChannelClearing,
+            DiagnosticLog = mutable.DiagnosticLog,
             TimeProvider = mutable.TimeProvider,
             CancellationToken = mutable.CancellationToken,
             Events = mutable.Events,
