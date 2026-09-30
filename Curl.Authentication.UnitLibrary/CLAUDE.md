@@ -37,6 +37,9 @@ elsewhere; a Type 2 the context cannot answer throws `HttpAuthenticationFailedEx
 (exit 94) where the SSPI build is matched, and sends nothing elsewhere, except that a Type 3
 past curl's 1024-byte buffer (the hand-built context's `Refused`) fails with exit 100,
 "user + domain + hostname too big for NTLM" (BL-849).
+A proxy's request (`HttpAuthRequest.IsProxy`, its URL the proxy's own) is answered on the same
+terms: `--proxy-ntlm` and `--proxy-negotiate` for a `407` as `--ntlm` and `--negotiate` for a
+401, for `HTTP` on the proxy's host (ADR-0270, BL-604).
 Message protection (BL-851, ADR-0183): an established context wraps and unwraps
 (`ISecurityContext.Wrap`/`Unwrap`) - the BCL's on the system route, `KerberosGssContext`'s on
 the hand-built Kerberos route; curl's own NTLM throws `NotSupportedException`, and an unfinished
