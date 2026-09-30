@@ -170,6 +170,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             FtpUseEprt = options.FtpUseEprt,
             SslLevel = options.SslLevel,
             FtpSslControlOnly = options.FtpSslControlOnly,
+            FtpCommandChannelClearing = CommandChannelClearingOf(options.FtpClearCommandChannel),
             ListOnly = options.ListOnly,
             UseAscii = options.UseAscii,
             Append = options.Append,
@@ -284,6 +285,19 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <returns><see langword="true" /> for <c>-C -</c> with a <c>-T</c> source.</returns>
     private static bool ResumesUploadFromUnknownOffset(CommandLineOptions options, Stream? upload) =>
         options.ResumeFromOutputSize && upload is not null;
+
+    /// <summary>
+    /// Gets the <c>CCC</c> behaviour the FTP handler reads for the command line's
+    /// <c>--ftp-ssl-ccc</c> and <c>--ftp-ssl-ccc-mode</c> (BL-636).
+    /// </summary>
+    /// <param name="clearing">What the parsed command line chose.</param>
+    /// <returns>The same choice in the handler's terms.</returns>
+    private static FtpCommandChannelClearing CommandChannelClearingOf(FtpClearCommandChannel clearing) => clearing switch
+    {
+        FtpClearCommandChannel.Active => FtpCommandChannelClearing.Active,
+        FtpClearCommandChannel.Passive => FtpCommandChannelClearing.Passive,
+        _ => FtpCommandChannelClearing.Off,
+    };
 
     /// <summary>
     /// Gets <paramref name="events" />, or <see cref="NoTransferEvents.Instance" /> when it is <see langword="null" />.

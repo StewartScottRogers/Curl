@@ -197,6 +197,23 @@ public sealed class TransferContextFactoryTests
     }
 
     [TestMethod]
+    [DataRow(new string[0], FtpCommandChannelClearing.Off)]
+    [DataRow(new[] { "--ftp-ssl-ccc" }, FtpCommandChannelClearing.Passive)]
+    [DataRow(new[] { "--ftp-ssl-ccc-mode", "passive" }, FtpCommandChannelClearing.Passive)]
+    [DataRow(new[] { "--ftp-ssl-ccc-mode", "active" }, FtpCommandChannelClearing.Active)]
+    [DataRow(new[] { "--ftp-ssl-ccc-mode", "active", "--no-ftp-ssl-ccc" }, FtpCommandChannelClearing.Off)]
+    public void Create_FtpSslCccOptions_AreTheCommandChannelClearing(string[] options, FtpCommandChannelClearing expected)
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse([.. options, "ftp://example.com/f"]), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+
+        Assert.AreEqual(expected, context.FtpCommandChannelClearing);
+    }
+
+    [TestMethod]
     public void Create_FtpPort_IsCopiedVerbatim()
     {
         using MemoryStream standardInput = new();
