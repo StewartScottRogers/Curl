@@ -50,3 +50,4 @@ sample; say in the help that very short runs can under-report.
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
