@@ -1,0 +1,2 @@
+{"type":"assistant","message":"ignored"}
+{"type":"result","subtype":"success","total_cost_usd":1.00,"usage":{"input_tokens":100,"cache_creation_input_tokens":10,"cache_read_input_tokens":1000,"output_tokens":50}}

@@ -88,18 +88,18 @@ function Get-ReferenceCurl {
 }
 
 function Get-Scenarios {
-    # Each: Name, CurlArgs (URL marked PORT), Response (Record-CurlExchange escapes), Connections, NoServer.
+    # Each: Name, CurlArgs (URL marked PORT, output file OUTFILE), Response (Record-CurlExchange escapes), Connections, NoServer.
     $ok = 'HTTP/1.1 200 OK\r\n'
     $headers = (1..50 | ForEach-Object { "X-Header-${_}: value-$_\r\n" }) -join ''
     $chunks = ('1\r\na\r\n' * 1000) + '0\r\n\r\n'
     $hops = @(1..5 | ForEach-Object { "HTTP/1.1 302 Found\r\nLocation: /hop$_\r\nContent-Length: 0\r\n\r\n" })
     return @(
         [pscustomobject]@{ Name = 'startup'; CurlArgs = @('--version'); Response = @(); Connections = 1; NoServer = $true }
-        [pscustomobject]@{ Name = 'small-get'; CurlArgs = @('-s', '-o', 'out.bin', 'http://127.0.0.1:PORT/'); Response = @("${ok}Content-Length: 1024\r\n\r\n" + ('a' * 1024)); Connections = 1; NoServer = $false }
-        [pscustomobject]@{ Name = 'large-get'; CurlArgs = @('-s', '-o', 'out.bin', 'http://127.0.0.1:PORT/'); Response = @("${ok}Content-Length: $LargeBytes\r\n\r\n" + ('a' * $LargeBytes)); Connections = 1; NoServer = $false }
-        [pscustomobject]@{ Name = 'headers-verbose'; CurlArgs = @('-sv', '-o', 'out.bin', 'http://127.0.0.1:PORT/'); Response = @("${ok}${headers}Content-Length: 0\r\n\r\n"); Connections = 1; NoServer = $false }
-        [pscustomobject]@{ Name = 'chunked'; CurlArgs = @('-s', '-o', 'out.bin', 'http://127.0.0.1:PORT/'); Response = @("${ok}Transfer-Encoding: chunked\r\n\r\n$chunks"); Connections = 1; NoServer = $false }
-        [pscustomobject]@{ Name = 'redirects'; CurlArgs = @('-sL', '-o', 'out.bin', 'http://127.0.0.1:PORT/'); Response = $hops + @("${ok}Content-Length: 2\r\n\r\nok"); Connections = 6; NoServer = $false }
+        [pscustomobject]@{ Name = 'small-get'; CurlArgs = @('-s', '-o', 'OUTFILE', 'http://127.0.0.1:PORT/'); Response = @("${ok}Content-Length: 1024\r\n\r\n" + ('a' * 1024)); Connections = 1; NoServer = $false }
+        [pscustomobject]@{ Name = 'large-get'; CurlArgs = @('-s', '-o', 'OUTFILE', 'http://127.0.0.1:PORT/'); Response = @("${ok}Content-Length: $LargeBytes\r\n\r\n" + ('a' * $LargeBytes)); Connections = 1; NoServer = $false }
+        [pscustomobject]@{ Name = 'headers-verbose'; CurlArgs = @('-sv', '-o', 'OUTFILE', 'http://127.0.0.1:PORT/'); Response = @("${ok}${headers}Content-Length: 0\r\n\r\n"); Connections = 1; NoServer = $false }
+        [pscustomobject]@{ Name = 'chunked'; CurlArgs = @('-s', '-o', 'OUTFILE', 'http://127.0.0.1:PORT/'); Response = @("${ok}Transfer-Encoding: chunked\r\n\r\n$chunks"); Connections = 1; NoServer = $false }
+        [pscustomobject]@{ Name = 'redirects'; CurlArgs = @('-sL', '-o', 'OUTFILE', 'http://127.0.0.1:PORT/'); Response = $hops + @("${ok}Content-Length: 2\r\n\r\nok"); Connections = 6; NoServer = $false }
     )
 }
 
@@ -113,20 +113,20 @@ function Invoke-Run($Scenario, [string]$Exe, [string]$Folder) {
     # One recorded run, from its own folder; returns wall ms and peak working set bytes.
     New-Item -ItemType Directory -Force $Folder | Out-Null
     $port = Get-FreePort
-    $arguments = @($Scenario.CurlArgs | ForEach-Object { $_.Replace('PORT', "$port") })
-    Push-Location -LiteralPath $Folder
-    try {
-        # 6>$null: the recorder's own "curl exited ..." line per run is noise here; runs.log has it.
-        if ($Scenario.NoServer) {
-            & $record -NoServer -Curl $Exe -CurlArgs $arguments -OutDirectory $Folder 6>$null | Out-Null
-        } else {
-            & $record -Port $port -Curl $Exe -CurlArgs $arguments -OutDirectory $Folder -Response $Scenario.Response -Connections $Scenario.Connections 6>$null | Out-Null
-        }
-    } finally { Pop-Location }
+    # -o gets a full path in the run's folder: curl resolves a relative path against the
+    # process's working directory, which is not the run's folder (BL-1055).
+    $outFile = Join-Path $Folder 'out.bin'
+    $arguments = @($Scenario.CurlArgs | ForEach-Object { $_.Replace('PORT', "$port").Replace('OUTFILE', $outFile) })
+    # 6>$null: the recorder's own "curl exited ..." line per run is noise here; runs.log has it.
+    if ($Scenario.NoServer) {
+        & $record -NoServer -Curl $Exe -CurlArgs $arguments -OutDirectory $Folder 6>$null | Out-Null
+    } else {
+        & $record -Port $port -Curl $Exe -CurlArgs $arguments -OutDirectory $Folder -Response $Scenario.Response -Connections $Scenario.Connections 6>$null | Out-Null
+    }
     $timing = Get-Content -LiteralPath (Join-Path $Folder 'timing.json') -Raw | ConvertFrom-Json
     $exit = "$(Get-Content -LiteralPath (Join-Path $Folder 'exitcode.txt') -Raw)".Trim()
     # A large body is only written to out.bin; drop it once measured.
-    Remove-Item -LiteralPath (Join-Path $Folder 'out.bin') -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $outFile -ErrorAction SilentlyContinue
     return [pscustomobject]@{ Ms = [double]$timing.elapsedMilliseconds; Bytes = [long]$timing.peakWorkingSetBytes; Exit = $exit }
 }
 

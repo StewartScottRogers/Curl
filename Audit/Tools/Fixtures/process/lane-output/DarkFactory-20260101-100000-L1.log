@@ -1,0 +1,11 @@
+10:00:00 L1 -   shift   start  branch=work/dark-factory model=opus until 18:00
+10:00:00 L1 BL-001 claim   Fixture task one
+10:25:00 L1 BL-001 end     10 turns, 25.0 min
+10:30:00 L1 BL-001 push    integrated into work/dark-factory
+10:30:00 L1 BL-001 DONE    2026-01-01: Doing -> Done. Fixture task one works.
+10:31:00 L1 BL-002 claim   Fixture task two
+10:41:00 L1 BL-002 REQUEUE 2026-01-01: Doing -> Backlog. Waits on BL-009.
+10:41:30 L1 -   wait    No task can start yet: every ready task overlaps one in Doing or waits behind one that does, e.g. BL-002 with BL-003.
+11:01:30 L1 BL-002 claim   Fixture task two
+11:21:30 L1 BL-002 push    integrated into work/dark-factory
+11:21:30 L1 BL-002 DONE    2026-01-01: Doing -> Done. Fixture task two works.
