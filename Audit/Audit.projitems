@@ -1,0 +1,34 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!--
+    Shared-items manifest for the Audit shared project.
+
+    SharedGUID must match the ProjectGuid in Audit.shproj; Visual Studio pairs the
+    two files by that value.
+
+    The glob is recursive and takes every file, not only Markdown, because the office
+    holds scripts (Guard/, Tools/, RunAudit.*) beside its instructions, findings and
+    scorecards. It is load-bearing: audits add findings and scorecards outside Visual
+    Studio every time they run, and an explicit <None> list would be wrong after each
+    one. The project files themselves are excluded so they do not list themselves.
+
+    If Visual Studio ever rewrites the glob below into a list of individual files
+    (it can do this when files are added or moved through Solution Explorer),
+    restore the single wildcard line.
+  -->
+
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>{422A221E-CC14-4F14-A6E7-A3A64623E59D}</SharedGUID>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Audit</Import_RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)**\*" Exclude="$(MSBuildThisFileDirectory)Audit.shproj;$(MSBuildThisFileDirectory)Audit.projitems" />
+  </ItemGroup>
+
+</Project>
