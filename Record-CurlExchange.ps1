@@ -83,6 +83,12 @@
     what curl does with a response that stops without the peer closing, such as a head
     that never ends (BL-480). The script always reports how long curl ran.
 
+.PARAMETER AnswerHeldRequests
+    With HoldOpenMilliseconds, how many more requests arriving on a held connection are
+    answered, each with the response after the one before it (the last repeats), so a
+    later URL or -:/--next option group can reuse the connection (BL-754). Default 0:
+    what arrives is only recorded.
+
 .PARAMETER RespondAfterBodyBytes
     Instead of reading the whole request, send the response as soon as the header block
     and this many body bytes have arrived, then go on reading (and recording) whatever
@@ -545,6 +551,7 @@ param(
     [ValidateRange(0, 600000)] [int] $ResponseDelayMilliseconds = 0,
     [switch] $Reset,
     [ValidateRange(0, 600000)] [int] $HoldOpenMilliseconds = 0,
+    [ValidateRange(0, 1000)] [int] $AnswerHeldRequests = 0,
     [ValidateRange(-1, [int]::MaxValue)] [int] $RespondAfterBodyBytes = -1,
     [string] $StandardInput = '',
     [switch] $Ftp,
@@ -675,7 +682,7 @@ function ConvertTo-CommandLineArgument {
 # The server runs in its own runspace so curl can run in this one. It returns one
 # byte array per connection served.
 $serveConnections = {
-    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen, [bool] $CloseNotify)
+    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen, [bool] $CloseNotify, [int] $AnswerHeld)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -761,8 +768,11 @@ $serveConnections = {
                 }
             }
             if ($HoldOpen -gt 0) {
-                # Held open: wait for curl to hang up, recording what it still sends.
+                # Held open: wait for curl to hang up, recording what it still sends and
+                # answering up to $AnswerHeld more requests with the responses after this one.
                 $stream.ReadTimeout = $HoldOpen
+                $answered = 0
+                $nextRequestStart = [int] $received.Length
                 while ($true) {
                     try {
                         $count = $stream.Read($buffer, 0, $buffer.Length)
@@ -771,6 +781,14 @@ $serveConnections = {
                     }
                     if ($count -le 0) { break }
                     $received.Write($buffer, 0, $count)
+                    [byte[]] $pending = $received.ToArray()[$nextRequestStart..([int] $received.Length - 1)]
+                    if ($answered -lt $AnswerHeld -and (Test-RequestComplete -Received $pending -Length $pending.Length)) {
+                        $answered++
+                        $nextRequestStart = [int] $received.Length
+                        [byte[]] $heldResponse = $ResponseBytes[[Math]::Min($served + $answered, $ResponseBytes.Count - 1)]
+                        $stream.Write($heldResponse, 0, $heldResponse.Length)
+                        $stream.Flush()
+                    }
                 }
             }
             $requests.Add($received.ToArray())
@@ -2489,7 +2507,7 @@ try {
     } elseif ($Script) {
         [void] $server.AddScript($serveScriptedSession).AddArgument($listener).AddArgument($scriptSteps).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ScriptIdleMilliseconds).AddArgument($ScriptGapMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
-        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify)
+        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests)
     }
     if ($null -ne $server) { $serverRun = $server.BeginInvoke() }
 
