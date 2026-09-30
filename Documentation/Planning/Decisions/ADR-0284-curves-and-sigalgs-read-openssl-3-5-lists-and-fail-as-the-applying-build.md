@@ -97,7 +97,7 @@ error:14004410:SSL routines:CONNECT_CR_SRVR_HELLO:sslv3 alert handshake failure`
 - Where the client cannot offer what OpenSSL offers, the bytes differ: the dropped groups
   and schemes above; `ec_point_formats`, which OpenSSL leaves out when no EC group remains;
   the `padding` extension OpenSSL adds when a shorter list brings the ClientHello under 512
-  bytes; and brainpool groups in a hello that also offers TLS 1.3. BL-1046 (the groups),
+  bytes; and brainpool groups in a hello that also offers TLS 1.3. BL-1049 (the groups),
   BL-1047 (the signature schemes) and BL-1048 (the extensions) cover each.
 - `--curves ?bogus` on Windows fails with exit 35 where curl.se's build fails with 59; both
   are failures, and the OpenSSL syntax is the one scripts written for Linux use.

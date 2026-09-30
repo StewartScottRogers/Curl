@@ -1,5 +1,5 @@
 ---
-id: BL-1046
+id: BL-1049
 title: Offer the ML-KEM hybrid, pure ML-KEM and brainpool TLS 1.3 groups a --curves list names
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-30
 completed:
 ---
-# BL-1046 — Offer the ML-KEM hybrid, pure ML-KEM and brainpool TLS 1.3 groups a --curves list names
+# BL-1049 — Offer the ML-KEM hybrid, pure ML-KEM and brainpool TLS 1.3 groups a --curves list names
 
 ## Goal
 

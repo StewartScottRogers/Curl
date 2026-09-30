@@ -39,7 +39,7 @@ completed: 2026-09-30
 - Defaults taken: the exit 35 "no suitable" failures are reported before `--cert` is loaded (OpenSSL reports them at connect, after loading it; only a bad `--cert` together with an empty list tells the difference). `DEFAULT` expands to the Schannel profile on Windows. The `--curves`/`--sigalgs` proxy forms are not parsed yet (BL-618 carried the origin forms only), so the HTTPS proxy's handshake is unchanged.
 - `touches` gained `Documentation/Planning/Decisions` for ADR-0284 and its index row; no task in Doing names it (BL-991 touches only the SSH projects).
 - `--ai-help` needs no change: the option set and its text are unchanged; only the behaviour behind `--curves`/`--sigalgs` is new.
-- Filed: BL-1046 (ML-KEM hybrid, pure ML-KEM and brainpool TLS 1.3 groups), BL-1047 (ML-DSA, ed448, brainpool TLS 1.3 ECDSA schemes), BL-1048 (`ec_point_formats`, `padding` and brainpool groups beside TLS 1.3 in OpenSSL's hello).
+- Filed: BL-1049 (ML-KEM hybrid, pure ML-KEM and brainpool TLS 1.3 groups), BL-1047 (ML-DSA, ed448, brainpool TLS 1.3 ECDSA schemes), BL-1048 (`ec_point_formats`, `padding` and brainpool groups beside TLS 1.3 in OpenSSL's hello).
 - Quality: `Curl.Networking.UnitLibrary` 100% line, 100% branch, 869 members, 0 failing (worst CRAP 10); `Curl.Console` 100%/100%, 0 failing.
 
 ## Log
