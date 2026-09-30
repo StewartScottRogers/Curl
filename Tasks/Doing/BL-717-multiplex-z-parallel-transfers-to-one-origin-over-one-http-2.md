@@ -33,3 +33,4 @@ With `-Z`, transfers to the same HTTP/2 origin share one connection as concurren
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
