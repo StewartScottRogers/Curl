@@ -9,7 +9,7 @@ touches: [Audit/Tools/Invoke-MutationTest.ps1]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1004 — Build a BCL-only mutation test runner that mutates one library at a time
 
@@ -53,15 +53,22 @@ Design:
 
 ## Acceptance criteria
 
-- [ ] `-SelfTest` prints `PASS` and no `FAIL` for the cases above.
-- [ ] `Invoke-MutationTest.ps1 -Library Curl.Protocol.Dict.UnitLibrary -MaxMutants 5 -Seed 1 -OutFile <tmp>.json` writes JSON with 5 mutants, each with an outcome, and a `score` between 0 and 1; running it twice gives the same five sites.
-- [ ] After that run, `git status --porcelain` in the checkout it was run from is unchanged and `git worktree list` shows no `mutation-` worktree.
-- [ ] A library whose baseline fails (simulate with `-Commit` of a commit that does not build, or a scratch break in the worktree via `-SelfTest`) stops with a message and no mutants.
-- [ ] Header help documents parameters, outcomes and the score formula; the script runs under PowerShell 7 and Windows PowerShell 5.1 and is ASCII only.
+- [x] `-SelfTest` prints `PASS` and no `FAIL` for the cases above.
+- [x] `Invoke-MutationTest.ps1 -Library Curl.Protocol.Dict.UnitLibrary -MaxMutants 5 -Seed 1 -OutFile <tmp>.json` writes JSON with 5 mutants, each with an outcome, and a `score` between 0 and 1; running it twice gives the same five sites.
+- [x] After that run, `git status --porcelain` in the checkout it was run from is unchanged and `git worktree list` shows no `mutation-` worktree.
+- [x] A library whose baseline fails (simulate with `-Commit` of a commit that does not build, or a scratch break in the worktree via `-SelfTest`) stops with a message and no mutants.
+- [x] Header help documents parameters, outcomes and the score formula; the script runs under PowerShell 7 and Windows PowerShell 5.1 and is ASCII only.
 
 ## Notes
+
+- On the audit branch (worktree moved from Z:/repos/Curl.audit to Z:/repos/Curl.auditbranch, so <repo>.audit stays free for this tool's worktrees), commit 60dbb883, pull request https://github.com/StewartScottRogers/Curl/pull/31.
+- -SelfTest: 17 PASS, 0 FAIL under Windows PowerShell 5.1 and PowerShell 7.6.6 (string, verbatim and escaped strings, char literal, List<int>, comment line, trailing comment, two operators, spaced comparisons, + 1 not + 10, true/false/!(, attribute and using lines, mutation applied, score, and a scratch project that does not compile stopping as a failed baseline).
+- Curl.Protocol.Dict.UnitLibrary -MaxMutants 5 -Seed 1 -TimeoutSeconds 120, run twice: 35 sites; the same 5 each time - DictProtocolHandler.cs:115 > timedOut, DictRequest.cs:184 && and 185 && stillborn (|| leaves the out variable unassigned: a genuine compile error), DictRequest.cs:184 < killed, DictRequest.cs:149 || killed; score 1. git status in the checkout unchanged; no mutation- worktree left.
+- Git calls go through Invoke-Git with ErrorActionPreference Continue: Windows PowerShell 5.1 turned git's stderr progress (Preparing worktree) into a terminating error.
+- A mutant that loops forever costs the whole -TimeoutSeconds (default 600, as specified); the quality auditor (BL-1009) should pass a lower one, about 3x the baseline test time.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. Invoke-MutationTest.ps1 mutation-tests one library reproducibly and reports the score; in PR #31, awaiting Stewart's merge.
