@@ -59,7 +59,9 @@ internal static class Libssh2ErrorCode
 
     /// <summary>
     /// <c>LIBSSH2_ERROR_SOCKET_RECV</c>: the peer closed instead of answering the
-    /// <c>ssh-userauth</c> service request. Measured 2026-09-29 (BL-565, BL-567).
+    /// <c>ssh-userauth</c> service request. Measured 2026-09-29 (BL-565, BL-567). Also the
+    /// code printed with <see cref="FailedGettingBanner" /> when the server resets the
+    /// connection before its identification string (measured 2026-09-30, BL-991, ADR-0283).
     /// </summary>
     internal const int SocketReceive = -43;
 

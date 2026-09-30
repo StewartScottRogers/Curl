@@ -198,6 +198,19 @@ public sealed partial class SshTransportTests
     }
 
     [TestMethod]
+    public async Task NegotiateAlgorithmsAsync_PeerResetsTheConnectionAfterTheBanner_FailsWithMinus1AsMeasured()
+    {
+        ResettingConnection connection = new(false, Encoding.ASCII.GetBytes("SSH-2.0-OpenSSH_9.6\r\n"));
+        SshTransport transport = new(connection, SshAlgorithmPreferences.WindowsReference, EverythingImplemented, new RepeatingRandomSource(0), new SystemSshEphemeralKeySource());
+
+        SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
+            async () => await transport.NegotiateAlgorithmsAsync(CancellationToken.None));
+
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+        Assert.AreEqual(KeyExchangeBroken, failure.Message);
+    }
+
+    [TestMethod]
     public async Task NegotiateAlgorithmsAsync_Cancelled_Throws()
     {
         SshTransport transport = new(new ScriptedConnection(), SshAlgorithmPreferences.WindowsReference, EverythingImplemented, new RepeatingRandomSource(0), new SystemSshEphemeralKeySource());

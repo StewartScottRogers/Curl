@@ -92,9 +92,10 @@ internal sealed class SshTransport
     /// <returns>What the key exchange that follows needs.</returns>
     /// <exception cref="SshTransferException">
     /// Exit 2 with curl's <c>Failure establishing ssh session</c> message: <c>-13, Failed
-    /// getting banner</c> when no identification string arrives; <c>-5, Unable to exchange
+    /// getting banner</c> when no identification string arrives (<c>-43</c> when the
+    /// connection fails first); <c>-5, Unable to exchange
     /// encryption keys</c> when the lists share no algorithm; <c>-1, Unable to exchange
-    /// encryption keys</c> when the peer closes, breaks the packet framing, sends a
+    /// encryption keys</c> when the peer closes or resets the connection, breaks the packet framing, sends a
     /// malformed <c>KEXINIT</c>, sends any other message first but <c>IGNORE</c>,
     /// <c>DEBUG</c> or <c>UNIMPLEMENTED</c>, or sends even those first under strict key
     /// exchange.
@@ -102,9 +103,9 @@ internal sealed class SshTransport
     internal async ValueTask<SshNegotiatedHandshake> NegotiateAlgorithmsAsync(CancellationToken cancellationToken)
     {
         string serverIdentificationLine = await SshIdentificationExchange.ExchangeAsync(connection, connectionReader, cancellationToken).ConfigureAwait(false);
-        byte[] clientPayload = await SendClientKexInitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            byte[] clientPayload = await SendClientKexInitAsync(cancellationToken).ConfigureAwait(false);
             (byte[] serverPayload, int packetsBefore) = await ReadServerKexInitAsync(cancellationToken).ConfigureAwait(false);
             SshNegotiatedHandshake handshake = Negotiate(serverIdentificationLine, clientPayload, serverPayload);
             if (handshake.Algorithms.IsStrictKeyExchange && packetsBefore > 0)
@@ -114,7 +115,7 @@ internal sealed class SshTransport
 
             return handshake;
         }
-        catch (Exception exception) when (exception is InvalidDataException or EndOfStreamException)
+        catch (Exception exception) when (exception is InvalidDataException or IOException)
         {
             throw SshTransferException.SessionEstablishmentFailed(Libssh2ErrorCode.SocketNone, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
         }
@@ -135,7 +136,7 @@ internal sealed class SshTransport
     /// <returns>The exchange hash, the session identifier and the keys' derivation.</returns>
     /// <exception cref="SshTransferException">
     /// Exit 2 with <c>Failure establishing ssh session: -8, Unable to exchange encryption
-    /// keys</c>, as measured, when the peer closes, sends an unexpected or malformed
+    /// keys</c>, as measured, when the peer closes (or resets the connection), sends an unexpected or malformed
     /// message, a public value outside its group, a host key or signature of another type,
     /// or a signature that does not verify; with <c>-4</c> (a MAC) or <c>-12</c> (an AES-GCM
     /// tag) in place of <c>-8</c> when a re-exchange reads a packet that fails its check
@@ -169,7 +170,7 @@ internal sealed class SshTransport
             serverIdentification = handshake.ServerIdentification;
             return new SshKeyExchangeResult(handshake.Algorithms, outcome.HostKey, outcome.ExchangeHash, session, keys);
         }
-        catch (Exception exception) when (exception is InvalidDataException or EndOfStreamException or CryptographicException)
+        catch (Exception exception) when (exception is InvalidDataException or IOException or CryptographicException)
         {
             throw KeyExchangeMethodFailed();
         }

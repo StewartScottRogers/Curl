@@ -450,6 +450,20 @@ public sealed partial class SshProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("sftp", "", "-43, Failed getting banner", DisplayName = "sftp, reset before the banner")]
+    [DataRow("scp", "", "-43, Failed getting banner", DisplayName = "scp, reset before the banner")]
+    [DataRow("sftp", "SSH-2.0-OpenSSH_9.6\r\n", "-1, Unable to exchange encryption keys", DisplayName = "sftp, reset after the banner")]
+    public async Task ExecuteAsync_ServerResetsTheConnection_FailsWithExit2AsMeasured(string scheme, string sentBeforeTheReset, string expectedReason)
+    {
+        SshProtocolHandler handler = new(new ResettingConnector(Encoding.ASCII.GetBytes(sentBeforeTheReset)), new InMemoryKeyFileSystem(new Dictionary<string, string>()), SshAlgorithmPreferences.WindowsReference, Encoding.UTF8);
+
+        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse($"{scheme}://{Host}/f"), Output = new MemoryStream(), Credentials = new NetworkCredential(User, Password) });
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+        Assert.AreEqual($"Failure establishing ssh session: {expectedReason}", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_SftpQuoteCommands_RunsThemAroundTheDownloadAndDropsThosePrefixedWithPlus()
     {
         InMemorySshServer server = Server();
@@ -624,5 +638,11 @@ public sealed partial class SshProtocolHandlerTests
     {
         public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
             ValueTask.FromResult(ConnectResult.Refused("Failed to connect"));
+    }
+
+    private sealed class ResettingConnector(byte[] sentBeforeTheReset) : IConnector
+    {
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(ConnectResult.Connected(new ResettingConnection(false, sentBeforeTheReset)));
     }
 }

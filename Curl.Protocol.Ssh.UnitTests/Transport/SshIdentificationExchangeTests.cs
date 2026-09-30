@@ -65,6 +65,21 @@ public sealed class SshIdentificationExchangeTests
     }
 
     [TestMethod]
+    [DataRow(false, "", DisplayName = "reset while curl waits for the banner")]
+    [DataRow(false, "SSH-2.0-Open", DisplayName = "reset part-way through the banner")]
+    [DataRow(true, "", DisplayName = "reset before curl sends its identification")]
+    public async Task ExchangeAsync_PeerResetsTheConnection_FailsWithMinus43AsMeasured(bool resetOnWrite, string sent)
+    {
+        ResettingConnection connection = new(resetOnWrite, Encoding.ASCII.GetBytes(sent));
+
+        SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
+            async () => await SshIdentificationExchange.ExchangeAsync(connection, new SshConnectionReader(connection), CancellationToken.None));
+
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+        Assert.AreEqual("Failure establishing ssh session: -43, Failed getting banner", failure.Message);
+    }
+
+    [TestMethod]
     public async Task ExchangeAsync_LineLongerThanTheLimit_FailsAsNoBanner()
     {
         ScriptedConnection connection = new(Encoding.ASCII.GetBytes(new string('x', SshIdentificationExchange.MaximumLineLength) + "\nSSH-2.0-x\r\n"));

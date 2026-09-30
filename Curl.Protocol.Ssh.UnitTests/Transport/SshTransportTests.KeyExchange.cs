@@ -480,6 +480,22 @@ public sealed partial class SshTransportTests
     }
 
     [TestMethod]
+    public async Task ExchangeKeysAsync_PeerResetsTheConnectionBeforeTheReply_FailsWithMinus8AsAClose()
+    {
+        byte[] serverBytes = new SshServerScript()
+            .Line(TestKeyExchangeServer.ServerIdentification)
+            .KexInit(ServerKexInit("ecdh-sha2-nistp256", "ssh-dss", strict: true))
+            .Bytes;
+        SshTransport transport = new(new ResettingConnection(false, serverBytes), SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0), new TestEphemeralKeys());
+        SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(CancellationToken.None);
+
+        SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
+            async () => await transport.ExchangeKeysAsync(handshake, CancellationToken.None));
+
+        Assert.AreEqual(KeyExchangeMethodFailed, failure.Message);
+    }
+
+    [TestMethod]
     public async Task ExchangeKeysAsync_AnotherMessageInsteadOfNewKeys_FailsWithMinus8()
     {
         await AssertKeyExchangeFailsAsync(Script("ecdh-sha2-nistp256", TestHostKey.Dsa(), tamper: payloads => [.. payloads, [SshMessageNumber.KeyExchangeInit]]));
