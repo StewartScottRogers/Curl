@@ -289,7 +289,8 @@ param(
     # Prove how the CI watch reads failures from a failed run's log and which it files, and exit.
     [switch]$TestCiWatch,
     # Prove that task IDs of three digits or more (BL-992, BL-1003) are read from next output,
-    # -Reason text, status lines and file names, and exit.
+    # -Reason text, status lines and file names, and that a wait logs next's reason line
+    # rather than a WARNING printed before it, and exit.
     [switch]$TestTaskIds,
     # Prove the CURL_DARK_FACTORY_LANE marker's value for a lane, a coordinator and a
     # launcher, and that a claude -p run inherits it, and exit.
@@ -1650,6 +1651,15 @@ function Get-NextTaskId {
     return ''
 }
 
+function Get-WaitReason {
+    # Why task-board.ps1 next offered nothing: its 'No task ...' line, never a WARNING it
+    # printed first (a duplicate ID) or that warning's wrapped continuation lines (BL-1054).
+    param([string]$Text)
+    $reason = @($Text -split "`r?`n" | Where-Object { $_ -match '^No task ' }) | Select-Object -First 1
+    if ($reason) { return $reason.Trim() }
+    return @($Text -split "`r?`n" | Where-Object { $_ -notmatch '^WARNING:' -and $_ -notmatch '^\s*Tasks[\\/]' }) -join ' '
+}
+
 function Get-TaskIdsNamed {
     # Every distinct ID a Log line or -Reason names, in order.
     param([string]$Text)
@@ -1670,7 +1680,11 @@ if ($TestTaskIds) {
         ,@('next offers nothing', '', (Get-NextTaskId 'No task is ready.'))
         ,@('a reason names two IDs', 'BL-1003,BL-999', ((Get-TaskIdsNamed 'Waiting on BL-1003 and BL-999') -join ','))
         ,@('a needs-Stewart status line', 'BL-1005', (Get-NeedsStewartId '  BL-1005 Normal Stewart Title  [needs Stewart]'))
-        ,@('a file name with a four-digit ID', 'BL-1003', (Get-TaskIdFromFileName 'BL-1003-accept-four-digit-ids.md')))
+        ,@('a file name with a four-digit ID', 'BL-1003', (Get-TaskIdFromFileName 'BL-1003-accept-four-digit-ids.md'))
+        ,@('a wait reason behind a wrapped duplicate-ID warning', 'No task can start yet: every ready task overlaps one in Doing or waits behind one that does, e.g. BL-806 with BL-797.',
+            (Get-WaitReason "WARNING: Duplicate task ID BL-806: `r`nTasks\Backlog\BL-806-write-curl-s-v-tls-lines.md, `r`nTasks\Done\2026-09-28_1849\BL-806-stop-lanes-auto.md`r`nNo task can start yet: every ready task overlaps one in Doing or waits behind one that does, e.g. BL-806 with BL-797."))
+        ,@('a wait reason when nothing is ready, after a warning', 'No task is ready.', (Get-WaitReason "WARNING: Duplicate task ID BL-806: Tasks\Backlog\a.md, Tasks\Done\b.md`nNo task is ready."))
+        ,@('a wait reason with no warning', 'No task is ready.', (Get-WaitReason 'No task is ready.')))
     $failed = 0
     foreach ($case in $cases) {
         if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
@@ -2808,7 +2822,7 @@ function Invoke-Claim {
             $next = (Invoke-Board $boardArgs) -join "`n"
             $id = Get-NextTaskId $next
             if (-not $id) {
-                if ($next -match 'can start yet' -or (Get-DoingCount) -gt 0) { return @{ Wait = $true; Why = (Get-Short $next 80) } }
+                if ($next -match 'can start yet' -or (Get-DoingCount) -gt 0) { return @{ Wait = $true; Why = (Get-Short (Get-WaitReason $next) 80) } }
                 return @{ None = $true }
             }
             Invoke-Board @('move', '-Id', $id, '-To', 'Doing') | Out-Null

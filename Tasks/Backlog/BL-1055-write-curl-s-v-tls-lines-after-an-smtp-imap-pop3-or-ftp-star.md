@@ -1,5 +1,5 @@
 ---
-id: BL-806
+id: BL-1055
 title: Write curl's -v TLS lines after an SMTP, IMAP, POP3 or FTP STARTTLS upgrade
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-806 — Write curl's -v TLS lines after an SMTP, IMAP, POP3 or FTP STARTTLS upgrade
+# BL-1055 — Write curl's -v TLS lines after an SMTP, IMAP, POP3 or FTP STARTTLS upgrade
 
 ## Goal
 
@@ -41,3 +41,4 @@ After an SMTP `STARTTLS` is accepted, `-v` writes the lines curl 8.21.0 writes f
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-30: Renumbered from BL-806, which the archived Done task BL-806 keeps (BL-1054).

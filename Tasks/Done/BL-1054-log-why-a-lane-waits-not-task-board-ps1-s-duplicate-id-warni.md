@@ -8,9 +8,9 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-09-30
-completed:
+completed: 2026-09-30
 ---
-# BL-1054 — Log why a lane waits, not task-board.ps1's duplicate-ID warning, and clear the BL-806 duplicate that causes it
+# BL-1054 â€” Log why a lane waits, not task-board.ps1's duplicate-ID warning, and clear the BL-806 duplicate that causes it
 
 ## Goal
 
@@ -24,12 +24,16 @@ Two fixes, both needed: the lane should log the line that answers the question (
 
 ## Acceptance criteria
 
-- [ ] A lane that waits logs `wait` with the reason line from `next`, not a `WARNING:` line, even while a duplicate-ID warning is printed; a `-Test*` case proves it on recorded `next` output.
-- [ ] The Backlog task holding BL-806 has a new ID, with its references updated, and `task-board.ps1 status` prints no duplicate-ID warning.
+- [x] A lane that waits logs `wait` with the reason line from `next`, not a `WARNING:` line, even while a duplicate-ID warning is printed; a `-Test*` case proves it on recorded `next` output.
+- [x] The Backlog task holding BL-806 has a new ID, with its references updated, and `task-board.ps1 status` prints no duplicate-ID warning.
 
 ## Notes
+
+- New Get-WaitReason in RunDarkFactory.ps1 picks next's 'No task ...' line; with none it drops WARNING: lines and the 'Tasks\...' paths a duplicate-ID warning wraps onto. Invoke-Claim logs that as the wait reason. Three -TestTaskIds cases prove it on recorded next output, including the real wrapped BL-806 warning.
+- The Backlog BL-806 (STARTTLS -v TLS lines) is now BL-1055, the next free ID; the archived Done BL-806 keeps its ID, and ADR-0130's BL-806 references are to that one, so nothing else changed. Touching Tasks/Backlog is board housekeeping the task asks for, not a new project.
 
 ## Log
 
 - 2026-09-30: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. Lane wait lines give next's reason, not a duplicate-ID warning; Backlog BL-806 renumbered BL-1055
