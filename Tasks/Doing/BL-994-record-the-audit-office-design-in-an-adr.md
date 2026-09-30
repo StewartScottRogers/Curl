@@ -91,3 +91,4 @@ stops "task Done" from standing in for "defect gone".
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
