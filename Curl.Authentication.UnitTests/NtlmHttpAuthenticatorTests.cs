@@ -27,7 +27,7 @@ public sealed class NtlmHttpAuthenticatorTests
     /// </summary>
     private const int LargestFittingUserLength = 414;
 
-    private static readonly string Type2Challenge ="NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredChallenge;
+    private static readonly string Type2Challenge = "NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredChallenge;
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_BeforeAnyChallenge_SendsType1()
