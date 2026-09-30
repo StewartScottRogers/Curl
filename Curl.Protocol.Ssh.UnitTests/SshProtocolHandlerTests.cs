@@ -137,6 +137,20 @@ public sealed partial class SshProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ServerOffersOnlyHmacMd5Etm_TransfersOverItWithTheFullSet()
+    {
+        InMemorySshServer server = new(User, Password) { Cipher = "aes128-ctr", Mac = "hmac-md5-etm@openssh.com" };
+        byte[] large = [.. Enumerable.Range(0, 70000).Select(index => (byte)(index * 7))];
+        server.Files["/data/large.bin"] = large;
+
+        Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/large.bin", preferences: SshAlgorithmPreferences.Full);
+
+        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result);
+        CollectionAssert.AreEqual(large, outcome.Output);
+        Assert.AreEqual("disconnect 11 Shutdown", server.Events[^1]);
+    }
+
+    [TestMethod]
     [DynamicData(nameof(Presets))]
     public async Task ExecuteAsync_ScpDownload_WritesTheFileAndEndsTheSessionAsCurlDoes(string platform, SshAlgorithmPreferences preferences)
     {

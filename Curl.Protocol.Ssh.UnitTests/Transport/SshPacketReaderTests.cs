@@ -70,6 +70,7 @@ public sealed class SshPacketReaderTests
     [DataRow("aes128-ctr", "hmac-md5-96", -4, DisplayName = "hmac-md5-96")]
     [DataRow("arcfour128", "hmac-ripemd160", -4, DisplayName = "arcfour128, hmac-ripemd160")]
     [DataRow("blowfish-cbc", "hmac-sha1-etm@openssh.com", -4, DisplayName = "blowfish-cbc, hmac-sha1-etm")]
+    [DataRow("aes128-ctr", "hmac-md5-etm@openssh.com", -4, DisplayName = "hmac-md5-etm")]
     [DataRow("aes128-gcm@openssh.com", null, -12, DisplayName = "AES-GCM")]
     [DataRow("chacha20-poly1305@openssh.com", null, -12, DisplayName = "ChaCha20-Poly1305")]
     public async Task ReadAsync_ProtectedPacketAltered_ThrowsWithLibssh2sCode(string cipher, string? mac, int expectedCode)

@@ -511,6 +511,8 @@ public sealed partial class SshTransportTests
     [TestMethod]
     [DataRow("aes128-ctr", "hmac-sha2-256", -1, "Failure establishing ssh session: -4, Unable to exchange encryption keys", DisplayName = "MAC-then-encrypt")]
     [DataRow("aes256-ctr", "hmac-sha2-512-etm@openssh.com", -1, "Failure establishing ssh session: -4, Unable to exchange encryption keys", DisplayName = "encrypt-then-MAC")]
+    [DataRow("aes128-ctr", "hmac-sha1-etm@openssh.com", -1, "Failure establishing ssh session: -4, Unable to exchange encryption keys", DisplayName = "hmac-sha1-etm")]
+    [DataRow("aes128-ctr", "hmac-md5-etm@openssh.com", -1, "Failure establishing ssh session: -4, Unable to exchange encryption keys", DisplayName = "hmac-md5-etm")]
     [DataRow("aes256-gcm@openssh.com", null, -1, "Failure establishing ssh session: -12, Unable to exchange encryption keys", DisplayName = "AES-GCM")]
     [DataRow("chacha20-poly1305@openssh.com", null, -1, "Failure establishing ssh session: -12, Unable to exchange encryption keys", DisplayName = "ChaCha20-Poly1305 tag")]
     [DataRow("chacha20-poly1305@openssh.com", null, 3, KeyExchangeMethodFailed, DisplayName = "ChaCha20-Poly1305 length, off the block size")]
