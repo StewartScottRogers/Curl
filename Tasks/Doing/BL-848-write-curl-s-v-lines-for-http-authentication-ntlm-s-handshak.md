@@ -88,3 +88,4 @@ project and its `.UnitTests` twin to `touches` before editing it and note why he
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-30: Backlog -> Doing.
