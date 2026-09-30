@@ -366,7 +366,7 @@ internal static class CurlComposition
         LateBoundSecurityContextFactory proxyContexts = new();
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts);
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider);
-        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer);
+        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts);
         UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider);
         PoolingConnector poolingConnector = new(tcpConnector, timeProvider);
 
@@ -412,6 +412,10 @@ internal static class CurlComposition
     /// Opens the QUIC connections <c>--http3</c> and <c>--http3-only</c> ask for (ADR-0144, BL-732);
     /// <see langword="null" /> for a connector with no QUIC.
     /// </param>
+    /// <param name="socks5SecurityContexts">
+    /// Makes the Kerberos contexts SOCKS5 GSS-API runs on, with the <c>--socks5-*</c> options of
+    /// <see cref="Socks5AuthenticationMapping.FromCommandLine" /> (BL-615); <see langword="null" /> for none.
+    /// </param>
     /// <returns>The connector.</returns>
     internal static TcpConnector CreateTcpConnector(
         CommandLineOptions options,
@@ -421,7 +425,8 @@ internal static class CurlComposition
         TimeProvider timeProvider,
         HttpProxyTunnelOptions proxyTunnelOptions,
         ITlsProvider? proxyTlsProvider = null,
-        QuicDialer? quicDialer = null) =>
+        QuicDialer? quicDialer = null,
+        ISecurityContextFactory? socks5SecurityContexts = null) =>
         new(
             dnsResolver,
             tcpDialer,
@@ -437,7 +442,8 @@ internal static class CurlComposition
             HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion),
             quicDialer,
             localBinding: LocalBindingOf(options),
-            preProxy: PreProxyOf(options));
+            preProxy: PreProxyOf(options),
+            socks5Authentication: Socks5AuthenticationMapping.FromCommandLine(options, socks5SecurityContexts, OperatingSystem.IsWindows()));
 
     /// <summary>
     /// The SOCKS proxy the connector reaches an HTTP or HTTPS proxy through: the <c>--preproxy</c>
