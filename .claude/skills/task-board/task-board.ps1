@@ -312,6 +312,26 @@ function Get-Collision($Task, [object[]] $Tasks) {
     return $null
 }
 
+# The ready tasks, in 'next' order, each marked with why it can or cannot start now.
+# Walking the queue in order, a task whose touches overlap one in Doing is waiting, and
+# reserves its touches: a lower task that overlaps a reservation is held back behind it,
+# even when it overlaps nothing in Doing. Without that, smaller tasks on the same projects
+# keep starting as each Doing task ends, and a large task is never free to start (BL-717,
+# BL-1041). A task that touches * reserves everything, so it runs once Doing empties.
+function Get-StartOrder([object[]] $Ready, [object[]] $Tasks) {
+    $reserved = @()
+    foreach ($task in $Ready) {
+        $busy = Get-Collision $task $Tasks
+        if ($busy) {
+            $reserved += $task
+            [pscustomobject]@{ Task = $task; Start = $false; Behind = $busy; HeldBy = $null }
+            continue
+        }
+        $holder = @($reserved | Where-Object { Test-Overlap $task.Touches $_.Touches }) | Select-Object -First 1
+        [pscustomobject]@{ Task = $task; Start = (-not $holder); Behind = $null; HeldBy = $holder }
+    }
+}
+
 function Get-NextId([object[]] $Tasks) {
     $highest = -1
     foreach ($task in $Tasks) { if ($task.Number -gt $highest) { $highest = $task.Number } }
@@ -338,6 +358,10 @@ switch ($Command) {
         $tasks = Get-Tasks
         $doneIds = Get-DoneIds $tasks
         $readyIds = @((Get-LaneReadyTasks $tasks) | ForEach-Object { $_.Id })
+        $heldBy = @{}
+        foreach ($entry in @(Get-StartOrder (Get-LaneReadyTasks $tasks) $tasks)) {
+            if ($entry.HeldBy) { $heldBy[$entry.Task.Id] = $entry.HeldBy.Id }
+        }
 
         foreach ($state in $States) {
             $inState = @($tasks | Where-Object { $_.State -eq $state -and -not $_.Archived } | Sort-Object Number)
@@ -353,6 +377,7 @@ switch ($Command) {
                         $flag = 'ready, #' + ([array]::IndexOf($readyIds, $task.Id) + 1) + ' in queue'
                         $collision = Get-Collision $task $tasks
                         if ($collision) { $flag += ", overlaps $($collision.Id) in Doing" }
+                        elseif ($heldBy.ContainsKey($task.Id)) { $flag += ", held back behind $($heldBy[$task.Id])" }
                     }
                 }
                 elseif ($state -eq 'Done' -and $task.Completed) { $flag = "completed $($task.Completed)" }
@@ -374,10 +399,13 @@ switch ($Command) {
         $skipIds = @($Skip | ForEach-Object { $_ -split '[,\s]+' } | Where-Object { $_ } | ForEach-Object { $_.ToUpperInvariant() })
         $ready = @((Get-LaneReadyTasks $tasks) | Where-Object { $skipIds -notcontains $_.Id })
         if ($ready.Count -eq 0) { Write-Output 'No task is ready.'; break }
-        $free = @($ready | Where-Object { -not (Get-Collision $_ $tasks) })
+        $order = @(Get-StartOrder $ready $tasks)
+        $free = @($order | Where-Object { $_.Start } | ForEach-Object { $_.Task })
         if ($free.Count -eq 0) {
-            $first = $ready[0]
-            Write-Output ('No task can start yet: every ready task overlaps one in Doing, e.g. {0} with {1}.' -f $first.Id, (Get-Collision $first $tasks).Id)
+            $first = $order[0]
+            $held = @($order | Where-Object { $_.HeldBy }).Count
+            $also = if ($held) { "; $held more held back behind the tasks waiting" } else { '' }
+            Write-Output ('No task can start yet: every ready task overlaps one in Doing or waits behind one that does, e.g. {0} with {1}{2}.' -f $first.Task.Id, $first.Behind.Id, $also)
             break
         }
         $task = $free[0]
@@ -385,20 +413,22 @@ switch ($Command) {
     }
 
     'capacity' {
-        # Greedy in 'next' order: a ready task is picked when its touches overlap
-        # neither a Doing task nor a task picked before it.
+        # Greedy in 'next' order: a ready task is picked when 'next' would let it start
+        # (Get-StartOrder: it overlaps no Doing task and is not held back behind a waiting
+        # one) and its touches overlap no task picked before it.
         $tasks = Get-Tasks
         $doing = @($tasks | Where-Object { $_.State -eq 'Doing' })
-        $claimed = @($doing | ForEach-Object { , $_.Touches })
+        $claimed = @()
         $picked = @()
-        foreach ($task in (Get-LaneReadyTasks $tasks)) {
+        foreach ($entry in @(Get-StartOrder (Get-LaneReadyTasks $tasks) $tasks)) {
+            if (-not $entry.Start) { continue }
             $overlaps = $false
             foreach ($touches in $claimed) {
-                if (Test-Overlap $task.Touches $touches) { $overlaps = $true; break }
+                if (Test-Overlap $entry.Task.Touches $touches) { $overlaps = $true; break }
             }
             if ($overlaps) { continue }
-            $picked += $task.Id
-            $claimed += , $task.Touches
+            $picked += $entry.Task.Id
+            $claimed += , $entry.Task.Touches
         }
         if ($picked.Count -eq 0) { $more = 'none more can start' }
         else { $more = '{0} more can start ({1})' -f $picked.Count, ($picked -join ', ') }
