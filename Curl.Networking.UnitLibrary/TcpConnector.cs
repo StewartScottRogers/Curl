@@ -83,6 +83,11 @@ namespace Curl.Networking;
 /// target - is opened through (BL-614); <see langword="null" /> for none. A SOCKS
 /// <see cref="ConnectTarget.Proxy" /> and a direct target never pass through it.
 /// </param>
+/// <param name="socks5Authentication">
+/// The methods a SOCKS5 greeting offers and how GSS-API authenticates (<c>--socks5-basic</c>,
+/// <c>--socks5-gssapi</c>, <c>--socks5-gssapi-service</c>, <c>--socks5-gssapi-nec</c>, BL-615);
+/// <see langword="null" /> for <see cref="Socks5AuthenticationOptions.Default" />.
+/// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -100,7 +105,8 @@ public sealed class TcpConnector(
     TimeSpan? happyEyeballsTimeout = null,
     LocalBinding? localBinding = null,
     INetworkInterfaceLookup? networkInterfaceLookup = null,
-    ProxyEndpoint? preProxy = null) : IConnector
+    ProxyEndpoint? preProxy = null,
+    Socks5AuthenticationOptions? socks5Authentication = null) : IConnector
 {
     private const string AnyHost = "*";
 
@@ -136,6 +142,12 @@ public sealed class TcpConnector(
     /// <c>--local-port</c>), or <see langword="null" /> to leave it to the system.
     /// </summary>
     public LocalBinding? LocalBinding => localBinding;
+
+    /// <summary>
+    /// Gets the methods a SOCKS5 greeting offers and how GSS-API authenticates (BL-615):
+    /// <see cref="Socks5AuthenticationOptions.Default" /> when none were given.
+    /// </summary>
+    public Socks5AuthenticationOptions Socks5Authentication => socks5Authentication ?? Socks5AuthenticationOptions.Default;
 
     // Every TCP dial goes through this one: bound as localBinding asks, or the dialer as given.
     private ITcpDialer BindingDialer() => localBinding is null
@@ -1103,6 +1115,7 @@ public sealed class TcpConnector(
                 destination.Host,
                 destination.Port,
                 (host, port, token) => ResolveAsync(host, port, target, token),
+                Socks5Authentication,
                 cancellationToken).ConfigureAwait(false), null);
         }
         catch (Exception exception)

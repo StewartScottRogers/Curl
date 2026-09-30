@@ -169,9 +169,14 @@ newly dialled one. A `407` to a CONNECT that sent a credential goes on through `
 SOCKS4a sends the host as written; `Socks5Handshake` offers no authentication and GSSAPI (and
 user name and password with a credential), resolves locally for SOCKS5 and sends the name for
 SOCKS5h. Every read takes exactly the reply's bytes, so the tunnel's bytes stay on the
-connection. A refused or cut-short handshake is exit 97 with curl's message; GSSAPI is offered
-but not implemented, so a proxy that picks it fails with the message the reference build's SSPI
-printed. ADR-0084 records these choices (first address, literals, UTF-8, disposal). Through an HTTPS proxy (`Https`, BL-266) TLS runs to the proxy host first, then the same CONNECT
+connection. A refused or cut-short handshake is exit 97 with curl's message. ADR-0084 records
+these choices (first address, literals, UTF-8, disposal). Per ADR-0274 (BL-615) `TcpConnector`
+takes optional `Socks5AuthenticationOptions` (`--socks5-basic`, `--socks5-gssapi`, and the
+GSS-API service, NEC mode, delegation and `ISecurityContextFactory`): the greeting offers only
+the methods allowed and a proxy picking another fails with curl's message, and a proxy picking
+GSSAPI gets `Socks5GssapiNegotiation`, RFC 1961's Kerberos token exchange and its protection-level
+message offering none, in the platform build's texts (`Socks5GssapiFailureText`). Tests script
+the context with `Fakes/ScriptedSecurityContextFactory`. Through an HTTPS proxy (`Https`, BL-266) TLS runs to the proxy host first, then the same CONNECT
 over it, then TLS to the target inside that; each handshake failure is the TLS provider's result.
 The handshake to the proxy runs through the proxy's `ITlsProvider` (the `--proxy-*` TLS options,
 ADR-0095), and so does the handshake to an HTTPS forward proxy (`ConnectTarget.IsForwardProxy`

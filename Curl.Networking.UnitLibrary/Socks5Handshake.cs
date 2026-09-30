@@ -8,16 +8,17 @@ namespace Curl.Networking;
 
 /// <summary>
 /// The SOCKS5 and SOCKS5h handshake (RFC 1928, with RFC 1929 user name and password) as
-/// the Schannel build of curl 8.21.0 runs it (measured): a greeting offering no
-/// authentication and GSSAPI, and user name and password when there is a credential; the
-/// sub-negotiation when the proxy picks it; then one CONNECT request and its reply.
+/// curl 8.21.0 runs it (measured): a greeting offering no authentication, GSSAPI unless
+/// <c>--socks5-basic</c> alone was given, and user name and password when there is a credential
+/// unless <c>--socks5-gssapi</c> alone was given; RFC 1929's sub-negotiation or RFC 1961's GSS-API
+/// exchange (<see cref="Socks5GssapiNegotiation" />) when the proxy picks it; then one CONNECT
+/// request and its reply.
 /// </summary>
 /// <remarks>
 /// SOCKS5 resolves the host locally and sends its first address; SOCKS5h sends the host
-/// name for the proxy to resolve. Both send an address literal as an address. GSSAPI is
-/// offered because curl offers it, but not implemented: a proxy that picks it fails with the
-/// message the reference build's SSPI printed against a loopback proxy with no Kerberos
-/// service name (measured; BL-213's Notes). ADR-0084 records these choices.
+/// name for the proxy to resolve. Both send an address literal as an address. A proxy that
+/// picks a method that was not allowed fails with curl's message for it. ADR-0084 and
+/// ADR-0274 record these choices.
 /// </remarks>
 internal static class Socks5Handshake
 {
@@ -26,12 +27,6 @@ internal static class Socks5Handshake
 
     /// <summary>The most bytes the user name or the password may hold (measured: 256 is refused).</summary>
     public const int MaximumCredentialBytes = 255;
-
-    /// <summary>
-    /// The exit 97 message when the proxy picks GSSAPI, as curl 8.21.0's SSPI reports it (measured).
-    /// </summary>
-    public const string GssapiFailureMessage =
-        "SSPI error: InitializeSecurityContext failed: SEC_E_TARGET_UNKNOWN (0x80090303) - The specified target is unknown or unreachable";
 
     private const byte NoAuthentication = 0;
     private const byte Gssapi = 1;
@@ -46,6 +41,7 @@ internal static class Socks5Handshake
     /// <param name="host">The host the tunnel reaches.</param>
     /// <param name="port">The port the tunnel reaches.</param>
     /// <param name="resolve">Resolves the host for SOCKS5.</param>
+    /// <param name="authentication">The methods allowed, and how GSS-API runs.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns><see langword="null" /> when the tunnel is open, else the failure.</returns>
     public static async ValueTask<ConnectResult?> RunAsync(
@@ -54,6 +50,7 @@ internal static class Socks5Handshake
         string host,
         int port,
         Func<string, int, CancellationToken, ValueTask<IReadOnlyList<IPAddress>>> resolve,
+        Socks5AuthenticationOptions authentication,
         CancellationToken cancellationToken)
     {
         var literal = SocksProxyTunnel.ParseAddressLiteral(host);
@@ -63,30 +60,52 @@ internal static class Socks5Handshake
             return SocksProxyTunnel.Failed("SOCKS5: the destination hostname is too long to be resolved remotely by the proxy.");
         }
 
-        return await NegotiateAuthenticationAsync(connection, proxy.Credential, cancellationToken).ConfigureAwait(false)
+        return await NegotiateAuthenticationAsync(connection, proxy, authentication, cancellationToken).ConfigureAwait(false)
             ?? await RequestConnectAsync(connection, host, port, hostName, literal, resolve, cancellationToken).ConfigureAwait(false);
     }
 
     private static async ValueTask<ConnectResult?> NegotiateAuthenticationAsync(
         IConnection connection,
-        NetworkCredential? credential,
+        ProxyEndpoint proxy,
+        Socks5AuthenticationOptions authentication,
         CancellationToken cancellationToken)
     {
-        byte[] greeting = credential is null
-            ? [5, 2, NoAuthentication, Gssapi]
-            : [5, 3, NoAuthentication, Gssapi, UserNameAndPassword];
-        await SocksProxyTunnel.SendAsync(connection, greeting, cancellationToken).ConfigureAwait(false);
+        // Without user name and password allowed, curl forgets the credential (measured).
+        var credential = authentication.AllowUserNameAndPassword ? proxy.Credential : null;
+        await SocksProxyTunnel.SendAsync(connection, Greeting(authentication.AllowGssapi, credential is not null), cancellationToken).ConfigureAwait(false);
 
         return await SocksProxyTunnel.ReadReplyAsync(connection, 2, cancellationToken).ConfigureAwait(false) switch
         {
             null => SocksProxyTunnel.Failed(SocksProxyTunnel.ProxyClosedMessage),
             [not 5, _] => SocksProxyTunnel.Failed("Received invalid version in initial SOCKS5 response."),
             [_, NoAuthentication] => null,
+            [_, UserNameAndPassword] when !authentication.AllowUserNameAndPassword =>
+                SocksProxyTunnel.Failed("BASIC authentication proposed but not enabled."),
             [_, UserNameAndPassword] => await AuthenticateAsync(connection, credential, cancellationToken).ConfigureAwait(false),
-            [_, Gssapi] => SocksProxyTunnel.Failed(GssapiFailureMessage),
+            [_, Gssapi] when !authentication.AllowGssapi =>
+                SocksProxyTunnel.Failed("SOCKS5 GSSAPI per-message authentication is not enabled."),
+            [_, Gssapi] => await Socks5GssapiNegotiation.RunAsync(connection, proxy.Host, authentication, cancellationToken).ConfigureAwait(false),
             [_, NoAcceptableMethod] => SocksProxyTunnel.Failed("No authentication method was acceptable."),
             _ => SocksProxyTunnel.Failed("Unknown SOCKS5 mode attempted to be used by server."),
         };
+    }
+
+    // Version 5, the method count, then no authentication, GSSAPI and user name and password
+    // as allowed, in that order (measured).
+    private static byte[] Greeting(bool offerGssapi, bool offerUserNameAndPassword)
+    {
+        List<byte> methods = [NoAuthentication];
+        if (offerGssapi)
+        {
+            methods.Add(Gssapi);
+        }
+
+        if (offerUserNameAndPassword)
+        {
+            methods.Add(UserNameAndPassword);
+        }
+
+        return [5, (byte)methods.Count, .. methods];
     }
 
     // RFC 1929.
