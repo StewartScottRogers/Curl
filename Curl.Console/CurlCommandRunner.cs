@@ -485,6 +485,17 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(CurlExitCode.FailedInit, CurlEasyErrorText.Of(CurlExitCode.FailedInit));
 
     /// <summary>
+    /// The result of a transfer whose <c>--interface</c> value libcurl refuses when curl sets it
+    /// (<c>CURLOPT_INTERFACE</c>, option 10062, 0x274e): exit 43 with curl 8.21.0's message, before
+    /// any connection (measured 2026-09-29, BL-600 Notes). It is compared by reference, so that
+    /// <see cref="TransferAllAsync" /> stops before the remaining URLs, as curl does.
+    /// </summary>
+    private static readonly TransferResult InterfaceSetoptFailure =
+        TransferResult.Failure(CurlExitCode.BadFunctionArgument, InterfaceSetoptMessage);
+
+    private const string InterfaceSetoptMessage = "setopt 0x274e got bad argument";
+
+    /// <summary>
     /// Standard output, deferring a write failure as curl's stdio buffer does and recording
     /// it for the current transfer: every transfer's without <c>-Z</c>, and a <c>--trace -</c>
     /// dump's; under <c>-Z</c> each transfer has one of its own (task BL-773).
@@ -1827,6 +1838,11 @@ internal sealed class CurlCommandRunner(
         }
 
         ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(transfer);
+        if (RefuseMalformedInterface(options, eventsBeforeConnecting) is { } setoptFailure)
+        {
+            return (setoptFailure, givenUrl, transferUrl);
+        }
+
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
         await LoadCookieFilesAsync(dispatch, options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
         await OpenAltSvcCacheAsync(options, transferUrl).ConfigureAwait(false);
@@ -2504,6 +2520,26 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Refuses a <c>--interface</c> value libcurl refuses when curl sets it
+    /// (<see cref="InterfaceBinding.IsMalformed" />): curl 8.21.0 reports <c>setopt 0x274e got bad
+    /// argument</c> as a <c>-v</c> line, fails the transfer with exit 43 and that message, still writes
+    /// its <c>-w</c> output, and transfers nothing after it (measured 2026-09-29, BL-600 Notes).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="events">Where the <c>-v</c> line goes.</param>
+    /// <returns><see cref="InterfaceSetoptFailure" />, or <see langword="null" /> when the value was accepted.</returns>
+    private static TransferResult? RefuseMalformedInterface(CommandLineOptions options, ITransferEvents events)
+    {
+        if (options.Interface is not { IsMalformed: true })
+        {
+            return null;
+        }
+
+        events.ReportInfo(InterfaceSetoptMessage);
+        return InterfaceSetoptFailure;
+    }
+
+    /// <summary>
     /// The scheme <c>%{scheme}</c> prints: the URL's, in lower case, or <see langword="null" />
     /// (printed as nothing) when the URL cannot be parsed or no handler serves its scheme, as
     /// curl 8.21.0 prints it for <c>dict://exa mple.com/</c> and <c>xyz://a/b</c>.
@@ -2572,6 +2608,7 @@ internal sealed class CurlCommandRunner(
         IpfsMalformedTargetUrlFailure,
         IpfsRemoteNameFailure,
         KnownHostsFileMissingFailure,
+        InterfaceSetoptFailure,
     };
 
     /// <summary>

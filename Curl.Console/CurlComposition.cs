@@ -429,7 +429,52 @@ internal static class CurlComposition
             AddressFamilyOf(options),
             UnixSocketOf(options),
             HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion),
-            quicDialer);
+            quicDialer,
+            localBinding: LocalBindingOf(options));
+
+    /// <summary>
+    /// What the TCP connector binds each connection's local end to, from <c>--interface</c> and
+    /// <c>--local-port</c>, or <see langword="null" /> for neither (BL-600): a plain name is tried as an
+    /// interface and then as a host, <c>if!</c> as an interface only, <c>host!</c> as a host only, and
+    /// <c>ifhost!</c> binds its host with its interface part kept as the device name; the port range is
+    /// <see cref="LocalPortRange.First" /> and <see cref="LocalPortRange.Count" />, or any port. A value
+    /// libcurl refuses at setopt never reaches a connect, so its empty parts are not looked at. Each option
+    /// group builds its own connector and pool, so a bound connection is never reused unbound.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The binding, or <see langword="null" />.</returns>
+    internal static LocalBinding? LocalBindingOf(CommandLineOptions options)
+    {
+        if (options.Interface is null && options.LocalPorts is null)
+        {
+            return null;
+        }
+
+        LocalPortRange ports = options.LocalPorts ?? new LocalPortRange(0, 0);
+        (string? interfaceName, string? hostName, string? deviceName) = LocalBindingNamesOf(options.Interface);
+        return new LocalBinding(interfaceName, hostName, deviceName, ports.First, ports.Count);
+    }
+
+    /// <summary>
+    /// The names <see cref="LocalBindingOf" /> binds for a <c>--interface</c> value: a plain name as both
+    /// interface and host, <c>ifhost!</c>'s parts as device and host, <c>if!</c> and <c>host!</c> as given.
+    /// </summary>
+    private static (string? InterfaceName, string? HostName, string? DeviceName) LocalBindingNamesOf(InterfaceBinding? named)
+    {
+        if (named is null)
+        {
+            return (null, null, null);
+        }
+
+        if (named.InterfaceOrHostName is { } name)
+        {
+            return (name, name, null);
+        }
+
+        return named.InterfaceName is not null && named.HostName is not null
+            ? (null, named.HostName, named.InterfaceName)
+            : (named.InterfaceName, named.HostName, null);
+    }
 
     /// <summary>
     /// The Unix domain socket the TCP connector dials in place of each URL's host: the last of

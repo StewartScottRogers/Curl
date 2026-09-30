@@ -110,6 +110,9 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
             throw new InvalidOperationException("An infinite delay ended without being cancelled.");
         }
 
+        public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken) =>
+            DialAsync(endPoint, cancellationToken);
+
         public async ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken)
         {
             await Task.Delay(Timeout.Infinite, cancellationToken);
