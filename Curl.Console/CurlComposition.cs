@@ -363,10 +363,16 @@ internal static class CurlComposition
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(proxyTlsClientOptions, timeProvider);
-        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options);
+        LateBoundSecurityContextFactory proxyContexts = new();
+        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts);
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider);
         TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer);
+        UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider);
+        PoolingConnector poolingConnector = new(tcpConnector, timeProvider);
 
+        // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
+        // contexts come from, which can only be made once the connectors exist (BL-604).
+        proxyContexts.Bind(CreateSecurityContextFactory(poolingConnector, udpDatagramConnector));
         return new CurlTransports(
             dnsResolver,
             timeProvider,
@@ -378,8 +384,8 @@ internal static class CurlComposition
             proxyTunnelOptions,
             quicDialer,
             tcpConnector,
-            CreateUdpDatagramConnector(options, dnsResolver, timeProvider),
-            new PoolingConnector(tcpConnector, timeProvider));
+            udpDatagramConnector,
+            poolingConnector);
     }
 
     /// <summary>
@@ -547,14 +553,15 @@ internal static class CurlComposition
     /// and the proxy authenticated with the scheme the <c>--proxy-*</c> auth switches pick
     /// (<see cref="CommandLineOptions.ProxyAuthSchemes" />), answered by the same
     /// <see cref="CreateHttpAuthenticator" /> the origin uses: Basic up front, Digest and
-    /// <c>--proxy-anyauth</c> after a <c>407</c> (ADR-0186). Its Negotiate and NTLM contexts come
-    /// from a <see cref="SystemSecurityContextFactory" />, with the <c>--proxy-service-name</c> and
-    /// <c>--delegation</c> of <see cref="NegotiateOptionsMapping.FromCommandLine" />, though the
-    /// authenticator answers neither for a proxy yet (BL-604).
+    /// <c>--proxy-anyauth</c> after a <c>407</c> (ADR-0186), NTLM's Type 1 and Type 3 and
+    /// Negotiate's tokens on the same connection (ADR-0270). Its Negotiate and NTLM contexts come
+    /// from <paramref name="securityContexts" />, with the <c>--proxy-service-name</c> and
+    /// <c>--delegation</c> of <see cref="NegotiateOptionsMapping.FromCommandLine" />.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
+    /// <param name="securityContexts">Makes the proxy's NTLM and Negotiate contexts: <see cref="CreateSecurityContextFactory" />'s router in production.</param>
     /// <returns>The tunnel's options.</returns>
-    internal static HttpProxyTunnelOptions CreateProxyTunnelOptions(CommandLineOptions options) =>
+    internal static HttpProxyTunnelOptions CreateProxyTunnelOptions(CommandLineOptions options, ISecurityContextFactory securityContexts) =>
         new(
             options.UserAgent switch
             {
@@ -567,7 +574,7 @@ internal static class CurlComposition
             ProxyHeaders = options.ProxyHeaders,
             CommandLineTextEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()),
             ProxyAuthSchemes = options.ProxyAuthSchemes,
-            ProxyAuthenticator = CreateHttpAuthenticator(new SystemSecurityContextFactory(), NegotiateOptionsMapping.FromCommandLine(options)),
+            ProxyAuthenticator = CreateHttpAuthenticator(securityContexts, NegotiateOptionsMapping.FromCommandLine(options)),
         };
 
     /// <summary>

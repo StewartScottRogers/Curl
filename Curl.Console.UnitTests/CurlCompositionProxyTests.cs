@@ -336,6 +336,20 @@ public sealed class CurlCompositionProxyTests
     }
 
     [TestMethod]
+    public async Task CreateTransports_ProxyNtlm_AnswersTheTunnelWithTheRoutersType1()
+    {
+        // The tunnel's authenticator is bound to ADR-0142's router once the connectors exist
+        // (BL-604): SSPI's Type 1 on Windows, curl's own NTLM's elsewhere.
+        CurlTransports transports = CurlComposition.CreateTransports(
+            CommandLineParser.Parse(["--proxy-ntlm", "-U", "u:p", "-p", "-x", "127.0.0.1:18604", "http://example.test/"], _ => true).Options!);
+        HttpAuthRequest request = new("CONNECT", CurlUrl.Parse("http://127.0.0.1:18604/"), "example.test:80", new System.Net.NetworkCredential("u", "p"), null, HttpAuthSchemes.Ntlm, IsProxy: true);
+
+        string? value = await transports.ProxyTunnelOptions.ProxyAuthenticator!.CreateAuthorizationAsync(request, [], CancellationToken.None);
+
+        StringAssert.StartsWith(value, "NTLM TlRMTVNTUAAB", StringComparison.Ordinal);
+    }
+
+    [TestMethod]
     public async Task RunAsync_ForwardProxyWithProxyAnyAuth_AnswersTheProxysBasicChallengeOnTheSameConnection()
     {
         // curl -x http://127.0.0.1:18603 -U u:p --proxy-anyauth http://example.invalid/ against a 407 offering Basic (BL-603 Notes).
@@ -523,7 +537,7 @@ public sealed class CurlCompositionProxyTests
 
     /// <summary>The tunnel options the production composition maps from <paramref name="arguments" />.</summary>
     private static HttpProxyTunnelOptions TunnelOptionsFor(string[] arguments) =>
-        CurlComposition.CreateProxyTunnelOptions(CommandLineParser.Parse(arguments, _ => true).Options!);
+        CurlComposition.CreateProxyTunnelOptions(CommandLineParser.Parse(arguments, _ => true).Options!, new SystemSecurityContextFactory());
 
     /// <summary>
     /// Runs <paramref name="arguments" /> through the production composition over

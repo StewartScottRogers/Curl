@@ -233,8 +233,8 @@ body are checked: `Curl.Core`'s `ProxySelector` (held by `TransferDispatch`, rea
 process's proxy environment variables in production and none in tests unless given) picks it
 from `-x` or a `--socks` option, `--noproxy` and the variables; `-U` replaces its credential;
 it goes into `HttpRequestOptions.ForwardProxy` with `-p` as `ProxyTunnel`. A CONNECT tunnel
-authenticates with the scheme `--proxy-basic`, `--proxy-digest` and `--proxy-anyauth` pick,
-through the same `RankedHttpAuthenticator` the origin uses (`CreateProxyTunnelOptions`, ADR-0186),
+authenticates with the scheme `--proxy-basic`, `--proxy-digest`, `--proxy-ntlm`, `--proxy-negotiate` and `--proxy-anyauth` pick,
+through the same `RankedHttpAuthenticator` the origin uses (`CreateProxyTunnelOptions`, ADR-0186), its contexts from ADR-0142's router through a `LateBoundSecurityContextFactory` bound once the connectors exist (ADR-0270),
 and a forward proxy's `407` is answered with the same pick, which `CreateProtocolHandlers` hands
 the HTTP handler (ADR-0187). Under
 `--unix-socket` or `--abstract-unix-socket` no proxy is chosen or even parsed, and the group's
