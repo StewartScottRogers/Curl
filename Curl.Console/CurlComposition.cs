@@ -443,7 +443,8 @@ internal static class CurlComposition
             quicDialer,
             localBinding: LocalBindingOf(options),
             preProxy: PreProxyOf(options),
-            socks5Authentication: Socks5AuthenticationMapping.FromCommandLine(options, socks5SecurityContexts, OperatingSystem.IsWindows()));
+            socks5Authentication: Socks5AuthenticationMapping.FromCommandLine(options, socks5SecurityContexts, OperatingSystem.IsWindows()),
+            haproxyProtocol: HaproxyProtocolOf(options));
 
     /// <summary>
     /// The SOCKS proxy the connector reaches an HTTP or HTTPS proxy through: the <c>--preproxy</c>
@@ -458,6 +459,19 @@ internal static class CurlComposition
         && ProxyUrlParser.TryParse(options.PreProxy, ProxyKind.Socks4, out ProxyEndpoint? preProxy, out _)
         && preProxy.Kind is not (ProxyKind.Http or ProxyKind.Https)
             ? preProxy
+            : null;
+
+    /// <summary>
+    /// The HAProxy PROXY protocol v1 line the TCP connector sends first on each connection:
+    /// with <c>--haproxy-protocol</c>, or with <c>--haproxy-clientip</c> alone, which turns it on
+    /// even after <c>--no-haproxy-protocol</c> as curl 8.21.0's libcurl does (measured, BL-616
+    /// Notes); <see langword="null" /> for neither.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The header, or <see langword="null" />.</returns>
+    internal static HaproxyProtocolHeader? HaproxyProtocolOf(CommandLineOptions options) =>
+        options.HaproxyProtocol || options.HaproxyClientIp is not null
+            ? new HaproxyProtocolHeader(options.HaproxyClientIp)
             : null;
 
     /// <summary>
