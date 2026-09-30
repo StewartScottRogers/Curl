@@ -39,3 +39,4 @@ An `ftp://` passive data connection that never connects is bounded only by `-m` 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-30: Backlog -> Doing.
