@@ -68,6 +68,8 @@ public sealed class FtpProtocolHandler : IProtocolHandler
 
     private readonly IConnector connector;
 
+    private readonly IConnector dataConnector;
+
     private readonly IConnectionListener listener;
 
     private readonly ITlsProvider tlsProvider;
@@ -90,7 +92,7 @@ public sealed class FtpProtocolHandler : IProtocolHandler
     /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="connector" /> is <see langword="null" />.</exception>
     public FtpProtocolHandler(IConnector connector)
-        : this(connector, UnavailableConnectionListener.Instance, UnavailableTlsProvider.Instance, UnavailableDnsResolver.Instance, UnavailableNetworkInterfaceLookup.Instance, PlaintextSchemes)
+        : this(connector, connector, UnavailableConnectionListener.Instance, UnavailableTlsProvider.Instance, UnavailableDnsResolver.Instance, UnavailableNetworkInterfaceLookup.Instance, PlaintextSchemes)
     {
     }
 
@@ -161,12 +163,46 @@ public sealed class FtpProtocolHandler : IProtocolHandler
         ITlsProvider tlsProvider,
         IDnsResolver dnsResolver,
         INetworkInterfaceLookup interfaceLookup)
-        : this(connector, listener, tlsProvider, dnsResolver, interfaceLookup, Schemes)
+        : this(connector, connector, listener, tlsProvider, dnsResolver, interfaceLookup, Schemes)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a handler that serves <c>ftp</c> and <c>ftps</c> as the five-argument
+    /// constructor does, but opens each passive data connection through
+    /// <paramref name="dataConnector" />, one that does not hold the connect to
+    /// <c>--connect-timeout</c>, as curl 8.21.0 does not (measured, BL-797).
+    /// </summary>
+    /// <param name="connector">
+    /// Supplies the control connection, made with TLS for <c>ftps</c> (port 990 unless the URL
+    /// names one).
+    /// </param>
+    /// <param name="dataConnector">Supplies the passive data connection.</param>
+    /// <param name="listener">Binds the port the server connects back to under <c>-P</c>.</param>
+    /// <param name="tlsProvider">
+    /// Upgrades the control connection after an accepted <c>AUTH</c>, and each data connection
+    /// after an accepted <c>PROT P</c>.
+    /// </param>
+    /// <param name="dnsResolver">Resolves a <c>-P</c> host name; its first address is the one used.</param>
+    /// <param name="interfaceLookup">
+    /// Finds a <c>-P</c> interface name's addresses; the first of the control connection's
+    /// family and IPv6 scope is the one used.
+    /// </param>
+    /// <exception cref="ArgumentNullException">Any argument is <see langword="null" />.</exception>
+    public FtpProtocolHandler(
+        IConnector connector,
+        IConnector dataConnector,
+        IConnectionListener listener,
+        ITlsProvider tlsProvider,
+        IDnsResolver dnsResolver,
+        INetworkInterfaceLookup interfaceLookup)
+        : this(connector, dataConnector, listener, tlsProvider, dnsResolver, interfaceLookup, Schemes)
     {
     }
 
     private FtpProtocolHandler(
         IConnector connector,
+        IConnector dataConnector,
         IConnectionListener listener,
         ITlsProvider tlsProvider,
         IDnsResolver dnsResolver,
@@ -174,6 +210,7 @@ public sealed class FtpProtocolHandler : IProtocolHandler
         string[] schemes)
     {
         this.connector = connector ?? throw new ArgumentNullException(nameof(connector));
+        this.dataConnector = dataConnector ?? throw new ArgumentNullException(nameof(dataConnector));
         this.listener = listener ?? throw new ArgumentNullException(nameof(listener));
         this.tlsProvider = tlsProvider ?? throw new ArgumentNullException(nameof(tlsProvider));
         this.dnsResolver = dnsResolver ?? throw new ArgumentNullException(nameof(dnsResolver));
@@ -227,7 +264,7 @@ public sealed class FtpProtocolHandler : IProtocolHandler
 
     private async ValueTask<TransferResult> TransferAsync(IConnection control, FtpControlConnectionName name, ITransferContext context, bool implicitTls, long started)
     {
-        var connections = new FtpSessionConnections(connector, listener, tlsProvider, dnsResolver, interfaceLookup);
+        var connections = new FtpSessionConnections(dataConnector, listener, tlsProvider, dnsResolver, interfaceLookup);
         using var connectPhase = new FtpConnectPhaseLimit(context, started);
         var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog)), name, context, implicitTls, connectPhase);
         await using (session.ConfigureAwait(false))

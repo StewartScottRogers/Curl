@@ -60,6 +60,56 @@ public sealed class FtpProtocolHandlerDataConnectFailureTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_WithADataConnector_DialsTheDataConnectionThroughItAndNamesItsTimeoutViaTheDataAddress()
+    {
+        // curl -v --disable-epsv --no-ftp-skip-pasv-ip --connect-timeout 1 ftp://127.0.0.1:47911/f.txt,
+        // PASV naming 10.255.255.1 port 1025, measured 2026-09-30 (BL-797): the data connect ran
+        // until Windows gave up, 21 s, then
+        // curl: (28) Failed to connect to 127.0.0.1:47911 via 10.255.255.1:1025 after 21125 ms: Could not connect to server
+        var control = new ScriptedConnection(Encoding.Latin1.GetBytes(
+            "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n257 \"/\" is current directory\r\n227 Entering Passive Mode (10,255,255,1,4,1)\r\n"));
+        var controlConnector = new QueuedConnector(ConnectResult.Connected(control));
+        var dataConnector = new QueuedConnector(
+            ConnectResult.Failed(CurlExitCode.OperationTimedOut, "Failed to connect to 10.255.255.1:1025 after 21125 ms: Could not connect to server"));
+        var handler = new FtpProtocolHandler(
+            controlConnector,
+            dataConnector,
+            new QueuedListener(),
+            new QueuedTlsProvider(),
+            new NamedDnsResolver(new Dictionary<string, IPAddress[]>()),
+            new NamedNetworkInterfaceLookup(new Dictionary<string, IPAddress[]>()));
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse("ftp://127.0.0.1:47911/f.txt"),
+            Output = new MemoryStream(),
+            FtpDisableEpsv = true,
+            FtpSkipPasvIp = false,
+        };
+
+        TransferResult result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(
+            TransferResult.Failure(CurlExitCode.OperationTimedOut, "Failed to connect to 127.0.0.1:47911 via 10.255.255.1:1025 after 21125 ms: Could not connect to server"),
+            result with { Report = null });
+        Assert.HasCount(1, controlConnector.Targets);
+        Assert.AreEqual(new ConnectTarget("10.255.255.1", 1025, false), dataConnector.Targets.Single() with { DiagnosticLog = NoDiagnosticLog.Instance });
+    }
+
+    [TestMethod]
+    public void Constructor_WithANullDataConnector_ThrowsArgumentNullException()
+    {
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => new FtpProtocolHandler(
+            new QueuedConnector(),
+            null!,
+            new QueuedListener(),
+            new QueuedTlsProvider(),
+            new NamedDnsResolver(new Dictionary<string, IPAddress[]>()),
+            new NamedNetworkInterfaceLookup(new Dictionary<string, IPAddress[]>())));
+
+        Assert.AreEqual("dataConnector", exception.ParamName);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_FtpSkipPasvIpDataConnectionRefused_NamesTheUrlHostAndViaTheControlAddress()
     {
         // curl -sS ftp://localhost:47709/f.txt, PASV naming 127.0.0.2 port 1, so the data

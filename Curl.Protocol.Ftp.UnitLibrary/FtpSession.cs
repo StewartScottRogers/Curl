@@ -1307,7 +1307,7 @@ internal sealed class FtpSession(
             Events = new FtpDataConnectEvents(context.Events, failure),
             DiagnosticLog = context.DiagnosticLog,
         };
-        ConnectResult connected = await connections.Connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        ConnectResult connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         dataConnection = connected.Connection;
         if (dataConnection is null)
         {
