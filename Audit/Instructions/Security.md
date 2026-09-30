@@ -99,5 +99,6 @@ negative test at all is a Low finding, unless the fuzzer found something on it.
 ## Keys
 
 Follow the key rule in [Report-Format.md](Report-Format.md). Kinds: `fuzz-crash`, `fuzz-hang`,
-`timing-leak`, `secret-dependent-branch`, `secret-in-output`, `secret-in-log`,
+`timing-leak`, `secret-dependent-branch`, `secret-dependent-lookup` (a table read at a secret
+index, as in an S-box cipher), `secret-in-output`, `secret-in-log`,
 `untested-parser`, `unfuzzable`.
