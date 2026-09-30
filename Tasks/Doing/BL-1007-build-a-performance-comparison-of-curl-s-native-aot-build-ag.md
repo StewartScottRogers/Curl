@@ -60,3 +60,4 @@ in the fixed row order above, which the scorecard (BL-1017) copies.
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
