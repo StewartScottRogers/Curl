@@ -33,3 +33,4 @@ ADR-0234 states, as a second amendment, what curl 8.18.0 (OpenSSL, MIT) was meas
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
