@@ -19,7 +19,9 @@ runs the handshake, requests `ssh-userauth`, checks the host key, authenticates,
 or `ScpFileDownload` - or `SftpDirectoryListing` for an `sftp` path
 ending with a slash - into the output, and ends the session with
 `DISCONNECT` 11 `Shutdown`; every `SshTransferException` becomes a failed
-`TransferResult`. The console passes the platform's preset and ADR-0022's credential
+`TransferResult`. On the way it reports curl's `-v` lines, worded in `SshInfoLines`, through
+`ITransferEvents`, and each block written to the output through
+`ReceivedDataReportingStream` (ADR-0262). The console passes the platform's preset and ADR-0022's credential
 encoding. `Curl.Protocol.Ssh.UnitTests` drives it end to end against the public
 `Fakes.InMemorySshServer`, an `IConnector` answering each connection with a real
 server-side session over `Fakes.InMemoryDuplexConnection`.

@@ -8,7 +8,7 @@ namespace Curl.Protocol.Ssh.Negotiation;
 /// strings.
 /// </summary>
 [TestClass]
-public sealed class SshAlgorithmPreferencesTests
+public sealed partial class SshAlgorithmPreferencesTests
 {
     [TestMethod]
     public void WindowsReference_IsCurl8210WinCngKexInit()

@@ -12,10 +12,36 @@ namespace Curl.Protocol.Ssh;
 internal sealed class SshTransferException(CurlExitCode exitCode, string message)
     : Exception(message)
 {
+    /// <summary>The exit 79 text curl prints for a failure of the SSH layer that has no message of its own.</summary>
+    internal const string SshLayerErrorMessage = "Error in the SSH layer";
+
     /// <summary>
     /// Gets the curl exit code the transfer reports.
     /// </summary>
     internal CurlExitCode ExitCode { get; } = exitCode;
+
+    /// <summary>
+    /// Gets a value indicating whether curl writes the message as a <c>-v</c> line too, as
+    /// its <c>failf</c> does; <see langword="false" /> for a failure curl returns without a
+    /// message of its own, whose text is the exit code's (ADR-0262).
+    /// </summary>
+    internal bool IsVerboseLine { get; private init; } = true;
+
+    /// <summary>
+    /// Gets a value indicating whether the failure came before curl finished setting up the
+    /// session, so <c>-v</c> ends with <c>closing connection #N</c> rather than the connection
+    /// left intact: the <c>SFTP</c> subsystem failing to start. Every failure before the
+    /// transfer starts ends the connection whatever this says (ADR-0262).
+    /// </summary>
+    internal bool EndsConnection { get; private init; }
+
+    /// <summary>
+    /// Creates the exit 60 failure curl 8.21.0 reports when the known-hosts check refuses the
+    /// host key: no message of its own, so curl prints the exit code's text.
+    /// </summary>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException KnownHostRefused() =>
+        new(CurlExitCode.PeerFailedVerification, "SSL peer certificate or SSH remote key was not OK") { IsVerboseLine = false };
 
     /// <summary>
     /// Creates the failure curl 8.21.0 reports when libssh2's session startup fails:
@@ -43,7 +69,7 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     /// </summary>
     /// <returns>The exception.</returns>
     internal static SshTransferException LoginDenied() =>
-        new(CurlExitCode.LoginDenied, "Login denied");
+        new(CurlExitCode.LoginDenied, "Login denied") { IsVerboseLine = false };
 
     /// <summary>
     /// Creates the failure curl 8.21.0 reports when the server's answer to the
@@ -54,7 +80,7 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     /// </summary>
     /// <returns>The exception.</returns>
     internal static SshTransferException SshLayerError() =>
-        new(CurlExitCode.Ssh, "Error in the SSH layer");
+        new(CurlExitCode.Ssh, SshLayerErrorMessage) { IsVerboseLine = false };
 
     /// <summary>
     /// Creates the failure curl 8.21.0 reports when libssh2 cannot start the SFTP session:
@@ -64,7 +90,7 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     /// <param name="description">libssh2's description, such as <c>Unable to request SFTP subsystem</c>.</param>
     /// <returns>The exception.</returns>
     internal static SshTransferException SftpInitializationFailed(string description) =>
-        new(CurlExitCode.FailedInit, $"Failure initializing sftp session: {description}");
+        new(CurlExitCode.FailedInit, $"Failure initializing sftp session: {description}") { EndsConnection = true };
 
     /// <summary>
     /// Creates the failure curl 8.21.0 reports when the server answers <c>SSH_FXP_OPEN</c>

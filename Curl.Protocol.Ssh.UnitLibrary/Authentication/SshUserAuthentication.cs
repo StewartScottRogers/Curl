@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Net;
 using System.Text;
+using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Keys;
 using Curl.Protocol.Ssh.PacketProtection;
 using Curl.Protocol.Ssh.Transport;
@@ -29,8 +30,13 @@ namespace Curl.Protocol.Ssh.Authentication;
 /// <param name="userKeys">
 /// The user's key files for <c>publickey</c>, or <see langword="null" /> to skip the method.
 /// </param>
-internal sealed class SshUserAuthentication(SshTransport transport, Encoding credentialEncoding, SshUserKeySource? userKeys = null)
+/// <param name="events">
+/// Where curl's <c>-v</c> lines for each method go (ADR-0262), or <see langword="null" /> for nowhere.
+/// </param>
+internal sealed class SshUserAuthentication(SshTransport transport, Encoding credentialEncoding, SshUserKeySource? userKeys = null, ITransferEvents? events = null)
 {
+    private readonly ITransferEvents events = events ?? NoTransferEvents.Instance;
+
     /// <summary>The service the client requests before authenticating.</summary>
     internal const string UserAuthService = "ssh-userauth";
 
@@ -104,10 +110,14 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
         byte[] user = credentialEncoding.GetBytes(credentials?.UserName ?? string.Empty);
         byte[] password = credentialEncoding.GetBytes(credentials?.Password ?? string.Empty);
         string? methods = await ListMethodsAsync(user, cancellationToken).ConfigureAwait(false);
-        if (methods is not null)
+        if (methods is null)
         {
-            await AuthenticateWithMethodsAsync(methods, user, password, cancellationToken).ConfigureAwait(false);
+            events.ReportInfo(SshInfoLines.AcceptedWithoutAuthentication);
+            return;
         }
+
+        events.ReportInfo(SshInfoLines.OffersAuthentication(methods));
+        await AuthenticateWithMethodsAsync(methods, user, password, cancellationToken).ConfigureAwait(false);
     }
 
     private static SshTransferException ServiceRequestFailed(int libssh2ErrorCode) =>
@@ -128,14 +138,24 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
 
     private async ValueTask AuthenticateWithMethodsAsync(string methods, byte[] user, byte[] password, CancellationToken cancellationToken)
     {
-        if (methods.Contains(PublicKeyMethod, StringComparison.Ordinal) && await TryPublicKeyAsync(user, cancellationToken).ConfigureAwait(false))
+        bool offersPublicKey = methods.Contains(PublicKeyMethod, StringComparison.Ordinal);
+        if (offersPublicKey && await TryPublicKeyAsync(user, cancellationToken).ConfigureAwait(false))
         {
             return;
         }
 
         if (methods.Contains(PasswordMethod, StringComparison.Ordinal) && await TryPasswordAsync(user, password, cancellationToken).ConfigureAwait(false))
         {
+            events.ReportInfo(SshInfoLines.PasswordAuthenticated);
             return;
+        }
+
+        // curl then asks the SSH agent, which this client never finds, as the reference
+        // machine found none (ADR-0262).
+        if (offersPublicKey)
+        {
+            events.ReportInfo(SshInfoLines.TryingAgent);
+            events.ReportInfo(SshInfoLines.AgentConnectFailed);
         }
 
         await RequireKeyboardInteractiveAsync(methods, user, password, cancellationToken).ConfigureAwait(false);
@@ -152,6 +172,8 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
         {
             throw SshTransferException.LoginDenied();
         }
+
+        events.ReportInfo(SshInfoLines.KeyboardInteractiveAuthenticated);
     }
 
     // libssh2 checks the length first, then the service name's length field and bytes.
@@ -254,7 +276,8 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
     // libssh2 first asks whether the key would do, without a signature; PK_OK is answered
     // with the signed request, and SUCCESS to the question authenticates at once. The
     // public key comes from --pubkey or the private key, so with --pubkey the question is
-    // asked even when the private key cannot be read.
+    // asked even when the private key cannot be read. The -v lines name the key files, then
+    // the outcome with libssh2's reason for a denial (ADR-0262).
     private async ValueTask<bool> TryPublicKeyAsync(byte[] user, CancellationToken cancellationToken)
     {
         if (userKeys is null)
@@ -263,31 +286,54 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
         }
 
         SshUserKeyFiles files = await userKeys.LocateAsync(cancellationToken).ConfigureAwait(false);
-        SshPublicKey? publicKey = await userKeys.ReadPublicKeyAsync(files, cancellationToken).ConfigureAwait(false);
-        string? algorithm = publicKey is null ? null : SignatureAlgorithmFor(publicKey.KeyType);
-        return algorithm is not null && await TryPublicKeyQuestionAsync(user, algorithm, publicKey!, files, cancellationToken).ConfigureAwait(false);
+        if (files.PublicKeyPath is { } publicKeyPath)
+        {
+            events.ReportInfo(SshInfoLines.TryingPublicKeyFile(publicKeyPath));
+        }
+
+        events.ReportInfo(SshInfoLines.TryingPrivateKeyFile(files.PrivateKeyPath));
+        string? denial = await DenyPublicKeyAsync(user, files, cancellationToken).ConfigureAwait(false);
+        events.ReportInfo(denial is null ? SshInfoLines.AuthenticatedViaPublicKey : SshInfoLines.PublicKeyDenied(denial));
+        return denial is null;
     }
 
-    private async ValueTask<bool> TryPublicKeyQuestionAsync(byte[] user, string algorithm, SshPublicKey publicKey, SshUserKeyFiles files, CancellationToken cancellationToken)
+    // Null when the key authenticated the user; libssh2's reason otherwise.
+    private async ValueTask<string?> DenyPublicKeyAsync(byte[] user, SshUserKeyFiles files, CancellationToken cancellationToken)
+    {
+        SshPublicKey? publicKey = await userKeys!.ReadPublicKeyAsync(files, cancellationToken).ConfigureAwait(false);
+        string? algorithm = publicKey is null ? null : SignatureAlgorithmFor(publicKey.KeyType);
+        return algorithm is null
+            ? SshInfoLines.ReasonUnknown
+            : await AskPublicKeyQuestionAsync(user, algorithm, publicKey!, files, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask<string?> AskPublicKeyQuestionAsync(byte[] user, string algorithm, SshPublicKey publicKey, SshUserKeyFiles files, CancellationToken cancellationToken)
     {
         byte[]? answer = await TryExchangeAsync(
             PublicKeyRequest(user, algorithm, publicKey.Blob, signed: false),
             [SshAuthenticationMessageNumber.Success, SshAuthenticationMessageNumber.Failure, SshAuthenticationMessageNumber.PublicKeyOk],
             cancellationToken).ConfigureAwait(false);
-        return answer?[0] == SshAuthenticationMessageNumber.PublicKeyOk
-            ? await TrySignedPublicKeyAsync(user, algorithm, publicKey, files, cancellationToken).ConfigureAwait(false)
-            : answer?[0] == SshAuthenticationMessageNumber.Success;
+        byte answerType = MessageTypeOf(answer);
+        if (answerType == SshAuthenticationMessageNumber.PublicKeyOk)
+        {
+            return await SendSignedPublicKeyAsync(user, algorithm, publicKey, files, cancellationToken).ConfigureAwait(false);
+        }
+
+        return answerType == SshAuthenticationMessageNumber.Success ? null : SshInfoLines.PublicKeyCombinationInvalid;
     }
+
+    // The answer's message number, or 0, which no message has, when the method ended without one.
+    private static byte MessageTypeOf(byte[]? answer) => answer is null ? (byte)0 : answer[0];
 
     // RFC 4252 section 7: the signature covers the session identifier as a string, then the
     // request up to and including the public key blob. A private key that cannot be read or
     // is not of the public key's type fails the method before anything is sent.
-    private async ValueTask<bool> TrySignedPublicKeyAsync(byte[] user, string algorithm, SshPublicKey publicKey, SshUserKeyFiles files, CancellationToken cancellationToken)
+    private async ValueTask<string?> SendSignedPublicKeyAsync(byte[] user, string algorithm, SshPublicKey publicKey, SshUserKeyFiles files, CancellationToken cancellationToken)
     {
         SshPrivateKey? privateKey = await userKeys!.ReadPrivateKeyAsync(files, cancellationToken).ConfigureAwait(false);
         if (privateKey?.KeyType != publicKey.KeyType)
         {
-            return false;
+            return SshInfoLines.SignCallbackFailed;
         }
 
         byte[] request = PublicKeyRequest(user, algorithm, publicKey.Blob, signed: true);
@@ -301,7 +347,7 @@ internal sealed class SshUserAuthentication(SshTransport transport, Encoding cre
             message.ToArray(),
             [SshAuthenticationMessageNumber.Success, SshAuthenticationMessageNumber.Failure],
             cancellationToken).ConfigureAwait(false);
-        return answer?[0] == SshAuthenticationMessageNumber.Success;
+        return answer?[0] == SshAuthenticationMessageNumber.Success ? null : SshInfoLines.SignatureRefused;
     }
 
     // libssh2 upgrades only an ssh-rsa key: once the server has sent server-sig-algs, the

@@ -56,6 +56,14 @@ public sealed record SshAlgorithmPreferences(
     };
 
     /// <summary>
+    /// Gets the libssh2 cryptography backend the platform's curl names in its <c>-v</c> line
+    /// <c>SSH: libssh2 cryptography backend: &lt;name&gt;</c>: <c>WinCNG</c> for
+    /// <see cref="WindowsReference" />, <c>OpenSSL</c> for <see cref="OpenSslReference" />,
+    /// and <see langword="null" />, writing no line, otherwise (ADR-0262).
+    /// </summary>
+    public string? CryptographyBackend { get; init; }
+
+    /// <summary>
     /// Gets what curl 8.21.0's Windows build (libssh2 1.11.1 on WinCNG) offers, byte for byte
     /// and in its order.
     /// </summary>
@@ -66,7 +74,8 @@ public sealed record SshAlgorithmPreferences(
             "chacha20-poly1305@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr,aes256-cbc,rijndael-cbc@lysator.liu.se,"
             + "aes192-cbc,aes128-cbc,arcfour128,arcfour,3des-cbc"),
         Split(WindowsMacs),
-        [SshAlgorithmCatalogue.NoCompression]);
+        [SshAlgorithmCatalogue.NoCompression])
+    { CryptographyBackend = "WinCNG" };
 
     /// <summary>
     /// Gets what curl 8.21.0's OpenSSL build (libssh2 1.11.1 on OpenSSL, Linux and macOS)
@@ -80,7 +89,8 @@ public sealed record SshAlgorithmPreferences(
             + "ssh-ed25519-cert-v01@openssh.com," + RsaHostKeys),
         Split(OpenSslCiphers),
         Split(OpenSslMacs),
-        [SshAlgorithmCatalogue.NoCompression]);
+        [SshAlgorithmCatalogue.NoCompression])
+    { CryptographyBackend = "OpenSSL" };
 
     /// <summary>
     /// Gets every algorithm libssh2 1.11.1 or libssh 0.12.2 offers, in ADR-0122's full-set
@@ -137,6 +147,15 @@ public sealed record SshAlgorithmPreferences(
                 CurlExitCode.Ssh,
                 $"libssh2 method '{string.Join(',', narrowed)}' failed: The requested method(s) are not currently supported");
     }
+
+    /// <summary>
+    /// Gets the host-key algorithms curl narrows a known-hosts entry's type to, as its
+    /// <c>SSH: set '&lt;names&gt;' as hostkey type</c> line names them (ADR-0262).
+    /// </summary>
+    /// <param name="knownHostKeyType">A key type <see cref="NarrowHostKeysTo" /> recognizes, such as <c>ssh-rsa</c>.</param>
+    /// <returns>The names, comma-separated, such as <c>rsa-sha2-256,rsa-sha2-512,ssh-rsa</c>.</returns>
+    internal static string NarrowedHostKeyNames(string knownHostKeyType) =>
+        string.Join(',', KnownHostNarrowing[knownHostKeyType]);
 
     private static string[] Split(string names) => names.Split(',');
 }

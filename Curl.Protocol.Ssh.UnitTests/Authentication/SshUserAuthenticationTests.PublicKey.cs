@@ -342,7 +342,8 @@ public sealed partial class SshUserAuthenticationTests
         ScriptedConnection connection = new(script.Bytes);
         SshTransport transport = new(connection, SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33), ephemeralKeys);
         await transport.ExchangeKeysAsync(await transport.NegotiateAlgorithmsAsync(CancellationToken.None), CancellationToken.None);
-        return new KeyedPeer(new SshUserAuthentication(transport, Encoding.UTF8, keys), connection, exchange.ExchangeHash, SshPacketProtections.ForClientToServer(ctr, exchange.Keys(exchange.ExchangeHash)));
+        TranscriptTransferEvents events = new();
+        return new KeyedPeer(new SshUserAuthentication(transport, Encoding.UTF8, keys, events), connection, exchange.ExchangeHash, SshPacketProtections.ForClientToServer(ctr, exchange.Keys(exchange.ExchangeHash)), events);
     }
 
     // The client's messages after its KEXINIT, key-exchange message and NEWKEYS.
@@ -417,5 +418,5 @@ public sealed partial class SshUserAuthenticationTests
         return ecdsa.VerifyData(data, ieee, hash);
     }
 
-    private sealed record KeyedPeer(SshUserAuthentication Authentication, ScriptedConnection Connection, byte[] SessionIdentifier, ISshPacketProtection ClientProtection);
+    private sealed record KeyedPeer(SshUserAuthentication Authentication, ScriptedConnection Connection, byte[] SessionIdentifier, ISshPacketProtection ClientProtection, TranscriptTransferEvents Events);
 }

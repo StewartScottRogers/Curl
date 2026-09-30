@@ -127,14 +127,20 @@ public sealed class SshProtocolHandler : IProtocolHandler
             ? await KnownHostsFile.LoadAsync(fileSystem, knownHostsPath, context.CancellationToken).ConfigureAwait(false)
             : null;
         SshSessionTarget target = new(url.IdnHost, port, options, knownHosts);
-        try
+        var connectTarget = new ConnectTarget(target.Host, target.Port, UseTls: false)
         {
-            SshAlgorithmPreferences offered = SshHostKeyChecker.NarrowHostKeys(preferences.WithCompression(options.Compression), target.Host, port, options, knownHosts);
-            return await ConnectAndTransferAsync(context, target, offered).ConfigureAwait(false);
+            Proxy = context.Proxy,
+            Events = context.Events,
+        };
+        ConnectResult connect = await connector.ConnectAsync(connectTarget, context.CancellationToken).ConfigureAwait(false);
+        if (connect.Connection is not { } connection)
+        {
+            return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
         }
-        catch (SshTransferException exception)
+
+        await using (connection.ConfigureAwait(false))
         {
-            return TransferResult.Failure(exception.ExitCode, exception.Message);
+            return await RunSessionAsync(context, target, connection, connect.ConnectionNumber).ConfigureAwait(false);
         }
     }
 
@@ -155,67 +161,124 @@ public sealed class SshProtocolHandler : IProtocolHandler
         }
     }
 
-    private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context, SshSessionTarget target, SshAlgorithmPreferences offered)
+    // The -v lines libssh2's session start writes, then the session. A failure before the
+    // transfer started, or one that ends the connection, closes it; a transfer's own
+    // outcome leaves it intact (ADR-0262).
+    private async ValueTask<TransferResult> RunSessionAsync(ITransferContext context, SshSessionTarget target, IConnection connection, long connectionNumber)
     {
-        var connectTarget = new ConnectTarget(target.Host, target.Port, UseTls: false)
+        ITransferEvents events = context.Events;
+        if (preferences.CryptographyBackend is { } backend)
         {
-            Proxy = context.Proxy,
-            Events = context.Events,
-        };
-        ConnectResult connect = await connector.ConnectAsync(connectTarget, context.CancellationToken).ConfigureAwait(false);
-        if (connect.Connection is not { } connection)
-        {
-            return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
+            events.ReportInfo(SshInfoLines.CryptographyBackend(backend));
         }
 
-        await using (connection.ConfigureAwait(false))
+        events.ReportInfo(SshInfoLines.User(context.Credentials?.UserName ?? string.Empty));
+        try
         {
-            return await RunSessionAsync(context, target, new SshTransport(connection, offered, SshAlgorithmCatalogue.Implemented, randomSource, ephemeralKeySource)).ConfigureAwait(false);
+            TransferResult result = await HandshakeAndTransferAsync(context, target, connection).ConfigureAwait(false);
+            events.ReportInfo(SshInfoLines.ConnectionLeftIntact(connectionNumber, target.Host, target.Port));
+            return result;
+        }
+        catch (SshTransferException exception)
+        {
+            if (exception.IsVerboseLine)
+            {
+                events.ReportInfo(exception.Message);
+            }
+
+            events.ReportInfo(SshInfoLines.ClosingConnection(connectionNumber));
+            return TransferResult.Failure(exception.ExitCode, exception.Message);
         }
     }
 
     // The handshake, then the rest of the session, which always ends with DISCONNECT.
-    private async ValueTask<TransferResult> RunSessionAsync(ITransferContext context, SshSessionTarget target, SshTransport transport)
+    private async ValueTask<TransferResult> HandshakeAndTransferAsync(ITransferContext context, SshSessionTarget target, IConnection connection)
     {
+        SshAlgorithmPreferences offered = SshHostKeyChecker.NarrowHostKeys(
+            preferences.WithCompression(target.Options.Compression), target.Host, target.Port, target.Options, target.KnownHosts, context.Events);
+        SshTransport transport = new(connection, offered, SshAlgorithmCatalogue.Implemented, randomSource, ephemeralKeySource);
         SshKeyExchangeResult keys = await transport.ExchangeKeysAsync(
             await transport.NegotiateAlgorithmsAsync(context.CancellationToken).ConfigureAwait(false),
             context.CancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await AuthenticateAndTransferAsync(context, target, transport, keys.HostKey).ConfigureAwait(false);
+        }
+        finally
+        {
+            await DisconnectIgnoringFailureAsync(transport, context.CancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask<TransferResult> AuthenticateAndTransferAsync(ITransferContext context, SshSessionTarget target, SshTransport transport, byte[] hostKey)
+    {
+        ITransferEvents events = context.Events;
+        SshUserKeySource userKeys = new(fileSystem, readEnvironmentVariable, target.Options, credentialEncoding);
+        SshUserAuthentication authentication = new(transport, credentialEncoding, userKeys, events);
+        await authentication.RequestServiceAsync(context.CancellationToken).ConfigureAwait(false);
+        SshHostKeyChecker.Check(hostKey, target.Host, target.Port, target.Options, target.KnownHosts, events);
+        await authentication.AuthenticateAsync(context.Credentials, context.CancellationToken).ConfigureAwait(false);
+        events.ReportInfo(SshInfoLines.AuthenticationComplete);
+        bool overScp = context.Url.Scheme == ScpScheme;
+        if (overScp)
+        {
+            events.ReportInfo(SshInfoLines.ConnectionEstablished);
+        }
+
+        return await TransferAsync(context, transport, overScp).ConfigureAwait(false);
+    }
+
+    // The transfer's failure message is a -v line too, as curl's failf writes it, unless
+    // curl returns it without one.
+    private static async ValueTask<TransferResult> TransferAsync(ITransferContext context, SshTransport transport, bool overScp)
+    {
         TransferResult result;
         try
         {
-            result = await AuthenticateAndDownloadAsync(context, target, transport, keys.HostKey).ConfigureAwait(false);
+            ReceivedDataReportingStream output = new(context.Output, context.Events);
+            result = overScp
+                ? await TransferOverScpAsync(context, transport, output).ConfigureAwait(false)
+                : await TransferOverSftpAsync(context, transport, output).ConfigureAwait(false);
         }
-        catch (SshTransferException exception)
+        catch (SshTransferException exception) when (!exception.EndsConnection)
         {
-            result = TransferResult.Failure(exception.ExitCode, exception.Message);
+            if (exception.IsVerboseLine)
+            {
+                context.Events.ReportInfo(exception.Message);
+            }
+
+            return TransferResult.Failure(exception.ExitCode, exception.Message);
         }
 
-        await DisconnectIgnoringFailureAsync(transport, context.CancellationToken).ConfigureAwait(false);
+        ReportReturnedFailure(context.Events, result);
         return result;
     }
 
-    private async ValueTask<TransferResult> AuthenticateAndDownloadAsync(ITransferContext context, SshSessionTarget target, SshTransport transport, byte[] hostKey)
+    /// <summary>
+    /// Writes a failure a transfer returned rather than threw as a <c>-v</c> line, as curl's
+    /// <c>failf</c> writes it; <c>Error in the SSH layer</c>, which curl returns without a
+    /// message of its own, and a success write nothing (ADR-0262).
+    /// </summary>
+    /// <param name="events">Where the line goes.</param>
+    /// <param name="result">The transfer's outcome.</param>
+    internal static void ReportReturnedFailure(ITransferEvents events, TransferResult result)
     {
-        SshUserKeySource userKeys = new(fileSystem, readEnvironmentVariable, target.Options, credentialEncoding);
-        SshUserAuthentication authentication = new(transport, credentialEncoding, userKeys);
-        await authentication.RequestServiceAsync(context.CancellationToken).ConfigureAwait(false);
-        SshHostKeyChecker.Check(hostKey, target.Host, target.Port, target.Options, target.KnownHosts);
-        await authentication.AuthenticateAsync(context.Credentials, context.CancellationToken).ConfigureAwait(false);
-        return context.Url.Scheme == ScpScheme
-            ? await TransferOverScpAsync(context, transport).ConfigureAwait(false)
-            : await TransferOverSftpAsync(context, transport).ConfigureAwait(false);
+        if (result.ErrorMessage is { } message && message != SshTransferException.SshLayerErrorMessage)
+        {
+            events.ReportInfo(message);
+        }
     }
 
     // An upload is sent (ADR-0258); otherwise the file is downloaded (ADR-0225).
-    private static async ValueTask<TransferResult> TransferOverScpAsync(ITransferContext context, SshTransport transport) =>
+    private static async ValueTask<TransferResult> TransferOverScpAsync(ITransferContext context, SshTransport transport, Stream output) =>
         context.Upload is { } upload
             ? await new ScpFileUpload(transport).UploadAsync(context.Url.AbsolutePath, context.CreateFileMode, upload, context.Progress, context.CancellationToken).ConfigureAwait(false)
-            : await new ScpFileDownload(transport).DownloadAsync(context.Url.AbsolutePath, context.Output, context.Progress, context.CancellationToken).ConfigureAwait(false);
+            : await new ScpFileDownload(transport).DownloadAsync(context.Url.AbsolutePath, output, context.Progress, context.CancellationToken).ConfigureAwait(false);
 
     // An upload is sent (ADR-0244); otherwise a path ending with a slash is listed and any
     // other is downloaded (ADR-0241). Each runs the -Q commands around it (ADR-0247), with
     // Windows' 32-bit C long deciding how curl reads their numbers and dates.
-    private static async ValueTask<TransferResult> TransferOverSftpAsync(ITransferContext context, SshTransport transport)
+    private static async ValueTask<TransferResult> TransferOverSftpAsync(ITransferContext context, SshTransport transport, Stream output)
     {
         string urlPath = context.Url.AbsolutePath;
         SftpQuoteCommands quotes = SftpQuoteCommands.From(context, OperatingSystem.IsWindows());
@@ -225,8 +288,8 @@ public sealed class SshProtocolHandler : IProtocolHandler
         }
 
         return SftpRemotePath.NamesDirectory(urlPath)
-            ? await new SftpDirectoryListing(transport).ListAsync(urlPath, context.ListOnly, context.NoBody, context.Output, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false)
-            : await new SftpFileDownload(transport).DownloadAsync(urlPath, context.CreateFileMode, context.Output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom).ConfigureAwait(false);
+            ? await new SftpDirectoryListing(transport).ListAsync(urlPath, context.ListOnly, context.NoBody, output, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false)
+            : await new SftpFileDownload(transport).DownloadAsync(urlPath, context.CreateFileMode, output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom).ConfigureAwait(false);
     }
 
     // What the host-key check and the key files need to know about the session.

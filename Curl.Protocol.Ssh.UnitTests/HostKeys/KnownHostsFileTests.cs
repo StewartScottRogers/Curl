@@ -10,7 +10,7 @@ namespace Curl.Protocol.Ssh.HostKeys;
 /// other than 22, and whether curl accepted the host key.
 /// </summary>
 [TestClass]
-public sealed class KnownHostsFileTests
+public sealed partial class KnownHostsFileTests
 {
     internal const string HostKeyBase64 =
         "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJiizKUsfmEIwLjqUEuwvawTkyGivLftrsjESHWacn79Pc3zAok7zZJSKVKfI63nqYoM6v65EAxm9rAVGyJ6eMQ=";

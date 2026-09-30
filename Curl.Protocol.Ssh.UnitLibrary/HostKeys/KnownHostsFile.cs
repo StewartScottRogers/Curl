@@ -35,7 +35,18 @@ internal sealed class KnownHostsFile
 
     private readonly List<KnownHostsEntry> entries;
 
-    private KnownHostsFile(List<KnownHostsEntry> entries) => this.entries = entries;
+    private KnownHostsFile(List<KnownHostsEntry> entries, bool readFailed)
+    {
+        this.entries = entries;
+        ReadFailed = readFailed;
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether libssh2 would report the file unread: it could not be
+    /// opened, or a line could not be parsed. curl notes it under <c>-v</c> and carries on
+    /// with the entries read (ADR-0262).
+    /// </summary>
+    internal bool ReadFailed { get; }
 
     /// <summary>
     /// Gets the entries read, in libssh2's order: lines top to bottom, and a line's plain
@@ -55,11 +66,11 @@ internal sealed class KnownHostsFile
         {
             if (!TryReadLine(line.EndsWith('\r') ? line[..^1] : line, entries))
             {
-                break;
+                return new KnownHostsFile(entries, readFailed: true);
             }
         }
 
-        return new KnownHostsFile(entries);
+        return new KnownHostsFile(entries, readFailed: false);
     }
 
     /// <summary>
@@ -76,7 +87,7 @@ internal sealed class KnownHostsFile
         FileOpenResult opened = await fileSystem.OpenForReadAsync(path, cancellationToken).ConfigureAwait(false);
         if (opened.Content is not { } content)
         {
-            return new KnownHostsFile([]);
+            return new KnownHostsFile([], readFailed: true);
         }
 
         await using (content.ConfigureAwait(false))
@@ -110,16 +121,33 @@ internal sealed class KnownHostsFile
     /// <param name="port">The port connected to.</param>
     /// <param name="hostKey">The server's host key blob, <c>K_S</c>.</param>
     /// <returns>The outcome.</returns>
-    internal KnownHostsCheck Check(string host, int port, byte[] hostKey)
+    internal KnownHostsCheck Check(string host, int port, byte[] hostKey) => Lookup(host, port, hostKey).Check;
+
+    /// <summary>
+    /// Checks the server's host key as <see cref="Check" /> does, and also returns the key
+    /// text of the entry libssh2 hands curl for its <c>-v</c> line: the matching entry, or
+    /// on a mismatch the first entry that took part (ADR-0262).
+    /// </summary>
+    /// <param name="host">The URL's host name.</param>
+    /// <param name="port">The port connected to.</param>
+    /// <param name="hostKey">The server's host key blob, <c>K_S</c>.</param>
+    /// <returns>The outcome and the entry's key text, <see langword="null" /> when not found.</returns>
+    internal KnownHostsLookup Lookup(string host, int port, byte[] hostKey)
     {
         KnownHostKeyType type = KnownHostKeyTypeNames.FromName(SshKeyBlobReader.ReadKeyTypeName(hostKey));
         string key = Convert.ToBase64String(hostKey);
         string[] names = port == 22 ? [host] : [$"[{host}]:{port}", host];
         List<KnownHostsEntry> candidates = [.. names.SelectMany(name => entries.Where(entry => entry.Names(name)))
             .Where(entry => type != KnownHostKeyType.Unknown && entry.KeyType == type)];
-        return candidates.Count == 0
-            ? KnownHostsCheck.NotFound
-            : candidates.Any(entry => entry.Key == key) ? KnownHostsCheck.Match : KnownHostsCheck.Mismatch;
+        if (candidates.Count == 0)
+        {
+            return new KnownHostsLookup(KnownHostsCheck.NotFound, null);
+        }
+
+        KnownHostsEntry? match = candidates.Find(entry => entry.Key == key);
+        return match is null
+            ? new KnownHostsLookup(KnownHostsCheck.Mismatch, candidates[0].Key)
+            : new KnownHostsLookup(KnownHostsCheck.Match, match.Key);
     }
 
     private static bool NamesHostForNarrowing(string name, string host, int port)

@@ -15,7 +15,7 @@ namespace Curl.Protocol.Ssh;
 /// from curl 8.21.0 (ADR-0213, ADR-0215, ADR-0220, ADR-0225).
 /// </summary>
 [TestClass]
-public sealed class SshProtocolHandlerTests
+public sealed partial class SshProtocolHandlerTests
 {
     private const string User = "tester";
 
@@ -335,7 +335,7 @@ public sealed class SshProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_KnownHostsEntryOfAnUnknownType_IsExit79BeforeConnecting()
+    public async Task ExecuteAsync_KnownHostsEntryOfAnUnknownType_IsExit79BeforeTheHandshake()
     {
         InMemorySshServer server = Server();
         SshOptions options = new() { KnownHostsPath = "known_hosts" };
@@ -344,7 +344,7 @@ public sealed class SshProtocolHandlerTests
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/f", options, files: new() { ["known_hosts"] = line });
 
         AssertFailure(outcome, CurlExitCode.Ssh, "Unknown host key type: 3932160");
-        Assert.IsEmpty(server.Targets, "nothing is connected");
+        Assert.HasCount(1, server.Targets, "curl connects before libssh2's session starts (ADR-0262)");
     }
 
     [TestMethod]
