@@ -9,7 +9,7 @@ touches: [Audit/Findings, Audit/Scorecards, Audit/Instructions/Report-Format.md,
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1001 — Define the audit finding, auditor report and scorecard formats
 
@@ -93,14 +93,19 @@ previous scorecard" (the same numbers' deltas); links to the new finding files.
 
 ## Acceptance criteria
 
-- [ ] `Audit/Findings/README.md` and `FINDING-TEMPLATE.md` exist with the front matter fields, statuses, severities (each defined in one sentence) and section order above, and the README states the closure rule in those words.
-- [ ] `Audit/Instructions/Report-Format.md` defines the JSON block, the `key` rule and each auditor's `metrics` names, and its example parses with `ConvertFrom-Json`.
-- [ ] `Audit/Instructions/Auditor-Rules.md` states the seven rules above.
-- [ ] `Audit/Scorecards/README.md` and `SCORECARD-TEMPLATE.md` exist with the sections in the order above and the auditor rows in the fixed order.
+- [x] `Audit/Findings/README.md` and `FINDING-TEMPLATE.md` exist with the front matter fields, statuses, severities (each defined in one sentence) and section order above, and the README states the closure rule in those words.
+- [x] `Audit/Instructions/Report-Format.md` defines the JSON block, the `key` rule and each auditor's `metrics` names, and its example parses with `ConvertFrom-Json`.
+- [x] `Audit/Instructions/Auditor-Rules.md` states the seven rules above.
+- [x] `Audit/Scorecards/README.md` and `SCORECARD-TEMPLATE.md` exist with the sections in the order above and the auditor rows in the fixed order.
 
 ## Notes
+
+- Written by align-and-document on the audit branch (worktree Z:/repos/Curl.audit), commit b36cc1c5, in pull request https://github.com/StewartScottRogers/Curl/pull/28. Checked: the Report-Format example is the one json block and parses with ConvertFrom-Json (auditor quality, 1 finding); Auditor-Rules has rules 1-7; the four severities are defined one sentence each; the closure rule is in the spec's words; the scorecard sections and auditor rows are in the fixed order; all six files ASCII.
+- Interpretations the agent made: `reproduction` is an object {command, expected, actual}; `location` is path:line (logs/<file>:<line> or commit:<sha> outside the tree); `key` never holds a line number; commit and fingerprint are copied from the prompt; an unmeasurable required metric is null; reliable also needs a parseable report and no writes to the audited tree (BL-1017, BL-1020).
+- Decided: a report key matching a rejected finding is not re-filed (added to BL-1016). Filed BL-1037 for the glossary terms.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. The finding, auditor report and scorecard formats and the auditor rules are defined; on the audit branch in PR #28, awaiting Stewart's merge.
