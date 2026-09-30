@@ -30,8 +30,11 @@ With `-Z`, transfers to the same HTTP/2 origin share one connection as concurren
 
 ## Notes
 
+- 2026-09-30, resume from the first attempt's work: lane 1 timed out after 120 min on 2026-09-29 with 27 files and about 2,200 lines uncommitted (HTTP/2 multiplexing in Curl.Networking PoolingConnector/MultiplexingNegotiation, Curl.Protocol.Http Http2Session/ReadAheadConnectionStream/ReceivedFrame, Curl.Console CurlCommandRunner/CurlComposition/ParallelHostQueue, and their tests). They are on branch `wip/BL-717`, commit bb9a17be, based on 529fad47. Start with `git fetch origin wip/BL-717` and `git cherry-pick --no-commit bb9a17be` (resolve against the current branch), read what is there, build and run the tests, and finish it rather than starting again. Commit in logical steps as parts pass, so a second timeout loses less. Delete the `wip/BL-717` branch only after this task is Done.
+
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-717-20260929-191003-L1.jsonl
+- 2026-09-30: Blocked -> Backlog. Stewart asked to try again (2026-09-30); resume from branch wip/BL-717.
