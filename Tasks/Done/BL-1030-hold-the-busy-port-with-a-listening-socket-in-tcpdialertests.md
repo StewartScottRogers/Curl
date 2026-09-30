@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests/TcpDialerTests.cs]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-1030 — Hold the busy port with a listening socket in TcpDialerTests so the --local-port tests pass on Linux
 
@@ -22,8 +22,8 @@ Since BL-600 (commit 2c49fa2b) CI has failed on ubuntu-latest only, e.g. run 366
 
 ## Acceptance criteria
 
-- [ ] Both port holders in `TcpDialerTests` call `Listen()` after `Bind`.
-- [ ] The `CI` workflow passes on Windows, Linux and macOS for the commit that lands this.
+- [x] Both port holders in `TcpDialerTests` call `Listen()` after `Bind`.
+- [x] The `CI` workflow passes on Windows, Linux and macOS for the commit that lands this.
 
 ## Notes
 
@@ -31,3 +31,4 @@ Since BL-600 (commit 2c49fa2b) CI has failed on ubuntu-latest only, e.g. run 366
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. The --local-port tests hold a listening port and pass on every platform; CI run 36676564862 green on Windows, Linux and macOS.
