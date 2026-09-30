@@ -32,3 +32,4 @@ Shift 20260929-191003 ran with BL-987's `Invoke-CiWatch` in its coordinator loop
 ## Log
 
 - 2026-09-30: Created.
+- 2026-09-30: Backlog -> Doing.
