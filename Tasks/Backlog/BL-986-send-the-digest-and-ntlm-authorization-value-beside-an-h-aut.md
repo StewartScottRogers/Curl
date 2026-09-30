@@ -1,5 +1,5 @@
 ---
-id: BL-984
+id: BL-986
 title: Send the Digest and NTLM Authorization value beside an -H Authorization header, as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-984 — Send the Digest and NTLM Authorization value beside an -H Authorization header, as curl does
+# BL-986 — Send the Digest and NTLM Authorization value beside an -H Authorization header, as curl does
 
 ## Goal
 

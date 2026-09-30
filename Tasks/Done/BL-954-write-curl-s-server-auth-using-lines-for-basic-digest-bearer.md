@@ -38,7 +38,7 @@ Measured 2026-09-29 with `Record-CurlExchange.ps1` against curl 8.21.0 (x86_64-w
 - `--oauth2-bearer tok`: `Server auth using Bearer with user ''`; with `-u u:p` as well: `... with user 'u'`.
 - `--digest -u u:p` against a Digest 401: `Server auth using Digest with user 'u'` before both requests; the first sends no `Authorization`.
 - `--digest` without `-u`: no line. `--anyauth -u u:p`: no line on the first request, the Digest line on the retry.
-- `-H "Authorization: x" --digest -u u:p`: the Digest line is still written, and the retry sends curl's `Authorization: Digest ...` **and** `Authorization: x`. Curl here drops its own value; filed as BL-984.
+- `-H "Authorization: x" --digest -u u:p`: the Digest line is still written, and the retry sends curl's `Authorization: Digest ...` **and** `Authorization: x`. Curl here drops its own value; filed as BL-986.
 - `--ntlm -u u:p`: `Server auth using NTLM with user 'u'` before every request.
 - `-x http://proxy -U pu:pp`: `Proxy auth using Basic with user 'pu'`; with `-u u:p` too, the proxy line comes first, then the server line. `-H "Proxy-Authorization: x"` does not stop the proxy line.
 - `--proxy-digest` / `--proxy-ntlm -U pu:pp`: `Proxy auth using Digest|NTLM with user 'pu'` before each request (Digest's first with no header).
