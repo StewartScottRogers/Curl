@@ -450,6 +450,44 @@ internal static class TlsFailureMessages
     public const string PinnedPublicKeyMismatch = "SSL: public key does not match pinned public key";
 
     /// <summary>
+    /// Every build's message for exit 35 when a <c>--curves</c> list the OpenSSL build accepts
+    /// leaves no group to offer, such as <c>?bogus</c> or <c>-X25519</c>: measured with curl
+    /// 8.18.0's OpenSSL 3.5.5 build, 2026-09-30 (BL-709, ADR-0284).
+    /// </summary>
+    public const string OpenSslNoSuitableGroups = "TLS connect error: error:0A000127:SSL routines::no suitable groups";
+
+    /// <summary>
+    /// Every build's message for exit 35 when a <c>--sigalgs</c> list names only schemes the
+    /// client cannot offer, such as <c>RSA+SHA1</c>: measured with curl 8.18.0's OpenSSL 3.5.5
+    /// build, 2026-09-30 (BL-709, ADR-0284).
+    /// </summary>
+    public const string OpenSslNoSuitableSignatureAlgorithm = "TLS connect error: error:0A000076:SSL routines::no suitable signature algorithm";
+
+    /// <summary>
+    /// The Windows message for exit 35 when the server answers a <c>--curves</c> ClientHello
+    /// with a <c>handshake_failure</c> alert, as the one Windows build that applies
+    /// <c>--curves</c>, curl.se's curl 8.18.0 with LibreSSL 4.2.1, prints it (measured
+    /// 2026-09-30 against a server limited to P-384; BL-709, ADR-0151, ADR-0284).
+    /// </summary>
+    public const string LibreSslHandshakeFailureAlert = "TLS connect error: error:14004410:SSL routines:CONNECT_CR_SRVR_HELLO:sslv3 alert handshake failure";
+
+    /// <summary>
+    /// Every build's message for exit 59 when OpenSSL refuses a <c>--curves</c> value, as curl
+    /// 8.18.0's OpenSSL and LibreSSL builds print it (measured, ADR-0151, BL-709).
+    /// </summary>
+    /// <param name="curves">The value, verbatim.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string CurvesListRefused(string curves) => $"failed setting curves list: '{curves}'";
+
+    /// <summary>
+    /// Every build's message for exit 59 when OpenSSL refuses a <c>--sigalgs</c> value, as curl
+    /// 8.18.0's OpenSSL build prints it (measured, ADR-0151, BL-709).
+    /// </summary>
+    /// <param name="signatureAlgorithms">The value, verbatim.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string SignatureAlgorithmsRefused(string signatureAlgorithms) => $"failed setting signature algorithms: '{signatureAlgorithms}'";
+
+    /// <summary>
     /// curl's own text for exit 58, printed when the failure has no message of its own, as
     /// for a <c>--cert</c> store path whose thumbprint is not hex (measured 2026-09-27).
     /// </summary>

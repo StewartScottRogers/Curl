@@ -14,9 +14,13 @@ answers SRV lookups through `DnsServerResolver.ResolveServiceAsync` (BL-527, ADR
 
 Per ADR-0140 and ADR-0162 (BL-708) there are two TLS providers, and `TlsClientRouting.Choose`
 picks one from a `TlsClientOptions` as one pure function: `HandBuiltTlsProvider` when a row of
-ADR-0140's table holds (today a `MaximumVersion` of TLS 1.0 or 1.1, and `RequireCertificateStatus`
-for `--cert-status` by ADR-0191; each option task adds its row and a data row in
-`TlsClientRoutingTests`), `SslStreamTlsProvider` otherwise. With `--cert-status` the hand-built
+ADR-0140's table holds (today a `MaximumVersion` of TLS 1.0 or 1.1, `RequireCertificateStatus`
+for `--cert-status` by ADR-0191, and `Curves` or `SignatureAlgorithms` by ADR-0151; each option task
+adds its row and a data row in `TlsClientRoutingTests`), `SslStreamTlsProvider` otherwise. Per
+ADR-0284 (BL-709) `CurvesAndSignatureAlgorithms.Apply` reads `--curves` through `OpenSslGroupList`
+and `--sigalgs` through `OpenSslSignatureAlgorithmList` (OpenSSL 3.5's syntax on every platform)
+and swaps the result into the profile's `supported_groups`, `key_share` and `signature_algorithms`;
+a refused value is exit 59 and an empty list exit 35, with OpenSSL's text. With `--cert-status` the hand-built
 client asks for the stapled OCSP response and a rejected one is exit 91 with
 `CertificateStatusFailureMessages`' text on every platform. Per ADR-0191 `--ssl-auto-client-cert`
 (`TlsClientOptions.AutoClientCertificate`) without `--cert` makes `ClientCertificateLoader.Load`

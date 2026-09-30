@@ -281,6 +281,12 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return (null, ConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure));
         }
 
+        var (profile, listFailure) = CurvesAndSignatureAlgorithms.Apply(Profile, _options);
+        if (listFailure is not null)
+        {
+            return (null, listFailure);
+        }
+
         var (clientCertificate, clientCertificateFailure) = ClientCertificateLoader.Load(_options, _matchesSchannelBuild, _certificateStore, _timeProvider.GetUtcNow());
         if (clientCertificateFailure is not null)
         {
@@ -292,7 +298,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         {
             var (chainPolicy, anchorsBesideSystemStore, revocationLists) = _verification.ReadTrustAnchors();
             return (new PreparedHandshake(
-                ClientSettings.Of(targetHost, offeredApplicationProtocols, suites, ToTlsClientCertificate(clientCertificate), Profile) with
+                ClientSettings.Of(targetHost, offeredApplicationProtocols, suites, ToTlsClientCertificate(clientCertificate), profile!) with
                 {
                     RequestOcspStatus = _options.RequireCertificateStatus,
                     TimeProvider = _timeProvider,
@@ -417,9 +423,17 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ? TlsFailureMessages.SchannelSslConnectError(failure, OffersOnlyVersionsBelowTls12)
         : TlsFailureMessages.OpenSslSslConnectError(failure);
 
-    private string HandshakeFailureMessage(TlsHandshakeFailure failure) => _matchesSchannelBuild
-        ? TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, OffersOnlyVersionsBelowTls12)
-        : TlsFailureMessages.OpenSslHandBuiltHandshakeFailure(failure);
+    // The Schannel build ignores --sigalgs and --curves, so on Windows a handshake that fails
+    // with either in force prints what the build that applies it prints (ADR-0151): OpenSSL's
+    // text for --sigalgs, and for --curves the handshake_failure alert as curl.se's LibreSSL
+    // build prints it (ADR-0284).
+    private string HandshakeFailureMessage(TlsHandshakeFailure failure) =>
+        !_matchesSchannelBuild || _options.SignatureAlgorithms is not null ? TlsFailureMessages.OpenSslHandBuiltHandshakeFailure(failure)
+        : _options.Curves is not null && IsHandshakeFailureAlertReceived(failure) ? TlsFailureMessages.LibreSslHandshakeFailureAlert
+        : TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, OffersOnlyVersionsBelowTls12);
+
+    private static bool IsHandshakeFailureAlertReceived(TlsHandshakeFailure failure) =>
+        failure is { Origin: TlsHandshakeFailureOrigin.AlertReceived, Alert: TlsAlertDescription.HandshakeFailure };
 
     // What a handshake was prepared with: the ClientHello's settings, the --cert certificate
     // the connection disposes, and the verifier that judges the server's chain.
@@ -461,7 +475,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             RequestOcspStatus = RequestOcspStatus,
             TimeProvider = TimeProvider,
             CipherSuites = [.. OfferedSuites.Where(Tls13RecordProtection.CanProtect)],
-            SupportedGroups = Profile.SupportedGroups,
+            SupportedGroups = [.. Profile.SupportedGroups.Where(TlsNamedGroup.CanShare)],
             KeyShareGroups = Profile.KeyShareGroups,
             SignatureAlgorithms = ClientHelloProfileMapping.CheckableSignatureAlgorithms(Profile),
             CertificateCompressionAlgorithms = Profile.CertificateCompressionAlgorithms,

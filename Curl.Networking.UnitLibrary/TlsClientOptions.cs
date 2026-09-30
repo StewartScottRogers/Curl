@@ -96,13 +96,15 @@ namespace Curl.Networking;
 /// <see cref="ArgumentException" /> for one (BL-502).
 /// </param>
 /// <param name="Curves">
-/// curl's <c>--curves</c> value, verbatim: the key-exchange groups to offer. ADR-0151 gives it to
-/// the hand-built client on every platform (BL-709); neither provider applies it yet.
+/// curl's <c>--curves</c> value, verbatim: the key-exchange groups to offer, in OpenSSL 3.5's syntax
+/// (<see cref="OpenSslGroupList" />). <see cref="TlsClientRouting" /> sends a connection with it to
+/// <see cref="HandBuiltTlsProvider" /> on every platform (ADR-0151, ADR-0284).
 /// <see langword="null" /> leaves the choice to the platform.
 /// </param>
 /// <param name="SignatureAlgorithms">
-/// curl's <c>--sigalgs</c> value, verbatim: the signature algorithms to offer. ADR-0151 gives it
-/// to the hand-built client on every platform (BL-709); neither provider applies it yet.
+/// curl's <c>--sigalgs</c> value, verbatim: the signature algorithms to offer, in OpenSSL 3.5's syntax
+/// (<see cref="OpenSslSignatureAlgorithmList" />). <see cref="TlsClientRouting" /> sends a connection
+/// with it to <see cref="HandBuiltTlsProvider" /> on every platform (ADR-0151, ADR-0284).
 /// <see langword="null" /> leaves the choice to the platform.
 /// </param>
 /// <param name="AllowEarlyData">

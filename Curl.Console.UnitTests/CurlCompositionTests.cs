@@ -318,6 +318,19 @@ public sealed partial class CurlCompositionTests
         Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "<tlsProvider>"));
     }
 
+    // ADR-0151 (BL-709): --curves and --sigalgs run the origin's TLS on the hand-built client
+    // on every platform; the proxy's handshake does not carry them.
+    [TestMethod]
+    [DataRow("--curves", "X25519")]
+    [DataRow("--sigalgs", "ECDSA+SHA256")]
+    public void CreateTransports_WithCurvesOrSigalgs_UpgradesTheOriginWithTheHandBuiltClient(string option, string value)
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(Parse(option, value, "https://example.com/"));
+
+        Assert.IsInstanceOfType<HandBuiltTlsProvider>(transports.TlsProvider);
+        Assert.IsInstanceOfType<SslStreamTlsProvider>(transports.ProxyTlsProvider);
+    }
+
     [TestMethod]
     public void CreateTransports_TcpConnector_ReceivesTcpDialerAndSecureSslStreamTlsProvider()
     {
