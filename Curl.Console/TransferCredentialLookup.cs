@@ -4,6 +4,7 @@ using System.Text;
 
 using Curl.Authentication;
 using Curl.Cli;
+using Curl.Core;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -33,9 +34,9 @@ namespace Curl.Console;
 /// sent when it has a user name.
 /// </para>
 /// <para>
-/// The lookup is made once per URL, for its host. A redirect keeps the credentials to the same
-/// host and drops them to another, as <c>RedirectFollower</c> does; curl looks each hop's host up
-/// again, which is BL-790.
+/// When the netrc file is in use, the lookup is made again for every redirect hop's URL
+/// (<see cref="ForRedirectHops" />), so each hop sends its own host's entry, or none, under
+/// <c>--location-trusted</c> too, as curl 8.21.0 does (measured, BL-505 Notes; BL-790).
 /// </para>
 /// </remarks>
 /// <param name="fileReader">Reads the netrc file.</param>
@@ -90,6 +91,27 @@ internal sealed class TransferCredentialLookup(
         credentials = CredentialsOf(result, urlUser, DecodedUserInformation(url.Password));
         return failure is null;
     }
+
+    /// <summary>
+    /// Gets the lookup each redirect hop's credentials come from when the netrc file is in use: the
+    /// same lookup as the first URL's, for the hop's own URL, as curl 8.21.0 sends the
+    /// <c>localhost</c> entry after a redirect from <c>127.0.0.1</c> to <c>localhost</c>, and nothing
+    /// when <c>localhost</c> has no entry, <c>--location-trusted</c> or not (BL-790). A file problem
+    /// on a hop sends the hop no netrc credentials rather than failing it.
+    /// </summary>
+    /// <param name="options">The option group of the transfer.</param>
+    /// <returns>
+    /// The lookup, or <see langword="null" /> when no netrc option is in effect or a <c>-u</c> with a
+    /// user name wins, so the first hop's credentials follow <c>RedirectFollower</c>'s origin rules.
+    /// </returns>
+    internal HopCredentialSelector? ForRedirectHops(CommandLineOptions options) =>
+        options.NetrcUse == NetrcUse.Ignored || !string.IsNullOrEmpty(options.Credentials?.UserName)
+            ? null
+            : hopUrl =>
+            {
+                _ = TryLookUp(options, hopUrl, out NetworkCredential? credentials, out _);
+                return credentials;
+            };
 
     /// <summary>
     /// Gets the credentials written in the URL, sent when no netrc option is in effect: its

@@ -102,12 +102,19 @@ namespace Curl.Core;
 /// <see cref="HttpRequestOptions.AltSvcRoute" /> for a hop to the first URL's origin and drop it
 /// for any other.
 /// </param>
+/// <param name="selectHopCredentials">
+/// Looks up each hop's <see cref="ITransferContext.Credentials" /> from the hop's own URL, whatever
+/// its origin and <c>--location-trusted</c>, as curl 8.21.0 looks the netrc file up again for each
+/// hop's host (BL-790 Notes); <see langword="null" /> to carry the first hop's credentials by the
+/// origin and URL rules above.
+/// </param>
 public sealed class RedirectFollower(
     ProtocolDispatcher dispatcher,
     HopProxySelector? selectHopProxy = null,
     bool? runsOnWindows = null,
     HstsTransferPolicy? hsts = null,
-    HopAltSvcSelector? selectHopAltSvc = null)
+    HopAltSvcSelector? selectHopAltSvc = null,
+    HopCredentialSelector? selectHopCredentials = null)
 {
     /// <summary>The Linux and macOS build's message for a multipart body it cannot rewind for the next hop.</summary>
     public const string CannotRewindMessage = "Cannot rewind mime/post data";
@@ -196,7 +203,7 @@ public sealed class RedirectFollower(
             Rewind(bodyContent, bodyStart, bodyDropped);
             chain.Followed(target);
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
         }
     }
 
@@ -494,7 +501,8 @@ public sealed class RedirectFollower(
         bool bodyDropped,
         bool sendCredentials,
         long operationStarted,
-        HopAltSvcSelector? selectHopAltSvc) =>
+        HopAltSvcSelector? selectHopAltSvc,
+        HopCredentialSelector? selectHopCredentials) =>
         new()
         {
             Url = url,
@@ -509,7 +517,7 @@ public sealed class RedirectFollower(
             TimeCondition = first.TimeCondition,
             HeaderOutput = first.HeaderOutput,
             PostData = bodyDropped ? null : first.PostData,
-            Credentials = HopCredentials(first, url, sendCredentials),
+            Credentials = selectHopCredentials is null ? HopCredentials(first, url, sendCredentials) : selectHopCredentials(url),
             TelnetOptions = first.TelnetOptions,
             TftpBlockSize = first.TftpBlockSize,
             TftpNoOptions = first.TftpNoOptions,

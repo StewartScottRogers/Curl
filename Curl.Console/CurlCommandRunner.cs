@@ -2939,7 +2939,8 @@ internal sealed class CurlCommandRunner(
             (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
                 TransferProxySelection.TrySelect(dispatch.ProxySelector, options, hopUrl, out hopProxy, out hopFailure),
             hsts: Hsts,
-            selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp);
+            selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
+            selectHopCredentials: CredentialLookup.ForRedirectHops(options));
 
         if (!CurlUrl.TryParse(
             QueryUrl.Append(url, options),

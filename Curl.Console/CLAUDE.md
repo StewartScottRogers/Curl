@@ -266,8 +266,9 @@ through the runner's `IDataFileReader` and environment. The URL's percent-decode
 the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; with no entry the
 URL's user and password are sent. A required file that is missing or malformed fails each URL with
 `curl: (26) .netrc error: no such file` or `syntax error` before anything is sent;
-`--netrc-optional` ignores both. A redirect keeps the credentials to the same host and drops them
-to another; curl's per-hop lookup is BL-790. Measured on curl 8.21.0 (BL-505 Notes).
+`--netrc-optional` ignores both. When the file is in use, `TransferCredentialLookup.ForRedirectHops`
+gives `RedirectFollower` the same lookup for each redirect hop's URL, so every hop sends its own
+host's entry or none, `--location-trusted` or not (BL-790). Measured on curl 8.21.0 (BL-505 Notes).
 An `ftp` or `ftps` URL is claimed by `RoutingFtpProtocolHandler`, which hands an `ftp` one to
 the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
