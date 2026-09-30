@@ -2,14 +2,14 @@
 id: BL-1029
 title: Make the audit-guard check required on master, so deleting the job from the factory branch's ci.yml cannot switch it off
 priority: High
-assignee: Stewart
+assignee: Claude
 pipeline: direct
 depends-on: [BL-998]
 touches: [.github]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1029 — Make the audit-guard check required on master, so deleting the job from the factory branch's ci.yml cannot switch it off
 
@@ -25,12 +25,18 @@ The robust fix is a GitHub branch protection rule (or ruleset) on `master` that 
 
 ## Acceptance criteria
 
-- [ ] `master` has a branch protection rule or ruleset requiring the `Audit paths untouched by the dark factory` status check.
-- [ ] The dark factory's shift-end pull request still merges when that check passes (the rule does not also require checks the `audit` pull requests never run).
-- [ ] ADR-0267 records the rule.
+- [x] `master` has a branch protection rule or ruleset requiring the `Audit paths untouched by the dark factory` status check.
+- [x] The dark factory's shift-end pull request still merges when that check passes (the rule does not also require checks the `audit` pull requests never run).
+- [x] ADR-0267 records the rule.
 
 ## Notes
+
+- 2026-09-30, Stewart: "make the check required". Created repository ruleset 24235022 "Audit guard required on master": target refs/heads/master, active, required status check `Audit paths untouched by the dark factory` (github-actions, integration 15368), no bypass actors (the factory merges with Stewart's credentials, so an admin bypass would let `gh pr merge --admin` skip it). No workflow or script pushes to master directly; RunDarkFactory.ps1 merges with `gh pr merge --merge`, no `--admin`.
+- Probe: pull request #26 from work/dark-factory showed BLOCKED while the check was pending and UNSTABLE (mergeable; only optional checks outstanding) once it passed; closed without merging.
+- Recorded as ADR-0267 section 7.
 
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. master's ruleset requires the audit guard check with no bypass, so deleting the job from the factory branch blocks its merge.

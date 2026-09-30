@@ -93,6 +93,19 @@ Audit tools are PowerShell or C# file-based apps only (no Python), base class li
 only, no package. Audit tools under `Audit/Tools/` are not product code and are not held
 to the coverage gates.
 
+### 7. The audit check is required on master (BL-1029)
+
+GitHub runs the workflow file of the branch being built, so the `audit-guard` job exists
+on `work/dark-factory` only while that branch's own `ci.yml` defines it: deleting the job
+would remove the check that catches the deletion. The repository ruleset "Audit guard
+required on master" (id 24235022, Stewart approved 2026-09-30) therefore requires the
+status check `Audit paths untouched by the dark factory` on every change to `master`, so
+a missing or failing check blocks the merge instead of passing it. It has no bypass
+actors: the dark factory merges with Stewart's GitHub credentials, so an admin bypass
+would let a lane merge with `gh pr merge --admin`. On any other pull request the job is
+skipped by its condition, and GitHub counts a skipped required check as passed.
+Stewart changes or removes the rule in the repository's settings.
+
 ## Rationale
 
 - **Guards outside the factory's reach, approval by Stewart.** The factory is the party
