@@ -9,7 +9,7 @@ touches: [.claude/agents/audit-security.md, Audit/Instructions/Security.md]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1010 — Write the audit-security auditor
 
@@ -56,14 +56,21 @@ Two files:
 
 ## Acceptance criteria
 
-- [ ] `.claude/agents/audit-security.md` exists with `name: audit-security`, `model: opus`, `tools: Read, Grep, Glob, Bash` and no editing tool.
-- [ ] `Audit/Instructions/Security.md` states the four steps, names the six libraries, the fuzz targets, the probe secret and the severity rules above.
-- [ ] `claude agents` lists `audit-security`.
-- [ ] A trial run limited to step 2 on `Curl.Cryptography.UnitLibrary` in a detached worktree ends with one report block that parses with `ConvertFrom-Json`; command and summary recorded under Notes; the worktree is unchanged.
+- [x] `.claude/agents/audit-security.md` exists with `name: audit-security`, `model: opus`, `tools: Read, Grep, Glob, Bash` and no editing tool.
+- [x] `Audit/Instructions/Security.md` states the four steps, names the six libraries, the fuzz targets, the probe secret and the severity rules above.
+- [x] `claude agents` lists `audit-security`.
+- [x] A trial run limited to step 2 on `Curl.Cryptography.UnitLibrary` in a detached worktree ends with one report block that parses with `ConvertFrom-Json`; command and summary recorded under Notes; the worktree is unchanged.
 
 ## Notes
+
+- On the audit branch (worktree Z:/repos/Curl.auditbranch), commits a8778c4e and 545ca0b2, pull request https://github.com/StewartScottRogers/Curl/pull/38.
+- claude agents: as for BL-1009, in Claude Code 2.1.284 it lists running sessions, not agent definitions; the trial's claude -p --agent audit-security is the proof the agent is found.
+- Trial, limited to step 2 on Curl.Cryptography.UnitLibrary as the criteria say: a detached worktree of a8778c4e (Z:/repos/Curl.audit/trial-security, removed after), fingerprint a79416f2c8228e31056dcab01f60a6f2d56320f8414ba12413dd15ab95dd0a3a; claude -p --agent audit-security --dangerously-skip-permissions "Audit the tree at ... This is a limited trial: do step 2 ... only, and only in Curl.Cryptography.UnitLibrary ...". The worktree showed no changes afterwards.
+- Report: one json block, parses with ConvertFrom-Json, all six fields, auditor security, the given commit and fingerprint, fuzz metrics null (step 1 skipped). Six High findings, all secret-indexed table lookups in hand-built ciphers: BlowfishState.cs:133 (also under BcryptPbkdf on an SSH key passphrase), Des.cs:170 (NTLM, password-derived keys), Cast128.cs:242 (SSH cast128-cbc), Camellia.cs:304 and Aria.cs:201 (TLS), Rc4.cs:113 (SSH arcfour, Kerberos rc4-hmac). Each annotated in phase 2 with the ADR that accepts it (ADR-0118, 0145, 0147, 0156), severity kept per rule 2 - Stewart's call at triage. Every MAC, tag, signature and key-check comparison it examined uses FixedTimeEquals or masked selection.
+- The trial showed a gap: no key kind for a table lookup, so it used secret-dependent-branch. Added secret-dependent-lookup to Security.md (545ca0b2).
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. The read-only audit-security auditor fuzzes, checks constant-time comparisons and secret output, and reports in the audit format; in PR #38, awaiting Stewart's merge.
