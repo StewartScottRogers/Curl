@@ -266,6 +266,10 @@ public sealed class HttpProtocolHandler(
         HttpAuthRequest? proxyAuthRequest = forwardProxy is null ? null : ProxyAuthRequestOf(authRequest, forwardProxy);
         using HttpTransferDeadline deadline = new(context);
         HttpInfoLineRecorder authorizationLines = new();
+        HttpInfoLineRecorder proxyAuthorizationLines = new();
+        string? proxyAuthorization = proxyAuthRequest is null
+            ? null
+            : await Authenticator.CreateAuthorizationAsync(proxyAuthRequest with { Events = proxyAuthorizationLines }, [], context.CancellationToken).ConfigureAwait(false);
         (string? authorization, HttpTransferException? authorizationFailure) = await CreateFirstAuthorizationAsync(authRequest with { Events = authorizationLines }, context.CancellationToken).ConfigureAwait(false);
         HttpRequestPlan plan = new(context, options, framing, authRequest, authorization)
         {
@@ -276,7 +280,8 @@ public sealed class HttpProtocolHandler(
             Progress = new HttpTransferProgress(context.Progress),
             ForwardProxy = forwardProxy,
             ProxyAuthRequest = proxyAuthRequest,
-            ProxyAuthorization = proxyAuthRequest is null ? null : Authenticator.CreateAuthorization(proxyAuthRequest, []),
+            ProxyAuthorization = proxyAuthorization,
+            ProxyAuthorizationInfoLines = proxyAuthorizationLines.Lines,
             RedirectsFollowed = options.RedirectsFollowed,
         };
         return Http3ProxyRefusalOf(plan) is { } refusal
@@ -362,13 +367,25 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Makes the request the authenticator is asked about for the forward proxy: the origin's
-    /// method, URL and request target (Digest's <c>uri</c> is the origin form, as curl 8.21.0
-    /// sends it), the proxy's credential, no bearer token, and <see cref="ProxyAuthSchemes" />.
-    /// Answered with no challenges it gives the pre-emptive <c>Proxy-Authorization</c>, which
-    /// only Basic sends.
+    /// method and request target (Digest's <c>uri</c> is the origin form, as curl 8.21.0
+    /// sends it), the proxy's own URL (NTLM and Negotiate ask for <c>HTTP</c> on the proxy's
+    /// host, as curl's Type 3 names <c>HTTP/&lt;proxy&gt;</c>, BL-604 Notes), the proxy's
+    /// credential, no bearer token, and <see cref="ProxyAuthSchemes" />. Answered with no
+    /// challenges it gives the pre-emptive <c>Proxy-Authorization</c>: Basic's, or NTLM's Type 1
+    /// or Negotiate's first token when that is the one scheme allowed (ADR-0270).
     /// </summary>
     private HttpAuthRequest ProxyAuthRequestOf(HttpAuthRequest originRequest, ProxyEndpoint proxy) =>
-        originRequest with { Credential = proxy.Credential, BearerToken = null, AllowedSchemes = ProxyAuthSchemes, IsProxy = true, AwsSigV4 = null };
+        originRequest with { Url = ProxyUrlOf(proxy), Credential = proxy.Credential, BearerToken = null, AllowedSchemes = ProxyAuthSchemes, IsProxy = true, AwsSigV4 = null };
+
+    /// <summary>
+    /// Gives <paramref name="proxy" />'s own URL, <c>http://host:port/</c> (<c>https</c> for an
+    /// HTTPS proxy), an IPv6 literal in brackets.
+    /// </summary>
+    private static CurlUrl ProxyUrlOf(ProxyEndpoint proxy)
+    {
+        string host = proxy.Host.Contains(':', StringComparison.Ordinal) && !proxy.Host.StartsWith('[') ? $"[{proxy.Host}]" : proxy.Host;
+        return CurlUrl.Parse($"{(proxy.Kind == ProxyKind.Https ? "https" : "http")}://{host}:{proxy.Port}/");
+    }
 
     /// <summary>
     /// Gives what signing the request with <c>--aws-sigv4</c> needs, or <see langword="null" />
@@ -1033,6 +1050,7 @@ public sealed class HttpProtocolHandler(
         bool headerNamesAuthorization = HttpRequestHeadFormatter.CustomHeadersOf(plan.Options.Headers, plan.Options).Any(header => header.Names("Authorization"));
         if (plan.ProxyAuthRequest is { } proxyRequest)
         {
+            ReportInfoLines(plan.Context.Events, plan.ProxyAuthorizationInfoLines);
             ReportAuthUsing(plan.Context.Events, HttpAuthUsingLines.AuthUsing(proxyRequest, plan.ProxyAuthorization, plan.ProxyAuthorizationAnswersChallenge, headerNamesAuthorization));
         }
 
@@ -1994,6 +2012,15 @@ public sealed class HttpProtocolHandler(
         public bool ProxyAuthorizationAnswersChallenge { get; init; }
 
         /// <summary>
+        /// Gets the <c>-v</c> lines the authenticator reported while it made the
+        /// <see cref="ProxyAuthorization" /> value before any challenge, written just before
+        /// <c>Proxy auth using ...</c> each time that value is sent, as curl 8.21.0 writes a
+        /// <c>--proxy-negotiate</c> context's failure there (measured, BL-604 Notes); empty for
+        /// a value that answers a 407.
+        /// </summary>
+        public IReadOnlyList<string> ProxyAuthorizationInfoLines { get; init; } = [];
+
+        /// <summary>
         /// Gets a value indicating whether the request is being sent again on a fresh connection
         /// because a pooled one died before its response, which happens at most once.
         /// </summary>
@@ -2118,6 +2145,7 @@ public sealed class HttpProtocolHandler(
                 ProxyAuthRequest = ProxyAuthRequest,
                 ProxyAuthorization = proxyAuthorization,
                 ProxyAuthorizationAnswersChallenge = proxyAuthorizationAnswersChallenge,
+                ProxyAuthorizationInfoLines = proxyAuthorizationAnswersChallenge ? [] : ProxyAuthorizationInfoLines,
                 SentOnFreshConnection = sentOnFreshConnection,
                 RedirectsFollowed = redirectsFollowed,
                 AuthorizationAnswersChallenge = authorizationAnswersChallenge,

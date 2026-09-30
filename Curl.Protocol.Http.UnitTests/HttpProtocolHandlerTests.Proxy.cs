@@ -45,8 +45,8 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.IsTrue(result.Report!.UsedProxy, $"Chunk size {chunkSize}");
             HttpAuthRequest proxyRequest = authenticator.Calls.Single(call => call.Request.IsProxy).Request;
             Assert.AreEqual(
-                new HttpAuthRequest("GET", CurlUrl.Parse("http://Example.com/a/b?c=d"), "/a/b?c=d", LoopbackProxy.Credential, null, HttpAuthSchemes.Basic, true),
-                proxyRequest,
+                new HttpAuthRequest("GET", CurlUrl.Parse("http://127.0.0.1:18183/"), "/a/b?c=d", LoopbackProxy.Credential, null, HttpAuthSchemes.Basic, true),
+                proxyRequest with { Events = NoTransferEvents.Instance },
                 $"Chunk size {chunkSize}");
         }
     }
