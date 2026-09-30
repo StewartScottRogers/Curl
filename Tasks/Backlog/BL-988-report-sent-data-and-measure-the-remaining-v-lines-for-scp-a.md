@@ -1,5 +1,5 @@
 ---
-id: BL-987
+id: BL-988
 title: Report sent data and measure the remaining -v lines for scp and sftp uploads
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-987 — Report sent data and measure the remaining -v lines for scp and sftp uploads
+# BL-988 — Report sent data and measure the remaining -v lines for scp and sftp uploads
 
 ## Goal
 

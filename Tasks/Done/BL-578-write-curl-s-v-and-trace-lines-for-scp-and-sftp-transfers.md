@@ -103,7 +103,7 @@ completed: 2026-09-29
   case gives `--key` a missing file so the result does not depend on the machine's `HOME`.
   `Curl.Protocol.Ssh.UnitTests` pins every line and branch: 1096 tests, and the SSH library
   at 100% line, 100% branch, 0 failing members. Fast tests: 0 failures.
-- **Follow-up:** BL-987 (sent data for uploads; the unmeasured password,
+- **Follow-up:** BL-988 (sent data for uploads; the unmeasured password,
   `keyboard-interactive` and short-file cases).
 
 ## Log
