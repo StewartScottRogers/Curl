@@ -28,7 +28,7 @@ completed: 2026-10-01
 
 ## Notes
 
-- Measured 2026-10-01 (ADR-0312 has the table) against a real OpenSSH 10.2p1 sshd: the
+- Measured 2026-10-01 (ADR-0313 has the table) against a real OpenSSH 10.2p1 sshd: the
   Ubuntu `openssh-server`, `openssh-sftp-server` and `libwrap0` packages fetched from
   archive.ubuntu.com, extracted with `dpkg -x` into `/tmp/bl1097` in WSL and run
   unprivileged on 127.0.0.1:2299 (`LD_LIBRARY_PATH` for libwrap, `SshdSessionPath`,
@@ -52,7 +52,7 @@ completed: 2026-10-01
   - sshd accepted each signature, so each was in the certificate's plain form (sshd checks
     the signature's algorithm against the certificate's).
 - Change: `SendSignedPublicKeyAsync` compares the private key with the public key's plain
-  type (`PlainMethods`) and signs under the chosen method's plain form (ADR-0312).
+  type (`PlainMethods`) and signs under the chosen method's plain form (ADR-0313).
 - Tests: `SshUserAuthenticationTests.KeyFileCertificate.cs` - four signing rows (RSA on
   OpenSSL and WinCNG, Ed25519, ECDSA), the refused other-key case and the other-type case.
 
@@ -60,4 +60,4 @@ completed: 2026-10-01
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
-- 2026-10-01: Doing -> Done. A --pubkey OpenSSH certificate (RSA, Ed25519, ECDSA) signs with its --key private key under the plain method as libssh2 1.11.1 does, measured against a real sshd on both builds (ADR-0312)
+- 2026-10-01: Doing -> Done. A --pubkey OpenSSH certificate (RSA, Ed25519, ECDSA) signs with its --key private key under the plain method as libssh2 1.11.1 does, measured against a real sshd on both builds (ADR-0313)
