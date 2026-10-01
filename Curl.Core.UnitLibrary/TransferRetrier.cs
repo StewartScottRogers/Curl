@@ -89,14 +89,16 @@ public sealed class TransferRetrier(Func<ITransferContext, ValueTask<TransferRes
         ArgumentNullException.ThrowIfNull(retriesAbandoned);
 
         TimeProvider clock = context.TimeProvider;
+        RetryDiagnosticLog log = new(context.DiagnosticLog);
         long started = clock.GetTimestamp();
         RetryWaits waits = new(policy.Delay);
         long retriesLeft = policy.Retries;
-        while (true)
+        for (int attempt = 1; ; attempt++)
         {
             TransferResult result = await transfer(context).ConfigureAwait(false);
             TimeSpan elapsed = clock.GetElapsedTime(started);
-            if (retriesLeft <= 0 || HasReached(policy.MaxTime, elapsed) || RetryReason(policy, context.Url, result) is not { } reason)
+            log.AttemptEnded(attempt, result, retriesLeft, elapsed);
+            if (RetryReason(policy, context.Url, result) is not { } reason || IsFinal(policy, retriesLeft, elapsed, attempt, result, log))
             {
                 return result;
             }
@@ -104,15 +106,38 @@ public sealed class TransferRetrier(Func<ITransferContext, ValueTask<TransferRes
             TimeSpan retryAfter = RetryAfter(reason, result.Report, clock);
             if (RetryAfterPassesMaxTime(policy.MaxTime, elapsed, retryAfter))
             {
+                log.MaxTimeReached(attempt, policy.MaxTime);
                 retriesAbandoned(result, TransferRetryWarning.RetryAfterExceedsMaxTime);
                 return result;
             }
 
             TimeSpan wait = waits.Next(retryAfter);
+            log.Retrying(attempt, reason, wait, retriesLeft);
             retrying(result, TransferRetryWarning.For(reason, wait, retriesLeft));
             retriesLeft--;
             await Task.Delay(wait, clock, context.CancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Whether an attempt that could be retried is final all the same, because no retries are left
+    /// or <c>--retry-max-time</c> has passed, logging which.
+    /// </summary>
+    private static bool IsFinal(RetryPolicy policy, long retriesLeft, TimeSpan elapsed, int attempt, TransferResult result, RetryDiagnosticLog log)
+    {
+        if (retriesLeft <= 0)
+        {
+            log.RetriesExhausted(policy.Retries, attempt, result);
+            return true;
+        }
+
+        if (HasReached(policy.MaxTime, elapsed))
+        {
+            log.MaxTimeReached(attempt, policy.MaxTime);
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>Whether <paramref name="elapsed" /> has reached a set <c>--retry-max-time</c>.</summary>

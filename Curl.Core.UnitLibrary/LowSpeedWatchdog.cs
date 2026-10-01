@@ -1,3 +1,4 @@
+using System.Globalization;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Core;
@@ -51,6 +52,8 @@ public sealed class LowSpeedWatchdog : IDisposable
 
     private readonly ITimer timer;
 
+    private readonly IDiagnosticLog log;
+
     private long bytesDownloaded;
 
     private long bytesUploaded;
@@ -66,10 +69,15 @@ public sealed class LowSpeedWatchdog : IDisposable
     /// <param name="bytesPerSecond">The <c>-Y</c> limit, in bytes per second; at least 1.</param>
     /// <param name="speedTime">The <c>-y</c> time the speed may stay below the limit; more than zero.</param>
     /// <param name="timeProvider">The clock the checks are taken and timed on.</param>
+    /// <param name="diagnosticLog">
+    /// Where the watchdog writes, component <see cref="DiagnosticLogComponents.Runner" /> (ADR-0222,
+    /// BL-921): the limit armed as <c>verbose</c> and the limit hit, ending the attempt with
+    /// <see cref="CurlExitCode.OperationTimedOut" />, as <c>error</c>; <see langword="null" /> for none.
+    /// </param>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="bytesPerSecond" /> is below 1, or <paramref name="speedTime" /> is not positive.
     /// </exception>
-    public LowSpeedWatchdog(long bytesPerSecond, TimeSpan speedTime, TimeProvider timeProvider)
+    public LowSpeedWatchdog(long bytesPerSecond, TimeSpan speedTime, TimeProvider timeProvider, IDiagnosticLog? diagnosticLog = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(bytesPerSecond, 1);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(speedTime, TimeSpan.Zero);
@@ -77,6 +85,14 @@ public sealed class LowSpeedWatchdog : IDisposable
         this.bytesPerSecond = bytesPerSecond;
         this.speedTime = speedTime;
         this.timeProvider = timeProvider;
+        log = diagnosticLog ?? NoDiagnosticLog.Instance;
+        if (log.IsEnabled(DiagnosticLogLevel.Verbose))
+        {
+            log.Write(DiagnosticLogLevel.Verbose, DiagnosticLogComponents.Runner, string.Create(
+                CultureInfo.InvariantCulture,
+                $"--speed-limit {bytesPerSecond} bytes/s over --speed-time {(long)speedTime.TotalSeconds} s armed"));
+        }
+
         samples.Enqueue(new(timeProvider.GetTimestamp(), 0, 0));
         timer = timeProvider.CreateTimer(_ => CheckSpeed(), null, CheckInterval, CheckInterval);
     }
@@ -106,8 +122,9 @@ public sealed class LowSpeedWatchdog : IDisposable
     /// <param name="bytesPerSecond">The <c>-Y</c> value, or <see langword="null" /> when not given.</param>
     /// <param name="speedTimeSeconds">The <c>-y</c> value in seconds, or <see langword="null" /> when not given.</param>
     /// <param name="timeProvider">The clock the checks are taken and timed on.</param>
+    /// <param name="diagnosticLog">Where the watchdog writes; <see langword="null" /> for none.</param>
     /// <returns>The started watchdog, or <see langword="null" /> when there is nothing to watch.</returns>
-    public static LowSpeedWatchdog? StartFromCommandLine(long? bytesPerSecond, long? speedTimeSeconds, TimeProvider timeProvider)
+    public static LowSpeedWatchdog? StartFromCommandLine(long? bytesPerSecond, long? speedTimeSeconds, TimeProvider timeProvider, IDiagnosticLog? diagnosticLog = null)
     {
         if (bytesPerSecond is null && speedTimeSeconds is null)
         {
@@ -116,7 +133,7 @@ public sealed class LowSpeedWatchdog : IDisposable
 
         long limit = bytesPerSecond ?? DefaultBytesPerSecond;
         TimeSpan time = speedTimeSeconds is { } seconds ? TimeSpan.FromSeconds(seconds) : DefaultSpeedTime;
-        return limit > 0 && time > TimeSpan.Zero ? new LowSpeedWatchdog(limit, time, timeProvider) : null;
+        return limit > 0 && time > TimeSpan.Zero ? new LowSpeedWatchdog(limit, time, timeProvider, diagnosticLog) : null;
     }
 
     /// <summary>
@@ -153,7 +170,18 @@ public sealed class LowSpeedWatchdog : IDisposable
     {
         if (HasStayedTooSlow())
         {
+            LogTooSlow();
             tooSlow.Cancel();
+        }
+    }
+
+    private void LogTooSlow()
+    {
+        if (log.IsEnabled(DiagnosticLogLevel.Error))
+        {
+            log.Write(DiagnosticLogLevel.Error, DiagnosticLogComponents.Runner, string.Create(
+                CultureInfo.InvariantCulture,
+                $"--speed-limit {bytesPerSecond} bytes/s not reached for {(long)speedTime.TotalSeconds} s; the attempt ends with exit {(int)CurlExitCode.OperationTimedOut} ({CurlExitCode.OperationTimedOut})"));
         }
     }
 

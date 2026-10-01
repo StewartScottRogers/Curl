@@ -182,6 +182,7 @@ public sealed class RedirectFollower(
         RedirectPolicy policy)
     {
         RedirectChain chain = new(context.TimeProvider);
+        RedirectDiagnosticLog log = new(context.DiagnosticLog);
         long operationStarted = context.OperationStarted ?? context.TimeProvider.GetTimestamp();
         long? uploadStart = SeekableStart(context.Upload);
         Stream? bodyContent = StreamBodyContent(http);
@@ -202,13 +203,16 @@ public sealed class RedirectFollower(
             bodyDropped |= DropsBody(responseCode, hop, policy);
             methodDropped |= DropsCustomMethod(responseCode, hop, policy, bodyDropped);
             bool bodyCannotBeResent = CannotBeResent(bodyContent, bodyDropped);
+            log.Limit(policy.MaxRedirects, chain.RedirectCount);
             if (StopBeforeHop(context, http, ref target, chain, policy, result, bodyCannotBeResent, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
             {
+                log.Refused(responseCode, target, stop);
                 return chain.Merge(stop);
             }
 
             Rewind(context.Upload, uploadStart, bodyDropped);
             Rewind(bodyContent, bodyStart, bodyDropped);
+            log.Followed(responseCode, target, bodyDropped, methodDropped);
             chain.Followed(target);
             // No stop means the target parsed, so next is set.
             hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
@@ -540,6 +544,7 @@ public sealed class RedirectFollower(
             CancellationToken = first.CancellationToken,
             Progress = first.Progress,
             Events = first.Events,
+            DiagnosticLog = first.DiagnosticLog,
         };
 
     /// <summary>

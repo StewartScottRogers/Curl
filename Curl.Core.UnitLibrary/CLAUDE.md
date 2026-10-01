@@ -4,6 +4,14 @@ Phase 1.
 
 Transfer engine: URL parsing, scheme dispatch, redirects, resume, retries, rate limiting, low-speed aborts (`LowSpeedWatchdog`, ADR-0106), IPFS gateway rewriting.
 
+Curl's own diagnostic log (`--log-level`, ADR-0222, BL-921): `TransferRetrier` writes component
+`retry` through `RetryDiagnosticLog` and `RedirectFollower` writes `redirect` through
+`RedirectDiagnosticLog` (target URLs without user information), both to the context's
+`ITransferContext.DiagnosticLog`, and every followed hop carries that log on. `MaxTimeWatchdog`
+and `LowSpeedWatchdog` (`runner`) and `Hsts\HstsTransferPolicy` (`hsts`, host names only) take
+the log through their constructor; `Curl.Console`'s runner passes the run's log. Proxy, alt-svc
+and HSTS entry expiry lines are BL-1071.
+
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network.

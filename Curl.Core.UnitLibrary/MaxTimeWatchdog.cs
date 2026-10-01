@@ -26,6 +26,8 @@ public sealed class MaxTimeWatchdog : IDisposable
 
     private readonly ITimer timer;
 
+    private readonly IDiagnosticLog log;
+
     private bool transferStarted;
 
     private long bytesReceived;
@@ -42,14 +44,25 @@ public sealed class MaxTimeWatchdog : IDisposable
     /// </summary>
     /// <param name="maxTime">The <c>-m</c> limit; more than zero.</param>
     /// <param name="timeProvider">The clock the limit is measured and timed on.</param>
+    /// <param name="diagnosticLog">
+    /// Where the watchdog writes, component <see cref="DiagnosticLogComponents.Runner" /> (ADR-0222,
+    /// BL-921): the limit armed as <c>verbose</c> and the limit passed, ending the attempt with
+    /// <see cref="CurlExitCode.OperationTimedOut" />, as <c>error</c>; <see langword="null" /> for none.
+    /// </param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxTime" /> is not positive.</exception>
-    public MaxTimeWatchdog(TimeSpan maxTime, TimeProvider timeProvider)
+    public MaxTimeWatchdog(TimeSpan maxTime, TimeProvider timeProvider, IDiagnosticLog? diagnosticLog = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(maxTime, TimeSpan.Zero);
         ArgumentNullException.ThrowIfNull(timeProvider);
         this.maxTime = maxTime;
         this.timeProvider = timeProvider;
+        log = diagnosticLog ?? NoDiagnosticLog.Instance;
         OperationStarted = timeProvider.GetTimestamp();
+        if (log.IsEnabled(DiagnosticLogLevel.Verbose))
+        {
+            log.Write(DiagnosticLogLevel.Verbose, DiagnosticLogComponents.Runner, string.Create(CultureInfo.InvariantCulture, $"--max-time {(long)maxTime.TotalMilliseconds} ms armed"));
+        }
+
         timer = timeProvider.CreateTimer(_ => CheckMaxTime(), null, maxTime, Timeout.InfiniteTimeSpan);
     }
 
@@ -95,9 +108,10 @@ public sealed class MaxTimeWatchdog : IDisposable
     /// </summary>
     /// <param name="maxTime">The <c>-m</c> value, or <see langword="null" /> when not given.</param>
     /// <param name="timeProvider">The clock the limit is measured and timed on.</param>
+    /// <param name="diagnosticLog">Where the watchdog writes; <see langword="null" /> for none.</param>
     /// <returns>The started watchdog, or <see langword="null" /> when there is no limit.</returns>
-    public static MaxTimeWatchdog? StartFromCommandLine(TimeSpan? maxTime, TimeProvider timeProvider) =>
-        maxTime is { } limit && limit > TimeSpan.Zero ? new MaxTimeWatchdog(limit, timeProvider) : null;
+    public static MaxTimeWatchdog? StartFromCommandLine(TimeSpan? maxTime, TimeProvider timeProvider, IDiagnosticLog? diagnosticLog = null) =>
+        maxTime is { } limit && limit > TimeSpan.Zero ? new MaxTimeWatchdog(limit, timeProvider, diagnosticLog) : null;
 
     /// <summary>
     /// Wraps a transfer's progress sink so the watchdog learns whether the transfer got past its
@@ -125,7 +139,18 @@ public sealed class MaxTimeWatchdog : IDisposable
     {
         if (HasJustTimedOut())
         {
+            LogTimedOut();
             timedOut.Cancel();
+        }
+    }
+
+    private void LogTimedOut()
+    {
+        if (log.IsEnabled(DiagnosticLogLevel.Error))
+        {
+            log.Write(DiagnosticLogLevel.Error, DiagnosticLogComponents.Runner, string.Create(
+                CultureInfo.InvariantCulture,
+                $"--max-time {(long)maxTime.TotalMilliseconds} ms passed after {(long)elapsedWhenTimedOut.TotalMilliseconds} ms; the attempt ends with exit {(int)CurlExitCode.OperationTimedOut} ({CurlExitCode.OperationTimedOut})"));
         }
     }
 
