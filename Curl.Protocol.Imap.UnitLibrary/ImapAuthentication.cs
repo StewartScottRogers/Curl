@@ -22,7 +22,8 @@ namespace Curl.Protocol.Imap;
 /// <item>No choice: with a user, <c>LOGINDISABLED</c> not advertised and the options
 /// allowing it, <c>LOGIN user password</c>, each as <see cref="ImapQuoting" /> writes it;
 /// answered other than <c>OK</c> it is exit 67 <c>Access denied. </c> and the byte curl
-/// prints from its response code. Otherwise exit 67 <c>Login denied</c>, nothing sent.</item>
+/// prints from its response code. Otherwise exit 67 <c>Login denied</c>, nothing sent, after
+/// the <c>-v</c> <c>SASL:</c> line curl writes for it (BL-1060).</item>
 /// </list>
 /// </remarks>
 internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthenticator? authenticator, ITransferContext context)
@@ -32,6 +33,12 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     private const string DefaultServiceName = "imap";
 
     private static readonly Func<string, bool> NoUntagged = static _ => false;
+
+    /// <summary>
+    /// The mechanisms curl 8.21.0's Schannel build knows but does not build in, in the order
+    /// its <c>-v</c> names them when one of them is all that was offered (BL-1060).
+    /// </summary>
+    private static readonly string[] NotBuiltInMechanisms = ["SCRAM-SHA-256", "SCRAM-SHA-1"];
 
     /// <summary>
     /// Logs in when the transfer has something to authenticate with.
@@ -57,7 +64,37 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
         WarnOfNoUsableMechanism(offered);
         return MayLogIn(request, options, capabilities)
             ? await LoginAsync(request.Credential!).ConfigureAwait(false)
-            : TransferResult.Failure(CurlExitCode.LoginDenied, ImapSessionMessages.LoginDenied);
+            : NoWayToLogIn(request, options, offered);
+    }
+
+    /// <summary>
+    /// Writes the <c>-v</c> lines curl 8.21.0's SASL code writes when no way of logging in is
+    /// possible, and fails with exit 67 <c>Login denied</c> (BL-1060): when the only offered
+    /// mechanisms a user and the options allow are SCRAM, which curl's Schannel build does not
+    /// build in, that none could be selected and one line naming each; otherwise
+    /// <c>no overlap</c> once a mechanism curl knows was offered, and <c>no auth mechanism was
+    /// offered or recognized</c> when none was.
+    /// </summary>
+    private TransferResult NoWayToLogIn(SaslRequest request, ImapLoginOptions options, IReadOnlyList<string> offered)
+    {
+        string[] notBuiltIn = request.Credential is null
+            ? []
+            : [.. NotBuiltInMechanisms.Where(mechanism => options.AllowedAmong([mechanism]).Count > 0 && offered.Contains(mechanism, StringComparer.OrdinalIgnoreCase))];
+        if (notBuiltIn.Length > 0)
+        {
+            context.Events.ReportInfo(ImapInfoLines.NoSaslMechanismSelectable);
+            foreach (string mechanism in notBuiltIn)
+            {
+                context.Events.ReportInfo(ImapInfoLines.SaslMechanismNotBuiltIn(mechanism));
+            }
+        }
+        else
+        {
+            context.Events.ReportInfo(
+                offered.Any(ImapLoginOptions.IsKnownMechanism) ? ImapInfoLines.NoSaslMechanismOverlap : ImapInfoLines.NoSaslMechanismOffered);
+        }
+
+        return TransferResult.Failure(CurlExitCode.LoginDenied, ImapSessionMessages.LoginDenied);
     }
 
     private static bool CanAuthenticate(SaslRequest request, ImapLoginOptions options, IReadOnlyList<string> offered) =>

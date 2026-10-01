@@ -11,8 +11,35 @@ internal static class ImapInfoLines
     /// <summary>The line after a <c>PREAUTH</c> greeting.</summary>
     internal const string Preauthenticated = "PREAUTH connection, already authenticated";
 
+    /// <summary>
+    /// The line written before exit 67 when no way of logging in was possible and the last
+    /// <c>CAPABILITY</c> listed no SASL mechanism curl knows (BL-1060).
+    /// </summary>
+    internal const string NoSaslMechanismOffered = "SASL: no auth mechanism was offered or recognized";
+
+    /// <summary>
+    /// The line written before exit 67 when no way of logging in was possible although the
+    /// last <c>CAPABILITY</c> listed a SASL mechanism curl knows (BL-1060).
+    /// </summary>
+    internal const string NoSaslMechanismOverlap = "SASL: no overlap between offered and configured auth mechanisms";
+
+    /// <summary>
+    /// The line written before exit 67 when the only mechanisms offered and allowed are ones
+    /// curl 8.21.0's Schannel build does not build in, each then named by
+    /// <see cref="SaslMechanismNotBuiltIn" /> (BL-1060).
+    /// </summary>
+    internal const string NoSaslMechanismSelectable = "SASL: no auth mechanism offered could be selected";
+
     /// <summary>The line once an empty <c>APPEND</c> literal has been sent.</summary>
     internal const string RequestSent = "Request completely sent off";
+
+    /// <summary>
+    /// Formats the line naming a mechanism that was offered and allowed but is not built in,
+    /// after <see cref="NoSaslMechanismSelectable" /> (BL-1060).
+    /// </summary>
+    /// <param name="mechanism">The mechanism, as curl names it.</param>
+    /// <returns>The line, such as <c>SASL: SCRAM-SHA-256 not builtin</c>.</returns>
+    internal static string SaslMechanismNotBuiltIn(string mechanism) => "SASL: " + mechanism + " not builtin";
 
     /// <summary>Formats the line for a response announcing a literal of <paramref name="size" /> bytes.</summary>
     /// <param name="size">The literal's size.</param>

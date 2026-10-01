@@ -71,6 +71,25 @@ public sealed class CurlCommandRunnerImapTransferEventTests
     }
 
     [TestMethod]
+    public async Task RunAsync_VerboseLoginWithNoMechanism_WritesTheSaslLineAndClosesWithExit67()
+    {
+        // Recorded on 2026-10-01 with -ImapReply 'CAPABILITY=* CAPABILITY IMAP4rev1 LOGINDISABLED AUTH=FOO\r\nOK done','GREETING=* OK ready' (BL-1060 Notes).
+        const string greeting = "* OK ready\r\n";
+        const string capabilityReply = "* CAPABILITY IMAP4rev1 LOGINDISABLED AUTH=FOO\r\nA001 OK done\r\n";
+
+        int exitCode = await RunAsync(["-sv"], "INBOX", 18244, 59084, [greeting, capabilityReply]);
+
+        Assert.AreEqual(67, exitCode);
+        Assert.AreEqual(
+            Opened(18244, 59084, greeting)
+            + Headers("< ", capabilityReply)
+            + "* SASL: no auth mechanism was offered or recognized" + InfoEnd
+            + "* closing connection #0" + InfoEnd,
+            Encoding.ASCII.GetString(standardError.ToArray()));
+        Assert.AreEqual(0, standardOutput.Length);
+    }
+
+    [TestMethod]
     public async Task RunAsync_VerboseAppend_WritesTheLiteralSentAndTheLineEndAfterIt()
     {
         files.ExistingContent["mail.txt"] = Encoding.ASCII.GetBytes(Upload);
