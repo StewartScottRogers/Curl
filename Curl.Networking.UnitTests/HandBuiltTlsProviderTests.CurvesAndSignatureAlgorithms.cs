@@ -17,6 +17,10 @@ public sealed partial class HandBuiltTlsProviderTests
 {
     private static readonly byte[] HandshakeFailureAlert = [0x15, 0x03, 0x03, 0x00, 0x02, 0x02, 0x28];
 
+    // What Ubuntu's curl 8.18.0 with OpenSSL 3.5.5 wrote for --curves '*brainpoolP256r1',
+    // '?bogus' and --sigalgs RSA+SHA1 before exit 35 (measured 2026-10-01, BL-1087).
+    private static readonly byte[] InternalErrorAlert = [0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x50];
+
     [TestMethod]
     [DataRow(OpenSslBuild, "X25519", new ushort[] { 0x001d }, new ushort[] { 0x001d })]
     [DataRow(OpenSslBuild, "P-384:X25519", new ushort[] { 0x0018, 0x001d }, new ushort[] { 0x0018 })]
@@ -115,14 +119,74 @@ public sealed partial class HandBuiltTlsProviderTests
         CurlExitCode exitCode,
         string expected)
     {
-        var (plaintext, stream) = Unanswered();
+        var (client, server) = InMemoryDuplexStream.CreatePair();
 
         var result = await Provider(new TlsClientOptions(Curves: curves, SignatureAlgorithms: signatureAlgorithms), matchesSchannelBuild)
-            .AuthenticateAsClientAsync(plaintext, CertificateHost, CancellationToken.None);
+            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
 
         Assert.AreEqual(exitCode, result.ExitCode);
         Assert.AreEqual(expected, result.ErrorMessage);
-        Assert.IsTrue(stream.IsDisposed);
+        Assert.IsTrue(client.IsDisposed);
+        // A refused list (exit 59) fails before connecting; nothing left to offer (exit 35) is
+        // announced with OpenSSL's internal_error alert in both builds (ADR-0303).
+        CollectionAssert.AreEqual(exitCode == CurlExitCode.SslCipher ? Array.Empty<byte>() : InternalErrorAlert, await ReadUntilClosedAsync(server));
+    }
+
+    // A peer already gone when the alert is written leaves the failure as it was.
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithNothingToOfferAndAWriteThatFails_StillFailsWithTheMeasuredLine()
+    {
+        var plaintext = new WriteFailingConnection(new IOException("Unable to write data to the transport connection."));
+
+        var result = await Provider(new TlsClientOptions(Curves: "?bogus"), OpenSslBuild)
+            .AuthenticateAsClientAsync(plaintext, CertificateHost, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual("TLS connect error: error:0A000127:SSL routines::no suitable groups", result.ErrorMessage);
+        Assert.IsTrue(plaintext.IsDisposed);
+    }
+
+    // Cancelled while the alert is written, the connection is still disposed and the
+    // cancellation escapes, as ITlsProvider lets it.
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithNothingToOfferAndTheAlertWriteCancelled_DisposesAndThrows()
+    {
+        var plaintext = new WriteFailingConnection(new OperationCanceledException());
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () =>
+            await Provider(new TlsClientOptions(Curves: "?bogus"), OpenSslBuild).AuthenticateAsClientAsync(plaintext, CertificateHost, CancellationToken.None));
+
+        Assert.IsTrue(plaintext.IsDisposed);
+    }
+
+    private static async Task<byte[]> ReadUntilClosedAsync(InMemoryDuplexStream server)
+    {
+        using var received = new MemoryStream();
+        await server.CopyToAsync(received);
+        return received.ToArray();
+    }
+
+    // A connection every write to fails with the given exception.
+    private sealed class WriteFailingConnection(Exception writeFailure) : IConnection
+    {
+        public bool IsDisposed { get; private set; }
+
+        public bool IsSecure => false;
+
+        public System.Net.EndPoint? RemoteEndPoint => null;
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) => ValueTask.FromResult(0);
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) =>
+            ValueTask.FromException(writeFailure);
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask DisposeAsync()
+        {
+            IsDisposed = true;
+            return ValueTask.CompletedTask;
+        }
     }
 
     // One starred group TLS 1.3 can share is enough (measured 2026-10-01, BL-1082): it alone

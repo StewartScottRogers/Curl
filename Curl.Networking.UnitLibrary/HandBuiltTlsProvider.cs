@@ -170,11 +170,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ArgumentNullException.ThrowIfNull(applicationProtocols);
 
         var offeredApplicationProtocols = _options.UseAlpn ? applicationProtocols : [];
-        var (prepared, preparationFailure) = Prepare(events, targetHost, offeredApplicationProtocols);
+        var (prepared, preparationFailure, sendsInternalErrorAlert) = Prepare(events, targetHost, offeredApplicationProtocols);
         if (prepared is null)
         {
-            await plaintext.DisposeAsync().ConfigureAwait(false);
-            return preparationFailure!;
+            return await FailBeforeHandshakeAsync(plaintext, preparationFailure!, sendsInternalErrorAlert, cancellationToken).ConfigureAwait(false);
         }
 
         var handshakeStarted = _timeProvider.GetTimestamp();
@@ -245,6 +244,38 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             PeerCertificateChain = [.. verifier.Observed.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
         };
 
+    /// <summary>
+    /// The fatal <c>internal_error</c> alert OpenSSL writes when <c>--curves</c> or
+    /// <c>--sigalgs</c> leaves nothing to offer, in a record with the ClientHello's legacy
+    /// version 3.1 (measured 2026-10-01 with curl 8.18.0 and OpenSSL 3.5.5, BL-1087).
+    /// </summary>
+    internal static ReadOnlySpan<byte> InternalErrorAlertRecord => [0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x50];
+
+    // A failure found before the handshake: the alert when it calls for one, then the
+    // plaintext is disposed whatever the write did, and cancellation escapes as in FailAsync.
+    private static async ValueTask<ConnectResult> FailBeforeHandshakeAsync(IConnection plaintext, ConnectResult failure, bool sendsInternalErrorAlert, CancellationToken cancellationToken)
+    {
+        var thrown = sendsInternalErrorAlert ? await TrySendInternalErrorAlertAsync(plaintext, cancellationToken).ConfigureAwait(false) : null;
+        await plaintext.DisposeAsync().ConfigureAwait(false);
+        RethrowIfCancellation(thrown);
+        return failure;
+    }
+
+    // The alert is a courtesy: a peer that is already gone leaves the failure as it was.
+    private static async ValueTask<Exception?> TrySendInternalErrorAlertAsync(IConnection plaintext, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await plaintext.WriteAsync(InternalErrorAlertRecord.ToArray(), cancellationToken).ConfigureAwait(false);
+            await plaintext.FlushAsync(cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+        catch (Exception exception)
+        {
+            return exception;
+        }
+    }
+
     // Cancellation is the one exception ITlsProvider lets escape; its stack trace is kept.
     private static void RethrowIfCancellation(Exception? thrown)
     {
@@ -274,7 +305,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     // Everything the handshake needs before a byte is sent, in the order the SslStream
     // provider does it: the suites, the --cert certificate, the trust event, the anchors.
-    private (PreparedHandshake? Prepared, ConnectResult? Failure) Prepare(
+    // --curves or --sigalgs leaving nothing to offer (exit 35, not a refused list's 59) is
+    // the one failure OpenSSL announces with an internal_error alert (BL-1087).
+    private (PreparedHandshake? Prepared, ConnectResult? Failure, bool SendsInternalErrorAlert) Prepare(
         ITransferEvents events,
         string targetHost,
         IReadOnlyList<string> offeredApplicationProtocols)
@@ -282,19 +315,19 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var (suites, cipherFailure) = SelectCipherSuites();
         if (cipherFailure is not null)
         {
-            return (null, ConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure));
+            return (null, ConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure), false);
         }
 
         var (profile, listFailure) = CurvesAndSignatureAlgorithms.Apply(Profile, _options);
         if (listFailure is not null)
         {
-            return (null, listFailure);
+            return (null, listFailure, listFailure.ExitCode == CurlExitCode.SslConnectError);
         }
 
         var (clientCertificate, clientCertificateFailure) = ClientCertificateLoader.Load(_options, _matchesSchannelBuild, _certificateStore, _timeProvider.GetUtcNow());
         if (clientCertificateFailure is not null)
         {
-            return (null, clientCertificateFailure);
+            return (null, clientCertificateFailure, false);
         }
 
         events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options, targetHost));
@@ -308,13 +341,13 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                     TimeProvider = _timeProvider,
                 },
                 clientCertificate,
-                new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost)), null);
+                new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost)), null, false);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
         {
             clientCertificate?.Dispose();
             var (exitCode, message) = _verification.TrustAnchorsUnusable(exception);
-            return (null, ConnectResult.Failed(exitCode, message));
+            return (null, ConnectResult.Failed(exitCode, message), false);
         }
     }
 
