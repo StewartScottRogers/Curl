@@ -31,3 +31,4 @@ An `ssh-rsa-cert-v01@openssh.com` key (from the agent, or `--key` with a certifi
 ## Log
 
 - 2026-09-30: Created.
+- 2026-10-01: Backlog -> Doing.
