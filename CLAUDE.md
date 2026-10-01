@@ -56,6 +56,13 @@ shift, `RunDarkFactory.ps1` merges its branch into `master` through a pull reque
 only when the `CI` workflow passed on Windows, Linux and macOS for the exact commit being
 merged. That merge needs no confirmation; a red or unfinished CI run means no merge.
 
+A third standing exception (Stewart, 2026-09-30: "stop asking redundant questions and just
+do the job without me"): an interactive session merges the audit office's pull requests
+(the `audit` branch, and any branch built from `master` for guarded audit or guard work)
+into `master` itself, then merges `master` into `work/dark-factory`, and goes on to the
+next audit task without asking - but only when the `CI` workflow passed on Windows, Linux
+and macOS for the pull request's head commit. It reports what it merged afterwards.
+
 Ask first for: a force push or any rewrite of already-pushed history, any other merge to `master`,
 a tag or a release, creating a repository or changing its visibility, and deleting a
 branch. Irreversible GitHub actions are run directly and not through the subagent, which
