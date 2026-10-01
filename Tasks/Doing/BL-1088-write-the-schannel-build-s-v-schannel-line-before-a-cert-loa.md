@@ -31,3 +31,4 @@ Under the Schannel wording, `-v -k --cert nosuch.pem https://127.0.0.1:port/` wr
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
