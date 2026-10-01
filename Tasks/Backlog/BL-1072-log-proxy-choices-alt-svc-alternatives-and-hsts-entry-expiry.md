@@ -1,5 +1,5 @@
 ---
-id: BL-1071
+id: BL-1072
 title: Log proxy choices, alt-svc alternatives and HSTS entry expiry to the diagnostic log
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-01
 completed:
 ---
-# BL-1071 — Log proxy choices, alt-svc alternatives and HSTS entry expiry to the diagnostic log
+# BL-1072 — Log proxy choices, alt-svc alternatives and HSTS entry expiry to the diagnostic log
 
 ## Goal
 

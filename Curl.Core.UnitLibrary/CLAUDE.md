@@ -10,7 +10,7 @@ Curl's own diagnostic log (`--log-level`, ADR-0222, BL-921): `TransferRetrier` w
 `ITransferContext.DiagnosticLog`, and every followed hop carries that log on. `MaxTimeWatchdog`
 and `LowSpeedWatchdog` (`runner`) and `Hsts\HstsTransferPolicy` (`hsts`, host names only) take
 the log through their constructor; `Curl.Console`'s runner passes the run's log. Proxy, alt-svc
-and HSTS entry expiry lines are BL-1071.
+and HSTS entry expiry lines are BL-1072.
 
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
