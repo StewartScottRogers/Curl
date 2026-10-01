@@ -203,6 +203,8 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("keepalive", null, (options, on) => options.TcpKeepAlive = on),
         CommandLineOption.Value("keepalive-time", null, SetKeepAliveTime),
         CommandLineOption.Value("keepalive-cnt", null, SetKeepAliveProbeCount),
+        CommandLineOption.Value("ip-tos", null, SetIpTypeOfService),
+        CommandLineOption.Value("vlan-priority", null, SetVlanPriority),
         CommandLineOption.NegatableFlag("styled-output", null, (options, on) => options.StyledOutput = on),
         CommandLineOption.Value("cacert", null, SettingExistingFile("--cacert", (options, file) => options.CaCertificateFile = file)),
         CommandLineOption.FileName("capath", null, (options, directory) => options.CaCertificateDirectory = directory),
@@ -338,6 +340,51 @@ public static class CommandLineOptionTable
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
     private const int MaximumCreateFileMode = 0b111_111_111;
+
+    /// <summary>The largest <c>--ip-tos</c> number curl 8.21.0 accepts: one byte.</summary>
+    private const int MaximumIpTypeOfService = 255;
+
+    /// <summary>The largest <c>--vlan-priority</c> curl 8.21.0 accepts.</summary>
+    private const int MaximumVlanPriority = 7;
+
+    /// <summary>
+    /// The names curl 8.21.0's <c>tos_entries</c> gives <c>--ip-tos</c>, upper case only, with the byte each
+    /// stands for: the DSCP code points shifted into the top six bits, the ECN code points, and the RFC 1349
+    /// Type of Service bits.
+    /// </summary>
+    private static readonly FrozenDictionary<string, int> IpTypeOfServiceNames = new Dictionary<string, int>(StringComparer.Ordinal)
+    {
+        ["AF11"] = 0x28,
+        ["AF12"] = 0x30,
+        ["AF13"] = 0x38,
+        ["AF21"] = 0x48,
+        ["AF22"] = 0x50,
+        ["AF23"] = 0x58,
+        ["AF31"] = 0x68,
+        ["AF32"] = 0x70,
+        ["AF33"] = 0x78,
+        ["AF41"] = 0x88,
+        ["AF42"] = 0x90,
+        ["AF43"] = 0x98,
+        ["CE"] = 0x03,
+        ["CS0"] = 0x00,
+        ["CS1"] = 0x20,
+        ["CS2"] = 0x40,
+        ["CS3"] = 0x60,
+        ["CS4"] = 0x80,
+        ["CS5"] = 0xa0,
+        ["CS6"] = 0xc0,
+        ["CS7"] = 0xe0,
+        ["ECT0"] = 0x02,
+        ["ECT1"] = 0x01,
+        ["EF"] = 0xb8,
+        ["LE"] = 0x04,
+        ["LOWCOST"] = 0x02,
+        ["LOWDELAY"] = 0x10,
+        ["MINCOST"] = 0x02,
+        ["RELIABILITY"] = 0x04,
+        ["THROUGHPUT"] = 0x08,
+    }.ToFrozenDictionary(StringComparer.Ordinal);
 
     /// <summary>The length curl 8.21.0 requires of a <c>--hostpubmd5</c> value: 32, the hex digits of an MD5 hash.</summary>
     private const int HostPublicKeyMd5Length = 32;
@@ -1303,6 +1350,65 @@ public static class CommandLineOptionTable
         }
 
         return refusal;
+    }
+
+    /// <summary>
+    /// Records <c>--ip-tos</c>: one of <see cref="IpTypeOfServiceNames" />, matched case-sensitively, or a number
+    /// from 0 to 255, as curl 8.21.0 reads it (measured 2026-10-01, BL-646 Notes).
+    /// </summary>
+    private static CommandLineRefusal? SetIpTypeOfService(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (IpTypeOfServiceNames.TryGetValue(value, out int named))
+        {
+            options.IpTypeOfService = named;
+            return null;
+        }
+
+        CommandLineRefusal? refusal = ParseAtMost(spelledOption, value, MaximumIpTypeOfService, out int number);
+        if (refusal is null)
+        {
+            options.IpTypeOfService = number;
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Records <c>--vlan-priority</c>: a number from 0 to 7, as curl 8.21.0 reads it (measured 2026-10-01,
+    /// BL-646 Notes).
+    /// </summary>
+    private static CommandLineRefusal? SetVlanPriority(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = ParseAtMost(spelledOption, value, MaximumVlanPriority, out int number);
+        if (refusal is null)
+        {
+            options.VlanPriority = number;
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Reads a number zero or more, as curl's <c>str2unummax</c> does: malformed or past <c>LONG_MAX</c> is
+    /// "expected a proper numerical parameter", negative is "expected a positive numerical parameter", and
+    /// past <paramref name="maximum" /> is "too large number".
+    /// </summary>
+    private static CommandLineRefusal? ParseAtMost(string spelledOption, string value, int maximum, out int number)
+    {
+        number = 0;
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long read);
+        if (refusal is not null)
+        {
+            return refusal;
+        }
+
+        if (read > maximum)
+        {
+            return CommandLineRefusal.TooLargeNumber(spelledOption);
+        }
+
+        number = (int)read;
+        return null;
     }
 
     private static CommandLineRefusal? SetConnectTimeout(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)

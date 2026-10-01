@@ -132,6 +132,15 @@ public sealed class CurlTransportsTests
         Assert.AreEqual(new TcpSocketOptions(KeepAliveSeconds: 5, KeepAliveProbeCount: 3), transports.TcpDialer.SocketOptions);
     }
 
+    [TestMethod]
+    public void CreateTransports_WithIpTosAndVlanPriority_DialsWithBoth()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(
+            Options("--ip-tos", "CS1", "--vlan-priority", "3", "gophers://example.com/"));
+
+        Assert.AreEqual(new TcpSocketOptions(TypeOfService: 0x20, VlanPriority: 3), transports.TcpDialer.SocketOptions);
+    }
+
     private static CommandLineOptions NoOptions() => Options("gophers://example.com/");
 
     private static CommandLineOptions Options(params string[] arguments)

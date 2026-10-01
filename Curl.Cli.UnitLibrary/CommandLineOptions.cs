@@ -986,6 +986,19 @@ public sealed class CommandLineOptions
     public long TcpKeepAliveProbeCount { get; internal set; }
 
     /// <summary>
+    /// The last <c>--ip-tos</c>: the IPv4 Type of Service or IPv6 Traffic Class byte, 0 to 255, from a
+    /// name such as <c>CS1</c> or a number. Zero, the default, sets nothing, as curl passes libcurl only a
+    /// value above 0.
+    /// </summary>
+    public int IpTypeOfService { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--vlan-priority</c>: the socket priority, 0 to 7, that Linux maps to the VLAN priority.
+    /// Zero, the default, sets nothing, as curl passes libcurl only a value above 0.
+    /// </summary>
+    public int VlanPriority { get; internal set; }
+
+    /// <summary>
     /// <see langword="false"/> when the last of <c>--styled-output</c> and <c>--no-styled-output</c> was
     /// <c>--no-styled-output</c>: never style header output. <see langword="true"/> otherwise, as curl styles
     /// headers written to a terminal by default. Parsed only until BL-736 styles header output.
