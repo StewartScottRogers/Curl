@@ -81,6 +81,24 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
     }
 
     [TestMethod]
+    public async Task RunAsync_VerboseLoginWithNoMechanism_WritesTheSaslLineAndClosesWithExit67()
+    {
+        // Recorded on 2026-10-01 with -u user:secret and -SmtpReply 'EHLO=250-localhost\r\n250 AUTH FOO' (BL-1061 Notes).
+        const string ehloReply = "250-localhost\r\n250 AUTH FOO\r\n";
+
+        int exitCode = await RunAsync(["-sv", "-u", "user:secret"], 18031, 60797, Greeting + ehloReply);
+
+        Assert.AreEqual(67, exitCode);
+        Assert.AreEqual(
+            Opened(18031, 60797)
+            + Headers("< ", ehloReply)
+            + "* SASL: no auth mechanism was offered or recognized" + InfoEnd
+            + "* closing connection #0" + InfoEnd,
+            Encoding.ASCII.GetString(standardError.ToArray()));
+        Assert.AreEqual(0, standardOutput.Length);
+    }
+
+    [TestMethod]
     public async Task RunAsync_VerboseMailUploadWithStartTls_WritesTheEstablishedConnectionLineAgainAfterTheUpgrade()
     {
         // Between "< 220 Ready to start TLS" and the second EHLO curl writes the connect's

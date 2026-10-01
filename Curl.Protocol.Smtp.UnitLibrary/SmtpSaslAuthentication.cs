@@ -13,7 +13,8 @@ namespace Curl.Protocol.Smtp;
 /// (in any case) on every line of the <c>EHLO</c> reply. No such line: no authentication.</item>
 /// <item>Nothing to authenticate with - no <c>-u</c>, no <c>--oauth2-bearer</c>, and not
 /// <c>AUTH=EXTERNAL</c> with <c>EXTERNAL</c> offered: no authentication.</item>
-/// <item>No usable mechanism among those offered: exit 67 <c>Login denied</c>, nothing sent.</item>
+/// <item>No usable mechanism among those offered: exit 67 <c>Login denied</c>, nothing sent,
+/// after the <c>-v</c> <c>SASL:</c> line curl writes for it (BL-1061).</item>
 /// <item>Under <c>--sasl-ir</c> the initial response goes on the <c>AUTH</c> line while the
 /// mechanism's name and the base64 fit in 504 characters; otherwise it answers the first
 /// <c>334</c>. An empty message is sent as <c>=</c>.</item>
@@ -46,6 +47,18 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     private const int MaxInitialResponseLength = 504;
 
     private static readonly char[] MechanismSeparators = [' ', '\t'];
+
+    /// <summary>The SASL mechanisms curl 8.21.0 knows by name, in any case.</summary>
+    private static readonly HashSet<string> KnownMechanisms = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "LOGIN", "PLAIN", "CRAM-MD5", "DIGEST-MD5", "GSSAPI", "EXTERNAL", "NTLM", "XOAUTH2", "OAUTHBEARER", "SCRAM-SHA-1", "SCRAM-SHA-256",
+    };
+
+    /// <summary>
+    /// The mechanisms curl 8.21.0's Schannel build knows but does not build in, in the order
+    /// its <c>-v</c> names them when one of them is all that could be used (BL-1061).
+    /// </summary>
+    private static readonly string[] NotBuiltInMechanisms = ["SCRAM-SHA-256", "SCRAM-SHA-1"];
 
     /// <summary>How many challenges the current exchange has been handed.</summary>
     private int challengesHanded;
@@ -239,10 +252,42 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
         if (denial == SmtpSessionMessages.LoginDenied)
         {
             SmtpDiagnosticLogLines.NoUsableMechanism(context.DiagnosticLog, offered);
+            ReportNoWayToLogIn(request, offered);
         }
 
         return TransferResult.Failure(CurlExitCode.LoginDenied, denial);
     }
+
+    /// <summary>
+    /// Writes the <c>-v</c> lines curl 8.21.0's SASL code writes when no mechanism can be used
+    /// (BL-1061): when the only offered mechanisms a user and the login options allow are
+    /// SCRAM, which curl's Schannel build does not build in, that none could be selected and
+    /// one line naming each; otherwise <c>no overlap</c> once a mechanism curl knows was
+    /// offered, and <c>no auth mechanism was offered or recognized</c> when none was.
+    /// </summary>
+    private void ReportNoWayToLogIn(SaslRequest request, List<string> offered)
+    {
+        string[] notBuiltIn = request.Credential is null
+            ? []
+            : [.. NotBuiltInMechanisms.Where(mechanism => Allows(request.RequiredMechanism, mechanism) && offered.Contains(mechanism, StringComparer.OrdinalIgnoreCase))];
+        if (notBuiltIn.Length > 0)
+        {
+            context.Events.ReportInfo(SmtpConnectionInfoLines.NoSaslMechanismSelectable);
+            foreach (string mechanism in notBuiltIn)
+            {
+                context.Events.ReportInfo(SmtpConnectionInfoLines.SaslMechanismNotBuiltIn(mechanism));
+            }
+        }
+        else
+        {
+            context.Events.ReportInfo(
+                offered.Any(KnownMechanisms.Contains) ? SmtpConnectionInfoLines.NoSaslMechanismOverlap : SmtpConnectionInfoLines.NoSaslMechanismOffered);
+        }
+    }
+
+    /// <summary>Whether <c>AUTH=</c> allows <paramref name="mechanism" />: absent, <c>*</c>, or naming it.</summary>
+    private static bool Allows(string? requiredMechanism, string mechanism) =>
+        requiredMechanism is null or "*" || mechanism.Equals(requiredMechanism, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Records whether the exchange was accepted, and fails a refused one with <c>Login denied</c>.</summary>
     private TransferResult? Finish(ExchangeOutcome outcome, string mechanism)

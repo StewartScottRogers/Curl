@@ -183,7 +183,8 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
 
     /// <summary>
     /// Writes the lines curl 8.21.0's <c>-v</c> ends an SMTP transfer with (BL-546): a failure's
-    /// message, then <c>shutting down connection #N</c> when <c>QUIT</c> was sent and
+    /// message, but for <c>Login denied</c>, which curl only makes <c>curl: (67)</c> of (BL-1061),
+    /// then <c>shutting down connection #N</c> when <c>QUIT</c> was sent and
     /// <c>closing connection #N</c> when it was not; a success ends with
     /// <c>Connection #N to host H:P left intact</c>.
     /// </summary>
@@ -195,7 +196,11 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
             return;
         }
 
-        events.ReportInfo(result.ErrorMessage!);
+        if (result.ErrorMessage != SmtpSessionMessages.LoginDenied)
+        {
+            events.ReportInfo(result.ErrorMessage!);
+        }
+
         events.ReportInfo(quitSent ? SmtpConnectionInfoLines.ShuttingDown(connectionNumber) : SmtpConnectionInfoLines.Closing(connectionNumber));
     }
 
