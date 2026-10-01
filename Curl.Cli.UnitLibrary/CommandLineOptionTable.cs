@@ -72,8 +72,9 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("verbose", 'v', (options, on) => options.SetVerbose(on)),
         CommandLineOption.FileName("trace", null, (options, file) => options.SelectTraceDump(TraceKind.HexDump, file, "--trace")),
         CommandLineOption.FileName("trace-ascii", null, (options, file) => options.SelectTraceDump(TraceKind.AsciiDump, file, "--trace-ascii")),
-        CommandLineOption.NegatableFlag("trace-time", null, (options, on) => options.TraceTime = on),
-        CommandLineOption.NegatableFlag("trace-ids", null, (options, on) => options.TraceIds = on),
+        CommandLineOption.NegatableFlag("trace-time", null, (options, on) => options.SetTraceTime(on)),
+        CommandLineOption.NegatableFlag("trace-ids", null, (options, on) => options.SetTraceIds(on)),
+        CommandLineOption.Value("trace-config", null, ApplyTraceConfig),
         CommandLineOption.Value("stderr", null, SetStandardErrorFile),
         CommandLineOption.Value("log-level", null, SetDiagnosticLogLevel),
         CommandLineOption.FileName("log-file", null, (options, file) => options.DiagnosticLogFile = file),
@@ -426,7 +427,7 @@ public static class CommandLineOptionTable
     /// <remarks>
     /// curl 8.21.0's manual marks <c>--fail-early</c>, <c>-#</c>, <c>--progress-meter</c>, <c>-S</c>,
     /// <c>--stderr</c>, <c>--styled-output</c>, <c>--trace</c>, <c>--trace-ascii</c>,
-    /// <c>--trace-time</c>, <c>--trace-ids</c>, <c>-v</c>, <c>-Z</c>, <c>--parallel-immediate</c>, <c>--parallel-max</c>, <c>--parallel-max-host</c> and <c>--rate</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
+    /// <c>--trace-time</c>, <c>--trace-ids</c>, <c>--trace-config</c>, <c>-v</c>, <c>-Z</c>, <c>--parallel-immediate</c>, <c>--parallel-max</c>, <c>--parallel-max-host</c> and <c>--rate</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
     /// and <c>-M</c> are global in its tool (<c>struct GlobalConfig</c>) without the mark, as is
     /// <c>--ssl-sessions</c> (<c>global-&gt;ssl_sessions</c>) and <c>--libcurl</c> (<c>global-&gt;libcurl</c>); <c>--dump-ca-embed</c>, like <c>-V</c>, ends
     /// the command line rather than setting anything of one group. Measured
@@ -444,6 +445,7 @@ public static class CommandLineOptionTable
         "trace-ascii",
         "trace-time",
         "trace-ids",
+        "trace-config",
         "stderr",
         "log-level",
         "log-file",
@@ -496,6 +498,13 @@ public static class CommandLineOptionTable
     {
         CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, path);
         return ConfigFileApplier.ApplyFile(options, path, spelledOption, pathExists, dataFileReader);
+    }
+
+    /// <summary>Applies <c>--trace-config</c>, whose value curl 8.21.0 never refuses, even empty: see <see cref="CommandLineOptions.ApplyTraceConfig"/>.</summary>
+    private static CommandLineRefusal? ApplyTraceConfig(CommandLineOptions options, string list, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        options.ApplyTraceConfig(list);
+        return null;
     }
 
     /// <summary>

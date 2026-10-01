@@ -276,15 +276,111 @@ public sealed class CommandLineOptions
     /// <c>--trace-time</c> and by the second <c>v</c> of <c>-vv</c>, cleared by <c>--no-trace-time</c>,
     /// by <c>--no-verbose</c> and by a <c>-v</c> or <c>--verbose</c> that is the first option of its
     /// argument (<c>--trace-time -v</c> shows no times; <c>--trace-time -sv</c> and <c>-v --trace-time</c> do).
+    /// <c>--trace-config time</c> (or <c>all</c>) also sets it, and that a first <c>-v</c> does not
+    /// clear: <c>--trace-config time -v</c> shows times (measured 2026-10-01, BL-649 Notes).
     /// </summary>
-    public bool TraceTime { get => globals.TraceTime; internal set => globals.TraceTime = value; }
+    public bool TraceTime { get => globals.TraceTime || globals.TraceConfigTime; internal set => globals.TraceTime = value; }
 
     /// <summary>
     /// <see langword="true"/> when every verbose or trace line carries its transfer and connection
     /// IDs, <c>[0-0] </c>: set by <c>--trace-ids</c> and by the second <c>v</c> of <c>-vv</c>, cleared
-    /// as <see cref="TraceTime"/> is (measured 2026-09-29, BL-648 Notes).
+    /// as <see cref="TraceTime"/> is (measured 2026-09-29, BL-648 Notes); set by
+    /// <c>--trace-config ids</c> (or <c>all</c>) as <see cref="TraceTime"/> is by <c>time</c>.
     /// </summary>
-    public bool TraceIds { get => globals.TraceIds; internal set => globals.TraceIds = value; }
+    public bool TraceIds { get => globals.TraceIds || globals.TraceConfigIds; internal set => globals.TraceIds = value; }
+
+    /// <summary>
+    /// The trace component names <c>--trace-config</c> turned on and did not turn off again, in lower
+    /// case: <c>tls</c>, <c>http/1</c>, <c>dns</c>, <c>doh</c> and the rest, with <c>all</c> standing for
+    /// every component. Names curl does not know are kept too, since curl 8.21.0 ignores them silently.
+    /// </summary>
+    public IReadOnlySet<string> TraceComponents => globals.TraceComponents;
+
+    /// <summary>
+    /// Applies <c>--trace-ids</c>, or <c>--no-trace-ids</c> when <paramref name="on"/> is
+    /// <see langword="false"/>, which also turns off <c>--trace-config ids</c>.
+    /// </summary>
+    /// <param name="on"><see langword="false"/> for <c>--no-trace-ids</c>.</param>
+    internal void SetTraceIds(bool on)
+    {
+        TraceIds = on;
+        globals.TraceConfigIds &= on;
+    }
+
+    /// <summary>
+    /// Applies <c>--trace-time</c>, or <c>--no-trace-time</c> when <paramref name="on"/> is
+    /// <see langword="false"/>, which also turns off <c>--trace-config time</c>.
+    /// </summary>
+    /// <param name="on"><see langword="false"/> for <c>--no-trace-time</c>.</param>
+    internal void SetTraceTime(bool on)
+    {
+        TraceTime = on;
+        globals.TraceConfigTime &= on;
+    }
+
+    /// <summary>
+    /// Applies <c>--trace-config &lt;list&gt;</c> as curl 8.21.0 reads it (measured 2026-10-01, BL-649
+    /// Notes): the list splits at commas, a name after a comma may start with blanks, a leading
+    /// <c>-</c> turns the name off and a leading <c>+</c> is dropped, and names are case-insensitive.
+    /// <c>ids</c> and <c>time</c> turn <see cref="TraceIds"/> and <see cref="TraceTime"/> on or off,
+    /// <c>all</c> both of them and every component; any other name, known to curl or not, goes into
+    /// or out of <see cref="TraceComponents"/>. Nothing is ever refused or warned about.
+    /// </summary>
+    /// <param name="list">The option's value, possibly empty.</param>
+    internal void ApplyTraceConfig(string list)
+    {
+        string[] tokens = list.Split(',');
+        for (int index = 0; index < tokens.Length; index++)
+        {
+            string token = index == 0 ? tokens[index] : tokens[index].TrimStart(' ', '\t');
+            bool on = !token.StartsWith('-');
+            string name = token.TrimStart('-', '+').ToLowerInvariant();
+            if (name.Length > 0)
+            {
+                ApplyTraceConfigName(name, on);
+            }
+        }
+    }
+
+    /// <summary>Turns one <c>--trace-config</c> name on or off: see <see cref="ApplyTraceConfig"/>.</summary>
+    private void ApplyTraceConfigName(string name, bool on)
+    {
+        switch (name)
+        {
+            case "ids":
+                SetTraceConfigIds(on);
+                break;
+            case "time":
+                SetTraceConfigTime(on);
+                break;
+            case "all":
+                SetTraceConfigIds(on);
+                SetTraceConfigTime(on);
+                SetTraceComponent(name, on);
+                break;
+            default:
+                SetTraceComponent(name, on);
+                break;
+        }
+    }
+
+    /// <summary>Turns <c>--trace-config ids</c> on or off, with <see cref="TraceIds"/>.</summary>
+    private void SetTraceConfigIds(bool on)
+    {
+        TraceIds = on;
+        globals.TraceConfigIds = on;
+    }
+
+    /// <summary>Turns <c>--trace-config time</c> on or off, with <see cref="TraceTime"/>.</summary>
+    private void SetTraceConfigTime(bool on)
+    {
+        TraceTime = on;
+        globals.TraceConfigTime = on;
+    }
+
+    /// <summary>Adds <paramref name="name"/> to <see cref="TraceComponents"/>, or takes it out when <paramref name="on"/> is <see langword="false"/>.</summary>
+    private void SetTraceComponent(string name, bool on) =>
+        _ = on ? globals.TraceComponents.Add(name) : globals.TraceComponents.Remove(name);
 
     /// <summary>
     /// The file the last <c>--stderr</c> names, to which curl writes what it would write to standard
@@ -1826,6 +1922,8 @@ public sealed class CommandLineOptions
         {
             Trace = TraceKind.None;
             TraceFile = null;
+            globals.TraceConfigIds = false;
+            globals.TraceConfigTime = false;
             return;
         }
 
