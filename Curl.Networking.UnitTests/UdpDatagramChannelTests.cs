@@ -54,6 +54,45 @@ public sealed class UdpDatagramChannelTests
     }
 
     [TestMethod]
+    public async Task LocalEndPoint_WhenBoundToAnyAddress_ReportsTheAddressTheRouteToTheServerSendsFrom()
+    {
+        await using var channel = new UdpDatagramChannel(TftpOnLoopback);
+
+        var local = (IPEndPoint)channel.LocalEndPoint;
+
+        Assert.AreEqual(IPAddress.Loopback, local.Address);
+        Assert.AreNotEqual(0, local.Port);
+    }
+
+    [TestMethod]
+    public async Task LocalEndPoint_WhenTheKernelHasNoRouteToTheServer_ReportsTheAnyAddress()
+    {
+        await using var channel = new UdpDatagramChannel(
+            TftpOnLoopback,
+            static (socket, localEndPoint) => socket.Bind(localEndPoint),
+            connectRouteProbe: static (_, _) => throw new SocketException((int)SocketError.NetworkUnreachable));
+
+        var local = (IPEndPoint)channel.LocalEndPoint;
+
+        Assert.AreEqual(IPAddress.Any, local.Address);
+        Assert.AreNotEqual(0, local.Port);
+    }
+
+    [TestMethod]
+    public async Task LocalEndPoint_WhenBoundToALocalAddress_ReportsItWithoutAskingTheRoute()
+    {
+        var routeAsked = false;
+        await using var channel = new UdpDatagramChannel(
+            TftpOnLoopback,
+            static (socket, localEndPoint) => socket.Bind(localEndPoint),
+            IPAddress.Loopback,
+            connectRouteProbe: (_, _) => routeAsked = true);
+
+        Assert.AreEqual(IPAddress.Loopback, ((IPEndPoint)channel.LocalEndPoint).Address);
+        Assert.IsFalse(routeAsked);
+    }
+
+    [TestMethod]
     public async Task Constructor_ForAnIPv6ServerEndPoint_BindsAnIPv6Socket()
     {
         await using var channel = new UdpDatagramChannel(new IPEndPoint(IPAddress.IPv6Loopback, 69));

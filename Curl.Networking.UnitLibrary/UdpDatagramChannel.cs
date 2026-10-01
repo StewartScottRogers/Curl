@@ -20,6 +20,8 @@ namespace Curl.Networking;
 public sealed class UdpDatagramChannel : IDatagramChannel
 {
     private readonly Socket _socket;
+    private readonly IPEndPoint _serverEndPoint;
+    private readonly Action<Socket, EndPoint> _connectRouteProbe;
 
     /// <summary>
     /// Opens a UDP socket of <paramref name="serverEndPoint" />'s address family, bound to
@@ -71,10 +73,18 @@ public sealed class UdpDatagramChannel : IDatagramChannel
     /// <param name="bind">Binds the socket to the local endpoint it is given.</param>
     /// <param name="localAddress">The local address to bind; <see langword="null" /> for any address of the family.</param>
     /// <param name="localPort">The local port to bind; <c>0</c> for an ephemeral one.</param>
-    internal UdpDatagramChannel(IPEndPoint serverEndPoint, Action<Socket, EndPoint> bind, IPAddress? localAddress = null, int localPort = 0)
+    /// <param name="connectRouteProbe">Connects the throwaway socket <see cref="LocalEndPoint" /> asks the kernel's route with; <see langword="null" /> for <see cref="Socket.Connect(EndPoint)" />.</param>
+    internal UdpDatagramChannel(
+        IPEndPoint serverEndPoint,
+        Action<Socket, EndPoint> bind,
+        IPAddress? localAddress = null,
+        int localPort = 0,
+        Action<Socket, EndPoint>? connectRouteProbe = null)
     {
         ArgumentNullException.ThrowIfNull(serverEndPoint);
 
+        _connectRouteProbe = connectRouteProbe ?? (static (socket, remoteEndPoint) => socket.Connect(remoteEndPoint));
+        _serverEndPoint = serverEndPoint;
         _socket = new Socket(serverEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
         try
         {
@@ -93,9 +103,27 @@ public sealed class UdpDatagramChannel : IDatagramChannel
     public EndPoint ServerEndPoint { get; }
 
     /// <summary>
-    /// Gets the local endpoint the socket is bound to, the client's transfer identifier.
+    /// Gets the local endpoint the socket's datagrams to <see cref="ServerEndPoint" /> leave
+    /// from, the client's transfer identifier: the bound endpoint, except that a socket bound to
+    /// any address reports the address the kernel's route to the server sends from, as curl's
+    /// connected UDP socket reports it through <c>getsockname</c> (BL-1051). When the kernel
+    /// has no route, the any address stays.
     /// </summary>
-    public EndPoint LocalEndPoint => _socket.LocalEndPoint!;
+    /// <remarks>
+    /// The channel's own socket stays unconnected, so a TFTP reply from a new port is still
+    /// received; the route is asked with a throwaway socket that is connected, which sends
+    /// nothing, and closed.
+    /// </remarks>
+    public EndPoint LocalEndPoint
+    {
+        get
+        {
+            var bound = (IPEndPoint)_socket.LocalEndPoint!;
+            return bound.Address.Equals(AnyAddressOf(bound.AddressFamily))
+                ? new IPEndPoint(RouteSourceAddress() ?? bound.Address, bound.Port)
+                : bound;
+        }
+    }
 
     /// <inheritdoc />
     /// <remarks>
@@ -133,6 +161,22 @@ public sealed class UdpDatagramChannel : IDatagramChannel
     {
         _socket.Dispose();
         return ValueTask.CompletedTask;
+    }
+
+    // The source address the kernel picks for the server: a connected UDP socket's local
+    // address. Connecting a UDP socket sends nothing; no route to the server is null.
+    private IPAddress? RouteSourceAddress()
+    {
+        using var probe = new Socket(_serverEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+        try
+        {
+            _connectRouteProbe(probe, _serverEndPoint);
+            return ((IPEndPoint)probe.LocalEndPoint!).Address;
+        }
+        catch (SocketException)
+        {
+            return null;
+        }
     }
 
     private static IPAddress AnyAddressOf(AddressFamily addressFamily) =>
