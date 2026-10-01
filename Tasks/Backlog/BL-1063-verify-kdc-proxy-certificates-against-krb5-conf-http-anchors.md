@@ -1,3 +1,15 @@
+---
+id: BL-1063
+title: Verify KDC proxy certificates against krb5.conf http_anchors
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: [BL-882]
+touches: [Curl.Kerberos.UnitLibrary, Curl.Kerberos.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
+requirement: none
+created: 2026-09-30
+completed:
+---
 # BL-1063 — Verify KDC proxy certificates against krb5.conf http_anchors
 
 ## Goal
