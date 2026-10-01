@@ -321,6 +321,7 @@ choices do not need one.
 | [0313](ADR-0313-a-key-file-certificate-signs-with-its-private-key-under-the-plain-method-as-libssh2-does.md) | A `--pubkey` OpenSSH certificate signs with its `--key` private key under the plain method, the server judging a key it does not certify, and a private key of another type fails with `Callback returned error`, as libssh2 1.11.1 does (BL-1097) | Accepted | 2026-10-01 |
 | [0314](ADR-0314-the-wincng-preset-reads-no-ed25519-or-ecdsa-private-key.md) | The WinCNG preset reads no Ed25519 or ECDSA private key: with `--pubkey` it asks and then fails with `Callback returned error`, without it `Reason unknown (-1)`, as Windows curl's libssh2 1.11.1 does (BL-1098) | Accepted | 2026-10-01 |
 | [0315](ADR-0315-smb-v-lines-follow-the-openssl-build-and-end-by-curls-transfer-phase.md) | SMB's `-v` lines follow the OpenSSL build: a `failf` text, then `closing connection #N` for a failure before the session is set up and `shutting down connection #N` otherwise, and `{ [N bytes data]` for each read (BL-598) | Accepted | 2026-10-01 |
+| [0316](ADR-0316-ip-tos-and-vlan-priority-set-every-socket-option-the-os-has.md) | `--ip-tos` and `--vlan-priority` parse as curl 8.21.0 does and set `IP_TOS`/`IPV6_TCLASS` and `SO_PRIORITY` raw, in each operating system's numbers, wherever it has them (BL-646) | Accepted | 2026-10-01 |
 
 ## Template
 
