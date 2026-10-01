@@ -68,3 +68,4 @@ completed:
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Console.UnitTests (its loopback --log-level info test pins 3 lines; the http lines make 7), which BL-736 in Doing touches
+- 2026-10-01: Backlog -> Doing.
