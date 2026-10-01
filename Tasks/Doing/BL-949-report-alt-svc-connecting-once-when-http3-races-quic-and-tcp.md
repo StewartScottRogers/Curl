@@ -34,3 +34,4 @@ When `--http3` races QUIC against TCP to an Alt-Svc alternative, the verbose lin
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
