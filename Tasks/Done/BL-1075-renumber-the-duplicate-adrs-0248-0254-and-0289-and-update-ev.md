@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions, Curl.Tls.UnitLibrary, Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1075 — Renumber the duplicate ADRs 0248, 0254 and 0289 and update every reference
 
@@ -27,10 +27,10 @@ ADR numbers 0248, 0254 and 0289 each name exactly one record in `Documentation/P
 
 ## Acceptance criteria
 
-- [ ] `Get-ChildItem Documentation/Planning/Decisions -Filter 'ADR-0248*.md'`, `'ADR-0254*.md'` and `'ADR-0289*.md'` each show one file.
-- [ ] `Documentation/Planning/Decisions/README.md` has one row per record of the three pairs, and the 0290 and 0291 rows, in number order in the index above `## Template`, with nothing below `## Template` but the template.
-- [ ] A search for each renumbered record's old number outside `Tasks/Done/<timestamp>/` finds only references to the record that kept it; each renumbered record's references use its new number.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] `Get-ChildItem Documentation/Planning/Decisions -Filter 'ADR-0248*.md'`, `'ADR-0254*.md'` and `'ADR-0289*.md'` each show one file.
+- [x] `Documentation/Planning/Decisions/README.md` has one row per record of the three pairs, and the 0290 and 0291 rows, in number order in the index above `## Template`, with nothing below `## Template` but the template.
+- [x] A search for each renumbered record's old number outside `Tasks/Done/<timestamp>/` finds only references to the record that kept it; each renumbered record's references use its new number.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
 
@@ -39,6 +39,7 @@ ADR numbers 0248, 0254 and 0289 each name exactly one record in `Documentation/P
   - 0254: the TLS 1.2 byte-stream record (cited by `Curl.Tls.UnitLibrary/CLAUDE.md` lines 16 and 158, ADR-0162, ADR-0205) becomes ADR-0249; the happy-eyeballs record (cited by TcpConnector.cs, CurlComposition.cs, two test files, Networking CLAUDE.md) keeps 0254 and gets a README row.
   - 0289: the HTTP/3 CONNECT-UDP record (cited by `Curl.Networking.UnitLibrary/CLAUDE.md` line 366 and ADR-0223) becomes ADR-0250; the SSH reset record (six citers) keeps 0289.
   - `touches` widened to `Curl.Tls.UnitLibrary` and `Curl.Networking.UnitLibrary` for those two CLAUDE.md files. BL-1049 (Doing) touches both, so the task went back to Backlog until BL-1049 is Done.
+- 2026-10-01 (lane 7): Done as planned; 0242, 0249 and 0250 were still uncited on this branch and `origin/work/dark-factory`. ADR-0249's citers (Tls CLAUDE.md lines 16 and 164, ADR-0162, ADR-0205) and ADR-0250's (Networking CLAUDE.md line 373, ADR-0223) now use the new numbers; every remaining 0248, 0254 and 0289 citer means the record that kept the number. No `.cs` file changed. README: rows 0242, 0249, 0250 and the happy-eyeballs 0254 added; not only 0289-0291 but every row 0289-0301 sat below `## Template`, so all of them moved into the index after 0288.
 
 
 ## Log
@@ -47,3 +48,4 @@ ADR numbers 0248, 0254 and 0289 each name exactly one record in `Documentation/P
 - 2026-10-01: Backlog -> Doing.
 - 2026-10-01: Doing -> Backlog. Needs Curl.Tls.UnitLibrary and Curl.Networking.UnitLibrary CLAUDE.md edits, which BL-1049 (Doing) touches
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. ADRs 0248, 0254 and 0289 each name one record; 0242, 0249 and 0250 renumbered with references, README indexed in order
