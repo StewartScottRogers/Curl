@@ -9,7 +9,7 @@ touches: [Audit/Tools/Test-AuditDue.ps1]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1019 — Report when an audit is due
 
@@ -49,14 +49,20 @@ checks each reason alone and together.
 
 ## Acceptance criteria
 
-- [ ] `-SelfTest` prints `PASS` and no `FAIL` for: no scorecard gives `no-audit`; a `RunDarkFactory.ps1` change gives `factory-script`; a milestone moving to `Done` gives `milestone:<N>`; both at once give both; neither gives `No audit due`.
-- [ ] Run in this repository today it prints `Audit due: no-audit` (no scorecard on `master` yet), exit 0.
-- [ ] `-Json` output parses with `ConvertFrom-Json` and has the four fields.
-- [ ] Header help documents reasons, parameters and exit codes; ASCII only; runs under PowerShell 7 and Windows PowerShell 5.1.
+- [x] `-SelfTest` prints `PASS` and no `FAIL` for: no scorecard gives `no-audit`; a `RunDarkFactory.ps1` change gives `factory-script`; a milestone moving to `Done` gives `milestone:<N>`; both at once give both; neither gives `No audit due`.
+- [x] Run in this repository today it prints `Audit due: no-audit` (no scorecard on `master` yet), exit 0.
+- [x] `-Json` output parses with `ConvertFrom-Json` and has the four fields.
+- [x] Header help documents reasons, parameters and exit codes; ASCII only; runs under PowerShell 7 and Windows PowerShell 5.1.
 
 ## Notes
+
+- Audit branch commit after 131076cd: Audit/Tools/Test-AuditDue.ps1.
+- -SelfTest: 6 PASS, 0 FAIL under Windows PowerShell 5.1 and PowerShell 7.6.6 on a scratch repository (no-audit; No audit due; factory-script; factory-script and milestone:1 together; milestone:1 alone; -Json's four fields).
+- In this repository after git fetch: 'Audit due: no-audit', exit 0. -Json parses with ConvertFrom-Json to due, reasons, lastScorecard, lastCommit. No byte outside printable ASCII.
+- Two PowerShell traps fixed during the self-test: a one-element array returned from a function arrives as a bare string ([0] took a hash's first character), and a variable named $json collided with the -Json switch (names are case-insensitive).
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. Test-AuditDue.ps1 reports whether an audit is due and why, from git alone; on the audit branch.
