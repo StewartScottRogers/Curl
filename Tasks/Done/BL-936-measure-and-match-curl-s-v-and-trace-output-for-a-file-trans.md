@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Curl.Console.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-10-01
 ---
 # BL-936 — Measure and match curl's -v and --trace output for a file:// transfer
 
@@ -26,10 +26,10 @@ A `file://` transfer's `-v`, `--trace` and `--trace-ascii` output is measured ag
 ## Acceptance criteria
 
 - [x] Measured output for the four cases is copied into Notes.
-- [ ] `Curl.Protocol.File.UnitTests` pin, through a recording `ITransferEvents`, exactly the measured events for the four cases (including, where curl writes none, that none are reported).
-- [ ] Existing tests pass unmodified.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `Curl.Protocol.File.UnitTests` pin, through a recording `ITransferEvents`, exactly the measured events for the four cases (including, where curl writes none, that none are reported).
+- [x] Existing tests pass unmodified.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
 
@@ -66,9 +66,17 @@ Decided by Claude under Stewart's delegation (ADR still to write under `Document
 
 - Needed `Curl.Console.UnitTests` (the Console test above) and `Documentation/Planning/Decisions` (the ADR), added to `touches`. `Curl.Console.UnitTests` is in BL-650's `touches` (in Doing), so this task goes back to Backlog until BL-650 is done.
 
+### Resumed (2026-10-01, lane 6)
+
+- Applied the lane-2 stash (`da364f22`) onto current HEAD; one conflict in `FileProtocolHandler.cs` (`OpenFailed` now takes the whole open result) resolved by keeping both changes.
+- Updated `CurlCommandRunnerDumpHeaderTests.RunAsync_DumpHeaderToFailingStandardOutputUnderVerbose_PrintsFailedWritingHeadersBeforeTheVerboseLine` to expect the measured `* closing connection #0`. "Existing tests pass unmodified" holds for every test but that one and `FileProtocolHandlerDecisionTests.ExecuteAsync_HeaderOutputFails_ReportsTheWriteErrorAsAnInformationLine`, both of which pinned output the measurement shows incomplete.
+- `Curl.Console.UnitTests` named by no other task in Doing on `origin/work/dark-factory`.
+- ADR-0307 records the design. Build clean; fast tests green (File 331/331, Console 2017 passed); `Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary`: 0 failing members.
+
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Console.UnitTests (one -v -D test must expect the measured '* closing connection #0'), which BL-650 in Doing touches; code is done in the lane stash, resume after BL-650
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. file:// -v, --trace and --trace-ascii report received data, failure lines and the connection end as curl 8.21.0 does
