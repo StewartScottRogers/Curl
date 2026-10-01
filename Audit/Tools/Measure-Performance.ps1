@@ -55,6 +55,7 @@
     performance.json: { referenceVersion, candidateVersion, candidateCommit, processorCount,
     iterations, referenceBinaryBytes, candidateBinaryBytes, largeGetBytes, scenarios: [ {
     name, curl: { medianMs, p90Ms, medianPeakWorkingSetBytes }, candidate: { ... } } ] }.
+    publish.log: the dotnet publish output, for its trim and AOT warnings.
     performance.md: the same as a Markdown table, rows in the scenario order above, which the
     scorecard (BL-1017) copies.
 
@@ -160,6 +161,8 @@ Write-Host "publishing Curl.Console: dotnet $($publish -join ' ')"
 $ErrorActionPreference = 'Continue'
 $publishOutput = & dotnet @publish 2>&1 | Out-String
 $publishExit = $LASTEXITCODE
+# Kept for the performance auditor, which reads it for trim and AOT warnings (IL2xxx, IL3xxx).
+[IO.File]::WriteAllText((Join-Path $OutDirectory 'publish.log'), $publishOutput)
 $ErrorActionPreference = 'Stop'
 $candidate = Join-Path $publishDir 'curl.exe'
 if ($publishExit -ne 0 -or -not (Test-Path -LiteralPath $candidate)) {
