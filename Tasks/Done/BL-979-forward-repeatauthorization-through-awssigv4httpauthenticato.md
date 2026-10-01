@@ -18,7 +18,7 @@ completed: 2026-10-01
 
 ## Context
 
-- BL-869 and ADR-0246 added `IHttpAuthenticator.RepeatAuthorization`, a default interface method that returns the value as sent, and implemented it in `RankedHttpAuthenticator` / `DigestAuthenticator`.
+- BL-869 and ADR-0238 added `IHttpAuthenticator.RepeatAuthorization`, a default interface method that returns the value as sent, and implemented it in `RankedHttpAuthenticator` / `DigestAuthenticator`.
 - `Curl.Console/AwsSigV4HttpAuthenticator.cs` wraps the ranked authenticator in `CurlComposition` and forwards `CreateAuthorization`, `CreateAuthorizationAsync` and `ContinueAuthorizationAsync` to `otherSchemes`, but not `RepeatAuthorization`, so the default (value as sent) wins in production. `Curl.Console` was held by another lane when BL-869 ran.
 
 ## Acceptance criteria

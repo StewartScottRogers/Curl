@@ -1,4 +1,4 @@
-# ADR-0222 — The hand-built TCP client sends the platform profile's hello, cut to what it can honour
+# ADR-0235 — The hand-built TCP client sends the platform profile's hello, cut to what it can honour
 
 - **Status:** Accepted
 - **Date:** 2026-09-29

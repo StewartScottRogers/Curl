@@ -1,4 +1,4 @@
-# ADR-0246 — A kept Digest answer is counted on from the value as sent
+# ADR-0238 — A kept Digest answer is counted on from the value as sent
 
 - **Status:** Accepted
 - **Date:** 2026-09-29

@@ -31,7 +31,7 @@ OpenSSL build's QUIC hello holds.
 3. **The OpenSSL build's QUIC hello is `ClientHelloProfile.OpenSsl`'s TLS 1.3 parts.**
    `QuicClientSettings.CreateOpenSslTlsSettings` keeps its TLS 1.3 suites QUIC can protect,
    all its groups and the X25519MLKEM768 + X25519 key shares, the signature schemes the
-   client can check (as ADR-0222 cuts them over TCP), `psk_key_exchange_modes` and
+   client can check (as ADR-0235 cuts them over TCP), `psk_key_exchange_modes` and
    `compress_certificate`, in the profile's order. It leaves out `renegotiation_info`,
    `ec_point_formats`, `encrypt_then_mac` and `extended_master_secret` (TLS 1.2 and below
    only) and `post_handshake_auth` (RFC 9001 section 4.4 forbids it to a QUIC client); puts

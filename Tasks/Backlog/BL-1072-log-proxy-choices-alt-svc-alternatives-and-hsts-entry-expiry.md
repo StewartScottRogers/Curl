@@ -18,7 +18,7 @@ Curl's own diagnostic log (`--log-level`) records which proxy a transfer uses or
 
 ## Context
 
-- Rules: ADR-0222 (levels, components, never-logged values, "test `IsEnabled` first"); ADR-0228 (the runner opens the log once the command line is accepted).
+- Rules: ADR-0222 (levels, components, never-logged values, "test `IsEnabled` first"); ADR-0236 (the runner opens the log once the command line is accepted).
 - BL-921 logged retries, redirects, the watchdogs and HSTS upgrades. It left these out: `ProxySelector.cs`/`NoProxyMatcher.cs` (which proxy, or why none; `verbose` the no-proxy match), `AltSvc/AltSvcCache.cs` and `Curl.Console/AltSvcTransferCache.cs` (an alternative stored or used: `info` used, `verbose` cache hits and misses), `Hsts/HstsCache.cs` (an entry stored or expired: `verbose`).
 - Wiring snag: `CurlComposition.CreateTransferDispatch` builds the `ProxySelector` before the run's log exists (it is opened per run by `CurlCommandRunner.OpenDiagnosticLogAsync`). Either pass the log per call (e.g. through `TransferProxySelection.TrySelect`, which has the transfer's context nearby) or give the selector a log the runner sets once it opens; decide and record an ADR.
 - A proxy URL may carry `user:password@`: log the proxy's scheme, host and port only.

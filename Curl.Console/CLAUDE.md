@@ -433,7 +433,7 @@ still gets the head, the progress meter is drawn as for a file (even when standa
 terminal), and the transfer switches standard output to binary as one to standard output does,
 so its `-w` line feeds stay LF on Windows (BL-495 Notes).
 
-Curl's own diagnostic log (ADR-0222, ADR-0228, BL-919) is opened by the runner, not the
+Curl's own diagnostic log (ADR-0222, ADR-0236, BL-919) is opened by the runner, not the
 composition, because its level and file come from the command line: after an accepted parse, the
 `--stderr` redirects and the config-file note, `RunDiagnosticLog` builds `NoDiagnosticLog.Instance`
 at `--log-level none` (no file created, no byte changed), otherwise a `Curl.Output`

@@ -15,7 +15,7 @@ namespace Curl.Kerberos;
 /// </summary>
 /// <remarks>
 /// Like MIT 1.22's DES3 random-to-key, this one does not correct DES weak keys,
-/// which a random key hits with probability about 2^-52 (ADR-0232).
+/// which a random key hits with probability about 2^-52 (ADR-0237).
 /// </remarks>
 internal sealed class Des3CbcSha1KerberosEncryption : KerberosEncryption
 {

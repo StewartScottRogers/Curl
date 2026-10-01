@@ -1,4 +1,4 @@
-# ADR-0232 — The hand-built Kerberos has des3-cbc-sha1 as MIT 1.22 does
+# ADR-0237 — The hand-built Kerberos has des3-cbc-sha1 as MIT 1.22 does
 
 - **Status:** Accepted
 - **Date:** 2026-09-29

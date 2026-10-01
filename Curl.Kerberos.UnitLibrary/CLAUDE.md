@@ -26,7 +26,7 @@ its realm and locates a realm's KDCs from the file or from DNS SRV records throu
 decrypts, checksums and makes keys from passwords with `aes128`/`aes256-cts-hmac-sha1-96`
 (RFC 3962), `aes128-cts-hmac-sha256-128`, `aes256-cts-hmac-sha384-192` (RFC 8009),
 `rc4-hmac` (RFC 4757), `camellia128-cts-cmac`, `camellia256-cts-cmac` (RFC 6803) and
-`des3-cbc-sha1` (RFC 3961 section 6.3; `Des3CbcSha1KerberosEncryption`, BL-894, ADR-0232,
+`des3-cbc-sha1` (RFC 3961 section 6.3; `Des3CbcSha1KerberosEncryption`, BL-894, ADR-0237,
 its zero padding dropped before a decrypted value is decoded, `KerberosAsn1.WithoutPadding`):
 `KerberosEncryption.Create` gives one per `KerberosEncryptionType`,
 confounders come from `IKerberosRandomSource`, and a failed integrity check throws

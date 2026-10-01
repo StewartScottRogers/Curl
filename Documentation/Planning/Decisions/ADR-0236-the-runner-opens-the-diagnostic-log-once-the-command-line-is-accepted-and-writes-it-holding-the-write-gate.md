@@ -1,4 +1,4 @@
-# ADR-0228 — The runner opens the diagnostic log once the command line is accepted, and writes it holding the write gate
+# ADR-0236 — The runner opens the diagnostic log once the command line is accepted, and writes it holding the write gate
 
 - **Status:** Accepted
 - **Date:** 2026-09-29

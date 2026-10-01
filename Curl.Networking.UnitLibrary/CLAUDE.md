@@ -31,7 +31,7 @@ implement `ITlsProviderWithWarnings`. `HandBuiltTlsProvider` runs `TlsClientConn
 ClientHello offering TLS 1.3 and TLS 1.2, TLS 1.2 the default minimum, ADR-0205) for a range
 spanning both, `Tls13ClientConnection` for a TLS 1.3 minimum and `Tls12ClientConnection` for a
 ceiling below TLS 1.3, over the internal `ConnectionStream`, and returns a `HandBuiltTlsConnection`.
-Per ADR-0222 (BL-820) its ClientHello is the platform curl's measured profile, `ClientHelloProfile.Schannel`
+Per ADR-0235 (BL-820) its ClientHello is the platform curl's measured profile, `ClientHelloProfile.Schannel`
 for the Schannel build and `ClientHelloProfile.OpenSsl` for the OpenSSL build, turned into the TLS
 settings by `ClientHelloProfileMapping`: the profile's extension order and fixed extensions, its lists
 cut to the signature schemes and groups the client can honour, and the options changing only the lists
