@@ -16,6 +16,8 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
 {
     private const string Host = "server.example.test";
 
+    private const string DefaultCachePath = "/tmp/krb5cc_1000";
+
     private static readonly byte[] RandomBytes = [.. Enumerable.Range(1, 64).Select(value => (byte)value)];
 
     [TestMethod]
@@ -72,6 +74,38 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
 
         Assert.AreEqual(SecurityContextStatus.ContinueNeeded, step.Status);
         CollectionAssert.AreEqual(new[] { "HTTP", Host }, kdc.Requests.Single().Body.ServerName!.Components.ToArray());
+    }
+
+    [TestMethod]
+    public async Task GetAsync_TicketGrantingTicketCached_StoresTheTgsTicketInTheDefaultCacheSoTheSecondGetAsksNoKdc()
+    {
+        FakeKdc kdc = new();
+        InMemoryKerberosFiles files = CacheFiles(TicketGrantingTicket());
+        int cacheLength = files.Contents(DefaultCachePath).Length;
+        KerberosServiceTicketSource tickets = Tickets(kdc, () => Store(files));
+
+        using KerberosCredential first = await tickets.GetAsync("HTTP", Host, CancellationToken.None);
+        int storedLength = files.Contents(DefaultCachePath).Length;
+        using KerberosCredential second = await tickets.GetAsync("HTTP", Host, CancellationToken.None);
+
+        Assert.IsGreaterThan(cacheLength, storedLength);
+        Assert.HasCount(1, kdc.Exchanges);
+        Assert.AreEqual(storedLength, files.Contents(DefaultCachePath).Length);
+        CollectionAssert.AreEqual(first.Ticket.Encode(), second.Ticket.Encode());
+        CollectionAssert.AreEqual(new[] { "HTTP", Host }, second.Server.Components.ToArray());
+    }
+
+    [TestMethod]
+    public async Task GetAsync_DomainRealmConfigured_ReadsTheCacheOnlyInTheKdcClient()
+    {
+        FakeKdc kdc = new();
+        InMemoryKerberosFiles files = CacheFiles(TicketGrantingTicket());
+        KerberosConfiguration configuration = Configuration("[domain_realm]\n .example.test = EXAMPLE.TEST\n");
+        KerberosServiceTicketSource tickets = new(() => configuration, () => Store(files), _ => Client(configuration, kdc));
+
+        using KerberosCredential ticket = await tickets.GetAsync("HTTP", Host, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { DefaultCachePath }, files.PathsRead);
     }
 
     [TestMethod]
@@ -243,10 +277,10 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
     private static HandBuiltSecurityContextFactory Factory(KerberosServiceTicketSource tickets) =>
         new(tickets, new FixedTimeProvider(FakeKdc.Now), new FixedKerberosRandomSource(RandomBytes), new FixedNtlmRandomSource(RandomBytes));
 
-    private static KerberosServiceTicketSource Tickets(FakeKdc kdc, Func<CredentialCache> readCache)
+    private static KerberosServiceTicketSource Tickets(FakeKdc kdc, Func<CredentialCacheStore> createCacheStore)
     {
         KerberosConfiguration configuration = Configuration(string.Empty);
-        return new KerberosServiceTicketSource(() => configuration, readCache, _ => Client(configuration, kdc));
+        return new KerberosServiceTicketSource(() => configuration, createCacheStore, _ => Client(configuration, kdc));
     }
 
     private static KerberosConfiguration Configuration(string extra) =>
@@ -257,7 +291,25 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
     private static KerberosKdcClient Client(KerberosConfiguration configuration, FakeKdc kdc) =>
         new(configuration, new FakeSrvLookup(), kdc, new FixedTimeProvider(FakeKdc.Now), new FixedKerberosRandomSource(RandomBytes));
 
-    private static CredentialCache Cache(params CachedCredential[] credentials) => new(null, FakeKdc.Alice, credentials);
+    /// <summary>A writable store whose default cache, <c>/tmp/krb5cc_1000</c>, holds <paramref name="credentials" />.</summary>
+    private static CredentialCacheStore Cache(params CachedCredential[] credentials) => Store(CacheFiles(credentials));
+
+    private static CredentialCacheStore Store(InMemoryKerberosFiles files) => new(files, _ => null, () => 1000, fileWriter: files);
+
+    /// <summary>
+    /// In-memory files holding the version 4 cache file <c>/tmp/krb5cc_1000</c> with the default
+    /// principal <c>alice@EXAMPLE.TEST</c> and <paramref name="credentials" />.
+    /// </summary>
+    private static InMemoryKerberosFiles CacheFiles(params CachedCredential[] credentials) =>
+        new InMemoryKerberosFiles { ReturnsCopies = true }.Add(
+            DefaultCachePath,
+            [
+                0x05, 0x04, 0x00, 0x00,
+                0, 0, 0, 1, 0, 0, 0, 1,
+                0, 0, 0, 12, .. "EXAMPLE.TEST"u8,
+                0, 0, 0, 5, .. "alice"u8,
+                .. credentials.SelectMany(CredentialCacheWriter.WriteCredential),
+            ]);
 
     private static CachedCredential TicketGrantingTicket() =>
         Cached(KerberosKdcClient.TicketGrantingServer(FakeKdc.Realm), new KerberosKey(18, [.. FakeKdc.TicketGrantingSessionKey]));
