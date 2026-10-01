@@ -33,3 +33,4 @@ A client certificate whose key is Ed448 or ML-DSA-44/65/87 signs the TLS 1.3 (an
 ## Log
 
 - 2026-09-30: Created.
+- 2026-09-30: Backlog -> Doing.
