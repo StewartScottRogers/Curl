@@ -121,6 +121,13 @@ internal static class HttpTransferMessages
     internal const string Http3NotOverHttpProxy = "HTTP/3 is not supported over an HTTP proxy";
 
     /// <summary>
+    /// Why <c>--http3-only</c>, or <c>--http3</c> with an <c>https://</c> URL, gives up HTTP/3
+    /// over a Unix domain socket: <c>Curl_conn_may_http3</c> in <c>lib/vquic/vquic.c</c> at
+    /// <c>curl-8_21_0</c> (ADR-0187, BL-867), exit 96 for <c>--http3-only</c>.
+    /// </summary>
+    internal const string Http3NotOverUnixSocket = "HTTP/3 cannot be used over UNIX domain sockets";
+
+    /// <summary>
     /// Formats the message for an HTTP/3 request stream the server reset, exit 95 before any
     /// body byte arrived and exit 18 after: <c>HTTP/3 stream 0 reset by server (error 0x10c
     /// REQUEST_CANCELLED)</c> (<c>cf-ngtcp2.c</c> at <c>curl-8_21_0</c>, ADR-0187).

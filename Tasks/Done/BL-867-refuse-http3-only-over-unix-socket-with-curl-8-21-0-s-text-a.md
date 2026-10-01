@@ -8,7 +8,7 @@ depends-on: [BL-839]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-867 — Refuse --http3-only over --unix-socket with curl 8.21.0's text and exit 96
 
@@ -24,10 +24,10 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Http.UnitTests` pins exit 96 and `HTTP/3 cannot be used over UNIX domain sockets` for `--http3-only` with a Unix socket and an `https://` URL, and that no connection is dialled.
-- [ ] A test pins the Unix-socket check running before the non-HTTPS check (an `http://` URL with a Unix socket gives exit 96).
-- [ ] A test pins what `--http3` with a Unix socket does, as read from `curl-8_21_0`, recorded under Notes.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports 100% line and branch coverage.
+- [x] A test in `Curl.Protocol.Http.UnitTests` pins exit 96 and `HTTP/3 cannot be used over UNIX domain sockets` for `--http3-only` with a Unix socket and an `https://` URL, and that no connection is dialled.
+- [x] A test pins the Unix-socket check running before the non-HTTPS check (an `http://` URL with a Unix socket gives exit 96).
+- [x] A test pins what `--http3` with a Unix socket does, as read from `curl-8_21_0`, recorded under Notes.
+- [x] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports 100% line and branch coverage.
 
 ## Notes
 
@@ -54,9 +54,22 @@ completed:
   (ADR-0223), but with exit 96 instead of 3 for `--http3-only`. The `-v` line
   `closing connection #-1` follows the refusal as for the other pre-connect refusals.
 
+- 2026-09-30 (lane 1): Delivered as planned. `HttpRequestOptions.OverUnixSocket` is set by
+  `HttpRequestOptionsMapping` from `--unix-socket` or `--abstract-unix-socket`. In
+  `HttpProtocolHandler`, `Http3RefusalOf` checks the Unix socket before the proxy and the
+  non-HTTPS checks and carries its exit code (96) with the message; `TriesQuic` skips QUIC
+  over a Unix socket. Tests: `HttpProtocolHandlerTests.Http3UnixSocket.cs`,
+  `HttpUnixSocketMappingTests`, `HttpRequestOptionsTests`.
+- Choice: `--http3` with an `http://` URL over a Unix socket reports no refusal, as
+  `--http3` with an `http://` URL through a proxy does (ADR-0144: plain HTTP/1.1, the
+  HTTPS connect filter that calls `Curl_conn_may_http3` is not set up). A Unix socket
+  with a proxy refuses for the Unix socket first, curls check order. ADR-0187 already
+  records the curl-8_21_0 row, so no new ADR.
+
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Console (HttpRequestOptionsMapping) to pass --unix-socket to the HTTP handler; Curl.Console is held by BL-650 in Doing
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. --http3-only over a Unix socket fails with exit 96 and curl 8.21.0's text before connecting; --http3 drops HTTP/3 and reports the refusal
