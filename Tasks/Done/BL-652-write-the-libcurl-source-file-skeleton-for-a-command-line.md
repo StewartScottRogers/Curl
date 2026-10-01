@@ -93,7 +93,7 @@ What the other runs showed:
 - **Unwritable file:** gets `Warning: Failed to open <file> to write libcurl code`, wrapped at 79 columns. `-s` hides it.
 - **Other options:** `-m 1` adds `CURLOPT_TIMEOUT_MS`; that line and other option lines belong to BL-653 and BL-654.
 
-Decisions are in ADR-0303:
+Decisions are in ADR-0306:
 
 - The source is built from the transfers performed, using the glob-expanded URL.
 - Strings are quoted as UTF-8 bytes.
