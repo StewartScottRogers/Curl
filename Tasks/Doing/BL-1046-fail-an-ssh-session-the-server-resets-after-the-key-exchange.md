@@ -33,3 +33,4 @@ An `sftp://` or `scp://` session whose server resets the TCP connection after th
 ## Log
 
 - 2026-09-30: Created.
+- 2026-10-01: Backlog -> Doing.
