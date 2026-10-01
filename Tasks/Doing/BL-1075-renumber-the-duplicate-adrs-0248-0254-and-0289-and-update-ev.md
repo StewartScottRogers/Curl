@@ -46,3 +46,4 @@ ADR numbers 0248, 0254 and 0289 each name exactly one record in `Documentation/P
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
 - 2026-10-01: Doing -> Backlog. Needs Curl.Tls.UnitLibrary and Curl.Networking.UnitLibrary CLAUDE.md edits, which BL-1049 (Doing) touches
+- 2026-10-01: Backlog -> Doing.
