@@ -77,10 +77,31 @@ internal static class OpenSslCertificateText
     /// </returns>
     internal static string? CertificateLevel(int level, X509Certificate2 certificate)
     {
+        return CertificateLevel(level, certificate, isLibreSsl: false);
+    }
+
+    /// <summary>
+    /// Returns the <c>Certificate level</c> line for one certificate in the chain, as the
+    /// OpenSSL build or curl.se's LibreSSL build prints it. LibreSSL has no
+    /// <c>EVP_PKEY_get0_type_name</c> or <c>EVP_PKEY_get_group_name</c>, so curl prints the
+    /// type as <c>?</c> and no group: <c>Public key type ? (256/128 Bits/secBits)</c>
+    /// (measured, BL-1050).
+    /// </summary>
+    /// <param name="level">The certificate's place in the chain, 0 for the server's own.</param>
+    /// <param name="certificate">The certificate.</param>
+    /// <param name="isLibreSsl">Whether to word it as curl.se's LibreSSL build.</param>
+    /// <returns>The line, or <see langword="null"/> for a key this tool cannot describe.</returns>
+    internal static string? CertificateLevel(int level, X509Certificate2 certificate, bool isLibreSsl)
+    {
         var key = PublicKeyText(certificate.PublicKey);
         if (key is null)
         {
             return null;
+        }
+
+        if (isLibreSsl)
+        {
+            key = "?" + key[key.IndexOf(" (", StringComparison.Ordinal)..];
         }
 
         var algorithm = certificate.SignatureAlgorithm.Value!;

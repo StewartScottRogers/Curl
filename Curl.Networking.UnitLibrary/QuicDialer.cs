@@ -180,7 +180,7 @@ public sealed class QuicDialer
             return (openFailure!, true);
         }
 
-        request.Target.Events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options));
+        request.Target.Events.ReportTlsTrust(DescribeTrust());
         var (verifier, unusable) = CreateVerifier(request.Target.Host);
         if (verifier is null)
         {
@@ -365,6 +365,17 @@ public sealed class QuicDialer
             ? "Connection was reset"
             : ConnectFailureReason.Describe(exception, _matchesSchannelBuild);
 
+    // On Windows, without --cacert, Curl verifies against the Windows stores, which curl.se's
+    // LibreSSL build names as --ca-native makes it (measured, BL-1050); its embedded bundle's
+    // "CA Blob from configuration" is not printed, as Curl embeds none (ADR-0144).
+    private TlsTrustEvent DescribeTrust()
+    {
+        var trust = SslStreamTlsProvider.DescribeTrust(_options) with { IsQuic = true };
+        return _matchesSchannelBuild && _options.CaCertificateFile is null
+            ? trust with { CaCertificateFile = null, UsesWindowsSystemStores = true }
+            : trust;
+    }
+
     private MultiplexedConnectResult Connected(
         QuicDialRequest request,
         IPEndPoint endPoint,
@@ -388,6 +399,7 @@ public sealed class QuicDialer
             CertificateVerifyResult = verifier.Observed.VerifyResult,
             PeerCertificateChain = [.. verifier.Observed.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
             VerifiedHostName = SslStreamTlsProvider.VerifiedHostName(request.Target.Host, _options.Insecure),
+            IsQuic = true,
         });
         events.ReportConnectionOpened(new ConnectionOpenedEvent
         {

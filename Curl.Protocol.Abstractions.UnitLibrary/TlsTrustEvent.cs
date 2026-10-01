@@ -33,4 +33,16 @@ public sealed record TlsTrustEvent
     /// <see langword="null" /> when there is none.
     /// </summary>
     public string? CaCertificateDirectory { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether trust anchors come from Windows' ROOT and CA system
+    /// stores, which curl's builds name as <c>Native: Windows System Stores ROOT+CA</c>.
+    /// </summary>
+    public bool UsesWindowsSystemStores { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the trust is a QUIC connect's (HTTP/3), which on
+    /// Windows curl.se's LibreSSL build words rather than the Schannel build (ADR-0144).
+    /// </summary>
+    public bool IsQuic { get; init; }
 }

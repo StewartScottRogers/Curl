@@ -43,7 +43,8 @@ internal static class TransferEventInfoText
     /// <summary>
     /// Returns the lines a curl build prints for a finished handshake: for Schannel the ALPN
     /// lines, none when no protocol was offered; for OpenSSL those and
-    /// <see cref="OpenSslHandshakeText"/>'s.
+    /// <see cref="OpenSslHandshakeText"/>'s. A QUIC handshake under Schannel gets curl.se's
+    /// LibreSSL lines, since that is the build that speaks HTTP/3 on Windows (ADR-0144).
     /// </summary>
     /// <param name="handshake">The facts the handshake negotiated.</param>
     /// <param name="tlsBackend">The curl build whose wording to use.</param>
@@ -51,7 +52,25 @@ internal static class TransferEventInfoText
     public static IReadOnlyList<string> TlsHandshake(TlsHandshakeEvent handshake, TlsBackend tlsBackend)
     {
         var alpnLines = AlpnLines(handshake);
-        return tlsBackend == TlsBackend.OpenSsl ? OpenSslHandshakeText.Lines(handshake, alpnLines) : alpnLines;
+        if (tlsBackend == TlsBackend.OpenSsl)
+        {
+            return OpenSslHandshakeText.Lines(handshake, alpnLines);
+        }
+
+        return handshake.IsQuic ? OpenSslHandshakeText.LibreSslLines(handshake, alpnLines) : alpnLines;
+    }
+
+    /// <summary>
+    /// Returns the <c>SSL Trust</c> lines a curl build prints before a handshake: the OpenSSL
+    /// build's (<see cref="OpenSslTrustText"/>), which curl.se's LibreSSL build also prints for
+    /// a QUIC connect on Windows (ADR-0144); the Schannel build prints none.
+    /// </summary>
+    /// <param name="trust">The trust the connection is set up with.</param>
+    /// <param name="tlsBackend">The curl build whose wording to use.</param>
+    /// <returns>The lines, in the order curl prints them.</returns>
+    public static IReadOnlyList<string> TlsTrust(TlsTrustEvent trust, TlsBackend tlsBackend)
+    {
+        return tlsBackend == TlsBackend.OpenSsl || trust.IsQuic ? OpenSslTrustText.Lines(trust) : [];
     }
 
     private static IReadOnlyList<string> AlpnLines(TlsHandshakeEvent handshake)

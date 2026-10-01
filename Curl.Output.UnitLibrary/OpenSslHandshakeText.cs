@@ -68,25 +68,51 @@ internal static class OpenSslHandshakeText
     /// <returns>The lines, without the <c>* </c> prefix.</returns>
     internal static IReadOnlyList<string> Lines(TlsHandshakeEvent handshake, IReadOnlyList<string> alpnLines)
     {
+        return Lines(handshake, alpnLines, isLibreSsl: false);
+    }
+
+    /// <summary>
+    /// Returns the lines curl.se's LibreSSL build (curl 8.18.0, LibreSSL 4.2.1) prints for a
+    /// handshake, as it does for a QUIC connect on Windows: the OpenSSL lines, but with
+    /// <c>[blank] / UNDEF</c> for the group and signature, <c>Public key type ?</c> with no
+    /// type or group name, and no <c>OpenSSL verify result</c> line, since LibreSSL lacks the
+    /// OpenSSL 3 calls curl takes them from (measured, BL-1050).
+    /// </summary>
+    /// <param name="handshake">The facts the handshake negotiated.</param>
+    /// <param name="alpnLines">The two ALPN lines, or none when nothing was offered.</param>
+    /// <returns>The lines, without the <c>* </c> prefix.</returns>
+    internal static IReadOnlyList<string> LibreSslLines(TlsHandshakeEvent handshake, IReadOnlyList<string> alpnLines)
+    {
+        return Lines(handshake, alpnLines, isLibreSsl: true);
+    }
+
+    private static List<string> Lines(TlsHandshakeEvent handshake, IReadOnlyList<string> alpnLines, bool isLibreSsl)
+    {
         var lines = new List<string>();
         lines.AddRange(alpnLines.Take(1));
-        lines.Add(
-            $"SSL connection using {VersionNames.GetValueOrDefault(handshake.ProtocolVersion, "unknown")} / " +
-            $"{CipherName(handshake.CipherSuite)} / {handshake.NegotiatedGroupName ?? "[blank]"} / {handshake.PeerSignatureTypeName ?? "UNDEF"}");
+        lines.Add(ConnectionLine(handshake, isLibreSsl));
         lines.AddRange(alpnLines.Skip(1));
         if (handshake.ServerCertificate is { } certificate)
         {
             lines.AddRange(OpenSslCertificateText.PeerCertificate(certificate, handshake.IsProxy));
             lines.AddRange(handshake.PeerCertificateChain
-                .Select((chainCertificate, level) => OpenSslCertificateText.CertificateLevel(level, chainCertificate))
+                .Select((chainCertificate, level) => OpenSslCertificateText.CertificateLevel(level, chainCertificate, isLibreSsl))
                 .OfType<string>());
             if (HostNameMatches(handshake, certificate, lines))
             {
-                lines.AddRange(VerifyResult(handshake));
+                lines.AddRange(VerifyResult(handshake, isLibreSsl));
             }
         }
 
         return lines;
+    }
+
+    private static string ConnectionLine(TlsHandshakeEvent handshake, bool isLibreSsl)
+    {
+        var groupName = isLibreSsl ? null : handshake.NegotiatedGroupName;
+        var signatureTypeName = isLibreSsl ? null : handshake.PeerSignatureTypeName;
+        return $"SSL connection using {VersionNames.GetValueOrDefault(handshake.ProtocolVersion, "unknown")} / " +
+            $"{CipherName(handshake.CipherSuite)} / {groupName ?? "[blank]"} / {signatureTypeName ?? "UNDEF"}";
     }
 
     // ossl_verifyhost runs only when the host name is checked, and curl stops at a mismatch
@@ -112,10 +138,14 @@ internal static class OpenSslHandshakeText
         return suite is { } negotiated ? CipherNames.GetValueOrDefault(negotiated, negotiated.ToString()) : "(NONE)";
     }
 
-    private static IEnumerable<string> VerifyResult(TlsHandshakeEvent handshake)
+    private static IEnumerable<string> VerifyResult(TlsHandshakeEvent handshake, bool isLibreSsl)
     {
         var result = handshake.CertificateVerifyResult ?? (handshake.CertificateVerified ? 0 : UnspecifiedVerifyError);
-        yield return "OpenSSL verify result: " + result.ToString("x", CultureInfo.InvariantCulture);
+        if (!isLibreSsl)
+        {
+            yield return "OpenSSL verify result: " + result.ToString("x", CultureInfo.InvariantCulture);
+        }
+
         yield return result == 0 ? "SSL certificate verified via OpenSSL." : " SSL certificate verification failed, continuing anyway!";
     }
 }
