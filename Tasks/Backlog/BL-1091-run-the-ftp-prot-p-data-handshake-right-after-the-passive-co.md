@@ -1,5 +1,5 @@
 ---
-id: BL-1090
+id: BL-1091
 title: Run the FTP PROT P data handshake right after the passive connect, as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-01
 completed:
 ---
-# BL-1090 — Run the FTP PROT P data handshake right after the passive connect, as curl does
+# BL-1091 — Run the FTP PROT P data handshake right after the passive connect, as curl does
 
 ## Goal
 
