@@ -13,7 +13,7 @@
     <auditor>.md in -ReportDirectory and applies these rules:
 
       catch       A reported finding from the same auditor as a planted defect in -Manifest,
-                  whose location names the planted file or whose title, key or evidence holds
+                  whose location names the planted file and whose title, key or evidence holds
                   the manifest's catch text, is a catch, not a finding. It is never filed; it is
                   written to catches.json in -ReportDirectory for the scorecard (BL-1017).
       repeat      A reported finding whose key equals a proposed or accepted finding's key is
@@ -112,13 +112,15 @@ function Get-Slug([string]$Title) {
 function ConvertTo-Normalised([string]$Path) { return ("$Path" -replace '\\', '/' -replace ':\d+(-\d+)?$', '').Trim() }
 
 function Test-Catch($Finding, [string]$Auditor, [object[]]$Planted) {
+    # A catch: the planted defect's own auditor, in the defect's file, with the manifest's catch
+    # fragment in the finding's title, key or evidence. The same rule as Write-AuditScorecard.ps1.
     foreach ($p in $Planted) {
         if ($p.auditor -ne $Auditor) { continue }
         $sameFile = (ConvertTo-Normalised $Finding.location) -ieq (ConvertTo-Normalised $p.file)
         $haystack = "$($Finding.title) $($Finding.key) $($Finding.evidence)"
         $catchText = "$($p.catch)".Trim()
         $named = $catchText -and $haystack.IndexOf($catchText, [StringComparison]::OrdinalIgnoreCase) -ge 0
-        if ($sameFile -or $named) { return $p }
+        if ($sameFile -and $named) { return $p }
     }
     return $null
 }

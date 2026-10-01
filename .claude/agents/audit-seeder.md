@@ -31,7 +31,11 @@ Do exactly this:
    findings. Then commit everything in the worktree as one commit with the message
    `Audit baseline` - `git -c user.name="Audit seeder" -c user.email=audit-seeder@example.invalid commit -am` after `git add -A` - on the detached HEAD. Never create a branch and never push.
 4. **Write the manifest** to the manifest path, as JSON:
-   `{ "seed": <seed>, "commit": "<the Audit baseline commit>", "planted": [ { "id": "PD-###", "auditor": "<auditor>", "file": "<path relative to the worktree, or to the log copy for process>", "line": <line or null>, "description": "<what you changed, concretely>", "catch": "<the entry's Catch, made concrete for this site>" } ] }`.
+   `{ "seed": <seed>, "commit": "<the Audit baseline commit>", "planted": [ { "id": "PD-###", "auditor": "<auditor>", "file": "<path relative to the worktree, or to the log copy for process>", "line": <line or null>, "description": "<what you changed, concretely>", "catch": "<a short fragment a correct finding must contain>" } ] }`.
+   The `catch` is one short fragment - a distinctive identifier, word or finding kind such as
+   `SequenceEqual`, `Parse_Port_Rejects` or `weak-assertion` - taken from the entry's **Catch**
+   and made concrete for this site. A finding catches the defect when it comes from the same
+   auditor, names the same file, and contains this fragment in its title, key or evidence.
 5. **Touch nothing else.** Never change the checkout you were started in, the real log folder,
    or anything outside the worktree, the log copy and the manifest path.
 
