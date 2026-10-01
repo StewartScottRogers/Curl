@@ -121,8 +121,9 @@ public sealed partial class TcpConnectorQuicTests
     [TestMethod]
     public async Task ConnectMultiplexedAsync_InTheOpenSslBuild_SendsTheOpenSslProfilesTls13ClientHello()
     {
-        // ADR-0140 and ADR-0290: ClientHelloProfile.OpenSsl (BL-787's capture) cut to its TLS 1.3
-        // parts, in its extension order, with quic_transport_parameters last and no session ID.
+        // ADR-0291: the order and extensions BL-957 measured from Fedora's curl 8.18.0 (OpenSSL
+        // 3.5.7, ngtcp2 1.22.1) - quic_transport_parameters first, the profile's TLS 1.2
+        // extensions kept, supported_versions TLS 1.3 only - over ClientHelloProfile.OpenSsl's lists.
         var profile = ClientHelloProfile.OpenSsl;
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
 
@@ -136,11 +137,15 @@ public sealed partial class TcpConnectorQuicTests
         CollectionAssert.AreEqual(
             new[]
             {
-                TlsExtensionType.ServerName, TlsExtensionType.SupportedGroups, TlsExtensionType.ApplicationLayerProtocolNegotiation,
-                TlsExtensionType.SignatureAlgorithms, TlsExtensionType.SupportedVersions, TlsExtensionType.PskKeyExchangeModes,
-                TlsExtensionType.KeyShare, TlsExtensionType.CompressCertificate, TlsExtensionType.QuicTransportParameters,
+                TlsExtensionType.QuicTransportParameters, TlsExtensionType.ServerName, TlsExtensionType.EcPointFormats,
+                TlsExtensionType.SupportedGroups, TlsExtensionType.ApplicationLayerProtocolNegotiation, TlsExtensionType.EncryptThenMac,
+                TlsExtensionType.ExtendedMasterSecret, TlsExtensionType.PostHandshakeAuth, TlsExtensionType.SignatureAlgorithms,
+                TlsExtensionType.SupportedVersions, TlsExtensionType.PskKeyExchangeModes, TlsExtensionType.KeyShare,
+                TlsExtensionType.CompressCertificate,
             },
             hello.Extensions.Select(extension => extension.Type).ToArray());
+        CollectionAssert.AreEqual(new byte[] { 0x02, 0x03, 0x04 }, Data(hello, TlsExtensionType.SupportedVersions));
+        CollectionAssert.AreEqual(new byte[] { 0x03, 0x00, 0x01, 0x02 }, Data(hello, TlsExtensionType.EcPointFormats));
         CollectionAssert.AreEqual(SupportedGroupsExtension.Encode(profile.SupportedGroups).Data, Data(hello, TlsExtensionType.SupportedGroups));
         CollectionAssert.AreEqual(PskKeyExchangeModesExtension.Encode(profile.PskKeyExchangeModes).Data, Data(hello, TlsExtensionType.PskKeyExchangeModes));
         CollectionAssert.AreEqual(CompressCertificateExtension.Encode(profile.CertificateCompressionAlgorithms).Data, Data(hello, TlsExtensionType.CompressCertificate));
@@ -148,7 +153,7 @@ public sealed partial class TcpConnectorQuicTests
         CollectionAssert.AreEqual(
             profile.KeyShareGroups.ToArray(),
             KeyShareExtension.DecodeClientShares(Data(hello, TlsExtensionType.KeyShare)).Value!.Select(share => share.Group).ToArray());
-        var expectedSchemes = profile.SignatureAlgorithms.Where(scheme => TlsSignatureScheme.IsCertificateVerifyScheme(scheme) || TlsSignatureScheme.IsTls12Scheme(scheme)).ToArray();
+        var expectedSchemes = profile.SignatureAlgorithms.Where(scheme => scheme is not (0x0303 or 0x0301 or 0x0302 or 0x0402 or 0x0502 or 0x0602)).ToArray();
         CollectionAssert.AreEqual(SignatureAlgorithmsExtension.Encode(expectedSchemes).Data, Data(hello, TlsExtensionType.SignatureAlgorithms));
     }
 
