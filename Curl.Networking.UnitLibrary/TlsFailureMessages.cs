@@ -457,6 +457,13 @@ internal static class TlsFailureMessages
     public const string OpenSslNoSuitableGroups = "TLS connect error: error:0A000127:SSL routines::no suitable groups";
 
     /// <summary>
+    /// Every build's message for exit 35 when a <c>--curves</c> list stars only groups
+    /// TLS 1.3 cannot share a key for, such as <c>*brainpoolP256r1:P-384</c>, and TLS 1.3 is
+    /// offered: measured with curl 8.18.0's OpenSSL 3.5.5 build, 2026-10-01 (BL-1082).
+    /// </summary>
+    public const string OpenSslNoSuitableKeyShare = "TLS connect error: error:0A000065:SSL routines::no suitable key share";
+
+    /// <summary>
     /// Every build's message for exit 35 when a <c>--sigalgs</c> list names only schemes the
     /// client cannot offer, such as <c>RSA+SHA1</c>: measured with curl 8.18.0's OpenSSL 3.5.5
     /// build, 2026-09-30 (BL-709, ADR-0284).

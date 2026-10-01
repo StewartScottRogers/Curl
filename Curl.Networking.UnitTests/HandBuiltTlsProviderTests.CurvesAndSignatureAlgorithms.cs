@@ -86,7 +86,8 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.IsFalse(hello.Extensions.Any(extension => extension.Type == TlsExtensionType.KeyShare));
     }
 
-    // The failures come before a byte is sent, in the OpenSSL build's order (measured), and are
+    // The failures come before a ClientHello is sent, in the OpenSSL build's order (measured;
+    // stars on TLS 1.2-only groups alone, BL-1082, measured 2026-10-01), and are
     // the same on every platform.
     [TestMethod]
     [DataRow(SchannelBuild, "bogus", null, CurlExitCode.SslCipher, "failed setting curves list: 'bogus'")]
@@ -98,6 +99,14 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow(OpenSslBuild, "-X25519", "RSA+SHA1", CurlExitCode.SslConnectError, "TLS connect error: error:0A000127:SSL routines::no suitable groups")]
     [DataRow(SchannelBuild, null, "RSA+SHA1", CurlExitCode.SslConnectError, "TLS connect error: error:0A000076:SSL routines::no suitable signature algorithm")]
     [DataRow(OpenSslBuild, "X25519", "RSA+SHA1", CurlExitCode.SslConnectError, "TLS connect error: error:0A000076:SSL routines::no suitable signature algorithm")]
+    [DataRow(OpenSslBuild, "*brainpoolP256r1:P-384", null, CurlExitCode.SslConnectError, "TLS connect error: error:0A000065:SSL routines::no suitable key share")]
+    [DataRow(SchannelBuild, "*brainpoolP256r1:P-384", null, CurlExitCode.SslConnectError, "TLS connect error: error:0A000065:SSL routines::no suitable key share")]
+    [DataRow(OpenSslBuild, "*brainpoolP256r1:X25519", null, CurlExitCode.SslConnectError, "TLS connect error: error:0A000065:SSL routines::no suitable key share")]
+    [DataRow(OpenSslBuild, "brainpoolP256r1:*brainpoolP384r1:X25519", null, CurlExitCode.SslConnectError, "TLS connect error: error:0A000065:SSL routines::no suitable key share")]
+    [DataRow(OpenSslBuild, "*brainpoolP256r1", null, CurlExitCode.SslConnectError, "TLS connect error: error:0A000127:SSL routines::no suitable groups")]
+    [DataRow(OpenSslBuild, "brainpoolP256r1", null, CurlExitCode.SslConnectError, "TLS connect error: error:0A000127:SSL routines::no suitable groups")]
+    [DataRow(OpenSslBuild, "*brainpoolP256r1", "RSA+SHA1", CurlExitCode.SslConnectError, "TLS connect error: error:0A000127:SSL routines::no suitable groups")]
+    [DataRow(OpenSslBuild, "*brainpoolP256r1:P-384", "RSA+SHA1", CurlExitCode.SslConnectError, "TLS connect error: error:0A000076:SSL routines::no suitable signature algorithm")]
     public async Task AuthenticateAsClientAsync_WithCurvesOrSigalgsLeavingNothingToOffer_FailsWithTheMeasuredLine(
         bool matchesSchannelBuild,
         string? curves,
@@ -113,6 +122,30 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.AreEqual(exitCode, result.ExitCode);
         Assert.AreEqual(expected, result.ErrorMessage);
         Assert.IsTrue(stream.IsDisposed);
+    }
+
+    // One starred group TLS 1.3 can share is enough (measured 2026-10-01, BL-1082): it alone
+    // gets the key share.
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithATls12OnlyAndATls13GroupStarred_SharesTheTls13Group()
+    {
+        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Curves: "*brainpoolP256r1:*P-384"), OpenSslBuild, ProfileHost, Http11));
+
+        CollectionAssert.AreEqual(new ushort[] { 0x0018 }, KeySharesOf(hello).Select(share => share.Group).ToArray());
+    }
+
+    // A TLS 1.2 ceiling sends no key share, so stars on TLS 1.2-only groups alone do not fail
+    // it: the TLS 1.2 ClientHello offers the groups (measured 2026-10-01, BL-1082).
+    [TestMethod]
+    [DataRow("*brainpoolP256r1:P-384", new ushort[] { 0x001a, 0x0018 })]
+    [DataRow("*brainpoolP256r1:X25519", new ushort[] { 0x001a, 0x001d })]
+    [DataRow("*brainpoolP256r1", new ushort[] { 0x001a })]
+    public async Task AuthenticateAsClientAsync_WithOnlyTls12OnlyGroupsStarredUnderATls12Ceiling_OffersTheGroups(string curves, ushort[] groups)
+    {
+        var hello = DecodeClientHello(await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Curves: curves)), OpenSslBuild, ProfileHost, Http11));
+
+        CollectionAssert.AreEqual(groups, SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray());
+        Assert.IsFalse(hello.Extensions.Any(extension => extension.Type == TlsExtensionType.KeyShare));
     }
 
     // A server sharing no group or unable to sign answers handshake_failure: Windows prints what

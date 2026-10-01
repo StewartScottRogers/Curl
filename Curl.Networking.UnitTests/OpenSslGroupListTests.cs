@@ -96,16 +96,16 @@ public sealed class OpenSslGroupListTests
         Assert.IsEmpty(offered.KeyShares);
     }
 
-    // A starred TLS 1.2-only group gets no TLS 1.3 key share. (OpenSSL's curl then fails with
-    // exit 35 "no suitable key share", measured 2026-10-01; matching that is BL-1081.)
+    // Stars on TLS 1.2-only groups alone leave no key share, which the provider refuses as
+    // OpenSSL's "no suitable key share" when it offers TLS 1.3 (measured 2026-10-01, BL-1082).
     [TestMethod]
-    public void Parse_WithATls12OnlyGroupStarred_SendsItNoKeyShare()
+    public void Parse_WithOnlyATls12OnlyGroupStarred_LeavesNoKeyShare()
     {
         var offered = OpenSslGroupList.Parse("*brainpoolP256r1:P-384", ClientHelloProfile.OpenSsl);
 
         Assert.IsNotNull(offered);
         CollectionAssert.AreEqual(new ushort[] { TlsNamedGroup.BrainpoolP256r1, TlsNamedGroup.Secp384r1 }, offered.Groups.ToArray());
-        CollectionAssert.DoesNotContain(offered.KeyShares.ToArray(), TlsNamedGroup.BrainpoolP256r1);
+        Assert.IsEmpty(offered.KeyShares);
     }
 
     // Every name OpenSSL 3.5 knows is a group the client can offer (BL-1049): none is dropped.
