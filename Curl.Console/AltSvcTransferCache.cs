@@ -39,7 +39,8 @@ namespace Curl.Console;
 /// for an origin a <c>--connect-to</c> mapping matches.
 /// </para>
 /// <para>
-/// Every header is learned as having come over <c>h1</c>, from the origin, never the alternative. With
+/// Every header is learned under the version its response came over - <c>h3</c> for HTTP/3, <c>h2</c> for
+/// HTTP/2, <c>h1</c> otherwise (BL-947) - from the origin, never the alternative. With
 /// <c>--alt-svc ""</c> nothing is read or written. A file that cannot be opened reads as empty and one that
 /// cannot be written is left as it is, both silently, as curl does.
 /// </para>
@@ -112,10 +113,10 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     }
 
     /// <inheritdoc />
-    public IReadOnlyList<AltSvcAlternative> StoreFromResponse(CurlUrl origin, string altSvcHeader, DateTimeOffset now)
+    public IReadOnlyList<AltSvcAlternative> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now)
     {
         HashSet<AltSvcEntry> held = new(cache.Entries, ReferenceEqualityComparer.Instance);
-        cache.ApplyHeader(altSvcHeader, AltSvcAlpn.H1, origin.IdnHost, origin.Port);
+        cache.ApplyHeader(altSvcHeader, SourceAlpnOf(responseVersion), origin.IdnHost, origin.Port);
         return
         [
             .. cache.Entries
@@ -123,6 +124,21 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
                 .Select(entry => new AltSvcAlternative(AltSvcAlpnToken.Format(entry.DestinationAlpn), entry.DestinationHost, entry.DestinationPort)),
         ];
     }
+
+    /// <summary>
+    /// The source ALPN a header is learned under, from the version its response came over, as curl 8.21.0's
+    /// <c>Curl_altsvc_parse</c> maps <c>k->httpversion</c>: HTTP/3 to <c>h3</c>, HTTP/2 to <c>h2</c>, any
+    /// other version to <c>h1</c> (BL-947).
+    /// </summary>
+    /// <param name="responseVersion">The HTTP version the response came over.</param>
+    /// <returns>The source ALPN.</returns>
+    internal static AltSvcAlpn SourceAlpnOf(Version responseVersion) =>
+        responseVersion.Major switch
+        {
+            3 => AltSvcAlpn.H3,
+            2 => AltSvcAlpn.H2,
+            _ => AltSvcAlpn.H1,
+        };
 
     /// <summary>
     /// Writes the file, replacing it, in curl's format with the platform's line endings; nothing for

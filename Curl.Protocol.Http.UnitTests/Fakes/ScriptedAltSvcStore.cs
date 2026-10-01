@@ -12,12 +12,12 @@ public sealed class ScriptedAltSvcStore(params AltSvcAlternative[] added) : IAlt
     /// <summary>
     /// Gets every <see cref="StoreFromResponse" /> call made, in order.
     /// </summary>
-    public List<(CurlUrl Origin, string AltSvcHeader, DateTimeOffset Now)> Responses { get; } = [];
+    public List<(CurlUrl Origin, string AltSvcHeader, Version ResponseVersion, DateTimeOffset Now)> Responses { get; } = [];
 
     /// <inheritdoc />
-    public IReadOnlyList<AltSvcAlternative> StoreFromResponse(CurlUrl origin, string altSvcHeader, DateTimeOffset now)
+    public IReadOnlyList<AltSvcAlternative> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now)
     {
-        Responses.Add((origin, altSvcHeader, now));
+        Responses.Add((origin, altSvcHeader, responseVersion, now));
         return added;
     }
 }

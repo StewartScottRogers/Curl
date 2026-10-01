@@ -67,8 +67,9 @@ internal sealed class HttpResponseHeadReader
     /// its continuation lines folded in - just before its lines are reported to
     /// <see cref="Events" />; a header whose head fails before it is whole is never told, nor
     /// the last header of a final head the peer closed among its headers (<see cref="HeadActedOn" />).
+    /// It is told with the status line of the head the header belongs to.
     /// </summary>
-    internal Action<HttpResponseHeader> HeaderReceived { get; init; } = static _ => { };
+    internal Action<HttpStatusLine, HttpResponseHeader> HeaderReceived { get; init; } = static (_, _) => { };
 
     /// <summary>
     /// Gets what finds the header of a final head that curl 8.21.0 refuses while it reads the
@@ -375,7 +376,7 @@ internal sealed class HttpResponseHeadReader
             return;
         }
 
-        HeaderReceived(builder.LastHeader);
+        HeaderReceived(headStatusLine!, builder.LastHeader);
         ReportHeldHeaderLines();
     }
 
@@ -447,7 +448,7 @@ internal sealed class HttpResponseHeadReader
     {
         if (held.IsActedOn)
         {
-            HeaderReceived(held.Header);
+            HeaderReceived(headStatusLine!, held.Header);
         }
 
         ReportHeaderLines(held.Lines, held.KeepsHttp10Alive);

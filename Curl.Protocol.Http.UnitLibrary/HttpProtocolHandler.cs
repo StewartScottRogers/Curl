@@ -936,10 +936,10 @@ public sealed class HttpProtocolHandler(
         HttpResponseHeadReader headReader = new(responseConnection)
         {
             Events = context.Events,
-            HeaderReceived = header =>
+            HeaderReceived = (statusLine, header) =>
             {
                 cookiesStored = StoreCookie(context, header, cookiesStored);
-                StoreAltSvc(context, options.AltSvcStore, header);
+                StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
             },
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
             IsHttp2OrHttp3 = requestStream is not null,
@@ -1588,9 +1588,11 @@ public sealed class HttpProtocolHandler(
     /// <c>https</c> URL and <paramref name="store" /> is set, to the store with the transfer's
     /// URL as the origin, and reports curl 8.21.0's <c>Added alt-svc: &lt;host&gt;:&lt;port&gt; over
     /// &lt;id&gt;</c> for each alternative it added, before the header line (measured, BL-623
-    /// Notes). curl learns no alternative over plain <c>http</c>.
+    /// Notes). curl learns no alternative over plain <c>http</c>. The store is told
+    /// <paramref name="responseVersion" />, the version the response came over, as curl 8.21.0
+    /// passes <c>k->httpversion</c> to <c>Curl_altsvc_parse</c> (BL-947).
     /// </summary>
-    private static void StoreAltSvc(ITransferContext context, IAltSvcStore? store, HttpResponseHeader header)
+    private static void StoreAltSvc(ITransferContext context, IAltSvcStore? store, Version responseVersion, HttpResponseHeader header)
     {
         if (store is null
             || context.Url.Scheme != "https"
@@ -1599,7 +1601,7 @@ public sealed class HttpProtocolHandler(
             return;
         }
 
-        foreach (AltSvcAlternative added in store.StoreFromResponse(context.Url, header.Value, context.TimeProvider.GetUtcNow()))
+        foreach (AltSvcAlternative added in store.StoreFromResponse(context.Url, header.Value, responseVersion, context.TimeProvider.GetUtcNow()))
         {
             context.Events.ReportInfo($"Added alt-svc: {added.Host}:{added.Port} over {added.Alpn}");
         }

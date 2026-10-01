@@ -68,8 +68,9 @@ Windows on 2026-09-29, are in BL-733's Notes:
 
 Known differences, each filed:
 
-- Headers are still learned under `h1` whatever version the response came over, where curl
-  records `h2` or `h3`; so `--http3-only` never uses an entry its own responses taught (BL-947).
+- Resolved by BL-947: headers were learned under `h1` whatever version the response came over,
+  where curl records `h2` or `h3`; they are now learned under the version the response came over,
+  so `--http3-only` uses an entry its own HTTP/3 responses taught.
 - ALPN is still the option group's list, where curl offers `h2` alone to an `h2` alternative and
   `http/1.1` alone after a switch to `h1`, and prefers a same-destination `h2` or `h1` entry's
   version (BL-948). On Windows without a version option, an `h2` alternative is therefore

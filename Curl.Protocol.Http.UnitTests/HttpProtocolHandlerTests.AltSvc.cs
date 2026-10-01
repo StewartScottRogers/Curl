@@ -1,3 +1,5 @@
+using System.Net;
+using Curl.Http2;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http.Fakes;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -88,10 +90,52 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
             Assert.AreEqual(
-                (CurlUrl.Parse(AltSvcHttpsUrl), "h2=\":8443\"; ma=60, h1=\"a.example:1\", h3=\":443\"", CookieTime),
+                (CurlUrl.Parse(AltSvcHttpsUrl), "h2=\":8443\"; ma=60, h1=\"a.example:1\", h3=\":443\"", HttpVersion.Version11, CookieTime),
                 store.Responses.Single(),
                 $"Chunk size {chunkSize}");
         }
+    }
+
+    /// <summary>
+    /// curl 8.21.0 learns an <c>Alt-Svc</c> header under the version its response came over
+    /// (<c>k->httpversion</c>, BL-947): HTTP/2 here.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http2ResponseWithAltSvc_TellsTheStoreHttp2()
+    {
+        HpackEncoder server = new();
+        byte[] response = Http2Response(
+            Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "204"), new("alt-svc", "h3=\":443\"; ma=60")]), isEndStream: true, isEndHeaders: true));
+        ScriptedAltSvcStore store = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("https://example.com/"),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { AltSvcStore = store },
+        };
+
+        TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(new ScriptedConnection(response, 65536), null, applicationProtocol: "h2")))
+            .ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(("h3=\":443\"; ma=60", HttpVersion.Version20), (store.Responses.Single().AltSvcHeader, store.Responses.Single().ResponseVersion));
+    }
+
+    /// <summary>
+    /// curl 8.21.0 learns an <c>Alt-Svc</c> header under the version its response came over
+    /// (<c>k->httpversion</c>, BL-947): HTTP/3 here.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http3ResponseWithAltSvc_TellsTheStoreHttp3()
+    {
+        FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("204", ("alt-svc", "h3=\":443\"; ma=60"))));
+        ScriptedAltSvcStore store = new();
+
+        TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
+            .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), options: new HttpRequestOptions { AltSvcStore = store }));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(("h3=\":443\"; ma=60", HttpVersion.Version30), (store.Responses.Single().AltSvcHeader, store.Responses.Single().ResponseVersion));
     }
 
     [TestMethod]
