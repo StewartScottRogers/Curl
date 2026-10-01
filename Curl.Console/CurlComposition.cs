@@ -383,7 +383,7 @@ internal static class CurlComposition
     /// </param>
     internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider, ConnectionCache? runConnections = null)
     {
-        TcpDialer tcpDialer = new(new TcpSocketOptions(options.TcpNoDelay, options.TcpKeepAlive));
+        TcpDialer tcpDialer = new(TcpSocketOptions.FromCommandLine(options.TcpNoDelay, options.TcpKeepAlive, options.TcpKeepAliveSeconds, options.TcpKeepAliveProbeCount));
         IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider);

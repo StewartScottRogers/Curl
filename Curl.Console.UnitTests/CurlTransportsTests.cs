@@ -123,6 +123,15 @@ public sealed class CurlTransportsTests
         Assert.AreEqual(new TcpSocketOptions(noDelay, keepAlive), transports.TcpDialer.SocketOptions);
     }
 
+    [TestMethod]
+    public void CreateTransports_WithKeepAliveTimeAndCount_DialsWithThoseTimers()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(
+            Options("--keepalive-time", "5", "--keepalive-cnt", "3", "gophers://example.com/"));
+
+        Assert.AreEqual(new TcpSocketOptions(KeepAliveSeconds: 5, KeepAliveProbeCount: 3), transports.TcpDialer.SocketOptions);
+    }
+
     private static CommandLineOptions NoOptions() => Options("gophers://example.com/");
 
     private static CommandLineOptions Options(params string[] arguments)
