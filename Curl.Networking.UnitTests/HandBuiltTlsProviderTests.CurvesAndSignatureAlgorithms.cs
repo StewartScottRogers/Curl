@@ -42,6 +42,14 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow(OpenSslBuild, "ECDSA+SHA256", new ushort[] { 0x0403 })]
     [DataRow(OpenSslBuild, "rsa_pss_rsae_sha256:ECDSA+SHA256", new ushort[] { 0x0804, 0x0403 })]
     [DataRow(OpenSslBuild, "RSA+SHA256:RSA-PSS+SHA256:ECDSA+SHA384:ed25519:mldsa65:RSA+SHA1", new ushort[] { 0x0401, 0x0804, 0x0503, 0x0807, 0x0905 })]
+    [DataRow(OpenSslBuild, "mldsa44", new ushort[] { 0x0904 })]
+    [DataRow(OpenSslBuild, "mldsa65", new ushort[] { 0x0905 })]
+    [DataRow(OpenSslBuild, "mldsa87", new ushort[] { 0x0906 })]
+    [DataRow(OpenSslBuild, "ed448", new ushort[] { 0x0808 })]
+    [DataRow(OpenSslBuild, "ecdsa_brainpoolP256r1tls13_sha256", new ushort[] { 0x081a })]
+    [DataRow(OpenSslBuild, "ecdsa_brainpoolP384r1tls13_sha384", new ushort[] { 0x081b })]
+    [DataRow(OpenSslBuild, "ecdsa_brainpoolP512r1tls13_sha512", new ushort[] { 0x081c })]
+    [DataRow(OpenSslBuild, "ed25519:mldsa65", new ushort[] { 0x0807, 0x0905 })]
     [DataRow(SchannelBuild, "ECDSA+SHA256", new ushort[] { 0x0403 })]
     public async Task AuthenticateAsClientAsync_WithSigalgs_OffersTheMeasuredSchemesAndTheProfilesGroups(bool matchesSchannelBuild, string signatureAlgorithms, ushort[] schemes)
     {
