@@ -31,3 +31,4 @@ Found in BL-1035 (2026-10-01, lane 4): on Windows, `--filter "TestCategory=Integ
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
