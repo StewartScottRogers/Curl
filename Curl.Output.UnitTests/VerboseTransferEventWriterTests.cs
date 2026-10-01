@@ -86,6 +86,23 @@ public sealed class VerboseTransferEventWriterTests
     }
 
     [TestMethod]
+    public void SecondConnectionOpened_SaysEstablished2ndConnectionAndTheControlConnectionDoesNot()
+    {
+        // Measured 2026-09-30, curl 8.21.0 (mingw, Schannel), BL-944: -v ftp://localhost:47942/dir/file.txt ->
+        // * Established connection to localhost (127.0.0.1 port 47942) from 127.0.0.1 port 53197
+        // * Established 2nd connection to localhost (127.0.0.1 port 53195) from 127.0.0.1 port 53198
+        VerboseTransferEventWriter writer = new(output, writesDataLines: true);
+
+        writer.ReportConnectionOpened(Opened(new IPEndPoint(IPAddress.Loopback, 47942), 53197) with { HostName = "localhost" });
+        writer.ReportConnectionOpened(Opened(new IPEndPoint(IPAddress.Loopback, 53195), 53198) with { HostName = "localhost", IsSecondConnection = true });
+
+        Assert.AreEqual(
+            "* Established connection to localhost (127.0.0.1 port 47942) from 127.0.0.1 port 53197 \r\n" +
+            "* Established 2nd connection to localhost (127.0.0.1 port 53195) from 127.0.0.1 port 53198 \r\n",
+            WrittenAsWindowsStandardError());
+    }
+
+    [TestMethod]
     public void HttpExchangeWithTraceTime_StampsEachLineStartAsCurl()
     {
         // Measured 2026-09-27, curl 8.21.0 (mingw, Schannel): Record-CurlExchange.ps1 -Port 18358

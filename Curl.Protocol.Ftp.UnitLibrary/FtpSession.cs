@@ -1304,7 +1304,7 @@ internal sealed class FtpSession(
         var target = new ConnectTarget(host, port, false)
         {
             Proxy = context.Proxy,
-            Events = new FtpDataConnectEvents(context.Events, failure),
+            Events = new FtpDataConnectEvents(context.Events, failure, controlName.Host),
             DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);

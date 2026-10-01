@@ -30,6 +30,9 @@ public sealed class RecordingTransferEvents : ITransferEvents
     /// </summary>
     public List<string> Transcript { get; } = [];
 
+    /// <summary>Gets every <see cref="ReportConnectionOpened" /> event, in order.</summary>
+    public List<ConnectionOpenedEvent> ConnectionsOpened { get; } = [];
+
     /// <summary>Gets every data block received, in order, as Latin-1 text.</summary>
     public List<string> DataReceived { get; } = [];
 
@@ -44,9 +47,7 @@ public sealed class RecordingTransferEvents : ITransferEvents
     }
 
     /// <inheritdoc />
-    public void ReportConnectionOpened(ConnectionOpenedEvent opened)
-    {
-    }
+    public void ReportConnectionOpened(ConnectionOpenedEvent opened) => ConnectionsOpened.Add(opened);
 
     /// <inheritdoc />
     public void ReportConnectionReused(ConnectionReusedEvent reused)

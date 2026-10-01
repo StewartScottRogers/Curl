@@ -176,10 +176,41 @@ public sealed class FtpProtocolHandlerDataConnectFailureTests
             events.Calls.SkipWhile(call => call != "ReportInfo: Trying 127.0.0.2:1...").ToArray());
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_DataConnectionOpened_IsReportedAsTheSecondConnectionToTheUrlsHost()
+    {
+        // curl 8.21.0 -v --no-ftp-skip-pasv-ip ftp://localhost:47943/dir/file.txt (measured 2026-09-30, BL-944):
+        // * Established 2nd connection to localhost (127.0.0.1 port 53199) from 127.0.0.1 port 53203
+        var events = new RecordingTransferEvents();
+        var dialed = new ConnectionOpenedEvent
+        {
+            HostName = "127.0.0.2",
+            RemoteEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.2"), 1),
+            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 53203),
+            ConnectionNumber = 1,
+        };
+
+        await RunPasvAsync(
+            "ftp://localhost:47707/f.txt",
+            "227 Entering Passive Mode (127,0,0,2,0,1)",
+            skipPasvIp: false,
+            ConnectResult.Refused("refused"),
+            events,
+            reports => reports.ReportConnectionOpened(dialed));
+
+        Assert.AreEqual(dialed with { HostName = "localhost", IsSecondConnection = true }, events.ConnectionsOpened.Single());
+    }
+
     private static void ReportEveryEvent(ITransferEvents reports)
     {
         reports.ReportInfo("Trying 127.0.0.2:1...");
-        reports.ReportConnectionOpened(null!);
+        reports.ReportConnectionOpened(new ConnectionOpenedEvent
+        {
+            HostName = "127.0.0.2",
+            RemoteEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.2"), 1),
+            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 1),
+            ConnectionNumber = 1,
+        });
         reports.ReportConnectionReused(null!);
         reports.ReportTlsHandshake(null!);
         reports.ReportTlsData([], sent: true);
