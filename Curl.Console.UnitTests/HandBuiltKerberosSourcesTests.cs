@@ -24,11 +24,11 @@ public sealed class HandBuiltKerberosSourcesTests
     }
 
     [TestMethod]
-    public void ReadCredentialCache_NoKrb5ccname_ReadsTmpKrb5ccOfTheUserId()
+    public void CreateCredentialCacheStore_NoKrb5ccname_ReadsTmpKrb5ccOfTheUserId()
     {
         MemoryFiles files = new();
 
-        KerberosFileException failure = Assert.ThrowsExactly<KerberosFileException>(() => Sources(files, _ => null).ReadCredentialCache());
+        KerberosFileException failure = Assert.ThrowsExactly<KerberosFileException>(() => Sources(files, _ => null).CreateCredentialCacheStore().ReadDefault());
 
         Assert.AreEqual(KerberosFileError.NotFound, failure.Error);
         CollectionAssert.AreEqual(new[] { "/tmp/krb5cc_1000" }, files.PathsRead);
@@ -62,7 +62,7 @@ public sealed class HandBuiltKerberosSourcesTests
     {
         MemoryFiles files = new() { ["/etc/krb5.conf"] = "[realms]\n EXAMPLE.TEST = {\n kdc = https://kdcproxy.example.test/KdcProxy\n }\n" };
         RecordingProxy proxy = new();
-        HandBuiltKerberosSources sources = new(files, _ => null, () => 1000, new NoSrvRecords(), new UnreachableKdc(), proxy, TimeProvider.System);
+        HandBuiltKerberosSources sources = new(files, new NoFileWriter(), _ => null, () => 1000, new NoSrvRecords(), new UnreachableKdc(), proxy, TimeProvider.System);
         KerberosKdcClient client = sources.CreateKdcClient(sources.ReadConfiguration());
         using CredentialCache cache = new(null, new KerberosPrincipal(1, Realm, ["alice"]), [TicketGrantingTicket()]);
 
@@ -74,7 +74,7 @@ public sealed class HandBuiltKerberosSourcesTests
     }
 
     private static HandBuiltKerberosSources Sources(MemoryFiles files, Func<string, string?> environment) =>
-        new(files, environment, () => 1000, new NoSrvRecords(), new UnreachableKdc(), new RecordingProxy(), TimeProvider.System);
+        new(files, new NoFileWriter(), environment, () => 1000, new NoSrvRecords(), new UnreachableKdc(), new RecordingProxy(), TimeProvider.System);
 
     private sealed class MemoryFiles : Dictionary<string, string>, IKerberosFileReader
     {
@@ -87,6 +87,11 @@ public sealed class HandBuiltKerberosSourcesTests
         }
 
         public IReadOnlyList<string>? ListFileNames(string path) => null;
+    }
+
+    private sealed class NoFileWriter : IKerberosFileWriter
+    {
+        public bool AppendAllBytes(string path, ReadOnlySpan<byte> bytes) => false;
     }
 
     private sealed class NoSrvRecords : IKerberosSrvLookup

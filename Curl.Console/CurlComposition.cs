@@ -225,6 +225,7 @@ internal static class CurlComposition
         DnsServerResolver srvResolver = new(new DnsServerResolverOptions(null, null, null, null), TimeProvider.System);
         HandBuiltKerberosSources sources = new(
             new KerberosDiskFileReader(),
+            new KerberosDiskFileWriter(),
             HandBuiltKerberosSources.ReadProcessEnvironmentVariable,
             ProcessUserId.Read,
             new KerberosDnsSrvLookup(srvResolver.ResolveServiceAsync),
