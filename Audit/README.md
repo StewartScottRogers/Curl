@@ -42,6 +42,8 @@ or to one of the guards themselves: the hook, `.claude/settings.json`, `ci.yml` 
 (BL-1029), and a red run blocks the shift-end merge; the CI watch files the failure as an
 interactive-only task (BL-999).
 
-**The `audit` branch and Stewart's approval.** Audit work is done on the `audit` branch, cut
+**The `audit` branch.** Audit work is done on the `audit` branch, cut
 from `master`, never on the factory's branch. It reaches `master` only through a pull
-request Stewart approves each time; the factory branch then takes it by merging `master`.
+request, which an interactive session merges once CI is green on all three platforms (Stewart's
+standing exception, 2026-09-30, in CLAUDE.md and ADR-0267); a dark factory lane never does. The
+factory branch then takes it by merging `master`.

@@ -1,0 +1,1 @@
+{ "seed": 1, "commit": "abc1234", "planted": [ { "id": "PD-101", "auditor": "security", "file": "Curl.Tls.UnitLibrary/TlsMac.cs", "line": 40, "description": "FixedTimeEquals replaced by SequenceEqual in Verify", "catch": "SequenceEqual" } ] }

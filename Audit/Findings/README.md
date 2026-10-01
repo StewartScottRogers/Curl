@@ -86,7 +86,9 @@ given kind of finding gets; they apply these definitions and never replace them.
    its Summary says so.
 7. A report that matches a planted defect is a catch, not a finding, and is never filed
    here; it counts toward the auditor's catch rate on the scorecard.
-8. `rejected` and `closed` findings are never edited again.
+8. `closed` findings are never edited again. A `rejected` finding is never edited either,
+   except that a report repeating its `key` adds a `Re-audits` line saying it was still
+   reported; its status stays `rejected` (Decided by Claude, 2026-09-30, BL-1016).
 
 ## Body
 
