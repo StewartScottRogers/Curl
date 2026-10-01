@@ -9,17 +9,21 @@ order:
    finding's file - in the pull request, or by telling an interactive session which to set.
    Only Stewart accepts or rejects a finding; Claude never sets either status on its own
    judgement, however clear a finding looks.
-3. **Accepted findings become tasks.** After the pull request has merged to `master`, an
-   interactive session on `master`, or on `work/dark-factory` once it has merged `master`, runs
+3. **Accepted findings become tasks.** An interactive session sets the status on the `audit`
+   branch, then runs the script from the audit branch's worktree against the factory's board:
 
    ```powershell
+   $env:CLAUDE_PROJECT_DIR = '<the work/dark-factory checkout>'
    powershell -NoProfile -File Audit/Tools/New-TasksFromAcceptedFindings.ps1
    ```
 
-   which files one Curl task per accepted finding that has none yet and writes the task's ID into
-   the finding's `task` field. The session commits the new tasks and the updated findings, and
-   pushes. `-WhatIf` shows what it would file without changing anything. The script refuses to
-   run inside a dark factory process.
+   which files one Curl task per accepted finding that has none yet, on the factory's board, and
+   writes the task's ID into the finding's `task` field, on the `audit` branch. The two land
+   apart: the session commits and pushes the new tasks on `work/dark-factory`, and the updated
+   findings on `audit`, whose pull request it merges once CI is green. Never commit a finding on
+   `work/dark-factory` - the CI audit guard fails any audit path changed there. `-WhatIf` shows
+   what it would file without changing anything. The script refuses to run inside a dark factory
+   process.
 4. **The factory works the tasks** like any other: they change product code, not audit paths, so
    lanes may take them. The finding stays `accepted` while its task is worked and after it is
    Done; only a later re-audit that finds the reproduction no longer reproduces closes it
