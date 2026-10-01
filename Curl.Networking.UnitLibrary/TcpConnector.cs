@@ -93,7 +93,7 @@ namespace Curl.Networking;
 /// written first on every new connection once it is dialled and any proxy tunnel is open, before the
 /// target's TLS handshake, from the socket's own ends (BL-616); <see langword="null" /> to send none.
 /// </param>
-public sealed class TcpConnector(
+public sealed partial class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
     ITlsProvider tlsProvider,
@@ -397,8 +397,9 @@ public sealed class TcpConnector(
     /// </para>
     /// <para>
     /// A <c>--connect-timeout</c> greater than zero bounds the handshakes; without one each
-    /// handshake has QUIC's own 10 seconds (ADR-0144 section 5). A proxy on the target is not
-    /// used: curl's ngtcp2 build connects QUIC directly.
+    /// handshake has QUIC's own 10 seconds (ADR-0144 section 5). An HTTP or HTTPS proxy on the
+    /// target is tunnelled through with CONNECT-UDP, as curl 8.22.0 does (BL-942,
+    /// <see cref="ConnectMultiplexedThroughProxyAsync" />); a SOCKS one is not used.
     /// </para>
     /// </remarks>
     public async ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken)
@@ -407,6 +408,11 @@ public sealed class TcpConnector(
         if (quicDialer is null)
         {
             return MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC is not available on this connector");
+        }
+
+        if (UdpTunnelProxyOf(target) is { } proxy)
+        {
+            return await ConnectMultiplexedThroughProxyAsync(target, proxy, quicDialer, cancellationToken).ConfigureAwait(false);
         }
 
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);

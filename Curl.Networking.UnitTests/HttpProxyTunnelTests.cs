@@ -383,4 +383,63 @@ public sealed class HttpProxyTunnelTests
 
         Assert.AreEqual("tunnel".Length, connection.UnreadCount);
     }
+
+    [TestMethod]
+    public void BuildConnectUdpRequest_ForAnHttpProxy_MatchesCurl822()
+    {
+        // curl 8.22.0 --http3-only -x http://127.0.0.1:18942 https://example.com/ (BL-942 Notes).
+        var request = HttpProxyTunnel.BuildConnectUdpRequest("example.com", 443, new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 18942, null), HttpProxyTunnelOptions.Default with { UserAgent = "curl/8.22.0" }, null);
+
+        Assert.AreEqual(
+            "GET http://127.0.0.1:18942/.well-known/masque/udp/example.com/443/ HTTP/1.1\r\n"
+                + "Host: 127.0.0.1:18942\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n"
+                + "Connection: Upgrade\r\nUpgrade: connect-udp\r\nCapsule-Protocol: ?1\r\n\r\n",
+            Encoding.Latin1.GetString(request));
+    }
+
+    [TestMethod]
+    public void BuildConnectUdpRequest_ThroughAnHttp10ProxyToAnIpv6Literal_MatchesCurl822()
+    {
+        // curl 8.22.0 --http3-only --proxy1.0 127.0.0.1:18942 https://[::1]:8443/ -U u:p
+        // --proxy-header "X-P: q" (BL-942 Notes): the colons percent-encoded, the header last.
+        var request = HttpProxyTunnel.BuildConnectUdpRequest(
+            "[::1]", 8443,
+            new ProxyEndpoint(ProxyKind.Http10, "127.0.0.1", 18942, null),
+            HttpProxyTunnelOptions.Default with { UserAgent = "curl/8.22.0", ProxyHeaders = ["X-P: q"] },
+            "Basic dTpw");
+
+        Assert.AreEqual(
+            "GET http://127.0.0.1:18942/.well-known/masque/udp/%3A%3A1/8443/ HTTP/1.0\r\n"
+                + "Host: 127.0.0.1:18942\r\nProxy-Authorization: Basic dTpw\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n"
+                + "Connection: Upgrade\r\nUpgrade: connect-udp\r\nCapsule-Protocol: ?1\r\nX-P: q\r\n\r\n",
+            Encoding.Latin1.GetString(request));
+    }
+
+    [TestMethod]
+    public void BuildConnectUdpRequest_ThroughAnHttpsProxy_NamesItWithHttps()
+    {
+        // curl 8.22.0 -x https://localhost:18942 --proxy-insecure (BL-942 Notes).
+        var request = HttpProxyTunnel.BuildConnectUdpRequest("example.com", 443, new ProxyEndpoint(ProxyKind.Https, "localhost", 18942, null), HttpProxyTunnelOptions.Default, null);
+
+        StringAssert.StartsWith(Encoding.Latin1.GetString(request), "GET https://localhost:18942/.well-known/masque/udp/example.com/443/ HTTP/1.1\r\nHost: localhost:18942\r\n");
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\n\r\n", true)]
+    [DataRow("HTTP/1.1 200 OK\r\n\r\n", true)]
+    [DataRow("HTTP/1.1 100 Continue\r\n\r\n", false)]
+    [DataRow("HTTP/1.1 403 Forbidden\r\n\r\n", false)]
+    public async Task OpensUdpTunnel_Takes101And2xx(string reply, bool opens)
+    {
+        var result = await HttpProxyTunnel.ReadReplyAsync(new ScriptedConnection(Encoding.Latin1.GetBytes(reply)), CancellationToken.None);
+
+        Assert.AreEqual(opens, result.OpensUdpTunnel);
+    }
+
+    [TestMethod]
+    public void OpensUdpTunnel_ForAReplyCurlGivesUpOn_IsFalse()
+    {
+        Assert.IsFalse(HttpProxyTunnelReply.Failed("Proxy CONNECT aborted").OpensUdpTunnel);
+        Assert.IsFalse(new HttpProxyTunnelReply(101, "Proxy CONNECT aborted").OpensUdpTunnel);
+    }
 }

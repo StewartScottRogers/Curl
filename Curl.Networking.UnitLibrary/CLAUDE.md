@@ -351,6 +351,12 @@ recvfrom() ...`. This project therefore references `Curl.Quic.UnitLibrary`, whic
 `Curl.Networking.UnitTests` see its internals: `Fakes/QuicTestServer` and `QuicTestTlsServer` are
 copies of `Curl.Quic.UnitTests`' in-memory server, reached through `Fakes/QuicServerChannelOpener`.
 `PoolingConnector.ConnectMultiplexedAsync` passes straight through to its inner connector.
+Per ADR-0289 (BL-942) a target whose `Proxy` is an HTTP, HTTP/1.0 or HTTPS proxy is not
+resolved: `TcpConnector.UdpTunnel.cs` dials the proxy, sends curl 8.22.0's CONNECT-UDP request
+(`HttpProxyTunnel.BuildConnectUdpRequest`), takes a `101` or `2xx` (`OpensUdpTunnel`), and hands
+`QuicDialer.DialThroughTunnelAsync` a `CapsuleDatagramChannel`, which carries each datagram as an
+RFC 9297 `DATAGRAM` capsule over the proxy connection. Tests run the handshake through
+`Fakes/CapsuleQuicProxyConnection`, which feeds the capsules to a `QuicTestServer`.
 
 Per ADR-0222 (BL-920) `TcpConnector` and `PoolingConnector` write the connect steps to
 `ConnectTarget.DiagnosticLog` (`--log-level`) through `NetworkDiagnosticLog`, the one place that

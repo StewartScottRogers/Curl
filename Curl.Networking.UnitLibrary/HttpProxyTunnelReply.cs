@@ -63,6 +63,13 @@ internal readonly record struct HttpProxyTunnelReply(int StatusCode, string? Rec
     public bool OpensTunnel => RecvErrorMessage is null && StatusCode is >= 200 and <= 299;
 
     /// <summary>
+    /// Gets a value indicating whether the proxy opened a CONNECT-UDP tunnel: a complete reply
+    /// with status 101 or one from 200 to 299, as curl 8.22.0 accepts both a
+    /// <c>101 Switching Protocols</c> and a <c>200 OK</c> (measured, BL-942).
+    /// </summary>
+    public bool OpensUdpTunnel => OpensTunnel || (RecvErrorMessage is null && StatusCode == 101);
+
+    /// <summary>
     /// Creates the reply curl gives up on, with its exit 56 message.
     /// </summary>
     /// <param name="recvErrorMessage">The message curl prints.</param>

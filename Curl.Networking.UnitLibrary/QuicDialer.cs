@@ -98,7 +98,7 @@ public sealed class QuicDialer
                 return TimedOut(request);
             }
 
-            var (result, tryNextAddress) = await AttemptAsync(request, new IPEndPoint(address, request.Port), remaining, cancellationToken).ConfigureAwait(false);
+            var (result, tryNextAddress) = await AttemptAsync(request, new IPEndPoint(address, request.Port), remaining, tunnel: null, cancellationToken).ConfigureAwait(false);
             if (!tryNextAddress)
             {
                 return result;
@@ -110,29 +110,65 @@ public sealed class QuicDialer
         return lastFailure!;
     }
 
-    // One address: curl's Trying line, the ClientHello's suites and --cert certificate, then
-    // the connect; the certificate is disposed once the handshake no longer needs it.
+    /// <summary>
+    /// Runs the QUIC handshake over <paramref name="tunnel" />, a CONNECT-UDP tunnel through an
+    /// HTTP proxy at <paramref name="proxyEndPoint" /> (BL-942): no <c>Trying</c> line, as
+    /// curl 8.22.0 prints none once the tunnel is up (measured), and the tunnel disposed when
+    /// the handshake does not connect.
+    /// </summary>
+    /// <param name="request">The target, its destination and the connect's clock.</param>
+    /// <param name="tunnel">The datagram channel the tunnel carries.</param>
+    /// <param name="proxyEndPoint">The proxy's address, which the failure lines name.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>The QUIC connection, or the handshake's failure.</returns>
+    internal async ValueTask<MultiplexedConnectResult> DialThroughTunnelAsync(
+        QuicDialRequest request,
+        IDatagramChannel tunnel,
+        IPEndPoint proxyEndPoint,
+        CancellationToken cancellationToken)
+    {
+        var remaining = request.ConnectTimeout - _timeProvider.GetElapsedTime(request.Started);
+        var (result, _) = remaining <= TimeSpan.Zero
+            ? (TimedOut(request), false)
+            : await AttemptAsync(request, proxyEndPoint, remaining, tunnel, cancellationToken).ConfigureAwait(false);
+        if (result.Connection is null)
+        {
+            await tunnel.DisposeAsync().ConfigureAwait(false);
+        }
+
+        return result;
+    }
+
+    // One address: curl's Trying line (none through a tunnel), the ClientHello's suites and
+    // --cert certificate, then the connect; the certificate is disposed once the handshake no
+    // longer needs it.
     private async ValueTask<(MultiplexedConnectResult Result, bool TryNextAddress)> AttemptAsync(
         QuicDialRequest request,
         IPEndPoint endPoint,
         TimeSpan? handshakeTimeout,
+        IDatagramChannel? tunnel,
         CancellationToken cancellationToken)
     {
-        var events = request.Target.Events;
-        events.ReportInfo($"  Trying {endPoint}...");
+        if (tunnel is null)
+        {
+            request.Target.Events.ReportInfo($"  Trying {endPoint}...");
+        }
+
         var (tls, loadedCertificate, preparationFailure) = PrepareTls(request.Target.Host);
         using var clientCertificate = loadedCertificate;
         return tls is null
             ? (preparationFailure!, false)
-            : await ConnectAsync(request, endPoint, tls, handshakeTimeout, cancellationToken).ConfigureAwait(false);
+            : await ConnectAsync(request, endPoint, tls, handshakeTimeout, tunnel, cancellationToken).ConfigureAwait(false);
     }
 
-    // The trust anchors, the channel and the handshake, once the ClientHello is ready.
+    // The trust anchors, the channel (the tunnel when there is one) and the handshake, once
+    // the ClientHello is ready.
     private async ValueTask<(MultiplexedConnectResult Result, bool TryNextAddress)> ConnectAsync(
         QuicDialRequest request,
         IPEndPoint endPoint,
         Tls13ClientSettings tls,
         TimeSpan? handshakeTimeout,
+        IDatagramChannel? tunnel,
         CancellationToken cancellationToken)
     {
         request.Target.Events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options));
@@ -143,7 +179,7 @@ public sealed class QuicDialer
             return (MultiplexedConnectResult.Failed(exitCode, message), false);
         }
 
-        var (channel, openFailure) = OpenChannel(endPoint);
+        var (channel, openFailure) = OpenChannel(endPoint, tunnel);
         if (channel is null)
         {
             return (Failed(request, endPoint, openFailure!), true);
@@ -221,9 +257,15 @@ public sealed class QuicDialer
         }
     }
 
-    // A socket that cannot be opened or bound fails the attempt as a connect that reached nothing.
-    private (IDatagramChannel? Channel, QuicHandshakeFailure? Failure) OpenChannel(IPEndPoint endPoint)
+    // The tunnel when there is one; else a new socket, which, when it cannot be opened or bound,
+    // fails the attempt as a connect that reached nothing.
+    private (IDatagramChannel? Channel, QuicHandshakeFailure? Failure) OpenChannel(IPEndPoint endPoint, IDatagramChannel? tunnel)
     {
+        if (tunnel is not null)
+        {
+            return (tunnel, null);
+        }
+
         try
         {
             return (_channelOpener.Open(endPoint), null);
