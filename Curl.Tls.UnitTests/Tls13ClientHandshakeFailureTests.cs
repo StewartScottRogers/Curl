@@ -28,6 +28,7 @@ public sealed class Tls13ClientHandshakeFailureTests
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { CipherSuites = [0xc02f] }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.X25519, 0x0016] }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.Secp256r1] }));
+        Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.BrainpoolP256r1, TlsNamedGroup.X25519], KeyShareGroups = [TlsNamedGroup.BrainpoolP256r1] }));
     }
 
     [TestMethod]
@@ -254,6 +255,15 @@ public sealed class Tls13ClientHandshakeFailureTests
         client.Start();
 
         AssertFails(TlsAlertDescription.IllegalParameter, client.Receive(TlsEncryptionLevel.Initial, RetryBytes([Tls13(), KeyShareExtension.EncodeSelectedGroup(TlsNamedGroup.Secp384r1)])));
+    }
+
+    [TestMethod]
+    public void AHelloRetryRequestForATls12OnlyGroupOfferedIsAnIllegalParameter()
+    {
+        using Tls13ClientHandshake client = Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.BrainpoolP256r1, TlsNamedGroup.X25519] });
+        client.Start();
+
+        AssertFails(TlsAlertDescription.IllegalParameter, client.Receive(TlsEncryptionLevel.Initial, RetryBytes([Tls13(), KeyShareExtension.EncodeSelectedGroup(TlsNamedGroup.BrainpoolP256r1)])));
     }
 
     [TestMethod]

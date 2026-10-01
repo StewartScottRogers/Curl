@@ -373,7 +373,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         IServerCertificateVerifier verifier,
         CancellationToken cancellationToken)
     {
-        var offer = new TlsClientSettings(settings.ToTls13(), settings.ToTls12(_options));
+        var offer = new TlsClientSettings(settings.ToTls13(alongsideTls12: true), settings.ToTls12(_options));
         return Describe(await TlsClientConnection.ConnectAsync(transport, offer, _random, verifier, cancellationToken).ConfigureAwait(false));
     }
 
@@ -383,7 +383,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         IServerCertificateVerifier verifier,
         CancellationToken cancellationToken)
     {
-        var tls13 = await Tls13ClientConnection.ConnectAsync(transport, settings.ToTls13(), _random, verifier, cancellationToken).ConfigureAwait(false);
+        var tls13 = await Tls13ClientConnection.ConnectAsync(transport, settings.ToTls13(alongsideTls12: false), _random, verifier, cancellationToken).ConfigureAwait(false);
         return tls13.Stream is { } tls13Stream ? HandBuiltHandshake.Completed(tls13Stream) : HandBuiltHandshake.Failed(tls13.Failure!);
     }
 
@@ -470,8 +470,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             ClientHelloProfile profile) =>
             new(ServerNameFor(targetHost), applicationProtocols, cipherSuites, clientCertificate, profile);
 
-        // Both builds send a 32-byte legacy session ID (middlebox compatibility mode).
-        internal Tls13ClientSettings ToTls13() => new()
+        // Both builds send a 32-byte legacy session ID (middlebox compatibility mode). Beside
+        // TLS 1.2, OpenSSL keeps the TLS 1.2-only groups in supported_groups (measured, BL-1086);
+        // with TLS 1.3 alone, a group TLS 1.3 cannot use is not offered.
+        internal Tls13ClientSettings ToTls13(bool alongsideTls12) => new()
         {
             ServerName = ServerName,
             ApplicationProtocols = ApplicationProtocols,
@@ -479,7 +481,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             RequestOcspStatus = RequestOcspStatus,
             TimeProvider = TimeProvider,
             CipherSuites = [.. OfferedSuites.Where(Tls13RecordProtection.CanProtect)],
-            SupportedGroups = [.. Profile.SupportedGroups.Where(TlsNamedGroup.CanShare)],
+            SupportedGroups = alongsideTls12 ? Profile.SupportedGroups : [.. Profile.SupportedGroups.Where(TlsNamedGroup.CanShare)],
             KeyShareGroups = Profile.KeyShareGroups,
             SignatureAlgorithms = ClientHelloProfileMapping.CheckableSignatureAlgorithms(Profile),
             CertificateCompressionAlgorithms = Profile.CertificateCompressionAlgorithms,

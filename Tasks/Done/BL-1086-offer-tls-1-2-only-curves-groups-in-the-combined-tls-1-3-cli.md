@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1086 — Offer TLS 1.2-only --curves groups in the combined TLS 1.3 ClientHello's supported_groups as OpenSSL's curl does
 
@@ -25,13 +25,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] The `brainpoolP256r1:X25519` row pins [0x001a, 0x001d], and a `*brainpoolP256r1:*P-384` row pins [0x001a, 0x0018] with key share [0x0018].
-- [ ] A HelloRetryRequest naming a TLS 1.2-only group fails as today's unoffered-group case does.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports no failing member in Curl.Tls.UnitLibrary or Curl.Networking.UnitLibrary.
+- [x] The `brainpoolP256r1:X25519` row pins [0x001a, 0x001d], and a `*brainpoolP256r1:*P-384` row pins [0x001a, 0x0018] with key share [0x0018].
+- [x] A HelloRetryRequest naming a TLS 1.2-only group fails as today's unoffered-group case does.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports no failing member in Curl.Tls.UnitLibrary or Curl.Networking.UnitLibrary.
 
 ## Notes
+
+- `Tls13ClientSettings` now accepts TLS 1.2-only ECDHE groups (`TlsNamedGroup.IsTls12EcdheGroup`) in `SupportedGroups`; key share groups must still pass `CanShare`, and a HelloRetryRequest naming a group `CanShare` refuses is an `illegal_parameter`, as an unoffered group is.
+- `HandBuiltTlsProvider.ClientSettings.ToTls13(alongsideTls12)`: the combined TLS 1.3 + 1.2 ClientHello keeps the profile's groups as measured; a TLS 1.3-only ClientHello (`--tlsv1.3`) still drops TLS 1.2-only groups. Default taken (not measured here): OpenSSL's `tls_valid_group` rejects a group whose highest TLS version is below the connection's minimum.
+- Build clean with -warnaserror, all fast tests green, Measure-CodeQuality.ps1: 0 failing members.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. Combined TLS 1.3 ClientHello offers TLS 1.2-only --curves groups in supported_groups, as OpenSSL's curl does
