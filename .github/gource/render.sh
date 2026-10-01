@@ -38,18 +38,28 @@ fps=30
 # Gource sizes text and user icons in pixels. Scaling them 4x makes 8K read like 1080p: file
 # and project names stay legible on a wall-sized screen without crowding the tree.
 scale=4
-# Target length of the animation, however long or short the project's history is.
-seconds=75
+# The animation's length is fixed, however long the history grows: the size of every
+# quality - and so of the GitHub Pages site, limited to 1 GB - follows the number of seconds,
+# not the number of commits. The whole history plays in history_seconds, then Gource spends
+# about 9 s settling the camera after the last commit (measured on the 2026-10-01 render),
+# so the video runs about 55 s.
+#
+# Why 46: that render played 64 s of history plus the 9 s tail, and the site came to
+# 1,053 MB - 94 MB of downloads (gource.mp4 is size-targeted, so that part is fixed), 22 MB
+# for the tail and 14.6 MB per second of history across the HLS ladders. 850 MB leaves
+# 733 MB, 50 s at that rate; 46 s keeps a tenth in hand, since the same history in fewer
+# seconds moves more per frame and costs more per second.
+history_seconds=46
 
 cs make-log > "$work/gource.log"
 cs make-captions > "$work/captions.txt"
 first=$(head -n 1 "$work/gource.log" | cut -d'|' -f1)
 last=$(tail -n 1 "$work/gource.log" | cut -d'|' -f1)
-days=$(awk -v s=$(( last - first + 1 )) 'BEGIN { printf "%.2f", s / 86400 }')
-# Spread the history over the target length, at least 0.2 seconds per day so a long
-# history is not a blur. Quiet stretches are skipped (--auto-skip-seconds), so the
-# finished animation can come in a little shorter.
-spd=$(awk -v d="$days" -v t="$seconds" 'BEGIN { s = (t - 5) / d; if (s < 0.2) s = 0.2; printf "%.2f", s }')
+days=$(awk -v s=$(( last - first + 1 )) 'BEGIN { printf "%.4f", s / 86400 }')
+# Spread the first-to-last commit span over history_seconds, with no floor, so a longer
+# history plays faster rather than longer. Quiet stretches are skipped
+# (--auto-skip-seconds), so the finished animation can come in a little shorter.
+spd=$(awk -v d="$days" -v t="$history_seconds" 'BEGIN { printf "%.6f", t / d }')
 
 run=()
 if command -v xvfb-run > /dev/null; then run=(xvfb-run -a -s "-screen 0 ${width}x${height}x24"); fi
