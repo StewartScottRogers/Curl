@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: docs
 depends-on: []
-touches: [Documentation/Planning/Decisions, Curl.Networking.UnitLibrary, Curl.Quic.UnitLibrary, Curl.Console, Curl.Kerberos.UnitLibrary, Tasks/Backlog/BL-940-check-ml-dsa-ed448-brainpool-tls-1-3-and-sha-224-signatures.md, Tasks/Backlog/BL-941-send-the-tls-1-2-only-hand-built-clienthello-in-the-platform.md]
+touches: [Documentation/Planning/Decisions, Curl.Networking.UnitLibrary, Curl.Quic.UnitLibrary, Curl.Console, Curl.Kerberos.UnitLibrary, Tasks/Backlog/BL-940-check-ml-dsa-ed448-brainpool-tls-1-3-and-sha-224-signatures.md, Tasks/Backlog/BL-941-send-the-tls-1-2-only-hand-built-clienthello-in-the-platform.md, Tasks/Backlog/BL-1072-log-proxy-choices-alt-svc-alternatives-and-hsts-entry-expiry.md, Tasks/Done/BL-921-log-retries-redirects-watchdog-limits-hsts-and-alt-svc-decis.md, Tasks/Done/BL-979-forward-repeatauthorization-through-awssigv4httpauthenticato.md]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-10-01
 ---
 # BL-983 — Renumber the duplicate ADRs 0222, 0228, 0232 and 0246 and update every reference
 
@@ -29,10 +29,10 @@ ADR numbers 0222, 0228, 0232 and 0246 each name exactly one record in `Documenta
 
 ## Acceptance criteria
 
-- [ ] `Get-ChildItem Documentation/Planning/Decisions -Filter 'ADR-02[24]*.md'` and `-Filter 'ADR-023*.md'` show 0222, 0228, 0232 and 0246 once each.
-- [ ] `Documentation/Planning/Decisions/README.md` has one row per record of the four pairs, and the 0248 row, in number order in the index above `## Template`.
-- [ ] A search for each renumbered record's old number finds only references to the record that kept it; each renumbered record's references use its new number.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] `Get-ChildItem Documentation/Planning/Decisions -Filter 'ADR-02[24]*.md'` and `-Filter 'ADR-023*.md'` show 0222, 0228, 0232 and 0246 once each.
+- [x] `Documentation/Planning/Decisions/README.md` has one row per record of the four pairs, and the 0248 row, in number order in the index above `## Template`.
+- [x] A search for each renumbered record's old number finds only references to the record that kept it; each renumbered record's references use its new number.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
 
@@ -43,6 +43,10 @@ ADR numbers 0222, 0228, 0232 and 0246 each name exactly one record in `Documenta
   - 0246: styled output keeps 0246 (Console, Output); the kept-Digest record becomes **0238**. Its references: `ADR-0239` line 51 ("superseded by ADR-0246 … (BL-869)"), `Tasks/Backlog/BL-979-…` line 21. Neither 0246 record has a README row yet; add both.
 - New numbers are the lowest free ones, 0235–0238: no branch, lane worktree or task cites them, and lanes numbering a new ADR take the highest plus one, so the gap avoids a fresh collision.
 - `touches` widened to the folders above that cite the renumbered records. `Curl.Networking.UnitLibrary` and `Curl.Console` are in BL-717's `touches` (in Doing, lane 1), so the task went back to Backlog until BL-717 is done.
+- Done (lane 1, 2026-10-01) as planned: 0222 hello -> ADR-0235, 0228 runner -> ADR-0236, 0232 des3 -> ADR-0237, 0246 Digest -> ADR-0238 (`git mv`, title lines renumbered). 0235-0238 were still free on `origin/work/dark-factory`. References updated since the plan moved: `Curl.Networking.UnitLibrary/CLAUDE.md` line 34; `ADR-0290` line 34 ("as ADR-0222 cuts them over TCP" meant the hello); `Curl.Console/CLAUDE.md` line 436; `BL-941` (three); `BL-1072` line 21 and `Tasks/Done/BL-921` line 41 (both meant the runner record); `Tasks/Done/BL-979` line 21 (the Digest record); Kerberos `CLAUDE.md` and `Des3CbcSha1KerberosEncryption.cs`; `ADR-0239` line 51. `QuicClientSettings.cs` no longer cites it, and BL-940 is now archived, so neither changed. Archived tasks under `Tasks/Done/<timestamp>/` keep their history as written.
+- `touches` gained `BL-1072`, `Tasks/Done/BL-921` and `Tasks/Done/BL-979` (each cites a renumbered record); no task in Doing names them.
+- README: rows for 0235-0238 and 0246 (styled output) added; the runner row (now 0236) and the 0248 Negotiate row moved from below `## Template` into the index. The 0289 (SSH reset), 0290 and 0291 rows are still below `## Template`, and the 0248 SSH known-hosts record has no row: left for the 0248/0254/0289 duplicate task.
+- Also duplicated, outside this task: 0289 (SSH reset after key exchange / HTTP/3 CONNECT-UDP). Filed BL-1075 for 0248, 0254 and 0289.
 - Also duplicated, outside this task: 0248 (Negotiate 2xx / SSH known hosts) and 0254 (TcpConnector happy eyeballs / TLS 1.2 byte stream). Worth their own task.
 
 ## Log
@@ -51,3 +55,4 @@ ADR numbers 0222, 0228, 0232 and 0246 each name exactly one record in `Documenta
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Networking.UnitLibrary and Curl.Console, both in BL-717's touches (Doing, lane 1); renumbering plan is in Notes
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. ADR numbers 0222, 0228, 0232 and 0246 name one record each; the hello, runner, des3 and Digest records are ADR-0235 to ADR-0238, indexed and cited by their new numbers
