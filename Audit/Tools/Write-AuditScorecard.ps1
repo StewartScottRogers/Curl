@@ -323,7 +323,7 @@ if ($SelfTest) {
         Check 'a delta: small-get Curl median 70.0 -> 78.0 is +8.0' ($text -match '(?m)^\| small-get \|.*\| \+8\.0 \|.*\|$' -or ($text -split '## Change since')[1] -match '\| small-get \| [^|]+ \| [^|]+ \| [^|]+ \| \+8\.0 \|') 'small-get delta'
         Check 'a catch-rate delta in points: quality 0% -> 100% is +100' ((($text -split '## Change since')[1]) -match '(?m)^\| quality \|( [^|]+ \|){9} \+100 \|$') 'quality +100'
         Check 'unreliable numbers are marked' ($text -match '\| security \| opus \| 0 \(unreliable\) \|') 'security row'
-        Check 'an auditor that did not run reads not run' ($text -match '\| process \| sonnet \|') 'process ran'
+        Check 'the model column comes from -Models' ($text -match '\| process \| sonnet \|' -and $text -match '\| security \| opus \|') 'process sonnet, security opus'
         Check 'new findings listed' ($text -match '- \[AF-0002\]\(\.\./Findings/AF-0002-x\.md\) - High - quality - New quality finding') 'AF-0002'
         Check 'two runs give the same bytes' ([IO.File]::ReadAllText($second) -ceq $text) (Split-Path $second -Leaf)
     }
