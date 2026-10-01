@@ -42,3 +42,4 @@ Every ADR number in `Documentation/Planning/Decisions` names exactly one decisio
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Its 0187 references are in Curl.Console (BL-589 in Doing) and Curl.Protocol.Http.UnitLibrary/UnitTests (BL-835 in Doing); resumes when they finish.
+- 2026-09-30: Backlog -> Doing.
