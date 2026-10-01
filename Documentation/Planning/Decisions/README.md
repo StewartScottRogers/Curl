@@ -319,6 +319,7 @@ choices do not need one.
 | [0311](ADR-0311-an-rsa-certificate-identity-signs-with-the-rsa-sha2-certificate-method-on-openssl-as-libssh2-does.md) | An `ssh-rsa-cert-v01@openssh.com` identity is upgraded from `server-sig-algs` to `rsa-sha2-512-cert-v01@openssh.com` or `rsa-sha2-256-cert-v01@openssh.com` as libssh2 1.11.1 does on OpenSSL, not on WinCNG and not for an OpenSSH 7.7 or older banner (BL-1036) | Accepted | 2026-10-01 |
 | [0312](ADR-0312-doh-https-records-for-ech-follow-curl-s-doh-c.md) | DoH HTTPS records for ECH follow curl's `lib/doh.c`: QTYPE 65, `_<port>._https.<host>` off port 443, the first of at most four records decoded by `ServiceBindingRecordDecoder` (BL-707) | Accepted | 2026-10-01 |
 | [0313](ADR-0313-a-key-file-certificate-signs-with-its-private-key-under-the-plain-method-as-libssh2-does.md) | A `--pubkey` OpenSSH certificate signs with its `--key` private key under the plain method, the server judging a key it does not certify, and a private key of another type fails with `Callback returned error`, as libssh2 1.11.1 does (BL-1097) | Accepted | 2026-10-01 |
+| [0314](ADR-0314-the-wincng-preset-reads-no-ed25519-or-ecdsa-private-key.md) | The WinCNG preset reads no Ed25519 or ECDSA private key: with `--pubkey` it asks and then fails with `Callback returned error`, without it `Reason unknown (-1)`, as Windows curl's libssh2 1.11.1 does (BL-1098) | Accepted | 2026-10-01 |
 
 ## Template
 
