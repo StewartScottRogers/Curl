@@ -1,5 +1,5 @@
 ---
-id: BL-1081
+id: BL-1082
 title: Fail --curves with only a TLS 1.2 group starred as OpenSSL's curl does: exit 35 no suitable key share
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-01
 completed:
 ---
-# BL-1081 — Fail --curves with only a TLS 1.2 group starred as OpenSSL's curl does: exit 35 no suitable key share
+# BL-1082 — Fail --curves with only a TLS 1.2 group starred as OpenSSL's curl does: exit 35 no suitable key share
 
 ## Goal
 

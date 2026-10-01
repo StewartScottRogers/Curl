@@ -46,7 +46,7 @@ lists follow ADR-0284's rules (first group shared unless one is starred).
   `s_server -groups <group>`, which confirms the hybrids' byte order.
 - With every known name usable, a starred group without a key share can only be a TLS 1.2
   brainpool group; OpenSSL's curl fails that with exit 35 "no suitable key share" (measured),
-  which BL-1081 takes on. The `ec_point_formats` difference ADR-0284 noted now shows on the
+  which BL-1082 takes on. The `ec_point_formats` difference ADR-0284 noted now shows on the
   ML-KEM-only lists too; BL-1048 covers it.
 
 ## Alternatives considered

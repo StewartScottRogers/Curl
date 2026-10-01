@@ -52,7 +52,7 @@ completed: 2026-10-01
   - `SecP256r1MLKEM768:X25519MLKEM768:SecP384r1MLKEM1024:*MLKEM512` 11eb,11ec,11ed,0200 / 0200
   - `brainpoolP256r1:brainpoolP256r1tls13` 001a,001f / 001f
   - `MLKEM768:-MLKEM768` sends nothing: exit 35 "no suitable groups".
-  - `*brainpoolP256r1:P-384` sends nothing: exit 35 `error:0A000065:SSL routines::no suitable key share`. Filed as BL-1081.
+  - `*brainpoolP256r1:P-384` sends nothing: exit 35 `error:0A000065:SSL routines::no suitable key share`. Filed as BL-1082.
 - **For BL-1048 (ec_point_formats):** these lists send no `ec_point_formats`:
   - `X25519MLKEM768`, `SecP256r1MLKEM768`, `SecP384r1MLKEM1024`, `MLKEM512/768/1024`
   - `SecP256r1MLKEM768:X25519MLKEM768:SecP384r1MLKEM1024:*MLKEM512`
