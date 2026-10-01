@@ -33,3 +33,4 @@ A SASL GSSAPI exchange (SMTP, IMAP, POP3) asks its security context for the `--d
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
