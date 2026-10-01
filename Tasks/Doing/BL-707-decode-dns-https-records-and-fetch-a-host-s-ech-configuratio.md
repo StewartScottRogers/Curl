@@ -32,3 +32,4 @@ The DNS codec in `Curl.Networking.UnitLibrary` encodes HTTPS (type 65) queries a
 ## Log
 
 - 2026-09-28: Created.
+- 2026-10-01: Backlog -> Doing.
