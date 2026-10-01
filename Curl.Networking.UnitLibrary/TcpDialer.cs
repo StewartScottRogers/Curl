@@ -113,17 +113,14 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         try
         {
             ApplySocketOptions(socket);
-            var deviceBound = TryBindToDevice(socket, deviceName);
-            if (deviceBound && !bindsAddressAfterDevice)
-            {
-                // libcurl says so only for a name bound as a device alone, never for ifhost!.
-                events.ReportInfo(LocalBindLines.DeviceBound(deviceName));
-            }
-            else
-            {
-                var localEndPoint = await chooseLocalEndAsync(cancellationToken).ConfigureAwait(false);
-                BindLocalEnd(socket, localEndPoint, localPortCount, events);
-            }
+            await BindDeviceOrLocalEndAsync(
+                deviceName,
+                bindsAddressAfterDevice,
+                [ExcludeFromCodeCoverage(Justification = "ADR-0083: binds the real socket, as its method does.")] (string name) => TryBindToDevice(socket, name),
+                chooseLocalEndAsync,
+                [ExcludeFromCodeCoverage(Justification = "ADR-0083: binds the real socket, as its method does.")] (IPEndPoint localEndPoint) => BindLocalEnd(socket, localEndPoint, localPortCount, events),
+                events,
+                cancellationToken).ConfigureAwait(false);
 
             await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
         }
@@ -134,6 +131,47 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         }
 
         return Connected(socket, endPoint);
+    }
+
+    /// <summary>
+    /// Binds a socket to the device <paramref name="deviceName" /> through <paramref name="tryBindToDevice" />,
+    /// as libcurl's <c>bindlocal</c> tries <c>SO_BINDTODEVICE</c>, writing curl's <c>-v</c> line
+    /// <c>socket successfully bound to interface '&lt;name&gt;'</c> when that bind is the whole binding
+    /// (BL-1076); otherwise binds the local end <paramref name="chooseLocalEndAsync" /> chooses through
+    /// <paramref name="bindLocalEnd" />.
+    /// </summary>
+    /// <remarks>
+    /// curl 8.18.0 on Linux writes the line for a plain or <c>if!</c> name whose device bind succeeds, before
+    /// the connect, so it stands even when the connect is then refused; <c>ifhost!</c> binds the device
+    /// silently and goes on to its host's address, and a refused device bind falls back to the interface's
+    /// address (BL-1076 Notes).
+    /// </remarks>
+    /// <param name="deviceName">The interface to bind the socket to.</param>
+    /// <param name="bindsAddressAfterDevice"><see langword="true" /> for <c>ifhost!</c>.</param>
+    /// <param name="tryBindToDevice">Binds the socket to the named device, answering whether it did.</param>
+    /// <param name="chooseLocalEndAsync">Chooses the local address and first port, only when one is to be bound.</param>
+    /// <param name="bindLocalEnd">Binds the socket's local end to the end point chosen.</param>
+    /// <param name="events">Where the <c>-v</c> line goes.</param>
+    /// <param name="cancellationToken">Cancels the choice of local end.</param>
+    /// <returns>A task that completes once the socket is bound.</returns>
+    internal static async ValueTask BindDeviceOrLocalEndAsync(
+        string deviceName,
+        bool bindsAddressAfterDevice,
+        Func<string, bool> tryBindToDevice,
+        Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
+        Action<IPEndPoint> bindLocalEnd,
+        ITransferEvents events,
+        CancellationToken cancellationToken)
+    {
+        if (tryBindToDevice(deviceName) && !bindsAddressAfterDevice)
+        {
+            // libcurl says so only for a name bound as a device alone, never for ifhost!.
+            events.ReportInfo(LocalBindLines.DeviceBound(deviceName));
+            return;
+        }
+
+        var localEndPoint = await chooseLocalEndAsync(cancellationToken).ConfigureAwait(false);
+        bindLocalEnd(localEndPoint);
     }
 
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
