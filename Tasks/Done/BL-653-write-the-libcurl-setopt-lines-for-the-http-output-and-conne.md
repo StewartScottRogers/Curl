@@ -75,7 +75,7 @@ Combined (`-X PUT -H 'X-A: 1' -d a=1 -u user:pass -L -e http://ref/ -A agent/1 -
 
 The full measured texts are pinned byte for byte in `Curl.Cli.UnitTests/LibcurlSourceCodeOptionTests.cs`: one data row per measured command line, three combined cases (HTTP, form and cookies, FTP), and two `--next` groups.
 
-Decisions are recorded in ADR-0307: the order, defaults left out, HTTP-only lines, how variables are numbered, and octal before a hex digit. Default taken: `--json`'s headers are suppressed by a `-H` that starts with the same name followed by `:`, compared without regard to case. `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`: 100% line, 100% branch, 0 failing members (worst CRAP 10).
+Decisions are recorded in ADR-0308: the order, defaults left out, HTTP-only lines, how variables are numbered, and octal before a hex digit. Default taken: `--json`'s headers are suppressed by a `-H` that starts with the same name followed by `:`, compared without regard to case. `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`: 100% line, 100% branch, 0 failing members (worst CRAP 10).
 
 ## Log
 
