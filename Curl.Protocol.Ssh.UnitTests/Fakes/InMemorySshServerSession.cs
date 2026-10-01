@@ -43,6 +43,8 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
 
     private string? scpUploadPath;
 
+    private byte[] keyboardInteractiveUser = [];
+
     private readonly HashSet<string> listedDirectories = new(StringComparer.Ordinal);
 
     private SshPacketReader? packetReader;
@@ -163,6 +165,9 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
             case SshAuthenticationMessageNumber.Request:
                 await AnswerAuthenticationAsync(payload, message).ConfigureAwait(false);
                 break;
+            case SshAuthenticationMessageNumber.InfoResponse:
+                await AnswerKeyboardInteractiveAsync(message).ConfigureAwait(false);
+                break;
             case SshConnectionMessageNumber.ChannelOpen:
                 await AnswerChannelOpenAsync(message).ConfigureAwait(false);
                 break;
@@ -201,17 +206,39 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         {
             SshUserAuthentication.PasswordMethod => server.IsPassword(user, message.Skip(1).ReadString().ToArray()),
             SshUserAuthentication.PublicKeyMethod => await AnswerPublicKeyAsync(payload, message).ConfigureAwait(false),
+            SshUserAuthentication.KeyboardInteractiveMethod when server.OffersKeyboardInteractive => await AskForThePasswordAsync(user).ConfigureAwait(false),
             _ => false,
         };
+        await AnswerAuthenticationOutcomeAsync(method, user, succeeded).ConfigureAwait(false);
+    }
+
+    private async Task AnswerAuthenticationOutcomeAsync(string method, byte[] user, bool? succeeded)
+    {
         if (succeeded is { } outcome)
         {
             RecordAndResetIfAt($"auth {method} {Encoding.UTF8.GetString(user)} {(outcome ? "ok" : "refused")}");
-            await SendAsync(outcome ? [SshAuthenticationMessageNumber.Success] : [SshAuthenticationMessageNumber.Failure, .. Name("publickey,password"), 0]).ConfigureAwait(false);
+            await SendAsync(outcome ? [SshAuthenticationMessageNumber.Success] : [SshAuthenticationMessageNumber.Failure, .. Name(server.AuthenticationMethods), 0]).ConfigureAwait(false);
             if (outcome && isCompressionDelayed)
             {
                 StartCompression();
             }
         }
+    }
+
+    // keyboard-interactive's one prompt, as OpenSSH's PAM asks it; the answer arrives as
+    // an INFO_RESPONSE.
+    private async Task<bool?> AskForThePasswordAsync(byte[] user)
+    {
+        keyboardInteractiveUser = user;
+        await SendAsync(Join([SshAuthenticationMessageNumber.InfoRequest], Name(string.Empty), Name(string.Empty), Name(string.Empty), UInt32(1), Name("Password: "), [0])).ConfigureAwait(false);
+        return null;
+    }
+
+    private async Task AnswerKeyboardInteractiveAsync(SshWireReader message)
+    {
+        message.ReadUInt32();
+        byte[] answer = message.ReadString().ToArray();
+        await AnswerAuthenticationOutcomeAsync(SshUserAuthentication.KeyboardInteractiveMethod, keyboardInteractiveUser, server.IsPassword(keyboardInteractiveUser, answer)).ConfigureAwait(false);
     }
 
     // Both directions at once: the server's packets after this point, and the client's,
@@ -303,14 +330,17 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         ResetIfAt("scp header");
         if (server.Files.TryGetValue(path, out byte[]? file))
         {
-            await SendChannelDataAsync(Encoding.ASCII.GetBytes($"T1790702112 0 1790702112 0\nC0644 {file.Length} {path.Split('/')[^1]}\n")).ConfigureAwait(false);
+            await SendChannelDataAsync(Encoding.ASCII.GetBytes($"T1790702112 0 1790702112 0\nC0644 {file.Length + server.ScpFileShortBy} {path.Split('/')[^1]}\n")).ConfigureAwait(false);
             foreach (byte[] chunk in file.Chunk(ScpChunkSize))
             {
                 await SendChannelDataAsync(chunk).ConfigureAwait(false);
                 ResetIfAt("scp data");
             }
 
-            await SendChannelDataAsync([0]).ConfigureAwait(false);
+            if (server.ScpFileShortBy == 0)
+            {
+                await SendChannelDataAsync([0]).ConfigureAwait(false);
+            }
         }
         else
         {

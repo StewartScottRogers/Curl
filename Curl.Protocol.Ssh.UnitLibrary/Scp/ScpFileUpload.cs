@@ -13,13 +13,22 @@ namespace Curl.Protocol.Ssh.Scp;
 /// acknowledgement, sends the <c>C</c> line with the file's mode, size and name, waits for
 /// the second acknowledgement, sends the source's bytes in curl's 64 KiB blocks and closes
 /// the channel. No zero byte follows the bytes and no <c>T</c> line precedes the
-/// <c>C</c> line, as measured.
+/// <c>C</c> line, as measured. Each channel write of at most 32700 bytes is reported as
+/// sent data, and a copy that reaches the source's end writes curl's <c>upload completely
+/// sent off</c> line, as measured (BL-988).
 /// </summary>
 /// <param name="transport">The transport, after the user is authenticated.</param>
-internal sealed class ScpFileUpload(SshTransport transport)
+/// <param name="events">Where the sent bytes and the line after them are reported.</param>
+internal sealed class ScpFileUpload(SshTransport transport, ITransferEvents events)
 {
     /// <summary>How many bytes of the source curl reads at a time: its 64 KiB upload buffer.</summary>
     internal const int ReadBufferSize = 65536;
+
+    /// <summary>
+    /// The most bytes one <c>libssh2_channel_write</c> takes, so the most curl reports as one
+    /// block of sent data: measured 2026-10-01 as 32700, 32700 and 136 for each 64 KiB block.
+    /// </summary>
+    internal const int ChannelWriteSize = 32700;
 
     /// <summary>
     /// The mode the <c>C</c> line carries when <c>--create-file-mode</c> gives 0: curl then
@@ -68,7 +77,12 @@ internal sealed class ScpFileUpload(SshTransport transport)
             throw failure;
         }
 
-        TransferResult result = await new Copy(channel, upload, progress, size).RunAsync(cancellationToken).ConfigureAwait(false);
+        TransferResult result = await new Copy(channel, upload, progress, size, events).RunAsync(cancellationToken).ConfigureAwait(false);
+        if (result.IsSuccess)
+        {
+            events.ReportInfo(SshInfoLines.UploadSent(result.BytesTransferred));
+        }
+
         await IgnoringConnectionFailureAsync(() => channel.CloseAsync(cancellationToken)).ConfigureAwait(false);
         return result with { Report = new TransferReport { UploadSize = result.BytesTransferred } };
     }
@@ -172,7 +186,7 @@ internal sealed class ScpFileUpload(SshTransport transport)
     }
 
     // One copy of the source's bytes into the channel, counting them as they go.
-    private sealed class Copy(SshSessionChannel channel, Stream upload, ITransferProgress progress, long size)
+    private sealed class Copy(SshSessionChannel channel, Stream upload, ITransferProgress progress, long size, ITransferEvents events)
     {
         private long sent;
 
@@ -195,8 +209,14 @@ internal sealed class ScpFileUpload(SshTransport transport)
             int read;
             while ((read = await ReadSourceAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
             {
-                await channel.SendAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-                sent += read;
+                for (int start = 0; start < read; start += ChannelWriteSize)
+                {
+                    ReadOnlyMemory<byte> write = buffer.AsMemory(start, Math.Min(ChannelWriteSize, read - start));
+                    await channel.SendAsync(write, cancellationToken).ConfigureAwait(false);
+                    events.ReportDataSent(write.Span);
+                    sent += write.Length;
+                }
+
                 progress.ReportUploaded(sent, size);
             }
 

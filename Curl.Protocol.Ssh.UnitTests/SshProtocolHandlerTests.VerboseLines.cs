@@ -225,6 +225,118 @@ public sealed partial class SshProtocolHandlerTests
         Assert.AreEqual(expected, string.Join(" | ", events.Transcript));
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_SftpUpload_ReportsTheSentDataAndTheUploadSentOffAsMeasured()
+    {
+        string lines = await RunRecordingLinesAsync(new InMemorySshServer(User, Password), "sftp://files.example/up.txt", upload: Hello);
+
+        Assert.AreEqual(
+            $"{Start} | * SSH: no knownhosts file configured | {PasswordLogin} | => hello world | * upload completely sent off: 11 bytes | "
+            + "* Connection #0 to host files.example:22 left intact",
+            lines);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ScpUpload_ReportsTheSentDataAfterTheConnectionEstablishedAsMeasured()
+    {
+        string lines = await RunRecordingLinesAsync(new InMemorySshServer(User, Password), "scp://files.example/up.txt", upload: Hello);
+
+        Assert.AreEqual(
+            $"{Start} | * SSH: no knownhosts file configured | {PasswordLogin} | * SSH: connection established | => hello world | "
+            + "* upload completely sent off: 11 bytes | * Connection #0 to host files.example:22 left intact",
+            lines);
+    }
+
+    [TestMethod]
+    [DataRow("sftp", "* SSH: authentication complete", DisplayName = "sftp")]
+    [DataRow("scp", "* SSH: connection established", DisplayName = "scp")]
+    public async Task ExecuteAsync_EmptyUpload_ReportsTheRequestSentOffAsMeasured(string scheme, string lastSessionLine)
+    {
+        string lines = await RunRecordingLinesAsync(new InMemorySshServer(User, Password), $"{scheme}://files.example/up.txt", upload: []);
+
+        StringAssert.EndsWith(lines, $"{lastSessionLine} | * Request completely sent off | * Connection #0 to host files.example:22 left intact");
+    }
+
+    [TestMethod]
+    [DataRow("sftp", "30000 30000 5536 4464", DisplayName = "sftp: WRITEs of at most 30000 bytes")]
+    [DataRow("scp", "32700 32700 136 4464", DisplayName = "scp: channel writes of at most 32700 bytes")]
+    public async Task ExecuteAsync_LargeUpload_ReportsEachBlockLibssh2SendsAsMeasured(string scheme, string expectedSizes)
+    {
+        TranscriptTransferEvents events = new();
+        InMemorySshServer server = new(User, Password);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse($"{scheme}://files.example/up.bin"),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential(User, Password),
+            Upload = new MemoryStream(new byte[70000]),
+            Events = events,
+        };
+
+        await Handler(server).ExecuteAsync(context);
+        await server.WhenSessionsEndAsync();
+
+        Assert.AreEqual(expectedSizes, string.Join(' ', events.Transcript.Where(line => line.StartsWith("=> ", StringComparison.Ordinal)).Select(line => line.Length - 3)));
+        Assert.AreEqual(70000, server.Files["/up.bin"].Length);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_KeyboardInteractiveSucceeds_ReportsTheAgentThenTheMethodAsMeasured()
+    {
+        InMemorySshServer server = new(User, Password) { OffersKeyboardInteractive = true };
+        server.Files["/f"] = Hello;
+
+        string lines = await RunRecordingLinesAsync(server, "scp://files.example/f");
+
+        Assert.AreEqual(
+            $"{Start} | * SSH: no knownhosts file configured | * SSH: host offers authentication via: publickey,keyboard-interactive | "
+            + $"* SSH: trying private key file '' | {NoKeyDenied} | * SSH: trying publickey authentication via agent | "
+            + "* SSH: failure connecting to agent | * SSH: initialized keyboard interactive authentication | * SSH: authentication complete | "
+            + "* SSH: connection established | <= hello world | * Connection #0 to host files.example:22 left intact",
+            lines);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ScpFileShort_ReportsTheEndAsEmptyDataAndClosesTheConnectionAsMeasured()
+    {
+        InMemorySshServer server = new(User, Password) { ScpFileShortBy = 5 };
+        server.Files["/f"] = Hello;
+
+        string lines = await RunRecordingLinesAsync(server, "scp://files.example/f");
+
+        StringAssert.EndsWith(lines, "* SSH: connection established | <= hello world | <=  | * end of response with 5 bytes missing | * closing connection #0");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ScpConnectionResetDuringTheBytes_ClosesTheConnectionWithoutALineAsMeasured()
+    {
+        InMemorySshServer server = new(User, Password) { ResetsAt = "scp data" };
+        server.Files["/f"] = Encoding.ASCII.GetBytes(new string('a', 20000));
+
+        string lines = await RunRecordingLinesAsync(server, "scp://files.example/f");
+
+        StringAssert.EndsWith(lines, "a | * closing connection #0");
+        Assert.DoesNotContain("Error in the SSH layer", lines);
+    }
+
+    [TestMethod]
+    [DataRow(CurlExitCode.PartialFile, "end of response with 5 bytes missing", false, true, DisplayName = "a short file")]
+    [DataRow(CurlExitCode.Ssh, "Error in the SSH layer", false, true, DisplayName = "the connection lost during a file's bytes")]
+    [DataRow(CurlExitCode.Ssh, "Error in the SSH layer", true, false, DisplayName = "the connection lost during a directory listing")]
+    [DataRow(CurlExitCode.RemoteFileNotFound, "Could not open remote file for reading: No such file or directory", false, false, DisplayName = "another failure")]
+    public void FailedWhileTransferring_TellsTheFailuresAfterWhichCurlClosesTheConnection(CurlExitCode exitCode, string message, bool listsDirectory, bool expected)
+    {
+        bool closes = SshProtocolHandler.FailedWhileTransferring(TransferResult.Failure(exitCode, message, 0), listsDirectory);
+
+        Assert.AreEqual(expected, closes);
+    }
+
+    [TestMethod]
+    public void FailedWhileTransferring_Success_LeavesTheConnection()
+    {
+        Assert.IsFalse(SshProtocolHandler.FailedWhileTransferring(TransferResult.Success(5), listsDirectory: false));
+    }
+
     private static InMemorySshServer ServerWithAFile()
     {
         InMemorySshServer server = new(User, Password);
@@ -238,13 +350,15 @@ public sealed partial class SshProtocolHandlerTests
         SshOptions? options = null,
         Dictionary<string, string>? files = null,
         NetworkCredential? credentials = null,
-        ISshAgentConnector? agent = null)
+        ISshAgentConnector? agent = null,
+        byte[]? upload = null)
     {
         TranscriptTransferEvents events = new();
         TransferContext context = new()
         {
             Url = CurlUrl.Parse(url),
             Output = new MemoryStream(),
+            Upload = upload is null ? null : new MemoryStream(upload),
             Credentials = credentials ?? new NetworkCredential(User, Password),
             Ssh = options,
             Events = events,

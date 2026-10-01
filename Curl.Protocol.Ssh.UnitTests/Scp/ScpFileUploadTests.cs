@@ -117,7 +117,7 @@ public sealed class ScpFileUploadTests
         ScriptedConnection connection = new(ScpServerScript.Receiving().Bytes);
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
-            async () => await new ScpFileUpload(SftpSessionTests.Transport(connection))
+            async () => await new ScpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
                 .UploadAsync("/f/stdin.txt", Mode0644, new UnseekableStream(HelloScp), new RecordingProgress(), CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.UploadFailed, failure.ExitCode);
@@ -270,7 +270,7 @@ public sealed class ScpFileUploadTests
     {
         ScriptedConnection connection = new(script.Bytes);
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
-            async () => await new ScpFileUpload(SftpSessionTests.Transport(connection))
+            async () => await new ScpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
                 .UploadAsync("/x/f", Mode0644, new MemoryStream(HelloScp), new RecordingProgress(), CancellationToken.None));
         return (failure, connection.Written);
     }
@@ -279,7 +279,7 @@ public sealed class ScpFileUploadTests
     {
         ScriptedConnection connection = new(script.Bytes);
         RecordingProgress progress = new();
-        TransferResult result = await new ScpFileUpload(SftpSessionTests.Transport(connection))
+        TransferResult result = await new ScpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
             .UploadAsync(urlPath, mode, source, progress, CancellationToken.None);
         return new Outcome(result, progress.Reports, connection.Written);
     }

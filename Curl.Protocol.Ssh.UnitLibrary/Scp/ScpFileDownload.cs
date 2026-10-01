@@ -130,6 +130,9 @@ internal sealed class ScpFileDownload(SshTransport transport)
                 int read = await channel.ReadAsync(buffer.AsMemory(0, ReadLength()), cancellationToken).ConfigureAwait(false);
                 if (read == 0)
                 {
+                    // Measured (BL-988): curl writes the channel's end on as an empty
+                    // block, which --trace shows as 0 bytes of received data.
+                    await output.WriteAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
                     return EndOfChannel();
                 }
 

@@ -167,6 +167,20 @@ internal static class SshInfoLines
     /// <returns>The line.</returns>
     internal static string PublicKeyDenied(string reason) => $"SSH: publickey authentication denied: {reason}";
 
+    /// <summary>
+    /// The line once an upload's every byte is sent: curl's own, after the transfer reads
+    /// the source's end, measured 2026-10-01 (BL-988).
+    /// </summary>
+    /// <param name="bytesSent">The bytes sent.</param>
+    /// <returns>
+    /// The line, such as <c>upload completely sent off: 13 bytes</c>, or
+    /// <c>Request completely sent off</c> for an empty source.
+    /// </returns>
+    internal static string UploadSent(long bytesSent) =>
+        bytesSent == 0
+            ? "Request completely sent off"
+            : string.Create(CultureInfo.InvariantCulture, $"upload completely sent off: {bytesSent} bytes");
+
     /// <summary>The line after a transfer that leaves the connection for reuse.</summary>
     /// <param name="connectionNumber">The connection's number.</param>
     /// <param name="host">The URL's host.</param>
@@ -175,7 +189,7 @@ internal static class SshInfoLines
     internal static string ConnectionLeftIntact(long connectionNumber, string host, int port) =>
         string.Create(CultureInfo.InvariantCulture, $"Connection #{connectionNumber} to host {host}:{port} left intact");
 
-    /// <summary>The line after a failure before the connection was set up.</summary>
+    /// <summary>The line after a failure before the connection was set up, or while the transfer's bytes were moving.</summary>
     /// <param name="connectionNumber">The connection's number.</param>
     /// <returns>The line, such as <c>closing connection #0</c>.</returns>
     internal static string ClosingConnection(long connectionNumber) =>

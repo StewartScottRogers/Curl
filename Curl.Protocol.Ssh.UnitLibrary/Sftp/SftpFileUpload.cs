@@ -13,10 +13,13 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// sends each as <c>WRITE</c>s of at most 30000 bytes, waits for their statuses, reports
 /// progress, closes the handle and closes the channel with <c>EOF</c> and <c>CLOSE</c>,
 /// as measured. A failure before the copy closes the channel the same way before the
-/// handler's <c>DISCONNECT</c> (BL-973).
+/// handler's <c>DISCONNECT</c> (BL-973). Each <c>WRITE</c>'s bytes are reported as sent
+/// data, and a copy that reaches the source's end writes curl's <c>upload completely sent
+/// off</c> line before the <c>-Q</c> commands that follow it, as measured (BL-988).
 /// </summary>
 /// <param name="transport">The transport, after the user is authenticated.</param>
-internal sealed class SftpFileUpload(SshTransport transport)
+/// <param name="events">Where the sent bytes and the line after them are reported.</param>
+internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents events)
 {
     /// <summary>How many bytes of the source curl reads at a time: its 64 KiB upload buffer, as measured.</summary>
     internal const int ReadBufferSize = 65536;
@@ -79,8 +82,13 @@ internal sealed class SftpFileUpload(SshTransport transport)
                 long writeOffset = options.Append ? 0 : offset;
                 SkipResumedPart(upload, writeOffset);
                 long? expected = upload.CanSeek ? upload.Length - upload.Position : null;
-                Copy copy = new(session, handle, upload, progress, expected);
+                Copy copy = new(session, handle, upload, progress, expected, events);
                 TransferResult result = await copy.RunAsync(writeOffset, cancellationToken).ConfigureAwait(false);
+                if (result.IsSuccess)
+                {
+                    events.ReportInfo(SshInfoLines.UploadSent(result.BytesTransferred));
+                }
+
                 result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
                 return result with { Report = new TransferReport { UploadSize = result.BytesTransferred } };
             },
@@ -143,7 +151,7 @@ internal sealed class SftpFileUpload(SshTransport transport)
     }
 
     // One copy of the source's bytes to the open file, counting those the server acknowledged.
-    private sealed class Copy(SftpSession session, byte[] handle, Stream upload, ITransferProgress progress, long? expected)
+    private sealed class Copy(SftpSession session, byte[] handle, Stream upload, ITransferProgress progress, long? expected, ITransferEvents events)
     {
         private long acknowledged;
 
@@ -196,6 +204,7 @@ internal sealed class SftpFileUpload(SshTransport transport)
             {
                 ReadOnlyMemory<byte> chunk = block.Slice(start, Math.Min(WriteChunkSize, block.Length - start));
                 writes.Add((await session.SendWriteAsync(handle, offset + start, chunk, cancellationToken).ConfigureAwait(false), chunk.Length));
+                events.ReportDataSent(chunk.Span);
             }
 
             foreach ((uint id, int length) in writes)

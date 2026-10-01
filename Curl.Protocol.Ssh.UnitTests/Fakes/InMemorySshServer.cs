@@ -78,6 +78,23 @@ public sealed class InMemorySshServer(string userName, string password) : IConne
     public bool HangsUpOnChannelOpen { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the server offers <c>publickey,keyboard-interactive</c>
+    /// rather than <c>publickey,password</c>, asking for <see cref="Password" /> with one
+    /// <c>Password:</c> prompt, as OpenSSH does through PAM (BL-988).
+    /// </summary>
+    public bool OffersKeyboardInteractive { get; init; }
+
+    /// <summary>
+    /// Gets how many bytes more than an SCP download's file holds the server's <c>C</c> line
+    /// announces before the channel ends, with no zero byte after the bytes: 0, the default,
+    /// for the file's own size.
+    /// </summary>
+    public int ScpFileShortBy { get; init; }
+
+    /// <summary>Gets the authentication methods a refusal lists, as <see cref="OffersKeyboardInteractive" /> chooses them.</summary>
+    internal string AuthenticationMethods => OffersKeyboardInteractive ? "publickey,keyboard-interactive" : "publickey,password";
+
+    /// <summary>
     /// Gets the step at which the server resets the connection rather than answering, or
     /// <see langword="null" />, the default, to answer everything: one of its
     /// <see cref="Events" /> - <c>service ssh-userauth</c>, <c>channel open session</c>,
