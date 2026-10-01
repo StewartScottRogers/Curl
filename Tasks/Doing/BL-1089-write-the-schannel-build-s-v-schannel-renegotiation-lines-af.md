@@ -32,3 +32,4 @@ Under the Schannel wording, `-v https://<host>/` writes the three `* schannel:` 
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
