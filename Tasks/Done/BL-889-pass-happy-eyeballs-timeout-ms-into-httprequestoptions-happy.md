@@ -8,7 +8,7 @@ depends-on: [BL-644, BL-835]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-889 — Pass --happy-eyeballs-timeout-ms into HttpRequestOptions.HappyEyeballsTimeout
 
@@ -24,16 +24,19 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Console.UnitTests` has a test showing `HttpRequestOptionsMapping` maps `--happy-eyeballs-timeout-ms 1000` to `HappyEyeballsTimeout` of 1000 ms, and a test showing it stays 200 ms when the option is not given.
-- [ ] `Curl.Console.UnitTests` has a test showing `CurlComposition.CreateTcpConnector` gives a connector whose `HappyEyeballsTimeout` is 50 ms for `--happy-eyeballs-timeout-ms 50` and `TcpConnector.DefaultHappyEyeballsTimeout` without it.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Console` reports 100% line and branch coverage and no failing member.
+- [x] `Curl.Console.UnitTests` has a test showing `HttpRequestOptionsMapping` maps `--happy-eyeballs-timeout-ms 1000` to `HappyEyeballsTimeout` of 1000 ms, and a test showing it stays 200 ms when the option is not given.
+- [x] `Curl.Console.UnitTests` has a test showing `CurlComposition.CreateTcpConnector` gives a connector whose `HappyEyeballsTimeout` is 50 ms for `--happy-eyeballs-timeout-ms 50` and `TcpConnector.DefaultHappyEyeballsTimeout` without it.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Console` reports 100% line and branch coverage and no failing member.
 
 ## Notes
 
 Filed by BL-835 as its follow-up: `Curl.Console` was outside BL-835's `touches`.
 
+- 2026-09-30: `HttpRequestOptionsMapping.HappyEyeballsTimeoutOf` maps the option and holds it to the longest .NET timer delay (uint.MaxValue - 1 ms), as `TcpConnector` does, because `HttpProtocolHandler` passes it to `Task.Delay`, which throws past that; only a 64-bit C long (Linux, macOS) reaches it, so that test is excluded on Windows. `CreateTcpConnector` passes `options.HappyEyeballsTimeout` straight through (`TcpConnector` clamps it). Tests: `HappyEyeballsTimeoutMappingTests`. Curl.Console 100% line and branch, 0 failing members.
+
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. --happy-eyeballs-timeout-ms now sets both the QUIC-vs-TCP race (HttpRequestOptions) and the IPv4-vs-IPv6 race (TcpConnector)
