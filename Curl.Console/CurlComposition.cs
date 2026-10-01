@@ -20,6 +20,7 @@ using Curl.Protocol.Ldap;
 using Curl.Protocol.Mqtt;
 using Curl.Protocol.Pop3;
 using Curl.Protocol.Rtsp;
+using Curl.Protocol.Smb;
 using Curl.Protocol.Smtp;
 using Curl.Protocol.Ssh;
 using Curl.Protocol.Ssh.Negotiation;
@@ -51,7 +52,8 @@ internal static class CurlComposition
     /// <c>Sec-WebSocket-Key</c> and frame mask from <see cref="SystemWebSocketRandomSource" />
     /// (ADR-0128); <c>rtsp</c> over <paramref name="connector" />, sending one <c>OPTIONS *</c>
     /// request per transfer with a pre-emptive <c>Authorization</c> from the same authenticator
-    /// (ADR-0169); <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
+    /// (ADR-0169); <c>smb</c> and <c>smbs</c> over <paramref name="connector" />, speaking curl's SMBv1 on every
+    /// platform (ADR-0200); <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
     /// and key files from the disk and offering the Windows curl's libssh2 algorithms on Windows and the
     /// OpenSSL build's elsewhere (ADR-0122); and <c>tftp</c> over
     /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS
@@ -66,7 +68,7 @@ internal static class CurlComposition
     /// <see cref="EndPointReportingProtocolHandler" />, so every scheme's report carries the end
     /// points of the first connection its transfer opened (ADR-0119).
     /// </summary>
-    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>imaps</c>, <c>mqtts</c>, <c>pop3s</c>, <c>smtps</c>, <c>ldaps</c>, <c>wss</c> and <c>ftps</c>.</param>
+    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>imaps</c>, <c>mqtts</c>, <c>pop3s</c>, <c>smtps</c>, <c>ldaps</c>, <c>smbs</c>, <c>wss</c> and <c>ftps</c>.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
     /// <param name="tlsProvider">
     /// Upgrades an FTP connection after an accepted <c>AUTH</c> or <c>PROT P</c>, an IMAP connection after an accepted <c>STARTTLS</c>, a POP3 connection
@@ -138,6 +140,7 @@ internal static class CurlComposition
             new LdapProtocolHandler(recordingConnector, OperatingSystem.IsWindows() ? LdapDialect.WinLdap : LdapDialect.OpenLdap),
             new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()),
             new RtspProtocolHandler(recordingConnector, httpAuthenticator),
+            new SmbProtocolHandler(recordingConnector),
             new SshProtocolHandler(
                 recordingConnector,
                 new PhysicalFileSystem(),

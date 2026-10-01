@@ -16,6 +16,7 @@ using Curl.Protocol.Ldap;
 using Curl.Protocol.Mqtt;
 using Curl.Protocol.Pop3;
 using Curl.Protocol.Rtsp;
+using Curl.Protocol.Smb;
 using Curl.Protocol.Smtp;
 using Curl.Protocol.Ssh;
 using Curl.Protocol.Telnet;
@@ -71,6 +72,8 @@ public sealed partial class CurlCompositionTests
             ["pop3"] = typeof(Pop3ProtocolHandler),
             ["pop3s"] = typeof(Pop3ProtocolHandler),
             ["rtsp"] = typeof(RtspProtocolHandler),
+            ["smb"] = typeof(SmbProtocolHandler),
+            ["smbs"] = typeof(SmbProtocolHandler),
             ["scp"] = typeof(SshProtocolHandler),
             ["sftp"] = typeof(SshProtocolHandler),
             ["smtp"] = typeof(SmtpProtocolHandler),
@@ -469,7 +472,7 @@ public sealed partial class CurlCompositionTests
         IConnector[] connectors = [.. handlers.SelectMany(ConnectorsOf).Where(connector => !ReferenceEquals(connector, ftpData))];
         string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => Unwrapped(handler).GetType().Name).Order()];
         CollectionAssert.AreEqual(
-            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "ImapProtocolHandler", "LdapProtocolHandler", "MqttProtocolHandler", "Pop3ProtocolHandler", "RoutingFtpProtocolHandler", "RtspProtocolHandler", "SmtpProtocolHandler", "SshProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler", "WsProtocolHandler" },
+            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "ImapProtocolHandler", "LdapProtocolHandler", "MqttProtocolHandler", "Pop3ProtocolHandler", "RoutingFtpProtocolHandler", "RtspProtocolHandler", "SmbProtocolHandler", "SmtpProtocolHandler", "SshProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler", "WsProtocolHandler" },
             connectingHandlers);
         Assert.IsTrue(connectors.All(connector => ReferenceEquals(connector, transports.PoolingConnector)));
         Assert.AreSame(transports.PoolingConnector, dispatch.ConnectionPool);
