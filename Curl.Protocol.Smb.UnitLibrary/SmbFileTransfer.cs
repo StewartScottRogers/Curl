@@ -139,6 +139,7 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
                 return (TransferResult.Failure(CurlExitCode.RecvError, refused, offset), false);
             }
 
+            ReportDataReceived(data.Span);
             if (await WriteAsync(data, offset).ConfigureAwait(false) is { } writeFailure)
             {
                 return (writeFailure, false);
@@ -185,6 +186,16 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
             {
                 return (Uploaded(TransferResult.Success(written), written), false);
             }
+        }
+    }
+
+    // A read's bytes are -v's "{ [N bytes data]" line, as curl's client writer traces them;
+    // an empty read, the end of the file, writes nothing to trace.
+    private void ReportDataReceived(ReadOnlySpan<byte> data)
+    {
+        if (!data.IsEmpty)
+        {
+            context.Events.ReportDataReceived(data);
         }
     }
 

@@ -130,6 +130,19 @@ public sealed class SmbFileTransferTests
     }
 
     [TestMethod]
+    public async Task TransferAsync_EmptyFile_ReportsNoDataReceived()
+    {
+        var events = new TranscriptTransferEvents();
+        var connection = new ScriptedConnection(Replies(ReadResponse([])));
+        var context = new TransferContext { Url = CurlUrl.Parse(SmbRecordedExchange.DownloadUrl), Output = new MemoryStream(), Events = events };
+
+        await new SmbFileTransfer(connection, new SmbMessageReader(connection, TimeProvider.System), UserId, context)
+            .TransferAsync(SmbRecordedExchange.Host, DownloadPath());
+
+        Assert.IsEmpty(events.Transcript);
+    }
+
+    [TestMethod]
     public async Task TransferAsync_FullRead_ReadsAgainFromWhereItEnded()
     {
         byte[] first = new byte[SmbReadRequest.MaxPayloadSize];

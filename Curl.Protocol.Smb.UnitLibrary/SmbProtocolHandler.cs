@@ -1,3 +1,4 @@
+using System.Globalization;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Smb;
@@ -31,6 +32,9 @@ public sealed class SmbProtocolHandler : IProtocolHandler
     private const int DefaultPort = 445;
 
     private const string SecureScheme = "smbs";
+
+    // The number curl names a connection it never opened by, as in "closing connection #-1".
+    private const long NoConnectionNumber = -1;
 
     private static readonly string[] Schemes = ["smb", SecureScheme];
 
@@ -86,7 +90,9 @@ public sealed class SmbProtocolHandler : IProtocolHandler
         CurlUrl url = context.Url;
         if (SmbUrlPath.TryParse(url.AbsolutePath, out SmbUrlPath? path) is { } pathError)
         {
-            return TransferResult.Failure(CurlExitCode.UrlMalformat, pathError);
+            TransferResult refused = TransferResult.Failure(CurlExitCode.UrlMalformat, pathError);
+            ReportConnectionEnd(context.Events, refused, closes: true, NoConnectionNumber);
+            return refused;
         }
 
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, url.Scheme == SecureScheme)
@@ -101,17 +107,42 @@ public sealed class SmbProtocolHandler : IProtocolHandler
             return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
         }
 
+        TransferResult result;
+        bool closes;
         await using (connection.ConfigureAwait(false))
         {
-            return await TransferAsync(connection, context, path!).ConfigureAwait(false);
+            (result, closes) = await TransferAsync(connection, context, path!).ConfigureAwait(false);
         }
+
+        ReportConnectionEnd(context.Events, result, closes, connect.ConnectionNumber);
+        return result;
     }
 
-    private async ValueTask<TransferResult> TransferAsync(IConnection connection, ITransferContext context, SmbUrlPath path)
+    /// <summary>
+    /// Reports the <c>-v</c> lines curl 8.21.0 ends an SMB transfer with (measured, BL-598
+    /// Notes): a failure's text when curl reports it through <c>failf</c>, then
+    /// <c>closing connection #N</c> for a failure before the session is set up (curl's
+    /// connect phase, which ends the connection as aborted) and <c>shutting down connection #N</c>
+    /// for any other outcome.
+    /// </summary>
+    private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, bool closes, long connectionNumber)
+    {
+        if (result.ErrorMessage is { } message && SmbMessages.IsVerboseLine(message))
+        {
+            events.ReportInfo(message);
+        }
+
+        events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"{(closes ? "closing" : "shutting down")} connection #{connectionNumber}"));
+    }
+
+    // Returns the outcome and whether it ended curl's connect phase (no user, or a session
+    // that was not set up), which curl ends with "closing connection" rather than
+    // "shutting down connection".
+    private async ValueTask<(TransferResult Result, bool Closes)> TransferAsync(IConnection connection, ITransferContext context, SmbUrlPath path)
     {
         if (context.Credentials is not { } credentials)
         {
-            return TransferResult.Failure(CurlExitCode.LoginDenied, SmbMessages.LoginDenied);
+            return (TransferResult.Failure(CurlExitCode.LoginDenied, SmbMessages.LoginDenied), true);
         }
 
         var transferLog = new SmbTransferLog(context.DiagnosticLog);
@@ -123,13 +154,14 @@ public sealed class SmbProtocolHandler : IProtocolHandler
             context.CancellationToken).ConfigureAwait(false);
         if (failure is not null)
         {
-            return failure;
+            return (failure, true);
         }
 
-        return context.Upload is { CanSeek: false }
+        TransferResult result = context.Upload is { CanSeek: false }
             ? TransferResult.Failure(CurlExitCode.SendError, SmbMessages.UploadSizeUnknown)
             : await new SmbFileTransfer(connection, reader, userId, context)
                 .TransferAsync(context.Url.IdnHost, path)
                 .ConfigureAwait(false);
+        return (result, false);
     }
 }
