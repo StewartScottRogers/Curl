@@ -36,3 +36,4 @@ Filed by BL-835 as its follow-up: `Curl.Console` was outside BL-835's `touches`.
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
