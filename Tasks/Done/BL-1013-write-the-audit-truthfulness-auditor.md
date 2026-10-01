@@ -9,7 +9,7 @@ touches: [.claude/agents/audit-truthfulness.md, Audit/Instructions/Truthfulness.
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1013 — Write the audit-truthfulness auditor
 
@@ -52,15 +52,20 @@ Two files:
 
 ## Acceptance criteria
 
-- [ ] `.claude/agents/audit-truthfulness.md` exists with `name: audit-truthfulness`, `model: sonnet`, `tools: Read, Grep, Glob, Bash` and no editing tool.
-- [ ] `Audit/Instructions/Truthfulness.md` states the five steps with their sample sizes, the severity rule, and its relationship to `align-and-document` (reports only; fixing stays with `align-and-document`).
-- [ ] `git diff --quiet HEAD -- .claude/agents/align-and-document.md` succeeds.
-- [ ] `claude agents` lists `audit-truthfulness`.
-- [ ] A trial run limited to step 5 in a detached worktree ends with one report block that parses with `ConvertFrom-Json`; command and summary under Notes.
+- [x] `.claude/agents/audit-truthfulness.md` exists with `name: audit-truthfulness`, `model: sonnet`, `tools: Read, Grep, Glob, Bash` and no editing tool.
+- [x] `Audit/Instructions/Truthfulness.md` states the five steps with their sample sizes, the severity rule, and its relationship to `align-and-document` (reports only; fixing stays with `align-and-document`).
+- [x] `git diff --quiet HEAD -- .claude/agents/align-and-document.md` succeeds.
+- [x] `claude agents` lists `audit-truthfulness`.
+- [x] A trial run limited to step 5 in a detached worktree ends with one report block that parses with `ConvertFrom-Json`; command and summary under Notes.
 
 ## Notes
+
+- Audit branch commit 1ed4dbc5; .claude/agents/align-and-document.md unchanged (git diff --quiet succeeded).
+- Trial limited to step 5: detached worktree of 1ed4dbc5, fingerprint 2b17174d...; claude -p --agent audit-truthfulness --dangerously-skip-permissions "... do step 5 ... only ... Never start a dark factory shift ...". One json block, all six fields; 10 statements each of RunDarkFactory.ps1 and task-board.ps1 checked, one Low finding (task-board.ps1's help lists fewer status markers than status prints). Worktree unchanged; removed after.
+- claude agents: in Claude Code 2.1.284 it lists running sessions, not agent definitions, so it cannot show this agent; the trial's claude -p --agent <name> is the proof the agent is found.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. The read-only audit-truthfulness auditor samples names, docs, ADRs and script help against the code; on the audit branch.

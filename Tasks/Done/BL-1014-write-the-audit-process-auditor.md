@@ -9,7 +9,7 @@ touches: [.claude/agents/audit-process.md, Audit/Instructions/Process.md]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1014 — Write the audit-process auditor
 
@@ -50,14 +50,19 @@ Two files:
 
 ## Acceptance criteria
 
-- [ ] `.claude/agents/audit-process.md` exists with `name: audit-process`, `model: sonnet`, `tools: Read, Grep, Glob, Bash` and no editing tool.
-- [ ] `Audit/Instructions/Process.md` states the three steps, each finding rule with its threshold, and the severity rule above.
-- [ ] `claude agents` lists `audit-process`.
-- [ ] A trial run with `-Since` one day back ends with one report block that parses with `ConvertFrom-Json` and carries every process metric name; command and summary under Notes; the log folder is unchanged.
+- [x] `.claude/agents/audit-process.md` exists with `name: audit-process`, `model: sonnet`, `tools: Read, Grep, Glob, Bash` and no editing tool.
+- [x] `Audit/Instructions/Process.md` states the three steps, each finding rule with its threshold, and the severity rule above.
+- [x] `claude agents` lists `audit-process`.
+- [x] A trial run with `-Since` one day back ends with one report block that parses with `ConvertFrom-Json` and carries every process metric name; command and summary under Notes; the log folder is unchanged.
 
 ## Notes
+
+- Audit branch commit c0f2fc39; Process.md later also reads the audit's saved ci-runs.json (6c8f9e88).
+- Trial: detached worktree of c0f2fc39, fingerprint 0292a24a...; claude -p --agent audit-process --dangerously-skip-permissions "... The factory's log folder is Z:\repos\Curl.logs ... -Since <yesterday> ...". One json block, all six fields, all 14 process metric names. Findings: Medium BL-564 claimed 3 times and requeued twice; Low CI red 906 minutes; Low seven tasks over 3x the median cost (BL-568, BL-564, BL-572, BL-902, BL-578 costliest); Low BL-742 and BL-796 runs ended without integration when a shift was stopped. Worktree unchanged; nothing written to the log folder (the non-run files there are the factory's own); removed after.
+- claude agents: in Claude Code 2.1.284 it lists running sessions, not agent definitions, so it cannot show this agent; the trial's claude -p --agent <name> is the proof the agent is found.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. The read-only audit-process auditor measures the factory's process from its logs and CI and files waste at fixed thresholds; on the audit branch.

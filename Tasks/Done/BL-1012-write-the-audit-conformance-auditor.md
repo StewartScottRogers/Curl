@@ -9,7 +9,7 @@ touches: [.claude/agents/audit-conformance.md, Audit/Instructions/Conformance.md
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1012 — Write the audit-conformance auditor
 
@@ -48,15 +48,20 @@ Two files:
 
 ## Acceptance criteria
 
-- [ ] `.claude/agents/audit-conformance.md` exists with `name: audit-conformance`, `model: opus`, `tools: Read, Grep, Glob, Bash` and no editing tool.
-- [ ] `Audit/Instructions/Conformance.md` states the five steps, cites `conformance-auditor.md`'s sections as the standard and gives the severity mapping above.
-- [ ] `git diff --quiet HEAD -- .claude/agents/conformance-auditor.md` succeeds (the existing agent is unchanged).
-- [ ] `claude agents` lists `audit-conformance`.
-- [ ] A trial run with `-Count 10` in a detached worktree ends with one report block that parses with `ConvertFrom-Json`; command and summary under Notes.
+- [x] `.claude/agents/audit-conformance.md` exists with `name: audit-conformance`, `model: opus`, `tools: Read, Grep, Glob, Bash` and no editing tool.
+- [x] `Audit/Instructions/Conformance.md` states the five steps, cites `conformance-auditor.md`'s sections as the standard and gives the severity mapping above.
+- [x] `git diff --quiet HEAD -- .claude/agents/conformance-auditor.md` succeeds (the existing agent is unchanged).
+- [x] `claude agents` lists `audit-conformance`.
+- [x] A trial run with `-Count 10` in a detached worktree ends with one report block that parses with `ConvertFrom-Json`; command and summary under Notes.
 
 ## Notes
+
+- Audit branch commit 0eeb558b; .claude/agents/conformance-auditor.md unchanged (git diff --quiet succeeded).
+- Trial: detached worktree of 0eeb558b, fingerprint fca42271...; claude -p --agent audit-conformance --dangerously-skip-permissions "Audit the tree ... use -Count 10 ...". One json block, all six fields, differentialCases 10, differentialDifferences 2, seed 250303883 (0x0eeb558b). One High finding: --libcurl refused with exit 2 where curl 8.21.0 exits 0 and writes the C file, reduced to 'curl --libcurl lc.c http://127.0.0.1:PORT/'. Worktree unchanged; removed after.
+- claude agents: in Claude Code 2.1.284 it lists running sessions, not agent definitions, so it cannot show this agent; the trial's claude -p --agent <name> is the proof the agent is found.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. The read-only audit-conformance auditor runs the differential tool, reduces each difference and names the reference curl; on the audit branch.
