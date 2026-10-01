@@ -40,3 +40,4 @@ completed:
 - 2026-09-28: Created.
 - 2026-10-01: Backlog -> Doing.
 - 2026-10-01: Doing -> Backlog. Run budget ran out mid-task: --ssl-sessions is implemented and tested in the stashed working tree; the ADR, --tls-earlydata and the coverage confirmation remain (see Notes)
+- 2026-10-01: Backlog -> Doing.
