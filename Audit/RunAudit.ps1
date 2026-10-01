@@ -256,7 +256,7 @@ if ($DryRun) {
 New-Item -ItemType Directory -Force $RunDir, (Join-Path $RunDir 'reports'), (Join-Path $RunDir 'scratch'), (Join-Path $RunDir 'logs') | Out-Null
 Write-Step "audit $Stamp of $Ref; auditors $($Selected -join ', '); $Planted planted; seed $Seed"
 Set-Caption 'preparing'
-$planted = Join-Path $RunDir 'planted'
+$plantedTree = Join-Path $RunDir 'planted'
 try {
     # 2. the audit branch
     Invoke-Git @('-C', $repo, 'fetch', '-q', 'origin') | Out-Null
@@ -279,15 +279,15 @@ try {
 
     # 3. the planted tree, the overlay and the logs
     $auditedCommit = "$(Invoke-Git @('-C', $repo, 'rev-parse', $Ref) | Select-Object -First 1)".Trim()
-    Invoke-Git @('-C', $repo, 'worktree', 'add', '--detach', $planted, $auditedCommit) | Out-Null
+    Invoke-Git @('-C', $repo, 'worktree', 'add', '--detach', $plantedTree, $auditedCommit) | Out-Null
     foreach ($part in 'Audit\Instructions', 'Audit\Tools', 'Audit\PlantedDefects') {
         $source = Join-Path $auditTree $part
-        $target = Join-Path $planted $part
+        $target = Join-Path $plantedTree $part
         if (Test-Path -LiteralPath $target) { Remove-Item -Recurse -Force -LiteralPath $target }
         Copy-Item -Recurse -LiteralPath $source -Destination $target
     }
-    Get-ChildItem -LiteralPath (Join-Path $planted '.claude\agents') -Filter 'audit-*.md' -ErrorAction SilentlyContinue | Remove-Item -Force
-    Copy-Item -Path (Join-Path $auditTree '.claude\agents\audit-*.md') -Destination (Join-Path $planted '.claude\agents')
+    Get-ChildItem -LiteralPath (Join-Path $plantedTree '.claude\agents') -Filter 'audit-*.md' -ErrorAction SilentlyContinue | Remove-Item -Force
+    Copy-Item -Path (Join-Path $auditTree '.claude\agents\audit-*.md') -Destination (Join-Path $plantedTree '.claude\agents')
     $fingerprint = "$(& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $auditTree 'Audit\Tools\Get-AuditorFingerprint.ps1') -Root $auditTree)".Trim()
     $scorecards = @(Get-ChildItem -LiteralPath (Join-Path $auditTree 'Audit\Scorecards') -Filter '????-??-??_????.md' -ErrorAction SilentlyContinue | Sort-Object Name)
     $since = if ($scorecards.Count) { [datetime]::ParseExact($scorecards[-1].BaseName, 'yyyy-MM-dd_HHmm', $null) } else { $Started.AddDays(-7) }
@@ -299,12 +299,12 @@ try {
     $ErrorActionPreference = 'Continue'
     & gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500 > (Join-Path $logs 'ci-runs.json') 2>$null
     $ErrorActionPreference = 'Stop'
-    Write-Step "planted tree $planted at $auditedCommit; fingerprint $fingerprint; logs since $($since.ToString('yyyy-MM-dd HH:mm'))"
+    Write-Step "planted tree $plantedTree at $auditedCommit; fingerprint $fingerprint; logs since $($since.ToString('yyyy-MM-dd HH:mm'))"
 
     # 4. seed
     Set-Caption 'seeding'
     $manifest = Join-Path $RunDir 'manifest.json'
-    $seedPrompt = "Seed an audit. Worktree: $planted (detached at $auditedCommit). Log copy: $logs. Manifest path: $manifest. Seed: $Seed. Count: $Planted. Plant at least one defect for each of these auditors: $($Selected -join ', '), and only for them. Follow your instructions exactly; change nothing outside the worktree, the log copy and the manifest path."
+    $seedPrompt = "Seed an audit. Worktree: $plantedTree (detached at $auditedCommit). Log copy: $logs. Manifest path: $manifest. Seed: $Seed. Count: $Planted. Plant at least one defect for each of these auditors: $($Selected -join ', '), and only for them. Follow your instructions exactly; change nothing outside the worktree, the log copy and the manifest path."
     $null = Invoke-Agent 'audit-seeder' $Models.seeder $seedPrompt $auditTree (Join-Path $RunDir 'seeder.md')
     if (-not (Test-Path -LiteralPath $manifest)) { throw 'The seeder wrote no manifest.' }
     Write-Step "seeded: $(@((Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json).planted).Count) defects"
@@ -318,14 +318,14 @@ try {
         $open = @(Get-OpenFindings (Join-Path $auditTree 'Audit\Findings') $a)
         $reaudit = if ($open.Count) { "Re-audit these open findings by running each reproduction:`n" + ($open -join "`n") } else { 'There are no findings to re-audit.' }
         $logsLine = if ($a -eq 'process') { " The factory's log folder is $logs; the previous scorecard's date is $($since.ToString('yyyy-MM-dd'))." } else { '' }
-        $prompt = "Audit the tree at $planted (commit $auditedCommit; auditor fingerprint $fingerprint).$logsLine Your temporary folder is $scratch. $reaudit Follow Audit/Instructions/Auditor-Rules.md and Audit/Instructions/$($Method[$a]).md in that tree, and end with exactly one json report block."
-        $exit = Invoke-Agent "audit-$a" $Models[$a] $prompt $planted (Join-Path $RunDir "reports\$a.md")
-        $dirty = @(Invoke-Git @('-C', $planted, 'status', '--porcelain') | Where-Object { $_ })
+        $prompt = "Audit the tree at $plantedTree (commit $auditedCommit; auditor fingerprint $fingerprint).$logsLine Your temporary folder is $scratch. $reaudit Follow Audit/Instructions/Auditor-Rules.md and Audit/Instructions/$($Method[$a]).md in that tree, and end with exactly one json report block."
+        $exit = Invoke-Agent "audit-$a" $Models[$a] $prompt $plantedTree (Join-Path $RunDir "reports\$a.md")
+        $dirty = @(Invoke-Git @('-C', $plantedTree, 'status', '--porcelain') | Where-Object { $_ })
         if ($dirty.Count) {
             $changedTree += $a
             Write-Step "$a wrote to the audited tree ($($dirty.Count) paths); resetting it"
-            Invoke-Git @('-C', $planted, 'reset', '-q', '--hard') | Out-Null
-            Invoke-Git @('-C', $planted, 'clean', '-q', '-fdx') | Out-Null
+            Invoke-Git @('-C', $plantedTree, 'reset', '-q', '--hard') | Out-Null
+            Invoke-Git @('-C', $plantedTree, 'clean', '-q', '-fdx') | Out-Null
         }
         Write-Step "$a finished (exit $exit)"
     }
@@ -367,7 +367,7 @@ catch {
 }
 finally {
     # 8. clean up the planted tree; keep the run folder
-    if (Test-Path -LiteralPath $planted) { Invoke-Git @('-C', $repo, 'worktree', 'remove', '--force', $planted) -AllowFailure | Out-Null }
+    if (Test-Path -LiteralPath $plantedTree) { Invoke-Git @('-C', $repo, 'worktree', 'remove', '--force', $plantedTree) -AllowFailure | Out-Null }
     Write-Step "run folder $RunDir; cost $($script:CostUsd.ToString('0.00', [Globalization.CultureInfo]::InvariantCulture)) USD"
 }
 exit $(if ($failedRun) { 1 } else { 0 })
