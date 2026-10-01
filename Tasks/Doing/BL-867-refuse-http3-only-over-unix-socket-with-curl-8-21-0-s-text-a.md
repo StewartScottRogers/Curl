@@ -59,3 +59,4 @@ completed:
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Console (HttpRequestOptionsMapping) to pass --unix-socket to the HTTP handler; Curl.Console is held by BL-650 in Doing
+- 2026-09-30: Backlog -> Doing.
