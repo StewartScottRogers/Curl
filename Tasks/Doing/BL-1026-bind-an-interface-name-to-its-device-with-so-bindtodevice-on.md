@@ -37,3 +37,4 @@ On Linux, `--interface <name>`, `if!<name>` and `ifhost!<name>!<host>` first try
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
