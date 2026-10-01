@@ -127,7 +127,7 @@ namespace Curl.Console;
 /// </param>
 /// <param name="tlsSessions">
 /// The run's TLS session cache, which the <c>--ssl-sessions</c> file is loaded into before the
-/// transfers and saved from after them (ADR-0313, <see cref="TlsSessionFileLines" />);
+/// transfers and saved from after them (ADR-0319, <see cref="TlsSessionFileLines" />);
 /// <see langword="null" /> to leave the file alone.
 /// </param>
 /// <remarks>
@@ -1036,7 +1036,7 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Loads or saves the run's <c>--ssl-sessions</c> file (ADR-0313) when the runner keeps a
+    /// Loads or saves the run's <c>--ssl-sessions</c> file (ADR-0319) when the runner keeps a
     /// session cache, and writes the lines that gives to standard error.
     /// </summary>
     /// <param name="options">The first option group, which holds the global <c>--ssl-sessions</c>.</param>

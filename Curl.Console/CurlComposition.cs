@@ -381,7 +381,7 @@ internal static class CurlComposition
     /// <returns>The provider.</returns>
     /// <param name="sessions">
     /// The run's <c>--ssl-sessions</c> cache, which the hand-built provider offers and keeps
-    /// sessions in when <see cref="TlsClientOptions.SslSessionsFile" /> is given (ADR-0313);
+    /// sessions in when <see cref="TlsClientOptions.SslSessionsFile" /> is given (ADR-0319);
     /// <see langword="null" /> for none.
     /// </param>
     internal static ITlsProviderWithWarnings CreateTlsProvider(TlsClientOptions options, TimeProvider timeProvider, TlsSessionCache? sessions = null) =>
@@ -403,7 +403,7 @@ internal static class CurlComposition
     /// The run's connection cache, which every option group's pooling connector shares
     /// (<see cref="CreatePoolingConnector" />); <see langword="null" /> for a pool of the group's own.
     /// </param>
-    /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache, which the origin's TLS provider uses (ADR-0313); <see langword="null" /> for none.</param>
+    /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache, which the origin's TLS provider uses (ADR-0319); <see langword="null" /> for none.</param>
     internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null)
     {
         TcpDialer tcpDialer = new(TcpSocketOptions.FromCommandLine(options.TcpNoDelay, options.TcpKeepAlive, options.TcpKeepAliveSeconds, options.TcpKeepAliveProbeCount)
