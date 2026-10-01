@@ -285,6 +285,7 @@ choices do not need one.
 | [0286](ADR-0286-an-ftp-passive-data-connect-is-not-held-to-connect-timeout.md) | Measured: FTP's passive data connections go through `PoolingConnector.Over(TcpConnector.WithoutConnectTimeout())`, so only `-m` or the system ends one, as curl 8.21.0 does; a dial the system timed out is exit 28 with the connect message on every connect | Accepted | 2026-09-30 |
 | [0287](ADR-0287-compressed-advertises-and-decodes-zstd.md) | Measured: `--compressed` sends `Accept-Encoding: deflate, gzip, br, zstd` on the Schannel and OpenSSL builds and decodes `Content-Encoding: zstd` with `Curl.Zstandard`'s `ZstandardDecoder`, frame after frame; corrupt data and bytes after the last frame are exit 61 | Accepted | 2026-09-30 |
 | [0288](ADR-0288-dark-factory-runs-stop-at-a-six-dollar-cost-cap.md) | `RunDarkFactory.ps1 -TaskBudgetUsd` (default $6, 0 for none) caps every headless run with `--max-budget-usd`; a task run that stops at the cap is stashed and blocked for splitting like a timed-out one (AF-0004) | Accepted | 2026-10-01 |
+| [0289](ADR-0289-http-3-through-an-http-proxy-runs-quic-in-a-connect-udp-tunnel.md) | `--http3` and `--http3-only` through an HTTP or HTTPS proxy run QUIC in a CONNECT-UDP tunnel (RFC 9298) in `DATAGRAM` capsules, as curl 8.22.0 does (measured, BL-942): `CONNECT-UDP tunnel failed, response <n>` is exit 7, and `--http3` races it against a TCP `CONNECT`; supersedes ADR-0223's interim refusal | Accepted | 2026-10-01 |
 
 ## Template
 

@@ -48,7 +48,10 @@ first `failf` of a transfer in its error buffer, and the refusal came first.
 3. `--http3` connects over TCP through the proxy as without it and never tries QUIC; a
    failed transfer keeps its exit code and is reported with the refusal's text; a
    successful one prints nothing more.
-4. **Interim for HTTP proxies.** The SOCKS rows match 8.21.0 too. The HTTP proxy rows are
+4. **Interim for HTTP proxies - superseded by ADR-0289 (BL-942, 2026-10-01).** An HTTP,
+   HTTP/1.0 or HTTPS proxy is no longer refused: QUIC goes through it in a CONNECT-UDP
+   tunnel, and decisions 1 to 3 now hold for SOCKS proxies only. The text below is kept as
+   it was decided. The SOCKS rows match 8.21.0 too. The HTTP proxy rows are
    the 8.18.0 behaviour: 8.21.0 tunnels QUIC through CONNECT-UDP instead, which is new
    protocol work (RFC 9298 and RFC 9297) filed as BL-942. Until it lands, the measured
    8.18.0 behaviour is the closest measured behaviour, and it never lets `--http3-only`
