@@ -8,7 +8,7 @@ depends-on: [BL-869]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-10-01
 ---
 # BL-979 — Forward RepeatAuthorization through AwsSigV4HttpAuthenticator so curl.exe counts a kept Digest nonce on
 
@@ -23,14 +23,17 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `AwsSigV4HttpAuthenticator.RepeatAuthorization` returns `otherSchemes.RepeatAuthorization(request, sentAuthorization)` when `request.AwsSigV4` is `null`, and the value as sent otherwise.
-- [ ] `AwsSigV4HttpAuthenticatorTests` covers both branches (a fake inner authenticator that marks its answer), and `Measure-CodeQuality.ps1` reports 100% line and branch coverage for `Curl.Console`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] `AwsSigV4HttpAuthenticator.RepeatAuthorization` returns `otherSchemes.RepeatAuthorization(request, sentAuthorization)` when `request.AwsSigV4` is `null`, and the value as sent otherwise.
+- [x] `AwsSigV4HttpAuthenticatorTests` covers both branches (a fake inner authenticator that marks its answer), and `Measure-CodeQuality.ps1` reports 100% line and branch coverage for `Curl.Console`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-01: Added `AwsSigV4HttpAuthenticator.RepeatAuthorization`: without `AwsSigV4` it forwards to the other schemes (so `RankedHttpAuthenticator` counts a kept Digest nonce on); a signed request sends its value as sent, the same split `ContinueAuthorizationAsync` makes. It throws on a null request like its siblings. Tests: `RepeatAuthorization_AwsSigV4_SendsTheValueAsSent`, plus forwarding and null-request checks in `EveryCall_*`. `Measure-CodeQuality.ps1 -Library Curl.Console`: 100% line, 100% branch, worst CRAP 10. Build clean with `-warnaserror`; all fast tests green.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Renumbered from BL-972, which the RSA coefficient fix pushed first also holds.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. AwsSigV4HttpAuthenticator forwards RepeatAuthorization, so curl.exe counts a kept Digest nonce on (nc=00000002)
