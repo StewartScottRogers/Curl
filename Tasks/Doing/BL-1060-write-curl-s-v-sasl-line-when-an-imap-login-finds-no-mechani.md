@@ -36,3 +36,4 @@ When an IMAP login ends exit 67 because no way of logging in is possible, `-v` w
 ## Log
 
 - 2026-09-30: Created.
+- 2026-10-01: Backlog -> Doing.
