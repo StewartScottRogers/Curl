@@ -75,16 +75,26 @@ internal sealed class HttpExchangeLog(IDiagnosticLog log, string component)
     /// <param name="versionName">The version used: <c>HTTP/1.x</c>, <c>HTTP/2</c> or <c>HTTP/3</c>.</param>
     internal void DowngradeOf(HttpVersionPreference asked, bool secure, string versionName)
     {
-        string? message = (asked, versionName) switch
-        {
-            (HttpVersionPreference.Http3, not "HTTP/3") => "--http3 fell back to " + versionName + " over TCP",
-            (HttpVersionPreference.Http2, Http1VersionName) when secure => "--http2 refused by ALPN; using HTTP/1.x",
-            _ => null,
-        };
-        if (message is not null && log.IsEnabled(DiagnosticLogLevel.Warning))
+        if (DowngradeMessage(asked, secure, versionName) is { } message && log.IsEnabled(DiagnosticLogLevel.Warning))
         {
             Write(DiagnosticLogLevel.Warning, message);
         }
+    }
+
+    /// <summary>
+    /// Gives the warning <see cref="DowngradeOf" /> logs, or <see langword="null" /> when the
+    /// connection speaks the version asked for.
+    /// </summary>
+    private static string? DowngradeMessage(HttpVersionPreference asked, bool secure, string versionName)
+    {
+        if (asked == HttpVersionPreference.Http3 && versionName != "HTTP/3")
+        {
+            return "--http3 fell back to " + versionName + " over TCP";
+        }
+
+        return asked == HttpVersionPreference.Http2 && secure && versionName == Http1VersionName
+            ? "--http2 refused by ALPN; using HTTP/1.x"
+            : null;
     }
 
     /// <summary>The version name an HTTP/1.x exchange is logged with.</summary>
