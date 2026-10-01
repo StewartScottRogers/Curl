@@ -22,7 +22,7 @@ public sealed class RedirectFollowerHstsTests
 
     private readonly HstsTransferPolicy hsts = new(new FakeTimeProvider(Now));
 
-    private readonly RecordingEvents events = new();
+    private readonly RecordingTransferEvents events = new();
 
     [TestMethod]
     public async Task FollowAsync_HttpTargetOfAHostTheHopTaught_IsSwitchedReportedAndCountedAsFollowed()
@@ -34,18 +34,20 @@ public sealed class RedirectFollowerHstsTests
         Assert.AreEqual("https://localhost:18443/x", handler.Urls[1].OriginalString);
         Assert.AreEqual("https://localhost:18443/x", result.Report!.EffectiveUrl);
         Assert.AreEqual(1, result.Report.RedirectCount);
-        CollectionAssert.AreEqual(new[] { HstsTransferPolicy.SwitchedMessagePrefix + "https://localhost:18443/x" }, events.Infos);
+        CollectionAssert.AreEqual(
+            new[] { RedirectFollower.IssueAnotherRequestMessagePrefix + HttpTarget + "'", HstsTransferPolicy.SwitchedMessagePrefix + "https://localhost:18443/x" },
+            events.Infos);
     }
 
     [TestMethod]
-    public async Task FollowAsync_HttpTargetOfAnUnknownHost_IsFollowedAsItIs()
+    public async Task FollowAsync_HttpTargetOfAnUnknownHost_IsFollowedAsItIsWithoutASwitchLine()
     {
         ScriptedHandler handler = new(Response(301, HttpTarget), Response(200));
 
         await FollowAsync(handler, Start, new RedirectPolicy());
 
         Assert.AreEqual(HttpTarget, handler.Urls[1].OriginalString);
-        Assert.IsEmpty(events.Infos);
+        CollectionAssert.AreEqual(new[] { RedirectFollower.IssueAnotherRequestMessagePrefix + HttpTarget + "'" }, events.Infos);
     }
 
     [TestMethod]
@@ -130,46 +132,6 @@ public sealed class RedirectFollowerHstsTests
         {
             Urls.Add(context.Url);
             return ValueTask.FromResult(script[Urls.Count - 1]);
-        }
-    }
-
-    /// <summary>Records every info line; ignores the rest.</summary>
-    private sealed class RecordingEvents : ITransferEvents
-    {
-        public List<string> Infos { get; } = [];
-
-        public void ReportInfo(string text) => Infos.Add(text);
-
-        public void ReportConnectionOpened(ConnectionOpenedEvent opened)
-        {
-        }
-
-        public void ReportConnectionReused(ConnectionReusedEvent reused)
-        {
-        }
-
-        public void ReportTlsHandshake(TlsHandshakeEvent handshake)
-        {
-        }
-
-        public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)
-        {
-        }
-
-        public void ReportRequestHeader(ReadOnlySpan<byte> bytes)
-        {
-        }
-
-        public void ReportResponseHeader(ReadOnlySpan<byte> bytes)
-        {
-        }
-
-        public void ReportDataSent(ReadOnlySpan<byte> bytes)
-        {
-        }
-
-        public void ReportDataReceived(ReadOnlySpan<byte> bytes)
-        {
         }
     }
 }

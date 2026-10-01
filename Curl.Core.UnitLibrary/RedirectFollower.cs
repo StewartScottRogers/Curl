@@ -125,6 +125,14 @@ public sealed class RedirectFollower(
     /// </summary>
     public const string CredentialsInUrlMessage = "URL rejected: Credentials was passed in the URL when prohibited";
 
+    /// <summary>
+    /// The start of curl 8.21.0's <c>-v</c> line for a redirect target it goes on to request, followed
+    /// by the target and a closing <c>'</c>: written once the target parses with a scheme curl knows,
+    /// before the HSTS switch and the <c>--proto-redir</c> and <c>--disallow-username-in-url</c>
+    /// checks, and not when <c>--max-redirs</c> refuses the hop (measured, BL-907 Notes).
+    /// </summary>
+    public const string IssueAnotherRequestMessagePrefix = "Issue another request to this URL: '";
+
     private readonly bool rewindFailsAsReadError = runsOnWindows ?? OperatingSystem.IsWindows();
 
     private static readonly HashSet<string> SchemesCurlParses = new(
@@ -351,8 +359,14 @@ public sealed class RedirectFollower(
             return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false);
         }
 
+        if (!SchemesCurlParses.Contains(next.Scheme))
+        {
+            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false);
+        }
+
+        first.Events.ReportInfo(IssueAnotherRequestMessagePrefix + target + "'");
         next = SwitchedToHttps(ref target, next, first);
-        return SchemeRefusal(next.Scheme, policy);
+        return ProtocolDisabledRefusal(next.Scheme, policy);
     }
 
     /// <summary>
@@ -371,17 +385,10 @@ public sealed class RedirectFollower(
         return CurlUrl.Parse(httpsUrl, first.PathAsIs);
     }
 
-    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? SchemeRefusal(string scheme, RedirectPolicy policy)
-    {
-        if (!SchemesCurlParses.Contains(scheme))
-        {
-            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false);
-        }
-
-        return policy.AllowedSchemes.Contains(scheme) && policy.AllowedTransferSchemes?.Contains(scheme) != false
+    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? ProtocolDisabledRefusal(string scheme, RedirectPolicy policy) =>
+        policy.AllowedSchemes.Contains(scheme) && policy.AllowedTransferSchemes?.Contains(scheme) != false
             ? null
             : (CurlExitCode.UnsupportedProtocol, $"Protocol \"{scheme}\" is disabled (in redirect)", false);
-    }
 
     private static string UnparsableUrlReason(string target)
     {
