@@ -104,6 +104,18 @@ public sealed partial class CurlCommandRunnerDiagnosticLogTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ProxyWithPasswordAtLogLevelInfo_LogsTheProxyButNotThePassword()
+    {
+        string logFile = Path.Combine(CreateTemporaryDirectory(), "x.log");
+
+        await RunOverLoopbackAsync("-x", "http://user:secret@proxy:3128", "--log-level", "info", "--log-file", logFile, Url);
+
+        string log = File.ReadAllText(logFile);
+        StringAssert.Contains(log, "[info] [proxy] using proxy http://proxy:3128 for http://127.0.0.1");
+        Assert.IsFalse(log.Contains("secret", StringComparison.Ordinal), log);
+    }
+
+    [TestMethod]
     public async Task RunAsync_LogFileThatCannotBeOpened_WarnsOnceAndKeepsTheExitCode()
     {
         files.UnwritablePaths.Add("adir");

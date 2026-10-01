@@ -132,4 +132,23 @@ public sealed class NoProxyMatcherTests
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => NoProxyMatcher.Matches(null!, "*"));
     }
+
+    [TestMethod]
+    [DataRow(" other.test ,\t10.0.0.0/8 , .a.test", "10.1.2.3", "10.0.0.0/8")]
+    [DataRow("other.test,A.TEST.", "www.a.test", "A.TEST.")]
+    [DataRow("*", "a.test", "*")]
+    public void MatchingEntry_AMatch_ReturnsTheEntryAsWritten(string noProxy, string host, string expected)
+    {
+        Assert.AreEqual(expected, NoProxyMatcher.MatchingEntry(host, noProxy));
+    }
+
+    [TestMethod]
+    [DataRow("other.test", "a.test")]
+    [DataRow("", "a.test")]
+    [DataRow(null, "a.test")]
+    [DataRow("*", "")]
+    public void MatchingEntry_NoMatch_ReturnsNull(string? noProxy, string host)
+    {
+        Assert.IsNull(NoProxyMatcher.MatchingEntry(host, noProxy));
+    }
 }

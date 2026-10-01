@@ -40,13 +40,18 @@ internal static class TransferProxySelection
     /// <param name="failure">
     /// The selector's failure for proxy text curl cannot use; <see langword="null" /> otherwise.
     /// </param>
+    /// <param name="diagnosticLog">
+    /// The run's diagnostic log, where the selector writes its choice under component <c>proxy</c>
+    /// (BL-1072); <see langword="null" /> writes nothing.
+    /// </param>
     /// <returns><see langword="true" /> unless the transfer must end with <paramref name="failure" />.</returns>
     internal static bool TrySelect(
         ProxySelector selector,
         CommandLineOptions options,
         CurlUrl url,
         out ProxyEndpoint? proxy,
-        [NotNullWhen(false)] out TransferResult? failure)
+        [NotNullWhen(false)] out TransferResult? failure,
+        IDiagnosticLog? diagnosticLog = null)
     {
         proxy = null;
         failure = null;
@@ -59,10 +64,10 @@ internal static class TransferProxySelection
 
         if (!string.IsNullOrEmpty(options.PreProxy))
         {
-            return TrySelectBehindPreProxy(selector, options, options.PreProxy, url, out proxy, out failure);
+            return TrySelectBehindPreProxy(selector, options, options.PreProxy, url, diagnosticLog, out proxy, out failure);
         }
 
-        if (!selector.TrySelect(url, options.Proxy?.Address, KindWithoutSchemeOf(options.Proxy), options.NoProxy, out ProxyEndpoint? selected, out failure))
+        if (!selector.TrySelect(url, options.Proxy?.Address, KindWithoutSchemeOf(options.Proxy), options.NoProxy, out ProxyEndpoint? selected, out failure, diagnosticLog))
         {
             return false;
         }
@@ -85,13 +90,14 @@ internal static class TransferProxySelection
         CommandLineOptions options,
         string preProxyText,
         CurlUrl url,
+        IDiagnosticLog? log,
         out ProxyEndpoint? proxy,
         [NotNullWhen(false)] out TransferResult? failure)
     {
         proxy = null;
-        if (!TrySelectPreProxy(selector, options, preProxyText, url, out ProxyEndpoint? preProxy, out failure)
+        if (!TrySelectPreProxy(selector, options, preProxyText, url, log, out ProxyEndpoint? preProxy, out failure)
             || preProxy is null
-            || !TrySelectProxyBehindPreProxy(selector, options, url, out ProxyEndpoint? selected, out failure))
+            || !TrySelectProxyBehindPreProxy(selector, options, url, log, out ProxyEndpoint? selected, out failure))
         {
             return failure is null;
         }
@@ -109,10 +115,11 @@ internal static class TransferProxySelection
         CommandLineOptions options,
         string preProxyText,
         CurlUrl url,
+        IDiagnosticLog? log,
         out ProxyEndpoint? preProxy,
         [NotNullWhen(false)] out TransferResult? failure)
     {
-        if (!selector.TrySelect(url, preProxyText, ProxyKind.Socks4, options.NoProxy, out preProxy, out failure))
+        if (!selector.TrySelect(url, preProxyText, ProxyKind.Socks4, options.NoProxy, out preProxy, out failure, log))
         {
             return false;
         }
@@ -134,6 +141,7 @@ internal static class TransferProxySelection
         ProxySelector selector,
         CommandLineOptions options,
         CurlUrl url,
+        IDiagnosticLog? log,
         out ProxyEndpoint? selected,
         [NotNullWhen(false)] out TransferResult? failure)
     {
@@ -144,7 +152,7 @@ internal static class TransferProxySelection
             return true;
         }
 
-        if (!selector.TrySelect(url, proxyOption.Address, KindWithoutSchemeOf(proxyOption), options.NoProxy, out selected, out failure))
+        if (!selector.TrySelect(url, proxyOption.Address, KindWithoutSchemeOf(proxyOption), options.NoProxy, out selected, out failure, log))
         {
             return false;
         }

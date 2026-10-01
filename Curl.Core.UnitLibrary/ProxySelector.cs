@@ -75,6 +75,12 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     /// The failure the transfer ends with when the chosen proxy text cannot be used
     /// (<see cref="ProxyUrlParser" />); <see langword="null" /> otherwise.
     /// </param>
+    /// <param name="diagnosticLog">
+    /// Where the choice is written, component <see cref="DiagnosticLogComponents.Proxy" />
+    /// (BL-1072): the proxy chosen as <c>info</c>, by scheme, host and port only; a no-proxy
+    /// match, naming its entry, and no proxy text as <c>verbose</c>. <see langword="null" />
+    /// writes nothing.
+    /// </param>
     /// <returns><see langword="true" /> unless the chosen proxy text is unusable.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="url" /> is <see langword="null" />.</exception>
     public bool TrySelect(
@@ -83,27 +89,16 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
         ProxyKind proxyOptionKind,
         string? noProxyOption,
         out ProxyEndpoint? proxy,
-        [NotNullWhen(false)] out TransferResult? failure)
+        [NotNullWhen(false)] out TransferResult? failure,
+        IDiagnosticLog? diagnosticLog = null)
     {
         ArgumentNullException.ThrowIfNull(url);
 
+        ProxyDiagnosticLog log = new(diagnosticLog);
         proxy = null;
         failure = null;
-        if (url.Scheme == "file"
-            || NoProxyMatcher.Matches(HostName(url), noProxyOption ?? ReadNoProxy()))
-        {
-            return true;
-        }
-
-        (string? proxyText, ProxyKind kindWithoutScheme) = proxyOption is null
-            ? (ReadProxyFor(url.Scheme), ProxyKind.Http)
-            : (proxyOption, proxyOptionKind);
-        if (string.IsNullOrEmpty(proxyText))
-        {
-            return true;
-        }
-
-        return ProxyUrlParser.TryParse(proxyText, kindWithoutScheme, out proxy, out failure);
+        return IsReachedDirectly(url, noProxyOption, log)
+            || TryParseProxyFor(url, proxyOption, proxyOptionKind, log, out proxy, out failure);
     }
 
     /// <summary>
@@ -111,6 +106,57 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     /// loses its brackets (<see cref="CurlUrl.Host" /> never carries the zone).
     /// </summary>
     private static string HostName(CurlUrl url) => url.Host.StartsWith('[') ? url.Host[1..^1] : url.Host;
+
+    /// <summary>Whether <paramref name="url" /> is a <c>file</c> URL or its host is exempt from every proxy.</summary>
+    private bool IsReachedDirectly(CurlUrl url, string? noProxyOption, ProxyDiagnosticLog log)
+    {
+        if (url.Scheme == "file")
+        {
+            log.FileUrl();
+            return true;
+        }
+
+        string host = HostName(url);
+        if (NoProxyMatcher.MatchingEntry(host, noProxyOption ?? ReadNoProxy()) is not { } entry)
+        {
+            return false;
+        }
+
+        log.Exempted(host, entry);
+        return true;
+    }
+
+    /// <summary>
+    /// Parses the proxy text that applies to <paramref name="url" />: the option's when given,
+    /// else the environment's; none or empty is a direct connection.
+    /// </summary>
+    private bool TryParseProxyFor(
+        CurlUrl url,
+        string? proxyOption,
+        ProxyKind proxyOptionKind,
+        ProxyDiagnosticLog log,
+        out ProxyEndpoint? proxy,
+        [NotNullWhen(false)] out TransferResult? failure)
+    {
+        proxy = null;
+        failure = null;
+        (string? proxyText, ProxyKind kindWithoutScheme) = proxyOption is null
+            ? (ReadProxyFor(url.Scheme), ProxyKind.Http)
+            : (proxyOption, proxyOptionKind);
+        if (string.IsNullOrEmpty(proxyText))
+        {
+            log.NoneGiven(url);
+            return true;
+        }
+
+        if (!ProxyUrlParser.TryParse(proxyText, kindWithoutScheme, out proxy, out failure))
+        {
+            return false;
+        }
+
+        log.Chosen(url, proxy);
+        return true;
+    }
 
     private string? ReadNoProxy() => Read("no_proxy") ?? Read("NO_PROXY");
 

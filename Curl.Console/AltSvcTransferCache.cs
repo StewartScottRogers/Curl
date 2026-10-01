@@ -78,15 +78,20 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// <param name="connectToEntries">The transfer's <c>--connect-to</c> values, which win over an alternative.</param>
     /// <param name="fileSystem">Opens the file.</param>
     /// <param name="clock">The clock expiries are counted on.</param>
+    /// <param name="diagnosticLog">
+    /// The run's diagnostic log, where the cache writes alternatives stored and used under component
+    /// <c>altsvc</c> (BL-1072); <see langword="null" /> writes nothing.
+    /// </param>
     /// <returns>The cache.</returns>
     internal static async Task<AltSvcTransferCache> OpenAsync(
         string file,
         RequestedHttpVersion? requestedVersion,
         IReadOnlyList<string> connectToEntries,
         IFileSystem fileSystem,
-        TimeProvider clock)
+        TimeProvider clock,
+        IDiagnosticLog? diagnosticLog = null)
     {
-        AltSvcCache cache = new(clock);
+        AltSvcCache cache = new(clock, diagnosticLog);
         if (file.Length > 0)
         {
             cache.ReadFile(await ReadTextAsync(file, fileSystem).ConfigureAwait(false));

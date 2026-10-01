@@ -19,7 +19,8 @@ namespace Curl.Core.Hsts;
 /// <param name="diagnosticLog">
 /// Where the policy writes its decisions, component <see cref="DiagnosticLogComponents.Hsts" />
 /// (ADR-0222, BL-921): a URL switched to <c>https</c> as <c>info</c>, an <c>http</c> host the cache
-/// does not know and each header learned as <c>verbose</c>; <see langword="null" /> for none. Only
+/// does not know and each header learned as <c>verbose</c>, and the cache's own entry stored and
+/// expired lines (<see cref="HstsCache" />, BL-1072); <see langword="null" /> for none. Only
 /// the host is written, never the URL, so no credential can be.
 /// </param>
 public sealed class HstsTransferPolicy(TimeProvider timeProvider, IDiagnosticLog? diagnosticLog = null)
@@ -32,7 +33,7 @@ public sealed class HstsTransferPolicy(TimeProvider timeProvider, IDiagnosticLog
 
     private const string HeaderName = "Strict-Transport-Security";
 
-    private readonly HstsCache cache = new(timeProvider);
+    private readonly HstsCache cache = new(timeProvider, diagnosticLog);
 
     private readonly Lock gate = new();
 

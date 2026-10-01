@@ -29,6 +29,7 @@ public sealed class HstsTransferPolicyDiagnosticLogTests
         CollectionAssert.AreEqual(
             new[]
             {
+                (DiagnosticLogLevel.Verbose, DiagnosticLogComponents.Hsts, "stored entry for example.com"),
                 (DiagnosticLogLevel.Verbose, DiagnosticLogComponents.Hsts, "learned Strict-Transport-Security from example.com"),
                 (DiagnosticLogLevel.Info, DiagnosticLogComponents.Hsts, "http URL to example.com switched to https by its HSTS entry"),
             },
