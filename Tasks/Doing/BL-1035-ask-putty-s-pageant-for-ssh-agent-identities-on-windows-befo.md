@@ -31,3 +31,4 @@ BL-902 (ADR-0270) built the agent step behind `ISshAgentConnector` with `SystemS
 ## Log
 
 - 2026-09-30: Created.
+- 2026-10-01: Backlog -> Doing.
