@@ -508,6 +508,9 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private readonly StandardOutputFailureDeferringStream deferringStandardOutput = new(standardOutput);
 
+    /// <summary>Each transfer's option group and URL, in the order they started, for the <c>--libcurl</c> file.</summary>
+    private readonly List<(CommandLineOptions Options, string Url)> libcurlTransfers = [];
+
     /// <summary>
     /// The state of the transfer the current asynchronous flow is running, set as each transfer
     /// starts, so that transfers running at once under <c>-Z</c> each see their own (ADR-0127).
@@ -913,7 +916,9 @@ internal sealed class CurlCommandRunner(
             return (int)CurlExitCode.Ok;
         }
 
-        if (await TransferAllGroupsAsync(groups).ConfigureAwait(false) is not { } exitCode)
+        CurlExitCode? transfersExitCode = await TransferAllGroupsAsync(groups).ConfigureAwait(false);
+        await WriteLibcurlSourceAsync(options).ConfigureAwait(false);
+        if (transfersExitCode is not { } exitCode)
         {
             return (int)CurlExitCode.FailedInit;
         }
@@ -921,6 +926,63 @@ internal sealed class CurlCommandRunner(
         await WriteErrorLinesAsync(warningLinesAfterTransfers).ConfigureAwait(false);
 
         return (int)exitCode;
+    }
+
+    /// <summary>
+    /// Notes a transfer for the <c>--libcurl</c> source file, in the order the transfers start; nothing
+    /// without <c>--libcurl</c>.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="givenUrl">The URL as the glob expanded it, before any scheme is guessed.</param>
+    private void RecordLibcurlTransfer(CommandLineOptions options, string givenUrl)
+    {
+        if (options.LibcurlFile is null)
+        {
+            return;
+        }
+
+        lock (libcurlTransfers)
+        {
+            libcurlTransfers.Add((options, givenUrl));
+        }
+    }
+
+    /// <summary>
+    /// Writes the <c>--libcurl</c> source file once the transfers are done, as curl 8.21.0 does whether
+    /// they succeeded or not (<see cref="LibcurlSourceCode" />): <c>-</c> to standard output with
+    /// <c>\n</c> line ends, and a file in text mode, so with <c>\r\n</c> on Windows. A file that cannot
+    /// be opened gets curl's warning, unless <c>-s</c> was given (measured 2026-10-01, BL-652 Notes).
+    /// </summary>
+    /// <param name="options">The first option group; <c>--libcurl</c> is global.</param>
+    /// <returns>A task that completes when the file is written.</returns>
+    private async Task WriteLibcurlSourceAsync(CommandLineOptions options)
+    {
+        if (options.LibcurlFile is not { } file)
+        {
+            return;
+        }
+
+        string source = LibcurlSourceCode.Generate(libcurlTransfers);
+        if (file == "-")
+        {
+            await GatedStandardOutput.WriteAsync(Encoding.UTF8.GetBytes(source)).ConfigureAwait(false);
+            await GatedStandardOutput.FlushAsync().ConfigureAwait(false);
+            return;
+        }
+
+        FileOpenResult opened = await fileSystem
+            .OpenForWriteAsync(file, FileWriteMode.Truncate, DeferredOutputFileStream.CreateMode, CancellationToken.None)
+            .ConfigureAwait(false);
+        if (opened.Content is not { } content)
+        {
+            await (options.Silent ? Task.CompletedTask : WriteErrorLineAsync($"Warning: Failed to open {file} to write libcurl code")).ConfigureAwait(false);
+            return;
+        }
+
+        await using (content.ConfigureAwait(false))
+        {
+            await content.WriteAsync(Encoding.UTF8.GetBytes(runsOnWindows ? source.Replace("\n", "\r\n", StringComparison.Ordinal) : source)).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -1839,6 +1901,7 @@ internal sealed class CurlCommandRunner(
             return (await ReportIpfsGatewayFailureAsync(options, transfer, ipfsFailure).ConfigureAwait(false), givenUrl, string.Empty);
         }
 
+        RecordLibcurlTransfer(options, givenUrl);
         string? uploadFile = transfer.UploadFile;
         string transferUrl = UrlSchemeGuesser.AddScheme(givenUrl, options.DefaultProtocol);
         if (uploadFile is not null && !UploadTransferUrl.TryResolve(transferUrl, uploadFile, out transferUrl))
