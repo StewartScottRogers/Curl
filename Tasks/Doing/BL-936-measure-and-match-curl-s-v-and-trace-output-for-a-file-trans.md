@@ -71,3 +71,4 @@ Decided by Claude under Stewart's delegation (ADR still to write under `Document
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Console.UnitTests (one -v -D test must expect the measured '* closing connection #0'), which BL-650 in Doing touches; code is done in the lane stash, resume after BL-650
+- 2026-10-01: Backlog -> Doing.
