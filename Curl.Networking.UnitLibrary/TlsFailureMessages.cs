@@ -471,6 +471,13 @@ internal static class TlsFailureMessages
     public const string OpenSslNoSuitableSignatureAlgorithm = "TLS connect error: error:0A000076:SSL routines::no suitable signature algorithm";
 
     /// <summary>
+    /// Every build's message for exit 35 when a <c>--sigalgs</c> list names no scheme TLS 1.2
+    /// can check, such as <c>RSA+SHA1</c> or <c>mldsa65</c>, under a TLS 1.2 ceiling: measured
+    /// with curl 8.18.0's OpenSSL 3.5.5 build, 2026-10-01 (BL-1094).
+    /// </summary>
+    public const string OpenSslNoCiphersAvailable = "TLS connect error: error:0A0000B5:SSL routines::no ciphers available";
+
+    /// <summary>
     /// The Windows message for exit 35 when the server answers a <c>--curves</c> ClientHello
     /// with a <c>handshake_failure</c> alert, as the one Windows build that applies
     /// <c>--curves</c>, curl.se's curl 8.18.0 with LibreSSL 4.2.1, prints it (measured

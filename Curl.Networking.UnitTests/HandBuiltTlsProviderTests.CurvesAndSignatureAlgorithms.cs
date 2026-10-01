@@ -132,6 +132,47 @@ public sealed partial class HandBuiltTlsProviderTests
         CollectionAssert.AreEqual(exitCode == CurlExitCode.SslCipher ? Array.Empty<byte>() : InternalErrorAlert, await ReadUntilClosedAsync(server));
     }
 
+    // Under a TLS 1.2 ceiling, a list leaving no group sends the ClientHello without
+    // ec_point_formats and supported_groups, as Ubuntu's curl 8.18.0 with OpenSSL 3.5.5 did for
+    // '?bogus' and X25519MLKEM768 (measured 2026-10-01, BL-1094).
+    [TestMethod]
+    [DataRow(SchannelBuild, "?bogus")]
+    [DataRow(OpenSslBuild, "?bogus")]
+    [DataRow(OpenSslBuild, "X25519MLKEM768")]
+    public async Task AuthenticateAsClientAsync_WithCurvesLeavingNoGroupUnderATls12Ceiling_SendsTheHelloWithoutGroups(bool matchesSchannelBuild, string curves)
+    {
+        var hello = DecodeClientHello(await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Curves: curves)), matchesSchannelBuild, ProfileHost, Http11));
+
+        var types = ExtensionTypes(hello);
+        CollectionAssert.DoesNotContain(types, TlsExtensionType.SupportedGroups);
+        CollectionAssert.DoesNotContain(types, TlsExtensionType.EcPointFormats);
+        CollectionAssert.Contains(types, TlsExtensionType.SignatureAlgorithms);
+    }
+
+    // Under a TLS 1.2 ceiling, a list leaving no scheme TLS 1.2 can check fails with OpenSSL's
+    // "no ciphers available" and its internal_error alert, whatever --curves leaves (measured
+    // 2026-10-01, BL-1094).
+    [TestMethod]
+    [DataRow(SchannelBuild, null, "RSA+SHA1")]
+    [DataRow(OpenSslBuild, null, "RSA+SHA1")]
+    [DataRow(OpenSslBuild, null, "mldsa65")]
+    [DataRow(OpenSslBuild, "?bogus", "RSA+SHA1")]
+    public async Task AuthenticateAsClientAsync_WithSigalgsLeavingNoTls12SchemeUnderATls12Ceiling_FailsWithNoCiphersAvailable(
+        bool matchesSchannelBuild,
+        string? curves,
+        string signatureAlgorithms)
+    {
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+
+        var result = await Provider(Tls12Only(new TlsClientOptions(Curves: curves, SignatureAlgorithms: signatureAlgorithms)), matchesSchannelBuild)
+            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual("TLS connect error: error:0A0000B5:SSL routines::no ciphers available", result.ErrorMessage);
+        Assert.IsTrue(client.IsDisposed);
+        CollectionAssert.AreEqual(InternalErrorAlert, await ReadUntilClosedAsync(server));
+    }
+
     // A peer already gone when the alert is written leaves the failure as it was.
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithNothingToOfferAndAWriteThatFails_StillFailsWithTheMeasuredLine()
