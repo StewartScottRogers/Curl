@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Security;
 using System.Runtime.ExceptionServices;
 using System.Security.Authentication;
@@ -353,7 +354,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return clientCertificateFailure;
         }
 
-        events.ReportTlsTrust(DescribeTrust());
+        events.ReportTlsTrust(DescribeTrust(_options, targetHost));
         X509ChainPolicy? chainPolicy;
         X509Certificate2Collection anchorsBesideSystemStore;
         CertificateRevocationListFile? revocationLists;
@@ -520,17 +521,19 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return _options.UseAlpn ? applicationProtocols : [];
     }
 
-    private TlsTrustEvent DescribeTrust() => DescribeTrust(_options);
-
     /// <summary>
     /// Describes the trust a handshake with <paramref name="options" /> verifies against, as
     /// both TLS clients report it before the handshake: <c>-k</c>, the <c>--cacert</c> file or
-    /// else <see cref="OpenSslDefaultCaCertificateFile" />, and the <c>--capath</c> directory.
+    /// else <see cref="OpenSslDefaultCaCertificateFile" />, the <c>--capath</c> directory,
+    /// <c>--ssl-auto-client-cert</c>, and whether <paramref name="targetHost" /> is an IP address.
     /// </summary>
     /// <param name="options">The handshake's settings.</param>
+    /// <param name="targetHost">The host the handshake connects to; an IPv6 literal may keep its brackets.</param>
     /// <returns>The event.</returns>
-    internal static TlsTrustEvent DescribeTrust(TlsClientOptions options) => new()
+    internal static TlsTrustEvent DescribeTrust(TlsClientOptions options, string targetHost) => new()
     {
+        UsesAutomaticClientCertificate = options.AutoClientCertificate,
+        TargetsIpAddress = IPAddress.TryParse(targetHost.Trim('[', ']'), out _),
         VerifiesPeer = !options.Insecure,
         CaCertificateFile = options.CaCertificateFile ?? OpenSslDefaultCaCertificateFile,
         CaCertificateDirectory = options.CaCertificateDirectory,

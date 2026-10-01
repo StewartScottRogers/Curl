@@ -63,14 +63,15 @@ internal static class TransferEventInfoText
     /// <summary>
     /// Returns the <c>SSL Trust</c> lines a curl build prints before a handshake: the OpenSSL
     /// build's (<see cref="OpenSslTrustText"/>), which curl.se's LibreSSL build also prints for
-    /// a QUIC connect on Windows (ADR-0144); the Schannel build prints none.
+    /// a QUIC connect on Windows (ADR-0144); the Schannel build's <c>schannel:</c> lines
+    /// (<see cref="SchannelTrustText"/>) instead.
     /// </summary>
     /// <param name="trust">The trust the connection is set up with.</param>
     /// <param name="tlsBackend">The curl build whose wording to use.</param>
     /// <returns>The lines, in the order curl prints them.</returns>
     public static IReadOnlyList<string> TlsTrust(TlsTrustEvent trust, TlsBackend tlsBackend)
     {
-        return tlsBackend == TlsBackend.OpenSsl || trust.IsQuic ? OpenSslTrustText.Lines(trust) : [];
+        return tlsBackend == TlsBackend.OpenSsl || trust.IsQuic ? OpenSslTrustText.Lines(trust) : SchannelTrustText.Lines(trust);
     }
 
     private static IReadOnlyList<string> AlpnLines(TlsHandshakeEvent handshake)

@@ -297,7 +297,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return (null, clientCertificateFailure);
         }
 
-        events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options));
+        events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options, targetHost));
         try
         {
             var (chainPolicy, anchorsBesideSystemStore, revocationLists) = _verification.ReadTrustAnchors();

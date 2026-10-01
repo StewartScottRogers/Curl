@@ -180,7 +180,7 @@ public sealed class QuicDialer
             return (openFailure!, true);
         }
 
-        request.Target.Events.ReportTlsTrust(DescribeTrust());
+        request.Target.Events.ReportTlsTrust(DescribeTrust(request.Target.Host));
         var (verifier, unusable) = CreateVerifier(request.Target.Host);
         if (verifier is null)
         {
@@ -386,9 +386,9 @@ public sealed class QuicDialer
     // On Windows, without --cacert, Curl verifies against the Windows stores, which curl.se's
     // LibreSSL build names as --ca-native makes it (measured, BL-1050); its embedded bundle's
     // "CA Blob from configuration" is not printed, as Curl embeds none (ADR-0144).
-    private TlsTrustEvent DescribeTrust()
+    private TlsTrustEvent DescribeTrust(string targetHost)
     {
-        var trust = SslStreamTlsProvider.DescribeTrust(_options) with { IsQuic = true };
+        var trust = SslStreamTlsProvider.DescribeTrust(_options, targetHost) with { IsQuic = true };
         return _matchesSchannelBuild && _options.CaCertificateFile is null
             ? trust with { CaCertificateFile = null, UsesWindowsSystemStores = true }
             : trust;

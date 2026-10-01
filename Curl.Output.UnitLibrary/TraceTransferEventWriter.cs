@@ -135,7 +135,7 @@ public sealed class TraceTransferEventWriter(
     /// <inheritdoc />
     /// <remarks>
     /// The OpenSSL build writes its <c>SSL Trust</c> lines (<see cref="OpenSslTrustText"/>);
-    /// the Schannel build writes nothing, except for a QUIC connect, where curl.se's LibreSSL
+    /// the Schannel build its <c>schannel:</c> lines (<see cref="SchannelTrustText"/>), except for a QUIC connect, where curl.se's LibreSSL
     /// build writes the OpenSSL lines (<see cref="TransferEventInfoText.TlsTrust"/>).
     /// </remarks>
     public void ReportTlsTrust(TlsTrustEvent trust)

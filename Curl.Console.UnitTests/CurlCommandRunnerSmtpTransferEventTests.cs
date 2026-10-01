@@ -102,9 +102,8 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
     public async Task RunAsync_VerboseMailUploadWithStartTls_WritesTheEstablishedConnectionLineAgainAfterTheUpgrade()
     {
         // Between "< 220 Ready to start TLS" and the second EHLO curl writes the connect's
-        // "Established connection" line again (BL-1058). It also writes two "schannel:" lines
-        // first, which the Schannel build writes before every handshake, HTTPS's included;
-        // BL-1083 adds them for every handshake.
+        // "Established connection" line again (BL-1058), after the two "schannel:" lines the
+        // Schannel build writes before every handshake, HTTPS's included (BL-1083).
         int exitCode = await RunAsync(
             ["-sv", "-k", "--ssl-reqd"], 18027, 53681, Greeting + EhloReply + "220 Ready to start TLS\r\n" + SecureEhloReply + Transaction);
 
@@ -114,6 +113,8 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
             + Headers("< ", EhloReply)
             + "> STARTTLS" + HeaderEnd
             + "< 220 Ready to start TLS" + HeaderEnd
+            + "* schannel: disabled automatic use of client certificate" + InfoEnd
+            + "* schannel: using IP address, SNI is not supported by OS." + InfoEnd
             + "* Established connection to 127.0.0.1 (127.0.0.1 port 18027) from 127.0.0.1 port 53681 " + InfoEnd
             + "> EHLO client" + HeaderEnd
             + Headers("< ", SecureEhloReply)
@@ -181,7 +182,7 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
         return new CurlCommandRunner(
                 _ => new TransferDispatch(
                     new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
-                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver()))),
                 files,
                 files,
                 standardOutput,
@@ -208,6 +209,29 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
                 ConnectionNumber = 0,
             });
             return inner.ConnectAsync(target, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// A pass-through TLS provider that reports the trust before its handshake, as
+    /// <c>SslStreamTlsProvider</c> does, so the Schannel build's <c>schannel:</c> lines appear.
+    /// </summary>
+    private sealed class TrustReportingTlsProvider : ITlsProvider
+    {
+        public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+            IConnection plaintext,
+            string targetHost,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(ConnectResult.Connected(plaintext));
+
+        public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+            IConnection plaintext,
+            string targetHost,
+            ITransferEvents events,
+            CancellationToken cancellationToken)
+        {
+            events.ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = false, TargetsIpAddress = IPAddress.TryParse(targetHost, out _) });
+            return AuthenticateAsClientAsync(plaintext, targetHost, cancellationToken);
         }
     }
 }
