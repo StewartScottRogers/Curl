@@ -24,6 +24,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since <date>
 - `-LogRoot`: the log folder the prompt names. Always pass it: the default is the folder beside
   the tree being run, which for an audit worktree is not the factory's.
 - `-OutFile`: in the temporary folder the prompt names.
+- `-CiRunsJson <log folder>\ci-runs.json` when the log folder holds that file: an audit run
+  saves the CI runs there when it copies the logs, so every auditor and every re-audit reads
+  the same CI history. Without it the tool asks `gh` for the runs as they are now.
 
 Put every metric it prints in `metrics`, with the names [Report-Format.md](Report-Format.md)
 defines: `tasksDone`, `medianTaskMinutes`, `p90TaskMinutes`, `tasksClaimedMoreThanOnce`,
