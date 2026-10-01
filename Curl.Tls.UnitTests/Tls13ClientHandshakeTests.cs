@@ -37,6 +37,14 @@ public sealed class Tls13ClientHandshakeTests
     [DataRow(TlsNamedGroup.Secp384r1)]
     [DataRow(TlsNamedGroup.Secp521r1)]
     [DataRow(TlsNamedGroup.Ffdhe2048)]
+    [DataRow(TlsNamedGroup.MlKem512)]
+    [DataRow(TlsNamedGroup.MlKem768)]
+    [DataRow(TlsNamedGroup.MlKem1024)]
+    [DataRow(TlsNamedGroup.SecP256r1MlKem768)]
+    [DataRow(TlsNamedGroup.SecP384r1MlKem1024)]
+    [DataRow(TlsNamedGroup.BrainpoolP256r1Tls13)]
+    [DataRow(TlsNamedGroup.BrainpoolP384r1Tls13)]
+    [DataRow(TlsNamedGroup.BrainpoolP512r1Tls13)]
     public void HandshakeCompletesWithAKeyShareOnEachGroup(int group)
     {
         Tls13TestServer server = new(TestServerCredential.Ed25519()) { Group = (ushort)group };
@@ -55,6 +63,9 @@ public sealed class Tls13ClientHandshakeTests
     [DataRow(TlsNamedGroup.Ffdhe3072)]
     [DataRow(TlsNamedGroup.X448)]
     [DataRow(TlsNamedGroup.X25519MlKem768)]
+    [DataRow(TlsNamedGroup.MlKem1024)]
+    [DataRow(TlsNamedGroup.SecP384r1MlKem1024)]
+    [DataRow(TlsNamedGroup.BrainpoolP256r1Tls13)]
     public void HandshakeCompletesAfterAHelloRetryRequestForEachGroup(int group)
     {
         Tls13TestServer server = new(TestServerCredential.Ed25519()) { Group = (ushort)group, CipherSuite = 0x1302 };

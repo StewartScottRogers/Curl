@@ -1,0 +1,156 @@
+namespace Curl.Tls;
+
+/// <summary>
+/// Known answers for the TLS 1.3 key shares, made with OpenSSL 3.5.5 (Ubuntu, 2026-10-01):
+/// <c>openssl genpkey -algorithm ML-KEM-n -pkeyopt hexseed:...</c> and <c>openssl pkeyutl -encap</c>
+/// for ML-KEM, <c>openssl genpkey -algorithm EC</c> and <c>openssl pkeyutl -derive</c> for the
+/// elliptic curves. The hybrids combine them, so a hybrid's answer is its two halves' answers.
+/// </summary>
+internal static class KeyShareKnownAnswers
+{
+    /// <summary>ML-KEM-512 from the seed d || z = 00 01 .. 3f: SHA-256 of the encapsulation key, an encapsulation to it and its shared secret.</summary>
+    public static readonly MlKemAnswer MlKem512 = new(
+        "3ae268dccc5456ac0d0f9b39257dc48fe081383b97c400512d712b739762daee",
+        "5f2227b24eddd418474db83ecc3b95bcd0b6833a33537af2472cf39141307cb7a7c39c6239b37b250a28aca82bc0c7df" +
+        "fb8ce218ff6080472f8887af8e96e43f190cfa520bfc93dd2adae328d5efc1b406e93473a4e2a108a12ae2864583045b" +
+        "030d5298cba2dedb7aea0fb832f4d4db0319120563fdb40a50f9dc72ddafa34edc38eb54de00df7462554e15cd62e274" +
+        "befeec8397dedd8db7f72bb023ab3b844104fc7b9697487a6d609c8f5c7270b6bb8e202339388c1986b8ca1118ea2dfd" +
+        "d41ed76230cb36351391268b3416de147dad0e3c47a6d2feabcad9ef78b9b6cb0d70ca763590652d7cee3ea656209375" +
+        "ff80bac5b346d4aa12da9a70b19be8ca890a1ac522be3a0ff117d41e8725d4e4ca931aeac07f2eff74f1aefe91e0fb7d" +
+        "dcf295e4fdf313380192c9d0b1cf0e4d5737e682dd3e13fdcf1b0f0cd3f04ceaa1e965564411649338a6d60612db465b" +
+        "ed0f4e117453ebef3399876904c1ca3e3c87008e26742bb4c384db0e852a945dc09e93f5a819e7ca24e454edbda8d3ec" +
+        "b0cdc0065026ad927e8de6f74d5286e6db3e8b6ffdeb32b4be0f06560474ac7dbe7d6a4548bc7da4bf746292445325c2" +
+        "337737d9ac12872fc1caa083180c0b881d33daeb6eb54723432a3b049ca1bc38a57019a48bc307e4bc0c3862091c8b8d" +
+        "6151b0a9bfb8ecf22e18b19f6c24e8d0ff1fcbbbaa21960e7206badc8e69f7b77d9b378983d4dd775b9e2eaf50d1c3fc" +
+        "d6a7ec90f491b9452c57207604cbd86cd9f9dd2dc66b3749cf8ea967eea66bbecc3c537575b3c8ef39bac59cdab8c3a8" +
+        "4b01de2753233913a45da9969ef9f3b293928edc099f2e14354d010bf4bc66ec907339f5499f798a0f0dfc8e01199abc" +
+        "0bac0e29921d4c13d2b40f389bc5a3623bf954c5d2d7414c27e18e95c8829933cbfb62a80748a848a35f2972899479ac" +
+        "206932384b91d52292e8eb60a1d3af5cbf7153a500596d8e0fca3cc8301631a18f342215caee734a4cd96dfdd08b0637" +
+        "59f8bec345720ad95a1a9d7cf7d71dbb4a9d05ee6dfa077c72a64656439e1400f2a65c6529611016e38fc13f21989ec7",
+        "e07876d92b467a341038aeef10022ef6bb7ff87a0592caa6ab4312c1a0ae3e3f");
+
+    /// <summary>ML-KEM-768 from the seed d || z = 00 01 .. 3f: SHA-256 of the encapsulation key, an encapsulation to it and its shared secret.</summary>
+    public static readonly MlKemAnswer MlKem768 = new(
+        "0b7934c83125c788995e2ba6bd761e33046b3e40571be53e023309a29f398cc9",
+        "6fbaffc0d0c18178c466ea211e97ff669acf04713a228192bfcee6d63b37d093a941a5141c70b67932e3f67744a159ce" +
+        "79c32db85a041095f8cde8f8a48d3f26c69c59635331c8469743b6e3258c140952e866ed41eb08b3b16d75c6b46dbc15" +
+        "b75acddd8c80677c2b61c5f842e98fc5ce1f95eec915889cd60c7d5cae3086c636091713ccf9e047501e71480132907e" +
+        "5d42a35da999f9090e8570b63c4bb7b62b1b6d7f5f261372ff40e04021cb6ba638c94b2384779319728f341288f6f039" +
+        "151635e8995bcca8d672f956cde3ca91d3d4fbc1c09cdf9de88e0cb0cac1717266aa4f1d5f75a5306663238822b320a7" +
+        "f9fbe2d70a88e7d87a5ef18856461171e00deaeaeaf9ac43d460b6320d0c9b7a81e2bc57a395c5d37496fdde8508a1b3" +
+        "57204e46c83078a65b7718041c7d0c37b1fdff9d421f50afeb070ee5027909693939c3150d5365b21f462c98938c9d81" +
+        "01892387a6554d008d0c94dbc8b35d66e212200ddf4a8a7aebd477a8615da1df802854718e367f7feaee05c56a51d614" +
+        "615f87c087dcc6d0231038f2606ab9005ef80f141f763111405d1af21ffa350b8a36823e8c31e3c0bd85c0817c83db24" +
+        "3f3a9cf226471b02a3673919c977d593dfffb661630640f4e58a0567975d4f671ce2329d8d404fc259be0b5e9f9c0f9c" +
+        "0c3e91c52435a5a421eec9a1902ab9c4e89ad7a8096240d161ce7a2e5dcdc9f59910c8436dff1a6ee7d1dab50fda3e10" +
+        "b7e64e7a142d6c9322f7166d5388471d43f1a126c9677489424e03e27e089e7c94124a4a20b55866ae9a89a6112d7d2b" +
+        "d32d9a4d4818d795efc7de9fb30f8cfe49a9bb96e666d3a02a74de92e85fd164c4c6445e2c613e457fa5f41a699c1b8c" +
+        "c242302632a6f6b7c4d16f5df7f43a87a19ff2eab7e3ebd54a0a9315a15099bc4117f1949119a75d73db04927260530b" +
+        "d2f604791a773a742cefef2a4a42209d9e0ea5a99f62ce115cb0b8f22ea7abf9adf9f389ae1a730b342977ca4f3d6ecb" +
+        "eeb057e4b3233b5f7d68c7ce6a43e6f40a63c0c7fd5319a388d71b8e032160d6effe5a29a524990519c8db2c30194ab1" +
+        "b7d3158c0de24a236fdd4896d5f7ed6721d83863d2a8794a96049df8205fb58e7617a531f89e0aa1633f2e9535019f11" +
+        "5199e38034299d6e3185934639f6da5b994a079e33ae6875128b88a96d9131a5fcf128b1299985db8b43b3d48b28fdba" +
+        "73096161c73ef9ddcbe5cdc96d8a880503ff4656305eb2d5c1c7ab2d6eed2471d3697cf581b4a999ede60d4aab6bb03c" +
+        "b7a7dfa7a2cb2be055bf9a0d4842c7dbc89c2b34e6928dfe2afbde98e1f1e4d4c378e5b66627ef5e10eeaa1628f9dca4" +
+        "ad01ce6380ade26551588bf78f8d0e6b89b6fc69088aa8399287116c911b6082fcb11d0a2f3c4b73abded640a08cb94a" +
+        "b5fff40e613550071894d544ac6ba3b2d19b2dc4670d041f1943def0a1afb4de0f940810e44bd0f7310a0a9b8f5c2f10" +
+        "b6bb69823cb80e2630dd530f63ebbe32a1de4c1dcbc4dcbc4972cdc47f6e3672",
+        "032c0bc93933afba5df3562ae524e54cf14ad30472d6ebb3669ca8903125e9ae");
+
+    /// <summary>ML-KEM-1024 from the seed d || z = 00 01 .. 3f: SHA-256 of the encapsulation key, an encapsulation to it and its shared secret.</summary>
+    public static readonly MlKemAnswer MlKem1024 = new(
+        "c7b8fa0aa471d5ae18922d6ccad5b31e1d84f92ae723abfd13747018740a8530",
+        "40eea4ea6dc4a1cda9c6fa526e0878480877b8fa799e314a4f4403b37d9f4f29ce2f7ff3e5b71960e54cf1e17d9e31e2" +
+        "9e6302f0591dfb96dcefd189504f0f6b23fc85924a8ea989919450bb74b19ef0c144fe0dab8d30cda825fba10aec484e" +
+        "4abfb452248cfd6b55aa9f5999757019e75568ebc45bf4b4c02b5e28eb826b2a0c7d8fc0af13c319a3838eddae84c89f" +
+        "bc949447c4ebcab3e93908e0bb94f0a1d61410269924f671fca5538e30d6843d0251c64fb2587e643a20e1edd95948b2" +
+        "fe0b9fa898ba77cfb96df568c49efb71a9d31a384e1d478e79d1a9889e2e227529c1e55c976959ac906f5d4f882bec50" +
+        "d466d63c652ad5d21432f63b030d5dd2a50562cc11933cbd915d20ec1a60fb29c8faed5da33f982d98dc31bb582dbdfe" +
+        "12a920e9cda20c889f03c76742f19afe623b065624adce8f54a79e681258febd23ca09899539ff871a5b10c20da90be8" +
+        "88e6d2a736ab486d96d32a0bf49544d65e0ef7888c105e0e1d88a91644ad7602fd3384f49278a8ac963da148f40166e9" +
+        "5232955943541d135275c7cdf68111e6054424562cfa23c1e7ca6b32dfd993f99f2571d2f3c12252c1e8d8466bba4047" +
+        "fe8c51c3e699e015232653efc62d2f320c4550bb3ac1be68bf61afab7cdffb8b5e4ad55002e3f5b243282193567706b0" +
+        "3b7bfb5203890a84dcd07cf2e6069e79c6e2f3d64e1e9642df8a4e2d5bf55a9cf16b6bab283b24cb8f5388dd0027ed41" +
+        "931a57347476cfbf27b6f0fe5e36c88fae403f1de72274aeb85ccbb63dee8ae76d3329e11300b280c115cbbba108246c" +
+        "733b1781cea64d14d180dcdbec0f59b2fef3484edf4e2e21c61ebd79b4647ad08ee43fb7206f2abff3a3ef4723a2aba7" +
+        "d4485f28d9c22bea5812ed493f2127aa75c7d7de63ed33b163fed1df2bc49f6a13f26491b68628043da2e9f07223f6d3" +
+        "0deccf224f014aa01c3192af2790fc701225b069826441a2f4874ea3cd9cf0a62ebcda84980069df6dd24bb709c94473" +
+        "dfd381568e6193d3e6d1b2ffa97daf99eb5bfe4a9215cc12171fd3ff263914b3c1d209405ad8545de1f7717e9b7bf51f" +
+        "b38dd1a90cd67afa614927a74f1976e367faf34c5a5013ea378e84660a77a2b52733b8e3ed8fa75109fdf80188d83a27" +
+        "2ce5268991aefc635ee68e78f16e8bb15be674367d2aa2bea8c08cb55fa49c001b67335b3e3f330bce2a7063f09b2d99" +
+        "c9f1edb6318f8fedeccc1a56e2e4be5843ae5908f05a6fe4372a51af4cf62fe488daa3fddcbf4274efeec39149247183" +
+        "defd4c75a62dbb5a00d9564dae307e9ba0be188639fa0cb9f9fb27890ec6de605feb55ad1978aec132c02eccfca18551" +
+        "376423a4398e829353ccea3f3d430a6ed8871fff5ddbb2bd2fd4fe78526663f43665d77839e674147e1276b095d21ffa" +
+        "530c715ea518c53fb2c67467aad9c4702c13861be0aa8b6f81b96a79a7d919f11320472d92d0633c88d40cf69f30a6ef" +
+        "ca5d58e878d55203321f57470f8a7fd465712244a0205eb3f3b13ddeee47a7394c8f2e1941b899de621686cb6e7fc8ca" +
+        "faf414c214ee70b753cb9a9777166cbde79c30b566d3620a30046e29c5870f83096f00b2695e4877cc43c321e86ae641" +
+        "ba591e8178931c614c7bcf0aeb7eda7f90cfd1af59e1fca84b28c9ff16389a0fa01d35a1edb8aa3b96fe1eeeb79f95e5" +
+        "4a4a2a36d632416573557adc31271e0f16b519a5753333ac67f75eb8c548c1a56126c10665fc8d609a708ef7d26b3437" +
+        "5a55f21e1122aa9b057324b4491c14c40b2b83ac2dfba9229b6edeb2a9fdb946321aa526ba8340b33f16b63845acf072" +
+        "b8200885eccc4e9536f77fe02148ad9fd62d8b91ee080385b262c05bcf4a8cec9430017554a00a6ad2db582636941131" +
+        "c7e9ffa56e7671e21a614880bfbb5a9292eeb9426cc022c045e0ccacf2539cda19fb8a94e64174f59677ec35c6948ad8" +
+        "8f1b9e3e5fdf96c9142009df848866331d89f0e9296522a1c4290c8794311f6c2a5ca4811c013e46f74ab41d53adc778" +
+        "4c134564efdf49cf6f783801efae853717f778a97d398650f6439da13ea29cf7ef9a762d7bf73e85de1e3eb6b419f89b" +
+        "7ea0cd2cc11a0d8bd38dec04719ff83a1c050b29514b7b36ce324de41e397a592797513b56b4ee4ff65726edfd666b75" +
+        "ca5cce8181573fe5c78147c07a7d509603734213ab9da228b1e597544db25962",
+        "6a4d0022f61c67de38754e11068ec198753d1ee6f33063bbfb6c1bee5504575f");
+
+    /// <summary>prime256v1 (OpenSSL's name): the client's private scalar and public point, the server's public point and the shared secret.</summary>
+    public static readonly EcdhAnswer Secp256r1 = new(
+        "b51a9ee807cc2590ac060bc393178bba666d8dbb873a80bdd530fb6c2bbfa016",
+        "0497445eeccc752827ee98d2c34cf03cd225e327010ca6eab158f9059259fa456a1852dd15f5babfe81ceaa2ae881e3d" +
+        "e088d12b258b08fc2cc0a6ea7f128e02c3",
+        "04b70632934c181e02ee0b714c068b846e0ff1ac3af772ebabe2eebf271cf89c1be2750520294ceec8a8cd8518972ee5" +
+        "16335a6147f09f19253a0ff02e7dded9bc",
+        "8054878c7744ab7d78aa4f62a2892dad4c63ad29dfaf99d9d04f7de89f0e9f27");
+
+    /// <summary>secp384r1 (OpenSSL's name): the client's private scalar and public point, the server's public point and the shared secret.</summary>
+    public static readonly EcdhAnswer Secp384r1 = new(
+        "cde51286de2a2ccfcd884e13de6f60f7fb303cac42cc5a9b95469423488573d0c6cbb434e3d82637705aa15a63707a19",
+        "0440827a00ce100268d509b74e9e48451fcac1a8a98ed67a2107808353242af897013fe6069b5891c8cb8b6966a38ef6" +
+        "4618cec57ac1a6ecef5b6a3334164e5e5794a377917dc6586460d6dadad0f33490b6827ddebc70cde3384282614a8d72" +
+        "47",
+        "04e558ab039dc9d926f18408e67a4963767626de1c7585233fccf5836fe1cdc3072480b5332fedf6a3853d52d5c7a941" +
+        "54285831992900166b490e5ba9cdcc060e1b90ef1ff5f3ce94c563f74daf47c91f10a61cc50e17afc1f361df2ccaac87" +
+        "16",
+        "85ee893edd7747d887497d30a2daea48bf70cefd92a16a69f0c211d436748e6d1844d82649db4427ab041deaaabd295b");
+
+    /// <summary>brainpoolP256r1 (OpenSSL's name): the client's private scalar and public point, the server's public point and the shared secret.</summary>
+    public static readonly EcdhAnswer BrainpoolP256r1 = new(
+        "55d6d6055c3802adbed007da8dfb0163ccb1aa9190ee030a8c52e7ba6e5417c5",
+        "0462737c6d8f5bc0632ee7cc5e8b53cc5d828816d494b2c834f3bc09b41126ee192b72a47f8b599655f75b0ef05b2af0" +
+        "d52238dc92b6f4799f60baa01d4c0fee32",
+        "042bd99823d6519aa5fe387daecc3a36d23dc70560d2cb1007ab8c6275f4053e979dfb4b40010ebd4f213f658e123ee1" +
+        "e43bf56f59973ac6befa2563d248a9fe04",
+        "4b9726f9c4fe01a4490f190a22b276f96685d6978d8105b294e08c6686db5c43");
+
+    /// <summary>brainpoolP384r1 (OpenSSL's name): the client's private scalar and public point, the server's public point and the shared secret.</summary>
+    public static readonly EcdhAnswer BrainpoolP384r1 = new(
+        "3bc52db5b812fc408baf4271897bfac2db69579aec0ecba48ec92a16c5ea7482a3707065f9984c0a9ef9f62d0e12bfdf",
+        "046637e1e18a3060df96b1b5da60cd9a4a4bf08ebb24edafa8151927c256396b01035b51e06f4027db6d14451fff73fb" +
+        "5504267202203c1e62f81be97fe745008ed0b525d9abd8208f88e9abedb4a42096f497b0a165a0b883899fbe7f45de58" +
+        "a3",
+        "04322a659e2c2a19565640849eca969f991bdac8f2b0ba8f9ca9a9cb27cb1804f2d044971c4f49af619686044ad80b4d" +
+        "64845ca834274ca099723feeaa9404e489737247f817deab87a942b902b03a11c4e936fa4fce0ac15c194d5d4925e03d" +
+        "d9",
+        "7fc714b0b33fe24875e5b4ea165fb2424f1a2bf6d243e969265c0f7fb760eb026e6eed8ec2310583c69505361e3c6f3c");
+
+    /// <summary>brainpoolP512r1 (OpenSSL's name): the client's private scalar and public point, the server's public point and the shared secret.</summary>
+    public static readonly EcdhAnswer BrainpoolP512r1 = new(
+        "52956f5063282a805fa76e9c54dfb3876383dc2c42df507de7afea047237900b008ff4c4358a041fcae989fb3043bf1b" +
+        "0d370195d34f5b74d3224749940986d1",
+        "047c894f0747ebfa08f65d01a870287dcce575f138696db16e8534f300733e23583b946ab1d2964f64e4f34c1cac75f8" +
+        "1b2b7e2388f54483adc40251de82b908b47469759c56e4899b14934542a20307f1151de19e95b09cb2fbe5b7349e9377" +
+        "e22779dcb86c534ad15d28edfd7637fb52d5f9011f4c9b650f8c3bacf738e7cbcd",
+        "041d0a44848603817a78f5218773569bd8c4bd47b5db658e2d9d5ba22f67d1291d5e7f5ece73f90f104546adbf82a4e6" +
+        "08831334659312ecf834ac5fae75438af68628e6748c23bcb3ec045d844c61c4d3c168ebdce5821fc1f65d43a4ca0817" +
+        "beb5fa3ced461d0a857b98863eddbe72b23239730b6b35120f655238efe33abb1e",
+        "3a5bdc50ecbcbcdedabf1522f8ccb6676ce1f137409f437b67c19900e93828318cb51e52120d41aeb8d2fd109ce87928" +
+        "1f8a747547f691dcc747dba7fe165a24");
+}
+
+/// <summary>An ML-KEM known answer, as hex.</summary>
+internal sealed record MlKemAnswer(string EncapsulationKeySha256, string Ciphertext, string SharedSecret);
+
+/// <summary>An ECDH known answer, as hex; the points are uncompressed.</summary>
+internal sealed record EcdhAnswer(string ClientPrivateKey, string ClientPublicKey, string ServerPublicKey, string SharedSecret);

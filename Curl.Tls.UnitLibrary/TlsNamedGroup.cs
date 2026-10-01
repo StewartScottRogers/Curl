@@ -2,9 +2,9 @@ namespace Curl.Tls;
 
 /// <summary>
 /// The named groups (RFC 8446 section 4.2.7) the TLS 1.3 client can make a key share
-/// for - X25519, x448, the NIST curves, the RFC 7919 finite-field groups and the
-/// X25519MLKEM768 hybrid - and the brainpool curves TLS 1.2 ECDHE also agrees on
-/// (RFC 7027).
+/// for - X25519, x448, the NIST curves, the brainpool <c>tls13</c> curves (RFC 8734), the
+/// RFC 7919 finite-field groups, pure ML-KEM and the three ML-KEM hybrids - and the
+/// brainpool curves TLS 1.2 ECDHE also agrees on (RFC 7027).
 /// </summary>
 public static class TlsNamedGroup
 {
@@ -47,18 +47,53 @@ public static class TlsNamedGroup
     /// <summary>ffdhe8192 (RFC 7919).</summary>
     public const ushort Ffdhe8192 = 0x0104;
 
+    /// <summary>brainpoolP256r1tls13 (RFC 8734), brainpoolP256r1 for TLS 1.3 only.</summary>
+    public const ushort BrainpoolP256r1Tls13 = 0x001f;
+
+    /// <summary>brainpoolP384r1tls13 (RFC 8734), brainpoolP384r1 for TLS 1.3 only.</summary>
+    public const ushort BrainpoolP384r1Tls13 = 0x0020;
+
+    /// <summary>brainpoolP512r1tls13 (RFC 8734), brainpoolP512r1 for TLS 1.3 only.</summary>
+    public const ushort BrainpoolP512r1Tls13 = 0x0021;
+
+    /// <summary>MLKEM512, pure ML-KEM-512 (draft-ietf-tls-mlkem).</summary>
+    public const ushort MlKem512 = 0x0200;
+
+    /// <summary>MLKEM768, pure ML-KEM-768 (draft-ietf-tls-mlkem).</summary>
+    public const ushort MlKem768 = 0x0201;
+
+    /// <summary>MLKEM1024, pure ML-KEM-1024 (draft-ietf-tls-mlkem).</summary>
+    public const ushort MlKem1024 = 0x0202;
+
+    /// <summary>SecP256r1MLKEM768, the secp256r1 and ML-KEM-768 hybrid (draft-ietf-tls-ecdhe-mlkem).</summary>
+    public const ushort SecP256r1MlKem768 = 0x11eb;
+
     /// <summary>X25519MLKEM768, the ML-KEM-768 and X25519 hybrid (draft-ietf-tls-ecdhe-mlkem).</summary>
     public const ushort X25519MlKem768 = 0x11ec;
 
+    /// <summary>SecP384r1MLKEM1024, the secp384r1 and ML-KEM-1024 hybrid (draft-ietf-tls-ecdhe-mlkem).</summary>
+    public const ushort SecP384r1MlKem1024 = 0x11ed;
+
     /// <summary>Returns whether the TLS 1.3 client can make a key share for <paramref name="group" />.</summary>
     /// <param name="group">The named group code point.</param>
-    /// <returns><see langword="true" /> for X25519, x448, the three NIST curves, the five finite-field groups and X25519MLKEM768.</returns>
-    public static bool CanShare(ushort group) =>
-        group is X25519 or X448 or X25519MlKem768 or Secp256r1 or Secp384r1 or Secp521r1 or (>= Ffdhe2048 and <= Ffdhe8192);
+    /// <returns>
+    /// <see langword="true" /> for X25519, x448, the three NIST curves, the three brainpool
+    /// <c>tls13</c> curves, the five finite-field groups, the three pure ML-KEM groups and
+    /// the three ML-KEM hybrids.
+    /// </returns>
+    public static bool CanShare(ushort group) => IsTls13CurveGroup(group) || group is >= Ffdhe2048 and <= Ffdhe8192 || IsMlKemGroup(group);
 
     /// <summary>Returns whether the TLS 1.2 and below client agrees ECDHE on <paramref name="group" />.</summary>
     /// <param name="group">The named group code point.</param>
     /// <returns><see langword="true" /> for X25519, x448, the three NIST curves and the three brainpool curves.</returns>
     public static bool IsTls12EcdheGroup(ushort group) =>
         group is X25519 or X448 or (>= Secp256r1 and <= Secp521r1) or (>= BrainpoolP256r1 and <= BrainpoolP512r1);
+
+    // X25519, x448, the NIST curves and the brainpool tls13 curves.
+    private static bool IsTls13CurveGroup(ushort group) =>
+        group is X25519 or X448 or (>= Secp256r1 and <= Secp521r1) or (>= BrainpoolP256r1Tls13 and <= BrainpoolP512r1Tls13);
+
+    // Pure ML-KEM and the three ML-KEM hybrids.
+    private static bool IsMlKemGroup(ushort group) =>
+        group is (>= MlKem512 and <= MlKem1024) or (>= SecP256r1MlKem768 and <= SecP384r1MlKem1024);
 }

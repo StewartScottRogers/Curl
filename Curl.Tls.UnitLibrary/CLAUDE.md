@@ -79,12 +79,18 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   extensions (`padding` in the order pads a 256-to-511-byte hello to 512).
 - Key shares: `X25519KeyShare`, `X448KeyShare`, `EcdhKeyShare` (NIST curves, points
   checked by `NistCurve`), `BrainpoolKeyShare` (TLS 1.2's brainpool curves over
-  `Curl.Cryptography`'s `BrainpoolEcdh`, BL-803), `FfdheKeyShare` (RFC 7919 groups) and
+  `Curl.Cryptography`'s `BrainpoolEcdh`, BL-803, and their RFC 8734 `tls13` groups,
+  BL-1049), `FfdheKeyShare` (RFC 7919 groups),
   `X25519MlKem768KeyShare` (BL-879: the ML-KEM-768 encapsulation key then the X25519
   key out, the 1088-byte ciphertext then the server's X25519 key in, the ML-KEM secret
-  then the X25519 secret as the shared secret); `TlsNamedGroup` names them. A server
-  share of the wrong length is `illegal_parameter`. The server's encapsulation lives in
-  the tests (`X25519MlKem768ServerShare`), since the client never needs it.
+  then the X25519 secret as the shared secret), `MlKemKeyShare` (MLKEM512/768/1024: the
+  encapsulation key out, the ciphertext in) and `EcdhMlKemKeyShare` (SecP256r1MLKEM768 and
+  SecP384r1MLKEM1024, curve first: the point then the encapsulation key out, the server's
+  point then the ciphertext in, the ECDH secret then the ML-KEM secret; BL-1049);
+  `TlsNamedGroup` names them. A server share of the wrong length is `illegal_parameter`.
+  The server's encapsulations live in the tests (`X25519MlKem768ServerShare`,
+  `MlKemServerShare`), since the client never needs them; `KeyShareKnownAnswers` holds
+  OpenSSL 3.5.5's known answers for the new shares.
 - TLS 1.3 over a byte stream (ADR-0157): `Tls13RecordProtection` is one direction under
   one traffic secret (RFC 8446 section 5.2 nonces, no padding sent, peer padding removed,
   every TLS 1.3 suite: GCM, ChaCha20-Poly1305, CCM, and CCM8 with its 8-byte tag,
