@@ -1716,7 +1716,7 @@ internal sealed class CurlCommandRunner(
 
         await RemoveOutputFileOfFailedTransferAsync(options, result).ConfigureAwait(false);
         bool endsTheRun = EndsTheRun(options, result);
-        standardOutputSwitchedToBinary |= SwitchesStandardOutputToBinary(transfer, result);
+        standardOutputSwitchedToBinary |= SwitchesStandardOutputToBinary(options, transfer, result);
         bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
             options, transfer.UrlIndex, standardOutputSwitchedToBinary, endsTheRun);
         await WriteOutAsync(options, transfer, givenUrl, transferUrl, result, standardOutputIsBinary).ConfigureAwait(false);
@@ -2181,13 +2181,16 @@ internal sealed class CurlCommandRunner(
     /// opened: one sending its body to standard output, or discarding it under <c>--out-null</c>
     /// (<c>--out-null u -w "%{http_code}\n"</c> wrote LF, measured 2026-09-28, BL-495 Notes). An
     /// IPFS URL that could not be rewritten counts: curl 8.21.0 wrote its <c>-w</c> line feed as LF
-    /// without <c>-o</c> and as CR LF with one (measured 2026-09-27, BL-240 Notes).
+    /// without <c>-o</c> and as CR LF with one (measured 2026-09-27, BL-240 Notes). A transfer
+    /// under <c>-B</c> / <c>--use-ascii</c> never does: curl leaves standard output in text mode
+    /// for it (measured 2026-10-01, BL-961 Notes).
     /// </summary>
+    /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when standard output is now in binary mode.</returns>
-    private static bool SwitchesStandardOutputToBinary(UrlTransfer transfer, TransferResult result) =>
-        !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure);
+    private static bool SwitchesStandardOutputToBinary(CommandLineOptions options, UrlTransfer transfer, TransferResult result) =>
+        !options.UseAscii && !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure);
 
     /// <summary>
     /// Gives the output entry of the URL at <paramref name="index" />.
@@ -2229,9 +2232,17 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="options">The option group.</param>
     /// <param name="first">The position of the first URL looked at.</param>
-    /// <returns><see langword="true" /> when one of those URLs saves no file.</returns>
+    /// <returns>
+    /// <see langword="true" /> when one of those URLs saves no file; never under <c>-B</c>, which
+    /// leaves standard output in text mode.
+    /// </returns>
     private static bool UrlFromSwitchesStandardOutputToBinary(CommandLineOptions options, int first)
     {
+        if (options.UseAscii)
+        {
+            return false;
+        }
+
         for (int later = first; later < options.Urls.Count; later++)
         {
             if (!WritesToFile(options, later))
@@ -2856,8 +2867,9 @@ internal sealed class CurlCommandRunner(
         Stream? headerOutput)
     {
         // curl switches standard output to binary mode as the transfer starts, so the transfer's
-        // own --trace - lines already end in a bare line feed (measured, BL-546 Notes).
-        standardOutputSwitchedToBinary |= !transfer.WritesToFile;
+        // own --trace - lines already end in a bare line feed (measured, BL-546 Notes); under -B
+        // it leaves standard output in text mode (BL-961 Notes).
+        standardOutputSwitchedToBinary |= !options.UseAscii && !transfer.WritesToFile;
         if (!options.Silent)
         {
             await WriteErrorLinesAsync(dispatch.WarningLinesBeforeEachTransfer).ConfigureAwait(false);
@@ -3148,7 +3160,7 @@ internal sealed class CurlCommandRunner(
             Func<TransferContext> createAttemptContext = () => transferContextFactory.Create(
                 options,
                 url,
-                RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, Running.GatedStandardOutput) : Stream.Null),
+                RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
                 range,
                 options.ResumeFrom,
                 headerOutput,
@@ -4045,6 +4057,20 @@ internal sealed class CurlCommandRunner(
     /// <returns>The flushing stream, or <paramref name="output" /> when buffering is on.</returns>
     private static Stream FlushedEachWriteUnderNoBuffer(CommandLineOptions options, Stream output) =>
         options.NoBuffer ? new FlushEachWriteStream(output) : output;
+
+    /// <summary>
+    /// Writes a body sent to standard output in text mode on Windows under <c>-B</c> /
+    /// <c>--use-ascii</c>, each line feed as CR LF, until an earlier or concurrent transfer has
+    /// switched standard output to binary mode (<see cref="TextModeUntilBinaryStream" />). curl
+    /// 8.21.0's Schannel build wrote <c>-B</c>'s <c>l1\nl2\r\n</c> as <c>l1\r\nl2\r\r\n</c>, its
+    /// <c>-I</c> and <c>-i</c> header lines ending <c>\r\r\n</c>, and a <c>-B</c> transfer after
+    /// one without it unchanged (measured 2026-10-01, BL-961 Notes).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="output">Standard output.</param>
+    /// <returns>The text-mode stream, or <paramref name="output" /> without <c>-B</c> or off Windows.</returns>
+    private Stream InTextModeUnderUseAscii(CommandLineOptions options, Stream output) =>
+        runsOnWindows && options.UseAscii ? new TextModeUntilBinaryStream(output, () => standardOutputSwitchedToBinary) : output;
 
     /// <summary>
     /// Writes each of <paramref name="lines" /> to standard error, in order.

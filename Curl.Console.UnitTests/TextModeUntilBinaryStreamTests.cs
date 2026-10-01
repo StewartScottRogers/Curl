@@ -46,6 +46,32 @@ public sealed class TextModeUntilBinaryStreamTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_BeforeAndAfterTheSwitch_WritesCrLfThenBareLineFeeds()
+    {
+        using MemoryStream inner = new();
+        bool binary = false;
+        await using TextModeUntilBinaryStream stream = new(inner, () => binary);
+
+        await stream.WriteAsync("a\r\n"u8.ToArray());
+        binary = true;
+        await stream.WriteAsync("b\n"u8.ToArray());
+
+        CollectionAssert.AreEqual("a\r\r\nb\n"u8.ToArray(), inner.ToArray());
+    }
+
+    [TestMethod]
+    public async Task FlushAsync_ReachesTheInnerStream()
+    {
+        await using BufferedStream inner = new(new MemoryStream());
+        await using TextModeUntilBinaryStream stream = new(inner, () => true);
+
+        await stream.WriteAsync(new byte[] { 1 });
+        await stream.FlushAsync();
+
+        Assert.AreEqual(1, inner.Length);
+    }
+
+    [TestMethod]
     public void Flush_ReachesTheInnerStream()
     {
         using BufferedStream inner = new(new MemoryStream());
