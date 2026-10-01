@@ -60,8 +60,15 @@ each block received, before the block itself on standard output.
    none running, so when the list names `publickey` and neither `publickey` nor `password`
    authenticated, the two agent lines are written before `keyboard-interactive`, as measured.
    (Superseded by ADR-0271, which asks a real agent and writes its outcome's lines.)
-5. **`publickey`'s reason is libssh2's text for the step that failed**: the public key
-   unreadable or no signature algorithm the server accepts, `Reason unknown (-1)`; the question
+5. **`publickey`'s reason is libssh2's text for the step that failed**: with no `--pubkey`,
+   a public key that cannot be derived from the private key, `Reason unknown (-1)` (on WinCNG;
+   ADR-0281 gives OpenSSL's texts); a `--pubkey` file that does not open, `Unable to open
+   public key file`, and one that does not parse, `file_read_publickey`'s text for it (BL-1043:
+   `Invalid data in public key file`, `Missing public key data`, `Invalid public key data` or
+   `Invalid key data, not base64 encoded`); an `ssh-rsa` key with no signature algorithm the
+   server's `server-sig-algs` accepts, `No signing signature matched`, both as ADR-0230
+   measured on WinCNG and the same on OpenSSL (amended by BL-1043; first written as
+   `Reason unknown (-1)` for both); the question
    refused, `Username/PublicKey combination invalid`; the private key unreadable or of another
    type, `Callback returned error`; the signed request refused, `Invalid signature for supplied
    public key, or bad username/public key combination`. A connection lost during the method is
