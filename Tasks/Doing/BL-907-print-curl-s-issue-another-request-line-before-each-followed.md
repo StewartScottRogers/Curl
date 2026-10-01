@@ -34,3 +34,4 @@ Under `-v -L`, each redirect that is followed prints `* Issue another request to
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
