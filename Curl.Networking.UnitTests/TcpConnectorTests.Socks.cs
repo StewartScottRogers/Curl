@@ -20,6 +20,21 @@ public sealed partial class TcpConnectorTests
 
     private static readonly byte[] BytesAfterTheHandshake = [0xAA, 0xBB];
 
+    [TestMethod]
+    [DataRow(ProxyKind.Socks4)]
+    [DataRow(ProxyKind.Socks5)]
+    public async Task ConnectAsync_ThroughSocks_ReportsNoMappedDestinationSoTheOriginIsNamedLeftIntact(ProxyKind kind)
+    {
+        // curl -v --socks5 127.0.0.1:18535 http://localhost:8080/ ->
+        // * Connection #0 to host localhost:8080 left intact (the origin, not the proxy; BL-1074)
+        byte[] reply = kind == ProxyKind.Socks4 ? Socks4Granted : [.. Socks5NoAuthentication, .. Socks5Succeeded];
+        var (result, _) = await ConnectThroughSocksAsync(kind, "127.0.0.1", reply);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNull(result.MappedHost);
+        Assert.AreEqual(0, result.MappedPort);
+    }
+
     // SOCKS4
 
     [TestMethod]

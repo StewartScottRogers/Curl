@@ -270,6 +270,30 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// Measured (BL-1074): through a CONNECT tunnel or a SOCKS proxy, curl 8.21.0 names the origin,
+    /// not the proxy, in its last <c>-v</c> line: <c>-p -x http://127.0.0.1:18536
+    /// http://example.invalid:8080/</c> ends <c>* Connection #0 to host example.invalid:8080 left
+    /// intact</c>, and <c>--socks4</c>, <c>--socks5</c> and <c>--socks5-hostname</c> the same.
+    /// </summary>
+    [TestMethod]
+    [DataRow(ProxyKind.Http, true, DisplayName = "-p through an HTTP proxy")]
+    [DataRow(ProxyKind.Socks4, false, DisplayName = "SOCKS4 proxy")]
+    [DataRow(ProxyKind.Socks5, false, DisplayName = "SOCKS5 proxy")]
+    [DataRow(ProxyKind.Socks5Hostname, false, DisplayName = "SOCKS5h proxy")]
+    public async Task ExecuteAsync_KeptAliveThroughATunnelledProxy_ReportsTheOriginLeftIntact(ProxyKind kind, bool proxyTunnel)
+    {
+        RecordingTransferEvents events = new();
+        HttpRequestOptions options = new() { ForwardProxy = new ProxyEndpoint(kind, "127.0.0.1", 18536, null), ProxyTunnel = proxyTunnel };
+        TransferContext context = new() { Url = CurlUrl.Parse("http://example.invalid:8080/"), Output = new MemoryStream(), Http = options, Events = events };
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(new TurnTakingConnection(65536, ProxyOkHead + "ok")), new OriginAndProxyAuthenticator(null, null, null))
+            .ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("Connection #0 to host example.invalid:8080 left intact", events.Info[^1]);
+    }
+
+    /// <summary>
     /// Measured: <c>curl -s -w "%{proxy_used}" http://127.0.0.1:18081/</c> prints <c>0</c> for
     /// a direct transfer (BL-302 Notes).
     /// </summary>

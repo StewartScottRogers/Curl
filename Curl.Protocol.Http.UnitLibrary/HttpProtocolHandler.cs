@@ -917,7 +917,8 @@ public sealed class HttpProtocolHandler(
     /// Names a connection left intact by its Unix domain socket, else by the <c>--connect-to</c>
     /// destination the connector reports it dialled, else by the alt-svc alternative it was
     /// dialled to, else by the target's host and port: curl 8.21.0 names the host it connected
-    /// to, not the origin (BL-623 case 1, BL-900, BL-975).
+    /// to, not the origin (BL-623 case 1, BL-900, BL-975), except through a CONNECT tunnel or a
+    /// SOCKS proxy, where it names the origin, not the proxy (BL-1074).
     /// </summary>
     private static string LeftIntactLine(ConnectTarget target, ConnectResult connect) =>
         (connect.UnixSocketPath, connect.MappedHost, target.AltSvcRoute) switch
