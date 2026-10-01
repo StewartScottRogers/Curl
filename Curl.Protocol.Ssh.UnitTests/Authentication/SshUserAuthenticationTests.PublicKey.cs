@@ -35,11 +35,11 @@ public sealed partial class SshUserAuthenticationTests
 
     private static readonly NetworkCredential WrongPassword = new("tester", "wrong");
 
-    private static readonly byte[] RsaBlob = SshPublicKeyFile.Parse(TestUserKeys.RsaPublicKeyFile)!.Blob;
+    private static readonly byte[] RsaBlob = SshPublicKeyFile.Parse(TestUserKeys.RsaPublicKeyFile).Key!.Blob;
 
-    private static readonly byte[] EcdsaBlob = SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile)!.Blob;
+    private static readonly byte[] EcdsaBlob = SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile).Key!.Blob;
 
-    private static readonly byte[] Ed25519Blob = SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile)!.Blob;
+    private static readonly byte[] Ed25519Blob = SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile).Key!.Blob;
 
     [TestMethod]
     public async Task AuthenticateAsync_EncryptedEd25519KeyWithItsPassphrase_AsksThenSignsWithSshEd25519()
@@ -145,13 +145,44 @@ public sealed partial class SshUserAuthenticationTests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsync_PubkeyUnreadableOnOpenSsl_KeepsReasonUnknown()
+    [DataRow("WinCNG", DisplayName = "WinCNG, as measured")]
+    [DataRow("OpenSSL", DisplayName = "OpenSSL")]
+    public async Task AuthenticateAsync_PubkeyMissing_ReportsTheUnopenedPublicKeyFileOnEachBackend(string backend)
     {
-        KeyedPeer peer = await ConnectWithBackendAsync("OpenSSL", Keys(TestUserKeys.RsaPkcs1, "not a public key\n"), Failure("publickey,password"), Failure("publickey,password"));
+        SshOptions options = new() { PrivateKeyPath = KeyPath, PublicKeyPath = PublicKeyPath };
+        SshUserKeySource keys = new(new InMemoryKeyFileSystem(new Dictionary<string, string> { [KeyPath] = TestUserKeys.RsaPkcs1 }), _ => null, options, Encoding.UTF8);
+        KeyedPeer peer = await ConnectWithBackendAsync(backend, keys, Failure("publickey,password"), Failure("publickey,password"));
 
         await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
 
-        CollectionAssert.Contains(peer.Events.Transcript, "* SSH: publickey authentication denied: Reason unknown (-1)");
+        AssertMethods(await AuthenticationMessagesAsync(peer), "none", "password");
+        CollectionAssert.Contains(peer.Events.Transcript, "* SSH: publickey authentication denied: Unable to open public key file");
+    }
+
+    [TestMethod]
+    [DataRow("WinCNG", DisplayName = "WinCNG")]
+    [DataRow("OpenSSL", DisplayName = "OpenSSL")]
+    public async Task AuthenticateAsync_PubkeyMalformed_ReportsFileReadPublicKeysReasonOnEachBackend(string backend)
+    {
+        KeyedPeer peer = await ConnectWithBackendAsync(backend, Keys(TestUserKeys.RsaPkcs1, "not-a-public-key\n"), Failure("publickey,password"), Failure("publickey,password"));
+
+        await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
+
+        AssertMethods(await AuthenticationMessagesAsync(peer), "none", "password");
+        CollectionAssert.Contains(peer.Events.Transcript, "* SSH: publickey authentication denied: Invalid public key data");
+    }
+
+    [TestMethod]
+    [DataRow("WinCNG", DisplayName = "WinCNG, as measured")]
+    [DataRow("OpenSSL", DisplayName = "OpenSSL")]
+    public async Task AuthenticateAsync_ServerSigAlgsNamesNoRsaAlgorithm_ReportsNoSigningSignatureMatchedOnEachBackend(string backend)
+    {
+        KeyedPeer peer = await ConnectWithBackendAsync(
+            backend, Keys(TestUserKeys.RsaPkcs1), ExtensionInfo(("server-sig-algs", "ssh-ed25519")), Failure("publickey,password"), Failure("publickey,password"));
+
+        await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
+
+        CollectionAssert.Contains(peer.Events.Transcript, "* SSH: publickey authentication denied: No signing signature matched");
     }
 
     [TestMethod]

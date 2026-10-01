@@ -51,8 +51,32 @@ internal static class SshInfoLines
     /// <summary>The <c>scp</c> line after <see cref="AuthenticationComplete" />.</summary>
     internal const string ConnectionEstablished = "SSH: connection established";
 
-    /// <summary>The <c>publickey</c> denial reason when the public key cannot be read, as the WinCNG build gives it.</summary>
+    /// <summary>
+    /// The WinCNG build's <c>publickey</c> denial reason when, with no <c>--pubkey</c>, the
+    /// public key cannot be derived from the private key (ADR-0262, ADR-0281).
+    /// </summary>
     internal const string ReasonUnknown = "Reason unknown (-1)";
+
+    /// <summary>The <c>publickey</c> denial reason when the <c>--pubkey</c> file does not open, on both backends (ADR-0230).</summary>
+    internal const string PublicKeyFileUnopened = "Unable to open public key file";
+
+    /// <summary>The <c>publickey</c> denial reason when the <c>--pubkey</c> file's first line is one character or less.</summary>
+    internal const string PublicKeyFileLineTooShort = "Invalid data in public key file";
+
+    /// <summary>The <c>publickey</c> denial reason when the <c>--pubkey</c> file's first line is white space only.</summary>
+    internal const string PublicKeyFileBlank = "Missing public key data";
+
+    /// <summary>The <c>publickey</c> denial reason when the <c>--pubkey</c> file's first line has no space.</summary>
+    internal const string PublicKeyFileWithoutSpace = "Invalid public key data";
+
+    /// <summary>The <c>publickey</c> denial reason when the <c>--pubkey</c> file's key data is not base64.</summary>
+    internal const string PublicKeyFileNotBase64 = "Invalid key data, not base64 encoded";
+
+    /// <summary>
+    /// The <c>publickey</c> denial reason when the server's <c>server-sig-algs</c> names none of
+    /// the RSA signature algorithms an <c>ssh-rsa</c> key could use, on both backends (ADR-0230).
+    /// </summary>
+    internal const string NoSigningSignatureMatched = "No signing signature matched";
 
     /// <summary>
     /// The OpenSSL build's <c>publickey</c> denial reason when, with no <c>--pubkey</c>, the

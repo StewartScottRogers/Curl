@@ -55,16 +55,19 @@ internal sealed class SshUserKeySource(
     /// </summary>
     /// <param name="files">The located files.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
-    /// <returns>The public key, or <see langword="null" /> when the file cannot be opened or read.</returns>
-    internal async ValueTask<SshPublicKey?> ReadPublicKeyAsync(SshUserKeyFiles files, CancellationToken cancellationToken)
+    /// <returns>
+    /// The public key; or none, with libssh2's reason when the <c>--pubkey</c> file did not
+    /// open or parse, and without one when the private key could not be read.
+    /// </returns>
+    internal async ValueTask<SshPublicKeyReading> ReadPublicKeyAsync(SshUserKeyFiles files, CancellationToken cancellationToken)
     {
         if (files.PublicKeyPath is { } publicKeyPath)
         {
             string? text = await ReadTextAsync(publicKeyPath, cancellationToken).ConfigureAwait(false);
-            return text is null ? null : SshPublicKeyFile.Parse(text);
+            return text is null ? new SshPublicKeyReading(null, SshInfoLines.PublicKeyFileUnopened) : SshPublicKeyFile.Parse(text);
         }
 
-        return (await ReadPrivateKeyAsync(files, cancellationToken).ConfigureAwait(false))?.PublicKey;
+        return new SshPublicKeyReading((await ReadPrivateKeyAsync(files, cancellationToken).ConfigureAwait(false))?.PublicKey, null);
     }
 
     /// <summary>

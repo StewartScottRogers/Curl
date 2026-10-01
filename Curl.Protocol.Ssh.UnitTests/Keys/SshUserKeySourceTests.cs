@@ -91,9 +91,9 @@ public sealed class SshUserKeySourceTests
     {
         SshUserKeySource source = Source(new Dictionary<string, string> { ["k"] = TestUserKeys.EcdsaP256OpenSsh }, Home, new SshOptions());
 
-        SshPublicKey? key = await source.ReadPublicKeyAsync(new SshUserKeyFiles("k", null), CancellationToken.None);
+        SshPublicKey? key = (await source.ReadPublicKeyAsync(new SshUserKeyFiles("k", null), CancellationToken.None)).Key;
 
-        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile)!.Blob, key!.Blob);
+        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile).Key!.Blob, key!.Blob);
     }
 
     [TestMethod]
@@ -102,18 +102,32 @@ public sealed class SshUserKeySourceTests
         InMemoryKeyFileSystem fileSystem = new(new Dictionary<string, string> { ["k.pub"] = TestUserKeys.RsaPublicKeyFile });
         SshUserKeySource source = new(fileSystem, _ => null, new SshOptions(), Encoding.UTF8);
 
-        SshPublicKey? key = await source.ReadPublicKeyAsync(new SshUserKeyFiles("k", "k.pub"), CancellationToken.None);
+        SshPublicKey? key = (await source.ReadPublicKeyAsync(new SshUserKeyFiles("k", "k.pub"), CancellationToken.None)).Key;
 
         Assert.AreEqual("ssh-rsa", key!.KeyType);
         CollectionAssert.AreEqual(new[] { "k.pub" }, fileSystem.Opened.ToArray());
     }
 
     [TestMethod]
-    public async Task ReadPublicKeyAsync_PubkeyMissing_ReturnsNull()
+    public async Task ReadPublicKeyAsync_PubkeyMissing_GivesLibssh2sUnopenedFileReason()
     {
         SshUserKeySource source = Source([], Home, new SshOptions());
 
-        Assert.IsNull(await source.ReadPublicKeyAsync(new SshUserKeyFiles("k", "k.pub"), CancellationToken.None));
+        SshPublicKeyReading reading = await source.ReadPublicKeyAsync(new SshUserKeyFiles("k", "k.pub"), CancellationToken.None);
+
+        Assert.IsNull(reading.Key);
+        Assert.AreEqual("Unable to open public key file", reading.DenialReason);
+    }
+
+    [TestMethod]
+    public async Task ReadPublicKeyAsync_PrivateKeyUnreadable_GivesNoKeyAndNoReason()
+    {
+        SshUserKeySource source = Source([], Home, new SshOptions());
+
+        SshPublicKeyReading reading = await source.ReadPublicKeyAsync(new SshUserKeyFiles("k", null), CancellationToken.None);
+
+        Assert.IsNull(reading.Key);
+        Assert.IsNull(reading.DenialReason);
     }
 
     private static SshUserKeySource Source(Dictionary<string, string> files, string? home, SshOptions options) =>

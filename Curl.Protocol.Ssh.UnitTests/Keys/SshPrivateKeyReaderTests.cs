@@ -37,7 +37,7 @@ public sealed class SshPrivateKeyReaderTests
 
         Assert.IsInstanceOfType<RsaSshPrivateKey>(key);
         Assert.AreEqual("ssh-rsa", key.KeyType);
-        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.RsaPublicKeyFile)!.Blob, key.PublicKeyBlob);
+        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.RsaPublicKeyFile).Key!.Blob, key.PublicKeyBlob);
     }
 
     [TestMethod]
@@ -50,7 +50,7 @@ public sealed class SshPrivateKeyReaderTests
     [DataRow(TestUserKeys.EcdsaP521OpenSsh, TestUserKeys.EcdsaP521PublicKeyFile, DisplayName = "P-521 openssh-key-v1")]
     public void Read_EcdsaKeyInEachFormat_ReadsTheKeyOfItsPublicKeyFile(string text, string publicKeyFile)
     {
-        SshPublicKey expected = SshPublicKeyFile.Parse(publicKeyFile)!;
+        SshPublicKey expected = SshPublicKeyFile.Parse(publicKeyFile).Key!;
 
         SshPrivateKey? key = SshPrivateKeyReader.Read(text, Secret);
 
@@ -121,7 +121,7 @@ public sealed class SshPrivateKeyReaderTests
 
         Assert.IsInstanceOfType<Ed25519SshPrivateKey>(key);
         Assert.AreEqual("ssh-ed25519", key.KeyType);
-        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile)!.Blob, key.PublicKeyBlob);
+        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile).Key!.Blob, key.PublicKeyBlob);
     }
 
     [TestMethod]
@@ -146,7 +146,7 @@ public sealed class SshPrivateKeyReaderTests
     {
         SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.Ed25519OpenSsh, []);
 
-        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile)!.Blob, key!.PublicKeyBlob);
+        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile).Key!.Blob, key!.PublicKeyBlob);
     }
 
     [TestMethod]
@@ -155,7 +155,7 @@ public sealed class SshPrivateKeyReaderTests
         SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.Ed25519Pkcs8, []);
 
         Assert.IsInstanceOfType<Ed25519SshPrivateKey>(key);
-        CollectionAssert.AreEqual(SshPublicKeyFile.Parse("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGX8BTc94jNCFKn//daYyhhor97hE+LfZyYTJxcsfXpY")!.Blob, key.PublicKeyBlob);
+        CollectionAssert.AreEqual(SshPublicKeyFile.Parse("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGX8BTc94jNCFKn//daYyhhor97hE+LfZyYTJxcsfXpY").Key!.Blob, key.PublicKeyBlob);
     }
 
     [TestMethod]
@@ -172,7 +172,7 @@ public sealed class SshPrivateKeyReaderTests
     {
         SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.EcdsaP256OpenSshAes256Gcm, Secret);
 
-        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile)!.Blob, key!.PublicKeyBlob);
+        CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile).Key!.Blob, key!.PublicKeyBlob);
     }
 
     [TestMethod]
