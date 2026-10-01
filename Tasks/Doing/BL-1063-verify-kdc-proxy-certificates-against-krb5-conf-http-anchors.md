@@ -33,3 +33,4 @@ Curl verifies an `https://` KDC proxy's certificate the way MIT does. It reads `
 ## Log
 
 - 2026-09-30: Created.
+- 2026-10-01: Backlog -> Doing.
