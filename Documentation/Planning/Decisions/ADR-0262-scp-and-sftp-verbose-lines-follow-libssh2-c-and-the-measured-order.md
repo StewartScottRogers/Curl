@@ -1,6 +1,6 @@
 # ADR-0262 — `scp` and `sftp` `-v` lines follow `lib/vssh/libssh2.c` and the measured order
 
-- **Status:** Accepted; decision 4 superseded by ADR-0271
+- **Status:** Accepted; decision 4 superseded by ADR-0271; decision 6's short file and the missing upload data by ADR-0294
 - **Date:** 2026-09-29
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-578.
