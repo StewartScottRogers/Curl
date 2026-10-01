@@ -3,9 +3,9 @@ id: AF-0004
 title: 31 tasks cost over 3x the median task cost; the costliest are BL-703, BL-527, BL-568, BL-658 and BL-708
 auditor: process
 severity: Low
-status: proposed
+status: accepted
 key: process:logs:task-costs:cost-outlier
-task: none
+task: BL-1070
 found: 2026-09-30
 found-at: d065d6d3507e2ed87905d40a24233af193913378
 scorecard: 2026-09-30_1754.md

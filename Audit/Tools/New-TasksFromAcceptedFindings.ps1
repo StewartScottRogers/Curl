@@ -12,7 +12,8 @@
       -Pipeline  docs for a truthfulness finding, direct for a process finding, feature otherwise
       -Touches   the repository folders (or, for a file at the root, the file) the finding's
                  location names - never an audit path;
-                 none when it names no folder, so the task runs alone
+                 RunDarkFactory.ps1 for a process finding located in the logs; none
+                 otherwise when it names no folder, so the task runs alone
 
     then fills the task's Goal, Context (the finding's ID, evidence and reproduction, and that
     the finding closes only when a re-audit confirms the fix) and Acceptance criteria (the
@@ -106,6 +107,9 @@ function Invoke-Triage([string]$Findings, [string]$BoardScript, [string]$Root) {
         if ($f.Status -ne 'accepted' -or $f.Task -ne 'none') { continue }
         $newArgs = @('new', '-Title', "Fix $($f.Id): $($f.Title)", '-Priority', (Get-TaskPriority $f.Severity), '-Pipeline', (Get-TaskPipeline $f.Auditor))
         $touches = @(Get-TaskTouches $f.Location $Root)
+        # A process finding is about how the factory works, and its location is in the logs, which
+        # are no repository path; its fix is in the factory's script.
+        if (-not $touches.Count -and $f.Auditor -eq 'process') { $touches = @('RunDarkFactory.ps1') }
         if ($touches.Count) { $newArgs += @('-Touches', ($touches -join ',')) }
         if ($WhatIf) { Write-Host "would file: $($newArgs -join ' ')"; continue }
         $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $BoardScript @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
