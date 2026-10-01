@@ -13,19 +13,21 @@ namespace Curl.Networking;
 /// address and no CNAME is <see cref="DnsMessageFailure.NoContent" />. For a
 /// <see cref="DnsRecordType.Srv" /> query, which DoH never sends and <see cref="DnsServerResolver" />
 /// does (BL-694), SRV records are stored as <see cref="DnsAnswer.ServiceRecords" /> and count as content.
+/// For a <see cref="DnsRecordType.Https" /> query (BL-707), the first 4 HTTPS records' data are stored
+/// undecoded as <see cref="DnsAnswer.HttpsRecordData" />, as curl's <c>doh_store_https</c> does, and count as content.
 /// </summary>
 public static class DnsAnswerDecoder
 {
     /// <summary>Decodes <paramref name="message" /> as the answer to a query for <paramref name="askedType" />.</summary>
     /// <param name="message">The DNS message, the DoH response body.</param>
-    /// <param name="askedType">The record type the query asked for, <see cref="DnsRecordType.A" />, <see cref="DnsRecordType.Aaaa" /> or <see cref="DnsRecordType.Srv" />.</param>
+    /// <param name="askedType">The record type the query asked for, <see cref="DnsRecordType.A" />, <see cref="DnsRecordType.Aaaa" />, <see cref="DnsRecordType.Srv" /> or <see cref="DnsRecordType.Https" />.</param>
     /// <returns>The addresses, CNAMEs and TTL, or the failure that stopped the decode.</returns>
     public static DnsAnswer Decode(ReadOnlySpan<byte> message, DnsRecordType askedType)
     {
         var reader = new DnsAnswerReader(message.ToArray(), askedType);
         var failure = reader.Read();
         return failure == DnsMessageFailure.None
-            ? new DnsAnswer(failure, reader.Addresses, reader.CanonicalNames, reader.TimeToLiveSeconds) { ServiceRecords = reader.ServiceRecords }
+            ? new DnsAnswer(failure, reader.Addresses, reader.CanonicalNames, reader.TimeToLiveSeconds) { ServiceRecords = reader.ServiceRecords, HttpsRecordData = reader.HttpsRecordData }
             : new DnsAnswer(failure, [], [], reader.TimeToLiveSeconds);
     }
 
@@ -41,6 +43,7 @@ public static class DnsAnswerDecoder
         private const ushort InternetClass = 1;
         private const int MaximumAddresses = 24;
         private const int MaximumCanonicalNames = 4;
+        private const int MaximumHttpsRecords = 4;
         private const int MaximumNameSteps = 128;
 
         private int _index = HeaderLength;
@@ -52,6 +55,8 @@ public static class DnsAnswerDecoder
         public List<string> CanonicalNames { get; } = [];
 
         public List<DnsServiceRecord> ServiceRecords { get; } = [];
+
+        public List<byte[]> HttpsRecordData { get; } = [];
 
         public uint TimeToLiveSeconds { get; private set; } = int.MaxValue;
 
@@ -96,7 +101,7 @@ public static class DnsAnswerDecoder
                 return DnsMessageFailure.Malformed;
             }
 
-            return Addresses.Count == 0 && CanonicalNames.Count == 0 && ServiceRecords.Count == 0
+            return Addresses.Count == 0 && CanonicalNames.Count == 0 && ServiceRecords.Count == 0 && HttpsRecordData.Count == 0
                 ? DnsMessageFailure.NoContent
                 : DnsMessageFailure.None;
         }
@@ -187,7 +192,7 @@ public static class DnsAnswerDecoder
                 (ushort)DnsRecordType.Aaaa => StoreAddress(16),
                 (ushort)DnsRecordType.Cname => StoreCanonicalName(),
                 (ushort)DnsRecordType.Srv => StoreServiceRecord(),
-                _ => DnsMessageFailure.None,
+                _ => StoreHttpsRecordData(),
             };
             _index += _recordDataLength;
             return failure;
@@ -236,6 +241,20 @@ public static class DnsAnswerDecoder
             var failure = FollowName(_index + 6, target);
             ServiceRecords.Add(new DnsServiceRecord(ReadUInt16At(_index), ReadUInt16At(_index + 2), ReadUInt16At(_index + 4), target.ToString()));
             return failure;
+        }
+
+        /// <summary>
+        /// Keeps an HTTPS record's data undecoded, and ignores a DNAME's; past the fourth, HTTPS
+        /// records are silently ignored, as curl ignores them.
+        /// </summary>
+        private DnsMessageFailure StoreHttpsRecordData()
+        {
+            if (_recordType == (ushort)DnsRecordType.Https && HttpsRecordData.Count < MaximumHttpsRecords)
+            {
+                HttpsRecordData.Add(message.AsSpan(_index, _recordDataLength).ToArray());
+            }
+
+            return DnsMessageFailure.None;
         }
 
         /// <summary>

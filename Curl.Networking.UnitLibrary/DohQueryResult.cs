@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking;
 
 /// <summary>What one of <see cref="DohDnsResolver" />'s two DoH queries came back with.</summary>
-/// <param name="RecordType">The type asked for: <see cref="DnsRecordType.A" /> or <see cref="DnsRecordType.Aaaa" />.</param>
+/// <param name="RecordType">The type asked for: <see cref="DnsRecordType.A" />, <see cref="DnsRecordType.Aaaa" /> or <see cref="DnsRecordType.Https" />.</param>
 /// <param name="ExchangeFailure">
 /// <see cref="CurlExitCode.Ok" /> when the response was read; otherwise the exit code the connection
 /// or the exchange failed with, and then <paramref name="Answer" /> is <see langword="null" />.

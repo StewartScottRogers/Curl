@@ -16,6 +16,9 @@ public sealed class DnsAnswerDecoderTests
     /// <summary>The question for <c>example.test</c> type AAAA.</summary>
     private const string QuestionAaaa = "076578616D706C65047465737400001C0001";
 
+    /// <summary>The question for <c>example.test</c> type HTTPS (65).</summary>
+    private const string QuestionHttps = "076578616D706C6504746573740000410001";
+
     /// <summary>An A record for the question's name (a pointer to offset 12), TTL 60, 127.0.0.1.</summary>
     private const string AnswerA = "C00C000100010000003C00047F000001";
 
@@ -358,6 +361,43 @@ public sealed class DnsAnswerDecoderTests
     public void Decode_AnAAnswer_HasNoServiceRecords()
     {
         Assert.IsEmpty(DnsAnswerDecoder.Decode(MeasuredAnswer, DnsRecordType.A).ServiceRecords);
+    }
+
+    [TestMethod]
+    public void Decode_AnHttpsAnswerWithEch_KeepsTheRecordDataUndecoded()
+    {
+        // example.test HTTPS 1 . alpn=h2 ech=AABBCCDDEEFF, TTL 60 (BL-707).
+        const string RecordData = "000100" + "00010003026832" + "00050006AABBCCDDEEFF";
+        var message = Message(Header("8180", 1, 1) + QuestionHttps + "C00C004100010000003C0014" + RecordData);
+
+        var answer = DnsAnswerDecoder.Decode(message, DnsRecordType.Https);
+
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
+        Assert.HasCount(1, answer.HttpsRecordData);
+        Assert.AreEqual(RecordData, Convert.ToHexString(answer.HttpsRecordData[0]));
+        Assert.IsEmpty(answer.Addresses);
+        Assert.AreEqual(60u, answer.TimeToLiveSeconds);
+        Assert.AreEqual("AABBCCDDEEFF", Convert.ToHexString(ServiceBindingRecordDecoder.Decode(answer.HttpsRecordData[0]).Record!.EchConfigList.Span));
+    }
+
+    [TestMethod]
+    public void Decode_FiveHttpsRecords_KeepsTheFirstFourAsCurlDoes()
+    {
+        var records = string.Concat(Enumerable.Range(1, 5).Select(priority => $"C00C004100010000003C0003{priority:X4}00"));
+        var message = Message(Header("8180", 1, 5) + QuestionHttps + records);
+
+        var answer = DnsAnswerDecoder.Decode(message, DnsRecordType.Https);
+
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
+        CollectionAssert.AreEqual(
+            new[] { "000100", "000200", "000300", "000400" },
+            answer.HttpsRecordData.Select(Convert.ToHexString).ToArray());
+    }
+
+    [TestMethod]
+    public void Decode_AnAAnswer_HasNoHttpsRecordData()
+    {
+        Assert.IsEmpty(DnsAnswerDecoder.Decode(MeasuredAnswer, DnsRecordType.A).HttpsRecordData);
     }
 
     /// <summary>A header with ID 0, the given flags and section counts, in hex.</summary>

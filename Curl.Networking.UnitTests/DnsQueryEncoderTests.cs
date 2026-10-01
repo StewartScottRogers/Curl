@@ -117,4 +117,16 @@ public sealed class DnsQueryEncoderTests
         var label = new string('a', 63);
         return string.Join('.', label, label, label, label, label)[..length];
     }
+
+    [TestMethod]
+    public void Encode_AnHttpsQuery_AsksForType65()
+    {
+        // BL-707: curl's HTTPS query differs from its A query only in QTYPE, 00 41.
+        var encoding = DnsQueryEncoder.Encode("example.test", DnsRecordType.Https);
+
+        Assert.AreEqual(DnsMessageFailure.None, encoding.Failure);
+        Assert.AreEqual(
+            "000001000001000000000000076578616D706C6504746573740000410001",
+            Convert.ToHexString(encoding.Bytes));
+    }
 }

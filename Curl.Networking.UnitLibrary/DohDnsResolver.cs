@@ -116,6 +116,55 @@ public sealed class DohDnsResolver : IDnsResolver
         return [.. results[1].Addresses, .. results[0].Addresses];
     }
 
+    /// <summary>
+    /// Fetches <paramref name="host" />'s HTTPS record (RFC 9460) through the DoH server, the
+    /// query curl 8.21.0 adds to the A and AAAA ones under <c>--ech true</c> or <c>hard</c> to find
+    /// the host's ECHConfigList (ADR-0311, BL-707). The name asked for is the host itself on port
+    /// 443 and <c>_&lt;port&gt;._https.&lt;host&gt;</c> on any other port (RFC 9460 section 9.1), and
+    /// the first HTTPS record of the answer is decoded, as curl decodes only the first.
+    /// </summary>
+    /// <param name="host">The host name, already converted to its ASCII form.</param>
+    /// <param name="port">The port the transfer connects to.</param>
+    /// <param name="cancellationToken">Cancels the query.</param>
+    /// <returns>
+    /// The record, its <see cref="ServiceBindingRecord.EchConfigList" /> among its parameters; or
+    /// <see langword="null" /> for an IP address literal or <c>localhost</c>, which are never asked
+    /// for, and when the query fails, the answer holds no HTTPS record or its first one does not decode.
+    /// </returns>
+    public async ValueTask<ServiceBindingRecord?> ResolveHttpsRecordAsync(string host, int port, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(host);
+
+        if (HttpsQueryFor(host, port) is not { } query)
+        {
+            return null;
+        }
+
+        var result = await QueryAsync(query, DnsRecordType.Https, cancellationToken).ConfigureAwait(false);
+        return result.Answer is { Failure: DnsMessageFailure.None, HttpsRecordData: [var first, ..] }
+            ? ServiceBindingRecordDecoder.Decode(first).Record
+            : null;
+    }
+
+    /// <summary>The HTTPS query for <paramref name="host" />, or <see langword="null" /> for a literal, <c>localhost</c> or a name that does not encode.</summary>
+    private static byte[]? HttpsQueryFor(string host, int port)
+    {
+        if (IPAddress.TryParse(host.Trim('[', ']'), out _) || TcpConnector.IsLocalhost(host))
+        {
+            return null;
+        }
+
+        var query = DnsQueryEncoder.Encode(HttpsQueryName(host, port), DnsRecordType.Https);
+        return query.Failure == DnsMessageFailure.None ? query.Bytes : null;
+    }
+
+    /// <summary>The name curl asks the HTTPS record of: the host on port 443, <c>_&lt;port&gt;._https.&lt;host&gt;</c> on any other.</summary>
+    /// <param name="host">The host name.</param>
+    /// <param name="port">The port the transfer connects to.</param>
+    /// <returns>The query name.</returns>
+    internal static string HttpsQueryName(string host, int port) =>
+        port == 443 ? host : $"_{port}._https.{host}";
+
     /// <summary>Builds the POST curl sends for one DNS query.</summary>
     /// <param name="query">The DNS query message.</param>
     /// <returns>The request line, header block and body.</returns>

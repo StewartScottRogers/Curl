@@ -338,7 +338,12 @@ bytes and a query over 272 bytes. `DnsAnswerDecoder` returns a `DnsAnswer`: the 
 type asked for (at most 24), the CNAME targets followed through compression pointers (at most 4),
 the smallest TTL, or a `DnsMessageFailure`, a pointer loop ending as `LabelLoop` after 128 steps.
 `DnsMessageFailureText` gives curl's `--trace-config doh` text for each failure. For an SRV query
-the decoder also keeps each SRV record as `DnsAnswer.ServiceRecords` (`DnsServiceRecord`).
+the decoder also keeps each SRV record as `DnsAnswer.ServiceRecords` (`DnsServiceRecord`). Per
+ADR-0311 (BL-707), for an HTTPS (type 65) query it keeps the first four HTTPS records' data
+undecoded as `DnsAnswer.HttpsRecordData`, as curl's `doh_store_https` does, and
+`ServiceBindingRecordDecoder` decodes one into a `ServiceBindingRecord` (RFC 9460: priority, target,
+`alpn`, `no-default-alpn`, `port`, `ipv4hint`, `ech`, `ipv6hint`; other keys skipped), refusing a
+malformed one with a `ServiceBindingFailure`.
 
 `DohDnsResolver` (ADR-0152 and its BL-641 amendment) is the `IDnsResolver` behind `--doh-url`. It
 takes an `IConnector` for the DoH connections (a `TcpConnector` of its own, built with the system
@@ -349,7 +354,10 @@ carries `PoolScheme` `https`, so the handshake offers ALPN `http/1.1`. `DohRespo
 response as curl does: status and `Content-Type` ignored, a `Content-Length` or chunked body of at
 most 3000 bytes, anything else a failure. It returns the AAAA answer's addresses, then the A
 answer's; a query that fails yields none, and none from both makes `TcpConnector` fail with exit 6.
-IP literals and `localhost` (`TcpConnector.IsLocalhost`) are answered without a query. Its tests
+IP literals and `localhost` (`TcpConnector.IsLocalhost`) are answered without a query.
+`ResolveHttpsRecordAsync` (ADR-0311, BL-707) POSTs one HTTPS query, for the host on port 443 and
+`_<port>._https.<host>` on any other, and returns the answer's first record decoded, its
+`EchConfigList` the configuration `--ech` uses, or `null`. Its tests
 drive it through `Fakes/FakeConnector`'s `BytesToRead` and through a `TcpConnector` over fakes.
 
 Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,

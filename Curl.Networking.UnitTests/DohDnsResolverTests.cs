@@ -306,6 +306,94 @@ public sealed class DohDnsResolverTests
         CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Loopback, 48637) }, dialer.DialedEndPoints);
     }
 
+    [TestMethod]
+    [DataRow(null)]
+    [DataRow("")]
+    [DataRow(" ")]
+    public async Task ResolveHttpsRecordAsync_WithNoHost_Throws(string? host)
+    {
+        var resolver = new DohDnsResolver(new FakeConnector(), MeasuredDohUrl);
+
+        await Assert.ThrowsAsync<ArgumentException>(async () => await resolver.ResolveHttpsRecordAsync(host!, 443, CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task ResolveHttpsRecordAsync_OnPort443_PostsTheHttpsQueryAndReturnsTheEchConfigList()
+    {
+        const string RecordData = "000100" + "00010003026832" + "00050006AABBCCDDEEFF";
+        var question = "076578616D706C650474657374000041" + "0001";
+        var answer = Convert.FromHexString("000081800001000100000000" + question + "C00C004100010000003C0014" + RecordData);
+        var connector = Answering(Ok(answer));
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl);
+
+        var record = await resolver.ResolveHttpsRecordAsync("example.test", 443, CancellationToken.None);
+
+        var head = "POST /dns-query HTTP/1.1\r\n"
+            + $"Host: 127.0.0.1:{DohPort}\r\n"
+            + "Accept: */*\r\n"
+            + "Content-Type: application/dns-message\r\n"
+            + "Content-Length: 30\r\n"
+            + "\r\n";
+        var query = Convert.FromHexString("000001000001000000000000" + question);
+        Assert.HasCount(1, connector.Opened);
+        CollectionAssert.AreEqual(Encoding.Latin1.GetBytes(head).Concat(query).ToArray(), connector.Opened[0].Written);
+        Assert.IsNotNull(record);
+        CollectionAssert.AreEqual(new[] { "h2" }, record.ApplicationProtocols.ToArray());
+        Assert.AreEqual("AABBCCDDEEFF", Convert.ToHexString(record.EchConfigList.Span));
+    }
+
+    [TestMethod]
+    public async Task ResolveHttpsRecordAsync_OnAnotherPort_AsksForThePortPrefixedName()
+    {
+        var connector = new FakeConnector();
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl);
+
+        var record = await resolver.ResolveHttpsRecordAsync("example.test", 8443, CancellationToken.None);
+
+        Assert.IsNull(record);
+        var expected = DnsQueryEncoder.Encode("_8443._https.example.test", DnsRecordType.Https).Bytes;
+        CollectionAssert.AreEqual(expected, connector.Opened[0].Written.TakeLast(expected.Length).ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("127.0.0.1")]
+    [DataRow("[::1]")]
+    [DataRow("localhost")]
+    public async Task ResolveHttpsRecordAsync_ForALiteralOrLocalhost_AsksNothing(string host)
+    {
+        var connector = new FakeConnector();
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl);
+
+        Assert.IsNull(await resolver.ResolveHttpsRecordAsync(host, 443, CancellationToken.None));
+        Assert.IsEmpty(connector.Targets);
+    }
+
+    [TestMethod]
+    public async Task ResolveHttpsRecordAsync_ForANameWithAnEmptyLabel_AsksNothing()
+    {
+        var connector = new FakeConnector();
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl);
+
+        Assert.IsNull(await resolver.ResolveHttpsRecordAsync("a..test", 443, CancellationToken.None));
+        Assert.IsEmpty(connector.Targets);
+    }
+
+    [TestMethod]
+    public async Task ResolveHttpsRecordAsync_WhenTheAnswerHoldsNoHttpsRecord_ReturnsNull()
+    {
+        var connector = Answering(Ok(AnswerTo(DnsRecordType.A, IPAddress.Loopback)));
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl);
+
+        Assert.IsNull(await resolver.ResolveHttpsRecordAsync("example.test", 443, CancellationToken.None));
+    }
+
+    [TestMethod]
+    public void HttpsQueryName_FollowsRfc9460Section9_1()
+    {
+        Assert.AreEqual("example.test", DohDnsResolver.HttpsQueryName("example.test", 443));
+        Assert.AreEqual("_80._https.example.test", DohDnsResolver.HttpsQueryName("example.test", 80));
+    }
+
     private static async Task AssertCouldNotResolveAsync(IConnector dohConnector)
     {
         var dialer = new FakeTcpDialer();
