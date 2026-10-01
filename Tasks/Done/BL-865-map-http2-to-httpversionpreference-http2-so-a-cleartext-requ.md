@@ -8,7 +8,7 @@ depends-on: [BL-716]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-865 — Map --http2 to HttpVersionPreference.Http2 so a cleartext request upgrades to h2c
 
@@ -24,13 +24,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `HttpVersionMapping.ToHttpVersionPreference(RequestedHttpVersion.Http2)` returns `HttpVersionPreference.Http2`, pinned in `Curl.Console.UnitTests`, and no version option still returns `Http11`.
-- [ ] The doc comment on `ToHttpVersionPreference` says what `--http2` now maps to.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] `HttpVersionMapping.ToHttpVersionPreference(RequestedHttpVersion.Http2)` returns `HttpVersionPreference.Http2`, pinned in `Curl.Console.UnitTests`, and no version option still returns `Http11`.
+- [x] The doc comment on `ToHttpVersionPreference` says what `--http2` now maps to.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
+
+- `--http2` now maps to `HttpVersionPreference.Http2`; the handler upgrades only when the transport is not TLS (`HttpProtocolHandler`, BL-716), so `https://` still leaves the choice to ALPN, which `HttpOverTlsApplicationProtocolsOf` keeps offering as `h2,http/1.1`.
+- `AltSvcTransferCache.ApplyTo` uses the same mapping; a switched alt-svc route still falls to `Http11`/`Http3Only` as before, and a same-ALPN route keeps `Http2`, which only matters over cleartext.
+- Two pins changed in `HttpVersionMappingTests`: the enum mapping row and the `HttpRequestOptionsFromCommandLine` row for `--http2`. Full fast suite green on Windows.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. --http2 maps to HttpVersionPreference.Http2, so a cleartext request sends the h2c upgrade
