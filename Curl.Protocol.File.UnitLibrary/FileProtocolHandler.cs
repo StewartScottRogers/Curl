@@ -71,12 +71,21 @@ namespace Curl.Protocol.File;
 public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandler
 {
     /// <summary>
-    /// The chunk size for a <c>file://</c> download body, which is curl's
+    /// The write size for a <c>file://</c> download body, which is curl's
     /// <c>CURL_MAX_WRITE_SIZE</c>. It is observable — it is the size of every write to
-    /// the output but the last — so it is pinned here rather than left to
-    /// <see cref="Stream.CopyToAsync(Stream)" />, whose buffer is five times larger.
+    /// the output but the last, and the <c>passed 16384</c> of an exit 23 message — so
+    /// each <see cref="DownloadReadSize" /> read is written in slices of this size.
     /// </summary>
     private const int ChunkSize = 16384;
+
+    /// <summary>
+    /// The read size for a <c>file://</c> download body. curl 8.21.0 reads the source
+    /// 102399 bytes at a time and reports each read as one <c>&lt;= Recv data</c> block:
+    /// a 1000000-byte file traces nine blocks of 102399 bytes and one of 78409 (BL-936),
+    /// and a 300000-byte file unreadable from byte 150000 delivers 102399 bytes and exits 0
+    /// (BL-976).
+    /// </summary>
+    private const int DownloadReadSize = 102399;
 
     /// <summary>
     /// The chunk size for a <c>file://</c> upload body. curl 8.21.0 reads a <c>-T</c>
@@ -394,7 +403,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         return CopyAsync(
             source,
             context.Output,
-            ChunkSize,
+            DownloadReadSize,
+            DownloadReadSize,
             ChunkSize,
             count,
             context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue,
@@ -553,6 +563,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 destination,
                 UploadChunkSize,
                 firstChunkSize,
+                UploadChunkSize * 2,
                 long.MaxValue,
                 long.MaxValue,
                 static _ => { },
@@ -580,12 +591,17 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// <param name="source">Where the bytes come from.</param>
     /// <param name="destination">Where they go.</param>
     /// <param name="chunkSize">
-    /// The most to read at once: <see cref="ChunkSize" /> for a download,
+    /// The most to read at once: <see cref="DownloadReadSize" /> for a download,
     /// <see cref="UploadChunkSize" /> for an upload.
     /// </param>
     /// <param name="firstChunkSize">
     /// The most to read the first time, which is <paramref name="chunkSize" /> unless an
     /// upload's <c>-C</c> skip left the source part-way into a chunk.
+    /// </param>
+    /// <param name="writeSize">
+    /// The most to write at once: <see cref="ChunkSize" /> for a download, whose reads are
+    /// larger; for an upload, twice <see cref="UploadChunkSize" />, so even a chunk doubled by
+    /// <c>--crlf</c> is written whole.
     /// </param>
     /// <param name="count">
     /// How many bytes at most to read, or <see cref="long.MaxValue" /> to run to the end of
@@ -613,9 +629,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// success.
     /// </param>
     /// <param name="reportWriteFailure">
-    /// Builds the outcome of a failed write, from the size of the chunk offered, how many
+    /// Builds the outcome of a failed write, from the size of the write offered, how many
     /// of its bytes the destination accepted before failing, and the bytes written before
-    /// that chunk.
+    /// that write.
     /// </param>
     /// <param name="cancellationToken">Cancels the copy.</param>
     /// <returns>
@@ -630,6 +646,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         Stream destination,
         int chunkSize,
         int firstChunkSize,
+        int writeSize,
         long count,
         long maxWritten,
         Action<ReadOnlyMemory<byte>> reportChunkRead,
@@ -667,11 +684,10 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             int allowed = (int)Math.Min(chunk.Length, maxWritten - transferred);
 
             // At the limit exactly, the next chunk writes nothing at all, not an empty write.
-            if (allowed > 0
-                && await TryWriteAsync(destination, chunk[..allowed], cancellationToken).ConfigureAwait(false)
-                    is { } accepted)
+            if (await TryWriteInSlicesAsync(destination, chunk[..allowed], writeSize, cancellationToken)
+                    .ConfigureAwait(false) is { } failure)
             {
-                return reportWriteFailure(allowed, accepted, transferred);
+                return reportWriteFailure(failure.Offered, failure.Accepted, transferred + failure.WrittenBefore);
             }
 
             consumed += read;
@@ -726,6 +742,38 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         {
             return -1;
         }
+    }
+
+    /// <summary>
+    /// Writes a chunk in writes of at most <paramref name="writeSize" /> bytes, stopping at
+    /// the first that fails. An empty chunk makes no write at all.
+    /// </summary>
+    /// <param name="destination">The stream to write to.</param>
+    /// <param name="chunk">The bytes to write.</param>
+    /// <param name="writeSize">The most to write at once.</param>
+    /// <param name="cancellationToken">Cancels the writes.</param>
+    /// <returns>
+    /// <see langword="null" /> when every write succeeded; otherwise the size of the write
+    /// that failed, how many of its bytes the destination accepted, and how many bytes of
+    /// <paramref name="chunk" /> earlier writes had already delivered.
+    /// </returns>
+    private static async ValueTask<(int Offered, int Accepted, int WrittenBefore)?> TryWriteInSlicesAsync(
+        Stream destination,
+        ReadOnlyMemory<byte> chunk,
+        int writeSize,
+        CancellationToken cancellationToken)
+    {
+        for (int written = 0; written < chunk.Length; written += writeSize)
+        {
+            ReadOnlyMemory<byte> slice = chunk.Slice(written, Math.Min(writeSize, chunk.Length - written));
+
+            if (await TryWriteAsync(destination, slice, cancellationToken).ConfigureAwait(false) is { } accepted)
+            {
+                return (slice.Length, accepted, written);
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

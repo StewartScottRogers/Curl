@@ -39,6 +39,30 @@ public sealed class FileProtocolHandlerTransferEventTests
         CollectionAssert.AreEqual(new[] { "<= hello\n", ShuttingDown }, events.Transcript);
     }
 
+    // curl --trace-ascii tr.txt -o out file:///<dir>/big.txt on a 1000000-byte file traces
+    // nine "<= Recv data, 102399 bytes (0x18fff)" and one "<= Recv data, 78409 bytes"
+    // (BL-936); the output still takes writes of at most 16384 bytes (BL-976).
+    [TestMethod]
+    public async Task ExecuteAsync_DownloadPastTwoReads_ReportsReceivedDataInReadSizedChunksAndWritesInSixteenKilobytes()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Encoding.ASCII.GetBytes(new string('a', 250000)));
+        var events = new RecordingTransferEvents();
+        var output = new ChunkRecordingStream();
+
+        var result = await new FileProtocolHandler(fileSystem)
+            .ExecuteAsync(new TransferContext { Url = FileUrl, Output = output, Events = events });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { 102399, 102399, 45202 },
+            events.Transcript.Where(line => line.StartsWith("<= ", StringComparison.Ordinal)).Select(line => line.Length - 3).ToArray());
+        int[] oneRead = [16384, 16384, 16384, 16384, 16384, 16384, 4095];
+        CollectionAssert.AreEqual(
+            oneRead.Concat(oneRead).Concat([16384, 16384, 12434]).ToArray(),
+            output.WriteLengths.ToArray());
+    }
+
     // curl -v writes the meter's line end before "* shutting down connection #0", after a
     // failure's own line: done falls between the two.
     [TestMethod]

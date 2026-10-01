@@ -20,7 +20,7 @@ public sealed class FileProtocolHandlerTests
     private const string EncodedUrlPath = "/dir/my%20file.txt";
 
     /// <summary>
-    /// The chunk size curl uses for a <c>file://</c> download body, measured at 16 kilobytes.
+    /// The write size curl uses for a <c>file://</c> download body, measured at 16 kilobytes.
     /// </summary>
     private const int ChunkSize = 16384;
 
@@ -119,7 +119,7 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
-    // curl reads a file:// body in 16 kilobyte chunks. LargeContent() is 40000 bytes, so
+    // curl writes a file:// body in 16 kilobyte chunks. LargeContent() is 40000 bytes, so
     // the whole sequence of writes is determined: two full chunks and the 7232 left over.
     [TestMethod]
     public async Task ExecuteAsync_FileLargerThanOneChunk_WritesAFullChunkFirst()
@@ -542,9 +542,32 @@ public sealed class FileProtocolHandlerTests
             result.ErrorMessage);
     }
 
+    // A 40000-byte file is one read (BL-976) written as 16384, 16384 and 7232: a failure on
+    // the third write passes 7232 and counts the 32768 bytes the first two delivered.
+    [TestMethod]
+    public async Task ExecuteAsync_OutputFailsOnALaterWriteOfOneRead_ReportsThatWriteAndTheBytesBeforeIt()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, new byte[40000]);
+        var context = new TransferContext
+        {
+            Url = FileUrl,
+            Output = FaultingStream.FailingOnWrite(3),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual(
+            "Failure writing output to destination, passed 7232 returned 0",
+            result.ErrorMessage);
+        Assert.AreEqual(32768L, result.BytesTransferred);
+    }
+
     // Measured in BL-099 with curl 8.21.0: `curl -sS file:///<N-byte file> >&-` prints
     // passed 4096 returned 0 for 4096 bytes, and passed 16384 returned 0 for 16385 and
-    // 20000, because libcurl reads 16384 bytes at a time.
+    // 20000, because libcurl writes at most 16384 bytes at a time.
     [TestMethod]
     [DataRow(4096, 4096)]
     [DataRow(16385, 16384)]
@@ -735,11 +758,14 @@ public sealed class FileProtocolHandlerTests
 
     // curl 8.21.0 treats a download read that fails after the open as the end of the file:
     // with the source under another process's byte-range lock it exits 0 with what it had.
+    // Re-measured in BL-976: a 300000-byte file locked at bytes 150000-150999 delivers the
+    // first 102399-byte read and exits 0.
     [TestMethod]
     public async Task ExecuteAsync_SourceReadFailsMidBody_EndsTheBodyThereAndSucceeds()
     {
+        const int DownloadReadSize = 102399;
         var fileSystem = new FakeFileSystem();
-        byte[] content = LargeContent();
+        byte[] content = new byte[300000];
         fileSystem.AddFileReadingFrom(OsPath, FaultingStream.FailingOnRead(content, 2), content.Length);
         var output = new ChunkRecordingStream();
         var context = new TransferContext { Url = FileUrl, Output = output };
@@ -749,8 +775,8 @@ public sealed class FileProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsNull(result.ErrorMessage);
-        Assert.AreEqual((long)ChunkSize, result.BytesTransferred);
-        CollectionAssert.AreEqual(content[..ChunkSize], output.ToArray());
+        Assert.AreEqual((long)DownloadReadSize, result.BytesTransferred);
+        CollectionAssert.AreEqual(content[..DownloadReadSize], output.ToArray());
     }
 
     [TestMethod]
@@ -1046,7 +1072,8 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         using var cancellation = new CancellationTokenSource();
-        byte[] content = LargeContent();
+        // Larger than one 102399-byte read, so the copy loop comes round a second time.
+        byte[] content = new byte[300000];
         var source = CancellingStream.Reading(
             content,
             triggerOperationNumber: 1,
