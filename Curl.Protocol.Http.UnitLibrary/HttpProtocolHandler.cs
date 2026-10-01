@@ -986,6 +986,7 @@ public sealed class HttpProtocolHandler(
             Events = context.Events,
             HeaderReceived = (statusLine, header) =>
             {
+                ReportAuthProblemLines(plan, statusLine, header);
                 cookiesStored = StoreCookie(context, header, cookiesStored);
                 StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
             },
@@ -1212,6 +1213,21 @@ public sealed class HttpProtocolHandler(
         HttpNegotiateInfoLines.IsNegotiateChallenge(plan.AuthRequest, statusLine, header)
             || HttpNtlmInfoLines.IsNtlmChallenge(plan.AuthRequest, statusLine, header)
             || (plan.ProxyAuthRequest is { } proxyRequest && HttpNtlmInfoLines.IsNtlmChallenge(proxyRequest, statusLine, header));
+
+    /// <summary>
+    /// Reports the <c>authentication problem, ignoring.</c> lines curl writes just before a
+    /// challenge header refusing the Basic or Bearer value the request sent to the proxy or the
+    /// origin (<see cref="HttpAuthProblemLines" />, BL-1040).
+    /// </summary>
+    private static void ReportAuthProblemLines(HttpRequestPlan plan, HttpStatusLine statusLine, HttpResponseHeader header)
+    {
+        if (plan.ProxyAuthRequest is { } proxyRequest)
+        {
+            ReportInfoLines(plan.Context.Events, [.. HttpAuthProblemLines.LinesBefore(proxyRequest, plan.ProxyAuthorization, statusLine, header)]);
+        }
+
+        ReportInfoLines(plan.Context.Events, [.. HttpAuthProblemLines.LinesBefore(plan.AuthRequest, plan.Authorization, statusLine, header)]);
+    }
 
     /// <summary>Reports <paramref name="line" />, or nothing when it is <see langword="null" />.</summary>
     private static void ReportAuthUsing(ITransferEvents events, string? line)
