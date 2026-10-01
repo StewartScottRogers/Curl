@@ -290,7 +290,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// reported (ADR-0085), except in the Schannel build after a TLS 1.3 handshake: each session
     /// ticket record <see cref="SessionTicketRecordDetector" /> finds before the first
     /// application data is reported, from the connection's first read, as a received
-    /// <c>NewSessionTicket</c> (ADR-0306, BL-1089).
+    /// <c>NewSessionTicket</c> (ADR-0309, BL-1089).
     /// </para>
     /// </remarks>
     /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>

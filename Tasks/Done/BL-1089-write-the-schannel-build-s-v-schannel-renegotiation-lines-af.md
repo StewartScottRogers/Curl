@@ -35,7 +35,7 @@ Under the Schannel wording, `-v https://<host>/` writes the three `* schannel:` 
   per ticket record (example.com, google, cloudflare one; github, microsoft two); none with
   `--tls-max 1.2`. Record-CurlExchange.ps1 was not extended: a server that sends tickets
   needs a non-Windows TLS stack, so the recorder could not reproduce it on this machine.
-- Decision (ADR-0306): `SslStream` hides tickets, so in the Schannel build a
+- Decision (ADR-0309): `SslStream` hides tickets, so in the Schannel build a
   `SessionTicketRecordDetector` on `ConnectionStream` follows the record boundaries after a
   TLS 1.3 handshake. At the first plaintext read, the leading records no run of application
   data records accounts for (record length less 17) are reported as received
@@ -46,7 +46,7 @@ Under the Schannel wording, `-v https://<host>/` writes the three `* schannel:` 
 - The first draft also counted a read that filled its buffer as matching. It was dropped
   because it never changed the answer for the better.
 - Not covered: the hand-built TLS path reports no `TlsMessageEvent`s, so it writes no lines;
-  tickets after the first application data go unreported (ADR-0306, Consequences).
+  tickets after the first application data go unreported (ADR-0309, Consequences).
 - Tests: `SessionTicketRecordDetectorTests` (12), `SslStreamTlsProviderTests.SessionTickets` (5),
   `SchannelRenegotiationTextTests` (10). Networking 2193 passed, Output 518 passed; quality
   100/100, 0 failing members in both libraries.

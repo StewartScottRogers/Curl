@@ -7,7 +7,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking;
 
 /// <summary>
-/// Pins when the provider reports TLS 1.3 session tickets (BL-1089, ADR-0306): only the
+/// Pins when the provider reports TLS 1.3 session tickets (BL-1089, ADR-0309): only the
 /// Schannel build after a TLS 1.3 handshake follows the records, and whatever it reports is a
 /// received <c>NewSessionTicket</c>, the bytes the server sent arriving intact either way.
 /// Whether the test server sends a ticket is the platform's choice, so

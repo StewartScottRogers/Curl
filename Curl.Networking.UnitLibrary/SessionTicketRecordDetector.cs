@@ -7,7 +7,7 @@ namespace Curl.Networking;
 /// how many records the server sent after a TLS 1.3 handshake and before the first
 /// application data that carried no application data: the <c>NewSessionTicket</c> records,
 /// each of which curl 8.21.0's Schannel build answers with its three <c>schannel:</c>
-/// renegotiation lines (BL-1089, ADR-0306).
+/// renegotiation lines (BL-1089, ADR-0309).
 /// </summary>
 /// <remarks>
 /// <para>

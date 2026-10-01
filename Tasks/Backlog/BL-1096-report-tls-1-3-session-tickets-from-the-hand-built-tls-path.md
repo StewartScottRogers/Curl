@@ -18,7 +18,7 @@ Under the Schannel wording, a transfer routed through HandBuiltTlsProvider (for 
 
 ## Context
 
-- ADR-0306 (BL-1089): SslStreamConnection reports a received NewSessionTicket TlsMessageEvent per ticket record, and Curl.Output words it under TlsBackend.Schannel. HandBuiltTlsConnection reports no TlsMessageEvent, so the hand-built path writes nothing.
+- ADR-0309 (BL-1089): SslStreamConnection reports a received NewSessionTicket TlsMessageEvent per ticket record, and Curl.Output words it under TlsBackend.Schannel. HandBuiltTlsConnection reports no TlsMessageEvent, so the hand-built path writes nothing.
 - The hand-built client sees the ticket in the clear, so it can report one event per record that carries tickets.
 
 ## Acceptance criteria

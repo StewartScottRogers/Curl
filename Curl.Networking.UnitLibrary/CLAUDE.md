@@ -137,7 +137,7 @@ through `IHandshakeReportingTlsProvider`'s `isProxy` argument. Per ADR-0305 (BL-
 that does not load still reports the trust first in the Schannel build, with `TargetsIpAddress`
 `false` (curl writes no SNI line), through `ReportTrustBeforeClientCertificateFailure`, in both
 providers; the OpenSSL build reports none. `SslStream` exposes no TLS
-records, so no `TlsMessageEvent` is reported, with one exception (ADR-0306, BL-1089): in the Schannel
+records, so no `TlsMessageEvent` is reported, with one exception (ADR-0309, BL-1089): in the Schannel
 build after a TLS 1.3 handshake, `ConnectionStream.TicketRecords` (a `SessionTicketRecordDetector`)
 follows the record boundaries read, and at the first read returning plaintext `SslStreamConnection`
 reports each leading record no application data accounts for as a received `NewSessionTicket`, so

@@ -4,7 +4,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Pins when <see cref="SessionTicketRecordDetector" /> reports a session ticket (BL-1089,
-/// ADR-0306), with record sizes measured under <c>SslStream</c>: example.com sent one 445-byte
+/// ADR-0309), with record sizes measured under <c>SslStream</c>: example.com sent one 445-byte
 /// ticket record and then the response in a 1049-byte and a 22-byte record, read as 1037
 /// bytes of plaintext; github.com sent two 74-byte ticket records on their own before the
 /// response. Each record's plaintext is its length less 17 bytes.
