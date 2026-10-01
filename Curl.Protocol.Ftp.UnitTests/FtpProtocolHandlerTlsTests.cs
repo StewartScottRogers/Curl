@@ -286,9 +286,71 @@ public sealed class FtpProtocolHandlerTlsTests
             _ => { },
             ConnectResult.Failed(CurlExitCode.SslConnectError, "schannel: failed to receive handshake"));
 
-        Assert.AreEqual(LogInSent + "PBSZ 0\r\nPROT P\r\nPWD\r\nEPSV\r\nTYPE I\r\nSIZE a.txt\r\nRETR a.txt\r\n", run.Sent);
+        Assert.AreEqual(LogInSent + "PBSZ 0\r\nPROT P\r\nPWD\r\nEPSV\r\n", run.Sent);
         Assert.IsTrue(run.Data.IsDisposed);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SslConnectError, "schannel: failed to receive handshake"), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PassiveProtP_RunsTheDataHandshakeBeforeTypeI()
+    {
+        // curl 8.21.0 -v -k --ssl-reqd ftp://127.0.0.1:18021/a.txt writes the data connection's
+        // schannel: lines right after "Trying 127.0.0.1:<port>...", before "> TYPE I" (BL-1084).
+        var events = new RecordingTransferEvents();
+        var securedControl = Scripted(LoggedIn + Protected + Pwd + Retrieved);
+        var tls = new QueuedTlsProvider(ConnectResult.Connected(securedControl), ConnectResult.Connected(Scripted("hello")));
+        var headersAtHandshake = new List<string[]>();
+        tls.BeforeEachHandshake = () => headersAtHandshake.Add([.. events.Headers]);
+        var connector = new QueuedConnector(
+            ConnectResult.Connected(Scripted(Greeting + AuthAccepted)),
+            ConnectResult.Connected(new ScriptedConnection()));
+        TransferContext context = MutableContext.Build(
+            new TransferContext { Url = CurlUrl.Parse("ftp://127.0.0.1:18021/a.txt"), Output = new MemoryStream() },
+            m =>
+            {
+                m.SslLevel = TransportSecurityLevel.Required;
+                m.Events = events;
+            });
+
+        TransferResult result = await new FtpProtocolHandler(connector, new QueuedListener(), tls).ExecuteAsync(context);
+
+        Assert.AreEqual("< " + Epsv, headersAtHandshake[1][^1]);
+        CollectionAssert.Contains(events.Headers, "> TYPE I\r\n");
+        Assert.AreEqual(TransferResult.Success(5), result with { Report = null });
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ActiveProtP_RunsTheDataHandshakeAfterTheAccept()
+    {
+        // curl -k --ssl-reqd -P - ftp://127.0.0.1:18437/a.txt: the server connects back only
+        // after RETR, so the handshake runs over the accepted connection.
+        var accepted = new ScriptedConnection();
+        var pending = new ScriptedPendingConnection(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 56703), ConnectResult.Connected(accepted));
+        var controlLocal = new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 55129);
+        var securedControl = new ScriptedConnection(Encoding.Latin1.GetBytes(
+            LoggedIn + Protected + Pwd + "200 EPRT command successful\r\n200 Type set\r\n213 5\r\n150 Opening BINARY mode data connection\r\n226 Transfer complete\r\n221 Bye\r\n"))
+        {
+            LocalEndPoint = controlLocal,
+        };
+        var tls = new QueuedTlsProvider(ConnectResult.Connected(securedControl), ConnectResult.Connected(Scripted("hello")));
+        var control = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + AuthAccepted))
+        {
+            LocalEndPoint = controlLocal,
+        };
+        var connector = new QueuedConnector(ConnectResult.Connected(control));
+        TransferContext context = MutableContext.Build(
+            new TransferContext { Url = CurlUrl.Parse("ftp://127.0.0.1:18437/a.txt"), Output = new MemoryStream() },
+            m =>
+            {
+                m.SslLevel = TransportSecurityLevel.Required;
+                m.FtpPort = "-";
+            });
+
+        TransferResult result = await new FtpProtocolHandler(connector, new QueuedListener(ListenResult.Listening(pending)), tls).ExecuteAsync(context);
+
+        Assert.AreSame(accepted, tls.Handshakes[1].Plaintext);
+        StringAssert.Contains(Encoding.Latin1.GetString(securedControl.Sent), "RETR a.txt\r\n");
+        Assert.AreEqual(TransferResult.Success(5), result with { Report = null });
     }
 
     [TestMethod]
