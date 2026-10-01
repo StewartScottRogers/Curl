@@ -70,3 +70,4 @@ completed:
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Networking.UnitTests (its CheckableSignatureAlgorithms test pins the nine schemes), which BL-847 in Doing touches
+- 2026-09-30: Backlog -> Doing.
