@@ -40,3 +40,4 @@ A TLS connect to an Alt-Svc alternative offers exactly the ALPN that alternative
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
