@@ -559,9 +559,9 @@ internal sealed class CurlCommandRunner(
     /// <c>--hsts</c>, as curl 8.21.0's tool shares one through its share handle: an <c>https</c>
     /// response's <c>Strict-Transport-Security</c> switches a later <c>http</c> URL or redirect to the
     /// same host to <c>https</c> (measured 2026-09-29, BL-621 Notes; ADR-0218). Made on first use, on
-    /// the run's clock.
+    /// the run's clock, writing to the run's diagnostic log (BL-921).
     /// </summary>
-    private HstsTransferPolicy Hsts => LazyInitializer.EnsureInitialized(ref hsts, () => new HstsTransferPolicy(timeProvider));
+    private HstsTransferPolicy Hsts => LazyInitializer.EnsureInitialized(ref hsts, () => new HstsTransferPolicy(timeProvider, diagnosticLog));
 
     /// <summary>The run's HSTS cache once <see cref="Hsts" /> has made it.</summary>
     private HstsTransferPolicy? hsts;
@@ -3937,7 +3937,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The accepted command line.</param>
     /// <returns>The started watchdog, or <see langword="null" /> when the speed is not watched.</returns>
     private LowSpeedWatchdog? StartLowSpeedWatchdog(CommandLineOptions options) =>
-        Running.AttemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(options.SpeedLimit, options.SpeedTimeSeconds, timeProvider);
+        Running.AttemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(options.SpeedLimit, options.SpeedTimeSeconds, timeProvider, diagnosticLog);
 
     /// <summary>
     /// Starts the <c>-m</c> watchdog for the attempt whose context is being created, on the
@@ -3947,7 +3947,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The accepted command line.</param>
     /// <returns>The started watchdog, or <see langword="null" /> without a positive <c>-m</c>.</returns>
     private MaxTimeWatchdog? StartMaxTimeWatchdog(CommandLineOptions options) =>
-        Running.AttemptMaxTimeWatchdog = MaxTimeWatchdog.StartFromCommandLine(options.MaxTime, timeProvider);
+        Running.AttemptMaxTimeWatchdog = MaxTimeWatchdog.StartFromCommandLine(options.MaxTime, timeProvider, diagnosticLog);
 
     /// <summary>
     /// Performs one attempt through <paramref name="follower" /> under the <c>-Y</c>/<c>-y</c> and
