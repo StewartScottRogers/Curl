@@ -9,7 +9,7 @@ touches: [Audit/Tools/Write-AuditScorecard.ps1, Audit/Tools/Fixtures/scorecard]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1017 — Write the audit scorecard with each auditor's planted-defect catch rate
 
@@ -51,13 +51,19 @@ previous scorecard) and checks the rules.
 
 ## Acceptance criteria
 
-- [ ] `-SelfTest` prints `PASS` and no `FAIL` for: catch rates per auditor; the auditor that missed a defect and the one with no block are unreliable and nobody else is; a catch by the wrong auditor does not count; `-ReliabilityOnly` prints exactly the two names; the written scorecard has the template's sections in order, the fingerprint, and a correct delta against the previous scorecard.
-- [ ] Two runs on the same inputs produce byte-identical scorecards except the file name.
-- [ ] Header help documents parameters and rules; ASCII only; runs under PowerShell 7 and Windows PowerShell 5.1.
+- [x] `-SelfTest` prints `PASS` and no `FAIL` for: catch rates per auditor; the auditor that missed a defect and the one with no block are unreliable and nobody else is; a catch by the wrong auditor does not count; `-ReliabilityOnly` prints exactly the two names; the written scorecard has the template's sections in order, the fingerprint, and a correct delta against the previous scorecard.
+- [x] Two runs on the same inputs produce byte-identical scorecards except the file name.
+- [x] Header help documents parameters and rules; ASCII only; runs under PowerShell 7 and Windows PowerShell 5.1.
 
 ## Notes
+
+- Audit branch commits 2f33b213 and 66ec06ff.
+- -SelfTest: 14 PASS, 0 FAIL under Windows PowerShell 5.1 and PowerShell 7.6.6, on Audit/Tools/Fixtures/scorecard (six auditors: security misses its planted defect, conformance has no report block, truthfulness also reports in security's planted file with security's fragment): catch rates per auditor; security and conformance unreliable and nobody else; the wrong auditor's catch counts for neither; -ReliabilityOnly prints exactly security, conformance; sections in template order, no placeholder left, fingerprint in the header; previous scorecard linked and fingerprint 'changed'; deltas +8.0 (small-get Curl median 70 to 78) and +100 points (quality catch rate); unreliable numbers marked; the model column; new findings listed; two runs byte-identical. ASCII only.
+- Found by the self-test: PowerShell's comma binds tighter than +, which had dropped candidateBinaryBytes from the performance metrics; fixed.
+- The catch rule is the same as Write-AuditFindings.ps1's (same auditor, same file, the manifest's fragment).
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. Write-AuditScorecard.ps1 writes the scorecard with catch rates, reliability, metrics and deltas, byte-for-byte reproducible; on the audit branch.

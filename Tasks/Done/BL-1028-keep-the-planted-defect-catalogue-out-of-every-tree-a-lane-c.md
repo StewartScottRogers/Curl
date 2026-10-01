@@ -9,7 +9,7 @@ touches: [Audit/PlantedDefects, .claude/agents/audit-seeder.md]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1028 — Keep the planted-defect catalogue out of every tree a lane can search, since a repository-wide Grep still reads Audit
 
@@ -41,3 +41,4 @@ Options to weigh (Decided by Claude when delivered): keep the catalogue only on 
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. The planted-defect catalogue is stored base64-encoded, so no repository search returns its text; recorded in ADR-0267 section 8.
