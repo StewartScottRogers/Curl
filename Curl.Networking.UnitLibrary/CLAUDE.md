@@ -302,6 +302,12 @@ Per ADR-0292 (BL-1025) QUIC's UDP sockets bind the same way: `TcpConnector` puts
 `IUdpChannelOpener.OpenFrom` (`TcpDialer.BindLocalEnd` walks the range) before it reports the trust
 anchors; a failed bind moves on to the next address and ends with exit 45, 43 or 7 and the one line
 `Failed to connect to <host> port <port> after N ms: <words>`, with no `QUIC connect to` line.
+Per BL-1077 an `--interface` name is first bound as a device there too, through
+`IUdpChannelOpener.OpenFromDeviceAsync`, whose `UdpChannelOpener` runs the same
+`TcpDialer.BindDeviceOrLocalEndAsync` with `TcpDialer.TryBindToDevice` (internal constructor seam for
+tests): a plain or `if!` name bound so binds no address or port (the socket then binds any address on
+an ephemeral port, as the kernel would on the first send), `ifhost!` goes on to bind its host. QUIC
+writes none of the bind's `-v` lines yet.
 
 Per ADR-0149 (BL-507) `TcpConnector` takes an optional `UnixSocketAddress` (`--unix-socket`,
 `--abstract-unix-socket`, whose name starts with a NUL). With one, every connect dials it through

@@ -99,6 +99,21 @@ public sealed class UdpDatagramChannel : IDatagramChannel
         ServerEndPoint = serverEndPoint;
     }
 
+    /// <summary>
+    /// Takes over <paramref name="boundSocket" />, a UDP socket of <paramref name="serverEndPoint" />'s
+    /// address family already bound, as <see cref="UdpChannelOpener.OpenFromDeviceAsync" /> binds one to an
+    /// <c>--interface</c> device before any address (BL-1077).
+    /// </summary>
+    /// <param name="serverEndPoint">The resolved endpoint the first datagram goes to.</param>
+    /// <param name="boundSocket">The bound socket, which the channel now owns.</param>
+    internal UdpDatagramChannel(IPEndPoint serverEndPoint, Socket boundSocket)
+    {
+        _connectRouteProbe = static (socket, remoteEndPoint) => socket.Connect(remoteEndPoint);
+        _serverEndPoint = serverEndPoint;
+        _socket = boundSocket;
+        ServerEndPoint = serverEndPoint;
+    }
+
     /// <inheritdoc />
     public EndPoint ServerEndPoint { get; }
 
@@ -179,6 +194,6 @@ public sealed class UdpDatagramChannel : IDatagramChannel
         }
     }
 
-    private static IPAddress AnyAddressOf(AddressFamily addressFamily) =>
+    internal static IPAddress AnyAddressOf(AddressFamily addressFamily) =>
         addressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any;
 }

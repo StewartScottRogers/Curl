@@ -58,6 +58,34 @@ public sealed class QuicServerChannelOpener : IUdpChannelOpener
         return Open(serverEndPoint);
     }
 
+    /// <summary>Gets whether each device bind <see cref="OpenFromDeviceAsync" /> asks for succeeds, as on Linux.</summary>
+    public bool DeviceBinds { get; init; }
+
+    /// <summary>Gets the device name and <c>ifhost!</c> choice each <see cref="OpenFromDeviceAsync" /> was asked for, in order.</summary>
+    internal List<(string DeviceName, bool BindsAddressAfterDevice)> DeviceBoundTo { get; } = [];
+
+    /// <inheritdoc />
+    /// <remarks>Decides as <see cref="UdpChannelOpener" /> does, through <see cref="TcpDialer.BindDeviceOrLocalEndAsync" />, recording the local end it binds in <see cref="BoundFrom" />.</remarks>
+    public async ValueTask<IDatagramChannel> OpenFromDeviceAsync(
+        IPEndPoint serverEndPoint,
+        string deviceName,
+        bool bindsAddressAfterDevice,
+        Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
+        int localPortCount,
+        CancellationToken cancellationToken)
+    {
+        DeviceBoundTo.Add((deviceName, bindsAddressAfterDevice));
+        await TcpDialer.BindDeviceOrLocalEndAsync(
+            deviceName,
+            bindsAddressAfterDevice,
+            _ => DeviceBinds,
+            chooseLocalEndAsync,
+            localEndPoint => BoundFrom.Add((localEndPoint, localPortCount)),
+            NoTransferEvents.Instance,
+            cancellationToken);
+        return Open(serverEndPoint);
+    }
+
     /// <summary>One channel: each datagram sent goes to the server at once, and its answers queue up to be received.</summary>
     internal sealed class Channel(QuicServerChannelOpener opener, IPEndPoint serverEndPoint, QuicTestServer? server, IDatagramChannel? realSocket) : IDatagramChannel
     {

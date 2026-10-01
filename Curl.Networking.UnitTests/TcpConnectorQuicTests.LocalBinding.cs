@@ -127,6 +127,163 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task ConnectMultiplexedAsync_WithAPlainInterfaceNameItsDeviceBinds_BindsNoAddressOrPort()
+    {
+        // libcurl's bindlocal runs for QUIC's socket too: SO_BINDTODEVICE alone, then no address (BL-1077).
+        var opener = new QuicServerChannelOpener { ServerFor = _ => Server(), DeviceBinds = true };
+        var connector = BindingConnector(opener, new LocalBinding("eth0", "eth0", null, 41000, 3));
+
+        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+
+        await using var connection = result.Connection!;
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(("eth0", false), opener.DeviceBoundTo.Single());
+        Assert.IsEmpty(opener.BoundFrom);
+    }
+
+    [TestMethod]
+    public async Task ConnectMultiplexedAsync_WithAnIfNameItsDeviceBinds_BindsNoAddressOrPort()
+    {
+        var opener = new QuicServerChannelOpener { ServerFor = _ => Server(), DeviceBinds = true };
+        var connector = BindingConnector(opener, new LocalBinding("eth0", null, null, 0, 1));
+
+        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+
+        await using var connection = result.Connection!;
+        Assert.AreEqual(("eth0", false), opener.DeviceBoundTo.Single());
+        Assert.IsEmpty(opener.BoundFrom);
+    }
+
+    [TestMethod]
+    public async Task ConnectMultiplexedAsync_WithIfhostItsDeviceBinds_BindsTheHostAfterTheDevice()
+    {
+        var opener = new QuicServerChannelOpener { ServerFor = _ => Server(), DeviceBinds = true };
+        var connector = BindingConnector(opener, new LocalBinding(null, "127.0.0.1", "eth0", 41000, 2));
+
+        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+
+        await using var connection = result.Connection!;
+        Assert.AreEqual(("eth0", true), opener.DeviceBoundTo.Single());
+        Assert.AreEqual((new IPEndPoint(IPAddress.Loopback, 41000), 2), opener.BoundFrom.Single());
+    }
+
+    [TestMethod]
+    public async Task ConnectMultiplexedAsync_WithOnlyALocalPort_AsksForNoDeviceBind()
+    {
+        var opener = new QuicServerChannelOpener { ServerFor = _ => Server(), DeviceBinds = true };
+        var connector = BindingConnector(opener, new LocalBinding(null, null, null, 41000, 1));
+
+        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+
+        await using var connection = result.Connection!;
+        Assert.IsEmpty(opener.DeviceBoundTo);
+        Assert.AreEqual((new IPEndPoint(IPAddress.Any, 41000), 1), opener.BoundFrom.Single());
+    }
+
+    [TestMethod]
+    public async Task UdpChannelOpener_OpenFromDeviceAsync_WhenTheDeviceBindsAlone_BindsAnyAddressAndChoosesNoLocalEnd()
+    {
+        var devicesAsked = new List<string>();
+        var opener = new UdpChannelOpener((_, name) => { devicesAsked.Add(name); return true; });
+        var chooserCalls = 0;
+
+        await using var channel = await opener.OpenFromDeviceAsync(
+            new IPEndPoint(IPAddress.Loopback, 9),
+            "eth0",
+            bindsAddressAfterDevice: false,
+            _ => { chooserCalls++; return ValueTask.FromResult(new IPEndPoint(IPAddress.Loopback, 41000)); },
+            1,
+            CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "eth0" }, devicesAsked);
+        Assert.AreEqual(0, chooserCalls);
+        Assert.AreNotEqual(41000, ((IPEndPoint)channel.LocalEndPoint!).Port);
+        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 9), channel.ServerEndPoint);
+    }
+
+    [TestMethod]
+    public async Task UdpChannelOpener_OpenFromDeviceAsync_ForIfhost_BindsTheChosenLocalEndAfterTheDevice()
+    {
+        var opener = new UdpChannelOpener((_, _) => true);
+
+        await using var channel = await opener.OpenFromDeviceAsync(
+            new IPEndPoint(IPAddress.Loopback, 9),
+            "eth0",
+            bindsAddressAfterDevice: true,
+            _ => ValueTask.FromResult(new IPEndPoint(IPAddress.Loopback, 0)),
+            1,
+            CancellationToken.None);
+
+        var bound = (IPEndPoint)channel.LocalEndPoint!;
+        Assert.AreEqual(IPAddress.Loopback, bound.Address);
+        Assert.AreNotEqual(0, bound.Port);
+    }
+
+    [TestMethod]
+    public async Task UdpChannelOpener_OpenFromDeviceAsync_WhenTheDeviceDoesNotBind_BindsTheChosenLocalEnd()
+    {
+        var opener = new UdpChannelOpener((_, _) => false);
+
+        await using var channel = await opener.OpenFromDeviceAsync(
+            new IPEndPoint(IPAddress.IPv6Loopback, 9),
+            "bogus0",
+            bindsAddressAfterDevice: false,
+            _ => ValueTask.FromResult(new IPEndPoint(IPAddress.IPv6Loopback, 0)),
+            1,
+            CancellationToken.None);
+
+        Assert.AreEqual(IPAddress.IPv6Loopback, ((IPEndPoint)channel.LocalEndPoint!).Address);
+    }
+
+    [TestMethod]
+    public async Task UdpChannelOpener_OpenFromDeviceAsync_WhenTheChosenPortIsTaken_ThrowsInterfaceFailed()
+    {
+        using var taken = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        taken.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        var takenEndPoint = (IPEndPoint)taken.LocalEndPoint!;
+        var opener = new UdpChannelOpener((_, _) => false);
+
+        var exception = await Assert.ThrowsExactlyAsync<LocalBindException>(async () => await opener.OpenFromDeviceAsync(
+            new IPEndPoint(IPAddress.Loopback, 9),
+            "eth0",
+            bindsAddressAfterDevice: false,
+            _ => ValueTask.FromResult(takenEndPoint),
+            1,
+            CancellationToken.None));
+
+        Assert.AreEqual(LocalBindFailure.InterfaceFailed, exception.Failure);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux)]
+    public async Task UdpChannelOpener_OpenFromDeviceAsync_OnLinuxWithTheLoopbackDevice_BindsItAlone()
+    {
+        var chooserCalls = 0;
+
+        await using var channel = await new UdpChannelOpener().OpenFromDeviceAsync(
+            new IPEndPoint(IPAddress.Loopback, 9),
+            "lo",
+            bindsAddressAfterDevice: false,
+            _ => { chooserCalls++; return ValueTask.FromResult(new IPEndPoint(IPAddress.Loopback, 0)); },
+            1,
+            CancellationToken.None);
+
+        Assert.AreEqual(0, chooserCalls);
+    }
+
+    [TestMethod]
+    public async Task UdpChannelOpener_OpenFromDeviceAsync_WithANullArgument_ThrowsArgumentNullException()
+    {
+        var opener = new UdpChannelOpener();
+        var server = new IPEndPoint(IPAddress.Loopback, 9);
+        Func<CancellationToken, ValueTask<IPEndPoint>> choose = _ => ValueTask.FromResult(new IPEndPoint(IPAddress.Loopback, 0));
+
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await opener.OpenFromDeviceAsync(null!, "eth0", false, choose, 1, CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await opener.OpenFromDeviceAsync(server, null!, false, choose, 1, CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await opener.OpenFromDeviceAsync(server, "eth0", false, null!, 1, CancellationToken.None));
+    }
+
+    [TestMethod]
     public async Task UdpChannelOpener_OpenFrom_BindsTheFirstFreePortOfTheRange()
     {
         using var taken = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);

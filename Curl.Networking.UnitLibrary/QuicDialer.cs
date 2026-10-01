@@ -311,9 +311,27 @@ public sealed class QuicDialer
             return _channelOpener.Open(endPoint);
         }
 
-        var localAddress = await localBinding.ChooseAsync(endPoint.AddressFamily, NoTransferEvents.Instance, cancellationToken).ConfigureAwait(false);
         var binding = localBinding.Binding;
-        return _channelOpener.OpenFrom(endPoint, new IPEndPoint(localAddress, binding.FirstPort), binding.PortCount);
+        if ((binding.InterfaceName ?? binding.DeviceName) is { } deviceName)
+        {
+            // An --interface name is bound as a device first, as LocalBindingTcpDialer binds TCP's (BL-1077).
+            return await _channelOpener.OpenFromDeviceAsync(
+                endPoint,
+                deviceName,
+                bindsAddressAfterDevice: binding.InterfaceName is null,
+                token => ChooseLocalEndAsync(localBinding, endPoint.AddressFamily, token),
+                binding.PortCount,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        var localEndPoint = await ChooseLocalEndAsync(localBinding, endPoint.AddressFamily, cancellationToken).ConfigureAwait(false);
+        return _channelOpener.OpenFrom(endPoint, localEndPoint, binding.PortCount);
+    }
+
+    private static async ValueTask<IPEndPoint> ChooseLocalEndAsync(LocalBindingAddressChooser localBinding, AddressFamily family, CancellationToken cancellationToken)
+    {
+        var localAddress = await localBinding.ChooseAsync(family, NoTransferEvents.Instance, cancellationToken).ConfigureAwait(false);
+        return new IPEndPoint(localAddress, localBinding.Binding.FirstPort);
     }
 
     // A local end that could not be bound, as curl.se's ngtcp2 build ends it (measured, BL-1025):
