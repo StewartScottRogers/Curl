@@ -133,7 +133,7 @@ and client certificate are ready (`-k`, the `--cacert` file or else the referenc
 default bundle name `/cacert.pem`, which is named but never read, and `--capath`), sets the
 event's `VerifiedHostName` (the host without IPv6 brackets, `null` with `-k`) and `IsProxy`;
 `TcpConnector` reports the HTTPS proxy's handshake, and a forward proxy's, with `IsProxy` set
-through `IHandshakeReportingTlsProvider`'s `isProxy` argument. Per ADR-0304 (BL-1088) a `--cert`
+through `IHandshakeReportingTlsProvider`'s `isProxy` argument. Per ADR-0305 (BL-1088) a `--cert`
 that does not load still reports the trust first in the Schannel build, with `TargetsIpAddress`
 `false` (curl writes no SNI line), through `ReportTrustBeforeClientCertificateFailure`, in both
 providers; the OpenSSL build reports none. `SslStream` exposes no TLS

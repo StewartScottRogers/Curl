@@ -546,7 +546,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// whether the client certificate is picked automatically, then fails on the certificate,
     /// before <c>schannel_connect_step1</c> would write the SNI line, so the event carries
     /// <see cref="TlsTrustEvent.TargetsIpAddress" /> <see langword="false" /> whatever the host
-    /// (measured with curl 8.21.0, BL-1088, ADR-0304). The OpenSSL build reports nothing.
+    /// (measured with curl 8.21.0, BL-1088, ADR-0305). The OpenSSL build reports nothing.
     /// </summary>
     /// <param name="events">Where the trust is reported.</param>
     /// <param name="options">The handshake's settings.</param>
