@@ -40,6 +40,16 @@ public sealed class QuicServerChannelOpener : IUdpChannelOpener
         return channel;
     }
 
+    /// <summary>Gets the local endpoint and port count each <see cref="OpenFrom" /> was asked for, in order.</summary>
+    internal List<(IPEndPoint LocalEndPoint, int LocalPortCount)> BoundFrom { get; } = [];
+
+    /// <inheritdoc />
+    public IDatagramChannel OpenFrom(IPEndPoint serverEndPoint, IPEndPoint localEndPoint, int localPortCount)
+    {
+        BoundFrom.Add((localEndPoint, localPortCount));
+        return Open(serverEndPoint);
+    }
+
     /// <summary>One channel: each datagram sent goes to the server at once, and its answers queue up to be received.</summary>
     internal sealed class Channel(QuicServerChannelOpener opener, IPEndPoint serverEndPoint, QuicTestServer? server) : IDatagramChannel
     {

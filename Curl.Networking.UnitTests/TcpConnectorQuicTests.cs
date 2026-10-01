@@ -288,7 +288,7 @@ public sealed partial class TcpConnectorQuicTests
         var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
 
         Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.ExitCode);
-        Assert.IsEmpty(opener.Opened);
+        Assert.IsTrue(opener.Opened.Single().IsDisposed);
     }
 
     [TestMethod]

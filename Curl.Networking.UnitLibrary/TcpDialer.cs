@@ -114,7 +114,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// port from <paramref name="localEndPoint" />'s port that binds, trying at most
     /// <paramref name="portCount" /> ports and never past 65535, as libcurl's <c>bindlocal</c> does.
     /// </summary>
-    /// <param name="socket">A TCP socket not yet bound or connected.</param>
+    /// <param name="socket">A TCP or UDP socket not yet bound or connected.</param>
     /// <param name="localEndPoint">The local address and the first port.</param>
     /// <param name="portCount">How many ports to try; fewer than 1 is taken as 1.</param>
     /// <exception cref="LocalBindException">

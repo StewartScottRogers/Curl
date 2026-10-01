@@ -32,6 +32,8 @@ public sealed class QuicDialer
         [CurlExitCode.SendError] = "Failed sending data to the peer",
         [CurlExitCode.RecvError] = "Failure when receiving data from the peer",
         [CurlExitCode.PeerFailedVerification] = "SSL peer certificate or SSH remote key was not OK",
+        [CurlExitCode.InterfaceFailed] = "Failed binding local connection end",
+        [CurlExitCode.BadFunctionArgument] = "A libcurl function was given a bad argument",
     };
 
     private readonly IUdpChannelOpener _channelOpener;
@@ -171,18 +173,18 @@ public sealed class QuicDialer
         IDatagramChannel? tunnel,
         CancellationToken cancellationToken)
     {
+        // curl.se's ngtcp2 build binds the socket before it names the trust anchors (measured, BL-1025).
+        var (channel, openFailure) = await OpenChannelAsync(request, endPoint, tunnel, cancellationToken).ConfigureAwait(false);
+        if (channel is null)
+        {
+            return (openFailure!, true);
+        }
+
         request.Target.Events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options));
         var (verifier, unusable) = CreateVerifier(request.Target.Host);
         if (verifier is null)
         {
-            var (exitCode, message) = _verification.TrustAnchorsUnusable(unusable!);
-            return (MultiplexedConnectResult.Failed(exitCode, message), false);
-        }
-
-        var (channel, openFailure) = OpenChannel(endPoint, tunnel);
-        if (channel is null)
-        {
-            return (Failed(request, endPoint, openFailure!), true);
+            return (await TrustAnchorsUnusableAsync(channel, tunnel, unusable!).ConfigureAwait(false), false);
         }
 
         var handshake = new QuicClientConnectionState(new QuicClientSettings { Tls = tls }, _random, verifier, _timeProvider);
@@ -196,6 +198,19 @@ public sealed class QuicDialer
         await channel.DisposeAsync().ConfigureAwait(false);
         cancellation?.Throw();
         return (Failed(request, endPoint, failure!), LeavesTimeForTheNextAddress(failure!));
+    }
+
+    // The failure for trust anchors or revocation lists that cannot be read; the socket opened is closed,
+    // and a tunnel left to DialThroughTunnelAsync, which closes it.
+    private async ValueTask<MultiplexedConnectResult> TrustAnchorsUnusableAsync(IDatagramChannel channel, IDatagramChannel? tunnel, Exception unusable)
+    {
+        if (tunnel is null)
+        {
+            await channel.DisposeAsync().ConfigureAwait(false);
+        }
+
+        var (exitCode, message) = _verification.TrustAnchorsUnusable(unusable);
+        return MultiplexedConnectResult.Failed(exitCode, message);
     }
 
     // What the ClientHello offers, in the order HandBuiltTlsProvider prepares it: the suites,
@@ -257,9 +272,14 @@ public sealed class QuicDialer
         }
     }
 
-    // The tunnel when there is one; else a new socket, which, when it cannot be opened or bound,
-    // fails the attempt as a connect that reached nothing.
-    private (IDatagramChannel? Channel, QuicHandshakeFailure? Failure) OpenChannel(IPEndPoint endPoint, IDatagramChannel? tunnel)
+    // The tunnel when there is one; else a new socket, bound as --interface and --local-port ask.
+    // A local end that cannot be bound fails the attempt as the TCP path's does (BindFailed); a
+    // socket that cannot be opened, as a connect that reached nothing.
+    private async ValueTask<(IDatagramChannel? Channel, MultiplexedConnectResult? Failure)> OpenChannelAsync(
+        QuicDialRequest request,
+        IPEndPoint endPoint,
+        IDatagramChannel? tunnel,
+        CancellationToken cancellationToken)
     {
         if (tunnel is not null)
         {
@@ -268,12 +288,48 @@ public sealed class QuicDialer
 
         try
         {
-            return (_channelOpener.Open(endPoint), null);
+            return (await OpenBoundChannelAsync(request.LocalBinding, endPoint, cancellationToken).ConfigureAwait(false), null);
+        }
+        catch (LocalBindException exception)
+        {
+            return (null, BindFailed(request, exception.Failure));
         }
         catch (SocketException exception)
         {
-            return (null, new QuicHandshakeFailure(CurlExitCode.CouldntConnect, ConnectFailureReason.Describe(exception, _matchesSchannelBuild)));
+            var failure = new QuicHandshakeFailure(CurlExitCode.CouldntConnect, ConnectFailureReason.Describe(exception, _matchesSchannelBuild));
+            return (null, Failed(request, endPoint, failure));
         }
+    }
+
+    // Unbound without a LocalBinding; else on the address chosen for the family dialled and the
+    // first free port of the --local-port range, as libcurl's bindlocal binds a QUIC socket.
+    private async ValueTask<IDatagramChannel> OpenBoundChannelAsync(LocalBindingAddressChooser? localBinding, IPEndPoint endPoint, CancellationToken cancellationToken)
+    {
+        if (localBinding is null)
+        {
+            return _channelOpener.Open(endPoint);
+        }
+
+        var localAddress = await localBinding.ChooseAsync(endPoint.AddressFamily, cancellationToken).ConfigureAwait(false);
+        var binding = localBinding.Binding;
+        return _channelOpener.OpenFrom(endPoint, new IPEndPoint(localAddress, binding.FirstPort), binding.PortCount);
+    }
+
+    // A local end that could not be bound, as curl.se's ngtcp2 build ends it (measured, BL-1025):
+    // no "QUIC connect to" line, only "Failed to connect to", with exit 45 and exit 43 worded as
+    // the TCP path words them and a local address of the other family the usual exit 7.
+    private MultiplexedConnectResult BindFailed(QuicDialRequest request, LocalBindFailure failure)
+    {
+        var exitCode = failure switch
+        {
+            LocalBindFailure.InterfaceFailed => CurlExitCode.InterfaceFailed,
+            LocalBindFailure.BadArgument => CurlExitCode.BadFunctionArgument,
+            _ => CurlExitCode.CouldntConnect,
+        };
+        var elapsedMilliseconds = (long)_timeProvider.GetElapsedTime(request.NameResolved).TotalMilliseconds;
+        var message = $"Failed to connect to {request.Target.Host} port {request.Target.Port} after {elapsedMilliseconds} ms: {ExitCodeWords[exitCode]}";
+        request.Target.Events.ReportInfo(message);
+        return MultiplexedConnectResult.Failed(exitCode, message);
     }
 
     // The channel's socket failing is curl's recvfrom() failure, exit 56; a cancellation is

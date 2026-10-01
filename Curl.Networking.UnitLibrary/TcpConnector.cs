@@ -163,9 +163,14 @@ public sealed partial class TcpConnector(
     public HaproxyProtocolHeader? HaproxyProtocol => haproxyProtocol;
 
     // Every TCP dial goes through this one: bound as localBinding asks, or the dialer as given.
-    private ITcpDialer BindingDialer() => localBinding is null
-        ? tcpDialer
-        : new LocalBindingTcpDialer(tcpDialer, localBinding, networkInterfaceLookup ?? new SystemNetworkInterfaceLookup(), dnsResolver);
+    private ITcpDialer BindingDialer() => LocalAddressChooser() is { } addressChooser
+        ? new LocalBindingTcpDialer(tcpDialer, addressChooser)
+        : tcpDialer;
+
+    // Chooses the local address TCP dials and QUIC's UDP sockets bind; null when localBinding is.
+    private LocalBindingAddressChooser? LocalAddressChooser() => localBinding is null
+        ? null
+        : new LocalBindingAddressChooser(localBinding, networkInterfaceLookup ?? new SystemNetworkInterfaceLookup(), dnsResolver);
 
     /// <summary>
     /// Gets the Unix domain socket every connect dials in place of the target's host, port and
@@ -464,7 +469,8 @@ public sealed partial class TcpConnector(
             started,
             timeProvider.GetTimestamp(),
             connectTimeout > TimeSpan.Zero ? connectTimeout : null,
-            TakeConnectionNumber()), null);
+            TakeConnectionNumber(),
+            LocalAddressChooser()), null);
     }
 
     /// <summary>
