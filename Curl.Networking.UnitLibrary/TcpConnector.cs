@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 
 using Curl.Protocol.Abstractions;
@@ -189,6 +190,7 @@ public sealed partial class TcpConnector(
     private readonly ResolveOverrides _resolveOverrides = resolveOverrides ?? ResolveOverrides.None;
     private readonly ConnectToMappings _connectToMappings = connectToMappings ?? ConnectToMappings.None;
     private readonly ConcurrentDictionary<string, DnsCacheEntry> _dnsCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConditionalWeakTable<ConnectTarget, object> _altSvcReported = new();
     private int _resolveEntriesLoaded;
     private long _nextConnectionNumber;
 
@@ -502,6 +504,9 @@ public sealed partial class TcpConnector(
     /// reported first as curl 8.21.0's <c>Alt-svc connecting from [&lt;id&gt;]&lt;host&gt;:&lt;port&gt;
     /// to [&lt;id&gt;]&lt;host&gt;:&lt;port&gt;</c> (measured, BL-623 Notes), else the target itself.
     /// An alternative counts as mapped, so exit 7 names it after <c>via</c>, as curl's does.
+    /// The line is reported once per target object: <c>--http3</c> races QUIC and TCP with one
+    /// target, and curl 8.18.0's ngtcp2 build reports it once for both attempts (measured, BL-733
+    /// Notes, BL-949).
     /// </summary>
     private ConnectDestination DestinationOf(ConnectTarget target)
     {
@@ -512,8 +517,12 @@ public sealed partial class TcpConnector(
         }
 
         var alternative = route.Alternative;
-        target.Events.ReportInfo(
-            $"Alt-svc connecting from [{route.OriginAlpn}]{target.Host}:{target.Port} to [{alternative.Alpn}]{alternative.Host}:{alternative.Port}");
+        if (_altSvcReported.TryAdd(target, target))
+        {
+            target.Events.ReportInfo(
+                $"Alt-svc connecting from [{route.OriginAlpn}]{target.Host}:{target.Port} to [{alternative.Alpn}]{alternative.Host}:{alternative.Port}");
+        }
+
         return new ConnectDestination(alternative.Host, alternative.Port, IsMapped: true, ParseError: null);
     }
 
