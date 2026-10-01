@@ -37,3 +37,4 @@ ADR numbers 0248, 0254 and 0289 each name exactly one record in `Documentation/P
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
