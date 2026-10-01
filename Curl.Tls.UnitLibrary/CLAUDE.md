@@ -49,7 +49,7 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   `TlsHandshakeFailure` (the alert to send, and a rejected chain's reason). Covers
   HelloRetryRequest (cookie included), the TLS 1.3 suites (`Tls13CipherSuite`), ALPN,
   SNI, CertificateVerify with RSA-PSS (RSAE and PSS keys), ECDSA P-256/384/521 and
-  Ed25519, the server Finished, an optional client certificate
+  brainpoolP256r1/384r1/512r1 (RFC 8734), Ed25519, Ed448 and ML-DSA-44/65/87, the server Finished, an optional client certificate
   (`TlsClientCertificate`), and NewSessionTicket after completion. With `post_handshake_auth`
   in `Tls13ClientSettings.ExtensionOrder` the hello offers it, and a CertificateRequest
   after completion (its context non-empty, else `illegal_parameter`) is answered at the
@@ -205,13 +205,17 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   both handshakes run it once the verifier accepts the chain, expose `CertificateStatus`,
   and fail anything but good with `bad_certificate_status_response` and
   `TlsHandshakeFailure.CertificateStatusRejection`.
-- Signatures: `TlsSignatureScheme` (codes, the TLS 1.3 and TLS 1.2 scheme tables - TLS
-  1.2 adds `rsa_pkcs1_*`, `ecdsa_sha1` and the five `dsa_*` (verify only) and binds
-  `ecdsa_*` to no curve - TLS 1.0/1.1's
+- Signatures: `TlsSignatureScheme` (codes, the TLS 1.3 and TLS 1.2 scheme tables - the
+  brainpool `tls13` schemes and `mldsa44/65/87` are TLS 1.3 only; TLS 1.2 adds
+  `rsa_pkcs1_*` (SHA-224 included), `ecdsa_sha1`, `ecdsa_sha224` and the five `dsa_*`
+  (verify only) and binds `ecdsa_*` to no curve; `ed448` is in both, so every scheme of
+  `ClientHelloProfile.OpenSsl` is checkable (BL-940) - TLS 1.0/1.1's
   legacy signatures, and the CertificateVerify content), `TlsCertificatePublicKey` (a
   certificate's `SubjectPublicKeyInfo`, the signature checks - a brainpool ECDSA key with
-  `Curl.Cryptography`'s `BrainpoolEcdsa`, ADR-0219 - and the RSA pre-master
-  secret encryption), `TlsSigningKey` with `RsaTlsSigningKey`, `EcdsaTlsSigningKey` and
+  `Curl.Cryptography`'s `BrainpoolEcdsa`, ADR-0219, Ed448 and ML-DSA with its `Ed448`
+  and `MlDsa`, SHA-224 hashed with its `DsaSignature.HashData`, and `rsa_pkcs1_sha224`'s
+  DigestInfo block checked with the public operation as TLS 1.0's MD5+SHA-1 block is -
+  and the RSA pre-master secret encryption), `TlsSigningKey` with `RsaTlsSigningKey`, `EcdsaTlsSigningKey` and
   `Ed25519TlsSigningKey`.
 - Tests: `Tls13TestServer` and `Tls12TestServer` in `Curl.Tls.UnitTests` are in-memory
   servers built from these codecs; `Tls12TestServer` resumes from a shared

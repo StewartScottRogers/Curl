@@ -60,19 +60,65 @@ internal sealed record TestServerCredential(byte[] Certificate, TlsSigningKey Si
         return new(WithForeignKey("CN=brainpool", publicKey), new Ed25519TlsSigningKey(new byte[32]), scheme) { BrainpoolKey = key };
     }
 
+    /// <summary>Gets the signer of a key the library cannot sign with (Ed448, ML-DSA), rather than <see cref="SigningKey" />, which is then a placeholder.</summary>
+    public Func<byte[], byte[]>? ContentSigner { get; init; }
+
+    /// <summary>An Ed448 certificate, whose signatures the server makes with <c>Curl.Cryptography</c>'s <see cref="Cryptography.Ed448" />.</summary>
+    public static TestServerCredential Ed448()
+    {
+        byte[] privateKey = new byte[Cryptography.Ed448.PrivateKeySize];
+        Cryptography.Ed448.GeneratePrivateKey(privateKey);
+        byte[] rawPublicKey = new byte[Cryptography.Ed448.PublicKeySize];
+        Cryptography.Ed448.ComputePublicKey(privateKey, rawPublicKey);
+        PublicKey publicKey = new(new Oid(TlsSignatureScheme.Ed448Oid), null, new AsnEncodedData(rawPublicKey));
+        return new(WithForeignKey("CN=ed448", publicKey), new Ed25519TlsSigningKey(new byte[32]), TlsSignatureScheme.Ed448)
+        {
+            ContentSigner = content =>
+            {
+                byte[] signature = new byte[Cryptography.Ed448.SignatureSize];
+                Cryptography.Ed448.Sign(privateKey, content, signature);
+                return signature;
+            },
+        };
+    }
+
+    /// <summary>An ML-DSA certificate of <paramref name="parameterSet" />, whose signatures the server makes with <c>Curl.Cryptography</c>'s <see cref="Cryptography.MlDsa" />.</summary>
+    public static TestServerCredential MlDsa(MlDsaParameterSet parameterSet, string algorithmOid, ushort scheme)
+    {
+        Cryptography.MlDsa key = Cryptography.MlDsa.GenerateKey(parameterSet);
+        byte[] rawPublicKey = new byte[Cryptography.MlDsa.GetPublicKeySize(parameterSet)];
+        key.ExportPublicKey(rawPublicKey);
+        PublicKey publicKey = new(new Oid(algorithmOid), null, new AsnEncodedData(rawPublicKey));
+        return new(WithForeignKey("CN=mldsa", publicKey), new Ed25519TlsSigningKey(new byte[32]), scheme)
+        {
+            ContentSigner = content =>
+            {
+                byte[] signature = new byte[Cryptography.MlDsa.GetSignatureSize(parameterSet)];
+                key.SignData(content, [], signature);
+                return signature;
+            },
+        };
+    }
+
     /// <summary>Signs <paramref name="content" /> by <paramref name="rule" /> with this credential's key.</summary>
     public byte[] Sign(TlsSignatureRule rule, byte[] content) => this switch
     {
         { SignsWithDsa: true } => TestDsaKey.Sign(rule.Hash, content),
         { BrainpoolKey: { } brainpool } => SignBrainpool(brainpool, rule.Hash, content),
+        { ContentSigner: { } signer } => signer(content),
         _ => SigningKey.SignByRule(rule, content),
     };
+
+    /// <summary>Signs a TLS 1.3 CertificateVerify's <paramref name="content" /> with <see cref="Scheme" />: by hand for a key the library cannot sign with, otherwise with <see cref="SigningKey" />, which refuses a scheme that does not fit it.</summary>
+    public byte[] SignCertificateVerify(byte[] content) => BrainpoolKey is not null || ContentSigner is not null
+        ? Sign(TlsSignatureScheme.FindRule(Scheme)!, content)
+        : SigningKey.Sign(Scheme, content);
 
     /// <summary>Signs with a brainpool key and encodes r and s as the DER <c>ECDSA-Sig-Value</c> TLS carries.</summary>
     private static byte[] SignBrainpool(BrainpoolEcdsa key, HashAlgorithmName hash, byte[] content)
     {
         byte[] rs = new byte[key.SignatureLength];
-        key.SignHash(CryptographicOperations.HashData(hash, content), hash, rs);
+        key.SignHash(DsaSignature.HashData(content, hash), hash, rs);
         AsnWriter writer = new(AsnEncodingRules.DER);
         using (writer.PushSequence())
         {

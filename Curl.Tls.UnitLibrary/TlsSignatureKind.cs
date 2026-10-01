@@ -23,4 +23,16 @@ internal enum TlsSignatureKind
 
     /// <summary>DSA (FIPS 186-4) with the DER <c>Dss-Sig-Value</c> signature of RFC 5246 section 4.7.</summary>
     Dsa,
+
+    /// <summary>
+    /// <c>rsa_pkcs1_sha224</c>: RSASSA-PKCS1-v1_5 with SHA-224's DigestInfo, built by hand
+    /// because the BCL does not compute SHA-224.
+    /// </summary>
+    RsaPkcs1Sha224,
+
+    /// <summary>Ed448 (RFC 8032) with an empty context.</summary>
+    Ed448,
+
+    /// <summary>Pure ML-DSA (FIPS 204) with an empty context; the key's OID names the parameter set.</summary>
+    MlDsa,
 }

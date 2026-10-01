@@ -520,6 +520,28 @@ public sealed class Tls12ClientHandshakeFailureTests
     }
 
     [TestMethod]
+    [DataRow("ecdsa", TlsSignatureScheme.EcdsaSha224, (ushort)0xc02b)]
+    [DataRow("brainpool", TlsSignatureScheme.EcdsaSha224, (ushort)0xc02b)]
+    [DataRow("rsa", TlsSignatureScheme.RsaPkcs1Sha224, (ushort)0xc02f)]
+    [DataRow("ed448", TlsSignatureScheme.Ed448, (ushort)0xc02b)]
+    public void ABadServerKeyExchangeSignatureWithASha224SchemeOrEd448IsADecryptError(string credential, int scheme, int cipherSuite)
+    {
+        TestServerCredential signer = credential switch
+        {
+            "ecdsa" => TestServerCredential.Ecdsa(ECCurve.NamedCurves.nistP256, TlsSignatureScheme.EcdsaSecp256r1Sha256),
+            "brainpool" => TestServerCredential.Brainpool(BrainpoolCurve.BrainpoolP256r1, TlsSignatureScheme.BrainpoolP256r1Oid, TlsSignatureScheme.EcdsaSecp256r1Sha256),
+            "rsa" => TestServerCredential.Rsa(TlsSignatureScheme.RsaPkcs1Sha256),
+            _ => TestServerCredential.Ed448(),
+        };
+        Tls12TestServer server = new(signer) { CipherSuite = (ushort)cipherSuite, SignatureScheme = (ushort)scheme };
+        Tls12ClientHandshake client = Client(DefaultSettings with { SignatureAlgorithms = [(ushort)scheme] });
+
+        Tls12HandshakeOutput output = Run(client, server, flight => ReplaceServerKeyExchange(flight, TlsProtocolVersion.Tls12, message => message with { Signature = Corrupt(message.Signature!) }));
+
+        AssertFails(TlsAlertDescription.DecryptError, output);
+    }
+
+    [TestMethod]
     public void ABrainpoolCertificateKeyOfTheWrongLengthIsABadCertificate()
     {
         AsnWriter writer = new(AsnEncodingRules.DER);

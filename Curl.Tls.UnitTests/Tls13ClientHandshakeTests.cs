@@ -145,6 +145,43 @@ public sealed class Tls13ClientHandshakeTests
     public void HandshakeCompletesWithEd25519() => AssertCompletes(TestServerCredential.Ed25519());
 
     [TestMethod]
+    public void HandshakeCompletesWithEd448() => AssertCompletesOfferingIt(TestServerCredential.Ed448());
+
+    [TestMethod]
+    [DataRow(Cryptography.BrainpoolCurve.BrainpoolP256r1, TlsSignatureScheme.BrainpoolP256r1Oid, TlsSignatureScheme.EcdsaBrainpoolP256r1Tls13Sha256)]
+    [DataRow(Cryptography.BrainpoolCurve.BrainpoolP384r1, TlsSignatureScheme.BrainpoolP384r1Oid, TlsSignatureScheme.EcdsaBrainpoolP384r1Tls13Sha384)]
+    [DataRow(Cryptography.BrainpoolCurve.BrainpoolP512r1, TlsSignatureScheme.BrainpoolP512r1Oid, TlsSignatureScheme.EcdsaBrainpoolP512r1Tls13Sha512)]
+    public void HandshakeCompletesWithEachBrainpoolTls13Scheme(Cryptography.BrainpoolCurve curve, string curveOid, int scheme) =>
+        AssertCompletesOfferingIt(TestServerCredential.Brainpool(curve, curveOid, (ushort)scheme));
+
+    [TestMethod]
+    [DataRow(Cryptography.MlDsaParameterSet.MlDsa44, TlsSignatureScheme.MlDsa44Oid, TlsSignatureScheme.MlDsa44)]
+    [DataRow(Cryptography.MlDsaParameterSet.MlDsa65, TlsSignatureScheme.MlDsa65Oid, TlsSignatureScheme.MlDsa65)]
+    [DataRow(Cryptography.MlDsaParameterSet.MlDsa87, TlsSignatureScheme.MlDsa87Oid, TlsSignatureScheme.MlDsa87)]
+    public void HandshakeCompletesWithEachMlDsaScheme(Cryptography.MlDsaParameterSet parameterSet, string algorithmOid, int scheme) =>
+        AssertCompletesOfferingIt(TestServerCredential.MlDsa(parameterSet, algorithmOid, (ushort)scheme));
+
+    [TestMethod]
+    [DataRow("ed448")]
+    [DataRow("brainpool")]
+    [DataRow("mldsa")]
+    public void ABadCertificateVerifySignatureOnEachAddedSchemeIsADecryptError(string name)
+    {
+        TestServerCredential credential = name switch
+        {
+            "ed448" => TestServerCredential.Ed448(),
+            "brainpool" => TestServerCredential.Brainpool(Cryptography.BrainpoolCurve.BrainpoolP256r1, TlsSignatureScheme.BrainpoolP256r1Oid, TlsSignatureScheme.EcdsaBrainpoolP256r1Tls13Sha256),
+            _ => TestServerCredential.MlDsa(Cryptography.MlDsaParameterSet.MlDsa44, TlsSignatureScheme.MlDsa44Oid, TlsSignatureScheme.MlDsa44),
+        };
+        Tls13TestServer server = new(credential);
+        using Tls13ClientHandshake client = Client(DefaultSettings with { SignatureAlgorithms = [credential.Scheme] });
+
+        Tls13HandshakeOutput output = Run(client, server, replaceFlight: flight => Tamper(flight, HandshakeType.CertificateVerify));
+
+        Assert.AreEqual(TlsAlertDescription.DecryptError, output.Failure!.Alert);
+    }
+
+    [TestMethod]
     public void HandshakeNegotiatesTheApplicationProtocolTheServerChose()
     {
         Tls13TestServer server = new(TestServerCredential.Ed25519()) { ApplicationProtocol = "http/1.1" };
@@ -257,10 +294,14 @@ public sealed class Tls13ClientHandshakeTests
         CollectionAssert.AreEqual(clientCredential.Certificate, server.ClientCertificates[0]);
     }
 
-    private static void AssertCompletes(TestServerCredential credential)
+    /// <summary>Completes a handshake whose client offers only <paramref name="credential" />'s scheme, which the default settings do not offer.</summary>
+    private static void AssertCompletesOfferingIt(TestServerCredential credential) =>
+        AssertCompletes(credential, DefaultSettings with { SignatureAlgorithms = [credential.Scheme] });
+
+    private static void AssertCompletes(TestServerCredential credential, Tls13ClientSettings? settings = null)
     {
         Tls13TestServer server = new(credential);
-        using Tls13ClientHandshake client = Client();
+        using Tls13ClientHandshake client = Client(settings);
 
         Tls13HandshakeOutput output = Run(client, server);
 

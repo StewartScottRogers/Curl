@@ -44,14 +44,14 @@ public sealed partial class HandBuiltTlsProviderTests
     }
 
     [TestMethod]
-    public void CheckableSignatureAlgorithms_LeaveOutOnlyTheOpenSslSchemesTheClientCannotCheck()
+    public void CheckableSignatureAlgorithms_KeepEverySchemeOfBothProfiles()
     {
         CollectionAssert.AreEqual(
             ClientHelloProfile.Schannel.SignatureAlgorithms.ToArray(),
             ClientHelloProfileMapping.CheckableSignatureAlgorithms(ClientHelloProfile.Schannel).ToArray());
         CollectionAssert.AreEqual(
-            new ushort[] { 0x0905, 0x0906, 0x0904, 0x0808, 0x081a, 0x081b, 0x081c, 0x0303, 0x0301 },
-            ClientHelloProfile.OpenSsl.SignatureAlgorithms.Except(ClientHelloProfileMapping.CheckableSignatureAlgorithms(ClientHelloProfile.OpenSsl)).ToArray());
+            ClientHelloProfile.OpenSsl.SignatureAlgorithms.ToArray(),
+            ClientHelloProfileMapping.CheckableSignatureAlgorithms(ClientHelloProfile.OpenSsl).ToArray());
     }
 
     [TestMethod]

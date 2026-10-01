@@ -270,7 +270,7 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
             byte[] certificate = new CertificateMessage([], chain).Encode();
             Add(flight, CompressCertificate is null ? certificate : CompressCertificate(certificate[HandshakeMessage.HeaderLength..]).Encode());
             byte[] content = TlsSignatureScheme.BuildCertificateVerifyContent(true, TranscriptHash());
-            Add(flight, new CertificateVerify(credential.Scheme, credential.SigningKey.Sign(credential.Scheme, content)).Encode());
+            Add(flight, new CertificateVerify(credential.Scheme, credential.SignCertificateVerify(content)).Encode());
         }
 
         Add(flight, new Finished(schedule.ComputeFinishedVerifyData(ServerHandshakeTrafficSecret, TranscriptHash())).Encode());
