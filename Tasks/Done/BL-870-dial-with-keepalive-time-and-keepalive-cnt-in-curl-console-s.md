@@ -8,7 +8,7 @@ depends-on: [BL-645]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-870 — Dial with --keepalive-time and --keepalive-cnt in Curl.Console's TcpDialer
 
@@ -24,13 +24,16 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `CurlComposition` builds its `TcpDialer` with `TcpSocketOptions.FromCommandLine(options.TcpNoDelay, options.TcpKeepAlive, options.TcpKeepAliveSeconds, options.TcpKeepAliveProbeCount)`.
-- [ ] A `CurlTransportsTests` test pins `--keepalive-time 5 --keepalive-cnt 3` as `new TcpSocketOptions(KeepAliveSeconds: 5, KeepAliveProbeCount: 3)` on `transports.TcpDialer.SocketOptions`, and the existing no-switch test still expects the defaults.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Console` reports 100% line and branch coverage and no failing member.
+- [x] `CurlComposition` builds its `TcpDialer` with `TcpSocketOptions.FromCommandLine(options.TcpNoDelay, options.TcpKeepAlive, options.TcpKeepAliveSeconds, options.TcpKeepAliveProbeCount)`.
+- [x] A `CurlTransportsTests` test pins `--keepalive-time 5 --keepalive-cnt 3` as `new TcpSocketOptions(KeepAliveSeconds: 5, KeepAliveProbeCount: 3)` on `transports.TcpDialer.SocketOptions`, and the existing no-switch test still expects the defaults.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Console` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- `CurlComposition.CreateTransports` now builds its `TcpDialer` from `TcpSocketOptions.FromCommandLine`, so 0 (not given) keeps libcurl's 60 s and 9 probes. Verified: build clean with -warnaserror, 33 fast test assemblies green, Curl.Console 100% line and branch, 0 failing members, worst CRAP 10.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. curl --keepalive-time and --keepalive-cnt now set the dialer's keepalive idle time, interval and probe count
