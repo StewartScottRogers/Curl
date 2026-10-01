@@ -1,0 +1,8 @@
+{ "seed": 1, "commit": "abc1234", "planted": [
+  { "id": "PD-001", "auditor": "quality", "file": "Curl.Cli.UnitTests/ParserTests.cs", "line": 30, "description": "weakened", "catch": "Parse_Empty_Throws" },
+  { "id": "PD-101", "auditor": "security", "file": "Curl.Tls.UnitLibrary/TlsMac.cs", "line": 40, "description": "SequenceEqual", "catch": "SequenceEqual" },
+  { "id": "PD-202", "auditor": "performance", "file": "Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs", "line": 286, "description": "per byte", "catch": "CopyFramedAsync" },
+  { "id": "PD-303", "auditor": "conformance", "file": "Curl.Cli.UnitLibrary/CommandLineOptionTable.cs", "line": 332, "description": "row removed", "catch": "--egd-file" },
+  { "id": "PD-402", "auditor": "truthfulness", "file": "Documentation/Planning/Decisions/ADR-0280-x.md", "line": 29, "description": "81 to 82", "catch": "ADR-0280" },
+  { "id": "PD-502", "auditor": "process", "file": "ci-runs.json", "line": null, "description": "90 minute red", "catch": "ci-red" }
+] }
