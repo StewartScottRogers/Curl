@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: docs
 depends-on: []
-touches: [Documentation/Planning/Decisions]
+touches: [Documentation/Planning/Decisions, Curl.Tls.UnitLibrary, Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-10-01
 completed:
@@ -34,7 +34,15 @@ ADR numbers 0248, 0254 and 0289 each name exactly one record in `Documentation/P
 
 ## Notes
 
+- 2026-10-01 (lane 2): Plan, from counting citers outside `Tasks/Done/<timestamp>/` on this branch and `origin/work/dark-factory`. Free numbers nothing cites: 0242, 0249, 0250 (also 0251, 0252, 0257, 0260, 0261).
+  - 0248: the SSH known-hosts record (no citers) becomes ADR-0242; the Negotiate 2xx record keeps 0248. Only its title line, file name and a new README row change.
+  - 0254: the TLS 1.2 byte-stream record (cited by `Curl.Tls.UnitLibrary/CLAUDE.md` lines 16 and 158, ADR-0162, ADR-0205) becomes ADR-0249; the happy-eyeballs record (cited by TcpConnector.cs, CurlComposition.cs, two test files, Networking CLAUDE.md) keeps 0254 and gets a README row.
+  - 0289: the HTTP/3 CONNECT-UDP record (cited by `Curl.Networking.UnitLibrary/CLAUDE.md` line 366 and ADR-0223) becomes ADR-0250; the SSH reset record (six citers) keeps 0289.
+  - `touches` widened to `Curl.Tls.UnitLibrary` and `Curl.Networking.UnitLibrary` for those two CLAUDE.md files. BL-1049 (Doing) touches both, so the task went back to Backlog until BL-1049 is Done.
+
+
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Backlog. Needs Curl.Tls.UnitLibrary and Curl.Networking.UnitLibrary CLAUDE.md edits, which BL-1049 (Doing) touches
