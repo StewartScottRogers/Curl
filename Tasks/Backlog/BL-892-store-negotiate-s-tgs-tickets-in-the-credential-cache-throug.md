@@ -34,3 +34,4 @@ Negotiate's hand-built Kerberos route stores a service ticket it got by a TGS ex
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Backlog. Lane 2 could not integrate: push kept being refused. The work is on branch factory/BL-892-lane-2-20260930-140644; start with git cherry-pick --no-commit factory/BL-892-lane-2-20260930-140644 and fix it.
