@@ -212,7 +212,8 @@ internal static class CurlComposition
     /// elsewhere the system GSS-API with the hand-built SPNEGO and Kerberos behind it, whose KDC
     /// exchanges go through a <see cref="KerberosKdcSocketTransport" /> over
     /// <paramref name="datagramConnector" /> and <paramref name="connector" /> (waiting
-    /// <see cref="KdcReplyTimeout" /> for a UDP reply) and whose SRV lookups go through a
+    /// <see cref="KdcReplyTimeout" /> for a UDP reply), whose <c>https://</c> KDCs are reached through a
+    /// <see cref="KerberosKdcProxyHttpsTransport" /> over <paramref name="connector" /> with TLS, and whose SRV lookups go through a
     /// <see cref="DnsServerResolver" /> asking the system's DNS servers (ADR-0176).
     /// </summary>
     /// <param name="connector">Opens TCP connections to a KDC.</param>
@@ -228,6 +229,7 @@ internal static class CurlComposition
             ProcessUserId.Read,
             new KerberosDnsSrvLookup(srvResolver.ResolveServiceAsync),
             kdcTransport,
+            new KerberosKdcProxyHttpsTransport(connector, KdcProxyExchangeTimeout, TimeProvider.System),
             TimeProvider.System);
         return new RoutingSecurityContextFactory(
             OperatingSystem.IsWindows(),
@@ -240,6 +242,13 @@ internal static class CurlComposition
     /// first per-KDC wait (<c>krb5_sendto_kdc</c>), one second.
     /// </summary>
     internal static TimeSpan KdcReplyTimeout { get; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// How long one HTTPS exchange with an MS-KKDCP proxy, connection and TLS included, may take
+    /// before the next KDC is tried (BL-882): ten seconds, as MIT's <c>krb5_sendto_kdc</c> gives
+    /// one KDC's stream connection.
+    /// </summary>
+    internal static TimeSpan KdcProxyExchangeTimeout { get; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// Creates the SASL authenticator the SMTP, POP3 and IMAP handlers share (ADR-0121): a
