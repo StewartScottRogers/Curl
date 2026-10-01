@@ -143,18 +143,34 @@ public sealed partial class HttpRequestHeadFormatterTests
 
     /// <summary>
     /// Measured with curl 8.21.0 <c>--compressed -e http://r/ -H "X-A: 1"</c> (BL-177 Notes):
-    /// Accept-Encoding follows Accept and comes before Referer and the <c>-H</c> values; the
-    /// reference's <c>zstd</c> token is left out (ADR-0020).
+    /// Accept-Encoding follows Accept and comes before Referer and the <c>-H</c> values, with
+    /// all four of the Schannel build's tokens, <c>zstd</c> included (BL-861 Notes, ADR-0287).
     /// </summary>
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public void Format_Compressed_SendsAcceptEncodingAfterAccept()
     {
         HttpRequestOptions options = new() { Compressed = true, Referer = "http://r/", Headers = ["X-A: 1"] };
 
         AssertHead(
-            "GET / HTTP/1.1\r\n" + DefaultHeaders + "Accept-Encoding: deflate, gzip, br\r\nReferer: http://r/\r\nX-A: 1\r\n\r\n",
+            "GET / HTTP/1.1\r\n" + DefaultHeaders + "Accept-Encoding: deflate, gzip, br, zstd\r\nReferer: http://r/\r\nX-A: 1\r\n\r\n",
             CurlUrl.Parse(Url),
             options);
+    }
+
+    /// <summary>
+    /// Measured with Linux curl 8.18.0 (OpenSSL, WSL Ubuntu) <c>--compressed</c> (BL-861
+    /// Notes): the OpenSSL build sends the same four tokens as the Schannel build; macOS's
+    /// OpenSSL build links brotli and zstd too (cited, ADR-0287).
+    /// </summary>
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Format_Compressed_OnTheOpenSslBuild_SendsTheSameFourTokens()
+    {
+        AssertHead(
+            "GET / HTTP/1.1\r\n" + DefaultHeaders + "Accept-Encoding: deflate, gzip, br, zstd\r\n\r\n",
+            CurlUrl.Parse(Url),
+            new HttpRequestOptions { Compressed = true });
     }
 
     [TestMethod]
@@ -390,13 +406,13 @@ public sealed partial class HttpRequestHeadFormatterTests
     /// Measured (BL-182 Notes): with a cookie jar, curl sends <c>Cookie</c> after
     /// <c>Referer</c> and before the <c>-H</c> values and the body's headers, and still sends
     /// it when an <c>-H</c> value names <c>Cookie</c>. The <c>--compressed</c> row sends
-    /// <c>Accept-Encoding</c> without <c>zstd</c> (ADR-0020).
+    /// <c>Accept-Encoding</c> with <c>zstd</c> (ADR-0287).
     /// </summary>
     [TestMethod]
     [DataRow(
         new[] { "X-A: 1" },
         null,
-        "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAccept-Encoding: deflate, gzip, br\r\nReferer: ref\r\nCookie: j=k\r\nX-A: 1\r\n\r\n",
+        "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAccept-Encoding: deflate, gzip, br, zstd\r\nReferer: ref\r\nCookie: j=k\r\nX-A: 1\r\n\r\n",
         DisplayName = "-u -e --compressed -H")]
     [DataRow(
         new[] { "Cookie: c=d" },
@@ -568,7 +584,7 @@ public sealed partial class HttpRequestHeadFormatterTests
     public void Format_ForwardProxyWithRefererAndCookie_SendsProxyConnectionBetweenThem()
     {
         const string expected = "GET http://example.com/h HTTP/1.1\r\nHost: other\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
-            + "Accept-Encoding: deflate, gzip, br\r\nReferer: r\r\nProxy-Connection: Keep-Alive\r\nCookie: a=b\r\n\r\n";
+            + "Accept-Encoding: deflate, gzip, br, zstd\r\nReferer: r\r\nProxy-Connection: Keep-Alive\r\nCookie: a=b\r\n\r\n";
         HttpRequestOptions options = new() { Headers = ["Host: other"], Referer = "r", Compressed = true };
 
         byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://example.com/h"), options, cookie: "a=b", forwardProxy: true);

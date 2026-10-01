@@ -170,7 +170,12 @@ internal sealed class HttpContentDecoder : IDisposable
             return HttpContentCoding.Deflate;
         }
 
-        return Is(coding, "br") ? HttpContentCoding.Brotli : null;
+        if (Is(coding, "br"))
+        {
+            return HttpContentCoding.Brotli;
+        }
+
+        return Is(coding, "zstd") ? HttpContentCoding.Zstandard : null;
     }
 
     private static bool Is(string coding, string name) =>

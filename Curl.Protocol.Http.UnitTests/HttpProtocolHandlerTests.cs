@@ -778,7 +778,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         byte[] gzip = HttpContentDecoderTests.Bytes(HttpContentDecoderTests.Gzip);
         string response = "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 25\r\n\r\n" + Latin1(gzip);
-        string request = "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAccept-Encoding: deflate, gzip, br\r\n\r\n";
+        string request = "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAccept-Encoding: deflate, gzip, br, zstd\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();

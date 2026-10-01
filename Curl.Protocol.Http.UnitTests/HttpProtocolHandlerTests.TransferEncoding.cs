@@ -171,7 +171,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_RawWithCompressed_AsksForEncodingAndWritesTheBodyUndecoded()
     {
-        const string expected = "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "Accept-Encoding: deflate, gzip, br\r\n\r\n";
+        const string expected = "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "Accept-Encoding: deflate, gzip, br, zstd\r\n\r\n";
         const string response = "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 5\r\n\r\nhello";
         MemoryStream output = new();
 

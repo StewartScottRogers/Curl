@@ -107,7 +107,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_DecodedBodyWithBytesAfterItsStream_WritesTheStreamThenFailsWithExit23(string response, bool compressed, string message)
     {
         HttpRequestOptions options = new() { TransferEncoding = !compressed, Compressed = compressed };
-        string expected = compressed ? "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "Accept-Encoding: deflate, gzip, br\r\n\r\n" : TrEncodingGet;
+        string expected = compressed ? "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "Accept-Encoding: deflate, gzip, br, zstd\r\n\r\n" : TrEncodingGet;
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();
@@ -132,7 +132,7 @@ public sealed partial class HttpProtocolHandlerTests
             MemoryStream output = new();
             HttpRequestOptions options = new() { TransferEncoding = true, Raw = true, Compressed = response.Contains("Content-Encoding", StringComparison.Ordinal) };
             string expected = options.Compressed
-                ? "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "TE: gzip\r\nAccept-Encoding: deflate, gzip, br\r\nConnection: TE\r\n\r\n"
+                ? "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "TE: gzip\r\nAccept-Encoding: deflate, gzip, br, zstd\r\nConnection: TE\r\n\r\n"
                 : TrEncodingGet;
 
             TransferResult result = await Handler(QueueConnector.For(Connection(Encoded(response), chunkSize, expected)))
@@ -161,7 +161,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_TransferEncodingAndCompressed_DecodesTheTransferCodingThenTheContentCoding()
     {
-        const string expected = "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "TE: gzip\r\nAccept-Encoding: deflate, gzip, br\r\nConnection: TE\r\n\r\n";
+        const string expected = "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "TE: gzip\r\nAccept-Encoding: deflate, gzip, br, zstd\r\nConnection: TE\r\n\r\n";
         string response = "HTTP/1.1 200 OK\r\nContent-Length: 42\r\nContent-Encoding: gzip\r\nTransfer-Encoding: gzip\r\n\r\n"
             + Latin1(HttpContentDecoderTests.Bytes(GzipOfGzipHello));
         foreach (int chunkSize in ChunkSizes)

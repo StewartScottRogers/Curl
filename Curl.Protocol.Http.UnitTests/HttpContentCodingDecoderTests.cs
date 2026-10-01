@@ -15,6 +15,15 @@ public sealed class HttpContentCodingDecoderTests
     /// <summary><c>world</c> as gzip, as sent to curl after <c>hello</c> as a second member.</summary>
     private const string GzipWorld = "1F8B08000000000004002BCF2FCA4901004311773A05000000";
 
+    /// <summary><c>hello zstd\n</c>, the content of <see cref="ZstdHelloFrame" />.</summary>
+    private const string ZstdHello = "68656C6C6F207A7374640A";
+
+    /// <summary>
+    /// <c>hello zstd\n</c> as the 20-byte zstd frame sent to curl (BL-861 Notes): single
+    /// segment, a 1-byte content size of 11, no checksum, one last raw block of 11 bytes.
+    /// </summary>
+    private const string ZstdHelloFrame = "28B52FFD200B590000" + ZstdHello;
+
     private static readonly int[] ChunkSizes = [1, 7, 65536];
 
     /// <summary>
@@ -158,6 +167,114 @@ public sealed class HttpContentCodingDecoderTests
         CollectionAssert.AreEqual(body, Decode(coding, Encode(coding, body), 65536));
     }
 
+    /// <summary>
+    /// Measured (BL-861 Notes): a 20-byte zstd frame of <c>hello zstd\n</c> writes it, exit 0.
+    /// </summary>
+    [TestMethod]
+    public void Decode_ZstdFrame_WritesItsContent()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            byte[] decoded = Decode("zstd", HttpContentDecoderTests.Bytes(ZstdHelloFrame), chunkSize);
+
+            Assert.AreEqual("hello zstd\n", Encoding.ASCII.GetString(decoded), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured (BL-861 Notes): two concatenated frames write both contents, exit 0.
+    /// </summary>
+    [TestMethod]
+    public void Decode_TwoConcatenatedZstdFrames_WritesBothContents()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            byte[] decoded = Decode("zstd", HttpContentDecoderTests.Bytes(ZstdHelloFrame + ZstdHelloFrame), chunkSize);
+
+            Assert.AreEqual("hello zstd\nhello zstd\n", Encoding.ASCII.GetString(decoded), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured (BL-861 Notes): the frame's first 15 bytes write <c>hello </c>, what its raw
+    /// block gave, and exit 0; a body that ends mid-frame is not an error.
+    /// </summary>
+    [TestMethod]
+    public void Decode_TruncatedZstdFrame_WritesWhatArrivedWithoutFailing()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            byte[] decoded = Decode("zstd", HttpContentDecoderTests.Bytes(ZstdHelloFrame)[..15], chunkSize);
+
+            Assert.AreEqual("hello ", Encoding.ASCII.GetString(decoded), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured (BL-861 Notes): a bad magic number and a reserved block type each write
+    /// nothing and exit 61 with <c>Unrecognized or bad HTTP Content or Transfer-Encoding</c>.
+    /// </summary>
+    [TestMethod]
+    [DataRow("29B52FFD200B590000" + ZstdHello, DisplayName = "zstd: bad magic number")]
+    [DataRow("28B52FFD200B5F0000" + ZstdHello, DisplayName = "zstd: reserved block type")]
+    public void Decode_CorruptZstdBody_ThrowsExit61WithoutWriting(string encoded)
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            List<byte> decoded = [];
+
+            HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
+                () => DecodeInto(decoded, "zstd", HttpContentDecoderTests.Bytes(encoded), chunkSize));
+
+            Assert.IsEmpty(decoded, $"Chunk size {chunkSize}");
+            Assert.AreEqual(CurlExitCode.BadContentEncoding, thrown.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("Unrecognized or bad HTTP Content or Transfer-Encoding", thrown.Message, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured (BL-861 Notes): <c>junk</c> or four zero bytes after the last frame write the
+    /// frame's content and then exit 61 - not gzip and Brotli's exit 23 - because libzstd
+    /// reads them as the next frame's magic number and rejects it.
+    /// </summary>
+    [TestMethod]
+    [DataRow(ZstdHelloFrame + "6A756E6B", DisplayName = "zstd, then junk")]
+    [DataRow(ZstdHelloFrame + "00000000", DisplayName = "zstd, then four zero bytes")]
+    public void Decode_BytesAfterTheLastZstdFrame_WritesTheFrameThenThrowsExit61(string encoded)
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            List<byte> decoded = [];
+
+            HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
+                () => DecodeInto(decoded, "zstd", HttpContentDecoderTests.Bytes(encoded), chunkSize));
+
+            Assert.AreEqual("hello zstd\n", Encoding.ASCII.GetString([.. decoded]), $"Chunk size {chunkSize}");
+            Assert.AreEqual(CurlExitCode.BadContentEncoding, thrown.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("Unrecognized or bad HTTP Content or Transfer-Encoding", thrown.Message, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// A 40000-byte RLE block comes out in pieces of at most the output size, however its
+    /// frame arrives.
+    /// </summary>
+    [TestMethod]
+    public void Decode_LargeZstdBlock_ReturnsPiecesOfAtMostTheOutputSize()
+    {
+        // Window descriptor 0x30 (64 KiB), then a last RLE block of 40000 bytes of 'A'.
+        byte[] encoded = HttpContentDecoderTests.Bytes("28B52FFD0030" + "03E204" + "41");
+        using HttpContentCodingDecoder decoder = new(HttpContentCoding.Zstandard);
+
+        int[] sizes = [.. decoder.Decode(encoded).Select(piece => piece.Length)];
+
+        CollectionAssert.AreEqual(new[] { 16384, 16384, 7232 }, sizes);
+        foreach (int chunkSize in ChunkSizes)
+        {
+            CollectionAssert.AreEqual(Enumerable.Repeat((byte)'A', 40000).ToArray(), Decode("zstd", encoded, chunkSize), $"Chunk size {chunkSize}");
+        }
+    }
+
     private static byte[] Decode(string coding, byte[] encoded, int chunkSize)
     {
         List<byte> decoded = [];
@@ -181,6 +298,7 @@ public sealed class HttpContentCodingDecoderTests
     {
         "gzip" => HttpContentCoding.Gzip,
         "deflate" => HttpContentCoding.Deflate,
+        "zstd" => HttpContentCoding.Zstandard,
         _ => HttpContentCoding.Brotli,
     };
 

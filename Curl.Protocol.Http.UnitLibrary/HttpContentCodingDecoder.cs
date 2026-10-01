@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.IO.Compression;
 using Curl.Protocol.Abstractions;
+using Curl.Zstandard;
 
 namespace Curl.Protocol.Http;
 
@@ -32,6 +33,12 @@ namespace Curl.Protocol.Http;
 /// <see cref="BrotliDecoder" />, which says how many bytes its stream used; the end of a gzip
 /// member or a zlib stream is found from its <see cref="HttpContentChecksumTrailer" />.
 /// </para>
+/// <para>
+/// <c>zstd</c> is decoded with <see cref="ZstandardDecoder" />, frame after frame; bytes
+/// after the last frame are read as the start of another, so <c>junk</c> there is exit 61
+/// <see cref="HttpTransferMessages.BadContentEncoding" />, after the frame's content is
+/// written (measured, BL-861 Notes).
+/// </para>
 /// </remarks>
 /// <param name="coding">The coding to decode.</param>
 internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisposable
@@ -50,6 +57,8 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
     private readonly HttpContentInput input = new();
 
     private readonly byte[] output = new byte[OutputSize];
+
+    private readonly ZstandardDecoder zstandard = new();
 
     private byte[] start = [];
 
@@ -81,7 +90,12 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
             throw BytesAfterTheEnd();
         }
 
-        return coding == HttpContentCoding.Brotli ? DecodeBrotli(encoded) : DecodeDeflate(encoded);
+        return coding switch
+        {
+            HttpContentCoding.Brotli => DecodeBrotli(encoded),
+            HttpContentCoding.Zstandard => DecodeZstandard(encoded),
+            _ => DecodeDeflate(encoded),
+        };
     }
 
     /// <summary>
@@ -116,6 +130,31 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
         if (!encoded.IsEmpty)
         {
             throw BytesAfterTheEnd();
+        }
+    }
+
+    /// <summary>
+    /// Decodes Zstandard frames one after another, as libzstd does for curl: bytes after a
+    /// frame start the next one, so bytes that are no frame are corrupt (exit 61), never
+    /// bytes after the end.
+    /// </summary>
+    private IEnumerable<ReadOnlyMemory<byte>> DecodeZstandard(ReadOnlyMemory<byte> encoded)
+    {
+        OperationStatus status;
+        do
+        {
+            status = zstandard.Decompress(encoded.Span, output, out int consumed, out int written);
+            encoded = encoded[consumed..];
+            if (written > 0)
+            {
+                yield return output.AsMemory(0, written);
+            }
+        }
+        while (status == OperationStatus.DestinationTooSmall || (status == OperationStatus.Done && !encoded.IsEmpty));
+
+        if (status == OperationStatus.InvalidData)
+        {
+            throw Corrupt(HttpTransferMessages.BadContentEncoding);
         }
     }
 

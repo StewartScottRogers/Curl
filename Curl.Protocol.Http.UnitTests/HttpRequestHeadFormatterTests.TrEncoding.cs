@@ -68,7 +68,7 @@ public sealed partial class HttpRequestHeadFormatterTests
     public void Format_TransferEncodingWithEveryOtherHeader_SendsTeAfterAcceptAndConnectionLast()
     {
         const string expected = "POST /a HTTP/1.1\r\nHost: 127.0.0.1:18180\r\nAuthorization: Basic dTpw\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nTE: gzip\r\nAccept-Encoding: deflate, gzip, br\r\n"
+            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nTE: gzip\r\nAccept-Encoding: deflate, gzip, br, zstd\r\n"
             + "Referer: http://r/\r\nCookie: c=1\r\nIf-Modified-Since: Sat, 01 Jan 2000 00:00:00 GMT\r\nX-A: 1\r\n"
             + "Content-Length: 4\r\nContent-Type: application/x-www-form-urlencoded\r\nConnection: x, TE\r\n\r\n";
         HttpRequestOptions options = new()

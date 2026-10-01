@@ -76,7 +76,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_EveryHeader_PutsRangeAfterAuthorizationAndTheConditionAfterCookie()
     {
         const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18831\r\nAuthorization: Basic dTpw\r\nRange: bytes=0-9\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nAccept-Encoding: deflate, gzip, br\r\nReferer: ref\r\nCookie: a=b\r\n"
+            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nAccept-Encoding: deflate, gzip, br, zstd\r\nReferer: ref\r\nCookie: a=b\r\n"
             + "If-Modified-Since: Sun, 06 Nov 1994 08:49:37 GMT\r\nX-A: 1\r\n\r\n";
         TransferContext context = new TransferContext
         {

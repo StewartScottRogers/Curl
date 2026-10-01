@@ -46,7 +46,7 @@ public sealed class CurlCommandRunnerTransferEncodingTests
         int exitCode = await RunAsync(response, "-sS", "--compressed", Url);
 
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(Http11RequestLine + DefaultHeaders + "Accept-Encoding: deflate, gzip, br\r\n\r\n", RequestText);
+        Assert.AreEqual(Http11RequestLine + DefaultHeaders + "Accept-Encoding: deflate, gzip, br, zstd\r\n\r\n", RequestText);
         Assert.AreEqual("hello", StandardOutputText);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
