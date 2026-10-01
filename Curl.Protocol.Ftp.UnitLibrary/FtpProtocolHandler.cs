@@ -209,12 +209,18 @@ public sealed class FtpProtocolHandler : IProtocolHandler
         INetworkInterfaceLookup interfaceLookup,
         string[] schemes)
     {
-        this.connector = connector ?? throw new ArgumentNullException(nameof(connector));
-        this.dataConnector = dataConnector ?? throw new ArgumentNullException(nameof(dataConnector));
-        this.listener = listener ?? throw new ArgumentNullException(nameof(listener));
-        this.tlsProvider = tlsProvider ?? throw new ArgumentNullException(nameof(tlsProvider));
-        this.dnsResolver = dnsResolver ?? throw new ArgumentNullException(nameof(dnsResolver));
-        this.interfaceLookup = interfaceLookup ?? throw new ArgumentNullException(nameof(interfaceLookup));
+        ArgumentNullException.ThrowIfNull(connector);
+        ArgumentNullException.ThrowIfNull(dataConnector);
+        ArgumentNullException.ThrowIfNull(listener);
+        ArgumentNullException.ThrowIfNull(tlsProvider);
+        ArgumentNullException.ThrowIfNull(dnsResolver);
+        ArgumentNullException.ThrowIfNull(interfaceLookup);
+        this.connector = connector;
+        this.dataConnector = dataConnector;
+        this.listener = listener;
+        this.tlsProvider = tlsProvider;
+        this.dnsResolver = dnsResolver;
+        this.interfaceLookup = interfaceLookup;
         this.schemes = schemes;
     }
 
