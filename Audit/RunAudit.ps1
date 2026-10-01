@@ -342,8 +342,8 @@ try {
     $findingsLine = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Write-AuditFindings.ps1') -ReportDirectory $reports -Manifest $manifest -FindingsDirectory (Join-Path $auditTree 'Audit\Findings') -Scorecard $scorecardName -Commit $auditedCommit -Date $Started.ToString('yyyy-MM-dd') @unreliableArg
     Write-Step "$findingsLine; unreliable: $(if ($unreliable.Count) { $unreliable -join ', ' } else { 'none' })"
     $finished = Get-Date
-    $models = ($Selected | ForEach-Object { "$_=$($Models[$_])" }) -join ','
-    $scorecard = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Write-AuditScorecard.ps1') @common @changedArg -ScorecardsDirectory (Join-Path $auditTree 'Audit\Scorecards') -Commit $auditedCommit -Branch ($Ref -replace '^origin/', '') -Started $Started -Finished $finished -CostUsd $script:CostUsd -Models $models -Fingerprint $fingerprint
+    $modelList = ($Selected | ForEach-Object { "$_=$($Models[$_])" }) -join ','
+    $scorecard = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Write-AuditScorecard.ps1') @common @changedArg -ScorecardsDirectory (Join-Path $auditTree 'Audit\Scorecards') -Commit $auditedCommit -Branch ($Ref -replace '^origin/', '') -Started $Started -Finished $finished -CostUsd $script:CostUsd -Models $modelList -Fingerprint $fingerprint
     Write-Step "scorecard $scorecard"
 
     # 7. commit, push, pull request
