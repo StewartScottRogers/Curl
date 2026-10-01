@@ -1,5 +1,5 @@
 ---
-id: BL-1078
+id: BL-1081
 title: End an SSH packet whose decrypted length is over the maximum with libssh2's -41 as both reference builds do
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-01
 completed:
 ---
-# BL-1078 — End an SSH packet whose decrypted length is over the maximum with libssh2's -41 as both reference builds do
+# BL-1081 — End an SSH packet whose decrypted length is over the maximum with libssh2's -41 as both reference builds do
 
 ## Goal
 
