@@ -103,6 +103,15 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     private readonly IFileSystem fileSystem =
         fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
+    /// <summary>
+    /// The connection number the last transfer past its open was given, so the next is one
+    /// more: curl 8.21.0 numbers <c>file://</c> transfers as connections, <c>#0</c>, <c>#1</c>
+    /// and on, and a transfer whose open failed takes no number (measured in BL-936). The
+    /// count is this handler's own, so a run that mixes <c>file://</c> with a networked
+    /// scheme numbers them apart where curl shares one count.
+    /// </summary>
+    private long lastConnectionNumber = -1;
+
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => Schemes;
 
@@ -147,20 +156,77 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     {
         if (!FileUrlPath.TryParse(context.Url, out var path))
         {
-            return TransferResult.Failure(CurlExitCode.UrlMalformat, FileTransferMessages.BadUrl);
+            return ReportFailure(
+                context.Events,
+                TransferResult.Failure(CurlExitCode.UrlMalformat, FileTransferMessages.BadUrl));
         }
 
         if (context.ResumeFrom is < 0)
         {
-            return TransferResult.Failure(
-                CurlExitCode.BadDownloadResume,
-                FileTransferMessages.ResumeFailed);
+            return ReportFailure(
+                context.Events,
+                TransferResult.Failure(CurlExitCode.BadDownloadResume, FileTransferMessages.ResumeFailed));
         }
 
         return context.Upload is { } upload
             ? await UploadAsync(context, path, upload).ConfigureAwait(false)
             : await DownloadAsync(context, path).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Reports a failed transfer's message as an information line, as libcurl's
+    /// <c>failf</c> does under <c>-v</c> and <c>--trace</c>: curl 8.21.0 prints
+    /// <c>* Could not open file ...</c> before <c>curl: (37)</c>, measured in BL-936. Exit 55
+    /// is the exception: its message is only <c>curl_easy_strerror</c>'s text, which no
+    /// <c>failf</c> wrote, so curl prints no line for it.
+    /// </summary>
+    /// <param name="events">Where the line goes.</param>
+    /// <param name="result">The outcome of the transfer.</param>
+    /// <returns><paramref name="result" />, unchanged.</returns>
+    private static TransferResult ReportFailure(ITransferEvents events, TransferResult result)
+    {
+        if (result.ErrorMessage is { } message && message != FileTransferMessages.DestinationWriteFailed)
+        {
+            events.ReportInfo(message);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Reports how a transfer that got past its open ended: its failure, if any, then that
+    /// its data is done, so the progress meter ends its line, then the line libcurl writes
+    /// as it lets the connection go. curl 8.21.0 under <c>-v</c> writes the meter's line end
+    /// before <c>* shutting down connection #0</c>, measured in BL-936.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="result">The outcome of the transfer.</param>
+    /// <param name="connectionNumber">The number the transfer's connection was given.</param>
+    /// <returns><paramref name="result" />, unchanged.</returns>
+    /// <remarks>
+    /// libcurl's <c>multi_done</c> counts exit 23 and exit 26 as premature and closes the
+    /// connection; every other outcome, success included, shuts it down. Measured in BL-936.
+    /// </remarks>
+    private static TransferResult ReportConnectionEnd(
+        ITransferContext context,
+        TransferResult result,
+        long connectionNumber)
+    {
+        ITransferEvents events = context.Events;
+        ReportFailure(events, result);
+        context.Progress.ReportTransferDone();
+        events.ReportInfo(result.ExitCode is CurlExitCode.WriteError or CurlExitCode.ReadError
+            ? FileTransferMessages.ClosingConnection(connectionNumber)
+            : FileTransferMessages.ShuttingDownConnection(connectionNumber));
+
+        return result;
+    }
+
+    /// <summary>
+    /// Gives a transfer that got past its open the next connection number.
+    /// </summary>
+    /// <returns>The number, counting from 0.</returns>
+    private long TakeConnectionNumber() => Interlocked.Increment(ref lastConnectionNumber);
 
     /// <summary>
     /// Opens the source and, whatever happens next, disposes it.
@@ -178,12 +244,15 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         if (!opened.IsOpen || opened.Content is null)
         {
             transferLog.OpenFailed(path.OsPath, "reading", opened);
-            return TransferResult.Failure(
-                CurlExitCode.FileCouldntReadFile,
-                FileTransferMessages.CouldNotOpenForReading(path.UrlPath));
+            return ReportFailure(
+                context.Events,
+                TransferResult.Failure(
+                    CurlExitCode.FileCouldntReadFile,
+                    FileTransferMessages.CouldNotOpenForReading(path.UrlPath)));
         }
 
         transferLog.OpenedForReading(path.OsPath, opened.Length);
+        long connectionNumber = TakeConnectionNumber();
 
         // curl 8.21.0 draws its meter for a download that got past the open and failed
         // later (exit 63, exit 36) and never for one whose open failed (exit 37), measured
@@ -198,6 +267,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         {
             result = await DownloadFromAsync(context, source, opened).ConfigureAwait(false);
         }
+
+        ReportConnectionEnd(context, result, connectionNumber);
 
         // -R/--remote-time is applied by whoever owns the output file, so a successful
         // download, an unmet -z included, hands the source's timestamp back in whole
@@ -327,6 +398,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             ChunkSize,
             count,
             context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue,
+            chunk => context.Events.ReportDataReceived(chunk.Span),
             static chunk => chunk,
             static (_, transferred) => TransferResult.Success(transferred),
             static (offered, accepted, transferred) => TransferResult.Failure(
@@ -365,7 +437,10 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     }
 
     /// <summary>
-    /// Opens the destination and, whatever happens next, disposes it.
+    /// Numbers the upload's connection, performs the upload, then reports how it ended. An
+    /// upload takes its number before its destination opens: curl 8.21.0 opens the
+    /// destination in the transfer phase, so even a destination that will not open (exit 23)
+    /// ends <c>* closing connection #0</c>, measured in BL-936.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="path">The parsed URL path.</param>
@@ -374,6 +449,26 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// </param>
     /// <returns>The outcome of the upload.</returns>
     private async ValueTask<TransferResult> UploadAsync(
+        ITransferContext context,
+        FileUrlPath path,
+        Stream upload)
+    {
+        long connectionNumber = TakeConnectionNumber();
+        TransferResult result = await UploadIntoDestinationAsync(context, path, upload).ConfigureAwait(false);
+
+        return ReportConnectionEnd(context, result, connectionNumber);
+    }
+
+    /// <summary>
+    /// Opens the destination and, whatever happens next, disposes it.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="path">The parsed URL path.</param>
+    /// <param name="upload">
+    /// The stream to upload from, owned by the caller and so left undisposed here.
+    /// </param>
+    /// <returns>The outcome of the upload.</returns>
+    private async ValueTask<TransferResult> UploadIntoDestinationAsync(
         ITransferContext context,
         FileUrlPath path,
         Stream upload)
@@ -460,6 +555,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 firstChunkSize,
                 long.MaxValue,
                 long.MaxValue,
+                static _ => { },
                 convertChunk,
                 (consumed, transferred) => needed is { } length
                     ? new TransferResult(
@@ -500,6 +596,13 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// for no limit. A chunk that would pass it is written only up to it, and the copy then
     /// fails with exit 63, as curl 8.21.0 does.
     /// </param>
+    /// <param name="reportChunkRead">
+    /// Told each chunk as read, before any of it is written or cut short by
+    /// <paramref name="maxWritten" />: a download reports it as received data, as curl
+    /// 8.21.0's <c>--trace</c> shows all six bytes of a file cut to three by
+    /// <c>--max-filesize 3</c> (BL-936). An upload reports nothing, as curl writes no
+    /// <c>=&gt; Send data</c> for a <c>file://</c> upload.
+    /// </param>
     /// <param name="convertChunk">
     /// Turns each chunk read into the chunk written: the chunk itself, or its
     /// <c>--crlf</c> conversion on an upload.
@@ -529,6 +632,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         int firstChunkSize,
         long count,
         long maxWritten,
+        Action<ReadOnlyMemory<byte>> reportChunkRead,
         Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk,
         Func<long, long, TransferResult> reportReadFailure,
         Func<long, long, long, TransferResult> reportWriteFailure,
@@ -558,6 +662,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 break;
             }
 
+            reportChunkRead(buffer.AsMemory(0, read));
             ReadOnlyMemory<byte> chunk = convertChunk(buffer.AsMemory(0, read));
             int allowed = (int)Math.Min(chunk.Length, maxWritten - transferred);
 
@@ -732,11 +837,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
     /// <summary>
     /// Writes curl's synthesised header block, when the caller asked for headers at all,
-    /// one line per write as curl does. A failed write reports its message to
-    /// <see cref="ITransferContext.Events" /> as an information line too, as libcurl's
-    /// <c>failf</c> does: curl 8.21.0 under <c>-v</c> prints
-    /// <c>* client returned ERROR on write of 20 bytes</c> before <c>curl: (23)</c>
-    /// (measured 2026-09-26, BL-111 Notes).
+    /// one line per write as curl does. A failed write's message reaches
+    /// <see cref="ITransferContext.Events" /> as an information line through
+    /// <see cref="ReportConnectionEnd" />, as libcurl's <c>failf</c> does: curl 8.21.0 under
+    /// <c>-v</c> prints <c>* client returned ERROR on write of 20 bytes</c> before
+    /// <c>curl: (23)</c> (measured 2026-09-26, BL-111 Notes).
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="opened">The metadata that came with the open.</param>
@@ -760,10 +865,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
             if (await TryWriteAsync(headerOutput, bytes, context.CancellationToken).ConfigureAwait(false) is not null)
             {
-                string message = FileTransferMessages.HeaderWriteFailed(bytes.Length);
-                context.Events.ReportInfo(message);
-
-                return TransferResult.Failure(CurlExitCode.WriteError, message);
+                return TransferResult.Failure(
+                    CurlExitCode.WriteError,
+                    FileTransferMessages.HeaderWriteFailed(bytes.Length));
             }
         }
 

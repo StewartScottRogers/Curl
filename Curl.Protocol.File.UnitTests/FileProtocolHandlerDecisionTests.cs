@@ -135,7 +135,11 @@ public sealed class FileProtocolHandlerDecisionTests
 
         await handler.ExecuteAsync(context);
 
-        CollectionAssert.AreEqual(new[] { HeaderWriteFailedForFirstLine }, events.Info);
+        // Exit 23 is premature to libcurl's multi_done, so the connection line that follows
+        // is "closing", not "shutting down" (BL-936).
+        CollectionAssert.AreEqual(
+            new[] { HeaderWriteFailedForFirstLine, "closing connection #0" },
+            events.Info);
     }
 
     [TestMethod]
