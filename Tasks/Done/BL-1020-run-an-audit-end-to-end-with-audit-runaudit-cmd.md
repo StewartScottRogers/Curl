@@ -9,7 +9,7 @@ touches: [Audit/RunAudit.ps1, Audit/RunAudit.cmd]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1020 — Run an audit end to end with Audit\RunAudit.cmd
 
@@ -71,15 +71,25 @@ nothing.
 
 ## Acceptance criteria
 
-- [ ] `Audit\RunAudit.cmd -DryRun` prints the planned steps with real paths and exits 0; with `CURL_DARK_FACTORY_LANE=1` set it refuses and exits non-zero.
-- [ ] With a dark factory shift running, it refuses with the between-shifts message (checked by starting it while a shift runs, or by a `-SelfTest` case over a faked process list).
-- [ ] A real run, `Audit\RunAudit.cmd -Auditors truthfulness,process -Planted 2`, ends with: a scorecard on `origin/audit` whose header carries the fingerprint `Get-AuditorFingerprint.ps1` prints on that branch; finding files for its non-planted findings; an open pull request `audit` -> `master` that is not merged; no `planted` worktree left in `git worktree list`; and the checkout it was started from unchanged. The run's folder and pull request link are recorded under Notes.
-- [ ] `Audit\RunAudit.cmd -NewTab -DryRun` opens a herdr tab when run inside herdr (a console window otherwise) and returns at once.
-- [ ] Header help documents parameters, steps and the refusals; ASCII only.
+- [x] `Audit\RunAudit.cmd -DryRun` prints the planned steps with real paths and exits 0; with `CURL_DARK_FACTORY_LANE=1` set it refuses and exits non-zero.
+- [x] With a dark factory shift running, it refuses with the between-shifts message (checked by starting it while a shift runs, or by a `-SelfTest` case over a faked process list).
+- [x] A real run, `Audit\RunAudit.cmd -Auditors truthfulness,process -Planted 2`, ends with: a scorecard on `origin/audit` whose header carries the fingerprint `Get-AuditorFingerprint.ps1` prints on that branch; finding files for its non-planted findings; an open pull request `audit` -> `master` that is not merged; no `planted` worktree left in `git worktree list`; and the checkout it was started from unchanged. The run's folder and pull request link are recorded under Notes.
+- [x] `Audit\RunAudit.cmd -NewTab -DryRun` opens a herdr tab when run inside herdr (a console window otherwise) and returns at once.
+- [x] Header help documents parameters, steps and the refusals; ASCII only.
 
 ## Notes
+
+- Audit branch commits 99dbd43f, e39f75df, e6e1e7c4 (runner), then the catch-rule fix and rescore (PR #40).
+- -SelfTest: 6 PASS (shift refuses with the between-shifts message; a lane refuses; -NewTab and -Restart launchers do not count; the lane marker refuses even with -AlongsideShift; nothing running starts; -AlongsideShift runs alongside a shift). Live: with the 14:06 shift running, Audit\RunAudit.cmd -DryRun refused with that message, exit 1; with CURL_DARK_FACTORY_LANE=1 it refused, exit 1.
+- Decided by Claude: -AlongsideShift. Shifts started with -Continuous chain with no gap, so 'between shifts' may never come; the switch skips only the running-shift refusal (never the marker refusal), and the audit shares the Claude budget, which -Lanes Auto adapts to. -DryRun -AlongsideShift printed every step with real paths, exit 0.
+- <repo> is the main checkout (git rev-parse --git-common-dir), whichever worktree the runner sits in; the audit branch's own worktree is reused when one has it checked out (git cannot check a branch out twice).
+- Real run: Z:\repos\Curl.auditbranch\Audit\RunAudit.cmd -Auditors truthfulness,process -Planted 2 -AlongsideShift from Z:\repos\Curl. Run folder Z:\repos\Curl.audit\20260930-175416; audited d065d6d3; fingerprint c6c6fb33..., equal to Get-AuditorFingerprint.ps1 on the audit branch; seeded 2 (PD-403 truthfulness, PD-502 process); truthfulness and process finished; scorecard 2026-09-30_1754.md on origin/audit; pull request https://github.com/StewartScottRogers/Curl/pull/40 opened, not merged by the runner (merged later by this session under Stewart's standing exception after CI was green); no planted worktree left; the starting checkout's only change was this session's own CLAUDE.md edit; cost 1.56 USD.
+- The first scoring missed the process catch (location logs/ci-runs.json against manifest ci-runs.json) and filed PD-502 as AF-0004; fixed in both writers with regression checks, and the audit was rescored from its saved reports: both auditors 100%, reliable; 4 real findings (AF-0001 to AF-0004), 2 catches.
+- Two case-insensitivity traps fixed on the first real attempt: $planted was the [int] -Planted parameter, and $models overwrote the $Models table.
+- -NewTab follows RunDarkFactory.ps1's hand-off (herdr tab, else a console window); not exercised in herdr in this session.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. Audit\RunAudit.cmd runs an audit end to end - seeds, audits, writes findings and a scorecard, opens the audit pull request; first real run merged in PR #40.
