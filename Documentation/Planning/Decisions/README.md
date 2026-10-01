@@ -318,6 +318,7 @@ choices do not need one.
 | [0310](ADR-0310-under-a-tls-1-2-ceiling-curves-never-fails-and-sigalgs-fails-with-no-ciphers-available.md) | Under a TLS 1.2 ceiling a `--curves` list leaving no group sends the ClientHello without `ec_point_formats` and `supported_groups`, and a `--sigalgs` list leaving no scheme TLS 1.2 can check fails with exit 35 and OpenSSL's `no ciphers available` (BL-1094) | Accepted | 2026-10-01 |
 | [0311](ADR-0311-an-rsa-certificate-identity-signs-with-the-rsa-sha2-certificate-method-on-openssl-as-libssh2-does.md) | An `ssh-rsa-cert-v01@openssh.com` identity is upgraded from `server-sig-algs` to `rsa-sha2-512-cert-v01@openssh.com` or `rsa-sha2-256-cert-v01@openssh.com` as libssh2 1.11.1 does on OpenSSL, not on WinCNG and not for an OpenSSH 7.7 or older banner (BL-1036) | Accepted | 2026-10-01 |
 | [0312](ADR-0312-doh-https-records-for-ech-follow-curl-s-doh-c.md) | DoH HTTPS records for ECH follow curl's `lib/doh.c`: QTYPE 65, `_<port>._https.<host>` off port 443, the first of at most four records decoded by `ServiceBindingRecordDecoder` (BL-707) | Accepted | 2026-10-01 |
+| [0313](ADR-0313-a-key-file-certificate-signs-with-its-private-key-under-the-plain-method-as-libssh2-does.md) | A `--pubkey` OpenSSH certificate signs with its `--key` private key under the plain method, the server judging a key it does not certify, and a private key of another type fails with `Callback returned error`, as libssh2 1.11.1 does (BL-1097) | Accepted | 2026-10-01 |
 
 ## Template
 
