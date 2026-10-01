@@ -49,8 +49,9 @@ session, which the writer and reader start at the first `NEWKEYS` for `zlib` and
 `SshUserAuthentication`, which requests the `ssh-userauth` service and authenticates the
 user with `none`, `publickey`, `password`, the ssh-agent's identities and
 `keyboard-interactive` in curl's order (ADR-0215, ADR-0230, ADR-0271) - the agent through
-`ISshAgentConnector` (`SystemSshAgentConnector`: the Windows pipe or the Unix socket
-`SSH_AUTH_SOCK` names) and `SshAgentClient`, which speaks the agent protocol; `Keys` holds `SshUserKeySource`, which finds `--key` (or curl's
+`ISshAgentConnector` (`PlatformSshAgentConnector`: on Windows PuTTY's Pageant through
+`PageantSshAgentConnector`, then `SystemSshAgentConnector`'s pipe; elsewhere the Unix socket
+`SSH_AUTH_SOCK` names - ADR-0304) and `SshAgentClient`, which speaks the agent protocol; `Keys` holds `SshUserKeySource`, which finds `--key` (or curl's
 default files through an injected `HOME` reader), `--pubkey` and `--pass`,
 `SshPrivateKeyReader`, which reads every PEM, PKCS #8 and `openssh-key-v1` key file
 ADR-0122 lists, Ed25519 and bcrypt-encrypted `openssh-key-v1` included
@@ -87,4 +88,6 @@ Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network. The one exception is the local ssh-agent:
 `SystemSshAgentConnector` opens its named pipe or Unix domain socket, behind
-`ISshAgentConnector`, in two methods excluded from coverage under ADR-0083 (ADR-0271).
+`ISshAgentConnector`, in two methods excluded from coverage under ADR-0083 (ADR-0271),
+and `WindowsPageantWindow` makes Pageant's Win32 calls behind `IPageantWindow`, excluded
+the same way (ADR-0304).

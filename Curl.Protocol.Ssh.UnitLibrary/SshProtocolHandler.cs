@@ -86,7 +86,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
             new SystemSshRandomSource(),
             new SystemSshEphemeralKeySource(),
             Environment.GetEnvironmentVariable,
-            new SystemSshAgentConnector(Environment.GetEnvironmentVariable, OperatingSystem.IsWindows()))
+            PlatformSshAgentConnector.Create(Environment.GetEnvironmentVariable, OperatingSystem.IsWindows(), new WindowsPageantWindow()))
     {
     }
 
