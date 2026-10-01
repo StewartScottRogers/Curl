@@ -34,3 +34,4 @@ After an accepted IMAP `STARTTLS`, POP3 `STLS` or FTP `AUTH TLS`, `-v` writes th
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
