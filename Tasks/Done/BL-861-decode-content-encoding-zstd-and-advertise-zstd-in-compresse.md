@@ -8,7 +8,7 @@ depends-on: [BL-860]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console.UnitTests, Documentation/Planning/Decisions, Documentation/Planning/Roadmap.md]
 requirement: FR-073
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-861 — Decode Content-Encoding zstd and advertise zstd in --compressed, superseding ADR-0020
 
@@ -26,11 +26,11 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `--compressed` sends `Accept-Encoding: deflate, gzip, br, zstd` on the Schannel build, pinned byte for byte against the measured request, with each other platform's measured header pinned in its own test.
-- [ ] A `Content-Encoding: zstd` body of `hello zstd\n` writes `hello zstd\n`, exit 0, and two concatenated frames write both decoded, as measured.
-- [ ] A corrupt zstd body, a truncated one and one with bytes after its last frame each give the measured stdout, stderr text and exit code, from tests named for each case.
-- [ ] A new ADR supersedes ADR-0020, ADR-0020's status reads `Superseded by ADR-<that number>`, and `Documentation/Planning/Decisions/README.md` indexes both.
-- [ ] `Curl.Protocol.Http.UnitLibrary` meets the quality gates.
+- [x] `--compressed` sends `Accept-Encoding: deflate, gzip, br, zstd` on the Schannel build, pinned byte for byte against the measured request, with each other platform's measured header pinned in its own test.
+- [x] A `Content-Encoding: zstd` body of `hello zstd\n` writes `hello zstd\n`, exit 0, and two concatenated frames write both decoded, as measured.
+- [x] A corrupt zstd body, a truncated one and one with bytes after its last frame each give the measured stdout, stderr text and exit code, from tests named for each case.
+- [x] A new ADR supersedes ADR-0020, ADR-0020's status reads `Superseded by ADR-<that number>`, and `Documentation/Planning/Decisions/README.md` indexes both.
+- [x] `Curl.Protocol.Http.UnitLibrary` meets the quality gates.
 
 ## Notes
 
@@ -64,6 +64,17 @@ completed:
   mid-frame is not an error. Change `HttpRequestHeadFormatter.AcceptEncoding`, the
   literal in the Http and Console tests, `HttpProtocolHandler`'s doc comment, and add the
   `ProjectReference` plus the protocol `CLAUDE.md` line.
+- 2026-09-30 (lane 1): delivered as planned; ADR-0287 supersedes ADR-0020. The Schannel
+  header test is `[OSCondition(Windows)]` and
+  `Format_Compressed_OnTheOpenSslBuild_SendsTheSameFourTokens` pins the Linux measurement
+  off Windows. zstd tests: `HttpContentCodingDecoderTests.Decode_ZstdFrame_*`,
+  `_TwoConcatenatedZstdFrames_*`, `_TruncatedZstdFrame_*`, `_CorruptZstdBody_*`,
+  `_BytesAfterTheLastZstdFrame_*`, `_LargeZstdBlock_*`; the `Content-Encoding: zstd`
+  mapping in `HttpContentDecoderTests`. `Curl.Protocol.Http.UnitLibrary` measured at 100%
+  line and branch coverage (cobertura from the MSTest collector); build clean, fast tests
+  green. Choice: fewer than four bytes after the last frame are held as a magic number in
+  progress and dropped at the end of the body (not measured; libzstd waits for more input
+  the same way).
 
 ## Log
 
@@ -71,3 +82,4 @@ completed:
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Console.UnitTests (its --compressed test pins the old Accept-Encoding), which BL-633 in Doing touches; measurements recorded in Notes
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. --compressed sends deflate, gzip, br, zstd and Content-Encoding: zstd decodes through Curl.Zstandard, with curl's exit 61 for corrupt or trailing bytes

@@ -1,6 +1,6 @@
 # ADR-0020 — `--compressed` advertises `deflate, gzip, br` until a zstd decoder exists
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0287
 - **Date:** 2026-09-26
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions").
