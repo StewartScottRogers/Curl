@@ -134,6 +134,30 @@ public sealed class WsProtocolHandlerNegotiateTests
     }
 
     [TestMethod]
+    [DataRow(Head101 + "\x81\x02ok")]
+    [DataRow(NegotiateDenied)]
+    [DataRow("HTTP/1.1 403 Forbidden\r\n\r\n")]
+    public async Task ExecuteAsync_NegotiateTokenSent_EndsItsHandshakeOnceTheResponseArrives(string reply)
+    {
+        // curl sends the upgrade only once, so a kept context is disposed of whatever the status (ADR-0248).
+        var authenticator = new RecordingAuthenticator("Negotiate YIIB");
+
+        await RunAsync(reply, authenticator, credential: null);
+
+        CollectionAssert.AreEqual(new[] { "Negotiate YIIB" }, authenticator.EndedAuthorizations);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NothingSent_EndsNoHandshake()
+    {
+        var authenticator = new RecordingAuthenticator();
+
+        await RunAsync(Head101, authenticator, credential: null);
+
+        Assert.IsEmpty(authenticator.EndedAuthorizations);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_BasicValueSentWithNegotiateAllowed_WritesNoServerAuthLine()
     {
         var authenticator = new RecordingAuthenticator("Basic dTpw");
