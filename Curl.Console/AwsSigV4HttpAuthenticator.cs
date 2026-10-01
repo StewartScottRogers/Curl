@@ -57,6 +57,20 @@ internal sealed class AwsSigV4HttpAuthenticator(IHttpAuthenticator otherSchemes,
             : ValueTask.FromResult<string?>(null);
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// A request without <see cref="HttpAuthRequest.AwsSigV4" /> goes to the other schemes, so a
+    /// kept Digest answer counts its nonce on as curl 8.21.0 does (BL-979); a signed request
+    /// sends its value as sent.
+    /// </remarks>
+    public string RepeatAuthorization(HttpAuthRequest request, string sentAuthorization)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return request.AwsSigV4 is null
+            ? otherSchemes.RepeatAuthorization(request, sentAuthorization)
+            : sentAuthorization;
+    }
+
     /// <summary>
     /// Signs <paramref name="request" /> before any challenge, when it has a credential, and
     /// reports the <c>-v</c> lines curl 8.21.0 prints for it: the string to sign, the
