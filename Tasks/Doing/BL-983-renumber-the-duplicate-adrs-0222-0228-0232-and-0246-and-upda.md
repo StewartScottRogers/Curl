@@ -50,3 +50,4 @@ ADR numbers 0222, 0228, 0232 and 0246 each name exactly one record in `Documenta
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Networking.UnitLibrary and Curl.Console, both in BL-717's touches (Doing, lane 1); renumbering plan is in Notes
+- 2026-10-01: Backlog -> Doing.
