@@ -211,6 +211,16 @@ public sealed class SftpFileUploadTests
     }
 
     [TestMethod]
+    public async Task UploadAsync_CreateFileModeZero_SendsCurlsDefault0644AsTheOpensPermissionsAsMeasured()
+    {
+        SftpServerScript script = SftpServerScript.Started().HomeDirectory().Handle().Status(2, SftpStatusCode.Ok).Status(3, SftpStatusCode.Ok);
+
+        Outcome outcome = await UploadAsync(script, "/n.txt", Plain with { CreateFileMode = 0 }, new MemoryStream(Content));
+
+        CollectionAssert.AreEqual(SftpServerScript.OpenRequest("/n.txt", NewFile, 1, 0x1A4), Requests(outcome)[2]);
+    }
+
+    [TestMethod]
     [DataRow("/~/up/x.txt", "/home/fake/up/x.txt", DisplayName = "home path, as measured")]
     [DataRow("/a%20b.txt", "/a b.txt", DisplayName = "escaped space")]
     public async Task UploadAsync_UrlPath_OpensThePathCurlSends(string urlPath, string expected)

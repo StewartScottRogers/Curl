@@ -118,9 +118,13 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
             ? await session.StatSizeAsync(path, cancellationToken).ConfigureAwait(false) ?? 0
             : options.ResumeFrom;
         uint flags = OpenFlagsFor(options.Append, offset);
-        (byte[]? handle, uint status) = await session.OpenAsync(path, flags, options.CreateFileMode, cancellationToken).ConfigureAwait(false);
+
+        // Measured (BL-984): curl sets CURLOPT_NEW_FILE_PERMS only for a non-zero
+        // --create-file-mode, so 0 opens with its default, 0644.
+        UnixFileMode createFileMode = options.CreateFileMode == 0 ? TransferContext.DefaultCreateFileMode : options.CreateFileMode;
+        (byte[]? handle, uint status) = await session.OpenAsync(path, flags, createFileMode, cancellationToken).ConfigureAwait(false);
         handle ??= options.CreateDirectories && StatusesThatCreateDirectories.Contains(status)
-            ? await CreateDirectoriesAndOpenAsync(session, path, flags, options.CreateFileMode, cancellationToken).ConfigureAwait(false)
+            ? await CreateDirectoriesAndOpenAsync(session, path, flags, createFileMode, cancellationToken).ConfigureAwait(false)
             : throw SshTransferException.SftpUploadFailed(status);
         return (handle, offset);
     }
