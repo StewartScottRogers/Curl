@@ -6,24 +6,25 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Pins <see cref="KerberosKdcProxyHttpsTransport" />: MIT's <c>POST /path HTTP/1.0</c> request
-/// over a TLS connection from the connector seam, the <c>200</c> reply's body, and every other
+/// over a plain connection from the connector seam secured by the transport's own TLS client, the
+/// <c>200</c> reply's body, and every other
 /// outcome - another status, a reply with no blank line, one too long, a refused connection,
 /// a proxy silent past the timeout - as an <see cref="IOException" />.
 /// </summary>
 [TestClass]
-public sealed class KerberosKdcProxyHttpsTransportTests
+public sealed partial class KerberosKdcProxyHttpsTransportTests
 {
     [TestMethod]
-    public async Task PostAsync_ProxyAnswers200_SendsMitsRequestOverTlsAndReturnsTheBody()
+    public async Task PostAsync_ProxyAnswers200_SendsMitsRequestOverItsOwnTlsAndReturnsTheBody()
     {
         FakeConnector connector = new();
         connector.BytesToRead.Add(Reply("HTTP/1.1 200 OK\r\nContent-Type: application/kerberos\r\nContent-Length: 2\r\n\r\n", [0xAA, 0xBB]));
-        KerberosKdcProxyHttpsTransport transport = new(connector, TimeSpan.FromSeconds(10), new ManualTimeProvider());
+        KerberosKdcProxyHttpsTransport transport = OverPlaintext(connector, new ManualTimeProvider());
 
         byte[] reply = await transport.PostAsync("kdcproxy.example.test", 443, "KdcProxy", new byte[] { 0x30, 0x01, 0x02 }, CancellationToken.None);
 
         CollectionAssert.AreEqual(new byte[] { 0xAA, 0xBB }, reply);
-        Assert.AreEqual(new ConnectTarget("kdcproxy.example.test", 443, UseTls: true), connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("kdcproxy.example.test", 443, UseTls: false), connector.Targets.Single());
         byte[] expected = Reply(
             "POST /KdcProxy HTTP/1.0\r\n" +
             "Host: kdcproxy.example.test\r\n" +
@@ -54,7 +55,7 @@ public sealed class KerberosKdcProxyHttpsTransportTests
     {
         FakeConnector connector = new();
         connector.BytesToRead.Add(Reply("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n", []));
-        KerberosKdcProxyHttpsTransport transport = new(connector, TimeSpan.FromSeconds(10), new ManualTimeProvider());
+        KerberosKdcProxyHttpsTransport transport = OverPlaintext(connector, new ManualTimeProvider());
 
         IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => transport.PostAsync("kdcproxy.example.test", 443, "KdcProxy", new byte[] { 0x30 }, CancellationToken.None));
 
@@ -95,7 +96,7 @@ public sealed class KerberosKdcProxyHttpsTransportTests
     {
         FakeConnector connector = new();
         connector.BytesToRead.Add(new byte[KerberosKdcProxyHttpsTransport.MaximumReplyLength + 1]);
-        KerberosKdcProxyHttpsTransport transport = new(connector, TimeSpan.FromSeconds(10), new ManualTimeProvider());
+        KerberosKdcProxyHttpsTransport transport = OverPlaintext(connector, new ManualTimeProvider());
 
         IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => transport.PostAsync("proxy", 443, "", new byte[] { 0x30 }, CancellationToken.None));
 
@@ -106,7 +107,7 @@ public sealed class KerberosKdcProxyHttpsTransportTests
     public async Task PostAsync_ProxyRefusesOrFailsTls_ThrowsIOExceptionWithTheConnectorsMessage()
     {
         FakeConnector connector = new() { Failure = ConnectResult.Failed(CurlExitCode.SslConnectError, "TLS connect error") };
-        KerberosKdcProxyHttpsTransport transport = new(connector, TimeSpan.FromSeconds(10), new ManualTimeProvider());
+        KerberosKdcProxyHttpsTransport transport = OverPlaintext(connector, new ManualTimeProvider());
 
         IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => transport.PostAsync("proxy", 443, "", new byte[] { 0x30 }, CancellationToken.None));
 
@@ -118,7 +119,7 @@ public sealed class KerberosKdcProxyHttpsTransportTests
     {
         ManualTimeProvider time = new();
         StallingConnection connection = new() { OnStalled = () => time.Advance(10000) };
-        KerberosKdcProxyHttpsTransport transport = new(new SingleConnectionConnector(connection), TimeSpan.FromSeconds(10), time);
+        KerberosKdcProxyHttpsTransport transport = OverPlaintext(new SingleConnectionConnector(connection), time);
 
         IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => transport.PostAsync("proxy", 443, "", new byte[] { 0x30 }, CancellationToken.None));
 
@@ -131,12 +132,22 @@ public sealed class KerberosKdcProxyHttpsTransportTests
     {
         using CancellationTokenSource cancel = new();
         StallingConnection connection = new() { OnStalled = cancel.Cancel };
-        KerberosKdcProxyHttpsTransport transport = new(new SingleConnectionConnector(connection), TimeSpan.FromSeconds(10), new ManualTimeProvider());
+        KerberosKdcProxyHttpsTransport transport = OverPlaintext(new SingleConnectionConnector(connection), new ManualTimeProvider());
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => transport.PostAsync("proxy", 443, "", new byte[] { 0x30 }, cancel.Token));
     }
 
     private static byte[] Reply(string head, byte[] body) => [.. Encoding.ASCII.GetBytes(head), .. body];
+
+    private static KerberosKdcProxyHttpsTransport OverPlaintext(IConnector connector, TimeProvider time) =>
+        new(connector, TimeSpan.FromSeconds(10), time, new PassThroughTlsClient(), _ => null);
+
+    /// <summary>Hands the plaintext stream back unsecured, so a scripted connection's bytes are the exchange.</summary>
+    private sealed class PassThroughTlsClient : IKerberosKdcProxyTlsClient
+    {
+        public Task<Stream> AuthenticateAsync(Stream plaintext, string host, System.Security.Cryptography.X509Certificates.X509Certificate2Collection? anchors, CancellationToken cancellationToken) =>
+            Task.FromResult(plaintext);
+    }
 
     private sealed class SingleConnectionConnector(IConnection connection) : IConnector
     {

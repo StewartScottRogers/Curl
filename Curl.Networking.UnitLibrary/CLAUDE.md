@@ -11,6 +11,13 @@ else: `KerberosKdcSocketTransport` moves a KDC's UDP datagram through an `IDatag
 (one-second reply wait) and its TCP stream through an `IConnector` (the stream owns and
 disposes the connection, `ConnectionStream`'s `ownsConnection`), and `KerberosDnsSrvLookup`
 answers SRV lookups through `DnsServerResolver.ResolveServiceAsync` (BL-527, ADR-0176).
+`KerberosKdcProxyHttpsTransport` posts an `https://` KDC's `KDC-PROXY-MESSAGE` (BL-882) over a
+plain TCP connection from its `IConnector` (`UseTls: false`) secured by its own
+`IKerberosKdcProxyTlsClient`, `KerberosKdcProxyTlsClient` in production, so the transfer's `-k`,
+`--cacert` and `--capath` never apply to a KDC proxy (ADR-0300, BL-1063): the certificate must name
+the host and lead to the realm's `http_anchors` roots, which `KerberosHttpAnchorLoader` loads as
+MIT's `load_anchor` does, or to the system's trust store when there are none. Any failure, an
+anchor that cannot be loaded included, is an `IOException`, so the sender tries the next KDC.
 
 Per ADR-0140 and ADR-0162 (BL-708) there are two TLS providers, and `TlsClientRouting.Choose`
 picks one from a `TlsClientOptions` as one pure function: `HandBuiltTlsProvider` when a row of
@@ -60,7 +67,7 @@ type: `TcpDialer` (behind `ITcpDialer`) and `TcpConnectionListener` with its
 `UdpDatagramConnector`, behind `IDatagramConnector`, and by `DnsSocketOpener`) the only one that constructs a
 UDP `Socket`; `DnsSocketOpener` (behind `IDnsSocketOpener`) also constructs the TCP `Socket` and
 `NetworkStream` a truncated DNS reply is asked again over. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
-`TlsClientOptions`) is the only type that constructs an `SslStream`; it runs the
+`TlsClientOptions`) and `KerberosKdcProxyTlsClient` (below) are the only types that construct an `SslStream`; the provider runs the
 handshake over the plaintext `IConnection` through the internal `ConnectionStream`
 adapter and returns an `SslStreamConnection`. With `--cacert` (`TlsClientOptions.CaCertificateFile`)
 it trusts only the certificates in that PEM file; there the Schannel build also checks

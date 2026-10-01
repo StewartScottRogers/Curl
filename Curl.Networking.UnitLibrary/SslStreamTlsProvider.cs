@@ -13,8 +13,9 @@ namespace Curl.Networking;
 /// <see cref="SslStream" /> over the plaintext connection, verifying the server
 /// certificate and host name as curl does unless <see cref="TlsClientOptions.Insecure" />
 /// is set. With <see cref="TlsClientOptions.CaCertificateFile" /> the chain must lead to a
-/// certificate in that PEM file instead of the system store. It is the only type in the
-/// solution that constructs an <see cref="SslStream" />.
+/// certificate in that PEM file instead of the system store. It and
+/// <see cref="KerberosKdcProxyTlsClient" />, whose trust is a KDC proxy's own (ADR-0300), are the
+/// only types in the solution that construct an <see cref="SslStream" />.
 /// </summary>
 /// <remarks>
 /// Per ADR-0009 it behaves like the curl build the platform usually runs: the Schannel
