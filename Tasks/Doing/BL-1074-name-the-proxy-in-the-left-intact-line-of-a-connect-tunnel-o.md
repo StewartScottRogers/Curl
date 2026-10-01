@@ -49,3 +49,4 @@ connect-to host, then origin).
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
