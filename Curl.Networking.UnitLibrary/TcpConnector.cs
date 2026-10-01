@@ -202,7 +202,10 @@ public sealed partial class TcpConnector(
     /// exit 6, and <c>Failed to connect to &lt;host&gt;:&lt;port&gt; after &lt;n&gt; ms:
     /// Could not connect to server</c> for exit 7, or exit 28 when the system timed the last dial
     /// out, where <c>n</c> is the time spent
-    /// dialing as measured by the injected <see cref="TimeProvider" />. When
+    /// dialing as measured by the injected <see cref="TimeProvider" />. A
+    /// <see cref="ConnectTarget.IsForwardProxy" /> target names itself as the proxy, as curl does:
+    /// <c>Failed to connect to &lt;proxy host&gt;:&lt;port&gt; over proxy &lt;proxy host&gt; after
+    /// &lt;n&gt; ms: ...</c>, for exit 7 and for exit 45. When
     /// <see cref="ConnectTarget.UseTls" /> is set, the <see cref="ITlsProvider" />'s result
     /// is returned as it is, so a failed handshake keeps the exit code and message the
     /// provider chose.
@@ -559,12 +562,13 @@ public sealed partial class TcpConnector(
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
             var via = destination.IsMapped ? $" via {destination.Host}:{destination.Port}" : string.Empty;
+            var overProxy = target.IsForwardProxy ? $" over proxy {target.Host}" : string.Empty;
             return DialFailure(
                 target.Events,
                 lastDialError,
                 lastBindFailure,
                 new ConnectTimings(started, nameResolved, null, null),
-                $"Failed to connect to {target.Host}:{target.Port}{via} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}");
+                $"Failed to connect to {target.Host}:{target.Port}{via}{overProxy} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}");
         }
 
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
