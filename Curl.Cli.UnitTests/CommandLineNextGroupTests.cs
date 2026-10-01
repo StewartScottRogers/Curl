@@ -38,7 +38,7 @@ public sealed class CommandLineNextGroupTests
         "disable-eprt", "eprt", "ssl", "ftp-ssl", "ssl-reqd", "ftp-ssl-reqd", "ftp-ssl-control", "ftp-ssl-ccc",
         "ftp-ssl-ccc-mode", "ftp-account", "ftp-alternative-to-user", "ftp-pret", "list-only", "use-ascii", "crlf", "append",
         "quote", "create-file-mode", "insecure", "ssl-no-revoke", "ssl-revoke-best-effort", "ssl-allow-beast",
-        "ca-native", "alpn", "sessionid", "tcp-nodelay", "keepalive", "keepalive-time", "keepalive-cnt", "ip-tos", "vlan-priority", "cacert", "capath", "crlfile",
+        "ca-native", "alpn", "sessionid", "tcp-nodelay", "keepalive", "keepalive-time", "keepalive-cnt", "ip-tos", "vlan-priority", "tcp-fastopen", "mptcp", "cacert", "capath", "crlfile",
         "pinnedpubkey", "cert-status", "ssl-auto-client-cert", "proxy-insecure",
         "proxy-cacert", "proxy-capath", "proxy-cert", "proxy-key", "proxy-cert-type", "proxy-key-type", "proxy-pass",
         "proxy-ciphers", "proxy-tls13-ciphers", "proxy-crlfile", "proxy-pinnedpubkey", "proxy-ca-native",

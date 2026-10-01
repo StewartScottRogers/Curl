@@ -405,6 +405,8 @@ internal static class CurlComposition
         {
             TypeOfService = options.IpTypeOfService,
             VlanPriority = options.VlanPriority,
+            FastOpen = options.TcpFastOpen,
+            MultipathTcp = options.MultipathTcp,
         });
         IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);

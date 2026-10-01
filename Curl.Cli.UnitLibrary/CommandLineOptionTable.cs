@@ -205,6 +205,8 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("keepalive-cnt", null, SetKeepAliveProbeCount),
         CommandLineOption.Value("ip-tos", null, SetIpTypeOfService),
         CommandLineOption.Value("vlan-priority", null, SetVlanPriority),
+        CommandLineOption.NegatableFlag("tcp-fastopen", null, (options, on) => options.TcpFastOpen = on),
+        CommandLineOption.NegatableFlag("mptcp", null, (options, on) => options.MultipathTcp = on),
         CommandLineOption.NegatableFlag("styled-output", null, (options, on) => options.StyledOutput = on),
         CommandLineOption.Value("cacert", null, SettingExistingFile("--cacert", (options, file) => options.CaCertificateFile = file)),
         CommandLineOption.FileName("capath", null, (options, directory) => options.CaCertificateDirectory = directory),

@@ -999,6 +999,19 @@ public sealed class CommandLineOptions
     public int VlanPriority { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when the last of <c>--tcp-fastopen</c> and <c>--no-tcp-fastopen</c> was
+    /// <c>--tcp-fastopen</c>: ask the operating system for TCP Fast Open on every TCP connection.
+    /// <see langword="false"/> otherwise, curl's default.
+    /// </summary>
+    public bool TcpFastOpen { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when the last of <c>--mptcp</c> and <c>--no-mptcp</c> was <c>--mptcp</c>: open every
+    /// TCP connection's socket as Multipath TCP. <see langword="false"/> otherwise, curl's default.
+    /// </summary>
+    public bool MultipathTcp { get; internal set; }
+
+    /// <summary>
     /// <see langword="false"/> when the last of <c>--styled-output</c> and <c>--no-styled-output</c> was
     /// <c>--no-styled-output</c>: never style header output. <see langword="true"/> otherwise, as curl styles
     /// headers written to a terminal by default. Parsed only until BL-736 styles header output.
