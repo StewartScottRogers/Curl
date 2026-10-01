@@ -323,6 +323,7 @@ choices do not need one.
 | [0315](ADR-0315-smb-v-lines-follow-the-openssl-build-and-end-by-curls-transfer-phase.md) | SMB's `-v` lines follow the OpenSSL build: a `failf` text, then `closing connection #N` for a failure before the session is set up and `shutting down connection #N` otherwise, and `{ [N bytes data]` for each read (BL-598) | Accepted | 2026-10-01 |
 | [0316](ADR-0316-ip-tos-and-vlan-priority-set-every-socket-option-the-os-has.md) | `--ip-tos` and `--vlan-priority` parse as curl 8.21.0 does and set `IP_TOS`/`IPV6_TCLASS` and `SO_PRIORITY` raw, in each operating system's numbers, wherever it has them (BL-646) | Accepted | 2026-10-01 |
 | [0317](ADR-0317-tcp-fastopen-and-mptcp-open-the-sockets-the-os-has.md) | `--tcp-fastopen` sets TCP Fast Open raw on Windows, Linux and macOS, and `--mptcp` opens `IPPROTO_MPTCP` sockets everywhere, failing with curl's `failed to open socket` lines where the OS refuses them (BL-647) | Accepted | 2026-10-01 |
+| [0318](ADR-0318-trace-config-sets-ids-time-and-components-each-component-task-writes-its-lines.md) | `--trace-config` parses curl's comma list: `ids`, `time` and `all` set the prefixes (not cleared by a first `-v`), other names are kept as components, and each component's lines are written by its own task (BL-649) | Accepted | 2026-10-01 |
 
 ## Template
 
