@@ -590,9 +590,13 @@ public sealed class Tls13ClientHandshake : IDisposable
             return selected.Alert;
         }
 
-        IsResumed = selected.Value == 0 && Tls13CipherSuite.Find(cipherSuite)!.KeySchedule.HashAlgorithm == SessionSchedule.HashAlgorithm;
+        IsResumed = SelectsTheOfferedTicket(selected.Value, cipherSuite);
         return IsResumed ? null : TlsAlertDescription.IllegalParameter;
     }
+
+    /// <summary>Returns whether <paramref name="selectedIdentity" /> is the one identity offered, index 0, and <paramref name="cipherSuite" /> hashes as the ticket's suite does.</summary>
+    private bool SelectsTheOfferedTicket(ushort selectedIdentity, ushort cipherSuite) =>
+        selectedIdentity == 0 && Tls13CipherSuite.Find(cipherSuite)!.KeySchedule.HashAlgorithm == SessionSchedule.HashAlgorithm;
 
     private void EnterHandshakeKeys(ushort cipherSuite, byte[] encoded, ushort group, byte[] sharedSecret, Tls13HandshakeOutputBuilder output)
     {

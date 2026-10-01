@@ -102,8 +102,6 @@ public sealed class CurlCommandRunnerHstsTests
     [TestMethod]
     public async Task RunAsync_RedirectToHttpOfAHostJustLearned_IsSwitchedBeforeTheNextHop()
     {
-        // curl prints "Issue another request to this URL: 'http://localhost:18443/x'" just before the
-        // switch line; the HTTP handler does not print that line for a followed redirect yet (BL-901).
         ScriptedConnector server = new(
         [
             Encoding.Latin1.GetBytes($"HTTP/1.1 301 Moved\r\n{MaxAge60}\r\nLocation: http://localhost:18443/x\r\nContent-Length: 0\r\n\r\n"),
@@ -115,7 +113,9 @@ public sealed class CurlCommandRunnerHstsTests
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(
             StandardErrorText,
-            "* Connection #0 to host localhost:18443 left intact\r\n" + Switched + "https://localhost:18443/x\r\n* using HTTP/1.x\r\n");
+            "* Connection #0 to host localhost:18443 left intact\r\n"
+            + "* Issue another request to this URL: 'http://localhost:18443/x'\r\n"
+            + Switched + "https://localhost:18443/x\r\n* using HTTP/1.x\r\n");
         Assert.AreEqual("https", server.Targets[1].PoolScheme);
         Assert.AreEqual("hihttps://localhost:18443/x 1", StandardOutputText);
         Assert.AreEqual(CacheFileText("localhost \"20260929 14:23:10\""), SavedCacheFile());

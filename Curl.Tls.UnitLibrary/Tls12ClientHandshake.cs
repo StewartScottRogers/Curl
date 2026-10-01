@@ -41,7 +41,8 @@ public sealed class Tls12ClientHandshake
 
     private static readonly string[] RsaKeyOids = [TlsSignatureScheme.RsaEncryptionOid];
 
-    private static readonly string[] EcdsaKeyOids = [TlsSignatureScheme.EcPublicKeyOid, TlsSignatureScheme.Ed25519Oid];
+    // ECDHE_ECDSA suites authenticate with an ECDSA or an EdDSA certificate (RFC 8422 section 5.3).
+    private static readonly string[] EcdsaKeyOids = [TlsSignatureScheme.EcPublicKeyOid, TlsSignatureScheme.Ed25519Oid, TlsSignatureScheme.Ed448Oid];
 
     private static readonly string[] DsaKeyOids = [TlsSignatureScheme.DsaOid];
 

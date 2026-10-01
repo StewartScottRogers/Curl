@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
@@ -84,6 +85,42 @@ public sealed class CurlCommandRunnerEndPointTests
 
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hi127.0.0.1 62095 127.0.0.1 18227\n", output);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpTransferThroughAUnixSocket_ReportsThePathAndNoPorts()
+    {
+        // curl -s --unix-socket "C:\Users\Stewart Rogers\AppData\Local\Temp\bl793.sock" -w
+        // "[%{remote_ip}|%{remote_port}|%{local_ip}|%{local_port}|%{num_connects}]" http://x/ printed
+        // "hi[C:\Users\Stewart Rogers\AppData\Local\Temp\bl|-1||-1|1]": the path cut to 45 characters
+        // (BL-793 Notes).
+        EndPointScriptedConnector connector = new(
+            new EndPointScriptedConnector.Script(
+                null,
+                new UnixDomainSocketEndPoint("/tmp/a-socket-path-long-enough-to-be-cut-by-curl/bl793.sock"),
+                Latin1("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi")));
+
+        (int exitCode, string output) = await RunAsync(
+            ["-s", "-w", "[%{remote_ip}|%{remote_port}|%{local_ip}|%{local_port}|%{num_connects}]", "http://x/"],
+            connector,
+            FailingDatagramConnector());
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("hi[/tmp/a-socket-path-long-enough-to-be-cut-by-c|-1||-1|1]", output);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpConnectFails_ReportsNoEndPoints()
+    {
+        // curl -s --unix-socket <missing socket> -w "[...]" http://x/ exited 7 and printed "[|-1||-1|0]",
+        // as a refused TCP connect does (BL-793 Notes).
+        (int exitCode, string output) = await RunAsync(
+            ["-s", "-w", "[%{remote_ip}|%{remote_port}|%{local_ip}|%{local_port}|%{num_connects}]", "http://x/"],
+            new EndPointScriptedConnector(),
+            FailingDatagramConnector());
+
+        Assert.AreEqual(7, exitCode);
+        Assert.AreEqual("[|-1||-1|0]", output);
     }
 
     [TestMethod]

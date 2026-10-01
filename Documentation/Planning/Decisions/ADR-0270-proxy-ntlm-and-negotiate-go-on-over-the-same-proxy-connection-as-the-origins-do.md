@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-602 (ADR-0186) answers a CONNECT tunnel's `407` and BL-603 (ADR-0187) a forward proxy's,
+BL-602 (ADR-0186) answers a CONNECT tunnel's `407` and BL-603 (ADR-0239) a forward proxy's,
 but only once, for Basic and Digest: `RankedHttpAuthenticator` refused NTLM and Negotiate for a
 proxy, the tunnel never went on after a CONNECT that sent a credential, and the forward proxy's
 first `Proxy-Authorization` was made synchronously, so no Type 1 could go up front. curl

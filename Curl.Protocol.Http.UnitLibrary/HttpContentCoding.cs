@@ -1,7 +1,7 @@
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// A content coding <c>--compressed</c> decodes (ADR-0020).
+/// A content coding <c>--compressed</c> decodes (ADR-0287).
 /// </summary>
 internal enum HttpContentCoding
 {
@@ -13,4 +13,7 @@ internal enum HttpContentCoding
 
     /// <summary><c>br</c>: a Brotli stream.</summary>
     Brotli,
+
+    /// <summary><c>zstd</c>: one or more Zstandard frames, decoded by <c>Curl.Zstandard</c> (ADR-0287).</summary>
+    Zstandard,
 }

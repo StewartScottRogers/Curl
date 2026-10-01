@@ -32,7 +32,12 @@ namespace Curl.Protocol.Pop3;
 /// was refused; either refused, exit 67 <c>Access denied. &lt;c&gt;</c>, c being <c>-</c>
 /// or <c>*</c> as above.</item>
 /// <item>None of these possible, or <c>AUTH=</c> ruling out the one that is: exit 67
-/// <c>Login denied</c>.</item>
+/// <c>Login denied</c>, after the <c>-v</c> line <c>SASL: no overlap between offered and
+/// configured auth mechanisms</c> when <c>CAPA</c> listed a SASL mechanism curl knows and
+/// <c>SASL: no auth mechanism was offered or recognized</c> otherwise; when the only offered
+/// mechanisms the credentials and options allow are SCRAM, which curl's Schannel build does
+/// not build in, <c>SASL: no auth mechanism offered could be selected</c> and one
+/// <c>SASL: &lt;mechanism&gt; not builtin</c> line each instead (BL-810).</item>
 /// </list>
 /// A login failure sends no <c>QUIT</c>.
 /// </remarks>
@@ -49,6 +54,12 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
 
     /// <summary>What curl sends for an empty SASL message (RFC 5034 section 4).</summary>
     private const string EmptyMessage = "=";
+
+    /// <summary>
+    /// The mechanisms curl 8.21.0's Schannel build knows but does not build in, in the order
+    /// its <c>-v</c> names them when one of them is all that was offered (BL-810).
+    /// </summary>
+    private static readonly string[] NotBuiltInMechanisms = ["SCRAM-SHA-256", "SCRAM-SHA-1"];
 
     private readonly MailRequestOptions mail = context.Mail ?? new MailRequestOptions();
 
@@ -212,7 +223,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     {
         if (options.Method == Pop3LoginMethod.Sasl || context.Credentials is not { } credential)
         {
-            return ValueTask.FromResult<TransferResult?>(LoginDenied());
+            return ValueTask.FromResult<TransferResult?>(NoWayToLogIn(options, capabilities));
         }
 
         if (apopTimestamp is not null)
@@ -222,8 +233,43 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
 
         return AllowsUserAndPass(options, capabilities)
             ? SendUserAndPassAsync(credential.UserName, credential.Password)
-            : ValueTask.FromResult<TransferResult?>(LoginDenied());
+            : ValueTask.FromResult<TransferResult?>(NoWayToLogIn(options, capabilities));
     }
+
+    /// <summary>
+    /// Writes the <c>-v</c> line curl 8.21.0's SASL code writes when no way of logging in is
+    /// possible, and fails with exit 67 <c>Login denied</c> (BL-810): <c>no overlap</c> once
+    /// <c>CAPA</c> listed a mechanism curl knows, <c>no auth mechanism was offered or
+    /// recognized</c> when it listed none or was refused.
+    /// </summary>
+    private TransferResult NoWayToLogIn(Pop3LoginOptions options, Pop3Capabilities? capabilities)
+    {
+        IReadOnlyList<string> offered = capabilities?.SaslMechanisms ?? [];
+        string[] notBuiltIn = [.. NotBuiltInMechanisms.Where(mechanism => IsAllowed(options, mechanism) && offered.Contains(mechanism, StringComparer.OrdinalIgnoreCase))];
+        if (notBuiltIn.Length > 0)
+        {
+            context.Events.ReportInfo(Pop3SessionMessages.NoSaslMechanismSelectable);
+            foreach (string mechanism in notBuiltIn)
+            {
+                context.Events.ReportInfo(string.Format(CultureInfo.InvariantCulture, Pop3SessionMessages.SaslMechanismNotBuiltIn, mechanism));
+            }
+        }
+        else
+        {
+            context.Events.ReportInfo(
+                offered.Any(Pop3LoginOptions.IsKnownMechanism) ? Pop3SessionMessages.NoSaslMechanismOverlap : Pop3SessionMessages.NoSaslMechanismOffered);
+        }
+
+        return LoginDenied();
+    }
+
+    /// <summary>
+    /// Whether curl would try <paramref name="mechanism" />: it needs a user name and password,
+    /// and the login options allow every way or name it.
+    /// </summary>
+    private bool IsAllowed(Pop3LoginOptions options, string mechanism) =>
+        context.Credentials is not null
+        && (options.Method == Pop3LoginMethod.Any || mechanism.Equals(options.RequiredMechanism, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Whether <c>USER</c>/<c>PASS</c> may be sent: the login options allow any way, and

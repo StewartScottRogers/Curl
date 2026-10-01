@@ -35,15 +35,13 @@ public sealed class QuicClientSettingsTests
     }
 
     [TestMethod]
-    public void CreateOpenSslTlsSettings_OffersOnlyTheSignatureSchemesTheClientCanCheck()
+    public void CreateOpenSslTlsSettings_OffersEverySignatureSchemeOfTheOpenSslProfile()
     {
         Tls13ClientSettings settings = QuicClientSettings.CreateOpenSslTlsSettings(null);
 
         Assert.IsNull(settings.ServerName);
-        Assert.Contains((ushort)0x0804, settings.SignatureAlgorithms);
-        Assert.Contains((ushort)0x0401, settings.SignatureAlgorithms);
-        Assert.DoesNotContain((ushort)0x0905, settings.SignatureAlgorithms);
-        Assert.IsTrue(settings.SignatureAlgorithms.All(scheme => ClientHelloProfile.OpenSsl.SignatureAlgorithms.Contains(scheme)));
+        Assert.Contains((ushort)0x0905, settings.SignatureAlgorithms);
+        CollectionAssert.AreEqual(ClientHelloProfile.OpenSsl.SignatureAlgorithms.ToArray(), settings.SignatureAlgorithms.ToArray());
     }
 
     [TestMethod]

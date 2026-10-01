@@ -734,6 +734,29 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow("http://localhost:18203/b", false, "lu:lp")]
+    [DataRow("http://localhost:18203/b", true, "lu:lp")]
+    [DataRow("http://other:18203/b", true, null)]
+    [DataRow(Next, false, null)]
+    public async Task FollowAsync_CredentialSelector_GivesEveryHopAfterTheFirstItsHostsCredentials(
+        string target,
+        bool trusted,
+        string? expected)
+    {
+        // curl -n -L looks the netrc file up again for each hop's host, --location-trusted or not
+        // (BL-790): the selector's answer replaces the first hop's credentials, none included.
+        ScriptedHandler handler = new(Redirect(302, target), Ok(200, 0));
+        RedirectFollower follower = new(
+            new ProtocolDispatcher([handler]),
+            selectHopCredentials: url => url.Host == "localhost" ? new NetworkCredential("lu", "lp") : null);
+
+        await follower.FollowAsync(Context(Location(), credentials: true), new RedirectPolicy { LocationTrusted = trusted });
+
+        Assert.AreEqual("u:p", UserAndPassword(handler.Contexts[0].Credentials));
+        Assert.AreEqual(expected, UserAndPassword(handler.Contexts[1].Credentials));
+    }
+
+    [TestMethod]
     public async Task FollowAsync_BackToFirstHost_SendsCredentialsAgain()
     {
         ScriptedHandler handler = new(Redirect(302, "http://localhost:18203/b"), Redirect(302, Next), Ok(200, 0));

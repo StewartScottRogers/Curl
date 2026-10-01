@@ -5,9 +5,11 @@
 #   hls/av1/master.m3u8    adaptive stream in AV1 at 8K, 4K and 1080p, for browsers that
 #                          decode AV1 - what the viewer page plays wherever it can
 #   hls/h264/master.m3u8   the same in H.264 at 4K and 1080p, for browsers that do not
-#   hls/<codec>/<height>p/ each quality as 2-second fragmented-MP4 segments, all under
-#                          GitHub's 100 MB file limit however large the render gets
-#   gource.mp4             the 4K H.264 quality as one file, for download
+#   hls/<codec>/<height>p/ each quality as 2-second fragmented-MP4 segments; every quality
+#                          is bitrate-capped, so a segment stays far under GitHub's 100 MB
+#                          file limit and the whole site under GitHub Pages' 1 GB
+#   gource.mp4             the 4K H.264 quality as one file, for download: remuxed when it
+#                          fits in 85 MiB, otherwise re-encoded (two-pass) to land there
 #   gource.gif             the widest GIF under GitHub's 10 MB inline limit, for the README
 #   still-8k.jpg           the final frame at full 8K, for download
 #   poster.jpg             the final frame at 1920 px, shown before the video plays
@@ -66,13 +68,20 @@ rm -f "$work/probe.ppm"
 # a browser plays one codec per stream, so AV1 gets a full ladder of its own. SVT-AV1 is
 # fast enough for a runner (it refuses 8K below preset 8); libaom is the slow fallback if
 # ffmpeg lacks it.
+#
+# Each AV1 quality is encoded to a target bitrate (VBR), not a constant quality: Gource's
+# bloom and particles made constant-quality 8K run at 95 Mbit/s on average and 240 Mbit/s at
+# peak - 2-second segments of 60 MB and a 1.3 GB site, over GitHub Pages' 1 GB limit, and
+# growing with the history. A bitrate bounds the size by the length, which is fixed: at
+# about 75 s the AV1 ladder comes to roughly 280 + 110 + 40 MB.
 gop=$(( fps * 2 ))
+av1_rate_8k=30M
+av1_rate_4k=12M
+av1_rate_1080=4M
 if ffmpeg -hide_banner -encoders 2> /dev/null | grep -q libsvtav1; then
-    av1_8k=(-c:v libsvtav1 -preset 8 -crf 32 -svtav1-params tune=0:scd=0)
-    av1_small=(-c:v libsvtav1 -preset 8 -crf 36 -svtav1-params tune=0:scd=0)
+    av1=(-c:v libsvtav1 -preset 8 -svtav1-params tune=0:scd=0)
 else
-    av1_8k=(-c:v libaom-av1 -cpu-used 8 -row-mt 1 -crf 32 -b:v 0)
-    av1_small=("${av1_8k[@]}")
+    av1=(-c:v libaom-av1 -cpu-used 8 -row-mt 1)
 fi
 av1_common=(-g "$gop" -pix_fmt yuv420p)
 hls=(-f hls -hls_time 2 -hls_playlist_type vod -hls_segment_type fmp4
@@ -96,11 +105,11 @@ echo "rendering ${width}x${height} at ${fps} fps: $days day(s) at ${spd}s/day, $
     --output-framerate "$fps" --output-ppm-stream - \
   | ffmpeg -y -loglevel error -r "$fps" -f image2pipe -vcodec ppm -i - \
       -filter_complex "[0:v]split=4[a8][s4][s2][s1];[s4]scale=3840:2160:flags=lanczos,split[a4][h4];[s2]scale=1920:1080:flags=lanczos,split[a2][h2];[s1]fps=1[still]" \
-      -map "[a8]" "${av1_8k[@]}" "${av1_common[@]}" "${hls[@]}" \
+      -map "[a8]" "${av1[@]}" -b:v "$av1_rate_8k" "${av1_common[@]}" "${hls[@]}" \
           -hls_segment_filename "$d/av1/4320p/seg_%03d.m4s" "$d/av1/4320p/index.m3u8" \
-      -map "[a4]" "${av1_small[@]}" "${av1_common[@]}" "${hls[@]}" \
+      -map "[a4]" "${av1[@]}" -b:v "$av1_rate_4k" "${av1_common[@]}" "${hls[@]}" \
           -hls_segment_filename "$d/av1/2160p/seg_%03d.m4s" "$d/av1/2160p/index.m3u8" \
-      -map "[a2]" "${av1_small[@]}" "${av1_common[@]}" "${hls[@]}" \
+      -map "[a2]" "${av1[@]}" -b:v "$av1_rate_1080" "${av1_common[@]}" "${hls[@]}" \
           -hls_segment_filename "$d/av1/1080p/seg_%03d.m4s" "$d/av1/1080p/index.m3u8" \
       -map "[h4]" "${x264[@]}" -crf 18 -maxrate 14M -bufsize 28M -level 5.1 "${hls[@]}" \
           -hls_segment_filename "$d/h264/2160p/seg_%03d.m4s" "$d/h264/2160p/index.m3u8" \
@@ -112,10 +121,35 @@ for ladder in av1 h264; do
     cs make-master-playlist "$d/$ladder" > "$d/$ladder/master.m3u8"
 done
 
-# A fragmented MP4 is its init segment followed by its media segments; remux the 4K H.264
-# one into a plain, seekable MP4 for download, and use the 1080p one as the GIF's source.
+# A fragmented MP4 is its init segment followed by its media segments; the 4K H.264 one
+# becomes the plain, seekable gource.mp4 for download, and the 1080p one the GIF's source.
+# gource.mp4 is one file, so it alone must fit GitHub's 100 MB file limit (the 4K ladder
+# reached 117 MB on 2026-09-30 and every push was refused). It is remuxed as it is when it
+# fits in mp4_limit; otherwise it is re-encoded in two passes at the bitrate that lands it
+# there, measured from the duration, and the bitrate lowered by a tenth until it fits.
+mp4_limit=$(( 85 * 1024 * 1024 ))
 cat "$d/h264/2160p/init.mp4" "$d/h264/2160p"/seg_*.m4s > "$work/2160p.frag.mp4"
 ffmpeg -y -loglevel error -i "$work/2160p.frag.mp4" -c copy -movflags +faststart "$work/gource.mp4"
+if [ "$(wc -c < "$work/gource.mp4")" -gt "$mp4_limit" ]; then
+    duration=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$work/2160p.frag.mp4")
+    # 97% of the budget for the video stream, the rest for the container.
+    kbps=$(awk -v b="$mp4_limit" -v t="$duration" 'BEGIN { printf "%d", b * 8 * 0.97 / t / 1000 }')
+    for attempt in 1 2 3; do
+        echo "gource.mp4: remux is $(wc -c < "$work/gource.mp4") bytes, over $mp4_limit; two-pass at ${kbps} kbit/s over ${duration}s"
+        x264_mp4=("${x264[@]}" -b:v "${kbps}k" -maxrate $(( kbps * 2 ))k -bufsize $(( kbps * 4 ))k
+                  -level 5.1 -passlogfile "$work/x264")
+        ffmpeg -y -loglevel error -i "$work/2160p.frag.mp4" "${x264_mp4[@]}" -pass 1 -an -f null -
+        ffmpeg -y -loglevel error -i "$work/2160p.frag.mp4" "${x264_mp4[@]}" -pass 2 -an \
+            -movflags +faststart "$work/gource.mp4"
+        if [ "$(wc -c < "$work/gource.mp4")" -le "$mp4_limit" ]; then break; fi
+        kbps=$(( kbps * 9 / 10 ))
+    done
+    rm -f "$work"/x264*.log "$work"/x264*.log.mbtree
+    if [ "$(wc -c < "$work/gource.mp4")" -gt "$mp4_limit" ]; then
+        echo "gource.mp4 is still $(wc -c < "$work/gource.mp4") bytes after three encodes, over $mp4_limit" >&2
+        exit 1
+    fi
+fi
 cat "$d/h264/1080p/init.mp4" "$d/h264/1080p"/seg_*.m4s > "$work/1080p.frag.mp4"
 ffmpeg -y -loglevel error -i "$work/still-8k.jpg" -vf scale=1920:-2:flags=lanczos -q:v 3 "$work/poster.jpg"
 
@@ -128,6 +162,11 @@ for spec in "1280 12 0.5" "1024 12 0.5" "800 12 0.5" "640 10 0.5" "640 10 0.33" 
         -loop 0 "$work/gource.gif"
     if [ "$(wc -c < "$work/gource.gif")" -le "$limit" ]; then break; fi
 done
+if [ "$(wc -c < "$work/gource.gif")" -gt "$limit" ]; then
+    # Still published (the viewer and the download do not need it), but the README will
+    # show a broken image until the smallest setting above is made smaller.
+    echo "::warning::gource.gif is $(wc -c < "$work/gource.gif") bytes even at ${gw}px, over $limit; GitHub will not show it in the README"
+fi
 
 cs make-stats "$work/gource.log" "$width" "$height" "$fps" > "$work/stats.json"
 

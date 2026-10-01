@@ -4,6 +4,7 @@
     <ProjectReference Include="..\Curl.Http2.UnitLibrary\Curl.Http2.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Http3.UnitLibrary\Curl.Http3.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Zstandard.UnitLibrary\Curl.Zstandard.UnitLibrary.csproj" />
   </ItemGroup>
 
   <ItemGroup>

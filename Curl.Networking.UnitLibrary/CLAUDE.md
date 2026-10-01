@@ -153,7 +153,12 @@ one limit, the constructor's `connectTimeout` (`CurlComposition.ConnectTimeoutOf
 or a smaller `-m`), else `DefaultConnectTimeout` (300 s), on its `TimeProvider`; when it passes the
 connect fails with exit 28 and `Connection timed out after N milliseconds`, N from the connect's
 start, also reported as a `-v` line. A cancellation arriving once the limit has passed is that
-failure; an earlier one escapes. Tests stall through `Fakes/StallingTcpDialer`,
+failure; an earlier one escapes. Per ADR-0286 (BL-797) `WithoutConnectTimeout()` gives a view of
+the same connector (DNS cache, numbering, every setting) whose connects run under the longest
+timer delay instead, FTP's passive data connector; `PoolingConnector.Over(inner)` gives a pooling
+connector over the same cache, configuration and numbering that opens through `inner`. A dial whose
+last attempt failed with `SocketError.TimedOut` is exit 28 with the usual `Failed to connect to`
+message, as curl 8.21.0 ends a dial the system gave up on. Tests stall through `Fakes/StallingTcpDialer`,
 `StallingTlsProvider` and `StallingConnection` and fire the limit with `ManualTimeProvider.Advance`.
 Per ADR-0143 (BL-500) `TcpConnector` and `UdpDatagramConnector` take the `-4`/`-6` choice as an
 `AddressFamily` (`Unspecified` for either): `AddressFamilyFilter` keeps a name's addresses of that
@@ -249,6 +254,13 @@ connection is reported `with proxy` (`ConnectionReusedEvent.IsProxy`) when the t
 forward proxy (`ConnectTarget.IsForwardProxy`) or tunnels through one, naming the proxy's host
 and port for a tunnel, as curl 8.21.0 prints it (BL-360).
 
+Per ADR-0285 (BL-754) the pool's state - idle and leased connections, negotiations, numbering and
+clock - lives in a `ConnectionCache`. `new PoolingConnector(inner, timeProvider)` makes and owns
+one, closed by its `DisposeAsync`; `new PoolingConnector(inner, cache, configuration)` shares a
+given cache, which only its owner closes, and puts `configuration` into `ConnectionPoolKey`
+(`Configuration`, compared with `Equals`), so connectors over one cache - the `--next` option groups
+of one run - reuse each other's connections only when their configurations are equal.
+
 Per BL-717 a pooled connection whose `IConnectionSession` multiplexes (HTTP/2) is shared, not
 checked out: while its session's `ConcurrentTransferLimit` has streams to spare, a transfer with the
 same key gets another `PooledConnection` lease on it (`* Multiplexed connection found`), and once
@@ -283,8 +295,8 @@ path as the host and `ConnectionOpenedEvent.UnixSocketRemoteIp`, and returns the
 abstract name as given) as `ConnectResult.UnixSocketPath`, which `PoolingConnector` keeps in its
 `PoolEntry` for the opened and every reused result, so the HTTP handler's left-intact line names
 the socket (BL-884). A path too long for `sun_path`
-(108 bytes, 104 on macOS, with its NUL) is exit 6 `Unix socket path too long: '<path>'`. Pools are
-per option group, so different sockets never share a connection.
+(108 bytes, 104 on macOS, with its NUL) is exit 6 `Unix socket path too long: '<path>'`. The socket
+is part of each option group's pool configuration, so different sockets never share a connection.
 
 The DNS-over-HTTPS message codec (ADR-0152, BL-640) is pure code, bytes in and bytes out, as
 curl 8.21.0's `lib/doh.c` does it. `DnsQueryEncoder` writes the measured query (ID 0, flags

@@ -1,6 +1,6 @@
 # ADR-0126 — `--next` option groups run in order, each with its own dispatch, sharing the cookie store and the transfer numbering
 
-- **Status:** Accepted
+- **Status:** Accepted; amended by ADR-0285 (BL-754): the groups share one connection cache
 - **Date:** 2026-09-28
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-509.

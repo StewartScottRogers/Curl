@@ -106,6 +106,14 @@ public sealed class SaslAuthenticator(
                 [OAuthBearerMessage(UserOf(request), request.Host, request.Port, TokenOf(request)), FieldSeparator.ToString()],
         };
 
+    /// <summary>
+    /// Gets the <c>--delegation</c> level GSSAPI's Kerberos context is asked for, as curl's
+    /// GSS-API build passes <c>CURLOPT_GSSAPI_DELEGATION</c> to <c>gss_init_sec_context</c> for
+    /// SASL too (BL-874); <see cref="SecurityDelegation.None" /> when not set. NTLM's context
+    /// never delegates.
+    /// </summary>
+    public SecurityDelegation GssapiDelegation { get; init; }
+
     /// <inheritdoc />
     public string? ChooseMechanism(SaslRequest request, IReadOnlyList<string> offeredMechanisms) =>
         SaslMechanismRanking.PickFirst(request, offeredMechanisms, securityContexts is not null);
@@ -160,12 +168,12 @@ public sealed class SaslAuthenticator(
     }
 
     // GSSAPI runs on the raw Kerberos mechanism with signing keys for its security-layer
-    // message; NTLM on an NTLM context with none.
+    // message and the --delegation level; NTLM on an NTLM context with neither.
     private SecurityContextSaslExchange BeginOnSecurityContext(string name, SaslRequest request, ISecurityContextFactory contexts) =>
         name == SaslMechanismRanking.Gssapi
             ? new SecurityContextSaslExchange(
                 name,
-                contexts.Create(SecurityContextSaslExchange.ContextRequestFor(SecurityMechanism.Kerberos, request) with { MessageProtection = ProtectionLevel.Sign }),
+                contexts.Create(SecurityContextSaslExchange.ContextRequestFor(SecurityMechanism.Kerberos, request) with { MessageProtection = ProtectionLevel.Sign, Delegation = GssapiDelegation }),
                 credentialEncoding.GetBytes(request.AuthorizationIdentity ?? string.Empty))
             : new SecurityContextSaslExchange(name, contexts.Create(SecurityContextSaslExchange.ContextRequestFor(SecurityMechanism.Ntlm, request)), securityLayerAuthorizationIdentity: null);
 

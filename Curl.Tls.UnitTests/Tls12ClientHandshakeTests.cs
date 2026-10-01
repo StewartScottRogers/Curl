@@ -221,6 +221,19 @@ public sealed class Tls12ClientHandshakeTests
     }
 
     [TestMethod]
+    [DataRow("ecdsa256", TlsSignatureScheme.EcdsaSha224, (ushort)0xc02b)]
+    [DataRow("brainpoolP256r1", TlsSignatureScheme.EcdsaSha224, (ushort)0xc02b)]
+    [DataRow("rsa", TlsSignatureScheme.RsaPkcs1Sha224, (ushort)0xc02f)]
+    [DataRow("ed448", TlsSignatureScheme.Ed448, (ushort)0xc02b)]
+    public void ServerKeyExchangeVerifiesWithTheSha224SchemesAndEd448WhenOffered(string credential, int scheme, int cipherSuite)
+    {
+        Tls12TestServer server = new(Credential(credential)) { CipherSuite = (ushort)cipherSuite, SignatureScheme = (ushort)scheme };
+        Tls12ClientHandshake client = Client(DefaultSettings with { SignatureAlgorithms = [(ushort)scheme] });
+
+        AssertCompletesWithServerKeys(client, server, Run(client, server));
+    }
+
+    [TestMethod]
     [DataRow(TlsProtocolVersion.Tls10, (ushort)0xc013, "rsa")]
     [DataRow(TlsProtocolVersion.Tls10, (ushort)0x002f, "rsa")]
     [DataRow(TlsProtocolVersion.Tls11, (ushort)0xc009, "ecdsa")]
@@ -485,6 +498,30 @@ public sealed class Tls12ClientHandshakeTests
     }
 
     [TestMethod]
+    public void AnEd448ClientCertificateSignsTheCertificateVerifyWithEd448()
+    {
+        TestServerCredential clientCredential = Credential("ed448");
+        Tls12TestServer server = new(TestServerCredential.Ecdsa(ECCurve.NamedCurves.nistP256, TlsSignatureScheme.EcdsaSecp256r1Sha256))
+        {
+            RequestClientCertificate = true,
+            ClientCertificateSchemes = [TlsSignatureScheme.Ed25519, TlsSignatureScheme.Ed448],
+        };
+        Tls12ClientHandshake client = Client(DefaultSettings with
+        {
+            SignatureAlgorithms = [TlsSignatureScheme.EcdsaSecp256r1Sha256, TlsSignatureScheme.Ed448],
+            ClientCertificate = new TlsClientCertificate([clientCredential.Certificate], clientCredential.SigningKey),
+        });
+
+        Tls12HandshakeOutput output = Run(client, server);
+
+        // The server has already checked the CertificateVerify against the certificate's Ed448 key.
+        AssertCompletesWithServerKeys(client, server, output);
+        Assert.IsTrue(client.ClientCertificateSent);
+        CollectionAssert.AreEqual(clientCredential.Certificate, server.ClientCertificates[0]);
+        Assert.AreEqual(TlsSignatureScheme.Ed448, Tls12CertificateVerify.Decode(Body(output.MessagesToSend[2]), true).Value.SignatureAlgorithm);
+    }
+
+    [TestMethod]
     public void AClientCertificateOnTlsOneOneSignsWithEcdsaOverSha1()
     {
         TestServerCredential clientCredential = Credential("ecdsa");
@@ -582,6 +619,7 @@ public sealed class Tls12ClientHandshakeTests
         "ecdsa" or "ecdsa256" => TestServerCredential.Ecdsa(ECCurve.NamedCurves.nistP256, TlsSignatureScheme.EcdsaSecp256r1Sha256),
         "ecdsa384" => TestServerCredential.Ecdsa(ECCurve.NamedCurves.nistP384, TlsSignatureScheme.EcdsaSecp384r1Sha384),
         "ed25519" => TestServerCredential.Ed25519(),
+        "ed448" => TestServerCredential.Ed448(),
         "rsa" => TestServerCredential.Rsa(TlsSignatureScheme.RsaPkcs1Sha256),
         "rsa-pss" => TestServerCredential.RsaPss(TlsSignatureScheme.RsaPssPssSha256),
         "brainpoolP256r1" => TestServerCredential.Brainpool(BrainpoolCurve.BrainpoolP256r1, TlsSignatureScheme.BrainpoolP256r1Oid, TlsSignatureScheme.EcdsaSecp256r1Sha256),

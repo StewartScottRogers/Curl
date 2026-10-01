@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-ADR-0187 answers one 407 and one 401 in either order, each retry keeping the other header as
+ADR-0239 answers one 407 and one 401 in either order, each retry keeping the other header as
 it was sent. curl 8.21.0 does not send the kept Digest answer again unchanged: it counts its
 nonce on to `nc=00000002`, keeps the `cnonce` and sends the hash for that count (measured,
 BL-603 Notes, cases `Uu-digest-407d-401d-200` and `Uu-any-401d-407d-200`).

@@ -454,7 +454,7 @@ public sealed partial class CurlCompositionTests
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions(), timeProvider);
 
         Assert.AreSame(transports.TcpConnector, CapturedDependency<IConnector>(transports.PoolingConnector));
-        Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(transports.PoolingConnector));
+        Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(CapturedDependency<ConnectionCache>(transports.PoolingConnector)));
     }
 
     [TestMethod]
@@ -465,7 +465,8 @@ public sealed partial class CurlCompositionTests
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
         IProtocolHandler[] handlers = [.. CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatch.Dispatcher).Values.Distinct()];
-        IConnector[] connectors = [.. handlers.SelectMany(ConnectorsOf)];
+        IConnector ftpData = Unrecorded(CapturedDependency<IConnector>(FtpHandlerOf(dispatch), "dataConnector"));
+        IConnector[] connectors = [.. handlers.SelectMany(ConnectorsOf).Where(connector => !ReferenceEquals(connector, ftpData))];
         string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => Unwrapped(handler).GetType().Name).Order()];
         CollectionAssert.AreEqual(
             new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "ImapProtocolHandler", "LdapProtocolHandler", "MqttProtocolHandler", "Pop3ProtocolHandler", "RoutingFtpProtocolHandler", "RtspProtocolHandler", "SmtpProtocolHandler", "SshProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler", "WsProtocolHandler" },
@@ -494,13 +495,48 @@ public sealed partial class CurlCompositionTests
 
         Dictionary<string, IProtocolHandler> handlers = CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatch.Dispatcher);
         Assert.AreSame(handlers["ftp"], handlers["ftps"]);
-        FtpProtocolHandler ftp = (FtpProtocolHandler)CapturedDependency<IProtocolHandler>(Unwrapped(handlers["ftps"]), "ftpHandler");
+        FtpProtocolHandler ftp = FtpHandlerOf(dispatch);
         Assert.IsInstanceOfType<TcpConnectionListener>(CapturedDependency<IConnectionListener>(ftp));
         Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(ftp));
         Assert.AreSame(transports.DnsResolver, CapturedDependency<IDnsResolver>(ftp));
         Assert.IsInstanceOfType<SystemNetworkInterfaceLookup>(CapturedDependency<INetworkInterfaceLookup>(ftp));
-        Assert.AreSame(transports.PoolingConnector, Unrecorded(CapturedDependency<IConnector>(ftp)));
+        Assert.AreSame(transports.PoolingConnector, Unrecorded(CapturedDependency<IConnector>(ftp, "connector")));
     }
+
+    [TestMethod]
+    public void CreateTransferDispatch_ProductionTransports_FtpDataConnectionsGoThroughThePoolOverAConnectorWithoutTheConnectTimeout()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+
+        TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
+
+        // BL-797: curl 8.21.0 does not hold a passive data connect to --connect-timeout.
+        PoolingConnector data = (PoolingConnector)Unrecorded(CapturedDependency<IConnector>(FtpHandlerOf(dispatch), "dataConnector"));
+        Assert.AreNotSame(transports.PoolingConnector, data);
+        Assert.AreSame(CapturedDependency<ConnectionCache>(transports.PoolingConnector), CapturedDependency<ConnectionCache>(data));
+        IConnector inner = CapturedDependency<IConnector>(data);
+        Assert.AreNotSame(transports.TcpConnector, inner);
+        Assert.AreSame(transports.TcpConnector, CapturedDependency<TcpConnector>(inner));
+    }
+
+    [TestMethod]
+    public void CreateDispatcher_ProductionTransports_FtpDataConnectionsGoThroughThePoolOverAConnectorWithoutTheConnectTimeout()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+
+        ProtocolDispatcher dispatcher = CurlComposition.CreateDispatcher(transports);
+
+        IProtocolHandler routing = Unwrapped(CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatcher)["ftp"]);
+        FtpProtocolHandler ftp = (FtpProtocolHandler)CapturedDependency<IProtocolHandler>(routing, "ftpHandler");
+        PoolingConnector data = (PoolingConnector)Unrecorded(CapturedDependency<IConnector>(ftp, "dataConnector"));
+        Assert.AreSame(CapturedDependency<ConnectionCache>(transports.PoolingConnector), CapturedDependency<ConnectionCache>(data));
+    }
+
+    /// <summary>The FTP handler behind the <c>ftp</c> scheme's router in <paramref name="dispatch" />.</summary>
+    private static FtpProtocolHandler FtpHandlerOf(TransferDispatch dispatch) =>
+        (FtpProtocolHandler)CapturedDependency<IProtocolHandler>(
+            Unwrapped(CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatch.Dispatcher)["ftp"]),
+            "ftpHandler");
 
     [TestMethod]
     public async Task CreateRunner_FtpsUrlWithFakeConnectors_ReachesConnectorAtPort990WithTls()

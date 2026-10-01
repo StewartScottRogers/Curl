@@ -31,7 +31,7 @@ successful 3xx hop's `TransferReport.RedirectUrl` under a `RedirectPolicy`
 (`--max-redirs`, `--post301/302/303`, `--location-trusted`, allowed redirect schemes),
 rewriting POST to GET and dropping credentials to another host, port or scheme as curl
 8.21.0 does - except that each hop sends its own URL's user information unless `-u`
-credentials go to it (ADR-0193, BL-814) - and returns the last hop's result with one merged report (redirect count,
+credentials go to it (ADR-0240, BL-814) - and returns the last hop's result with one merged report (redirect count,
 effective URL, summed header/request/connection counts, timings from the first hop with
 `RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. Given a
 `HopProxySelector`, it chooses each hop's proxy again from that hop's own URL, as curl
@@ -40,7 +40,9 @@ effective URL, summed header/request/connection counts, timings from the first h
 hop's URL (ADR-0226); without one, only a hop to the first URL's origin keeps its route. Under
 `HttpRequestOptions.AutoReferer` (`-e "...;auto"`) each hop is sent the previous URL, without
 user information or fragment, as its `Referer`, and the merged report's `Referer` is the last
-one sent, which `%{referer}` prints (ADR-0101, BL-361).
+one sent, which `%{referer}` prints (ADR-0101, BL-361). Each target that parses with a scheme
+curl knows is reported as `Issue another request to this URL: '<target>'` before the HSTS
+switch and the `--proto-redir` check, never after a `--max-redirs` refusal (BL-907).
 
 `TransferRetrier` runs a transfer again under `--retry` (`RetryPolicy`: `--retry`,
 `--retry-delay`) after curl 8.21.0's transient failures: exit 28, 6, 5 or 12

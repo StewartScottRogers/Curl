@@ -102,12 +102,19 @@ namespace Curl.Core;
 /// <see cref="HttpRequestOptions.AltSvcRoute" /> for a hop to the first URL's origin and drop it
 /// for any other.
 /// </param>
+/// <param name="selectHopCredentials">
+/// Looks up each hop's <see cref="ITransferContext.Credentials" /> from the hop's own URL, whatever
+/// its origin and <c>--location-trusted</c>, as curl 8.21.0 looks the netrc file up again for each
+/// hop's host (BL-790 Notes); <see langword="null" /> to carry the first hop's credentials by the
+/// origin and URL rules above.
+/// </param>
 public sealed class RedirectFollower(
     ProtocolDispatcher dispatcher,
     HopProxySelector? selectHopProxy = null,
     bool? runsOnWindows = null,
     HstsTransferPolicy? hsts = null,
-    HopAltSvcSelector? selectHopAltSvc = null)
+    HopAltSvcSelector? selectHopAltSvc = null,
+    HopCredentialSelector? selectHopCredentials = null)
 {
     /// <summary>The Linux and macOS build's message for a multipart body it cannot rewind for the next hop.</summary>
     public const string CannotRewindMessage = "Cannot rewind mime/post data";
@@ -117,6 +124,14 @@ public sealed class RedirectFollower(
     /// <c>--disallow-username-in-url</c> (BL-626 Notes).
     /// </summary>
     public const string CredentialsInUrlMessage = "URL rejected: Credentials was passed in the URL when prohibited";
+
+    /// <summary>
+    /// The start of curl 8.21.0's <c>-v</c> line for a redirect target it goes on to request, followed
+    /// by the target and a closing <c>'</c>: written once the target parses with a scheme curl knows,
+    /// before the HSTS switch and the <c>--proto-redir</c> and <c>--disallow-username-in-url</c>
+    /// checks, and not when <c>--max-redirs</c> refuses the hop (measured, BL-907 Notes).
+    /// </summary>
+    public const string IssueAnotherRequestMessagePrefix = "Issue another request to this URL: '";
 
     private readonly bool rewindFailsAsReadError = runsOnWindows ?? OperatingSystem.IsWindows();
 
@@ -196,7 +211,7 @@ public sealed class RedirectFollower(
             Rewind(bodyContent, bodyStart, bodyDropped);
             chain.Followed(target);
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
         }
     }
 
@@ -344,8 +359,14 @@ public sealed class RedirectFollower(
             return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false);
         }
 
+        if (!SchemesCurlParses.Contains(next.Scheme))
+        {
+            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false);
+        }
+
+        first.Events.ReportInfo(IssueAnotherRequestMessagePrefix + target + "'");
         next = SwitchedToHttps(ref target, next, first);
-        return SchemeRefusal(next.Scheme, policy);
+        return ProtocolDisabledRefusal(next.Scheme, policy);
     }
 
     /// <summary>
@@ -364,17 +385,10 @@ public sealed class RedirectFollower(
         return CurlUrl.Parse(httpsUrl, first.PathAsIs);
     }
 
-    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? SchemeRefusal(string scheme, RedirectPolicy policy)
-    {
-        if (!SchemesCurlParses.Contains(scheme))
-        {
-            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false);
-        }
-
-        return policy.AllowedSchemes.Contains(scheme) && policy.AllowedTransferSchemes?.Contains(scheme) != false
+    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? ProtocolDisabledRefusal(string scheme, RedirectPolicy policy) =>
+        policy.AllowedSchemes.Contains(scheme) && policy.AllowedTransferSchemes?.Contains(scheme) != false
             ? null
             : (CurlExitCode.UnsupportedProtocol, $"Protocol \"{scheme}\" is disabled (in redirect)", false);
-    }
 
     private static string UnparsableUrlReason(string target)
     {
@@ -494,7 +508,8 @@ public sealed class RedirectFollower(
         bool bodyDropped,
         bool sendCredentials,
         long operationStarted,
-        HopAltSvcSelector? selectHopAltSvc) =>
+        HopAltSvcSelector? selectHopAltSvc,
+        HopCredentialSelector? selectHopCredentials) =>
         new()
         {
             Url = url,
@@ -509,7 +524,7 @@ public sealed class RedirectFollower(
             TimeCondition = first.TimeCondition,
             HeaderOutput = first.HeaderOutput,
             PostData = bodyDropped ? null : first.PostData,
-            Credentials = HopCredentials(first, url, sendCredentials),
+            Credentials = selectHopCredentials is null ? HopCredentials(first, url, sendCredentials) : selectHopCredentials(url),
             TelnetOptions = first.TelnetOptions,
             TftpBlockSize = first.TftpBlockSize,
             TftpNoOptions = first.TftpNoOptions,

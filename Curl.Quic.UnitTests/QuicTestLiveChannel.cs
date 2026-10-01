@@ -1,5 +1,5 @@
+using System.Collections.Concurrent;
 using System.Net;
-using System.Threading.Channels;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Quic;
@@ -7,16 +7,25 @@ namespace Curl.Quic;
 /// <summary>
 /// A datagram channel wired to a <see cref="QuicTestServer" /> that a connection's loop and a
 /// test can use at once: every use of the server is under one lock, and datagrams to receive
-/// queue in a <see cref="Channel{T}" />. A test can make the server stop answering, send it
-/// frames to deliver, queue a datagram from another endpoint, make the next receive fail, or
-/// wait, datagram by datagram, until the server has taken what it expects from the client.
-/// The channel owns the server and disposes it.
+/// queue in a <see cref="ConcurrentQueue{T}" /> counted by a <see cref="SemaphoreSlim" />, so a
+/// receive the loop cancels never takes a datagram with it. A test can make the server stop
+/// answering, send it frames to deliver, queue a datagram from another endpoint, make the next
+/// receive fail, or wait, datagram by datagram, until the server has taken what it expects from
+/// the client. The channel owns the server and disposes it.
 /// </summary>
+/// <remarks>
+/// Not a <c>System.Threading.Channels</c> channel: on .NET 10.0.12 an unbounded channel loses an
+/// item written just after a waiting <c>ReadAsync</c> is cancelled (about 1 in 27,000 such races
+/// under load), and the connection's loop cancels its receive on every wake, so a test whose
+/// server packet was lost waited forever (BL-1067).
+/// </remarks>
 internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChannel
 {
     public static readonly EndPoint ClientAddress = new IPEndPoint(IPAddress.Loopback, 50123);
 
-    private readonly Channel<(byte[]? Datagram, EndPoint From, Exception? Error)> inbound = Channel.CreateUnbounded<(byte[]?, EndPoint, Exception?)>();
+    private readonly ConcurrentQueue<(byte[]? Datagram, EndPoint From, Exception? Error)> inbound = new();
+
+    private readonly SemaphoreSlim inboundCount = new(0);
 
     /// <summary>How long a test waits for the connection's loop to act before it fails rather than hangs; never how long anything is meant to take.</summary>
     public static readonly TimeSpan HangGuard = TimeSpan.FromMinutes(1);
@@ -51,7 +60,7 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
             datagram = server.Protect(QuicPacketType.OneRtt, frames);
         }
 
-        inbound.Writer.TryWrite((datagram, ServerEndPoint, null));
+        Enqueue((datagram, ServerEndPoint, null));
     }
 
     /// <summary>Queues a 1-RTT packet the server protected, as if it came from an endpoint other than the server.</summary>
@@ -63,11 +72,11 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
             datagram = server.Protect(QuicPacketType.OneRtt, frames);
         }
 
-        inbound.Writer.TryWrite((datagram, ClientAddress, null));
+        Enqueue((datagram, ClientAddress, null));
     }
 
     /// <summary>Makes the next receive throw <paramref name="error" />.</summary>
-    public void FailNextReceive(Exception error) => inbound.Writer.TryWrite((null, ServerEndPoint, error));
+    public void FailNextReceive(Exception error) => Enqueue((null, ServerEndPoint, error));
 
     /// <summary>Returns the frames of type <typeparamref name="T" /> the server has taken from the client in 1-RTT packets.</summary>
     public List<T> Sent<T>()
@@ -125,7 +134,7 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
 
         foreach (byte[] answer in answers)
         {
-            inbound.Writer.TryWrite((answer, ServerEndPoint, null));
+            Enqueue((answer, ServerEndPoint, null));
         }
 
         taken.SetResult();
@@ -134,7 +143,10 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
 
     public async ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
-        (byte[]? datagram, EndPoint from, Exception? error) = await inbound.Reader.ReadAsync(cancellationToken);
+        // A wait that is cancelled takes no count, so the datagram stays queued for the next receive.
+        await inboundCount.WaitAsync(cancellationToken);
+        inbound.TryDequeue(out (byte[]? Datagram, EndPoint From, Exception? Error) next);
+        (byte[]? datagram, EndPoint from, Exception? error) = next;
         if (error is not null)
         {
             throw error;
@@ -142,6 +154,13 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
 
         datagram!.CopyTo(buffer);
         return new DatagramReceived(datagram!.Length, from);
+    }
+
+    // Queues a datagram, or a receive failure, for the client, then counts it.
+    private void Enqueue((byte[]? Datagram, EndPoint From, Exception? Error) received)
+    {
+        inbound.Enqueue(received);
+        inboundCount.Release();
     }
 
     /// <summary>Disposes the server too, which the channel owns; what it took from the client stays readable.</summary>

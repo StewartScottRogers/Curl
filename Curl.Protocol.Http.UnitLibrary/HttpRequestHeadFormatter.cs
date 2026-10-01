@@ -43,10 +43,10 @@ internal static class HttpRequestHeadFormatter
     internal const string DefaultUserAgent = "curl/8.21.0";
 
     /// <summary>
-    /// The <c>Accept-Encoding</c> value <c>--compressed</c> sends: curl 8.21.0's without
-    /// <c>zstd</c>, which Curl cannot decode (ADR-0020).
+    /// The <c>Accept-Encoding</c> value <c>--compressed</c> sends: curl 8.21.0's, the same
+    /// four tokens on the Schannel and OpenSSL builds (measured, BL-861 Notes; ADR-0287).
     /// </summary>
-    internal const string AcceptEncoding = "deflate, gzip, br";
+    internal const string AcceptEncoding = "deflate, gzip, br, zstd";
 
     private const string HostName = "Host";
 

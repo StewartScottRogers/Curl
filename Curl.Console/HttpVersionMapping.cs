@@ -13,18 +13,21 @@ internal static class HttpVersionMapping
 {
     /// <summary>
     /// Maps the version option onto the handler's preference: <c>-0</c> to
-    /// <see cref="HttpVersionPreference.Http10" />, <c>--http2-prior-knowledge</c> to
+    /// <see cref="HttpVersionPreference.Http10" />, <c>--http2</c> to
+    /// <see cref="HttpVersionPreference.Http2" />, so a cleartext request asks to upgrade to
+    /// <c>h2c</c> (BL-865) while over TLS ALPN still decides, <c>--http2-prior-knowledge</c> to
     /// <see cref="HttpVersionPreference.Http2PriorKnowledge" />, <c>--http3</c> to
     /// <see cref="HttpVersionPreference.Http3" />, <c>--http3-only</c> to
-    /// <see cref="HttpVersionPreference.Http3Only" /> (ADR-0144), and every other choice, none
-    /// included, to <see cref="HttpVersionPreference.Http11" />: <c>--http2</c> asks for HTTP/2
-    /// only through ALPN, so its request is HTTP/1.1 unless the server picks <c>h2</c>.
+    /// <see cref="HttpVersionPreference.Http3Only" /> (ADR-0144), and <c>--http1.1</c> and no
+    /// version option to <see cref="HttpVersionPreference.Http11" />: curl's default never
+    /// upgrades over cleartext.
     /// </summary>
     /// <param name="version">The command line's <see cref="CommandLineOptions.HttpVersion" />.</param>
     /// <returns>The preference.</returns>
     internal static HttpVersionPreference ToHttpVersionPreference(RequestedHttpVersion? version) => version switch
     {
         RequestedHttpVersion.Http10 => HttpVersionPreference.Http10,
+        RequestedHttpVersion.Http2 => HttpVersionPreference.Http2,
         RequestedHttpVersion.Http2PriorKnowledge => HttpVersionPreference.Http2PriorKnowledge,
         RequestedHttpVersion.Http3 => HttpVersionPreference.Http3,
         RequestedHttpVersion.Http3Only => HttpVersionPreference.Http3Only,

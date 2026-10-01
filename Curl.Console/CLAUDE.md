@@ -12,11 +12,12 @@ calls - no container, no reflection, no assembly scanning, so native AOT sees ev
 type. `Curl.Core.UnitLibrary` dispatches through the `IProtocolHandler` instances it is
 given and must never reference a protocol library directly.
 
-`CurlComposition.CreateTransports` wraps the run's `TcpConnector` in one `PoolingConnector`,
+`CurlComposition.CreateTransports` wraps an option group's `TcpConnector` in one `PoolingConnector`,
 which every TCP handler connects through, so a later URL to the same pool key reuses an
-earlier URL's connection; `TransferDispatch` holds it as the run's `ConnectionPool`, and the
-runner disposes the dispatch, closing the pool without writing anything, once the transfers
-end, whatever their outcome (ADR-0050, BL-334). It also holds the `TcpConnector`'s
+earlier URL's connection; `TransferDispatch` holds it as its `ConnectionPool`. In production the
+connector shares the run's `ConnectionCache`, which the runner closes without writing anything once
+the run's transfers end, whatever their outcome (ADR-0050, BL-334, ADR-0285); a connector made
+without one owns its pool, which disposing the dispatch closes. It also holds the `TcpConnector`'s
 `LoadResolveEntries`, which the runner calls at the start of every URL's transfer, just before
 the `-b` files load, so `-v` prints the `--resolve` entries' `Added ... to DNS cache` lines for
 each URL; a `--retry` attempt and a followed redirect reload nothing, as in curl 8.21.0 (BL-486).
@@ -185,7 +186,11 @@ in a later option group, once the groups before it have run (BL-509).
 The `-:`/`--next` option groups (`CommandLineParseResult.Groups`) run in order, up to and
 including the first with an output option left over (ADR-0126, BL-509). Each group's URLs use
 that group's options through a `TransferDispatch` the factory builds for the group and the runner
-disposes when the group ends, so connections are not yet reused across groups (BL-754).
+disposes when the group ends. Every group's `PoolingConnector` shares the run's one
+`ConnectionCache` (`CurlComposition.CreatePoolingConnector`), keyed on the group's
+`OptionGroupConnectionSettings`, so a later group reuses an earlier group's connection when their
+TLS, proxy TLS and other connection settings are equal, and the runner closes the cache when the
+run ends (ADR-0285, BL-754).
 `%{urlnum}` (`UrlTransfer.UrlNumber`), `%{xfer_id}` and `%{conn_id}` count on across groups, the
 `-v`/trace output stays open for the whole run, `--fail-early` stops every group, and the exit
 code is the last transfer's. Measured on curl 8.21.0 (BL-509 Notes).
@@ -236,7 +241,7 @@ it goes into `HttpRequestOptions.ForwardProxy` with `-p` as `ProxyTunnel`. A CON
 authenticates with the scheme `--proxy-basic`, `--proxy-digest`, `--proxy-ntlm`, `--proxy-negotiate` and `--proxy-anyauth` pick,
 through the same `RankedHttpAuthenticator` the origin uses (`CreateProxyTunnelOptions`, ADR-0186), its contexts from ADR-0142's router through a `LateBoundSecurityContextFactory` bound once the connectors exist (ADR-0270),
 and a forward proxy's `407` is answered with the same pick, which `CreateProtocolHandlers` hands
-the HTTP handler (ADR-0187). Under
+the HTTP handler (ADR-0239). Under
 `--unix-socket` or `--abstract-unix-socket` no proxy is chosen or even parsed, and the group's
 `TcpConnector` dials that socket (`CurlComposition.UnixSocketOf`), as curl 8.21.0 does (ADR-0149, BL-507).
 With `--preproxy` (ADR-0273, BL-614) the environment is not read: `--noproxy` drops both proxies, an
@@ -261,14 +266,17 @@ through the runner's `IDataFileReader` and environment. The URL's percent-decode
 the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; with no entry the
 URL's user and password are sent. A required file that is missing or malformed fails each URL with
 `curl: (26) .netrc error: no such file` or `syntax error` before anything is sent;
-`--netrc-optional` ignores both. A redirect keeps the credentials to the same host and drops them
-to another; curl's per-hop lookup is BL-790. Measured on curl 8.21.0 (BL-505 Notes).
+`--netrc-optional` ignores both. When the file is in use, `TransferCredentialLookup.ForRedirectHops`
+gives `RedirectFollower` the same lookup for each redirect hop's URL, so every hop sends its own
+host's entry or none, `--location-trusted` or not (BL-790). Measured on curl 8.21.0 (BL-505 Notes).
 An `ftp` or `ftps` URL is claimed by `RoutingFtpProtocolHandler`, which hands an `ftp` one to
 the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
 other transfer, `ftps` through an HTTP proxy included (curl 8.21.0 tunnels it with
 `CONNECT host:990`, BL-458), goes to `FtpProtocolHandler` over the pooling connector
-(ADR-0093, BL-434). `CurlComposition.CreateFtpProtocolHandler` builds it with a
+(ADR-0093, BL-434), its passive data connections over `CurlComposition.FtpDataConnectorOf`'s
+`PoolingConnector.Over(TcpConnector.WithoutConnectTimeout())`, which `--connect-timeout` does not
+limit (ADR-0286, BL-797). `CurlComposition.CreateFtpProtocolHandler` builds it with a
 `TcpConnectionListener` for `-P`, the run's TLS provider and DNS resolver, and a
 `SystemNetworkInterfaceLookup` (ADR-0102, ADR-0108, ADR-0110), and `TransferContextFactory`
 copies `-P`, `--disable-eprt`, `--ssl`/`--ssl-reqd` and `--ftp-ssl-control` into the context.

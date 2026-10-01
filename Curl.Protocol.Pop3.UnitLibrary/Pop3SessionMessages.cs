@@ -33,6 +33,31 @@ internal static class Pop3SessionMessages
     internal const string LoginDenied = "Login denied";
 
     /// <summary>
+    /// The <c>-v</c> line written before <see cref="LoginDenied" /> when no way of logging in
+    /// was possible and <c>CAPA</c> listed no SASL mechanism curl knows, or was refused (BL-810).
+    /// </summary>
+    internal const string NoSaslMechanismOffered = "SASL: no auth mechanism was offered or recognized";
+
+    /// <summary>
+    /// The <c>-v</c> line written before <see cref="LoginDenied" /> when no way of logging in
+    /// was possible although <c>CAPA</c> listed a SASL mechanism curl knows (BL-810).
+    /// </summary>
+    internal const string NoSaslMechanismOverlap = "SASL: no overlap between offered and configured auth mechanisms";
+
+    /// <summary>
+    /// The <c>-v</c> line written before <see cref="LoginDenied" /> when the only mechanisms
+    /// offered and allowed are ones curl 8.21.0's Schannel build does not build in, each then
+    /// named by <see cref="SaslMechanismNotBuiltIn" /> (BL-810).
+    /// </summary>
+    internal const string NoSaslMechanismSelectable = "SASL: no auth mechanism offered could be selected";
+
+    /// <summary>
+    /// The <c>-v</c> line naming a mechanism, <c>{0}</c>, that was offered and allowed but is
+    /// not built in, after <see cref="NoSaslMechanismSelectable" /> (BL-810).
+    /// </summary>
+    internal const string SaslMechanismNotBuiltIn = "SASL: {0} not builtin";
+
+    /// <summary>
     /// <c>USER</c> or <c>PASS</c> was refused; <c>{0}</c> is <c>-</c> for <c>-ERR</c>, <c>*</c>
     /// for another <c>+</c> line (exit 67, BL-548).
     /// </summary>

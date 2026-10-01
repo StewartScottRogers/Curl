@@ -37,6 +37,13 @@ public sealed record ConnectionOpenedEvent
     public string? UnixSocketRemoteIp { get; init; }
 
     /// <summary>
+    /// Gets whether the connection is a transfer's second one, such as FTP's passive data
+    /// connection, which curl 8.21.0's <c>-v</c> calls <c>Established 2nd connection</c>
+    /// (measured, BL-944); <see langword="false" />, the default, for every other connection.
+    /// </summary>
+    public bool IsSecondConnection { get; init; }
+
+    /// <summary>
     /// Gets curl's number for the connection, the <c>N</c> of <c>#N</c>.
     /// </summary>
     public required long ConnectionNumber { get; init; }

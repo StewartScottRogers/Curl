@@ -15,7 +15,7 @@ namespace Curl.Tls;
 /// <param name="SubjectPublicKeyInfo">The whole DER <c>SubjectPublicKeyInfo</c>.</param>
 public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveOid, byte[] KeyBits, byte[] SubjectPublicKeyInfo)
 {
-    private const int MinimumLegacyRsaModulusLength = 36 + 11;
+    private const int Pkcs1Type1Overhead = 11;
     private const int MaximumRsaModulusLength = 16384 / 8;
     private const int MaximumRsaExponentBits = 64;
 
@@ -128,41 +128,47 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
         TlsSignatureKind.Ecdsa => VerifyEcdsa(rule.Hash, content, signature),
         TlsSignatureKind.Ed25519 => VerifyEd25519(content, signature),
         TlsSignatureKind.Dsa => VerifyDsa(rule.Hash, content, signature),
+        TlsSignatureKind.Ed448 => VerifyEd448(content, signature),
+        TlsSignatureKind.MlDsa => VerifyMlDsa(content, signature),
         _ => VerifyRsa(rule, content, signature),
     };
 
-    private bool VerifyRsa(TlsSignatureRule rule, byte[] content, byte[] signature) => rule.Kind == TlsSignatureKind.RsaMd5Sha1
-        ? VerifyRsaMd5Sha1(content, signature)
-        : VerifyRsa(rule.Hash, rule.Kind == TlsSignatureKind.RsaPss ? RSASignaturePadding.Pss : RSASignaturePadding.Pkcs1, content, signature);
+    private bool VerifyRsa(TlsSignatureRule rule, byte[] content, byte[] signature) => rule.Kind switch
+    {
+        TlsSignatureKind.RsaMd5Sha1 or TlsSignatureKind.RsaPkcs1Sha224 => VerifyHandBuiltPkcs1(rule.Kind, content, signature),
+        _ => VerifyRsa(rule.Hash, rule.Kind == TlsSignatureKind.RsaPss ? RSASignaturePadding.Pss : RSASignaturePadding.Pkcs1, content, signature),
+    };
 
     /// <summary>
-    /// The BCL verifies PKCS #1 v1.5 only with a DigestInfo, so TLS 1.0 and 1.1's bare MD5
-    /// and SHA-1 block is checked with the public operation s^e mod n, which involves no secret.
+    /// The BCL verifies PKCS #1 v1.5 only with a DigestInfo of a hash it computes, so TLS 1.0
+    /// and 1.1's bare MD5 and SHA-1 block and <c>rsa_pkcs1_sha224</c>'s block are checked with
+    /// the public operation s^e mod n, which involves no secret.
     /// </summary>
-    private bool VerifyRsaMd5Sha1(byte[] content, byte[] signature)
+    private bool VerifyHandBuiltPkcs1(TlsSignatureKind kind, byte[] content, byte[] signature)
     {
         AsnReader key = new AsnReader(KeyBits, AsnEncodingRules.DER).ReadSequence();
         BigInteger modulus = key.ReadInteger();
         BigInteger exponent = key.ReadInteger();
         key.ThrowIfNotEmpty();
         var value = new BigInteger(signature, isUnsigned: true, isBigEndian: true);
-        if (!IsUsableLegacyRsaKey(modulus, exponent) || signature.Length != modulus.GetByteCount(isUnsigned: true) || value >= modulus)
+        if (!IsUsableHandBuiltPkcs1Key(modulus, exponent, TlsSignatureScheme.HandBuiltPkcs1PayloadLength(kind)) || signature.Length != modulus.GetByteCount(isUnsigned: true) || value >= modulus)
         {
             return false;
         }
 
         BigInteger recovered = BigInteger.ModPow(value, exponent, modulus);
-        return recovered == new BigInteger(TlsSignatureScheme.BuildMd5Sha1Block(content, signature.Length), isUnsigned: true, isBigEndian: true);
+        return recovered == new BigInteger(TlsSignatureScheme.BuildHandBuiltPkcs1Block(kind, content, signature.Length), isUnsigned: true, isBigEndian: true);
     }
 
     /// <summary>
-    /// Whether a server's RSA key can carry the MD5 and SHA-1 block (36 bytes and 11 of
-    /// padding) within OpenSSL's limits on the public operation: a modulus of at most
-    /// 16384 bits and an exponent of at most 64 bits.
+    /// Whether a server's RSA key can carry a block of <paramref name="payloadLength" /> bytes
+    /// and 11 of padding within OpenSSL's limits on the public operation: a modulus of at
+    /// most 16384 bits and an exponent of at most 64 bits.
     /// </summary>
-    private static bool IsUsableLegacyRsaKey(BigInteger modulus, BigInteger exponent) =>
+    private static bool IsUsableHandBuiltPkcs1Key(BigInteger modulus, BigInteger exponent, int payloadLength) =>
         modulus.Sign > 0
-        && modulus.GetByteCount(isUnsigned: true) is >= MinimumLegacyRsaModulusLength and <= MaximumRsaModulusLength
+        && modulus.GetByteCount(isUnsigned: true) >= payloadLength + Pkcs1Type1Overhead
+        && modulus.GetByteCount(isUnsigned: true) <= MaximumRsaModulusLength
         && exponent.Sign > 0
         && exponent.GetBitLength() <= MaximumRsaExponentBits;
 
@@ -185,7 +191,7 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
     {
         using ECDsa ecdsa = ECDsa.Create();
         ecdsa.ImportSubjectPublicKeyInfo(SubjectPublicKeyInfo, out _);
-        return ecdsa.VerifyData(content, signature, hash, DSASignatureFormat.Rfc3279DerSequence);
+        return ecdsa.VerifyHash(Cryptography.DsaSignature.HashData(content, hash), signature, DSASignatureFormat.Rfc3279DerSequence);
     }
 
     /// <summary>
@@ -203,7 +209,7 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
         }
 
         byte[]? rs = DecodeDerSignature(signature, Cryptography.BrainpoolEcdsa.GetSignatureLength(curve) / 2);
-        return rs is not null && Cryptography.BrainpoolEcdsa.VerifyHash(curve, KeyBits, CryptographicOperations.HashData(hash, content), rs);
+        return rs is not null && Cryptography.BrainpoolEcdsa.VerifyHash(curve, KeyBits, Cryptography.DsaSignature.HashData(content, hash), rs);
     }
 
     /// <summary>
@@ -277,5 +283,36 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
         }
 
         return signature.Length == Cryptography.Ed25519.SignatureSize && Cryptography.Ed25519.Verify(KeyBits, content, signature);
+    }
+
+    private bool VerifyEd448(byte[] content, byte[] signature)
+    {
+        if (KeyBits.Length != Cryptography.Ed448.PublicKeySize)
+        {
+            throw new CryptographicException("An Ed448 public key is 57 bytes.");
+        }
+
+        return signature.Length == Cryptography.Ed448.SignatureSize && Cryptography.Ed448.Verify(KeyBits, content, signature);
+    }
+
+    /// <summary>
+    /// Checks a pure ML-DSA signature with an empty context (draft-ietf-tls-mldsa) with the
+    /// hand-built <see cref="Cryptography.MlDsa" />; the key's OID names the parameter set and
+    /// its bit string is the raw public key (RFC 9881).
+    /// </summary>
+    private bool VerifyMlDsa(byte[] content, byte[] signature)
+    {
+        Cryptography.MlDsaParameterSet parameterSet = AlgorithmOid switch
+        {
+            TlsSignatureScheme.MlDsa44Oid => Cryptography.MlDsaParameterSet.MlDsa44,
+            TlsSignatureScheme.MlDsa65Oid => Cryptography.MlDsaParameterSet.MlDsa65,
+            _ => Cryptography.MlDsaParameterSet.MlDsa87,
+        };
+        if (KeyBits.Length != Cryptography.MlDsa.GetPublicKeySize(parameterSet))
+        {
+            throw new CryptographicException("An ML-DSA public key is its parameter set's length.");
+        }
+
+        return signature.Length == Cryptography.MlDsa.GetSignatureSize(parameterSet) && Cryptography.MlDsa.VerifyData(parameterSet, KeyBits, content, [], signature);
     }
 }

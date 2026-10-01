@@ -38,6 +38,7 @@ public sealed class HttpRequestOptionsTests
         Assert.IsNull(options.AwsSigV4);
         Assert.IsNull(options.ForwardProxy);
         Assert.IsFalse(options.ProxyTunnel);
+        Assert.IsFalse(options.OverUnixSocket);
     }
 
     [TestMethod]
@@ -73,6 +74,7 @@ public sealed class HttpRequestOptionsTests
             AwsSigV4 = "aws:amz",
             ForwardProxy = proxy,
             ProxyTunnel = true,
+            OverUnixSocket = true,
         };
 
         Assert.AreEqual("PATCH", options.CustomMethod);
@@ -98,6 +100,7 @@ public sealed class HttpRequestOptionsTests
         Assert.AreEqual("aws:amz", options.AwsSigV4);
         Assert.AreSame(proxy, options.ForwardProxy);
         Assert.IsTrue(options.ProxyTunnel);
+        Assert.IsTrue(options.OverUnixSocket);
     }
 
     [TestMethod]

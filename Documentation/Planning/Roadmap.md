@@ -243,7 +243,8 @@ missing, so the drop-in claim becomes defensible.
 
 Work that is agreed in principle but not yet sequenced.
 
-- `--compressed` advertising `zstd`. The hand-built Zstandard decoder exists in
-  `Curl.Zstandard` (BL-857 to BL-860); until BL-861 wires it into HTTP,
-  `--compressed` sends `Accept-Encoding: deflate, gzip, br`; see
-  [ADR-0020](Decisions/ADR-0020-compressed-advertises-deflate-gzip-and-br-until-a-zstd-decoder-exists.md).
+Nothing at present. The last item, `--compressed` advertising `zstd`, is done: the
+hand-built Zstandard decoder in `Curl.Zstandard` (BL-857 to BL-860) decodes
+`Content-Encoding: zstd`, and `--compressed` sends `Accept-Encoding: deflate, gzip, br, zstd`
+(BL-861); see
+[ADR-0287](Decisions/ADR-0287-compressed-advertises-and-decodes-zstd.md).

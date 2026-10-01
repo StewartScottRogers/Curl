@@ -79,6 +79,35 @@ public sealed class TlsSignatureTests
     }
 
     [TestMethod]
+    public void AnEd448KeySignsOnlyTheEd448SchemeAndIsFiftySevenBytes()
+    {
+        Ed448TlsSigningKey key = new(new byte[57]);
+
+        Assert.IsTrue(key.CanSign(TlsSignatureScheme.Ed448));
+        Assert.IsFalse(key.CanSign(TlsSignatureScheme.Ed25519));
+        Assert.IsFalse(key.CanSign(TlsSignatureScheme.MlDsa44));
+        Assert.IsFalse(key.CanSign(TlsSignatureScheme.EcdsaSecp256r1Sha256));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new Ed448TlsSigningKey(new byte[32]));
+    }
+
+    [TestMethod]
+    [DataRow(Cryptography.MlDsaParameterSet.MlDsa44, TlsSignatureScheme.MlDsa44)]
+    [DataRow(Cryptography.MlDsaParameterSet.MlDsa65, TlsSignatureScheme.MlDsa65)]
+    [DataRow(Cryptography.MlDsaParameterSet.MlDsa87, TlsSignatureScheme.MlDsa87)]
+    public void AnMlDsaKeySignsOnlyItsParameterSetsScheme(Cryptography.MlDsaParameterSet parameterSet, int scheme)
+    {
+        using Cryptography.MlDsa mlDsa = Cryptography.MlDsa.GenerateKey(parameterSet, new byte[32]);
+        MlDsaTlsSigningKey key = new(mlDsa);
+        ushort[] others = [TlsSignatureScheme.MlDsa44, TlsSignatureScheme.MlDsa65, TlsSignatureScheme.MlDsa87, TlsSignatureScheme.Ed448, TlsSignatureScheme.Ed25519, TlsSignatureScheme.RsaPssRsaeSha256];
+
+        Assert.IsTrue(key.CanSign((ushort)scheme));
+        foreach (ushort other in others.Where(other => other != scheme))
+        {
+            Assert.IsFalse(key.CanSign(other), $"0x{other:x4}");
+        }
+    }
+
+    [TestMethod]
     public void AnEd25519KeyIsThirtyTwoBytes() =>
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new Ed25519TlsSigningKey(new byte[31]));
 
@@ -114,6 +143,59 @@ public sealed class TlsSignatureTests
         TlsCertificatePublicKey key = TlsCertificatePublicKey.Read(TestServerCredential.Ed25519().Certificate)!;
 
         Assert.AreEqual(TlsAlertDescription.DecryptError, key.VerifySignature(TlsSignatureScheme.Ed25519, [1], new byte[63]));
+    }
+
+    [TestMethod]
+    [DataRow(TlsSignatureScheme.MlDsa44)]
+    [DataRow(TlsSignatureScheme.MlDsa65)]
+    [DataRow(TlsSignatureScheme.MlDsa87)]
+    [DataRow(TlsSignatureScheme.EcdsaBrainpoolP256r1Tls13Sha256)]
+    [DataRow(TlsSignatureScheme.EcdsaBrainpoolP384r1Tls13Sha384)]
+    [DataRow(TlsSignatureScheme.EcdsaBrainpoolP512r1Tls13Sha512)]
+    public void MlDsaAndTheBrainpoolTls13SchemesAreTlsOneThreeOnly(int scheme)
+    {
+        Assert.IsTrue(TlsSignatureScheme.IsCertificateVerifyScheme((ushort)scheme));
+        Assert.IsFalse(TlsSignatureScheme.IsTls12Scheme((ushort)scheme));
+    }
+
+    [TestMethod]
+    public void AnEd448KeyOfTheWrongLengthIsABadCertificateAndASignatureOfTheWrongLengthADecryptError()
+    {
+        TlsCertificatePublicKey shortKey = new(TlsSignatureScheme.Ed448Oid, null, new byte[56], []);
+        TlsCertificatePublicKey key = new(TlsSignatureScheme.Ed448Oid, null, new byte[57], []);
+
+        Assert.AreEqual(TlsAlertDescription.BadCertificate, shortKey.VerifySignature(TlsSignatureScheme.Ed448, [1], new byte[114]));
+        Assert.AreEqual(TlsAlertDescription.DecryptError, key.VerifySignature(TlsSignatureScheme.Ed448, [1], new byte[113]));
+    }
+
+    [TestMethod]
+    [DataRow(TlsSignatureScheme.MlDsa44, TlsSignatureScheme.MlDsa44Oid, 1312, 2420)]
+    [DataRow(TlsSignatureScheme.MlDsa65, TlsSignatureScheme.MlDsa65Oid, 1952, 3309)]
+    [DataRow(TlsSignatureScheme.MlDsa87, TlsSignatureScheme.MlDsa87Oid, 2592, 4627)]
+    public void AnMlDsaKeyOfTheWrongLengthIsABadCertificateAndASignatureOfTheWrongLengthADecryptError(int scheme, string algorithmOid, int keyLength, int signatureLength)
+    {
+        TlsCertificatePublicKey shortKey = new(algorithmOid, null, new byte[keyLength - 1], []);
+        TlsCertificatePublicKey key = new(algorithmOid, null, new byte[keyLength], []);
+
+        Assert.AreEqual(TlsAlertDescription.BadCertificate, shortKey.VerifySignature((ushort)scheme, [1], new byte[signatureLength]));
+        Assert.AreEqual(TlsAlertDescription.DecryptError, key.VerifySignature((ushort)scheme, [1], new byte[signatureLength - 1]));
+    }
+
+    [TestMethod]
+    public void AnMlDsaSchemeForAnotherParameterSetIsAnIllegalParameter()
+    {
+        TlsCertificatePublicKey key = new(TlsSignatureScheme.MlDsa44Oid, null, new byte[1312], []);
+
+        Assert.AreEqual(TlsAlertDescription.IllegalParameter, key.VerifySignature(TlsSignatureScheme.MlDsa65, [1], new byte[3309]));
+    }
+
+    [TestMethod]
+    public void ABrainpoolTls13SchemeForAnotherCurveIsAnIllegalParameter()
+    {
+        TlsCertificatePublicKey key = TlsCertificatePublicKey.Read(TestServerCredential.Brainpool(Cryptography.BrainpoolCurve.BrainpoolP256r1, TlsSignatureScheme.BrainpoolP256r1Oid, TlsSignatureScheme.EcdsaBrainpoolP256r1Tls13Sha256).Certificate)!;
+
+        Assert.AreEqual(TlsAlertDescription.IllegalParameter, key.VerifySignature(TlsSignatureScheme.EcdsaBrainpoolP384r1Tls13Sha384, [1], [1]));
+        Assert.AreEqual(TlsAlertDescription.IllegalParameter, key.VerifySignature(TlsSignatureScheme.EcdsaSecp256r1Sha256, [1], [1]));
     }
 
     [TestMethod]

@@ -196,6 +196,20 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    public void TryGetVariableText_UnixSocketConnection_PrintsItsRemoteIpAndNoPorts()
+    {
+        // curl --unix-socket "C:\Users\Stewart Rogers\AppData\Local\Temp\bl793.sock"
+        // -w "[%{remote_ip}|%{remote_port}|%{local_ip}|%{local_port}]" http://x/ printed
+        // "[C:\Users\Stewart Rogers\AppData\Local\Temp\bl|-1||-1]" (BL-793 Notes).
+        TransferWriteOutVariables variables = WithReport(new TransferReport { UnixSocketRemoteIp = @"C:\Users\Stewart Rogers\AppData\Local\Temp\bl" });
+
+        Assert.AreEqual(@"C:\Users\Stewart Rogers\AppData\Local\Temp\bl", Get(variables, "remote_ip"));
+        Assert.AreEqual("-1", Get(variables, "remote_port"));
+        Assert.AreEqual(string.Empty, Get(variables, "local_ip"));
+        Assert.AreEqual("-1", Get(variables, "local_port"));
+    }
+
+    [TestMethod]
     public void TryGetVariableText_NoEndPoints_PrintsLocalPortMinusOne()
     {
         // curl -s -w "..." ftp://127.0.0.1:47518/f against a closed port printed " -1  -1" (BL-515 Notes).

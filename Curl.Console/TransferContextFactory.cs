@@ -182,6 +182,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             MaxTime = options.MaxTime,
             OperationStarted = OperationStartedOf(maxTimeWatchdog),
             TimeCondition = options.TimeCondition,
+            RemoteTime = options.RemoteTime,
             Proxy = proxy,
             Http = HttpOptionsWithAltSvc(
                 url,

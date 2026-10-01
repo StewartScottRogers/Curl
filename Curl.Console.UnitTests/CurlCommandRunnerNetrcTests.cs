@@ -415,6 +415,64 @@ public sealed class CurlCommandRunnerNetrcTests
         Assert.AreEqual(carried, requests[1].Contains("Authorization:", StringComparison.Ordinal));
     }
 
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task RunAsync_RedirectToAHostWithItsOwnEntry_SendsThatEntry(bool locationTrusted)
+    {
+        // curl -n -L (and --location-trusted) from 127.0.0.1 to localhost with entries for both:
+        // the second hop sends Basic bHU6bHA= (lu:lp), measured in BL-505.
+        dataFiles.Files["home/.netrc"] = Encoding.UTF8.GetBytes(Entry + "machine localhost login lu password lp\n");
+
+        string[] requests = await RunRedirectedToLocalhostAsync(locationTrusted ? ["--location-trusted"] : []);
+
+        Assert.AreEqual(
+            "/b HTTP/1.1\r\nHost: localhost:18505\r\nAuthorization: Basic bHU6bHA=\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            requests[1]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TrustedRedirectToAHostWithoutAnEntry_SendsNoCredentials()
+    {
+        // curl -n --location-trusted from 127.0.0.1 to localhost with no localhost entry: the
+        // second hop sends no Authorization, measured in BL-505.
+        dataFiles.Files["home/.netrc"] = Encoding.UTF8.GetBytes(Entry);
+
+        string[] requests = await RunRedirectedToLocalhostAsync(["--location-trusted"]);
+
+        Assert.AreEqual(
+            "/b HTTP/1.1\r\nHost: localhost:18505\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            requests[1]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TrustedRedirectWithAUserOption_CarriesItAndReadsNoNetrc()
+    {
+        // -u with a user name wins over -n, so --location-trusted carries it to localhost.
+        dataFiles.Files["home/.netrc"] = Encoding.UTF8.GetBytes(Entry + "machine localhost login lu password lp\n");
+
+        string[] requests = await RunRedirectedToLocalhostAsync(["--location-trusted", "-u", "q:r"]);
+
+        Assert.Contains("Authorization: Basic cTpy\r\n", requests[1]);
+        Assert.IsEmpty(dataFiles.PathsRead);
+    }
+
+    private async Task<string[]> RunRedirectedToLocalhostAsync(string[] options)
+    {
+        ScriptedConnector server = new(
+        [
+            Encoding.Latin1.GetBytes("HTTP/1.1 302 Found\r\nLocation: http://localhost:18505/b\r\nContent-Length: 0\r\n\r\n"),
+            Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"),
+        ]);
+
+        int exitCode = await RunAsync(["-s", "-S", "-n", "-L", .. options, Url], handler: HttpOver(server));
+
+        Assert.AreEqual(0, exitCode);
+        string[] requests = Encoding.Latin1.GetString(server.Written).Split("GET ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests);
+        return requests;
+    }
+
     private static HttpProtocolHandler HttpOver(ScriptedConnector server) =>
         new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
 

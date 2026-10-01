@@ -77,6 +77,40 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
     }
 
     [TestMethod]
+    public async Task RunAsync_DataConnectStillRunningPastTheConnectTimeout_RunsOnUntilTheSystemGivesUp()
+    {
+        // curl -v --disable-epsv --no-ftp-skip-pasv-ip --connect-timeout 1 ftp://127.0.0.1:47911/f.txt,
+        // PASV naming 10.255.255.1 port 1025, measured 2026-09-30 (BL-797 Notes): --connect-timeout
+        // does not end the data connect; Windows gives up after 21 s and curl ends with exit 28.
+        ScriptedFtpConnector control = new([LoggedIn + "227 Entering Passive Mode (10,255,255,1,4,1)\r\n"]);
+        TaskCompletionSource<ConnectResult> systemGivesUp = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        GatedDataConnector data = new(systemGivesUp.Task);
+        Task<int> run = Run(
+            control,
+            data,
+            "-sS",
+            "--disable-epsv",
+            "--no-ftp-skip-pasv-ip",
+            "--connect-timeout",
+            "1",
+            "ftp://127.0.0.1:47911/f.txt");
+        await data.Dialling;
+
+        clock.Advance(TimeSpan.FromSeconds(20));
+        bool endedByTheConnectTimeout = run.IsCompleted;
+        systemGivesUp.SetResult(ConnectResult.Failed(
+            CurlExitCode.OperationTimedOut,
+            "Failed to connect to 10.255.255.1:1025 after 21125 ms: Could not connect to server"));
+        int exitCode = await run;
+
+        Assert.IsFalse(endedByTheConnectTimeout);
+        Assert.AreEqual((int)CurlExitCode.OperationTimedOut, exitCode);
+        Assert.AreEqual(
+            "curl: (28) Failed to connect to 127.0.0.1:47911 via 10.255.255.1:1025 after 21125 ms: Could not connect to server" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_RetrieveStalledMidwayAtMaxTime_EndsWithTheBytesReceivedOutOfTheSize()
     {
         ScriptedFtpConnector connector = new(
@@ -93,14 +127,24 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
     /// <summary>Runs <paramref name="arguments" /> and advances the clock by <paramref name="wait" /> once the server has stalled.</summary>
     private async Task<int> RunUntilStalledAsync(ScriptedFtpConnector connector, TimeSpan wait, params string[] arguments)
     {
+        Task<int> run = Run(connector, ftpDataConnector: null, arguments);
+        await connector.Stalled;
+        clock.Advance(wait);
+        return await run;
+    }
+
+    /// <summary>Starts <paramref name="arguments" />, the FTP data connections through <paramref name="ftpDataConnector" /> when given.</summary>
+    private Task<int> Run(IConnector connector, IConnector? ftpDataConnector, params string[] arguments)
+    {
         InMemoryFileSystem files = new();
         TransferDispatch dispatch = new(
             new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
                 connector,
                 new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
                 new PassThroughTlsProvider(),
-                new LoopbackDnsResolver())));
-        Task<int> run = new CurlCommandRunner(
+                new LoopbackDnsResolver(),
+                ftpDataConnector: ftpDataConnector)));
+        return new CurlCommandRunner(
                 _ => dispatch,
                 files,
                 files,
@@ -110,9 +154,23 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
                 runsOnWindows: false,
                 timeProvider: clock)
             .RunAsync(arguments);
-        await connector.Stalled;
-        clock.Advance(wait);
-        return await run;
+    }
+
+    /// <summary>
+    /// A data connector whose connect waits for <paramref name="outcome" />, as a dial the system
+    /// is still retrying does; <see cref="Dialling" /> completes once it has been asked.
+    /// </summary>
+    private sealed class GatedDataConnector(Task<ConnectResult> outcome) : IConnector
+    {
+        private readonly TaskCompletionSource dialling = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Dialling => dialling.Task;
+
+        public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
+        {
+            dialling.TrySetResult();
+            return await outcome.WaitAsync(cancellationToken);
+        }
     }
 
     /// <summary>

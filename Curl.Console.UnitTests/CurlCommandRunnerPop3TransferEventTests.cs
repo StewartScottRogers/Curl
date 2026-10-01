@@ -77,6 +77,24 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
     }
 
     [TestMethod]
+    public async Task RunAsync_VerboseLoginWithNoMechanism_WritesTheSaslLineAndClosesWithExit67()
+    {
+        // Recorded on 2026-09-30 with -Pop3Reply 'GREETING=+OK POP3 ready','CAPA=+OK\r\nTOP\r\n.' (BL-810 Notes).
+        const string greeting = "+OK POP3 ready\r\n";
+        const string capaReply = "+OK\r\nTOP\r\n.\r\n";
+
+        int exitCode = await RunAsync(["-sv"], 18411, 49971, [greeting, capaReply]);
+
+        Assert.AreEqual(67, exitCode);
+        Assert.AreEqual(
+            Opened(18411, 49971, greeting)
+            + Headers("< ", capaReply)
+            + "* SASL: no auth mechanism was offered or recognized" + InfoEnd
+            + "* closing connection #0" + InfoEnd,
+            Encoding.ASCII.GetString(standardError.ToArray()));
+    }
+
+    [TestMethod]
     public async Task RunAsync_VerboseRetrWithStls_WritesTheSessionLinesAroundTheUpgrade()
     {
         // curl also writes two "schannel:" lines and a second "Established connection" line

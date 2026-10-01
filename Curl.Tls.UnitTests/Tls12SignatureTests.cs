@@ -71,6 +71,88 @@ public sealed class Tls12SignatureTests
     }
 
     [TestMethod]
+    public void AnRsaKeyWhosePrivateParametersCannotBeExportedCannotSignRsaPkcs1Sha224()
+    {
+        using NonExportableRsa rsa = new();
+
+        Assert.IsFalse(new RsaTlsSigningKey(rsa).CanSign(TlsSignatureScheme.FindTls12Rule(TlsSignatureScheme.RsaPkcs1Sha224)));
+    }
+
+    [TestMethod]
+    public void TheSha224SchemesAreTlsOneTwoOnlyAndEd448IsBoth()
+    {
+        Assert.IsTrue(TlsSignatureScheme.IsTls12Scheme(TlsSignatureScheme.RsaPkcs1Sha224));
+        Assert.IsTrue(TlsSignatureScheme.IsTls12Scheme(TlsSignatureScheme.EcdsaSha224));
+        Assert.IsFalse(TlsSignatureScheme.IsCertificateVerifyScheme(TlsSignatureScheme.RsaPkcs1Sha224));
+        Assert.IsFalse(TlsSignatureScheme.IsCertificateVerifyScheme(TlsSignatureScheme.EcdsaSha224));
+        Assert.IsTrue(TlsSignatureScheme.IsTls12Scheme(TlsSignatureScheme.Ed448));
+        Assert.IsTrue(TlsSignatureScheme.IsCertificateVerifyScheme(TlsSignatureScheme.Ed448));
+    }
+
+    [TestMethod]
+    public void TheRsaPkcs1Sha224BlockIsTypeOnePaddingAroundTheSha224DigestInfo()
+    {
+        byte[] digestInfo = Convert.FromHexString("302d300d06096086480165030402040500041c" + "23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7");
+
+        byte[] block = TlsSignatureScheme.BuildHandBuiltPkcs1Block(TlsSignatureKind.RsaPkcs1Sha224, "abc"u8.ToArray(), 64);
+
+        Assert.AreEqual(0, block[0]);
+        Assert.AreEqual(1, block[1]);
+        Assert.AreEqual(0xff, block[2]);
+        Assert.AreEqual(0, block[64 - 47 - 1]);
+        CollectionAssert.AreEqual(digestInfo, block[^47..]);
+        Assert.AreEqual(47, TlsSignatureScheme.HandBuiltPkcs1PayloadLength(TlsSignatureKind.RsaPkcs1Sha224));
+    }
+
+    [TestMethod]
+    public void AnRsaPkcs1Sha224SignatureVerifiesAndAFlippedByteIsADecryptError()
+    {
+        TestServerCredential credential = TestServerCredential.Rsa(TlsSignatureScheme.RsaPkcs1Sha256);
+        TlsSignatureRule rule = TlsSignatureScheme.FindTls12Rule(TlsSignatureScheme.RsaPkcs1Sha224)!;
+        TlsCertificatePublicKey key = TlsCertificatePublicKey.Read(credential.Certificate)!;
+
+        byte[] signature = credential.SigningKey.SignByRule(rule, Content);
+        byte[] flipped = [.. signature];
+        flipped[^1] ^= 0x01;
+
+        Assert.IsNull(key.VerifySignature(rule, Content, signature));
+        Assert.AreEqual(TlsAlertDescription.DecryptError, key.VerifySignature(rule, Content, flipped));
+    }
+
+    [TestMethod]
+    public void AnRsaKeyTooShortForTheSha224DigestInfoIsADecryptError()
+    {
+        byte[] modulus = new byte[57];
+        modulus[0] = 0xc0;
+        modulus[^1] = 0x01;
+        AsnWriter writer = new(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            writer.WriteInteger(new BigInteger(modulus, isUnsigned: true, isBigEndian: true));
+            writer.WriteInteger(65537);
+        }
+
+        TlsCertificatePublicKey key = new(TlsSignatureScheme.RsaEncryptionOid, null, writer.Encode(), []);
+
+        Assert.AreEqual(TlsAlertDescription.DecryptError, key.VerifySignature(TlsSignatureScheme.FindTls12Rule(TlsSignatureScheme.RsaPkcs1Sha224), Content, new byte[57]));
+    }
+
+    [TestMethod]
+    public void AnEcdsaSha224SignatureVerifiesAndAFlippedByteIsADecryptError()
+    {
+        TestServerCredential credential = TestServerCredential.Ecdsa(ECCurve.NamedCurves.nistP384, TlsSignatureScheme.EcdsaSecp384r1Sha384);
+        TlsSignatureRule rule = TlsSignatureScheme.FindTls12Rule(TlsSignatureScheme.EcdsaSha224)!;
+        TlsCertificatePublicKey key = TlsCertificatePublicKey.Read(credential.Certificate)!;
+
+        byte[] signature = credential.SigningKey.SignByRule(rule, Content);
+        byte[] flipped = [.. signature];
+        flipped[^1] ^= 0x01;
+
+        Assert.IsNull(key.VerifySignature(rule, Content, signature));
+        Assert.AreEqual(TlsAlertDescription.DecryptError, key.VerifySignature(rule, Content, flipped));
+    }
+
+    [TestMethod]
     public void AnRsaKeyCertifiedAsPssCannotSignTheLegacyBlock()
     {
         using RSA rsa = RSA.Create(2048);

@@ -42,6 +42,48 @@ public sealed class CurlCommandRunnerHttp3Tests
     }
 
     [TestMethod]
+    public async Task RunAsync_Http3OnlyVerboseInclude_WritesCurlsLinesAndHttpVersion3()
+    {
+        // curl -s -v -i --http3-only https://cloudflare-quic.com/ -o out -w '%{http_version}\n' with
+        // curl.se's ngtcp2 build (BL-734 Notes): from "using HTTP/3" to "left intact" the lines are
+        // the transfer's own; the connect and TLS lines before them come from the QUIC dialer.
+        ScriptedMultiplexedStream stream = new(0, Http3Response("hello", ("content-type", "text/html"), ("server", "cloudflare")));
+        ScriptedMultiplexedConnection quic = new(stream) { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 18443) };
+        ScriptedQuicConnector connector = new(MultiplexedConnectResult.Connected(quic, null), new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
+
+        (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, "-s", "-v", "-i", "--http3-only", "-w", "%{http_version}\n", HttpsUrl);
+
+        Assert.AreEqual(0, exitCode, standardError);
+        Assert.AreEqual("HTTP/3 200 \r\ncontent-length: 5\r\ncontent-type: text/html\r\nserver: cloudflare\r\n\r\nhello3\n", standardOutput);
+        // The header lines keep their CR LF and Windows' text mode adds a CR before each line
+        // feed, so every CR is dropped to compare the same text on every platform.
+        string verbose = standardError.Replace("\r", string.Empty, StringComparison.Ordinal);
+        Assert.AreEqual(
+            "* using HTTP/3\n"
+            + "* [HTTP/3] [0] OPENED stream for https://localhost:18443/q\n"
+            + "* [HTTP/3] [0] [:method: GET]\n"
+            + "* [HTTP/3] [0] [:scheme: https]\n"
+            + "* [HTTP/3] [0] [:authority: localhost:18443]\n"
+            + "* [HTTP/3] [0] [:path: /q]\n"
+            + "* [HTTP/3] [0] [user-agent: curl/8.21.0]\n"
+            + "* [HTTP/3] [0] [accept: */*]\n"
+            + "> GET /q HTTP/3\n"
+            + "> Host: localhost:18443\n"
+            + "> User-Agent: curl/8.21.0\n"
+            + "> Accept: */*\n"
+            + "> \n"
+            + "* Request completely sent off\n"
+            + "< HTTP/3 200 \n"
+            + "< content-length: 5\n"
+            + "< content-type: text/html\n"
+            + "< server: cloudflare\n"
+            + "< \n"
+            + "{ [5 bytes data]\n"
+            + "* Connection #0 to host localhost:18443 left intact\n",
+            verbose[verbose.IndexOf("* using HTTP/3", StringComparison.Ordinal)..]);
+    }
+
+    [TestMethod]
     public async Task RunAsync_Http3AndQuicFails_FallsBackToTcp()
     {
         ScriptedConnector tcp = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")]);
@@ -110,11 +152,15 @@ public sealed class CurlCommandRunnerHttp3Tests
     }
 
     /// <summary>A response on the request stream: a 200 head with the body's length, then the body.</summary>
-    private static byte[] Http3Response(string body)
+    private static byte[] Http3Response(string body, params (string Name, string Value)[] headers)
     {
         byte[] head = new QpackEncoder(0, 0).EncodeFieldSection(
             0,
-            [new HeaderField(":status", "200"), new HeaderField("content-length", body.Length.ToString(System.Globalization.CultureInfo.InvariantCulture))]);
+            [
+                new HeaderField(":status", "200"),
+                new HeaderField("content-length", body.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                .. headers.Select(header => new HeaderField(header.Name, header.Value)),
+            ]);
         return [.. new Http3HeadersFrame(head).ToBytes(), .. new Http3DataFrame(Encoding.Latin1.GetBytes(body)).ToBytes()];
     }
 

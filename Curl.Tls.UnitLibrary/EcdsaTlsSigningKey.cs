@@ -4,7 +4,8 @@ namespace Curl.Tls;
 
 /// <summary>
 /// An ECDSA key on P-256, P-384 or P-521 that signs with the <c>ecdsa_*</c> scheme of its
-/// curve, or in TLS 1.2 and below with any <c>ecdsa_*</c> hash, SHA-1 included.
+/// curve, or in TLS 1.2 and below with any <c>ecdsa_*</c> hash, SHA-1 and SHA-224 included
+/// (SHA-224 hashed by <c>Curl.Cryptography</c>, since the BCL does not compute it).
 /// </summary>
 public sealed class EcdsaTlsSigningKey : TlsSigningKey
 {
@@ -24,5 +25,5 @@ public sealed class EcdsaTlsSigningKey : TlsSigningKey
         rule.Kind == TlsSignatureKind.Ecdsa && (rule.CurveOid is null || rule.CurveOid == curveOid);
 
     private protected override byte[] Sign(TlsSignatureRule rule, byte[] content) =>
-        key.SignData(content, rule.Hash, DSASignatureFormat.Rfc3279DerSequence);
+        key.SignHash(Cryptography.DsaSignature.HashData(content, rule.Hash), DSASignatureFormat.Rfc3279DerSequence);
 }

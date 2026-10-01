@@ -9,7 +9,8 @@ HTTP/1.0, HTTP/1.1, HTTP/2 and HTTP/3. Also serves ipfs and ipns, which curl rew
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and, of the
 hand-built libraries ADR-0120 lets a protocol use, `Curl.Http2.UnitLibrary` (HPACK and
 the HTTP/2 frame layer) and `Curl.Http3.UnitLibrary` (QPACK and the HTTP/3 frame layer,
-allowed by BL-668); nothing else horizontal. Never `Curl.Quic.UnitLibrary`: QUIC arrives
+allowed by BL-668) and `Curl.Zstandard.UnitLibrary` (the Zstandard decoder behind
+`Content-Encoding: zstd`, BL-861, ADR-0287); nothing else horizontal. Never `Curl.Quic.UnitLibrary`: QUIC arrives
 as an `IMultiplexedConnection` from the connector. Referencing another protocol library
 is a build break, and `Curl.Protocol.Abstractions.UnitTests` fails if one appears.
 

@@ -46,7 +46,12 @@ recorder, which has no KDC:
    forwarded ticket-granting ticket (ADR-0210) and the initial token carries the delegation
    flag and a `KRB-CRED`; a ticket-granting ticket that is not forwardable, or any failure to
    forward it, sends no delegation, as MIT drops the flag when `krb5_fwd_tgt_creds` fails.
-   SASL passes no level yet (BL-874).
+6. SASL GSSAPI (SMTP, POP3, IMAP) asks its Kerberos context for the `--delegation` level too, as
+   curl's GSS-API build passes `CURLOPT_GSSAPI_DELEGATION` to `gss_init_sec_context` for SASL
+   (BL-874). The level is per option group like the service names, so it rides on
+   `SaslAuthenticator.GssapiDelegation`, which `CurlComposition` sets from the group's
+   `NegotiateOptions`, not on `SaslRequest`; SASL NTLM never delegates. On Windows the router
+   still clears it (rule 3).
 
 ## Consequences
 
@@ -64,3 +69,6 @@ recorder, which has no KDC:
   build does not, and a drop-in replacement must not delegate where curl does not.
 - **Add the names to `HttpAuthRequest`.** Rejected: they are per option group, not per request,
   and the authenticator is already built per group; it would widen a shared contract for nothing.
+- **Add the level to `SaslRequest` and `MailRequestOptions` (BL-874).** Rejected for the same
+  reason: the SMTP, POP3 and IMAP handlers would each copy a value they never read into every
+  request, when the SASL authenticator is already built per group.

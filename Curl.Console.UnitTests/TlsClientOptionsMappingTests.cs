@@ -374,6 +374,15 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
+    public void ProxyFromCommandLine_NoAlpn_TurnsTheProxysAlpnOff()
+    {
+        // curl -v --no-alpn --proxy-insecure -x https://... http://... prints no ALPN line for the
+        // proxy on both builds (curl 8.21.0, measured, BL-753).
+        Assert.AreEqual(new TlsClientOptions(UseAlpn: false), MapProxy("--no-alpn", Url));
+        Assert.IsTrue(MapProxy(Url).UseAlpn);
+    }
+
+    [TestMethod]
     public void ProxyFromCommandLine_ProxyCaNativeAndProxySslAllowBeast_ChangeNothing()
     {
         Assert.AreEqual(new TlsClientOptions(), MapProxy("--proxy-ca-native", "--proxy-ssl-allow-beast", Url));

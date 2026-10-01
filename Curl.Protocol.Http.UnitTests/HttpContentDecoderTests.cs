@@ -37,6 +37,8 @@ public sealed class HttpContentDecoderTests
     [DataRow("deflate", ZLib, DisplayName = "zlib-wrapped deflate")]
     [DataRow("deflate", RawDeflate, DisplayName = "raw deflate")]
     [DataRow("br", Brotli, DisplayName = "br")]
+    [DataRow("zstd", "28B52FFD2005290000" + "68656C6C6F", DisplayName = "zstd")]
+    [DataRow("ZSTD", "28B52FFD2005290000" + "68656C6C6F", DisplayName = "zstd compared without case")]
     [DataRow("gzip, br", GzipThenBrotli, DisplayName = "Stacked gzip, br")]
     [DataRow("identity, gzip,, \tbr", GzipThenBrotli, DisplayName = "identity and empty items skipped")]
     public async Task WriteAsync_EncodedBody_WritesTheDecodedBody(string contentEncoding, string encoded)
@@ -70,12 +72,10 @@ public sealed class HttpContentDecoderTests
 
     /// <summary>
     /// Measured: <c>Content-Encoding: compress</c> gives
-    /// <c>curl: (61) Unrecognized content encoding type</c>. <c>zstd</c> is refused the same
-    /// way, because Curl does not advertise it (ADR-0020).
+    /// <c>curl: (61) Unrecognized content encoding type</c>.
     /// </summary>
     [TestMethod]
     [DataRow("compress")]
-    [DataRow("zstd")]
     [DataRow("gzip, compress")]
     public async Task WriteAsync_UnrecognizedCoding_ThrowsExit61WithoutWriting(string contentEncoding)
     {

@@ -18,7 +18,7 @@ public sealed class HttpVersionMappingTests
     [DataRow(null, HttpVersionPreference.Http11)]
     [DataRow(RequestedHttpVersion.Http10, HttpVersionPreference.Http10)]
     [DataRow(RequestedHttpVersion.Http11, HttpVersionPreference.Http11)]
-    [DataRow(RequestedHttpVersion.Http2, HttpVersionPreference.Http11)]
+    [DataRow(RequestedHttpVersion.Http2, HttpVersionPreference.Http2)]
     [DataRow(RequestedHttpVersion.Http2PriorKnowledge, HttpVersionPreference.Http2PriorKnowledge)]
     [DataRow(RequestedHttpVersion.Http3, HttpVersionPreference.Http3)]
     [DataRow(RequestedHttpVersion.Http3Only, HttpVersionPreference.Http3Only)]
@@ -74,7 +74,7 @@ public sealed class HttpVersionMappingTests
     }
 
     [TestMethod]
-    [DataRow("--http2", HttpVersionPreference.Http11)]
+    [DataRow("--http2", HttpVersionPreference.Http2)]
     [DataRow("--http2-prior-knowledge", HttpVersionPreference.Http2PriorKnowledge)]
     [DataRow("--http3", HttpVersionPreference.Http3)]
     [DataRow("--http3-only", HttpVersionPreference.Http3Only)]

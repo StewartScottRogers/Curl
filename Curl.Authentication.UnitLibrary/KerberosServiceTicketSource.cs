@@ -7,14 +7,15 @@ namespace Curl.Authentication;
 /// host-based service: the principal <c>service/host@REALM</c>, with the host lower-cased
 /// and the realm from <c>krb5.conf</c>'s <c>[domain_realm]</c> or <c>default_realm</c>, else
 /// the credential cache's own; the ticket from the default credential cache, or by a TGS
-/// exchange with its ticket-granting ticket (ADR-0142, ADR-0176).
+/// exchange with its ticket-granting ticket, stored back in that cache so the next run asks
+/// no KDC (ADR-0142, ADR-0176, ADR-0208).
 /// </summary>
 /// <param name="readConfiguration">Reads <c>krb5.conf</c>; called on each request, so nothing is read until Negotiate is answered.</param>
-/// <param name="readCredentialCache">Reads the default credential cache.</param>
+/// <param name="createCredentialCacheStore">Makes the store that finds, reads and writes the default credential cache.</param>
 /// <param name="createKdcClient">Makes the KDC client for the configuration read.</param>
 public sealed class KerberosServiceTicketSource(
     Func<KerberosConfiguration> readConfiguration,
-    Func<CredentialCache> readCredentialCache,
+    Func<CredentialCacheStore> createCredentialCacheStore,
     Func<KerberosConfiguration, KerberosKdcClient> createKdcClient)
 {
     /// <summary>MIT's <c>KRB5_NT_SRV_HST</c>, the name type of a host-based service's principal.</summary>
@@ -31,11 +32,12 @@ public sealed class KerberosServiceTicketSource(
     public async Task<KerberosCredential> GetAsync(string serviceName, string hostName, CancellationToken cancellationToken)
     {
         KerberosConfiguration configuration = readConfiguration();
-        using CredentialCache cache = readCredentialCache();
+        CredentialCacheStore store = createCredentialCacheStore();
+        string cacheName = store.DefaultCacheName();
         string host = hostName.ToLowerInvariant();
-        string realm = configuration.RealmOfHost(host) ?? cache.DefaultPrincipal.Realm;
+        string realm = configuration.RealmOfHost(host) ?? DefaultPrincipalRealm(store, cacheName);
         KerberosPrincipal server = new(HostBasedServiceNameType, realm, [serviceName, host]);
-        return await createKdcClient(configuration).GetServiceTicketAsync(server, cache, cancellationToken).ConfigureAwait(false);
+        return await createKdcClient(configuration).GetServiceTicketAsync(server, store, cacheName, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -51,7 +53,13 @@ public sealed class KerberosServiceTicketSource(
     public async Task<KerberosCredential> GetForwardedTicketGrantingTicketAsync(CancellationToken cancellationToken)
     {
         KerberosConfiguration configuration = readConfiguration();
-        using CredentialCache cache = readCredentialCache();
+        using CredentialCache cache = createCredentialCacheStore().ReadDefault();
         return await createKdcClient(configuration).GetForwardedTicketGrantingTicketAsync(cache, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static string DefaultPrincipalRealm(CredentialCacheStore store, string cacheName)
+    {
+        using CredentialCache cache = store.Read(cacheName);
+        return cache.DefaultPrincipal.Realm;
     }
 }

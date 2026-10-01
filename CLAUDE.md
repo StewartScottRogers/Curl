@@ -56,6 +56,13 @@ shift, `RunDarkFactory.ps1` merges its branch into `master` through a pull reque
 only when the `CI` workflow passed on Windows, Linux and macOS for the exact commit being
 merged. That merge needs no confirmation; a red or unfinished CI run means no merge.
 
+A third standing exception (Stewart, 2026-09-30: "stop asking redundant questions and just
+do the job without me"): an interactive session merges the audit office's pull requests
+(the `audit` branch, and any branch built from `master` for guarded audit or guard work)
+into `master` itself, then merges `master` into `work/dark-factory`, and goes on to the
+next audit task without asking - but only when the `CI` workflow passed on Windows, Linux
+and macOS for the pull request's head commit. It reports what it merged afterwards.
+
 Ask first for: a force push or any rewrite of already-pushed history, any other merge to `master`,
 a tag or a release, creating a repository or changing its visibility, and deleting a
 branch. Irreversible GitHub actions are run directly and not through the subagent, which
@@ -134,6 +141,50 @@ project and library as `touches`. A test a live task already names is not filed 
 Every session, lanes included, whispers milestones to Stewart through the PostToolUse hook
 `.claude/hooks/whisper-milestone.ps1`: a task moved to Done, a CI failure filed, a commit
 made, a branch deleted - quietly, in Windows' Zira voice, one phrase at a time.
+## Audit office
+An independent team of AI auditors audits the dark factory and the code it produced, from
+outside the factory's reach (ADR-0267; `Audit/README.md` maps the folder). Six read-only
+auditors, each reading `Audit/Instructions/Auditor-Rules.md` and its own method there:
+
+- `audit-quality` (Sonnet): tests whose names lie, weak assertions, mutants no test kills.
+- `audit-security` (Opus): fuzzing, constant-time secret comparisons, secrets in output.
+- `audit-performance` (Sonnet): Curl's native build against real curl on six transfers.
+- `audit-conformance` (Opus): generated command lines through real curl and Curl.
+- `audit-truthfulness` (Sonnet): names, doc comments, documents, ADRs and script help.
+- `audit-process` (Sonnet): the factory's logs, git history and CI runs.
+
+`audit-seeder` (Sonnet) plants known defects from the encoded catalogue in
+`Audit/PlantedDefects/` before each audit, at least one per auditor, so each auditor's
+catch rate is measured. An auditor that misses a defect planted for it, returns no report
+block, or changes the audited tree is **unreliable** on that audit's scorecard: its
+re-audits close nothing and its numbers are marked.
+
+Audit paths are `Audit/` and `.claude/agents/audit-*`. Four guards keep the factory out:
+tasks that touch them are interactive only, and `task-board.ps1` refuses a lane filing or
+claiming one; every factory process carries `CURL_DARK_FACTORY_LANE`, and the PreToolUse
+hook `.claude/hooks/guard-audit-paths.ps1` refuses it any read or change of an audit path;
+the CI job `audit-guard` (`Audit/Guard/Test-AuditPathsUntouched.ps1`, required on `master`)
+fails when `work/dark-factory` changes one; and audit work is done on the `audit` branch,
+whose pull requests an interactive session merges once CI is green (the standing exception
+in "Git and GitHub"). A lane that meets an audit path stops and leaves it to an interactive
+session.
+
+Run an audit with `Audit\RunAudit.cmd -NewTab` (in herdr, like the factory; never with
+`Start-Process`). `-Auditors` picks some of the six, `-Planted` the defect count (default
+8), `-Ref` the commit (default `origin/work/dark-factory`), `-DryRun` prints the plan. It
+refuses inside a factory process and while a shift runs; `-AlongsideShift` runs it anyway,
+sharing the Claude budget, since `-Continuous` shifts leave no gap. It writes findings and a
+scorecard on the `audit` branch and opens its pull request, which it never merges.
+
+Cadence: on demand, before each roadmap-milestone merge to `master`, and after changes to
+`RunDarkFactory.ps1`. `Audit\Tools\Test-AuditDue.ps1` says when one is due; a shift's end
+announces it, and holds a milestone's merge until the audit has run (BL-1022).
+
+Findings are `Audit/Findings/AF-####-*.md`, arriving `proposed`. Only Stewart sets
+`accepted` or `rejected`; `Audit/Triage.md` and `Audit\Tools\New-TasksFromAcceptedFindings.ps1`
+turn accepted ones into lane-eligible Curl tasks. A finding closes only when a re-audit by
+its own, reliable auditor confirms the fix - never because its task reached Done.
+
 ## Repository layout
 Flat and linear. Every project is a directory immediately under the repository root.
 There is no `src/` and no `tests/`; do not create them.
@@ -144,9 +195,10 @@ Curl/
 ├── Curl.Core.UnitTests/          ← its tests, immediately beside it
 ├── Curl.Protocol.Http.UnitLibrary/
 ├── Curl.Protocol.Http.UnitTests/
-├── ...                           ← 48 projects, one flat alphabetical run
+├── ...                           ← 66 projects, one flat alphabetical run
 ├── Documentation/                ← shared project (docs and planning)
 ├── Tasks/                        ← shared project (task board)
+├── Audit/                        ← shared project (the audit office; never written by the factory)
 ├── data/                         ← local runtime data (gitignored, never read or modify)
 └── .claude/                      ← Claude Code configuration
 ```

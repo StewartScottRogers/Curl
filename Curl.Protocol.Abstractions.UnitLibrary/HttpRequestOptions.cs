@@ -186,6 +186,13 @@ public sealed record HttpRequestOptions
     public bool ProxyTunnel { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the transfer goes over a Unix domain socket
+    /// (<c>--unix-socket</c> or <c>--abstract-unix-socket</c>), which rules out HTTP/3 before
+    /// connecting, as curl 8.21.0's <c>Curl_conn_may_http3</c> does.
+    /// </summary>
+    public bool OverUnixSocket { get; init; }
+
+    /// <summary>
     /// Gets the alternative service this transfer connects to in place of its origin
     /// (<c>--alt-svc</c>), or <see langword="null" />, the default, to connect to the origin.
     /// </summary>

@@ -91,6 +91,9 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
 
     public List<byte[]> ClientCertificates { get; } = [];
 
+    /// <summary>Gets the signature scheme of the last client CertificateVerify received, or 0 before one.</summary>
+    public ushort ClientCertificateVerifyScheme { get; private set; }
+
     /// <summary>Answers a ClientHello: either a HelloRetryRequest alone, or the ServerHello and the encrypted flight.</summary>
     public TestServerFlight Answer(byte[] clientHelloBytes)
     {
@@ -270,7 +273,7 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
             byte[] certificate = new CertificateMessage([], chain).Encode();
             Add(flight, CompressCertificate is null ? certificate : CompressCertificate(certificate[HandshakeMessage.HeaderLength..]).Encode());
             byte[] content = TlsSignatureScheme.BuildCertificateVerifyContent(true, TranscriptHash());
-            Add(flight, new CertificateVerify(credential.Scheme, credential.SigningKey.Sign(credential.Scheme, content)).Encode());
+            Add(flight, new CertificateVerify(credential.Scheme, credential.SignCertificateVerify(content)).Encode());
         }
 
         Add(flight, new Finished(schedule.ComputeFinishedVerifyData(ServerHandshakeTrafficSecret, TranscriptHash())).Encode());
@@ -339,6 +342,7 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         Assert.AreEqual(HandshakeType.CertificateVerify, verify.Message!.Type);
         CertificateVerify signature = CertificateVerify.Decode(verify.Message.Body).Value;
         CollectionAssert.Contains(ClientCertificateSchemes.ToList(), signature.Algorithm);
+        ClientCertificateVerifyScheme = signature.Algorithm;
         byte[] content = TlsSignatureScheme.BuildCertificateVerifyContent(false, TranscriptHash());
         Assert.IsNull(TlsCertificatePublicKey.Read(ClientCertificates[0])!.VerifySignature(signature.Algorithm, content, signature.Signature));
         transcriptMessages.Add(flight[certificate.BytesConsumed..(certificate.BytesConsumed + verify.BytesConsumed)]);
