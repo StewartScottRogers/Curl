@@ -32,7 +32,7 @@ When `--curves` or `--sigalgs` leaves nothing to offer (no suitable groups, key 
 - Measured 2026-10-01 with `Record-CurlExchange.ps1 -Curl wsl.exe -ListenAddress 172.26.96.1 -Port 48443` (Ubuntu curl 8.18.0, OpenSSL 3.5.5): `--sigalgs RSA+SHA1`, `--curves '?bogus'` and `--curves '*brainpoolP256r1'` each write exactly `15 03 01 00 02 02 50` before exit 35; `--curves bogus` (exit 59) writes nothing. Windows curl 8.21.0 (Schannel) ignores both options and sends its ClientHello.
 - Decision (ADR-0303, decided by Claude under Stewart's delegation): both builds send the alert, since both fail these as OpenSSL does (ADR-0284). `Prepare` flags an exit-35 `CurvesAndSignatureAlgorithms.Apply` failure; `FailBeforeHandshakeAsync` writes the alert, disposes the plaintext whatever the write did, and lets cancellation escape. A failed write is otherwise ignored.
 - Tests: the existing failure data-row test now pins the bytes the server receives (alert for exit 35, none for exit 59), plus a write-fails test and a write-cancelled test. Quality: Curl.Networking.UnitLibrary 100% line and branch, 0 failing members.
-- Found while measuring, filed as BL-1090: under `--tls-max 1.2`, real curl sends a ClientHello for `--curves '?bogus'` and fails `--sigalgs RSA+SHA1` with `no ciphers available`; Curl fails both differently.
+- Found while measuring, filed as BL-1094: under `--tls-max 1.2`, real curl sends a ClientHello for `--curves '?bogus'` and fails `--sigalgs RSA+SHA1` with `no ciphers available`; Curl fails both differently.
 ## Log
 
 - 2026-10-01: Created.

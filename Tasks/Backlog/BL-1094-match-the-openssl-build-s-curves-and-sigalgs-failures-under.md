@@ -1,5 +1,5 @@
 ---
-id: BL-1090
+id: BL-1094
 title: Match the OpenSSL build's --curves and --sigalgs failures under a TLS 1.2 ceiling
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-01
 completed:
 ---
-# BL-1090 — Match the OpenSSL build's --curves and --sigalgs failures under a TLS 1.2 ceiling
+# BL-1094 — Match the OpenSSL build's --curves and --sigalgs failures under a TLS 1.2 ceiling
 
 ## Goal
 
