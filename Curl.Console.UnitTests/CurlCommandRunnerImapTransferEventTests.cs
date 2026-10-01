@@ -117,10 +117,26 @@ public sealed class CurlCommandRunnerImapTransferEventTests
     }
 
     [TestMethod]
-    public async Task RunAsync_VerboseUidFetchWithStartTls_WritesTheSessionLinesAroundTheUpgrade()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task RunAsync_VerboseUidFetchWithStartTlsOnWindows_WritesTheSchannelLinesAroundTheUpgrade()
     {
         // Between "< A002 OK Begin TLS negotiation now" and the second CAPABILITY curl writes the
         // two "schannel:" lines and the connect's "Established connection" line again (BL-1084).
+        await AssertStartTlsFetchLinesAsync(
+            "* schannel: disabled automatic use of client certificate" + InfoEnd
+            + "* schannel: using IP address, SNI is not supported by OS." + InfoEnd);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task RunAsync_VerboseUidFetchWithStartTlsOffWindows_WritesTheOpenSslTrustLineAroundTheUpgrade()
+    {
+        // The OpenSSL build writes its "SSL Trust" line before the handshake instead (BL-1090).
+        await AssertStartTlsFetchLinesAsync("* SSL Trust: peer verification disabled" + InfoEnd);
+    }
+
+    private async Task AssertStartTlsFetchLinesAsync(string tlsBackendLines)
+    {
         const string secureCapabilityReply = "* CAPABILITY IMAP4rev1 AUTH=PLAIN AUTH=LOGIN\r\nA003 OK CAPABILITY completed\r\n";
 
         int exitCode = await RunAsync(
@@ -136,8 +152,7 @@ public sealed class CurlCommandRunnerImapTransferEventTests
             + Headers("< ", CapabilityReply)
             + "> A002 STARTTLS" + HeaderEnd
             + "< A002 OK Begin TLS negotiation now" + HeaderEnd
-            + "* schannel: disabled automatic use of client certificate" + InfoEnd
-            + "* schannel: using IP address, SNI is not supported by OS." + InfoEnd
+            + tlsBackendLines
             + "* Established connection to 127.0.0.1 (127.0.0.1 port 18146) from 127.0.0.1 port 59452 " + InfoEnd
             + "> A003 CAPABILITY" + HeaderEnd
             + Headers("< ", secureCapabilityReply)

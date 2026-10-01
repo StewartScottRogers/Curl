@@ -95,10 +95,26 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
     }
 
     [TestMethod]
-    public async Task RunAsync_VerboseRetrWithStls_WritesTheSessionLinesAroundTheUpgrade()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task RunAsync_VerboseRetrWithStlsOnWindows_WritesTheSchannelLinesAroundTheUpgrade()
     {
         // Between "< +OK Begin TLS negotiation" and the second CAPA curl writes the two
         // "schannel:" lines and the connect's "Established connection" line again (BL-1084).
+        await AssertStlsRetrLinesAsync(
+            "* schannel: disabled automatic use of client certificate" + InfoEnd
+            + "* schannel: using IP address, SNI is not supported by OS." + InfoEnd);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task RunAsync_VerboseRetrWithStlsOffWindows_WritesTheOpenSslTrustLineAroundTheUpgrade()
+    {
+        // The OpenSSL build writes its "SSL Trust" line before the handshake instead (BL-1090).
+        await AssertStlsRetrLinesAsync("* SSL Trust: peer verification disabled" + InfoEnd);
+    }
+
+    private async Task AssertStlsRetrLinesAsync(string tlsBackendLines)
+    {
         int exitCode = await RunAsync(
             ["-sv", "-k", "--ssl-reqd"],
             18112,
@@ -111,8 +127,7 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
             + Headers("< ", CapaReply)
             + "> STLS" + HeaderEnd
             + "< +OK Begin TLS negotiation" + HeaderEnd
-            + "* schannel: disabled automatic use of client certificate" + InfoEnd
-            + "* schannel: using IP address, SNI is not supported by OS." + InfoEnd
+            + tlsBackendLines
             + "* Established connection to 127.0.0.1 (127.0.0.1 port 18112) from 127.0.0.1 port 64807 " + InfoEnd
             + "> CAPA" + HeaderEnd
             + Headers("< ", SecureCapaReply)
