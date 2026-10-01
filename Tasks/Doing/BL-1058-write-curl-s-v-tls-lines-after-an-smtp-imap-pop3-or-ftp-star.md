@@ -42,3 +42,4 @@ After an SMTP `STARTTLS` is accepted, `-v` writes the lines curl 8.21.0 writes f
 
 - 2026-09-28: Created.
 - 2026-09-30: Renumbered from BL-806, which the archived Done task BL-806 keeps (BL-1054).
+- 2026-10-01: Backlog -> Doing.
