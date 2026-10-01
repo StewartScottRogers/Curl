@@ -294,7 +294,7 @@ public sealed class HttpProtocolHandler(
     /// <c>Curl_conn_may_http3</c> checks: over a Unix domain socket, exit 96, for
     /// <c>--http3-only</c> with any URL and <c>--http3</c> with an <c>https://</c> URL (BL-867);
     /// then, exit 3, <c>--http3</c> or <c>--http3-only</c> with an <c>https://</c> URL through a
-    /// SOCKS proxy, or through an HTTP or HTTPS proxy (ADR-0223); or <see langword="null" />
+    /// SOCKS proxy (ADR-0223; an HTTP or HTTPS proxy is tunnelled through, BL-942); or <see langword="null" />
     /// when HTTP/3 is not refused.
     /// </summary>
     private static Http3Refusal? Http3RefusalOf(HttpRequestPlan plan)
@@ -318,13 +318,18 @@ public sealed class HttpProtocolHandler(
         plan.Options.OverUnixSocket && (https || plan.Options.Version == HttpVersionPreference.Http3Only);
 
     /// <summary>
-    /// Gives the proxy's refusal of HTTP/3 for an <c>https://</c> URL, exit 3, or
-    /// <see langword="null" /> without a proxy or for any other URL (ADR-0223).
+    /// Gives a SOCKS proxy's refusal of HTTP/3 for an <c>https://</c> URL, exit 3, or
+    /// <see langword="null" /> without a proxy, through an HTTP or HTTPS proxy, which QUIC
+    /// tunnels through with CONNECT-UDP as curl 8.21.0 does (BL-942), or for any other URL.
     /// </summary>
     private static Http3Refusal? Http3ProxyRefusalOf(HttpRequestPlan plan, bool https) =>
-        https && plan.Options.ForwardProxy is { } proxy
-            ? new Http3Refusal(Http3RefusalFor(proxy.Kind), CurlExitCode.UrlMalformat)
+        https && plan.Options.ForwardProxy is { } proxy && !IsHttpProxy(proxy)
+            ? new Http3Refusal(HttpTransferMessages.Http3NotOverSocksProxy, CurlExitCode.UrlMalformat)
             : null;
+
+    /// <summary>Decides whether <paramref name="proxy" /> is an HTTP or HTTPS proxy rather than a SOCKS one.</summary>
+    private static bool IsHttpProxy(ProxyEndpoint proxy) =>
+        proxy.Kind is ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https;
 
     /// <summary>
     /// Why HTTP/3 is refused before connecting: the <paramref name="Message" /> curl writes into
@@ -335,16 +340,7 @@ public sealed class HttpProtocolHandler(
     private readonly record struct Http3Refusal(string Message, CurlExitCode ExitCode);
 
     /// <summary>
-    /// Gives why a proxy of <paramref name="kind" /> refuses HTTP/3: the HTTP proxy message for
-    /// an HTTP or HTTPS proxy, and the SOCKS proxy message for any SOCKS kind (ADR-0223).
-    /// </summary>
-    private static string Http3RefusalFor(ProxyKind kind) =>
-        kind is ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https
-            ? HttpTransferMessages.Http3NotOverHttpProxy
-            : HttpTransferMessages.Http3NotOverSocksProxy;
-
-    /// <summary>
-    /// Runs a transfer whose HTTP/3 a proxy (measured on curl.se's ngtcp2 build, ADR-0223) or a
+    /// Runs a transfer whose HTTP/3 a SOCKS proxy (measured on curl.se's ngtcp2 build, ADR-0223) or a
     /// Unix domain socket (read from curl 8.21.0, BL-867) rules out: reports the refusal's
     /// message; then fails <c>--http3-only</c> with the refusal's exit code and message before
     /// connecting; and runs <c>--http3</c> over TCP or the Unix socket, where a failure keeps
@@ -555,7 +551,7 @@ public sealed class HttpProtocolHandler(
     /// Opens the transfer's connection (ADR-0144 section 4, ADR-0172): over QUIC for
     /// <c>--http3-only</c>, whose failure is the transfer's; over QUIC raced against TCP for
     /// <c>--http3</c> (<see cref="RaceQuicAgainstTcpAsync" />); and over TCP for every other
-    /// version, for an <c>http://</c> URL and through a proxy. A QUIC connection is handed on
+    /// version, for an <c>http://</c> URL and through a SOCKS proxy. A QUIC connection is handed on
     /// as an <see cref="Http3Session" />.
     /// </summary>
     private async ValueTask<ConnectResult> ConnectAsync(HttpRequestPlan plan, ConnectTarget target)
@@ -582,7 +578,9 @@ public sealed class HttpProtocolHandler(
     /// connect fails or once <see cref="HttpRequestOptions.HappyEyeballsTimeout" /> has passed on
     /// the transfer's clock without it completing; the first to connect carries the transfer
     /// and the other is cancelled, its connection disposed should it still complete; when both
-    /// fail the transfer fails with the QUIC attempt's exit code and message.
+    /// fail the transfer fails with the QUIC attempt's exit code and message, or through a proxy
+    /// with the TCP <c>CONNECT</c>'s, as curl 8.22.0 does after a refused CONNECT-UDP (measured,
+    /// BL-942).
     /// </summary>
     private async ValueTask<ConnectResult> RaceQuicAgainstTcpAsync(HttpRequestPlan plan, ConnectTarget target)
     {
@@ -612,7 +610,7 @@ public sealed class HttpProtocolHandler(
         }
 
         ConnectResult tcpResult = await tcp.ConfigureAwait(false);
-        return tcpResult.Connection is null
+        return tcpResult.Connection is null && target.Proxy is null
             ? ConnectResult.Failed(quicResult.ExitCode, quicResult.ErrorMessage!, tcpResult.Timings, tcpResult.ConnectionNumber)
             : tcpResult;
     }
@@ -659,12 +657,13 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Decides whether the transfer tries QUIC: <c>--http3</c> or <c>--http3-only</c> with an
-    /// <c>https://</c> URL, no proxy and no Unix domain socket.
+    /// <c>https://</c> URL, no Unix domain socket, and no proxy or an HTTP or HTTPS one, which
+    /// the connector tunnels QUIC through with CONNECT-UDP (BL-942).
     /// </summary>
     private static bool TriesQuic(HttpRequestPlan plan, ConnectTarget target) =>
         plan.Options.Version is HttpVersionPreference.Http3 or HttpVersionPreference.Http3Only
             && target.UseTls
-            && plan.Options.ForwardProxy is null
+            && (plan.Options.ForwardProxy is null || IsHttpProxy(plan.Options.ForwardProxy))
             && !plan.Options.OverUnixSocket;
 
     /// <summary>

@@ -115,12 +115,6 @@ internal static class HttpTransferMessages
     internal const string Http3NotOverSocksProxy = "HTTP/3 is not supported over a SOCKS proxy";
 
     /// <summary>
-    /// Why <c>--http3</c> or <c>--http3-only</c> gives up HTTP/3 for an <c>https://</c> URL
-    /// through an HTTP or HTTPS proxy (measured on curl.se's 8.18.0 build, BL-837, ADR-0223).
-    /// </summary>
-    internal const string Http3NotOverHttpProxy = "HTTP/3 is not supported over an HTTP proxy";
-
-    /// <summary>
     /// Why <c>--http3-only</c>, or <c>--http3</c> with an <c>https://</c> URL, gives up HTTP/3
     /// over a Unix domain socket: <c>Curl_conn_may_http3</c> in <c>lib/vquic/vquic.c</c> at
     /// <c>curl-8_21_0</c> (ADR-0187, BL-867), exit 96 for <c>--http3-only</c>.
