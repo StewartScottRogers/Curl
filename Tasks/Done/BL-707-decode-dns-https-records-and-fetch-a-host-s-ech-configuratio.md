@@ -33,7 +33,7 @@ The DNS codec in `Curl.Networking.UnitLibrary` encodes HTTPS (type 65) queries a
   (8.21.0, `curl -V`) and Ubuntu's OpenSSL build (8.18.0, `wsl.exe -e curl -V`) list no `ECH` or
   `HTTPSRR` feature, so `Record-CurlExchange.ps1 -Tls -k` as a DoH server would record only the A
   and AAAA POSTs measured in BL-639. The HTTPS query is therefore the measured A query with QTYPE 65,
-  as curl's single `doh_req_encode` writes every type (ADR-0311). For `example.test`, in a POST of
+  as curl's single `doh_req_encode` writes every type (ADR-0312). For `example.test`, in a POST of
   `Content-Length: 30`:
   `000001000001000000000000076578616D706C6504746573740000410001`.
   Off port 443 the name is `_<port>._https.<host>` (curl's `doh.c`, RFC 9460 section 9.1).
@@ -42,7 +42,7 @@ The DNS codec in `Curl.Networking.UnitLibrary` encodes HTTPS (type 65) queries a
   or `hard` the HTTPS query joins the A and AAAA ones; `doh_store_https` keeps up to four records'
   data; only the first is decoded (`doh_resp_decode_httpsrr`), reading `alpn`, `no-default-alpn`,
   `port`, `ipv4hint`, `ech` and `ipv6hint` and skipping other keys.
-- Decided (ADR-0311): `ServiceBindingRecordDecoder` refuses a record that overruns or whose known
+- Decided (ADR-0312): `ServiceBindingRecordDecoder` refuses a record that overruns or whose known
   parameter has the wrong shape (`ServiceBindingFailure`) rather than read past its end; key order
   is not checked, as curl does not check it.
 - Delivered: `DnsRecordType.Https`, `DnsAnswer.HttpsRecordData`, `ServiceBindingRecord`,
@@ -55,4 +55,4 @@ The DNS codec in `Curl.Networking.UnitLibrary` encodes HTTPS (type 65) queries a
 
 - 2026-09-28: Created.
 - 2026-10-01: Backlog -> Doing.
-- 2026-10-01: Doing -> Done. DoH fetches a host's HTTPS record and ServiceBindingRecordDecoder decodes RFC 9460 records, ech included, for --ech (ADR-0311)
+- 2026-10-01: Doing -> Done. DoH fetches a host's HTTPS record and ServiceBindingRecordDecoder decodes RFC 9460 records, ech included, for --ech (ADR-0312)
