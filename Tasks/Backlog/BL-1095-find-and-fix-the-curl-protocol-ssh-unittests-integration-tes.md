@@ -1,5 +1,5 @@
 ---
-id: BL-1086
+id: BL-1095
 title: Find and fix the Curl.Protocol.Ssh.UnitTests Integration test that hangs on Windows
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-01
 completed:
 ---
-# BL-1086 — Find and fix the Curl.Protocol.Ssh.UnitTests Integration test that hangs on Windows
+# BL-1095 — Find and fix the Curl.Protocol.Ssh.UnitTests Integration test that hangs on Windows
 
 ## Goal
 

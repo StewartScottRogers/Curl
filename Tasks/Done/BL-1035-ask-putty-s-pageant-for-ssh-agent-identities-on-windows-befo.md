@@ -37,7 +37,7 @@ BL-902 (ADR-0270) built the agent step behind `ISshAgentConnector` with `SystemS
 - **Design (ADR-0304):** `PlatformSshAgentConnector.Create` → on Windows `FirstReachableSshAgentConnector[PageantSshAgentConnector, SystemSshAgentConnector]`; `PageantSshAgentConnector` + `PageantAgentStream` hold the transaction logic behind `IPageantWindow`; `WindowsPageantWindow` is the thin Win32 adapter (`LibraryImport`, so the csproj gains `AllowUnsafeBlocks`), excluded under ADR-0083 and run by `WindowsPageantWindowTests` (Integration, Windows only, `DoNotParallelize`).
 - **One difference from libssh2:** an answer length over 8188 fails instead of copying past the mapping's end.
 - **Gates:** solution build `-warnaserror` clean; fast tests all green (Ssh 1514); Pageant tests incl. Integration 19/19; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary`: 0 failing members.
-- **Found:** an existing Ssh Integration test hangs on Windows (not one of these); filed BL-1086.
+- **Found:** an existing Ssh Integration test hangs on Windows (not one of these); filed BL-1095.
 
 ## Log
 
