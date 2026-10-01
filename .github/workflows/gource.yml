@@ -1,5 +1,5 @@
 # Keeps the README's showcase on the `gource` branch, served by GitHub Pages at
-# https://stewartscottrogers.github.io/Curl/: a Gource video of Curl's history (an 8K
+# https://stewartscottrogers.github.io/Curl/: a Gource video of Curl's history (a 4K
 # adaptive stream with a full-screen viewer page, and the GIF the README shows) and the
 # code coverage report (coverage/index.html, and coverage/badge.svg for the README), and
 # the live task board page (board/index.html, served at .../Curl/board/).
@@ -21,7 +21,7 @@
 # overlap and a run decides only once the render before it has finished; board-page has a
 # group of its own, so the page goes up within minutes instead of waiting behind a render.
 #
-# An 8K render takes the better part of an hour on a runner, hence the long timeout.
+# A render with its MP4 re-encode can take an hour or more on a runner, hence the long timeout.
 #
 # When it renders:
 #   * hourly (from master, once this file is merged), if any branch has new commits;
@@ -194,7 +194,7 @@ jobs:
           echo "$FINGERPRINT" > fingerprint.txt
           date +%s > rendered-at.txt
           printf '%s\n' '# gource' '' \
-            'The README showcase of Curl: the 8K Gource viewer, the code coverage report and' \
+            'The README showcase of Curl: the 4K Gource viewer, the code coverage report and' \
             'the live task board page (board/), served by GitHub Pages at' \
             'https://stewartscottrogers.github.io/Curl/ (the board at .../Curl/board/), and' \
             'the GIF and coverage badge the README shows.' \
@@ -241,7 +241,7 @@ jobs:
           git init -q -b gource
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html .nojekyll hls gource.mp4 gource.gif still-8k.jpg poster.jpg stats.json \
+          git add index.html .nojekyll hls gource.mp4 gource.gif still-4k.jpg poster.jpg stats.json \
             fingerprint.txt rendered-at.txt README.md $extra
           git commit -q -m "chore(gource): render $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gource
@@ -253,7 +253,7 @@ jobs:
         run: gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds" --silent
 
   # The live task board page, published on every run and never gated on `decide`: it is
-  # one small file and must not wait behind an 8K render. It commits onto the gource
+  # one small file and must not wait behind a render. It commits onto the gource
   # branch without force, like the coverage job, and only when the page changed.
   board-page:
     runs-on: ubuntu-latest

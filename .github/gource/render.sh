@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Renders Curl's history across every branch, once, at 7680x4320 (8K), into the directory
-# given:
+# Renders Curl's history across every branch, once, at 3840x2160 (4K), into the directory
+# given. There is no 8K rendering (Stewart, 2026-10-01): 4K is the top quality.
 #
-#   hls/av1/master.m3u8    adaptive stream in AV1 at 8K, 4K and 1080p, for browsers that
+#   hls/av1/master.m3u8    adaptive stream in AV1 at 4K and 1080p, for browsers that
 #                          decode AV1 - what the viewer page plays wherever it can
 #   hls/h264/master.m3u8   the same in H.264 at 4K and 1080p, for browsers that do not
 #   hls/<codec>/<height>p/ each quality as 2-second fragmented-MP4 segments, each far under
@@ -10,7 +10,7 @@
 #   gource.mp4             the 4K H.264 quality as one file, for download: remuxed when it
 #                          fits in 85 MiB, otherwise re-encoded (two-pass) to land there
 #   gource.gif             the widest GIF under GitHub's 10 MB inline limit, for the README
-#   still-8k.jpg           the final frame at full 8K, for download
+#   still-4k.jpg           the final frame at full 4K, for download
 #   poster.jpg             the final frame at 1920 px, shown before the video plays
 #   stats.json             the numbers the viewer page shows
 #
@@ -29,27 +29,27 @@ export DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_SKIP_FIRST_TIME_EXPE
 cs() { dotnet run --file "$here/$1.cs" -- "${@:2}"; }
 work="$out/.work"
 rm -rf "$work"
-mkdir -p "$work/hls/av1/4320p" "$work/hls/av1/2160p" "$work/hls/av1/1080p" \
+mkdir -p "$work/hls/av1/2160p" "$work/hls/av1/1080p" \
     "$work/hls/h264/2160p" "$work/hls/h264/1080p"
 
-width=7680
-height=4320
+width=3840
+height=2160
 fps=30
-# Gource sizes text and user icons in pixels. Scaling them 4x makes 8K read like 1080p: file
+# Gource sizes text and user icons in pixels. Scaling them 2x makes 4K read like 1080p: file
 # and project names stay legible on a wall-sized screen without crowding the tree.
-scale=4
+scale=2
 # The animation's length is fixed, however long the history grows: the size of every
 # quality - and so of the GitHub Pages site, limited to 1 GB - follows the number of seconds,
 # not the number of commits. The whole history plays in history_seconds, then Gource spends
-# about 9 s settling the camera after the last commit (measured on the 2026-10-01 render),
-# so the video runs about 55 s.
+# about 9 s settling the camera after the last commit, so the video runs about 70-80 s.
 #
-# Why 46: that render played 64 s of history plus the 9 s tail, and the site came to
-# 1,053 MB - 94 MB of downloads (gource.mp4 is size-targeted, so that part is fixed), 22 MB
-# for the tail and 14.6 MB per second of history across the HLS ladders. 850 MB leaves
-# 733 MB, 50 s at that rate; 46 s keeps a tenth in hand, since the same history in fewer
-# seconds moves more per frame and costs more per second.
-history_seconds=46
+# Why 70 (the pace the showcase has always had): the 2026-10-01 render (2b78a4b8) played
+# 64 s of history plus that tail, 72.8 s in all, and without its 8K stream its site would
+# have been 526 MB - 93 MB of downloads (gource.mp4 is size-targeted, so that part is
+# fixed) and 433 MB for the 4K and 1080p streams, about 6.6 MB per second of history.
+# 850 MB would allow about 115 s at that rate; 70 s leaves 40% in hand for Gource drawing
+# 4K natively rather than scaling down from 8K, which keeps finer detail and may cost more.
+history_seconds=70
 
 cs make-log > "$work/gource.log"
 cs make-captions > "$work/captions.txt"
@@ -73,18 +73,14 @@ if "${run[@]}" gource "$work/gource.log" --log-format custom -320x180 --multi-sa
 fi
 rm -f "$work/probe.ppm"
 
-# AV1 carries 8K at a fraction of H.264's size and is what 8K displays decode in hardware;
-# a browser plays one codec per stream, so AV1 gets a full ladder of its own. SVT-AV1 is
-# fast enough for a runner (it refuses 8K below preset 8); libaom is the slow fallback if
-# ffmpeg lacks it.
+# AV1 carries 4K at a fraction of H.264's size; a browser plays one codec per stream, so
+# AV1 gets a ladder of its own. SVT-AV1 is fast enough for a runner; libaom is the slow
+# fallback if ffmpeg lacks it.
 #
-# Each AV1 quality is a constant quality (CRF). At CRF 32 Gource's bloom and particles ran
-# 8K at 95 Mbit/s on average and 240 Mbit/s at peak - 2-second segments of 60 MB and a
-# 1.3 GB site, over GitHub Pages' 1 GB limit - so 8K and 4K are coarser now. A target
-# bitrate (VBR) would bound the size outright, but SVT-AV1's VBR look-ahead at 8K exhausts
-# the runner's memory and the job is killed mid-render (2026-10-01).
+# Each AV1 quality is a constant quality (CRF); the bounded length is what bounds the size.
+# A target bitrate (VBR) was tried on 2026-10-01 and the render job was killed partway
+# through, most likely out of memory in SVT-AV1's look-ahead (then at 8K).
 gop=$(( fps * 2 ))
-av1_crf_8k=42
 av1_crf_4k=40
 av1_crf_1080=36
 if ffmpeg -hide_banner -encoders 2> /dev/null | grep -q libsvtav1; then
@@ -113,9 +109,7 @@ echo "rendering ${width}x${height} at ${fps} fps: $days day(s) at ${spd}s/day, $
     --font-size 18 --font-scale "$scale" --dir-colour 8AB4F8 --highlight-colour FFFFFF \
     --output-framerate "$fps" --output-ppm-stream - \
   | ffmpeg -y -loglevel error -r "$fps" -f image2pipe -vcodec ppm -i - \
-      -filter_complex "[0:v]split=4[a8][s4][s2][s1];[s4]scale=3840:2160:flags=lanczos,split[a4][h4];[s2]scale=1920:1080:flags=lanczos,split[a2][h2];[s1]fps=1[still]" \
-      -map "[a8]" "${av1[@]}" -crf "$av1_crf_8k" "${av1_common[@]}" "${hls[@]}" \
-          -hls_segment_filename "$d/av1/4320p/seg_%03d.m4s" "$d/av1/4320p/index.m3u8" \
+      -filter_complex "[0:v]split=4[a4][h4][s2][s1];[s2]scale=1920:1080:flags=lanczos,split[a2][h2];[s1]fps=1[still]" \
       -map "[a4]" "${av1[@]}" -crf "$av1_crf_4k" "${av1_common[@]}" "${hls[@]}" \
           -hls_segment_filename "$d/av1/2160p/seg_%03d.m4s" "$d/av1/2160p/index.m3u8" \
       -map "[a2]" "${av1[@]}" -crf "$av1_crf_1080" "${av1_common[@]}" "${hls[@]}" \
@@ -124,7 +118,7 @@ echo "rendering ${width}x${height} at ${fps} fps: $days day(s) at ${spd}s/day, $
           -hls_segment_filename "$d/h264/2160p/seg_%03d.m4s" "$d/h264/2160p/index.m3u8" \
       -map "[h2]" "${x264[@]}" -crf 18 -maxrate 6M -bufsize 12M -level 4.1 "${hls[@]}" \
           -hls_segment_filename "$d/h264/1080p/seg_%03d.m4s" "$d/h264/1080p/index.m3u8" \
-      -map "[still]" -update 1 -q:v 2 "$work/still-8k.jpg"
+      -map "[still]" -update 1 -q:v 2 "$work/still-4k.jpg"
 
 for ladder in av1 h264; do
     cs make-master-playlist "$d/$ladder" > "$d/$ladder/master.m3u8"
@@ -160,7 +154,7 @@ if [ "$(wc -c < "$work/gource.mp4")" -gt "$mp4_limit" ]; then
     fi
 fi
 cat "$d/h264/1080p/init.mp4" "$d/h264/1080p"/seg_*.m4s > "$work/1080p.frag.mp4"
-ffmpeg -y -loglevel error -i "$work/still-8k.jpg" -vf scale=1920:-2:flags=lanczos -q:v 3 "$work/poster.jpg"
+ffmpeg -y -loglevel error -i "$work/still-4k.jpg" -vf scale=1920:-2:flags=lanczos -q:v 3 "$work/poster.jpg"
 
 # GitHub only plays a GIF inline, and shows nothing over 10 MB: the largest that fits.
 limit=$(( 9500 * 1024 ))
@@ -182,7 +176,7 @@ cs make-stats "$work/gource.log" "$width" "$height" "$fps" > "$work/stats.json"
 # Move everything into place only now that every piece exists.
 rm -rf "$out/hls"
 mv "$d" "$out/hls"
-for f in gource.mp4 gource.gif still-8k.jpg poster.jpg stats.json; do mv -f "$work/$f" "$out/$f"; done
+for f in gource.mp4 gource.gif still-4k.jpg poster.jpg stats.json; do mv -f "$work/$f" "$out/$f"; done
 rm -rf "$work"
 
 du -sh "$out/hls"/*/* | sed 's/^/  /'
