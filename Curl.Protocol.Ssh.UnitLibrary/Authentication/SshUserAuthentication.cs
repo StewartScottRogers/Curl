@@ -94,6 +94,8 @@ internal sealed class SshUserAuthentication(
 
     private const string CertificateSuffix = "-cert-v01@openssh.com";
 
+    private const string EcdsaKeyTypePrefix = "ecdsa-sha2-";
+
     private const string SkEcdsaMethod = "sk-ecdsa-sha2-nistp256@openssh.com";
 
     private const string SkEd25519Method = "sk-ssh-ed25519@openssh.com";
@@ -499,7 +501,7 @@ internal sealed class SshUserAuthentication(
     private async ValueTask<string?> DenyPublicKeyAsync(byte[] user, SshUserKeyFiles files, CancellationToken cancellationToken)
     {
         SshPublicKeyReading reading = await userKeys!.ReadPublicKeyAsync(files, cancellationToken).ConfigureAwait(false);
-        if (reading.Key is not { } publicKey)
+        if (reading.Key is not { } publicKey || (files.PublicKeyPath is null && !BackendReadsPrivateKey(publicKey.KeyType)))
         {
             return reading.DenialReason ?? await UnderivablePublicKeyReasonAsync(files, cancellationToken).ConfigureAwait(false);
         }
@@ -551,7 +553,7 @@ internal sealed class SshUserAuthentication(
     private async ValueTask<string?> SendSignedPublicKeyAsync(byte[] user, string algorithm, SshPublicKey publicKey, SshUserKeyFiles files, CancellationToken cancellationToken)
     {
         SshPrivateKey? privateKey = await userKeys!.ReadPrivateKeyAsync(files, cancellationToken).ConfigureAwait(false);
-        if (privateKey?.KeyType != PlainMethodOf(publicKey.KeyType))
+        if (!CanSign(privateKey, publicKey))
         {
             return SshInfoLines.SignCallbackFailed;
         }
@@ -566,6 +568,18 @@ internal sealed class SshUserAuthentication(
             cancellationToken).ConfigureAwait(false);
         return answer?[0] == SshAuthenticationMessageNumber.Success ? null : SshInfoLines.SignatureRefused;
     }
+
+    // Whether the private key read, is of the public key's plain type, and is one the backend reads.
+    private bool CanSign(SshPrivateKey? privateKey, SshPublicKey publicKey) =>
+        privateKey is not null && privateKey.KeyType == PlainMethodOf(publicKey.KeyType) && BackendReadsPrivateKey(privateKey.KeyType);
+
+    // WinCNG's libssh2 has no Ed25519 or ECDSA, so it reads no such private key, in any
+    // format: deriving the public key from one fails without a message, and signing with one
+    // fails the sign callback (BL-1098, ADR-0314). Other key types and backends read as
+    // SshPrivateKeyReader does (ADR-0122).
+    private bool BackendReadsPrivateKey(string keyType) =>
+        transport.CryptographyBackend != SshAlgorithmPreferences.WinCngBackend
+        || !(keyType == Ed25519SshPrivateKey.Ed25519KeyType || keyType.StartsWith(EcdsaKeyTypePrefix, StringComparison.Ordinal));
 
     // libssh2 upgrades only an ssh-rsa key, and on OpenSSL an RSA certificate too: once the
     // server has sent server-sig-algs, the first of its own RSA algorithms the server names,
