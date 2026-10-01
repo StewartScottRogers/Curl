@@ -34,3 +34,4 @@ Two gaps: the park path does not make its Doing -> Backlog move reach the shared
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
