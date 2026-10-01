@@ -35,3 +35,4 @@ A `file://` download larger than 16384 bytes reports its received data (`--trace
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
