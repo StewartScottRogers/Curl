@@ -357,8 +357,9 @@ param(
     # 15 minutes it adds at most one lane or retires straight down to the pace, paced to the
     # usage windows and capped by the board, the machine and -MaxLanes.
     [ValidatePattern('^(?i:auto|[1-9]|1[0-6])$')][string]$Lanes = '1',
-    # -Lanes Auto's lane maximum (Stewart, 2026-09-28: "Maybe we should set the max lanes to 6").
-    [ValidateRange(1, 16)][int]$MaxLanes = 6,
+    # -Lanes Auto's lane maximum (Stewart, 2026-10-01: "restart the dark factory with a
+    # default of 9 lanes"; it was 6 from 2026-09-28).
+    [ValidateRange(1, 16)][int]$MaxLanes = 9,
     # The fewest lanes a -Lanes Auto shift starts with. 16 starts at the ceiling and dials
     # down (Stewart, 2026-09-28: "Just start aggressively and dial down", BL-823). A start,
     # not a floor: the ceilings still cap it, and Auto still retires below it when pace demands.
@@ -1282,7 +1283,7 @@ if ($TestAutoLanes) {
         ,@('start saved 5', '5 (last shift saved 5)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 5 }) 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('start first shift', '3 (first auto shift)', "$((Get-AutoStartCount $null 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('start min 4 ceiling 2', '2 (first auto shift, capped at 2)', "$((Get-AutoStartCount $null 2 16 4 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
-        ,@('start default at ceiling', '6 (last shift saved 2, raised to 16 by -MinStartLanes, capped at 6)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 2 }) 16 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('start default at ceiling', '9 (last shift saved 2, raised to 16 by -MinStartLanes, capped at 9)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 2 }) 16 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('start default at capacity', '4 (first auto shift, capped at 4)', "$((Get-AutoStartCount $null 4 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('start min 3 saved 2', '3 (last shift saved 2, raised to 3 by -MinStartLanes)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 2 }) 16 16 3) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('start min 1 saved 1', '1 (last shift saved 1)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 1 }) 16 16 1 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })"))
