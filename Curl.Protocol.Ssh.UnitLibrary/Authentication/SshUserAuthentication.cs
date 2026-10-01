@@ -587,7 +587,7 @@ internal sealed class SshUserAuthentication(
 
     // What follows the chosen RSA algorithm in the upgraded method, or null when libssh2
     // leaves the method alone: WinCNG's libssh2 lists no upgrade for a certificate, and
-    // OpenSSL's skips it for an OpenSSH 7.7 or older banner (SSH_BUG_SIGTYPE, ADR-0310).
+    // OpenSSL's skips it for an OpenSSH 7.7 or older banner (SSH_BUG_SIGTYPE, ADR-0311).
     private string? UpgradeSuffixOf(string method) => method switch
     {
         RsaSshPrivateKey.RsaKeyType => string.Empty,

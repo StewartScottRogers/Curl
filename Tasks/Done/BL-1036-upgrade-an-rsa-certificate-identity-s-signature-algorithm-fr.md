@@ -28,7 +28,7 @@ An `ssh-rsa-cert-v01@openssh.com` key (from the agent, or `--key` with a certifi
 
 ## Notes
 
-- Measured 2026-10-01 (ADR-0310 has the table): a throwaway loopback server from
+- Measured 2026-10-01 (ADR-0311 has the table): a throwaway loopback server from
   `InMemorySshServer` (EXT_INFO added, each `publickey` request's algorithm recorded; not
   committed), an RSA key with an `ssh-keygen -s` certificate passed as `--key k --pubkey
   k-cert.pub`. Ubuntu curl 8.18.0 (libssh2 1.11.1, OpenSSL), through an `nc` relay in WSL:
@@ -48,10 +48,10 @@ An `ssh-rsa-cert-v01@openssh.com` key (from the agent, or `--key` with a certifi
   only the RSA certificate among upgradable methods; modelled as the certificate check.
 - Key-file certificates still fail at the signature (`SshPrivateKey.KeyType` is never the
   certificate's type); only the method choice is shared with the agent here. Filed as
-  BL-1096.
+  BL-1097.
 
 ## Log
 
 - 2026-09-30: Created.
 - 2026-10-01: Backlog -> Doing.
-- 2026-10-01: Doing -> Done. An ssh-rsa-cert-v01@openssh.com identity is upgraded to rsa-sha2-512/256-cert-v01@openssh.com from server-sig-algs as libssh2 1.11.1 does on OpenSSL (not on WinCNG, not for OpenSSH 7.7 or older), measured on both builds (ADR-0310)
+- 2026-10-01: Doing -> Done. An ssh-rsa-cert-v01@openssh.com identity is upgraded to rsa-sha2-512/256-cert-v01@openssh.com from server-sig-algs as libssh2 1.11.1 does on OpenSSL (not on WinCNG, not for OpenSSH 7.7 or older), measured on both builds (ADR-0311)

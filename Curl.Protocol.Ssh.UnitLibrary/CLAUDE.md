@@ -48,7 +48,7 @@ session, which the writer and reader start at the first `NEWKEYS` for `zlib` and
 `zlib@openssh.com` (ADR-0264); `Authentication` holds
 `SshUserAuthentication`, which requests the `ssh-userauth` service and authenticates the
 user with `none`, `publickey`, `password`, the ssh-agent's identities and
-`keyboard-interactive` in curl's order (ADR-0215, ADR-0230, ADR-0271), upgrading an `ssh-rsa` key, and on OpenSSL an RSA certificate, from `server-sig-algs` (ADR-0310) - the agent through
+`keyboard-interactive` in curl's order (ADR-0215, ADR-0230, ADR-0271), upgrading an `ssh-rsa` key, and on OpenSSL an RSA certificate, from `server-sig-algs` (ADR-0311) - the agent through
 `ISshAgentConnector` (`PlatformSshAgentConnector`: on Windows PuTTY's Pageant through
 `PageantSshAgentConnector`, then `SystemSshAgentConnector`'s pipe; elsewhere the Unix socket
 `SSH_AUTH_SOCK` names - ADR-0304) and `SshAgentClient`, which speaks the agent protocol; `Keys` holds `SshUserKeySource`, which finds `--key` (or curl's

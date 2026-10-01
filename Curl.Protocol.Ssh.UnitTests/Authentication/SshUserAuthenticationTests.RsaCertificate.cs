@@ -6,7 +6,7 @@ namespace Curl.Protocol.Ssh.Authentication;
 
 /// <summary>
 /// Pins the upgrade of an <c>ssh-rsa-cert-v01@openssh.com</c> identity from
-/// <c>server-sig-algs</c> (BL-1036, ADR-0310), measured 2026-10-01 with an
+/// <c>server-sig-algs</c> (BL-1036, ADR-0311), measured 2026-10-01 with an
 /// <c>ssh-keygen -s</c> certificate against a loopback server built from this library:
 /// curl 8.18.0 with libssh2 1.11.1 on OpenSSL upgrades it to the
 /// <c>rsa-sha2-*-cert-v01@openssh.com</c> method, except for an OpenSSH 7.7 or older banner,

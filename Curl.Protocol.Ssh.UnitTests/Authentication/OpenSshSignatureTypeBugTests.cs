@@ -2,7 +2,7 @@ namespace Curl.Protocol.Ssh.Authentication;
 
 /// <summary>
 /// Pins libssh2 1.11.1's <c>is_version_less_than_78</c> reading of the server's banner
-/// (ADR-0310): the text after the first <c>OpenSSH_</c>, read by <c>strtol</c> up to a dot.
+/// (ADR-0311): the text after the first <c>OpenSSH_</c>, read by <c>strtol</c> up to a dot.
 /// </summary>
 [TestClass]
 public sealed class OpenSshSignatureTypeBugTests

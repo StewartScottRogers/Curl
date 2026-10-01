@@ -1,5 +1,5 @@
 ---
-id: BL-1096
+id: BL-1097
 title: Sign with a --key private key whose --pubkey is an OpenSSH certificate, as libssh2 does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-01
 completed:
 ---
-# BL-1096 — Sign with a --key private key whose --pubkey is an OpenSSH certificate, as libssh2 does
+# BL-1097 — Sign with a --key private key whose --pubkey is an OpenSSH certificate, as libssh2 does
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-`SshUserAuthentication.SendSignedPublicKeyAsync` fails the method when the private key's `KeyType` differs from the public key's, and a certificate's type (`ssh-rsa-cert-v01@openssh.com`, ...) never equals its private key's. libssh2's `libssh2_userauth_publickey_fromfile_ex` signs with the private key file under the chosen method and sends the certificate blob; the signature names `plain_method`'s form. BL-1036 (ADR-0310) already chooses the upgraded certificate method on OpenSSL. Found in BL-1036. Measure first with the reference curl (Windows) and the WSL Ubuntu curl (libssh2 1.11.1, OpenSSL) against a loopback server that accepts the certificate, as ADR-0310 did, including a certificate whose key is not the private key's.
+`SshUserAuthentication.SendSignedPublicKeyAsync` fails the method when the private key's `KeyType` differs from the public key's, and a certificate's type (`ssh-rsa-cert-v01@openssh.com`, ...) never equals its private key's. libssh2's `libssh2_userauth_publickey_fromfile_ex` signs with the private key file under the chosen method and sends the certificate blob; the signature names `plain_method`'s form. BL-1036 (ADR-0311) already chooses the upgraded certificate method on OpenSSL. Found in BL-1036. Measure first with the reference curl (Windows) and the WSL Ubuntu curl (libssh2 1.11.1, OpenSSL) against a loopback server that accepts the certificate, as ADR-0311 did, including a certificate whose key is not the private key's.
 
 ## Acceptance criteria
 
