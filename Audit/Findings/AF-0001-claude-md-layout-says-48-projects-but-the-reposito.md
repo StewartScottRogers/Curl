@@ -5,7 +5,7 @@ auditor: truthfulness
 severity: Low
 status: accepted
 key: truthfulness:CLAUDE.md:repository-layout-project-count:false-statement
-task: none
+task: BL-1065
 found: 2026-09-30
 found-at: d065d6d3507e2ed87905d40a24233af193913378
 scorecard: 2026-09-30_1754.md
