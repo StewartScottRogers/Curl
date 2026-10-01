@@ -1,5 +1,5 @@
 ---
-id: AF-0005
+id: AF-0004
 title: 31 tasks cost over 3x the median task cost; the costliest are BL-703, BL-527, BL-568, BL-658 and BL-708
 auditor: process
 severity: Low
@@ -12,11 +12,11 @@ scorecard: 2026-09-30_1754.md
 closed:
 closed-by:
 ---
-# AF-0005 - 31 tasks cost over 3x the median task cost; the costliest are BL-703, BL-527, BL-568, BL-658 and BL-708
+# AF-0004 - 31 tasks cost over 3x the median task cost; the costliest are BL-703, BL-527, BL-568, BL-658 and BL-708
 
 ## Summary
 
-Low finding from the process auditor at `logs/BL-703-*.jsonl`: 31 tasks cost over 3x the median task cost; the costliest are BL-703, BL-527, BL-568, BL-658 and BL-708. Reported by an auditor flagged unreliable in 2026-09-30_1754.md.
+Low finding from the process auditor at `logs/BL-703-*.jsonl`: 31 tasks cost over 3x the median task cost; the costliest are BL-703, BL-527, BL-568, BL-658 and BL-708.
 
 ## Evidence
 

@@ -16,7 +16,7 @@ closed-by:
 
 ## Summary
 
-Medium finding from the process auditor at `logs/BL-564-20260929-023709-L4.jsonl`: BL-564 was claimed 3 times: lanes 1, 4 and 6, with two conflict-resolve runs. Reported by an auditor flagged unreliable in 2026-09-30_1754.md.
+Medium finding from the process auditor at `logs/BL-564-20260929-023709-L4.jsonl`: BL-564 was claimed 3 times: lanes 1, 4 and 6, with two conflict-resolve runs.
 
 ## Evidence
 
