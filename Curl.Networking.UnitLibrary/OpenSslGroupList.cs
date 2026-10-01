@@ -19,9 +19,8 @@ internal static class OpenSslGroupList
 
     private static readonly char[] EntrySeparators = [':', '/'];
 
-    // OpenSSL 3.5's names for every group it offers in a ClientHello. The client offers only
-    // the groups Curl.Tls can use; the others are known names, so they are dropped rather
-    // than refused.
+    // OpenSSL 3.5's names for every group it offers in a ClientHello, each one Curl.Tls can
+    // use (BL-1049 added the brainpool tls13 curves, pure ML-KEM and the NIST-curve hybrids).
     private static readonly FrozenDictionary<string, ushort> GroupsByName = new Dictionary<string, ushort>(StringComparer.OrdinalIgnoreCase)
     {
         ["secp256r1"] = TlsNamedGroup.Secp256r1,
@@ -34,9 +33,9 @@ internal static class OpenSslGroupList
         ["brainpoolP256r1"] = TlsNamedGroup.BrainpoolP256r1,
         ["brainpoolP384r1"] = TlsNamedGroup.BrainpoolP384r1,
         ["brainpoolP512r1"] = TlsNamedGroup.BrainpoolP512r1,
-        ["brainpoolP256r1tls13"] = 0x001f,
-        ["brainpoolP384r1tls13"] = 0x0020,
-        ["brainpoolP512r1tls13"] = 0x0021,
+        ["brainpoolP256r1tls13"] = TlsNamedGroup.BrainpoolP256r1Tls13,
+        ["brainpoolP384r1tls13"] = TlsNamedGroup.BrainpoolP384r1Tls13,
+        ["brainpoolP512r1tls13"] = TlsNamedGroup.BrainpoolP512r1Tls13,
         ["x25519"] = TlsNamedGroup.X25519,
         ["x448"] = TlsNamedGroup.X448,
         ["ffdhe2048"] = TlsNamedGroup.Ffdhe2048,
@@ -44,12 +43,12 @@ internal static class OpenSslGroupList
         ["ffdhe4096"] = TlsNamedGroup.Ffdhe4096,
         ["ffdhe6144"] = TlsNamedGroup.Ffdhe6144,
         ["ffdhe8192"] = TlsNamedGroup.Ffdhe8192,
-        ["MLKEM512"] = 0x0200,
-        ["MLKEM768"] = 0x0201,
-        ["MLKEM1024"] = 0x0202,
-        ["SecP256r1MLKEM768"] = 0x11eb,
+        ["MLKEM512"] = TlsNamedGroup.MlKem512,
+        ["MLKEM768"] = TlsNamedGroup.MlKem768,
+        ["MLKEM1024"] = TlsNamedGroup.MlKem1024,
+        ["SecP256r1MLKEM768"] = TlsNamedGroup.SecP256r1MlKem768,
         ["X25519MLKEM768"] = TlsNamedGroup.X25519MlKem768,
-        ["SecP384r1MLKEM1024"] = 0x11ed,
+        ["SecP384r1MLKEM1024"] = TlsNamedGroup.SecP384r1MlKem1024,
     }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Reads a <c>--curves</c> value.</summary>
@@ -76,8 +75,24 @@ internal static class OpenSslGroupList
         }
 
         ushort[] usable = [.. groups.Where(IsUsable)];
-        ushort[] shared = [.. keyShares.Where(group => usable.Contains(group) && TlsNamedGroup.CanShare(group))];
-        return new OfferedGroups(usable, shared.Length > 0 ? shared : [.. usable.Where(TlsNamedGroup.CanShare).Take(1)]);
+        // Every starred group was offered too (a removal takes it out of both lists), but only
+        // a TLS 1.3 group gets a key share.
+        ushort[] shared = [.. keyShares.Where(TlsNamedGroup.CanShare)];
+        return new OfferedGroups(usable, shared.Length > 0 ? shared : FirstWithKeyShare(usable));
+    }
+
+    // The first group a TLS 1.3 key share can be made for, or none.
+    private static ushort[] FirstWithKeyShare(ushort[] groups)
+    {
+        foreach (var group in groups)
+        {
+            if (TlsNamedGroup.CanShare(group))
+            {
+                return [group];
+            }
+        }
+
+        return [];
     }
 
     // Applies one entry to the lists, or returns false when OpenSSL refuses it.
