@@ -116,6 +116,7 @@ public sealed class TransferContextFactoryTests
         Assert.IsNull(context.ConnectTimeout);
         Assert.IsNull(context.MaxTime);
         Assert.IsNull(context.TimeCondition);
+        Assert.IsFalse(context.RemoteTime);
         Assert.IsFalse(context.PathAsIs);
     }
 
@@ -147,6 +148,7 @@ public sealed class TransferContextFactoryTests
             "--create-file-mode", "0600",
             "--connect-timeout", "3",
             "--path-as-is",
+            "-R",
             "-m", "9",
             "-z", "Sun, 06 Nov 1994 08:49:37 GMT",
             "tftp://example.com/x");
@@ -179,6 +181,7 @@ public sealed class TransferContextFactoryTests
         Assert.IsTrue(context.PathAsIs);
         Assert.AreEqual(options.TimeCondition, context.TimeCondition);
         Assert.IsNotNull(context.TimeCondition);
+        Assert.IsTrue(context.RemoteTime);
     }
 
     [TestMethod]
