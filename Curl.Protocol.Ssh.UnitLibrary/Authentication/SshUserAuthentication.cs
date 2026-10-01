@@ -545,11 +545,13 @@ internal sealed class SshUserAuthentication(
 
     // RFC 4252 section 7: the signature covers the session identifier as a string, then the
     // request up to and including the public key blob. A private key that cannot be read or
-    // is not of the public key's type fails the method before anything is sent.
+    // is not of the public key's type - a certificate's plain type - fails the method before
+    // anything is sent. libssh2 signs a certificate with the --key private key under the
+    // plain method and leaves a key the certificate does not certify to the server (BL-1097).
     private async ValueTask<string?> SendSignedPublicKeyAsync(byte[] user, string algorithm, SshPublicKey publicKey, SshUserKeyFiles files, CancellationToken cancellationToken)
     {
         SshPrivateKey? privateKey = await userKeys!.ReadPrivateKeyAsync(files, cancellationToken).ConfigureAwait(false);
-        if (privateKey?.KeyType != publicKey.KeyType)
+        if (privateKey?.KeyType != PlainMethodOf(publicKey.KeyType))
         {
             return SshInfoLines.SignCallbackFailed;
         }
@@ -557,7 +559,7 @@ internal sealed class SshUserAuthentication(
         byte[] request = PublicKeyRequest(user, algorithm, publicKey.Blob, signed: true);
         SshWireWriter message = new();
         message.WriteBytes(request);
-        message.WriteString(privateKey!.Sign(algorithm, SignedData(request)));
+        message.WriteString(privateKey!.Sign(PlainMethodOf(algorithm), SignedData(request)));
         byte[]? answer = await TryExchangeAsync(
             message.ToArray(),
             [SshAuthenticationMessageNumber.Success, SshAuthenticationMessageNumber.Failure],
