@@ -33,3 +33,4 @@ Negotiate's hand-built Kerberos route stores a service ticket it got by a TGS ex
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
