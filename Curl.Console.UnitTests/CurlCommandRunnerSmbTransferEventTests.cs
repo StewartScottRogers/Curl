@@ -53,7 +53,7 @@ public sealed class CurlCommandRunnerSmbTransferEventTests
             "*   Trying 172.26.96.1:14450..." + InfoEnd
             + "* Established connection to 172.26.96.1 (172.26.96.1 port 14450) from 172.26.99.197 port 54210 " + InfoEnd
             + "* closing connection #0" + InfoEnd
-            + "curl: (67) Login denied" + InfoEnd,
+            + "curl: (67) Login denied" + Environment.NewLine,
             Encoding.ASCII.GetString(standardError.ToArray()));
     }
 
