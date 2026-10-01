@@ -34,3 +34,4 @@ A Negotiate context kept for its next leg is disposed of once the response to it
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
