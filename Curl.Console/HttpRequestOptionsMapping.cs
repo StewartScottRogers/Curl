@@ -73,6 +73,7 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="CommandLineOptions.IgnoreContentLength" /> verbatim; and
     /// <paramref name="proxy" /> as <see cref="HttpRequestOptions.ForwardProxy" /> with
     /// <see cref="CommandLineOptions.ProxyTunnel" /> as <see cref="HttpRequestOptions.ProxyTunnel" />; and
+    /// whether <see cref="CommandLineOptions.UnixSocketPath" /> is set as <see cref="HttpRequestOptions.OverUnixSocket" />; and
     /// <paramref name="commandLineTextEncoding" /> as <see cref="HttpRequestOptions.CommandLineTextEncoding" />; and
     /// <see cref="CommandLineOptions.Expect100Timeout" /> as <see cref="HttpRequestOptions.ContinueWait" /> (<see cref="ContinueWaitOf" />).
     /// </returns>
@@ -106,6 +107,7 @@ internal static class HttpRequestOptionsMapping
             IgnoreContentLength = options.IgnoreContentLength,
             ForwardProxy = proxy,
             ProxyTunnel = options.ProxyTunnel,
+            OverUnixSocket = options.UnixSocketPath is not null,
             ContinueWait = ContinueWaitOf(options),
         };
 
