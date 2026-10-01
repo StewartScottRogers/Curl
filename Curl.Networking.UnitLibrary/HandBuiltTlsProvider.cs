@@ -199,17 +199,21 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     /// <summary>
     /// Turns the <c>--cert</c> certificate into what the hand-built client presents: the
-    /// certificate and a signing key for its RSA or ECDSA private key.
+    /// certificate and a signing key for its RSA or ECDSA private key, or the Ed25519, Ed448
+    /// or ML-DSA signing key a <see cref="HandBuiltKeyCertificate" /> carries.
     /// </summary>
     /// <param name="certificate">The loaded certificate with its key, or <see langword="null" />.</param>
     /// <returns>The client certificate, or <see langword="null" /> when there is none or its key is of another kind.</returns>
-    internal static TlsClientCertificate? ToTlsClientCertificate(X509Certificate2? certificate)
-    {
-        TlsSigningKey? key = certificate?.GetRSAPrivateKey() is { } rsa ? new RsaTlsSigningKey(rsa)
-            : certificate?.GetECDsaPrivateKey() is { } ecdsa ? new EcdsaTlsSigningKey(ecdsa)
+    internal static TlsClientCertificate? ToTlsClientCertificate(X509Certificate2? certificate) =>
+        certificate is not null && SigningKeyOf(certificate) is { } key
+            ? new TlsClientCertificate([certificate.RawData], key)
             : null;
-        return key is null ? null : new TlsClientCertificate([certificate!.RawData], key);
-    }
+
+    private static TlsSigningKey? SigningKeyOf(X509Certificate2 certificate) =>
+        certificate is HandBuiltKeyCertificate handBuilt ? handBuilt.SigningKey
+            : certificate.GetRSAPrivateKey() is { } rsa ? new RsaTlsSigningKey(rsa)
+            : certificate.GetECDsaPrivateKey() is { } ecdsa ? new EcdsaTlsSigningKey(ecdsa)
+            : null;
 
     /// <summary>
     /// Returns the name the ClientHello carries in <c>server_name</c>: the target host, or
