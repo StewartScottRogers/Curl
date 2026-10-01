@@ -26,8 +26,14 @@ internal static class Tls12ClientHelloBuilder
             extensions.Add(SrpExtension.Encode(Encoding.UTF8.GetBytes(settings.SrpCredentials.UserName)));
         }
 
-        extensions.Add(UncompressedPointFormat);
-        extensions.Add(SupportedGroupsExtension.Encode(settings.SupportedGroups));
+        // With no group to offer, OpenSSL sends neither ec_point_formats nor supported_groups
+        // (measured with --tls-max 1.2 --curves '?bogus', BL-1094).
+        if (settings.SupportedGroups.Count > 0)
+        {
+            extensions.Add(UncompressedPointFormat);
+            extensions.Add(SupportedGroupsExtension.Encode(settings.SupportedGroups));
+        }
+
         AddSessionAndStatusExtensions(settings, extensions);
         AddNegotiatedExtensions(settings, extensions);
         return new ClientHello((ushort)settings.MaximumVersion, random, sessionId, settings.OfferedCipherSuites, [0], extensions);
