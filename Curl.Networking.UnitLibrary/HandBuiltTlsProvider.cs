@@ -133,7 +133,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <param name="targetHost">The host name to validate the server certificate against.</param>
     /// <param name="events">Where the trust and the completed handshake are reported.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
-    /// <returns>The same result <see cref="ITlsProvider.AuthenticateAsClientAsync" /> describes.</returns>
+    /// <returns>The same result <see cref="ITlsProvider.AuthenticateAsClientAsync(IConnection, string, CancellationToken)" /> describes.</returns>
     public ValueTask<ConnectResult> AuthenticateAsClientAsync(
         IConnection plaintext,
         string targetHost,
@@ -155,7 +155,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <param name="isProxy"><see langword="true" /> when the handshake is with an HTTPS proxy.</param>
     /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
-    /// <returns>The same result <see cref="ITlsProvider.AuthenticateAsClientAsync" /> describes.</returns>
+    /// <returns>The same result <see cref="ITlsProvider.AuthenticateAsClientAsync(IConnection, string, CancellationToken)" /> describes.</returns>
     public async ValueTask<ConnectResult> AuthenticateAsClientAsync(
         IConnection plaintext,
         string targetHost,

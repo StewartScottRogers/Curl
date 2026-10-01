@@ -169,6 +169,25 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.AreEqual(expected, SslStreamTlsProvider.VerifiedHostName(targetHost, insecure));
     }
 
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithEventsThroughITlsProvider_ReportsTheTrustAndTheHandshake()
+    {
+        // A protocol handler's STARTTLS upgrade holds only an ITlsProvider (BL-1058).
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var serverTask = RunEchoServerAsync(server, SslProtocols.None);
+        ITlsProvider provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true), OpenSslBuild);
+        var events = new RecordingTransferEvents();
+
+        var result = await provider.AuthenticateAsClientAsync(
+            new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.IsInstanceOfType<TlsTrustEvent>(events.TlsEvents[0]);
+        Assert.IsEmpty(Assert.ContainsSingle(events.Handshakes).OfferedApplicationProtocols);
+        await result.Connection!.DisposeAsync();
+        await IgnoreFailureAsync(serverTask);
+    }
+
     private static async Task<ConnectResult> ReportingHandshakeAsync(
         TlsClientOptions options,
         RecordingTransferEvents events,
