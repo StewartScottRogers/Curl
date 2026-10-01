@@ -70,3 +70,4 @@ completed:
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Console.UnitTests (its --compressed test pins the old Accept-Encoding), which BL-633 in Doing touches; measurements recorded in Notes
+- 2026-09-30: Backlog -> Doing.
