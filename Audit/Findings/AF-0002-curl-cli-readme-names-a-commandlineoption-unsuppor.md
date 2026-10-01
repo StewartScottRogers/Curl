@@ -3,7 +3,7 @@ id: AF-0002
 title: Curl.Cli README names a CommandLineOption.UnsupportedFlag builder that does not exist and says --http2 is refused as unsupported
 auditor: truthfulness
 severity: Medium
-status: proposed
+status: accepted
 key: truthfulness:Curl.Cli.UnitLibrary/README.md:CommandLineOption.UnsupportedFlag:false-statement
 task: none
 found: 2026-09-30
