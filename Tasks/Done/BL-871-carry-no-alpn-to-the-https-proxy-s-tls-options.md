@@ -8,7 +8,7 @@ depends-on: [BL-753]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-871 — Carry --no-alpn to the HTTPS proxy's TLS options
 
@@ -24,12 +24,17 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Console.UnitTests/TlsClientOptionsMappingTests.cs` pins that `ProxyFromCommandLine` of a command line with `--no-alpn` has `UseAlpn` false, and without it true.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports no failing member in `Curl.Console`.
+- [x] A test in `Curl.Console.UnitTests/TlsClientOptionsMappingTests.cs` pins that `ProxyFromCommandLine` of a command line with `--no-alpn` has `UseAlpn` false, and without it true.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports no failing member in `Curl.Console`.
 
 ## Notes
+
+- `ProxyFromCommandLine` now passes `UseAlpn: options.UseAlpn`; doc comment cites ADR-0190 and the BL-753 measurement. No new decision, so no ADR.
+- Pinned by `ProxyFromCommandLine_NoAlpn_TurnsTheProxysAlpnOff` (false with `--no-alpn`, true without).
+- Measure-CodeQuality: Curl.Console 100/100, 0 failing; the 2 failing members are in Curl.Protocol.Ftp.UnitLibrary and Curl.Tls.UnitLibrary, outside this task.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. --no-alpn now turns ALPN off in the HTTPS proxy's TLS handshake
