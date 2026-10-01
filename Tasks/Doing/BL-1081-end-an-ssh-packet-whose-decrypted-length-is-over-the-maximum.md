@@ -33,3 +33,4 @@ An SSH packet whose decrypted `packet_length` is over the maximum ends with `cur
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
