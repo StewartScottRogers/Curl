@@ -71,6 +71,14 @@ internal sealed class AwsSigV4HttpAuthenticator(IHttpAuthenticator otherSchemes,
             : sentAuthorization;
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Forwarded to the other schemes, so a Negotiate context kept for its next leg is disposed
+    /// of in the composed binary too (ADR-0248, BL-982); a signed value has nothing to end there.
+    /// </remarks>
+    public void EndAuthorization(string sentAuthorization) =>
+        otherSchemes.EndAuthorization(sentAuthorization);
+
     /// <summary>
     /// Signs <paramref name="request" /> before any challenge, when it has a credential, and
     /// reports the <c>-v</c> lines curl 8.21.0 prints for it: the string to sign, the

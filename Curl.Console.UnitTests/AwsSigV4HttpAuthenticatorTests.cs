@@ -118,6 +118,17 @@ public sealed class AwsSigV4HttpAuthenticatorTests
     }
 
     [TestMethod]
+    public void EndAuthorization_KeptNegotiateValue_GoesToTheOtherSchemes()
+    {
+        var otherSchemes = new OtherSchemes();
+        var authenticator = new AwsSigV4HttpAuthenticator(otherSchemes, new AwsSigV4Signer(new FixedUtcClock(Measured), Encoding.Latin1));
+
+        authenticator.EndAuthorization("Negotiate YQ==");
+
+        CollectionAssert.AreEqual(new[] { "Negotiate YQ==" }, otherSchemes.Ended);
+    }
+
+    [TestMethod]
     public async Task EveryCall_NullRequest_Throws()
     {
         AwsSigV4HttpAuthenticator authenticator = Authenticator();
@@ -155,6 +166,10 @@ public sealed class AwsSigV4HttpAuthenticatorTests
             ValueTask.FromResult<string?>("continued");
 
         public string RepeatAuthorization(HttpAuthRequest request, string sentAuthorization) => "repeated " + sentAuthorization;
+
+        public List<string> Ended { get; } = [];
+
+        public void EndAuthorization(string sentAuthorization) => Ended.Add(sentAuthorization);
     }
 
     /// <summary>Records every <c>-v</c> line reported.</summary>
