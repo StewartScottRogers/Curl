@@ -37,3 +37,4 @@ A connect to a forward HTTP proxy (`-x http://...` with an `http://` URL) that f
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
