@@ -34,3 +34,4 @@ On Windows, Linux and macOS, `curl smb://...` and `curl smbs://...` run end to e
 ## Log
 
 - 2026-09-28: Created.
+- 2026-10-01: Backlog -> Doing.
