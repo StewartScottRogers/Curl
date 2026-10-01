@@ -158,12 +158,167 @@ public sealed class CurlCompositionSshVerboseTests
         Assert.AreEqual(0, exitCode);
     }
 
+    [TestMethod]
+    [DataRow("sftp", "", DisplayName = "sftp")]
+    [DataRow("scp", "* SSH: connection established\n", DisplayName = "scp")]
+    public async Task CreateRunner_UploadWithAPublicKey_WritesTheSentDataAndTheUploadSentOffAsMeasured(string scheme, string established)
+    {
+        using TemporaryFiles files = new();
+        (string key, string publicKey) = files.UserKeys();
+        string source = files.Write("up.txt", "hello upload\n");
+
+        (int exitCode, string standardOutput, string standardError) = await RunAsync(
+            Server(authorizesTheTestKey: true), ["-v", "-sS", "-k", "--key", key, "--pubkey", publicKey, "-u", $"{User}:", "-T", source, $"{scheme}://127.0.0.1:2222/data/up.txt"]);
+
+        Assert.AreEqual(
+            Start
+            + "* SSH: no knownhosts file configured\n"
+            + "* SSH: host offers authentication via: publickey,password\n"
+            + $"* SSH: trying public key file '{publicKey}'\n"
+            + $"* SSH: trying private key file '{key}'\n"
+            + "* SSH: authenticated via publickey\n"
+            + "* SSH: authentication complete\n"
+            + established
+            + "} [13 bytes data]\n"
+            + "* upload completely sent off: 13 bytes\n"
+            + "* Connection #0 to host 127.0.0.1:2222 left intact\n",
+            standardError);
+        Assert.AreEqual(string.Empty, standardOutput);
+        Assert.AreEqual(0, exitCode);
+    }
+
+    [TestMethod]
+    [DataRow("sftp", "", DisplayName = "sftp")]
+    [DataRow("scp", "* SSH: connection established\n", DisplayName = "scp")]
+    public async Task CreateRunner_UploadTraceAscii_WritesTheSentDataAsMeasured(string scheme, string established)
+    {
+        using TemporaryFiles files = new();
+        (string key, string publicKey) = files.UserKeys();
+        string source = files.Write("up.txt", "hello upload\n");
+
+        (int exitCode, string standardOutput, string standardError) = await RunAsync(
+            Server(authorizesTheTestKey: true), ["--trace-ascii", "-", "-sS", "-k", "--key", key, "--pubkey", publicKey, "-u", $"{User}:", "-T", source, $"{scheme}://127.0.0.1:2222/data/up.txt"]);
+
+        Assert.AreEqual(
+            Start
+            + "* SSH: no knownhosts file configured\n"
+            + "* SSH: host offers authentication via: publickey,password\n"
+            + $"* SSH: trying public key file '{publicKey}'\n"
+            + $"* SSH: trying private key file '{key}'\n"
+            + "* SSH: authenticated via publickey\n"
+            + "* SSH: authentication complete\n"
+            + established
+            + "=> Send data, 13 bytes (0xd)\n"
+            + "0000: hello upload.\n"
+            + "* upload completely sent off: 13 bytes\n"
+            + "* Connection #0 to host 127.0.0.1:2222 left intact\n",
+            standardOutput);
+        Assert.AreEqual(string.Empty, standardError);
+        Assert.AreEqual(0, exitCode);
+    }
+
+    [TestMethod]
+    public async Task CreateRunner_ScpDownloadWithKeyboardInteractive_WritesTheAgentThenTheMethodAsMeasured()
+    {
+        using TemporaryFiles files = new();
+        string key = files.PathOf("id_missing");
+        InMemorySshServer server = new(User, Password) { OffersKeyboardInteractive = true };
+        server.Files["/data/hello.txt"] = "hello world"u8.ToArray();
+
+        (int exitCode, string standardOutput, string standardError) = await RunWithoutAgentAsync(
+            server, ["-v", "-sS", "-k", "--key", key, "-u", $"{User}:{Password}", "scp://127.0.0.1:2222/data/hello.txt"]);
+
+        Assert.AreEqual(
+            Start
+            + "* SSH: no knownhosts file configured\n"
+            + "* SSH: host offers authentication via: publickey,keyboard-interactive\n"
+            + $"* SSH: trying private key file '{key}'\n"
+            + $"* SSH: publickey authentication denied: {MissingKeyDenied}\n"
+            + "* SSH: trying publickey authentication via agent\n"
+            + "* SSH: failure connecting to agent\n"
+            + "* SSH: initialized keyboard interactive authentication\n"
+            + "* SSH: authentication complete\n"
+            + "* SSH: connection established\n"
+            + "{ [11 bytes data]\n"
+            + "* Connection #0 to host 127.0.0.1:2222 left intact\n",
+            standardError);
+        Assert.AreEqual("hello world", standardOutput);
+        Assert.AreEqual(0, exitCode);
+    }
+
+    [TestMethod]
+    public async Task CreateRunner_ScpFileShort_WritesTheFailureAndClosesTheConnectionAsMeasured()
+    {
+        using TemporaryFiles files = new();
+        string key = files.PathOf("id_missing");
+
+        (int exitCode, string standardOutput, string standardError) = await RunAsync(
+            ShortFileServer(), ["-v", "-sS", "-k", "--key", key, "-u", $"{User}:{Password}", "scp://127.0.0.1:2222/data/x"]);
+
+        StringAssert.EndsWith(
+            standardError,
+            "* SSH: authentication complete\n"
+            + "* SSH: connection established\n"
+            + "{ [5 bytes data]\n"
+            + "* end of response with 5 bytes missing\n"
+            + "* closing connection #0\n"
+            + "curl: (18) end of response with 5 bytes missing\n");
+        Assert.AreEqual("01234", standardOutput);
+        Assert.AreEqual(18, exitCode);
+    }
+
+    [TestMethod]
+    public async Task CreateRunner_ScpFileShortTraceAscii_WritesTheChannelsEndAsEmptyDataAsMeasured()
+    {
+        using TemporaryFiles files = new();
+        string key = files.PathOf("id_missing");
+
+        (int exitCode, string standardOutput, string standardError) = await RunAsync(
+            ShortFileServer(), ["--trace-ascii", "-", "-sS", "-k", "--key", key, "-u", $"{User}:{Password}", "scp://127.0.0.1:2222/data/x"]);
+
+        StringAssert.EndsWith(
+            standardOutput,
+            "* SSH: connection established\n"
+            + "<= Recv data, 5 bytes (0x5)\n"
+            + "0000: 01234\n"
+            + "01234"
+            + "<= Recv data, 0 bytes (0x0)\n"
+            + "* end of response with 5 bytes missing\n"
+            + "* closing connection #0\n");
+        Assert.AreEqual("curl: (18) end of response with 5 bytes missing\n", standardError);
+        Assert.AreEqual(18, exitCode);
+    }
+
+    // Measured against a scripted scp announcing 10 bytes and sending 5.
+    private static InMemorySshServer ShortFileServer()
+    {
+        InMemorySshServer server = new(User, Password) { ScpFileShortBy = 5 };
+        server.Files["/data/x"] = "01234"u8.ToArray();
+        return server;
+    }
+
     private static InMemorySshServer Server(bool authorizesTheTestKey = false)
     {
         byte[]? publicKey = authorizesTheTestKey ? Convert.FromBase64String(TestUserKeys.RsaPublicKeyFile.Split(' ')[1]) : null;
         InMemorySshServer server = new(User, Password) { AuthorizedPublicKey = publicKey };
         server.Files["/data/hello.txt"] = "hello world"u8.ToArray();
         return server;
+    }
+
+    // SSH_AUTH_SOCK names no agent for the run, so the result does not
+    // depend on whether the machine runs one; no other test here reaches the agent step.
+    private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunWithoutAgentAsync(InMemorySshServer server, string[] arguments)
+    {
+        string? agentSocket = Environment.GetEnvironmentVariable("SSH_AUTH_SOCK");
+        Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", Path.Combine(Path.GetTempPath(), $"curl-bl988-no-agent-{Guid.NewGuid():N}"));
+        try
+        {
+            return await RunAsync(server, arguments);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SSH_AUTH_SOCK", agentSocket);
+        }
     }
 
     private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(InMemorySshServer server, string[] arguments)
