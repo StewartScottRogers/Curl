@@ -24,7 +24,7 @@ public sealed class UdpChannelOpener(IPAddress? localAddress = null, int localPo
 
         return new UdpDatagramChannel(
             serverEndPoint,
-            (socket, firstLocalEndPoint) => TcpDialer.BindLocalEnd(socket, (IPEndPoint)firstLocalEndPoint, localPortCount),
+            (socket, firstLocalEndPoint) => TcpDialer.BindLocalEnd(socket, (IPEndPoint)firstLocalEndPoint, localPortCount, NoTransferEvents.Instance),
             localEndPoint.Address,
             localEndPoint.Port);
     }

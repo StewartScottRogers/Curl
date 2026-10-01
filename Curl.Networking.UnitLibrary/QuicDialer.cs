@@ -302,7 +302,8 @@ public sealed class QuicDialer
     }
 
     // Unbound without a LocalBinding; else on the address chosen for the family dialled and the
-    // first free port of the --local-port range, as libcurl's bindlocal binds a QUIC socket.
+    // first free port of the --local-port range, as libcurl's bindlocal binds a QUIC socket. Its -v
+    // bind lines are not written for QUIC yet: the TCP path's (BL-1027) were not measured over QUIC.
     private async ValueTask<IDatagramChannel> OpenBoundChannelAsync(LocalBindingAddressChooser? localBinding, IPEndPoint endPoint, CancellationToken cancellationToken)
     {
         if (localBinding is null)
@@ -310,7 +311,7 @@ public sealed class QuicDialer
             return _channelOpener.Open(endPoint);
         }
 
-        var localAddress = await localBinding.ChooseAsync(endPoint.AddressFamily, cancellationToken).ConfigureAwait(false);
+        var localAddress = await localBinding.ChooseAsync(endPoint.AddressFamily, NoTransferEvents.Instance, cancellationToken).ConfigureAwait(false);
         var binding = localBinding.Binding;
         return _channelOpener.OpenFrom(endPoint, new IPEndPoint(localAddress, binding.FirstPort), binding.PortCount);
     }

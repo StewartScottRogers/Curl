@@ -44,7 +44,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     {
         ArgumentNullException.ThrowIfNull(endPoint);
 
-        return DialBoundAsync(endPoint, null, 0, cancellationToken);
+        return DialBoundAsync(endPoint, null, 0, NoTransferEvents.Instance, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -58,7 +58,22 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         ArgumentNullException.ThrowIfNull(endPoint);
         ArgumentNullException.ThrowIfNull(localEndPoint);
 
-        return DialBoundAsync(endPoint, localEndPoint, localPortCount, cancellationToken);
+        return DialBoundAsync(endPoint, localEndPoint, localPortCount, NoTransferEvents.Instance, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Excluded from coverage per ADR-0083, as <see cref="DialAsync" /> is. The bind and its lines are
+    /// <see cref="BindLocalEnd" />'s, which unit tests measure.
+    /// </remarks>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(endPoint);
+        ArgumentNullException.ThrowIfNull(localEndPoint);
+        ArgumentNullException.ThrowIfNull(events);
+
+        return DialBoundAsync(endPoint, localEndPoint, localPortCount, events, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -73,13 +88,15 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         bool bindsAddressAfterDevice,
         Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
         int localPortCount,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(endPoint);
         ArgumentNullException.ThrowIfNull(deviceName);
         ArgumentNullException.ThrowIfNull(chooseLocalEndAsync);
+        ArgumentNullException.ThrowIfNull(events);
 
-        return DialDeviceBoundAsync(endPoint, deviceName, bindsAddressAfterDevice, chooseLocalEndAsync, localPortCount, cancellationToken);
+        return DialDeviceBoundAsync(endPoint, deviceName, bindsAddressAfterDevice, chooseLocalEndAsync, localPortCount, events, cancellationToken);
     }
 
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
@@ -89,16 +106,23 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         bool bindsAddressAfterDevice,
         Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
         int localPortCount,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         try
         {
             ApplySocketOptions(socket);
-            if (!TryBindToDevice(socket, deviceName) || bindsAddressAfterDevice)
+            var deviceBound = TryBindToDevice(socket, deviceName);
+            if (deviceBound && !bindsAddressAfterDevice)
+            {
+                // libcurl says so only for a name bound as a device alone, never for ifhost!.
+                events.ReportInfo(LocalBindLines.DeviceBound(deviceName));
+            }
+            else
             {
                 var localEndPoint = await chooseLocalEndAsync(cancellationToken).ConfigureAwait(false);
-                BindLocalEnd(socket, localEndPoint, localPortCount);
+                BindLocalEnd(socket, localEndPoint, localPortCount, events);
             }
 
             await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
@@ -113,7 +137,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     }
 
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
-    private async ValueTask<DialedTcpConnection> DialBoundAsync(IPEndPoint endPoint, IPEndPoint? bindTo, int localPortCount, CancellationToken cancellationToken)
+    private async ValueTask<DialedTcpConnection> DialBoundAsync(IPEndPoint endPoint, IPEndPoint? bindTo, int localPortCount, ITransferEvents events, CancellationToken cancellationToken)
     {
         var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         try
@@ -121,7 +145,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
             ApplySocketOptions(socket);
             if (bindTo is not null)
             {
-                BindLocalEnd(socket, bindTo, localPortCount);
+                BindLocalEnd(socket, bindTo, localPortCount, events);
             }
 
             await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
@@ -213,26 +237,39 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// <param name="socket">A TCP or UDP socket not yet bound or connected.</param>
     /// <param name="localEndPoint">The local address and the first port.</param>
     /// <param name="portCount">How many ports to try; fewer than 1 is taken as 1.</param>
+    /// <param name="events">
+    /// Where curl's <c>-v</c> lines go (BL-1027): <c>Bind to local port N failed, trying next</c> for each port
+    /// that would not bind with another left, then <c>Local port: N</c> for the port bound, as asked for, or
+    /// <c>bind failed with errno N: reason</c> when none would.
+    /// </param>
     /// <exception cref="LocalBindException">
     /// No port bound (<see cref="LocalBindFailure.InterfaceFailed" />): each was in use, not
     /// permitted, or the address is not local.
     /// </exception>
-    internal static void BindLocalEnd(Socket socket, IPEndPoint localEndPoint, int portCount)
+    internal static void BindLocalEnd(Socket socket, IPEndPoint localEndPoint, int portCount, ITransferEvents events)
     {
         var lastPort = Math.Min(localEndPoint.Port + Math.Max(portCount, 1) - 1, IPEndPoint.MaxPort);
+        SocketException? lastFailure = null;
         for (var port = localEndPoint.Port; port <= lastPort; port++)
         {
             try
             {
                 socket.Bind(new IPEndPoint(localEndPoint.Address, port));
+                events.ReportInfo(LocalBindLines.LocalPort(port));
                 return;
             }
-            catch (SocketException)
+            catch (SocketException exception)
             {
-                // libcurl moves on to the next port of the range.
+                // libcurl moves on to the next port of the range, saying so while one is left.
+                lastFailure = exception;
+                if (port < lastPort)
+                {
+                    events.ReportInfo(LocalBindLines.PortFailedTryingNext(port));
+                }
             }
         }
 
+        events.ReportInfo(LocalBindLines.BindFailed(lastFailure!, OperatingSystem.IsWindows()));
         throw new LocalBindException(LocalBindFailure.InterfaceFailed);
     }
 

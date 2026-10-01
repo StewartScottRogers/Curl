@@ -283,6 +283,12 @@ fails throws `LocalBindException`, a `SocketException`, so `AddressFamilyRace` m
 address with curl's `from  port 0 failed:` line and returns the last `LocalBindFailure`:
 `InterfaceFailed` is exit 45 `Failed binding local connection end`, `BadArgument` (an `ifhost!`
 interface part over 254 characters) exit 43, `AddressFamilyMismatch` the usual exit 7.
+Per ADR-0295 (BL-1027) the bind writes curl's `-v` lines, texts in `LocalBindLines`, on the target's
+`Events`, which `TcpConnector` gives each race's `LocalBindingTcpDialer`: the chooser writes
+`Name ... resolved to` and the `Could not resolve host`/`Could not bind to` lines, and `TcpDialer`,
+through the `ITcpDialer.DialFromAsync` overload taking `ITransferEvents` (whose default writes nothing)
+and `DialFromDeviceAsync`, writes `socket successfully bound to interface`, and `BindLocalEnd` the
+`Bind to local port N failed, trying next`, `Local port: N` and `bind failed with errno N` lines.
 Per ADR-0292 (BL-1025) QUIC's UDP sockets bind the same way: `TcpConnector` puts the chooser on
 `QuicDialRequest.LocalBinding`, and `QuicDialer` binds each socket through
 `IUdpChannelOpener.OpenFrom` (`TcpDialer.BindLocalEnd` walks the range) before it reports the trust

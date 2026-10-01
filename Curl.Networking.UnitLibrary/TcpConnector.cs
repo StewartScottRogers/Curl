@@ -162,9 +162,9 @@ public sealed partial class TcpConnector(
     /// </summary>
     public HaproxyProtocolHeader? HaproxyProtocol => haproxyProtocol;
 
-    // Every TCP dial goes through this one: bound as localBinding asks, or the dialer as given.
-    private ITcpDialer BindingDialer() => LocalAddressChooser() is { } addressChooser
-        ? new LocalBindingTcpDialer(tcpDialer, addressChooser)
+    // Every TCP dial goes through this one: bound as localBinding asks, its -v bind lines on events, or the dialer as given.
+    private ITcpDialer BindingDialer(ITransferEvents events) => LocalAddressChooser() is { } addressChooser
+        ? new LocalBindingTcpDialer(tcpDialer, addressChooser, events)
         : tcpDialer;
 
     // Chooses the local address TCP dials and QUIC's UDP sockets bind; null when localBinding is.
@@ -1347,7 +1347,7 @@ public sealed partial class TcpConnector(
         ConnectTarget target,
         CancellationToken cancellationToken)
     {
-        var race = new AddressFamilyRace(BindingDialer(), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog));
+        var race = new AddressFamilyRace(BindingDialer(target.Events), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog));
         var (dialed, remoteEndPoint, lastError, lastBindFailure) = await race.DialAsync(addresses, port, cancellationToken).ConfigureAwait(false);
         return dialed is null
             ? (null, lastError, lastBindFailure)

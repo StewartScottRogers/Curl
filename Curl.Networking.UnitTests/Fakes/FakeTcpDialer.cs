@@ -49,6 +49,17 @@ public sealed class FakeTcpDialer : ITcpDialer
         return DialAsync(endPoint, cancellationToken);
     }
 
+    /// <summary>Gets the events each bound dial given them was given, in order.</summary>
+    public List<ITransferEvents> BoundDialEvents { get; } = [];
+
+    /// <inheritdoc />
+    public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        BoundDialEvents.Add(events);
+
+        return DialFromAsync(endPoint, localEndPoint, localPortCount, cancellationToken);
+    }
+
     /// <summary>
     /// Gets or sets what one Unix socket dial does: return a connection, or throw. Defaults to
     /// refusing.

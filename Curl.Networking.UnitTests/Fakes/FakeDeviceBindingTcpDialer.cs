@@ -7,7 +7,7 @@ namespace Curl.Networking.Fakes;
 /// <summary>
 /// A <see cref="FakeTcpDialer" /> whose device bind answers <see cref="DeviceBinds" />, as
 /// <see cref="TcpDialer.DialFromDeviceAsync" /> does: a device bound with no address after it dials
-/// unbound, anything else binds the local end chosen through <see cref="FakeTcpDialer.DialFromAsync" />.
+/// unbound, anything else binds the local end chosen through <see cref="FakeTcpDialer.DialFromAsync(IPEndPoint, IPEndPoint, int, ITransferEvents, CancellationToken)" />.
 /// </summary>
 /// <param name="inner">Records the dials and answers them.</param>
 /// <param name="deviceBinds">Whether <c>SO_BINDTODEVICE</c> succeeds.</param>
@@ -34,6 +34,7 @@ public sealed class FakeDeviceBindingTcpDialer(FakeTcpDialer inner, bool deviceB
         bool bindsAddressAfterDevice,
         Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
         int localPortCount,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         DeviceDials.Add((deviceName, bindsAddressAfterDevice));
@@ -43,7 +44,7 @@ public sealed class FakeDeviceBindingTcpDialer(FakeTcpDialer inner, bool deviceB
         }
 
         var localEndPoint = await chooseLocalEndAsync(cancellationToken);
-        return await inner.DialFromAsync(endPoint, localEndPoint, localPortCount, cancellationToken);
+        return await inner.DialFromAsync(endPoint, localEndPoint, localPortCount, events, cancellationToken);
     }
 
     /// <inheritdoc />

@@ -32,11 +32,17 @@ internal sealed class LocalBindingAddressChooser(
     /// is <see cref="LocalBindFailure.InterfaceFailed" /> after <c>if!</c> and is resolved as a host
     /// otherwise; with neither name the unspecified address of the family, so only the port is bound.
     /// </summary>
+    /// <remarks>
+    /// The <c>-v</c> lines libcurl writes as it chooses go to <paramref name="events" /> (BL-1027): the
+    /// <c>Name ... resolved to</c> line for a host resolved, and the <c>Could not ...</c> lines for a host
+    /// or an <c>if!</c> interface that gives no address. A family mismatch writes nothing more, as in curl.
+    /// </remarks>
     /// <param name="family">The family of the address dialled.</param>
+    /// <param name="events">Where the <c>-v</c> lines go.</param>
     /// <param name="cancellationToken">Cancels a host name's resolve.</param>
     /// <returns>The local address to bind.</returns>
     /// <exception cref="LocalBindException">No local address can be chosen, as its <see cref="LocalBindException.Failure" /> says.</exception>
-    public async ValueTask<IPAddress> ChooseAsync(AddressFamily family, CancellationToken cancellationToken)
+    public async ValueTask<IPAddress> ChooseAsync(AddressFamily family, ITransferEvents events, CancellationToken cancellationToken)
     {
         if (binding.DeviceName is { Length: > LocalBinding.LongestDeviceName })
         {
@@ -50,12 +56,16 @@ internal sealed class LocalBindingAddressChooser(
 
         if (binding.HostName is { } hostName)
         {
-            return await ResolveHostAsync(hostName, family, cancellationToken).ConfigureAwait(false);
+            return await ResolveHostAsync(hostName, family, events, cancellationToken).ConfigureAwait(false);
         }
 
-        return binding.InterfaceName is null
-            ? UnspecifiedAddress(family)
-            : throw new LocalBindException(LocalBindFailure.InterfaceFailed);
+        if (binding.InterfaceName is { } interfaceName)
+        {
+            events.ReportInfo(LocalBindLines.CouldNotBindInterface(interfaceName, OperatingSystem.IsWindows()));
+            throw new LocalBindException(LocalBindFailure.InterfaceFailed);
+        }
+
+        return UnspecifiedAddress(family);
     }
 
     /// <summary>
@@ -83,16 +93,19 @@ internal sealed class LocalBindingAddressChooser(
     /// other name through the resolver. The first address is bound; none is
     /// <see cref="LocalBindFailure.InterfaceFailed" />, and one of the other family
     /// <see cref="LocalBindFailure.AddressFamilyMismatch" /> (measured: <c>host!localhost</c> and
-    /// <c>::1</c> to <c>127.0.0.1</c> are exit 7).
+    /// <c>::1</c> to <c>127.0.0.1</c> are exit 7). Either way curl's line for it goes to <paramref name="events" />.
     /// </summary>
-    private async ValueTask<IPAddress> ResolveHostAsync(string hostName, AddressFamily family, CancellationToken cancellationToken)
+    private async ValueTask<IPAddress> ResolveHostAsync(string hostName, AddressFamily family, ITransferEvents events, CancellationToken cancellationToken)
     {
         var addresses = await LookUpAsync(hostName, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
+            events.ReportInfo(LocalBindLines.CouldNotResolveHost(hostName));
+            events.ReportInfo(LocalBindLines.CouldNotBindHost(hostName, OperatingSystem.IsWindows()));
             throw new LocalBindException(LocalBindFailure.InterfaceFailed);
         }
 
+        events.ReportInfo(LocalBindLines.NameResolved(hostName, family, addresses[0], OperatingSystem.IsWindows(), OperatingSystem.IsLinux()));
         return addresses[0].AddressFamily == family
             ? addresses[0]
             : throw new LocalBindException(LocalBindFailure.AddressFamilyMismatch);

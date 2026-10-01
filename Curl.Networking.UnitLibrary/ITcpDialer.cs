@@ -44,6 +44,31 @@ public interface ITcpDialer
     ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Binds and connects as <see cref="DialFromAsync(IPEndPoint, IPEndPoint, int, CancellationToken)" />
+    /// does, writing curl's <c>-v</c> bind lines (<c>Local port: N</c> and the rest, BL-1027) to
+    /// <paramref name="events" />.
+    /// </summary>
+    /// <remarks>
+    /// This default writes no line: it dials through the overload without <paramref name="events" />, for
+    /// a dialer that binds no real socket. <see cref="TcpDialer" /> writes them.
+    /// </remarks>
+    /// <param name="endPoint">The address and port to connect to.</param>
+    /// <param name="localEndPoint">The local address, of <paramref name="endPoint" />'s family, and the first local port (0 for any).</param>
+    /// <param name="localPortCount">How many local ports to try, at least 1.</param>
+    /// <param name="events">Where the <c>-v</c> bind lines go.</param>
+    /// <param name="cancellationToken">Cancels the connect.</param>
+    /// <returns>The open plaintext connection and the local end point of its socket.</returns>
+    /// <exception cref="LocalBindException">
+    /// No port of the range could be bound (<see cref="LocalBindFailure.InterfaceFailed" />).
+    /// </exception>
+    /// <exception cref="SocketException">The connection could not be made.</exception>
+    /// <exception cref="OperationCanceledException">
+    /// <paramref name="cancellationToken" /> was cancelled.
+    /// </exception>
+    ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, ITransferEvents events, CancellationToken cancellationToken) =>
+        DialFromAsync(endPoint, localEndPoint, localPortCount, cancellationToken);
+
+    /// <summary>
     /// Binds the socket to the device <paramref name="deviceName" /> first, as libcurl's <c>bindlocal</c>
     /// does with <c>SO_BINDTODEVICE</c> on Linux (BL-1026), then, when that fails or
     /// <paramref name="bindsAddressAfterDevice" /> says so, binds the local end
@@ -52,7 +77,9 @@ public interface ITcpDialer
     /// </summary>
     /// <remarks>
     /// This default binds no device, as on every platform but Linux: it binds the local end chosen and
-    /// connects through <see cref="DialFromAsync" />.
+    /// connects through <see cref="DialFromAsync(IPEndPoint, IPEndPoint, int, ITransferEvents, CancellationToken)" />.
+    /// A device bound alone writes curl's <c>socket successfully bound to interface</c> line to
+    /// <paramref name="events" />, and an address bound the lines that overload writes (BL-1027).
     /// </remarks>
     /// <param name="endPoint">The address and port to connect to.</param>
     /// <param name="deviceName">The interface to bind the socket to.</param>
@@ -63,6 +90,7 @@ public interface ITcpDialer
     /// </param>
     /// <param name="chooseLocalEndAsync">Chooses the local address and first port, only when one is to be bound.</param>
     /// <param name="localPortCount">How many local ports to try, at least 1.</param>
+    /// <param name="events">Where the <c>-v</c> bind lines go.</param>
     /// <param name="cancellationToken">Cancels the connect.</param>
     /// <returns>The open plaintext connection and the local end point of its socket.</returns>
     /// <exception cref="LocalBindException">
@@ -78,12 +106,13 @@ public interface ITcpDialer
         bool bindsAddressAfterDevice,
         Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
         int localPortCount,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(chooseLocalEndAsync);
 
         var localEndPoint = await chooseLocalEndAsync(cancellationToken).ConfigureAwait(false);
-        return await DialFromAsync(endPoint, localEndPoint, localPortCount, cancellationToken).ConfigureAwait(false);
+        return await DialFromAsync(endPoint, localEndPoint, localPortCount, events, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
