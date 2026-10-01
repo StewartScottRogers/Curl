@@ -10,7 +10,8 @@
       -Title     "Fix AF-NNNN: (the finding's title)"
       -Priority  High for a Critical or High finding, Normal for Medium, Low for Low
       -Pipeline  docs for a truthfulness finding, direct for a process finding, feature otherwise
-      -Touches   the repository folders the finding's location names - never an audit path;
+      -Touches   the repository folders (or, for a file at the root, the file) the finding's
+                 location names - never an audit path;
                  none when it names no folder, so the task runs alone
 
     then fills the task's Goal, Context (the finding's ID, evidence and reproduction, and that
@@ -69,6 +70,7 @@ function Get-TaskTouches([string]$Location, [string]$Root) {
         $first = ($path -split '/')[0]
         if (-not $first -or $first -eq 'Audit' -or $path -like '.claude/agents/audit-*') { continue }
         if (Test-Path -LiteralPath (Join-Path $Root $first) -PathType Container) { $touches += $first }
+        elseif (Test-Path -LiteralPath (Join-Path $Root $path) -PathType Leaf) { $touches += $path }
     }
     return @($touches | Select-Object -Unique)
 }
@@ -105,16 +107,16 @@ function Invoke-Triage([string]$Findings, [string]$BoardScript, [string]$Root) {
         $newArgs = @('new', '-Title', "Fix $($f.Id): $($f.Title)", '-Priority', (Get-TaskPriority $f.Severity), '-Pipeline', (Get-TaskPipeline $f.Auditor))
         $touches = @(Get-TaskTouches $f.Location $Root)
         if ($touches.Count) { $newArgs += @('-Touches', ($touches -join ',')) }
-        if ($WhatIf) { Write-Output "would file: $($newArgs -join ' ')"; continue }
+        if ($WhatIf) { Write-Host "would file: $($newArgs -join ' ')"; continue }
         $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $BoardScript @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
         if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Error "task-board.ps1 new failed for $($f.Id): $out" -ErrorAction Continue; return 1 }
         $id = $Matches[1]
         Set-TaskBody (Join-Path $Root $Matches[2]) $f
         [IO.File]::WriteAllText($f.Path, ([regex]::new('(?m)^task: none').Replace($f.Text, "task: $id", 1)), $Utf8)
-        Write-Output "filed $id for $($f.Id)"
+        Write-Host "filed $id for $($f.Id)"
         $filed++
     }
-    Write-Output "tasks filed: $filed"
+    Write-Host "tasks filed: $filed"
     return 0
 }
 
