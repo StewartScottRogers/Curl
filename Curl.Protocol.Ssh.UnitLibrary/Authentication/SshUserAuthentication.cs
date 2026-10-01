@@ -414,7 +414,7 @@ internal sealed class SshUserAuthentication(
         {
             answer = await ReadAnswerAsync([SshMessageNumber.ServiceAccept], cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is EndOfStreamException or InvalidDataException)
+        catch (Exception exception) when (exception is EndOfStreamException or SshConnectionLostException or InvalidDataException)
         {
             throw ServiceRequestFailed(Libssh2ErrorCode.SocketReceive);
         }
@@ -476,23 +476,24 @@ internal sealed class SshUserAuthentication(
     // Null when the key authenticated the user; libssh2's reason otherwise.
     private async ValueTask<string?> DenyPublicKeyAsync(byte[] user, SshUserKeyFiles files, CancellationToken cancellationToken)
     {
-        SshPublicKey? publicKey = await userKeys!.ReadPublicKeyAsync(files, cancellationToken).ConfigureAwait(false);
-        if (publicKey is null)
+        SshPublicKeyReading reading = await userKeys!.ReadPublicKeyAsync(files, cancellationToken).ConfigureAwait(false);
+        if (reading.Key is not { } publicKey)
         {
-            return await UnreadablePublicKeyReasonAsync(files, cancellationToken).ConfigureAwait(false);
+            return reading.DenialReason ?? await UnderivablePublicKeyReasonAsync(files, cancellationToken).ConfigureAwait(false);
         }
 
         string? algorithm = ChooseSignatureAlgorithm(publicKey.KeyType);
         return algorithm is null
-            ? SshInfoLines.ReasonUnknown
+            ? SshInfoLines.NoSigningSignatureMatched
             : await AskPublicKeyQuestionAsync(user, algorithm, publicKey, files, cancellationToken).ConfigureAwait(false);
     }
 
-    // WinCNG's libssh2 fails to derive the public key without a message, which curl writes
-    // as Reason unknown (-1); OpenSSL's says whether the private key file opened (BL-990).
-    private async ValueTask<string> UnreadablePublicKeyReasonAsync(SshUserKeyFiles files, CancellationToken cancellationToken)
+    // With no --pubkey, WinCNG's libssh2 fails to derive the public key without a message,
+    // which curl writes as Reason unknown (-1); OpenSSL's says whether the private key file
+    // opened (BL-990).
+    private async ValueTask<string> UnderivablePublicKeyReasonAsync(SshUserKeyFiles files, CancellationToken cancellationToken)
     {
-        if (transport.CryptographyBackend != SshAlgorithmPreferences.OpenSslBackend || files.PublicKeyPath is not null)
+        if (transport.CryptographyBackend != SshAlgorithmPreferences.OpenSslBackend)
         {
             return SshInfoLines.ReasonUnknown;
         }

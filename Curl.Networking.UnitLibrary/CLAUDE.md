@@ -11,6 +11,13 @@ else: `KerberosKdcSocketTransport` moves a KDC's UDP datagram through an `IDatag
 (one-second reply wait) and its TCP stream through an `IConnector` (the stream owns and
 disposes the connection, `ConnectionStream`'s `ownsConnection`), and `KerberosDnsSrvLookup`
 answers SRV lookups through `DnsServerResolver.ResolveServiceAsync` (BL-527, ADR-0176).
+`KerberosKdcProxyHttpsTransport` posts an `https://` KDC's `KDC-PROXY-MESSAGE` (BL-882) over a
+plain TCP connection from its `IConnector` (`UseTls: false`) secured by its own
+`IKerberosKdcProxyTlsClient`, `KerberosKdcProxyTlsClient` in production, so the transfer's `-k`,
+`--cacert` and `--capath` never apply to a KDC proxy (ADR-0300, BL-1063): the certificate must name
+the host and lead to the realm's `http_anchors` roots, which `KerberosHttpAnchorLoader` loads as
+MIT's `load_anchor` does, or to the system's trust store when there are none. Any failure, an
+anchor that cannot be loaded included, is an `IOException`, so the sender tries the next KDC.
 
 Per ADR-0140 and ADR-0162 (BL-708) there are two TLS providers, and `TlsClientRouting.Choose`
 picks one from a `TlsClientOptions` as one pure function: `HandBuiltTlsProvider` when a row of
@@ -31,7 +38,7 @@ implement `ITlsProviderWithWarnings`. `HandBuiltTlsProvider` runs `TlsClientConn
 ClientHello offering TLS 1.3 and TLS 1.2, TLS 1.2 the default minimum, ADR-0205) for a range
 spanning both, `Tls13ClientConnection` for a TLS 1.3 minimum and `Tls12ClientConnection` for a
 ceiling below TLS 1.3, over the internal `ConnectionStream`, and returns a `HandBuiltTlsConnection`.
-Per ADR-0222 (BL-820) its ClientHello is the platform curl's measured profile, `ClientHelloProfile.Schannel`
+Per ADR-0235 (BL-820) its ClientHello is the platform curl's measured profile, `ClientHelloProfile.Schannel`
 for the Schannel build and `ClientHelloProfile.OpenSsl` for the OpenSSL build, turned into the TLS
 settings by `ClientHelloProfileMapping`: the profile's extension order and fixed extensions, its lists
 cut to the signature schemes and groups the client can honour, and the options changing only the lists
@@ -60,7 +67,7 @@ type: `TcpDialer` (behind `ITcpDialer`) and `TcpConnectionListener` with its
 `UdpDatagramConnector`, behind `IDatagramConnector`, and by `DnsSocketOpener`) the only one that constructs a
 UDP `Socket`; `DnsSocketOpener` (behind `IDnsSocketOpener`) also constructs the TCP `Socket` and
 `NetworkStream` a truncated DNS reply is asked again over. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
-`TlsClientOptions`) is the only type that constructs an `SslStream`; it runs the
+`TlsClientOptions`) and `KerberosKdcProxyTlsClient` (below) are the only types that construct an `SslStream`; the provider runs the
 handshake over the plaintext `IConnection` through the internal `ConnectionStream`
 adapter and returns an `SslStreamConnection`. With `--cacert` (`TlsClientOptions.CaCertificateFile`)
 it trusts only the certificates in that PEM file; there the Schannel build also checks
@@ -274,14 +281,26 @@ closes) when the last lease ends, pooled only if every lease marked it reusable 
 does (measured, BL-717 Notes).
 
 Per ADR-0269 (BL-600) `TcpConnector` takes an optional `LocalBinding` (`--interface`, `--local-port`)
-and dials every TCP address, a proxy's included, through the internal `LocalBindingTcpDialer`, which
-picks the local address for the family dialled (an interface `INetworkInterfaceLookup` finds, none on
-Windows; else a host, `localhost` as `::1` first; else the unspecified address) and calls
+and dials every TCP address, a proxy's included, through the internal `LocalBindingTcpDialer`, whose
+`LocalBindingAddressChooser` picks the local address for the family dialled (an interface
+`INetworkInterfaceLookup` finds, none on Windows; else a host, `localhost` as `::1` first; else the
+unspecified address), and calls
 `ITcpDialer.DialFromAsync`, whose `TcpDialer.BindLocalEnd` tries each port of the range. A bind that
 fails throws `LocalBindException`, a `SocketException`, so `AddressFamilyRace` moves on to the next
 address with curl's `from  port 0 failed:` line and returns the last `LocalBindFailure`:
 `InterfaceFailed` is exit 45 `Failed binding local connection end`, `BadArgument` (an `ifhost!`
 interface part over 254 characters) exit 43, `AddressFamilyMismatch` the usual exit 7.
+Per ADR-0295 (BL-1027) the bind writes curl's `-v` lines, texts in `LocalBindLines`, on the target's
+`Events`, which `TcpConnector` gives each race's `LocalBindingTcpDialer`: the chooser writes
+`Name ... resolved to` and the `Could not resolve host`/`Could not bind to` lines, and `TcpDialer`,
+through the `ITcpDialer.DialFromAsync` overload taking `ITransferEvents` (whose default writes nothing)
+and `DialFromDeviceAsync`, writes `socket successfully bound to interface`, and `BindLocalEnd` the
+`Bind to local port N failed, trying next`, `Local port: N` and `bind failed with errno N` lines.
+Per ADR-0292 (BL-1025) QUIC's UDP sockets bind the same way: `TcpConnector` puts the chooser on
+`QuicDialRequest.LocalBinding`, and `QuicDialer` binds each socket through
+`IUdpChannelOpener.OpenFrom` (`TcpDialer.BindLocalEnd` walks the range) before it reports the trust
+anchors; a failed bind moves on to the next address and ends with exit 45, 43 or 7 and the one line
+`Failed to connect to <host> port <port> after N ms: <words>`, with no `QUIC connect to` line.
 
 Per ADR-0149 (BL-507) `TcpConnector` takes an optional `UnixSocketAddress` (`--unix-socket`,
 `--abstract-unix-socket`, whose name starts with a NUL). With one, every connect dials it through
@@ -339,7 +358,7 @@ Per ADR-0180 (BL-728) `TcpConnector` takes an optional `QuicDialer`, and its
 `--resolve`, `--connect-to`, `-4`/`-6` and `-v` lines) and hands the addresses, as a
 `QuicDialRequest`, to the dialer. `QuicDialer` opens a UDP channel for each address in turn
 through `IUdpChannelOpener` (`UdpChannelOpener` in production, binding `UdpDatagramChannel` to a
-local address and port), runs `Curl.Quic`'s `QuicClientConnector` with curl's ClientHello and a
+local address and port, or to the first free port of a range through `OpenFrom`), runs `Curl.Quic`'s `QuicClientConnector` with curl's ClientHello and a
 `HandBuiltCertificateVerifier`, and returns a `QuicConnection`. Per BL-847 the ClientHello is
 curl.se's LibreSSL build's (`QuicClientSettings.CreateLibreSslTlsSettings`) for the Windows build and
 the OpenSSL profile's TLS 1.3 parts (`CreateOpenSslTlsSettings`) for the OpenSSL build; both builds
@@ -351,6 +370,12 @@ recvfrom() ...`. This project therefore references `Curl.Quic.UnitLibrary`, whic
 `Curl.Networking.UnitTests` see its internals: `Fakes/QuicTestServer` and `QuicTestTlsServer` are
 copies of `Curl.Quic.UnitTests`' in-memory server, reached through `Fakes/QuicServerChannelOpener`.
 `PoolingConnector.ConnectMultiplexedAsync` passes straight through to its inner connector.
+Per ADR-0289 (BL-942) a target whose `Proxy` is an HTTP, HTTP/1.0 or HTTPS proxy is not
+resolved: `TcpConnector.UdpTunnel.cs` dials the proxy, sends curl 8.22.0's CONNECT-UDP request
+(`HttpProxyTunnel.BuildConnectUdpRequest`), takes a `101` or `2xx` (`OpensUdpTunnel`), and hands
+`QuicDialer.DialThroughTunnelAsync` a `CapsuleDatagramChannel`, which carries each datagram as an
+RFC 9297 `DATAGRAM` capsule over the proxy connection. Tests run the handshake through
+`Fakes/CapsuleQuicProxyConnection`, which feeds the capsules to a `QuicTestServer`.
 
 Per ADR-0222 (BL-920) `TcpConnector` and `PoolingConnector` write the connect steps to
 `ConnectTarget.DiagnosticLog` (`--log-level`) through `NetworkDiagnosticLog`, the one place that

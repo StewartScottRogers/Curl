@@ -85,6 +85,54 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenAForwardProxyFailsToDial_NamesTheProxyInTheCouldntConnectMessage()
+    {
+        // curl 8.21.0 (Schannel): curl -sS -x http://127.0.0.1:1 http://example.com/ -> exit 7,
+        // curl: (7) Failed to connect to 127.0.0.1:1 over proxy 127.0.0.1 after 2028 ms: Could not connect to server
+        // (measured with Record-CurlExchange.ps1 2026-10-01, BL-1024).
+        var timeProvider = new ManualTimeProvider();
+        var dialer = new FakeTcpDialer
+        {
+            DialOutcome = _ =>
+            {
+                timeProvider.Advance(2028);
+                throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused);
+            },
+        };
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), timeProvider);
+
+        var result = await connector.ConnectAsync(
+            new ConnectTarget("127.0.0.1", 1, UseTls: false) { IsForwardProxy = true },
+            CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(
+            "Failed to connect to 127.0.0.1:1 over proxy 127.0.0.1 after 2028 ms: Could not connect to server",
+            result.ErrorMessage);
+        Assert.IsNull(result.Connection);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenAForwardProxyCannotBindTheInterface_NamesTheProxyInTheInterfaceFailedMessage()
+    {
+        // curl 8.21.0 (Schannel): curl -sS --interface bogus0 -x http://127.0.0.1:47599 http://example.com/ -> exit 45,
+        // curl: (45) Failed to connect to 127.0.0.1:47599 over proxy 127.0.0.1 after 2760 ms: Failed binding local connection end
+        // (measured with Record-CurlExchange.ps1 2026-10-01, BL-1024).
+        var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
+        var connector = LocalBindingConnector(dialer, new LocalBinding("bogus0", null, null, 0, 1), Interfaces(("lo", [IPAddress.Loopback])));
+
+        var result = await connector.ConnectAsync(
+            new ConnectTarget("127.0.0.1", 47599, UseTls: false) { IsForwardProxy = true },
+            CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.InterfaceFailed, result.ExitCode);
+        Assert.AreEqual(
+            "Failed to connect to 127.0.0.1:47599 over proxy 127.0.0.1 after 0 ms: Failed binding local connection end",
+            result.ErrorMessage);
+        Assert.IsEmpty(dialer.BoundDials);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheLastAddressFailsForAnotherReason_IsNotMarkedRefused()
     {
         // curl 8.21.0 (Schannel): curl --retry 1 --retry-connrefused http://0.0.0.0:1/ -> exit 7,

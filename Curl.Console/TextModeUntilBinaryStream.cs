@@ -11,7 +11,8 @@ namespace Curl.Console;
 /// curl switches standard output to binary mode when a transfer that sends its body there
 /// starts, so a <c>--trace-ascii -</c> dump of an SMTP upload with no <c>-o</c> ends its lines
 /// with a bare LF from the first line, while one with <c>-o</c> ends them CR LF (measured on curl
-/// 8.21.0, BL-546 and BL-242 Notes).
+/// 8.21.0, BL-546 and BL-242 Notes). A body sent to standard output under <c>-B</c> is written
+/// through this stream too, as curl leaves standard output in text mode for it (BL-961 Notes).
 /// </remarks>
 internal sealed class TextModeUntilBinaryStream(Stream inner, Func<bool> isBinary) : Stream
 {
@@ -51,4 +52,11 @@ internal sealed class TextModeUntilBinaryStream(Stream inner, Func<bool> isBinar
     /// <inheritdoc />
     public override void Write(byte[] buffer, int offset, int count) =>
         (isBinary() ? inner : textMode).Write(buffer, offset, count);
+
+    /// <inheritdoc />
+    public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+        (isBinary() ? inner : textMode).WriteAsync(buffer, cancellationToken);
+
+    /// <inheritdoc />
+    public override Task FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
 }

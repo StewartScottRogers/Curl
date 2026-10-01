@@ -14,11 +14,11 @@ completed:
 
 ## Goal
 
-When the version range's ceiling is below TLS 1.3, `HandBuiltTlsProvider`'s ClientHello follows the platform profile's extension order too, as the platform curl's does, not `Tls12ClientHelloBuilder`'s fixed OpenSSL order (ADR-0222 decision 3).
+When the version range's ceiling is below TLS 1.3, `HandBuiltTlsProvider`'s ClientHello follows the platform profile's extension order too, as the platform curl's does, not `Tls12ClientHelloBuilder`'s fixed OpenSSL order (ADR-0235 decision 3).
 
 ## Context
 
-- ADR-0222 (BL-820): above that ceiling the hello is the profile's; below it the profile's lists apply but `Tls12ClientSettings` has no extension order, so the Schannel build's `--tls-max 1.2` hello is in OpenSSL's order.
+- ADR-0235 (BL-820): above that ceiling the hello is the profile's; below it the profile's lists apply but `Tls12ClientSettings` has no extension order, so the Schannel build's `--tls-max 1.2` hello is in OpenSSL's order.
 - Measure first: `Record-CurlExchange.ps1 -Tls` with `--tls-max 1.2` (and `--tls-max 1.0`) against the Windows reference build, and under WSL for the OpenSSL build, to see which of the profile's extensions each build drops for a TLS 1.2 ceiling (the TLS 1.3 ones, at least). Pin what is measured.
 - Likely shape: an `ExtensionOrder` (and fixed extensions) on `Tls12ClientSettings`, defaulting to today's order, and `ClientHelloProfileMapping` giving it the profile's order without the TLS 1.3-only extensions.
 
@@ -29,7 +29,7 @@ When the version range's ceiling is below TLS 1.3, `HandBuiltTlsProvider`'s Clie
 
 ## Notes
 
-- Filed by BL-820 (ADR-0222).
+- Filed by BL-820 (ADR-0235).
 
 ## Log
 

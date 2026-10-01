@@ -32,6 +32,8 @@ public sealed class QuicDialer
         [CurlExitCode.SendError] = "Failed sending data to the peer",
         [CurlExitCode.RecvError] = "Failure when receiving data from the peer",
         [CurlExitCode.PeerFailedVerification] = "SSL peer certificate or SSH remote key was not OK",
+        [CurlExitCode.InterfaceFailed] = "Failed binding local connection end",
+        [CurlExitCode.BadFunctionArgument] = "A libcurl function was given a bad argument",
     };
 
     private readonly IUdpChannelOpener _channelOpener;
@@ -98,7 +100,7 @@ public sealed class QuicDialer
                 return TimedOut(request);
             }
 
-            var (result, tryNextAddress) = await AttemptAsync(request, new IPEndPoint(address, request.Port), remaining, cancellationToken).ConfigureAwait(false);
+            var (result, tryNextAddress) = await AttemptAsync(request, new IPEndPoint(address, request.Port), remaining, tunnel: null, cancellationToken).ConfigureAwait(false);
             if (!tryNextAddress)
             {
                 return result;
@@ -110,43 +112,79 @@ public sealed class QuicDialer
         return lastFailure!;
     }
 
-    // One address: curl's Trying line, the ClientHello's suites and --cert certificate, then
-    // the connect; the certificate is disposed once the handshake no longer needs it.
+    /// <summary>
+    /// Runs the QUIC handshake over <paramref name="tunnel" />, a CONNECT-UDP tunnel through an
+    /// HTTP proxy at <paramref name="proxyEndPoint" /> (BL-942): no <c>Trying</c> line, as
+    /// curl 8.22.0 prints none once the tunnel is up (measured), and the tunnel disposed when
+    /// the handshake does not connect.
+    /// </summary>
+    /// <param name="request">The target, its destination and the connect's clock.</param>
+    /// <param name="tunnel">The datagram channel the tunnel carries.</param>
+    /// <param name="proxyEndPoint">The proxy's address, which the failure lines name.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>The QUIC connection, or the handshake's failure.</returns>
+    internal async ValueTask<MultiplexedConnectResult> DialThroughTunnelAsync(
+        QuicDialRequest request,
+        IDatagramChannel tunnel,
+        IPEndPoint proxyEndPoint,
+        CancellationToken cancellationToken)
+    {
+        var remaining = request.ConnectTimeout - _timeProvider.GetElapsedTime(request.Started);
+        var (result, _) = remaining <= TimeSpan.Zero
+            ? (TimedOut(request), false)
+            : await AttemptAsync(request, proxyEndPoint, remaining, tunnel, cancellationToken).ConfigureAwait(false);
+        if (result.Connection is null)
+        {
+            await tunnel.DisposeAsync().ConfigureAwait(false);
+        }
+
+        return result;
+    }
+
+    // One address: curl's Trying line (none through a tunnel), the ClientHello's suites and
+    // --cert certificate, then the connect; the certificate is disposed once the handshake no
+    // longer needs it.
     private async ValueTask<(MultiplexedConnectResult Result, bool TryNextAddress)> AttemptAsync(
         QuicDialRequest request,
         IPEndPoint endPoint,
         TimeSpan? handshakeTimeout,
+        IDatagramChannel? tunnel,
         CancellationToken cancellationToken)
     {
-        var events = request.Target.Events;
-        events.ReportInfo($"  Trying {endPoint}...");
+        if (tunnel is null)
+        {
+            request.Target.Events.ReportInfo($"  Trying {endPoint}...");
+        }
+
         var (tls, loadedCertificate, preparationFailure) = PrepareTls(request.Target.Host);
         using var clientCertificate = loadedCertificate;
         return tls is null
             ? (preparationFailure!, false)
-            : await ConnectAsync(request, endPoint, tls, handshakeTimeout, cancellationToken).ConfigureAwait(false);
+            : await ConnectAsync(request, endPoint, tls, handshakeTimeout, tunnel, cancellationToken).ConfigureAwait(false);
     }
 
-    // The trust anchors, the channel and the handshake, once the ClientHello is ready.
+    // The trust anchors, the channel (the tunnel when there is one) and the handshake, once
+    // the ClientHello is ready.
     private async ValueTask<(MultiplexedConnectResult Result, bool TryNextAddress)> ConnectAsync(
         QuicDialRequest request,
         IPEndPoint endPoint,
         Tls13ClientSettings tls,
         TimeSpan? handshakeTimeout,
+        IDatagramChannel? tunnel,
         CancellationToken cancellationToken)
     {
-        request.Target.Events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options));
+        // curl.se's ngtcp2 build binds the socket before it names the trust anchors (measured, BL-1025).
+        var (channel, openFailure) = await OpenChannelAsync(request, endPoint, tunnel, cancellationToken).ConfigureAwait(false);
+        if (channel is null)
+        {
+            return (openFailure!, true);
+        }
+
+        request.Target.Events.ReportTlsTrust(DescribeTrust());
         var (verifier, unusable) = CreateVerifier(request.Target.Host);
         if (verifier is null)
         {
-            var (exitCode, message) = _verification.TrustAnchorsUnusable(unusable!);
-            return (MultiplexedConnectResult.Failed(exitCode, message), false);
-        }
-
-        var (channel, openFailure) = OpenChannel(endPoint);
-        if (channel is null)
-        {
-            return (Failed(request, endPoint, openFailure!), true);
+            return (await TrustAnchorsUnusableAsync(channel, tunnel, unusable!).ConfigureAwait(false), false);
         }
 
         var handshake = new QuicClientConnectionState(new QuicClientSettings { Tls = tls }, _random, verifier, _timeProvider);
@@ -162,8 +200,21 @@ public sealed class QuicDialer
         return (Failed(request, endPoint, failure!), LeavesTimeForTheNextAddress(failure!));
     }
 
+    // The failure for trust anchors or revocation lists that cannot be read; the socket opened is closed,
+    // and a tunnel left to DialThroughTunnelAsync, which closes it.
+    private async ValueTask<MultiplexedConnectResult> TrustAnchorsUnusableAsync(IDatagramChannel channel, IDatagramChannel? tunnel, Exception unusable)
+    {
+        if (tunnel is null)
+        {
+            await channel.DisposeAsync().ConfigureAwait(false);
+        }
+
+        var (exitCode, message) = _verification.TrustAnchorsUnusable(unusable);
+        return MultiplexedConnectResult.Failed(exitCode, message);
+    }
+
     // What the ClientHello offers, in the order HandBuiltTlsProvider prepares it: the suites,
-    // then the --cert certificate. Both QUIC builds run on the OpenSSL API (BL-847): curl.se's
+    // then the --cert certificate. Both QUIC builds run on the OpenSSL API (ADR-0290): curl.se's
     // LibreSSL build on Windows sends its measured hello, the OpenSSL build elsewhere its own.
     private (Tls13ClientSettings? Tls, X509Certificate2? ClientCertificate, MultiplexedConnectResult? Failure) PrepareTls(string targetHost)
     {
@@ -221,17 +272,65 @@ public sealed class QuicDialer
         }
     }
 
-    // A socket that cannot be opened or bound fails the attempt as a connect that reached nothing.
-    private (IDatagramChannel? Channel, QuicHandshakeFailure? Failure) OpenChannel(IPEndPoint endPoint)
+    // The tunnel when there is one; else a new socket, bound as --interface and --local-port ask.
+    // A local end that cannot be bound fails the attempt as the TCP path's does (BindFailed); a
+    // socket that cannot be opened, as a connect that reached nothing.
+    private async ValueTask<(IDatagramChannel? Channel, MultiplexedConnectResult? Failure)> OpenChannelAsync(
+        QuicDialRequest request,
+        IPEndPoint endPoint,
+        IDatagramChannel? tunnel,
+        CancellationToken cancellationToken)
     {
+        if (tunnel is not null)
+        {
+            return (tunnel, null);
+        }
+
         try
         {
-            return (_channelOpener.Open(endPoint), null);
+            return (await OpenBoundChannelAsync(request.LocalBinding, endPoint, cancellationToken).ConfigureAwait(false), null);
+        }
+        catch (LocalBindException exception)
+        {
+            return (null, BindFailed(request, exception.Failure));
         }
         catch (SocketException exception)
         {
-            return (null, new QuicHandshakeFailure(CurlExitCode.CouldntConnect, ConnectFailureReason.Describe(exception, _matchesSchannelBuild)));
+            var failure = new QuicHandshakeFailure(CurlExitCode.CouldntConnect, ConnectFailureReason.Describe(exception, _matchesSchannelBuild));
+            return (null, Failed(request, endPoint, failure));
         }
+    }
+
+    // Unbound without a LocalBinding; else on the address chosen for the family dialled and the
+    // first free port of the --local-port range, as libcurl's bindlocal binds a QUIC socket. Its -v
+    // bind lines are not written for QUIC yet: the TCP path's (BL-1027) were not measured over QUIC.
+    private async ValueTask<IDatagramChannel> OpenBoundChannelAsync(LocalBindingAddressChooser? localBinding, IPEndPoint endPoint, CancellationToken cancellationToken)
+    {
+        if (localBinding is null)
+        {
+            return _channelOpener.Open(endPoint);
+        }
+
+        var localAddress = await localBinding.ChooseAsync(endPoint.AddressFamily, NoTransferEvents.Instance, cancellationToken).ConfigureAwait(false);
+        var binding = localBinding.Binding;
+        return _channelOpener.OpenFrom(endPoint, new IPEndPoint(localAddress, binding.FirstPort), binding.PortCount);
+    }
+
+    // A local end that could not be bound, as curl.se's ngtcp2 build ends it (measured, BL-1025):
+    // no "QUIC connect to" line, only "Failed to connect to", with exit 45 and exit 43 worded as
+    // the TCP path words them and a local address of the other family the usual exit 7.
+    private MultiplexedConnectResult BindFailed(QuicDialRequest request, LocalBindFailure failure)
+    {
+        var exitCode = failure switch
+        {
+            LocalBindFailure.InterfaceFailed => CurlExitCode.InterfaceFailed,
+            LocalBindFailure.BadArgument => CurlExitCode.BadFunctionArgument,
+            _ => CurlExitCode.CouldntConnect,
+        };
+        var elapsedMilliseconds = (long)_timeProvider.GetElapsedTime(request.NameResolved).TotalMilliseconds;
+        var message = $"Failed to connect to {request.Target.Host} port {request.Target.Port} after {elapsedMilliseconds} ms: {ExitCodeWords[exitCode]}";
+        request.Target.Events.ReportInfo(message);
+        return MultiplexedConnectResult.Failed(exitCode, message);
     }
 
     // The channel's socket failing is curl's recvfrom() failure, exit 56; a cancellation is
@@ -266,6 +365,17 @@ public sealed class QuicDialer
             ? "Connection was reset"
             : ConnectFailureReason.Describe(exception, _matchesSchannelBuild);
 
+    // On Windows, without --cacert, Curl verifies against the Windows stores, which curl.se's
+    // LibreSSL build names as --ca-native makes it (measured, BL-1050); its embedded bundle's
+    // "CA Blob from configuration" is not printed, as Curl embeds none (ADR-0144).
+    private TlsTrustEvent DescribeTrust()
+    {
+        var trust = SslStreamTlsProvider.DescribeTrust(_options) with { IsQuic = true };
+        return _matchesSchannelBuild && _options.CaCertificateFile is null
+            ? trust with { CaCertificateFile = null, UsesWindowsSystemStores = true }
+            : trust;
+    }
+
     private MultiplexedConnectResult Connected(
         QuicDialRequest request,
         IPEndPoint endPoint,
@@ -289,6 +399,7 @@ public sealed class QuicDialer
             CertificateVerifyResult = verifier.Observed.VerifyResult,
             PeerCertificateChain = [.. verifier.Observed.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
             VerifiedHostName = SslStreamTlsProvider.VerifiedHostName(request.Target.Host, _options.Insecure),
+            IsQuic = true,
         });
         events.ReportConnectionOpened(new ConnectionOpenedEvent
         {

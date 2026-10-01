@@ -114,6 +114,12 @@ public sealed class HttpRequestOptionsTests
     }
 
     [TestMethod]
+    public void TriesTcpBeforeQuic_ByDefault_IsFalseSoHttp3StartsWithQuic()
+    {
+        Assert.IsFalse(new HttpRequestOptions().TriesTcpBeforeQuic);
+    }
+
+    [TestMethod]
     public void With_ChangingOneMember_KeepsTheRest()
     {
         var get = new HttpRequestOptions { UserAgent = "agent/1", FollowRedirects = true };

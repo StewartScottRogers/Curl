@@ -294,7 +294,7 @@ public sealed class HttpProtocolHandler(
     /// <c>Curl_conn_may_http3</c> checks: over a Unix domain socket, exit 96, for
     /// <c>--http3-only</c> with any URL and <c>--http3</c> with an <c>https://</c> URL (BL-867);
     /// then, exit 3, <c>--http3</c> or <c>--http3-only</c> with an <c>https://</c> URL through a
-    /// SOCKS proxy, or through an HTTP or HTTPS proxy (ADR-0223); or <see langword="null" />
+    /// SOCKS proxy (ADR-0223; an HTTP or HTTPS proxy is tunnelled through, BL-942); or <see langword="null" />
     /// when HTTP/3 is not refused.
     /// </summary>
     private static Http3Refusal? Http3RefusalOf(HttpRequestPlan plan)
@@ -318,13 +318,18 @@ public sealed class HttpProtocolHandler(
         plan.Options.OverUnixSocket && (https || plan.Options.Version == HttpVersionPreference.Http3Only);
 
     /// <summary>
-    /// Gives the proxy's refusal of HTTP/3 for an <c>https://</c> URL, exit 3, or
-    /// <see langword="null" /> without a proxy or for any other URL (ADR-0223).
+    /// Gives a SOCKS proxy's refusal of HTTP/3 for an <c>https://</c> URL, exit 3, or
+    /// <see langword="null" /> without a proxy, through an HTTP or HTTPS proxy, which QUIC
+    /// tunnels through with CONNECT-UDP as curl 8.21.0 does (BL-942), or for any other URL.
     /// </summary>
     private static Http3Refusal? Http3ProxyRefusalOf(HttpRequestPlan plan, bool https) =>
-        https && plan.Options.ForwardProxy is { } proxy
-            ? new Http3Refusal(Http3RefusalFor(proxy.Kind), CurlExitCode.UrlMalformat)
+        https && plan.Options.ForwardProxy is { } proxy && !IsHttpProxy(proxy)
+            ? new Http3Refusal(HttpTransferMessages.Http3NotOverSocksProxy, CurlExitCode.UrlMalformat)
             : null;
+
+    /// <summary>Decides whether <paramref name="proxy" /> is an HTTP or HTTPS proxy rather than a SOCKS one.</summary>
+    private static bool IsHttpProxy(ProxyEndpoint proxy) =>
+        proxy.Kind is ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https;
 
     /// <summary>
     /// Why HTTP/3 is refused before connecting: the <paramref name="Message" /> curl writes into
@@ -335,16 +340,7 @@ public sealed class HttpProtocolHandler(
     private readonly record struct Http3Refusal(string Message, CurlExitCode ExitCode);
 
     /// <summary>
-    /// Gives why a proxy of <paramref name="kind" /> refuses HTTP/3: the HTTP proxy message for
-    /// an HTTP or HTTPS proxy, and the SOCKS proxy message for any SOCKS kind (ADR-0223).
-    /// </summary>
-    private static string Http3RefusalFor(ProxyKind kind) =>
-        kind is ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https
-            ? HttpTransferMessages.Http3NotOverHttpProxy
-            : HttpTransferMessages.Http3NotOverSocksProxy;
-
-    /// <summary>
-    /// Runs a transfer whose HTTP/3 a proxy (measured on curl.se's ngtcp2 build, ADR-0223) or a
+    /// Runs a transfer whose HTTP/3 a SOCKS proxy (measured on curl.se's ngtcp2 build, ADR-0223) or a
     /// Unix domain socket (read from curl 8.21.0, BL-867) rules out: reports the refusal's
     /// message; then fails <c>--http3-only</c> with the refusal's exit code and message before
     /// connecting; and runs <c>--http3</c> over TCP or the Unix socket, where a failure keeps
@@ -382,7 +378,12 @@ public sealed class HttpProtocolHandler(
         ConnectTarget urlTarget = TargetOf(plan.Context.Url);
         ConnectTarget target = plan.ForwardProxy is { } proxy
             ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https) { IsForwardProxy = true }
-            : urlTarget with { Proxy = plan.Options.ForwardProxy, AltSvcRoute = plan.Options.AltSvcRoute };
+            : urlTarget with
+            {
+                Proxy = plan.Options.ForwardProxy,
+                AltSvcRoute = plan.Options.AltSvcRoute,
+                ApplicationProtocols = AltSvcApplicationProtocols.Of(plan.Options.AltSvcRoute),
+            };
         return target with { PoolScheme = urlTarget.UseTls ? "https" : "http", Events = plan.Context.Events };
     }
 
@@ -555,7 +556,7 @@ public sealed class HttpProtocolHandler(
     /// Opens the transfer's connection (ADR-0144 section 4, ADR-0172): over QUIC for
     /// <c>--http3-only</c>, whose failure is the transfer's; over QUIC raced against TCP for
     /// <c>--http3</c> (<see cref="RaceQuicAgainstTcpAsync" />); and over TCP for every other
-    /// version, for an <c>http://</c> URL and through a proxy. A QUIC connection is handed on
+    /// version, for an <c>http://</c> URL and through a SOCKS proxy. A QUIC connection is handed on
     /// as an <see cref="Http3Session" />.
     /// </summary>
     private async ValueTask<ConnectResult> ConnectAsync(HttpRequestPlan plan, ConnectTarget target)
@@ -567,7 +568,9 @@ public sealed class HttpProtocolHandler(
 
         if (plan.Options.Version == HttpVersionPreference.Http3)
         {
-            return await RaceQuicAgainstTcpAsync(plan, target).ConfigureAwait(false);
+            return plan.Options.TriesTcpBeforeQuic
+                ? await RaceTcpAgainstQuicAsync(plan, target).ConfigureAwait(false)
+                : await RaceQuicAgainstTcpAsync(plan, target).ConfigureAwait(false);
         }
 
         MultiplexedConnectResult quic = await plan.Deadline.ConnectMultiplexedAsync(connector, target).ConfigureAwait(false);
@@ -582,14 +585,16 @@ public sealed class HttpProtocolHandler(
     /// connect fails or once <see cref="HttpRequestOptions.HappyEyeballsTimeout" /> has passed on
     /// the transfer's clock without it completing; the first to connect carries the transfer
     /// and the other is cancelled, its connection disposed should it still complete; when both
-    /// fail the transfer fails with the QUIC attempt's exit code and message.
+    /// fail the transfer fails with the QUIC attempt's exit code and message, or through a proxy
+    /// with the TCP <c>CONNECT</c>'s, as curl 8.22.0 does after a refused CONNECT-UDP (measured,
+    /// BL-942).
     /// </summary>
     private async ValueTask<ConnectResult> RaceQuicAgainstTcpAsync(HttpRequestPlan plan, ConnectTarget target)
     {
         using CancellationTokenSource quicAbandoned = new();
         using CancellationTokenSource tcpAbandoned = new();
         Task<MultiplexedConnectResult> quic = plan.Deadline.ConnectMultiplexedAsync(connector, target, quicAbandoned.Token).AsTask();
-        await QuicOrHappyEyeballsTimeoutAsync(plan, quic).ConfigureAwait(false);
+        await FirstAttemptOrHappyEyeballsTimeoutAsync(plan, quic).ConfigureAwait(false);
         if (quic.IsCompleted && (await quic.ConfigureAwait(false)).Connection is { } early)
         {
             return Http3Connected(early, quic.Result);
@@ -612,21 +617,60 @@ public sealed class HttpProtocolHandler(
         }
 
         ConnectResult tcpResult = await tcp.ConfigureAwait(false);
-        return tcpResult.Connection is null
+        return tcpResult.Connection is null && target.Proxy is null
             ? ConnectResult.Failed(quicResult.ExitCode, quicResult.ErrorMessage!, tcpResult.Timings, tcpResult.ConnectionNumber)
             : tcpResult;
     }
 
     /// <summary>
-    /// Waits until the QUIC connect completes or the happy-eyeballs timeout passes on the
-    /// transfer's clock, whichever comes first.
+    /// Races TCP against QUIC for <c>--http3</c> with TCP as the preferred first attempt, as curl
+    /// 8.21.0 does for an <c>--alt-svc</c> entry naming the origin itself with <c>h2</c> or
+    /// <c>h1</c> (<c>cf_hc_get_pref_alpn</c>, BL-948): <see cref="RaceQuicAgainstTcpAsync" /> with the
+    /// two attempts swapped, so the QUIC connect starts when the TCP connect fails or once the
+    /// happy-eyeballs timeout has passed, and when both fail the transfer fails with the TCP
+    /// attempt's result, the first attempt's, as curl's <c>cf_hc_connect</c> reports it.
     /// </summary>
-    private static async Task QuicOrHappyEyeballsTimeoutAsync(HttpRequestPlan plan, Task quic)
+    private async ValueTask<ConnectResult> RaceTcpAgainstQuicAsync(HttpRequestPlan plan, ConnectTarget target)
     {
-        using CancellationTokenSource quicCompleted = new();
-        Task timeout = Task.Delay(plan.Options.HappyEyeballsTimeout, plan.Context.TimeProvider, quicCompleted.Token);
-        await Task.WhenAny(quic, timeout).ConfigureAwait(false);
-        await quicCompleted.CancelAsync().ConfigureAwait(false);
+        using CancellationTokenSource quicAbandoned = new();
+        using CancellationTokenSource tcpAbandoned = new();
+        Task<ConnectResult> tcp = plan.Deadline.ConnectAsync(connector, target, tcpAbandoned.Token).AsTask();
+        await FirstAttemptOrHappyEyeballsTimeoutAsync(plan, tcp).ConfigureAwait(false);
+        if (tcp.IsCompleted && (await tcp.ConfigureAwait(false)).Connection is not null)
+        {
+            return tcp.Result;
+        }
+
+        Task<MultiplexedConnectResult> quic = plan.Deadline.ConnectMultiplexedAsync(connector, target, quicAbandoned.Token).AsTask();
+        if (await Task.WhenAny(tcp, quic).ConfigureAwait(false) == quic && (await quic.ConfigureAwait(false)).Connection is { } early)
+        {
+            await tcpAbandoned.CancelAsync().ConfigureAwait(false);
+            _ = DisposeLosingTcpAsync(tcp);
+            return Http3Connected(early, quic.Result);
+        }
+
+        ConnectResult tcpResult = await tcp.ConfigureAwait(false);
+        if (tcpResult.Connection is not null)
+        {
+            await quicAbandoned.CancelAsync().ConfigureAwait(false);
+            _ = DisposeLosingQuicAsync(quic);
+            return tcpResult;
+        }
+
+        MultiplexedConnectResult quicResult = await quic.ConfigureAwait(false);
+        return quicResult.Connection is { } quicConnection ? Http3Connected(quicConnection, quicResult) : tcpResult;
+    }
+
+    /// <summary>
+    /// Waits until the first attempt of a race, <paramref name="first" />, completes or the
+    /// happy-eyeballs timeout passes on the transfer's clock, whichever comes first.
+    /// </summary>
+    private static async Task FirstAttemptOrHappyEyeballsTimeoutAsync(HttpRequestPlan plan, Task first)
+    {
+        using CancellationTokenSource firstCompleted = new();
+        Task timeout = Task.Delay(plan.Options.HappyEyeballsTimeout, plan.Context.TimeProvider, firstCompleted.Token);
+        await Task.WhenAny(first, timeout).ConfigureAwait(false);
+        await firstCompleted.CancelAsync().ConfigureAwait(false);
     }
 
     /// <summary>Disposes the connection a TCP connect that lost the race opens anyway.</summary>
@@ -659,12 +703,13 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Decides whether the transfer tries QUIC: <c>--http3</c> or <c>--http3-only</c> with an
-    /// <c>https://</c> URL, no proxy and no Unix domain socket.
+    /// <c>https://</c> URL, no Unix domain socket, and no proxy or an HTTP or HTTPS one, which
+    /// the connector tunnels QUIC through with CONNECT-UDP (BL-942).
     /// </summary>
     private static bool TriesQuic(HttpRequestPlan plan, ConnectTarget target) =>
         plan.Options.Version is HttpVersionPreference.Http3 or HttpVersionPreference.Http3Only
             && target.UseTls
-            && plan.Options.ForwardProxy is null
+            && (plan.Options.ForwardProxy is null || IsHttpProxy(plan.Options.ForwardProxy))
             && !plan.Options.OverUnixSocket;
 
     /// <summary>
@@ -743,6 +788,7 @@ public sealed class HttpProtocolHandler(
         else if (outcome.DiedBeforeResponse)
         {
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.ConnectionDiedRetrying(outcome.RetryCount));
+            HttpExchangeLog.For(plan.Context.DiagnosticLog, streams).RetryingOnFreshConnection(outcome.RetryCount);
         }
     }
 
@@ -868,15 +914,17 @@ public sealed class HttpProtocolHandler(
         };
 
     /// <summary>
-    /// Names a connection left intact by its Unix domain socket, else by the alt-svc
-    /// alternative it was dialled to, else by the target's host and port: curl 8.21.0 names the
-    /// host it connected to, not the origin (BL-623 case 1, BL-900).
+    /// Names a connection left intact by its Unix domain socket, else by the <c>--connect-to</c>
+    /// destination the connector reports it dialled, else by the alt-svc alternative it was
+    /// dialled to, else by the target's host and port: curl 8.21.0 names the host it connected
+    /// to, not the origin (BL-623 case 1, BL-900, BL-975).
     /// </summary>
     private static string LeftIntactLine(ConnectTarget target, ConnectResult connect) =>
-        (connect.UnixSocketPath, target.AltSvcRoute) switch
+        (connect.UnixSocketPath, connect.MappedHost, target.AltSvcRoute) switch
         {
-            ({ } socketPath, _) => HttpConnectionInfoLines.LeftIntactOverUnixSocket(connect.ConnectionNumber, socketPath),
-            (null, { Alternative: var alternative }) => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, alternative.Host, alternative.Port),
+            ({ } socketPath, _, _) => HttpConnectionInfoLines.LeftIntactOverUnixSocket(connect.ConnectionNumber, socketPath),
+            (null, { } mappedHost, _) => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, mappedHost, connect.MappedPort),
+            (null, null, { Alternative: var alternative }) => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, alternative.Host, alternative.Port),
             _ => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, target.Host, target.Port),
         };
 
@@ -924,20 +972,23 @@ public sealed class HttpProtocolHandler(
             ResponseConnection = timedConnection,
             RedirectCount = plan.RedirectsFollowed - options.RedirectsFollowed,
         };
+        HttpExchangeLog exchangeLog = HttpExchangeLog.For(context.DiagnosticLog, streams);
         HttpResponseBodyReader body = new(responseConnection)
         {
             PassesTransferCoding = options.Raw,
             IgnoresContentLength = options.IgnoreContentLength,
             DecodesTransferCoding = options.TransferEncoding,
+            Log = exchangeLog,
         };
         int cookiesStored = 0;
         HttpResponseHeadReader headReader = new(responseConnection)
         {
             Events = context.Events,
-            HeaderReceived = header =>
+            HeaderReceived = (statusLine, header) =>
             {
+                ReportAuthProblemLines(plan, statusLine, header);
                 cookiesStored = StoreCookie(context, header, cookiesStored);
-                StoreAltSvc(context, options.AltSvcStore, header);
+                StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
             },
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
             IsHttp2OrHttp3 = requestStream is not null,
@@ -948,6 +999,7 @@ public sealed class HttpProtocolHandler(
         HttpResponseHead? actedOn = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
         ReportProtocolChosen(context.Events, newConnection, streams);
+        LogVersionChosen(exchangeLog, plan, transport, newConnection, streams);
         ReportAuthorizationLines(plan);
         try
         {
@@ -956,11 +1008,13 @@ public sealed class HttpProtocolHandler(
             exchange.RequestReady = context.TimeProvider.GetTimestamp();
             bool bodyLeftUnsent = await SendBodyAsync(context, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
             ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
+            exchangeLog.RequestSent(framing.Method, context.Url.AbsolutePath, request);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
             exchange.Head = await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
             HttpHeadRefusal? refusal = headReader.Refusal;
             exchange.Head = HeadCurlRead(exchange.Head, refusal);
             actedOn = headReader.HeadActedOn(exchange.Head);
+            exchangeLog.ReplyRead(actedOn);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, actedOn);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
             ThrowIfHeaderRefused(refusal);
@@ -982,14 +1036,16 @@ public sealed class HttpProtocolHandler(
         {
             headReader.ReportHeldLines();
             ReportReceiveFailure(context.Events, failure);
+            exchangeLog.Failed(failure.ExitCode, failure);
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
             { Report = exchange.Report(body) };
             return FailedOutcome(plan, connect, upload, headReader, failure, failed);
         }
-        catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
+        catch (OperationCanceledException canceled) when (plan.Deadline.EndedByLimit)
         {
             headReader.ReportHeldLines();
+            exchangeLog.Failed(CurlExitCode.OperationTimedOut, canceled);
             string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
             TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
                 with
@@ -998,6 +1054,7 @@ public sealed class HttpProtocolHandler(
         }
 
         TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
+        LogExchanged(exchangeLog, context.TimeProvider, exchange.RequestReady, actedOn!, body);
         return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection)))
         {
             LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
@@ -1101,6 +1158,32 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Logs the version the exchange uses to the diagnostic log (BL-922), and, on a connection
+    /// this transfer opened, a downgrade from the version the command line asked for.
+    /// </summary>
+    private static void LogVersionChosen(HttpExchangeLog exchangeLog, HttpRequestPlan plan, IConnection transport, bool newConnection, IHttpStreamSession? streams)
+    {
+        string versionName = streams?.VersionName ?? HttpExchangeLog.Http1VersionName;
+        exchangeLog.VersionChosen(versionName, newConnection);
+        if (newConnection)
+        {
+            exchangeLog.DowngradeOf(plan.Options.Version, transport.IsSecure, versionName);
+        }
+    }
+
+    /// <summary>
+    /// Logs the end of a successful exchange to the diagnostic log (BL-922), reading the clock
+    /// only when <c>info</c> lines are written so a disabled log changes no timing.
+    /// </summary>
+    private static void LogExchanged(HttpExchangeLog exchangeLog, TimeProvider timeProvider, long? requestReady, HttpResponseHead head, HttpResponseBodyReader body)
+    {
+        if (exchangeLog.LogsInfo)
+        {
+            exchangeLog.Exchanged(head.StatusLine.StatusCode, body.BytesWritten, timeProvider.GetElapsedTime(requestReady!.Value));
+        }
+    }
+
+    /// <summary>
     /// Reports, just before the request is sent, what curl 8.21.0 writes while it picks the
     /// request's auth (measured, BL-843 and BL-954 Notes): <c>Proxy auth using ...</c> for a
     /// forward proxy, then the lines the authenticator reported while it made the request's
@@ -1130,6 +1213,21 @@ public sealed class HttpProtocolHandler(
         HttpNegotiateInfoLines.IsNegotiateChallenge(plan.AuthRequest, statusLine, header)
             || HttpNtlmInfoLines.IsNtlmChallenge(plan.AuthRequest, statusLine, header)
             || (plan.ProxyAuthRequest is { } proxyRequest && HttpNtlmInfoLines.IsNtlmChallenge(proxyRequest, statusLine, header));
+
+    /// <summary>
+    /// Reports the <c>authentication problem, ignoring.</c> lines curl writes just before a
+    /// challenge header refusing the Basic or Bearer value the request sent to the proxy or the
+    /// origin (<see cref="HttpAuthProblemLines" />, BL-1040).
+    /// </summary>
+    private static void ReportAuthProblemLines(HttpRequestPlan plan, HttpStatusLine statusLine, HttpResponseHeader header)
+    {
+        if (plan.ProxyAuthRequest is { } proxyRequest)
+        {
+            ReportInfoLines(plan.Context.Events, [.. HttpAuthProblemLines.LinesBefore(proxyRequest, plan.ProxyAuthorization, statusLine, header)]);
+        }
+
+        ReportInfoLines(plan.Context.Events, [.. HttpAuthProblemLines.LinesBefore(plan.AuthRequest, plan.Authorization, statusLine, header)]);
+    }
 
     /// <summary>Reports <paramref name="line" />, or nothing when it is <see langword="null" />.</summary>
     private static void ReportAuthUsing(ITransferEvents events, string? line)
@@ -1554,9 +1652,11 @@ public sealed class HttpProtocolHandler(
     /// <c>https</c> URL and <paramref name="store" /> is set, to the store with the transfer's
     /// URL as the origin, and reports curl 8.21.0's <c>Added alt-svc: &lt;host&gt;:&lt;port&gt; over
     /// &lt;id&gt;</c> for each alternative it added, before the header line (measured, BL-623
-    /// Notes). curl learns no alternative over plain <c>http</c>.
+    /// Notes). curl learns no alternative over plain <c>http</c>. The store is told
+    /// <paramref name="responseVersion" />, the version the response came over, as curl 8.21.0
+    /// passes <c>k->httpversion</c> to <c>Curl_altsvc_parse</c> (BL-947).
     /// </summary>
-    private static void StoreAltSvc(ITransferContext context, IAltSvcStore? store, HttpResponseHeader header)
+    private static void StoreAltSvc(ITransferContext context, IAltSvcStore? store, Version responseVersion, HttpResponseHeader header)
     {
         if (store is null
             || context.Url.Scheme != "https"
@@ -1565,7 +1665,7 @@ public sealed class HttpProtocolHandler(
             return;
         }
 
-        foreach (AltSvcAlternative added in store.StoreFromResponse(context.Url, header.Value, context.TimeProvider.GetUtcNow()))
+        foreach (AltSvcAlternative added in store.StoreFromResponse(context.Url, header.Value, responseVersion, context.TimeProvider.GetUtcNow()))
         {
             context.Events.ReportInfo($"Added alt-svc: {added.Host}:{added.Port} over {added.Alpn}");
         }

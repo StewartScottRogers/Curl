@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
@@ -559,9 +560,9 @@ internal sealed class CurlCommandRunner(
     /// <c>--hsts</c>, as curl 8.21.0's tool shares one through its share handle: an <c>https</c>
     /// response's <c>Strict-Transport-Security</c> switches a later <c>http</c> URL or redirect to the
     /// same host to <c>https</c> (measured 2026-09-29, BL-621 Notes; ADR-0218). Made on first use, on
-    /// the run's clock.
+    /// the run's clock, writing to the run's diagnostic log (BL-921).
     /// </summary>
-    private HstsTransferPolicy Hsts => LazyInitializer.EnsureInitialized(ref hsts, () => new HstsTransferPolicy(timeProvider));
+    private HstsTransferPolicy Hsts => LazyInitializer.EnsureInitialized(ref hsts, () => new HstsTransferPolicy(timeProvider, diagnosticLog));
 
     /// <summary>The run's HSTS cache once <see cref="Hsts" /> has made it.</summary>
     private HstsTransferPolicy? hsts;
@@ -596,6 +597,12 @@ internal sealed class CurlCommandRunner(
     /// The <c>%{conn_id}</c> the next transfer that connects takes, counted per run from zero.
     /// </summary>
     private long nextConnectionId;
+
+    /// <summary>
+    /// The <c>%{conn_id}</c> of each connection a transfer of the run opened, by the pool's number
+    /// for it, which a later transfer that reuses the connection takes (<see cref="ConnectionIdRecordingTransferEvents" />, BL-1052).
+    /// </summary>
+    private readonly ConcurrentDictionary<long, long> connectionIdsByPoolNumber = new();
 
     /// <summary>
     /// The <c>%{xfer_id}</c> the next transfer takes, counted per run from zero, one for every URL
@@ -1464,7 +1471,8 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Performs one transfer of a <c>-Z</c> run, then, holding the run's <see cref="writeGate" />,
-    /// records how it ended and writes its report (<see cref="EndParallelTransferAsync" />). A transfer
+    /// records how it ended and writes its report (<see cref="EndParallelTransferAsync" />). Where <c>-w</c> or <c>--trace-ids</c> prints
+    /// it, a transfer
     /// <c>--fail-early</c> cancels ends as <see cref="ParallelRun.AbortedResult" />.
     /// </summary>
     /// <param name="run">The run.</param>
@@ -1716,7 +1724,7 @@ internal sealed class CurlCommandRunner(
 
         await RemoveOutputFileOfFailedTransferAsync(options, result).ConfigureAwait(false);
         bool endsTheRun = EndsTheRun(options, result);
-        standardOutputSwitchedToBinary |= SwitchesStandardOutputToBinary(transfer, result);
+        standardOutputSwitchedToBinary |= SwitchesStandardOutputToBinary(options, transfer, result);
         bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
             options, transfer.UrlIndex, standardOutputSwitchedToBinary, endsTheRun);
         await WriteOutAsync(options, transfer, givenUrl, transferUrl, result, standardOutputIsBinary).ConfigureAwait(false);
@@ -2181,13 +2189,17 @@ internal sealed class CurlCommandRunner(
     /// opened: one sending its body to standard output, or discarding it under <c>--out-null</c>
     /// (<c>--out-null u -w "%{http_code}\n"</c> wrote LF, measured 2026-09-28, BL-495 Notes). An
     /// IPFS URL that could not be rewritten counts: curl 8.21.0 wrote its <c>-w</c> line feed as LF
-    /// without <c>-o</c> and as CR LF with one (measured 2026-09-27, BL-240 Notes).
+    /// without <c>-o</c> and as CR LF with one (measured 2026-09-27, BL-240 Notes). Where <c>-w</c> or <c>--trace-ids</c> prints
+    /// it, a transfer
+    /// under <c>-B</c> / <c>--use-ascii</c> never does: curl leaves standard output in text mode
+    /// for it (measured 2026-10-01, BL-961 Notes).
     /// </summary>
+    /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when standard output is now in binary mode.</returns>
-    private static bool SwitchesStandardOutputToBinary(UrlTransfer transfer, TransferResult result) =>
-        !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure);
+    private static bool SwitchesStandardOutputToBinary(CommandLineOptions options, UrlTransfer transfer, TransferResult result) =>
+        !options.UseAscii && !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure);
 
     /// <summary>
     /// Gives the output entry of the URL at <paramref name="index" />.
@@ -2229,9 +2241,17 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="options">The option group.</param>
     /// <param name="first">The position of the first URL looked at.</param>
-    /// <returns><see langword="true" /> when one of those URLs saves no file.</returns>
+    /// <returns>
+    /// <see langword="true" /> when one of those URLs saves no file; never under <c>-B</c>, which
+    /// leaves standard output in text mode.
+    /// </returns>
     private static bool UrlFromSwitchesStandardOutputToBinary(CommandLineOptions options, int first)
     {
+        if (options.UseAscii)
+        {
+            return false;
+        }
+
         for (int later = first; later < options.Urls.Count; later++)
         {
             if (!WritesToFile(options, later))
@@ -2519,6 +2539,7 @@ internal sealed class CurlCommandRunner(
     /// (measured 2026-09-29, BL-648 Notes). With <c>-w</c> the events also record the certificate
     /// verify codes <c>%{ssl_verify_result}</c> and <c>%{proxy_ssl_verify_result}</c> print
     /// (<see cref="VerifyResultRecordingTransferEvents" />, BL-661); nothing else reads them.
+    /// Where <c>-w</c> or <c>--trace-ids</c> prints it, a transfer that reuses a connection takes that connection's <c>%{conn_id}</c> (<see cref="ConnectionIdRecordingTransferEvents" />, BL-1052).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
@@ -2526,8 +2547,12 @@ internal sealed class CurlCommandRunner(
     private ITransferEvents SetUpTransferEvents(CommandLineOptions options, UrlTransfer transfer)
     {
         RunningTransferState state = Running;
-        ITransferEvents events = transferEventOutput.EventsFor(transfer.TransferId, () => state.ConnectionId ??= nextConnectionId++);
-        state.Events = options.WriteOut is null ? events : new VerifyResultRecordingTransferEvents(events, state);
+        Func<long> takeConnectionId = () => state.ConnectionId ??= nextConnectionId++;
+        ITransferEvents events = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
+        ITransferEvents recorded = options.WriteOut is null ? events : new VerifyResultRecordingTransferEvents(events, state);
+        state.Events = options.WriteOut is null && !options.TraceIds
+            ? recorded
+            : new ConnectionIdRecordingTransferEvents(recorded, state, connectionIdsByPoolNumber, takeConnectionId);
         return transferEventOutput.EventsFor(transfer.TransferId, () => null);
     }
 
@@ -2856,8 +2881,9 @@ internal sealed class CurlCommandRunner(
         Stream? headerOutput)
     {
         // curl switches standard output to binary mode as the transfer starts, so the transfer's
-        // own --trace - lines already end in a bare line feed (measured, BL-546 Notes).
-        standardOutputSwitchedToBinary |= !transfer.WritesToFile;
+        // own --trace - lines already end in a bare line feed (measured, BL-546 Notes); under -B
+        // it leaves standard output in text mode (BL-961 Notes).
+        standardOutputSwitchedToBinary |= !options.UseAscii && !transfer.WritesToFile;
         if (!options.Silent)
         {
             await WriteErrorLinesAsync(dispatch.WarningLinesBeforeEachTransfer).ConfigureAwait(false);
@@ -3148,7 +3174,7 @@ internal sealed class CurlCommandRunner(
             Func<TransferContext> createAttemptContext = () => transferContextFactory.Create(
                 options,
                 url,
-                RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, Running.GatedStandardOutput) : Stream.Null),
+                RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
                 range,
                 options.ResumeFrom,
                 headerOutput,
@@ -3937,7 +3963,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The accepted command line.</param>
     /// <returns>The started watchdog, or <see langword="null" /> when the speed is not watched.</returns>
     private LowSpeedWatchdog? StartLowSpeedWatchdog(CommandLineOptions options) =>
-        Running.AttemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(options.SpeedLimit, options.SpeedTimeSeconds, timeProvider);
+        Running.AttemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(options.SpeedLimit, options.SpeedTimeSeconds, timeProvider, diagnosticLog);
 
     /// <summary>
     /// Starts the <c>-m</c> watchdog for the attempt whose context is being created, on the
@@ -3947,7 +3973,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The accepted command line.</param>
     /// <returns>The started watchdog, or <see langword="null" /> without a positive <c>-m</c>.</returns>
     private MaxTimeWatchdog? StartMaxTimeWatchdog(CommandLineOptions options) =>
-        Running.AttemptMaxTimeWatchdog = MaxTimeWatchdog.StartFromCommandLine(options.MaxTime, timeProvider);
+        Running.AttemptMaxTimeWatchdog = MaxTimeWatchdog.StartFromCommandLine(options.MaxTime, timeProvider, diagnosticLog);
 
     /// <summary>
     /// Performs one attempt through <paramref name="follower" /> under the <c>-Y</c>/<c>-y</c> and
@@ -4045,6 +4071,20 @@ internal sealed class CurlCommandRunner(
     /// <returns>The flushing stream, or <paramref name="output" /> when buffering is on.</returns>
     private static Stream FlushedEachWriteUnderNoBuffer(CommandLineOptions options, Stream output) =>
         options.NoBuffer ? new FlushEachWriteStream(output) : output;
+
+    /// <summary>
+    /// Writes a body sent to standard output in text mode on Windows under <c>-B</c> /
+    /// <c>--use-ascii</c>, each line feed as CR LF, until an earlier or concurrent transfer has
+    /// switched standard output to binary mode (<see cref="TextModeUntilBinaryStream" />). curl
+    /// 8.21.0's Schannel build wrote <c>-B</c>'s <c>l1\nl2\r\n</c> as <c>l1\r\nl2\r\r\n</c>, its
+    /// <c>-I</c> and <c>-i</c> header lines ending <c>\r\r\n</c>, and a <c>-B</c> transfer after
+    /// one without it unchanged (measured 2026-10-01, BL-961 Notes).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="output">Standard output.</param>
+    /// <returns>The text-mode stream, or <paramref name="output" /> without <c>-B</c> or off Windows.</returns>
+    private Stream InTextModeUnderUseAscii(CommandLineOptions options, Stream output) =>
+        runsOnWindows && options.UseAscii ? new TextModeUntilBinaryStream(output, () => standardOutputSwitchedToBinary) : output;
 
     /// <summary>
     /// Writes each of <paramref name="lines" /> to standard error, in order.

@@ -45,6 +45,9 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
     private string StandardErrorText => Encoding.Latin1.GetString(standardError.ToArray());
 
+    /// <summary>Gets standard error with every CR LF made LF, so a line reads the same on every platform.</summary>
+    private string StandardErrorLines => StandardErrorText.Replace("\r\n", "\n", StringComparison.Ordinal);
+
     [TestMethod]
     public async Task RunAsync_SecondRunAfterAnH3AltSvcHeader_ConnectsOverHttp3()
     {
@@ -126,6 +129,67 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     }
 
     [TestMethod]
+    public async Task RunAsync_H2EntryForAnotherPortOnWindowsWithoutAVersionOption_OffersH2AloneAndSpeaksHttp2()
+    {
+        // curl.se 8.18.0, "h1 127.0.0.1 18736 h2 127.0.0.1 18735 ...": * ALPN: curl offers h2 (BL-733 Notes case 4).
+        CacheFileHolds(OtherPortH2Entry);
+        ScriptedConnector server = new([Http2Response("hello")]) { ApplicationProtocol = "h2", ReportsTheAlpnOffer = true };
+
+        int exitCode = await RunAsync(server, ["-sSv", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
+
+        Assert.AreEqual(0, exitCode, StandardErrorText);
+        Assert.AreEqual("hello|2", StandardOutputText);
+        CollectionAssert.AreEqual(new[] { "h2" }, server.Targets.Single().ApplicationProtocols!.ToArray());
+        StringAssert.Contains(StandardErrorLines, "* ALPN: curl offers h2\n");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EntrySwitchingToH1_OffersHttp11Alone()
+    {
+        CacheFileHolds($"h2 localhost 18443 h1 localhost 18444 {Future} 0 0");
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi")]) { ReportsTheAlpnOffer = true };
+
+        int exitCode = await RunAsync(server, ["-sSv", "--alt-svc", CacheFile, Origin]);
+
+        Assert.AreEqual(0, exitCode, StandardErrorText);
+        Assert.AreEqual(new AltSvcRoute("h2", new AltSvcAlternative("h1", "localhost", 18444)), server.Targets.Single().AltSvcRoute);
+        CollectionAssert.AreEqual(new[] { "http/1.1" }, server.Targets.Single().ApplicationProtocols!.ToArray());
+        StringAssert.Contains(StandardErrorLines, "* ALPN: curl offers http/1.1\n");
+    }
+
+    [TestMethod]
+    [DataRow("h2")]
+    [DataRow("h1")]
+    public async Task RunAsync_Http3AndAnEntryNamingTheOriginWithATcpVersion_TriesTcpFirstBeforeHttp3(string alpn)
+    {
+        // curl 8.21.0's cf_hc_get_pref_alpn makes the entry's version the first attempt (BL-948).
+        CacheFileHolds($"h1 localhost 18443 {alpn} localhost 18443 {Future} 0 0");
+        ScriptedConnector tcp = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi")]);
+        ScriptedQuicConnector connector = new(MultiplexedConnectResult.Connected(new ScriptedMultiplexedConnection(new ScriptedMultiplexedStream(0, Http3Response("h3"))), null), tcp);
+
+        int exitCode = await RunAsync(connector, ["-sS", "-w", "|%{http_version}", "--http3", "--alt-svc", CacheFile, Origin]);
+
+        Assert.AreEqual(0, exitCode, StandardErrorText);
+        Assert.AreEqual("hi|1.1", StandardOutputText);
+        Assert.AreEqual(1, connector.TcpConnectCount);
+        Assert.IsEmpty(connector.QuicTargets);
+        Assert.IsNull(tcp.Targets.Single().AltSvcRoute);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http3AndAnH3EntryNamingTheOrigin_StillTriesHttp3First()
+    {
+        CacheFileHolds($"h1 localhost 18443 h3 localhost 18443 {Future} 0 0");
+        ScriptedQuicConnector connector = Http3Server("hello");
+
+        int exitCode = await RunAsync(connector, ["-sS", "-w", "|%{http_version}", "--http3", "--alt-svc", CacheFile, Origin]);
+
+        Assert.AreEqual(0, exitCode, StandardErrorText);
+        Assert.AreEqual("hello|3", StandardOutputText);
+        Assert.AreEqual(0, connector.TcpConnectCount);
+    }
+
+    [TestMethod]
     public async Task RunAsync_H2EntryForAnotherPortAndNoAlpnAgreed_UsesHttp11ThereWithAltUsed()
     {
         // curl.se's build offers only h2 there and, when the server agrees on nothing, sends HTTP/1.1 (measured).
@@ -198,6 +262,56 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
         Assert.AreEqual(route, tcp.Targets.Single().AltSvcRoute);
     }
 
+    /// <summary>
+    /// curl stores a header under the version its response came over (BL-947): a run over HTTP/2 to
+    /// <c>www.google.com</c> wrote <c>h2 www.google.com 443 h3 www.google.com 443 ...</c> (measured, BL-733 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_AltSvcHeaderOverHttp2_WritesAnEntryLearnedUnderH2()
+    {
+        ScriptedConnector server = new([Http2Response("hello", ("alt-svc", "h3=\":18443\""))]) { ApplicationProtocol = "h2" };
+
+        int exitCode = await RunAsync(server, ["-sS", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
+
+        Assert.AreEqual(0, exitCode, StandardErrorText);
+        Assert.AreEqual("hello|2", StandardOutputText);
+        Assert.AreEqual(CacheFileText($"h2 localhost 18443 h3 localhost 18443 {Future} 0 0"), SavedCacheFile());
+    }
+
+    /// <summary>
+    /// A run over HTTP/3 to <c>www.google.com</c> added <c>h3 www.google.com 443 h3 www.google.com 443 ...</c>
+    /// (measured, BL-733 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_AltSvcHeaderOverHttp3_WritesAnEntryLearnedUnderH3()
+    {
+        ScriptedQuicConnector connector = new(
+            MultiplexedConnectResult.Connected(new ScriptedMultiplexedConnection(new ScriptedMultiplexedStream(0, Http3Response("hello", ("alt-svc", "h3=\":18443\"")))), null),
+            new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
+
+        int exitCode = await RunAsync(connector, ["-sS", "-w", "|%{http_version}", "--http3-only", "--alt-svc", CacheFile, Origin]);
+
+        Assert.AreEqual(0, exitCode, StandardErrorText);
+        Assert.AreEqual("hello|3", StandardOutputText);
+        Assert.AreEqual(CacheFileText($"h3 localhost 18443 h3 localhost 18443 {Future} 0 0"), SavedCacheFile());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http3OnlyAfterAnHttp3ResponseAdvertisedAnotherPort_ConnectsToThatAlternative()
+    {
+        ScriptedQuicConnector firstServer = new(
+            MultiplexedConnectResult.Connected(new ScriptedMultiplexedConnection(new ScriptedMultiplexedStream(0, Http3Response("hi", ("alt-svc", "h3=\":18444\"")))), null),
+            new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
+        await RunAsync(firstServer, ["-s", "--http3-only", "--alt-svc", CacheFile, Origin]);
+        files.ExistingContent[CacheFile] = files.Written[CacheFile].ToArray();
+        ScriptedQuicConnector secondServer = Http3Server("hello");
+
+        int exitCode = await RunAsync(secondServer, ["-sS", "--http3-only", "--alt-svc", CacheFile, Origin]);
+
+        Assert.AreEqual(0, exitCode, StandardErrorText);
+        Assert.AreEqual(new AltSvcRoute("h3", new AltSvcAlternative("h3", "localhost", 18444)), secondServer.QuicTargets.Single().AltSvcRoute);
+    }
+
     [TestMethod]
     public async Task RunAsync_RedirectFromAnH3AlternativeToAnotherOrigin_ConnectsToItOverTcp()
     {
@@ -238,14 +352,14 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
             new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
 
     /// <summary>
-    /// A response on the HTTP/3 request stream: a 200 head, or a 302 head when <paramref name="extra" /> is
-    /// given, with the body's length and the extra fields, then the body.
+    /// A response on the HTTP/3 request stream: a 200 head, or a 302 head when <paramref name="extra" />
+    /// names a <c>location</c>, with the body's length and the extra fields, then the body.
     /// </summary>
     private static byte[] Http3Response(string body, params (string Name, string Value)[] extra)
     {
         HeaderField[] fields =
         [
-            new(":status", extra.Length == 0 ? "200" : "302"),
+            new(":status", extra.Any(field => field.Name == "location") ? "302" : "200"),
             new("content-length", body.Length.ToString(CultureInfo.InvariantCulture)),
             .. extra.Select(field => new HeaderField(field.Name, field.Value)),
         ];
@@ -253,14 +367,22 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
         return [.. new Http3HeadersFrame(head).ToBytes(), .. new Http3DataFrame(Encoding.Latin1.GetBytes(body)).ToBytes()];
     }
 
-    /// <summary>An HTTP/2 server's bytes: its settings and their acknowledgement, then a 200 on stream 1 with the body.</summary>
-    private static byte[] Http2Response(string body) =>
+    /// <summary>
+    /// An HTTP/2 server's bytes: its settings and their acknowledgement, then a 200 on stream 1 with the
+    /// body's length and the extra fields, then the body.
+    /// </summary>
+    private static byte[] Http2Response(string body, params (string Name, string Value)[] extra) =>
     [
         .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettings([])),
         .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettingsAcknowledgement()),
         .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateHeaders(
             1,
-            new HpackEncoder().Encode([new(":status", "200"), new("content-length", body.Length.ToString(CultureInfo.InvariantCulture))]),
+            new HpackEncoder().Encode(
+            [
+                new(":status", "200"),
+                new("content-length", body.Length.ToString(CultureInfo.InvariantCulture)),
+                .. extra.Select(field => new HeaderField(field.Name, field.Value)),
+            ]),
             isEndStream: false,
             isEndHeaders: true)),
         .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateData(1, Encoding.Latin1.GetBytes(body), isEndStream: true)),

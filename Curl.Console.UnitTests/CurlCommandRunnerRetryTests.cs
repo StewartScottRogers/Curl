@@ -251,6 +251,17 @@ public sealed class CurlCommandRunnerRetryTests
         Assert.AreEqual(0, clock.Waits.Count);
     }
 
+    [TestMethod]
+    public async Task RunAsync_RetryWithLogLevelWarningToLogFile_LogsTheRetryUnderRetry()
+    {
+        int exitCode = await RunAsync([Busy, Ok], "-s", "--retry", "1", "--log-level", "warning", "--log-file", "x.log", Url);
+
+        Assert.AreEqual(0, exitCode);
+        string log = Encoding.UTF8.GetString(outputFiles.Written["x.log"].ToArray());
+        StringAssert.Contains(log, "] [warning] [retry] attempt 1 failed (HttpError); retrying in 1000 ms, 1 retries left" + NewLine);
+        Assert.IsFalse(log.Contains("[info]", StringComparison.Ordinal), log);
+    }
+
     private Task<int> RunAsync(string[] responses, params string[] arguments) =>
         RunAsync(responses, writesProgressMeter: false, arguments);
 

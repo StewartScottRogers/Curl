@@ -87,8 +87,9 @@ after the `C` line; none after the file's bytes. The path `/x/it's!''here` was s
 - A header failure throws with the channel still open, as a failed SFTP open does
   (ADR-0220); libssh2 frees the channel there, but the handler (BL-576) ends the
   session either way and nothing observable differs.
-- A connection that breaks before the `exec` answer is exit 79 `Error in the SSH layer`:
-  not measured, it is curl's code for an SSH failure with no message of its own.
+- A connection that breaks before the `exec` answer is exit 79 with libssh2's message for
+  the step: `Unexpected error` at the channel open, `Failed waiting for channel success`
+  at the `exec` request, as measured in BL-1046 (ADR-0289).
 - Where curl waits for more of a line that its length rule leaves open (`T1 0 1\n`), this
   library waits too, so `-m` ends the transfer as it ends curl's.
 - Uploads (BL-577), the handler (BL-576) and the `-v` lines (BL-578) build on these

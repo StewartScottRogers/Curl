@@ -194,15 +194,19 @@ public sealed class KeyShareTests
     [DataRow(0x0016, false)]
     [DataRow(0x00ff, false)]
     [DataRow(0x0105, false)]
-    [DataRow(0x11eb, false)]
+    [DataRow(0x11eb, true)]
+    [DataRow(0x0022, false)]
+    [DataRow(0x0203, false)]
+    [DataRow(0x11ee, false)]
     public void CanShareNamesTheGroupsWithAKeyShare(int group, bool expected) =>
         Assert.AreEqual(expected, TlsNamedGroup.CanShare((ushort)group));
 
     [TestMethod]
     [DataRow(0x0016)]
-    [DataRow(0x001f)]
+    [DataRow(0x0022)]
     [DataRow(0x0105)]
-    [DataRow(0x11eb)]
+    [DataRow(0x0203)]
+    [DataRow(0x11ee)]
     public void TheSystemRandomSourceRefusesAGroupItCannotShare(int group) =>
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => SystemTlsRandomSource.Instance.CreateKeyShare((ushort)group));
 

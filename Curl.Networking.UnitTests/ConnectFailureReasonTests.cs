@@ -24,6 +24,7 @@ public sealed class ConnectFailureReasonTests
     [DataRow(SocketError.AddressNotAvailable, "Address not available")]
     [DataRow(SocketError.NetworkDown, "Network down")]
     [DataRow(SocketError.InvalidArgument, "Invalid arguments")]
+    [DataRow(SocketError.AddressAlreadyInUse, "Address already in use")]
     public void Describe_WithWinsockWording_GivesCurlsWords(SocketError error, string expected)
     {
         var reason = ConnectFailureReason.Describe(new SocketException((int)error), usesWinsockWording: true);

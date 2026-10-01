@@ -37,8 +37,11 @@ OpenSSL build was at hand, so its wording is taken from the source above.
   text when the private key file does not open and the unrecognized-format text when it
   opens; for `WinCNG`, or a preset that names no backend, `Reason unknown (-1)` as before.
 - An unreadable `--pubkey` and an RSA key with no signature algorithm the server accepts
-  keep `Reason unknown (-1)` here; libssh2 names both (`Unable to open public key file`,
-  `No signing signature matched`) on either backend, and that is left to its own task.
+  give libssh2's own text on either backend, not `Reason unknown (-1)` (amended by
+  BL-1043): `Unable to open public key file` for a `--pubkey` that does not open,
+  `file_read_publickey`'s text for one that does not parse, and `No signing signature
+  matched`; ADR-0262 point 5 lists them. The backend decides the reason only when, with
+  no `--pubkey`, the public key cannot be derived from the private key.
 - libssh2's `Unsupported private key file format` (a PEM key of a type it cannot derive)
   is not distinguished: this library reads no such key.
 

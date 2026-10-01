@@ -1,5 +1,5 @@
 # Keeps the README's showcase on the `gource` branch, served by GitHub Pages at
-# https://stewartscottrogers.github.io/Curl/: a Gource video of Curl's history (an 8K
+# https://stewartscottrogers.github.io/Curl/: a Gource video of Curl's history (a 4K
 # adaptive stream with a full-screen viewer page, and the GIF the README shows) and the
 # code coverage report (coverage/index.html, and coverage/badge.svg for the README), and
 # the live task board page (board/index.html, served at .../Curl/board/).
@@ -21,7 +21,7 @@
 # overlap and a run decides only once the render before it has finished; board-page has a
 # group of its own, so the page goes up within minutes instead of waiting behind a render.
 #
-# An 8K render takes the better part of an hour on a runner, hence the long timeout.
+# A render with its MP4 re-encode can take an hour or more on a runner, hence the long timeout.
 #
 # When it renders:
 #   * hourly (from master, once this file is merged), if any branch has new commits;
@@ -194,7 +194,7 @@ jobs:
           echo "$FINGERPRINT" > fingerprint.txt
           date +%s > rendered-at.txt
           printf '%s\n' '# gource' '' \
-            'The README showcase of Curl: the 8K Gource viewer, the code coverage report and' \
+            'The README showcase of Curl: the 4K Gource viewer, the code coverage report and' \
             'the live task board page (board/), served by GitHub Pages at' \
             'https://stewartscottrogers.github.io/Curl/ (the board at .../Curl/board/), and' \
             'the GIF and coverage badge the README shows.' \
@@ -221,23 +221,27 @@ jobs:
           [ -f board/index.html ] && extra="$extra board"
           # GitHub refuses any file over 100 MB (GH001), and a refused push leaves the README's
           # video frozen while the coverage job keeps the branch looking fresh. Name every
-          # file over 95 MiB and stop here instead. GitHub Pages serves at most 1 GB.
+          # file over 95 MiB and stop here instead. GitHub Pages serves at most 1 GB: stop
+          # above 1,000,000,000 bytes too, and warn from 900 MiB so it is seen coming.
           too_big=$(find . -path ./.git -prune -o -type f -size +95M -printf '%s bytes  %P\n')
           if [ -n "$too_big" ]; then
             echo "::error::files over 95 MiB, which GitHub would refuse at 100 MB:"
             echo "$too_big"
             exit 1
           fi
-          site=$(du -sb --exclude=.git . | cut -f1)
+          site=$(find . -path ./.git -prune -o -type f -printf '%s\n' | awk '{ s += $1 } END { printf "%d", s }')
           echo "site: $site bytes; largest files:"
           find . -path ./.git -prune -o -type f -printf '%s  %P\n' | sort -rn | head -5
-          if [ "$site" -gt $(( 900 * 1024 * 1024 )) ]; then
-            echo "::warning::the site is $site bytes, near or over GitHub Pages' 1 GB limit"
+          if [ "$site" -gt 1000000000 ]; then
+            echo "::error::the site is $site bytes, over GitHub Pages' 1 GB limit; shorten history_seconds in render.sh"
+            exit 1
+          elif [ "$site" -gt $(( 900 * 1024 * 1024 )) ]; then
+            echo "::warning::the site is $site bytes, near GitHub Pages' 1 GB limit"
           fi
           git init -q -b gource
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html .nojekyll hls gource.mp4 gource.gif still-8k.jpg poster.jpg stats.json \
+          git add index.html .nojekyll hls gource.mp4 gource.gif still-4k.jpg poster.jpg stats.json \
             fingerprint.txt rendered-at.txt README.md $extra
           git commit -q -m "chore(gource): render $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gource
@@ -249,7 +253,7 @@ jobs:
         run: gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds" --silent
 
   # The live task board page, published on every run and never gated on `decide`: it is
-  # one small file and must not wait behind an 8K render. It commits onto the gource
+  # one small file and must not wait behind a render. It commits onto the gource
   # branch without force, like the coverage job, and only when the page changed.
   board-page:
     runs-on: ubuntu-latest

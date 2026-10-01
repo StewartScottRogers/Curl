@@ -121,6 +121,16 @@ public sealed class KerberosConfiguration(KerberosConfigurationNode root)
     public IReadOnlyList<string> KdcEntries(string realm) => GetValues("realms", realm, "kdc");
 
     /// <summary>
+    /// Gets the <c>http_anchors</c> values of <c>[realms]</c> <paramref name="realm" />, in file
+    /// order: where the roots its MS-KKDCP proxies' certificates must lead to are kept
+    /// (<see cref="KerberosHttpAnchor.Parse" /> reads each). MIT reads the relation from the realm
+    /// only, never from <c>[libdefaults]</c>, so neither does this (ADR-0300).
+    /// </summary>
+    /// <param name="realm">The realm, matched case-sensitively.</param>
+    /// <returns>The values as written; empty when the realm sets none, and the system's trust store is used.</returns>
+    public IReadOnlyList<string> HttpAnchors(string realm) => GetValues("realms", realm, "http_anchors");
+
+    /// <summary>
     /// Maps <paramref name="host" /> to its realm as MIT's profile module does: the host,
     /// lower-cased and without a trailing dot, is looked up in <c>[domain_realm]</c>, then
     /// each suffix from each dot (<c>.example.com</c>, then <c>example.com</c>); failing

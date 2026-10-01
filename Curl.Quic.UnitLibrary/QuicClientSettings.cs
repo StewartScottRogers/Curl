@@ -13,18 +13,6 @@ public sealed record QuicClientSettings
     /// <summary>The length of every connection ID the client chooses, as curl's ngtcp2 build uses.</summary>
     public const int CurlConnectionIdLength = 20;
 
-    // The OpenSSL profile's extensions a TLS 1.3-only QUIC ClientHello leaves out (ADR-0140,
-    // BL-847): those only TLS 1.2 and below use, and post_handshake_auth, which RFC 9001
-    // section 4.4 forbids a QUIC client.
-    private static readonly TlsExtensionType[] OpenSslExtensionsLeftOutOfQuic =
-    [
-        TlsExtensionType.RenegotiationInfo,
-        TlsExtensionType.EcPointFormats,
-        TlsExtensionType.EncryptThenMac,
-        TlsExtensionType.ExtendedMasterSecret,
-        TlsExtensionType.PostHandshakeAuth,
-    ];
-
     /// <summary>The ALPN protocols curl's build offers over QUIC, in order.</summary>
     public static IReadOnlyList<string> CurlApplicationProtocols { get; } = ["h3", "h3-29"];
 
@@ -73,15 +61,16 @@ public sealed record QuicClientSettings
         ],
         FixedExtensions = [new TlsExtension(TlsExtensionType.EcPointFormats, [0x01, 0x00])],
     };
-
     /// <summary>
     /// Returns the TLS settings of the OpenSSL build's QUIC ClientHello, the QUIC hello on
-    /// Linux and macOS (ADR-0140, BL-847): <see cref="ClientHelloProfile.OpenSsl" />'s TLS 1.3
-    /// parts - its TLS 1.3 suites QUIC can protect, its groups and key shares, the signature
-    /// schemes the client can check, <c>psk_key_exchange_modes</c> and <c>compress_certificate</c> -
-    /// in its extension order without the extensions TLS 1.3 over QUIC does not send, then
-    /// <c>quic_transport_parameters</c> last, where OpenSSL's extension table puts it; ALPN
-    /// <c>h3</c> then <c>h3-29</c>, and no legacy session ID.
+    /// Linux and macOS, as BL-957 measured it (ADR-0140, ADR-0290, ADR-0291):
+    /// <see cref="ClientHelloProfile.OpenSsl" />'s hello with <c>quic_transport_parameters</c>
+    /// first in place of <c>renegotiation_info</c> and every other extension in the profile's
+    /// order - <c>ec_point_formats</c>, <c>encrypt_then_mac</c>, <c>extended_master_secret</c>
+    /// and <c>post_handshake_auth</c> included, as OpenSSL still sends them - its TLS 1.3 suites
+    /// QUIC can protect, its groups and key shares, the signature schemes TLS 1.3 allows,
+    /// <c>supported_versions</c> TLS 1.3 only, ALPN <c>h3</c> then <c>h3-29</c>, and no legacy
+    /// session ID.
     /// </summary>
     /// <param name="serverName">The host name for <c>server_name</c>, or <see langword="null" /> for an IP address.</param>
     /// <returns>The settings.</returns>
@@ -94,16 +83,25 @@ public sealed record QuicClientSettings
             CipherSuites = [.. profile.CipherSuites.Where(QuicPacketProtection.CanProtect)],
             SupportedGroups = profile.SupportedGroups,
             KeyShareGroups = profile.KeyShareGroups,
-            SignatureAlgorithms = [.. profile.SignatureAlgorithms.Where(IsCheckableScheme)],
+            SignatureAlgorithms = [.. profile.SignatureAlgorithms.Where(IsTls13Scheme)],
             CertificateCompressionAlgorithms = profile.CertificateCompressionAlgorithms,
             ApplicationProtocols = CurlApplicationProtocols,
-            ExtensionOrder = [.. profile.ExtensionOrder.Except(OpenSslExtensionsLeftOutOfQuic), TlsExtensionType.QuicTransportParameters],
-            FixedExtensions = [PskKeyExchangeModesExtension.Encode(profile.PskKeyExchangeModes)],
+            ExtensionOrder = [TlsExtensionType.QuicTransportParameters, .. profile.ExtensionOrder.Where(type => type != TlsExtensionType.RenegotiationInfo)],
+            FixedExtensions =
+            [
+                EcPointFormatsExtension.Encode(profile.EcPointFormats),
+                EncryptThenMacExtension.Encode(),
+                ExtendedMasterSecretExtension.Encode(),
+                PostHandshakeAuthExtension.Encode(),
+                PskKeyExchangeModesExtension.Encode(profile.PskKeyExchangeModes),
+            ],
         };
     }
 
-    // A scheme a server's CertificateVerify or certificate signature can be checked with, as
-    // the TCP path cuts the profile's list (ADR-0222).
-    private static bool IsCheckableScheme(ushort scheme) =>
-        TlsSignatureScheme.IsCertificateVerifyScheme(scheme) || TlsSignatureScheme.IsTls12Scheme(scheme);
+    // A scheme OpenSSL keeps in a TLS 1.3-only hello, as BL-957 measured: the TLS 1.3 schemes
+    // and RSA PKCS #1 v1.5 over SHA-2, which RFC 8446 section 4.2.3 allows in certificates;
+    // the SHA-1, SHA-224 and DSA schemes go.
+    private static bool IsTls13Scheme(ushort scheme) =>
+        TlsSignatureScheme.IsCertificateVerifyScheme(scheme)
+        || scheme is TlsSignatureScheme.RsaPkcs1Sha256 or TlsSignatureScheme.RsaPkcs1Sha384 or TlsSignatureScheme.RsaPkcs1Sha512;
 }

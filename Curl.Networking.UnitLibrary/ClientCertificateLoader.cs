@@ -16,6 +16,8 @@ internal static class ClientCertificateLoader
 {
     private const string EncryptedPrivateKeyBegin = "-----BEGIN ENCRYPTED PRIVATE KEY-----";
 
+    private const string PrivateKeyLabel = "PRIVATE KEY";
+
     private static readonly string[] DerPrivateKeyLabels = ["PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY"];
 
     /// <summary>
@@ -73,7 +75,7 @@ internal static class ClientCertificateLoader
     /// <summary>
     /// Loads the <see cref="TlsClientOptions.ClientCertificate" /> as a build on the OpenSSL
     /// API does: the OpenSSL build, and curl.se's LibreSSL build, which dials QUIC on Windows
-    /// (BL-847). <c>--pass</c>, when given, is the passphrase in place of the one in <c>--cert</c>.
+    /// (ADR-0290). <c>--pass</c>, when given, is the passphrase in place of the one in <c>--cert</c>.
     /// </summary>
     /// <param name="options">The handshake's settings.</param>
     /// <param name="recognisesDriveLetters"><see langword="true" /> for a Windows build of curl, which keeps a drive letter's colon in the <c>--cert</c> value.</param>
@@ -271,10 +273,7 @@ internal static class ClientCertificateLoader
 
         try
         {
-            using var withKey = keyFileType == ClientCertificateFileType.Der
-                ? CombineWithDerKey(certificatePem, File.ReadAllBytes(keyPath))
-                : CombineWithKey(certificatePem, File.ReadAllText(keyPath), passphrase);
-            return (Reimport(withKey), null);
+            return (LoadWithPrivateKey(certificatePem, keyPath, keyFileType == ClientCertificateFileType.Der, passphrase), null);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or CryptographicException)
         {
@@ -362,6 +361,42 @@ internal static class ClientCertificateLoader
         {
             return false;
         }
+    }
+
+    // An Ed25519, Ed448 or ML-DSA certificate's key is read by hand, since the BCL holds
+    // none of them on every platform (ADR-0301); any other goes to the BCL.
+    private static X509Certificate2 LoadWithPrivateKey(string certificatePem, string keyPath, bool isDer, string? passphrase)
+    {
+        using var certificate = X509Certificate2.CreateFromPem(certificatePem);
+        var keyAlgorithm = certificate.PublicKey.Oid.Value;
+        if (HandBuiltPrivateKeyReader.Reads(keyAlgorithm))
+        {
+            var privateKeyInfo = isDer ? File.ReadAllBytes(keyPath) : PemPrivateKeyInfo(File.ReadAllText(keyPath));
+            var signingKey = HandBuiltPrivateKeyReader.Read(privateKeyInfo, keyAlgorithm!, certificate.PublicKey.EncodedKeyValue.RawData);
+            return new HandBuiltKeyCertificate(certificate, signingKey);
+        }
+
+        using var withKey = isDer
+            ? CombineWithDerKey(certificatePem, File.ReadAllBytes(keyPath))
+            : CombineWithKey(certificatePem, File.ReadAllText(keyPath), passphrase);
+        return Reimport(withKey);
+    }
+
+    // The first unencrypted PKCS#8 block in the file.
+    private static byte[] PemPrivateKeyInfo(string keyPem)
+    {
+        var remaining = keyPem.AsSpan();
+        while (PemEncoding.TryFind(remaining, out var fields))
+        {
+            if (remaining[fields.Label].SequenceEqual(PrivateKeyLabel))
+            {
+                return Convert.FromBase64String(remaining[fields.Base64Data].ToString());
+            }
+
+            remaining = remaining[fields.Location.End..];
+        }
+
+        throw new CryptographicException("The key file holds no PEM PRIVATE KEY.");
     }
 
     // OpenSSL reads a DER key as PKCS#8, PKCS#1 RSA or SEC 1 EC, whichever it parses as; it

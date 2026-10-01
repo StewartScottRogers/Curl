@@ -42,7 +42,8 @@ internal sealed class SmtpSession(
     ITransferContext context,
     string domain,
     bool implicitTls,
-    SmtpCommandLineText commandLineText) : IAsyncDisposable
+    SmtpCommandLineText commandLineText,
+    ConnectionOpenedEvent? opened) : IAsyncDisposable
 {
     private const int StartTlsAccepted = 220;
 
@@ -202,17 +203,25 @@ internal sealed class SmtpSession(
     }
 
     /// <summary>
-    /// Runs the TLS handshake over the connection and greets again over the secured one; a
-    /// failed handshake ends the session with its exit code and no <c>QUIT</c>.
+    /// Runs the TLS handshake over the connection, reporting it to the transfer's events, and
+    /// greets again over the secured one; a failed handshake ends the session with its exit
+    /// code and no <c>QUIT</c>. A completed one reports the connect's
+    /// <c>Established connection</c> line again, as curl 8.21.0 writes it a second time
+    /// between <c>220 Ready to start TLS</c> and the second <c>EHLO</c> (measured, BL-1058).
     /// </summary>
     private async ValueTask<TransferResult?> UpgradeAsync()
     {
         ConnectResult secured = await tlsProvider
-            .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.CancellationToken)
+            .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.Events, context.CancellationToken)
             .ConfigureAwait(false);
         if (secured.Connection is not { } connection)
         {
             return TransferResult.Failure(secured.ExitCode, secured.ErrorMessage!);
+        }
+
+        if (opened is not null)
+        {
+            context.Events.ReportConnectionOpened(opened);
         }
 
         securedConnection = connection;

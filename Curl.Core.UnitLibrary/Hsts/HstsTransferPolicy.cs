@@ -16,7 +16,13 @@ namespace Curl.Core.Hsts;
 /// is ignored. Every member takes one lock, so <c>-Z</c> transfers may share the cache.
 /// </remarks>
 /// <param name="timeProvider">The clock expiries are counted on.</param>
-public sealed class HstsTransferPolicy(TimeProvider timeProvider)
+/// <param name="diagnosticLog">
+/// Where the policy writes its decisions, component <see cref="DiagnosticLogComponents.Hsts" />
+/// (ADR-0222, BL-921): a URL switched to <c>https</c> as <c>info</c>, an <c>http</c> host the cache
+/// does not know and each header learned as <c>verbose</c>; <see langword="null" /> for none. Only
+/// the host is written, never the URL, so no credential can be.
+/// </param>
+public sealed class HstsTransferPolicy(TimeProvider timeProvider, IDiagnosticLog? diagnosticLog = null)
 {
     /// <summary>
     /// What curl's <c>-v</c> line says before the switched URL: <c>Switched from HTTP to HTTPS due to
@@ -29,6 +35,8 @@ public sealed class HstsTransferPolicy(TimeProvider timeProvider)
     private readonly HstsCache cache = new(timeProvider);
 
     private readonly Lock gate = new();
+
+    private readonly IDiagnosticLog log = diagnosticLog ?? NoDiagnosticLog.Instance;
 
     /// <summary>Adds the entries of an HSTS file's text, as <see cref="HstsCache.ReadFile" /> does.</summary>
     /// <param name="fileText">The whole file.</param>
@@ -66,10 +74,22 @@ public sealed class HstsTransferPolicy(TimeProvider timeProvider)
         ArgumentNullException.ThrowIfNull(urlText);
         ArgumentNullException.ThrowIfNull(url);
 
-        httpsUrl = url.Scheme == "http" && Knows(HostName(url))
-            ? "https" + urlText[urlText.IndexOf(':', StringComparison.Ordinal)..]
-            : null;
-        return httpsUrl is not null;
+        httpsUrl = null;
+        if (url.Scheme != "http")
+        {
+            return false;
+        }
+
+        string host = HostName(url);
+        if (!Knows(host))
+        {
+            WriteIfEnabled(DiagnosticLogLevel.Verbose, host, name => $"no HSTS entry for {name}; http kept");
+            return false;
+        }
+
+        httpsUrl = "https" + urlText[urlText.IndexOf(':', StringComparison.Ordinal)..];
+        WriteIfEnabled(DiagnosticLogLevel.Info, host, name => $"http URL to {name} switched to https by its HSTS entry");
+        return true;
     }
 
     /// <summary>
@@ -94,8 +114,21 @@ public sealed class HstsTransferPolicy(TimeProvider timeProvider)
                 if (string.Equals(header.Key, HeaderName, StringComparison.OrdinalIgnoreCase))
                 {
                     cache.ApplyHeader(header.Value, HostName(url));
+                    WriteIfEnabled(DiagnosticLogLevel.Verbose, HostName(url), name => $"learned {HeaderName} from {name}");
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Writes the message <paramref name="build" /> makes for <paramref name="host" /> at
+    /// <paramref name="level" />, building it only when the level is enabled.
+    /// </summary>
+    private void WriteIfEnabled(DiagnosticLogLevel level, string host, Func<string, string> build)
+    {
+        if (log.IsEnabled(level))
+        {
+            log.Write(level, DiagnosticLogComponents.Hsts, build(host));
         }
     }
 

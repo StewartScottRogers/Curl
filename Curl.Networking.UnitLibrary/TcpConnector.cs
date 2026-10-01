@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 
 using Curl.Protocol.Abstractions;
@@ -93,7 +94,7 @@ namespace Curl.Networking;
 /// written first on every new connection once it is dialled and any proxy tunnel is open, before the
 /// target's TLS handshake, from the socket's own ends (BL-616); <see langword="null" /> to send none.
 /// </param>
-public sealed class TcpConnector(
+public sealed partial class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
     ITlsProvider tlsProvider,
@@ -161,10 +162,15 @@ public sealed class TcpConnector(
     /// </summary>
     public HaproxyProtocolHeader? HaproxyProtocol => haproxyProtocol;
 
-    // Every TCP dial goes through this one: bound as localBinding asks, or the dialer as given.
-    private ITcpDialer BindingDialer() => localBinding is null
-        ? tcpDialer
-        : new LocalBindingTcpDialer(tcpDialer, localBinding, networkInterfaceLookup ?? new SystemNetworkInterfaceLookup(), dnsResolver);
+    // Every TCP dial goes through this one: bound as localBinding asks, its -v bind lines on events, or the dialer as given.
+    private ITcpDialer BindingDialer(ITransferEvents events) => LocalAddressChooser() is { } addressChooser
+        ? new LocalBindingTcpDialer(tcpDialer, addressChooser, events)
+        : tcpDialer;
+
+    // Chooses the local address TCP dials and QUIC's UDP sockets bind; null when localBinding is.
+    private LocalBindingAddressChooser? LocalAddressChooser() => localBinding is null
+        ? null
+        : new LocalBindingAddressChooser(localBinding, networkInterfaceLookup ?? new SystemNetworkInterfaceLookup(), dnsResolver);
 
     /// <summary>
     /// Gets the Unix domain socket every connect dials in place of the target's host, port and
@@ -189,6 +195,7 @@ public sealed class TcpConnector(
     private readonly ResolveOverrides _resolveOverrides = resolveOverrides ?? ResolveOverrides.None;
     private readonly ConnectToMappings _connectToMappings = connectToMappings ?? ConnectToMappings.None;
     private readonly ConcurrentDictionary<string, DnsCacheEntry> _dnsCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConditionalWeakTable<ConnectTarget, object> _altSvcReported = new();
     private int _resolveEntriesLoaded;
     private long _nextConnectionNumber;
 
@@ -200,7 +207,10 @@ public sealed class TcpConnector(
     /// exit 6, and <c>Failed to connect to &lt;host&gt;:&lt;port&gt; after &lt;n&gt; ms:
     /// Could not connect to server</c> for exit 7, or exit 28 when the system timed the last dial
     /// out, where <c>n</c> is the time spent
-    /// dialing as measured by the injected <see cref="TimeProvider" />. When
+    /// dialing as measured by the injected <see cref="TimeProvider" />. A
+    /// <see cref="ConnectTarget.IsForwardProxy" /> target names itself as the proxy, as curl does:
+    /// <c>Failed to connect to &lt;proxy host&gt;:&lt;port&gt; over proxy &lt;proxy host&gt; after
+    /// &lt;n&gt; ms: ...</c>, for exit 7 and for exit 45. When
     /// <see cref="ConnectTarget.UseTls" /> is set, the <see cref="ITlsProvider" />'s result
     /// is returned as it is, so a failed handshake keeps the exit code and message the
     /// provider chose.
@@ -397,8 +407,9 @@ public sealed class TcpConnector(
     /// </para>
     /// <para>
     /// A <c>--connect-timeout</c> greater than zero bounds the handshakes; without one each
-    /// handshake has QUIC's own 10 seconds (ADR-0144 section 5). A proxy on the target is not
-    /// used: curl's ngtcp2 build connects QUIC directly.
+    /// handshake has QUIC's own 10 seconds (ADR-0144 section 5). An HTTP or HTTPS proxy on the
+    /// target is tunnelled through with CONNECT-UDP, as curl 8.22.0 does (BL-942,
+    /// <see cref="ConnectMultiplexedThroughProxyAsync" />); a SOCKS one is not used.
     /// </para>
     /// </remarks>
     public async ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken)
@@ -407,6 +418,11 @@ public sealed class TcpConnector(
         if (quicDialer is null)
         {
             return MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC is not available on this connector");
+        }
+
+        if (UdpTunnelProxyOf(target) is { } proxy)
+        {
+            return await ConnectMultiplexedThroughProxyAsync(target, proxy, quicDialer, cancellationToken).ConfigureAwait(false);
         }
 
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);
@@ -453,7 +469,8 @@ public sealed class TcpConnector(
             started,
             timeProvider.GetTimestamp(),
             connectTimeout > TimeSpan.Zero ? connectTimeout : null,
-            TakeConnectionNumber()), null);
+            TakeConnectionNumber(),
+            LocalAddressChooser()), null);
     }
 
     /// <summary>
@@ -496,6 +513,9 @@ public sealed class TcpConnector(
     /// reported first as curl 8.21.0's <c>Alt-svc connecting from [&lt;id&gt;]&lt;host&gt;:&lt;port&gt;
     /// to [&lt;id&gt;]&lt;host&gt;:&lt;port&gt;</c> (measured, BL-623 Notes), else the target itself.
     /// An alternative counts as mapped, so exit 7 names it after <c>via</c>, as curl's does.
+    /// The line is reported once per target object: <c>--http3</c> races QUIC and TCP with one
+    /// target, and curl 8.18.0's ngtcp2 build reports it once for both attempts (measured, BL-733
+    /// Notes, BL-949).
     /// </summary>
     private ConnectDestination DestinationOf(ConnectTarget target)
     {
@@ -506,8 +526,12 @@ public sealed class TcpConnector(
         }
 
         var alternative = route.Alternative;
-        target.Events.ReportInfo(
-            $"Alt-svc connecting from [{route.OriginAlpn}]{target.Host}:{target.Port} to [{alternative.Alpn}]{alternative.Host}:{alternative.Port}");
+        if (_altSvcReported.TryAdd(target, target))
+        {
+            target.Events.ReportInfo(
+                $"Alt-svc connecting from [{route.OriginAlpn}]{target.Host}:{target.Port} to [{alternative.Alpn}]{alternative.Host}:{alternative.Port}");
+        }
+
         return new ConnectDestination(alternative.Host, alternative.Port, IsMapped: true, ParseError: null);
     }
 
@@ -544,16 +568,18 @@ public sealed class TcpConnector(
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
             var via = destination.IsMapped ? $" via {destination.Host}:{destination.Port}" : string.Empty;
+            var overProxy = target.IsForwardProxy ? $" over proxy {target.Host}" : string.Empty;
             return DialFailure(
                 target.Events,
                 lastDialError,
                 lastBindFailure,
                 new ConnectTimings(started, nameResolved, null, null),
-                $"Failed to connect to {target.Host}:{target.Port}{via} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}");
+                $"Failed to connect to {target.Host}:{target.Port}{via}{overProxy} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}");
         }
 
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
-        return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken).ConfigureAwait(false);
+        var named = destination.IsMapped ? dialed with { MappedDestination = destination } : dialed;
+        return await SecureWhenAskedAsync(named, target, timings, 0, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1226,7 +1252,9 @@ public sealed class TcpConnector(
             isReused: false,
             connectionNumber,
             applicationProtocol,
-            unixSocketPath: dialed.UnixSocketPath);
+            unixSocketPath: dialed.UnixSocketPath,
+            mappedHost: dialed.MappedDestination?.Host,
+            mappedPort: dialed.MappedDestination?.Port ?? 0);
     }
 
     // A forward proxy is the target itself, so its handshake runs through the proxy's
@@ -1249,9 +1277,11 @@ public sealed class TcpConnector(
     /// <summary>
     /// Returns the protocols the handshake with <paramref name="target" /> offers through ALPN:
     /// <paramref name="httpOverTls" /> for HTTP over TLS to the origin, the one target the HTTP
-    /// handler pools as <c>https</c> (BL-490, ADR-0141); <c>http/1.1</c> alone for an HTTPS
-    /// forward proxy, whatever the HTTP version options say, as both curl 8.21.0 builds offer it
-    /// (measured, BL-753, ADR-0190); nothing for any other protocol, which curl offers no ALPN.
+    /// handler pools as <c>https</c> (BL-490, ADR-0141), unless the target names its own
+    /// <see cref="ConnectTarget.ApplicationProtocols" />, as a connect to an Alt-Svc alternative of
+    /// another HTTP version does (BL-948); <c>http/1.1</c> alone for an HTTPS forward proxy, whatever
+    /// the HTTP version options say, as both curl 8.21.0 builds offer it (measured, BL-753,
+    /// ADR-0190); nothing for any other protocol, which curl offers no ALPN.
     /// </summary>
     /// <param name="target">The target whose handshake is about to run.</param>
     /// <param name="httpOverTls">What HTTP over TLS to the origin offers.</param>
@@ -1260,7 +1290,7 @@ public sealed class TcpConnector(
         target.IsForwardProxy
             ? HttpApplicationProtocols.Http11Only
             : string.Equals(target.PoolScheme, "https", StringComparison.OrdinalIgnoreCase)
-                ? httpOverTls
+                ? target.ApplicationProtocols ?? httpOverTls
                 : [];
 
     // A provider that can report its handshake reports its trust and handshake on the
@@ -1317,7 +1347,7 @@ public sealed class TcpConnector(
         ConnectTarget target,
         CancellationToken cancellationToken)
     {
-        var race = new AddressFamilyRace(BindingDialer(), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog));
+        var race = new AddressFamilyRace(BindingDialer(target.Events), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog));
         var (dialed, remoteEndPoint, lastError, lastBindFailure) = await race.DialAsync(addresses, port, cancellationToken).ConfigureAwait(false);
         return dialed is null
             ? (null, lastError, lastBindFailure)
@@ -1386,7 +1416,15 @@ public sealed class TcpConnector(
         string HostName,
         IPEndPoint? RemoteEndPoint,
         string? UnixSocketRemoteIp = null,
-        string? UnixSocketPath = null);
+        string? UnixSocketPath = null)
+    {
+        /// <summary>
+        /// Gets the <c>--connect-to</c> or alt-svc destination the socket was dialled to in
+        /// place of the target's host and port, which the HTTP handler names in its left-intact
+        /// line (BL-975); <see langword="null" /> when the socket went to the target itself or a proxy.
+        /// </summary>
+        public ConnectDestination? MappedDestination { get; init; }
+    }
 
     /// <summary>
     /// What a CONNECT tunnel is opened for: the target, the destination named in the CONNECT,

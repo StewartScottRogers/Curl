@@ -135,9 +135,9 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
     /// </summary>
     private (byte[] KeyExchange, byte[] SharedSecret) ServerShare(KeyShareEntry? clientShare)
     {
-        if (Group == TlsNamedGroup.X25519MlKem768)
+        if (MlKemServerShare.IsMlKemGroup(Group))
         {
-            return X25519MlKem768ServerShare.Answer(clientShare?.KeyExchange);
+            return MlKemServerShare.Answer(Group, clientShare?.KeyExchange);
         }
 
         using Tls13KeyShare serverShare = SystemTlsRandomSource.Instance.CreateKeyShare(Group);

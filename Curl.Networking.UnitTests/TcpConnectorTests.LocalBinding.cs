@@ -9,7 +9,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// <c>--interface</c> and <c>--local-port</c> through <see cref="TcpConnector" />'s
-/// <c>localBinding</c> (BL-600): the local end each dial asks <see cref="ITcpDialer.DialFromAsync" />
+/// <c>localBinding</c> (BL-600): the local end each dial asks <see cref="ITcpDialer.DialFromAsync(IPEndPoint, IPEndPoint, int, ITransferEvents, CancellationToken)" />
 /// for, and exit 45, 43 and 7 as curl 8.21.0 ends a connect whose local end cannot be bound
 /// (measured on Windows 2026-09-29, BL-600 Notes).
 /// </summary>

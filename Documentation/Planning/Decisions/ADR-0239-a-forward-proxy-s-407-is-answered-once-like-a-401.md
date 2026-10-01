@@ -48,7 +48,7 @@ libcurl's Digest counts each use of a nonce.
   header as it was, so one 407 and one 401 can both be answered in either order.
 - A kept Digest answer is sent again unchanged (`nc=00000001`, the same hash), not counted on
   to `nc=00000002`: `IHttpAuthenticator` keeps no state between calls (ADR-0014). Filed as a
-  follow-up; superseded by ADR-0246, which counts it on (BL-869).
+  follow-up; superseded by ADR-0238, which counts it on (BL-869).
 
 ## Consequences
 

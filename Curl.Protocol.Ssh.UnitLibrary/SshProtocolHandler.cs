@@ -189,7 +189,9 @@ public sealed class SshProtocolHandler : IProtocolHandler
         try
         {
             TransferResult result = await HandshakeAndTransferAsync(context, target, connection).ConfigureAwait(false);
-            events.ReportInfo(SshInfoLines.ConnectionLeftIntact(connectionNumber, target.Host, target.Port));
+            events.ReportInfo(FailedWhileTransferring(result, ListsDirectory(context))
+                ? SshInfoLines.ClosingConnection(connectionNumber)
+                : SshInfoLines.ConnectionLeftIntact(connectionNumber, target.Host, target.Port));
             return result;
         }
         catch (SshTransferException exception)
@@ -203,6 +205,24 @@ public sealed class SshProtocolHandler : IProtocolHandler
             return TransferResult.Failure(exception.ExitCode, exception.Message);
         }
     }
+
+    /// <summary>
+    /// Tells whether a transfer's outcome is a failure while its bytes were moving, after
+    /// which curl closes the connection ("Transfer returned error") rather than leaving it
+    /// intact: a short file (exit 18) or the connection lost during a file's bytes
+    /// (<c>Error in the SSH layer</c>), measured 2026-10-01 for <c>scp</c> (BL-988). An
+    /// <c>sftp</c> directory is read in curl's state machine before that phase, so its
+    /// failures leave the connection intact, as every failure thrown before the bytes does.
+    /// </summary>
+    /// <param name="result">The transfer's outcome.</param>
+    /// <param name="listsDirectory">Whether the transfer listed an <c>sftp</c> directory.</param>
+    /// <returns><see langword="true" /> when the connection is closed.</returns>
+    internal static bool FailedWhileTransferring(TransferResult result, bool listsDirectory) =>
+        result.ExitCode == CurlExitCode.PartialFile
+        || (result.ErrorMessage == SshTransferException.SshLayerErrorMessage && !listsDirectory);
+
+    private static bool ListsDirectory(ITransferContext context) =>
+        context.Url.Scheme != ScpScheme && context.Upload is null && SftpRemotePath.NamesDirectory(context.Url.AbsolutePath);
 
     // The handshake, then the rest of the session, which always ends with DISCONNECT.
     private async ValueTask<TransferResult> HandshakeAndTransferAsync(ITransferContext context, SshSessionTarget target, IConnection connection)
@@ -285,7 +305,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     // An upload is sent (ADR-0258); otherwise the file is downloaded (ADR-0225).
     private static async ValueTask<TransferResult> TransferOverScpAsync(ITransferContext context, SshTransport transport, Stream output) =>
         context.Upload is { } upload
-            ? await new ScpFileUpload(transport).UploadAsync(context.Url.AbsolutePath, context.CreateFileMode, upload, context.Progress, context.CancellationToken).ConfigureAwait(false)
+            ? await new ScpFileUpload(transport, context.Events).UploadAsync(context.Url.AbsolutePath, context.CreateFileMode, upload, context.Progress, context.CancellationToken).ConfigureAwait(false)
             : await new ScpFileDownload(transport).DownloadAsync(context.Url.AbsolutePath, output, context.Progress, context.CancellationToken).ConfigureAwait(false);
 
     // An upload is sent (ADR-0244); otherwise a path ending with a slash is listed and any
@@ -297,7 +317,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         SftpQuoteCommands quotes = SftpQuoteCommands.From(context, OperatingSystem.IsWindows());
         if (context.Upload is { } upload)
         {
-            return await new SftpFileUpload(transport).UploadAsync(urlPath, SftpUploadOptions.From(context), upload, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false);
+            return await new SftpFileUpload(transport, context.Events).UploadAsync(urlPath, SftpUploadOptions.From(context), upload, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false);
         }
 
         return SftpRemotePath.NamesDirectory(urlPath)

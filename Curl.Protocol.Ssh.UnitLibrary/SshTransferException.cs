@@ -280,6 +280,25 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
         new(CurlExitCode.Ssh, "Unable to complete request for channel-process-startup");
 
     /// <summary>
+    /// Creates the failure curl 8.21.0 reports when the connection is closed or reset while
+    /// an SCP download waits for the answer to its <c>session</c> channel open: exit 79 and
+    /// libssh2's <c>Unexpected error</c>, measured 2026-10-01 (BL-1046, ADR-0289).
+    /// </summary>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException ScpChannelOpenBroken() =>
+        new(CurlExitCode.Ssh, "Unexpected error");
+
+    /// <summary>
+    /// Creates the failure curl 8.21.0 reports when the connection is closed or reset while
+    /// an SCP download waits for the answer to its <c>exec</c> request: exit 79 and
+    /// libssh2's <c>Failed waiting for channel success</c>, measured 2026-10-01 (BL-1046,
+    /// ADR-0289).
+    /// </summary>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException ScpExecRequestBroken() =>
+        new(CurlExitCode.Ssh, "Failed waiting for channel success");
+
+    /// <summary>
     /// Creates the failure curl 8.21.0 reports when the connection breaks while it reads
     /// the SCP server's <c>T</c> or <c>C</c> line: exit 79 and <c>Failed reading SCP
     /// response</c>, measured 2026-09-29 (BL-574, ADR-0225).

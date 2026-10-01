@@ -43,6 +43,8 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
 
     private string? scpUploadPath;
 
+    private byte[] keyboardInteractiveUser = [];
+
     private readonly HashSet<string> listedDirectories = new(StringComparer.Ordinal);
 
     private SshPacketReader? packetReader;
@@ -56,6 +58,8 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
     private bool closeSent;
 
     private bool isCompressionDelayed;
+
+    private int resetStepsSeen;
 
     private SshPacketReader Reader => packetReader!;
 
@@ -152,14 +156,17 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         {
             case SshMessageNumber.Disconnect:
                 uint reason = message.ReadUInt32();
-                server.Record($"disconnect {reason} {message.ReadName()}");
+                RecordAndResetIfAt($"disconnect {reason} {message.ReadName()}");
                 return false;
             case SshMessageNumber.ServiceRequest:
-                server.Record($"service {message.ReadName()}");
+                RecordAndResetIfAt($"service {message.ReadName()}");
                 await SendAsync([SshMessageNumber.ServiceAccept, .. Name(SshUserAuthentication.UserAuthService)]).ConfigureAwait(false);
                 break;
             case SshAuthenticationMessageNumber.Request:
                 await AnswerAuthenticationAsync(payload, message).ConfigureAwait(false);
+                break;
+            case SshAuthenticationMessageNumber.InfoResponse:
+                await AnswerKeyboardInteractiveAsync(message).ConfigureAwait(false);
                 break;
             case SshConnectionMessageNumber.ChannelOpen:
                 await AnswerChannelOpenAsync(message).ConfigureAwait(false);
@@ -175,15 +182,15 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
                 break;
             case SshConnectionMessageNumber.ChannelEof when scpUploadPath is not null:
                 StoreScpUpload();
-                server.Record("channel eof");
+                RecordAndResetIfAt("channel eof");
                 await SendCloseAsync().ConfigureAwait(false);
                 break;
             case SshConnectionMessageNumber.ChannelEof:
-                server.Record("channel eof");
+                RecordAndResetIfAt("channel eof");
                 await SendCloseAsync().ConfigureAwait(false);
                 break;
             case SshConnectionMessageNumber.ChannelClose:
-                server.Record("channel close");
+                RecordAndResetIfAt("channel close");
                 break;
         }
 
@@ -199,17 +206,39 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         {
             SshUserAuthentication.PasswordMethod => server.IsPassword(user, message.Skip(1).ReadString().ToArray()),
             SshUserAuthentication.PublicKeyMethod => await AnswerPublicKeyAsync(payload, message).ConfigureAwait(false),
+            SshUserAuthentication.KeyboardInteractiveMethod when server.OffersKeyboardInteractive => await AskForThePasswordAsync(user).ConfigureAwait(false),
             _ => false,
         };
+        await AnswerAuthenticationOutcomeAsync(method, user, succeeded).ConfigureAwait(false);
+    }
+
+    private async Task AnswerAuthenticationOutcomeAsync(string method, byte[] user, bool? succeeded)
+    {
         if (succeeded is { } outcome)
         {
-            server.Record($"auth {method} {Encoding.UTF8.GetString(user)} {(outcome ? "ok" : "refused")}");
-            await SendAsync(outcome ? [SshAuthenticationMessageNumber.Success] : [SshAuthenticationMessageNumber.Failure, .. Name("publickey,password"), 0]).ConfigureAwait(false);
+            RecordAndResetIfAt($"auth {method} {Encoding.UTF8.GetString(user)} {(outcome ? "ok" : "refused")}");
+            await SendAsync(outcome ? [SshAuthenticationMessageNumber.Success] : [SshAuthenticationMessageNumber.Failure, .. Name(server.AuthenticationMethods), 0]).ConfigureAwait(false);
             if (outcome && isCompressionDelayed)
             {
                 StartCompression();
             }
         }
+    }
+
+    // keyboard-interactive's one prompt, as OpenSSH's PAM asks it; the answer arrives as
+    // an INFO_RESPONSE.
+    private async Task<bool?> AskForThePasswordAsync(byte[] user)
+    {
+        keyboardInteractiveUser = user;
+        await SendAsync(Join([SshAuthenticationMessageNumber.InfoRequest], Name(string.Empty), Name(string.Empty), Name(string.Empty), UInt32(1), Name("Password: "), [0])).ConfigureAwait(false);
+        return null;
+    }
+
+    private async Task AnswerKeyboardInteractiveAsync(SshWireReader message)
+    {
+        message.ReadUInt32();
+        byte[] answer = message.ReadString().ToArray();
+        await AnswerAuthenticationOutcomeAsync(SshUserAuthentication.KeyboardInteractiveMethod, keyboardInteractiveUser, server.IsPassword(keyboardInteractiveUser, answer)).ConfigureAwait(false);
     }
 
     // Both directions at once: the server's packets after this point, and the client's,
@@ -244,7 +273,7 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
 
     private async Task AnswerChannelOpenAsync(SshWireReader message)
     {
-        server.Record($"channel open {message.ReadName()}");
+        RecordAndResetIfAt($"channel open {message.ReadName()}");
         clientChannel = message.ReadUInt32();
         if (server.HangsUpOnChannelOpen)
         {
@@ -261,7 +290,7 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         string type = message.Skip(4).ReadName();
         message.ReadBoolean();
         byte[] argument = message.ReadString().ToArray();
-        server.Record($"{type} {Encoding.Latin1.GetString(argument)}");
+        RecordAndResetIfAt($"{type} {Encoding.Latin1.GetString(argument)}");
         await SendAsync([SshConnectionMessageNumber.ChannelSuccess, .. UInt32(clientChannel)]).ConfigureAwait(false);
         if (type == "exec" && argument.AsSpan().StartsWith(ScpUploadPrefix))
         {
@@ -290,7 +319,7 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
     {
         byte[] received = scpInput.ToArray();
         int lineEnd = Array.IndexOf(received, (byte)'\n');
-        server.Record($"scp {Encoding.Latin1.GetString(received, 0, lineEnd)}");
+        RecordAndResetIfAt($"scp {Encoding.Latin1.GetString(received, 0, lineEnd)}");
         server.Files[scpUploadPath!] = received[(lineEnd + 1)..];
     }
 
@@ -298,15 +327,20 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
     // an error line; then the channel's end.
     private async Task RunScpAsync(string path)
     {
+        ResetIfAt("scp header");
         if (server.Files.TryGetValue(path, out byte[]? file))
         {
-            await SendChannelDataAsync(Encoding.ASCII.GetBytes($"T1790702112 0 1790702112 0\nC0644 {file.Length} {path.Split('/')[^1]}\n")).ConfigureAwait(false);
+            await SendChannelDataAsync(Encoding.ASCII.GetBytes($"T1790702112 0 1790702112 0\nC0644 {file.Length + server.ScpFileShortBy} {path.Split('/')[^1]}\n")).ConfigureAwait(false);
             foreach (byte[] chunk in file.Chunk(ScpChunkSize))
             {
                 await SendChannelDataAsync(chunk).ConfigureAwait(false);
+                ResetIfAt("scp data");
             }
 
-            await SendChannelDataAsync([0]).ConfigureAwait(false);
+            if (server.ScpFileShortBy == 0)
+            {
+                await SendChannelDataAsync([0]).ConfigureAwait(false);
+            }
         }
         else
         {
@@ -338,13 +372,14 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         SshWireReader request = new SshWireReader(packet).Skip(1);
         if (type == SftpPacketType.Init)
         {
+            ResetIfAt("sftp init");
             await SendSftpAsync([SftpPacketType.Version, .. UInt32(3)]).ConfigureAwait(false);
             return;
         }
 
         uint id = request.ReadUInt32();
         string argument = Encoding.UTF8.GetString(request.ReadString().Span);
-        server.Record($"sftp {type} {argument}");
+        RecordAndResetIfAt($"sftp {type} {argument}");
         if (server.RefusedPaths.Contains(argument))
         {
             await SendSftpAsync(Status(id, 2)).ConfigureAwait(false);
@@ -448,6 +483,22 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         }
         catch (IOException)
         {
+        }
+    }
+
+    // Records an event, then resets at it when the server is told to.
+    private void RecordAndResetIfAt(string text)
+    {
+        server.Record(text);
+        ResetIfAt(text);
+    }
+
+    // The client's ResettingConnection reads the server's close as a reset.
+    private void ResetIfAt(string step)
+    {
+        if (step == server.ResetsAt && ++resetStepsSeen == server.ResetsAtOccurrence)
+        {
+            throw new HangUp();
         }
     }
 

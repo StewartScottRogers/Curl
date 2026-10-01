@@ -312,7 +312,8 @@ first. So:
 - `-MinStartLanes` defaults to 16, so an Auto shift starts at its ceiling
   (`min(capacity, machineCap, -MaxLanes)`). `-MinStartLanes 3` still starts at
   `max(saved, 3)`, as the BL-780 amendment describes.
-- `-MaxLanes` defaults to 6, so a default start is at most 6 lanes.
+- `-MaxLanes` defaulted to 6, so a default start was at most 6 lanes. It defaults to 9
+  since 2026-10-01 (amendment below).
 - A step that scales down goes straight to `max(1, floor(desired + 0.25))`, the count the
   hold band accepts. A ceiling does this at once. A pace target does it once the previous
   step was low too. So from 6 lanes with a confirmed pace of 2.4, the step traces
@@ -321,3 +322,11 @@ first. So:
   traces each one. Each lane still finishes and integrates its task first.
 - Scaling up stays at one lane per step. The meter needs samples at each count before it
   can trust the rate at the next one.
+
+## Amendment 2026-10-01: the lane maximum is 9
+
+Stewart, closing a shift for machine maintenance: "Then I will restart the dark factory
+with a default of 9 lanes." `-MaxLanes` now defaults to 9, so a default `-Lanes Auto`
+shift starts at `min(capacity, machineCap, 9)` and paces down from there as before. The
+board's capacity and the probed machine cap still bind first when lower. A fixed count is
+still `-Lanes 9`.

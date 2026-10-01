@@ -119,6 +119,22 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task ConnectMultiplexedAsync_OverARealUdpSocketBoundToAnyAddress_ReportsTheAddressItSendsFrom()
+    {
+        // curl.se's ngtcp2 build writes "from 192.168.1.174 port 51486", not 0.0.0.0 (BL-734,
+        // BL-1051): a loopback peer is reached from 127.0.0.1.
+        var opener = new QuicServerChannelOpener { ServerFor = _ => Server(), ReportsARealUdpSocketsLocalEndPoint = true };
+        var events = new RecordingTransferEvents();
+
+        var result = await Connector(opener, new ManualTimeProvider()).ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+
+        await using var connection = result.Connection!;
+        var local = events.Opened.Single().LocalEndPoint;
+        Assert.AreEqual(IPAddress.Loopback, local.Address);
+        Assert.AreNotEqual(0, local.Port);
+    }
+
+    [TestMethod]
     public async Task ConnectMultiplexedAsync_NumbersTheConnectionAfterTheTcpConnectionsBeforeIt()
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
@@ -288,7 +304,7 @@ public sealed partial class TcpConnectorQuicTests
         var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
 
         Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.ExitCode);
-        Assert.IsEmpty(opener.Opened);
+        Assert.IsTrue(opener.Opened.Single().IsDisposed);
     }
 
     [TestMethod]

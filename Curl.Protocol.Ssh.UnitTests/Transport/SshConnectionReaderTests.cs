@@ -72,4 +72,14 @@ public sealed class SshConnectionReaderTests
 
         await Assert.ThrowsExactlyAsync<EndOfStreamException>(async () => await reader.ReadExactlyAsync(3, CancellationToken.None));
     }
+
+    [TestMethod]
+    public async Task ReadExactlyAsync_ConnectionReset_ThrowsSshConnectionLostWrappingTheReset()
+    {
+        SshConnectionReader reader = new(new ResettingConnection(false, [1, 2]));
+
+        SshConnectionLostException lost = await Assert.ThrowsExactlyAsync<SshConnectionLostException>(async () => await reader.ReadExactlyAsync(3, CancellationToken.None));
+
+        Assert.IsInstanceOfType<System.Net.Sockets.SocketException>(lost.InnerException?.InnerException);
+    }
 }

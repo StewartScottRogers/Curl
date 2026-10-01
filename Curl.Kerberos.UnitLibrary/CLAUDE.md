@@ -26,7 +26,7 @@ its realm and locates a realm's KDCs from the file or from DNS SRV records throu
 decrypts, checksums and makes keys from passwords with `aes128`/`aes256-cts-hmac-sha1-96`
 (RFC 3962), `aes128-cts-hmac-sha256-128`, `aes256-cts-hmac-sha384-192` (RFC 8009),
 `rc4-hmac` (RFC 4757), `camellia128-cts-cmac`, `camellia256-cts-cmac` (RFC 6803) and
-`des3-cbc-sha1` (RFC 3961 section 6.3; `Des3CbcSha1KerberosEncryption`, BL-894, ADR-0232,
+`des3-cbc-sha1` (RFC 3961 section 6.3; `Des3CbcSha1KerberosEncryption`, BL-894, ADR-0237,
 its zero padding dropped before a decrypted value is decoded, `KerberosAsn1.WithoutPadding`):
 `KerberosEncryption.Create` gives one per `KerberosEncryptionType`,
 confounders come from `IKerberosRandomSource`, and a failed integrity check throws
@@ -47,7 +47,9 @@ credential cache, by a TGS exchange with the cache's ticket-granting ticket, or 
 exchange, over the injected `IKerberosKdcTransport` (`KerberosKdcSender` picks UDP or
 TCP and frames TCP) and, for an `https://` KDC, the optional `IKerberosKdcProxyTransport`
 with the request wrapped in MS-KKDCP's `KerberosKdcProxyMessage` as MIT does (BL-827;
-without one, `https://` KDCs are skipped); every refusal is a `KerberosKdcException` with a `KerberosKdcError`
+without one, `https://` KDCs are skipped), posted through its anchored overload with the realm's
+`http_anchors` (`KerberosConfiguration.HttpAnchors`, each read by `KerberosHttpAnchor.Parse` as
+`FILE:`, `DIR:` or `ENV:`; BL-1063, ADR-0300); every refusal is a `KerberosKdcException` with a `KerberosKdcError`
 (BL-690, ADR-0168), and follows the KDCs' cross-realm referrals (`krbtgt/OTHER@REALM`) to
 OTHER's KDCs up to `MaximumReferralHops` times (BL-826, ADR-0256); given a
 `CredentialCacheStore` and a cache name instead, it stores a ticket got by a TGS exchange

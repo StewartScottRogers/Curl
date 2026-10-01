@@ -51,8 +51,32 @@ internal static class SshInfoLines
     /// <summary>The <c>scp</c> line after <see cref="AuthenticationComplete" />.</summary>
     internal const string ConnectionEstablished = "SSH: connection established";
 
-    /// <summary>The <c>publickey</c> denial reason when the public key cannot be read, as the WinCNG build gives it.</summary>
+    /// <summary>
+    /// The WinCNG build's <c>publickey</c> denial reason when, with no <c>--pubkey</c>, the
+    /// public key cannot be derived from the private key (ADR-0262, ADR-0281).
+    /// </summary>
     internal const string ReasonUnknown = "Reason unknown (-1)";
+
+    /// <summary>The <c>publickey</c> denial reason when the <c>--pubkey</c> file does not open, on both backends (ADR-0230).</summary>
+    internal const string PublicKeyFileUnopened = "Unable to open public key file";
+
+    /// <summary>The <c>publickey</c> denial reason when the <c>--pubkey</c> file's first line is one character or less.</summary>
+    internal const string PublicKeyFileLineTooShort = "Invalid data in public key file";
+
+    /// <summary>The <c>publickey</c> denial reason when the <c>--pubkey</c> file's first line is white space only.</summary>
+    internal const string PublicKeyFileBlank = "Missing public key data";
+
+    /// <summary>The <c>publickey</c> denial reason when the <c>--pubkey</c> file's first line has no space.</summary>
+    internal const string PublicKeyFileWithoutSpace = "Invalid public key data";
+
+    /// <summary>The <c>publickey</c> denial reason when the <c>--pubkey</c> file's key data is not base64.</summary>
+    internal const string PublicKeyFileNotBase64 = "Invalid key data, not base64 encoded";
+
+    /// <summary>
+    /// The <c>publickey</c> denial reason when the server's <c>server-sig-algs</c> names none of
+    /// the RSA signature algorithms an <c>ssh-rsa</c> key could use, on both backends (ADR-0230).
+    /// </summary>
+    internal const string NoSigningSignatureMatched = "No signing signature matched";
 
     /// <summary>
     /// The OpenSSL build's <c>publickey</c> denial reason when, with no <c>--pubkey</c>, the
@@ -167,6 +191,20 @@ internal static class SshInfoLines
     /// <returns>The line.</returns>
     internal static string PublicKeyDenied(string reason) => $"SSH: publickey authentication denied: {reason}";
 
+    /// <summary>
+    /// The line once an upload's every byte is sent: curl's own, after the transfer reads
+    /// the source's end, measured 2026-10-01 (BL-988).
+    /// </summary>
+    /// <param name="bytesSent">The bytes sent.</param>
+    /// <returns>
+    /// The line, such as <c>upload completely sent off: 13 bytes</c>, or
+    /// <c>Request completely sent off</c> for an empty source.
+    /// </returns>
+    internal static string UploadSent(long bytesSent) =>
+        bytesSent == 0
+            ? "Request completely sent off"
+            : string.Create(CultureInfo.InvariantCulture, $"upload completely sent off: {bytesSent} bytes");
+
     /// <summary>The line after a transfer that leaves the connection for reuse.</summary>
     /// <param name="connectionNumber">The connection's number.</param>
     /// <param name="host">The URL's host.</param>
@@ -175,7 +213,7 @@ internal static class SshInfoLines
     internal static string ConnectionLeftIntact(long connectionNumber, string host, int port) =>
         string.Create(CultureInfo.InvariantCulture, $"Connection #{connectionNumber} to host {host}:{port} left intact");
 
-    /// <summary>The line after a failure before the connection was set up.</summary>
+    /// <summary>The line after a failure before the connection was set up, or while the transfer's bytes were moving.</summary>
     /// <param name="connectionNumber">The connection's number.</param>
     /// <returns>The line, such as <c>closing connection #0</c>.</returns>
     internal static string ClosingConnection(long connectionNumber) =>

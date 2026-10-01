@@ -104,7 +104,7 @@ public sealed class SftpTransferQuoteTests
         ScriptedConnection connection = new(script.Bytes);
         SftpUploadOptions options = new(0, true, false, false, Mode0644);
 
-        TransferResult result = await new SftpFileUpload(SftpSessionTests.Transport(connection)).UploadAsync(
+        TransferResult result = await new SftpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance).UploadAsync(
             "/u.txt", options, new MemoryStream(Hello), NoTransferProgress.Instance, CancellationToken.None, Quotes(null, ["rm /b"], ["mkdir /nd"]));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -126,7 +126,7 @@ public sealed class SftpTransferQuoteTests
         SftpServerScript script = SftpServerScript.Started().HomeDirectory().Handle().Status(2, SftpStatusCode.Ok).Status(3, SftpStatusCode.Ok).Status(4, 4);
         ScriptedConnection connection = new(script.Bytes);
 
-        TransferResult result = await new SftpFileUpload(SftpSessionTests.Transport(connection)).UploadAsync(
+        TransferResult result = await new SftpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance).UploadAsync(
             "/u.txt", new SftpUploadOptions(0, false, false, false, Mode0644), new MemoryStream(Hello), NoTransferProgress.Instance, CancellationToken.None, Quotes(null, [], ["mkdir /nd"]));
 
         Assert.AreEqual(CurlExitCode.QuoteError, result.ExitCode);

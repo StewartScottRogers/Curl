@@ -152,10 +152,11 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
+        var connectEvents = new ConnectionOpenedCapturingTransferEvents(context.Events);
         var target = new ConnectTarget(url.IdnHost, url.Port, implicitTls)
         {
             Proxy = context.Proxy,
-            Events = context.Events,
+            Events = connectEvents,
             DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connected = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
@@ -173,7 +174,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
 
             // curl decodes the path once connected, so a malformed one still costs a connect.
             TransferResult result = SmtpEhloDomain.Read(url, localHostName) is { } domain
-                ? await RunSessionAsync(channel, context, domain, implicitTls).ConfigureAwait(false)
+                ? await RunSessionAsync(channel, context, domain, implicitTls, connectEvents.Opened).ConfigureAwait(false)
                 : TransferResult.Failure(CurlExitCode.UrlMalformat, SmtpSessionMessages.MalformedUrl);
             ReportConnectionEnd(context.Events, result, channel.QuitSent, target, connected.ConnectionNumber);
             return result;
@@ -182,7 +183,8 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
 
     /// <summary>
     /// Writes the lines curl 8.21.0's <c>-v</c> ends an SMTP transfer with (BL-546): a failure's
-    /// message, then <c>shutting down connection #N</c> when <c>QUIT</c> was sent and
+    /// message, but for <c>Login denied</c>, which curl only makes <c>curl: (67)</c> of (BL-1061),
+    /// then <c>shutting down connection #N</c> when <c>QUIT</c> was sent and
     /// <c>closing connection #N</c> when it was not; a success ends with
     /// <c>Connection #N to host H:P left intact</c>.
     /// </summary>
@@ -194,13 +196,18 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
             return;
         }
 
-        events.ReportInfo(result.ErrorMessage!);
+        if (result.ErrorMessage != SmtpSessionMessages.LoginDenied)
+        {
+            events.ReportInfo(result.ErrorMessage!);
+        }
+
         events.ReportInfo(quitSent ? SmtpConnectionInfoLines.ShuttingDown(connectionNumber) : SmtpConnectionInfoLines.Closing(connectionNumber));
     }
 
-    private async ValueTask<TransferResult> RunSessionAsync(SmtpControlChannel channel, ITransferContext context, string domain, bool implicitTls)
+    private async ValueTask<TransferResult> RunSessionAsync(
+        SmtpControlChannel channel, ITransferContext context, string domain, bool implicitTls, ConnectionOpenedEvent? opened)
     {
-        var session = new SmtpSession(channel, tlsProvider, saslAuthenticator, context, domain, implicitTls, commandLineText);
+        var session = new SmtpSession(channel, tlsProvider, saslAuthenticator, context, domain, implicitTls, commandLineText, opened);
         await using (session.ConfigureAwait(false))
         {
             return await session.RunAsync().ConfigureAwait(false);

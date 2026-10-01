@@ -99,6 +99,60 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WithAPerConnectAlpnList_OffersExactlyItInPlaceOfTheOptionGroupsList()
+    {
+        // curl -v --alt-svc cache.txt https://127.0.0.1:18736/ with "h1 127.0.0.1 18736 h2 127.0.0.1 18735 ..."
+        // says ALPN: curl offers h2 (curl.se 8.18.0, measured, BL-733 Notes case 4).
+        var tlsProvider = new FakeTlsProvider();
+        var connector = new TcpConnector(
+            new FakeDnsResolver(Loopback),
+            new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
+            tlsProvider,
+            new ManualTimeProvider(),
+            httpOverTlsApplicationProtocols: HttpApplicationProtocols.Http11Only);
+
+        await connector.ConnectAsync(
+            new ConnectTarget("localhost", 18499, UseTls: true) { PoolScheme = "https", AltSvcRoute = RouteToAlternative, ApplicationProtocols = ["h2"] },
+            CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "h2" }, Assert.ContainsSingle(tlsProvider.ReceivedApplicationProtocols).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithoutAPerConnectAlpnList_OffersTheOptionGroupsList()
+    {
+        var tlsProvider = new FakeTlsProvider();
+        var connector = new TcpConnector(
+            new FakeDnsResolver(Loopback),
+            new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
+            tlsProvider,
+            new ManualTimeProvider(),
+            httpOverTlsApplicationProtocols: HttpApplicationProtocols.H2ThenHttp11);
+
+        await connector.ConnectAsync(
+            new ConnectTarget("localhost", 18499, UseTls: true) { PoolScheme = "https", AltSvcRoute = RouteToAlternative },
+            CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "h2", "http/1.1" }, Assert.ContainsSingle(tlsProvider.ReceivedApplicationProtocols).ToArray());
+    }
+
+    [TestMethod]
+    public void ApplicationProtocolsFor_AForwardProxyWithAPerConnectList_StillOffersHttp11()
+    {
+        var target = new ConnectTarget("proxy.example", 443, UseTls: true) { PoolScheme = "https", IsForwardProxy = true, ApplicationProtocols = ["h2"] };
+
+        CollectionAssert.AreEqual(new[] { "http/1.1" }, TcpConnector.ApplicationProtocolsFor(target, HttpApplicationProtocols.H2ThenHttp11).ToArray());
+    }
+
+    [TestMethod]
+    public void ApplicationProtocolsFor_ANonHttpsTargetWithAPerConnectList_OffersNothing()
+    {
+        var target = new ConnectTarget("example.com", 990, UseTls: true) { ApplicationProtocols = ["h2"] };
+
+        Assert.IsEmpty(TcpConnector.ApplicationProtocolsFor(target, HttpApplicationProtocols.H2ThenHttp11));
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WithAnAltSvcRouteAndAConnectToMappingForAnotherHost_DialsTheAlternative()
     {
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };

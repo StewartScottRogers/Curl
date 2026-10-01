@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
 
+using Curl.Networking.Fakes;
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -194,11 +197,50 @@ public sealed class TcpDialerTests
     }
 
     [TestMethod]
+    public async Task DialFromDeviceAsync_WithNullChooser_ThrowsArgumentNullException()
+    {
+        var exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(
+            async () => await new TcpDialer().DialFromDeviceAsync(new IPEndPoint(IPAddress.Loopback, 80), "lo", false, null!, 1, NoTransferEvents.Instance, CancellationToken.None));
+
+        Assert.AreEqual("chooseLocalEndAsync", exception.ParamName);
+    }
+
+    // curl 8.18.0 on Linux, as uid 1000 and as root alike (BL-1026 Notes): --interface lo ->
+    // "socket successfully bound to interface 'lo'".
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux)]
+    public void TryBindToDevice_OnLinuxWithTheLoopbackDevice_BindsIt()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        Assert.IsTrue(TcpDialer.TryBindToDevice(socket, "lo"));
+    }
+
+    // curl 8.18.0 on Linux: if!bogus0 -> errno 19, "No such device", and curl carries on without it.
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux)]
+    public void TryBindToDevice_OnLinuxWithNoSuchDevice_ReturnsFalse()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        Assert.IsFalse(TcpDialer.TryBindToDevice(socket, "bogus0"));
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Linux)]
+    public void TryBindToDevice_OffLinux_ReturnsFalse()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        Assert.IsFalse(TcpDialer.TryBindToDevice(socket, "lo"));
+    }
+
+    [TestMethod]
     public void BindLocalEnd_WithAFreePort_BindsIt()
     {
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
-        TcpDialer.BindLocalEnd(socket, new IPEndPoint(IPAddress.Loopback, 0), 0);
+        TcpDialer.BindLocalEnd(socket, new IPEndPoint(IPAddress.Loopback, 0), 0, NoTransferEvents.Instance);
 
         var bound = (IPEndPoint)socket.LocalEndPoint!;
         Assert.AreEqual(IPAddress.Loopback, bound.Address);
@@ -214,7 +256,7 @@ public sealed class TcpDialerTests
         {
             using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
-            TcpDialer.BindLocalEnd(socket, new IPEndPoint(IPAddress.Loopback, busy), 2);
+            TcpDialer.BindLocalEnd(socket, new IPEndPoint(IPAddress.Loopback, busy), 2, NoTransferEvents.Instance);
 
             Assert.AreEqual(busy + 1, ((IPEndPoint)socket.LocalEndPoint!).Port);
         }
@@ -232,10 +274,113 @@ public sealed class TcpDialerTests
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
         var exception = Assert.ThrowsExactly<LocalBindException>(
-            () => TcpDialer.BindLocalEnd(socket, new IPEndPoint(IPAddress.Loopback, busy), 1));
+            () => TcpDialer.BindLocalEnd(socket, new IPEndPoint(IPAddress.Loopback, busy), 1, NoTransferEvents.Instance));
 
         Assert.AreEqual(LocalBindFailure.InterfaceFailed, exception.Failure);
         Assert.AreEqual(SocketError.Success, exception.SocketErrorCode);
+    }
+
+    [TestMethod]
+    public void BindLocalEnd_WithNoPortAskedFor_ReportsLocalPortZero()
+    {
+        // curl --interface 127.0.0.1 to localhost, both platforms: "Local port: 0", whatever port the system gave.
+        var events = new RecordingTransferEvents();
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        TcpDialer.BindLocalEnd(socket, new IPEndPoint(IPAddress.Loopback, 0), 1, events);
+
+        CollectionAssert.AreEqual(new[] { "Local port: 0" }, events.Info);
+    }
+
+    [TestMethod]
+    public void BindLocalEnd_WhenTheFirstPortIsInUse_ReportsItThenTheLocalPortBound()
+    {
+        // curl --local-port 40000-40005 with 40000-40002 in use, both platforms:
+        // "Bind to local port 40000 failed, trying next" for each, then "Local port: 40003".
+        var events = new RecordingTransferEvents();
+        var (busy, holder) = HoldAPortWithTheNextFree();
+        using (holder)
+        {
+            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            TcpDialer.BindLocalEnd(socket, new IPEndPoint(IPAddress.Loopback, busy), 2, events);
+        }
+
+        CollectionAssert.AreEqual(new[] { $"Bind to local port {busy} failed, trying next", $"Local port: {busy + 1}" }, events.Info);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void BindLocalEnd_WhenEveryPortIsInUseOnWindows_ReportsErrno10048()
+    {
+        // curl 8.21.0 Windows, --local-port 40000-40002 all in use: "bind failed with errno 10048: Address already in use".
+        Assert.AreEqual("bind failed with errno 10048: Address already in use", LastLineOfABusyPortBind());
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux)]
+    public void BindLocalEnd_WhenEveryPortIsInUseOnLinux_ReportsErrno98()
+    {
+        // curl 8.18.0 Linux, --local-port 40000-40001 both in use: "bind failed with errno 98: Address already in use".
+        Assert.AreEqual("bind failed with errno 98: Address already in use", LastLineOfABusyPortBind());
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.OSX)]
+    public void BindLocalEnd_WhenEveryPortIsInUseOnMacOS_ReportsErrno48()
+    {
+        // macOS's EADDRINUSE is 48 (sys/errno.h), its strerror "Address already in use".
+        Assert.AreEqual("bind failed with errno 48: Address already in use", LastLineOfABusyPortBind());
+    }
+
+    // curl 8.18.0 on Linux: --interface lo -> "socket successfully bound to interface 'lo'", and
+    // ifhost!lo!127.0.0.1 binds the device silently and goes on to "Local port: 0".
+    [TestMethod]
+    [TestCategory("Integration")]
+    [OSCondition(OperatingSystems.Linux)]
+    [DataRow(false, "socket successfully bound to interface 'lo'", DisplayName = "lo")]
+    [DataRow(true, "Local port: 0", DisplayName = "ifhost!lo!127.0.0.1")]
+    public async Task DialFromDeviceAsync_OnLinuxWithTheLoopbackDevice_ReportsCurlsLine(bool bindsAddressAfterDevice, string expected)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var events = new RecordingTransferEvents();
+
+        try
+        {
+            var dialed = await new TcpDialer().DialFromDeviceAsync(
+                (IPEndPoint)listener.LocalEndpoint,
+                "lo",
+                bindsAddressAfterDevice,
+                _ => ValueTask.FromResult(new IPEndPoint(IPAddress.Loopback, 0)),
+                1,
+                events,
+                cancellation.Token);
+            await dialed.Connection.DisposeAsync();
+        }
+        finally
+        {
+            listener.Stop();
+        }
+
+        CollectionAssert.AreEqual(new[] { expected }, events.Info);
+    }
+
+    private static string LastLineOfABusyPortBind()
+    {
+        var events = new RecordingTransferEvents();
+        using var holder = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        holder.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        // Listening, so the port is in use on Linux too (SO_REUSEADDR).
+        holder.Listen();
+        var busy = ((IPEndPoint)holder.LocalEndPoint!).Port;
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        Assert.ThrowsExactly<LocalBindException>(
+            () => TcpDialer.BindLocalEnd(socket, new IPEndPoint(IPAddress.Loopback, busy), 1, events));
+
+        return events.Info.Single();
     }
 
     /// <summary>

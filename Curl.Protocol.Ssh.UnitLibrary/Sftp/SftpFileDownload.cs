@@ -34,7 +34,8 @@ internal sealed class SftpFileDownload(SshTransport transport)
     /// <c>-C</c> offset the file cannot serve (<see cref="SftpDownloadPart.Choose" />); exit 18, <c>end of response with N bytes
     /// missing</c>, when the file ends before the size <c>STAT</c> gave; exit 79,
     /// <c>Error in the SSH layer</c>, when a read fails or the connection breaks during
-    /// the copy - each with the bytes written so far.
+    /// the copy - each with the bytes written so far; success with nothing written when
+    /// the connection is closed or reset at <c>OPEN</c>, as measured (BL-1046).
     /// </returns>
     /// <exception cref="SshTransferException">
     /// The session could not start (<see cref="SftpSession.StartAsync" />), <c>REALPATH</c>
@@ -60,15 +61,31 @@ internal sealed class SftpFileDownload(SshTransport transport)
                     () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
                 byte[] path = SftpRemotePath.ResolveUrlPath(urlPath, homeDirectory);
                 await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
-                (byte[] handle, long? size) = await SshConnectionFailure.ReportAsSshLayerErrorAsync(async () =>
+                if (await OpenUnlessTheConnectionEndsAsync(session, path, createFileMode, cancellationToken).ConfigureAwait(false) is not { } handle)
                 {
-                    byte[] opened = await session.OpenForReadingAsync(path, createFileMode, cancellationToken).ConfigureAwait(false);
-                    return (opened, await session.StatSizeAsync(path, cancellationToken).ConfigureAwait(false));
-                }).ConfigureAwait(false);
+                    return await quotes.FinishAsync(session, null, homeDirectory, TransferResult.Success(0), cancellationToken).ConfigureAwait(false);
+                }
+
+                long? size = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
+                    () => session.StatSizeAsync(path, cancellationToken)).ConfigureAwait(false);
                 TransferResult result = await CopyPartAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
                 return await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
             },
             cancellationToken).ConfigureAwait(false);
+    }
+
+    // Measured (BL-1046): curl takes a connection closed or reset while it waits for the
+    // OPEN answer as libssh2's SSH_FX_OK, so the download succeeds with nothing written.
+    private static async ValueTask<byte[]?> OpenUnlessTheConnectionEndsAsync(SftpSession session, byte[] path, UnixFileMode createFileMode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await session.OpenForReadingAsync(path, createFileMode, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is EndOfStreamException or SshConnectionLostException)
+        {
+            return null;
+        }
     }
 
     // Measured: a range or -C offset the file cannot serve reads nothing, and the handle

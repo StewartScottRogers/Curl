@@ -193,7 +193,10 @@ TLS, proxy TLS and other connection settings are equal, and the runner closes th
 run ends (ADR-0285, BL-754).
 `%{urlnum}` (`UrlTransfer.UrlNumber`), `%{xfer_id}` and `%{conn_id}` count on across groups, the
 `-v`/trace output stays open for the whole run, `--fail-early` stops every group, and the exit
-code is the last transfer's. Measured on curl 8.21.0 (BL-509 Notes).
+code is the last transfer's. Measured on curl 8.21.0 (BL-509 Notes). Under `-w` or `--trace-ids` a
+transfer that reuses a pooled connection, in its own group or a later one, takes that connection's
+`%{conn_id}` (`ConnectionIdRecordingTransferEvents`), so two URLs on one kept-alive connection print
+`[1 0][0 0]` for `[%{num_connects} %{conn_id}]` (BL-1052).
 
 Under `-Z` (ADR-0127, BL-519) the same loops start each transfer, in command-line order across the
 groups, once fewer than `--parallel-max` are running (`ParallelTransferQueue`), without waiting for
@@ -433,7 +436,7 @@ still gets the head, the progress meter is drawn as for a file (even when standa
 terminal), and the transfer switches standard output to binary as one to standard output does,
 so its `-w` line feeds stay LF on Windows (BL-495 Notes).
 
-Curl's own diagnostic log (ADR-0222, ADR-0228, BL-919) is opened by the runner, not the
+Curl's own diagnostic log (ADR-0222, ADR-0236, BL-919) is opened by the runner, not the
 composition, because its level and file come from the command line: after an accepted parse, the
 `--stderr` redirects and the config-file note, `RunDiagnosticLog` builds `NoDiagnosticLog.Instance`
 at `--log-level none` (no file created, no byte changed), otherwise a `Curl.Output`

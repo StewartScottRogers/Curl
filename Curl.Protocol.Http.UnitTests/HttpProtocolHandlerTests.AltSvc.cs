@@ -1,3 +1,5 @@
+using System.Net;
+using Curl.Http2;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http.Fakes;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -31,6 +33,29 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreSame(route, target.AltSvcRoute);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_WithARouteSwitchingToH2_AsksTheConnectorToOfferH2Alone()
+    {
+        // curl.se 8.18.0 with "h1 127.0.0.1 18736 h2 127.0.0.1 18735 ..." says ALPN: curl offers h2 (BL-733 Notes case 4).
+        AltSvcRoute route = new("h1", new AltSvcAlternative("h2", "localhost", 18443));
+        QueueConnector connector = QueueConnector.For(Connection(EmptyOkHead, 65536));
+
+        TransferResult result = await Handler(connector).ExecuteAsync(CookieContext(AltSvcHttpsUrl, new HttpRequestOptions { AltSvcRoute = route }));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "h2" }, connector.Targets.Single().ApplicationProtocols!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WithARouteOfTheSameVersion_LeavesTheOfferToTheConnector()
+    {
+        QueueConnector connector = QueueConnector.For(Connection(EmptyOkHead, 65536));
+
+        await Handler(connector).ExecuteAsync(CookieContext(AltSvcHttpsUrl, new HttpRequestOptions { AltSvcRoute = new("h1", AltSvcAlternative18443) }));
+
+        Assert.IsNull(connector.Targets.Single().ApplicationProtocols);
+    }
+
     /// <summary>
     /// Measured (BL-623 Notes, case 1): with the entry <c>h1 localhost 18499 h1 localhost 18443</c>,
     /// curl 8.21.0 ends <c>* Connection #0 to host localhost:18443 left intact</c>, naming the alternative.
@@ -45,6 +70,24 @@ public sealed partial class HttpProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("Connection #0 to host localhost:18443 left intact", events.Info[^1]);
+    }
+
+    /// <summary>
+    /// Measured (BL-975): <c>-v --connect-to example.invalid:80:127.0.0.1:18499 http://example.invalid/</c>
+    /// makes curl 8.21.0 end <c>* Connection #0 to host 127.0.0.1:18499 left intact</c>, naming the
+    /// destination the connector reports, ahead of any alt-svc alternative.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_KeptAliveOnAConnectToDestination_ReportsTheDestinationLeftIntact()
+    {
+        RecordingTransferEvents events = new();
+        QueueConnector connector = new(ConnectResult.Connected(Connection(EmptyOkHead, 65536), null, mappedHost: "127.0.0.1", mappedPort: 18499));
+
+        TransferResult result = await Handler(connector)
+            .ExecuteAsync(CookieContext(AltSvcHttpsUrl, new HttpRequestOptions { AltSvcRoute = new("h1", AltSvcAlternative18443) }, events));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("Connection #0 to host 127.0.0.1:18499 left intact", events.Info[^1]);
     }
 
     [TestMethod]
@@ -88,10 +131,52 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
             Assert.AreEqual(
-                (CurlUrl.Parse(AltSvcHttpsUrl), "h2=\":8443\"; ma=60, h1=\"a.example:1\", h3=\":443\"", CookieTime),
+                (CurlUrl.Parse(AltSvcHttpsUrl), "h2=\":8443\"; ma=60, h1=\"a.example:1\", h3=\":443\"", HttpVersion.Version11, CookieTime),
                 store.Responses.Single(),
                 $"Chunk size {chunkSize}");
         }
+    }
+
+    /// <summary>
+    /// curl 8.21.0 learns an <c>Alt-Svc</c> header under the version its response came over
+    /// (<c>k->httpversion</c>, BL-947): HTTP/2 here.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http2ResponseWithAltSvc_TellsTheStoreHttp2()
+    {
+        HpackEncoder server = new();
+        byte[] response = Http2Response(
+            Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "204"), new("alt-svc", "h3=\":443\"; ma=60")]), isEndStream: true, isEndHeaders: true));
+        ScriptedAltSvcStore store = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("https://example.com/"),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { AltSvcStore = store },
+        };
+
+        TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(new ScriptedConnection(response, 65536), null, applicationProtocol: "h2")))
+            .ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(("h3=\":443\"; ma=60", HttpVersion.Version20), (store.Responses.Single().AltSvcHeader, store.Responses.Single().ResponseVersion));
+    }
+
+    /// <summary>
+    /// curl 8.21.0 learns an <c>Alt-Svc</c> header under the version its response came over
+    /// (<c>k->httpversion</c>, BL-947): HTTP/3 here.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http3ResponseWithAltSvc_TellsTheStoreHttp3()
+    {
+        FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("204", ("alt-svc", "h3=\":443\"; ma=60"))));
+        ScriptedAltSvcStore store = new();
+
+        TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
+            .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), options: new HttpRequestOptions { AltSvcStore = store }));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(("h3=\":443\"; ma=60", HttpVersion.Version30), (store.Responses.Single().AltSvcHeader, store.Responses.Single().ResponseVersion));
     }
 
     [TestMethod]

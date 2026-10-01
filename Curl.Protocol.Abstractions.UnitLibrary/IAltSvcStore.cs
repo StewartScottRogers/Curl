@@ -22,10 +22,16 @@ public interface IAltSvcStore
     /// connection went to.
     /// </param>
     /// <param name="altSvcHeader">The <c>Alt-Svc</c> header's value, verbatim.</param>
+    /// <param name="responseVersion">
+    /// The HTTP version the response came over (<see cref="System.Net.HttpVersion.Version30" />,
+    /// <see cref="System.Net.HttpVersion.Version20" />, or an HTTP/1.x version), which names the source
+    /// ALPN the alternatives are stored under, as curl 8.21.0 passes <c>k->httpversion</c> to
+    /// <c>Curl_altsvc_parse</c>.
+    /// </param>
     /// <param name="now">The receive time that each alternative's <c>ma</c> counts from.</param>
     /// <returns>
     /// The alternatives the header added, in header order, for the caller's
     /// <c>Added alt-svc</c> lines; empty when it added none.
     /// </returns>
-    IReadOnlyList<AltSvcAlternative> StoreFromResponse(CurlUrl origin, string altSvcHeader, DateTimeOffset now);
+    IReadOnlyList<AltSvcAlternative> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now);
 }

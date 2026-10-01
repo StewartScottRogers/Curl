@@ -138,6 +138,23 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ToAConnectToDestination_KeepsItOnTheOpenedAndTheReusedResult()
+    {
+        _inner.MappedHost = "127.0.0.1";
+        _inner.MappedPort = 18499;
+        await using var pool = CreatePool();
+
+        var opened = await pool.ConnectAsync(Target(), CancellationToken.None);
+        opened.Connection!.MarkReusable();
+        await opened.Connection.DisposeAsync();
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.AreEqual(("127.0.0.1", 18499), (opened.MappedHost, opened.MappedPort));
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreEqual(("127.0.0.1", 18499), (reused.MappedHost, reused.MappedPort));
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ReusingAForwardProxyConnection_ReportsItWithProxy()
     {
         await using var pool = CreatePool();

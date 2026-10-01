@@ -115,7 +115,7 @@ public sealed partial class CurlCompositionTests
 
         await RunWithFakeConnectorsAsync(url, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
 
-        Assert.AreEqual(new ConnectTarget("h", port, useTls) { PoolScheme = poolScheme }, connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("h", port, useTls) { PoolScheme = poolScheme }, connector.Targets.Single() with { Events = NoTransferEvents.Instance });
     }
 
     [TestMethod]

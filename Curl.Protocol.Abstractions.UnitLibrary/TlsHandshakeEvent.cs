@@ -88,4 +88,10 @@ public sealed record TlsHandshakeEvent
     /// An IP address is given without brackets (ADR-0085).
     /// </summary>
     public string? VerifiedHostName { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the handshake was a QUIC connect's (HTTP/3), which on
+    /// Windows curl.se's LibreSSL build words rather than the Schannel build (ADR-0144).
+    /// </summary>
+    public bool IsQuic { get; init; }
 }

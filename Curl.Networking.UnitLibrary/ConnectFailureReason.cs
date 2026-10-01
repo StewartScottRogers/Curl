@@ -11,7 +11,7 @@ namespace Curl.Networking;
 /// back to the system's message; elsewhere it prints <c>strerror</c>, which is the message
 /// .NET gives a <see cref="SocketException" /> there. <c>Connection refused</c> was
 /// measured (BL-408), <c>Network down</c> and <c>Invalid arguments</c> too, from a Unix socket
-/// connect (BL-507); the other Winsock words are curl's <c>lib/strerror.c</c> table.
+/// connect (BL-507), <c>Address already in use</c> from a <c>--local-port</c> bind (BL-1027); the other Winsock words are curl's <c>lib/strerror.c</c> table.
 /// </remarks>
 public static class ConnectFailureReason
 {
@@ -27,6 +27,7 @@ public static class ConnectFailureReason
         [SocketError.ConnectionReset] = "Connection reset",
         [SocketError.ConnectionAborted] = "Connection aborted",
         [SocketError.InvalidArgument] = "Invalid arguments",
+        [SocketError.AddressAlreadyInUse] = "Address already in use",
     };
 
     /// <summary>

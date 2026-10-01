@@ -1,3 +1,4 @@
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Curl.Kerberos;
 using Curl.Protocol.Abstractions;
@@ -7,36 +8,81 @@ namespace Curl.Networking;
 /// <summary>
 /// The production <see cref="IKerberosKdcProxyTransport" /> (BL-882): one HTTPS POST to an
 /// MS-KKDCP proxy, an <c>https://</c> <c>kdc</c> entry, made as MIT's <c>sendto_kdc.c</c> makes
-/// it. The connection comes from an <see cref="IConnector" /> asked for TLS, which verifies the
-/// proxy's certificate against its host name, with no ALPN and no pooling; the request is
-/// <c>POST /path HTTP/1.0</c> with MIT's headers and the <c>KDC-PROXY-MESSAGE</c> as its body,
-/// and the reply is read until the proxy closes the connection. Every failure to get a
-/// <c>200</c> body back within <paramref name="exchangeTimeout" /> is an
-/// <see cref="IOException" />, so the sender tries the realm's next KDC.
+/// it. The connection comes from an <see cref="IConnector" /> asked for plain TCP, with no
+/// pooling, and its TLS is this transport's own (<see cref="IKerberosKdcProxyTlsClient" />, no
+/// ALPN): the proxy's certificate must name its host and lead to the realm's
+/// <c>http_anchors</c> roots, or to the system's trust store when there are none, so the
+/// transfer's <c>-k</c>, <c>--cacert</c> and <c>--capath</c> never apply (ADR-0300, BL-1063).
+/// The request is <c>POST /path HTTP/1.0</c> with MIT's headers and the
+/// <c>KDC-PROXY-MESSAGE</c> as its body, and the reply is read until the proxy closes the
+/// connection. Every failure to get a <c>200</c> body back within the exchange timeout, an
+/// anchor that cannot be loaded included, is an <see cref="IOException" />, so the sender tries
+/// the realm's next KDC.
 /// </summary>
-/// <param name="connector">Opens the TLS connection to the proxy.</param>
-/// <param name="exchangeTimeout">How long the whole exchange, connection included, may take.</param>
-/// <param name="timeProvider">Times the wait.</param>
-public sealed class KerberosKdcProxyHttpsTransport(IConnector connector, TimeSpan exchangeTimeout, TimeProvider timeProvider) : IKerberosKdcProxyTransport
+public sealed class KerberosKdcProxyHttpsTransport : IKerberosKdcProxyTransport
 {
     /// <summary>The largest reply read, headers included: MIT's limit for a stream reply.</summary>
     public const int MaximumReplyLength = 1024 * 1024;
 
     private static readonly byte[] HeaderEnd = "\r\n\r\n"u8.ToArray();
 
-    /// <inheritdoc />
-    public async Task<byte[]> PostAsync(string host, int port, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
+    private readonly IConnector _connector;
+
+    private readonly TimeSpan _exchangeTimeout;
+
+    private readonly TimeProvider _timeProvider;
+
+    private readonly IKerberosKdcProxyTlsClient _tlsClient;
+
+    private readonly Func<string, string?> _readEnvironmentVariable;
+
+    /// <summary>Creates the transport with <c>SslStream</c>-based TLS and the process's environment for <c>ENV:</c> anchors.</summary>
+    /// <param name="connector">Opens the TCP connection to the proxy.</param>
+    /// <param name="exchangeTimeout">How long the whole exchange, connection included, may take.</param>
+    /// <param name="timeProvider">Times the wait.</param>
+    public KerberosKdcProxyHttpsTransport(IConnector connector, TimeSpan exchangeTimeout, TimeProvider timeProvider)
+        : this(connector, exchangeTimeout, timeProvider, new KerberosKdcProxyTlsClient(), Environment.GetEnvironmentVariable)
     {
-        using CancellationTokenSource timeout = new(exchangeTimeout, timeProvider);
+    }
+
+    /// <summary>Creates the transport with the TLS client and environment given.</summary>
+    /// <param name="connector">Opens the TCP connection to the proxy.</param>
+    /// <param name="exchangeTimeout">How long the whole exchange, connection included, may take.</param>
+    /// <param name="timeProvider">Times the wait.</param>
+    /// <param name="tlsClient">Secures the connection and verifies the proxy's certificate.</param>
+    /// <param name="readEnvironmentVariable">Reads an <c>ENV:</c> anchor's variable, <see langword="null" /> when unset.</param>
+    internal KerberosKdcProxyHttpsTransport(
+        IConnector connector,
+        TimeSpan exchangeTimeout,
+        TimeProvider timeProvider,
+        IKerberosKdcProxyTlsClient tlsClient,
+        Func<string, string?> readEnvironmentVariable)
+    {
+        _connector = connector;
+        _exchangeTimeout = exchangeTimeout;
+        _timeProvider = timeProvider;
+        _tlsClient = tlsClient;
+        _readEnvironmentVariable = readEnvironmentVariable;
+    }
+
+    /// <inheritdoc />
+    public Task<byte[]> PostAsync(string host, int port, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken) =>
+        PostAsync(host, port, path, [], body, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<byte[]> PostAsync(string host, int port, string path, IReadOnlyList<string> httpAnchors, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
+    {
+        X509Certificate2Collection? anchors = httpAnchors.Count == 0 ? null : KerberosHttpAnchorLoader.Load(httpAnchors, _readEnvironmentVariable);
+        using CancellationTokenSource timeout = new(_exchangeTimeout, _timeProvider);
         using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         try
         {
-            byte[] reply = await ExchangeAsync(host, port, BuildRequest(host, path, body), linked.Token).ConfigureAwait(false);
+            byte[] reply = await ExchangeAsync(host, port, anchors, BuildRequest(host, path, body), linked.Token).ConfigureAwait(false);
             return ReadBody(host, port, reply);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new IOException($"The KDC proxy {host} port {port} did not answer within {exchangeTimeout.TotalSeconds:0.###} s.");
+            throw new IOException($"The KDC proxy {host} port {port} did not answer within {_exchangeTimeout.TotalSeconds:0.###} s.");
         }
     }
 
@@ -63,24 +109,25 @@ public sealed class KerberosKdcProxyHttpsTransport(IConnector connector, TimeSpa
         return [.. head, .. body.Span];
     }
 
-    private async Task<byte[]> ExchangeAsync(string host, int port, byte[] request, CancellationToken cancellationToken)
+    private async Task<byte[]> ExchangeAsync(string host, int port, X509Certificate2Collection? anchors, byte[] request, CancellationToken cancellationToken)
     {
-        ConnectResult connected = await connector.ConnectAsync(new ConnectTarget(host, port, UseTls: true), cancellationToken).ConfigureAwait(false);
+        ConnectResult connected = await _connector.ConnectAsync(new ConnectTarget(host, port, UseTls: false), cancellationToken).ConfigureAwait(false);
         IConnection connection = connected.Connection ?? throw new IOException(connected.ErrorMessage);
-        await using (connection.ConfigureAwait(false))
+        Stream secured = await _tlsClient.AuthenticateAsync(new ConnectionStream(connection, ownsConnection: true), host, anchors, cancellationToken).ConfigureAwait(false);
+        await using (secured.ConfigureAwait(false))
         {
-            await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
-            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-            return await ReadToEndAsync(host, port, connection, cancellationToken).ConfigureAwait(false);
+            await secured.WriteAsync(request, cancellationToken).ConfigureAwait(false);
+            await secured.FlushAsync(cancellationToken).ConfigureAwait(false);
+            return await ReadToEndAsync(host, port, secured, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private static async Task<byte[]> ReadToEndAsync(string host, int port, IConnection connection, CancellationToken cancellationToken)
+    private static async Task<byte[]> ReadToEndAsync(string host, int port, Stream secured, CancellationToken cancellationToken)
     {
         using MemoryStream reply = new();
         byte[] buffer = new byte[16384];
         int read;
-        while ((read = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+        while ((read = await secured.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
         {
             reply.Write(buffer, 0, read);
             if (reply.Length > MaximumReplyLength)

@@ -90,13 +90,14 @@ internal sealed class KerberosKdcSender(KerberosConfiguration configuration, Ker
 
     /// <summary>
     /// Posts the request to an MS-KKDCP proxy inside a <c>KDC-PROXY-MESSAGE</c> naming
-    /// <paramref name="realm" />, as MIT's <c>sendto_kdc.c</c> does. A reply that is not one is
+    /// <paramref name="realm" />, as MIT's <c>sendto_kdc.c</c> does, verified against the realm's
+    /// <c>http_anchors</c> (ADR-0300). A reply that is not one is
     /// an <see cref="IOException" />, so the realm's next KDC is tried, as MIT does.
     /// </summary>
     private async Task<byte[]> ExchangeThroughProxyAsync(string realm, KerberosKdcAddress kdc, byte[] request, CancellationToken cancellationToken)
     {
         byte[] body = new KerberosKdcProxyMessage(request, realm).Encode();
-        byte[] reply = await proxyTransport!.PostAsync(kdc.Host, kdc.Port, kdc.HttpsPath, body, cancellationToken).ConfigureAwait(false);
+        byte[] reply = await proxyTransport!.PostAsync(kdc.Host, kdc.Port, kdc.HttpsPath, configuration.HttpAnchors(realm), body, cancellationToken).ConfigureAwait(false);
         try
         {
             return KerberosKdcProxyMessage.Decode(reply).KerberosMessage;

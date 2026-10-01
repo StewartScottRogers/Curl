@@ -135,16 +135,14 @@ public sealed class TraceTransferEventWriter(
     /// <inheritdoc />
     /// <remarks>
     /// The OpenSSL build writes its <c>SSL Trust</c> lines (<see cref="OpenSslTrustText"/>);
-    /// the Schannel build writes nothing.
+    /// the Schannel build writes nothing, except for a QUIC connect, where curl.se's LibreSSL
+    /// build writes the OpenSSL lines (<see cref="TransferEventInfoText.TlsTrust"/>).
     /// </remarks>
     public void ReportTlsTrust(TlsTrustEvent trust)
     {
-        if (tlsBackend == TlsBackend.OpenSsl)
+        foreach (string line in TransferEventInfoText.TlsTrust(trust, tlsBackend))
         {
-            foreach (string line in OpenSslTrustText.Lines(trust))
-            {
-                WriteInfoLine(line);
-            }
+            WriteInfoLine(line);
         }
     }
 

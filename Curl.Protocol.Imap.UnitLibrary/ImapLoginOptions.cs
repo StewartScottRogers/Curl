@@ -59,6 +59,13 @@ internal sealed class ImapLoginOptions
     public bool AllowsLogin => PrefersLogin || AllowsAnyMechanism;
 
     /// <summary>
+    /// Tells whether curl 8.21.0 knows <paramref name="mechanism" /> by name, in any case.
+    /// </summary>
+    /// <param name="mechanism">A mechanism the server advertised.</param>
+    /// <returns><see langword="true" /> when curl knows it.</returns>
+    public static bool IsKnownMechanism(string mechanism) => KnownMechanisms.Contains(mechanism);
+
+    /// <summary>
     /// Reads <paramref name="options" />.
     /// </summary>
     /// <param name="options">The login options, or <see langword="null" /> when there are none.</param>

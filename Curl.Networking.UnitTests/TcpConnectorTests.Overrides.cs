@@ -85,6 +85,35 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WithAConnectToMapping_ReportsTheMappedHostAndPortForTheLeftIntactLine()
+    {
+        // curl -v --connect-to example.invalid:80:127.0.0.1:18499 http://example.invalid/ ends
+        // * Connection #0 to host 127.0.0.1:18499 left intact (measured, BL-975)
+        var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
+        var connector = new TcpConnector(
+            new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider(),
+            connectToMappings: new ConnectToMappings(["example.invalid:80:127.0.0.1:18499"]));
+
+        var result = await connector.ConnectAsync(new ConnectTarget("example.invalid", 80, UseTls: false), CancellationToken.None);
+
+        Assert.AreEqual(("127.0.0.1", 18499), (result.MappedHost, result.MappedPort));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithoutAMatchingConnectToMapping_ReportsNoMappedDestination()
+    {
+        var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
+        var connector = new TcpConnector(
+            new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider(),
+            connectToMappings: new ConnectToMappings(["other:80:127.0.0.1:18499"]));
+
+        var result = await connector.ConnectAsync(new ConnectTarget("example.invalid", 80, UseTls: false), CancellationToken.None);
+
+        Assert.IsNull(result.MappedHost);
+        Assert.AreEqual(0, result.MappedPort);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WithAConnectToMappingAndAResolveEntryForTheMappedHostAndPort_DialsTheEntrysAddress()
     {
         // curl --connect-to a:80::9 --resolve a:9:127.0.0.5 http://a/ -> Host a:9 was resolved. Trying 127.0.0.5:9

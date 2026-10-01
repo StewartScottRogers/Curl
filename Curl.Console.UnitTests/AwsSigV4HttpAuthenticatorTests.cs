@@ -100,6 +100,12 @@ public sealed class AwsSigV4HttpAuthenticatorTests
     }
 
     [TestMethod]
+    public void RepeatAuthorization_AwsSigV4_SendsTheValueAsSent()
+    {
+        Assert.AreEqual("sent", Authenticator().RepeatAuthorization(SignedRequest(), "sent"));
+    }
+
+    [TestMethod]
     public async Task EveryCall_WithoutAwsSigV4_GoesToTheOtherSchemes()
     {
         HttpAuthRequest request = SignedRequest() with { AwsSigV4 = null };
@@ -108,6 +114,18 @@ public sealed class AwsSigV4HttpAuthenticatorTests
         Assert.AreEqual("sync", authenticator.CreateAuthorization(request, []));
         Assert.AreEqual("async", await authenticator.CreateAuthorizationAsync(request, [], CancellationToken.None));
         Assert.AreEqual("continued", await authenticator.ContinueAuthorizationAsync(request, "x", true, ["y"], CancellationToken.None));
+        Assert.AreEqual("repeated sent", authenticator.RepeatAuthorization(request, "sent"));
+    }
+
+    [TestMethod]
+    public void EndAuthorization_KeptNegotiateValue_GoesToTheOtherSchemes()
+    {
+        var otherSchemes = new OtherSchemes();
+        var authenticator = new AwsSigV4HttpAuthenticator(otherSchemes, new AwsSigV4Signer(new FixedUtcClock(Measured), Encoding.Latin1));
+
+        authenticator.EndAuthorization("Negotiate YQ==");
+
+        CollectionAssert.AreEqual(new[] { "Negotiate YQ==" }, otherSchemes.Ended);
     }
 
     [TestMethod]
@@ -118,6 +136,7 @@ public sealed class AwsSigV4HttpAuthenticatorTests
         Assert.ThrowsExactly<ArgumentNullException>(() => authenticator.CreateAuthorization(null!, []));
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await authenticator.CreateAuthorizationAsync(null!, [], CancellationToken.None));
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await authenticator.ContinueAuthorizationAsync(null!, "x", true, ["y"], CancellationToken.None));
+        Assert.ThrowsExactly<ArgumentNullException>(() => authenticator.RepeatAuthorization(null!, "x"));
     }
 
     private static AwsSigV4HttpAuthenticator Authenticator() =>
@@ -145,6 +164,12 @@ public sealed class AwsSigV4HttpAuthenticatorTests
 
         public ValueTask<string?> ContinueAuthorizationAsync(HttpAuthRequest request, string sentAuthorization, bool sentBeforeAnyChallenge, IReadOnlyList<string> challenges, CancellationToken cancellationToken) =>
             ValueTask.FromResult<string?>("continued");
+
+        public string RepeatAuthorization(HttpAuthRequest request, string sentAuthorization) => "repeated " + sentAuthorization;
+
+        public List<string> Ended { get; } = [];
+
+        public void EndAuthorization(string sentAuthorization) => Ended.Add(sentAuthorization);
     }
 
     /// <summary>Records every <c>-v</c> line reported.</summary>

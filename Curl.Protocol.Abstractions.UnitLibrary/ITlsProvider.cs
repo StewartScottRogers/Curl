@@ -44,4 +44,30 @@ public interface ITlsProvider
         IConnection plaintext,
         string targetHost,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Performs the client handshake as
+    /// <see cref="AuthenticateAsClientAsync(IConnection, string, CancellationToken)" /> does,
+    /// reporting to <paramref name="events" /> what a provider that reports its handshake
+    /// reports, so a protocol handler's in-place upgrade (SMTP and IMAP <c>STARTTLS</c>, POP3
+    /// <c>STLS</c>, FTP <c>AUTH TLS</c>) writes curl's <c>-v</c> TLS lines (BL-1058).
+    /// </summary>
+    /// <remarks>
+    /// By default nothing is reported and the handshake is the three-argument overload's;
+    /// a provider that reports its handshake overrides this.
+    /// </remarks>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the handshake is reported.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>
+    /// The same result
+    /// <see cref="AuthenticateAsClientAsync(IConnection, string, CancellationToken)" /> returns.
+    /// </returns>
+    ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        CancellationToken cancellationToken) =>
+        AuthenticateAsClientAsync(plaintext, targetHost, cancellationToken);
 }

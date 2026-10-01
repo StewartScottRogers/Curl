@@ -81,10 +81,30 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
     }
 
     [TestMethod]
-    public async Task RunAsync_VerboseMailUploadWithStartTls_WritesTheSessionLinesAroundTheUpgrade()
+    public async Task RunAsync_VerboseLoginWithNoMechanism_WritesTheSaslLineAndClosesWithExit67()
     {
-        // curl also writes two "schannel:" lines and a second "Established connection" line
-        // between "< 220 Ready to start TLS" and the second EHLO; BL-806 adds them.
+        // Recorded on 2026-10-01 with -u user:secret and -SmtpReply 'EHLO=250-localhost\r\n250 AUTH FOO' (BL-1061 Notes).
+        const string ehloReply = "250-localhost\r\n250 AUTH FOO\r\n";
+
+        int exitCode = await RunAsync(["-sv", "-u", "user:secret"], 18031, 60797, Greeting + ehloReply);
+
+        Assert.AreEqual(67, exitCode);
+        Assert.AreEqual(
+            Opened(18031, 60797)
+            + Headers("< ", ehloReply)
+            + "* SASL: no auth mechanism was offered or recognized" + InfoEnd
+            + "* closing connection #0" + InfoEnd,
+            Encoding.ASCII.GetString(standardError.ToArray()));
+        Assert.AreEqual(0, standardOutput.Length);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_VerboseMailUploadWithStartTls_WritesTheEstablishedConnectionLineAgainAfterTheUpgrade()
+    {
+        // Between "< 220 Ready to start TLS" and the second EHLO curl writes the connect's
+        // "Established connection" line again (BL-1058). It also writes two "schannel:" lines
+        // first, which the Schannel build writes before every handshake, HTTPS's included;
+        // BL-1083 adds them for every handshake.
         int exitCode = await RunAsync(
             ["-sv", "-k", "--ssl-reqd"], 18027, 53681, Greeting + EhloReply + "220 Ready to start TLS\r\n" + SecureEhloReply + Transaction);
 
@@ -94,6 +114,7 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
             + Headers("< ", EhloReply)
             + "> STARTTLS" + HeaderEnd
             + "< 220 Ready to start TLS" + HeaderEnd
+            + "* Established connection to 127.0.0.1 (127.0.0.1 port 18027) from 127.0.0.1 port 53681 " + InfoEnd
             + "> EHLO client" + HeaderEnd
             + Headers("< ", SecureEhloReply)
             + "> MAIL FROM:<a@b> SIZE=22" + HeaderEnd

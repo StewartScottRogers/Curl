@@ -78,6 +78,40 @@ public sealed class InMemorySshServer(string userName, string password) : IConne
     public bool HangsUpOnChannelOpen { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the server offers <c>publickey,keyboard-interactive</c>
+    /// rather than <c>publickey,password</c>, asking for <see cref="Password" /> with one
+    /// <c>Password:</c> prompt, as OpenSSH does through PAM (BL-988).
+    /// </summary>
+    public bool OffersKeyboardInteractive { get; init; }
+
+    /// <summary>
+    /// Gets how many bytes more than an SCP download's file holds the server's <c>C</c> line
+    /// announces before the channel ends, with no zero byte after the bytes: 0, the default,
+    /// for the file's own size.
+    /// </summary>
+    public int ScpFileShortBy { get; init; }
+
+    /// <summary>Gets the authentication methods a refusal lists, as <see cref="OffersKeyboardInteractive" /> chooses them.</summary>
+    internal string AuthenticationMethods => OffersKeyboardInteractive ? "publickey,keyboard-interactive" : "publickey,password";
+
+    /// <summary>
+    /// Gets the step at which the server resets the connection rather than answering, or
+    /// <see langword="null" />, the default, to answer everything: one of its
+    /// <see cref="Events" /> - <c>service ssh-userauth</c>, <c>channel open session</c>,
+    /// <c>subsystem sftp</c>, <c>sftp 3 /data/f</c> and the like - or <c>sftp init</c> for
+    /// the SFTP <c>INIT</c>, <c>scp header</c> for the SCP download's <c>T</c> line, or
+    /// <c>scp data</c> for the point after the first block of its bytes (BL-1046). The client then reads what was sent before it,
+    /// then the <see cref="IOException" /> of a reset, through a <see cref="ResettingConnection" />.
+    /// </summary>
+    public string? ResetsAt { get; init; }
+
+    /// <summary>
+    /// Gets which occurrence of <see cref="ResetsAt" /> resets: the first by default, the
+    /// second to let one SFTP <c>READ</c> be answered first.
+    /// </summary>
+    public int ResetsAtOccurrence { get; init; } = 1;
+
+    /// <summary>
     /// Gets the one cipher the server offers in both directions, beside
     /// <see cref="Mac" />, which an AEAD cipher leaves unused: <c>aes128-ctr</c> by default.
     /// </summary>
@@ -135,7 +169,7 @@ public sealed class InMemorySshServer(string userName, string password) : IConne
         (InMemoryDuplexConnection client, InMemoryDuplexConnection server) = InMemoryDuplexConnection.CreatePair();
         InMemorySshServerSession session = new(this, server);
         sessions.Enqueue(Task.Run(session.RunAsync, CancellationToken.None));
-        return ValueTask.FromResult(ConnectResult.Connected(client));
+        return ValueTask.FromResult(ConnectResult.Connected(ResetsAt is null ? client : new ResettingConnection(client)));
     }
 
     /// <summary>Records one event.</summary>

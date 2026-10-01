@@ -53,12 +53,13 @@ Windows on 2026-09-29, are in BL-733's Notes:
    the transfer's `AltSvcRoute` and `Version`.
 2. **An entry naming another host or port** is the route, as before. When its version differs
    from the one it was found under, the transfer switches: `h3` to `Http3Only` (QUIC alone,
-   failing as measured), `h1` and `h2` to `Http11`, where TCP's ALPN chooses between HTTP/1.1 and
-   HTTP/2. When the versions agree, the version option's own preference stays, so `--http3`
+   failing as measured), `h1` and `h2` to `Http11`, where TCP's ALPN, offering the alternative's
+   version alone (BL-948, below), decides between HTTP/1.1 and HTTP/2. When the versions agree, the version option's own preference stays, so `--http3`
    still races QUIC against TCP to the alternative.
 3. **An entry naming the origin itself** is no route. An `h3` one makes a transfer without a
    version option `Http3`, racing QUIC against TCP and falling back to TCP as measured; every
-   other same-destination entry leaves the version as it is.
+   other same-destination entry leaves the version as it is, and under `--http3` an `h2` or `h1`
+   one makes TCP the race's first attempt (BL-948, below).
 4. **Redirects look up again.** `RedirectFollower` takes a `HopAltSvcSelector`; the runner's
    calls `ApplyTo` with each hop's URL, so a hop to another origin gets its own route and
    version (the first hop's switch to HTTP/3 does not follow it), and a hop to the same origin
@@ -68,13 +69,35 @@ Windows on 2026-09-29, are in BL-733's Notes:
 
 Known differences, each filed:
 
-- Headers are still learned under `h1` whatever version the response came over, where curl
-  records `h2` or `h3`; so `--http3-only` never uses an entry its own responses taught (BL-947).
-- ALPN is still the option group's list, where curl offers `h2` alone to an `h2` alternative and
-  `http/1.1` alone after a switch to `h1`, and prefers a same-destination `h2` or `h1` entry's
-  version (BL-948). On Windows without a version option, an `h2` alternative is therefore
-  offered `http/1.1` and spoken to over HTTP/1.1.
+- Resolved by BL-947: headers were learned under `h1` whatever version the response came over,
+  where curl records `h2` or `h3`; they are now learned under the version the response came over,
+  so `--http3-only` uses an entry its own HTTP/3 responses taught.
+- Resolved by BL-948: ALPN was the option group's list for every connect; see "ALPN per connect" below.
 - A `--http3` race to an alternative reports `Alt-svc connecting` twice, once per attempt (BL-949).
+
+## ALPN per connect (amended by BL-948)
+
+Decided by Claude under Stewart's delegation, 2026-10-01, from the measurements above (BL-733
+Notes, cases 4 and 5) and curl 8.21.0's `lib/cf-https-connect.c`.
+
+- **A connect to an alternative that switches version offers that version alone.** `ConnectTarget`
+  carries `ApplicationProtocols`, a per-connect ALPN list that `TcpConnector` offers in place of
+  the option group's HTTP-over-TLS list (a forward proxy's handshake still offers `http/1.1`, and a
+  target that is not pooled as `https` still offers nothing). The HTTP handler fills it from the
+  route (`AltSvcApplicationProtocols`): `h2` alone when the alternative switches to `h2`,
+  `http/1.1` alone when it switches to `h1`. So on Windows without a version option an `h2`
+  alternative is offered `h2` and, when the server agrees, spoken to over HTTP/2;
+  `-v` prints `* ALPN: curl offers h2`. An alternative of the version it was found under keeps
+  the option group's list, as case 5 measured (`--http3`, `h1` to `h1`: `ALPN: curl offers
+  h2,http/1.1`), and an `h3` alternative goes over QUIC.
+- **A same-destination `h2` or `h1` entry makes TCP the first attempt.** Under `--http3`,
+  `AltSvcTransferCache.ApplyTo` sets `HttpRequestOptions.TriesTcpBeforeQuic`, and the handler
+  races with the two attempts swapped: TCP starts at once, QUIC when TCP fails or once
+  `--happy-eyeballs-timeout-ms` passes, the first to connect carries the transfer, and when both
+  fail the TCP attempt's failure is the transfer's, as `cf_hc_connect` reports its first
+  attempt's result. Without `--http3` there is no QUIC attempt to reorder, and the offer stays
+  the option group's (unmeasured: what curl.se's build offers for a same-destination `h1` entry
+  under `--http2` is not pinned; no task asks for it until a measurement shows a difference).
 
 ## Alternatives considered
 

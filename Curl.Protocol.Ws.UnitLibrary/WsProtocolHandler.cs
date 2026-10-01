@@ -260,6 +260,7 @@ public sealed class WsProtocolHandler(
         var log = new WsTransferLog(context.DiagnosticLog);
         log.UpgradeRequested(method, WsUpgradeRequestFormatter.RequestTarget(context.Url));
         WsUpgradeResponse response = await WsUpgradeResponseReader.ReadAsync(connection, context.CancellationToken).ConfigureAwait(false);
+        EndSentAuthorization(authorization);
         await WriteHeadAsync(context.HeaderOutput, response.Head, context.CancellationToken).ConfigureAwait(false);
         TransferReport report = new()
         {
@@ -283,6 +284,20 @@ public sealed class WsProtocolHandler(
             : await ExchangeFramesAsync(connection, context, response.Remaining, report).ConfigureAwait(false);
         ReportTransferEnd(context.Events, result, connectionNumber);
         return result;
+    }
+
+    /// <summary>
+    /// Ends the handshake that sent <paramref name="sentAuthorization" /> once the upgrade's
+    /// response has arrived, whatever its status, so a Negotiate context kept for its next leg
+    /// is disposed of unstepped (ADR-0248, BL-982): curl sends the upgrade only once
+    /// (ADR-0228), so no leg follows even a 401.
+    /// </summary>
+    private void EndSentAuthorization(string? sentAuthorization)
+    {
+        if (sentAuthorization is not null)
+        {
+            authenticator.EndAuthorization(sentAuthorization);
+        }
     }
 
     /// <summary>

@@ -398,14 +398,14 @@ public sealed class SftpFileUploadTests
     }
 
     private static ValueTask<TransferResult> Upload(ScriptedConnection connection, string urlPath, SftpUploadOptions options) =>
-        new SftpFileUpload(SftpSessionTests.Transport(connection))
+        new SftpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
             .UploadAsync(urlPath, options, new MemoryStream(Content), new RecordingProgress(), CancellationToken.None);
 
     private static async Task<Outcome> UploadAsync(SftpServerScript script, string urlPath, SftpUploadOptions options, Stream source)
     {
         ScriptedConnection connection = new(script.Bytes);
         RecordingProgress progress = new();
-        TransferResult result = await new SftpFileUpload(SftpSessionTests.Transport(connection))
+        TransferResult result = await new SftpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
             .UploadAsync(urlPath, options, source, progress, CancellationToken.None);
         return new Outcome(result, progress.Reports, connection.Written);
     }

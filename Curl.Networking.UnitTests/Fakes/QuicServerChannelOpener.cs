@@ -16,6 +16,13 @@ public sealed class QuicServerChannelOpener : IUdpChannelOpener
     /// <summary>Gets the local endpoint each channel reports, or <see langword="null" /> for none.</summary>
     public EndPoint? LocalEndPoint { get; init; } = new IPEndPoint(IPAddress.Loopback, 50123);
 
+    /// <summary>
+    /// Gets whether each channel also opens a real, unconnected UDP socket through
+    /// <see cref="UdpChannelOpener" /> and reports that socket's local endpoint instead of
+    /// <see cref="LocalEndPoint" />; the datagrams still go to the in-memory server, so nothing is sent.
+    /// </summary>
+    public bool ReportsARealUdpSocketsLocalEndPoint { get; init; }
+
     /// <summary>Gets the server behind each endpoint; <see langword="null" /> for a peer that never answers.</summary>
     internal Func<IPEndPoint, QuicTestServer?> ServerFor { get; init; } = _ => null;
 
@@ -35,19 +42,30 @@ public sealed class QuicServerChannelOpener : IUdpChannelOpener
     public IDatagramChannel Open(IPEndPoint serverEndPoint)
     {
         OpenOutcome(serverEndPoint);
-        var channel = new Channel(this, serverEndPoint, ServerFor(serverEndPoint));
+        var realSocket = ReportsARealUdpSocketsLocalEndPoint ? new UdpChannelOpener().Open(serverEndPoint) : null;
+        var channel = new Channel(this, serverEndPoint, ServerFor(serverEndPoint), realSocket);
         Opened.Add(channel);
         return channel;
     }
 
+    /// <summary>Gets the local endpoint and port count each <see cref="OpenFrom" /> was asked for, in order.</summary>
+    internal List<(IPEndPoint LocalEndPoint, int LocalPortCount)> BoundFrom { get; } = [];
+
+    /// <inheritdoc />
+    public IDatagramChannel OpenFrom(IPEndPoint serverEndPoint, IPEndPoint localEndPoint, int localPortCount)
+    {
+        BoundFrom.Add((localEndPoint, localPortCount));
+        return Open(serverEndPoint);
+    }
+
     /// <summary>One channel: each datagram sent goes to the server at once, and its answers queue up to be received.</summary>
-    internal sealed class Channel(QuicServerChannelOpener opener, IPEndPoint serverEndPoint, QuicTestServer? server) : IDatagramChannel
+    internal sealed class Channel(QuicServerChannelOpener opener, IPEndPoint serverEndPoint, QuicTestServer? server, IDatagramChannel? realSocket) : IDatagramChannel
     {
         private readonly Queue<byte[]> _inbound = new();
 
         public EndPoint ServerEndPoint => serverEndPoint;
 
-        public EndPoint? LocalEndPoint => opener.LocalEndPoint;
+        public EndPoint? LocalEndPoint => realSocket is null ? opener.LocalEndPoint : realSocket.LocalEndPoint;
 
         public QuicTestServer? Server => server;
 
@@ -87,10 +105,13 @@ public sealed class QuicServerChannelOpener : IUdpChannelOpener
             throw new UnreachableException();
         }
 
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             IsDisposed = true;
-            return ValueTask.CompletedTask;
+            if (realSocket is not null)
+            {
+                await realSocket.DisposeAsync();
+            }
         }
     }
 }

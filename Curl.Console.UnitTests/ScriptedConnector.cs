@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Authentication;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -30,9 +31,30 @@ internal sealed class ScriptedConnector(IEnumerable<byte[]> reads) : IConnector
     /// </summary>
     public bool ReusesTheFirstConnection { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether each connect reports a TLS 1.3 handshake to the target's events,
+    /// offering through ALPN what <see cref="Curl.Networking.TcpConnector" /> would: the target's
+    /// <see cref="ConnectTarget.ApplicationProtocols" />, else <c>http/1.1</c> alone, the Windows build's
+    /// offer with no version option; <see langword="false" />, the default, for none.
+    /// </summary>
+    public bool ReportsTheAlpnOffer { get; init; }
+
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         Targets.Add(target);
+        if (ReportsTheAlpnOffer)
+        {
+            target.Events.ReportTlsHandshake(new TlsHandshakeEvent
+            {
+                ProtocolVersion = SslProtocols.Tls13,
+                CipherSuite = null,
+                NegotiatedApplicationProtocol = ApplicationProtocol,
+                OfferedApplicationProtocols = target.ApplicationProtocols ?? ["http/1.1"],
+                ServerCertificate = null,
+                CertificateVerified = false,
+            });
+        }
+
         bool isReused = ReusesTheFirstConnection && Targets.Count > 1;
         return ValueTask.FromResult(ConnectResult.Connected(new ScriptedConnection(pendingReads, written), null, isReused: isReused, applicationProtocol: ApplicationProtocol));
     }

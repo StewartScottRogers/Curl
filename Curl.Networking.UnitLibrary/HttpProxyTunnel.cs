@@ -39,9 +39,55 @@ internal static class HttpProxyTunnel
             .Append(CultureInfo.InvariantCulture, $"CONNECT {authority} {version}\r\n");
 
         AppendUnlessNamed(request, proxyHeaders, "Host", authority);
+        AppendCommonHeaders(request, proxyHeaders, options, proxyAuthorization);
+        return EndRequest(request, proxyHeaders);
+    }
+
+    /// <summary>
+    /// Builds the CONNECT-UDP request (RFC 9298) for <paramref name="host" /> and
+    /// <paramref name="port" /> through <paramref name="proxy" />, as curl 8.22.0 sends it over
+    /// HTTP/1.x (measured, BL-942): a <c>GET</c> of the proxy's
+    /// <c>/.well-known/masque/udp/&lt;host&gt;/&lt;port&gt;/</c> in absolute form, <c>Host</c>
+    /// naming the proxy, then the CONNECT's headers and <c>Connection: Upgrade</c>,
+    /// <c>Upgrade: connect-udp</c> and <c>Capsule-Protocol: ?1</c> before the
+    /// <c>--proxy-header</c> lines.
+    /// </summary>
+    /// <param name="host">The host the tunnel reaches; an IPv6 literal goes without brackets, its colons percent-encoded.</param>
+    /// <param name="port">The port the tunnel reaches.</param>
+    /// <param name="proxy">The proxy, whose kind picks <c>http</c> or <c>https</c> and HTTP/1.0 or HTTP/1.1.</param>
+    /// <param name="options">The <c>User-Agent</c> and the <c>--proxy-header</c> values.</param>
+    /// <param name="proxyAuthorization">The <c>Proxy-Authorization</c> value, or <see langword="null" /> to send none.</param>
+    /// <returns>The request bytes, ending with the empty line.</returns>
+    public static byte[] BuildConnectUdpRequest(string host, int port, ProxyEndpoint proxy, HttpProxyTunnelOptions options, string? proxyAuthorization)
+    {
+        var proxyAuthority = FormatAuthority(proxy.Host, proxy.Port);
+        var scheme = proxy.Kind == ProxyKind.Https ? "https" : "http";
+        var version = proxy.Kind == ProxyKind.Http10 ? "HTTP/1.0" : "HTTP/1.1";
+        HttpProxyTunnelHeader[] proxyHeaders = [.. options.ProxyHeaders.Select(value => HttpProxyTunnelHeader.Parse(RequestText(value, options)))];
+        var target = string.Create(CultureInfo.InvariantCulture, $"/.well-known/masque/udp/{Uri.EscapeDataString(host.Trim('[', ']'))}/{port}/");
+        var request = new StringBuilder()
+            .Append(CultureInfo.InvariantCulture, $"GET {scheme}://{proxyAuthority}{target} {version}\r\n");
+
+        AppendUnlessNamed(request, proxyHeaders, "Host", proxyAuthority);
+        AppendCommonHeaders(request, proxyHeaders, options, proxyAuthorization);
+        AppendUnlessNamed(request, proxyHeaders, "Connection", "Upgrade");
+        AppendUnlessNamed(request, proxyHeaders, "Upgrade", "connect-udp");
+        AppendUnlessNamed(request, proxyHeaders, "Capsule-Protocol", "?1");
+        return EndRequest(request, proxyHeaders);
+    }
+
+    // The headers both tunnel requests send after Host: Proxy-Authorization, User-Agent and
+    // Proxy-Connection.
+    private static void AppendCommonHeaders(StringBuilder request, HttpProxyTunnelHeader[] proxyHeaders, HttpProxyTunnelOptions options, string? proxyAuthorization)
+    {
         AppendUnlessNamed(request, proxyHeaders, "Proxy-Authorization", proxyAuthorization);
         AppendUnlessNamed(request, proxyHeaders, "User-Agent", options.UserAgent is { } userAgent ? RequestText(userAgent, options) : null);
         AppendUnlessNamed(request, proxyHeaders, "Proxy-Connection", "Keep-Alive");
+    }
+
+    // The --proxy-header lines, the empty line, and the request as Latin-1 bytes.
+    private static byte[] EndRequest(StringBuilder request, HttpProxyTunnelHeader[] proxyHeaders)
+    {
         foreach (var sentLine in proxyHeaders.Select(header => header.SentLine).OfType<string>())
         {
             request.Append(sentLine).Append("\r\n");

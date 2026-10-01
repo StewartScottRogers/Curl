@@ -32,4 +32,10 @@ public sealed class RecordingAuthenticator(string? authorization = null) : IHttp
         ContinuationCount++;
         return ValueTask.FromResult(authorization);
     }
+
+    /// <summary>Gets the sent values whose handshakes were ended, in order.</summary>
+    public List<string> EndedAuthorizations { get; } = [];
+
+    /// <inheritdoc />
+    public void EndAuthorization(string sentAuthorization) => EndedAuthorizations.Add(sentAuthorization);
 }

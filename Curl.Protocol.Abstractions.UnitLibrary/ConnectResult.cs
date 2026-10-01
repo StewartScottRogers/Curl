@@ -108,6 +108,21 @@ public sealed class ConnectResult
     public string? UnixSocketPath { get; private init; }
 
     /// <summary>
+    /// Gets the host a <c>--connect-to</c> mapping, or an alt-svc alternative, sent the
+    /// connection to in place of the target's host; <see langword="null" /> when it went to the
+    /// target's own host, through a proxy, over a Unix domain socket, or the connect failed.
+    /// curl 8.21.0 names it, with <see cref="MappedPort" />, in its <c>left intact</c> line
+    /// (measured, BL-975).
+    /// </summary>
+    public string? MappedHost { get; private init; }
+
+    /// <summary>
+    /// Gets the port beside <see cref="MappedHost" />; <c>0</c> when <see cref="MappedHost" /> is
+    /// <see langword="null" />.
+    /// </summary>
+    public int MappedPort { get; private init; }
+
+    /// <summary>
     /// Creates the result of a successful connect that recorded no timings, endpoint or
     /// CONNECT code.
     /// </summary>
@@ -151,6 +166,11 @@ public sealed class ConnectResult
     /// The path of the Unix domain socket the connection was dialled through, or
     /// <see langword="null" /> for a TCP connection.
     /// </param>
+    /// <param name="mappedHost">
+    /// The host a <c>--connect-to</c> mapping or alt-svc alternative sent the connection to, or
+    /// <see langword="null" /> when it went to the target's own host.
+    /// </param>
+    /// <param name="mappedPort">The port beside <paramref name="mappedHost" />; <c>0</c> when there is none.</param>
     /// <returns>A result whose <see cref="ExitCode" /> is <see cref="CurlExitCode.Ok" />.</returns>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="connection" /> is <see langword="null" />, which would leave a
@@ -165,7 +185,9 @@ public sealed class ConnectResult
         bool isReused = false,
         long connectionNumber = 0,
         string? applicationProtocol = null,
-        string? unixSocketPath = null)
+        string? unixSocketPath = null,
+        string? mappedHost = null,
+        int mappedPort = 0)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
@@ -179,6 +201,8 @@ public sealed class ConnectResult
             ConnectionNumber = connectionNumber,
             ApplicationProtocol = applicationProtocol,
             UnixSocketPath = unixSocketPath,
+            MappedHost = mappedHost,
+            MappedPort = mappedPort,
         };
     }
 
