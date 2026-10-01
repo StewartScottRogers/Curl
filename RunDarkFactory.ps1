@@ -212,6 +212,19 @@
     <repo>.lanes\machine-lanes.json (marked incomplete when -ProbeMaxLanes cut it short)
     and the probe folder is deleted. Run it only when no shift is building.
 
+    AUDIT CADENCE (BL-1022)
+
+    The audit office (ADR-0267) audits the factory between shifts, before each roadmap-
+    milestone merge and after changes to this script. At the end of a shift, before the merge
+    to master, the coordinator runs master's copy of Audit/Tools/Test-AuditDue.ps1 - never
+    this branch's - with -Json; when master has no copy yet it skips this silently. When an
+    audit is due it says "Audit due: <reasons>" in a notice (a chime and one sentence, not
+    the alarm). A milestone:<N> reason also holds the merge, which reads "not merged: audit
+    due before the Milestone <N> merge (run Audit\RunAudit.cmd)"; other reasons do not. At
+    the start of a shift, while Audit\RunAudit.ps1 runs, the coordinator refuses with "An
+    audit is running; shifts start between audits." - or with -Continuous waits and looks
+    again every 5 minutes. -TestAuditCadence proves both.
+
     LANE MARKER (CURL_DARK_FACTORY_LANE)
 
     Every process a shift runs work in sets the environment variable CURL_DARK_FACTORY_LANE
@@ -292,6 +305,8 @@ param(
     # -Reason text, status lines and file names, and that a wait logs next's reason line
     # rather than a WARNING printed before it, and exit.
     [switch]$TestTaskIds,
+    # Prove the audit cadence: the shift-end audit check and the start refusal (BL-1022), and exit.
+    [switch]$TestAuditCadence,
     # Prove the CURL_DARK_FACTORY_LANE marker's value for a lane, a coordinator and a
     # launcher, and that a claude -p run inherits it, and exit.
     [switch]$TestLaneMarker,
@@ -1835,6 +1850,79 @@ if ($TestShiftBranch) {
     exit $(if ($failed) { 1 } else { 0 })
 }
 
+function Get-AuditDueFromMaster {
+    # The audit office's view of whether an audit is due (BL-1019), from master's copy of
+    # Audit/Tools/Test-AuditDue.ps1 - never this branch's, so the factory never runs its own copy
+    # of an audit tool. Returns its -Json answer, or $null when master has no copy yet or it fails.
+    param([string]$Branch, [string]$MasterRef = 'origin/master')
+    $tool = Join-Path ([IO.Path]::GetTempPath()) "Test-AuditDue-$PID.ps1"
+    $copy = git -C $Root show "${MasterRef}:Audit/Tools/Test-AuditDue.ps1" 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $copy) { return $null }
+    try {
+        [IO.File]::WriteAllText($tool, ($copy -join "`r`n"))
+        $json = & powershell -NoProfile -ExecutionPolicy Bypass -File $tool -Json -Repository $Root -Ref "origin/$Branch" -ScorecardsRef $MasterRef 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $json) { return $null }
+        return ($json -join '') | ConvertFrom-Json
+    } catch { return $null }
+    finally { Remove-Item -LiteralPath $tool -ErrorAction SilentlyContinue }
+}
+
+function Get-AuditCadence {
+    # What the shift's end does with an audit-due answer: a report line, and whether to hold the
+    # merge (only for a roadmap milestone, which is audited before it reaches master).
+    param($Due)
+    $result = [pscustomobject]@{ Line = ''; HoldMerge = $false; MergeMessage = '' }
+    if (-not $Due -or -not $Due.due) { return $result }
+    $result.Line = "Audit due: $(@($Due.reasons) -join ', ')"
+    $milestone = @($Due.reasons | Where-Object { $_ -match '^milestone:(\d+)$' })[0]
+    if ($milestone -and $milestone -match '^milestone:(\d+)$') {
+        $result.HoldMerge = $true
+        $result.MergeMessage = "not merged: audit due before the Milestone $($Matches[1]) merge (run Audit\RunAudit.cmd)"
+    }
+    return $result
+}
+
+function Get-ShiftStartDecision {
+    # Whether a shift may start while an audit runs: start, refuse, or (with -Continuous) wait.
+    param([object[]]$Processes, [bool]$IsContinuous)
+    $audits = @($Processes | Where-Object { $_.CommandLine -match 'RunAudit\.ps1' -and $_.CommandLine -notmatch '\s-(NewTab|DryRun|SelfTest)\b' })
+    if (-not $audits.Count) { return 'start' }
+    if ($IsContinuous) { return 'wait' }
+    return 'refuse'
+}
+
+function Show-AuditNotice {
+    # A one-off notice, not the alarm: an audit is due, said once at the end of the shift.
+    param([string]$Line)
+    Write-Host ("  $Line  ".PadRight(78)) -ForegroundColor Black -BackgroundColor Cyan
+    Write-Trace '-' 'AUDIT' $Line 'Cyan'
+    if ($QuietAlarm) { return }
+    Invoke-Chime
+    $voice = Get-Voice
+    if ($voice) { $voice.SpeakAsyncCancelAll(); [void]$voice.SpeakAsync("Curl dark factory: $($Line.ToLowerInvariant() -replace ':', '.' -replace 'milestone\.', 'milestone ')") }
+}
+
+if ($TestAuditCadence) {
+    $failed = 0
+    $check = { param([string]$Name, [bool]$Ok, [string]$Detail) if (-not $Ok) { $script:auditCadenceFailed++ }; Write-Host "$(if ($Ok) { 'PASS' } else { 'FAIL' }) ${Name}: $Detail" -ForegroundColor $(if ($Ok) { 'Green' } else { 'Red' }) }
+    $script:auditCadenceFailed = 0
+    $none = Get-AuditDueFromMaster -Branch 'work/dark-factory' -MasterRef 'refs/heads/no-such-branch-for-the-test'
+    $c = Get-AuditCadence $none
+    & $check 'no copy on master skips silently' (($null -eq $none) -and -not $c.Line -and -not $c.HoldMerge) 'nothing reported, merge proceeds'
+    $c = Get-AuditCadence ([pscustomobject]@{ due = $true; reasons = @('factory-script') })
+    & $check 'factory-script is reported and the merge proceeds' ($c.Line -eq 'Audit due: factory-script' -and -not $c.HoldMerge) $c.Line
+    $c = Get-AuditCadence ([pscustomobject]@{ due = $true; reasons = @('factory-script', 'milestone:3') })
+    & $check 'milestone:3 is reported and the merge is skipped' ($c.Line -eq 'Audit due: factory-script, milestone:3' -and $c.HoldMerge -and $c.MergeMessage -eq 'not merged: audit due before the Milestone 3 merge (run Audit\RunAudit.cmd)') $c.MergeMessage
+    $c = Get-AuditCadence ([pscustomobject]@{ due = $false; reasons = @() })
+    & $check 'No audit due adds nothing' (-not $c.Line -and -not $c.HoldMerge) 'nothing'
+    $audit = [pscustomobject]@{ CommandLine = 'powershell -NoProfile -File Z:\repos\Curl\Audit\RunAudit.ps1 -Auditors truthfulness' }
+    $dry = [pscustomobject]@{ CommandLine = 'powershell -File Z:\repos\Curl\Audit\RunAudit.ps1 -DryRun' }
+    & $check 'a running audit refuses a shift start' ((Get-ShiftStartDecision @($audit) $false) -eq 'refuse') 'refuse'
+    & $check 'with -Continuous it waits instead' ((Get-ShiftStartDecision @($audit) $true) -eq 'wait') 'wait'
+    & $check 'a dry run or no audit lets the shift start' ((Get-ShiftStartDecision @($dry) $false) -eq 'start') 'start'
+    exit $(if ($script:auditCadenceFailed) { 1 } else { 0 })
+}
+
 function Invoke-MergeToMaster {
     # Stewart's standing permission (2026-09-27): at the end of a shift, merge the branch
     # into master through a pull request - only when the CI workflow passed, on every
@@ -3286,6 +3374,18 @@ $env:CURL_DARK_FACTORY_LANE = Get-LaneMarker -ForLane $Lane
 $LaneMarkerTrace = "lane-marker=CURL_DARK_FACTORY_LANE=$env:CURL_DARK_FACTORY_LANE"
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+# Shifts start between audits (BL-1022): while Audit\RunAudit.ps1 runs, refuse, or with
+# -Continuous wait and look again every 5 minutes. Lanes are started by a shift that already
+# passed this, so only the coordinator or a single runner checks.
+if (-not $Lane) {
+    while ($true) {
+        $decision = Get-ShiftStartDecision @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Select-Object CommandLine) $Continuous.IsPresent
+        if ($decision -eq 'start') { break }
+        if ($decision -eq 'refuse') { Write-Trace '-' 'refuse' 'An audit is running; shifts start between audits.' 'Red'; exit 1 }
+        Write-Trace '-' 'audit' 'An audit is running; shifts start between audits. Looking again in 5 minutes.' 'Yellow'
+        Start-Sleep -Seconds 300
+    }
+}
 # Logs used to be written to logs\ inside the checkout. Move them beside it, where the
 # next shift looks for the lanes it adopts - but never while a lane still writes there.
 $oldLogDir = Join-Path $Root 'logs'
@@ -3613,7 +3713,12 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     Publish-BoardStatus -Branch $branch -State 'ended'
     Write-Trace '-' 'shift' "end  $LaneCount lanes$(if ($AutoLanes) { ' (auto)' })" 'Cyan'
     if ($AutoLanes) { Save-AutoLanes $LaneCount }
-    Write-Trace '-' 'merge' (Invoke-MergeToMaster -Branch $branch) 'Cyan'
+    # The audit office's cadence (BL-1022): say when an audit is due, and hold a milestone's
+    # merge until it has run. Other reasons do not hold the merge.
+    $auditCadence = Get-AuditCadence (Get-AuditDueFromMaster -Branch $branch)
+    if ($auditCadence.Line) { Show-AuditNotice $auditCadence.Line }
+    $mergeLine = if ($auditCadence.HoldMerge) { $auditCadence.MergeMessage } else { Invoke-MergeToMaster -Branch $branch }
+    Write-Trace '-' 'merge' $mergeLine 'Cyan'
     # The merge waited for CI on the shift's last commit; a failure there finished after the
     # loop above stopped watching, so file it now (BL-1031).
     Invoke-CiWatch -Branch $branch -Final
