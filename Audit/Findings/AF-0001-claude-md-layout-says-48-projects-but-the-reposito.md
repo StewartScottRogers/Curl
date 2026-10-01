@@ -3,7 +3,7 @@ id: AF-0001
 title: CLAUDE.md layout says '48 projects' but the repository has 66
 auditor: truthfulness
 severity: Low
-status: proposed
+status: accepted
 key: truthfulness:CLAUDE.md:repository-layout-project-count:false-statement
 task: none
 found: 2026-09-30
