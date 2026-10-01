@@ -470,6 +470,8 @@ internal static class CurlComposition
     /// transfer of the option group instead (<see cref="UnixSocketOf" />, BL-507). HTTP over TLS
     /// offers the ALPN list the version option and the platform choose
     /// (<see cref="HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(RequestedHttpVersion?)" />, ADR-0141).
+    /// <c>--happy-eyeballs-timeout-ms</c> is how long it dials the first address family alone before
+    /// the other, curl's 200 ms when not given (ADR-0254, BL-889).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <param name="dnsResolver">Resolves a host no <c>--resolve</c> entry answers for.</param>
@@ -513,6 +515,7 @@ internal static class CurlComposition
             UnixSocketOf(options),
             HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion),
             quicDialer,
+            options.HappyEyeballsTimeout,
             localBinding: LocalBindingOf(options),
             preProxy: PreProxyOf(options),
             socks5Authentication: Socks5AuthenticationMapping.FromCommandLine(options, socks5SecurityContexts, OperatingSystem.IsWindows()),

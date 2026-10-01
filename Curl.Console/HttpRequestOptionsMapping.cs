@@ -1,6 +1,7 @@
 using System.Text;
 
 using Curl.Cli;
+using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
@@ -32,6 +33,9 @@ internal static class HttpRequestOptionsMapping
     private const string JsonContentType = "Content-Type: application/json";
 
     private const string JsonAccept = "Accept: application/json";
+
+    // The longest delay a .NET timer takes, about 49.7 days; a longer --happy-eyeballs-timeout-ms is held to it.
+    private const double LongestTimerDelayMilliseconds = uint.MaxValue - 1;
 
     /// <summary>
     /// Copies the HTTP request options from <paramref name="options" />.
@@ -75,7 +79,8 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="CommandLineOptions.ProxyTunnel" /> as <see cref="HttpRequestOptions.ProxyTunnel" />; and
     /// whether <see cref="CommandLineOptions.UnixSocketPath" /> is set as <see cref="HttpRequestOptions.OverUnixSocket" />; and
     /// <paramref name="commandLineTextEncoding" /> as <see cref="HttpRequestOptions.CommandLineTextEncoding" />; and
-    /// <see cref="CommandLineOptions.Expect100Timeout" /> as <see cref="HttpRequestOptions.ContinueWait" /> (<see cref="ContinueWaitOf" />).
+    /// <see cref="CommandLineOptions.Expect100Timeout" /> as <see cref="HttpRequestOptions.ContinueWait" /> (<see cref="ContinueWaitOf" />); and
+    /// <see cref="CommandLineOptions.HappyEyeballsTimeout" /> as <see cref="HttpRequestOptions.HappyEyeballsTimeout" /> (<see cref="HappyEyeballsTimeoutOf" />).
     /// </returns>
     internal static HttpRequestOptions FromCommandLine(
         CommandLineOptions options,
@@ -109,6 +114,7 @@ internal static class HttpRequestOptionsMapping
             ProxyTunnel = options.ProxyTunnel,
             OverUnixSocket = options.UnixSocketPath is not null,
             ContinueWait = ContinueWaitOf(options),
+            HappyEyeballsTimeout = HappyEyeballsTimeoutOf(options),
         };
 
     /// <summary>
@@ -121,6 +127,19 @@ internal static class HttpRequestOptionsMapping
     /// <returns>How long to wait before the body is sent anyway.</returns>
     internal static TimeSpan ContinueWaitOf(CommandLineOptions options) =>
         options.Expect100Timeout is { } given && given > TimeSpan.Zero ? given : HttpRequestOptions.DefaultContinueWait;
+
+    /// <summary>
+    /// How long a <c>--http3</c> transfer waits for the QUIC handshake before it also connects over
+    /// TCP: the <c>--happy-eyeballs-timeout-ms</c> value, held to the longest delay a .NET timer takes
+    /// (about 49.7 days) as <see cref="TcpConnector.HappyEyeballsTimeout" /> is, or curl's 200 ms
+    /// (<see cref="TcpConnector.DefaultHappyEyeballsTimeout" />) when it was not given (BL-889).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>How long the QUIC handshake runs alone.</returns>
+    internal static TimeSpan HappyEyeballsTimeoutOf(CommandLineOptions options) =>
+        options.HappyEyeballsTimeout is { } given
+            ? TimeSpan.FromMilliseconds(Math.Min(given.TotalMilliseconds, LongestTimerDelayMilliseconds))
+            : TcpConnector.DefaultHappyEyeballsTimeout;
 
     /// <summary>
     /// The <c>-d</c> family body, or <see langword="null" /> when there is none or <c>-G</c> moved it into the query.
