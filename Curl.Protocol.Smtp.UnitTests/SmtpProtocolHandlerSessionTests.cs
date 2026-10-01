@@ -43,7 +43,7 @@ public sealed class SmtpProtocolHandlerSessionTests
 
         Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18025, false), run.Connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18025, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsTrue(run.Connection.IsDisposed);
     }
 
@@ -52,11 +52,11 @@ public sealed class SmtpProtocolHandlerSessionTests
     {
         SmtpRun run = await RunAsync("smtp://127.0.0.1/client.example", Greeting + EhloReply + HelpReplyAndBye);
 
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 25, false), run.Connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 25, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ProxyAndEvents_ArePassedToTheConnector()
+    public async Task ExecuteAsync_ProxyAndEvents_ReachTheConnector()
     {
         var proxy = new ProxyEndpoint(ProxyKind.Socks5, "proxy", 1080, null);
         var events = new RecordingTransferEvents();
@@ -66,7 +66,8 @@ public sealed class SmtpProtocolHandlerSessionTests
         TransferResult result = await new SmtpProtocolHandler(connector, new QueuedTlsProvider()).ExecuteAsync(context);
 
         Assert.AreSame(proxy, connector.Targets.Single().Proxy);
-        Assert.AreSame(events, connector.Targets.Single().Events);
+        connector.Targets.Single().Events.ReportInfo("from the connector");
+        Assert.AreEqual("from the connector", events.Info.Last());
         Assert.AreEqual(SmtpRun.HelpAnswered, result);
     }
 
@@ -81,7 +82,7 @@ public sealed class SmtpProtocolHandlerSessionTests
             Required);
 
         Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 465, true), run.Connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 465, true), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsEmpty(run.Tls.Handshakes);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }

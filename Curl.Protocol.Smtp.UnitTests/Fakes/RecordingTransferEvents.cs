@@ -15,7 +15,8 @@ public sealed class RecordingTransferEvents : ITransferEvents
     /// <summary>
     /// Gets every event in order: <c>* text</c> for an information line, <c>&gt; </c> and
     /// <c>&lt; </c> with the Latin-1 bytes of a request and a response header, and
-    /// <c>} N</c> and <c>{ N</c> with the byte count of data sent and received.
+    /// <c>} N</c> and <c>{ N</c> with the byte count of data sent and received, and
+    /// <c>+ opened #N to H</c> for a connection opened.
     /// </summary>
     public List<string> Transcript { get; } = [];
 
@@ -27,9 +28,8 @@ public sealed class RecordingTransferEvents : ITransferEvents
     }
 
     /// <inheritdoc />
-    public void ReportConnectionOpened(ConnectionOpenedEvent opened)
-    {
-    }
+    public void ReportConnectionOpened(ConnectionOpenedEvent opened) =>
+        Transcript.Add($"+ opened #{opened.ConnectionNumber} to {opened.HostName}");
 
     /// <inheritdoc />
     public void ReportConnectionReused(ConnectionReusedEvent reused)

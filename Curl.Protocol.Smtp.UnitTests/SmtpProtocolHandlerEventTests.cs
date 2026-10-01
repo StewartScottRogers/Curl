@@ -158,6 +158,61 @@ public sealed class SmtpProtocolHandlerEventTests
             events.Transcript.Skip(OpenedSession.Length + 4).Take(3).ToArray());
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_StartTlsAccepted_ReportsTheHandshakeAndTheConnectionOpenedAgainBeforeTheSecondEhlo()
+    {
+        // curl 8.21.0 -v --ssl-reqd -k: between "< 220 Ready to start TLS" and the second EHLO it
+        // writes the TLS lines and the connect's "Established connection" line again (BL-1058).
+        RecordingTransferEvents events = new();
+        var plaintext = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + "250-localhost\r\n250 STARTTLS\r\n220 Ready to start TLS\r\n"));
+        var secured = new ScriptedConnection(Encoding.Latin1.GetBytes(EhloReply + SmtpRun.HelpReply + Bye));
+        var connector = new OpenedReportingConnector(ConnectResult.Connected(plaintext));
+        var tls = new QueuedTlsProvider(ConnectResult.Connected(secured));
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(Url),
+            Output = new MemoryStream(),
+            Events = events,
+            SslLevel = TransportSecurityLevel.Required,
+        };
+
+        TransferResult result = await new SmtpProtocolHandler(connector, tls).ExecuteAsync(context);
+
+        Assert.AreEqual(SmtpRun.HelpAnswered, result);
+        Assert.AreSame(events, tls.HandshakeEvents.Single());
+        CollectionAssert.AreEqual(
+            (string[])[
+                "+ opened #3 to 127.0.0.1",
+                "< 220 localhost ESMTP\r\n", "> EHLO client\r\n", "< 250-localhost\r\n", "< 250 STARTTLS\r\n",
+                "> STARTTLS\r\n", "< 220 Ready to start TLS\r\n",
+                "+ opened #3 to 127.0.0.1",
+                "> EHLO client\r\n",
+            ],
+            events.Transcript.Take(9).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_StartTlsAcceptedAfterAConnectThatReportedNothing_ReportsNoConnectionOpened()
+    {
+        RecordingTransferEvents events = new();
+        var secured = new ScriptedConnection(Encoding.Latin1.GetBytes(EhloReply + SmtpRun.HelpReply + Bye));
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(Url),
+            Output = new MemoryStream(),
+            Events = events,
+            SslLevel = TransportSecurityLevel.Required,
+        };
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(
+            context,
+            new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + "250-localhost\r\n250 STARTTLS\r\n220 Ready to start TLS\r\n")),
+            ConnectResult.Connected(secured));
+
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
+        Assert.IsFalse(events.Transcript.Any(line => line.StartsWith('+')));
+    }
+
     private static Task<SmtpRun> RunAsync(string replies, RecordingTransferEvents events, string? upload)
     {
         var context = new TransferContext
