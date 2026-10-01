@@ -37,3 +37,4 @@ An `Alt-Svc` header is stored in the `--alt-svc` cache under the source ALPN of 
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
