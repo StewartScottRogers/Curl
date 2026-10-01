@@ -23,11 +23,21 @@ namespace Curl.Networking;
 /// How many unanswered keepalive probes end the connection, from <c>--keepalive-cnt</c>:
 /// <see cref="DefaultKeepAliveProbeCount" /> unless it says otherwise.
 /// </param>
+/// <param name="TypeOfService">
+/// The IPv4 Type of Service or IPv6 Traffic Class byte from <c>--ip-tos</c>, set as <c>IP_TOS</c> or
+/// <c>IPV6_TCLASS</c>; 0, the default, sets neither, as curl passes libcurl only a value above 0.
+/// </param>
+/// <param name="VlanPriority">
+/// The socket priority from <c>--vlan-priority</c>, set as <c>SO_PRIORITY</c> where the operating system
+/// has it (Linux); 0, the default, sets nothing, as curl passes libcurl only a value above 0.
+/// </param>
 public sealed record TcpSocketOptions(
     bool NoDelay = true,
     bool KeepAlive = true,
     int KeepAliveSeconds = TcpSocketOptions.DefaultKeepAliveSeconds,
-    int KeepAliveProbeCount = TcpSocketOptions.DefaultKeepAliveProbeCount)
+    int KeepAliveProbeCount = TcpSocketOptions.DefaultKeepAliveProbeCount,
+    int TypeOfService = 0,
+    int VlanPriority = 0)
 {
     /// <summary>
     /// libcurl's idle time before the first keepalive probe and interval between probes: 60

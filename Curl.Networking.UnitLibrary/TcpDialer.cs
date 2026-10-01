@@ -313,7 +313,8 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
 
     /// <summary>
     /// Sets <see cref="SocketOptions" /> on <paramref name="socket" />:<see cref="Socket.NoDelay" />
-    /// from <see cref="TcpSocketOptions.NoDelay" />, and <c>SO_KEEPALIVE</c> from
+    /// from <see cref="TcpSocketOptions.NoDelay" />, the Type of Service or Traffic Class and priority
+    /// <see cref="QualityOfServiceSocketOptions.For" /> lists, and <c>SO_KEEPALIVE</c> from
     /// <see cref="TcpSocketOptions.KeepAlive" />, with the probe time and interval
     /// <see cref="TcpSocketOptions.KeepAliveSeconds" /> and the probe count
     /// <see cref="TcpSocketOptions.KeepAliveProbeCount" /> when it is on.
@@ -327,6 +328,11 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     internal void ApplySocketOptions(Socket socket)
     {
         socket.NoDelay = SocketOptions.NoDelay;
+        foreach (RawSocketOption option in QualityOfServiceSocketOptions.For(SocketOptions, socket.AddressFamily, QualityOfServiceSocketOptions.CurrentPlatform))
+        {
+            QualityOfServiceSocketOptions.TrySet(socket, option);
+        }
+
         socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, SocketOptions.KeepAlive);
         if (!SocketOptions.KeepAlive)
         {

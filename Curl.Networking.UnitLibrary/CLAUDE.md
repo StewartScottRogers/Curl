@@ -148,7 +148,7 @@ transfer offers `http/1.1` through ALPN (`TcpConnector.ApplicationProtocolsFor`)
 unknown or offline revocation status; and `TcpDialer` sets `TCP_NODELAY` and `SO_KEEPALIVE` from
 `TcpSocketOptions` (`--no-tcp-nodelay`, `--no-keepalive`), with the keepalive idle time, interval and probe
 count from `--keepalive-time` and `--keepalive-cnt` (`TcpSocketOptions.FromCommandLine`), in `ApplySocketOptions`,
-which unit tests measure; a timer the platform refuses is skipped, as libcurl skips it.
+which unit tests measure; a timer the platform refuses is skipped, as libcurl skips it. Per ADR-0316 (BL-646) it also sets `--ip-tos` as `IP_TOS` or `IPV6_TCLASS` and `--vlan-priority` as `SO_PRIORITY` (Linux only), raw in each system's numbers, as `QualityOfServiceSocketOptions.For` lists them.
 Per ADR-0100 it also reports curl's `-v` connect lines on the target's `Events`: `Trying` before
 each dial, `connect to ... failed: <reason>` after each failed one (the reason from
 `ConnectFailureReason`), the exit 7 message, and `ReportConnectionOpened` once any tunnel and
