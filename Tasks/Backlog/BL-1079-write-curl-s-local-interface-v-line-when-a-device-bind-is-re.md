@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Follow-up from BL-1027 (ADR-0294, Decision 4). libcurl 8.21.0's `bindlocal` (`lib/cf-socket.c`) writes
+- Follow-up from BL-1027 (ADR-0295, Decision 4). libcurl 8.21.0's `bindlocal` (`lib/cf-socket.c`) writes
   `infof(data, "Local Interface %s is ip %s using address family %i", iface, host, af)` when `Curl_if2ip`
   finds the interface's address (`IF2IP_FOUND`). On Linux 5.7 and later an unprivileged device bind succeeds,
   so the line shows only where `SO_BINDTODEVICE` is refused - an older kernel, a container without the

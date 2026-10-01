@@ -58,7 +58,7 @@ Linux, curl 8.18.0 OpenSSL under WSL Ubuntu, against a closed port (the bind lin
 - 8.18.0 on Linux writes no `connect to ... from  port 0 failed` line after a failed bind and ends with the failf text;
   left as BL-600/ADR-0269 decided (8.21.0 is the reference).
 
-### Decisions (ADR-0294, decided by Claude under Stewart's delegation)
+### Decisions (ADR-0295, decided by Claude under Stewart's delegation)
 
 - Seam: `TcpConnector` builds each race's `LocalBindingTcpDialer` with `target.Events`; it passes them to
   `LocalBindingAddressChooser.ChooseAsync` and to the inner dialer through a new `ITcpDialer.DialFromAsync` overload
