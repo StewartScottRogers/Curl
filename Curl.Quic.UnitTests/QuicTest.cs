@@ -5,6 +5,13 @@ namespace Curl.Quic;
 /// </summary>
 internal static class QuicTest
 {
+    /// <summary>
+    /// The <c>[Timeout]</c> of every asynchronous QUIC test: a test whose wait is never answered
+    /// fails after two minutes instead of hanging the run (BL-1067). Longer than
+    /// <see cref="QuicTestLiveChannel.HangGuard" />, so a guarded wait fails first with its own message.
+    /// </summary>
+    public const int HangTimeoutMilliseconds = 120_000;
+
     /// <summary>Reads hex written as the RFCs print it, with spaces and line breaks.</summary>
     public static byte[] Hex(string hex) => Convert.FromHexString(string.Concat(hex.Where(char.IsAsciiHexDigit)));
 

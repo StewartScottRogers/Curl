@@ -10,6 +10,7 @@ namespace Curl.Quic;
 public sealed class QuicConnectionTests
 {
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task OpenBidirectionalStreamAsync_RequestAndResponse_CarriesBothWays()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
@@ -34,6 +35,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task AcceptUnidirectionalStreamAsync_ServerStream_IsAcceptedAndRead()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
@@ -50,6 +52,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task ReadAsync_ServerResetsTheStream_ThrowsWithItsCode()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
@@ -66,6 +69,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task WriteAsync_AfterStopSending_ThrowsAndTheStreamIsReset()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
@@ -84,6 +88,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task Abort_SendsResetStreamAndStopSending()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
@@ -100,6 +105,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task OpenUnidirectionalStreamAsync_NoStreamAllowed_WaitsForMaxStreamsAndSendsStreamsBlocked()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync(parameters => GenerousServerLimits(parameters) with { InitialMaxStreamsUni = 0 });
@@ -117,6 +123,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task ReadAsync_ServerBreaksFlowControl_FailsTheConnectionWithRecvError()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
@@ -138,6 +145,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task AcceptUnidirectionalStreamAsync_ReceiveFails_FailsWithRecvError()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
@@ -154,6 +162,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task AcceptUnidirectionalStreamAsync_ServerClosesTheConnection_FailsWithRecvErrorAndSendsNoClose()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
@@ -172,6 +181,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task Loop_ServerGoesSilent_SendsKeepAlivesThenFailsWithTheIdleTimeout()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, ManualTimerTimeProvider clock) = await ConnectAsync(parameters => GenerousServerLimits(parameters) with { MaxIdleTimeout = 400 });
@@ -193,6 +203,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task Loop_UnacknowledgedStreamData_IsProbedWhenTheLossDetectionTimerFires()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, ManualTimerTimeProvider clock) = await ConnectAsync();
@@ -210,6 +221,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task CloseAsync_SendsTheApplicationCloseOnceAndRefusesFurtherUse()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
@@ -225,6 +237,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task DisposeAsync_OpenConnection_ClosesWithApplicationErrorZero()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();

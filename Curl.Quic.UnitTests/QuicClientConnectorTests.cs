@@ -7,6 +7,7 @@ namespace Curl.Quic;
 public sealed class QuicClientConnectorTests
 {
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task RunHandshakeAsync_InMemoryServer_Completes()
     {
         using QuicTestServer server = new();
@@ -23,6 +24,7 @@ public sealed class QuicClientConnectorTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task RunHandshakeAsync_SilentPeerAndNoConnectTimeout_ClosesWithInternalErrorAndExit55After10Seconds()
     {
         ManualTimerTimeProvider clock = new();
@@ -42,6 +44,7 @@ public sealed class QuicClientConnectorTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task RunHandshakeAsync_SilentPeer_ProbesTheInitialWithExponentialBackoff()
     {
         ManualTimerTimeProvider clock = new();
@@ -54,13 +57,13 @@ public sealed class QuicClientConnectorTests
         // PTO = 333 + 4 x 166.5 = 999 ms before any RTT sample, doubling each time it fires (RFC 9002 section 6.2.1): at 999, 2997 and 6993 ms.
         foreach (long wait in new long[] { 999, 1998, 3996 })
         {
-            await channel.WaitingToReceive.WaitAsync();
+            Assert.IsTrue(await channel.WaitingToReceive.WaitAsync(QuicTestLiveChannel.HangGuard));
             clock.Advance(wait - 1);
             sentBeforeEachProbe.Add(channel.Sent.Count);
             clock.Advance(1);
         }
 
-        await channel.WaitingToReceive.WaitAsync();
+        Assert.IsTrue(await channel.WaitingToReceive.WaitAsync(QuicTestLiveChannel.HangGuard));
         clock.Advance(3007);
         await run;
 
@@ -74,6 +77,7 @@ public sealed class QuicClientConnectorTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task RunHandshakeAsync_SilentPeerAndConnectTimeout_ClosesWithNoErrorAndExit28()
     {
         ManualTimerTimeProvider clock = new();
@@ -90,6 +94,7 @@ public sealed class QuicClientConnectorTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task RunHandshakeAsync_VersionNegotiationWithoutVersion1_FailsWithExit7()
     {
         using QuicTestServer server = new() { VersionNegotiation = [0xff00001d] };
@@ -103,6 +108,7 @@ public sealed class QuicClientConnectorTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task RunHandshakeAsync_DatagramFromAnotherEndpoint_IsIgnored()
     {
         using QuicTestServer server = new();
@@ -116,6 +122,7 @@ public sealed class QuicClientConnectorTests
     }
 
     [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task RunHandshakeAsync_CallerCancels_Throws()
     {
         using CancellationTokenSource cancellation = new();
