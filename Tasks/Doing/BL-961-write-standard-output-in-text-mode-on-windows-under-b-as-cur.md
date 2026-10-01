@@ -38,3 +38,4 @@ On Windows, `curl -B` writes standard output in C runtime text mode, so every LF
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
