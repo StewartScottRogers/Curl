@@ -89,7 +89,8 @@ internal static class CurlComposition
     /// </param>
     /// <param name="negotiateOptions">
     /// The <c>--service-name</c>, <c>--proxy-service-name</c> and <c>--delegation</c> the HTTP
-    /// handler's Negotiate answers with (<see cref="NegotiateOptionsMapping.FromCommandLine" />);
+    /// handler's Negotiate answers with (<see cref="NegotiateOptionsMapping.FromCommandLine" />), whose
+    /// <c>--delegation</c> the mail handlers' SASL GSSAPI asks for too (BL-874);
     /// <see cref="NegotiateOptions.Default" /> when not given.
     /// </param>
     /// <param name="signingClock">
@@ -119,6 +120,7 @@ internal static class CurlComposition
         EndPointRecordingDatagramConnector recordingDatagramConnector = new(datagramConnector, recorder);
         ISecurityContextFactory contexts = securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector);
         RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(contexts, negotiateOptions);
+        SecurityDelegation saslDelegation = (negotiateOptions ?? NegotiateOptions.Default).Delegation;
         AwsSigV4Signer signer = new(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
         HttpProtocolHandler http = new(recordingConnector, new AwsSigV4HttpAuthenticator(httpAuthenticator, signer), cookieStore, proxyAuthSchemes);
 
@@ -130,9 +132,9 @@ internal static class CurlComposition
             new TelnetProtocolHandler(recordingConnector),
             new TftpProtocolHandler(recordingDatagramConnector, recordingConnector, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
             new MqttProtocolHandler(recordingConnector),
-            new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts)),
-            new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts)),
-            new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts)),
+            new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation)),
+            new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation)),
+            new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation)),
             new LdapProtocolHandler(recordingConnector, OperatingSystem.IsWindows() ? LdapDialect.WinLdap : LdapDialect.OpenLdap),
             new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()),
             new RtspProtocolHandler(recordingConnector, httpAuthenticator),
@@ -243,12 +245,14 @@ internal static class CurlComposition
     /// Creates the SASL authenticator the SMTP, POP3 and IMAP handlers share (ADR-0121): a
     /// <see cref="SaslAuthenticator" /> encoding credentials in the platform's encoding
     /// (<see cref="CredentialEncoding.ForPlatform" />), as the HTTP authenticator does, and answering
-    /// GSSAPI and NTLM on the contexts <paramref name="securityContexts" /> makes (ADR-0184, BL-852).
+    /// GSSAPI and NTLM on the contexts <paramref name="securityContexts" /> makes (ADR-0184, BL-852),
+    /// asking GSSAPI's for the <paramref name="gssapiDelegation" /> level (BL-874).
     /// </summary>
     /// <param name="securityContexts">Makes GSSAPI's and NTLM's contexts: <see cref="CreateSecurityContextFactory" />'s in production.</param>
+    /// <param name="gssapiDelegation">The <c>--delegation</c> level; <see cref="SecurityDelegation.None" /> when not given.</param>
     /// <returns>The authenticator.</returns>
-    internal static ISaslAuthenticator CreateSaslAuthenticator(ISecurityContextFactory securityContexts) =>
-        new SaslAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), securityContexts);
+    internal static ISaslAuthenticator CreateSaslAuthenticator(ISecurityContextFactory securityContexts, SecurityDelegation gssapiDelegation = SecurityDelegation.None) =>
+        new SaslAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), securityContexts) { GssapiDelegation = gssapiDelegation };
 
     /// <summary>
     /// Creates the network transports for one run: a <see cref="TcpConnector" /> over the

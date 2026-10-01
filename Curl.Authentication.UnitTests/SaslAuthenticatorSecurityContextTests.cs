@@ -228,6 +228,32 @@ public sealed class SaslAuthenticatorSecurityContextTests
     }
 
     [TestMethod]
+    [DataRow(SecurityDelegation.None, DisplayName = "--delegation none")]
+    [DataRow(SecurityDelegation.Policy, DisplayName = "--delegation policy")]
+    [DataRow(SecurityDelegation.Always, DisplayName = "--delegation always")]
+    public void Begin_Gssapi_AsksTheContextForTheDelegationLevel(SecurityDelegation delegation)
+    {
+        ScriptedSecurityContextFactory factory = new(new ScriptedSecurityContext());
+        SaslAuthenticator authenticator = new(Windows1252, factory) { GssapiDelegation = delegation };
+
+        authenticator.Begin("GSSAPI", Request(new NetworkCredential(@"EXAMPLE\alice", "pw")));
+
+        Assert.AreEqual(delegation, factory.Requests.Single().Delegation);
+        Assert.AreEqual(SecurityMechanism.Kerberos, factory.Requests.Single().Mechanism);
+    }
+
+    [TestMethod]
+    public void Begin_NtlmWithDelegationAlways_NeverAsksTheContextToDelegate()
+    {
+        ScriptedSecurityContextFactory factory = new(new ScriptedSecurityContext());
+        SaslAuthenticator authenticator = new(Windows1252, factory) { GssapiDelegation = SecurityDelegation.Always };
+
+        authenticator.Begin("NTLM", Request(new NetworkCredential("alice", "pw")));
+
+        Assert.AreEqual(SecurityDelegation.None, factory.Requests.Single().Delegation);
+    }
+
+    [TestMethod]
     public async Task Begin_GssapiCompletedOnTheFirstToken_AnswersTheOfferNext()
     {
         ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.Completed, KerberosToken)) { IsCompleted = true };
