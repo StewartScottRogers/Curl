@@ -35,7 +35,7 @@ A client certificate whose key is Ed448 or ML-DSA-44/65/87 signs the TLS 1.3 (an
 - The test credentials `TestServerCredential.Ed448` and `.MlDsa` now sign with the new keys, so the `ContentSigner` workaround BL-940 added is gone; the TLS 1.3 test server records `ClientCertificateVerifyScheme`.
 - Tests: `Tls13ClientHandshakeTests.HandshakeSignsTheClientCertificateVerifyWithAnEd448OrMlDsaKey` (4 rows), `Tls12ClientHandshakeTests.AnEd448ClientCertificateSignsTheCertificateVerifyWithEd448`, `TlsSignatureTests.AnEd448KeySignsOnlyTheEd448SchemeAndIsFiftySevenBytes`, `TlsSignatureTests.AnMlDsaKeySignsOnlyItsParameterSetsScheme` (3 rows).
 - `Measure-CodeQuality.ps1` flagged `Tls13ClientHandshake.ReadSelectedIdentity` at complexity 12 (from BL-701, not this task); the ticket check moved to `SelectsTheOfferedTicket`, so the library reports 0 failing members.
-- Loading such a key from `--cert` is `Curl.Networking.UnitLibrary`'s job and filed as BL-1065.
+- Loading such a key from `--cert` is `Curl.Networking.UnitLibrary`'s job and filed as BL-1066.
 
 ## Log
 

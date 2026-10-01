@@ -1,5 +1,5 @@
 ---
-id: BL-1065
+id: BL-1066
 title: Load Ed25519, Ed448 and ML-DSA --cert private keys for the hand-built TLS client
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-30
 completed:
 ---
-# BL-1065 — Load Ed25519, Ed448 and ML-DSA --cert private keys for the hand-built TLS client
+# BL-1066 — Load Ed25519, Ed448 and ML-DSA --cert private keys for the hand-built TLS client
 
 ## Goal
 
