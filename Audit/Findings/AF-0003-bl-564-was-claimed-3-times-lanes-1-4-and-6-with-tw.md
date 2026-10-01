@@ -3,9 +3,9 @@ id: AF-0003
 title: BL-564 was claimed 3 times: lanes 1, 4 and 6, with two conflict-resolve runs
 auditor: process
 severity: Medium
-status: proposed
+status: accepted
 key: process:BL-564:BL-564:redone-work
-task: none
+task: BL-1069
 found: 2026-09-30
 found-at: d065d6d3507e2ed87905d40a24233af193913378
 scorecard: 2026-09-30_1754.md
