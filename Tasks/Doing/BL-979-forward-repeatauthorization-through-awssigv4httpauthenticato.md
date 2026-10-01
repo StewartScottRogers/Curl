@@ -33,3 +33,4 @@ completed:
 
 - 2026-09-29: Created.
 - 2026-09-29: Renumbered from BL-972, which the RSA coefficient fix pushed first also holds.
+- 2026-10-01: Backlog -> Doing.
