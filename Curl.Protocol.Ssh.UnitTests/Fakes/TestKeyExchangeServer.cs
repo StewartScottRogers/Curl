@@ -39,9 +39,10 @@ internal sealed record TestKeyExchangeServer(
         byte[] clientKexInit,
         byte[] serverKexInit,
         SshGroupExchangeSizes? groupExchangeSizes = null,
-        FiniteFieldDiffieHellmanGroup? exchangedGroup = null)
+        FiniteFieldDiffieHellmanGroup? exchangedGroup = null,
+        string serverIdentification = ServerIdentification)
     {
-        byte[] common = Join(Name(ClientIdentification), Name(ServerIdentification), String(clientKexInit), String(serverKexInit), String(hostKey.Blob));
+        byte[] common = Join(Name(ClientIdentification), Name(serverIdentification), String(clientKexInit), String(serverKexInit), String(hostKey.Blob));
         return method switch
         {
             "mlkem768x25519-sha256" => Hybrid(MlKemShares(MlKemParameterSet.MlKem768), X25519Shares(), HashAlgorithmName.SHA256, hostKey, common),

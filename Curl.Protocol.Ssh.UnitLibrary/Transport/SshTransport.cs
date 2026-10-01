@@ -89,6 +89,12 @@ internal sealed class SshTransport
     internal string? CryptographyBackend => preferences.CryptographyBackend;
 
     /// <summary>
+    /// Gets the server's identification string, without CR LF, once the first key exchange has
+    /// finished; <see langword="null" /> before.
+    /// </summary>
+    internal string? ServerIdentification => serverIdentification;
+
+    /// <summary>
     /// Gets the session identifier: the exchange hash of the first key exchange, which a
     /// <c>publickey</c> signature covers (RFC 4252 section 7).
     /// </summary>

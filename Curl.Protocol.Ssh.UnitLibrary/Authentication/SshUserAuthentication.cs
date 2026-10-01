@@ -90,6 +90,10 @@ internal sealed class SshUserAuthentication(
         ["sk-ssh-ed25519-cert-v01@openssh.com"] = SkEd25519Method,
     };
 
+    private const string RsaCertificateKeyType = "ssh-rsa-cert-v01@openssh.com";
+
+    private const string CertificateSuffix = "-cert-v01@openssh.com";
+
     private const string SkEcdsaMethod = "sk-ecdsa-sha2-nistp256@openssh.com";
 
     private const string SkEd25519Method = "sk-ssh-ed25519@openssh.com";
@@ -561,13 +565,15 @@ internal sealed class SshUserAuthentication(
         return answer?[0] == SshAuthenticationMessageNumber.Success ? null : SshInfoLines.SignatureRefused;
     }
 
-    // libssh2 upgrades only an ssh-rsa key: once the server has sent server-sig-algs, the
-    // first of its own RSA algorithms the server names, compared whole, and none when it
-    // names none of them; before, ssh-rsa itself. Other key types sign as their type. A
-    // method that found none is left behind for the agent's identities (ADR-0271).
+    // libssh2 upgrades only an ssh-rsa key, and on OpenSSL an RSA certificate too: once the
+    // server has sent server-sig-algs, the first of its own RSA algorithms the server names,
+    // compared whole, with a certificate's suffix after it, and none when it names none of
+    // them; before, the method itself. Other key types sign as their type. A method that
+    // found none is left behind for the agent's identities (ADR-0271).
     private string? ChooseSignatureAlgorithm(string method)
     {
-        if (method != RsaSshPrivateKey.RsaKeyType || serverSignatureAlgorithms is null)
+        string? suffix = UpgradeSuffixOf(method);
+        if (suffix is null || serverSignatureAlgorithms is null)
         {
             leftoverMethod = null;
             return method;
@@ -576,8 +582,19 @@ internal sealed class SshUserAuthentication(
         string[] accepted = serverSignatureAlgorithms.Split(',');
         string? algorithm = RsaSshPrivateKey.SignatureAlgorithms.FirstOrDefault(accepted.Contains);
         leftoverMethod = algorithm is null ? method : null;
-        return algorithm;
+        return algorithm is null ? null : algorithm + suffix;
     }
+
+    // What follows the chosen RSA algorithm in the upgraded method, or null when libssh2
+    // leaves the method alone: WinCNG's libssh2 lists no upgrade for a certificate, and
+    // OpenSSL's skips it for an OpenSSH 7.7 or older banner (SSH_BUG_SIGTYPE, ADR-0310).
+    private string? UpgradeSuffixOf(string method) => method switch
+    {
+        RsaSshPrivateKey.RsaKeyType => string.Empty,
+        RsaCertificateKeyType when transport.CryptographyBackend != SshAlgorithmPreferences.WinCngBackend
+            && !OpenSshSignatureTypeBug.AffectsServer(transport.ServerIdentification) => CertificateSuffix,
+        _ => null,
+    };
 
     // The publickey request: the signature flag, the algorithm and the public key blob; the
     // signature, when there is one, follows.
