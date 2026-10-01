@@ -39,3 +39,4 @@ Under the Schannel wording (Windows), `-v` writes the `* schannel:` lines curl 8
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
