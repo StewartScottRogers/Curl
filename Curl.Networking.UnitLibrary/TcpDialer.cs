@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 
 using Curl.Protocol.Abstractions;
 
@@ -16,6 +17,10 @@ namespace Curl.Networking;
 /// <param name="socketOptions">The options set on every socket before it connects.</param>
 public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
 {
+    // Linux's <asm-generic/socket.h>: SOL_SOCKET and SO_BINDTODEVICE.
+    private const int LinuxSolSocket = 1;
+    private const int LinuxSoBindToDevice = 25;
+
     /// <summary>
     /// Creates a dialer with curl's default socket options: <c>TCP_NODELAY</c> and
     /// <c>SO_KEEPALIVE</c> both on.
@@ -56,6 +61,57 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         return DialBoundAsync(endPoint, localEndPoint, localPortCount, cancellationToken);
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Excluded from coverage per ADR-0083, as <see cref="DialAsync" /> is. The device bind is
+    /// <see cref="TryBindToDevice" />'s, and the address bind <see cref="BindLocalEnd" />'s.
+    /// </remarks>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    public ValueTask<DialedTcpConnection> DialFromDeviceAsync(
+        IPEndPoint endPoint,
+        string deviceName,
+        bool bindsAddressAfterDevice,
+        Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
+        int localPortCount,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(endPoint);
+        ArgumentNullException.ThrowIfNull(deviceName);
+        ArgumentNullException.ThrowIfNull(chooseLocalEndAsync);
+
+        return DialDeviceBoundAsync(endPoint, deviceName, bindsAddressAfterDevice, chooseLocalEndAsync, localPortCount, cancellationToken);
+    }
+
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    private async ValueTask<DialedTcpConnection> DialDeviceBoundAsync(
+        IPEndPoint endPoint,
+        string deviceName,
+        bool bindsAddressAfterDevice,
+        Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
+        int localPortCount,
+        CancellationToken cancellationToken)
+    {
+        var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        try
+        {
+            ApplySocketOptions(socket);
+            if (!TryBindToDevice(socket, deviceName) || bindsAddressAfterDevice)
+            {
+                var localEndPoint = await chooseLocalEndAsync(cancellationToken).ConfigureAwait(false);
+                BindLocalEnd(socket, localEndPoint, localPortCount);
+            }
+
+            await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+
+        return Connected(socket, endPoint);
+    }
+
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
     private async ValueTask<DialedTcpConnection> DialBoundAsync(IPEndPoint endPoint, IPEndPoint? bindTo, int localPortCount, CancellationToken cancellationToken)
     {
@@ -76,6 +132,12 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
             throw;
         }
 
+        return Connected(socket, endPoint);
+    }
+
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    private static DialedTcpConnection Connected(Socket socket, IPEndPoint endPoint)
+    {
         var localEndPoint = (IPEndPoint)socket.LocalEndPoint!;
 
         return new DialedTcpConnection(
@@ -107,6 +169,40 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         }
 
         return new StreamConnection(new NetworkStream(socket, ownsSocket: true), endPoint);
+    }
+
+    /// <summary>
+    /// Binds <paramref name="socket" /> to the interface <paramref name="deviceName" /> with
+    /// <c>setsockopt(SOL_SOCKET, SO_BINDTODEVICE)</c>, the name and its terminating NUL as libcurl's
+    /// <c>bindlocal</c> passes them; Linux only, so every other platform answers <see langword="false" />.
+    /// </summary>
+    /// <remarks>
+    /// Excluded from coverage per ADR-0083: which branch runs is the platform's, so the Windows
+    /// coverage run reaches only one. The Linux tests in <c>TcpDialerTests</c> pin both answers.
+    /// Since Linux 5.7 an unprivileged process may bind an unbound socket to a device (measured
+    /// with curl 8.18.0 as uid 1000, BL-1026 Notes); a name that is no device is <c>ENODEV</c>.
+    /// </remarks>
+    /// <param name="socket">A socket not yet bound or connected.</param>
+    /// <param name="deviceName">The interface to bind to.</param>
+    /// <returns><see langword="true" /> when the socket is bound to the device.</returns>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter whose branch the platform picks.")]
+    internal static bool TryBindToDevice(Socket socket, string deviceName)
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return false;
+        }
+
+        try
+        {
+            socket.SetRawSocketOption(LinuxSolSocket, LinuxSoBindToDevice, Encoding.UTF8.GetBytes(deviceName + '\0'));
+            return true;
+        }
+        catch (SocketException)
+        {
+            // libcurl carries on to bind the interface's address, or the host's.
+            return false;
+        }
     }
 
     /// <summary>

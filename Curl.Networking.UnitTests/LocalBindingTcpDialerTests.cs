@@ -52,4 +52,94 @@ public sealed class LocalBindingTcpDialerTests
         Assert.IsEmpty(inner.BoundDials);
     }
 
+    // curl 8.18.0 on Linux, BL-1026 Notes: --interface lo and if!lo -> "socket successfully bound to
+    // interface 'lo'", no address and no --local-port bound.
+    [TestMethod]
+    [DataRow("lo", "lo", DisplayName = "plain name")]
+    [DataRow("lo", null, DisplayName = "if!")]
+    public async Task DialAsync_WithAnInterfaceNameTheDeviceBindTakes_BindsTheDeviceAlone(string interfaceName, string? hostName)
+    {
+        var inner = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
+        var deviceDialer = new FakeDeviceBindingTcpDialer(inner, deviceBinds: true);
+        var dialer = new LocalBindingTcpDialer(deviceDialer, new LocalBinding(interfaceName, hostName, null, 40000, 11), Interfaces(), new FakeDnsResolver());
+        var endPoint = new IPEndPoint(IPAddress.Loopback, 80);
+
+        await dialer.DialAsync(endPoint, CancellationToken.None);
+
+        Assert.AreEqual(("lo", false), deviceDialer.DeviceDials.Single());
+        Assert.IsEmpty(inner.BoundDials);
+        Assert.AreEqual(endPoint, inner.DialedEndPoints.Single());
+    }
+
+    [TestMethod]
+    public async Task DialAsync_WithAnInterfaceNameTheDeviceBindRefuses_BindsTheInterfaceAddress()
+    {
+        var inner = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
+        var deviceDialer = new FakeDeviceBindingTcpDialer(inner, deviceBinds: false);
+        var dialer = new LocalBindingTcpDialer(deviceDialer, new LocalBinding("lo", null, null, 40000, 11), Interfaces(("lo", [IPAddress.Loopback])), new FakeDnsResolver());
+        var endPoint = new IPEndPoint(IPAddress.Loopback, 80);
+
+        await dialer.DialAsync(endPoint, CancellationToken.None);
+
+        Assert.AreEqual(("lo", false), deviceDialer.DeviceDials.Single());
+        Assert.AreEqual((endPoint, new IPEndPoint(IPAddress.Loopback, 40000), 11), inner.BoundDials.Single());
+    }
+
+    // curl 8.18.0 on Linux, BL-1026 Notes: ifhost!lo!127.0.0.1 binds the device silently and goes on
+    // to "Name '127.0.0.1' family 2 resolved to '127.0.0.1' family 2".
+    [TestMethod]
+    [DataRow(true, DisplayName = "device bound")]
+    [DataRow(false, DisplayName = "device refused")]
+    public async Task DialAsync_WithIfhost_BindsTheDeviceThenTheHostAddress(bool deviceBinds)
+    {
+        var inner = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
+        var deviceDialer = new FakeDeviceBindingTcpDialer(inner, deviceBinds);
+        var dialer = new LocalBindingTcpDialer(deviceDialer, new LocalBinding(null, "127.0.0.1", "lo", 0, 1), Interfaces(), new FakeDnsResolver());
+        var endPoint = new IPEndPoint(IPAddress.Loopback, 80);
+
+        await dialer.DialAsync(endPoint, CancellationToken.None);
+
+        Assert.AreEqual(("lo", true), deviceDialer.DeviceDials.Single());
+        Assert.AreEqual((endPoint, new IPEndPoint(IPAddress.Loopback, 0), 1), inner.BoundDials.Single());
+    }
+
+    [TestMethod]
+    public async Task DialAsync_WithAHostNameOnly_BindsNoDevice()
+    {
+        var inner = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
+        var deviceDialer = new FakeDeviceBindingTcpDialer(inner, deviceBinds: true);
+        var dialer = new LocalBindingTcpDialer(deviceDialer, new LocalBinding(null, "127.0.0.1", null, 0, 1), Interfaces(), new FakeDnsResolver());
+        var endPoint = new IPEndPoint(IPAddress.Loopback, 80);
+
+        await dialer.DialAsync(endPoint, CancellationToken.None);
+
+        Assert.IsEmpty(deviceDialer.DeviceDials);
+        Assert.AreEqual((endPoint, new IPEndPoint(IPAddress.Loopback, 0), 1), inner.BoundDials.Single());
+    }
+
+    [TestMethod]
+    public async Task DialFromDeviceAsync_ByDefault_BindsTheLocalEndChosen()
+    {
+        ITcpDialer inner = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
+        var endPoint = new IPEndPoint(IPAddress.Loopback, 80);
+        var localEndPoint = new IPEndPoint(IPAddress.Loopback, 40000);
+
+        await inner.DialFromDeviceAsync(endPoint, "lo", false, _ => ValueTask.FromResult(localEndPoint), 3, CancellationToken.None);
+
+        Assert.AreEqual((endPoint, localEndPoint, 3), ((FakeTcpDialer)inner).BoundDials.Single());
+    }
+
+    [TestMethod]
+    public async Task DialFromDeviceAsync_ByDefaultWithNoChooser_ThrowsArgumentNullException()
+    {
+        ITcpDialer inner = new FakeTcpDialer();
+
+        var exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(
+            async () => await inner.DialFromDeviceAsync(new IPEndPoint(IPAddress.Loopback, 80), "lo", false, null!, 1, CancellationToken.None));
+
+        Assert.AreEqual("chooseLocalEndAsync", exception.ParamName);
+    }
+
+    private static SystemNetworkInterfaceLookup Interfaces(params (string Name, IPAddress[] Addresses)[] interfaces) =>
+        new(onWindows: false, () => interfaces);
 }

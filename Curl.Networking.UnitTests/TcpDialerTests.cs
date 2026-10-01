@@ -194,6 +194,45 @@ public sealed class TcpDialerTests
     }
 
     [TestMethod]
+    public async Task DialFromDeviceAsync_WithNullChooser_ThrowsArgumentNullException()
+    {
+        var exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(
+            async () => await new TcpDialer().DialFromDeviceAsync(new IPEndPoint(IPAddress.Loopback, 80), "lo", false, null!, 1, CancellationToken.None));
+
+        Assert.AreEqual("chooseLocalEndAsync", exception.ParamName);
+    }
+
+    // curl 8.18.0 on Linux, as uid 1000 and as root alike (BL-1026 Notes): --interface lo ->
+    // "socket successfully bound to interface 'lo'".
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux)]
+    public void TryBindToDevice_OnLinuxWithTheLoopbackDevice_BindsIt()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        Assert.IsTrue(TcpDialer.TryBindToDevice(socket, "lo"));
+    }
+
+    // curl 8.18.0 on Linux: if!bogus0 -> errno 19, "No such device", and curl carries on without it.
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux)]
+    public void TryBindToDevice_OnLinuxWithNoSuchDevice_ReturnsFalse()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        Assert.IsFalse(TcpDialer.TryBindToDevice(socket, "bogus0"));
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Linux)]
+    public void TryBindToDevice_OffLinux_ReturnsFalse()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        Assert.IsFalse(TcpDialer.TryBindToDevice(socket, "lo"));
+    }
+
+    [TestMethod]
     public void BindLocalEnd_WithAFreePort_BindsIt()
     {
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
