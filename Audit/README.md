@@ -6,22 +6,21 @@ conformance, truthfulness and process. The factory checks its own work; the offi
 so that something that did not write the code, and cannot be changed by what did, checks it
 too. The design is [ADR-0267](../Documentation/Planning/Decisions/ADR-0267-an-independent-audit-office-audits-the-dark-factory-from-outside-its-reach.md).
 
-Most of the office is still being built. Everything below marked *planned* names the task
-that builds it; the rest exists today.
+Every part below exists; the last column names the task that built it.
 
 ## Folder map
 
-| Path | What it holds | Status |
+| Path | What it holds | Built by |
 | --- | --- | --- |
-| `Guard/` | `Test-AuditPathsUntouched.ps1`, the CI audit guard: fails `CI` when `work/dark-factory` changes an audit path or a guard. | Built (BL-998) |
-| `Instructions/` | Each auditor's method (`Quality.md`, `Security.md`, `Performance.md`, `Conformance.md`, `Truthfulness.md`, `Process.md`), the rules every auditor follows (`Auditor-Rules.md`) and the finding, report and scorecard formats (`Report-Format.md`). | Planned: formats and rules BL-1001; methods BL-1009 to BL-1014 |
-| `PlantedDefects/` | The catalogue of known defects the seeder plants before an audit, to measure each auditor's catch rate. | Planned (BL-1015, kept out of lanes' reach by BL-1028) |
-| `Findings/` | One file per finding, with severity, evidence and a reproduction. A finding closes only when a re-audit confirms the fix. | Planned: format BL-1001, writing and closing BL-1016 |
-| `Scorecards/` | One scorecard per audit, in a fixed format so trends show, with each auditor's catch rate and a fingerprint of the auditor definitions it ran with. | Planned: format BL-1001, writing BL-1017 |
-| `Tools/` | Audit tooling: `Get-AuditorFingerprint.ps1` (BL-1002), `Invoke-MutationTest.ps1` (BL-1004), `Fuzz/` (BL-1005), `Invoke-DifferentialConformance.ps1` (BL-1006), `Measure-Performance.ps1` (BL-1007), `Measure-FactoryProcess.ps1` (BL-1008), `Write-AuditFindings.ps1` (BL-1016), `Write-AuditScorecard.ps1` (BL-1017), `New-TasksFromAcceptedFindings.ps1` (BL-1018), `Test-AuditDue.ps1` (BL-1019). Not product code, not held to the coverage gates. | Planned (task IDs beside each) |
-| `Triage.md` | Which findings Stewart accepted, and the Curl tasks they became. | Planned (BL-1018) |
-| `RunAudit.cmd`, `RunAudit.ps1` | Run an audit end to end, in a herdr tab. | Planned (BL-1020) |
-| `../.claude/agents/audit-*.md` | The auditor agents: `audit-quality`, `audit-security`, `audit-performance`, `audit-conformance`, `audit-truthfulness`, `audit-process`, and `audit-seeder`, which plants the defects. | Planned (BL-1009 to BL-1015) |
+| `Guard/` | `Test-AuditPathsUntouched.ps1`, the CI audit guard: fails `CI` when `work/dark-factory` changes an audit path or a guard. | BL-998 |
+| `Instructions/` | Each auditor's method (`Quality.md`, `Security.md`, `Performance.md`, `Conformance.md`, `Truthfulness.md`, `Process.md`), the rules every auditor follows (`Auditor-Rules.md`) and the finding, report and scorecard formats (`Report-Format.md`). | BL-1001, BL-1009 to BL-1014 |
+| `PlantedDefects/` | The catalogue of known defects the seeder plants before an audit, to measure each auditor's catch rate - stored encoded (`Catalogue.md.b64`) so no search of the repository returns it - with `Read-PlantedCatalogue.ps1`. | BL-1015, BL-1028 |
+| `Findings/` | One file per finding, `AF-####-*.md`, with severity, evidence and a reproduction. A finding closes only when a re-audit confirms the fix. | BL-1001, BL-1016 |
+| `Scorecards/` | One scorecard per audit, `yyyy-MM-dd_HHmm.md`, in a fixed format so trends show, with each auditor's catch rate and a fingerprint of the auditor definitions it ran with. | BL-1001, BL-1017 |
+| `Tools/` | Audit tooling: `Get-AuditorFingerprint.ps1`, `Invoke-MutationTest.ps1`, `Fuzz/`, `Invoke-DifferentialConformance.ps1`, `Measure-Performance.ps1`, `Measure-FactoryProcess.ps1`, `Write-AuditFindings.ps1`, `Write-AuditScorecard.ps1`, `New-TasksFromAcceptedFindings.ps1`, `Test-AuditDue.ps1`, and `Fixtures/` for their self-tests. Not product code, not held to the coverage gates. | BL-1002 to BL-1008, BL-1016 to BL-1019 |
+| `Triage.md` | How findings become Curl tasks: Stewart accepts or rejects each, then `New-TasksFromAcceptedFindings.ps1` files a task for each accepted one. | BL-1018 |
+| `RunAudit.cmd`, `RunAudit.ps1` | Run an audit end to end, in a herdr tab (`-NewTab`); `-DryRun` prints the plan. | BL-1020 |
+| `../.claude/agents/audit-*.md` | The auditor agents: `audit-quality`, `audit-security`, `audit-performance`, `audit-conformance`, `audit-truthfulness`, `audit-process`, and `audit-seeder`, which plants the defects. | BL-1009 to BL-1015 |
 
 ## Independence
 
