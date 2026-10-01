@@ -1,4 +1,4 @@
-# ADR-0193 — A redirect hop sends its own URL's user information unless command-line credentials win
+# ADR-0240 — A redirect hop sends its own URL's user information unless command-line credentials win
 
 - **Status:** Accepted
 - **Date:** 2026-09-29

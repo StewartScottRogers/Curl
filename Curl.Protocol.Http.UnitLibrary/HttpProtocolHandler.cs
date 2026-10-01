@@ -101,7 +101,7 @@ namespace Curl.Protocol.Http;
 /// <c>Proxy-Authenticate</c> challenges for the proxy's credential with the scheme set the
 /// handler was given (the <c>--proxy-*</c> auth switches' pick). Each retry keeps the other
 /// header as it was, so a 407 and a 401 can each be answered in the same transfer, in either
-/// order. Measured on curl 8.21.0 (BL-603 Notes, ADR-0187).
+/// order. Measured on curl 8.21.0 (BL-603 Notes, ADR-0239).
 /// </para>
 /// <para>
 /// A 417 that arrives while the body waits for <c>100 Continue</c> is answered, unless
@@ -1742,7 +1742,7 @@ public sealed class HttpProtocolHandler(
     /// Decides whether a response is answered with one more request, and with what
     /// <c>Proxy-Authorization</c> value: only a 407 from a forward proxy, on the same terms as
     /// <see cref="RetryAuthorizationAsync" /> sets for a 401, with the response's
-    /// <c>Proxy-Authenticate</c> challenges and the proxy's request (ADR-0187).
+    /// <c>Proxy-Authenticate</c> challenges and the proxy's request (ADR-0239).
     /// </summary>
     /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
     private ValueTask<string?> RetryProxyAuthorizationAsync(HttpRequestPlan plan, HttpResponseHead head, CancellationToken cancellationToken) =>

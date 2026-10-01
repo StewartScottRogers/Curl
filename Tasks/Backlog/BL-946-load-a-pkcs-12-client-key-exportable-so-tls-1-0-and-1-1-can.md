@@ -18,7 +18,7 @@ On Windows, an RSA client certificate given as a PKCS #12 file with `--cert` sig
 
 ## Context
 
-- BL-804 (ADR-0193) made `RsaTlsSigningKey` sign TLS 1.0/1.1's MD5 + SHA-1 block with the hand-built `RsaCrtPrivateKey`, which needs `RSA.ExportParameters(true)`. A key that refuses export does not fit that rule, so the client sends an empty Certificate.
+- BL-804 (ADR-0195) made `RsaTlsSigningKey` sign TLS 1.0/1.1's MD5 + SHA-1 block with the hand-built `RsaCrtPrivateKey`, which needs `RSA.ExportParameters(true)`. A key that refuses export does not fit that rule, so the client sends an empty Certificate.
 - `ClientCertificateLoader` (`Curl.Networking.UnitLibrary`) loads PKCS #12 with `X509CertificateLoader.LoadPkcs12(contents, passphrase)` and no `X509KeyStorageFlags`. On Windows that gives an `RSACng` whose export policy forbids plaintext export; on Linux and macOS the key exports.
 - Load with `X509KeyStorageFlags.Exportable` (keeping `EphemeralKeySet` semantics as today) in both the Schannel-build and OpenSSL-build PKCS #12 paths, and in the PEM path's round trip through PKCS #12 (`ClientCertificateLoader.cs` near line 375). A key from the Windows certificate store stays as the store gives it.
 

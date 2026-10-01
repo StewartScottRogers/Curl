@@ -44,7 +44,7 @@ internal static class CurlComposition
     /// <paramref name="tlsProvider" /> after <c>STARTTLS</c> or <c>STLS</c>), <c>ldap</c> and <c>ldaps</c>
     /// answering as WinLDAP's build on Windows and as the OpenLDAP build elsewhere (ADR-0166), and <c>http</c> and <c>https</c> over <paramref name="connector" />,
     /// the last two answering authentication with <see cref="CreateHttpAuthenticator" />'s
-    /// authenticator, answering a forward proxy with <paramref name="proxyAuthSchemes" /> (ADR-0187),
+    /// authenticator, answering a forward proxy with <paramref name="proxyAuthSchemes" /> (ADR-0239),
     /// and keeping cookies in <paramref name="cookieStore" />; <c>ws</c> and <c>wss</c>
     /// over <paramref name="connector" />, sending a pre-emptive <c>Authorization</c> from
     /// <see cref="CreateHttpAuthenticator" />'s authenticator and drawing each

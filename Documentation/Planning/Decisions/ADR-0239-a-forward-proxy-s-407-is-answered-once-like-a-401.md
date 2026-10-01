@@ -1,4 +1,4 @@
-# ADR-0187 — A forward proxy's 407 is answered once, like a 401
+# ADR-0239 — A forward proxy's 407 is answered once, like a 401
 
 - **Status:** Accepted
 - **Date:** 2026-09-29
