@@ -35,3 +35,4 @@ On Linux, a plain `--interface <name>` or `if!<name>` whose `SO_BINDTODEVICE` su
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
