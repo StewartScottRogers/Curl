@@ -35,3 +35,4 @@ An `--http3` or `--http3-only` transfer binds its UDP socket as `--interface` an
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
