@@ -74,7 +74,10 @@ commands through `SftpQuoteCommands`: those with no prefix after `REALPATH .`, t
 `SshKeyExchangeMethods`, `SshSignatureVerifiers`, `SshPacketProtections` or `SshCompressionMethods`, and
 `SshAlgorithmCatalogue.Implemented` offers it from then on. Failure messages and
 their libssh2 codes are ADR-0122's, ADR-0206's and ADR-0212's, measured from the
-reference builds.
+reference builds. A failed read or write of the connection, such as a reset, reaches
+the steps as an `SshConnectionLostException`, so `SshConnectionFailure.Is` tells it
+apart from the local output's `IOException`; each step reports it as libssh2 does
+(ADR-0283 for the handshake, ADR-0289 after it).
 
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a

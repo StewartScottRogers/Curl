@@ -91,8 +91,8 @@ the server's.
   with anything but `EOF`, a malformed answer, or a connection that breaks during the copy
   is exit 79 `Error in the SSH layer` with the bytes so far; `EOF` before the `STAT` size is
   exit 18 `end of response with <n> bytes missing`. A connection that breaks between the
-  session start and the copy is exit 79 too: not measured, it is curl's code for an SSH
-  failure with no message of its own.
+  session start and the copy is exit 79 too, except at `OPEN`, where curl succeeds with
+  nothing written: both measured in BL-1046 (ADR-0289).
 
 ## Consequences
 

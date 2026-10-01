@@ -39,7 +39,7 @@ internal sealed class ScpFileDownload(SshTransport transport)
     /// </returns>
     /// <exception cref="SshTransferException">
     /// The server refused the channel or the <c>exec</c> request, or the connection broke
-    /// before the header (exit 79); or the header failed (<see cref="ScpFileHeaderReader.ReadFileSizeAsync" />).
+    /// before the header (exit 79, with libssh2's message for the step); or the header failed (<see cref="ScpFileHeaderReader.ReadFileSizeAsync" />).
     /// </exception>
     internal async ValueTask<TransferResult> DownloadAsync(
         string urlPath,
@@ -55,23 +55,30 @@ internal sealed class ScpFileDownload(SshTransport transport)
         return result;
     }
 
+    // A connection closed or reset while either answer is awaited fails with libssh2's
+    // message for that step, as measured (BL-1046).
     private static async ValueTask StartAsync(SshSessionChannel channel, byte[] command, CancellationToken cancellationToken)
+    {
+        if (!await RequireConnectionAsync(() => channel.OpenAsync(cancellationToken), SshTransferException.ScpChannelOpenBroken).ConfigureAwait(false))
+        {
+            throw SshTransferException.ScpChannelOpenFailed(channel.OpenFailureReasonCode);
+        }
+
+        if (!await RequireConnectionAsync(() => channel.RequestExecAsync(command, cancellationToken), SshTransferException.ScpExecRequestBroken).ConfigureAwait(false))
+        {
+            throw SshTransferException.ScpExecRequestDenied();
+        }
+    }
+
+    private static async ValueTask<bool> RequireConnectionAsync(Func<ValueTask<bool>> step, Func<SshTransferException> broken)
     {
         try
         {
-            if (!await channel.OpenAsync(cancellationToken).ConfigureAwait(false))
-            {
-                throw SshTransferException.ScpChannelOpenFailed(channel.OpenFailureReasonCode);
-            }
-
-            if (!await channel.RequestExecAsync(command, cancellationToken).ConfigureAwait(false))
-            {
-                throw SshTransferException.ScpExecRequestDenied();
-            }
+            return await step().ConfigureAwait(false);
         }
         catch (Exception exception) when (SshConnectionFailure.Is(exception))
         {
-            throw SshTransferException.SshLayerError();
+            throw broken();
         }
     }
 

@@ -90,6 +90,7 @@ internal sealed class SshPacketWriter(IConnection connection, ISshRandomSource r
     /// <param name="message">The message, starting with its message number.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the packet has been flushed.</returns>
+    /// <exception cref="SshConnectionLostException">The write or the flush failed.</exception>
     internal async ValueTask WriteAsync(ReadOnlyMemory<byte> message, CancellationToken cancellationToken)
     {
         ReadOnlyMemory<byte> payload = compressor is null ? message : compressor.Compress(message.Span);
@@ -100,8 +101,16 @@ internal sealed class SshPacketWriter(IConnection connection, ISshRandomSource r
         payload.Span.CopyTo(packet.AsSpan(sizeof(uint) + 1));
         randomSource.Fill(packet.AsSpan(packet.Length - paddingLength));
 
-        await connection.WriteAsync(protection.Seal(SequenceNumber, packet), cancellationToken).ConfigureAwait(false);
-        await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await connection.WriteAsync(protection.Seal(SequenceNumber, packet), cancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException exception)
+        {
+            throw new SshConnectionLostException(exception);
+        }
+
         SequenceNumber = unchecked(SequenceNumber + 1);
     }
 }

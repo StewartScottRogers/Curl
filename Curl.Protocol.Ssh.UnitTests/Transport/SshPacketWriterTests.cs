@@ -89,4 +89,15 @@ public sealed class SshPacketWriterTests
 
         Assert.AreEqual(2u, writer.SequenceNumber);
     }
+
+    [TestMethod]
+    public async Task WriteAsync_ConnectionReset_ThrowsSshConnectionLostAndKeepsTheSequenceNumber()
+    {
+        SshPacketWriter writer = new(new ResettingConnection(true), new RepeatingRandomSource(0));
+
+        SshConnectionLostException lost = await Assert.ThrowsExactlyAsync<SshConnectionLostException>(async () => await writer.WriteAsync(new byte[] { 2 }, CancellationToken.None));
+
+        Assert.IsInstanceOfType<IOException>(lost.InnerException);
+        Assert.AreEqual(0u, writer.SequenceNumber);
+    }
 }

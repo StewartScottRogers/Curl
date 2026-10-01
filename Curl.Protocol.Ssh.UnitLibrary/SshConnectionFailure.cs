@@ -3,8 +3,8 @@ using Curl.Protocol.Ssh.PacketProtection;
 namespace Curl.Protocol.Ssh;
 
 /// <summary>
-/// Tells apart the exceptions that mean the SSH connection itself broke - the peer closed
-/// or disconnected, broke the framing, or sent a packet that fails its authentication -
+/// Tells apart the exceptions that mean the SSH connection itself broke - the peer closed,
+/// disconnected or reset it, broke the framing, or sent a packet that fails its authentication -
 /// from the failures a transfer reports on its own.
 /// </summary>
 internal static class SshConnectionFailure
@@ -13,9 +13,9 @@ internal static class SshConnectionFailure
     /// Gets whether <paramref name="exception" /> means the connection broke.
     /// </summary>
     /// <param name="exception">The exception.</param>
-    /// <returns><see langword="true" /> for an <see cref="EndOfStreamException" />, an <see cref="InvalidDataException" /> or an <see cref="SshPacketAuthenticationException" />.</returns>
+    /// <returns><see langword="true" /> for an <see cref="EndOfStreamException" />, an <see cref="SshConnectionLostException" />, an <see cref="InvalidDataException" /> or an <see cref="SshPacketAuthenticationException" />.</returns>
     internal static bool Is(Exception exception) =>
-        exception is EndOfStreamException or InvalidDataException or SshPacketAuthenticationException;
+        exception is EndOfStreamException or SshConnectionLostException or InvalidDataException or SshPacketAuthenticationException;
 
     /// <summary>
     /// Runs <paramref name="step" />, reporting a broken connection as curl does when an SFTP

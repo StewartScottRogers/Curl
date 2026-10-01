@@ -251,9 +251,19 @@ public sealed partial class SftpFileDownloadTests
     }
 
     [TestMethod]
-    public async Task DownloadAsync_ConnectionEndsBeforeTheCopy_ThrowsExit79()
+    public async Task DownloadAsync_ConnectionEndsAtTheOpen_SucceedsWithNothingWrittenAsMeasured()
     {
         SftpServerScript script = SftpServerScript.Started().HomeDirectory();
+
+        TransferResult result = await Download(new ScriptedConnection(script.Bytes), "/f");
+
+        Assert.AreEqual(TransferResult.Success(0), result);
+    }
+
+    [TestMethod]
+    public async Task DownloadAsync_ConnectionEndsAtTheStat_ThrowsExit79()
+    {
+        SftpServerScript script = SftpServerScript.Started().HomeDirectory().Handle();
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await Download(new ScriptedConnection(script.Bytes), "/f"));

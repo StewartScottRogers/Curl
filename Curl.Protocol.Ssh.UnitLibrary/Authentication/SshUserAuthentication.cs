@@ -414,7 +414,7 @@ internal sealed class SshUserAuthentication(
         {
             answer = await ReadAnswerAsync([SshMessageNumber.ServiceAccept], cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is EndOfStreamException or InvalidDataException)
+        catch (Exception exception) when (exception is EndOfStreamException or SshConnectionLostException or InvalidDataException)
         {
             throw ServiceRequestFailed(Libssh2ErrorCode.SocketReceive);
         }

@@ -26,6 +26,7 @@ internal sealed class SshConnectionReader(IConnection connection)
     /// <see langword="null" /> when the peer closed before the LF or the line ran past
     /// <paramref name="maximumLength" />.
     /// </returns>
+    /// <exception cref="SshConnectionLostException">A read from the connection failed.</exception>
     internal async ValueTask<string?> ReadLineAsync(int maximumLength, CancellationToken cancellationToken)
     {
         List<byte> line = [];
@@ -55,6 +56,7 @@ internal sealed class SshConnectionReader(IConnection connection)
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The bytes.</returns>
     /// <exception cref="EndOfStreamException">The peer closed first.</exception>
+    /// <exception cref="SshConnectionLostException">A read from the connection failed.</exception>
     internal async ValueTask<byte[]> ReadExactlyAsync(int count, CancellationToken cancellationToken)
     {
         byte[] bytes = new byte[count];
@@ -75,10 +77,20 @@ internal sealed class SshConnectionReader(IConnection connection)
         return bytes;
     }
 
+    // A failed read (a reset, BL-1046) is told apart from the local output's failures.
     private async ValueTask<bool> FillAsync(CancellationToken cancellationToken)
     {
         start = 0;
-        end = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            end = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException exception)
+        {
+            end = 0;
+            throw new SshConnectionLostException(exception);
+        }
+
         return end > 0;
     }
 }

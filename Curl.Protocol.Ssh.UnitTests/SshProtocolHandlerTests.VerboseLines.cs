@@ -192,11 +192,11 @@ public sealed partial class SshProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ScpServerHangsUpOnTheChannelOpen_LeavesTheSshLayerErrorUnwritten()
+    public async Task ExecuteAsync_ScpServerHangsUpOnTheChannelOpen_WritesLibssh2sUnexpectedError()
     {
         string lines = await RunRecordingLinesAsync(new InMemorySshServer(User, Password) { HangsUpOnChannelOpen = true }, "scp://files.example/f");
 
-        StringAssert.EndsWith(lines, "* SSH: connection established | * Connection #0 to host files.example:22 left intact");
+        StringAssert.EndsWith(lines, "* SSH: connection established | * Unexpected error | * Connection #0 to host files.example:22 left intact");
     }
 
     [TestMethod]

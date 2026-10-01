@@ -1,6 +1,5 @@
 using System.Buffers.Binary;
 using Curl.Protocol.Ssh.Connection;
-using Curl.Protocol.Ssh.PacketProtection;
 using Curl.Protocol.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Sftp;
@@ -530,8 +529,8 @@ internal sealed class SftpSession
         throw failure;
     }
 
-    // A refusal, a close, a disconnect, broken framing or a failed packet check all fail
-    // the step with libssh2's description for it.
+    // A refusal, a close, a disconnect, a reset (BL-1046), broken framing or a failed
+    // packet check all fail the step with libssh2's description for it, as measured.
     private static async ValueTask RequireAsync(Func<ValueTask<bool>> step, string failure)
     {
         bool succeeded;
@@ -539,7 +538,7 @@ internal sealed class SftpSession
         {
             succeeded = await step().ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is EndOfStreamException or InvalidDataException or SshPacketAuthenticationException)
+        catch (Exception exception) when (SshConnectionFailure.Is(exception))
         {
             succeeded = false;
         }

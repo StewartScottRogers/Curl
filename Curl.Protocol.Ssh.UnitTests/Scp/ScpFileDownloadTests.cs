@@ -299,16 +299,16 @@ public sealed class ScpFileDownloadTests
     }
 
     [TestMethod]
-    [DataRow(false, DisplayName = "before the channel opens")]
-    [DataRow(true, DisplayName = "before the exec request is answered")]
-    public async Task DownloadAsync_ConnectionBreaksBeforeScpStarts_FailsWithExit79(bool opened)
+    [DataRow(false, "Unexpected error", DisplayName = "before the channel opens")]
+    [DataRow(true, "Failed waiting for channel success", DisplayName = "before the exec request is answered")]
+    public async Task DownloadAsync_ConnectionClosesBeforeScpStarts_FailsWithExit79AndLibssh2sMessageAsMeasured(bool opened, string message)
     {
         ScpServerScript script = opened ? new ScpServerScript().Confirm() : new ScpServerScript();
 
         SshTransferException failure = await DownloadFailsAsync(script);
 
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
-        Assert.AreEqual("Error in the SSH layer", failure.Message);
+        Assert.AreEqual(message, failure.Message);
     }
 
     [TestMethod]
