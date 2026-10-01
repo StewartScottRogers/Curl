@@ -465,7 +465,9 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
             connectionNumber,
             connect.LocalEndPoint,
             connect.PeerCertificates,
-            connect.UnixSocketPath));
+            connect.UnixSocketPath,
+            connect.MappedHost,
+            connect.MappedPort));
         if (MayMultiplex(target, connect))
         {
             KeepNegotiating(entry, negotiation);
@@ -484,7 +486,9 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
             isReused: false,
             entry.ConnectionNumber,
             applicationProtocol: connect.ApplicationProtocol,
-            unixSocketPath: entry.UnixSocketPath);
+            unixSocketPath: entry.UnixSocketPath,
+            mappedHost: entry.MappedHost,
+            mappedPort: entry.MappedPort);
     }
 
     private ConnectResult Reuse(ConnectTarget target, PoolEntry entry)
@@ -506,7 +510,9 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
             entry.PeerCertificates,
             isReused: true,
             entry.ConnectionNumber,
-            unixSocketPath: entry.UnixSocketPath);
+            unixSocketPath: entry.UnixSocketPath,
+            mappedHost: entry.MappedHost,
+            mappedPort: entry.MappedPort);
     }
 
     private List<PoolEntry> RemoveExpired()

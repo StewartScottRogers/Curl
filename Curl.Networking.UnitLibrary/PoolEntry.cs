@@ -7,7 +7,8 @@ namespace Curl.Networking;
 /// <summary>
 /// One connection a <see cref="PoolingConnector" /> opened, with what it must report again
 /// when the connection is reused: its key, curl's number for it, its local end point and the
-/// server's certificates and the Unix domain socket it was dialled through.
+/// server's certificates, the Unix domain socket it was dialled through and the <c>--connect-to</c>
+/// destination it was dialled to.
 /// </summary>
 /// <param name="Key">The key it is pooled under, or <see langword="null" /> when it is never pooled.</param>
 /// <param name="Connection">The connection the inner connector opened.</param>
@@ -18,13 +19,20 @@ namespace Curl.Networking;
 /// The path of the Unix domain socket it was dialled through, or <see langword="null" /> for a TCP
 /// connection (BL-884).
 /// </param>
+/// <param name="MappedHost">
+/// The host a <c>--connect-to</c> mapping or alt-svc alternative sent it to, or
+/// <see langword="null" /> when it went to the target's own host (BL-975).
+/// </param>
+/// <param name="MappedPort">The port beside <paramref name="MappedHost" />; <c>0</c> when there is none.</param>
 internal sealed record PoolEntry(
     ConnectionPoolKey? Key,
     IConnection Connection,
     long ConnectionNumber,
     IPEndPoint? LocalEndPoint,
     IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificates,
-    string? UnixSocketPath)
+    string? UnixSocketPath,
+    string? MappedHost,
+    int MappedPort)
 {
     /// <summary>
     /// Gets or sets the timestamp, on the pool's <see cref="TimeProvider" />, at which the

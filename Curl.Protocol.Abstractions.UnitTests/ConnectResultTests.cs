@@ -175,6 +175,33 @@ public sealed class ConnectResultTests
     }
 
     [TestMethod]
+    public void Connected_WithoutMappedDestination_NamesNone()
+    {
+        var result = ConnectResult.Connected(new UnusedConnection());
+
+        Assert.IsNull(result.MappedHost);
+        Assert.AreEqual(0, result.MappedPort);
+    }
+
+    [TestMethod]
+    public void Connected_WithMappedDestination_CarriesIt()
+    {
+        var result = ConnectResult.Connected(new UnusedConnection(), null, mappedHost: "127.0.0.1", mappedPort: 18499);
+
+        Assert.AreEqual("127.0.0.1", result.MappedHost);
+        Assert.AreEqual(18499, result.MappedPort);
+    }
+
+    [TestMethod]
+    public void Failed_Always_NamesNoMappedDestination()
+    {
+        var result = ConnectResult.Failed(CurlExitCode.CouldntConnect, "refused");
+
+        Assert.IsNull(result.MappedHost);
+        Assert.AreEqual(0, result.MappedPort);
+    }
+
+    [TestMethod]
     public void Failed_Always_NamesNoUnixSocketPath()
     {
         var result = ConnectResult.Failed(CurlExitCode.CouldntConnect, "refused");

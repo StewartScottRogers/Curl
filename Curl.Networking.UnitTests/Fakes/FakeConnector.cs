@@ -31,6 +31,12 @@ public sealed class FakeConnector : IConnector
     /// <summary>Gets or sets the Unix domain socket path every connection reports, or <see langword="null" /> for TCP.</summary>
     public string? UnixSocketPath { get; set; }
 
+    /// <summary>Gets or sets the <c>--connect-to</c> host every connection reports, or <see langword="null" /> for none.</summary>
+    public string? MappedHost { get; set; }
+
+    /// <summary>Gets or sets the <c>--connect-to</c> port every connection reports beside <see cref="MappedHost" />.</summary>
+    public int MappedPort { get; set; }
+
     /// <inheritdoc />
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -54,6 +60,8 @@ public sealed class FakeConnector : IConnector
             new IPEndPoint(IPAddress.Loopback, 50000 + number),
             proxyConnectResponseCode: 200,
             peerCertificates: [new byte[] { (byte)number }],
-            unixSocketPath: UnixSocketPath));
+            unixSocketPath: UnixSocketPath,
+            mappedHost: MappedHost,
+            mappedPort: MappedPort));
     }
 }

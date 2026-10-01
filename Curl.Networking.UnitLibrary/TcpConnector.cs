@@ -568,7 +568,8 @@ public sealed partial class TcpConnector(
         }
 
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
-        return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken).ConfigureAwait(false);
+        var named = destination.IsMapped ? dialed with { MappedDestination = destination } : dialed;
+        return await SecureWhenAskedAsync(named, target, timings, 0, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1241,7 +1242,9 @@ public sealed partial class TcpConnector(
             isReused: false,
             connectionNumber,
             applicationProtocol,
-            unixSocketPath: dialed.UnixSocketPath);
+            unixSocketPath: dialed.UnixSocketPath,
+            mappedHost: dialed.MappedDestination?.Host,
+            mappedPort: dialed.MappedDestination?.Port ?? 0);
     }
 
     // A forward proxy is the target itself, so its handshake runs through the proxy's
@@ -1403,7 +1406,15 @@ public sealed partial class TcpConnector(
         string HostName,
         IPEndPoint? RemoteEndPoint,
         string? UnixSocketRemoteIp = null,
-        string? UnixSocketPath = null);
+        string? UnixSocketPath = null)
+    {
+        /// <summary>
+        /// Gets the <c>--connect-to</c> or alt-svc destination the socket was dialled to in
+        /// place of the target's host and port, which the HTTP handler names in its left-intact
+        /// line (BL-975); <see langword="null" /> when the socket went to the target itself or a proxy.
+        /// </summary>
+        public ConnectDestination? MappedDestination { get; init; }
+    }
 
     /// <summary>
     /// What a CONNECT tunnel is opened for: the target, the destination named in the CONNECT,

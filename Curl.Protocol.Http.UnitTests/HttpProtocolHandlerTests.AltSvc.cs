@@ -72,6 +72,24 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual("Connection #0 to host localhost:18443 left intact", events.Info[^1]);
     }
 
+    /// <summary>
+    /// Measured (BL-975): <c>-v --connect-to example.invalid:80:127.0.0.1:18499 http://example.invalid/</c>
+    /// makes curl 8.21.0 end <c>* Connection #0 to host 127.0.0.1:18499 left intact</c>, naming the
+    /// destination the connector reports, ahead of any alt-svc alternative.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_KeptAliveOnAConnectToDestination_ReportsTheDestinationLeftIntact()
+    {
+        RecordingTransferEvents events = new();
+        QueueConnector connector = new(ConnectResult.Connected(Connection(EmptyOkHead, 65536), null, mappedHost: "127.0.0.1", mappedPort: 18499));
+
+        TransferResult result = await Handler(connector)
+            .ExecuteAsync(CookieContext(AltSvcHttpsUrl, new HttpRequestOptions { AltSvcRoute = new("h1", AltSvcAlternative18443) }, events));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("Connection #0 to host 127.0.0.1:18499 left intact", events.Info[^1]);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_KeptAliveWithoutAnAltSvcRoute_ReportsTheOriginLeftIntact()
     {
