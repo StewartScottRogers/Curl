@@ -9,7 +9,7 @@ touches: [Audit/Tools/Write-AuditFindings.ps1, Audit/Tools/Fixtures/findings]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1016 — Write audit findings and close them only on a confirming re-audit
 
@@ -54,13 +54,19 @@ every rule above.
 
 ## Acceptance criteria
 
-- [ ] A report key that matches a `rejected` finding is not filed again: the finding gains a Re-audits line saying it is still reported, and its status stays `rejected` (Decided by Claude, 2026-09-30, raised while writing the BL-1001 formats: otherwise every audit re-files what Stewart already turned down).
-- [ ] `-SelfTest` prints `PASS` and no `FAIL` for: a new finding filed as `proposed` with the next ID; a repeated key appends a re-audit line and files nothing; a planted-defect match is skipped and appears in `catches.json`; `reproduces: false` from a reliable auditor closes the finding with `closed-by`; `reproduces: false` from an unreliable auditor does not close it; a finding whose task is Done but has no re-audit stays open; a `rejected` finding is untouched; a key matching a closed finding files a new one that names it.
-- [ ] Output files match `FINDING-TEMPLATE.md`'s front matter and section order exactly.
-- [ ] Header help documents parameters and rules; ASCII only; runs under PowerShell 7 and Windows PowerShell 5.1.
+- [x] A report key that matches a `rejected` finding is not filed again: the finding gains a Re-audits line saying it is still reported, and its status stays `rejected` (Decided by Claude, 2026-09-30, raised while writing the BL-1001 formats: otherwise every audit re-files what Stewart already turned down).
+- [x] `-SelfTest` prints `PASS` and no `FAIL` for: a new finding filed as `proposed` with the next ID; a repeated key appends a re-audit line and files nothing; a planted-defect match is skipped and appears in `catches.json`; `reproduces: false` from a reliable auditor closes the finding with `closed-by`; `reproduces: false` from an unreliable auditor does not close it; a finding whose task is Done but has no re-audit stays open; a `rejected` finding is untouched; a key matching a closed finding files a new one that names it.
+- [x] Output files match `FINDING-TEMPLATE.md`'s front matter and section order exactly.
+- [x] Header help documents parameters and rules; ASCII only; runs under PowerShell 7 and Windows PowerShell 5.1.
 
 ## Notes
+
+- Audit branch commits d4702810 and 86fd76c8. -SelfTest: 11 PASS, 0 FAIL under Windows PowerShell 5.1 and PowerShell 7.6.6 (new AF with next ID; repeat adds a line; planted match to catches.json; reliable re-audit closes; unreliable does not; Done task with no re-audit stays open; rejected stays rejected with a still-reported line; reappeared closed key files new naming it; unreliable flag in Summary; template fields and sections; summary line). ASCII only.
+- Findings/README.md rule 8 updated for the rejected-finding decision.
+- The catch rule is the same as BL-1017's: same auditor, same file, and the manifest's catch fragment in title, key or evidence; the seeder now writes catch as a short fragment.
 
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. Write-AuditFindings.ps1 files, repeats, re-audits and closes findings by the rules, with catches to catches.json; on the audit branch.
