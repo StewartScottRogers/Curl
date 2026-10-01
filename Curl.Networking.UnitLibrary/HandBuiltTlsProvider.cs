@@ -327,6 +327,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var (clientCertificate, clientCertificateFailure) = ClientCertificateLoader.Load(_options, _matchesSchannelBuild, _certificateStore, _timeProvider.GetUtcNow());
         if (clientCertificateFailure is not null)
         {
+            SslStreamTlsProvider.ReportTrustBeforeClientCertificateFailure(events, _options, targetHost, _matchesSchannelBuild);
             return (null, clientCertificateFailure, false);
         }
 

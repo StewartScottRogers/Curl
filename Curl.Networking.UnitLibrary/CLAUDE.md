@@ -133,7 +133,10 @@ and client certificate are ready (`-k`, the `--cacert` file or else the referenc
 default bundle name `/cacert.pem`, which is named but never read, and `--capath`), sets the
 event's `VerifiedHostName` (the host without IPv6 brackets, `null` with `-k`) and `IsProxy`;
 `TcpConnector` reports the HTTPS proxy's handshake, and a forward proxy's, with `IsProxy` set
-through `IHandshakeReportingTlsProvider`'s `isProxy` argument. `SslStream` exposes no TLS
+through `IHandshakeReportingTlsProvider`'s `isProxy` argument. Per ADR-0304 (BL-1088) a `--cert`
+that does not load still reports the trust first in the Schannel build, with `TargetsIpAddress`
+`false` (curl writes no SNI line), through `ReportTrustBeforeClientCertificateFailure`, in both
+providers; the OpenSSL build reports none. `SslStream` exposes no TLS
 records, so no `TlsMessageEvent` is reported. Per ADR-0124 the origin handshake of an `https://`
 transfer offers `http/1.1` through ALPN (`TcpConnector.ApplicationProtocolsFor`), none under `--no-alpn`
 (`TlsClientOptions.UseAlpn`); the Schannel build under `--ssl-revoke-best-effort`

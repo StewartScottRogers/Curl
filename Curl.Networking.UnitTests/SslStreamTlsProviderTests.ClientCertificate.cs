@@ -145,6 +145,35 @@ public sealed partial class SslStreamTlsProviderTests
                 : $"could not load PEM client certificate from {file}, OpenSSL error error:80000002:system library::No such file or directory, (no key found, wrong passphrase, or wrong file format?)");
     }
 
+    // BL-1088: curl 8.21.0's Schannel build writes "schannel: disabled automatic use of client
+    // certificate" before it fails on the certificate, and never gets as far as the SNI line.
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithAMissingClientCertificateFileToAnIpAddressInTheSchannelBuild_ReportsTheTrustWithoutTheIpAddressBeforeFailingWithExit58()
+    {
+        var events = new RecordingTransferEvents();
+        var options = new TlsClientOptions(Insecure: true, ClientCertificate: Path.Combine(_caFileDirectory, "nosuch.pem"));
+
+        var result = await new SslStreamTlsProvider(options, SchannelBuild).AuthenticateAsClientAsync(new FakeConnection(), "127.0.0.1", events, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SslCertProblem, result.ExitCode);
+        var trust = (TlsTrustEvent)Assert.ContainsSingle(events.TlsEvents);
+        Assert.IsFalse(trust.UsesAutomaticClientCertificate);
+        Assert.IsFalse(trust.TargetsIpAddress);
+        Assert.IsFalse(trust.VerifiesPeer);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithAMissingClientCertificateFileInTheOpenSslBuild_ReportsNoTrust()
+    {
+        var events = new RecordingTransferEvents();
+        var options = new TlsClientOptions(Insecure: true, ClientCertificate: Path.Combine(_caFileDirectory, "nosuch.pem"));
+
+        var result = await new SslStreamTlsProvider(options, OpenSslBuild).AuthenticateAsClientAsync(new FakeConnection(), "127.0.0.1", events, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SslCertProblem, result.ExitCode);
+        Assert.IsEmpty(events.TlsEvents);
+    }
+
     [TestMethod]
     [DataRow(SchannelBuild, "schannel: Failed to get certificate location or file for ")]
     [DataRow(OpenSslBuild, "could not load PEM client certificate from , OpenSSL error error:80000002:system library::No such file or directory, (no key found, wrong passphrase, or wrong file format?)")]

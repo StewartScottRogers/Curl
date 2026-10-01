@@ -350,6 +350,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var (clientCertificate, clientCertificateFailure) = LoadClientCertificate();
         if (clientCertificateFailure is not null)
         {
+            ReportTrustBeforeClientCertificateFailure(events, _options, targetHost, _matchesSchannelBuild);
             await plaintext.DisposeAsync().ConfigureAwait(false);
             return clientCertificateFailure;
         }
@@ -538,6 +539,26 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         CaCertificateFile = options.CaCertificateFile ?? OpenSslDefaultCaCertificateFile,
         CaCertificateDirectory = options.CaCertificateDirectory,
     };
+
+    /// <summary>
+    /// Reports, in the Schannel build only, the trust curl's Schannel build writes before a
+    /// <c>--cert</c> that does not load: its <c>schannel_acquire_credential_handle</c> writes
+    /// whether the client certificate is picked automatically, then fails on the certificate,
+    /// before <c>schannel_connect_step1</c> would write the SNI line, so the event carries
+    /// <see cref="TlsTrustEvent.TargetsIpAddress" /> <see langword="false" /> whatever the host
+    /// (measured with curl 8.21.0, BL-1088, ADR-0304). The OpenSSL build reports nothing.
+    /// </summary>
+    /// <param name="events">Where the trust is reported.</param>
+    /// <param name="options">The handshake's settings.</param>
+    /// <param name="targetHost">The host the handshake connects to.</param>
+    /// <param name="matchesSchannelBuild">Whether the Schannel build is reproduced.</param>
+    internal static void ReportTrustBeforeClientCertificateFailure(ITransferEvents events, TlsClientOptions options, string targetHost, bool matchesSchannelBuild)
+    {
+        if (matchesSchannelBuild)
+        {
+            events.ReportTlsTrust(DescribeTrust(options, targetHost) with { TargetsIpAddress = false });
+        }
+    }
 
     /// <summary>
     /// Returns the host name a handshake checks the certificate against, as

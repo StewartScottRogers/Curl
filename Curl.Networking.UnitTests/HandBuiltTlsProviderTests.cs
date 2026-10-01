@@ -447,6 +447,23 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.IsTrue(plaintextStream.IsDisposed);
     }
 
+    // BL-1088: the Schannel build's client-certificate line comes before the failure; no SNI line.
+    [TestMethod]
+    [DataRow(SchannelBuild, 1)]
+    [DataRow(OpenSslBuild, 0)]
+    public async Task AuthenticateAsClientAsync_WithAClientCertificateThatDoesNotLoadToAnIpAddress_ReportsTheTrustWithoutTheIpAddressOnlyInTheSchannelBuild(bool matchesSchannelBuild, int expectedTrustEvents)
+    {
+        var (plaintext, _) = Unanswered();
+        var events = new RecordingTransferEvents();
+        var options = new TlsClientOptions(ClientCertificate: Path.Combine(_directory, "nosuch.pem"));
+
+        var result = await Provider(options, matchesSchannelBuild).AuthenticateAsClientAsync(plaintext, "127.0.0.1", events, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SslCertProblem, result.ExitCode);
+        Assert.HasCount(expectedTrustEvents, events.TlsEvents);
+        Assert.IsTrue(events.TlsEvents.Cast<TlsTrustEvent>().All(trust => !trust.TargetsIpAddress && !trust.UsesAutomaticClientCertificate));
+    }
+
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WhenTheServerAsksForAClientCertificate_PresentsTheCertCertificate()
     {
