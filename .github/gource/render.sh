@@ -5,9 +5,8 @@
 #   hls/av1/master.m3u8    adaptive stream in AV1 at 8K, 4K and 1080p, for browsers that
 #                          decode AV1 - what the viewer page plays wherever it can
 #   hls/h264/master.m3u8   the same in H.264 at 4K and 1080p, for browsers that do not
-#   hls/<codec>/<height>p/ each quality as 2-second fragmented-MP4 segments; every quality
-#                          is bitrate-capped, so a segment stays far under GitHub's 100 MB
-#                          file limit and the whole site under GitHub Pages' 1 GB
+#   hls/<codec>/<height>p/ each quality as 2-second fragmented-MP4 segments, each far under
+#                          GitHub's 100 MB file limit (the workflow checks every file)
 #   gource.mp4             the 4K H.264 quality as one file, for download: remuxed when it
 #                          fits in 85 MiB, otherwise re-encoded (two-pass) to land there
 #   gource.gif             the widest GIF under GitHub's 10 MB inline limit, for the README
@@ -69,19 +68,19 @@ rm -f "$work/probe.ppm"
 # fast enough for a runner (it refuses 8K below preset 8); libaom is the slow fallback if
 # ffmpeg lacks it.
 #
-# Each AV1 quality is encoded to a target bitrate (VBR), not a constant quality: Gource's
-# bloom and particles made constant-quality 8K run at 95 Mbit/s on average and 240 Mbit/s at
-# peak - 2-second segments of 60 MB and a 1.3 GB site, over GitHub Pages' 1 GB limit, and
-# growing with the history. A bitrate bounds the size by the length, which is fixed: at
-# about 75 s the AV1 ladder comes to roughly 280 + 110 + 40 MB.
+# Each AV1 quality is a constant quality (CRF). At CRF 32 Gource's bloom and particles ran
+# 8K at 95 Mbit/s on average and 240 Mbit/s at peak - 2-second segments of 60 MB and a
+# 1.3 GB site, over GitHub Pages' 1 GB limit - so 8K and 4K are coarser now. A target
+# bitrate (VBR) would bound the size outright, but SVT-AV1's VBR look-ahead at 8K exhausts
+# the runner's memory and the job is killed mid-render (2026-10-01).
 gop=$(( fps * 2 ))
-av1_rate_8k=30M
-av1_rate_4k=12M
-av1_rate_1080=4M
+av1_crf_8k=42
+av1_crf_4k=40
+av1_crf_1080=36
 if ffmpeg -hide_banner -encoders 2> /dev/null | grep -q libsvtav1; then
     av1=(-c:v libsvtav1 -preset 8 -svtav1-params tune=0:scd=0)
 else
-    av1=(-c:v libaom-av1 -cpu-used 8 -row-mt 1)
+    av1=(-c:v libaom-av1 -cpu-used 8 -row-mt 1 -b:v 0)
 fi
 av1_common=(-g "$gop" -pix_fmt yuv420p)
 hls=(-f hls -hls_time 2 -hls_playlist_type vod -hls_segment_type fmp4
@@ -105,11 +104,11 @@ echo "rendering ${width}x${height} at ${fps} fps: $days day(s) at ${spd}s/day, $
     --output-framerate "$fps" --output-ppm-stream - \
   | ffmpeg -y -loglevel error -r "$fps" -f image2pipe -vcodec ppm -i - \
       -filter_complex "[0:v]split=4[a8][s4][s2][s1];[s4]scale=3840:2160:flags=lanczos,split[a4][h4];[s2]scale=1920:1080:flags=lanczos,split[a2][h2];[s1]fps=1[still]" \
-      -map "[a8]" "${av1[@]}" -b:v "$av1_rate_8k" "${av1_common[@]}" "${hls[@]}" \
+      -map "[a8]" "${av1[@]}" -crf "$av1_crf_8k" "${av1_common[@]}" "${hls[@]}" \
           -hls_segment_filename "$d/av1/4320p/seg_%03d.m4s" "$d/av1/4320p/index.m3u8" \
-      -map "[a4]" "${av1[@]}" -b:v "$av1_rate_4k" "${av1_common[@]}" "${hls[@]}" \
+      -map "[a4]" "${av1[@]}" -crf "$av1_crf_4k" "${av1_common[@]}" "${hls[@]}" \
           -hls_segment_filename "$d/av1/2160p/seg_%03d.m4s" "$d/av1/2160p/index.m3u8" \
-      -map "[a2]" "${av1[@]}" -b:v "$av1_rate_1080" "${av1_common[@]}" "${hls[@]}" \
+      -map "[a2]" "${av1[@]}" -crf "$av1_crf_1080" "${av1_common[@]}" "${hls[@]}" \
           -hls_segment_filename "$d/av1/1080p/seg_%03d.m4s" "$d/av1/1080p/index.m3u8" \
       -map "[h4]" "${x264[@]}" -crf 18 -maxrate 14M -bufsize 28M -level 5.1 "${hls[@]}" \
           -hls_segment_filename "$d/h264/2160p/seg_%03d.m4s" "$d/h264/2160p/index.m3u8" \
