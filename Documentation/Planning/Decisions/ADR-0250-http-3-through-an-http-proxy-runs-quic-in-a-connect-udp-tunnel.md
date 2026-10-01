@@ -1,4 +1,4 @@
-# ADR-0289 — HTTP/3 through an HTTP proxy runs QUIC in a CONNECT-UDP tunnel
+# ADR-0250 — HTTP/3 through an HTTP proxy runs QUIC in a CONNECT-UDP tunnel
 
 - **Status:** Accepted
 - **Date:** 2026-10-01

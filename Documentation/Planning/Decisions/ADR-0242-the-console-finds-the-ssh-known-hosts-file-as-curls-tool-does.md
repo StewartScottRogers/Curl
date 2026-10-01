@@ -1,4 +1,4 @@
-# ADR-0248 — The console finds the SSH known-hosts file as curl's tool does
+# ADR-0242 — The console finds the SSH known-hosts file as curl's tool does
 
 - **Status:** Accepted
 - **Date:** 2026-09-29

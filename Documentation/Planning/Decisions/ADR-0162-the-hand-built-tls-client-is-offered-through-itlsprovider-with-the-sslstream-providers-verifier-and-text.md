@@ -11,7 +11,7 @@ ADR-0140 routes a connection's TLS to the hand-built client in `Curl.Tls.UnitLib
 when an option `SslStream` cannot honour is in force, and gives BL-708 the second
 `ITlsProvider`, the routing function, the verifier shared with `SslStreamTlsProvider`, and
 the failure mapping. When BL-708 ran, `Curl.Tls.UnitLibrary` had two connections over a
-byte stream, `Tls13ClientConnection` (ADR-0157) and `Tls12ClientConnection` (ADR-0254),
+byte stream, `Tls13ClientConnection` (ADR-0157) and `Tls12ClientConnection` (ADR-0249),
 but no connection that offers TLS 1.3 and TLS 1.2 in one ClientHello and picks by the
 ServerHello, and no ClientHello profiles (BL-787). Of ADR-0140's routing rows, only the
 legacy-versions row's option (`--tls-max 1.0` or `1.1`) reaches `TlsClientOptions`; the

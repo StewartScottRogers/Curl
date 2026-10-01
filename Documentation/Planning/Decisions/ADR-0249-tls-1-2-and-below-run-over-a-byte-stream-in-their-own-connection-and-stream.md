@@ -1,4 +1,4 @@
-# ADR-0254 — TLS 1.2 and below run over a byte stream in their own connection and stream
+# ADR-0249 — TLS 1.2 and below run over a byte stream in their own connection and stream
 
 - **Status:** Accepted
 - **Date:** 2026-09-28
