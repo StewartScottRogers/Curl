@@ -8,7 +8,7 @@ namespace Curl.Networking;
 /// Decodes one HTTPS record's data (RFC 9460 section 2.2): the 2-byte SvcPriority, the
 /// uncompressed TargetName, then SvcParams as key, length and value until the data ends, the way
 /// curl 8.21.0's <c>doh_resp_decode_httpsrr</c> reads the first HTTPS record of a DoH answer
-/// (ADR-0311). The keys curl reads are kept: <c>alpn</c> (1), <c>no-default-alpn</c> (2),
+/// (ADR-0312). The keys curl reads are kept: <c>alpn</c> (1), <c>no-default-alpn</c> (2),
 /// <c>port</c> (3), <c>ipv4hint</c> (4), <c>ech</c> (5) and <c>ipv6hint</c> (6); any other key,
 /// <c>mandatory</c> (0) included, is skipped. A malformed record is refused with a
 /// <see cref="ServiceBindingFailure" /> rather than read past its end.

@@ -119,7 +119,7 @@ public sealed class DohDnsResolver : IDnsResolver
     /// <summary>
     /// Fetches <paramref name="host" />'s HTTPS record (RFC 9460) through the DoH server, the
     /// query curl 8.21.0 adds to the A and AAAA ones under <c>--ech true</c> or <c>hard</c> to find
-    /// the host's ECHConfigList (ADR-0311, BL-707). The name asked for is the host itself on port
+    /// the host's ECHConfigList (ADR-0312, BL-707). The name asked for is the host itself on port
     /// 443 and <c>_&lt;port&gt;._https.&lt;host&gt;</c> on any other port (RFC 9460 section 9.1), and
     /// the first HTTPS record of the answer is decoded, as curl decodes only the first.
     /// </summary>
