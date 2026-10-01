@@ -60,6 +60,11 @@ public sealed class TlsClientRoutingTests
     public void Choose_WithCurvesOrSigalgs_IsTheHandBuiltClient(TlsClientOptions options) =>
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(options));
 
+    // ADR-0319's row: --ssl-sessions, since SslStream can neither export nor import a session.
+    [TestMethod]
+    public void Choose_WithSslSessions_IsTheHandBuiltClient() =>
+        Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(SslSessionsFile: "sessions.txt")));
+
     [TestMethod]
     [DynamicData(nameof(PlainOptionSets))]
     public void Choose_WithAPlainOptionSet_IsSslStream(TlsClientOptions options) =>

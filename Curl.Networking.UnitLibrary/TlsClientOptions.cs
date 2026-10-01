@@ -126,8 +126,9 @@ namespace Curl.Networking;
 /// </param>
 /// <param name="SslSessionsFile">
 /// curl's <c>--ssl-sessions</c> file, which session tickets are loaded from and saved to;
-/// <see langword="null" /> when not given. ADR-0151 gives it to the hand-built client (BL-710);
-/// neither provider applies it yet.
+/// <see langword="null" /> when not given. It routes the connection to the hand-built client
+/// (ADR-0151), which offers and keeps sessions in the run's <see cref="TlsSessionCache" />
+/// (ADR-0319, BL-710).
 /// </param>
 /// <param name="Engine">
 /// curl's <c>--engine</c> name, verbatim; <see langword="null" /> when not given. No provider loads

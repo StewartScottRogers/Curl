@@ -379,10 +379,15 @@ internal static class CurlComposition
     /// <param name="options">The origin's or the HTTPS proxy's TLS options.</param>
     /// <param name="timeProvider">The clock the provider times its handshakes on.</param>
     /// <returns>The provider.</returns>
-    internal static ITlsProviderWithWarnings CreateTlsProvider(TlsClientOptions options, TimeProvider timeProvider) =>
-        TlsClientRouting.Choose(options) == TlsClientRoute.HandBuilt
-            ? new HandBuiltTlsProvider(options, timeProvider)
-            : new SslStreamTlsProvider(options, timeProvider);
+    /// <param name="sessions">
+    /// The run's <c>--ssl-sessions</c> cache, which the hand-built provider offers and keeps
+    /// sessions in when <see cref="TlsClientOptions.SslSessionsFile" /> is given (ADR-0313);
+    /// <see langword="null" /> for none.
+    /// </param>
+    internal static ITlsProviderWithWarnings CreateTlsProvider(TlsClientOptions options, TimeProvider timeProvider, TlsSessionCache? sessions = null) =>
+        TlsClientRouting.Choose(options) != TlsClientRoute.HandBuilt ? new SslStreamTlsProvider(options, timeProvider)
+            : sessions is not null && options.SslSessionsFile is not null ? new HandBuiltTlsProvider(options, timeProvider, sessions)
+            : new HandBuiltTlsProvider(options, timeProvider);
 
     /// <summary>
     /// Creates the network transports as <see cref="CreateTransports(CommandLineOptions)" /> does,
@@ -398,7 +403,8 @@ internal static class CurlComposition
     /// The run's connection cache, which every option group's pooling connector shares
     /// (<see cref="CreatePoolingConnector" />); <see langword="null" /> for a pool of the group's own.
     /// </param>
-    internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider, ConnectionCache? runConnections = null)
+    /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache, which the origin's TLS provider uses (ADR-0313); <see langword="null" /> for none.</param>
+    internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null)
     {
         TcpDialer tcpDialer = new(TcpSocketOptions.FromCommandLine(options.TcpNoDelay, options.TcpKeepAlive, options.TcpKeepAliveSeconds, options.TcpKeepAliveProbeCount)
             with
@@ -410,7 +416,7 @@ internal static class CurlComposition
         });
         IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
-        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider);
+        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(proxyTlsClientOptions, timeProvider);
         LateBoundSecurityContextFactory proxyContexts = new();
@@ -705,7 +711,7 @@ internal static class CurlComposition
     /// the real disk, the real network and the given standard streams, wrapping warnings at
     /// the width <see cref="TerminalColumns.Resolve()" /> gives. The network
     /// transports are built for each option group by
-    /// <see cref="CreateTransports(CommandLineOptions, TimeProvider, ConnectionCache?)" /> once the
+    /// <see cref="CreateTransports(CommandLineOptions, TimeProvider, ConnectionCache?, TlsSessionCache?)" /> once the
     /// command line is parsed, because their TLS settings come from it, over one
     /// <see cref="ConnectionCache" /> the runner closes when the run ends, so a later group reuses
     /// an earlier group's connection when their settings match (ADR-0285, BL-754).
@@ -730,8 +736,9 @@ internal static class CurlComposition
         bool terminalRendersStyles = false)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
+        TlsSessionCache tlsSessions = new(TimeProvider.System);
         return new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, TimeProvider.System, runConnections), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, TimeProvider.System, runConnections, tlsSessions), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -748,7 +755,8 @@ internal static class CurlComposition
             readEnvironmentVariable: name => Environment.GetEnvironmentVariable(name),
             terminalRendersStyles: terminalRendersStyles,
             accountHomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            runConnectionCache: runConnections);
+            runConnectionCache: runConnections,
+            tlsSessions: tlsSessions);
     }
 
     /// <summary>

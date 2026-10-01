@@ -22,7 +22,7 @@ anchor that cannot be loaded included, is an `IOException`, so the sender tries 
 Per ADR-0140 and ADR-0162 (BL-708) there are two TLS providers, and `TlsClientRouting.Choose`
 picks one from a `TlsClientOptions` as one pure function: `HandBuiltTlsProvider` when a row of
 ADR-0140's table holds (today a `MaximumVersion` of TLS 1.0 or 1.1, `RequireCertificateStatus`
-for `--cert-status` by ADR-0191, and `Curves` or `SignatureAlgorithms` by ADR-0151; each option task
+for `--cert-status` by ADR-0191, and `Curves` or `SignatureAlgorithms` by ADR-0151, and `SslSessionsFile` for `--ssl-sessions` by ADR-0319, whose `TlsSessionCache` the hand-built provider offers and keeps TLS 1.3 sessions in; each option task
 adds its row and a data row in `TlsClientRoutingTests`), `SslStreamTlsProvider` otherwise. Per
 ADR-0284 (BL-709) `CurvesAndSignatureAlgorithms.Apply` reads `--curves` through `OpenSslGroupList`
 and `--sigalgs` through `OpenSslSignatureAlgorithmList` (OpenSSL 3.5's syntax on every platform)

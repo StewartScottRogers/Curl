@@ -10,6 +10,7 @@ using Curl.Core.FileSystem;
 using Curl.Core.Globbing;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
+using Curl.Networking;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
 
@@ -123,6 +124,11 @@ namespace Curl.Console;
 /// <param name="runConnectionCache">
 /// The connection cache every option group's dispatch shares, closed once the run's transfers end
 /// (ADR-0285, BL-754); <see langword="null" /> when each group's dispatch keeps its own.
+/// </param>
+/// <param name="tlsSessions">
+/// The run's TLS session cache, which the <c>--ssl-sessions</c> file is loaded into before the
+/// transfers and saved from after them (ADR-0313, <see cref="TlsSessionFileLines" />);
+/// <see langword="null" /> to leave the file alone.
 /// </param>
 /// <remarks>
 /// <para>
@@ -249,7 +255,8 @@ internal sealed class CurlCommandRunner(
     Func<string, string?>? readEnvironmentVariable = null,
     bool terminalRendersStyles = false,
     string? accountHomeDirectory = null,
-    IAsyncDisposable? runConnectionCache = null)
+    IAsyncDisposable? runConnectionCache = null,
+    TlsSessionCache? tlsSessions = null)
 {
     /// <summary>
     /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
@@ -1011,6 +1018,7 @@ internal sealed class CurlCommandRunner(
     private async Task<CurlExitCode?> TransferAllGroupsAsync(IReadOnlyList<CommandLineOptions> groups)
     {
         standardError = writeGate.Guard(standardError);
+        await WriteTlsSessionLinesAsync(groups[0], TlsSessionFileLines.Load).ConfigureAwait(false);
         parallelRun = groups[0].Parallel ? NewParallelRun(groups[0]) : null;
         try
         {
@@ -1022,7 +1030,23 @@ internal sealed class CurlCommandRunner(
         finally
         {
             await (runConnectionCache?.DisposeAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
+            await WriteTlsSessionLinesAsync(groups[0], (sessions, options) => TlsSessionFileLines.Save(sessions, options, runsOnWindows)).ConfigureAwait(false);
             await transferEventOutput.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Loads or saves the run's <c>--ssl-sessions</c> file (ADR-0313) when the runner keeps a
+    /// session cache, and writes the lines that gives to standard error.
+    /// </summary>
+    /// <param name="options">The first option group, which holds the global <c>--ssl-sessions</c>.</param>
+    /// <param name="step">The load or the save.</param>
+    /// <returns>A task that completes when the lines are written.</returns>
+    private async Task WriteTlsSessionLinesAsync(CommandLineOptions options, Func<TlsSessionCache, CommandLineOptions, IReadOnlyList<string>> step)
+    {
+        foreach (string line in tlsSessions is null ? [] : step(tlsSessions, options))
+        {
+            await WriteErrorLineAsync(line).ConfigureAwait(false);
         }
     }
 

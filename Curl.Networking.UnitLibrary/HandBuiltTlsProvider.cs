@@ -58,6 +58,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     private readonly ServerCertificateVerification _verification;
 
+    private readonly TlsSessionCache? _sessions;
+
     /// <summary>
     /// Creates the provider for the curl build this platform usually runs: Schannel on
     /// Windows, OpenSSL elsewhere.
@@ -66,6 +68,19 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
     public HandBuiltTlsProvider(TlsClientOptions options, TimeProvider timeProvider)
         : this(options, OperatingSystem.IsWindows(), timeProvider, new SystemClientCertificateStore(), SystemTlsRandomSource.Instance)
+    {
+    }
+
+    /// <summary>
+    /// Creates the provider for the curl build this platform usually runs, offering each TLS
+    /// 1.3 handshake a session from <paramref name="sessions" /> and keeping the session
+    /// tickets it receives there (<c>--ssl-sessions</c>, ADR-0319).
+    /// </summary>
+    /// <param name="options">The settings applied to every handshake.</param>
+    /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
+    /// <param name="sessions">The run's session cache.</param>
+    public HandBuiltTlsProvider(TlsClientOptions options, TimeProvider timeProvider, TlsSessionCache sessions)
+        : this(options, OperatingSystem.IsWindows(), timeProvider, new SystemClientCertificateStore(), SystemTlsRandomSource.Instance, sessions ?? throw new ArgumentNullException(nameof(sessions)))
     {
     }
 
@@ -81,6 +96,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
     /// <param name="certificateStore">Opens the store a Schannel <c>--cert</c> store path names.</param>
     /// <param name="random">The source of the client's randoms and key shares.</param>
+    /// <param name="sessions">The run's session cache under <c>--ssl-sessions</c>, or <see langword="null" /> to neither offer nor keep sessions.</param>
     /// <exception cref="ArgumentException">
     /// <see cref="TlsClientOptions.MinimumVersion" /> is above <see cref="TlsClientOptions.MaximumVersion" />.
     /// </exception>
@@ -89,8 +105,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         bool matchesSchannelBuild,
         TimeProvider timeProvider,
         IClientCertificateStore certificateStore,
-        ITlsRandomSource random)
+        ITlsRandomSource random,
+        TlsSessionCache? sessions = null)
     {
+        _sessions = sessions;
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _ = TlsVersionRange.ToSslProtocols(options.MinimumVersion, options.MaximumVersion);
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
@@ -176,6 +194,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return await FailBeforeHandshakeAsync(plaintext, preparationFailure!, sendsInternalErrorAlert, cancellationToken).ConfigureAwait(false);
         }
 
+        var peerKey = SessionPeerKey(targetHost, plaintext.RemoteEndPoint);
+        prepared = prepared with { Settings = prepared.Settings with { ResumptionSession = OfferedSession(peerKey) } };
         var handshakeStarted = _timeProvider.GetTimestamp();
         var (handshake, thrown) = await TryHandshakeAsync(plaintext, prepared, cancellationToken).ConfigureAwait(false);
         prepared.Verifier.Observed.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
@@ -184,6 +204,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return await FailAsync(plaintext, prepared, handshake?.Failure, thrown).ConfigureAwait(false);
         }
 
+        KeepReceivedSessions(peerKey, handshake.Stream!);
         events.ReportTlsHandshake(DescribeHandshake(handshake, prepared.Verifier, offeredApplicationProtocols) with
         {
             IsProxy = isProxy,
@@ -213,6 +234,30 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             : certificate.GetRSAPrivateKey() is { } rsa ? new RsaTlsSigningKey(rsa)
             : certificate.GetECDsaPrivateKey() is { } ecdsa ? new EcdsaTlsSigningKey(ecdsa)
             : null;
+
+    // The connection's peer key in the --ssl-sessions cache, or null when there is no cache.
+    private string? SessionPeerKey(string targetHost, EndPoint? remoteEndPoint) =>
+        _sessions is null ? null : TlsSessionCache.PeerKey(targetHost, PortOf(remoteEndPoint), _options);
+
+    // The session the ClientHello offers to resume: taken out of the cache, as curl takes a TLS 1.3 one.
+    private TlsSessionRecord? OfferedSession(string? peerKey) => peerKey is null ? null : _sessions!.Take(peerKey);
+
+    // Keeps the session tickets the connection receives, read when the cache is saved.
+    private void KeepReceivedSessions(string? peerKey, Stream stream)
+    {
+        if (peerKey is not null)
+        {
+            _sessions!.Track(peerKey, () => ReceivedSessionsOf(stream));
+        }
+    }
+
+    // The port the session cache's peer key names: the connection's, or https's when the
+    // connection does not know its address.
+    internal static int PortOf(EndPoint? remoteEndPoint) => remoteEndPoint is IPEndPoint address ? address.Port : 443;
+
+    // The session tickets a TLS 1.3 connection has received; the TLS 1.2 client keeps none.
+    internal static IReadOnlyList<TlsSessionRecord> ReceivedSessionsOf(Stream stream) =>
+        stream is Tls13ClientStream tls13 ? tls13.Handshake.ReceivedSessions : [];
 
     /// <summary>
     /// Returns the name the ClientHello carries in <c>server_name</c>: the target host, or
@@ -492,6 +537,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         // --cert-status: ask for a stapled OCSP response and judge it on this clock.
         internal bool RequestOcspStatus { get; init; }
 
+        // --ssl-sessions: the session the TLS 1.3 ClientHello offers to resume, if any.
+        internal TlsSessionRecord? ResumptionSession { get; init; }
+
         internal TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
         private IReadOnlyList<ushort> OfferedSuites => CipherSuites ?? Profile.CipherSuites;
@@ -514,6 +562,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             ClientCertificate = ClientCertificate,
             RequestOcspStatus = RequestOcspStatus,
             TimeProvider = TimeProvider,
+            ResumptionSession = ResumptionSession,
             CipherSuites = [.. OfferedSuites.Where(Tls13RecordProtection.CanProtect)],
             SupportedGroups = alongsideTls12 ? Profile.SupportedGroups : [.. Profile.SupportedGroups.Where(TlsNamedGroup.CanShare)],
             KeyShareGroups = Profile.KeyShareGroups,
