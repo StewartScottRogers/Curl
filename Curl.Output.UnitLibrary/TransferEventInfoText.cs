@@ -74,6 +74,25 @@ internal static class TransferEventInfoText
         return tlsBackend == TlsBackend.OpenSsl || trust.IsQuic ? OpenSslTrustText.Lines(trust) : SchannelTrustText.Lines(trust);
     }
 
+    /// <summary>
+    /// Returns the info lines a curl build prints for one TLS message: the OpenSSL build's
+    /// <c>TLSv1.3 (IN), ...</c> line (<see cref="OpenSslMessageText"/>), when it has one; the
+    /// Schannel build's three renegotiation lines for a received session ticket
+    /// (<see cref="SchannelRenegotiationText"/>, BL-1089), and none for any other message.
+    /// </summary>
+    /// <param name="message">The message.</param>
+    /// <param name="tlsBackend">The curl build whose wording to use.</param>
+    /// <returns>The lines, without the <c>* </c> prefix, in the order curl prints them.</returns>
+    public static IReadOnlyList<string> TlsMessage(TlsMessageEvent message, TlsBackend tlsBackend)
+    {
+        if (tlsBackend == TlsBackend.Schannel)
+        {
+            return SchannelRenegotiationText.Lines(message);
+        }
+
+        return OpenSslMessageText.Line(message) is { } line ? [line] : [];
+    }
+
     private static IReadOnlyList<string> AlpnLines(TlsHandshakeEvent handshake)
     {
         if (handshake.OfferedApplicationProtocols.Count == 0)

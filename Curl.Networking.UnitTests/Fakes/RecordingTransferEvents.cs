@@ -61,6 +61,12 @@ public sealed class RecordingTransferEvents : ITransferEvents
     /// <inheritdoc />
     public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) => VerifyResults.Add((verifyResult, isProxy));
 
+    /// <summary>Gets every <see cref="ReportTlsMessage" /> message, in the order reported.</summary>
+    public List<TlsMessageEvent> TlsMessages { get; } = [];
+
+    /// <inheritdoc />
+    public void ReportTlsMessage(TlsMessageEvent message) => TlsMessages.Add(message);
+
     /// <inheritdoc />
     public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)
     {

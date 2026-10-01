@@ -155,11 +155,12 @@ public sealed class VerboseTransferEventWriter(
     /// <inheritdoc />
     /// <remarks>
     /// The OpenSSL build writes the message's line (<see cref="OpenSslMessageText"/>), when it
-    /// has one, then its bytes as <see cref="ReportTlsData"/> does; the Schannel build writes nothing.
+    /// has one, then its bytes as <see cref="ReportTlsData"/> does; the Schannel build writes only
+    /// its renegotiation lines for a received session ticket (<see cref="SchannelRenegotiationText"/>).
     /// </remarks>
     public void ReportTlsMessage(TlsMessageEvent message)
     {
-        if (tlsBackend == TlsBackend.OpenSsl && OpenSslMessageText.Line(message) is { } line)
+        foreach (string line in TransferEventInfoText.TlsMessage(message, tlsBackend))
         {
             WriteTextLine(line);
         }

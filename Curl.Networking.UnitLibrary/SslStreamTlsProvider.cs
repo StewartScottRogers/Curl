@@ -287,7 +287,10 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <see cref="TlsHandshakeEvent.VerifiedHostName" /> the target host without IPv6
     /// brackets, or <see langword="null" /> under <see cref="TlsClientOptions.Insecure" />.
     /// <see cref="SslStream" /> exposes no TLS records, so no <see cref="TlsMessageEvent" /> is
-    /// reported (ADR-0085).
+    /// reported (ADR-0085), except in the Schannel build after a TLS 1.3 handshake: each session
+    /// ticket record <see cref="SessionTicketRecordDetector" /> finds before the first
+    /// application data is reported, from the connection's first read, as a received
+    /// <c>NewSessionTicket</c> (ADR-0306, BL-1089).
     /// </para>
     /// </remarks>
     /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
@@ -391,7 +394,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             },
         };
 
-        var transport = new ConnectionStream(plaintext);
+        var transport = OpenTransport(plaintext);
         var sslStream = new SslStream(transport, leaveInnerStreamOpen: true);
         Exception failure;
         try
@@ -405,7 +408,11 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
             });
             return ConnectResult.Connected(
-                new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), clearsTls: !_matchesSchannelBuild),
+                new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), clearsTls: !_matchesSchannelBuild)
+                {
+                    TicketRecords = FollowTicketRecordsAfterHandshake(transport, sslStream.SslProtocol),
+                    TicketEvents = events,
+                },
                 new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
                 peerCertificates: peerCertificates,
                 applicationProtocol: NegotiatedApplicationProtocol(sslStream.NegotiatedApplicationProtocol));
@@ -474,6 +481,29 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         }
 
         return [.. sent];
+    }
+
+    // The Schannel build watches the records read for TLS 1.3 session tickets (BL-1089).
+    private ConnectionStream OpenTransport(IConnection plaintext) =>
+        new(plaintext) { TicketRecords = _matchesSchannelBuild ? new SessionTicketRecordDetector() : null };
+
+    /// <summary>
+    /// Keeps the transport's <see cref="SessionTicketRecordDetector" /> watching after a TLS 1.3
+    /// handshake, the only version whose tickets curl's Schannel build reports (measured with
+    /// <c>--tls-max 1.2</c>, BL-1089), and drops it otherwise.
+    /// </summary>
+    /// <param name="transport">The stream the handshake ran over.</param>
+    /// <param name="negotiated">The version the handshake negotiated.</param>
+    /// <returns>The detector still watching, or <see langword="null" /> when none is.</returns>
+    internal static SessionTicketRecordDetector? FollowTicketRecordsAfterHandshake(ConnectionStream transport, SslProtocols negotiated)
+    {
+        if (negotiated != SslProtocols.Tls13)
+        {
+            transport.TicketRecords = null;
+        }
+
+        transport.TicketRecords?.MarkHandshakeComplete();
+        return transport.TicketRecords;
     }
 
     private static TlsHandshakeEvent DescribeHandshake(

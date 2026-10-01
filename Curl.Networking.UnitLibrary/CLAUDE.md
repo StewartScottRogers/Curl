@@ -137,7 +137,11 @@ through `IHandshakeReportingTlsProvider`'s `isProxy` argument. Per ADR-0305 (BL-
 that does not load still reports the trust first in the Schannel build, with `TargetsIpAddress`
 `false` (curl writes no SNI line), through `ReportTrustBeforeClientCertificateFailure`, in both
 providers; the OpenSSL build reports none. `SslStream` exposes no TLS
-records, so no `TlsMessageEvent` is reported. Per ADR-0124 the origin handshake of an `https://`
+records, so no `TlsMessageEvent` is reported, with one exception (ADR-0306, BL-1089): in the Schannel
+build after a TLS 1.3 handshake, `ConnectionStream.TicketRecords` (a `SessionTicketRecordDetector`)
+follows the record boundaries read, and at the first read returning plaintext `SslStreamConnection`
+reports each leading record no application data accounts for as a received `NewSessionTicket`, so
+`-v` writes curl's `schannel:` renegotiation lines. Per ADR-0124 the origin handshake of an `https://`
 transfer offers `http/1.1` through ALPN (`TcpConnector.ApplicationProtocolsFor`), none under `--no-alpn`
 (`TlsClientOptions.UseAlpn`); the Schannel build under `--ssl-revoke-best-effort`
 (`TlsClientOptions.RevocationCheckBestEffort`) accepts a `--cacert` chain whose only faults are an
