@@ -59,7 +59,11 @@
     <repo>.logs\lanes-<stamp>\; the coordinator restarts a lane whose process has died (five tries
     each) and the lane resumes its task from the work in its worktree, first integrating
     any finished commits it had not pushed. A new shift adopts a stopped shift's lanes the
-    same way instead of refusing to start over their tasks in Doing. A run that dies on
+    same way instead of refusing to start over their tasks in Doing. A task in Doing that
+    no lane holds (BL-1071) is adopted by the one lane worktree with uncommitted work, or,
+    when none has any and a parked factory/<ID>-lane-* branch holds its work, returned to
+    Backlog; anything else refuses to start, and every refusal raises the alarm, so the
+    factory never stops without saying why. A run that dies on
     the API without naming the limit waits until a one-word probe is answered, then runs
     again (three times at most).
 
@@ -147,7 +151,9 @@
                  the fast tests and pushes. Red fast tests are run once more, with the
                  failing test names traced as "flaky?"; only red twice parks (BL-898). A conflict gets one headless run to resolve
                  it. Work that still will not integrate is pushed to its own branch,
-                 factory/<ID>-lane-<n>, and the task goes to Blocked for Stewart.
+                 factory/<ID>-lane-<n>-<stamp>, and the task goes back to Backlog on the
+                 shared branch, retried for several minutes; a park whose move is never
+                 pushed is in the lane's summary and the end-of-shift report (BL-1071).
 
     Claims and integrations hold ..\<repo>.lanes\integrate.lock, so they happen one at
     a time; runs overlap freely. This window coordinates: it starts the lanes, waits
@@ -324,6 +330,10 @@ param(
     # Prove the CURL_DARK_FACTORY_LANE marker's value for a lane, a coordinator and a
     # launcher, and that a claude -p run inherits it, and exit.
     [switch]$TestLaneMarker,
+    # Prove, on a throwaway repository, that a park pushes its move to Backlog or reports
+    # that it could not, how shift start settles a task in Doing held by no lane, and that a
+    # refused start raises the alarm (BL-1071), and exit.
+    [switch]$TestPark,
     # How often, in minutes, the lanes' heartbeats are published as status.json on the
     # force-pushed board branch, plus once at shift end. 0 = never publish.
     [ValidateRange(0, 60)][int]$HeartbeatMinutes = 3,
@@ -3029,22 +3039,129 @@ function Invoke-Park {
     # Work that will not integrate is kept on a branch of its own, and the task goes to
     # back to Backlog on the shared branch, so a later run picks it up from that branch and
     # fixes what broke. Integration trouble is Claude's to solve, not Stewart's.
-    param([string]$Id, [string]$Why)
+    # Returns '' once the task has left Doing on the shared branch, or a line for the lane's
+    # summary and the end-of-shift report saying it has not (BL-1071). The push that failed
+    # to integrate often failed because the remote was out of reach, so the move is retried
+    # for several minutes, waiting -RetrySeconds between tries.
+    param([string]$Id, [string]$Why, [int[]]$RetrySeconds = @(10, 30, 60, 120, 300))
     $park = "factory/$Id-lane-$Lane-$Stamp"
     # A local branch too: lanes may not fetch, but every worktree sees local branches.
     Invoke-Git @('branch', '-f', $park, 'HEAD') | Out-Null
     Invoke-Git @('push', '-q', 'origin', "HEAD:refs/heads/$park") | Out-Null
     $lock = Enter-Lock
     try {
-        foreach ($attempt in 1..3) {
+        foreach ($wait in @(0) + $RetrySeconds) {
+            if ($wait) { Start-Sleep -Seconds $wait }
             if (-not (Sync-Lane)) { continue }
-            if ((Get-TaskState $Id) -ne 'Doing') { return }
+            if ((Get-TaskState $Id) -ne 'Doing') { return '' }
             Invoke-Board @('move', '-Id', $Id, '-To', 'Backlog', '-Reason', "Lane $Lane could not integrate: $Why. The work is on branch $park; start with git cherry-pick --no-commit $park and fix it.") | Out-Null
             Invoke-Git @('add', '-A', 'Tasks') | Out-Null
-            Invoke-Git @('commit', '-q', '-m', "chore(tasks): block $Id - $Why") | Out-Null
-            if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return }
+            Invoke-Git @('commit', '-q', '-m', "chore(tasks): park $Id - $Why") | Out-Null
+            if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return '' }
         }
     } finally { $lock.Dispose() }
+    return "$Id PARK NOT PUSHED  $Why, and its move to Backlog never reached $Branch either, so it is still in Doing there. The work is on local branch $park; the next shift returns the task to Backlog."
+}
+
+function Get-ParkedBranches {
+    # The branches Invoke-Park kept task $Id's work on, local or on origin, by short name.
+    param([string]$Id, [string]$Repo = $Root)
+    $refs = @(git -C $Repo for-each-ref --format='%(refname:short)' "refs/heads/factory/$Id-lane-*" "refs/remotes/origin/factory/$Id-lane-*" 2>$null)
+    return @($refs | Where-Object { $_ } | ForEach-Object { "$_" -replace '^origin/', '' } | Sort-Object -Unique)
+}
+
+function Test-WorktreeDirty {
+    # Whether the worktree at $Dir exists and has uncommitted work.
+    param([string]$Dir)
+    if (-not (Test-Path (Join-Path $Dir '.git'))) { return $false }
+    return [bool](@(git -C $Dir status --porcelain 2>$null) | Where-Object { $_ })
+}
+
+function Get-OrphanAction {
+    # What shift start does with task $Id, in Doing but held by no lane of the previous shift
+    # (BL-1071): adopt it into the one lane worktree with uncommitted work, so that lane
+    # resumes it; return it to Backlog when no worktree has work and a parked branch holds
+    # it; otherwise refuse, saying why. -DirtyLanes are the lanes not already adopted whose
+    # worktrees have uncommitted work.
+    param([string]$Id, [string[]]$ParkedBranches, [int[]]$DirtyLanes)
+    $dirty = @($DirtyLanes | Where-Object { $_ })
+    if ($dirty.Count -eq 1) { return [pscustomobject]@{ Action = 'adopt'; Lane = $dirty[0]; Branch = ''; Why = '' } }
+    if ($dirty.Count -gt 1) {
+        return [pscustomobject]@{ Action = 'refuse'; Lane = 0; Branch = ''; Why = "$Id is in Doing and held by no lane, and lanes $($dirty -join ', ') have uncommitted work; which one is its work cannot be told" }
+    }
+    $parked = @($ParkedBranches | Where-Object { $_ } | Sort-Object)
+    if ($parked.Count) { return [pscustomobject]@{ Action = 'backlog'; Lane = 0; Branch = $parked[-1]; Why = '' } }
+    return [pscustomobject]@{ Action = 'refuse'; Lane = 0; Branch = ''; Why = "$Id is in Doing and held by no lane, no lane worktree has uncommitted work and no parked branch factory/$Id-lane-* exists" }
+}
+
+function Stop-ShiftStart {
+    # A shift that refuses to start says why: in the trace, and in the alarm that is the
+    # end-of-shift notice, so the factory never stops silently (BL-1071). The caller exits.
+    param([string]$Why, [scriptblock]$Notify = { param([string[]]$Reasons) Set-OwnTabLabel 'ALARM, read'; Invoke-Alarm -Reasons $Reasons })
+    Write-Trace '-' 'refuse' $Why 'Red'
+    & $Notify -Reasons @("SHIFT REFUSED  $Why", 'No shift runs until this is cleared and a shift is started again.')
+}
+
+if ($TestPark) {
+    # Lane 9 of a made-up shift parks two tasks in a throwaway repository with a bare origin:
+    # the first while origin answers, the second after origin has gone.
+    $temp = Join-Path ([IO.Path]::GetTempPath()) "df-park-$PID"
+    $origin = Join-Path $temp 'origin.git'
+    $repo = Join-Path $temp 'lane-9'
+    New-Item -ItemType Directory -Force -Path $temp | Out-Null
+    git init -q --bare -b work $origin 2>&1 | Out-Null
+    git clone -q $origin $repo 2>&1 | Out-Null
+    git -C $repo config user.name t; git -C $repo config user.email t@t
+    git -C $repo checkout -q -b work 2>&1 | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Tasks\Doing'), (Join-Path $repo 'Tasks\Backlog') | Out-Null
+    foreach ($id in 'BL-001', 'BL-002') {
+        Set-Content -Path (Join-Path $repo "Tasks\Doing\$id-park-me.md") -Encoding UTF8 -Value @(
+            '---', "id: $id", 'title: Park me', 'priority: Normal', 'assignee: Claude', 'pipeline: direct',
+            'depends-on: []', 'touches: [x]', 'requirement: none', 'created: 2026-10-01', 'completed:', '---',
+            "# $id - Park me", '', '## Goal', '', '## Context', '', '## Acceptance criteria', '', '- [x] Parked.', '', '## Notes', '', '## Log', '', '- 2026-10-01: Created.')
+    }
+    git -C $repo add -A 2>&1 | Out-Null
+    git -C $repo commit -q -m board 2>&1 | Out-Null
+    git -C $repo push -q origin work 2>&1 | Out-Null
+    $script:Root = $repo; $script:Branch = 'work'; $script:Lane = 9; $script:Stamp = 'test'
+    $script:LanesDir = $temp; $script:LockFile = Join-Path $temp 'integrate.lock'; $script:LogDir = Join-Path $temp 'logs'
+    $env:CLAUDE_PROJECT_DIR = $repo
+    $quiet = { param([string[]]$Reasons) $script:Alarmed = $Reasons }
+    $failed = 0
+    $cases = @(
+        ,@('a park pushes its move to Backlog, naming the branch', "'' Backlog factory/BL-001-lane-9-test", {
+            Set-Content -Path (Join-Path $repo 'work.txt') -Value 'work'
+            git -C $repo add -A 2>&1 | Out-Null; git -C $repo commit -q -m work 2>&1 | Out-Null
+            $r = Invoke-Park -Id 'BL-001' -Why 'push kept being refused' -RetrySeconds @()
+            $shared = @(git -C $repo ls-tree -r --name-only origin/work Tasks) -join ' '
+            $log = (git -C $repo show 'origin/work:Tasks/Backlog/BL-001-park-me.md') -join ' '
+            "'$r' $(if ($shared -match 'Backlog/BL-001-' -and $shared -notmatch 'Doing/BL-001-') { 'Backlog' } else { 'Doing' }) $(if ($log -match 'branch (factory/BL-001-lane-9-test);') { $Matches[1] } else { 'no branch in the Log' })" })
+        ,@('a park that cannot push says so for the summary', 'BL-002 PARK NOT PUSHED, still in Doing, branch kept', {
+            git -C $repo remote set-url origin (Join-Path $temp 'gone.git') 2>&1 | Out-Null
+            # The git failures it traces are expected here, so they are not printed.
+            $r = Invoke-Park -Id 'BL-002' -Why 'push kept being refused' -RetrySeconds @(0) 6>$null
+            "$(if ($r -match '^BL-002 PARK NOT PUSHED ') { 'BL-002 PARK NOT PUSHED' } else { "'$r'" }), $(if ($r -match 'still in Doing') { 'still in Doing' } else { 'state not said' }), $(if ((Get-ParkedBranches 'BL-002' $repo) -contains 'factory/BL-002-lane-9-test') { 'branch kept' } else { 'no branch' })" })
+        ,@('an orphan with a parked branch and clean lanes goes to Backlog', 'backlog factory/BL-002-lane-9-test', {
+            $a = Get-OrphanAction -Id 'BL-002' -ParkedBranches (Get-ParkedBranches 'BL-002' $repo) -DirtyLanes @(@(9) | Where-Object { Test-WorktreeDirty $repo })
+            "$($a.Action) $($a.Branch)" })
+        ,@('an orphan with uncommitted work in one lane is adopted by it', 'adopt 9', {
+            Set-Content -Path (Join-Path $repo 'half-done.txt') -Value 'half'
+            $a = Get-OrphanAction -Id 'BL-002' -ParkedBranches (Get-ParkedBranches 'BL-002' $repo) -DirtyLanes @(@(9) | Where-Object { Test-WorktreeDirty $repo })
+            "$($a.Action) $($a.Lane)" })
+        ,@('an orphan with no work anywhere is refused, saying why', 'refuse no parked branch', {
+            $a = Get-OrphanAction -Id 'BL-003' -ParkedBranches (Get-ParkedBranches 'BL-003' $repo) -DirtyLanes @()
+            "$($a.Action) $(if ($a.Why -match 'no parked branch factory/BL-003-lane-\* exists') { 'no parked branch' } else { $a.Why })" })
+        ,@('a refused start raises the alarm with its reason', 'SHIFT REFUSED  BL-003 is in Doing', {
+            $script:Alarmed = @()
+            Stop-ShiftStart -Why 'BL-003 is in Doing' -Notify $quiet
+            "$($script:Alarmed | Select-Object -First 1)" }))
+    foreach ($case in $cases) {
+        $got = & $case[2]
+        if ($case[1] -ceq $got) { Write-Host "PASS $($case[0]): $got" -ForegroundColor Green }
+        else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $got" -ForegroundColor Red; $failed++ }
+    }
+    Remove-Item -Recurse -Force -Path $temp -ErrorAction SilentlyContinue
+    exit $(if ($failed) { 1 } else { 0 })
 }
 
 function Write-LaneSummary {
@@ -3441,15 +3558,16 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     try { $Host.UI.RawUI.WindowTitle = "Dark factory - $(if ($AutoLanes) { 'auto' } else { $LaneCount }) lanes" } catch { }
     if ($ShiftBranch) { $moved = Restore-ShiftBranch -Branch $ShiftBranch; if ($moved) { Write-Trace '-' 'branch' $moved 'Red' } }
     $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
-    if ($branch -in 'master', 'main') { Write-Trace '-' 'refuse' "on $branch; switch to a feature branch" 'Red'; exit 1 }
-    if (Get-Dirty) { Write-Trace '-' 'refuse' 'working tree not clean; commit or stash first' 'Red'; exit 1 }
+    if ($branch -in 'master', 'main') { Stop-ShiftStart "on $branch; switch to a feature branch"; exit 1 }
+    if (Get-Dirty) { Stop-ShiftStart 'working tree not clean; commit or stash first'; exit 1 }
     git -C $Root fetch -q origin $branch
     if ((git -C $Root rev-parse HEAD).Trim() -ne (git -C $Root rev-parse "origin/$branch").Trim()) {
-        Write-Trace '-' 'refuse' "$branch differs from origin/$branch; push or pull first" 'Red'; exit 1
+        Stop-ShiftStart "$branch differs from origin/$branch; push or pull first"; exit 1
     }
     # Tasks in Doing are only allowed when a previous shift's lane holds each of them and that
     # lane is dead - a shift stopped mid-task, or killed while waiting for tokens. Those lanes
-    # are adopted: their worktrees are left as they are and they resume the task.
+    # are adopted: their worktrees are left as they are and they resume the task. An orphan,
+    # held by no lane, is settled by Get-OrphanAction (BL-1071).
     $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | ForEach-Object { Get-TaskIdFromFileName $_.Name })
     $adopt = @{}
     if ($stuck.Count) {
@@ -3459,12 +3577,38 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             foreach ($n in 1..16) {
                 $held = Get-LaneState $n 'task' $prevStamp
                 if (-not $held -or $stuck -notcontains $held) { continue }
-                if ((Get-LaneState $n 'pid' $prevStamp) -and (Test-LaneAlive $n $prevStamp)) { Write-Trace '-' 'refuse' "lane $n of shift $prevStamp is still running $held" 'Red'; exit 1 }
+                if ((Get-LaneState $n 'pid' $prevStamp) -and (Test-LaneAlive $n $prevStamp)) { Stop-ShiftStart "lane $n of shift $prevStamp is still running $held"; exit 1 }
                 $adopt[$n] = $held
             }
         }
         $orphans = @($stuck | Where-Object { $adopt.Values -notcontains $_ })
-        if ($orphans.Count) { Write-Trace '-' 'refuse' "task already in Doing and held by no lane: $($orphans -join ', ')" 'Red'; exit 1 }
+        if ($orphans.Count) {
+            $dirty = @(1..16 | Where-Object { -not $adopt.ContainsKey($_) -and (Test-WorktreeDirty (Join-Path $LanesDir "lane-$_")) })
+            $returned = @()
+            foreach ($id in $orphans) {
+                $action = Get-OrphanAction -Id $id -ParkedBranches (Get-ParkedBranches $id) -DirtyLanes $dirty
+                if ($action.Action -eq 'refuse') { Stop-ShiftStart $action.Why; exit 1 }
+                if ($action.Action -eq 'adopt') {
+                    $adopt[$action.Lane] = $id
+                    $dirty = @($dirty | Where-Object { $_ -ne $action.Lane })
+                    Write-Trace $id 'adopt' "held by no lane; lane $($action.Lane)'s worktree has uncommitted work, so that lane resumes it" 'Yellow'
+                    continue
+                }
+                Invoke-Board @('move', '-Id', $id, '-To', 'Backlog', '-Reason', "Returned from Doing at shift start: no lane held it and no lane worktree had uncommitted work. The work is on branch $($action.Branch); start with git cherry-pick --no-commit $($action.Branch) and fix it.") | Out-Null
+                if ((Get-TaskState $id) -ne 'Backlog') { Stop-ShiftStart "$id is in Doing and held by no lane, and moving it to Backlog failed"; exit 1 }
+                $returned += $id
+                Write-Trace $id 'requeue' "held by no lane; back to Backlog, work on $($action.Branch)" 'Yellow'
+            }
+            if ($returned.Count) {
+                git -C $Root add -A Tasks 2>&1 | Out-Null
+                git -C $Root commit -q -m "chore(tasks): return $($returned -join ', ') to Backlog - in Doing and held by no lane" 2>&1 | Out-Null
+                git -C $Root push -q origin "HEAD:$branch" 2>&1 | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    git -C $Root reset -q --hard "origin/$branch" 2>&1 | Out-Null
+                    Stop-ShiftStart "$($returned -join ', ') in Doing and held by no lane; returning them to Backlog could not be pushed to origin/$branch"; exit 1
+                }
+            }
+        }
         if (@($adopt.Keys | Where-Object { $_ -gt $LaneCount }).Count) { $LaneCount = [int]($adopt.Keys | Measure-Object -Maximum).Maximum }
     }
 
@@ -3789,15 +3933,17 @@ if ($Lane) {
 } else {
     if ($ShiftBranch) { $moved = Restore-ShiftBranch -Branch $ShiftBranch; if ($moved) { Write-Trace '-' 'branch' $moved 'Red' } }
     $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
-    if ($branch -in 'master', 'main') { Write-Trace '-' 'refuse' "on $branch; switch to a feature branch" 'Red'; exit 1 }
-    if (Get-Dirty) { Write-Trace '-' 'refuse' 'working tree not clean; commit or stash first' 'Red'; exit 1 }
+    if ($branch -in 'master', 'main') { Stop-ShiftStart "on $branch; switch to a feature branch"; exit 1 }
+    if (Get-Dirty) { Stop-ShiftStart 'working tree not clean; commit or stash first'; exit 1 }
     $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue)
-    if ($stuck.Count) { Write-Trace '-' 'refuse' "task already in Doing: $($stuck[0].Name)" 'Red'; exit 1 }
+    if ($stuck.Count) { Stop-ShiftStart "task already in Doing: $($stuck[0].Name)"; exit 1 }
 }
 
 Write-Trace '-' 'shift' "start  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))  $LaneMarkerTrace" 'Cyan'
 
 $done = 0; $blocked = 0; $requeued = 0; $stalls = @(); $failStreak = 0; $attempted = @{}
+# Parks whose move to Backlog never reached the shared branch, for the lane's summary.
+$parkLines = @()
 $stopWhy = ''
 # The task to run again once the usage limit resets; it is still claimed.
 $resumeId = ''
@@ -3819,7 +3965,11 @@ if ($Lane) {
         $heldState = Get-TaskState $held
         if ($ahead -gt 0 -and $heldState -in 'Done', 'Blocked', 'Backlog') {
             $problem = Invoke-Integrate -Id $held -State $heldState
-            if ($problem) { Invoke-Park -Id $held -Why $problem; Write-Trace $held 'PARKED' "$problem; back to Backlog" 'Yellow' }
+            if ($problem) {
+                $unpushed = Invoke-Park -Id $held -Why $problem
+                if ($unpushed) { $parkLines += $unpushed; Write-Trace $held 'PARKED' "$problem; the move to Backlog was not pushed either" 'Red' }
+                else { Write-Trace $held 'PARKED' "$problem; back to Backlog" 'Yellow' }
+            }
             else { Write-Trace $held 'push' "integrated the stopped lane's work into $branch" }
         }
         Set-LaneState 'task' ''
@@ -3913,8 +4063,9 @@ while ($true) {
     if ($Lane -and $state -in 'Done', 'Blocked', 'Backlog') {
         $problem = Invoke-Integrate -Id $id -State $state
         if ($problem) {
-            Write-Trace $id 'PARKED' "$problem; back to Backlog" 'Yellow'
-            Invoke-Park -Id $id -Why $problem
+            $unpushed = Invoke-Park -Id $id -Why $problem
+            if ($unpushed) { $parkLines += $unpushed; Write-Trace $id 'PARKED' "$problem; the move to Backlog was not pushed either" 'Red' }
+            else { Write-Trace $id 'PARKED' "$problem; back to Backlog" 'Yellow' }
             $state = 'Parked'
         } else {
             Write-Trace $id 'push' "integrated into $branch"
@@ -3962,11 +4113,13 @@ if (-not $Lane) { Publish-BoardStatus -Branch $branch -State 'ended' }
 
 if ($Lane) {
     # The coordinator raises one alarm for every lane; a lane only reports.
-    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)") + $stalls)
-    # A clean lane leaves an empty tab to close; one that blocked or stalled says read.
+    # Every line after SUMMARY reaches the coordinator's end-of-shift report: stalls, and
+    # parks whose move to Backlog was never pushed (BL-1071).
+    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)") + $stalls + $parkLines)
+    # A clean lane leaves an empty tab to close; one that blocked, stalled or could not park says read.
     $endLine = "Lane $Lane ended at $(Get-Date -Format 'HH:mm') ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)"
-    if (-not $stalls.Count -and -not $blocked) { Show-LaneEmpty $endLine 'empty, close' }
-    else { Show-LaneEmpty (@($endLine) + $stalls -join "`n") $(if ($stalls.Count) { 'STALLED, read' } else { 'BLOCKED, read' }) }
+    if (-not $stalls.Count -and -not $parkLines.Count -and -not $blocked) { Show-LaneEmpty $endLine 'empty, close' }
+    else { Show-LaneEmpty (@($endLine) + $stalls + $parkLines -join "`n") $(if ($stalls.Count -or $parkLines.Count) { 'STALLED, read' } else { 'BLOCKED, read' }) }
     try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane finished" } catch { }
     exit 0
 }
