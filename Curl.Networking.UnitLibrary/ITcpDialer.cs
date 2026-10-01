@@ -127,4 +127,14 @@ public interface ITcpDialer
     /// <paramref name="cancellationToken" /> was cancelled.
     /// </exception>
     ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gives the <see cref="SocketException" /> the operating system refuses to open a socket of
+    /// <paramref name="family" /> with, as it refuses Multipath TCP where it has none (<c>--mptcp</c>), or
+    /// <see langword="null" /> when the socket opens. curl reports such a refusal as <c>failed to open
+    /// socket</c> in place of its <c>Trying</c> line (BL-647), so it is asked before each dial.
+    /// </summary>
+    /// <param name="family">The address family about to be dialled.</param>
+    /// <returns>The refusal, or <see langword="null" />; <see langword="null" /> unless a dialer says otherwise.</returns>
+    SocketException? FailureToOpenSocket(AddressFamily family) => null;
 }

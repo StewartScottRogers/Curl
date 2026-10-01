@@ -109,7 +109,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         ITransferEvents events,
         CancellationToken cancellationToken)
     {
-        var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, SocketOptions.SocketProtocol);
         try
         {
             ApplySocketOptions(socket);
@@ -177,7 +177,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
     private async ValueTask<DialedTcpConnection> DialBoundAsync(IPEndPoint endPoint, IPEndPoint? bindTo, int localPortCount, ITransferEvents events, CancellationToken cancellationToken)
     {
-        var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, SocketOptions.SocketProtocol);
         try
         {
             ApplySocketOptions(socket);
@@ -205,6 +205,40 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         return new DialedTcpConnection(
             new StreamConnection(new NetworkStream(socket, ownsSocket: true), endPoint, localEndPoint),
             localEndPoint);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Only <c>--mptcp</c> can fail here: a plain TCP socket opens wherever .NET runs, so no socket is
+    /// opened to find out.
+    /// </remarks>
+    public SocketException? FailureToOpenSocket(AddressFamily family) =>
+        SocketOptions.MultipathTcp ? TryOpenSocket(family, SocketOptions.SocketProtocol) : null;
+
+    /// <summary>
+    /// Opens and closes a stream socket of <paramref name="family" /> with <paramref name="protocol" />,
+    /// giving the <see cref="SocketException" /> the operating system refuses it with, or
+    /// <see langword="null" /> when it opens.
+    /// </summary>
+    /// <remarks>
+    /// Excluded from coverage per ADR-0083: which branch runs is the platform's, so the Windows coverage
+    /// run, where Multipath TCP is refused, reaches only one.
+    /// </remarks>
+    /// <param name="family">The address family of the socket.</param>
+    /// <param name="protocol">The protocol to open it with.</param>
+    /// <returns>The refusal, or <see langword="null" />.</returns>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: the platform picks the branch.")]
+    internal static SocketException? TryOpenSocket(AddressFamily family, ProtocolType protocol)
+    {
+        try
+        {
+            using var socket = new Socket(family, SocketType.Stream, protocol);
+            return null;
+        }
+        catch (SocketException exception)
+        {
+            return exception;
+        }
     }
 
     /// <inheritdoc />
@@ -314,7 +348,8 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// <summary>
     /// Sets <see cref="SocketOptions" /> on <paramref name="socket" />:<see cref="Socket.NoDelay" />
     /// from <see cref="TcpSocketOptions.NoDelay" />, the Type of Service or Traffic Class and priority
-    /// <see cref="QualityOfServiceSocketOptions.For" /> lists, and <c>SO_KEEPALIVE</c> from
+    /// <see cref="QualityOfServiceSocketOptions.For" /> lists, TCP Fast Open as <see cref="FastOpenSocketOption.For" />
+    /// names it when <see cref="TcpSocketOptions.FastOpen" /> is set, and <c>SO_KEEPALIVE</c> from
     /// <see cref="TcpSocketOptions.KeepAlive" />, with the probe time and interval
     /// <see cref="TcpSocketOptions.KeepAliveSeconds" /> and the probe count
     /// <see cref="TcpSocketOptions.KeepAliveProbeCount" /> when it is on.
@@ -328,7 +363,8 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     internal void ApplySocketOptions(Socket socket)
     {
         socket.NoDelay = SocketOptions.NoDelay;
-        foreach (RawSocketOption option in QualityOfServiceSocketOptions.For(SocketOptions, socket.AddressFamily, QualityOfServiceSocketOptions.CurrentPlatform))
+        var platform = QualityOfServiceSocketOptions.CurrentPlatform;
+        foreach (RawSocketOption option in QualityOfServiceSocketOptions.For(SocketOptions, socket.AddressFamily, platform).Concat(FastOpenSocketOption.For(SocketOptions, platform)))
         {
             QualityOfServiceSocketOptions.TrySet(socket, option);
         }

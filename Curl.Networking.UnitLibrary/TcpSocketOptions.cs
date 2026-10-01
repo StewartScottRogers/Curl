@@ -1,3 +1,5 @@
+using System.Net.Sockets;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -31,14 +33,31 @@ namespace Curl.Networking;
 /// The socket priority from <c>--vlan-priority</c>, set as <c>SO_PRIORITY</c> where the operating system
 /// has it (Linux); 0, the default, sets nothing, as curl passes libcurl only a value above 0.
 /// </param>
+/// <param name="FastOpen">
+/// <see langword="true" /> for <c>--tcp-fastopen</c>: TCP Fast Open is asked for before the connect, in the
+/// option <see cref="FastOpenSocketOption.For" /> names for the operating system.
+/// </param>
+/// <param name="MultipathTcp">
+/// <see langword="true" /> for <c>--mptcp</c>: the socket is opened with protocol <c>IPPROTO_MPTCP</c>
+/// (<see cref="MultipathTcpProtocol" />) in place of TCP, as curl opens it, and an operating system that
+/// refuses it fails the connect rather than falling back to TCP (measured, BL-647 Notes).
+/// </param>
 public sealed record TcpSocketOptions(
     bool NoDelay = true,
     bool KeepAlive = true,
     int KeepAliveSeconds = TcpSocketOptions.DefaultKeepAliveSeconds,
     int KeepAliveProbeCount = TcpSocketOptions.DefaultKeepAliveProbeCount,
     int TypeOfService = 0,
-    int VlanPriority = 0)
+    int VlanPriority = 0,
+    bool FastOpen = false,
+    bool MultipathTcp = false)
 {
+    /// <summary>
+    /// <c>IPPROTO_MPTCP</c>: 262, the protocol number Linux gives Multipath TCP and curl opens a socket with
+    /// for <c>--mptcp</c>.
+    /// </summary>
+    public const int MultipathTcpProtocol = 262;
+
     /// <summary>
     /// libcurl's idle time before the first keepalive probe and interval between probes: 60
     /// seconds, what curl uses when <c>--keepalive-time</c> is absent or 0.
@@ -68,6 +87,12 @@ public sealed record TcpSocketOptions(
             keepAlive,
             ValueOrDefault(keepAliveSeconds, DefaultKeepAliveSeconds),
             ValueOrDefault(keepAliveProbeCount, DefaultKeepAliveProbeCount));
+
+    /// <summary>
+    /// Gets the protocol a socket is opened with: <see cref="MultipathTcpProtocol" /> when
+    /// <see cref="MultipathTcp" /> is set, <see cref="ProtocolType.Tcp" /> otherwise.
+    /// </summary>
+    public ProtocolType SocketProtocol => MultipathTcp ? (ProtocolType)MultipathTcpProtocol : ProtocolType.Tcp;
 
     private static int ValueOrDefault(long value, int defaultValue) =>
         value == 0 ? defaultValue : (int)Math.Min(value, int.MaxValue);

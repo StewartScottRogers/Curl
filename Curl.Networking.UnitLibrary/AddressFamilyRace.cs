@@ -57,8 +57,7 @@ internal sealed class AddressFamilyRace(
         using var race = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         try
         {
-            StartNext(first, race.Token);
-            Task? secondFamilyDue = second.Count == 0 ? null : Task.Delay(happyEyeballsTimeout, timeProvider, race.Token);
+            var secondFamilyDue = StartFirst(first, second, race.Token);
             while (_running.Count > 0)
             {
                 var completed = await Task.WhenAny(RunningTasks(secondFamilyDue)).ConfigureAwait(false);
@@ -110,18 +109,67 @@ internal sealed class AddressFamilyRace(
     }
 
     /// <summary>
+    /// Starts the first family's first address whose socket opens, and gives the delay after which the
+    /// second family starts: none when there is no second family, or when it has started already because
+    /// no socket of the first family would open.
+    /// </summary>
+    private Task? StartFirst(Queue<IPEndPoint> first, Queue<IPEndPoint> second, CancellationToken cancellationToken)
+    {
+        StartNext(first, cancellationToken);
+        if (_running.Count == 0)
+        {
+            // No socket of the first family would open: curl starts the other at once.
+            StartNext(second, cancellationToken);
+            return null;
+        }
+
+        return second.Count == 0 ? null : Task.Delay(happyEyeballsTimeout, timeProvider, cancellationToken);
+    }
+
+    /// <summary>
     /// Starts the next address of <paramref name="family" />, reporting its <c>Trying</c> line,
-    /// unless every address of it has been tried.
+    /// unless every address of it has been tried. An address whose socket the operating system
+    /// refuses to open (<see cref="ITcpDialer.FailureToOpenSocket" />) is reported with curl's
+    /// <see cref="SocketOpenFailedLines" /> in place of <c>Trying</c> and passed over for the next.
     /// </summary>
     private void StartNext(Queue<IPEndPoint> family, CancellationToken cancellationToken)
     {
-        if (family.TryDequeue(out var remoteEndPoint))
+        while (family.TryDequeue(out var remoteEndPoint))
         {
+            if (tcpDialer.FailureToOpenSocket(remoteEndPoint.AddressFamily) is { } refusal)
+            {
+                _lastError = refusal.SocketErrorCode;
+                _lastBindFailure = null;
+                foreach (var line in SocketOpenFailedLines(refusal, OperatingSystem.IsWindows()))
+                {
+                    events.ReportInfo(line);
+                }
+
+                log.DialFailed(remoteEndPoint, refusal);
+                continue;
+            }
+
             events.ReportInfo($"  Trying {remoteEndPoint}...");
             log.Dialling(remoteEndPoint);
             _running.Add(new Attempt(remoteEndPoint, family, DialOneAsync(remoteEndPoint, cancellationToken)));
+            return;
         }
     }
+
+    /// <summary>
+    /// curl's <c>-v</c> lines for a socket the operating system would not open, as for <c>--mptcp</c> where it
+    /// has no Multipath TCP (measured, BL-647 Notes). curl 8.21.0's Schannel build on Windows writes
+    /// <c>failed to open socket: The system could not find the environment option that was entered.</c>, its
+    /// stale <c>errno</c>'s text whatever Winsock said, then <c>connect to  port 0 from  port 0 failed: No
+    /// error</c>; curl 8.18.0's OpenSSL build on Linux writes only <c>failed to open socket: &lt;reason&gt;</c>,
+    /// such as <c>Protocol not supported</c>.
+    /// </summary>
+    /// <param name="refusal">The operating system's refusal.</param>
+    /// <param name="onWindows">Whether the lines are the Windows build's.</param>
+    /// <returns>The lines, in order.</returns>
+    internal static IReadOnlyList<string> SocketOpenFailedLines(SocketException refusal, bool onWindows) => onWindows
+        ? ["failed to open socket: The system could not find the environment option that was entered.", $"connect to  port 0 from  port 0 failed: {LocalBindException.ReasonText(onWindows)}"]
+        : [$"failed to open socket: {refusal.Message}"];
 
     // An async method, so a dialer that throws before it returns fails the task instead.
     private async Task<DialedTcpConnection> DialOneAsync(IPEndPoint remoteEndPoint, CancellationToken cancellationToken) =>

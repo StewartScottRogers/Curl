@@ -25,6 +25,19 @@ internal static class QualityOfServiceSocketOptions
     private const int LinuxSolSocket = 1;
     private const int LinuxSoPriority = 12;
 
+    // IP_TOS on an IPv4 socket and IPV6_TCLASS on an IPv6 one, in each operating system's numbers.
+    private static readonly Dictionary<(AddressFamily Family, SocketPlatform Platform), (int Level, int Name)> TypeOfServiceOptions = new()
+    {
+        [(AddressFamily.InterNetwork, SocketPlatform.Linux)] = (IpProtocolIp, 1),
+        [(AddressFamily.InterNetwork, SocketPlatform.Windows)] = (IpProtocolIp, 3),
+        [(AddressFamily.InterNetwork, SocketPlatform.Darwin)] = (IpProtocolIp, 3),
+        [(AddressFamily.InterNetwork, SocketPlatform.FreeBsd)] = (IpProtocolIp, 3),
+        [(AddressFamily.InterNetworkV6, SocketPlatform.Windows)] = (IpProtocolIpV6, 39),
+        [(AddressFamily.InterNetworkV6, SocketPlatform.Linux)] = (IpProtocolIpV6, 67),
+        [(AddressFamily.InterNetworkV6, SocketPlatform.Darwin)] = (IpProtocolIpV6, 36),
+        [(AddressFamily.InterNetworkV6, SocketPlatform.FreeBsd)] = (IpProtocolIpV6, 61),
+    };
+
     /// <summary>Gets the operating system this process runs on, as far as its socket option numbers go.</summary>
     /// <remarks>
     /// Excluded from coverage per ADR-0083: which branch runs is the platform's, so the Windows coverage
@@ -81,16 +94,7 @@ internal static class QualityOfServiceSocketOptions
     }
 
     private static (int Level, int Name)? TypeOfServiceOption(AddressFamily family, SocketPlatform platform) =>
-        (family, platform) switch
-        {
-            (AddressFamily.InterNetwork, SocketPlatform.Linux) => (IpProtocolIp, 1),
-            (AddressFamily.InterNetwork, SocketPlatform.Windows or SocketPlatform.Darwin or SocketPlatform.FreeBsd) => (IpProtocolIp, 3),
-            (AddressFamily.InterNetworkV6, SocketPlatform.Windows) => (IpProtocolIpV6, 39),
-            (AddressFamily.InterNetworkV6, SocketPlatform.Linux) => (IpProtocolIpV6, 67),
-            (AddressFamily.InterNetworkV6, SocketPlatform.Darwin) => (IpProtocolIpV6, 36),
-            (AddressFamily.InterNetworkV6, SocketPlatform.FreeBsd) => (IpProtocolIpV6, 61),
-            _ => null,
-        };
+        TypeOfServiceOptions.TryGetValue((family, platform), out var option) ? option : null;
 
     /// <summary>
     /// Sets <paramref name="option" /> on <paramref name="socket" />, leaving the socket as it was when the

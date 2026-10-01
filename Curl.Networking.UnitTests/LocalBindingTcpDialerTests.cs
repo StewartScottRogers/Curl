@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
@@ -62,6 +63,17 @@ public sealed class LocalBindingTcpDialerTests
         await dialer.DialAsync(new IPEndPoint(IPAddress.Loopback, 80), CancellationToken.None);
 
         Assert.AreSame(events, inner.BoundDialEvents.Single());
+    }
+
+    [TestMethod]
+    public void FailureToOpenSocket_AsksTheInnerDialer()
+    {
+        var refusal = new SocketException((int)SocketError.ProtocolNotSupported);
+        var inner = new FakeTcpDialer { SocketOpenOutcome = family => family == AddressFamily.InterNetwork ? refusal : null };
+        var dialer = new LocalBindingTcpDialer(inner, new LocalBinding(null, null, null, 40000, 2), new SystemNetworkInterfaceLookup(), new FakeDnsResolver(), NoTransferEvents.Instance);
+
+        Assert.AreSame(refusal, dialer.FailureToOpenSocket(AddressFamily.InterNetwork));
+        Assert.IsNull(dialer.FailureToOpenSocket(AddressFamily.InterNetworkV6));
     }
 
     [TestMethod]
