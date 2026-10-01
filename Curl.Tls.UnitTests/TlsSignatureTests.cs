@@ -79,6 +79,35 @@ public sealed class TlsSignatureTests
     }
 
     [TestMethod]
+    public void AnEd448KeySignsOnlyTheEd448SchemeAndIsFiftySevenBytes()
+    {
+        Ed448TlsSigningKey key = new(new byte[57]);
+
+        Assert.IsTrue(key.CanSign(TlsSignatureScheme.Ed448));
+        Assert.IsFalse(key.CanSign(TlsSignatureScheme.Ed25519));
+        Assert.IsFalse(key.CanSign(TlsSignatureScheme.MlDsa44));
+        Assert.IsFalse(key.CanSign(TlsSignatureScheme.EcdsaSecp256r1Sha256));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new Ed448TlsSigningKey(new byte[32]));
+    }
+
+    [TestMethod]
+    [DataRow(Cryptography.MlDsaParameterSet.MlDsa44, TlsSignatureScheme.MlDsa44)]
+    [DataRow(Cryptography.MlDsaParameterSet.MlDsa65, TlsSignatureScheme.MlDsa65)]
+    [DataRow(Cryptography.MlDsaParameterSet.MlDsa87, TlsSignatureScheme.MlDsa87)]
+    public void AnMlDsaKeySignsOnlyItsParameterSetsScheme(Cryptography.MlDsaParameterSet parameterSet, int scheme)
+    {
+        using Cryptography.MlDsa mlDsa = Cryptography.MlDsa.GenerateKey(parameterSet, new byte[32]);
+        MlDsaTlsSigningKey key = new(mlDsa);
+        ushort[] others = [TlsSignatureScheme.MlDsa44, TlsSignatureScheme.MlDsa65, TlsSignatureScheme.MlDsa87, TlsSignatureScheme.Ed448, TlsSignatureScheme.Ed25519, TlsSignatureScheme.RsaPssRsaeSha256];
+
+        Assert.IsTrue(key.CanSign((ushort)scheme));
+        foreach (ushort other in others.Where(other => other != scheme))
+        {
+            Assert.IsFalse(key.CanSign(other), $"0x{other:x4}");
+        }
+    }
+
+    [TestMethod]
     public void AnEd25519KeyIsThirtyTwoBytes() =>
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new Ed25519TlsSigningKey(new byte[31]));
 

@@ -244,6 +244,37 @@ public sealed class Tls13ClientHandshakeTests
     }
 
     [TestMethod]
+    [DataRow("ed448")]
+    [DataRow("mldsa44")]
+    [DataRow("mldsa65")]
+    [DataRow("mldsa87")]
+    public void HandshakeSignsTheClientCertificateVerifyWithAnEd448OrMlDsaKey(string credential)
+    {
+        TestServerCredential clientCredential = credential switch
+        {
+            "ed448" => TestServerCredential.Ed448(),
+            "mldsa44" => TestServerCredential.MlDsa(Cryptography.MlDsaParameterSet.MlDsa44, TlsSignatureScheme.MlDsa44Oid, TlsSignatureScheme.MlDsa44),
+            "mldsa65" => TestServerCredential.MlDsa(Cryptography.MlDsaParameterSet.MlDsa65, TlsSignatureScheme.MlDsa65Oid, TlsSignatureScheme.MlDsa65),
+            _ => TestServerCredential.MlDsa(Cryptography.MlDsaParameterSet.MlDsa87, TlsSignatureScheme.MlDsa87Oid, TlsSignatureScheme.MlDsa87),
+        };
+        Tls13TestServer server = new(TestServerCredential.Ed25519())
+        {
+            RequestClientCertificate = true,
+            ClientCertificateSchemes = [TlsSignatureScheme.Ed25519, TlsSignatureScheme.Ed448, TlsSignatureScheme.MlDsa44, TlsSignatureScheme.MlDsa65, TlsSignatureScheme.MlDsa87],
+        };
+        using Tls13ClientHandshake client = Client(DefaultSettings with
+        {
+            ClientCertificate = new TlsClientCertificate([clientCredential.Certificate], clientCredential.SigningKey),
+        });
+
+        // The server checks the CertificateVerify against the certificate's key with TlsCertificatePublicKey.
+        Assert.IsTrue(Run(client, server).IsComplete);
+        Assert.IsTrue(client.ClientCertificateSent);
+        CollectionAssert.AreEqual(clientCredential.Certificate, server.ClientCertificates[0]);
+        Assert.AreEqual(clientCredential.Scheme, server.ClientCertificateVerifyScheme);
+    }
+
+    [TestMethod]
     public void HandshakeSendsAnEmptyCertificateWhenItHasNone()
     {
         Tls13TestServer server = new(TestServerCredential.Ed25519()) { RequestClientCertificate = true };

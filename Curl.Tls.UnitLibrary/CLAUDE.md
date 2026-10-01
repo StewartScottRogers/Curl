@@ -215,8 +215,9 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   `Curl.Cryptography`'s `BrainpoolEcdsa`, ADR-0219, Ed448 and ML-DSA with its `Ed448`
   and `MlDsa`, SHA-224 hashed with its `DsaSignature.HashData`, and `rsa_pkcs1_sha224`'s
   DigestInfo block checked with the public operation as TLS 1.0's MD5+SHA-1 block is -
-  and the RSA pre-master secret encryption), `TlsSigningKey` with `RsaTlsSigningKey`, `EcdsaTlsSigningKey` and
-  `Ed25519TlsSigningKey`.
+  and the RSA pre-master secret encryption), `TlsSigningKey` with `RsaTlsSigningKey`, `EcdsaTlsSigningKey`,
+  `Ed25519TlsSigningKey`, `Ed448TlsSigningKey` and `MlDsaTlsSigningKey` (the last two over
+  `Curl.Cryptography`'s `Ed448` and `MlDsa`, empty context, BL-1064).
 - Tests: `Tls13TestServer` and `Tls12TestServer` in `Curl.Tls.UnitTests` are in-memory
   servers built from these codecs; `Tls12TestServer` resumes from a shared
   `Tls12TestSessionCache` and signs TLS 1.0/1.1 RSA with `BigInteger` (test code only).
