@@ -47,7 +47,7 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 ## Notes
 
 - CLAUDE.md line 198 now says "66 projects, one flat alphabetical run". That is the 66 Curl.* project directories at the root, each with a csproj. The four shared projects (Documentation, Tasks, Audit, .claude) are not counted: they appear in the tree by name.
-- Choice: I kept a number rather than removing it. The finding's reproduction matches the pattern `d+ projects, one flat`, so the wording keeps that exact shape. The number will drift as hand-built libraries are added, and the truthfulness auditor will catch that.
+- Choice: I kept a number rather than removing it. The finding's reproduction matches the pattern `\d+ projects, one flat`, so the wording keeps that exact shape. The number will drift as hand-built libraries are added, and the truthfulness auditor will catch that.
 
 ## Log
 
