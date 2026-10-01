@@ -33,6 +33,29 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreSame(route, target.AltSvcRoute);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_WithARouteSwitchingToH2_AsksTheConnectorToOfferH2Alone()
+    {
+        // curl.se 8.18.0 with "h1 127.0.0.1 18736 h2 127.0.0.1 18735 ..." says ALPN: curl offers h2 (BL-733 Notes case 4).
+        AltSvcRoute route = new("h1", new AltSvcAlternative("h2", "localhost", 18443));
+        QueueConnector connector = QueueConnector.For(Connection(EmptyOkHead, 65536));
+
+        TransferResult result = await Handler(connector).ExecuteAsync(CookieContext(AltSvcHttpsUrl, new HttpRequestOptions { AltSvcRoute = route }));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "h2" }, connector.Targets.Single().ApplicationProtocols!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WithARouteOfTheSameVersion_LeavesTheOfferToTheConnector()
+    {
+        QueueConnector connector = QueueConnector.For(Connection(EmptyOkHead, 65536));
+
+        await Handler(connector).ExecuteAsync(CookieContext(AltSvcHttpsUrl, new HttpRequestOptions { AltSvcRoute = new("h1", AltSvcAlternative18443) }));
+
+        Assert.IsNull(connector.Targets.Single().ApplicationProtocols);
+    }
+
     /// <summary>
     /// Measured (BL-623 Notes, case 1): with the entry <c>h1 localhost 18499 h1 localhost 18443</c>,
     /// curl 8.21.0 ends <c>* Connection #0 to host localhost:18443 left intact</c>, naming the alternative.

@@ -32,10 +32,13 @@ namespace Curl.Console;
 /// <para>
 /// An entry naming another host or port is connected to in place of the origin; when its version differs
 /// from the one it was found under, the transfer switches to it: <c>h3</c> to HTTP/3 alone, with no TCP
-/// fallback (<see cref="HttpVersionPreference.Http3Only" />), and <c>h1</c> or <c>h2</c> to TCP, where ALPN
-/// decides between them (<see cref="HttpVersionPreference.Http11" />). An entry naming the origin itself is
+/// fallback (<see cref="HttpVersionPreference.Http3Only" />), and <c>h1</c> or <c>h2</c> to TCP, whose handshake
+/// offers that version alone through ALPN (<see cref="HttpVersionPreference.Http11" />, with the HTTP handler
+/// setting the offer, BL-948). An entry naming the origin itself is
 /// no route; one naming <c>h3</c> makes a transfer without a version option race HTTP/3 against TCP as
-/// <c>--http3</c> does, falling back to TCP when QUIC fails (measured). None is used for plain <c>http</c> or
+/// <c>--http3</c> does, falling back to TCP when QUIC fails (measured), and one naming <c>h2</c> or <c>h1</c>
+/// makes TCP the first attempt of <c>--http3</c>'s race (<see cref="HttpRequestOptions.TriesTcpBeforeQuic" />,
+/// BL-948). None is used for plain <c>http</c> or
 /// for an origin a <c>--connect-to</c> mapping matches.
 /// </para>
 /// <para>
@@ -95,8 +98,8 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// <summary>
     /// Gives the HTTP options a connection to <paramref name="url" /> uses, as curl 8.21.0 looks its
     /// alternative up: <paramref name="http" /> with the <see cref="HttpRequestOptions.AltSvcRoute" /> and the
-    /// <see cref="HttpRequestOptions.Version" /> the alternative leaves it. The version is worked out afresh
-    /// from the version option, so a redirect hop's options, which carry the first hop's, may be passed.
+    /// <see cref="HttpRequestOptions.Version" /> and <see cref="HttpRequestOptions.TriesTcpBeforeQuic" /> the
+    /// alternative leaves it. They are worked out afresh from the version option, so a redirect hop's options, which carry the first hop's, may be passed.
     /// </summary>
     /// <param name="url">The URL the connection is for.</param>
     /// <param name="http">The transfer's HTTP options.</param>
@@ -106,9 +109,14 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
         HttpVersionPreference version = HttpVersionMapping.ToHttpVersionPreference(requestedVersion);
         return MatchFor(url) switch
         {
-            null => http with { AltSvcRoute = null, Version = version },
-            { IsSameDestination: true } same => http with { AltSvcRoute = null, Version = SameDestinationVersion(same.Entry.DestinationAlpn, version) },
-            { } other => http with { AltSvcRoute = RouteTo(other), Version = SwitchedVersion(other, version) },
+            null => http with { AltSvcRoute = null, Version = version, TriesTcpBeforeQuic = false },
+            { IsSameDestination: true } same => http with
+            {
+                AltSvcRoute = null,
+                Version = SameDestinationVersion(same.Entry.DestinationAlpn, version),
+                TriesTcpBeforeQuic = same.Entry.DestinationAlpn != AltSvcAlpn.H3,
+            },
+            { } other => http with { AltSvcRoute = RouteTo(other), Version = SwitchedVersion(other, version), TriesTcpBeforeQuic = false },
         };
     }
 

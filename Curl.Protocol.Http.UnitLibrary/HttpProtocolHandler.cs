@@ -378,7 +378,12 @@ public sealed class HttpProtocolHandler(
         ConnectTarget urlTarget = TargetOf(plan.Context.Url);
         ConnectTarget target = plan.ForwardProxy is { } proxy
             ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https) { IsForwardProxy = true }
-            : urlTarget with { Proxy = plan.Options.ForwardProxy, AltSvcRoute = plan.Options.AltSvcRoute };
+            : urlTarget with
+            {
+                Proxy = plan.Options.ForwardProxy,
+                AltSvcRoute = plan.Options.AltSvcRoute,
+                ApplicationProtocols = AltSvcApplicationProtocols.Of(plan.Options.AltSvcRoute),
+            };
         return target with { PoolScheme = urlTarget.UseTls ? "https" : "http", Events = plan.Context.Events };
     }
 
@@ -563,7 +568,9 @@ public sealed class HttpProtocolHandler(
 
         if (plan.Options.Version == HttpVersionPreference.Http3)
         {
-            return await RaceQuicAgainstTcpAsync(plan, target).ConfigureAwait(false);
+            return plan.Options.TriesTcpBeforeQuic
+                ? await RaceTcpAgainstQuicAsync(plan, target).ConfigureAwait(false)
+                : await RaceQuicAgainstTcpAsync(plan, target).ConfigureAwait(false);
         }
 
         MultiplexedConnectResult quic = await plan.Deadline.ConnectMultiplexedAsync(connector, target).ConfigureAwait(false);
@@ -587,7 +594,7 @@ public sealed class HttpProtocolHandler(
         using CancellationTokenSource quicAbandoned = new();
         using CancellationTokenSource tcpAbandoned = new();
         Task<MultiplexedConnectResult> quic = plan.Deadline.ConnectMultiplexedAsync(connector, target, quicAbandoned.Token).AsTask();
-        await QuicOrHappyEyeballsTimeoutAsync(plan, quic).ConfigureAwait(false);
+        await FirstAttemptOrHappyEyeballsTimeoutAsync(plan, quic).ConfigureAwait(false);
         if (quic.IsCompleted && (await quic.ConfigureAwait(false)).Connection is { } early)
         {
             return Http3Connected(early, quic.Result);
@@ -616,15 +623,54 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Waits until the QUIC connect completes or the happy-eyeballs timeout passes on the
-    /// transfer's clock, whichever comes first.
+    /// Races TCP against QUIC for <c>--http3</c> with TCP as the preferred first attempt, as curl
+    /// 8.21.0 does for an <c>--alt-svc</c> entry naming the origin itself with <c>h2</c> or
+    /// <c>h1</c> (<c>cf_hc_get_pref_alpn</c>, BL-948): <see cref="RaceQuicAgainstTcpAsync" /> with the
+    /// two attempts swapped, so the QUIC connect starts when the TCP connect fails or once the
+    /// happy-eyeballs timeout has passed, and when both fail the transfer fails with the TCP
+    /// attempt's result, the first attempt's, as curl's <c>cf_hc_connect</c> reports it.
     /// </summary>
-    private static async Task QuicOrHappyEyeballsTimeoutAsync(HttpRequestPlan plan, Task quic)
+    private async ValueTask<ConnectResult> RaceTcpAgainstQuicAsync(HttpRequestPlan plan, ConnectTarget target)
     {
-        using CancellationTokenSource quicCompleted = new();
-        Task timeout = Task.Delay(plan.Options.HappyEyeballsTimeout, plan.Context.TimeProvider, quicCompleted.Token);
-        await Task.WhenAny(quic, timeout).ConfigureAwait(false);
-        await quicCompleted.CancelAsync().ConfigureAwait(false);
+        using CancellationTokenSource quicAbandoned = new();
+        using CancellationTokenSource tcpAbandoned = new();
+        Task<ConnectResult> tcp = plan.Deadline.ConnectAsync(connector, target, tcpAbandoned.Token).AsTask();
+        await FirstAttemptOrHappyEyeballsTimeoutAsync(plan, tcp).ConfigureAwait(false);
+        if (tcp.IsCompleted && (await tcp.ConfigureAwait(false)).Connection is not null)
+        {
+            return tcp.Result;
+        }
+
+        Task<MultiplexedConnectResult> quic = plan.Deadline.ConnectMultiplexedAsync(connector, target, quicAbandoned.Token).AsTask();
+        if (await Task.WhenAny(tcp, quic).ConfigureAwait(false) == quic && (await quic.ConfigureAwait(false)).Connection is { } early)
+        {
+            await tcpAbandoned.CancelAsync().ConfigureAwait(false);
+            _ = DisposeLosingTcpAsync(tcp);
+            return Http3Connected(early, quic.Result);
+        }
+
+        ConnectResult tcpResult = await tcp.ConfigureAwait(false);
+        if (tcpResult.Connection is not null)
+        {
+            await quicAbandoned.CancelAsync().ConfigureAwait(false);
+            _ = DisposeLosingQuicAsync(quic);
+            return tcpResult;
+        }
+
+        MultiplexedConnectResult quicResult = await quic.ConfigureAwait(false);
+        return quicResult.Connection is { } quicConnection ? Http3Connected(quicConnection, quicResult) : tcpResult;
+    }
+
+    /// <summary>
+    /// Waits until the first attempt of a race, <paramref name="first" />, completes or the
+    /// happy-eyeballs timeout passes on the transfer's clock, whichever comes first.
+    /// </summary>
+    private static async Task FirstAttemptOrHappyEyeballsTimeoutAsync(HttpRequestPlan plan, Task first)
+    {
+        using CancellationTokenSource firstCompleted = new();
+        Task timeout = Task.Delay(plan.Options.HappyEyeballsTimeout, plan.Context.TimeProvider, firstCompleted.Token);
+        await Task.WhenAny(first, timeout).ConfigureAwait(false);
+        await firstCompleted.CancelAsync().ConfigureAwait(false);
     }
 
     /// <summary>Disposes the connection a TCP connect that lost the race opens anyway.</summary>

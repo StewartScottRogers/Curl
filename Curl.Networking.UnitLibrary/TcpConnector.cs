@@ -1255,9 +1255,11 @@ public sealed partial class TcpConnector(
     /// <summary>
     /// Returns the protocols the handshake with <paramref name="target" /> offers through ALPN:
     /// <paramref name="httpOverTls" /> for HTTP over TLS to the origin, the one target the HTTP
-    /// handler pools as <c>https</c> (BL-490, ADR-0141); <c>http/1.1</c> alone for an HTTPS
-    /// forward proxy, whatever the HTTP version options say, as both curl 8.21.0 builds offer it
-    /// (measured, BL-753, ADR-0190); nothing for any other protocol, which curl offers no ALPN.
+    /// handler pools as <c>https</c> (BL-490, ADR-0141), unless the target names its own
+    /// <see cref="ConnectTarget.ApplicationProtocols" />, as a connect to an Alt-Svc alternative of
+    /// another HTTP version does (BL-948); <c>http/1.1</c> alone for an HTTPS forward proxy, whatever
+    /// the HTTP version options say, as both curl 8.21.0 builds offer it (measured, BL-753,
+    /// ADR-0190); nothing for any other protocol, which curl offers no ALPN.
     /// </summary>
     /// <param name="target">The target whose handshake is about to run.</param>
     /// <param name="httpOverTls">What HTTP over TLS to the origin offers.</param>
@@ -1266,7 +1268,7 @@ public sealed partial class TcpConnector(
         target.IsForwardProxy
             ? HttpApplicationProtocols.Http11Only
             : string.Equals(target.PoolScheme, "https", StringComparison.OrdinalIgnoreCase)
-                ? httpOverTls
+                ? target.ApplicationProtocols ?? httpOverTls
                 : [];
 
     // A provider that can report its handshake reports its trust and handshake on the

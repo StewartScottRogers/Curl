@@ -103,6 +103,19 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// </remarks>
     public AltSvcRoute? AltSvcRoute { get; init; }
 
+    /// <summary>
+    /// Gets the protocols this connect's TLS handshake offers through ALPN in place of the list the
+    /// connector offers HTTP over TLS to the origin, or <see langword="null" />, the default, to offer
+    /// that list.
+    /// </summary>
+    /// <remarks>
+    /// The HTTP handler sets it for an <see cref="AltSvcRoute" /> whose alternative switches to another
+    /// HTTP version: <c>h2</c> alone to an <c>h2</c> alternative and <c>http/1.1</c> alone to an
+    /// <c>h1</c> one, as curl 8.21.0 offers them (measured, BL-948, ADR-0226). A forward proxy's
+    /// handshake ignores it.
+    /// </remarks>
+    public IReadOnlyList<string>? ApplicationProtocols { get; init; }
+
     private static string RequireHost(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host, nameof(Host));

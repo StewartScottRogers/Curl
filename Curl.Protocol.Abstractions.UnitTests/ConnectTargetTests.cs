@@ -164,6 +164,24 @@ public sealed class ConnectTargetTests
     }
 
     [TestMethod]
+    public void ApplicationProtocols_ByDefault_IsNullForTheConnectorsOwnList()
+    {
+        var target = new ConnectTarget("example.com", 443, true);
+
+        Assert.IsNull(target.ApplicationProtocols);
+    }
+
+    [TestMethod]
+    public void ApplicationProtocols_WhenSetWithInitializer_RoundTrips()
+    {
+        IReadOnlyList<string> protocols = ["h2"];
+
+        var target = new ConnectTarget("example.com", 443, true) { ApplicationProtocols = protocols };
+
+        Assert.AreSame(protocols, target.ApplicationProtocols);
+    }
+
+    [TestMethod]
     public void With_AnyChange_CannotBypassHostAndPortChecks()
     {
         var target = new ConnectTarget("example.com", 443, true);

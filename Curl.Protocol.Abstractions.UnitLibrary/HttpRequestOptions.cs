@@ -204,6 +204,19 @@ public sealed record HttpRequestOptions
     public AltSvcRoute? AltSvcRoute { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a <see cref="HttpVersionPreference.Http3" /> transfer starts its
+    /// TCP connect first and its QUIC connect once the TCP one fails or the
+    /// <see cref="HappyEyeballsTimeout" /> passes, rather than the other way round;
+    /// <see langword="false" />, the default, to start with QUIC.
+    /// </summary>
+    /// <remarks>
+    /// Set for an <c>--alt-svc</c> entry that names the origin itself with <c>h2</c> or <c>h1</c>, which
+    /// curl 8.21.0 makes the preferred first attempt (<c>cf_hc_get_pref_alpn</c>, BL-948). Any other
+    /// version ignores it.
+    /// </remarks>
+    public bool TriesTcpBeforeQuic { get; init; }
+
+    /// <summary>
     /// Gets the store each <c>Alt-Svc</c> header of an HTTPS response is handed to
     /// (<c>--alt-svc</c>), or <see langword="null" />, the default, to learn none.
     /// </summary>
