@@ -41,6 +41,8 @@ internal sealed class CommandLineGlobalState
 
     public string? SslSessionsFile { get; set; }
 
+    public string? LibcurlFile { get; set; }
+
     public bool Silent { get; set; }
 
     public bool ShowError { get; set; }

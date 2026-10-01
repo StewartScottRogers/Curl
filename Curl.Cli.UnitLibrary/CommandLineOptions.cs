@@ -1269,6 +1269,13 @@ public sealed class CommandLineOptions
     public string? SslSessionsFile { get => globals.SslSessionsFile; internal set => globals.SslSessionsFile = value; }
 
     /// <summary>
+    /// The <c>--libcurl</c> file the C source for the command line is written to once the transfers are
+    /// done (<see cref="LibcurlSourceCode" />), <c>-</c> for standard output; <see langword="null" /> when not
+    /// given. Global, as curl 8.21.0 keeps it: every option group shares the last value given.
+    /// </summary>
+    public string? LibcurlFile { get => globals.LibcurlFile; internal set => globals.LibcurlFile = value; }
+
+    /// <summary>
     /// The <c>-r</c> / <c>--range</c> text as curl keeps it, not yet parsed; <see langword="null"/>
     /// when not given. A value that starts with a digit and has no dash is kept as that leading
     /// number with a dash appended (<c>5abc</c> becomes <c>5-</c>); anything else is kept verbatim.

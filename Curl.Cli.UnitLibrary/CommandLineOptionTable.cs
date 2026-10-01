@@ -77,6 +77,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("stderr", null, SetStandardErrorFile),
         CommandLineOption.Value("log-level", null, SetDiagnosticLogLevel),
         CommandLineOption.FileName("log-file", null, (options, file) => options.DiagnosticLogFile = file),
+        CommandLineOption.FileName("libcurl", null, (options, file) => options.LibcurlFile = file),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
         CommandLineOption.Value("upload-file", 'T', AddUploadFile),
         CommandLineOption.NegatableFlag("remote-name", 'O', (options, on) => options.PairRemoteName(on)),
@@ -378,7 +379,7 @@ public static class CommandLineOptionTable
     /// <c>--stderr</c>, <c>--styled-output</c>, <c>--trace</c>, <c>--trace-ascii</c>,
     /// <c>--trace-time</c>, <c>--trace-ids</c>, <c>-v</c>, <c>-Z</c>, <c>--parallel-immediate</c>, <c>--parallel-max</c>, <c>--parallel-max-host</c> and <c>--rate</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
     /// and <c>-M</c> are global in its tool (<c>struct GlobalConfig</c>) without the mark, as is
-    /// <c>--ssl-sessions</c> (<c>global-&gt;ssl_sessions</c>); <c>--dump-ca-embed</c>, like <c>-V</c>, ends
+    /// <c>--ssl-sessions</c> (<c>global-&gt;ssl_sessions</c>) and <c>--libcurl</c> (<c>global-&gt;libcurl</c>); <c>--dump-ca-embed</c>, like <c>-V</c>, ends
     /// the command line rather than setting anything of one group. Measured
     /// 2026-09-28 (BL-508 Notes): <c>-v</c> given only after <c>--next</c> shows the first group's
     /// transfer too, while <c>-w</c>, <c>-o</c> and <c>-H</c> given before it do not reach the second group.
@@ -411,6 +412,7 @@ public static class CommandLineOptionTable
         "ai-help",
         "dump-ca-embed",
         "ssl-sessions",
+        "libcurl",
         "config",
         "next",
         "disable");
