@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1022 — Announce a due audit at shift end and hold a milestone merge to master until it runs
 
@@ -45,13 +45,19 @@ Design:
 
 ## Acceptance criteria
 
-- [ ] A new switch `-TestAuditCadence` prints `PASS` and no `FAIL` for: no copy on master skips silently; `Audit due: factory-script` is reported and the merge proceeds; `milestone:3` is reported and the merge is skipped with the message above; `No audit due` adds nothing; a faked running `RunAudit.ps1` process refuses a shift start, and with `-Continuous` waits instead.
-- [ ] The script header describes the audit check at shift end and the start refusal.
-- [ ] Every existing `-Test*` switch still prints no `FAIL` line.
+- [x] A new switch `-TestAuditCadence` prints `PASS` and no `FAIL` for: no copy on master skips silently; `Audit due: factory-script` is reported and the merge proceeds; `milestone:3` is reported and the merge is skipped with the message above; `No audit due` adds nothing; a faked running `RunAudit.ps1` process refuses a shift start, and with `-Continuous` waits instead.
+- [x] The script header describes the audit check at shift end and the start refusal.
+- [x] Every existing `-Test*` switch still prints no `FAIL` line.
 
 ## Notes
+
+- -TestAuditCadence: 7 PASS, 0 FAIL (no copy on master skips silently - a missing ref stands in for master without the tool; factory-script reported, merge proceeds; milestone:3 reported, merge skipped with the message; No audit due adds nothing; a faked running RunAudit.ps1 refuses a shift start, waits with -Continuous; a -DryRun audit or none lets it start). Every other -Test* switch prints no FAIL (-TestAlarm and -TestOutOfTokens not run: they sound the alarm).
+- The notice is Show-AuditNotice: a cyan line, a chime and one sentence, 'Curl dark factory: audit due ...' - not the alarm and not added to the alarm's reasons.
+- The start check runs only in the coordinator or a single runner (lanes are started by a shift that already passed it). It ignores RunAudit.ps1 launched with -NewTab, -DryRun or -SelfTest.
+- Interaction with RunAudit's -AlongsideShift (BL-1020): an audit started alongside a shift does not stop it; only a shift that starts while an audit runs waits.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. Shift end announces a due audit and holds a milestone merge; shift start waits for a running audit; -TestAuditCadence proves it.
