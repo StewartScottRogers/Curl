@@ -30,8 +30,7 @@ Lanes test only on Windows, so reproduce with `gh run view 36936558357 --log-fai
 
 ## Notes
 
-- Cause: the test pinned the `curl: (67) Login denied` error line with `
-`, but the runner ends curl's error line with `Environment.NewLine` (CRLF on Windows, LF elsewhere), as real curl does in text mode; only the verbose info lines are CRLF everywhere. Fixed the test to expect `Environment.NewLine`, the convention every other runner test already uses (e.g. CurlCommandRunnerConnectTimeoutTests). No production change.
+- Cause: the test pinned the `curl: (67) Login denied` error line with `\r\n`, but the runner ends curl's error line with `Environment.NewLine` (CRLF on Windows, LF elsewhere), as real curl does in text mode; only the verbose info lines are CRLF everywhere. Fixed the test to expect `Environment.NewLine`, the convention every other runner test already uses (e.g. CurlCommandRunnerConnectTimeoutTests). No production change.
 - CI on Linux and macOS is confirmed by the shift's CI watch once the commit lands; locally all fast tests pass on Windows.
 
 ## Log
