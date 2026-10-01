@@ -34,6 +34,15 @@
     task never needs `touches` and never sends a task back (BL-1069). Before each claim the shift
     also requeues any Blocked task whose reason names only tasks that are now Done.
 
+    COST CAP
+
+    Each headless run is capped at -TaskBudgetUsd (default $6, under three times the median
+    task's cost; AF-0004, ADR-0288) with claude's --max-budget-usd. A task run that reaches
+    the cap stops; like a timed-out run, its partial work is stashed and the task goes to
+    Blocked for Stewart, since it is too big for one run and wants splitting. claude checks
+    the cap between turns, so a run can end one turn's cost above it. -TaskBudgetUsd 0
+    removes the cap.
+
     OUT OF TOKENS
 
     When the account's usage limit refuses a run, that is not a stall. The task stays
@@ -265,6 +274,9 @@ param(
     [int]$MaxTasks = 0,
     # A single task run is killed after this long and filed as stalled.
     [int]$TaskMinutes = 120,
+    # A single headless run is stopped once it has cost this many US dollars (claude's
+    # --max-budget-usd) and its task filed as Blocked. 0 means no cap (ADR-0288).
+    [double]$TaskBudgetUsd = 6,
     # Model for each run. "opus" is the moving alias RunClaude.cmd also uses.
     [string]$Model = $(if ($env:CLAUDE_MODEL) { $env:CLAUDE_MODEL } else { 'opus' }),
     # Show the attention banner and exit, to check it can be seen across the room.
@@ -2831,7 +2843,9 @@ function Invoke-TaskRun {
     # lanes build at once: a tool call past its timeout is moved to the background, and a
     # headless run that then ends its reply to wait for it exits with the task still in
     # Doing (BL-855). It inherits CURL_DARK_FACTORY_LANE.
-    $psi = New-ClaudeRunStartInfo "/d /c claude -p --model $Model --dangerously-skip-permissions --output-format stream-json --verbose --disallowedTools $denied 2>`"$err`""
+    # The cost cap (AF-0004): the run stops once it has cost -TaskBudgetUsd.
+    $budget = if ($TaskBudgetUsd -gt 0) { ' --max-budget-usd ' + $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture) } else { '' }
+    $psi = New-ClaudeRunStartInfo "/d /c claude -p --model $Model --dangerously-skip-permissions --output-format stream-json --verbose$budget --disallowedTools $denied 2>`"$err`""
     $p = [System.Diagnostics.Process]::Start($psi)
     $p.StandardInput.Write($Text)
     $p.StandardInput.Close()
@@ -3102,6 +3116,12 @@ function Test-ApiFailure {
     if ($null -eq $r) { return ($Run.ExitCode -ne 0) }
     return ([bool]($r.PSObject.Properties['is_error'] -and $r.is_error) -and
         ([bool]$r.PSObject.Properties['api_error_status'] -or "$($r.terminal_reason)" -eq 'api_error'))
+}
+
+function Test-BudgetSpent {
+    # Whether the last run stopped because it reached the -TaskBudgetUsd cost cap.
+    $r = $script:RunResult
+    return ($null -ne $r -and "$($r.subtype)" -eq 'error_max_budget_usd')
 }
 
 function Wait-ForTokensByProbe {
@@ -3496,7 +3516,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         param([int]$N)
         $hoursLeft = [Math]::Max(0.01, ($shiftEnd - (Get-Date)).TotalHours).ToString([System.Globalization.CultureInfo]::InvariantCulture)
         @('-Lane', $N, '-Branch', $branch, '-Hours', $hoursLeft, '-MaxTasks', $MaxTasks,
-          '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-LogRoot', "`"$LogDir`"", '-ShiftStamp', $Stamp)
+          '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-LogRoot', "`"$LogDir`"", '-ShiftStamp', $Stamp)
     }
     $procs = @()
     $laneTabs = @{}
@@ -3743,7 +3763,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
         # An Auto shift hands on Auto, not the count it ended at; the next one starts from
         # the count auto-lanes.json saved.
-        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-HeartbeatMinutes', $HeartbeatMinutes, '-Continuous', '-ShiftBranch', $branch)
+        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-HeartbeatMinutes', $HeartbeatMinutes, '-Continuous', '-ShiftBranch', $branch)
         if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
         if ($WeeklyPace) { $forward += '-WeeklyPace' }
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
@@ -3879,7 +3899,8 @@ while ($true) {
     $apiRetries = 0
 
     if ($state -eq 'Doing') {
-        $why = if ($run.TimedOut) { "timed out after $TaskMinutes min" } else { "run ended in Doing, exit $($run.ExitCode)" }
+        $why = if ($run.TimedOut) { "timed out after $TaskMinutes min" }
+            elseif (Test-BudgetSpent) { "stopped at its $TaskBudgetUsd US dollar cost cap (-TaskBudgetUsd), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
         Save-StrayChanges $id
         Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $(Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl")") | Out-Null
         git -C $Root add -A Tasks 2>&1 | Out-Null
