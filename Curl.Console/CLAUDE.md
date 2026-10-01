@@ -193,7 +193,10 @@ TLS, proxy TLS and other connection settings are equal, and the runner closes th
 run ends (ADR-0285, BL-754).
 `%{urlnum}` (`UrlTransfer.UrlNumber`), `%{xfer_id}` and `%{conn_id}` count on across groups, the
 `-v`/trace output stays open for the whole run, `--fail-early` stops every group, and the exit
-code is the last transfer's. Measured on curl 8.21.0 (BL-509 Notes).
+code is the last transfer's. Measured on curl 8.21.0 (BL-509 Notes). Under `-w` or `--trace-ids` a
+transfer that reuses a pooled connection, in its own group or a later one, takes that connection's
+`%{conn_id}` (`ConnectionIdRecordingTransferEvents`), so two URLs on one kept-alive connection print
+`[1 0][0 0]` for `[%{num_connects} %{conn_id}]` (BL-1052).
 
 Under `-Z` (ADR-0127, BL-519) the same loops start each transfer, in command-line order across the
 groups, once fewer than `--parallel-max` are running (`ParallelTransferQueue`), without waiting for

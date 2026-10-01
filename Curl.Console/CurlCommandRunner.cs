@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
@@ -596,6 +597,12 @@ internal sealed class CurlCommandRunner(
     /// The <c>%{conn_id}</c> the next transfer that connects takes, counted per run from zero.
     /// </summary>
     private long nextConnectionId;
+
+    /// <summary>
+    /// The <c>%{conn_id}</c> of each connection a transfer of the run opened, by the pool's number
+    /// for it, which a later transfer that reuses the connection takes (<see cref="ConnectionIdRecordingTransferEvents" />, BL-1052).
+    /// </summary>
+    private readonly ConcurrentDictionary<long, long> connectionIdsByPoolNumber = new();
 
     /// <summary>
     /// The <c>%{xfer_id}</c> the next transfer takes, counted per run from zero, one for every URL
@@ -1464,7 +1471,8 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Performs one transfer of a <c>-Z</c> run, then, holding the run's <see cref="writeGate" />,
-    /// records how it ended and writes its report (<see cref="EndParallelTransferAsync" />). A transfer
+    /// records how it ended and writes its report (<see cref="EndParallelTransferAsync" />). Where <c>-w</c> or <c>--trace-ids</c> prints
+    /// it, a transfer
     /// <c>--fail-early</c> cancels ends as <see cref="ParallelRun.AbortedResult" />.
     /// </summary>
     /// <param name="run">The run.</param>
@@ -2181,7 +2189,8 @@ internal sealed class CurlCommandRunner(
     /// opened: one sending its body to standard output, or discarding it under <c>--out-null</c>
     /// (<c>--out-null u -w "%{http_code}\n"</c> wrote LF, measured 2026-09-28, BL-495 Notes). An
     /// IPFS URL that could not be rewritten counts: curl 8.21.0 wrote its <c>-w</c> line feed as LF
-    /// without <c>-o</c> and as CR LF with one (measured 2026-09-27, BL-240 Notes). A transfer
+    /// without <c>-o</c> and as CR LF with one (measured 2026-09-27, BL-240 Notes). Where <c>-w</c> or <c>--trace-ids</c> prints
+    /// it, a transfer
     /// under <c>-B</c> / <c>--use-ascii</c> never does: curl leaves standard output in text mode
     /// for it (measured 2026-10-01, BL-961 Notes).
     /// </summary>
@@ -2530,6 +2539,7 @@ internal sealed class CurlCommandRunner(
     /// (measured 2026-09-29, BL-648 Notes). With <c>-w</c> the events also record the certificate
     /// verify codes <c>%{ssl_verify_result}</c> and <c>%{proxy_ssl_verify_result}</c> print
     /// (<see cref="VerifyResultRecordingTransferEvents" />, BL-661); nothing else reads them.
+    /// Where <c>-w</c> or <c>--trace-ids</c> prints it, a transfer that reuses a connection takes that connection's <c>%{conn_id}</c> (<see cref="ConnectionIdRecordingTransferEvents" />, BL-1052).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
@@ -2537,8 +2547,12 @@ internal sealed class CurlCommandRunner(
     private ITransferEvents SetUpTransferEvents(CommandLineOptions options, UrlTransfer transfer)
     {
         RunningTransferState state = Running;
-        ITransferEvents events = transferEventOutput.EventsFor(transfer.TransferId, () => state.ConnectionId ??= nextConnectionId++);
-        state.Events = options.WriteOut is null ? events : new VerifyResultRecordingTransferEvents(events, state);
+        Func<long> takeConnectionId = () => state.ConnectionId ??= nextConnectionId++;
+        ITransferEvents events = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
+        ITransferEvents recorded = options.WriteOut is null ? events : new VerifyResultRecordingTransferEvents(events, state);
+        state.Events = options.WriteOut is null && !options.TraceIds
+            ? recorded
+            : new ConnectionIdRecordingTransferEvents(recorded, state, connectionIdsByPoolNumber, takeConnectionId);
         return transferEventOutput.EventsFor(transfer.TransferId, () => null);
     }
 
