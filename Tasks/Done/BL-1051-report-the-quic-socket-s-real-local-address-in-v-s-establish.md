@@ -8,7 +8,7 @@ depends-on: [BL-734]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-30
-completed:
+completed: 2026-10-01
 ---
 # BL-1051 — Report the QUIC socket's real local address in -v's Established connection line
 
@@ -23,12 +23,17 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Networking.UnitTests` shows the `ConnectionOpenedEvent` a QUIC connect reports carries a non-wildcard local address (a loopback peer gives `127.0.0.1` or `::1`).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Networking.UnitLibrary`.
+- [x] A test in `Curl.Networking.UnitTests` shows the `ConnectionOpenedEvent` a QUIC connect reports carries a non-wildcard local address (a loopback peer gives `127.0.0.1` or `::1`).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Networking.UnitLibrary`.
 
 ## Notes
+
+- Fixed in `UdpDatagramChannel.LocalEndPoint` (ADR-0298): a socket bound to the any address reports the address a throwaway UDP socket connected to the server gets; connecting a UDP socket sends nothing. The channel's own socket stays unconnected, so TFTP still takes replies from a new port and macOS `sendto` does not fail with `EISCONN`. No route keeps the any address. `QuicDialer` is unchanged.
+- Tests: `UdpDatagramChannelTests` (route's address, no route, bound address) and `TcpConnectorQuicTests.ConnectMultiplexedAsync_OverARealUdpSocketBoundToAnyAddress_ReportsTheAddressItSendsFrom`, through the new `QuicServerChannelOpener.ReportsARealUdpSocketsLocalEndPoint`.
+- Gates: `dotnet build Curl.slnx -warnaserror` clean, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 100% line, 100% branch, 0 failing members.
 
 ## Log
 
 - 2026-09-30: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. A QUIC connect's Established connection line and local_ip name the route's source address, not 0.0.0.0
