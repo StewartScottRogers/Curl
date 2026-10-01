@@ -30,6 +30,11 @@ internal sealed class SshPacketReader(SshConnectionReader reader)
     internal uint SequenceNumber { get; private set; }
 
     /// <summary>
+    /// Gets or sets where each payload's message number is logged at <c>verbose</c>.
+    /// </summary>
+    internal SshDiagnosticLog DiagnosticLog { get; set; } = SshDiagnosticLog.None;
+
+    /// <summary>
     /// Starts counting again from 0, as strict key exchange requires after each
     /// <c>NEWKEYS</c> (OpenSSH's <c>PROTOCOL</c>, section 1.10).
     /// </summary>
@@ -84,7 +89,9 @@ internal sealed class SshPacketReader(SshConnectionReader reader)
 
         SequenceNumber = unchecked(SequenceNumber + 1);
         byte[] payload = packet.AsSpan(1, payloadLength).ToArray();
-        return decompressor is null ? payload : decompressor.Decompress(payload);
+        byte[] message = decompressor is null ? payload : decompressor.Decompress(payload);
+        DiagnosticLog.MessageReceived(message[0]);
+        return message;
     }
 
     private void RejectBadLength(uint packetLength)

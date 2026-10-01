@@ -144,6 +144,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connect = await connector.ConnectAsync(connectTarget, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
@@ -186,9 +187,10 @@ public sealed class SshProtocolHandler : IProtocolHandler
         }
 
         events.ReportInfo(SshInfoLines.User(context.Credentials?.UserName ?? string.Empty));
+        SshDiagnosticLog log = new(context.DiagnosticLog);
         try
         {
-            TransferResult result = await HandshakeAndTransferAsync(context, target, connection).ConfigureAwait(false);
+            TransferResult result = await HandshakeAndTransferAsync(context, target, connection, log).ConfigureAwait(false);
             events.ReportInfo(FailedWhileTransferring(result, ListsDirectory(context))
                 ? SshInfoLines.ClosingConnection(connectionNumber)
                 : SshInfoLines.ConnectionLeftIntact(connectionNumber, target.Host, target.Port));
@@ -196,6 +198,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         }
         catch (SshTransferException exception)
         {
+            log.Failed(exception);
             if (exception.IsVerboseLine)
             {
                 events.ReportInfo(exception.Message);
@@ -225,14 +228,16 @@ public sealed class SshProtocolHandler : IProtocolHandler
         context.Url.Scheme != ScpScheme && context.Upload is null && SftpRemotePath.NamesDirectory(context.Url.AbsolutePath);
 
     // The handshake, then the rest of the session, which always ends with DISCONNECT.
-    private async ValueTask<TransferResult> HandshakeAndTransferAsync(ITransferContext context, SshSessionTarget target, IConnection connection)
+    private async ValueTask<TransferResult> HandshakeAndTransferAsync(ITransferContext context, SshSessionTarget target, IConnection connection, SshDiagnosticLog log)
     {
         SshAlgorithmPreferences offered = SshHostKeyChecker.NarrowHostKeys(
             preferences.WithCompression(target.Options.Compression), target.Host, target.Port, target.Options, target.KnownHosts, context.Events);
-        SshTransport transport = new(connection, offered, SshAlgorithmCatalogue.Implemented, randomSource, ephemeralKeySource);
-        SshKeyExchangeResult keys = await transport.ExchangeKeysAsync(
-            await transport.NegotiateAlgorithmsAsync(context.CancellationToken).ConfigureAwait(false),
-            context.CancellationToken).ConfigureAwait(false);
+        SshTransport transport = new(connection, offered, SshAlgorithmCatalogue.Implemented, randomSource, ephemeralKeySource, log);
+        SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(context.CancellationToken).ConfigureAwait(false);
+        log.HandshakeNegotiated(handshake);
+        long started = context.TimeProvider.GetTimestamp();
+        SshKeyExchangeResult keys = await transport.ExchangeKeysAsync(handshake, context.CancellationToken).ConfigureAwait(false);
+        log.KeysExchanged(handshake.Algorithms.KeyExchange, context.TimeProvider.GetElapsedTime(started));
         try
         {
             return await AuthenticateAndTransferAsync(context, target, transport, keys.HostKey).ConfigureAwait(false);
@@ -249,7 +254,9 @@ public sealed class SshProtocolHandler : IProtocolHandler
         SshUserKeySource userKeys = new(fileSystem, readEnvironmentVariable, target.Options, credentialEncoding);
         SshUserAuthentication authentication = new(transport, credentialEncoding, userKeys, events, agentConnector);
         await authentication.RequestServiceAsync(context.CancellationToken).ConfigureAwait(false);
+        transport.DiagnosticLog.HostKeyPresented(hostKey);
         SshHostKeyChecker.Check(hostKey, target.Host, target.Port, target.Options, target.KnownHosts, events);
+        transport.DiagnosticLog.HostKeyAccepted(target.Options, target.KnownHosts);
         await authentication.AuthenticateAsync(context.Credentials, context.CancellationToken).ConfigureAwait(false);
         events.ReportInfo(SshInfoLines.AuthenticationComplete);
         bool overScp = context.Url.Scheme == ScpScheme;
@@ -266,6 +273,9 @@ public sealed class SshProtocolHandler : IProtocolHandler
     private static async ValueTask<TransferResult> TransferAsync(ITransferContext context, SshTransport transport, bool overScp)
     {
         TransferResult result;
+        SshDiagnosticLog log = transport.DiagnosticLog;
+        log.TransferStarted(context.Url.Scheme, context.Url.AbsolutePath, context.Upload is not null);
+        long started = context.TimeProvider.GetTimestamp();
         try
         {
             ReceivedDataReportingStream output = new(context.Output, context.Events);
@@ -275,6 +285,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         }
         catch (SshTransferException exception) when (!exception.EndsConnection)
         {
+            log.Failed(exception);
             if (exception.IsVerboseLine)
             {
                 context.Events.ReportInfo(exception.Message);
@@ -283,6 +294,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
             return TransferResult.Failure(exception.ExitCode, exception.Message);
         }
 
+        log.TransferEnded(result, context.TimeProvider.GetElapsedTime(started));
         ReportReturnedFailure(context.Events, result);
         return result;
     }

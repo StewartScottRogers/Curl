@@ -36,6 +36,12 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     internal bool EndsConnection { get; private init; }
 
     /// <summary>
+    /// Gets the libssh2 error code the failure maps from, for a failure of libssh2s session
+    /// startup; <see langword="null" /> for every other failure.
+    /// </summary>
+    internal int? Libssh2Code { get; private init; }
+
+    /// <summary>
     /// Creates the exit 60 failure curl 8.21.0 reports when the known-hosts check refuses the
     /// host key: no message of its own, so curl prints the exit code's text.
     /// </summary>
@@ -51,7 +57,7 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     /// <param name="description">The libssh2 description curl prints.</param>
     /// <returns>The exception.</returns>
     internal static SshTransferException SessionEstablishmentFailed(int libssh2ErrorCode, string description) =>
-        new(CurlExitCode.FailedInit, $"Failure establishing ssh session: {libssh2ErrorCode}, {description}");
+        new(CurlExitCode.FailedInit, $"Failure establishing ssh session: {libssh2ErrorCode}, {description}") { Libssh2Code = libssh2ErrorCode };
 
     /// <summary>
     /// Creates the failure curl 8.21.0 reports when no method it tried authenticated the

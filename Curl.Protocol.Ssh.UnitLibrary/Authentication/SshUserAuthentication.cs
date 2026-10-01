@@ -70,6 +70,9 @@ internal sealed class SshUserAuthentication(
     /// </summary>
     internal const int MaximumPrompts = 100;
 
+    // How the diagnostic log names publickey with the ssh-agents identities.
+    private const string AgentMethod = "publickey (ssh-agent)";
+
     private const string ServerSignatureAlgorithmsExtension = "server-sig-algs";
 
     // What libssh2 1.11.1 names each certificate method in a signature, and in the method
@@ -145,6 +148,7 @@ internal sealed class SshUserAuthentication(
         byte[] user = credentialEncoding.GetBytes(userName);
         byte[] password = credentialEncoding.GetBytes(credentials?.Password ?? string.Empty);
         string? methods = await ListMethodsAsync(user, cancellationToken).ConfigureAwait(false);
+        transport.DiagnosticLog.AuthenticationMethodsListed(methods);
         if (methods is null)
         {
             events.ReportInfo(SshInfoLines.AcceptedWithoutAuthentication);
@@ -174,18 +178,18 @@ internal sealed class SshUserAuthentication(
     private async ValueTask AuthenticateWithMethodsAsync(string methods, UserCredentials credentials, CancellationToken cancellationToken)
     {
         bool offersPublicKey = methods.Contains(PublicKeyMethod, StringComparison.Ordinal);
-        if (offersPublicKey && await TryPublicKeyAsync(credentials.User, cancellationToken).ConfigureAwait(false))
+        if (offersPublicKey && await TryLoggedAsync(PublicKeyMethod, () => TryPublicKeyAsync(credentials.User, cancellationToken)).ConfigureAwait(false))
         {
             return;
         }
 
-        if (methods.Contains(PasswordMethod, StringComparison.Ordinal) && await TryPasswordAsync(credentials.User, credentials.Password, cancellationToken).ConfigureAwait(false))
+        if (methods.Contains(PasswordMethod, StringComparison.Ordinal) && await TryLoggedAsync(PasswordMethod, () => TryPasswordAsync(credentials.User, credentials.Password, cancellationToken)).ConfigureAwait(false))
         {
             events.ReportInfo(SshInfoLines.PasswordAuthenticated);
             return;
         }
 
-        if (offersPublicKey && await TryAgentAsync(credentials, cancellationToken).ConfigureAwait(false))
+        if (offersPublicKey && await TryLoggedAsync(AgentMethod, () => TryAgentAsync(credentials, cancellationToken)).ConfigureAwait(false))
         {
             return;
         }
@@ -337,6 +341,15 @@ internal sealed class SshUserAuthentication(
         return signedData.ToArray();
     }
 
+    // One method tried, with the diagnostic log naming it and its outcome (BL-925).
+    private async ValueTask<bool> TryLoggedAsync(string method, Func<ValueTask<bool>> attempt)
+    {
+        transport.DiagnosticLog.AuthenticationTried(method);
+        bool succeeded = await attempt().ConfigureAwait(false);
+        transport.DiagnosticLog.AuthenticationEnded(method, succeeded);
+        return succeeded;
+    }
+
     private async ValueTask RequireKeyboardInteractiveAsync(string methods, byte[] user, byte[] password, CancellationToken cancellationToken)
     {
         if (!methods.Contains(KeyboardInteractiveMethod, StringComparison.Ordinal))
@@ -344,7 +357,7 @@ internal sealed class SshUserAuthentication(
             throw SshTransferException.AuthenticationFailure();
         }
 
-        if (!await TryKeyboardInteractiveAsync(user, password, cancellationToken).ConfigureAwait(false))
+        if (!await TryLoggedAsync(KeyboardInteractiveMethod, () => TryKeyboardInteractiveAsync(user, password, cancellationToken)).ConfigureAwait(false))
         {
             throw SshTransferException.LoginDenied();
         }

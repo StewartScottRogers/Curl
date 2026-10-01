@@ -21,7 +21,11 @@ ending with a slash - into the output, and ends the session with
 `DISCONNECT` 11 `Shutdown`; every `SshTransferException` becomes a failed
 `TransferResult`. On the way it reports curl's `-v` lines, worded in `SshInfoLines`, through
 `ITransferEvents`, and each block written to the output through
-`ReceivedDataReportingStream` (ADR-0262). The console passes the platform's preset and ADR-0022's credential
+`ReceivedDataReportingStream` (ADR-0262). Curl's own diagnostic log (component `ssh`,
+ADR-0222, BL-925) is worded in `SshDiagnosticLog`, which the handler builds from
+`ITransferContext.DiagnosticLog` and hangs on `SshTransport.DiagnosticLog`, so the packet
+reader and writer, the authentication, the channel and the SFTP session all write to it;
+a new SSH step logs through it, never a password, pass phrase or key byte. The console passes the platform's preset and ADR-0022's credential
 encoding. `Curl.Protocol.Ssh.UnitTests` drives it end to end against the public
 `Fakes.InMemorySshServer`, an `IConnector` answering each connection with a real
 server-side session over `Fakes.InMemoryDuplexConnection`.

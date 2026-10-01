@@ -45,12 +45,14 @@ internal sealed class SshTransport
     /// <param name="catalogue">The algorithms this build implements.</param>
     /// <param name="randomSource">Where the cookie and padding bytes come from.</param>
     /// <param name="ephemeralKeySource">Where the key exchange's ephemeral key pairs come from.</param>
+    /// <param name="diagnosticLog">Where the session's steps are logged, or <see langword="null" /> for nowhere.</param>
     internal SshTransport(
         IConnection connection,
         SshAlgorithmPreferences preferences,
         SshAlgorithmCatalogue catalogue,
         ISshRandomSource randomSource,
-        ISshEphemeralKeySource ephemeralKeySource)
+        ISshEphemeralKeySource ephemeralKeySource,
+        SshDiagnosticLog? diagnosticLog = null)
     {
         this.connection = connection;
         this.preferences = preferences;
@@ -60,7 +62,16 @@ internal sealed class SshTransport
         connectionReader = new SshConnectionReader(connection);
         PacketReader = new SshPacketReader(connectionReader);
         PacketWriter = new SshPacketWriter(connection, randomSource);
+        DiagnosticLog = diagnosticLog ?? SshDiagnosticLog.None;
+        PacketReader.DiagnosticLog = DiagnosticLog;
+        PacketWriter.DiagnosticLog = DiagnosticLog;
     }
+
+    /// <summary>
+    /// Gets where the sessions steps are logged: the packet reader and writer, the
+    /// authentication, the channel and the SFTP session all write to it.
+    /// </summary>
+    internal SshDiagnosticLog DiagnosticLog { get; }
 
     /// <summary>
     /// Gets the reader of the server's packets.
@@ -209,6 +220,7 @@ internal sealed class SshTransport
             throw KeyExchangeMethodFailed();
         }
 
+        DiagnosticLog.KeysReExchanged(handshake.Algorithms);
         return await ExchangeKeysAsync(handshake, cancellationToken).ConfigureAwait(false);
     }
 
