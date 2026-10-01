@@ -9,7 +9,7 @@ touches: [CLAUDE.md, Audit/README.md]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1021 — Document the audit office in CLAUDE.md
 
@@ -50,13 +50,19 @@ is still marked planned.
 
 ## Acceptance criteria
 
-- [ ] `CLAUDE.md` has a `## Audit office` section between `## Dark factory` and `## Repository layout` containing every point above.
-- [ ] Every command, path, parameter and environment variable the section names exists in the repository as named (checked one by one; list them under Notes).
-- [ ] "Repository layout" shows `Audit/`, and "Git and GitHub" states the `audit` branch rule.
-- [ ] `Audit/README.md` marks nothing as planned that exists.
+- [x] `CLAUDE.md` has a `## Audit office` section between `## Dark factory` and `## Repository layout` containing every point above.
+- [x] Every command, path, parameter and environment variable the section names exists in the repository as named (checked one by one; list them under Notes).
+- [x] "Repository layout" shows `Audit/`, and "Git and GitHub" states the `audit` branch rule.
+- [x] `Audit/README.md` marks nothing as planned that exists.
 
 ## Notes
+
+- CLAUDE.md commit 2260b672: the Audit office section between Dark factory and Repository layout, and Audit/ in the layout tree. Git and GitHub already states the audit branch rule (the third standing exception, 00210924). The section says an interactive session merges the audit pull requests once CI is green - the task's 'only Stewart merges' predates Stewart's standing exception.
+- Every name the section uses, checked one by one on the merged tree: Audit/README.md, Audit/Instructions/Auditor-Rules.md, Audit/PlantedDefects, .claude/hooks/guard-audit-paths.ps1, Audit/Guard/Test-AuditPathsUntouched.ps1, Audit/RunAudit.cmd, Audit/Tools/Test-AuditDue.ps1, Audit/Triage.md, Audit/Tools/New-TasksFromAcceptedFindings.ps1, Audit/Findings, task-board.ps1, the seven audit-* agents, the ci.yml audit-guard job, CURL_DARK_FACTORY_LANE, and RunAudit's -Auditors, -Planted, -Ref, -DryRun, -AlongsideShift, -NewTab - all present.
+- Audit/README.md (audit branch e0edfcb7): the folder map as built, a 'Built by' column instead of 'Status'; no 'planned' left.
 
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. CLAUDE.md's Audit office section describes the office as built; the layout shows Audit/; Audit/README.md marks nothing planned.
