@@ -5,7 +5,7 @@ auditor: process
 severity: Low
 status: accepted
 key: process:logs:task-costs:cost-outlier
-task: none
+task: BL-1070
 found: 2026-09-30
 found-at: d065d6d3507e2ed87905d40a24233af193913378
 scorecard: 2026-09-30_1754.md
