@@ -14,6 +14,20 @@ public sealed class QueuedTlsProvider(params ConnectResult[] results) : ITlsProv
     /// <summary>Gets every plaintext connection and target host asked for, in order.</summary>
     public List<(IConnection Plaintext, string TargetHost)> Handshakes { get; } = [];
 
+    /// <summary>Gets the events each handshake was asked to report to, in order.</summary>
+    public List<ITransferEvents> HandshakeEvents { get; } = [];
+
+    /// <inheritdoc />
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        CancellationToken cancellationToken)
+    {
+        HandshakeEvents.Add(events);
+        return AuthenticateAsClientAsync(plaintext, targetHost, cancellationToken);
+    }
+
     /// <inheritdoc />
     public async ValueTask<ConnectResult> AuthenticateAsClientAsync(
         IConnection plaintext,

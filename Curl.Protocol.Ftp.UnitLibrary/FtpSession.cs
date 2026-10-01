@@ -396,17 +396,25 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
-    /// Runs the TLS handshake over the control connection and carries on over the secured
-    /// connection; a failed handshake ends the session with its exit code and no <c>QUIT</c>.
+    /// Runs the TLS handshake over the control connection, reporting it to the transfer's
+    /// events, and carries on over the secured connection; a failed handshake ends the session
+    /// with its exit code and no <c>QUIT</c>. A completed one reports the connect's
+    /// <c>Established connection</c> line again, as curl 8.21.0 writes it a second time
+    /// between <c>234</c> and <c>USER</c> (measured, BL-1084).
     /// </summary>
     private async ValueTask<TransferResult?> UpgradeControlAsync()
     {
         ConnectResult secured = await connections.TlsProvider
-            .AuthenticateAsClientAsync(control.Connection, context.Url.IdnHost, control.CancellationToken)
+            .AuthenticateAsClientAsync(control.Connection, context.Url.IdnHost, context.Events, control.CancellationToken)
             .ConfigureAwait(false);
         if (secured.Connection is not { } connection)
         {
             return TransferResult.Failure(secured.ExitCode, secured.ErrorMessage!);
+        }
+
+        if (connections.ControlOpened is { } opened)
+        {
+            context.Events.ReportConnectionOpened(opened);
         }
 
         securedControl = connection;
@@ -1188,9 +1196,10 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
-    /// Runs the TLS handshake over the data connection after an accepted <c>PROT P</c>; a
-    /// failed one ends the transfer with its exit code and no <c>QUIT</c>, as a failed
-    /// passive connect does.
+    /// Runs the TLS handshake over the data connection after an accepted <c>PROT P</c>,
+    /// reporting it to the transfer's events, which writes curl's <c>schannel:</c> lines and no
+    /// second <c>Established</c> line (measured, BL-1084); a failed one ends the transfer with
+    /// its exit code and no <c>QUIT</c>, as a failed passive connect does.
     /// </summary>
     private async ValueTask<TransferResult?> SecureDataConnectionAsync()
     {
@@ -1200,7 +1209,7 @@ internal sealed class FtpSession(
         }
 
         ConnectResult secured = await connections.TlsProvider
-            .AuthenticateAsClientAsync(dataConnection!, context.Url.IdnHost, context.CancellationToken)
+            .AuthenticateAsClientAsync(dataConnection!, context.Url.IdnHost, context.Events, context.CancellationToken)
             .ConfigureAwait(false);
         dataConnection = secured.Connection;
         if (dataConnection is null)

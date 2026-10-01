@@ -224,6 +224,46 @@ public sealed class ImapProtocolHandlerEventTests
         CollectionAssert.AreEqual((string[])["< A002 NO full\r\n", "* shutting down connection #0"], events.Transcript.TakeLast(2).ToArray());
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_StartTlsAccepted_ReportsTheHandshakeAndTheConnectionOpenedAgainBeforeTheSecondCapability()
+    {
+        // curl 8.21.0 -v -k --ssl-reqd: between "< A002 OK Begin TLS negotiation now" and the
+        // second CAPABILITY it writes the TLS lines and the connect's "Established connection"
+        // line again (measured, BL-1084).
+        var events = new RecordingTransferEvents();
+        var plaintext = Connection(Greeting, "* CAPABILITY IMAP4rev1 STARTTLS\r\nA001 OK done\r\n", "A002 OK Begin TLS negotiation now\r\n");
+        var secured = Connection("* CAPABILITY IMAP4rev1\r\nA003 OK done\r\n", "* LIST () \"/\" INBOX\r\nA004 OK LIST completed\r\n", LogoutReply);
+        var tls = new QueuedTlsProvider(ConnectResult.Connected(secured));
+        TransferContext context = TlsRequiredContext(events);
+
+        await new ImapProtocolHandler(new OpenedReportingConnector(ConnectResult.Connected(plaintext)), tls).ExecuteAsync(context);
+
+        Assert.AreSame(events, tls.HandshakeEvents.Single());
+        CollectionAssert.AreEqual(
+            (string[])[
+                "+ opened #3 to 127.0.0.1",
+                "< * OK ready\r\n", "> A001 CAPABILITY\r\n", "< * CAPABILITY IMAP4rev1 STARTTLS\r\n", "< A001 OK done\r\n",
+                "> A002 STARTTLS\r\n", "< A002 OK Begin TLS negotiation now\r\n",
+                "+ opened #3 to 127.0.0.1",
+                "> A003 CAPABILITY\r\n",
+            ],
+            events.Transcript.Take(9).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_StartTlsAcceptedAfterAConnectThatReportedNothing_ReportsNoConnectionOpened()
+    {
+        var events = new RecordingTransferEvents();
+        var plaintext = Connection(Greeting, "* CAPABILITY IMAP4rev1 STARTTLS\r\nA001 OK done\r\n", "A002 OK Begin TLS negotiation now\r\n");
+        var secured = Connection("* CAPABILITY IMAP4rev1\r\nA003 OK done\r\n", "* LIST () \"/\" INBOX\r\nA004 OK LIST completed\r\n", LogoutReply);
+        TransferContext context = TlsRequiredContext(events);
+
+        await new ImapProtocolHandler(new QueuedConnector(ConnectResult.Connected(plaintext)), new QueuedTlsProvider(ConnectResult.Connected(secured))).ExecuteAsync(context);
+
+        Assert.Contains("> A003 CAPABILITY\r\n", events.Transcript);
+        Assert.IsFalse(events.Transcript.Any(line => line.StartsWith('+')));
+    }
+
     private static async Task<RecordingTransferEvents> RunFetchAsync(params string[] afterSelect)
     {
         var events = new RecordingTransferEvents();
@@ -240,6 +280,15 @@ public sealed class ImapProtocolHandlerEventTests
             Output = new MemoryStream(),
             Events = events,
             Credentials = withUser ? new NetworkCredential("user", "secret") : null,
+        };
+
+    private static TransferContext TlsRequiredContext(ITransferEvents events) =>
+        new()
+        {
+            Url = CurlUrl.Parse(Host),
+            Output = new MemoryStream(),
+            Events = events,
+            SslLevel = TransportSecurityLevel.Required,
         };
 
     private static TransferContext AppendContext(ITransferEvents events, string message) =>

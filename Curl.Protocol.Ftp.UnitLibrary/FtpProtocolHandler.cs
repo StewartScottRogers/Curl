@@ -242,10 +242,11 @@ public sealed class FtpProtocolHandler : IProtocolHandler
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
         int defaultPort = implicitTls ? DefaultSecurePort : DefaultPort;
+        var connectEvents = new ConnectionOpenedCapturingTransferEvents(context.Events);
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, implicitTls)
         {
             Proxy = context.Proxy,
-            Events = context.Events,
+            Events = connectEvents,
             DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connected = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
@@ -264,13 +265,13 @@ public sealed class FtpProtocolHandler : IProtocolHandler
         await using (connection.ConfigureAwait(false))
         {
             var name = new FtpControlConnectionName(connected.ConnectionNumber, target.Host, target.Port);
-            return await TransferAsync(connection, name, context, implicitTls, started).ConfigureAwait(false);
+            return await TransferAsync(connection, name, connectEvents.Opened, context, implicitTls, started).ConfigureAwait(false);
         }
     }
 
-    private async ValueTask<TransferResult> TransferAsync(IConnection control, FtpControlConnectionName name, ITransferContext context, bool implicitTls, long started)
+    private async ValueTask<TransferResult> TransferAsync(IConnection control, FtpControlConnectionName name, ConnectionOpenedEvent? controlOpened, ITransferContext context, bool implicitTls, long started)
     {
-        var connections = new FtpSessionConnections(dataConnector, listener, tlsProvider, dnsResolver, interfaceLookup);
+        var connections = new FtpSessionConnections(dataConnector, listener, tlsProvider, dnsResolver, interfaceLookup, controlOpened);
         using var connectPhase = new FtpConnectPhaseLimit(context, started);
         var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog)), name, context, implicitTls, connectPhase);
         await using (session.ConfigureAwait(false))

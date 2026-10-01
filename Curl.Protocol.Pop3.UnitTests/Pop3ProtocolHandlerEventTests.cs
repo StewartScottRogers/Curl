@@ -161,6 +161,51 @@ public sealed class Pop3ProtocolHandlerEventTests
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith('>')));
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_StlsAccepted_ReportsTheHandshakeAndTheConnectionOpenedAgainBeforeTheSecondCapa()
+    {
+        // curl 8.21.0 -v -k --ssl-reqd: between "< +OK Begin TLS negotiation" and the second
+        // CAPA it writes the TLS lines and the connect's "Established connection" line again
+        // (measured, BL-1084).
+        var events = new RecordingTransferEvents();
+        var tls = new QueuedTlsProvider(ConnectResult.Connected(SecuredSession()));
+        var connector = new OpenedReportingConnector(ConnectResult.Connected(StlsAcceptingSession()));
+
+        await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(TlsRequiredContext(events));
+
+        Assert.AreSame(events, tls.HandshakeEvents.Single());
+        CollectionAssert.AreEqual(
+            (string[])[
+                "+ opened #3 to 127.0.0.1",
+                "< +OK POP3 ready\r\n", "> CAPA\r\n", "< +OK\r\n", "< STLS\r\n", "< .\r\n",
+                "> STLS\r\n", "< +OK Begin TLS negotiation\r\n",
+                "+ opened #3 to 127.0.0.1",
+                "> CAPA\r\n",
+            ],
+            events.Transcript.Take(10).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_StlsAcceptedAfterAConnectThatReportedNothing_ReportsNoConnectionOpened()
+    {
+        var events = new RecordingTransferEvents();
+        var tls = new QueuedTlsProvider(ConnectResult.Connected(SecuredSession()));
+
+        await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(StlsAcceptingSession())), tls).ExecuteAsync(TlsRequiredContext(events));
+
+        Assert.Contains("< +OK Begin TLS negotiation\r\n", events.Transcript);
+        Assert.IsFalse(events.Transcript.Any(line => line.StartsWith('+')));
+    }
+
+    private static ScriptedConnection StlsAcceptingSession() =>
+        new([.. new[] { Greeting, "+OK\r\nSTLS\r\n.\r\n", "+OK Begin TLS negotiation\r\n" }.Select(Encoding.Latin1.GetBytes)]);
+
+    private static ScriptedConnection SecuredSession() =>
+        new([.. new[] { CapaReply, "+OK 0 messages\r\n.\r\n", Bye }.Select(Encoding.Latin1.GetBytes)]);
+
+    private static TransferContext TlsRequiredContext(RecordingTransferEvents events) =>
+        new() { Url = CurlUrl.Parse(Url), Output = new MemoryStream(), Events = events, SslLevel = TransportSecurityLevel.Required };
+
     private static async Task<(TransferResult Result, RecordingTransferEvents Events, string Output)> RunAsync(
         string path, NetworkCredential? credentials, params string[] reads)
     {

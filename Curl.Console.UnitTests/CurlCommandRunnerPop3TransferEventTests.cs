@@ -97,8 +97,8 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
     [TestMethod]
     public async Task RunAsync_VerboseRetrWithStls_WritesTheSessionLinesAroundTheUpgrade()
     {
-        // curl also writes two "schannel:" lines and a second "Established connection" line
-        // between "< +OK Begin TLS negotiation" and the second CAPA; BL-806 adds them.
+        // Between "< +OK Begin TLS negotiation" and the second CAPA curl writes the two
+        // "schannel:" lines and the connect's "Established connection" line again (BL-1084).
         int exitCode = await RunAsync(
             ["-sv", "-k", "--ssl-reqd"],
             18112,
@@ -111,6 +111,9 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
             + Headers("< ", CapaReply)
             + "> STLS" + HeaderEnd
             + "< +OK Begin TLS negotiation" + HeaderEnd
+            + "* schannel: disabled automatic use of client certificate" + InfoEnd
+            + "* schannel: using IP address, SNI is not supported by OS." + InfoEnd
+            + "* Established connection to 127.0.0.1 (127.0.0.1 port 18112) from 127.0.0.1 port 64807 " + InfoEnd
             + "> CAPA" + HeaderEnd
             + Headers("< ", SecureCapaReply)
             + AuthPlainAndRetr(18112),
@@ -187,7 +190,7 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
         return new CurlCommandRunner(
                 _ => new TransferDispatch(
                     new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
-                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver()))),
                 files,
                 files,
                 standardOutput,
@@ -214,6 +217,29 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
                 ConnectionNumber = 0,
             });
             return inner.ConnectAsync(target, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// A pass-through TLS provider that reports the trust before its handshake, as
+    /// <c>SslStreamTlsProvider</c> does, so the Schannel build's <c>schannel:</c> lines appear.
+    /// </summary>
+    private sealed class TrustReportingTlsProvider : ITlsProvider
+    {
+        public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+            IConnection plaintext,
+            string targetHost,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(ConnectResult.Connected(plaintext));
+
+        public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+            IConnection plaintext,
+            string targetHost,
+            ITransferEvents events,
+            CancellationToken cancellationToken)
+        {
+            events.ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = false, TargetsIpAddress = IPAddress.TryParse(targetHost, out _) });
+            return AuthenticateAsClientAsync(plaintext, targetHost, cancellationToken);
         }
     }
 }

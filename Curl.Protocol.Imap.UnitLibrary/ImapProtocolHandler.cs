@@ -96,10 +96,11 @@ public sealed class ImapProtocolHandler : IProtocolHandler
     {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
+        var connectEvents = new ConnectionOpenedCapturingTransferEvents(context.Events);
         var target = new ConnectTarget(url.IdnHost, url.Port, implicitTls)
         {
             Proxy = context.Proxy,
-            Events = context.Events,
+            Events = connectEvents,
             DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connected = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
@@ -114,7 +115,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
         await using (connection.ConfigureAwait(false))
         {
             var session = new ImapSession(
-                new ImapControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog), tlsProvider, saslAuthenticator, context, implicitTls);
+                new ImapControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog), tlsProvider, saslAuthenticator, context, implicitTls, connectEvents.Opened);
             TransferResult result;
             await using (session.ConfigureAwait(false))
             {

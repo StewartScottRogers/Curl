@@ -43,17 +43,20 @@ public sealed class FtpProtocolHandlerTlsTests
     public async Task ExecuteAsync_FtpsUrl_ConnectsWithTlsToPort990AndProtectsTheData()
     {
         // curl -k ftps://127.0.0.1:18437/a.txt, here without the port
+        // curl -v writes the data handshake's schannel: lines, so it reports to the transfer's events (BL-1084).
+        var events = new RecordingTransferEvents();
         var securedData = Scripted("hello");
         TlsRun run = await RunAsync(
             "ftps://127.0.0.1/a.txt",
             Greeting + LoggedIn + Protected + Pwd + Retrieved,
-            _ => { },
+            m => m.Events = events,
             ConnectResult.Connected(securedData));
 
         Assert.AreEqual(LogInSent + "PBSZ 0\r\nPROT P\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 990, true), run.Connector.Targets[0]);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 64396, false), run.Connector.Targets[1]);
         Assert.AreSame(run.Data, run.Tls.Handshakes.Single().Plaintext);
+        Assert.AreSame(events, run.Tls.HandshakeEvents.Single());
         Assert.AreEqual("127.0.0.1", run.Tls.Handshakes.Single().TargetHost);
         Assert.IsTrue(securedData.IsDisposed);
         Assert.AreEqual("hello", run.OutputText);

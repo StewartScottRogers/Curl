@@ -59,7 +59,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
 
         Assert.AreEqual(Capa + List + Quit, run.Sent);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18110, false), run.Connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18110, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsEmpty(run.Tls.Handshakes);
         Assert.IsTrue(run.Connection.IsDisposed);
     }
@@ -69,7 +69,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         Pop3Run run = await RunAsync("pop3://127.0.0.1/", Greeting + CapaReply + ListReply + Bye);
 
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 110, false), run.Connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 110, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
     }
 
     [TestMethod]
@@ -83,7 +83,8 @@ public sealed class Pop3ProtocolHandlerSessionTests
         TransferResult result = await new Pop3ProtocolHandler(connector, new QueuedTlsProvider()).ExecuteAsync(context);
 
         Assert.AreSame(proxy, connector.Targets.Single().Proxy);
-        Assert.AreSame(events, connector.Targets.Single().Events);
+        connector.Targets.Single().Events.ReportInfo("from the connector");
+        Assert.AreEqual("from the connector", events.Info.Last());
         Assert.AreEqual(TransferResult.Success(ListedBytes), result);
     }
 
@@ -96,7 +97,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
         Pop3Run run = await RunAsync("pop3s://127.0.0.1/", Greeting + SecureCapaReply + ListReply + Bye, sslLevel);
 
         Assert.AreEqual(Capa + List + Quit, run.Sent);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 995, true), run.Connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 995, true), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsEmpty(run.Tls.Handshakes);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }

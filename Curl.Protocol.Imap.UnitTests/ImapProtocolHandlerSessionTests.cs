@@ -35,7 +35,7 @@ public sealed class ImapProtocolHandlerSessionTests
 
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18143, false), run.Connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18143, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsTrue(run.Connection.IsDisposed);
     }
 
@@ -44,7 +44,7 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         ImapRun run = await RunAsync("imap://127.0.0.1/", Greeting + CapabilityReply("A001") + ListReply("A002") + LogoutReply("A003"));
 
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 143, false), run.Connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 143, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
     }
 
     [TestMethod]
@@ -58,7 +58,8 @@ public sealed class ImapProtocolHandlerSessionTests
         ImapRun run = await ImapRun.ExecuteAsync(context, connection);
 
         Assert.AreSame(proxy, run.Connector.Targets.Single().Proxy);
-        Assert.AreSame(events, run.Connector.Targets.Single().Events);
+        run.Connector.Targets.Single().Events.ReportInfo("from the connector");
+        Assert.AreEqual("from the connector", events.Info.Last());
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -70,7 +71,7 @@ public sealed class ImapProtocolHandlerSessionTests
         ImapRun run = await RunAsync("imaps://127.0.0.1/", Greeting + CapabilityReply("A001") + ListReply("A002") + LogoutReply("A003"), Required);
 
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 993, true), run.Connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 993, true), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsEmpty(run.Tls.Handshakes);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
