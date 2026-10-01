@@ -129,9 +129,16 @@ function Get-ReportBlock([string]$Path) {
 
 function ConvertTo-Normalised([string]$Path) { return ("$Path" -replace '\\', '/' -replace ':\d+(-\d+)?$', '').Trim() }
 
+function Test-SamePath([string]$Location, [string]$Planted) {
+    # The finding's location names the planted file: the same path, or one ending with it (a
+    # process defect's file is relative to the log copy, which auditors cite as logs/...).
+    if (-not $Location -or -not $Planted) { return $false }
+    return ($Location -ieq $Planted) -or $Location.EndsWith('/' + $Planted, [StringComparison]::OrdinalIgnoreCase)
+}
+
 function Test-Caught($Planted, $Report) {
     foreach ($f in @($Report.findings | Where-Object { $_ })) {
-        $sameFile = (ConvertTo-Normalised $f.location) -ieq (ConvertTo-Normalised $Planted.file)
+        $sameFile = Test-SamePath (ConvertTo-Normalised $f.location) (ConvertTo-Normalised $Planted.file)
         $text = "$($f.title) $($f.key) $($f.evidence)"
         $fragment = "$($Planted.catch)".Trim()
         if ($sameFile -and $fragment -and $text.IndexOf($fragment, [StringComparison]::OrdinalIgnoreCase) -ge 0) { return $true }
@@ -325,6 +332,7 @@ if ($SelfTest) {
         Check 'unreliable numbers are marked' ($text -match '\| security \| opus \| 0 \(unreliable\) \|') 'security row'
         Check 'the model column comes from -Models' ($text -match '\| process \| sonnet \|' -and $text -match '\| security \| opus \|') 'process sonnet, security opus'
         Check 'new findings listed' ($text -match '- \[AF-0002\]\(\.\./Findings/AF-0002-x\.md\) - High - quality - New quality finding') 'AF-0002'
+        Check 'a process defect cited under logs/ is the same file' ((Test-SamePath 'logs/ci-runs.json' 'ci-runs.json') -and -not (Test-SamePath 'logs/other-ci-runs.json' 'ci-runs.json') -and (Test-SamePath 'Curl.Tls.UnitLibrary/TlsMac.cs' 'Curl.Tls.UnitLibrary/TlsMac.cs')) 'logs/ci-runs.json'
         Check 'two runs give the same bytes' ([IO.File]::ReadAllText($second) -ceq $text) (Split-Path $second -Leaf)
     }
     finally { Remove-Item -Recurse -Force -LiteralPath $work -ErrorAction SilentlyContinue }

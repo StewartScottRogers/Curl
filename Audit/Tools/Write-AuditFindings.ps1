@@ -111,12 +111,19 @@ function Get-Slug([string]$Title) {
 
 function ConvertTo-Normalised([string]$Path) { return ("$Path" -replace '\\', '/' -replace ':\d+(-\d+)?$', '').Trim() }
 
+function Test-SamePath([string]$Location, [string]$Planted) {
+    # The finding's location names the planted file: the same path, or one ending with it (a
+    # process defect's file is relative to the log copy, which auditors cite as logs/...).
+    if (-not $Location -or -not $Planted) { return $false }
+    return ($Location -ieq $Planted) -or $Location.EndsWith('/' + $Planted, [StringComparison]::OrdinalIgnoreCase)
+}
+
 function Test-Catch($Finding, [string]$Auditor, [object[]]$Planted) {
     # A catch: the planted defect's own auditor, in the defect's file, with the manifest's catch
     # fragment in the finding's title, key or evidence. The same rule as Write-AuditScorecard.ps1.
     foreach ($p in $Planted) {
         if ($p.auditor -ne $Auditor) { continue }
-        $sameFile = (ConvertTo-Normalised $Finding.location) -ieq (ConvertTo-Normalised $p.file)
+        $sameFile = Test-SamePath (ConvertTo-Normalised $Finding.location) (ConvertTo-Normalised $p.file)
         $haystack = "$($Finding.title) $($Finding.key) $($Finding.evidence)"
         $catchText = "$($p.catch)".Trim()
         $named = $catchText -and $haystack.IndexOf($catchText, [StringComparison]::OrdinalIgnoreCase) -ge 0
@@ -247,6 +254,7 @@ if ($SelfTest) {
         $newFields = @([regex]::Matches(($af7 -split '\r?\n---')[0], '(?m)^([a-z-]+):') | ForEach-Object { $_.Groups[1].Value }) -join ','
         $sections = @([regex]::Matches($af7, '(?m)^## (.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() }) -join ','
         Check 'front matter and sections match the template' ($newFields -eq $templateFields -and $sections -eq 'Summary,Evidence,Reproduction,Re-audits' -and $af7 -notmatch '\{\{') "$newFields | $sections"
+        Check 'a process defect cited under logs/ is the same file' ((Test-SamePath 'logs/ci-runs.json' 'ci-runs.json') -and -not (Test-SamePath 'logs/other-ci-runs.json' 'ci-runs.json') -and (Test-SamePath 'Curl.Tls.UnitLibrary/TlsMac.cs' 'Curl.Tls.UnitLibrary/TlsMac.cs')) 'logs/ci-runs.json'
         Check 'summary line' ($line -eq 'findings: new 3, still open 1, closed 1, catches 1') $line
         exit $(if ($failed) { 1 } else { 0 })
     }
