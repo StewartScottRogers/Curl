@@ -14,7 +14,7 @@ public sealed record QuicClientSettings
     public const int CurlConnectionIdLength = 20;
 
     // The OpenSSL profile's extensions a TLS 1.3-only QUIC ClientHello leaves out (ADR-0140,
-    // BL-847): those only TLS 1.2 and below use, and post_handshake_auth, which RFC 9001
+    // ADR-0290): those only TLS 1.2 and below use, and post_handshake_auth, which RFC 9001
     // section 4.4 forbids a QUIC client.
     private static readonly TlsExtensionType[] OpenSslExtensionsLeftOutOfQuic =
     [
@@ -76,7 +76,7 @@ public sealed record QuicClientSettings
 
     /// <summary>
     /// Returns the TLS settings of the OpenSSL build's QUIC ClientHello, the QUIC hello on
-    /// Linux and macOS (ADR-0140, BL-847): <see cref="ClientHelloProfile.OpenSsl" />'s TLS 1.3
+    /// Linux and macOS (ADR-0140, ADR-0290): <see cref="ClientHelloProfile.OpenSsl" />'s TLS 1.3
     /// parts - its TLS 1.3 suites QUIC can protect, its groups and key shares, the signature
     /// schemes the client can check, <c>psk_key_exchange_modes</c> and <c>compress_certificate</c> -
     /// in its extension order without the extensions TLS 1.3 over QUIC does not send, then

@@ -73,7 +73,7 @@ internal static class ClientCertificateLoader
     /// <summary>
     /// Loads the <see cref="TlsClientOptions.ClientCertificate" /> as a build on the OpenSSL
     /// API does: the OpenSSL build, and curl.se's LibreSSL build, which dials QUIC on Windows
-    /// (BL-847). <c>--pass</c>, when given, is the passphrase in place of the one in <c>--cert</c>.
+    /// (ADR-0290). <c>--pass</c>, when given, is the passphrase in place of the one in <c>--cert</c>.
     /// </summary>
     /// <param name="options">The handshake's settings.</param>
     /// <param name="recognisesDriveLetters"><see langword="true" /> for a Windows build of curl, which keeps a drive letter's colon in the <c>--cert</c> value.</param>

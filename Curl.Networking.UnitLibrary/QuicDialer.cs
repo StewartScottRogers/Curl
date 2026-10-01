@@ -199,7 +199,7 @@ public sealed class QuicDialer
     }
 
     // What the ClientHello offers, in the order HandBuiltTlsProvider prepares it: the suites,
-    // then the --cert certificate. Both QUIC builds run on the OpenSSL API (BL-847): curl.se's
+    // then the --cert certificate. Both QUIC builds run on the OpenSSL API (ADR-0290): curl.se's
     // LibreSSL build on Windows sends its measured hello, the OpenSSL build elsewhere its own.
     private (Tls13ClientSettings? Tls, X509Certificate2? ClientCertificate, MultiplexedConnectResult? Failure) PrepareTls(string targetHost)
     {

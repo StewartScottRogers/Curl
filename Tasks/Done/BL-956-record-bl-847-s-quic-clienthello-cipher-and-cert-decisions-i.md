@@ -8,7 +8,7 @@ depends-on: [BL-847]
 touches: [Documentation/Planning/Decisions, Curl.Networking.UnitLibrary, Curl.Quic.UnitLibrary, Curl.Networking.UnitTests, Curl.Quic.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-10-01
 ---
 # BL-956 — Record BL-847's QUIC ClientHello, cipher and --cert decisions in an ADR
 
@@ -24,15 +24,19 @@ An ADR marked "Decided by Claude under Stewart's delegation" records the three d
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Decisions` holds an ADR for the three decisions, marked "Decided by Claude under Stewart's delegation", listed in the folder's `README.md` index.
-- [ ] `grep -rn "BL-847" Curl.Networking.UnitLibrary Curl.Quic.UnitLibrary --include=*.cs` names that ADR beside or in place of each `BL-847` citation.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] `Documentation/Planning/Decisions` holds an ADR for the three decisions, marked "Decided by Claude under Stewart's delegation", listed in the folder's `README.md` index.
+- [x] `grep -rn "BL-847" Curl.Networking.UnitLibrary Curl.Quic.UnitLibrary --include=*.cs` names that ADR beside or in place of each `BL-847` citation.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
 
 Filed by BL-847.
 
+- Written directly (docs-only, no behaviour change): ADR-0290 records the three decisions from BL-847's Notes; its row is in the Decisions README. The four `BL-847` citations in `Curl.Networking.UnitLibrary` and `Curl.Quic.UnitLibrary`, and the two in `TcpConnectorQuicTests.TlsOptions.cs`, now cite ADR-0290.
+- Gates: `dotnet build Curl.slnx -warnaserror` clean; fast tests all green (Networking 1973, Quic 405).
+
 ## Log
 
 - 2026-09-29: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. ADR-0290 records BL-847's QUIC --ciphers, --cert and ClientHello decisions; code cites it

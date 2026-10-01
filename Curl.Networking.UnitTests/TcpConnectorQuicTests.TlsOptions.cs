@@ -10,7 +10,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// <see cref="QuicDialer" /> with <c>--cert</c>, <c>--ciphers</c> and <c>--tls13-ciphers</c>, and
-/// the OpenSSL build's ClientHello (BL-847, ADR-0140): the handshake runs against the in-memory
+/// the OpenSSL build's ClientHello (ADR-0290, ADR-0140): the handshake runs against the in-memory
 /// server, which records the ClientHello and any certificate the client presents.
 /// </summary>
 public sealed partial class TcpConnectorQuicTests
@@ -121,7 +121,7 @@ public sealed partial class TcpConnectorQuicTests
     [TestMethod]
     public async Task ConnectMultiplexedAsync_InTheOpenSslBuild_SendsTheOpenSslProfilesTls13ClientHello()
     {
-        // ADR-0140 and BL-847: ClientHelloProfile.OpenSsl (BL-787's capture) cut to its TLS 1.3
+        // ADR-0140 and ADR-0290: ClientHelloProfile.OpenSsl (BL-787's capture) cut to its TLS 1.3
         // parts, in its extension order, with quic_transport_parameters last and no session ID.
         var profile = ClientHelloProfile.OpenSsl;
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
