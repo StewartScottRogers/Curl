@@ -1,26 +1,34 @@
 using System.Collections.Frozen;
 using System.Text;
 using Curl.Core;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Cli;
 
 /// <summary>
 /// The C source file <c>--libcurl &lt;file&gt;</c> writes after the transfers, as curl 8.21.0 writes it: a
-/// header comment, <c>#include &lt;curl/curl.h&gt;</c>, a <c>main</c> that calls <c>curl_easy_init</c>, then
-/// for each transfer the <c>curl_easy_setopt</c> lines and the list of options that cannot be written as
-/// source, and <c>curl_easy_perform</c>, then the cleanup and the end-of-sample comment (measured
-/// 2026-10-01, BL-652 Notes). Every line ends in <c>\n</c>; the console layer writes the file in text mode
-/// on Windows, as curl does, and standard output in binary.
+/// header comment, <c>#include &lt;curl/curl.h&gt;</c>, a <c>main</c> that declares and fills the
+/// <c>curl_slist</c> and <c>curl_mime</c> variables and calls <c>curl_easy_init</c>, then for each transfer
+/// the <c>curl_easy_setopt</c> lines and the list of options that cannot be written as source, and
+/// <c>curl_easy_perform</c>, then the cleanup, the variables freed, and the end-of-sample comment (measured
+/// 2026-10-01, BL-652 and BL-653 Notes). Every line ends in <c>\n</c>; the console layer writes the file in
+/// text mode on Windows, as curl does, and standard output in binary.
 /// </summary>
 /// <remarks>
-/// This is the skeleton: per transfer it writes the lines curl writes for a command line naming only URLs,
-/// plus <c>CURLOPT_NOPROGRESS</c> for <c>-s</c> and <c>--no-progress-meter</c>. The lines other options add
-/// are BL-653's and BL-654's.
+/// Per transfer it writes curl's lines for the URL, <c>-s</c> and <c>--no-progress-meter</c>, the HTTP
+/// options (<c>-X</c>, <c>-H</c>, the <c>-d</c> family and <c>--json</c>, <c>-F</c> and
+/// <c>--form-string</c>, <c>-u</c>, <c>-L</c>, <c>-e</c>, <c>-A</c>, <c>-b</c>, <c>-c</c>,
+/// <c>--compressed</c>, <c>-I</c>, <c>-R</c>, <c>-f</c>), the output options (<c>-o</c>, <c>-O</c> and
+/// <c>-i</c> write nothing of their own) and the connection options (<c>--connect-timeout</c>, <c>-m</c>,
+/// <c>--resolve</c>, <c>--connect-to</c>, <c>-4</c>, <c>-6</c>). A number curl's default already has, such
+/// as a zero timeout, is not written, as curl does not write it. The lines other options add are BL-654's.
 /// </remarks>
 public static class LibcurlSourceCode
 {
     /// <summary>The longest string, in bytes, a <c>curl_easy_setopt</c> line quotes in full; a longer one is cut and ends in <c>...</c>.</summary>
     public const int LongestQuotedString = 2000;
+
+    private const string DefaultUserAgent = "curl/8.21.0";
 
     private static readonly FrozenDictionary<byte, string> NamedEscapes = new Dictionary<byte, string>
     {
@@ -44,8 +52,6 @@ public static class LibcurlSourceCode
         "{",
         "  CURLcode result;",
         "  CURL *curl;",
-        "",
-        "  curl = curl_easy_init();",
     ];
 
     private static readonly string[] UngeneratableOptionLines =
@@ -75,8 +81,6 @@ public static class LibcurlSourceCode
 
     private static readonly string[] FooterLines =
     [
-        "  curl_easy_cleanup(curl);",
-        "  curl = NULL;",
         "",
         "  return (int)result;",
         "}",
@@ -94,22 +98,30 @@ public static class LibcurlSourceCode
     {
         ArgumentNullException.ThrowIfNull(transfers);
 
-        List<string> lines = [.. HeaderLines];
+        LibcurlSourceVariables variables = new();
+        List<string> body = [];
         foreach ((CommandLineOptions options, string url) in transfers)
         {
-            lines.AddRange(TransferLines(options, url));
-            lines.AddRange(UngeneratableOptionLines);
+            body.AddRange(TransferLines(options, url, variables));
+            body.AddRange(UngeneratableOptionLines);
         }
 
+        List<string> lines = [.. HeaderLines, .. variables.Declarations];
+        if (variables.Initialisations.Count > 0)
+        {
+            lines.Add(string.Empty);
+            lines.AddRange(variables.Initialisations);
+        }
+
+        lines.AddRange(["", "  curl = curl_easy_init();", .. body, "  curl_easy_cleanup(curl);", "  curl = NULL;"]);
+        lines.AddRange(variables.Cleanups);
         lines.AddRange(FooterLines);
         return string.Concat(lines.Select(line => line + "\n"));
     }
 
     /// <summary>
     /// Quotes <paramref name="value" /> as a C string literal the way curl 8.21.0 does: its UTF-8 bytes,
-    /// cut at <see cref="LongestQuotedString" /> with <c>...</c> added, <c>\n</c>, <c>\r</c>, <c>\t</c>,
-    /// <c>\\</c>, <c>\"</c> and <c>\?</c> escaped, and any other byte outside printable ASCII as <c>\x</c>
-    /// and two lowercase hex digits.
+    /// quoted as <see cref="QuoteCBytes" /> quotes them.
     /// </summary>
     /// <param name="value">The string.</param>
     /// <exception cref="ArgumentNullException"><paramref name="value" /> is <see langword="null" />.</exception>
@@ -117,48 +129,216 @@ public static class LibcurlSourceCode
     public static string QuoteCString(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
+        return QuoteCBytes(Encoding.UTF8.GetBytes(value));
+    }
 
-        byte[] bytes = Encoding.UTF8.GetBytes(value);
+    /// <summary>
+    /// Quotes <paramref name="bytes" /> as a C string literal the way curl 8.21.0 does: cut at
+    /// <see cref="LongestQuotedString" /> with <c>...</c> added, <c>\n</c>, <c>\r</c>, <c>\t</c>, <c>\\</c>,
+    /// <c>\"</c> and <c>\?</c> escaped, and any other byte outside printable ASCII as <c>\x</c> and two
+    /// lowercase hex digits, or as <c>\</c> and three octal digits when a hex digit follows it, so a C
+    /// compiler does not read that digit as part of the escape.
+    /// </summary>
+    /// <param name="bytes">The bytes.</param>
+    /// <returns>The literal, quotes included.</returns>
+    public static string QuoteCBytes(ReadOnlySpan<byte> bytes)
+    {
+        int quoted = Math.Min(bytes.Length, LongestQuotedString);
         StringBuilder literal = new("\"");
-        foreach (byte character in bytes.AsSpan(0, Math.Min(bytes.Length, LongestQuotedString)))
+        for (int index = 0; index < quoted; index++)
         {
-            literal.Append(EscapeByte(character));
+            bool hexDigitFollows = index + 1 < bytes.Length && char.IsAsciiHexDigit((char)bytes[index + 1]);
+            literal.Append(EscapeByte(bytes[index], hexDigitFollows));
         }
 
         return literal.Append(bytes.Length > LongestQuotedString ? "...\"" : "\"").ToString();
     }
 
-    private static string EscapeByte(byte character) =>
+    private static string EscapeByte(byte character, bool hexDigitFollows) =>
         NamedEscapes.TryGetValue(character, out string? escape)
             ? escape
-            : character is < 0x20 or > 0x7E ? $"\\x{character:x2}" : ((char)character).ToString();
+            : character is >= 0x20 and <= 0x7E ? ((char)character).ToString()
+            : hexDigitFollows ? "\\" + Convert.ToString(character, 8).PadLeft(3, '0')
+            : $"\\x{character:x2}";
 
-    private static List<string> TransferLines(CommandLineOptions options, string url)
+    private static string Setopt(string option, string value) => $"  curl_easy_setopt(curl, {option}, {value});";
+
+    private static string SetoptOn(string option) => Setopt(option, "1L");
+
+    private static string SetoptMilliseconds(string option, TimeSpan time) => Setopt(option, $"{(long)time.TotalMilliseconds}L");
+
+    private static List<string> TransferLines(CommandLineOptions options, string url, LibcurlSourceVariables variables)
     {
-        List<string> lines =
-        [
-            "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L);",
-            $"  curl_easy_setopt(curl, CURLOPT_URL, {QuoteCString(url)});",
-        ];
-        if (options.Silent || options.ProgressMeterOff)
-        {
-            lines.Add("  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);");
-        }
-
-        lines.Add("  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.21.0\");");
-        lines.AddRange(SchemeLines(SchemeOf(options, url)));
-        lines.Add("  curl_easy_setopt(curl, CURLOPT_SSLVERSION, (long)CURL_SSLVERSION_TLSv1_2);");
-        lines.Add("  curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);");
+        List<string> lines = [Setopt("CURLOPT_BUFFERSIZE", "102400L"), Setopt("CURLOPT_URL", QuoteCString(url))];
+        AddIf(lines, options.Silent || options.ProgressMeterOff, SetoptOn("CURLOPT_NOPROGRESS"));
+        AddIf(lines, options.NoBody, SetoptOn("CURLOPT_NOBODY"));
+        AddIf(lines, options.FailMode == HttpFailMode.Fail, SetoptOn("CURLOPT_FAILONERROR"));
+        AddIf(lines, options.Credentials is not null, () => Setopt("CURLOPT_USERPWD", QuoteCString($"{options.Credentials!.UserName}:{options.Credentials.Password}")));
+        AddIf(lines, options.MaxTime > TimeSpan.Zero, () => SetoptMilliseconds("CURLOPT_TIMEOUT_MS", options.MaxTime!.Value));
+        lines.AddRange(RequestBodyLines(options, variables));
+        AddStringListIf(lines, "CURLOPT_HTTPHEADER", HttpHeaderLines(options), variables);
+        AddIf(lines, options.Referer is not null, () => Setopt("CURLOPT_REFERER", QuoteCString(options.Referer!)));
+        lines.Add(Setopt("CURLOPT_USERAGENT", QuoteCString(options.UserAgent ?? DefaultUserAgent)));
+        lines.AddRange(SchemeLines(options, SchemeOf(options, url)));
+        lines.Add(Setopt("CURLOPT_SSLVERSION", "(long)CURL_SSLVERSION_TLSv1_2"));
+        AddIf(lines, options.NoBody || options.RemoteTime, SetoptOn("CURLOPT_FILETIME"));
+        AddIf(lines, options.RequestMethod is not null, () => Setopt("CURLOPT_CUSTOMREQUEST", QuoteCString(options.RequestMethod!)));
+        AddIf(lines, options.ConnectTimeout > TimeSpan.Zero, () => SetoptMilliseconds("CURLOPT_CONNECTTIMEOUT_MS", options.ConnectTimeout!.Value));
+        AddIf(lines, options.IpAddressFamily != IpAddressFamilyChoice.Either, () => Setopt("CURLOPT_IPRESOLVE", $"{(int)options.IpAddressFamily}L"));
+        lines.Add(SetoptOn("CURLOPT_TCP_KEEPALIVE"));
+        AddStringListIf(lines, "CURLOPT_RESOLVE", options.ResolveEntries, variables);
+        AddStringListIf(lines, "CURLOPT_CONNECT_TO", options.ConnectToEntries, variables);
         return lines;
     }
 
-    /// <summary>The lines curl 8.21.0 writes for the scheme alone: the redirect limit for HTTP, the passive-IP skip for FTP.</summary>
-    private static string[] SchemeLines(string scheme) => scheme switch
+    private static void AddIf(List<string> lines, bool condition, string line) => AddIf(lines, condition, () => line);
+
+    private static void AddIf(List<string> lines, bool condition, Func<string> line)
     {
-        "http" or "https" => ["  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);"],
-        "ftp" or "ftps" => ["  curl_easy_setopt(curl, CURLOPT_FTP_SKIP_PASV_IP, 1L);"],
+        if (condition)
+        {
+            lines.Add(line());
+        }
+    }
+
+    private static void AddStringListIf(List<string> lines, string option, IReadOnlyList<string> items, LibcurlSourceVariables variables) =>
+        AddIf(lines, items.Count > 0, () => Setopt(option, variables.AddStringList(items)));
+
+    /// <summary>
+    /// The request body's lines: the <c>-F</c> form as <c>curl_mime</c> calls and <c>CURLOPT_MIMEPOST</c>, or
+    /// the <c>-d</c> family's bytes as <c>CURLOPT_POSTFIELDS</c> and, when not empty, their size; nothing
+    /// when there is neither, or when <c>-G</c> moves the data into the URL.
+    /// </summary>
+    private static List<string> RequestBodyLines(CommandLineOptions options, LibcurlSourceVariables variables)
+    {
+        if (options.FormParts.Count > 0)
+        {
+            List<string> lines = MimeLines(options.FormParts, variables, out int mime);
+            lines.Add(Setopt("CURLOPT_MIMEPOST", $"mime{mime}"));
+            return lines;
+        }
+
+        if (options.PostData is not { } data || options.DataInQuery)
+        {
+            return [];
+        }
+
+        List<string> postLines = [Setopt("CURLOPT_POSTFIELDS", QuoteCBytes(data.Span))];
+        AddIf(postLines, data.Length > 0, () => Setopt("CURLOPT_POSTFIELDSIZE_LARGE", $"(curl_off_t){data.Length}"));
+        return postLines;
+    }
+
+    /// <summary>The <c>-H</c> lines in order, then the <c>--json</c> ones a <c>-H</c> did not already give.</summary>
+    private static List<string> HttpHeaderLines(CommandLineOptions options)
+    {
+        List<string> headers = [.. options.Headers];
+        if (options.SendsJson)
+        {
+            AddJsonHeader(headers, "Content-Type");
+            AddJsonHeader(headers, "Accept");
+        }
+
+        return headers;
+    }
+
+    private static void AddJsonHeader(List<string> headers, string name) =>
+        AddIf(headers, !headers.Any(header => header.StartsWith(name + ":", StringComparison.OrdinalIgnoreCase)), $"{name}: application/json");
+
+    /// <summary>Makes the next <c>mime</c> variable and writes the lines that build <paramref name="parts" /> into it.</summary>
+    private static List<string> MimeLines(IReadOnlyList<FormPartSpecification> parts, LibcurlSourceVariables variables, out int mime)
+    {
+        int number = variables.AddMime();
+        List<string> lines = [$"  mime{number} = curl_mime_init(curl);"];
+        foreach (FormPartSpecification part in parts)
+        {
+            lines.Add($"  part{number} = curl_mime_addpart(mime{number});");
+            lines.AddRange(PartLines(part, number, variables));
+        }
+
+        mime = number;
+        return lines;
+    }
+
+    /// <summary>One part's lines, in curl's order: its content, encoder, file name, name, type and headers.</summary>
+    private static List<string> PartLines(FormPartSpecification part, int number, LibcurlSourceVariables variables)
+    {
+        string partVariable = $"part{number}";
+        List<string> lines = PartContentLines(part, partVariable, variables);
+        AddIf(lines, part.Encoder is not null, () => $"  curl_mime_encoder({partVariable}, {QuoteCString(part.Encoder!)});");
+        string? fileName = PartFileNameArgument(part);
+        AddIf(lines, fileName is not null, () => $"  curl_mime_filename({partVariable}, {fileName});");
+        AddIf(lines, part.Name is not null, () => $"  curl_mime_name({partVariable}, {QuoteCString(part.Name!)});");
+        AddIf(lines, part.ContentType is not null, () => $"  curl_mime_type({partVariable}, {QuoteCString(part.ContentType!)});");
+        if (part.Headers.Count > 0)
+        {
+            string list = variables.AddStringList(part.Headers);
+            lines.AddRange([$"  curl_mime_headers({partVariable}, {list}, 1);", $"  {list} = NULL;"]);
+        }
+
+        return lines;
+    }
+
+    private static List<string> PartContentLines(FormPartSpecification part, string partVariable, LibcurlSourceVariables variables)
+    {
+        switch (part.Kind)
+        {
+            case FormPartKind.Text:
+                return [$"  curl_mime_data({partVariable}, {QuoteCString(part.Content)}, CURL_ZERO_TERMINATED);"];
+            case FormPartKind.Multipart:
+                List<string> lines = MimeLines(part.Parts, variables, out int inner);
+                lines.AddRange([$"  curl_mime_subparts({partVariable}, mime{inner});", $"  mime{inner} = NULL;"]);
+                return lines;
+            default:
+                return part.Content == "-"
+                    ?
+                    [
+                        $"  curl_mime_data_cb({partVariable}, -1, (curl_read_callback)fread, \\",
+                        "                    (curl_seek_callback)fseek, NULL, stdin);",
+                    ]
+                    : [$"  curl_mime_filedata({partVariable}, {QuoteCString(part.Content)});"];
+        }
+    }
+
+    /// <summary>
+    /// The <c>curl_mime_filename</c> argument curl 8.21.0 writes for <paramref name="part" />, or
+    /// <see langword="null" /> for none: <c>&lt;file</c> clears the name <c>curl_mime_filedata</c> set, as
+    /// <c>NULL</c>, and drops any <c>;filename=</c>; <c>&lt;-</c> writes none; <c>@-</c> is named <c>-</c>
+    /// unless <c>;filename=</c> names it; any other part writes its <c>;filename=</c>.
+    /// </summary>
+    private static string? PartFileNameArgument(FormPartSpecification part) =>
+        part.Content == "-" && part.Kind is FormPartKind.FileContent or FormPartKind.FileUpload
+            ? StandardInputFileNameArgument(part)
+            : part.Kind == FormPartKind.FileContent ? "NULL" : QuotedOrNull(part.FileName);
+
+    private static string? StandardInputFileNameArgument(FormPartSpecification part) =>
+        part.Kind == FormPartKind.FileContent ? null : QuoteCString(part.FileName ?? "-");
+
+    private static string? QuotedOrNull(string? text) => text is null ? null : QuoteCString(text);
+
+    /// <summary>
+    /// The lines curl 8.21.0 writes for the scheme: for HTTP the redirect, <c>--compressed</c> and cookie
+    /// options and the redirect limit, which it writes for no other scheme; for FTP the passive-IP skip.
+    /// </summary>
+    private static List<string> SchemeLines(CommandLineOptions options, string scheme) => scheme switch
+    {
+        "http" or "https" => HttpLines(options),
+        "ftp" or "ftps" => [SetoptOn("CURLOPT_FTP_SKIP_PASV_IP")],
         _ => [],
     };
+
+    private static List<string> HttpLines(CommandLineOptions options)
+    {
+        List<string> lines = [];
+        AddIf(lines, options.FollowRedirects, SetoptOn("CURLOPT_FOLLOWLOCATION"));
+        AddIf(lines, options.AutoReferer, SetoptOn("CURLOPT_AUTOREFERER"));
+        lines.Add(Setopt("CURLOPT_MAXREDIRS", "50L"));
+        AddIf(lines, options.Compressed, Setopt("CURLOPT_ACCEPT_ENCODING", "\"\""));
+        string[] cookieStrings = [.. options.Cookies.Where(cookie => cookie.IsCookieString).Select(cookie => cookie.Value)];
+        AddIf(lines, cookieStrings.Length > 0, () => Setopt("CURLOPT_COOKIE", QuoteCString(string.Join("; ", cookieStrings))));
+        lines.AddRange(options.Cookies.Where(cookie => !cookie.IsCookieString).Select(cookie => Setopt("CURLOPT_COOKIEFILE", QuoteCString(cookie.Value))));
+        AddIf(lines, options.CookieJar is not null, () => Setopt("CURLOPT_COOKIEJAR", QuoteCString(options.CookieJar!)));
+        return lines;
+    }
 
     /// <summary>
     /// The scheme curl 8.21.0's tool finds for <paramref name="url" />, lowercase: its own, the
