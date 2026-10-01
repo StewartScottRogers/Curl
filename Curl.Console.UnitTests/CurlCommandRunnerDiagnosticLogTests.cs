@@ -71,8 +71,9 @@ public sealed partial class CurlCommandRunnerDiagnosticLogTests
 
         Assert.AreEqual(0, exitCode);
         string[] lines = Encoding.UTF8.GetString(error).Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        Assert.AreEqual(3, lines.Length, string.Join('\n', lines));
+        Assert.AreEqual(7, lines.Length, string.Join('\n', lines));
         Assert.IsTrue(lines.All(line => LogLinePattern().IsMatch(line)));
+        StringAssert.Contains(string.Join('\n', lines), "[info] [http] GET / sent");
         StringAssert.Contains(lines[^1], "[info] [runner] transfer 0 ended: exit 0");
     }
 
