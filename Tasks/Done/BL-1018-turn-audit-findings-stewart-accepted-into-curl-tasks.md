@@ -9,7 +9,7 @@ touches: [Audit/Tools/New-TasksFromAcceptedFindings.ps1, Audit/Triage.md]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1018 — Turn audit findings Stewart accepted into Curl tasks
 
@@ -53,15 +53,21 @@ Curl tasks. Finding format: `Audit/Findings/README.md` (BL-1001).
 
 ## Acceptance criteria
 
-- [ ] On a scratch board and a scratch findings folder (via `CLAUDE_PROJECT_DIR` pointing at a temporary copy), with one `accepted` finding without a task, one `accepted` with a task, one `proposed` and one `rejected`: exactly one task is filed, with the mapped priority and pipeline, no template comment left in it, and the finding's `task` field names it; the other three findings are byte-identical afterwards.
-- [ ] `-WhatIf` on the same input changes no file.
-- [ ] With `CURL_DARK_FACTORY_LANE=1` it exits non-zero with a message and changes nothing.
-- [ ] `Audit/Triage.md` states the four steps above, including that only Stewart accepts or rejects.
-- [ ] ASCII only; runs under PowerShell 7 and Windows PowerShell 5.1.
+- [x] On a scratch board and a scratch findings folder (via `CLAUDE_PROJECT_DIR` pointing at a temporary copy), with one `accepted` finding without a task, one `accepted` with a task, one `proposed` and one `rejected`: exactly one task is filed, with the mapped priority and pipeline, no template comment left in it, and the finding's `task` field names it; the other three findings are byte-identical afterwards.
+- [x] `-WhatIf` on the same input changes no file.
+- [x] With `CURL_DARK_FACTORY_LANE=1` it exits non-zero with a message and changes nothing.
+- [x] `Audit/Triage.md` states the four steps above, including that only Stewart accepts or rejects.
+- [x] ASCII only; runs under PowerShell 7 and Windows PowerShell 5.1.
 
 ## Notes
+
+- Audit branch commit 131076cd: Audit/Triage.md and Audit/Tools/New-TasksFromAcceptedFindings.ps1.
+- -SelfTest (scratch board via CLAUDE_PROJECT_DIR, scratch findings: accepted without a task, accepted with BL-900, proposed, rejected): 8 PASS, 0 FAIL under Windows PowerShell 5.1 and PowerShell 7.6.6 - refused with CURL_DARK_FACTORY_LANE=1 and nothing changed; -WhatIf changed no file; exactly one task filed, priority High and pipeline feature for a High quality finding, touches [Curl.Cli.UnitTests] from the location, no template comment left; the finding's task field names it; the other three findings byte-identical.
+- ASCII only (byte scan; no byte outside printable ASCII).
+- Decided: touches are the first path segment of each location part, when it is an existing repository folder and not an audit path; none otherwise (the task runs alone). Title 'Fix AF-NNNN: <finding title>'.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. New-TasksFromAcceptedFindings.ps1 files a lane-eligible task per accepted finding and links it; Triage.md sets out the steps; on the audit branch.
