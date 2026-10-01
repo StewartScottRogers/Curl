@@ -8,7 +8,7 @@ depends-on: []
 touches: [CLAUDE.md]
 requirement: none
 created: 2026-09-30
-completed:
+completed: 2026-09-30
 ---
 # BL-1065 — Fix AF-0001: CLAUDE.md layout says '48 projects' but the repository has 66
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- CLAUDE.md line 198 now says "66 projects, one flat alphabetical run". That is the 66 Curl.* project directories at the root, each with a csproj. The four shared projects (Documentation, Tasks, Audit, .claude) are not counted: they appear in the tree by name.
+- Choice: I kept a number rather than removing it. The finding's reproduction matches the pattern `d+ projects, one flat`, so the wording keeps that exact shape. The number will drift as hand-built libraries are added, and the truthfulness auditor will catch that.
 
 ## Log
 
 - 2026-09-30: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. CLAUDE.md's layout now gives the true project count (66), so AF-0001's reproduction matches
