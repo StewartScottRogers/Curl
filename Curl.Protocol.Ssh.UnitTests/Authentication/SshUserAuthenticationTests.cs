@@ -69,12 +69,42 @@ public sealed partial class SshUserAuthenticationTests
     }
 
     [TestMethod]
-    public async Task RequestServiceAsync_PeerBreaksTheFraming_FailsWithMinus43()
+    [DataRow(0xFFFFFFFFu, "-41", DisplayName = "the largest length")]
+    [DataRow(0u, "-12", DisplayName = "zero length")]
+    [DataRow(13u, "-43", DisplayName = "off the block size")]
+    public async Task RequestServiceAsync_UnprotectedPacketLengthBroken_FailsWithLibssh2sCode(uint packetLength, string expectedCode)
     {
-        SshServerScript script = new SshServerScript().RawPacket(uint.MaxValue, 4, [0, 0, 0, 0]);
+        SshServerScript script = new SshServerScript().RawPacket(packetLength, 4, [0, 0, 0, 0]);
         Peer peer = Connect(new ScriptedConnection(script.Bytes), Encoding.UTF8);
 
-        await AssertServiceRequestFailsAsync(peer, "-43, Failed to get response to ssh-userauth request");
+        await AssertServiceRequestFailsAsync(peer, $"{expectedCode}, Failed to get response to ssh-userauth request");
+    }
+
+    // Measured 2026-10-01 (BL-1081) on both reference builds by flipping bits of the
+    // encrypted length of SERVICE_ACCEPT, whose packet_length is 28 under aes128-ctr, 32
+    // under AES-GCM and 24 under chacha20-poly1305: the top bit gives -41 and zeroing it
+    // -12. A length off the block size aborts libssh2 or hangs it until -m, so Curl keeps
+    // -43 for it (ADR-0206).
+    [TestMethod]
+    [DataRow("aes128-ctr", "hmac-sha2-256", 0, (byte)0x80, "-41", DisplayName = "aes128-ctr, over the maximum, as measured")]
+    [DataRow("aes128-gcm@openssh.com", null, 0, (byte)0x80, "-41", DisplayName = "AES-GCM, over the maximum, as measured")]
+    [DataRow("chacha20-poly1305@openssh.com", null, 0, (byte)0x80, "-41", DisplayName = "ChaCha20-Poly1305, over the maximum, as measured")]
+    [DataRow("aes128-ctr", "hmac-sha2-256", 3, (byte)28, "-12", DisplayName = "aes128-ctr, zero length, as measured")]
+    [DataRow("aes128-gcm@openssh.com", null, 3, (byte)32, "-12", DisplayName = "AES-GCM, zero length, as measured")]
+    [DataRow("chacha20-poly1305@openssh.com", null, 3, (byte)24, "-12", DisplayName = "ChaCha20-Poly1305, zero length, as measured")]
+    [DataRow("aes128-ctr", "hmac-sha2-256", 3, (byte)1, "-43", DisplayName = "aes128-ctr, off the block size")]
+    public async Task RequestServiceAsync_AnswersLengthBroken_FailsWithLibssh2sCode(string cipher, string? mac, int lengthByte, byte flippedBits, string expectedCode)
+    {
+        SshNegotiatedAlgorithms algorithms = SshTestAlgorithms.With(cipher, mac);
+        SshKeyDerivation keys = new(HashAlgorithmName.SHA256, [1, 2, 3], [4, 5, 6], [4, 5, 6]);
+        byte[] serverBytes = new SshServerScript()
+            .Protect(SshPacketProtections.ForServerToClient(algorithms, keys), resetSequenceNumber: true)
+            .Packet([SshMessageNumber.ServiceAccept, .. Name("ssh-userauth")], sealedPacket => sealedPacket[lengthByte] ^= flippedBits)
+            .Bytes;
+        Peer peer = Connect(new ScriptedConnection(serverBytes), Encoding.UTF8);
+        peer.Transport.PacketReader.ChangeProtection(SshPacketProtections.ForServerToClient(algorithms, keys));
+
+        await AssertServiceRequestFailsAsync(peer, $"{expectedCode}, Failed to get response to ssh-userauth request");
     }
 
     [TestMethod]
@@ -299,6 +329,21 @@ public sealed partial class SshUserAuthenticationTests
             async () => await peer.Authentication.AuthenticateAsync(Tester, CancellationToken.None));
 
         Assert.AreEqual(keyboardInteractiveTried ? "Login denied" : "Authentication failure", failure.Message);
+        Assert.AreEqual(CurlExitCode.LoginDenied, failure.ExitCode);
+    }
+
+    [TestMethod]
+    [DataRow(0u, DisplayName = "zero length")]
+    [DataRow(uint.MaxValue, DisplayName = "over the maximum")]
+    public async Task AuthenticateAsync_AnswerToThePasswordHasABrokenLength_FailsAsAClose(uint packetLength)
+    {
+        byte[] serverBytes = [.. Frame(Failure("password")), .. new SshServerScript().RawPacket(packetLength, 4, [0, 0, 0, 0]).Bytes];
+        Peer peer = Connect(new ScriptedConnection(serverBytes), Encoding.UTF8);
+
+        SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
+            async () => await peer.Authentication.AuthenticateAsync(Tester, CancellationToken.None));
+
+        Assert.AreEqual("Authentication failure", failure.Message);
         Assert.AreEqual(CurlExitCode.LoginDenied, failure.ExitCode);
     }
 

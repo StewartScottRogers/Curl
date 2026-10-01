@@ -13,9 +13,10 @@ namespace Curl.Protocol.Ssh.Transport;
 internal sealed class SshPacketReader(SshConnectionReader reader)
 {
     /// <summary>
-    /// The largest whole packet accepted, <c>packet_length</c> field included and MAC
-    /// excluded: libssh2 1.11.1's <c>LIBSSH2_PACKET_MAXPAYLOAD</c>, above RFC 4253's
-    /// minimum of 35000.
+    /// The largest whole packet accepted, <c>packet_length</c> field and MAC or tag
+    /// included: libssh2 1.11.1's <c>LIBSSH2_PACKET_MAXPAYLOAD</c>, above RFC 4253's
+    /// minimum of 35000. Measured 2026-10-01 (BL-1081) under <c>aes128-ctr</c> with
+    /// <c>hmac-sha2-256</c>: a <c>packet_length</c> of 39964 is read, 39980 is refused.
     /// </summary>
     internal const int MaximumPacketSize = 40000;
 
@@ -64,8 +65,12 @@ internal sealed class SshPacketReader(SshConnectionReader reader)
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The payload, starting with its message number.</returns>
     /// <exception cref="EndOfStreamException">The peer closed before the packet was whole.</exception>
+    /// <exception cref="SshPacketLengthException">
+    /// The packet's length is zero, or the packet with its MAC or tag is larger than
+    /// <see cref="MaximumPacketSize" />.
+    /// </exception>
     /// <exception cref="InvalidDataException">
-    /// The packet is larger than <see cref="MaximumPacketSize" />, not a multiple of the
+    /// The packet is not a multiple of the
     /// protection's block size, has fewer than <see cref="SshPacketWriter.MinimumPadding" />
     /// padding bytes, or has no payload; or its payload does not inflate
     /// (<see cref="SshZlibDecompressor.Decompress" />).
@@ -94,10 +99,22 @@ internal sealed class SshPacketReader(SshConnectionReader reader)
         return message;
     }
 
+    // libssh2 1.11.1 refuses a zero length with -12 and a packet over the maximum, MAC or
+    // tag included, with -41, as both reference builds measured (BL-1081, ADR-0206).
     private void RejectBadLength(uint packetLength)
     {
+        if (packetLength == 0)
+        {
+            throw new SshPacketLengthException(Libssh2ErrorCode.Decrypt, packetLength);
+        }
+
+        if (sizeof(uint) + (long)packetLength + protection.TagLength > MaximumPacketSize)
+        {
+            throw new SshPacketLengthException(Libssh2ErrorCode.OutOfBoundary, packetLength);
+        }
+
         uint alignedLength = protection.PadsPacketLengthField ? packetLength + sizeof(uint) : packetLength;
-        if (packetLength == 0 || packetLength > MaximumPacketSize - sizeof(uint) || alignedLength % protection.BlockSize != 0)
+        if (alignedLength % protection.BlockSize != 0)
         {
             throw new InvalidDataException($"The SSH packet length {packetLength} is not a valid packet length.");
         }

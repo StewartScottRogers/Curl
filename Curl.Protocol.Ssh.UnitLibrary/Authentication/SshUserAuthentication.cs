@@ -109,8 +109,9 @@ internal sealed class SshUserAuthentication(
     /// <returns>A task that completes when the server accepts.</returns>
     /// <exception cref="SshTransferException">
     /// Exit 2, <c>Failure establishing ssh session: &lt;code&gt;, Failed to get response to
-    /// ssh-userauth request</c>, with <c>-43</c> when the peer closes or breaks the
-    /// framing, <c>-13</c> when it disconnects, and <c>-4</c> or <c>-12</c> when the answer
+    /// ssh-userauth request</c>, with <c>-43</c> when the peer closes or sends a length off
+    /// the block size, <c>-12</c> for a zero length and <c>-41</c> for one over the maximum
+    /// (BL-1081), <c>-13</c> when it disconnects, and <c>-4</c> or <c>-12</c> when the answer
     /// fails its MAC or tag; with <c>-14, Unexpected packet length</c> for an answer shorter
     /// than five bytes and <c>-14, Invalid response received from server</c> for one naming
     /// another service.
@@ -427,6 +428,10 @@ internal sealed class SshUserAuthentication(
         {
             answer = await ReadAnswerAsync([SshMessageNumber.ServiceAccept], cancellationToken).ConfigureAwait(false);
         }
+        catch (SshPacketLengthException exception)
+        {
+            throw ServiceRequestFailed(exception.Libssh2ErrorCode);
+        }
         catch (Exception exception) when (exception is EndOfStreamException or SshConnectionLostException or InvalidDataException)
         {
             throw ServiceRequestFailed(Libssh2ErrorCode.SocketReceive);
@@ -676,7 +681,7 @@ internal sealed class SshUserAuthentication(
             byte[] answer = await ReadAnswerAsync(wanted, cancellationToken).ConfigureAwait(false);
             return answer[0] == SshMessageNumber.Disconnect ? null : answer;
         }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or SshPacketAuthenticationException)
+        catch (Exception exception) when (exception is IOException or InvalidDataException or SshPacketAuthenticationException or SshPacketLengthException)
         {
             return null;
         }

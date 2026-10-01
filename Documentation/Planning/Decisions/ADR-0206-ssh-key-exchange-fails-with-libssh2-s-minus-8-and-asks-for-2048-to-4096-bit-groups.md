@@ -87,3 +87,40 @@ The OpenSSL build could not be measured the same day (the Docker engine was down
   (`RekeyLimit`), and libssh2 answers; rejected.
 - **Accept any prime the server sends.** libssh2 may; but a group smaller than asked for
   weakens the session and one larger than asked for is a server bug. Rejected.
+
+## Packet lengths libssh2 refuses (measured 2026-10-01, BL-1081)
+
+Decided by Claude under Stewart's delegation.
+
+Measured by flipping bits of the encrypted `packet_length` of the server's
+`SERVICE_ACCEPT` (28 under `aes128-ctr` with `hmac-sha2-256`, 32 under
+`aes128-gcm@openssh.com`, 24 under `chacha20-poly1305@openssh.com`), through a throwaway
+MSTest method bridging a `TcpListener` to `Fakes.InMemorySshServer`, with
+`-sS -k -m 15 -u u:p --ciphers <cipher> sftp://<host>:<port>/x`. The Windows build is Git
+for Windows' `mingw64\bin\curl.exe` (libssh2 1.11.1, which offers no AES-GCM); the OpenSSL
+build is `curlimages/curl:8.21.0`.
+
+| Length | Windows build | OpenSSL build |
+| --- | --- | --- |
+| unaltered | exit 78, `Could not open remote file for reading` (ctr, chacha) | the same (ctr, gcm, chacha) |
+| top bit set (over 2^31) | exit 2, `-41, Failed to get response to ssh-userauth request` (ctr, chacha) | the same (ctr, gcm, chacha) |
+| 40000, 40012, 39996, 39980 | exit 2, `-41, ...` (ctr) | 40000: the same (ctr, gcm, chacha); 39996, 40012: the same (ctr) |
+| 39964 | exit 28 at `-m 15`: accepted, waiting for the rest (ctr) | not measured |
+| zero | exit 2, `-12, Failed to get response to ssh-userauth request` (ctr three times, chacha); one earlier ctr run printed `-8, Unable to exchange encryption keys` and did not repeat | exit 2, `-12, ...` (ctr, gcm, chacha) |
+| one off the block size | ctr: `Assertion failed: (len % blocksize) == 0, file ../../libssh2-1.11.1/src/transport.c, line 139`, exit 3; chacha: exit 28 at `-m 15` | ctr: the same assertion, exit 139; gcm and chacha: exit 28 at `-m 15` |
+
+So libssh2 refuses a zero length with `LIBSSH2_ERROR_DECRYPT` (-12) and a packet whose
+4-byte length field, `packet_length` and MAC or tag together exceed 40000 bytes with
+`LIBSSH2_ERROR_OUT_OF_BOUNDARY` (-41), before reading the rest of the packet.
+
+Decision: `SshPacketReader` throws `SshPacketLengthException` carrying -12 for a zero
+length and -41 for a packet over 40000 bytes MAC or tag included (the maximum now counts
+the MAC, so 39964 is read and 39980 refused under `hmac-sha2-256`). Answering
+`ssh-userauth` it ends with exit 2 and `-12` or `-41, Failed to get response to
+ssh-userauth request`, as measured; in a key exchange or re-exchange it ends with the code
+and `Unable to exchange encryption keys`, as a failed MAC or tag does there (ADR-0212);
+before the server's `KEXINIT` it stays `-1`, and after authentication it stays a failure of
+the connection, as every other broken packet is. A length off the block size keeps the
+plain `InvalidDataException` and today's codes (-43 answering `ssh-userauth`, -8 in a key
+exchange): libssh2 aborts on an assertion or waits for bytes that never come, neither of
+which a script can rely on, as ADR-0259 decided for a failed ChaCha20-Poly1305 tag.

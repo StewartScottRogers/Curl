@@ -126,7 +126,7 @@ internal sealed class SshTransport
 
             return handshake;
         }
-        catch (Exception exception) when (exception is InvalidDataException or IOException)
+        catch (Exception exception) when (exception is InvalidDataException or SshPacketLengthException or IOException)
         {
             throw SshTransferException.SessionEstablishmentFailed(Libssh2ErrorCode.SocketNone, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
         }
@@ -151,7 +151,8 @@ internal sealed class SshTransport
     /// message, a public value outside its group, a host key or signature of another type,
     /// or a signature that does not verify; with <c>-4</c> (a MAC) or <c>-12</c> (an AES-GCM
     /// tag) in place of <c>-8</c> when a re-exchange reads a packet that fails its check
-    /// (ADR-0212).
+    /// (ADR-0212), and <c>-12</c> (a zero length) or <c>-41</c> (a length over the maximum)
+    /// when it reads one whose length libssh2 refuses (BL-1081, ADR-0206).
     /// </exception>
     /// <exception cref="NotSupportedException">The agreed method, host key, cipher or MAC is not implemented.</exception>
     internal async ValueTask<SshKeyExchangeResult> ExchangeKeysAsync(SshNegotiatedHandshake handshake, CancellationToken cancellationToken)
@@ -180,6 +181,10 @@ internal sealed class SshTransport
             sessionIdentifier = session;
             serverIdentification = handshake.ServerIdentification;
             return new SshKeyExchangeResult(handshake.Algorithms, outcome.HostKey, outcome.ExchangeHash, session, keys);
+        }
+        catch (SshPacketLengthException exception)
+        {
+            throw SshTransferException.SessionEstablishmentFailed(exception.Libssh2ErrorCode, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
         }
         catch (Exception exception) when (exception is InvalidDataException or IOException or CryptographicException)
         {

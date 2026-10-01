@@ -42,7 +42,10 @@ internal static class Libssh2ErrorCode
     /// reference build for <c>aes256-gcm@openssh.com</c> and <c>aes128-gcm@openssh.com</c>,
     /// the tag or the ciphertext altered; the Windows build offers no AES-GCM. A failed
     /// <c>chacha20-poly1305@openssh.com</c> tag ends with it too, by decision: both reference
-    /// builds loop until they run out of memory there instead (BL-1032, ADR-0259).
+    /// builds loop until they run out of memory there instead (BL-1032, ADR-0259). A packet
+    /// whose decrypted <c>packet_length</c> is zero ends with it too: measured 2026-10-01
+    /// (BL-1081, ADR-0206) on both reference builds under <c>aes128-ctr</c>, AES-GCM and
+    /// <c>chacha20-poly1305@openssh.com</c>.
     /// </summary>
     internal const int Decrypt = -12;
 
@@ -66,6 +69,14 @@ internal static class Libssh2ErrorCode
     /// connection before its identification string (measured 2026-09-30, BL-991, ADR-0283).
     /// </summary>
     internal const int SocketReceive = -43;
+
+    /// <summary>
+    /// <c>LIBSSH2_ERROR_OUT_OF_BOUNDARY</c>: a packet's decrypted <c>packet_length</c> makes
+    /// the packet, MAC or tag included, larger than 40000 bytes. Measured 2026-10-01
+    /// (BL-1032, BL-1081, ADR-0206) on both reference builds under <c>aes128-ctr</c>,
+    /// AES-GCM and <c>chacha20-poly1305@openssh.com</c>.
+    /// </summary>
+    internal const int OutOfBoundary = -41;
 
     /// <summary>The description printed with every failure of the key exchange.</summary>
     internal const string UnableToExchangeEncryptionKeys = "Unable to exchange encryption keys";
