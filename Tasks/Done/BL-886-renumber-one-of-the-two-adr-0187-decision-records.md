@@ -39,7 +39,7 @@ Every ADR number in `Documentation/Planning/Decisions` names exactly one decisio
 
 - 2026-09-30 (lane 1): done. Numbers chosen: the forward-proxy 407 record (BL-603) is now **ADR-0239** and the redirect user-information record (BL-814) **ADR-0240**, not 0288/0289 above the top. Why: 0239 and 0240 are gaps no file on any local branch and no live task (BL-983 reserves 0235-0238) names, while max+1 is exactly what parallel lanes take for new ADRs, so a gap cannot collide again. Both have README index rows now.
 - References updated: `Curl.Console/CLAUDE.md`, `Curl.Console/CurlComposition.cs`, `Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs` (lines 104 and 1745; the other ADR-0187 citations there are the HTTP/3 retry), `Curl.Core.UnitLibrary/CLAUDE.md`, ADR-0246 and ADR-0270 (both cited the proxy record), and BL-983's plan ("`ADR-0239` line 51"). The `HttpProtocolHandlerTests.ProxyAuthentication.cs` citation in the plan no longer exists. BL-946 (was BL-877) now says ADR-0195. The two remaining non-HTTP/3-file hits for ADR-0187 (ADR-0223, BL-942) mean the HTTP/3 record, which kept the number.
-- The second fast run hung in `Curl.Quic.UnitTests` (first run passed it 405/405); unrelated to this comment-only change, filed as BL-1064.
+- The second fast run hung in `Curl.Quic.UnitTests` (first run passed it 405/405); unrelated to this comment-only change, filed as BL-1067.
 
 ## Log
 

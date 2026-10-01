@@ -1,5 +1,5 @@
 ---
-id: BL-1064
+id: BL-1067
 title: Find and fix the Curl.Quic.UnitTests fast run that hung on a second dotnet test
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-30
 completed:
 ---
-# BL-1064 — Find and fix the Curl.Quic.UnitTests fast run that hung on a second dotnet test
+# BL-1067 — Find and fix the Curl.Quic.UnitTests fast run that hung on a second dotnet test
 
 ## Goal
 
