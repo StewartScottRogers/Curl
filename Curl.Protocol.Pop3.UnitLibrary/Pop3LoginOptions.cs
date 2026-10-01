@@ -38,6 +38,15 @@ internal sealed record Pop3LoginOptions(Pop3LoginMethod Method, string? Required
     ];
 
     /// <summary>
+    /// Tells whether <paramref name="mechanism" /> is a SASL mechanism curl 8.21.0 knows, in
+    /// any case (<c>SASL plain</c> measured as known in BL-810).
+    /// </summary>
+    /// <param name="mechanism">A mechanism name, such as one <c>CAPA</c> listed.</param>
+    /// <returns><see langword="true" /> when curl knows it.</returns>
+    public static bool IsKnownMechanism(string mechanism) =>
+        KnownMechanisms.Contains(mechanism, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Reads <paramref name="options" />.
     /// </summary>
     /// <param name="options">The login options, such as <c>AUTH=PLAIN</c>, or <see langword="null" /> for none.</param>
@@ -71,7 +80,7 @@ internal sealed record Pop3LoginOptions(Pop3LoginMethod Method, string? Required
             return new Pop3LoginOptions(Pop3LoginMethod.Apop, null);
         }
 
-        return KnownMechanisms.Contains(value, StringComparer.OrdinalIgnoreCase)
+        return IsKnownMechanism(value)
             ? new Pop3LoginOptions(Pop3LoginMethod.Sasl, value)
             : null;
     }
