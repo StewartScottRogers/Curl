@@ -9,7 +9,7 @@ touches: [.claude/agents/audit-seeder.md, Audit/PlantedDefects]
 lane: no
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-30
 ---
 # BL-1015 — Write the planted-defect catalogue and the audit-seeder agent that plants them
 
@@ -59,14 +59,21 @@ It must:
 
 ## Acceptance criteria
 
-- [ ] `Audit/PlantedDefects/Catalogue.md` has at least 3 entries per auditor, each with the fields above, and `README.md` explains the catalogue and says auditors must never read this folder.
-- [ ] `.claude/agents/audit-seeder.md` exists with `name: audit-seeder`, `model: sonnet` and the tools above, and states the five duties.
-- [ ] `claude agents` lists `audit-seeder`.
-- [ ] A trial run on a detached worktree of `HEAD` with count 6 and seed 1 leaves that worktree with one new commit `Audit baseline`, no `Audit/PlantedDefects` folder, a building solution, and a manifest listing 6 defects covering all six auditors; the checkout it was started in is unchanged. Command and manifest summary under Notes; the trial worktree is removed afterwards.
+- [x] `Audit/PlantedDefects/Catalogue.md` has at least 3 entries per auditor, each with the fields above, and `README.md` explains the catalogue and says auditors must never read this folder.
+- [x] `.claude/agents/audit-seeder.md` exists with `name: audit-seeder`, `model: sonnet` and the tools above, and states the five duties.
+- [x] `claude agents` lists `audit-seeder`.
+- [x] A trial run on a detached worktree of `HEAD` with count 6 and seed 1 leaves that worktree with one new commit `Audit baseline`, no `Audit/PlantedDefects` folder, a building solution, and a manifest listing 6 defects covering all six auditors; the checkout it was started in is unchanged. Command and manifest summary under Notes; the trial worktree is removed afterwards.
 
 ## Notes
+
+- Audit branch commits 6c8f9e88 (catalogue, decoder, README, seeder) and 86fd76c8 (catch as a short fragment).
+- Catalogue: 19 entries - quality 4, security 3, performance 3, conformance 3, truthfulness 3, process 3 - each with id, auditor, kind, Defect, Plant, Builds and Catch. Stored base64 as Audit/PlantedDefects/Catalogue.md.b64 (BL-1028); Read-PlantedCatalogue.ps1 decodes it (round trip byte-identical) and -Encode rewrites it. README.md explains the catalogue and says auditors must never read the folder.
+- claude agents: in Claude Code 2.1.284 it lists running sessions, not agent definitions; the trial's claude -p --agent audit-seeder is the proof the agent is found.
+- Trial: detached worktree of 6c8f9e88 (Z:/repos/Curl.audit/trial-seeder), a three-file log copy, from Z:/repos/Curl.auditbranch: claude -p --agent audit-seeder --dangerously-skip-permissions "Seed an audit. Worktree: ... Log copy: ... Manifest path: ... Seed: 1. Count: 6. ...". Result: one new commit b395e50d 'Audit baseline'; Audit/PlantedDefects, Findings and Scorecards gone; dotnet build Curl.slnx -warnaserror 0 warnings 0 errors; manifest seed 1, 6 defects, one per auditor (PD-001, PD-101, PD-202, PD-303, PD-402, PD-502); the starting checkout unchanged. Worktree removed after.
+- The trial ran before the catch was tightened to a short fragment, so its manifest's catch values are sentences; the seeder now writes a fragment, which both catch counters require.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-30: Backlog -> Doing.
+- 2026-09-30: Doing -> Done. The encoded planted-defect catalogue and the audit-seeder plant a seeded defect per auditor and write a manifest; on the audit branch.

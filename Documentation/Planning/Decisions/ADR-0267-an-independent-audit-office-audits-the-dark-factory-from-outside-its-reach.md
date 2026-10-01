@@ -109,6 +109,18 @@ would let a lane merge with `gh pr merge --admin`. On any other pull request the
 skipped by its condition, and GitHub counts a skipped required check as passed.
 Stewart changes or removes the rule in the repository's settings.
 
+### 8. The planted-defect catalogue is stored encoded (BL-1028)
+
+The PreToolUse hook stops a lane reading `Audit/` directly, but a search over the repository
+root - which lanes run constantly - still reaches it. The instructions and findings being
+seen is tolerable; the catalogue of planted defects is not, because a lane that read it could
+avoid exactly those defects and make the catch rates meaningless. So the catalogue is
+committed base64-encoded, `Audit/PlantedDefects/Catalogue.md.b64`, and only the
+`audit-seeder` decodes it, with `Read-PlantedCatalogue.ps1`. Keeping it only on the `audit`
+branch would not hold once audit pull requests merge routinely (section 4's amendment), and
+generating defects fresh each audit would lose the fixed catalogue scorecards compare
+against. Decided by Claude under Stewart's delegation, 2026-09-30.
+
 ## Rationale
 
 - **Guards outside the factory's reach, approval by Stewart.** The factory is the party

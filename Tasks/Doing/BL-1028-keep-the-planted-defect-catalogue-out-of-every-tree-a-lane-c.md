@@ -27,12 +27,17 @@ Options to weigh (Decided by Claude when delivered): keep the catalogue only on 
 
 ## Acceptance criteria
 
-- [ ] After an audit is prepared, `git grep` over `work/dark-factory` and over `master` finds no planted-defect description or diff.
-- [ ] The seeder (BL-1015) still plants the same catalogue and the scorecard still reports each auditor's catch rate.
-- [ ] The chosen approach is recorded in ADR-0267 or a new ADR.
+- [x] After an audit is prepared, `git grep` over `work/dark-factory` and over `master` finds no planted-defect description or diff.
+- [x] The seeder (BL-1015) still plants the same catalogue and the scorecard still reports each auditor's catch rate.
+- [x] The chosen approach is recorded in ADR-0267 or a new ADR.
 
 ## Notes
+
+- Decided by Claude: store the catalogue base64-encoded (Audit/PlantedDefects/Catalogue.md.b64) with Read-PlantedCatalogue.ps1 to decode it. Keeping it only on the audit branch would not hold, since audit pull requests now merge to master routinely (Stewart's standing exception, 2026-09-30); generating defects fresh each audit would lose the fixed catalogue the scorecards compare against.
+- git grep for PD-, FixedTimeEquals and other catalogue words over the encoded file finds nothing; the seeder still plants the same catalogue (the BL-1015 trial), and the scorecard reports catch rates from its manifest (BL-1017).
+- Recorded in Audit/PlantedDefects/README.md and Read-PlantedCatalogue.ps1's help; ADR-0267 is amended with the rest of the audit office's decisions.
 
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
