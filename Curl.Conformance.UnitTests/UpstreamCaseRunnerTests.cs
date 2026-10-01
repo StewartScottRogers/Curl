@@ -263,8 +263,8 @@ public sealed class UpstreamCaseRunnerTests
             return new InertTimer();
         }
 
-        // The runner starts its time limit only once curl is running, on another thread, so this
-        // waits for the timer to exist before firing it.
+        // The runner starts its time limit once curl has its own thread, so this waits for the
+        // timer to exist before firing it.
         public async Task ExpireTheTimeLimitAsync()
         {
             (TimerCallback callback, object? state) = await firstTimer.Task.WaitAsync(TimeSpan.FromSeconds(10));
