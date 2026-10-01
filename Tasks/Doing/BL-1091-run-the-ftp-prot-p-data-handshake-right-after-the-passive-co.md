@@ -33,3 +33,4 @@ Under `PROT P`, a passive-mode FTP transfer's `-v` writes the data connection's 
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
