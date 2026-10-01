@@ -40,7 +40,9 @@ internal static class Libssh2ErrorCode
     /// <c>LIBSSH2_ERROR_DECRYPT</c>: an AES-GCM packet's tag does not match, so libssh2's
     /// cipher refuses to decrypt it. Measured 2026-09-30 (BL-897, ADR-0212) on the OpenSSL
     /// reference build for <c>aes256-gcm@openssh.com</c> and <c>aes128-gcm@openssh.com</c>,
-    /// the tag or the ciphertext altered; the Windows build offers no AES-GCM.
+    /// the tag or the ciphertext altered; the Windows build offers no AES-GCM. A failed
+    /// <c>chacha20-poly1305@openssh.com</c> tag ends with it too, by decision: both reference
+    /// builds loop until they run out of memory there instead (BL-1032, ADR-0259).
     /// </summary>
     internal const int Decrypt = -12;
 

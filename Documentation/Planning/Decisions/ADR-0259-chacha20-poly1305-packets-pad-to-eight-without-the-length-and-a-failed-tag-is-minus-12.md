@@ -30,14 +30,43 @@ when a packet fails its tag.
   and checks `packet_length` alone to the block size whenever the cipher has an
   authentication tag, as for AES-GCM, and libssh2 1.11.1 interoperates with it.
 - **A failed tag is `LIBSSH2_ERROR_DECRYPT`, -12**, the AES-GCM code: libssh2 1.11.1's
-  `decrypt()` returns it whenever an integrated-MAC cipher refuses a packet. Not measured:
-  the Windows reference build offers the name but reaching it needs a server built from
-  these classes, as ADR-0212's run was. BL-897 (2026-09-30) confirmed -12 for AES-GCM on the
-  OpenSSL build, but there a chacha20-poly1305 packet with its tag or ciphertext altered
-  left curl printing nothing and not exiting; BL-1032 measures that case.
+  `decrypt()` returns it whenever an integrated-MAC cipher refuses a packet. Both reference
+  builds were measured on 2026-10-01 (BL-1032, below): neither exits at all, but loops
+  allocating memory until it is killed. Curl does not copy that; it ends with -12 and
+  exit 2, as the same builds do for a failed AES-GCM tag (ADR-0212). Decided by Claude
+  under Stewart's delegation: a run that only ends when the kernel kills it, with no
+  output, `-m` ignored and the machine's memory exhausted, is a libssh2 defect no script
+  can depend on, and a drop-in replacement must not take a machine down; -12 is the code
+  libssh2's integrated-MAC path is written to return.
 - **A corrupted length** decrypts to a different `packet_length`. One off the block size or
   over the maximum is the framing failure ADR-0206 maps (`-8`, exit 2); one that happens to
-  frame fails its tag (`-12`) or runs out of bytes, as the peer would see it.
+  frame fails its tag (`-12`) or runs out of bytes, as the peer would see it. Both reference
+  builds ended a chacha20-poly1305 length over the maximum with -41 instead (below); BL-1032
+  filed matching that as its own task.
+
+## Measured 2026-10-01 (BL-1032)
+
+Both reference builds, run as `curl -sS -k -u u:p sftp://<host>:<port>/x` against a throwaway
+MSTest method (deleted after the run) that bridged a `TcpListener` to
+`Fakes.InMemorySshServer` with `Cipher = "chacha20-poly1305@openssh.com"` and altered one
+byte of the server's first packet after `NEWKEYS` (`SERVICE_ACCEPT`, sequence number 3):
+the OpenSSL build as `curlimages/curl:8.21.0` under Docker Desktop (`OpenSSL/3.5.7`,
+`libssh2/1.11.1`, against `host.docker.internal`), and the Windows build as Git for
+Windows' `mingw64\bin\curl.exe` (`curl 8.21.0 (x86_64-w64-mingw32) ... Schannel ...
+libssh2/1.11.1`, against `127.0.0.1`).
+
+| Server's `SERVICE_ACCEPT` | OpenSSL build | Windows build |
+| --- | --- | --- |
+| Unaltered | exit 78, `curl: (78) Could not open remote file for reading: No such file or directory` | the same |
+| Last tag byte flipped | no output, never exits; one core at 100%, memory grows about 160 MiB/s until the kernel kills it (`OOMKilled=true`, exit 137, after 4.5 to 10 minutes, 30 to 60 GiB) | no output, never exits; one core at 100%, memory grows about 240 MiB/s (4.3 GiB at 18 s, when the harness killed it) |
+| Ciphertext byte 8 flipped (inside the encrypted payload; the length is bytes 0-3) | the same as the tag | the same as the tag |
+| Tag flipped, with `-m 10` or `--connect-timeout 5` | the same: neither option ends it | not run |
+| Tag flipped, the server closing the TCP connection 20 s later | the same: the close does not end it | not run |
+| Length's top bit flipped (`packet_length` over the maximum) | exit 2, `curl: (2) Failure establishing ssh session: -41, Failed to get response to ssh-userauth request` | the same |
+
+After an altered tag or payload curl sent no further byte and printed nothing, even under
+`-v` (its last line was `* SSH: user 'u'`). The loop is inside libssh2 1.11.1's read of
+the packet, which is why curl's own timeouts never run.
 
 ## Consequences
 
