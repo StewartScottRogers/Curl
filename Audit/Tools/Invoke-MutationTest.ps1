@@ -20,7 +20,9 @@
         ==  -> !=      !=  -> ==      ' < ' -> ' <= '   ' > ' -> ' >= '
         ' <= ' -> ' < '               ' >= ' -> ' > '   &&  -> ||      ||  -> &&
         '+ 1' -> '- 1'  '- 1' -> '+ 1' (not followed by a digit)
-        true -> false  false -> true  (whole words)        !(  -> (
+        true -> false  false -> true  (whole words, but never the one inside
+                                       ConfigureAwait(...), an equivalent mutant)
+                                                            !(  -> (
 
     The spaces around < and > keep generics such as List<int> out. The sites are sorted by
     file, line and column, then -MaxMutants are sampled with System.Random(-Seed), so the same
@@ -152,9 +154,13 @@ function Get-LineSites([string]$Line) {
     # replacement.
     if (Test-SkippedLine $Line) { return @() }
     $masked = Get-MaskedLine $Line
+    # The true or false inside ConfigureAwait(...) is never a site: in a console app with no
+    # synchronization context flipping it changes nothing, so no test can kill it (BL-1059).
+    $equivalent = @([regex]::Matches($masked, 'ConfigureAwait\(\s*(true|false)\s*\)') | ForEach-Object { $_.Groups[1].Index })
     $sites = @()
     foreach ($op in $Operators) {
         foreach ($m in [regex]::Matches($masked, $op.Pattern)) {
+            if ($op.Name -in 'true', 'false' -and $equivalent -contains $m.Index) { continue }
             $sites += [pscustomobject]@{ Operator = $op.Name; Column = $m.Index; Original = $m.Value; Mutated = $op.To }
         }
     }
@@ -232,6 +238,8 @@ if ($SelfTest) {
     Check 'true, false, !(' '!(@4,true@12,false@20' (& $show 'if (!(a) && true || false)' | ForEach-Object { ($_ -split ',' | Where-Object { $_ -notmatch '^(&&|\|\|)' }) -join ',' })
     Check 'attribute line' '' (& $show '[Theory(x == 1)]')
     Check 'using line' '' (& $show 'using static System.Math;')
+    Check 'ConfigureAwait(false) is not a site' '' (& $show 'await x.ReadAsync(b).ConfigureAwait(false);')
+    Check 'return false is still a site' 'false@7' (& $show 'return false;')
     Check 'mutation applied' 'if (a != b && c)' (Get-MutatedLine 'if (a == b && c)' (@(Get-LineSites 'if (a == b && c)')[0]))
     Check 'score' '0.75' "$(Get-Score 2 1 1)"
     Check 'score with nothing counted' '' "$(Get-Score 0 0 0)"
