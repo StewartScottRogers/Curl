@@ -34,3 +34,4 @@ An `ftp://` passive data connection's `-v` line reads `* Established 2nd connect
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-30: Backlog -> Doing.
