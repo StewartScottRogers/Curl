@@ -743,6 +743,7 @@ public sealed class HttpProtocolHandler(
         else if (outcome.DiedBeforeResponse)
         {
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.ConnectionDiedRetrying(outcome.RetryCount));
+            HttpExchangeLog.For(plan.Context.DiagnosticLog, streams).RetryingOnFreshConnection(outcome.RetryCount);
         }
     }
 
@@ -924,11 +925,13 @@ public sealed class HttpProtocolHandler(
             ResponseConnection = timedConnection,
             RedirectCount = plan.RedirectsFollowed - options.RedirectsFollowed,
         };
+        HttpExchangeLog exchangeLog = HttpExchangeLog.For(context.DiagnosticLog, streams);
         HttpResponseBodyReader body = new(responseConnection)
         {
             PassesTransferCoding = options.Raw,
             IgnoresContentLength = options.IgnoreContentLength,
             DecodesTransferCoding = options.TransferEncoding,
+            Log = exchangeLog,
         };
         int cookiesStored = 0;
         HttpResponseHeadReader headReader = new(responseConnection)
@@ -948,6 +951,7 @@ public sealed class HttpProtocolHandler(
         HttpResponseHead? actedOn = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
         ReportProtocolChosen(context.Events, newConnection, streams);
+        LogVersionChosen(exchangeLog, plan, transport, newConnection, streams);
         ReportAuthorizationLines(plan);
         try
         {
@@ -956,11 +960,13 @@ public sealed class HttpProtocolHandler(
             exchange.RequestReady = context.TimeProvider.GetTimestamp();
             bool bodyLeftUnsent = await SendBodyAsync(context, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
             ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
+            exchangeLog.RequestSent(framing.Method, context.Url.AbsolutePath, request);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
             exchange.Head = await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
             HttpHeadRefusal? refusal = headReader.Refusal;
             exchange.Head = HeadCurlRead(exchange.Head, refusal);
             actedOn = headReader.HeadActedOn(exchange.Head);
+            exchangeLog.ReplyRead(actedOn);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, actedOn);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
             ThrowIfHeaderRefused(refusal);
@@ -982,14 +988,16 @@ public sealed class HttpProtocolHandler(
         {
             headReader.ReportHeldLines();
             ReportReceiveFailure(context.Events, failure);
+            exchangeLog.Failed(failure.ExitCode, failure);
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
             { Report = exchange.Report(body) };
             return FailedOutcome(plan, connect, upload, headReader, failure, failed);
         }
-        catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
+        catch (OperationCanceledException canceled) when (plan.Deadline.EndedByLimit)
         {
             headReader.ReportHeldLines();
+            exchangeLog.Failed(CurlExitCode.OperationTimedOut, canceled);
             string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
             TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
                 with
@@ -998,6 +1006,7 @@ public sealed class HttpProtocolHandler(
         }
 
         TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
+        LogExchanged(exchangeLog, context.TimeProvider, exchange.RequestReady, actedOn!, body);
         return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection)))
         {
             LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
@@ -1097,6 +1106,32 @@ public sealed class HttpProtocolHandler(
         if (newConnection)
         {
             events.ReportInfo(streams?.UsingLine ?? HttpConnectionInfoLines.UsingHttp1);
+        }
+    }
+
+    /// <summary>
+    /// Logs the version the exchange uses to the diagnostic log (BL-922), and, on a connection
+    /// this transfer opened, a downgrade from the version the command line asked for.
+    /// </summary>
+    private static void LogVersionChosen(HttpExchangeLog exchangeLog, HttpRequestPlan plan, IConnection transport, bool newConnection, IHttpStreamSession? streams)
+    {
+        string versionName = streams?.VersionName ?? HttpExchangeLog.Http1VersionName;
+        exchangeLog.VersionChosen(versionName, newConnection);
+        if (newConnection)
+        {
+            exchangeLog.DowngradeOf(plan.Options.Version, transport.IsSecure, versionName);
+        }
+    }
+
+    /// <summary>
+    /// Logs the end of a successful exchange to the diagnostic log (BL-922), reading the clock
+    /// only when <c>info</c> lines are written so a disabled log changes no timing.
+    /// </summary>
+    private static void LogExchanged(HttpExchangeLog exchangeLog, TimeProvider timeProvider, long? requestReady, HttpResponseHead head, HttpResponseBodyReader body)
+    {
+        if (exchangeLog.LogsInfo)
+        {
+            exchangeLog.Exchanged(head.StatusLine.StatusCode, body.BytesWritten, timeProvider.GetElapsedTime(requestReady!.Value));
         }
     }
 

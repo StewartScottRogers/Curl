@@ -58,6 +58,12 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal long? MaximumBodySize { get; set; }
 
     /// <summary>
+    /// Gets or sets the exchange's diagnostic log, told how the body is framed and which codings
+    /// it decodes (BL-922); <see cref="HttpExchangeLog.Silent" /> unless an exchange sets one.
+    /// </summary>
+    internal HttpExchangeLog Log { get; set; } = HttpExchangeLog.Silent;
+
+    /// <summary>
     /// Gets or sets a value indicating whether transfer coding is written undecoded, as
     /// <c>--raw</c> asks (<see cref="HttpResponseBodyFraming" />).
     /// </summary>
@@ -246,7 +252,9 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(head.Headers, PassesTransferCoding, IgnoresContentLength, DecodesTransferCoding);
         IEnumerable<string> contentCodings = decodeContent ? HttpContentDecoder.ContentCodings(head.Headers) : [];
         IEnumerable<string> transferCodings = decodeTransfer ? framing.TransferCodings : [];
-        contentDecoder = HttpContentDecoder.ForCodings(contentCodings.Concat(transferCodings));
+        string[] decodedCodings = [.. contentCodings.Concat(transferCodings)];
+        Log.BodyFramed(framing, decodedCodings);
+        contentDecoder = HttpContentDecoder.ForCodings(decodedCodings);
         ExpectedLength = framing.ContentLength;
         Progress.ReportDownloaded(BytesWritten, ExpectedLength);
         try
