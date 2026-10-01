@@ -29,7 +29,9 @@
     Runs decide design and behaviour questions themselves (Stewart delegated them; see
     CLAUDE.md "Decisions") and block only for a new package or a threshold change. A
     task that waits on other tasks goes back to Backlog with them in `depends-on`, and a
-    run that needs a project outside `touches` widens it. Before each claim the shift
+    run that needs a project outside `touches` widens it, checking the overlap against
+    the shared branch's Doing rather than its own stale copy; a new ADR or a newly filed
+    task never needs `touches` and never sends a task back (BL-1069). Before each claim the shift
     also requeues any Blocked task whose reason names only tasks that are now Done.
 
     OUT OF TOKENS
@@ -2640,12 +2642,19 @@ Rules for this unattended run, in addition to CLAUDE.md:
    "Decided by Claude under Stewart's delegation", and carry on. Only a new package or
    a quality-threshold change goes to Blocked, with a -Reason that starts "Stewart:" and
    asks the question in one line.
-3. Stay inside the projects and files the task's `touches` field names. If the work
-   truly needs another one, read the `touches` of every task in Tasks/Doing. When none
-   of them names it, add it to this task's `touches`, say why under Notes, and carry
-   on. When one does, add it anyway and move the task to Backlog with a -Reason naming
-   the project and that task; the board will not offer it again until they no longer
-   overlap.
+3. Stay inside the projects and files the task's `touches` field names. Two additions
+   never need `touches` and never send a task back: a new ADR (its own file in
+   Documentation/Planning/Decisions and its row in that folder's README) and a task
+   filed with the board script. If two lanes pick the same ADR number, the shift's
+   rebase resolver renumbers this lane's. If the work truly needs another project or
+   file, read the `touches` of every other task in Doing on the shared branch as it is
+   now, not in this checkout, whose board is as old as this run:
+   `git ls-tree --name-only origin/{BRANCH} Tasks/Doing/` lists them and
+   `git show origin/{BRANCH}:<path>` shows one (other lanes keep that ref current).
+   When none of them names it, add it to this task's `touches`, say why under Notes,
+   and carry on. When one does, add it anyway and move the task to Backlog with a
+   -Reason naming the project and that task; the board will not offer it again until
+   they no longer overlap.
 4. If the only thing stopping the task is other work - an existing task, or one you
    file with the board script - add those IDs to its `depends-on` and move it to
    Backlog, not Blocked, with a -Reason naming them. The board starts it again once
@@ -2679,6 +2688,9 @@ stopped on conflicts. Resolve them:
    still do what its commit says. Never resolve by discarding one side wholesale.
 2. Files under Tasks/: a task file that one side moved and the other edited keeps the
    move and the edits. Curl.slnx and other lists: keep every entry from both sides.
+   An ADR number both sides used stays with the shared side's ADR; this lane's takes
+   the next free number in its file name, heading, the Decisions README row and every
+   reference to it.
 3. `git add` the resolved files, then `git -c core.editor=true rebase --continue`.
    Repeat until the rebase finishes.
 4. Run `dotnet build` and `dotnet test --filter "TestCategory!=Integration"`; fix what
