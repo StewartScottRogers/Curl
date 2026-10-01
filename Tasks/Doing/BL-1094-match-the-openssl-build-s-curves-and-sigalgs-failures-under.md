@@ -33,3 +33,4 @@ Under `--tls-max 1.2`, `--curves '?bogus'` sends a ClientHello as the OpenSSL bu
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
