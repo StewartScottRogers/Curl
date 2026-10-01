@@ -47,7 +47,9 @@ credential cache, by a TGS exchange with the cache's ticket-granting ticket, or 
 exchange, over the injected `IKerberosKdcTransport` (`KerberosKdcSender` picks UDP or
 TCP and frames TCP) and, for an `https://` KDC, the optional `IKerberosKdcProxyTransport`
 with the request wrapped in MS-KKDCP's `KerberosKdcProxyMessage` as MIT does (BL-827;
-without one, `https://` KDCs are skipped); every refusal is a `KerberosKdcException` with a `KerberosKdcError`
+without one, `https://` KDCs are skipped), posted through its anchored overload with the realm's
+`http_anchors` (`KerberosConfiguration.HttpAnchors`, each read by `KerberosHttpAnchor.Parse` as
+`FILE:`, `DIR:` or `ENV:`; BL-1063, ADR-0300); every refusal is a `KerberosKdcException` with a `KerberosKdcError`
 (BL-690, ADR-0168), and follows the KDCs' cross-realm referrals (`krbtgt/OTHER@REALM`) to
 OTHER's KDCs up to `MaximumReferralHops` times (BL-826, ADR-0256); given a
 `CredentialCacheStore` and a cache name instead, it stores a ticket got by a TGS exchange

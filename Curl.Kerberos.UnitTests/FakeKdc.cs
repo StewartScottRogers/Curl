@@ -78,6 +78,9 @@ internal sealed class FakeKdc : IKerberosKdcTransport, IKerberosKdcProxyTranspor
     /// <summary>Gets the <c>KDC-PROXY-MESSAGE</c> bodies posted to the proxy.</summary>
     public List<byte[]> ProxyBodies { get; } = [];
 
+    /// <summary>Gets the <c>http_anchors</c> each post to the proxy was verified against.</summary>
+    public List<IReadOnlyList<string>> ProxyAnchors { get; } = [];
+
     /// <summary>Gets or sets a body the proxy answers with instead of the wrapped answer.</summary>
     public byte[]? ProxyReply { get; set; }
 
@@ -126,6 +129,13 @@ internal sealed class FakeKdc : IKerberosKdcTransport, IKerberosKdcProxyTranspor
         ProxyBodies.Add(body.ToArray());
         KerberosKdcProxyMessage request = KerberosKdcProxyMessage.Decode(body);
         return Task.FromResult(ProxyReply ?? new KerberosKdcProxyMessage(Answer(request.KerberosMessage), null).Encode());
+    }
+
+    /// <summary>Records the anchors the post is verified against, then posts as the five-argument overload.</summary>
+    public Task<byte[]> PostAsync(string host, int port, string path, IReadOnlyList<string> httpAnchors, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
+    {
+        ProxyAnchors.Add(httpAnchors);
+        return PostAsync(host, port, path, body, cancellationToken);
     }
 
     public byte[] Answer(byte[] bytes)

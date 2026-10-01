@@ -113,6 +113,27 @@ public sealed class KerberosKdcSenderTests
     }
 
     [TestMethod]
+    public async Task SendAsync_HttpsEntryInARealmWithHttpAnchors_PostsVerifiedAgainstThem()
+    {
+        FakeKdc kdc = Answering(Reply);
+        string configuration = "[realms]\n EXAMPLE.TEST = {\n kdc = https://proxy.example.test/KdcProxy\n http_anchors = FILE:/etc/proxy-ca.pem\n http_anchors = ENV:PROXY_CA\n }\n";
+
+        await ProxiedSenderFor(kdc, configuration).SendAsync(FakeKdc.Realm, Request(), CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "FILE:/etc/proxy-ca.pem", "ENV:PROXY_CA" }, kdc.ProxyAnchors.Single().ToArray());
+    }
+
+    [TestMethod]
+    public async Task SendAsync_HttpsEntryInARealmWithoutHttpAnchors_PostsWithNoAnchors()
+    {
+        FakeKdc kdc = Answering(Reply);
+
+        await ProxiedSenderFor(kdc, HttpsThenTcp).SendAsync(FakeKdc.Realm, Request(), CancellationToken.None);
+
+        Assert.IsEmpty(kdc.ProxyAnchors.Single());
+    }
+
+    [TestMethod]
     public async Task SendAsync_ProxyReplyIsNotAKdcProxyMessage_TriesTheNextKdc()
     {
         FakeKdc kdc = Answering(Reply);
