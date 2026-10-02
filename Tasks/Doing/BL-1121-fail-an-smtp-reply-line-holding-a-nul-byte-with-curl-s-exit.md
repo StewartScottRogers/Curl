@@ -33,3 +33,4 @@ An SMTP reply line that contains a NUL byte ends the transfer with exit 8 `Nul b
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
