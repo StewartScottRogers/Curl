@@ -403,6 +403,18 @@ internal static class CurlComposition
         options.TraceComponents.Contains("haproxy") || options.TraceComponents.Contains("proxy") || options.TraceComponents.Contains("all");
 
     /// <summary>
+    /// Whether curl 8.21.0's <c>[SOCKS]</c> lines are written: <c>socks</c>, <c>proxy</c> or a
+    /// <c>--trace-config all</c> is among the trace components; neither <c>network</c> nor the
+    /// <c>all</c> that <c>-vvvv</c> puts there turns them on (measured, BL-1191 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesSocks(CommandLineOptions options) =>
+        options.TraceComponents.Contains("socks")
+        || options.TraceComponents.Contains("proxy")
+        || (options.TraceComponents.Contains("all") && !options.VerbosityTraceComponents.Contains("all"));
+
+    /// <summary>
     /// Whether curl 8.21.0's <c>[HAPPY-EYEBALLS]</c> lines are written: <c>happy-eyeballs</c>,
     /// <c>network</c> or <c>all</c> is among the trace components, which <c>-vvvv</c> puts there too
     /// (measured, BL-1161 Notes).
@@ -755,6 +767,7 @@ internal static class CurlComposition
             TracesDnsFilter = TracesDns(options),
             TracesSetupFilter = TracesSetup(options),
             TracesHaproxyFilter = TracesHaproxy(options),
+            TracesSocksFilter = TracesSocks(options),
             TracesHappyEyeballsFilter = TracesHappyEyeballs(options),
             TracesTcpFilter = TracesTcp(options),
             TracesHappyEyeballsTimer = TracesTimer(options),

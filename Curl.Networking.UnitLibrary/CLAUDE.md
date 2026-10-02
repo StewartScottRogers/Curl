@@ -412,7 +412,11 @@ and exit 6), and a looked-up name writes `[DNS] resolve complete for H:P` and, a
 the first `Trying` and its removal after `Established connection`, so `-vv` prints curl's order.
 Per ADR-0357's BL-1160 amendment, with a `HaproxyProtocolHeader` the setup filter also writes
 `HaproxyFilterAddedLine` beside the PROXY line, and `TcpConnector.TracesHaproxyFilter` writes the
-`[HAPROXY]` filter's removal after the connection is reported opened. Per BL-1186
+`[HAPROXY]` filter's removal after the connection is reported opened. Per ADR-0357's BL-1191
+amendment `TcpConnector.TracesSocksFilter` hands the SOCKS handshakes the target's events, on which
+`SocksProxyTunnel.Trace` writes curl's `[SOCKS]` lines (connecting, the handshake states' pollset
+lines, how the destination was resolved, request granted), and under `TracesSetupFilter` a SOCKS hop
+writes `[SETUP] added SOCKS filter to H:P` first. Per BL-1186
 `TcpConnector.TracesHappyEyeballsTimer` (`--trace-config timer`, `network`, `all`) has
 `ConnectAttemptTraceEvents` write `[TIMER] [HAPPY_EYEBALLS] set for <us>ns` and `gives multi timeout in
 <ms>ms` as a second family's delay starts, and `cleared` once an attempt connects, before `Connected to`.

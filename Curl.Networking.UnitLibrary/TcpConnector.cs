@@ -235,6 +235,13 @@ public sealed partial class TcpConnector(
     public bool TracesHaproxyFilter { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a SOCKS handshake, to a SOCKS proxy or a <c>--preproxy</c>,
+    /// writes curl 8.21.0's <c>[SOCKS]</c> lines as it runs, under <c>--trace-config socks</c>,
+    /// <c>proxy</c> or <c>all</c> (<see cref="SocksProxyTunnel" />, measured, BL-1191 Notes).
+    /// </summary>
+    public bool TracesSocksFilter { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether a direct connect writes the <c>[HAPPY-EYEBALLS]</c> lines curl
     /// 8.21.0 writes around its connect attempts under <c>--trace-config happy-eyeballs</c>,
     /// <c>network</c> or <c>all</c> (<see cref="ConnectAttemptTraceEvents" />, BL-1161).
@@ -1186,6 +1193,12 @@ public sealed partial class TcpConnector(
         var connection = dialed.Connection;
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);
         log.SocksHandshakeStarting(socks, destination.Host, destination.Port);
+        if (TracesSetupFilter)
+        {
+            // curl 8.21.0's setup filter adds the SOCKS filter once the proxy's socket connected (BL-1191 Notes).
+            target.Events.ReportInfo($"[SETUP] added SOCKS filter to {destination.Host}:{destination.Port}");
+        }
+
         var (failure, exception) = await RunSocksHandshakeAsync(connection, destination, socks, target, cancellationToken).ConfigureAwait(false);
         if (exception is not null || failure is not null)
         {
@@ -1443,6 +1456,7 @@ public sealed partial class TcpConnector(
                 (host, port, token) => ResolveWithFailureReasonAsync(host, port, target, token),
                 Socks5Authentication,
                 target.Events,
+                TracesSocksFilter ? target.Events : null,
                 cancellationToken).ConfigureAwait(false), null);
         }
         catch (Exception exception)

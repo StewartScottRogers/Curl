@@ -131,6 +131,17 @@ public sealed class CommandLineTraceConfigTests
     }
 
     [TestMethod]
+    [DataRow(new[] { "-vvvv" }, new[] { "setup", "protocol", "read", "write", "all" })]
+    [DataRow(new[] { "-vvvv", "--trace-config", "all" }, new[] { "setup", "protocol", "read", "write" })]
+    [DataRow(new[] { "--trace-config", "all", "-vvvv" }, new[] { "setup", "protocol", "read", "write" })]
+    [DataRow(new[] { "-v", "--trace-config", "socks" }, new string[0])]
+    public void Parse_VerbosityAndTraceConfig_KeepsTheComponentsOnlyVerbosityTurnedOn(string[] arguments, string[] expected)
+    {
+        // -vvvv's all does not write [SOCKS] lines, --trace-config all does (BL-1191 Notes).
+        CollectionAssert.AreEquivalent(expected, Accept(arguments).VerbosityTraceComponents.ToArray());
+    }
+
+    [TestMethod]
     public void Parse_TraceConfigInFirstGroup_ReachesTheSecondGroup()
     {
         CommandLineParseResult result = CommandLineParser.Parse(["--trace-config", "ids,tls", Url, "--next", Url]);

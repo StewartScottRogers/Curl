@@ -36,6 +36,7 @@ internal static class Socks4Handshake
     /// <param name="host">The host the tunnel reaches.</param>
     /// <param name="port">The port the tunnel reaches.</param>
     /// <param name="resolve">Resolves the host for SOCKS4.</param>
+    /// <param name="trace">Receives the <c>[SOCKS]</c> lines, or <see langword="null" /> for none.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns><see langword="null" /> when the tunnel is open, else the failure.</returns>
     public static async ValueTask<ConnectResult?> RunAsync(
@@ -44,8 +45,10 @@ internal static class Socks4Handshake
         string host,
         int port,
         Func<string, int, CancellationToken, ValueTask<DnsResolution>> resolve,
+        ITransferEvents? trace,
         CancellationToken cancellationToken)
     {
+        var kind = TraceConnecting(proxy, host, port, trace);
         var userId = Encoding.UTF8.GetBytes(proxy.Credential?.UserName ?? string.Empty);
         if (userId.Length > MaximumUserIdBytes)
         {
@@ -60,7 +63,45 @@ internal static class Socks4Handshake
             return failure;
         }
 
-        await SocksProxyTunnel.SendAsync(connection, BuildRequest(port, destination, userId), cancellationToken).ConfigureAwait(false);
+        return await RequestAsync(connection, kind, BuildRequest(port, destination, userId), destination, trace, cancellationToken).ConfigureAwait(false);
+    }
+
+    // curl 8.21.0 names the kind and the destination as given before anything else (BL-1191 Notes).
+    // Returns the kind's name, SOCKS4 or SOCKS4a, for the granted line.
+    private static string TraceConnecting(ProxyEndpoint proxy, string host, int port, ITransferEvents? trace)
+    {
+        var kind = proxy.Kind == ProxyKind.Socks4a ? "SOCKS4a" : "SOCKS4";
+        SocksProxyTunnel.Trace(trace, string.Create(CultureInfo.InvariantCulture, $"{kind} connecting to {host}:{port}"));
+        return kind;
+    }
+
+    // Sends the request and checks the proxy's eight-byte reply, writing the [SOCKS] lines around them.
+    private static async ValueTask<ConnectResult?> RequestAsync(
+        IConnection connection,
+        string kind,
+        byte[] request,
+        Socks4Destination destination,
+        ITransferEvents? trace,
+        CancellationToken cancellationToken)
+    {
+        if (destination.HostName is null)
+        {
+            SocksProxyTunnel.Trace(trace, $"SOCKS4 connect to IPv4 {new IPAddress(destination.Address)} (locally resolved)");
+        }
+
+        var result = await ExchangeAsync(connection, request, trace, cancellationToken).ConfigureAwait(false);
+        if (result is null)
+        {
+            SocksProxyTunnel.Trace(trace, $"{kind} request granted.");
+        }
+
+        return result;
+    }
+
+    private static async ValueTask<ConnectResult?> ExchangeAsync(IConnection connection, byte[] request, ITransferEvents? trace, CancellationToken cancellationToken)
+    {
+        await SocksProxyTunnel.SendAsync(connection, request, cancellationToken).ConfigureAwait(false);
+        SocksProxyTunnel.Trace(trace, "adjust pollset in (4)");
         var reply = new byte[8];
         return await SocksProxyTunnel.ReadExactlyAsync(connection, reply, cancellationToken).ConfigureAwait(false)
             ? CheckReply(reply)

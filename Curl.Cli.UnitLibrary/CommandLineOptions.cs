@@ -304,6 +304,13 @@ public sealed class CommandLineOptions
     public IReadOnlySet<string> TraceComponents => globals.TraceComponents;
 
     /// <summary>
+    /// The names in <see cref="TraceComponents"/> that only <c>-vv</c> and up put there, not a
+    /// <c>--trace-config</c>: <c>all</c> here came from <c>-vvvv</c>, which curl 8.21.0 does not let
+    /// write the <c>[SOCKS]</c> lines that <c>--trace-config all</c> writes (measured, BL-1191 Notes).
+    /// </summary>
+    public IReadOnlySet<string> VerbosityTraceComponents => globals.VerbosityTraceComponents;
+
+    /// <summary>
     /// Applies <c>--trace-ids</c>, or <c>--no-trace-ids</c> when <paramref name="on"/> is
     /// <see langword="false"/>, which also turns off <c>--trace-config ids</c>.
     /// </summary>

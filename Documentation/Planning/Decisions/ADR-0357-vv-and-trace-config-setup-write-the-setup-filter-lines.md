@@ -143,3 +143,24 @@ header line and each body block as an event, which is where curl's client writer
   block arrive in one read, as they do for a small response. A response with no body writes its
   `xfer_write_resp` for the head before `[OUT] done`. `eos` is always `0`, as measured.
 - Not written: `[OUT] done` before a failed transfer's `closing connection #N` (unmeasured).
+
+## Amendment, 2026-10-02 (BL-1191): the `[SOCKS]` lines
+
+Decided by Claude under Stewart's delegation.
+
+- Measured (BL-1191 Notes) through a scripted SOCKS server for SOCKS4, SOCKS4a, SOCKS5, SOCKS5h and
+  `--preproxy`: `SOCKS5: connecting to H:P` (SOCKS4: `SOCKS4 connecting to H:P`, no colon), `adjust
+  pollset in (7)` after the greeting, `SOCKS5 connect to H:P (remotely resolved)` for SOCKS5h (an
+  address literal too) or `A:P (locally resolved)` for SOCKS5, an IPv6 address in brackets
+  (SOCKS4: `SOCKS4 connect to IPv4 A (locally resolved)`, none for SOCKS4a), `adjust pollset in (15)`
+  (SOCKS4: `(4)`) after the request, and `SOCKS5 request granted.` before `Opened SOCKS connection`.
+  The numbers in brackets are curl's handshake states, the same on every run, so they are pinned.
+  A refused request ends after the pollset line with the existing exit 97 message. A pre-proxy names
+  the HTTP proxy as the destination.
+- `socks`, `proxy` and `--trace-config all` turn them on (`CurlComposition.TracesSocks`,
+  `TcpConnector.TracesSocksFilter`); `network` does not, and neither does `-vvvv`, although it puts
+  `all` among the components: `CommandLineOptions.VerbosityTraceComponents` tells the two apart.
+- The setup filter writes `[SETUP] added SOCKS filter to H:P` before the handshake.
+- Not written: `[SOCKS] query ALPN`, which curl writes after `Established connection` when the HTTP
+  layer asks the filter chain for ALPN, as `[TCP] query ALPN` (BL-1195) is; it follows in its own task.
+  The lines of a SOCKS5 user name and password or GSS-API negotiation are unmeasured.
