@@ -382,6 +382,8 @@ carries `PoolScheme` `https`, so the handshake offers ALPN `http/1.1`. `DohRespo
 response as curl does: status and `Content-Type` ignored, a `Content-Length` or chunked body of at
 most 3000 bytes, anything else a failure. It returns the AAAA answer's addresses, then the A
 answer's; a query that fails yields none, and none from both makes `TcpConnector` fail with exit 6.
+Both answers fill one entry, as curl's `struct dohentry`: `DohQueryResult.AsOneEntry` cuts each,
+A first, to the 24 addresses and 4 CNAMEs the earlier ones left room for (measured, BL-1153).
 IP literals and `localhost` (`TcpConnector.IsLocalhost`) are answered without a query.
 `ResolveHttpsRecordAsync` (ADR-0312, BL-707) POSTs one HTTPS query, for the host on port 443 and
 `_<port>._https.<host>` on any other, and returns the answer's first record decoded, its

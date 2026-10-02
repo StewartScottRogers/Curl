@@ -319,6 +319,56 @@ public sealed class DohDnsResolverTraceTests
     }
 
     [TestMethod]
+    public async Task ResolveAsync_AddressesAndCnamesOverTheSharedLimit_KeepsTheFirst24AddressesAnd4Cnames()
+    {
+        // Measured 2026-10-02 (BL-1153), the A query answered A 127.0.0.1-20 then CNAMEs c1-c3.test,
+        // the AAAA query AAAA ::1-::a then CNAMEs c4-c6.test (TTL 60 each): curl traced the 20 A lines,
+        // AAAA ::1-::4 and CNAMEs c1-c4.test, then printed "IPv6: ::1, ::2, ::3, ::4" and
+        // "IPv4: 127.0.0.1, ..., 127.0.0.20".
+        var connector = new FakeConnector();
+        connector.BytesToRead.Add(Ok(LimitAnswer(DnsRecordType.A, 20, [1, 2, 3])));
+        connector.BytesToRead.Add(Ok(LimitAnswer(DnsRecordType.Aaaa, 10, [4, 5, 6])));
+        var trace = new RecordingTransferEvents();
+
+        var addresses = await new DohDnsResolver(connector, MeasuredDohUrl, trace, DescribeExitCode).ResolveAsync("example.test", CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[] { "[DNS] hostname: example.test", "[DoH] TTL: 60 seconds" }
+                .Concat(Enumerable.Range(1, 20).Select(n => $"[DoH] A: 127.0.0.{n}"))
+                .Concat(Enumerable.Range(1, 4).Select(n => $"[DoH] AAAA: 0000:0000:0000:0000:0000:0000:0000:000{n}"))
+                .Concat(Enumerable.Range(1, 4).Select(n => $"CNAME: c{n}.test"))
+                .ToArray(),
+            trace.Info.ToArray());
+        CollectionAssert.AreEqual(
+            Enumerable.Range(1, 4).Select(n => $"::{n}").Concat(Enumerable.Range(1, 20).Select(n => $"127.0.0.{n}")).ToArray(),
+            addresses.Select(address => address.ToString()).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_AFillingTheSharedLimit_KeepsNothingFromTheAaaaAnswer()
+    {
+        // Measured 2026-10-02 (BL-1153), the A query answered A 127.0.0.1-24 then CNAMEs c1-c4.test,
+        // the AAAA query AAAA ::1-::5 then CNAMEs c5-c6.test: curl traced only the A answer's 24
+        // addresses and 4 CNAMEs, then printed "IPv6: (none)" and the 24 IPv4 addresses.
+        var connector = new FakeConnector();
+        connector.BytesToRead.Add(Ok(LimitAnswer(DnsRecordType.A, 24, [1, 2, 3, 4])));
+        connector.BytesToRead.Add(Ok(LimitAnswer(DnsRecordType.Aaaa, 5, [5, 6])));
+        var trace = new RecordingTransferEvents();
+
+        var addresses = await new DohDnsResolver(connector, MeasuredDohUrl, trace, DescribeExitCode).ResolveAsync("example.test", CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[] { "[DNS] hostname: example.test", "[DoH] TTL: 60 seconds" }
+                .Concat(Enumerable.Range(1, 24).Select(n => $"[DoH] A: 127.0.0.{n}"))
+                .Concat(Enumerable.Range(1, 4).Select(n => $"CNAME: c{n}.test"))
+                .ToArray(),
+            trace.Info.ToArray());
+        CollectionAssert.AreEqual(
+            Enumerable.Range(1, 24).Select(n => $"127.0.0.{n}").ToArray(),
+            addresses.Select(address => address.ToString()).ToArray());
+    }
+
+    [TestMethod]
     public void FormatAddress_WritesEveryIPv6GroupAsFourHexDigits()
     {
         Assert.AreEqual("2001:0db8:0000:0000:0000:0000:00ab:ff01", DohTraceLines.FormatAddress(System.Net.IPAddress.Parse("2001:db8::ab:ff01")));
@@ -346,6 +396,20 @@ public sealed class DohDnsResolverTraceTests
         CurlExitCode.PeerFailedVerification => "SSL peer certificate or SSH remote key was not OK",
         _ => exitCode.ToString(),
     };
+
+    // BL-1153's measured answers: example.test with addresses 1..addressCount of the type asked
+    // (127.0.0.n or ::n), then a CNAME c<n>.test for each n in cnames, every record TTL 60.
+    private static byte[] LimitAnswer(DnsRecordType recordType, int addressCount, int[] cnames)
+    {
+        var addressRecords = Enumerable.Range(1, addressCount).Select(n => recordType == DnsRecordType.A
+            ? "C00C000100010000003C00047F0000" + n.ToString("X2", System.Globalization.CultureInfo.InvariantCulture)
+            : "C00C001C00010000003C0010" + new string('0', 28) + n.ToString("X4", System.Globalization.CultureInfo.InvariantCulture));
+        var cnameRecords = cnames.Select(n => $"C00C000500010000003C000902633{n}047465737400");
+        var records = addressRecords.Concat(cnameRecords).ToArray();
+        var header = "000081800001" + records.Length.ToString("X4", System.Globalization.CultureInfo.InvariantCulture) + "00000000";
+        var question = ExampleTest + "00" + ((int)recordType).ToString("X4", System.Globalization.CultureInfo.InvariantCulture) + "0001";
+        return Convert.FromHexString(header + question + string.Concat(records));
+    }
 
     private static byte[] Ok(byte[] answer) =>
         [.. Response($"HTTP/1.1 200 OK\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer];
