@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cookies.UnitLibrary, Curl.Cookies.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1225 — Write curl's 'oversized cookie dropped' -v line for a Set-Cookie whose name and value pass 4096 bytes
 
@@ -26,14 +26,19 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Cookies.UnitTests` pin: a 4000-byte name with a 97-byte value refuses the cookie with exactly `oversized cookie dropped, name/val 4000 + 97 bytes`; a name and value of exactly 4096 bytes together are stored; the counts are of the trimmed name and value (a value written with surrounding spaces is counted without them).
-- [ ] The remark that curl prints nothing for an oversized name and value is corrected to say what curl prints, citing the measurement.
-- [ ] Every other Cookies test passes unchanged.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cookies.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] Tests in `Curl.Cookies.UnitTests` pin: a 4000-byte name with a 97-byte value refuses the cookie with exactly `oversized cookie dropped, name/val 4000 + 97 bytes`; a name and value of exactly 4096 bytes together are stored; the counts are of the trimmed name and value (a value written with surrounding spaces is counted without them).
+- [x] The remark that curl prints nothing for an oversized name and value is corrected to say what curl prints, citing the measurement.
+- [x] Every other Cookies test passes unchanged.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cookies.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- `TrySetNameAndValue` now refuses an oversized name and value with `oversized cookie dropped, name/val <n> + <v> bytes`, counting the trimmed name and value. The octet checks still run first, so the measured `LongNameAndValueWithAControlCharacter` case keeps `invalid octets in value`. Cookie-file lines get the same line, since curl shares `parse_first_pair`.
+- One existing test changed: `CookieStoreTests.StoreFromResponse_NameAndValueTooLong_ReportsNothing` pinned the old silence that the task corrects. It is now `..._ReportsOversizedCookieDropped` and expects `name/val 4000 + 200 bytes`. Every other Cookies test passes unchanged.
+- Results: Cookies 353 tests green; Measure-CodeQuality reports 100% line, 100% branch, 0 failing, worst CRAP 10; solution build clean with -warnaserror; fast tests green.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. SetCookieParser reports curl's 'oversized cookie dropped, name/val n + v bytes' -v line
