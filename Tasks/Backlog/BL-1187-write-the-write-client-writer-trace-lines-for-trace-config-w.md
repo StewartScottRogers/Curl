@@ -1,5 +1,5 @@
 ---
-id: BL-1183
+id: BL-1187
 title: Write the [WRITE] client writer trace lines for --trace-config write and -vvv
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1183 — Write the [WRITE] client writer trace lines for --trace-config write and -vvv
+# BL-1187 — Write the [WRITE] client writer trace lines for --trace-config write and -vvv
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-1185
+id: BL-1189
 title: Write the upload readers' and redirect hops' [READ] trace lines
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1185 — Write the upload readers' and redirect hops' [READ] trace lines
+# BL-1189 — Write the upload readers' and redirect hops' [READ] trace lines
 
 ## Goal
 

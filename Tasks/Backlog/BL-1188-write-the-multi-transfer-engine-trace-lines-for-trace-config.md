@@ -1,5 +1,5 @@
 ---
-id: BL-1184
+id: BL-1188
 title: Write the [MULTI] transfer engine trace lines for --trace-config multi, network and -vvvv
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1184 — Write the [MULTI] transfer engine trace lines for --trace-config multi, network and -vvvv
+# BL-1188 — Write the [MULTI] transfer engine trace lines for --trace-config multi, network and -vvvv
 
 ## Goal
 
