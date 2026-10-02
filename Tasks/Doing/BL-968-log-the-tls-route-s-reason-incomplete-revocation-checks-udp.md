@@ -37,3 +37,4 @@ The diagnostic log (`--log-level`) covers the connect steps BL-920 left out: why
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-02: Backlog -> Doing.
