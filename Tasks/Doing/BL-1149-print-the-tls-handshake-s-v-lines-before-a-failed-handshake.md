@@ -40,3 +40,4 @@ ALPN offer, `SSL connection using`, certificate details and verify result.
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-02: Backlog -> Doing.
