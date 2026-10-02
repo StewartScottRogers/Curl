@@ -18,6 +18,12 @@ internal static class FtpTransferMessages
     /// </summary>
     internal const string ReplyLineTooLarge = "A value or data field grew larger than allowed";
 
+    /// <summary>
+    /// The exit 8 message for a reply line holding a NUL byte, as curl 8.21.0's
+    /// <c>Curl_pp_readresp</c> fails it (BL-1117).
+    /// </summary>
+    internal const string NulByteInReplyLine = "Nul byte in server response line";
+
     /// <summary>The exit 28 message for a <c>421</c> reply before the data transfer.</summary>
     internal const string TimeoutReached = "Timeout was reached";
 

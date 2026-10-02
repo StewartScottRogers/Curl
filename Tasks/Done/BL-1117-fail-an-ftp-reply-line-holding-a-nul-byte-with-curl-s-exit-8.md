@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1117 — Fail an FTP reply line holding a NUL byte with curl's exit 8
 
@@ -25,13 +25,18 @@ An FTP control-connection reply line that contains a NUL byte ends the transfer 
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Protocol.Ftp.UnitTests` pin the two measured cases above: exit 8 with `Nul byte in server response line`, the `-v` events as measured (no event for the NUL line), and no `QUIT` written to the scripted connection.
-- [ ] A test pins that a NUL in a `220-` continuation line fails the same way, and one that a NUL in data-connection bytes of a download is written to the output unchanged.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] New tests in `Curl.Protocol.Ftp.UnitTests` pin the two measured cases above: exit 8 with `Nul byte in server response line`, the `-v` events as measured (no event for the NUL line), and no `QUIT` written to the scripted connection.
+- [x] A test pins that a NUL in a `220-` continuation line fails the same way, and one that a NUL in data-connection bytes of a download is written to the output unchanged.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- `FtpControlChannel.ReadLineAsync` throws the new `FtpReplyNulByteException` for a complete line holding a NUL, before reporting it; `FtpSession.ReadReplyAsync` maps it to exit 8 `Nul byte in server response line` with no `QUIT` (the throw path, as 421). Its own type because `InvalidDataException` is sealed and already means exit 100.
+- Decided: a NUL in the reply to `QUIT` or `ABOR` is ignored like an oversized one (`SendIgnoringReplyAsync`), since curl's `ftp_quit` treats any read error there as the end of the connection. Pinned by `ExecuteAsync_NulByteInTheReplyToQuit_StillSucceeds`.
+- The `* Nul byte...` and `* closing connection #0` `-v` lines are the console's generic failure lines; the handler reports nothing for the NUL line (tests pin the transcript).
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. An FTP reply line holding a NUL byte fails with exit 8, unreported and without QUIT, as curl 8.21.0

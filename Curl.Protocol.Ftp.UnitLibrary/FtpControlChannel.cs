@@ -106,6 +106,9 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
     /// <exception cref="InvalidDataException">
     /// A line reached 65536 bytes, its CR and LF included, as curl refuses with exit 100.
     /// </exception>
+    /// <exception cref="FtpReplyNulByteException">
+    /// A complete line held a NUL byte, as curl refuses with exit 8; the line is not reported.
+    /// </exception>
     public async ValueTask<FtpReply?> ReadReplyAsync()
     {
         string? firstLine = null;
@@ -145,6 +148,11 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
             {
                 line.Add(next);
                 byte[] bytes = [.. line];
+                if (Array.IndexOf(bytes, (byte)0) >= 0)
+                {
+                    throw new FtpReplyNulByteException();
+                }
+
                 reporting.ReportResponseHeader(bytes);
                 return Encoding.Latin1.GetString(bytes, 0, bytes.Length - 1).TrimEnd('\r');
             }

@@ -1718,6 +1718,11 @@ internal sealed class FtpSession(
             // An oversized reply to ABOR or QUIT changes nothing.
             return null;
         }
+        catch (FtpReplyNulByteException)
+        {
+            // Nor does one holding a NUL byte: curl's ftp_quit ends the connection on any read error.
+            return null;
+        }
     }
 
     private ValueTask<FtpReply> ExchangeAsync(string command) => ExchangeAsync(command, afterSent: null);
@@ -1739,7 +1744,7 @@ internal sealed class FtpSession(
 
     /// <summary>
     /// Reads the next reply, ending the conversation for a closed connection (exit 56), an
-    /// oversized line (exit 100), or a <c>421</c>, which curl reports as exit 28 with
+    /// oversized line (exit 100), a line holding a NUL byte (exit 8), or a <c>421</c>, which curl reports as exit 28 with
     /// <paramref name="closingMessage" /> and no <c>QUIT</c>.
     /// </summary>
     private async ValueTask<FtpReply> ReadReplyAsync(string closingMessage = FtpTransferMessages.TimeoutReached)
@@ -1748,6 +1753,10 @@ internal sealed class FtpSession(
         try
         {
             reply = await control.ReadReplyAsync().ConfigureAwait(false);
+        }
+        catch (FtpReplyNulByteException)
+        {
+            throw Failed(CurlExitCode.WeirdServerReply, FtpTransferMessages.NulByteInReplyLine);
         }
         catch (InvalidDataException)
         {
