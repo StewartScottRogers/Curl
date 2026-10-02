@@ -24,6 +24,8 @@
     -->
     <PublishAot Condition=" '$(PublishAot)' == '' ">true</PublishAot>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- The source-generated LibraryImport marshalling of NativeExtendedAttributeWriter (ADR-0320). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

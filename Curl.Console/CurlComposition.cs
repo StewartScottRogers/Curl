@@ -756,7 +756,8 @@ internal static class CurlComposition
             terminalRendersStyles: terminalRendersStyles,
             accountHomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             runConnectionCache: runConnections,
-            tlsSessions: tlsSessions);
+            tlsSessions: tlsSessions,
+            extendedAttributeWriter: NativeExtendedAttributeWriter.ForCurrentPlatform());
     }
 
     /// <summary>

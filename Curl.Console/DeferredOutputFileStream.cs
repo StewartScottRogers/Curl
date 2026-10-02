@@ -80,6 +80,19 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     internal bool IsOpen => file is not null;
 
     /// <summary>
+    /// Gets a value indicating whether <see cref="CompleteAsync" /> opened the file only to create it
+    /// empty after a transfer that wrote nothing, as curl does after it has set <c>--xattr</c>'s
+    /// attributes, so the file gets none.
+    /// </summary>
+    internal bool CreatedEmptyAfterTransfer { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the file is open because the transfer opened it, by a write or
+    /// before it started, rather than because <see cref="CompleteAsync" /> created it empty.
+    /// </summary>
+    internal bool OpenedForTheTransfer => IsOpen && !CreatedEmptyAfterTransfer;
+
+    /// <summary>
     /// Gets curl's <c>Warning: Failed to open the file &lt;path&gt;: &lt;reason&gt;</c> line once an
     /// open of the file has failed, or <see langword="null" /> while none has.
     /// </summary>
@@ -164,6 +177,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         }
 
         bool createsEmptyFile = file is null && result.IsSuccess && !result.TimeConditionUnmet;
+        CreatedEmptyAfterTransfer = createsEmptyFile;
 
         return createsEmptyFile && await TryOpenAsync(CancellationToken.None).ConfigureAwait(false) is null
             ? new TransferResult(CurlExitCode.WriteError, 0)

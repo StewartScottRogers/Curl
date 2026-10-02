@@ -325,6 +325,7 @@ choices do not need one.
 | [0317](ADR-0317-tcp-fastopen-and-mptcp-open-the-sockets-the-os-has.md) | `--tcp-fastopen` sets TCP Fast Open raw on Windows, Linux and macOS, and `--mptcp` opens `IPPROTO_MPTCP` sockets everywhere, failing with curl's `failed to open socket` lines where the OS refuses them (BL-647) | Accepted | 2026-10-01 |
 | [0318](ADR-0318-trace-config-sets-ids-time-and-components-each-component-task-writes-its-lines.md) | `--trace-config` parses curl's comma list: `ids`, `time` and `all` set the prefixes (not cleared by a first `-v`), other names are kept as components, and each component's lines are written by its own task (BL-649) | Accepted | 2026-10-01 |
 | [0319](ADR-0319-ssl-sessions-loads-and-saves-curls-session-file-through-the-hand-built-client.md) | `--ssl-sessions` routes to the hand-built TLS client, which offers and keeps TLS 1.3 sessions in a run cache loaded from and saved to curl 8.21.0's file format, under curl's peer key naming `IMPL-Curl`; curl's own lines are kept unused and written back; `--tls-earlydata` is left to BL-1105 (BL-710) | Accepted | 2026-10-01 |
+| [0320](ADR-0320-xattr-stores-curls-four-attributes-through-libc-where-a-curl-build-does.md) | `--xattr` stores `user.creator`, `user.xdg.referrer.url`, `user.mime_type` and `user.xdg.origin.url` (credentials stripped) after a successful `-o`/`-O` transfer, through libc `setxattr` on Linux and macOS and `extattr_set_file` on FreeBSD, and nothing on Windows, as curl's builds do (BL-651) | Accepted | 2026-10-01 |
 
 ## Template
 

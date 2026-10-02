@@ -320,6 +320,14 @@ Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result ca
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
 failed stamp is ignored for now; curl's warning lines for it are BL-139.
 
+Under `--xattr`, just before that stamp, a successful transfer to an `-o`/`-O` file it opened itself
+(not one created empty afterwards) gets curl's four extended attributes - `user.creator`,
+`user.xdg.referrer.url`, `user.mime_type`, `user.xdg.origin.url` without credentials - from
+`OutputFileExtendedAttributes` through the runner's `IExtendedAttributeWriter`. The composition
+passes `NativeExtendedAttributeWriter.ForCurrentPlatform()`: libc `setxattr` on Linux and macOS,
+`extattr_set_file` on FreeBSD, none on Windows, as curl's builds do. A failure prints
+`Warning: Error setting extended attributes on '<file>': <strerror>` unless `-s` (ADR-0320, BL-651).
+
 Under `-v`, `--trace` or `--trace-ascii` every transfer's context carries the run's
 `ITransferEvents`, which `TransferEventOutput` opens once the first command-line URL has parsed
 as a glob and closes after the last transfer (ADR-0046): `-v` is `Curl.Output`'s

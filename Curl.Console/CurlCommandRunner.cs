@@ -130,6 +130,11 @@ namespace Curl.Console;
 /// transfers and saved from after them (ADR-0319, <see cref="TlsSessionFileLines" />);
 /// <see langword="null" /> to leave the file alone.
 /// </param>
+/// <param name="extendedAttributeWriter">
+/// Stores <c>--xattr</c>'s attributes on an <c>-o</c> / <c>-O</c> file after a successful transfer
+/// (<see cref="OutputFileExtendedAttributes" />, ADR-0320); <see langword="null" /> where curl
+/// writes none, as on Windows, and in tests that give none.
+/// </param>
 /// <remarks>
 /// <para>
 /// The command line is parsed after the default config file, so its options apply first and the
@@ -256,7 +261,8 @@ internal sealed class CurlCommandRunner(
     bool terminalRendersStyles = false,
     string? accountHomeDirectory = null,
     IAsyncDisposable? runConnectionCache = null,
-    TlsSessionCache? tlsSessions = null)
+    TlsSessionCache? tlsSessions = null,
+    IExtendedAttributeWriter? extendedAttributeWriter = null)
 {
     /// <summary>
     /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
@@ -3752,13 +3758,52 @@ internal sealed class CurlCommandRunner(
 
         Running.OutputFileName = output.Path;
         Running.OpenedOutputFile = output.IsOpen ? output.Path : null;
+        await FinishOutputFileAsync(options, output, url, completed).ConfigureAwait(false);
+
+        return completed;
+    }
+
+    /// <summary>
+    /// Applies the after-transfer file options in curl 8.21.0's order: <c>--xattr</c>'s attributes
+    /// (<see cref="WriteRequestedExtendedAttributesAsync" />), then, under <c>-R</c>, the source's
+    /// time on a successful transfer whose result carries one.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="output">The output file's stream, closed.</param>
+    /// <param name="url">The transfer's URL.</param>
+    /// <param name="completed">The transfer's result.</param>
+    /// <returns>A task that completes when both are done.</returns>
+    private async Task FinishOutputFileAsync(
+        CommandLineOptions options,
+        DeferredOutputFileStream output,
+        CurlUrl url,
+        TransferResult completed)
+    {
+        await WriteRequestedExtendedAttributesAsync(options, output, url, completed).ConfigureAwait(false);
         if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
         {
             await StampOutputFileTimeAsync(options, output.Path, sourceLastWriteTimeUtc).ConfigureAwait(false);
         }
-
-        return completed;
     }
+
+    /// <summary>
+    /// Stores <c>--xattr</c>'s attributes when it was given, the transfer succeeded, it opened the
+    /// file itself rather than creating it empty afterwards, and the platform has a writer
+    /// (<see cref="WriteExtendedAttributesAsync" />); otherwise does nothing.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="output">The output file's stream, closed.</param>
+    /// <param name="url">The transfer's URL.</param>
+    /// <param name="completed">The transfer's result.</param>
+    /// <returns>A task that completes when the attributes are set or the warning written.</returns>
+    private Task WriteRequestedExtendedAttributesAsync(
+        CommandLineOptions options,
+        DeferredOutputFileStream output,
+        CurlUrl url,
+        TransferResult completed) =>
+        options.ExtendedAttributes && completed.IsSuccess && output.OpenedForTheTransfer && extendedAttributeWriter is { } writer
+            ? WriteExtendedAttributesAsync(options, writer, output.Path, url, completed)
+            : Task.CompletedTask;
 
     /// <summary>
     /// Creates the stream that opens <paramref name="path" /> on its first write: for appending
@@ -3814,6 +3859,36 @@ internal sealed class CurlCommandRunner(
         {
             await WriteErrorLineAsync(RemoteTimeFailureWarning.For(sourceLastWriteTimeUtc, errorCode))
                 .ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Stores <c>--xattr</c>'s attributes on <paramref name="outputFile" /> after a successful
+    /// transfer that opened it, as curl 8.21.0's <c>fwrite_xattr</c> does: the URL as typed,
+    /// normalised and without credentials, the <c>Referer</c> sent and the reply's content type
+    /// (<see cref="OutputFileExtendedAttributes" />). A failure prints curl's warning unless
+    /// <c>-s</c> was given; the transfer's exit code is unchanged either way.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="writer">Sets each attribute.</param>
+    /// <param name="outputFile">The <c>-o</c> / <c>-O</c> file.</param>
+    /// <param name="url">The transfer's URL.</param>
+    /// <param name="completed">The transfer's result, whose report holds the referer and content type.</param>
+    /// <returns>A task that completes when the attributes are set or the warning written.</returns>
+    private async Task WriteExtendedAttributesAsync(
+        CommandLineOptions options,
+        IExtendedAttributeWriter writer,
+        string outputFile,
+        CurlUrl url,
+        TransferResult completed)
+    {
+        IReadOnlyList<KeyValuePair<string, string>> attributes = OutputFileExtendedAttributes.For(
+            UrlEffective.Normalize(url.OriginalString, options.PathAsIs),
+            completed.Report?.Referer ?? options.Referer,
+            completed.Report?.ContentType);
+        if (OutputFileExtendedAttributes.Write(writer, outputFile, attributes) is { } warning && !options.Silent)
+        {
+            await WriteErrorLineAsync(warning).ConfigureAwait(false);
         }
     }
 
