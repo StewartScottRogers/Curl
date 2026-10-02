@@ -23,7 +23,7 @@ Under `-v --trace-config ssh` Curl writes the `[SSH]` lines curl 8.21.0 writes f
 
 ## Acceptance criteria
 
-- [x] Each path named in the Goal is measured and its `[SSH]` lines recorded in Notes (the agent only up to its failed connection; success filed as BL-1205).
+- [x] Each path named in the Goal is measured and its `[SSH]` lines recorded in Notes (the agent only up to its failed connection; success filed as BL-1207).
 - [x] `Curl.Protocol.Ssh.UnitTests` pins each against `InMemorySshServer`.
 - [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
@@ -64,11 +64,11 @@ Under `-v --trace-config ssh` Curl writes the `[SSH]` lines curl 8.21.0 writes f
   SCP download 78 from `SSH_SCP_DOWNLOAD_INIT`, SCP upload 25 from `SSH_SCP_UPLOAD_INIT`, `-Q` 21 from the command's state
   (`SSH_SFTP_QUOTE` for an unknown command, `QUOTE_STAT` for a bad chmod), before or after the transfer. The SFTP upload
   (exit 9) enters `SSH_SFTP_CLOSE` before its `Upload failed` line.
-- Not measurable here, written from curl's source (ADR-0373), filed as BL-1205: agent success (Windows `ssh-agent` is
+- Not measurable here, written from curl's source (ADR-0374), filed as BL-1207: agent success (Windows `ssh-agent` is
   disabled), a symbolic link in a listing, `-I` on a directory.
 - Verified: Curl's built `curl.dll` and real curl wrote identical stderr (ports and `Trying` aside) for the 22 command lines
   above with `-o`; with stdout to the null device Curl alone writes `{ [N bytes data]` lines, which predates this task.
-- Decided (ADR-0373): `SshStateTrace.Fail` writes the failure's way out from the trace's state, so each failure path needs no
+- Decided (ADR-0374): `SshStateTrace.Fail` writes the failure's way out from the trace's state, so each failure path needs no
   trace code of its own. Pinned in `SshProtocolHandlerTests.StateTraceOtherPaths.cs` (26 cases).
 - `--ai-help`: no option changed; nothing to update.
 

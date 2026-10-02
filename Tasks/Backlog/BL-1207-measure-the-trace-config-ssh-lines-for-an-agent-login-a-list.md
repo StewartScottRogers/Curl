@@ -1,5 +1,5 @@
 ---
-id: BL-1205
+id: BL-1207
 title: Measure the --trace-config ssh lines for an agent login, a listed symbolic link and -I on a directory
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1205 — Measure the --trace-config ssh lines for an agent login, a listed symbolic link and -I on a directory
+# BL-1207 — Measure the --trace-config ssh lines for an agent login, a listed symbolic link and -I on a directory
 
 ## Goal
 

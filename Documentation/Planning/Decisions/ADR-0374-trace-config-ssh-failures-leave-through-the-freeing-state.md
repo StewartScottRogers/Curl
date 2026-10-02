@@ -27,7 +27,7 @@ Paths no server here could show are written the way curl's `lib/vssh/libssh2.c` 
 them, not measured: a successful agent login (`SSH_AUTH_AGENT_LIST`, `SSH_AUTH_AGENT`; Windows'
 `ssh-agent` service is disabled on the measuring machine), a symbolic link in a listing (no
 `SSH_SFTP_READDIR_LINK` is written yet), and `-I` on a directory (`SSH_SFTP_GETINFO` to
-`SSH_SFTP_CLOSE`). BL-1205 measures them.
+`SSH_SFTP_CLOSE`). BL-1207 measures them.
 
 ## Consequences
 
