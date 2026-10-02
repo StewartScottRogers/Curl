@@ -140,6 +140,8 @@ if ($SelfTest) {
     & $finding 'AF-0002' 'accepted' 'BL-900' 'Medium' 'quality'
     & $finding 'AF-0003' 'proposed' 'none' 'High' 'security'
     & $finding 'AF-0004' 'rejected' 'none' 'Low' 'truthfulness'
+    & $finding 'AF-0005' 'deferred' 'none' 'High' 'quality'
+    & $finding 'AF-0006' 'blocked' 'none' 'High' 'quality'
     $before = @{}; foreach ($f in Get-ChildItem (Join-Path $work 'findings')) { $before[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
     $board = Join-Path $repo '.claude\skills\task-board\task-board.ps1'
     $savedDir = $env:CLAUDE_PROJECT_DIR; $savedLane = $env:CURL_DARK_FACTORY_LANE
@@ -167,8 +169,8 @@ if ($SelfTest) {
             Check 'no template comment left' ($t -notmatch '<!--') 'none'
             Check 'the finding names the task' ([IO.File]::ReadAllText((Join-Path $work 'findings\AF-0001-x.md')) -match "(?m)^task: $id$") $id
         }
-        $others = @('AF-0002-x.md', 'AF-0003-x.md', 'AF-0004-x.md' | Where-Object { [IO.File]::ReadAllText((Join-Path $work "findings\$_")) -cne $before[$_] })
-        Check 'the other three findings are byte-identical' ($others.Count -eq 0) "changed: $($others -join ',')"
+        $others = @('AF-0002-x.md', 'AF-0003-x.md', 'AF-0004-x.md', 'AF-0005-x.md', 'AF-0006-x.md' | Where-Object { [IO.File]::ReadAllText((Join-Path $work "findings\$_")) -cne $before[$_] })
+        Check 'the other five findings, deferred and blocked included, are byte-identical' ($others.Count -eq 0) "changed: $($others -join ',')"
     }
     finally {
         $env:CLAUDE_PROJECT_DIR = $savedDir; $env:CURL_DARK_FACTORY_LANE = $savedLane

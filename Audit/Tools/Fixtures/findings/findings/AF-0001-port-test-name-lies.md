@@ -3,7 +3,8 @@ id: AF-0001
 title: Port test name lies
 auditor: quality
 severity: Medium
-status: proposed
+status: deferred
+reason: Not sure what the test checks; parked to read later.
 key: quality:Curl.Core.UnitTests/UrlTests.cs:Parse_Port_Rejects:name-lies
 task: none
 found: 2026-10-01
@@ -36,3 +37,8 @@ Write-Output fixture
 - Actual: fixture
 
 ## Re-audits
+
+## Log
+
+- 2026-10-01: filed proposed.
+- 2026-10-02: proposed -> deferred. Not sure what the test checks; parked to read later.

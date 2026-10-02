@@ -4,6 +4,7 @@ title: CLAUDE.md layout says '48 projects' but the repository has 66
 auditor: truthfulness
 severity: Low
 status: accepted
+reason: Stewart accepted it on 2026-09-30.
 key: truthfulness:CLAUDE.md:repository-layout-project-count:false-statement
 task: BL-1065
 found: 2026-09-30
@@ -37,3 +38,7 @@ Run from the repository root:
 
 ## Re-audits
 
+## Log
+
+- 2026-09-30: filed proposed.
+- 2026-09-30: proposed -> accepted. Stewart accepted it on 2026-09-30 (log written 2026-10-02, BL-1183).

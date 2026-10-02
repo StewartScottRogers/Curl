@@ -3,7 +3,8 @@ id: AF-0006
 title: HeartbeatMinutes help says 5
 auditor: truthfulness
 severity: High
-status: proposed
+status: blocked
+reason: Waiting on the -HeartbeatMinutes default decision.
 key: truthfulness:RunDarkFactory.ps1:HeartbeatMinutes:false-help
 task: none
 found: 2026-10-01
@@ -36,3 +37,8 @@ Write-Output fixture
 - Actual: fixture
 
 ## Re-audits
+
+## Log
+
+- 2026-10-01: filed proposed.
+- 2026-10-02: proposed -> blocked. Waiting on the -HeartbeatMinutes default decision.

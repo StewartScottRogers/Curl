@@ -4,6 +4,7 @@ title: Curl.Cli README names a CommandLineOption.UnsupportedFlag builder that do
 auditor: truthfulness
 severity: Medium
 status: accepted
+reason: Stewart accepted it on 2026-09-30.
 key: truthfulness:Curl.Cli.UnitLibrary/README.md:CommandLineOption.UnsupportedFlag:false-statement
 task: BL-1068
 found: 2026-09-30
@@ -37,3 +38,7 @@ Select-String -Path Curl.Cli.UnitLibrary/CommandLineOption.cs,Curl.Cli.UnitLibra
 
 ## Re-audits
 
+## Log
+
+- 2026-09-30: filed proposed.
+- 2026-09-30: proposed -> accepted. Stewart accepted it on 2026-09-30 (log written 2026-10-02, BL-1183).
