@@ -34,3 +34,4 @@ With `--disallow-username-in-url`, a URL whose user information parses but whose
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
