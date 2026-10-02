@@ -102,6 +102,12 @@ internal static class ImapSessionMessages
     internal static string OutputWriteFailed(int passed, int returned) =>
         string.Create(CultureInfo.InvariantCulture, $"Failure writing output to destination, passed {passed} returned {returned}");
 
+    /// <summary>The <c>-D</c> stream refused a response line (exit 23, BL-1138).</summary>
+    /// <param name="passed">The length of the refused line, its line end included.</param>
+    /// <returns>The message to report.</returns>
+    internal static string HeaderWriteFailed(int passed) =>
+        string.Create(CultureInfo.InvariantCulture, $"client returned ERROR on write of {passed} bytes");
+
     /// <summary>
     /// Tells whether curl 8.21.0's <c>-v</c> writes <paramref name="message" /> as a <c>*</c>
     /// line when the transfer fails with it (BL-559). It does for every message it formats

@@ -496,7 +496,14 @@ internal sealed class ImapControlChannel(
         reporting.ReportResponseHeader(line);
         if (dumpHeader is not null)
         {
-            await dumpHeader.WriteAsync(line, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await dumpHeader.WriteAsync(line, cancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException)
+            {
+                throw new ImapHeaderWriteFailedException(line.Length);
+            }
         }
     }
 

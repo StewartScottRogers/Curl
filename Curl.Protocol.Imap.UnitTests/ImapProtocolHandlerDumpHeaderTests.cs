@@ -127,6 +127,44 @@ public sealed class ImapProtocolHandlerDumpHeaderTests
         Assert.AreEqual(ListLines, Encoding.Latin1.GetString(output.ToArray()));
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_DumpHeaderRefusesTheGreeting_FailsWithExit23AndSendsNothing()
+    {
+        // Measured (BL-1138): -D - into a closed pipe, exit 23, "client returned ERROR on write of 66 bytes", nothing sent.
+        RefusedRun run = await RunRefusedAsync(writesBeforeFailure: 0);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.WriteError, "client returned ERROR on write of 66 bytes"), run.Result);
+        Assert.AreEqual(string.Empty, run.Sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DumpHeaderRefusesALaterLine_FailsWithExit23AndSendsNoLogout()
+    {
+        // Measured (BL-1138): the CAPABILITY line refused, exit 23, "... of 55 bytes", nothing sent after A001 CAPABILITY.
+        RefusedRun run = await RunRefusedAsync(writesBeforeFailure: 1);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.WriteError, "client returned ERROR on write of 55 bytes"), run.Result);
+        Assert.AreEqual("A001 CAPABILITY\r\n", run.Sent);
+    }
+
+    private static async Task<RefusedRun> RunRefusedAsync(int writesBeforeFailure)
+    {
+        var connection = new ScriptedConnection(Latin1(Opening + ListLines + "A003 OK LIST completed\r\n" + Logout("A004")));
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(Host),
+            Output = new MemoryStream(),
+            DumpHeaderOutput = new FailingOutputStream(new IOException("The pipe has been ended.")) { WritesBeforeFailure = writesBeforeFailure },
+            Credentials = new NetworkCredential("u", "p"),
+        };
+
+        ImapRun run = await ImapRun.ExecuteAsync(context, connection, new FakeSaslAuthenticator("PLAIN", PlainMessage));
+
+        return new RefusedRun(run.Result, Encoding.Latin1.GetString(connection.Sent));
+    }
+
+    private sealed record RefusedRun(TransferResult Result, string Sent);
+
     private static string Logout(string tag) => "* BYE Logging out\r\n" + tag + " OK LOGOUT completed\r\n";
 
     private static byte[] Latin1(string text) => Encoding.Latin1.GetBytes(text);

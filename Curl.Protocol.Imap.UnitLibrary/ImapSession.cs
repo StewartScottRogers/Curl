@@ -125,6 +125,11 @@ internal sealed class ImapSession(
         {
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, weird.Message);
         }
+        catch (ImapHeaderWriteFailedException failed)
+        {
+            // Nothing more is sent, not even LOGOUT, as curl 8.21.0 does (BL-1138).
+            return TransferResult.Failure(CurlExitCode.WriteError, failed.Message);
+        }
         catch (SaslAuthenticationFailedException failure)
         {
             // Nothing more is sent, not even LOGOUT, as curl's Schannel build does (BL-781).
