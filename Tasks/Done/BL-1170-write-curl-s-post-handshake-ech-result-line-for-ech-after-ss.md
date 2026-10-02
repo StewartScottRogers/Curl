@@ -8,7 +8,7 @@ depends-on: [BL-1107]
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Output.UnitLibrary, Curl.Output.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1170 — Write curl's post-handshake ECH: result line for --ech after SSL connection using
 
@@ -28,12 +28,18 @@ After a completed hand-built handshake under `--ech`, `-v` writes curl 8.21.0's 
 
 ## Acceptance criteria
 
-- [ ] `Curl.Networking.UnitTests` and `Curl.Output.UnitTests` pin each status line above in its place after `SSL connection using`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage for each touched library.
+- [x] `Curl.Networking.UnitTests` and `Curl.Output.UnitTests` pin each status line above in its place after `SSL connection using`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage for each touched library.
 
 ## Notes
+
+- Ran directly, not through the `/feature` subagents: a three-file change (one field, one text class, one line) with the plan fixed by the task's Context.
+- `TlsHandshakeEvent.EchResult` carries the text after `ECH: result: `; `EchResultText.Of` (Networking) builds it from the `--ech` mode, the configurations offered and `-k`; `HandBuiltTlsProvider` fills it on a completed handshake; `OpenSslHandshakeText` writes it after `SSL connection using`. ADR-0367 records why a completed offer counts as accepted (a rejection always aborts with `ech_required`) and that the verified `success` text is from source, unmeasured.
+- Tests: `EchResultTextTests` (all four statuses and off), `HandBuiltTlsProviderTests.AuthenticateAsClientAsync_WithEchToACompletedHandshake_ReportsTheEchResult` (grease, not configured, off, against a TLS 1.2 SslStream server so it runs on macOS too), `VerboseTransferEventWriterTests.ReportTlsHandshake_OpenSslWithAnEchResult_WritesItAfterTheConnectionLine` (each line in place). No ECH-accepting test server exists, so the accepted texts are pinned at `EchResultText`, not end to end.
+- `Measure-CodeQuality.ps1`: Networking, Output and Abstractions all 100% line and branch, 0 failing members.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. -v writes curl's ECH: result: line after SSL connection using for a completed --ech handshake
