@@ -17,7 +17,7 @@ closed-by:
 
 ## Summary
 
-Medium finding from the quality auditor at `Curl.Networking.UnitLibrary/ConnectToMappings.cs:135`: ConnectToMappings.Failure can report IsMapped: true instead of false with no test failing.
+Medium finding from the quality auditor at `Curl.Networking.UnitLibrary/ConnectToMappings.cs:135`: ConnectToMappings.Failure can report IsMapped: true instead of false with no test failing. Reported by an auditor flagged unreliable in 2026-10-02_1400.md.
 
 ## Evidence
 

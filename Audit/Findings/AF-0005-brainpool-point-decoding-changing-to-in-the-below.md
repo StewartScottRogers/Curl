@@ -17,7 +17,7 @@ closed-by:
 
 ## Summary
 
-Medium finding from the quality auditor at `Curl.Cryptography.UnitLibrary/BrainpoolPoint.cs:161`: Brainpool point decoding: changing || to && in the below-modulus check is not caught by any test.
+Medium finding from the quality auditor at `Curl.Cryptography.UnitLibrary/BrainpoolPoint.cs:161`: Brainpool point decoding: changing || to && in the below-modulus check is not caught by any test. Reported by an auditor flagged unreliable in 2026-10-02_1400.md.
 
 ## Evidence
 

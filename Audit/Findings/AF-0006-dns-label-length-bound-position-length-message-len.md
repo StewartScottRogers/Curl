@@ -17,7 +17,7 @@ closed-by:
 
 ## Summary
 
-Medium finding from the quality auditor at `Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs:319`: DNS label length bound `position + length > message.Length` can become >= with no test failing.
+Medium finding from the quality auditor at `Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs:319`: DNS label length bound `position + length > message.Length` can become >= with no test failing. Reported by an auditor flagged unreliable in 2026-10-02_1400.md.
 
 ## Evidence
 

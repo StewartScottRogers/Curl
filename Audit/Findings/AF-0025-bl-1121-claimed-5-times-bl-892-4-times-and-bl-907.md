@@ -17,7 +17,7 @@ closed-by:
 
 ## Summary
 
-Medium finding from the process auditor at `logs/BL-1121`: BL-1121 claimed 5 times, BL-892 4 times and BL-907 3 times.
+Medium finding from the process auditor at `logs/BL-1121`: BL-1121 claimed 5 times, BL-892 4 times and BL-907 3 times. Reported by an auditor flagged unreliable in 2026-10-02_1400.md.
 
 ## Evidence
 

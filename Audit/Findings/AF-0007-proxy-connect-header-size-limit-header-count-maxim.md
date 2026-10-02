@@ -17,7 +17,7 @@ closed-by:
 
 ## Summary
 
-Medium finding from the quality auditor at `Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:170`: Proxy CONNECT header size limit `header.Count > MaximumHeaderBytes` can become >= with no test failing.
+Medium finding from the quality auditor at `Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:170`: Proxy CONNECT header size limit `header.Count > MaximumHeaderBytes` can become >= with no test failing. Reported by an auditor flagged unreliable in 2026-10-02_1400.md.
 
 ## Evidence
 

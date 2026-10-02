@@ -85,6 +85,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+# RunAudit.ps1 passes -ChangedTree through powershell -File as one comma-joined argument,
+# which arrives as a single string: split it, or an auditor that changed the tree is not
+# found and stays reliable (BL-1244).
+$ChangedTree = @($ChangedTree | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $Inv = [Globalization.CultureInfo]::InvariantCulture
 $Auditors = @('quality', 'security', 'performance', 'conformance', 'truthfulness', 'process')
 $Columns = @('NEW_CRITICAL', 'NEW_HIGH', 'NEW_MEDIUM', 'NEW_LOW', 'REAUDITED', 'CLOSED', 'STILL_OPEN', 'PLANTED_ASSIGNED', 'PLANTED_CAUGHT', 'CATCH_RATE')

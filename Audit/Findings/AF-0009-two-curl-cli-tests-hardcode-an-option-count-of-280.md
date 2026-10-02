@@ -17,7 +17,7 @@ closed-by:
 
 ## Summary
 
-Medium finding from the quality auditor at `Curl.Cli.UnitTests/CommandLineNextGroupTests.cs:61`: Two Curl.Cli tests hardcode an option count of 280 and fail against the 281 options in the table; the red baseline blocks mutation testing of Curl.Cli.
+Medium finding from the quality auditor at `Curl.Cli.UnitTests/CommandLineNextGroupTests.cs:61`: Two Curl.Cli tests hardcode an option count of 280 and fail against the 281 options in the table; the red baseline blocks mutation testing of Curl.Cli. Reported by an auditor flagged unreliable in 2026-10-02_1400.md.
 
 ## Evidence
 

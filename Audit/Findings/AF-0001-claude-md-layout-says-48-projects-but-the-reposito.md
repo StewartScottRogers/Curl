@@ -3,15 +3,15 @@ id: AF-0001
 title: CLAUDE.md layout says '48 projects' but the repository has 66
 auditor: truthfulness
 severity: Low
-status: closed
-reason: Re-audit 2026-10-02_1400.md: the reproduction no longer reproduces.
+status: accepted
+reason: Stewart accepted it on 2026-09-30.
 key: truthfulness:CLAUDE.md:repository-layout-project-count:false-statement
 task: BL-1065
 found: 2026-09-30
 found-at: d065d6d3507e2ed87905d40a24233af193913378
 scorecard: 2026-09-30_1754.md
-closed: 2026-10-02
-closed-by: 2026-10-02_1400.md
+closed:
+closed-by:
 ---
 # AF-0001 - CLAUDE.md layout says '48 projects' but the repository has 66
 
@@ -44,4 +44,3 @@ Run from the repository root:
 
 - 2026-09-30: filed proposed.
 - 2026-09-30: proposed -> accepted. Stewart accepted it on 2026-09-30 (log written 2026-10-02, BL-1183).
-- 2026-10-02: accepted -> closed. Re-audit 2026-10-02_1400.md: the reproduction no longer reproduces.

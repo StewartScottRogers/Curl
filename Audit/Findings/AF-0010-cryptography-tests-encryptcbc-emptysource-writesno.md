@@ -17,7 +17,7 @@ closed-by:
 
 ## Summary
 
-Low finding from the quality auditor at `Curl.Cryptography.UnitTests/BlowfishTests.cs:144`: Cryptography tests EncryptCbc_EmptySource_WritesNothing and Constructor_56ByteKey_IsAccepted (Blowfish, Cast128, Camellia, ChaCha20, Rc4) have no assertion.
+Low finding from the quality auditor at `Curl.Cryptography.UnitTests/BlowfishTests.cs:144`: Cryptography tests EncryptCbc_EmptySource_WritesNothing and Constructor_56ByteKey_IsAccepted (Blowfish, Cast128, Camellia, ChaCha20, Rc4) have no assertion. Reported by an auditor flagged unreliable in 2026-10-02_1400.md.
 
 ## Evidence
 
