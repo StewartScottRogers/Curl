@@ -1,5 +1,5 @@
 ---
-id: BL-1201
+id: BL-1203
 title: Retry the system ANSI code page read in SmtpCommandLineText when Windows fails a concurrent first read
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1201 — Retry the system ANSI code page read in SmtpCommandLineText when Windows fails a concurrent first read
+# BL-1203 — Retry the system ANSI code page read in SmtpCommandLineText when Windows fails a concurrent first read
 
 ## Goal
 

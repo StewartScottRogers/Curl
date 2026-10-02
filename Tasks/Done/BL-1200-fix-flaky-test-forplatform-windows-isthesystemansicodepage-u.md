@@ -44,7 +44,7 @@ completed: 2026-10-02
   and macOS both reads are `null`, so behaviour there is unchanged. The test's expected value
   retries the same way. Chosen over a P/Invoke of `GetACP`, which would need an OS branch
   that cannot be covered on one platform. Three new tests pin the retry.
-- `SmtpCommandLineText` has the same single read; filed as BL-1201 (outside `touches`).
+- `SmtpCommandLineText` has the same single read; filed as BL-1203 (outside `touches`).
 - `dotnet format --verify-no-changes` reports ENDOFLINE in `SystemSecurityContextFactoryTests.cs`
   and `NegotiateFailureLines.cs`, files this task did not change; the changed files are clean.
 
