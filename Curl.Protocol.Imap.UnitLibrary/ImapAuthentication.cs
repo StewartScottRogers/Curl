@@ -23,7 +23,7 @@ namespace Curl.Protocol.Imap;
 /// allowing it, <c>LOGIN user password</c>, each as <see cref="ImapQuoting" /> writes it;
 /// answered other than <c>OK</c> it is exit 67 <c>Access denied. </c> and the byte curl
 /// prints from its response code. Otherwise exit 67 <c>Login denied</c>, nothing sent, after
-/// the <c>-v</c> <c>SASL:</c> line curl writes for it (BL-1060).</item>
+/// the <c>-v</c> <c>SASL:</c> lines curl writes for it (BL-1060, BL-1219).</item>
 /// </list>
 /// </remarks>
 internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthenticator? authenticator, ITransferContext context)
@@ -34,11 +34,20 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
 
     private static readonly Func<string, bool> NoUntagged = static _ => false;
 
+    private const string BearerOption = "CURLOPT_XOAUTH2_BEARER";
+
     /// <summary>
-    /// The mechanisms curl 8.21.0's Schannel build knows but does not build in, in the order
-    /// its <c>-v</c> names them when one of them is all that was offered (BL-1060).
+    /// The mechanisms curl 8.21.0's <c>Curl_sasl_is_blocked</c> explains, in the order its
+    /// <c>-v</c> names them (BL-1219).
     /// </summary>
-    private static readonly string[] NotBuiltInMechanisms = ["SCRAM-SHA-256", "SCRAM-SHA-1"];
+    private static readonly string[] UnchosenMechanisms =
+        ["GSSAPI", "SCRAM-SHA-256", "SCRAM-SHA-1", "DIGEST-MD5", "CRAM-MD5", "NTLM", "OAUTHBEARER", "XOAUTH2"];
+
+    /// <summary>
+    /// The mechanisms <c>--oauth2-bearer</c> makes curl prefer when no <c>AUTH=</c> option
+    /// names any (BL-1060's measured <c>no overlap</c> lines).
+    /// </summary>
+    private static readonly string[] BearerMechanisms = ["OAUTHBEARER", "XOAUTH2"];
 
     /// <summary>
     /// Logs in when the transfer has something to authenticate with.
@@ -68,33 +77,86 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     }
 
     /// <summary>
-    /// Writes the <c>-v</c> lines curl 8.21.0's SASL code writes when no way of logging in is
-    /// possible, and fails with exit 67 <c>Login denied</c> (BL-1060): when the only offered
-    /// mechanisms a user and the options allow are SCRAM, which curl's Schannel build does not
-    /// build in, that none could be selected and one line naming each; otherwise
-    /// <c>no overlap</c> once a mechanism curl knows was offered, and <c>no auth mechanism was
-    /// offered or recognized</c> when none was.
+    /// Writes the <c>-v</c> lines curl 8.21.0's <c>Curl_sasl_is_blocked</c> writes when no way
+    /// of logging in is possible, and fails with exit 67 <c>Login denied</c> (BL-1060, BL-1219):
+    /// <c>no auth mechanism was offered or recognized</c> when no mechanism curl knows was
+    /// offered; <c>no overlap</c> when none offered is one curl prefers; otherwise that none
+    /// could be selected, then why <c>EXTERNAL</c> and each other offered, preferred mechanism
+    /// was not chosen.
     /// </summary>
     private TransferResult NoWayToLogIn(SaslRequest request, ImapLoginOptions options, IReadOnlyList<string> offered)
     {
-        string[] notBuiltIn = request.Credential is null
-            ? []
-            : [.. NotBuiltInMechanisms.Where(mechanism => options.AllowedAmong([mechanism]).Count > 0 && offered.Contains(mechanism, StringComparer.OrdinalIgnoreCase))];
-        if (notBuiltIn.Length > 0)
+        string[] known = [.. offered.Where(ImapLoginOptions.IsKnownMechanism)];
+        string[] enabled = [.. known.Where(mechanism => IsPreferred(mechanism, request, options))];
+        if (enabled.Length > 0)
         {
             context.Events.ReportInfo(ImapInfoLines.NoSaslMechanismSelectable);
-            foreach (string mechanism in notBuiltIn)
-            {
-                context.Events.ReportInfo(ImapInfoLines.SaslMechanismNotBuiltIn(mechanism));
-            }
+            ReportUnchosen(request, enabled);
         }
         else
         {
-            context.Events.ReportInfo(
-                offered.Any(ImapLoginOptions.IsKnownMechanism) ? ImapInfoLines.NoSaslMechanismOverlap : ImapInfoLines.NoSaslMechanismOffered);
+            context.Events.ReportInfo(known.Length > 0 ? ImapInfoLines.NoSaslMechanismOverlap : ImapInfoLines.NoSaslMechanismOffered);
         }
 
         return TransferResult.Failure(CurlExitCode.LoginDenied, ImapSessionMessages.LoginDenied);
+    }
+
+    /// <summary>
+    /// Whether curl prefers <paramref name="mechanism" />: as the <c>AUTH=</c> options say when
+    /// given, else only the bearer mechanisms with <c>--oauth2-bearer</c>, else any but
+    /// <c>EXTERNAL</c>.
+    /// </summary>
+    private static bool IsPreferred(string mechanism, SaslRequest request, ImapLoginOptions options) =>
+        options.NamesMechanisms || request.BearerToken is null
+            ? options.Prefers(mechanism)
+            : BearerMechanisms.Contains(mechanism, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Writes curl's line for each enabled mechanism it did not choose, as its Schannel build
+    /// writes them (<c>sasl_unchosen</c>): <c>EXTERNAL</c> with a password; SCRAM, DIGEST-MD5,
+    /// CRAM-MD5 and NTLM <c>not builtin</c>, its build macros reading so; GSSAPI and the bearer
+    /// mechanisms what they miss.
+    /// </summary>
+    private void ReportUnchosen(SaslRequest request, string[] enabled)
+    {
+        foreach (string line in UnchosenLines(request, enabled))
+        {
+            context.Events.ReportInfo(line);
+        }
+    }
+
+    private static IEnumerable<string> UnchosenLines(SaslRequest request, string[] enabled)
+    {
+        bool hasUser = request.Credential is { UserName.Length: > 0 };
+        bool hasBearerToken = request.BearerToken is not null;
+        IEnumerable<string> external = IsExternalRefusedForPassword(request, enabled) ? [ImapInfoLines.SaslExternalNotChosenWithPassword] : [];
+        return external.Concat(UnchosenMechanisms
+            .Where(mechanism => enabled.Contains(mechanism, StringComparer.OrdinalIgnoreCase))
+            .SelectMany(mechanism => UnchosenLines(mechanism, hasUser, hasBearerToken)));
+    }
+
+    /// <summary>Whether <c>EXTERNAL</c> was enabled and a password given, so curl did not choose it.</summary>
+    private static bool IsExternalRefusedForPassword(SaslRequest request, string[] enabled) =>
+        enabled.Contains(External, StringComparer.OrdinalIgnoreCase) && request.Credential is { Password.Length: > 0 };
+
+    private static IEnumerable<string> UnchosenLines(string mechanism, bool hasUser, bool hasBearerToken) => mechanism switch
+    {
+        "GSSAPI" => MissingLines(mechanism, null, hasUser),
+        "OAUTHBEARER" or "XOAUTH2" => MissingLines(mechanism, hasBearerToken ? null : BearerOption, hasUser),
+        _ => [ImapInfoLines.SaslMechanismNotBuiltIn(mechanism)],
+    };
+
+    private static IEnumerable<string> MissingLines(string mechanism, string? missingParameter, bool hasUser)
+    {
+        if (missingParameter is not null)
+        {
+            yield return ImapInfoLines.SaslMechanismMissing(mechanism, missingParameter);
+        }
+
+        if (!hasUser)
+        {
+            yield return ImapInfoLines.SaslMechanismMissing(mechanism, "username");
+        }
     }
 
     private static bool CanAuthenticate(SaslRequest request, ImapLoginOptions options, IReadOnlyList<string> offered) =>

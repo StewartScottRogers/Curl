@@ -59,6 +59,21 @@ internal sealed class ImapLoginOptions
     public bool AllowsLogin => PrefersLogin || AllowsAnyMechanism;
 
     /// <summary>
+    /// Gets a value indicating whether an <c>AUTH=</c> option was given, replacing the
+    /// mechanisms curl prefers by default (BL-1219).
+    /// </summary>
+    public bool NamesMechanisms { get; private set; }
+
+    /// <summary>
+    /// Tells whether the options leave <paramref name="mechanism" /> among curl's preferred
+    /// mechanisms: one they name, or any but <c>EXTERNAL</c> while they allow any (BL-1219).
+    /// </summary>
+    /// <param name="mechanism">A mechanism curl knows, in any case.</param>
+    /// <returns><see langword="true" /> when curl may choose it.</returns>
+    public bool Prefers(string mechanism) =>
+        AllowsAnyMechanism ? !string.Equals(mechanism, "EXTERNAL", StringComparison.OrdinalIgnoreCase) : namedMechanisms.Contains(mechanism);
+
+    /// <summary>
     /// Tells whether curl 8.21.0 knows <paramref name="mechanism" /> by name, in any case.
     /// </summary>
     /// <param name="mechanism">A mechanism the server advertised.</param>
@@ -75,6 +90,7 @@ internal sealed class ImapLoginOptions
         var parsed = new ImapLoginOptions();
         string[] segments = (options ?? string.Empty).Split(';');
         int count = segments[^1].Length == 0 ? segments.Length - 1 : segments.Length;
+        parsed.NamesMechanisms = count > 0;
         return segments.Take(count).All(parsed.TryAdd) ? parsed : null;
     }
 

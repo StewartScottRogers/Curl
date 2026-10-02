@@ -30,6 +30,12 @@ internal static class ImapInfoLines
     /// </summary>
     internal const string NoSaslMechanismSelectable = "SASL: no auth mechanism offered could be selected";
 
+    /// <summary>
+    /// The line after <see cref="NoSaslMechanismSelectable" /> when <c>EXTERNAL</c> was offered
+    /// and allowed but a password was given (BL-1219).
+    /// </summary>
+    internal const string SaslExternalNotChosenWithPassword = "SASL: auth EXTERNAL not chosen with password";
+
     /// <summary>The line once an empty <c>APPEND</c> literal has been sent.</summary>
     internal const string RequestSent = "Request completely sent off";
 
@@ -40,6 +46,15 @@ internal static class ImapInfoLines
     /// <param name="mechanism">The mechanism, as curl names it.</param>
     /// <returns>The line, such as <c>SASL: SCRAM-SHA-256 not builtin</c>.</returns>
     internal static string SaslMechanismNotBuiltIn(string mechanism) => "SASL: " + mechanism + " not builtin";
+
+    /// <summary>
+    /// Formats the line naming a mechanism that was offered and allowed but lacks what it
+    /// needs, after <see cref="NoSaslMechanismSelectable" /> (BL-1219).
+    /// </summary>
+    /// <param name="mechanism">The mechanism, as curl names it.</param>
+    /// <param name="missing">What it lacks, such as <c>username</c>.</param>
+    /// <returns>The line, such as <c>SASL: XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER</c>.</returns>
+    internal static string SaslMechanismMissing(string mechanism, string missing) => "SASL: " + mechanism + " is missing " + missing;
 
     /// <summary>Formats the line for a response announcing a literal of <paramref name="size" /> bytes.</summary>
     /// <param name="size">The literal's size.</param>
