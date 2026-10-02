@@ -35,3 +35,4 @@ The hand-built `GaloisCounterMode` is checked against published known answers, n
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
