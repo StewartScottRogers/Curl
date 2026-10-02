@@ -140,6 +140,49 @@ public sealed class CurlCommandRunnerRedirectTests
         Assert.AreEqual("GET /a HTTP/1.1\r\n" + Request, RequestsText);
     }
 
+    [TestMethod]
+    public async Task RunAsync_VerboseProtoExcludesTheUrlScheme_WritesTheVerboseLineBeforeTheErrorLine()
+    {
+        // Measured against curl 8.21.0 on 2026-10-01 (BL-805 Notes): curl -v --proto -http
+        // http://127.0.0.1:48805/ -> exit 1, "* Protocol "http" is disabled" then the curl: (1) line.
+        int exitCode = await RunAsync([Ok], "-v", "-sS", "--proto", "-http", Url);
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual(
+            "* Protocol \"http\" is disabled\n" + "curl: (1) Protocol \"http\" is disabled" + NewLine,
+            StandardErrorText);
+        Assert.AreEqual(string.Empty, RequestsText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_VerboseUnsupportedScheme_WritesTheVerboseLineBeforeTheErrorLine()
+    {
+        // curl -v --proto =http bogus://127.0.0.1:48806/ -> exit 1, "* Protocol "bogus" not supported"
+        // then the curl: (1) line (BL-805 Notes).
+        int exitCode = await RunAsync([Ok], "-v", "-sS", "--proto", "=http", "bogus://127.0.0.1:18244/");
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual(
+            "* Protocol \"bogus\" not supported\n" + "curl: (1) Protocol \"bogus\" not supported" + NewLine,
+            StandardErrorText);
+        Assert.AreEqual(string.Empty, RequestsText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_VerboseLocationToADisabledScheme_WritesTheVerboseLineBeforeTheErrorLine()
+    {
+        // curl -v -L, Location: file:///dir/x -> "* Issue another request to this URL: 'file:///dir/x'",
+        // "* Protocol "file" is disabled (in redirect)", then the curl: (1) line (BL-805 Notes).
+        int exitCode = await RunAsync([RedirectTo("file:///dir/x")], "-v", "-L", "-sS", Url);
+
+        Assert.AreEqual(1, exitCode);
+        StringAssert.EndsWith(
+            StandardErrorText,
+            "* Issue another request to this URL: 'file:///dir/x'\n"
+            + "* Protocol \"file\" is disabled (in redirect)\n"
+            + "curl: (1) Protocol \"file\" is disabled (in redirect)" + NewLine);
+    }
+
     private static string RedirectTo(string target) =>
         $"HTTP/1.1 302 Found\r\nLocation: {target}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
 

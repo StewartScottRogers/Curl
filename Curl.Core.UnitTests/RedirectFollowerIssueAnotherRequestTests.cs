@@ -86,7 +86,8 @@ public sealed class RedirectFollowerIssueAnotherRequestTests
 
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
         Assert.AreEqual("Protocol \"http\" is disabled (in redirect)", result.ErrorMessage);
-        CollectionAssert.AreEqual(new[] { IssueLine(Target) }, events.Infos);
+        // curl 8.21.0's -v also writes the refusal as an info line (measured 2026-10-01, BL-805 Notes).
+        CollectionAssert.AreEqual(new[] { IssueLine(Target), "Protocol \"http\" is disabled (in redirect)" }, events.Infos);
     }
 
     [TestMethod]

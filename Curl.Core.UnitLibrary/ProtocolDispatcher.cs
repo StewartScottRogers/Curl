@@ -62,15 +62,25 @@ public sealed class ProtocolDispatcher
         string scheme = context.Url.Scheme.ToLowerInvariant();
         if (!handlersByScheme.TryGetValue(scheme, out IProtocolHandler? handler))
         {
-            return ValueTask.FromResult(TransferResult.Failure(
-                CurlExitCode.UnsupportedProtocol,
-                $"Protocol \"{scheme}\" not supported"));
+            return Refused(context, $"Protocol \"{scheme}\" not supported");
         }
 
         return allowedSchemes is null || allowedSchemes.Contains(scheme)
             ? handler.ExecuteAsync(context)
-            : ValueTask.FromResult(TransferResult.Failure(
-                CurlExitCode.UnsupportedProtocol,
-                $"Protocol \"{scheme}\" is disabled"));
+            : Refused(context, $"Protocol \"{scheme}\" is disabled");
+    }
+
+    /// <summary>
+    /// Fails the transfer with exit 1 and <paramref name="message" />, which is also reported to
+    /// the transfer's events as the info line curl 8.21.0's <c>-v</c> writes before its
+    /// <c>curl: (1)</c> line (measured, BL-805 Notes).
+    /// </summary>
+    /// <param name="context">The refused transfer.</param>
+    /// <param name="message">The refusal's message.</param>
+    /// <returns>The exit 1 failure carrying <paramref name="message" />.</returns>
+    private static ValueTask<TransferResult> Refused(ITransferContext context, string message)
+    {
+        context.Events.ReportInfo(message);
+        return ValueTask.FromResult(TransferResult.Failure(CurlExitCode.UnsupportedProtocol, message));
     }
 }

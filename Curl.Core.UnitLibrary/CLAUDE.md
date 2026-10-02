@@ -28,7 +28,10 @@ through under `-R`; a time it cannot set comes back as `false`, never as an exce
 
 `ProtocolDispatcher` hands a transfer to the `IProtocolHandler` registered for its URL's
 scheme (case-insensitive) and returns exit 1, `Protocol "<scheme>" not supported`, when
-none is; two handlers claiming one scheme make its constructor throw. It is not yet wired
+none is, or `Protocol "<scheme>" is disabled` when `--proto` excludes it; either refusal is
+also reported to the transfer's events, as curl 8.21.0's `-v` writes it (BL-805), as is the
+`RedirectFollower`'s `(in redirect)` refusal. Two handlers claiming one scheme make its
+constructor throw. It is not yet wired
 into `Curl.Console`.
 
 `ByteRangeParser` is the one place `-r`/`--range` text becomes the `ByteRange` a handler
