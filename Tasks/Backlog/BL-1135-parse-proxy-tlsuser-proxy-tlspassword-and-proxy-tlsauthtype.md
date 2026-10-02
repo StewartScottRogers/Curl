@@ -1,5 +1,5 @@
 ---
-id: BL-1127
+id: BL-1135
 title: Parse --proxy-tlsuser, --proxy-tlspassword and --proxy-tlsauthtype and list TLS-SRP in curl -V
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-01
 completed:
 ---
-# BL-1127 — Parse --proxy-tlsuser, --proxy-tlspassword and --proxy-tlsauthtype and list TLS-SRP in curl -V
+# BL-1135 — Parse --proxy-tlsuser, --proxy-tlspassword and --proxy-tlsauthtype and list TLS-SRP in curl -V
 
 ## Goal
 

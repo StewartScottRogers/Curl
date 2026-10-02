@@ -39,7 +39,7 @@ list.
    does not verify, the `tlsv1 alert decrypt error` line).
 6. **The proxy forms.** `--proxy-tlsuser`, `--proxy-tlspassword` and `--proxy-tlsauthtype`
    are not yet parsed, and `curl -V` does not yet list `TLS-SRP`. Both need
-   `Curl.Cli.UnitLibrary`, which another lane held while BL-712 ran, so BL-1127 does them.
+   `Curl.Cli.UnitLibrary`, which another lane held while BL-712 ran, so BL-1135 does them.
    The proxy's `TlsClientOptions` already never carry the origin's SRP options.
 
 ## Consequences
