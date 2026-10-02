@@ -77,8 +77,11 @@ error:14004410:SSL routines:CONNECT_CR_SRVR_HELLO:sslv3 alert handshake failure`
 3. **Groups and schemes the client cannot run are left out, as unrunnable cipher suites
    are (ADR-0011).** OpenSSL names for groups `Curl.Tls` has no key exchange for
    (`SecP256r1MLKEM768`, `SecP384r1MLKEM1024`, `MLKEM512/768/1024`, the brainpool TLS 1.3
-   groups) are known names, dropped rather than refused, and schemes the client cannot check
-   (ML-DSA, ed448, brainpool TLS 1.3 ECDSA) are dropped. A list left with no group fails
+   groups) are known names, dropped rather than refused, and a scheme the client cannot
+   check would be dropped the same way. Every scheme `--sigalgs` names is now checkable:
+   BL-940 made `TlsSignatureScheme` check ML-DSA, ed448 and brainpool TLS 1.3 ECDSA, so
+   `ClientHelloProfileMapping.CheckableSignatureAlgorithms` keeps them and they are offered
+   as OpenSSL 3.5's curl offers them; BL-1047 pinned that. A list left with no group fails
    with the no-suitable-groups line, one left with no scheme with the no-suitable-signature
    line, both exit 35. TLS 1.3's `supported_groups` carries only groups it can share; the
    brainpool curves are offered to TLS 1.2 only.
@@ -95,10 +98,13 @@ error:14004410:SSL routines:CONNECT_CR_SRVR_HELLO:sslv3 alert handshake failure`
 - Each ClientHello list is pinned per value in `HandBuiltTlsProviderTests.CurvesAndSignatureAlgorithms`,
   `OpenSslGroupListTests` and `OpenSslSignatureAlgorithmListTests`, in both builds' profiles.
 - Where the client cannot offer what OpenSSL offers, the bytes differ: the dropped groups
-  and schemes above; `ec_point_formats`, which OpenSSL leaves out when no EC group remains;
+  above; `ec_point_formats`, which OpenSSL leaves out when no EC group remains;
   the `padding` extension OpenSSL adds when a shorter list brings the ClientHello under 512
-  bytes; and brainpool groups in a hello that also offers TLS 1.3. BL-1049 (the groups),
-  BL-1047 (the signature schemes) and BL-1048 (the extensions) cover each.
+  bytes; and brainpool groups in a hello that also offers TLS 1.3. BL-1049 (the groups)
+  and BL-1048 (the extensions) cover each. The signature schemes no longer differ: ML-DSA,
+  ed448 and brainpool TLS 1.3 ECDSA are offered and checked since BL-940, pinned by BL-1047
+  in `HandBuiltTlsProviderTests` (the `WithSigalgs` rows) and
+  `OpenSslCertificateVerifyKnownAnswerTests`.
 - `--curves ?bogus` on Windows fails with exit 35 where curl.se's build fails with 59; both
   are failures, and the OpenSSL syntax is the one scripts written for Linux use.
 
