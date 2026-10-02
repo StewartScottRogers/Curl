@@ -34,7 +34,8 @@ public sealed partial class TlsFailureMessagesTests
     [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsAlertDescription.HandshakeFailure, "TLS connect error: error:0A000410:SSL routines::ssl/tls alert handshake failure")]
     [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsAlertDescription.ProtocolVersion, "TLS connect error: error:0A00042E:SSL routines::tlsv1 alert protocol version")]
     [DataRow(TlsHandshakeFailureOrigin.AlertSent, TlsAlertDescription.DecodeError, "TLS connect error: error:0A00041A:SSL routines::tlsv1 alert decode error")]
-    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsAlertDescription.UnknownPskIdentity, "TLS connect error: error:0A00045B:SSL routines::reason(1115)")]
+    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsAlertDescription.UnknownPskIdentity, "TLS connect error: error:0A00045B:SSL routines::tlsv1 alert unknown psk identity")]
+    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsAlertDescription.EchRequired, "TLS connect error: error:0A000461:SSL routines::reason(1121)")]
     public void OpenSslHandBuiltHandshakeFailure_IsOpenSslsErrorStringForTheFailure(
         TlsHandshakeFailureOrigin origin,
         TlsAlertDescription alert,

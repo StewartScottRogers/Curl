@@ -136,7 +136,8 @@ internal static class TlsFailureMessages
         "schannel: next InitializeSecurityContext failed: SEC_E_ILLEGAL_MESSAGE (0x80090326) - This error usually occurs when a fatal SSL/TLS alert is received (e.g. handshake failed). More detail may be available in the Windows System event log.";
 
     // OpenSSL 3's reason strings for an alert, each its reason code 1000 plus the alert
-    // (ssl/ssl_err.c): handshake_failure (ADR-0140) and protocol_version (BL-502) measured.
+    // (ssl/ssl_err.c): handshake_failure (ADR-0140), protocol_version (BL-502) and
+    // unknown_psk_identity (BL-712, an SRP server that does not know the user) measured.
     private static readonly FrozenDictionary<TlsAlertDescription, string> OpenSslAlertReasons = new Dictionary<TlsAlertDescription, string>
     {
         [TlsAlertDescription.UnexpectedMessage] = "sslv3 alert unexpected message",
@@ -161,6 +162,7 @@ internal static class TlsFailureMessages
         [TlsAlertDescription.MissingExtension] = "tlsv13 alert missing extension",
         [TlsAlertDescription.UnsupportedExtension] = "tlsv1 unsupported extension",
         [TlsAlertDescription.UnrecognizedName] = "tlsv1 unrecognized name",
+        [TlsAlertDescription.UnknownPskIdentity] = "tlsv1 alert unknown psk identity",
         [TlsAlertDescription.BadCertificateStatusResponse] = "tlsv1 bad certificate status response",
         [TlsAlertDescription.CertificateRequired] = "tlsv13 alert certificate required",
         [TlsAlertDescription.NoApplicationProtocol] = "tlsv1 alert no application protocol",

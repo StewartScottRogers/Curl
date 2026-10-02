@@ -137,7 +137,8 @@ namespace Curl.Networking;
 /// </param>
 /// <param name="TlsUser">
 /// curl's <c>--tlsuser</c>: the TLS-SRP user name; <see langword="null" /> when not given. ADR-0151
-/// gives TLS-SRP to the hand-built client (BL-712); neither provider applies it yet.
+/// gives TLS-SRP to the hand-built client: <see cref="TlsClientRouting" /> sends it there and
+/// <see cref="TlsSrp" /> builds the login (ADR-0328).
 /// </param>
 /// <param name="TlsPassword">
 /// curl's <c>--tlspassword</c>: the TLS-SRP password, empty included; <see langword="null" /> when not

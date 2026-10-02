@@ -26,10 +26,18 @@ public static class TlsClientRouting
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        return CapsVersionsBelowTls12(options) || options.RequireCertificateStatus || NamesGroupsOrSignatureAlgorithms(options) || options.SslSessionsFile is not null || EchModes.Of(options) != EchMode.Off
+        return CapsVersionsBelowTls12(options) || options.RequireCertificateStatus || NamesGroupsOrSignatureAlgorithms(options) || UsesSessionsEchOrSrp(options)
             ? TlsClientRoute.HandBuilt
             : TlsClientRoute.SslStream;
     }
+
+    // The --ssl-sessions, --ech and TLS-SRP rows: features SslStream has no API for.
+    private static bool UsesSessionsEchOrSrp(TlsClientOptions options) =>
+        options.SslSessionsFile is not null || EchModes.Of(options) != EchMode.Off || UsesTlsSrp(options);
+
+    // The TLS-SRP row (ADR-0229, ADR-0328, BL-712): SslStream has no SRP, and --tlsuser alone
+    // turns it on, as libcurl defaults the TLS authentication type to SRP once a user is set.
+    private static bool UsesTlsSrp(TlsClientOptions options) => options.TlsUser is not null;
 
     // The --curves and --sigalgs row (ADR-0151, BL-709): SslStream offers the groups and
     // signature schemes the operating system chooses.

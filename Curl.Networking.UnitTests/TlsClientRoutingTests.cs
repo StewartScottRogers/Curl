@@ -96,6 +96,14 @@ public sealed class TlsClientRoutingTests
     public void Choose_WithCertStatus_IsTheHandBuiltClient(TlsClientOptions options) =>
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(options));
 
+    // ADR-0328's row: --tlsuser, since SslStream has no TLS-SRP; --tlspassword alone turns nothing on.
+    [TestMethod]
+    [DataRow("alice", "secret", TlsClientRoute.HandBuilt)]
+    [DataRow("alice", null, TlsClientRoute.HandBuilt)]
+    [DataRow(null, "secret", TlsClientRoute.SslStream)]
+    public void Choose_WithTlsSrpOptions_IsTheHandBuiltClientOnlyWithATlsUser(string? user, string? password, TlsClientRoute expected) =>
+        Assert.AreEqual(expected, TlsClientRouting.Choose(new TlsClientOptions(TlsUser: user, TlsPassword: password)));
+
     [TestMethod]
     public void Choose_WithNullOptions_ThrowsArgumentNullException() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => TlsClientRouting.Choose(null!));
