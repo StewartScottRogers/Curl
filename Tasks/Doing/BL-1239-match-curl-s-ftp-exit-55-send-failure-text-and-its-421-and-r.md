@@ -38,3 +38,4 @@ An FTP transfer reports a failed send with curl 8.21.0's exit 55 texts, writes `
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
