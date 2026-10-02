@@ -1,5 +1,5 @@
 ---
-id: BL-1202
+id: BL-1204
 title: Write the --trace-config ssh lines for uploads, listings, -Q commands, other logins and failures
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1202 — Write the --trace-config ssh lines for uploads, listings, -Q commands, other logins and failures
+# BL-1204 — Write the --trace-config ssh lines for uploads, listings, -Q commands, other logins and failures
 
 ## Goal
 
@@ -18,8 +18,8 @@ Under `-v --trace-config ssh` Curl writes the `[SSH]` lines curl 8.21.0 writes f
 
 ## Context
 
-- BL-1166 traced only a `publickey` login and SFTP and SCP downloads (ADR-0371); `SshStateTrace` is the writer, and the other paths write only the state changes they share with those.
-- Measure as BL-1166's Notes describe: `sshd` in WSL Ubuntu (`wsl -u root`; openssh-server is installed) on port 2222 with `KexAlgorithms`, `HostKeyAlgorithms`, `Ciphers` and `MACs` widened for WinCNG, an RSA PEM key in `AuthorizedKeysFile`, and real `curl.exe -v --trace-config ssh --insecure --key ... --pubkey ...`. Leave out the `block=1` and `pollset` lines (ADR-0371).
+- BL-1166 traced only a `publickey` login and SFTP and SCP downloads (ADR-0372); `SshStateTrace` is the writer, and the other paths write only the state changes they share with those.
+- Measure as BL-1166's Notes describe: `sshd` in WSL Ubuntu (`wsl -u root`; openssh-server is installed) on port 2222 with `KexAlgorithms`, `HostKeyAlgorithms`, `Ciphers` and `MACs` widened for WinCNG, an RSA PEM key in `AuthorizedKeysFile`, and real `curl.exe -v --trace-config ssh --insecure --key ... --pubkey ...`. Leave out the `block=1` and `pollset` lines (ADR-0372).
 
 ## Acceptance criteria
 

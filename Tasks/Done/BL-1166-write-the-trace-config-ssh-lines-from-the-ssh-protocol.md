@@ -67,7 +67,7 @@ Under `-v --trace-config ssh` (and `protocol`, `all`) Curl writes the `* [SSH] .
 - A denied key (Ed25519 under WinCNG) went on `[SSH_AUTH_PKEY] -> [SSH_AUTH_PASS_INIT]`,
   `-> [SSH_AUTH_HOST_INIT]`, `-> [SSH_AUTH_AGENT_INIT]`, `-> [SSH_AUTH_KEY_INIT]`, `-> [SSH_AUTH_DONE]`,
   `Authentication failure`, `[SSH_AUTH_DONE] -> [SSH_SESSION_FREE]`, `[SSH_SESSION_FREE] statemachine() -> 67, block=0`.
-  Only the first step is traced here; the rest is BL-1202's.
+  Only the first step is traced here; the rest is BL-1204's.
 - `--trace-config protocol` and `all` wrote the `[SSH]` lines too; `-v` alone and
   `--trace-config ssh` without `-v` wrote none.
 - Curl's built `curl.exe` against the same server wrote stderr identical to real curl's with the
@@ -75,7 +75,7 @@ Under `-v --trace-config ssh` (and `protocol`, `all`) Curl writes the `* [SSH] .
 - Implemented: `SshStateTrace` (Ssh library), `SshProtocolHandler.TracesStateMachine`,
   `CurlComposition.TracesSsh` and `CurlTransports.TracesSsh`. ADR-0372. Unmeasured paths
   (uploads, listings, `-Q`, password, agent, keyboard-interactive, fingerprints, failures) filed
-  as BL-1202.
+  as BL-1204.
 - `--ai-help all` describes `--trace-config` generically (comma-separated components, `all`,
   `ids`, `time`); still correct, no change needed.
 
