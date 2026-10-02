@@ -16,7 +16,6 @@ public sealed class CurlCompositionDnsTraceTests
     [TestMethod]
     [DataRow("dns")]
     [DataRow("doh")]
-    [DataRow("all")]
     [DataRow("tls,DNS")]
     public async Task Connect_UnderTraceConfigDns_WritesTheDnsFilterLinesAroundTheConnect(string components)
     {
@@ -49,6 +48,74 @@ public sealed class CurlCompositionDnsTraceTests
         List<string> lines = await ConnectAsync("-v", "--trace-config", components);
 
         CollectionAssert.AreEqual(new[] { "  Trying 127.0.0.1:47110...", "Established connection" }, lines);
+    }
+
+    [TestMethod]
+    [DataRow("-vv")]
+    [DataRow("-vvv")]
+    [DataRow("-v", "--trace-config", "setup")]
+    [DataRow("--trace-config", "-setup", "-vv")]
+    [DataRow("-vv", "--trace-config", "-network")]
+    public async Task Connect_WithTheSetupComponent_WritesTheSetupFilterLinesAroundTheConnect(params string[] arguments)
+    {
+        // curl -s -vv http://127.0.0.1:47320/ and curl -s -v --trace-config setup (BL-1103 Notes).
+        List<string> lines = await ConnectAsync(arguments);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[SETUP] added",
+                "[SETUP] happy eyeballing to origin 127.0.0.1:47110",
+                "  Trying 127.0.0.1:47110...",
+                "Established connection",
+                "[SETUP] removing connected setup filter",
+                "[SETUP] destroy",
+            },
+            lines);
+    }
+
+    [TestMethod]
+    [DataRow("-v", "--trace-config", "all")]
+    [DataRow("-vvvv")]
+    [DataRow("-v", "--trace-config", "setup,dns")]
+    public async Task Connect_WithTheSetupAndDnsComponents_WritesBothFiltersLinesInCurlsOrder(params string[] arguments)
+    {
+        // The [SETUP] and [DNS] lines of curl -s -vvvv and --trace-config all -v (BL-1103 Notes).
+        List<string> lines = await ConnectAsync(arguments);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[SETUP] added",
+                "[DNS] created DNS filter for 127.0.0.1:47110, transport=3, queries=3",
+                "[DNS] added",
+                "[DNS] cf_dns_start host 127.0.0.1:47110",
+                "[SETUP] happy eyeballing to origin 127.0.0.1:47110",
+                "  Trying 127.0.0.1:47110...",
+                "[DNS] Curl_conn_connect(block=0) -> 0, done=0",
+                "[DNS] connected filter chain below",
+                "[DNS] Curl_conn_connect(block=0) -> 0, done=1",
+                "Established connection",
+                "[DNS] removing connected setup filter",
+                "[DNS] destroy",
+                "[SETUP] removing connected setup filter",
+                "[SETUP] destroy",
+            },
+            lines);
+    }
+
+    [TestMethod]
+    [DataRow("-v")]
+    [DataRow("-vv", "--trace-config", "-setup")]
+    [DataRow("-vv", "--trace-config", "-all")]
+    [DataRow("-vv", "-v")]
+    [DataRow("-vv", "--no-verbose", "-v")]
+    [DataRow("-v", "--trace-config", "network")]
+    public async Task Connect_WithoutTheSetupComponent_WritesNoSetupLine(params string[] arguments)
+    {
+        List<string> lines = await ConnectAsync(arguments);
+
+        Assert.IsFalse(lines.Any(line => line.StartsWith("[SETUP]", StringComparison.Ordinal)));
     }
 
     [TestMethod]

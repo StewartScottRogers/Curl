@@ -84,7 +84,7 @@ public sealed class CurlCompositionDohTests
     [TestMethod]
     [DataRow("doh")]
     [DataRow("dns")]
-    [DataRow("all")]
+    [DataRow("network")]
     public async Task Connect_UnderTraceConfigDnsOrDoh_WritesTheDnsFilterAndDohLinesToTheTransfer(string component)
     {
         // curl -v --trace-config doh (or dns, which writes the same) --doh-url ... http://example.test:P/:

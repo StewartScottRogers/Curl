@@ -354,14 +354,23 @@ internal static class CurlComposition
             : new UnusableDohUrlResolver();
 
     /// <summary>
-    /// Whether <c>--trace-config</c> turned on curl 8.21.0's <c>[DNS]</c> lines: <c>dns</c>, <c>doh</c>
-    /// and <c>all</c> each turn on the DNS filter's lines and the DoH resolver's alike (measured,
+    /// Whether <c>--trace-config</c> turned on curl 8.21.0's <c>[DNS]</c> lines: <c>dns</c>, <c>doh</c>,
+    /// <c>network</c> (measured, BL-1103 Notes) and <c>all</c> each turn on the DNS filter's lines and the DoH resolver's alike (measured,
     /// BL-1102 Notes).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns><see langword="true" /> when the lines are written.</returns>
     internal static bool TracesDns(CommandLineOptions options) =>
-        options.TraceComponents.Contains("dns") || options.TraceComponents.Contains("doh") || options.TraceComponents.Contains("all");
+        options.TraceComponents.Contains("dns") || options.TraceComponents.Contains("doh") || options.TraceComponents.Contains("network") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[SETUP]</c> lines are written: <c>setup</c> or <c>all</c> is among the
+    /// trace components, which <c>-vv</c> and up put there too (measured, BL-1103 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesSetup(CommandLineOptions options) =>
+        options.TraceComponents.Contains("setup") || options.TraceComponents.Contains("all");
 
     /// <summary>
     /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
@@ -589,6 +598,7 @@ internal static class CurlComposition
             dnsCache: runDnsCache)
         {
             TracesDnsFilter = TracesDns(options),
+            TracesSetupFilter = TracesSetup(options),
             ResolverEvents = resolverEvents,
         };
 
