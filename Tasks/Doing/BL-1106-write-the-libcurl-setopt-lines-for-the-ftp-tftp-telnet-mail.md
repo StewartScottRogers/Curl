@@ -33,3 +33,4 @@ The `--libcurl` generator writes curl 8.21.0s lines for every option `LibcurlSou
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-02: Backlog -> Doing.
