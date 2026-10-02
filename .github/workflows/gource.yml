@@ -11,7 +11,8 @@
 #                  the badge, and the result is committed onto the gource branch;
 #   * render     - the video. It waits for coverage, then force-pushes a new single-commit
 #                  gource branch that carries the coverage/ and board/ folders over;
-#   * board-page - on every run, never gated on decide: when .github/board/site/index.html
+#   * board-page - on every run on work/dark-factory, never gated on decide (other branches
+#                  carry older copies of the page and would put them back): when .github/board/site/index.html
 #                  is in this commit and differs from the gource branch's board/index.html,
 #                  it commits the page there as board/index.html, without force. The page
 #                  fetches the task tree and the board branch's status.json itself, so it
@@ -256,6 +257,10 @@ jobs:
   # one small file and must not wait behind a render. It commits onto the gource
   # branch without force, like the coverage job, and only when the page changed.
   board-page:
+    # Only the branch the page shows publishes it. Pushes to master and audit, and the
+    # hourly schedule (which runs on master), carry older copies of the page and put
+    # them back over the factory's newer one (BL-1206).
+    if: github.ref == 'refs/heads/work/dark-factory'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
