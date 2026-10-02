@@ -713,13 +713,17 @@ internal sealed class FtpSession(
         }
 
         log.TransferStarted(command);
-        trace.TransferInitiated();
+        if (pendingConnection is not null)
+        {
+            trace.LeaveTransferState();
+        }
 
         if (await ReadyDataConnectionAsync().ConfigureAwait(false) is { } notReady)
         {
             return notReady;
         }
 
+        trace.TransferInitiated();
         return await CopyUploadAsync(upload).ConfigureAwait(false)
             ?? await ReadTransferCompleteAsync().ConfigureAwait(false);
     }
@@ -1022,6 +1026,7 @@ internal sealed class FtpSession(
     private TransferResult? AnnouncedActively(string verb)
     {
         context.Events.ReportInfo(FtpTransferMessages.ConnectDataStreamActively);
+        trace.DoPhaseComplete();
         log.ActivePortAnnounced(verb);
         return null;
     }
@@ -1138,9 +1143,13 @@ internal sealed class FtpSession(
         }
 
         pendingConnection = listening.PendingConnection;
-        return pendingConnection is null
-            ? await QuitAndFailAsync(listening.ExitCode, FtpTransferMessages.BindFailed(listening.ErrorMessage!)).ConfigureAwait(false)
-            : null;
+        if (pendingConnection is null)
+        {
+            return await QuitAndFailAsync(listening.ExitCode, FtpTransferMessages.BindFailed(listening.ErrorMessage!)).ConfigureAwait(false);
+        }
+
+        trace.ActivePortListening();
+        return null;
     }
 
     private static bool IsNonLocalBindFailure(ListenResult listening) =>
@@ -1174,6 +1183,7 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult?> AcceptDataConnectionAsync(IPendingConnection pending)
     {
         context.Events.ReportInfo(FtpTransferMessages.DataConnectionNotAvailable);
+        trace.AcceptPending();
         context.Events.ReportInfo(FtpTransferMessages.ReadyToAccept);
         using var timeout = new CancellationTokenSource(AcceptTimeout, context.TimeProvider);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, timeout.Token);
@@ -1474,13 +1484,12 @@ internal sealed class FtpSession(
                 context.Events.ReportInfo(FtpTransferMessages.GettingFile(expectedSize));
             }
 
-            trace.TransferInitiated();
-
             if (await ReadyDataConnectionAsync().ConfigureAwait(false) is { } notReady)
             {
                 return notReady;
             }
 
+            trace.TransferInitiated();
             return await CopyDataAsync().ConfigureAwait(false)
                 ?? await (window.MaxDownload is null ? ReadTransferCompleteAsync() : EndRangeAsync()).ConfigureAwait(false);
         }

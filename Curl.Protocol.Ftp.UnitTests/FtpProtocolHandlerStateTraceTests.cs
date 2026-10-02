@@ -71,6 +71,14 @@ public sealed class FtpProtocolHandlerStateTraceTests
         "* Connection #0 to host 127.0.0.1:47162 left intact",
     ];
 
+    private static readonly string[] ActiveAccept =
+    [
+        "* Ready to accept data connection from server",
+        "* Connection accepted from server",
+        "* Established 2nd connection to 127.0.0.1 (127.0.0.1 port 60356) from 127.0.0.1 port 60355 ",
+        "* [FTP] ftp_initiate_transfer()",
+    ];
+
     [TestMethod]
     public async Task ExecuteAsync_TracedPassiveDownload_WritesCurlsFtpLinesInOrder()
     {
@@ -230,6 +238,130 @@ public sealed class FtpProtocolHandlerStateTraceTests
 
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith("* [FTP]", StringComparison.Ordinal)));
         CollectionAssert.Contains(events.Transcript, "* Getting file with size: 6");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedActiveDownloadWithEprt_WritesThePortStates()
+    {
+        // curl -sS --trace-config ftp -v -P 127.0.0.1 ftp://127.0.0.1:47196/a.txt
+        TraceRecordingEvents events = await RunActiveAsync(
+            "/a.txt",
+            LoggedIn + "200 EPRT command successful\r\n200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            _ => { });
+
+        string[] expected =
+        [
+            .. ActiveDoPhase("EPRT |1|127.0.0.1|60355|", "200 EPRT command successful"),
+            "> TYPE I",
+            "* [FTP] [STOP] -> [RETR_TYPE]",
+            "* [FTP] [RETR_TYPE] ftp_domore_pollset()",
+            "< 200 Type set",
+            "> SIZE a.txt",
+            "* [FTP] [RETR_TYPE] -> [RETR_SIZE]",
+            "* [FTP] [RETR_SIZE] ftp_domore_pollset()",
+            "< 213 6",
+            "* [FTP] [RETR_SIZE] ftp_state_retr()",
+            "> RETR a.txt",
+            "* [FTP] [RETR_SIZE] -> [RETR]",
+            "* [FTP] [RETR] ftp_domore_pollset()",
+            "< 150 Opening BINARY mode data connection",
+            "* Maxdownload = -1",
+            "* Getting file with size: 6",
+            "* Data conn was not available immediately",
+            "* [FTP] [RETR] -> [STOP]",
+            "* [FTP] [STOP] ftp_domore_pollset()",
+            .. ActiveAccept,
+            .. TransferEnd,
+        ];
+        CollectionAssert.AreEqual(expected, events.Transcript);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedActiveDownloadWithPort_WritesThePortStates()
+    {
+        // curl -sS --trace-config ftp -v --disable-eprt -P 127.0.0.1 ftp://127.0.0.1:47196/a.txt
+        TraceRecordingEvents events = await RunActiveAsync(
+            "/a.txt",
+            LoggedIn + "200 PORT command successful\r\n200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            context => context.FtpUseEprt = false);
+
+        string[] expected = ActiveDoPhase("PORT 127,0,0,1,235,195", "200 PORT command successful");
+        CollectionAssert.AreEqual(expected, events.Transcript.Take(expected.Length).ToArray());
+        int notAvailable = events.Transcript.IndexOf("* Data conn was not available immediately");
+        string[] accept = ["* [FTP] [RETR] -> [STOP]", "* [FTP] [STOP] ftp_domore_pollset()", .. ActiveAccept];
+        CollectionAssert.AreEqual(
+            accept,
+            events.Transcript.Skip(notAvailable + 1).Take(2 + ActiveAccept.Length).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedActiveUpload_LeavesTheStorStateBeforeTheAccept()
+    {
+        // curl -sS --trace-config ftp -v -P 127.0.0.1 -T up.txt ftp://127.0.0.1:47197/u.txt
+        TraceRecordingEvents events = await RunActiveAsync(
+            "/u.txt",
+            LoggedIn + "200 EPRT command successful\r\n200 Type set\r\n" + Opened + Complete + Bye,
+            context => context.Upload = new MemoryStream("hi"u8.ToArray()));
+
+        string[] expected =
+        [
+            .. ActiveDoPhase("EPRT |1|127.0.0.1|60355|", "200 EPRT command successful"),
+            "> TYPE I",
+            "* [FTP] [STOP] -> [STOR_TYPE]",
+            "* [FTP] [STOR_TYPE] ftp_domore_pollset()",
+            "< 200 Type set",
+            "> STOR u.txt",
+            "* [FTP] [STOR_TYPE] -> [STOR]",
+            "* [FTP] [STOR] ftp_domore_pollset()",
+            "< 150 Opening BINARY mode data connection",
+            "* [FTP] [STOR] -> [STOP]",
+            "* Data conn was not available immediately",
+            "* [FTP] [STOP] ftp_domore_pollset()",
+            .. ActiveAccept,
+            "* upload completely sent off: 2 bytes",
+            .. TransferEnd,
+        ];
+        CollectionAssert.AreEqual(expected, events.Transcript);
+    }
+
+    /// <summary>The connect phase and an active-mode DO phase, as curl 8.21.0 wrote them (BL-1196).</summary>
+    private static string[] ActiveDoPhase(string announce, string accepted) =>
+    [
+        .. ConnectPhase.Take(17),
+        "* [FTP] [STOP] ftp_state_use_port(), opened socket",
+        "* [FTP] ftp_port_bind_socket(), socket bound to port 0",
+        "* [FTP] ftp_port_listen(), listening on port",
+        "> " + announce,
+        "* [FTP] [STOP] -> [PORT]",
+        "* [FTP] [PORT] perform, awaiting DATA connect",
+        "< " + accepted,
+        "* Connect data stream actively",
+        "* [FTP] [PORT] -> [STOP]",
+        "* [FTP] [STOP] DO phase is complete2",
+    ];
+
+    private static async Task<TraceRecordingEvents> RunActiveAsync(string path, string replies, Action<MutableContext> adjust)
+    {
+        var events = new TraceRecordingEvents();
+        var control = new ScriptedConnection(Encoding.Latin1.GetBytes(replies))
+        {
+            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 53991),
+            RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, ControlPort),
+        };
+        var data = new ScriptedConnection("hello\n"u8.ToArray()) { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 60356) };
+        var pending = new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 60355), ConnectResult.Connected(data));
+        var context = MutableContext.Build(
+            new TransferContext { Url = CurlUrl.Parse($"ftp://127.0.0.1:{ControlPort}{path}"), Output = new MemoryStream() },
+            mutable =>
+            {
+                mutable.Events = events;
+                mutable.FtpPort = "127.0.0.1";
+                adjust(mutable);
+            });
+
+        var handler = new FtpProtocolHandler(new QueuedConnector(ConnectResult.Connected(control)), new QueuedListener(ListenResult.Listening(pending)), new QueuedTlsProvider()) { TracesStateMachine = true };
+        await handler.ExecuteAsync(context);
+        return events;
     }
 
     private static async Task<TraceRecordingEvents> RunAsync(string path, string replies, Action<MutableContext> adjust, bool traced = true)

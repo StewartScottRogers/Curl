@@ -12,9 +12,10 @@ namespace Curl.Protocol.Ftp;
 /// <param name="events">The transfer's events.</param>
 /// <param name="enabled">Whether the lines are written; <see langword="false" /> writes nothing.</param>
 /// <remarks>
-/// Measured for a passive download, a passive upload and a listing (BL-1162 Notes). A command
-/// whose state was not measured (<c>CWD</c>, <c>MDTM</c>, <c>AUTH</c>, a quote, active mode's
-/// <c>EPRT</c> and <c>PORT</c>, <c>REST</c>) writes no state change.
+/// Measured for a passive download, a passive upload and a listing (BL-1162 Notes), and for an
+/// active-mode download and upload with <c>EPRT</c> and <c>PORT</c> (BL-1196 Notes). A command
+/// whose state was not measured (<c>CWD</c>, <c>MDTM</c>, <c>AUTH</c>, a quote, <c>REST</c>)
+/// writes no state change.
 /// </remarks>
 internal sealed class FtpStateTrace(ITransferEvents events, bool enabled)
 {
@@ -55,7 +56,7 @@ internal sealed class FtpStateTrace(ITransferEvents events, bool enabled)
     /// </summary>
     public void AwaitingReply()
     {
-        if (state == "PASV")
+        if (state is "PASV" or "PORT")
         {
             Note("perform, awaiting DATA connect");
         }
@@ -80,7 +81,43 @@ internal sealed class FtpStateTrace(ITransferEvents events, bool enabled)
         Note("DO phase starts");
     }
 
-    /// <summary>Writes the end of the DO phase, as the passive data connection is dialled.</summary>
+    /// <summary>
+    /// Writes the lines curl writes as it opens, binds and listens on the active-mode port,
+    /// before <c>EPRT</c> or <c>PORT</c> announces it (BL-1196).
+    /// </summary>
+    public void ActivePortListening()
+    {
+        Note("ftp_state_use_port(), opened socket");
+        Write("ftp_port_bind_socket(), socket bound to port 0");
+        Write("ftp_port_listen(), listening on port");
+    }
+
+    /// <summary>
+    /// Writes the DO_MORE phase's poll while the server's active-mode data connection is
+    /// awaited, leaving the transfer state for <c>STOP</c> first unless already left (BL-1196).
+    /// </summary>
+    public void AcceptPending()
+    {
+        LeaveTransferState();
+        Note("ftp_domore_pollset()");
+    }
+
+    /// <summary>
+    /// Writes the change from the transfer state back to <c>STOP</c>, unless the state is
+    /// <c>STOP</c> already.
+    /// </summary>
+    public void LeaveTransferState()
+    {
+        if (state != Stop)
+        {
+            Enter(Stop);
+        }
+    }
+
+    /// <summary>
+    /// Writes the end of the DO phase, as the passive data connection is dialled or once
+    /// <c>EPRT</c> or <c>PORT</c> is accepted.
+    /// </summary>
     public void DoPhaseComplete()
     {
         Enter(Stop);
@@ -93,11 +130,14 @@ internal sealed class FtpStateTrace(ITransferEvents events, bool enabled)
     /// <summary>Writes the note curl writes before it sends <c>RETR</c> for a file.</summary>
     public void RetrieveNext() => Note("ftp_state_retr()");
 
-    /// <summary>Writes the start of the data transfer: the transfer initiated, and back to <c>STOP</c>.</summary>
+    /// <summary>
+    /// Writes the start of the data transfer: the transfer initiated, and back to <c>STOP</c>
+    /// unless an active-mode accept left the transfer state already.
+    /// </summary>
     public void TransferInitiated()
     {
         Write("ftp_initiate_transfer()");
-        Enter(Stop);
+        LeaveTransferState();
     }
 
     /// <summary>Writes the close of the data connection and the start of reading the end-of-transfer reply.</summary>
@@ -122,6 +162,7 @@ internal sealed class FtpStateTrace(ITransferEvents events, bool enabled)
         {
             "USER" or "PASS" or "PWD" => verb,
             "EPSV" or "PASV" => "PASV",
+            "EPRT" or "PORT" => "PORT",
             "TYPE" or "SIZE" => transfer + "_" + verb,
             "RETR" or "STOR" or "APPE" or "LIST" or "NLST" => transfer,
             _ => null,
