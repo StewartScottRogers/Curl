@@ -34,3 +34,4 @@ An `smtp://` or `smtps://` transfer with `-D` writes every reply line it reads, 
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
