@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1121 — Fail an SMTP reply line holding a NUL byte with curl's exit 8
 
@@ -24,13 +24,18 @@ An SMTP reply line that contains a NUL byte ends the transfer with exit 8 `Nul b
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Protocol.Smtp.UnitTests` pin the two measured cases: exit 8 `Nul byte in server response line`, the `-v` events as measured (none for the NUL line), and no `QUIT` written to the scripted connection.
-- [ ] Tests pin the same failure for a NUL in a `250-` continuation line of the `EHLO` reply and in the reply to `MAIL FROM` during a send.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] New tests in `Curl.Protocol.Smtp.UnitTests` pin the two measured cases: exit 8 `Nul byte in server response line`, the `-v` events as measured (none for the NUL line), and no `QUIT` written to the scripted connection.
+- [x] Tests pin the same failure for a NUL in a `250-` continuation line of the `EHLO` reply and in the reply to `MAIL FROM` during a send.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- `SmtpControlChannel.ReadLineAsync` throws the new `SmtpNulByteInReplyException` for any complete line holding a NUL, before the line is reported, so skipped and continuation lines are refused too, as curl's `Curl_pp_readresp` checks every line. `SmtpSession`, `SmtpMailTransaction` and `SmtpCommandTransfer` map it to exit 8 with `SmtpSessionMessages.NulByteInResponseLine`; the throw skips `QUIT`, so the transfer ends `closing connection #0`.
+- Choice: a NUL in the reply to `QUIT` is ignored, as `QuitAsync` already ignores an overlong line; curl reads `QUIT`'s reply at disconnect, where its result is discarded. Pinned by `ExecuteAsync_QuitReplyHoldsANulByte_StillSucceeds`.
+- Tests: `SmtpProtocolHandlerNulByteTests` (7 cases, including a `VRFY` reply for the command path). Measure-CodeQuality: Smtp library 100% line, 100% branch, 0 failing members.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. An SMTP reply line holding a NUL byte fails with exit 8 'Nul byte in server response line', unreported and without QUIT

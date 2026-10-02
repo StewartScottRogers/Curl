@@ -23,8 +23,8 @@ namespace Curl.Protocol.Smtp;
 /// line once the reply is accepted. A reply is accepted when it is 2xx, or 553 for a
 /// command about a recipient; any other is exit 8, <c>Command failed: 550</c>, after which
 /// no further recipient is tried and <c>QUIT</c> is still sent.</item>
-/// <item>The server closing before a reply is complete is exit 56 and a reply line of 65536
-/// bytes exit 100, neither with <c>QUIT</c>.</item>
+/// <item>The server closing before a reply is complete is exit 56, a reply line of 65536
+/// bytes exit 100 and a reply line holding a NUL byte exit 8, none with <c>QUIT</c>.</item>
 /// <item>Every result carries the bytes written as <see cref="TransferResult.BytesTransferred" />
 /// and the last command reply's code as <see cref="TransferReport.ResponseCode" />;
 /// <c>QUIT</c>'s reply changes neither.</item>
@@ -58,6 +58,10 @@ internal sealed class SmtpCommandTransfer(
         catch (SmtpReplyMissingException)
         {
             result = TransferResult.Failure(CurlExitCode.RecvError, SmtpSessionMessages.ResponseReadingFailed);
+        }
+        catch (SmtpNulByteInReplyException)
+        {
+            result = TransferResult.Failure(CurlExitCode.WeirdServerReply, SmtpSessionMessages.NulByteInResponseLine);
         }
         catch (InvalidDataException)
         {

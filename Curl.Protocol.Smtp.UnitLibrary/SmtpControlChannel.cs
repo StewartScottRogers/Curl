@@ -117,6 +117,9 @@ internal sealed class SmtpControlChannel(
     /// <exception cref="InvalidDataException">
     /// A line reached 65536 bytes, its CR and LF included, as curl refuses with exit 100.
     /// </exception>
+    /// <exception cref="SmtpNulByteInReplyException">
+    /// A line held a NUL byte, as curl refuses with exit 8; the line is not reported.
+    /// </exception>
     public ValueTask<SmtpReply?> ReadReplyAsync() => ReadReplyAsync(static _ => ValueTask.CompletedTask);
 
     /// <summary>
@@ -164,7 +167,7 @@ internal sealed class SmtpControlChannel(
 
     /// <summary>
     /// Sends <c>QUIT</c> and reads its reply, ignoring whatever it says and a reply line that
-    /// is too long, as curl does once the session is open. Neither is reported, and nothing
+    /// is too long or holds a NUL byte, as curl does once the session is open. Neither is reported, and nothing
     /// is after them: curl sends <c>QUIT</c> once the transfer is over, where <c>-v</c> does
     /// not see it.
     /// </summary>
@@ -179,6 +182,9 @@ internal sealed class SmtpControlChannel(
             await ReadReplyAsync().ConfigureAwait(false);
         }
         catch (InvalidDataException)
+        {
+        }
+        catch (SmtpNulByteInReplyException)
         {
         }
     }
@@ -221,6 +227,11 @@ internal sealed class SmtpControlChannel(
             if (next == (byte)'\n')
             {
                 byte[] bytes = [.. line];
+                if (Array.IndexOf(bytes, (byte)0) >= 0)
+                {
+                    throw new SmtpNulByteInReplyException();
+                }
+
                 reporting.ReportResponseHeader(bytes);
                 return Encoding.Latin1.GetString(bytes, 0, bytes.Length - 1);
             }

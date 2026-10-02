@@ -23,7 +23,8 @@ namespace Curl.Protocol.Smtp;
 /// <see cref="ITlsProvider" />, whose failure is returned as it reported it, then
 /// <c>EHLO</c> again.</item>
 /// <item>The server closing before a reply is complete is exit 56; a reply line of 65536
-/// bytes is exit 100.</item>
+/// bytes is exit 100; a reply line holding a NUL byte is exit 8
+/// <c>Nul byte in server response line</c>, the line unreported (BL-1121).</item>
 /// <item>No failure above sends <c>QUIT</c>. Once the session is open, <c>QUIT</c>'s reply is
 /// read and whatever it says is ignored, as curl ignores it.</item>
 /// <item>Given an <see cref="ISaslAuthenticator" />, a session opened with <c>EHLO</c>
@@ -80,6 +81,10 @@ internal sealed class SmtpSession(
         catch (SmtpReplyMissingException)
         {
             return TransferResult.Failure(CurlExitCode.RecvError, SmtpSessionMessages.ResponseReadingFailed);
+        }
+        catch (SmtpNulByteInReplyException)
+        {
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, SmtpSessionMessages.NulByteInResponseLine);
         }
         catch (InvalidDataException)
         {
