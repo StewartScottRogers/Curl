@@ -38,3 +38,4 @@ A task whose `touches` names an audit guard file is interactive only, like one t
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
