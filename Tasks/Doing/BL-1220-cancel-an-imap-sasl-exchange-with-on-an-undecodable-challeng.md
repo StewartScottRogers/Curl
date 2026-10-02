@@ -35,3 +35,4 @@ When an IMAP server answers `AUTHENTICATE` with a `+` challenge that a challenge
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
