@@ -30,3 +30,4 @@ BL-864 made `TcpConnector` answer a stale Digest `407` to CONNECT afresh, with a
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-02: Backlog -> Doing.
