@@ -375,6 +375,7 @@ choices do not need one.
 | [0363](ADR-0363-a-failed-tls-handshake-reports-the-lines-curl-prints-before-it.md) | A failed TLS handshake is reported as a `TlsHandshakeEvent` marked `Failed`, so `-v` prints the Schannel build's ALPN offer and the OpenSSL build's certificate details before a `--pinnedpubkey` refusal (BL-1149) | Accepted | 2026-10-02 |
 | [0364](ADR-0364-the-tls-1-2-only-hello-carries-each-builds-record-version-and-openssl-refuses-a-legacy-ceiling.md) | Below a TLS 1.3 ceiling the Schannel build's hello is in a record of the ceiling's version, and the OpenSSL build refuses `--tls-max 1.0` and `1.1` with a `protocol_version` alert and exit 35 (BL-1152) | Accepted | 2026-10-02 |
 | [0365](ADR-0365-the-openssl-builds-tls12-hello-pads-and-its-quic-hello-never-does.md) | The OpenSSL build's TLS 1.2-ceiling hello pads a 256-to-511-byte hello to 512, and its QUIC hello never pads (BL-1156) | Accepted | 2026-10-02 |
+| [0366](ADR-0366-a-failed-resolve-writes-curls-could-not-resolve-and-dns-filter-lines.md) | A failed resolve writes curl's `Could not resolve` lines and, under `--trace-config dns`, the filter's exit 6 and async teardown lines (BL-1157) | Accepted | 2026-10-02 |
 
 ## Template
 
