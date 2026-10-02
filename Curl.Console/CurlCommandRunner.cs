@@ -534,8 +534,8 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private readonly StandardOutputFailureDeferringStream deferringStandardOutput = new(standardOutput);
 
-    /// <summary>Each transfer's option group and URL, in the order they started, for the <c>--libcurl</c> file.</summary>
-    private readonly List<(CommandLineOptions Options, string Url)> libcurlTransfers = [];
+    /// <summary>Each transfer's option group, URL and file facts, in the order they started, for the <c>--libcurl</c> file.</summary>
+    private readonly List<LibcurlTransfer> libcurlTransfers = [];
 
     /// <summary>
     /// The state of the transfer the current asynchronous flow is running, set as each transfer
@@ -962,7 +962,8 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="givenUrl">The URL as the glob expanded it, before any scheme is guessed.</param>
-    private void RecordLibcurlTransfer(CommandLineOptions options, string givenUrl)
+    /// <param name="uploadFile">The URL's <c>-T</c> file, or <see langword="null" /> when it uploads nothing.</param>
+    private void RecordLibcurlTransfer(CommandLineOptions options, string givenUrl, string? uploadFile)
     {
         if (options.LibcurlFile is null)
         {
@@ -971,7 +972,26 @@ internal sealed class CurlCommandRunner(
 
         lock (libcurlTransfers)
         {
-            libcurlTransfers.Add((options, givenUrl));
+            Running.LibcurlTransferIndex = libcurlTransfers.Count;
+            libcurlTransfers.Add(new LibcurlTransfer(options, givenUrl) { UploadFile = uploadFile });
+        }
+    }
+
+    /// <summary>
+    /// Notes what the transfer learnt about its files in its <c>--libcurl</c> entry; nothing without
+    /// <c>--libcurl</c>.
+    /// </summary>
+    /// <param name="change">Makes the entry with the new facts from the old one.</param>
+    private void UpdateLibcurlTransfer(Func<LibcurlTransfer, LibcurlTransfer> change)
+    {
+        if (Running.LibcurlTransferIndex is not { } index)
+        {
+            return;
+        }
+
+        lock (libcurlTransfers)
+        {
+            libcurlTransfers[index] = change(libcurlTransfers[index]);
         }
     }
 
@@ -1960,8 +1980,8 @@ internal sealed class CurlCommandRunner(
             return (await ReportIpfsGatewayFailureAsync(options, transfer, ipfsFailure).ConfigureAwait(false), givenUrl, string.Empty);
         }
 
-        RecordLibcurlTransfer(options, givenUrl);
         string? uploadFile = transfer.UploadFile;
+        RecordLibcurlTransfer(options, givenUrl, uploadFile);
         string transferUrl = UrlSchemeGuesser.AddScheme(givenUrl, options.DefaultProtocol);
         if (uploadFile is not null && !UploadTransferUrl.TryResolve(transferUrl, uploadFile, out transferUrl))
         {
@@ -2006,7 +2026,9 @@ internal sealed class CurlCommandRunner(
         if (options.EtagCompareFile is { } compareFile)
         {
             string header = await ReadIfNoneMatchHeaderAsync(options, compareFile).ConfigureAwait(false);
-            Running.IfNoneMatchHeaders = AddIfNoneMatchHeader(options, header);
+            IReadOnlyList<string> headers = AddIfNoneMatchHeader(options, header);
+            Running.IfNoneMatchHeaders = headers;
+            UpdateLibcurlTransfer(entry => entry with { IfNoneMatchHeaders = headers });
         }
 
         return options.EtagSaveFile is { } saveFile
@@ -3112,6 +3134,7 @@ internal sealed class CurlCommandRunner(
             return CannotOpenUploadFileResult();
         }
 
+        UpdateLibcurlTransfer(entry => entry with { UploadFileSize = opened.Length });
         await using (upload.ConfigureAwait(false))
         {
             return await TransferUploadingAsync(dispatch, options, url, upload, transfer, headerOutput)
@@ -3279,6 +3302,7 @@ internal sealed class CurlCommandRunner(
         }
 
         string? knownHosts = options.Insecure ? null : options.SshKnownHostsFile ?? KnownHostsSearch.Find(DataFileReader);
+        UpdateLibcurlTransfer(entry => entry with { SshKnownHostsFile = knownHosts, SshKnownHostsFileMissing = knownHosts is null && !options.Insecure });
         if (knownHosts is null && !options.Insecure
             && await ReportKnownHostsFileMissingAsync(options).ConfigureAwait(false) is { } failure)
         {
@@ -3810,6 +3834,7 @@ internal sealed class CurlCommandRunner(
         }
 
         await content.DisposeAsync().ConfigureAwait(false);
+        UpdateLibcurlTransfer(entry => entry with { OutputFileSize = existing.Length });
 
         return existing.Length;
     }

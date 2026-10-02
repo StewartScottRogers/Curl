@@ -182,6 +182,43 @@ public sealed class CurlCommandRunnerSshOptionTests
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
+    [TestMethod]
+    public async Task RunAsync_LibcurlWithAKnownHostsFile_WritesItAfterTheSshLines()
+    {
+        environment["HOME"] = "home";
+        dataFiles.Files["home/.ssh/known_hosts"] = [];
+
+        await RunAsync(["-s", "--libcurl", "-", "--compressed-ssh", "sftp://h/f"]);
+
+        Assert.Contains(
+            "  curl_easy_setopt(curl, CURLOPT_SSH_COMPRESSION, 1L);\n  curl_easy_setopt(curl, CURLOPT_SSH_KNOWNHOSTS, \"home/.ssh/known_hosts\");\n",
+            Encoding.UTF8.GetString(standardOutput.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibcurlWithoutAKnownHostsFile_StopsTheSourceWhereCurlFails()
+    {
+        int exitCode = await RunAsync(["-s", "--libcurl", "-", "sftp://h/f", "http://h/b"]);
+
+        Assert.AreEqual(2, exitCode);
+        Assert.EndsWith(
+            "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.21.0\");\n  curl_easy_cleanup(curl);\n  curl = NULL;\n\n  return (int)result;\n}\n/**** End of sample code ****/\n",
+            Encoding.UTF8.GetString(standardOutput.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibcurlUnderInsecure_WritesNoKnownHostsLine()
+    {
+        environment["HOME"] = "home";
+        dataFiles.Files["home/.ssh/known_hosts"] = [];
+
+        await RunAsync(["-s", "-k", "--libcurl", "-", "sftp://h/f"]);
+
+        string source = Encoding.UTF8.GetString(standardOutput.ToArray());
+        Assert.DoesNotContain("KNOWNHOSTS", source);
+        Assert.Contains("  result = curl_easy_perform(curl);\n", source);
+    }
+
     private Task<int> RunAsync(IReadOnlyList<string> arguments, bool runsOnWindows = false, string? accountHomeDirectory = null) =>
         new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher([sftp, scp, http])),

@@ -99,13 +99,13 @@ public sealed class LibcurlSourceCodeTests
     [TestMethod]
     public void Generate_NoTransfers_IsTheHeaderAndFooterAlone()
     {
-        Assert.AreEqual(Header + Footer, LibcurlSourceCode.Generate([]));
+        Assert.AreEqual(Header + Footer, LibcurlSourceCode.Generate(Array.Empty<LibcurlTransfer>()));
     }
 
     [TestMethod]
     public void Generate_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => LibcurlSourceCode.Generate(null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => LibcurlSourceCode.Generate((IReadOnlyList<(CommandLineOptions, string)>)null!));
     }
 
     [TestMethod]

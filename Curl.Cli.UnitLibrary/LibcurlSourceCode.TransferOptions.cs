@@ -16,11 +16,12 @@ public static partial class LibcurlSourceCode
         [RequestedHttpVersion.Http11] = "(long)CURL_HTTP_VERSION_1_1",
     }.ToFrozenDictionary();
 
-    /// <summary>The <c>--request-target</c>, <c>-l</c> and <c>-a</c> lines, after <c>CURLOPT_FAILONERROR</c> and before the netrc lines.</summary>
-    private static List<string> TransferModeLines(CommandLineOptions options)
+    /// <summary>The <c>--request-target</c>, <c>-T</c> upload, <c>-l</c> and <c>-a</c> lines, after <c>CURLOPT_FAILONERROR</c> and before the netrc lines.</summary>
+    private static List<string> TransferModeLines(CommandLineOptions options, bool uploads)
     {
         List<string> lines = [];
         AddStringIf(lines, "CURLOPT_REQUEST_TARGET", options.RequestTarget);
+        AddIf(lines, uploads, SetoptOn("CURLOPT_UPLOAD"));
         AddIf(lines, options.ListOnly, SetoptOn("CURLOPT_DIRLISTONLY"));
         AddIf(lines, options.Append, SetoptOn("CURLOPT_APPEND"));
         return lines;
@@ -63,7 +64,7 @@ public static partial class LibcurlSourceCode
     /// The <c>-Y</c>/<c>-y</c> and <c>-C</c> lines, after the scheme's lines: <c>-Y</c> alone also writes a
     /// 30-second time and <c>-y</c> alone a limit of 1, and a zero limit, time or offset is not written.
     /// </summary>
-    private static List<string> SpeedAndResumeLines(CommandLineOptions options)
+    private static List<string> SpeedAndResumeLines(CommandLineOptions options, long resumeOffset)
     {
         long limit = options.SpeedLimit ?? (options.SpeedTimeSeconds is null ? 0 : 1);
         long time = options.SpeedTimeSeconds ?? (options.SpeedLimit is null ? 0 : 30);
@@ -71,7 +72,7 @@ public static partial class LibcurlSourceCode
         AddIf(lines, limit > 0, () => Setopt("CURLOPT_LOW_SPEED_LIMIT", $"{limit}L"));
         AddIf(lines, time > 0, () => Setopt("CURLOPT_LOW_SPEED_TIME", $"{time}L"));
         lines.AddRange(RateLimitLines(options));
-        AddIf(lines, options.ResumeFrom > 0, () => Setopt("CURLOPT_RESUME_FROM_LARGE", $"(curl_off_t){options.ResumeFrom}"));
+        AddIf(lines, resumeOffset != 0, () => Setopt("CURLOPT_RESUME_FROM_LARGE", $"(curl_off_t){resumeOffset}"));
         return lines;
     }
 

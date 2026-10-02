@@ -87,21 +87,23 @@ public static partial class LibcurlSourceCode
 
     /// <summary>
     /// The lines curl 8.21.0 writes for an <c>scp</c> or <c>sftp</c> URL, after the key passwords: the private
-    /// and public key files, the host key hashes and <c>--compressed-ssh</c>.
+    /// and public key files, the host key hashes, <c>--compressed-ssh</c> and the known-hosts file.
     /// </summary>
-    private static List<string> SshLines(CommandLineOptions options, string scheme)
+    private static List<string> SshLines(LibcurlTransfer transfer, string scheme)
     {
         if (scheme is not ("scp" or "sftp"))
         {
             return [];
         }
 
+        CommandLineOptions options = transfer.Options;
         List<string> lines = [];
         AddStringIf(lines, "CURLOPT_SSH_PRIVATE_KEYFILE", options.PrivateKey);
         AddStringIf(lines, "CURLOPT_SSH_PUBLIC_KEYFILE", options.SshPublicKeyFile);
         AddStringIf(lines, "CURLOPT_SSH_HOST_PUBLIC_KEY_MD5", options.SshHostPublicKeyMd5);
         AddStringIf(lines, "CURLOPT_SSH_HOST_PUBLIC_KEY_SHA256", options.SshHostPublicKeySha256);
         AddIf(lines, options.SshCompression, SetoptOn("CURLOPT_SSH_COMPRESSION"));
+        lines.AddRange(KnownHostsLines(transfer));
         return lines;
     }
 

@@ -180,6 +180,12 @@ internal sealed class RunningTransferState(
     internal IReadOnlyList<string>? IfNoneMatchHeaders { get; set; }
 
     /// <summary>
+    /// Gets or sets where the transfer's entry is in the <c>--libcurl</c> file's list of transfers;
+    /// <see langword="null" /> without <c>--libcurl</c> (task BL-1177).
+    /// </summary>
+    internal int? LibcurlTransferIndex { get; set; }
+
+    /// <summary>
     /// Gets or sets the transfer's alt-svc cache, read before it connects and written when it is reported;
     /// <see langword="null" /> without <c>--alt-svc</c> and for a URL that is not <c>http</c> or <c>https</c> (task BL-623).
     /// </summary>

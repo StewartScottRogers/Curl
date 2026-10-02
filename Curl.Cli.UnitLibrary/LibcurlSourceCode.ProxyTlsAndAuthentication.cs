@@ -127,14 +127,15 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>The TLS lines for the server and the proxy, written after the scheme's lines in curl's order.</summary>
-    private static List<string> TlsLines(CommandLineOptions options, string scheme)
+    private static List<string> TlsLines(LibcurlTransfer transfer, string scheme)
     {
+        CommandLineOptions options = transfer.Options;
         (string? certificate, string? certificatePassword) = SplitCertificate(options.ClientCertificate);
         (string? proxyCertificate, string? proxyCertificatePassword) = SplitCertificate(options.ProxyClientCertificate);
         List<string> lines = [];
         AddStringIf(lines, "CURLOPT_KEYPASSWD", options.Passphrase ?? certificatePassword);
         AddStringIf(lines, "CURLOPT_PROXY_KEYPASSWD", options.ProxyPassphrase ?? proxyCertificatePassword);
-        lines.AddRange(SshLines(options, scheme));
+        lines.AddRange(SshLines(transfer, scheme));
         AddStringIf(lines, "CURLOPT_CAINFO", options.CaCertificateFile);
         AddStringIf(lines, "CURLOPT_PROXY_CAINFO", options.ProxyCaCertificateFile);
         AddStringIf(lines, "CURLOPT_PINNEDPUBLICKEY", options.PinnedPublicKey);

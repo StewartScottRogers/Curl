@@ -3,13 +3,13 @@ namespace Curl.Cli;
 /// <summary>
 /// Keeps <see cref="LibcurlSourceCode" /> in step with <see cref="CommandLineOptionTable" />: every option the
 /// table parses is listed here as one whose <c>--libcurl</c> lines the generator writes, one curl 8.21.0
-/// (Schannel) writes nothing for, or one still waiting for BL-1177, so an option added later cannot be
-/// forgotten (BL-654, BL-1106, BL-1174).
+/// (Schannel) writes nothing for, so an option added later cannot be
+/// forgotten (BL-654, BL-1106, BL-1174, BL-1177).
 /// </summary>
 [TestClass]
 public sealed class LibcurlSourceCodeOptionCoverageTests
 {
-    /// <summary>Options whose lines are written, each pinned by <c>LibcurlSourceCodeOptionTests</c>, <c>LibcurlSourceCodeProxyTlsAndAuthenticationTests</c> or <c>LibcurlSourceCodeTransferOptionTests</c>.</summary>
+    /// <summary>Options whose lines are written, each pinned by <c>LibcurlSourceCodeOptionTests</c>, <c>LibcurlSourceCodeProxyTlsAndAuthenticationTests</c>, <c>LibcurlSourceCodeTransferOptionTests</c>, <c>LibcurlSourceCodeProtocolOptionTests</c> or <c>LibcurlSourceCodeTransferFileTests</c>.</summary>
     private static readonly string[] Written =
     [
         "url", "silent", "progress-meter", "data", "data-ascii", "data-binary", "data-raw", "data-urlencode", "json",
@@ -36,7 +36,8 @@ public sealed class LibcurlSourceCodeOptionCoverageTests
         "ftp-skip-pasv-ip", "ftp-method", "ftp-create-dirs", "ftp-port", "ftp-pasv", "ssl", "ftp-ssl", "ssl-reqd",
         "ftp-ssl-reqd", "ftp-ssl-control", "ftp-ssl-ccc", "ftp-ssl-ccc-mode", "ftp-account", "ftp-alternative-to-user",
         "ftp-pret", "quote", "create-file-mode", "ip-tos", "vlan-priority", "mptcp", "pubkey", "hostpubmd5",
-        "hostpubsha256", "compressed-ssh", "proto", "proto-redir", "proto-default", "limit-rate", "parallel",
+        "hostpubsha256", "compressed-ssh", "proto", "proto-redir", "proto-default", "limit-rate", "parallel", "upload-file",
+        "etag-compare",
     ];
 
     /// <summary>Options curl 8.21.0's Schannel build writes no line for, measured (BL-653, BL-654, BL-1106 and BL-1174 Notes; ADR-0326 for the options the Schannel build refuses).</summary>
@@ -57,13 +58,11 @@ public sealed class LibcurlSourceCodeOptionCoverageTests
         "http2-prior-knowledge", "http3", "http3-only",
     ];
 
-    /// <summary>Options whose lines BL-1177 measures and writes: they need the console's per-transfer file knowledge.</summary>
-    private static readonly string[] WaitingForBl1177 = ["upload-file", "etag-compare"];
 
     [TestMethod]
-    public void EveryParsedOption_IsWrittenOrKnownToWriteNothingOrWaitingForItsTask()
+    public void EveryParsedOption_IsWrittenOrKnownToWriteNothing()
     {
-        HashSet<string> listed = [.. Written, .. WritesNothing, .. WaitingForBl1177];
+        HashSet<string> listed = [.. Written, .. WritesNothing];
 
         string[] unlisted = [.. CommandLineOptionTable.Rows.Select(row => row.LongName).Where(name => !listed.Contains(name))];
 
@@ -73,7 +72,7 @@ public sealed class LibcurlSourceCodeOptionCoverageTests
     [TestMethod]
     public void EveryListedOption_IsParsedAndListedOnce()
     {
-        string[] listed = [.. Written, .. WritesNothing, .. WaitingForBl1177];
+        string[] listed = [.. Written, .. WritesNothing];
         HashSet<string> parsed = [.. CommandLineOptionTable.Rows.Select(row => row.LongName)];
 
         Assert.HasCount(parsed.Count, listed);

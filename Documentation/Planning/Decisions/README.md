@@ -388,6 +388,7 @@ choices do not need one.
 | [0376](ADR-0376-trace-config-quic-writes-no-lines-of-its-own.md) | `--trace-config quic` writes no lines of its own: curl's ngtcp2 build writes no `[QUIC]` line under `quic`, `network`, `protocol` or `all` (measured); pinned as none (BL-1169) | Accepted | 2026-10-02 |
 | [0377](ADR-0377-trace-config-ssh-agent-lines-follow-the-server-answers.md) | The `--trace-config ssh` agent line `auth user ... for key ...` is written once per identity attempt plus once per server answer; a listed link goes through `SSH_SFTP_READDIR_LINK`; `-I` on an SFTP directory sends `STAT` in `SSH_SFTP_FILETIME`, all as measured (BL-1207) | Accepted | 2026-10-02 |
 | [0378](ADR-0378-an-unknown-ech-mode-fails-the-transfer-with-exit-43-as-the-ech-build-does.md) | An `--ech` mode libcurl's `setopt_ech` refuses (anything but `false`, `grease`, `true`, `hard`, `ecl:<list>`, `pn:<name>`, case-sensitive) fails the transfer with exit 43 and `setopt 0x2855 got bad argument`, as curls ECH build does, not exit 2 as the platform builds without ECH do (BL-1172) | Accepted | 2026-10-02 |
+| [0379](ADR-0379-libcurl-writes-the-transfer-file-lines-and-stops-where-the-known-hosts-setopt-fails.md) | `--libcurl` writes `-T`'s upload URL, `UPLOAD` and `INFILESIZE_LARGE`, `--etag-compare`'s `If-None-Match` header, `-C -`'s offset and `SSH_KNOWNHOSTS` from the console's per-transfer file facts, and stops the source after the SSH lines when curl fails to set the known-hosts file (BL-1177) | Accepted | 2026-10-02 |
 
 ## Template
 
