@@ -34,6 +34,14 @@ public sealed record Tls13ClientSettings
         [Tls13CipherSuite.Aes256GcmSha384.Code, Tls13CipherSuite.ChaCha20Poly1305Sha256.Code, Tls13CipherSuite.Aes128GcmSha256.Code];
 
     /// <summary>
+    /// Gets a value indicating whether the ClientHello also offers <c>TLS_EMPTY_RENEGOTIATION_INFO_SCSV</c>
+    /// (<c>00ff</c>, RFC 5746 section 3.3) after the TLS 1.3 suites and any <see cref="LowerVersions" /> ones,
+    /// as LibreSSL does. It is a signalling value, not a suite: it never joins <see cref="CipherSuites" />, and a
+    /// ServerHello that selects it is refused with <c>illegal_parameter</c>.
+    /// </summary>
+    public bool OfferEmptyRenegotiationInfoScsv { get; init; }
+
+    /// <summary>
     /// Gets the groups offered in <c>supported_groups</c>, in preference order; each must be one
     /// <see cref="TlsNamedGroup.CanShare" /> or <see cref="TlsNamedGroup.IsTls12EcdheGroup" /> accepts. A
     /// TLS 1.2-only group is offered for a TLS 1.2 continuation, as OpenSSL does, and is never retried on.

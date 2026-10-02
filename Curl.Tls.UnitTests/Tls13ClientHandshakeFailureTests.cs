@@ -213,6 +213,15 @@ public sealed class Tls13ClientHandshakeFailureTests
     }
 
     [TestMethod]
+    public void AServerHelloChoosingTheOfferedRenegotiationScsvIsAnIllegalParameter()
+    {
+        using Tls13ClientHandshake client = Client(DefaultSettings with { CipherSuites = [0x1301], OfferEmptyRenegotiationInfoScsv = true });
+        client.Start();
+
+        AssertFails(TlsAlertDescription.IllegalParameter, client.Receive(TlsEncryptionLevel.Initial, ServerHelloBytes([Tls13()], cipherSuite: Tls12CipherSuite.EmptyRenegotiationInfoScsv)));
+    }
+
+    [TestMethod]
     public void AServerHelloChangingTheSuiteAfterAHelloRetryRequestIsAnIllegalParameter()
     {
         using Tls13ClientHandshake client = Client(DefaultSettings with { CipherSuites = [0x1301, 0x1302] });
