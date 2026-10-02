@@ -33,3 +33,4 @@ Through a SOCKS4 or SOCKS5 proxy that resolves the target locally, a target name
 ## Log
 
 - 2026-09-28: Created.
+- 2026-10-01: Backlog -> Doing.
