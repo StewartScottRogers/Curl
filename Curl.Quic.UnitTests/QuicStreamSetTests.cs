@@ -110,6 +110,19 @@ public sealed class QuicStreamSetTests
     }
 
     [TestMethod]
+    public void ClientBidirectionalStreamLimit_FollowsTheServersParametersAndMaxStreams()
+    {
+        QuicStreamSet set = new(SmallClientLimits);
+        Assert.AreEqual(0UL, set.ClientBidirectionalStreamLimit);
+
+        set.SetPeerTransportParameters(ServerLimits with { InitialMaxStreamsBidi = 3 });
+        Assert.AreEqual(3UL, set.ClientBidirectionalStreamLimit);
+
+        set.Receive(new QuicMaxStreamsFrame(false, 7));
+        Assert.AreEqual(7UL, set.ClientBidirectionalStreamLimit);
+    }
+
+    [TestMethod]
     public void Receive_MaxFramesBelowTheCurrentLimits_AreIgnored()
     {
         QuicStreamSet set = Set();

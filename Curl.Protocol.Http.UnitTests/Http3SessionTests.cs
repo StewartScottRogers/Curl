@@ -97,6 +97,62 @@ public sealed class Http3SessionTests
     }
 
     [TestMethod]
+    [DataRow(3L, 3, DisplayName = "the server's MAX_STREAMS")]
+    [DataRow(5_000_000_000L, int.MaxValue, DisplayName = "a MAX_STREAMS past int, capped")]
+    [DataRow(null, int.MaxValue, DisplayName = "unknown, unlimited")]
+    public async Task ConcurrentTransferLimit_WhileTakingRequests_IsTheConnectionsStreamLimit(long? streamLimit, int expected)
+    {
+        await using Http3Session session = new(new FakeMultiplexedConnection { BidirectionalStreamLimit = streamLimit });
+
+        Assert.AreEqual(expected, session.ConcurrentTransferLimit);
+    }
+
+    [TestMethod]
+    public async Task ConcurrentTransferLimit_AfterARefusedStream_IsZero()
+    {
+        await using Http3Session session = new(new FakeMultiplexedConnection { BidirectionalStreamLimit = 3 });
+
+        session.StopNewStreams();
+
+        Assert.AreEqual(0, session.ConcurrentTransferLimit);
+    }
+
+    [TestMethod]
+    public async Task ShutDownAsync_WritesNothingAndLeavesTheConnectionOpen()
+    {
+        FakeMultiplexedConnection quic = new();
+        await using Http3Session session = new(quic);
+
+        await session.ShutDownAsync(CancellationToken.None);
+
+        Assert.IsNull(quic.CloseCode);
+        Assert.IsEmpty(quic.UnidirectionalStreams);
+    }
+
+    [TestMethod]
+    public async Task OpenRequestStreamAsync_ThreeTransfersAtOnce_OpenTheUnidirectionalStreamsOnceAndStreams0And4And8()
+    {
+        FakeMultiplexedConnection quic = new(new FakeMultiplexedStream(0, []), new FakeMultiplexedStream(4, []), new FakeMultiplexedStream(8, []));
+        await using Http3Session session = new(quic);
+
+        IMultiplexedStream[] opened = await Task.WhenAll(
+            Enumerable.Range(0, 3).Select(_ => Task.Run(async () => await session.OpenRequestStreamAsync(CancellationToken.None))));
+
+        CollectionAssert.AreEquivalent(new long[] { 0, 4, 8 }, opened.Select(stream => stream.StreamId).ToArray());
+        Assert.HasCount(3, quic.UnidirectionalStreams);
+    }
+
+    [TestMethod]
+    public async Task OpenRequestStreamAsync_WhenCancelledWhileAnotherOpens_Throws()
+    {
+        FakeMultiplexedConnection quic = new(new FakeMultiplexedStream(0, []));
+        await using Http3Session session = new(quic);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await session.OpenRequestStreamAsync(new CancellationToken(canceled: true)));
+    }
+
+    [TestMethod]
     public async Task StopNewStreams_RefusedStream_TurnsAcceptsNewStreamsFalse()
     {
         await using Http3Session session = new(new FakeMultiplexedConnection());

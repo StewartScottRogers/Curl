@@ -27,6 +27,7 @@ public sealed class QuicConnectionTests
             Assert.AreEqual("GET", Encoding.ASCII.GetString(channel.Sent<QuicStreamFrame>().Single().Data.Span));
             Assert.AreEqual(0L, stream.StreamId);
             Assert.AreEqual("h3", connection.ApplicationProtocol);
+            Assert.IsGreaterThan(0L, connection.BidirectionalStreamLimit!.Value, "the server's MAX_STREAMS for bidirectional streams");
             Assert.AreEqual(QuicTestChannel.ServerAddress, connection.RemoteEndPoint);
             Assert.AreEqual(QuicTestLiveChannel.ClientAddress, connection.LocalEndPoint);
             Assert.AreEqual(0, await stream.ReadAsync(Memory<byte>.Empty, CancellationToken.None));

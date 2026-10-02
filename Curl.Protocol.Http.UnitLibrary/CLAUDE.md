@@ -37,7 +37,7 @@ closes with its response.
 
 HTTP/3 (BL-731, ADR-0172) does the same over QUIC: for `--http3-only`, and for `--http3`
 before falling back to TCP, the handler asks the connector for an `IMultiplexedConnection`
-(`IConnector.ConnectMultiplexedAsync`) and wraps it in an `Http3Session`, which opens the
+(`IConnector.ConnectMultiplexedSessionAsync`) and wraps it in an `Http3Session`, which a pooling connector shares between `-Z` transfers up to the server's MAX_STREAMS (ADR-0338), which opens the
 client's control and QPACK streams and hands out an `Http3StreamConnection` per request
 (`HTTP/3 200 \r\n`, the headers, the empty line, then the DATA). `IHttpStreamSession` and
 `IHttpStreamConnection` are what the handler sees of either version. The session also reads

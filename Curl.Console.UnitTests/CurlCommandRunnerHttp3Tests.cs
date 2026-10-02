@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Http2;
 using Curl.Http3;
+using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -93,7 +94,7 @@ public sealed class CurlCommandRunnerHttp3Tests
 
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual("hello", standardOutput);
-        Assert.HasCount(1, connector.QuicTargets);
+        Assert.HasCount(1, connector.QuicTargets, standardError);
         Assert.AreEqual(1, connector.TcpConnectCount);
         StringAssert.StartsWith(Encoding.Latin1.GetString(tcp.Written), "GET /q HTTP/1.1\r\n");
     }
@@ -152,6 +153,40 @@ public sealed class CurlCommandRunnerHttp3Tests
     }
 
     /// <summary>A response on the request stream: a 200 head with the body's length, then the body.</summary>
+    [TestMethod]
+    public async Task RunAsync_ParallelHttp3OnlyToOneOrigin_CarriesThreeTransfersOnStreams0And4And8OfOneQuicConnection()
+    {
+        // curl -Z --http3-only -v -w '%{num_connects}\n' with three URLs on one origin, curl.se's
+        // ngtcp2 build (BL-735 Notes): one connection, the second and third transfers multiplexed
+        // onto it on streams 4 and 8, num_connects 1, 0 and 0, and one "left intact".
+        TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        ScriptedMultiplexedStream[] streams = [.. new long[] { 0, 4, 8 }.Select(id => new ScriptedMultiplexedStream(id, Http3Response(string.Empty)) { ReadsAfter = release.Task })];
+        ScriptedMultiplexedConnection quic = new(streams) { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 18443) };
+        ScriptedQuicConnector connector = new(MultiplexedConnectResult.Connected(quic, null), new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
+
+        PoolingConnector pool = new(connector, TimeProvider.System) { WaitsForMultiplexing = true };
+
+        Task<(int ExitCode, string StandardOutput, string StandardError)> run = RunAsync(
+            pool, "-Z", "--http3-only", "-s", "-v", "-w", "%{num_connects}\n", HttpsUrl + "1", HttpsUrl + "2", HttpsUrl + "3");
+        await Task.WhenAll(streams.Select(stream => stream.FirstWrite)).WaitAsync(TimeSpan.FromSeconds(30));
+        release.SetResult();
+        (int exitCode, string standardOutput, string standardError) = await run;
+        await pool.DisposeAsync();
+
+        Assert.AreEqual(0, exitCode, standardError);
+        Assert.HasCount(1, connector.QuicTargets, standardError);
+        CollectionAssert.AreEquivalent(new[] { "1", "0", "0" }, NormalizedNewLines(standardOutput).Split('\n', StringSplitOptions.RemoveEmptyEntries));
+        string[] lines = NormalizedNewLines(standardError).Replace("\r", string.Empty, StringComparison.Ordinal).Split('\n');
+        CollectionAssert.IsSubsetOf(
+            new[] { "* [HTTP/3] [0] OPENED stream for https://localhost:18443/q1", "* [HTTP/3] [4] OPENED stream for https://localhost:18443/q2", "* [HTTP/3] [8] OPENED stream for https://localhost:18443/q3" },
+            lines.Where(line => line.Contains("OPENED", StringComparison.Ordinal)).Order(StringComparer.Ordinal).ToArray());
+        Assert.HasCount(2, lines.Where(line => line == "* Multiplexed connection found"));
+        Assert.HasCount(2, lines.Where(line => line == "* Reusing existing https: connection with host localhost"));
+        Assert.HasCount(1, lines.Where(line => line == "* Connection #0 to host localhost:18443 left intact"));
+        Assert.AreEqual(1, quic.CloseCount, "closed once, at the end of the run");
+        Assert.AreEqual(0x100L, quic.CloseCode);
+    }
+
     private static byte[] Http3Response(string body, params (string Name, string Value)[] headers)
     {
         byte[] head = new QpackEncoder(0, 0).EncodeFieldSection(

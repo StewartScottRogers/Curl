@@ -29,6 +29,7 @@ namespace Curl.Networking;
 /// The asking <see cref="PoolingConnector" />'s configuration, compared with
 /// <see cref="object.Equals(object?)" />, or <see langword="null" /> for none.
 /// </param>
+/// <param name="IsQuic">Whether the connection runs over QUIC, which a transfer over TCP never shares (BL-735).</param>
 internal sealed record ConnectionPoolKey(
     string Scheme,
     string Host,
@@ -37,7 +38,8 @@ internal sealed record ConnectionPoolKey(
     bool IsForwardProxy,
     ConnectionPoolProxyKey? Proxy,
     string? AltSvcAuthority,
-    object? Configuration = null)
+    object? Configuration = null,
+    bool IsQuic = false)
 {
     /// <summary>
     /// Builds the key of <paramref name="target" />, or <see langword="null" /> when the

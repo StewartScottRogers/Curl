@@ -573,11 +573,15 @@ public sealed class HttpProtocolHandler(
                 : await RaceQuicAgainstTcpAsync(plan, target).ConfigureAwait(false);
         }
 
-        MultiplexedConnectResult quic = await plan.Deadline.ConnectMultiplexedAsync(connector, target).ConfigureAwait(false);
-        return quic.Connection is { } quicConnection
-            ? Http3Connected(quicConnection, quic)
-            : ConnectResult.Failed(quic.ExitCode, quic.ErrorMessage!);
+        return await ConnectOverQuicAsync(plan, target).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Connects over QUIC as an <see cref="Http3Session" />, which a pooling connector shares
+    /// between the transfers to the origin, each on a request stream of its own (BL-735).
+    /// </summary>
+    private ValueTask<ConnectResult> ConnectOverQuicAsync(HttpRequestPlan plan, ConnectTarget target, CancellationToken abandoned = default) =>
+        plan.Deadline.ConnectMultiplexedSessionAsync(connector, target, quic => new Http3Session(quic), abandoned);
 
     /// <summary>
     /// Races QUIC against TCP for <c>--http3</c> as curl's ngtcp2 build does
@@ -593,27 +597,27 @@ public sealed class HttpProtocolHandler(
     {
         using CancellationTokenSource quicAbandoned = new();
         using CancellationTokenSource tcpAbandoned = new();
-        Task<MultiplexedConnectResult> quic = plan.Deadline.ConnectMultiplexedAsync(connector, target, quicAbandoned.Token).AsTask();
+        Task<ConnectResult> quic = ConnectOverQuicAsync(plan, target, quicAbandoned.Token).AsTask();
         await FirstAttemptOrHappyEyeballsTimeoutAsync(plan, quic).ConfigureAwait(false);
-        if (quic.IsCompleted && (await quic.ConfigureAwait(false)).Connection is { } early)
+        if (quic.IsCompleted && (await quic.ConfigureAwait(false)).Connection is not null)
         {
-            return Http3Connected(early, quic.Result);
+            return quic.Result;
         }
 
         Task<ConnectResult> tcp = plan.Deadline.ConnectAsync(connector, target, tcpAbandoned.Token).AsTask();
         if (await Task.WhenAny(quic, tcp).ConfigureAwait(false) == tcp && (await tcp.ConfigureAwait(false)).Connection is not null)
         {
             await quicAbandoned.CancelAsync().ConfigureAwait(false);
-            _ = DisposeLosingQuicAsync(quic);
+            _ = DisposeLosingAttemptAsync(quic);
             return tcp.Result;
         }
 
-        MultiplexedConnectResult quicResult = await quic.ConfigureAwait(false);
-        if (quicResult.Connection is { } quicConnection)
+        ConnectResult quicResult = await quic.ConfigureAwait(false);
+        if (quicResult.Connection is not null)
         {
             await tcpAbandoned.CancelAsync().ConfigureAwait(false);
-            _ = DisposeLosingTcpAsync(tcp);
-            return Http3Connected(quicConnection, quicResult);
+            _ = DisposeLosingAttemptAsync(tcp);
+            return quicResult;
         }
 
         ConnectResult tcpResult = await tcp.ConfigureAwait(false);
@@ -641,24 +645,24 @@ public sealed class HttpProtocolHandler(
             return tcp.Result;
         }
 
-        Task<MultiplexedConnectResult> quic = plan.Deadline.ConnectMultiplexedAsync(connector, target, quicAbandoned.Token).AsTask();
-        if (await Task.WhenAny(tcp, quic).ConfigureAwait(false) == quic && (await quic.ConfigureAwait(false)).Connection is { } early)
+        Task<ConnectResult> quic = ConnectOverQuicAsync(plan, target, quicAbandoned.Token).AsTask();
+        if (await Task.WhenAny(tcp, quic).ConfigureAwait(false) == quic && (await quic.ConfigureAwait(false)).Connection is not null)
         {
             await tcpAbandoned.CancelAsync().ConfigureAwait(false);
-            _ = DisposeLosingTcpAsync(tcp);
-            return Http3Connected(early, quic.Result);
+            _ = DisposeLosingAttemptAsync(tcp);
+            return quic.Result;
         }
 
         ConnectResult tcpResult = await tcp.ConfigureAwait(false);
         if (tcpResult.Connection is not null)
         {
             await quicAbandoned.CancelAsync().ConfigureAwait(false);
-            _ = DisposeLosingQuicAsync(quic);
+            _ = DisposeLosingAttemptAsync(quic);
             return tcpResult;
         }
 
-        MultiplexedConnectResult quicResult = await quic.ConfigureAwait(false);
-        return quicResult.Connection is { } quicConnection ? Http3Connected(quicConnection, quicResult) : tcpResult;
+        ConnectResult quicResult = await quic.ConfigureAwait(false);
+        return quicResult.Connection is not null ? quicResult : tcpResult;
     }
 
     /// <summary>
@@ -673,33 +677,15 @@ public sealed class HttpProtocolHandler(
         await firstCompleted.CancelAsync().ConfigureAwait(false);
     }
 
-    /// <summary>Disposes the connection a TCP connect that lost the race opens anyway.</summary>
-    private static async Task DisposeLosingTcpAsync(Task<ConnectResult> tcp)
+    /// <summary>Disposes the connection a connect that lost the race opens anyway.</summary>
+    private static async Task DisposeLosingAttemptAsync(Task<ConnectResult> attempt)
     {
-        await ((Task)tcp).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        if (tcp.IsCompletedSuccessfully && tcp.Result.Connection is { } connection)
+        await ((Task)attempt).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        if (attempt.IsCompletedSuccessfully && attempt.Result.Connection is { } connection)
         {
             await connection.DisposeAsync().ConfigureAwait(false);
         }
     }
-
-    /// <summary>Disposes the connection a QUIC connect that lost the race opens anyway.</summary>
-    private static async Task DisposeLosingQuicAsync(Task<MultiplexedConnectResult> quic)
-    {
-        await ((Task)quic).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        if (quic.IsCompletedSuccessfully && quic.Result.Connection is { } connection)
-        {
-            await connection.DisposeAsync().ConfigureAwait(false);
-        }
-    }
-
-    /// <summary>Hands on a QUIC connection as an <see cref="Http3Session" />.</summary>
-    private static ConnectResult Http3Connected(IMultiplexedConnection connection, MultiplexedConnectResult quic) =>
-        ConnectResult.Connected(
-            new Http3Session(connection),
-            quic.Timings,
-            connection.LocalEndPoint as IPEndPoint,
-            applicationProtocol: connection.ApplicationProtocol);
 
     /// <summary>
     /// Decides whether the transfer tries QUIC: <c>--http3</c> or <c>--http3-only</c> with an
@@ -739,8 +725,8 @@ public sealed class HttpProtocolHandler(
     /// (<see cref="StreamSessionOf" />) carries each request on a stream of its own; its
     /// <see cref="Http2Session" /> is handed to the connection, which keeps it for the next
     /// transfer when pooled and sends its closing GOAWAY when it closes, or, on a connection
-    /// that holds no session, the GOAWAY is sent here (BL-817). An HTTP/3 connection is never
-    /// marked reusable.
+    /// that holds no session, the GOAWAY is sent here (BL-817). An HTTP/3 connection is marked
+    /// reusable while its session takes new requests (BL-735).
     /// </summary>
     private async ValueTask<HttpAttemptOutcome> ExchangeOnConnectionAsync(
         HttpRequestPlan plan,
@@ -777,11 +763,11 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Marks the connection reusable when the last response is reported left intact over
-    /// HTTP/1.x or HTTP/2, or reports that a pooled connection that died is being given up.
+    /// HTTP/1.x or HTTP/2, or over HTTP/3 while the session takes new requests, so a pool keeps it (BL-735), or reports that a pooled connection that died is being given up.
     /// </summary>
     private static void SettleConnection(HttpRequestPlan plan, IConnection connection, IHttpStreamSession? streams, HttpAttemptOutcome outcome)
     {
-        if (outcome.ReportsLeftIntact && streams is null or Http2Session)
+        if (outcome.ReportsLeftIntact && streams is null or Http2Session or Http3Session { AcceptsNewStreams: true })
         {
             connection.MarkReusable();
         }
@@ -851,13 +837,13 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Gives the session that carries each request on a stream of its own over the connection:
-    /// the HTTP/3 session a QUIC connect made, the HTTP/2 session an earlier transfer left with
+    /// the HTTP/3 session a QUIC connect made, which a pooled connection holds (BL-735), the HTTP/2 session an earlier transfer left with
     /// a pooled connection (BL-817), a new HTTP/2 session for a connection that speaks HTTP/2
     /// (<see cref="SpeaksHttp2" />), or <see langword="null" /> for HTTP/1.x.
     /// </summary>
     private static IHttpStreamSession? StreamSessionOf(HttpRequestPlan plan, ConnectResult connect, IConnection connection) =>
         (IHttpStreamSession?)(connection as Http3Session)
-            ?? (connection.Session as Http2Session)
+            ?? (connection.Session as IHttpStreamSession)
             ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection) : null);
 
     /// <summary>

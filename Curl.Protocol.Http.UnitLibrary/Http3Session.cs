@@ -31,7 +31,7 @@ namespace Curl.Protocol.Http;
 /// read with <see cref="ConnectionError" />, exit 56 and nghttp3's error name (ADR-0172).
 /// </para>
 /// </remarks>
-internal sealed class Http3Session : IHttpStreamSession, IConnection
+internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectionSession
 {
     /// <summary>The size of the buffer each server QPACK stream is read into.</summary>
     private const int QpackStreamBufferSize = 4096;
@@ -45,6 +45,8 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection
     private readonly CancellationTokenSource stopReadingPeerStreams = new();
 
     private readonly Lock gate = new();
+
+    private readonly SemaphoreSlim openingStreams = new(1, 1);
 
     private volatile Http3ControlStreamReader? controlStream;
 
@@ -113,6 +115,24 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection
     /// </summary>
     public bool AcceptsNewStreams => !isStoppedByRefusedStream && controlStream?.GoawayStreamId is null && ConnectionError is null;
 
+    /// <summary>
+    /// Gets how many transfers the connection carries at once, each on a request stream of its
+    /// own: the servers latest <c>MAX_STREAMS</c> for the clients bidirectional streams,
+    /// unlimited when the connection does not know it, or 0 once it takes no new request
+    /// (<see cref="AcceptsNewStreams" />), so a pool shares the session between <c>-Z</c>
+    /// transfers and opens a new connection when it is reached (BL-735).
+    /// </summary>
+    public int? ConcurrentTransferLimit => AcceptsNewStreams
+        ? (int)Math.Min(Connection.BidirectionalStreamLimit ?? int.MaxValue, int.MaxValue)
+        : 0;
+
+    /// <summary>
+    /// Does nothing: disposing the session closes the connection with <c>H3_NO_ERROR</c>.
+    /// </summary>
+    /// <param name="cancellationToken">Not used.</param>
+    /// <returns>A completed task.</returns>
+    public ValueTask ShutDownAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
     /// <summary>Gets a value indicating that QUIC traffic is always encrypted.</summary>
     public bool IsSecure => true;
 
@@ -128,11 +148,26 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection
 
     /// <summary>
     /// Opens the client's control stream with curl's <c>SETTINGS</c> and its QPACK encoder
-    /// and decoder streams, unless they are open already, then opens a request stream.
+    /// and decoder streams, unless they are open already, then opens a request stream; one
+    /// transfer at a time, as the <c>-Z</c> transfers a pool shares the session between open
+    /// theirs concurrently (BL-735).
     /// </summary>
     /// <param name="cancellationToken">Cancels the opens and writes.</param>
     /// <returns>The request stream.</returns>
     internal async ValueTask<IMultiplexedStream> OpenRequestStreamAsync(CancellationToken cancellationToken)
+    {
+        await openingStreams.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await OpenRequestStreamOneAtATimeAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            openingStreams.Release();
+        }
+    }
+
+    private async ValueTask<IMultiplexedStream> OpenRequestStreamOneAtATimeAsync(CancellationToken cancellationToken)
     {
         if (openedStreams.Count == 0) // the first request: the three unidirectional streams go first
         {
@@ -201,6 +236,7 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection
         await stopReadingPeerStreams.CancelAsync().ConfigureAwait(false);
         await PeerStreamsReading.ConfigureAwait(false);
         stopReadingPeerStreams.Dispose();
+        openingStreams.Dispose();
         foreach (IMultiplexedStream stream in openedStreams.Concat(acceptedStreams))
         {
             await stream.DisposeAsync().ConfigureAwait(false);

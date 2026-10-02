@@ -68,4 +68,53 @@ public sealed class EndPointRecordingConnectorTests
         Assert.AreEqual(CurlExitCode.RecvError, connect.ExitCode);
         Assert.AreSame(result, recorder.ReportOn(result));
     }
+
+    [TestMethod]
+    public async Task ConnectMultiplexedSessionAsync_Connected_RecordsTheLocalAndRemoteEndPoints()
+    {
+        IPEndPoint local = new(IPAddress.Loopback, 64514);
+        IPEndPoint remote = new(IPAddress.Loopback, 443);
+        ScriptedMultiplexedConnection quic = new(new ScriptedMultiplexedStream(0, [])) { LocalEndPoint = local };
+        ConnectionEndPointRecorder recorder = new();
+        EndPointRecordingConnector connector = new(new ScriptedQuicConnector(MultiplexedConnectResult.Connected(quic, null), new RecordingConnector(CurlExitCode.CouldntConnect, "unused")), recorder);
+        SessionOverQuic session = new(remote);
+
+        ConnectResult connect = await connector.ConnectMultiplexedSessionAsync(Target, _ => session, CancellationToken.None);
+
+        Assert.AreSame(session, connect.Connection);
+        TransferReport report = recorder.ReportOn(TransferResult.Success(0)).Report!;
+        Assert.AreEqual(local, report.LocalEndPoint);
+        Assert.AreEqual(remote, report.RemoteEndPoint);
+    }
+
+    [TestMethod]
+    public async Task ConnectMultiplexedSessionAsync_Failed_RecordsNothing()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        EndPointRecordingConnector connector = new(
+            new ScriptedQuicConnector(MultiplexedConnectResult.Failed(CurlExitCode.RecvError, "QUIC failed"), new RecordingConnector(CurlExitCode.CouldntConnect, "unused")),
+            recorder);
+        TransferResult result = TransferResult.Success(0);
+
+        ConnectResult connect = await connector.ConnectMultiplexedSessionAsync(Target, _ => throw new AssertFailedException("opened"), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.RecvError, connect.ExitCode);
+        Assert.AreSame(result, recorder.ReportOn(result));
+    }
+
+    /// <summary>A session over a QUIC connection that only names the server's endpoint.</summary>
+    private sealed class SessionOverQuic(EndPoint remoteEndPoint) : IConnection
+    {
+        public bool IsSecure => true;
+
+        public EndPoint? RemoteEndPoint => remoteEndPoint;
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 }
