@@ -78,7 +78,22 @@ internal sealed class Http2FrameTrace(ITransferEvents events) : IHttp2FrameObser
             Http2FrameType.Headers => Text($"FRAME[HEADERS, len={length}, hend={Bit(frame, Http2FrameFlags.EndHeaders)}, eos={Bit(frame, Http2FrameFlags.EndStream)}]"),
             Http2FrameType.Priority => Text($"FRAME[PRIORITY, len={length}, flags={frame.Flags}]"),
             Http2FrameType.RstStream => Text($"FRAME[RST_STREAM, len={length}, flags={frame.Flags}, error={BinaryPrimitives.ReadUInt32BigEndian(payload)}]"),
-            Http2FrameType.Settings => frame.HasFlag(Http2FrameFlags.Acknowledgement) ? "FRAME[SETTINGS, ack=1]" : Text($"FRAME[SETTINGS, len={length}]"),
+            Http2FrameType.Settings => DescribeSettings(frame),
+            _ => DescribeOtherFrame(frame),
+        };
+    }
+
+    /// <summary>Describes a SETTINGS frame: <c>FRAME[SETTINGS, ack=1]</c> for an acknowledgement, its length otherwise.</summary>
+    private static string DescribeSettings(Http2Frame frame) =>
+        frame.HasFlag(Http2FrameFlags.Acknowledgement) ? "FRAME[SETTINGS, ack=1]" : Text($"FRAME[SETTINGS, len={frame.Payload.Length}]");
+
+    /// <summary>Describes a PUSH_PROMISE, PING, GOAWAY, WINDOW_UPDATE or unknown frame, for <see cref="Describe"/>.</summary>
+    private static string DescribeOtherFrame(Http2Frame frame)
+    {
+        int length = frame.Payload.Length;
+        ReadOnlySpan<byte> payload = frame.Payload.Span;
+        return frame.Type switch
+        {
             Http2FrameType.PushPromise => Text($"FRAME[PUSH_PROMISE, len={length}, hend={Bit(frame, Http2FrameFlags.EndHeaders)}]"),
             Http2FrameType.Ping => Text($"FRAME[PING, len={length}, ack={Bit(frame, Http2FrameFlags.Acknowledgement)}]"),
             Http2FrameType.GoAway => DescribeGoAway(payload),
