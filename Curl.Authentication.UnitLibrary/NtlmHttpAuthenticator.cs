@@ -15,7 +15,8 @@ namespace Curl.Authentication;
 /// context cannot answer fails the transfer with exit 94. <see langword="false" /> where
 /// curl's own NTLM is (elsewhere): a Type 2 message it cannot read ends the transfer on the
 /// 401, exit 0, and a <see cref="SecurityContextStatus.Refused" /> answer, which is a Type 3
-/// message past curl's 1024-byte buffer, fails it with exit 100 (BL-849).
+/// message past curl's 1024-byte buffer, fails it with exit 100 (BL-849) and the message curl
+/// prints for the check that refused it (BL-1128).
 /// </param>
 /// <remarks>
 /// It keeps no context between legs. Type 3 comes from a new context stepped through its
@@ -33,6 +34,13 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
     /// when the Type 3 message would not fit its 1024-byte buffer (measured on Ubuntu, BL-849).
     /// </summary>
     public const string Type3TooLargeMessage = "user + domain + hostname too big for NTLM";
+
+    /// <summary>
+    /// The message curl 8.21.0's own NTLM prints for exit 100, <see cref="CurlExitCode.TooLarge" />,
+    /// when the Type 3 message's responses alone end past its 1024-byte buffer, as a Type 2
+    /// with large target information makes the NTLMv2 response do (<c>lib/vauth/ntlm.c</c>, BL-1114).
+    /// </summary>
+    public const string ResponsesTooLargeMessage = "incoming NTLM message too big";
 
     private const string SchemePrefix = "NTLM ";
 
@@ -184,10 +192,19 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
 
         if (authenticate.Status == SecurityContextStatus.Refused)
         {
-            throw new HttpAuthenticationFailedException(CurlExitCode.TooLarge, Type3TooLargeMessage);
+            throw new HttpAuthenticationFailedException(CurlExitCode.TooLarge, TooLargeMessageFor(context));
         }
 
         ReportRefused(request.Events, NtlmHandshakeLines.BadType2);
         return null;
     }
+
+    /// <summary>
+    /// Gets the message curl prints for the buffer check that refused the Type 3 message: the
+    /// responses check for curl's own NTLM that says so, the names check otherwise.
+    /// </summary>
+    private static string TooLargeMessageFor(ISecurityContext context) =>
+        context is HandBuiltNtlmSecurityContext { AnswerRefusedBecause: NtlmMessageFailure.ResponsesTooLarge }
+            ? ResponsesTooLargeMessage
+            : Type3TooLargeMessage;
 }

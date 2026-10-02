@@ -162,6 +162,37 @@ public sealed partial class NtlmHttpAuthenticatorTests
         Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode);
     }
 
+    /// <summary>
+    /// curl 8.21.0's <c>lib/vauth/ntlm.c</c> (BL-1114): when the NTLMv2 response, which carries
+    /// the challenge's target information, alone ends past the 1024-byte buffer, curl fails
+    /// with exit 100 and <c>incoming NTLM message too big</c>, not the names message.
+    /// </summary>
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_TargetInformationPushesResponsesPastCurlsBuffer_FailsWithIncomingMessageTooBig()
+    {
+        NtlmHttpAuthenticator authenticator = Authenticator(new HandBuiltNtlmContexts());
+
+        HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
+            () => authenticator.CreateAuthorizationAsync(Request("u:p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [ChallengeWithTargetInformation(1000)], CancellationToken.None).AsTask());
+
+        Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode);
+        Assert.AreEqual("incoming NTLM message too big", failure.Message);
+    }
+
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_OtherContextRefusesType3_FailsWithTheNamesMessage()
+    {
+        ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(
+            new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
+            new SecurityContextStep(SecurityContextStatus.Refused, [])));
+
+        HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
+            () => Authenticator(contexts).CreateAuthorizationAsync(Request("u:p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
+
+        Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode);
+        Assert.AreEqual(NtlmHttpAuthenticator.Type3TooLargeMessage, failure.Message);
+    }
+
     [TestMethod]
     public async Task CreateAuthorizationAsync_ContextRefusesType2WithSspi_FailsWithExit94()
     {
@@ -255,6 +286,24 @@ public sealed partial class NtlmHttpAuthenticatorTests
     }
 
     private static NtlmHttpAuthenticator Authenticator(ISecurityContextFactory contexts) => new(contexts, refusedChallengeFailsTransfer: false);
+
+    /// <summary>
+    /// Makes the measured Type 2 challenge with <paramref name="targetInformationLength" /> zero
+    /// bytes of target information after its 48-byte header in place of the measured ones.
+    /// </summary>
+    private static string ChallengeWithTargetInformation(int targetInformationLength)
+    {
+        byte[] measured = Convert.FromBase64String(HandBuiltNtlmSecurityContextTests.MeasuredChallenge);
+        byte[] challenge = new byte[NtlmChallengeMessage.TargetInformationHeaderLength + targetInformationLength];
+        measured.AsSpan(0, NtlmChallengeMessage.TargetInformationHeaderLength).CopyTo(challenge);
+        uint flags = BitConverter.ToUInt32(challenge, 20) | (uint)NtlmNegotiateFlags.NegotiateTargetInfo;
+        BitConverter.TryWriteBytes(challenge.AsSpan(20), flags);
+        BitConverter.TryWriteBytes(challenge.AsSpan(12), 0u);
+        BitConverter.TryWriteBytes(challenge.AsSpan(40), (ushort)targetInformationLength);
+        BitConverter.TryWriteBytes(challenge.AsSpan(42), (ushort)targetInformationLength);
+        BitConverter.TryWriteBytes(challenge.AsSpan(44), (uint)NtlmChallengeMessage.TargetInformationHeaderLength);
+        return "NTLM " + Convert.ToBase64String(challenge);
+    }
 
     private static HttpAuthRequest Request(string userColonPassword)
     {
