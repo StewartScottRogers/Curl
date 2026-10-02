@@ -37,3 +37,4 @@ When a POP3 server answers `AUTH` with a `+` challenge that a challenge-reading 
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
