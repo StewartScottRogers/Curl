@@ -34,3 +34,4 @@ After a `--http2` h2c upgrade, the frames Curl writes on the connection match cu
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-02: Backlog -> Doing.
