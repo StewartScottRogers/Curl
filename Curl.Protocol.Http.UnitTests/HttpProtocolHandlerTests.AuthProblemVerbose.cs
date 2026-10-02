@@ -105,6 +105,60 @@ public sealed partial class HttpProtocolHandlerTests
             LastHeadLines(lines));
     }
 
+    /// <summary>
+    /// Measured (BL-1175 Notes): <c>curl -s -S -v --digest -u u:p</c> against a Digest
+    /// <c>401</c> and then a second one without <c>stale=true</c> writes the Digest problem line,
+    /// then the duplicate line for the header's second Digest challenge, before that header.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestAnswerRefusedVerbose_WritesDigestProblemBeforeTheChallengeHeader()
+    {
+        const string Refusal = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Digest realm=\"r\", nonce=\"b\", qop=\"auth\", Digest realm=\"s\", nonce=\"c\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        TurnTakingConnection first = new(65536, StaleChallenge("a", stale: false, close: true));
+        TurnTakingConnection second = new(65536, Refusal);
+
+        List<string> lines = await DigestVerboseLinesAsync(first, second);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "< HTTP/1.1 401 Unauthorized",
+                "* Digest authentication problem, ignoring.",
+                "* Ignoring duplicate digest auth header.",
+                "< WWW-Authenticate: Digest realm=\"r\", nonce=\"b\", qop=\"auth\", Digest realm=\"s\", nonce=\"c\"",
+                "< Content-Length: 0",
+            },
+            LastHeadLines(lines));
+        Assert.AreEqual(1, lines.Count(line => line.Contains("Digest authentication problem", StringComparison.Ordinal)));
+    }
+
+    /// <summary>Measured (BL-1175 Notes): a stale Digest challenge writes no problem line; curl answers it afresh.</summary>
+    [TestMethod]
+    public async Task ExecuteAsync_StaleDigestChallengeVerbose_WritesNoProblemLine()
+    {
+        TurnTakingConnection first = new(65536, StaleChallenge("a", stale: false, close: true));
+        TurnTakingConnection second = new(65536, StaleChallenge("b", stale: true, close: true));
+        TurnTakingConnection third = new(65536, StaleOk);
+
+        List<string> lines = await DigestVerboseLinesAsync(first, second, third);
+
+        Assert.IsFalse(lines.Any(line => line.Contains("authentication problem", StringComparison.Ordinal)));
+        Assert.Contains("< HTTP/1.1 200 OK", lines);
+    }
+
+    /// <summary>Runs one <c>-v --digest -u u:p</c> transfer on <paramref name="connections" />, checks it succeeds, and gives its events by first line.</summary>
+    private static async Task<List<string>> DigestVerboseLinesAsync(params TurnTakingConnection[] connections)
+    {
+        RecordingTransferEvents events = new();
+        TransferContext context = new() { Url = CurlUrl.Parse(StaleUrl), Output = new MemoryStream(), Credentials = new NetworkCredential("u", "p"), Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest }, Events = events };
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connections), StaleAuthenticator("370cf856b91684edfd74ca6d21b5bebb", "fa452aa0c29c5f74b6287443cc695e23"))
+            .ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        return FirstLinesOf(events);
+    }
+
     /// <summary>Runs one <c>-v</c> transfer of <paramref name="url" /> on <paramref name="connection" />, checks it succeeds, and gives its events by first line.</summary>
     private static async Task<List<string>> AuthProblemLinesAsync(TurnTakingConnection connection, HttpRequestOptions options, NetworkCredential? credential, string url)
     {

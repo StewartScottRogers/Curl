@@ -986,12 +986,14 @@ public sealed class HttpProtocolHandler(
             Log = exchangeLog,
         };
         int cookiesStored = 0;
+        HttpAuthProblemLines originProblems = new();
+        HttpAuthProblemLines proxyProblems = new();
         HttpResponseHeadReader headReader = new(responseConnection)
         {
             Events = context.Events,
             HeaderReceived = (statusLine, header) =>
             {
-                ReportAuthProblemLines(plan, statusLine, header);
+                ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
                 cookiesStored = StoreCookie(context, header, cookiesStored);
                 StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
             },
@@ -1221,17 +1223,19 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Reports the <c>authentication problem, ignoring.</c> lines curl writes just before a
-    /// challenge header refusing the Basic or Bearer value the request sent to the proxy or the
-    /// origin (<see cref="HttpAuthProblemLines" />, BL-1040).
+    /// challenge header refusing the Basic, Bearer or Digest value the request sent to the proxy
+    /// or the origin, and its duplicate Digest lines, each read by the head's own
+    /// <see cref="HttpAuthProblemLines" /> (BL-1040, BL-1175).
     /// </summary>
-    private static void ReportAuthProblemLines(HttpRequestPlan plan, HttpStatusLine statusLine, HttpResponseHeader header)
+    private static void ReportAuthProblemLines(
+        HttpRequestPlan plan, HttpStatusLine statusLine, HttpResponseHeader header, HttpAuthProblemLines originProblems, HttpAuthProblemLines proxyProblems)
     {
         if (plan.ProxyAuthRequest is { } proxyRequest)
         {
-            ReportInfoLines(plan.Context.Events, [.. HttpAuthProblemLines.LinesBefore(proxyRequest, plan.ProxyAuthorization, statusLine, header)]);
+            ReportInfoLines(plan.Context.Events, [.. proxyProblems.LinesBefore(proxyRequest, plan.ProxyAuthorization, statusLine, header)]);
         }
 
-        ReportInfoLines(plan.Context.Events, [.. HttpAuthProblemLines.LinesBefore(plan.AuthRequest, plan.Authorization, statusLine, header)]);
+        ReportInfoLines(plan.Context.Events, [.. originProblems.LinesBefore(plan.AuthRequest, plan.Authorization, statusLine, header)]);
     }
 
     /// <summary>Reports <paramref name="line" />, or nothing when it is <see langword="null" />.</summary>
