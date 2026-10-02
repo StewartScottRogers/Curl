@@ -35,3 +35,4 @@ Below a TLS 1.3 ceiling, `HandBuiltTlsProvider`'s first record matches the platf
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
