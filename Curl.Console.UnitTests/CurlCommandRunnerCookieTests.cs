@@ -171,7 +171,7 @@ public sealed class CurlCommandRunnerCookieTests
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(
             Latin1(standardError.ToArray()),
-            NativeLines("* using HTTP/1.x\n* Restricted outgoing cookies due to header size, 'c' not sent\n> GET / HTTP/1.1\r\n"));
+            "* using HTTP/1.x\r\n* Restricted outgoing cookies due to header size, 'c' not sent\r\n> GET / HTTP/1.1\r\r\n");
         CollectionAssert.AreEqual(new[] { $"aaa={value}", $"bb={value}" }, SentCookies(server));
     }
 
