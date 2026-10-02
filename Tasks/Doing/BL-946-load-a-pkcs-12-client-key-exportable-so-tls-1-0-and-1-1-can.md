@@ -34,3 +34,4 @@ On Windows, an RSA client certificate given as a PKCS #12 file with `--cert` sig
 
 - 2026-09-29: Created.
 - 2026-09-29: Renumbered from BL-877, which the --pinnedpubkey -v task filed first also holds.
+- 2026-10-02: Backlog -> Doing.
