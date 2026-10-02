@@ -150,6 +150,29 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.IsFalse(ExtensionTypes(DecodeClientHello(record)).Contains(TlsExtensionType.EncryptedClientHello));
     }
 
+    // The ECH result rides on the completed handshake's event, for the -v line after
+    // `SSL connection using` (BL-1170); a TLS 1.2 server keeps it off macOS' TLS 1.3 gap.
+    [TestMethod]
+    [DataRow("grease", "status is sent GREASE, inner is NULL, outer is NULL")]
+    [DataRow("true", "status is not configured, inner is NULL, outer is NULL")]
+    [DataRow("false", null)]
+    [DataRow(null, null)]
+    public async Task AuthenticateAsClientAsync_WithEchToACompletedHandshake_ReportsTheEchResult(string? mode, string? expected)
+    {
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var serverTask = RunEchoServerAsync(server, SslProtocols.Tls12);
+        var events = new RecordingTransferEvents();
+
+        var result = await Provider(Tls12Only(new TlsClientOptions(Insecure: true, Ech: mode)), OpenSslBuild)
+            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        await using var connection = result.Connection!;
+        Assert.AreEqual(expected, Assert.ContainsSingle(events.Handshakes).EchResult);
+        await connection.DisposeAsync();
+        await IgnoreFailureAsync(serverTask);
+    }
+
     public static IEnumerable<object?[]> MeasuredEchLines =>
     [
         [new TlsClientOptions(Ech: "grease"), null, new[] { "ECH: will GREASE ClientHello" }],

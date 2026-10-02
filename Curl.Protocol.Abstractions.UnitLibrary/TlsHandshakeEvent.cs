@@ -108,4 +108,12 @@ public sealed record TlsHandshakeEvent
     /// <c> public key hash:</c> line, all of the OpenSSL build's (ADR-0363, BL-1149).
     /// </summary>
     public bool Failed { get; init; }
+
+    /// <summary>
+    /// Gets the text curl's OpenSSL ECH build writes after <c>ECH: result: </c>, straight after
+    /// <c>SSL connection using</c>, for a handshake under <c>--ech</c>, such as
+    /// <c>status is sent GREASE, inner is NULL, outer is NULL</c>; or <see langword="null" />
+    /// when <c>--ech</c> is off or the platform does not report it (ADR-0359, BL-1170).
+    /// </summary>
+    public string? EchResult { get; init; }
 }

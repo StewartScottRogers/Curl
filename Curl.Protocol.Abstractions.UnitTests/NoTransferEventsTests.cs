@@ -92,6 +92,7 @@ public sealed class NoTransferEventsTests
         Assert.IsNull(Handshake.PeerSignatureTypeName);
         Assert.IsNull(Handshake.CertificateVerifyResult);
         Assert.IsEmpty(Handshake.PeerCertificateChain);
+        Assert.IsNull(Handshake.EchResult);
     }
 
     [TestMethod]
@@ -102,12 +103,14 @@ public sealed class NoTransferEventsTests
             NegotiatedGroupName = "X25519MLKEM768",
             PeerSignatureTypeName = "RSASSA-PSS",
             CertificateVerifyResult = 18,
+            EchResult = "status is sent GREASE, inner is NULL, outer is NULL",
             PeerCertificateChain = [],
         };
 
         Assert.AreEqual("X25519MLKEM768", handshake.NegotiatedGroupName);
         Assert.AreEqual("RSASSA-PSS", handshake.PeerSignatureTypeName);
         Assert.AreEqual(18L, handshake.CertificateVerifyResult);
+        Assert.AreEqual("status is sent GREASE, inner is NULL, outer is NULL", handshake.EchResult);
         Assert.IsEmpty(handshake.PeerCertificateChain);
     }
 }

@@ -91,6 +91,11 @@ internal static class OpenSslHandshakeText
         var lines = new List<string>();
         lines.AddRange(alpnLines.Take(1));
         lines.Add(ConnectionLine(handshake, isLibreSsl));
+        if (handshake.EchResult is { } echResult)
+        {
+            lines.Add("ECH: result: " + echResult);
+        }
+
         lines.AddRange(alpnLines.Skip(1));
         if (handshake.ServerCertificate is { } certificate)
         {

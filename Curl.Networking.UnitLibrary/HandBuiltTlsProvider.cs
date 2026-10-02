@@ -254,6 +254,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         {
             IsProxy = run.IsProxy,
             VerifiedHostName = SslStreamTlsProvider.VerifiedHostName(run.TargetHost, _options.Insecure),
+            EchResult = EchResultText.Of(_options, run.Prepared.Settings.EchConfigs, run.TargetHost),
         });
         CertificateStatusText.Report(run.Events, handshake.CertificateStatus);
         return (handshake, null);
