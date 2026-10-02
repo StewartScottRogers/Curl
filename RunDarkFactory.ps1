@@ -63,7 +63,9 @@
     no lane holds (BL-1071) is adopted by the one lane worktree with uncommitted work, or,
     when none has any and a parked factory/<ID>-lane-* branch holds its work, returned to
     Backlog; anything else refuses to start, and every refusal raises the alarm, so the
-    factory never stops without saying why. A run that dies on
+    factory never stops without saying why. A coordinator whose clean checkout is only
+    behind origin/<branch> fast-forwards it and starts (BL-1141); one that is ahead of it
+    or has diverged from it refuses. A run that dies on
     the API without naming the limit waits until a one-word probe is answered, then runs
     again (three times at most).
 
@@ -1794,6 +1796,28 @@ function Invoke-Requeue {
 # ---------------------------------------------------------------------------- git
 
 function Get-Dirty { return @(git -C $Root status --porcelain) | Where-Object { $_ } }
+
+function Sync-CheckoutWithOrigin {
+    # Brings a clean, freshly fetched checkout level with origin/<Branch> before a shift
+    # starts. Only behind is fast-forwarded (BL-1141): a lane pushed after the last shift
+    # synced. Ahead or diverged needs a person, so it returns the refusal text; $null
+    # means the checkout now matches origin.
+    param([string]$Repo, [string]$Branch)
+    $head = "$(git -C $Repo rev-parse HEAD)".Trim()
+    $remote = "$(git -C $Repo rev-parse "origin/$Branch")".Trim()
+    if ($head -eq $remote) { return $null }
+    git -C $Repo merge-base --is-ancestor $head $remote 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        git -C $Repo merge-base --is-ancestor $remote $head 2>&1 | Out-Null
+        $how = if ($LASTEXITCODE -eq 0) { 'is ahead of' } else { 'has diverged from' }
+        return "$Branch $how origin/$Branch; push or reconcile first"
+    }
+    $behind = "$(git -C $Repo rev-list --count "$head..$remote")".Trim()
+    git -C $Repo merge -q --ff-only "origin/$Branch" 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { return "$Branch is behind origin/$Branch and git merge --ff-only failed; pull first" }
+    Write-Trace '-' 'sync' "fast-forwarded $Branch $behind commit(s) to origin/$Branch"
+    return $null
+}
 
 function Get-FailedTestNames {
     # What a dotnet test run's -Output says failed, as one short line for a trace or a park
@@ -3562,9 +3586,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     if ($branch -in 'master', 'main') { Stop-ShiftStart "on $branch; switch to a feature branch"; exit 1 }
     if (Get-Dirty) { Stop-ShiftStart 'working tree not clean; commit or stash first'; exit 1 }
     git -C $Root fetch -q origin $branch
-    if ((git -C $Root rev-parse HEAD).Trim() -ne (git -C $Root rev-parse "origin/$branch").Trim()) {
-        Stop-ShiftStart "$branch differs from origin/$branch; push or pull first"; exit 1
-    }
+    $syncRefusal = Sync-CheckoutWithOrigin -Repo $Root -Branch $branch
+    if ($syncRefusal) { Stop-ShiftStart $syncRefusal; exit 1 }
     # Tasks in Doing are only allowed when a previous shift's lane holds each of them and that
     # lane is dead - a shift stopped mid-task, or killed while waiting for tokens. Those lanes
     # are adopted: their worktrees are left as they are and they resume the task. An orphan,
