@@ -35,3 +35,4 @@ Under `-v`, every SOCKS tunnel `TcpConnector` opens (`-x socks*://`, `--socks*`,
 ## Log
 
 - 2026-09-30: Created.
+- 2026-10-02: Backlog -> Doing.
