@@ -37,3 +37,4 @@ On Windows (curl's Schannel build), `--tls13-ciphers` and `--proxy-tls13-ciphers
 ## Log
 
 - 2026-09-30: Created.
+- 2026-10-02: Backlog -> Doing.
