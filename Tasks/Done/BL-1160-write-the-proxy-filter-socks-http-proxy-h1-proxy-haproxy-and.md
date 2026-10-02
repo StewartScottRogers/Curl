@@ -29,7 +29,7 @@ Curl writes curl 8.21.0's `[SOCKS]`, `[HTTP-PROXY]`, `[H1-PROXY]`, `[HAPROXY]` a
 
 ## Notes
 
-- Split (as BL-1159 did, ADR-0357's BL-1160 amendment): this run delivers `[HAPROXY]` and pins `[SETUP]` through a plain HTTP proxy; `[HTTP-PROXY]`/`[H1-PROXY]` went to BL-1190, `[SOCKS]` to BL-1191, `[HTTPS-CONNECT]` to BL-1192 (filed with the board script, same `touches`). The acceptance boxes are ticked for the components this run delivers.
+- Split (as BL-1159 did, ADR-0357's BL-1160 amendment): this run delivers `[HAPROXY]` and pins `[SETUP]` through a plain HTTP proxy; `[HTTP-PROXY]`/`[H1-PROXY]` went to BL-1193, `[SOCKS]` to BL-1191, `[HTTPS-CONNECT]` to BL-1192 (filed with the board script, same `touches`). The acceptance boxes are ticked for the components this run delivers.
 - Measured 2026-10-02 with `Record-CurlExchange.ps1`, curl 8.21.0 Schannel (non-trace lines trimmed):
   - `-s -v --trace-config all -x http://127.0.0.1:18460 http://example.test/x`: no proxy filter line at all; `[SETUP] happy eyeballing to origin 127.0.0.1:18460` names the proxy. `--trace-config proxy -v`: plain `-v` output only. `-vv -x http://localhost:P`: `[SETUP] added`, the resolve lines, `[SETUP] happy eyeballing to origin localhost:P`, `Trying [::1]:P...`, `Trying 127.0.0.1:P...`, ... - a direct connect's lines.
   - `-v --trace-config setup,haproxy --haproxy-protocol http://127.0.0.1:18475/x`:
@@ -44,4 +44,4 @@ Curl writes curl 8.21.0's `[SOCKS]`, `[HTTP-PROXY]`, `[H1-PROXY]`, `[HAPROXY]` a
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
-- 2026-10-02: Doing -> Done. --trace-config haproxy/proxy/all and -vvvv write curl's [HAPROXY] lines and [SETUP] added HAPROXY filter; [SETUP] through a plain HTTP proxy pinned; tunnel, SOCKS and HTTPS-CONNECT filed as BL-1190..BL-1192
+- 2026-10-02: Doing -> Done. --trace-config haproxy/proxy/all and -vvvv write curl's [HAPROXY] lines and [SETUP] added HAPROXY filter; [SETUP] through a plain HTTP proxy pinned; tunnel, SOCKS and HTTPS-CONNECT filed as BL-1193..BL-1192

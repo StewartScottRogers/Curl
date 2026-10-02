@@ -77,7 +77,7 @@ Decided by Claude under Stewart's delegation.
 
 BL-1160 split again: this run delivers the `[HAPROXY]` lines and pins `[SETUP]` through a plain
 HTTP proxy; `[HTTP-PROXY]` and `[H1-PROXY]` (a CONNECT tunnel), `[SOCKS]` and `[HTTPS-CONNECT]` each
-go to a follow-up task (BL-1190, BL-1191, BL-1192), each a filter of its own with lines to measure.
+go to a follow-up task (BL-1193, BL-1191, BL-1192), each a filter of its own with lines to measure.
 
 - Measured (BL-1160 Notes): a plain `-x http://` proxy adds no proxy filter at all; its `[SETUP]`
   lines are a direct connect's, naming the proxy as the origin, which Curl already wrote, since a

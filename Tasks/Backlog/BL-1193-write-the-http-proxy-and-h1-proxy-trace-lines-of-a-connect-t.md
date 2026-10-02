@@ -1,5 +1,5 @@
 ---
-id: BL-1190
+id: BL-1193
 title: Write the [HTTP-PROXY] and [H1-PROXY] trace lines of a CONNECT tunnel for --trace-config
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1190 — Write the [HTTP-PROXY] and [H1-PROXY] trace lines of a CONNECT tunnel for --trace-config
+# BL-1193 — Write the [HTTP-PROXY] and [H1-PROXY] trace lines of a CONNECT tunnel for --trace-config
 
 ## Goal
 
