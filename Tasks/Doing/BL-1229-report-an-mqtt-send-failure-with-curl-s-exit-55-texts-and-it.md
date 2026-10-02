@@ -34,3 +34,4 @@ An `mqtt://` transfer whose packet cannot be sent ends with exit 55 and curl 8.2
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
