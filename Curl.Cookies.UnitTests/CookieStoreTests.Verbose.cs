@@ -166,4 +166,60 @@ public sealed partial class CookieStoreTests
         Assert.ThrowsExactly<ArgumentNullException>(() => store.StoreFromResponse(Www, (string)null!, 0, Now, NoTransferEvents.Instance));
         Assert.ThrowsExactly<ArgumentNullException>(() => store.StoreFromResponse(Www, "a=1", 0, Now, null!));
     }
+
+    /// <summary>
+    /// curl 8.21.0's <c>Curl_cookie_getlist</c> reports the limit as soon as the 150th matching cookie is taken,
+    /// so 151 and exactly 150 report it once and 149 report nothing (BL-1108).
+    /// </summary>
+    [TestMethod]
+    [DataRow(151, true)]
+    [DataRow(150, true)]
+    [DataRow(149, false)]
+    public void GetCookieHeader_ManyCookies_ReportsTheMostCookiesSent(int stored, bool reported)
+    {
+        CookieStore store = new();
+        foreach (int number in Enumerable.Range(1, stored))
+        {
+            store.StoreFromResponse(Loopback, "k" + number.ToString(System.Globalization.CultureInfo.InvariantCulture) + "=v", 0, Now, NoTransferEvents.Instance);
+        }
+
+        RecordingTransferEvents events = new();
+
+        string header = store.GetCookieHeader(Loopback, secure: false, Now, [], events)!;
+
+        Assert.HasCount(Math.Min(stored, CookieStore.MostCookiesSent), header.Split("; "));
+        CollectionAssert.AreEqual(reported ? new[] { "Included max number of cookies (150) in request!" } : Array.Empty<string>(), events.Info);
+    }
+
+    /// <summary>
+    /// curl 8.21.0's <c>http.c</c> names the first cookie that would make the header too long, sends none after
+    /// it and leaves the <c>-b name=value</c> strings out (BL-1108).
+    /// </summary>
+    [TestMethod]
+    public void GetCookieHeader_HeaderTooLong_ReportsTheFirstCookieLeftOut()
+    {
+        CookieStore store = new();
+        store.StoreFromResponse(Loopback, ["aaa=" + new string('x', 4000), "bb=" + new string('x', 4000), "c=" + new string('x', 165), "dd=1"], Now, NoTransferEvents.Instance);
+        RecordingTransferEvents events = new();
+
+        string header = store.GetCookieHeader(Loopback, secure: false, Now, ["s=1"], events)!;
+
+        Assert.AreEqual("aaa,dd,bb", string.Join(',', header.Split("; ").Select(pair => pair.Split('=')[0])));
+        CollectionAssert.AreEqual(new[] { "Restricted outgoing cookies due to header size, 'c' not sent" }, events.Info);
+    }
+
+    [TestMethod]
+    public void GetCookieHeader_WithinTheLimits_ReportsNothingAndSendsTheStrings()
+    {
+        CookieStore store = new();
+        store.StoreFromResponse(Loopback, ["a=1"], Now, NoTransferEvents.Instance);
+        RecordingTransferEvents events = new();
+
+        Assert.AreEqual("a=1; s=1", store.GetCookieHeader(Loopback, secure: false, Now, ["s=1"], events));
+        Assert.IsEmpty(events.Info);
+    }
+
+    [TestMethod]
+    public void GetCookieHeader_NullEvents_Throws() =>
+        Assert.ThrowsExactly<ArgumentNullException>(() => new CookieStore().GetCookieHeader(Loopback, secure: false, Now, [], null!));
 }

@@ -101,26 +101,74 @@ public sealed class CookieStore : ICookieStore
     /// <param name="cookieStrings">The strings sent after the stored cookies, verbatim, in order.</param>
     /// <returns>The header value, or <see langword="null"/> when there is nothing to send.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="url"/> or <paramref name="cookieStrings"/> is <see langword="null"/>.</exception>
-    public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, IReadOnlyList<string> cookieStrings)
+    public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, IReadOnlyList<string> cookieStrings) =>
+        GetCookieHeader(url, secure, now, cookieStrings, NoTransferEvents.Instance);
+
+    /// <summary>
+    /// Builds the <c>Cookie</c> header value as
+    /// <see cref="GetCookieHeader(CurlUrl, bool, DateTimeOffset, IReadOnlyList{string})"/> does, reporting to
+    /// <paramref name="events"/> the <c>-v</c> lines curl 8.21.0 prints when a limit cuts the header short:
+    /// <c>Included max number of cookies (150) in request!</c> once <see cref="MostCookiesSent"/> cookies match
+    /// (curl's <c>Curl_cookie_getlist</c>, also when exactly that many match), then
+    /// <c>Restricted outgoing cookies due to header size, '&lt;name&gt;' not sent</c>, naming the first cookie
+    /// left out to keep the value within <see cref="LongestCookieHeader"/> (curl's <c>http.c</c>).
+    /// </summary>
+    /// <param name="url">The request URL.</param>
+    /// <param name="secure">Whether the request goes over TLS.</param>
+    /// <param name="now">The time that decides which stored cookies have expired.</param>
+    /// <param name="cookieStrings">The strings sent after the stored cookies, verbatim, in order.</param>
+    /// <param name="events">Where the <c>-v</c> lines are reported, outside the store's lock.</param>
+    /// <returns>The header value, or <see langword="null"/> when there is nothing to send.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="url"/>, <paramref name="cookieStrings"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
+    public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, IReadOnlyList<string> cookieStrings, ITransferEvents events)
     {
         ArgumentNullException.ThrowIfNull(url);
         ArgumentNullException.ThrowIfNull(cookieStrings);
+        ArgumentNullException.ThrowIfNull(events);
 
         string host = CookieOrigin.HostOf(url);
         bool secureContext = secure || CookieOrigin.IsLoopback(host);
         string path = url.AbsolutePath;
         StringBuilder header = new();
+        List<string> verboseLines;
         lock (storeLock)
         {
             RemoveExpired(now);
-            IEnumerable<Cookie> sent = InSendingOrder(cookies.Where(cookie => IsSentTo(cookie, host, path, secureContext)).Take(MostCookiesSent));
-            if (TryAppendCookies(header, sent) && cookieStrings.Count > 0)
-            {
-                header.Append(header.Length == 0 ? string.Empty : "; ").AppendJoin("; ", cookieStrings);
-            }
+            List<Cookie> matching = [.. cookies.Where(cookie => IsSentTo(cookie, host, path, secureContext)).Take(MostCookiesSent)];
+            verboseLines = AppendCookieHeader(header, matching, cookieStrings);
+        }
+
+        foreach (string verboseLine in verboseLines)
+        {
+            events.ReportInfo(verboseLine);
         }
 
         return header.Length == 0 ? null : header.ToString();
+    }
+
+    /// <summary>
+    /// Appends the matching cookies in sending order, then <paramref name="cookieStrings"/> unless a cookie was left
+    /// out, and returns the <c>-v</c> lines curl prints for the limits that cut the header short.
+    /// </summary>
+    private static List<string> AppendCookieHeader(StringBuilder header, List<Cookie> matching, IReadOnlyList<string> cookieStrings)
+    {
+        List<string> verboseLines = [];
+        if (matching.Count == MostCookiesSent)
+        {
+            verboseLines.Add($"Included max number of cookies ({MostCookiesSent}) in request!");
+        }
+
+        string? leftOut = AppendCookiesWithinLongestHeader(header, InSendingOrder(matching));
+        if (leftOut is not null)
+        {
+            verboseLines.Add($"Restricted outgoing cookies due to header size, '{leftOut}' not sent");
+        }
+        else if (cookieStrings.Count > 0)
+        {
+            header.Append(header.Length == 0 ? string.Empty : "; ").AppendJoin("; ", cookieStrings);
+        }
+
+        return verboseLines;
     }
 
     /// <summary>
@@ -499,21 +547,24 @@ public sealed class CookieStore : ICookieStore
         || (requestPath.StartsWith(cookiePath, StringComparison.Ordinal)
             && (requestPath.Length == cookiePath.Length || requestPath[cookiePath.Length] == '/'));
 
-    /// <summary>Appends <c>name=value</c> pairs; <see langword="false"/> when one was left out to keep the value within <see cref="LongestCookieHeader"/>.</summary>
-    private static bool TryAppendCookies(StringBuilder header, IEnumerable<Cookie> sent)
+    /// <summary>
+    /// Appends <c>name=value</c> pairs until one would make the value longer than <see cref="LongestCookieHeader"/>;
+    /// returns that cookie's name, or <see langword="null"/> when every cookie was appended.
+    /// </summary>
+    private static string? AppendCookiesWithinLongestHeader(StringBuilder header, IEnumerable<Cookie> sent)
     {
         foreach (Cookie cookie in sent)
         {
             string separator = header.Length == 0 ? string.Empty : "; ";
             if (header.Length + separator.Length + cookie.Name.Length + 1 + cookie.Value.Length > LongestCookieHeader)
             {
-                return false;
+                return cookie.Name;
             }
 
             header.Append(separator).Append(cookie.Name).Append('=').Append(cookie.Value);
         }
 
-        return true;
+        return null;
     }
 
     /// <summary>Compares two cookies by curl's <c>cookie_sort</c> keys, leaving ties to a stable sort.</summary>
