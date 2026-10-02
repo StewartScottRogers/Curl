@@ -31,3 +31,4 @@ Record-CurlExchange.ps1 reads a request's whole body before answering when the h
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
