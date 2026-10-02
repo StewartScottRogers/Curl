@@ -15,6 +15,10 @@ namespace Curl.Protocol.Imap;
 /// <c>verbose</c> (ADR-0222), a line as its sender says it may be logged;
 /// <see langword="null" /> logs nothing.
 /// </param>
+/// <param name="dumpHeaderOutput">
+/// The <c>-D</c> stream alone (<see cref="ITransferContext.DumpHeaderOutput" />), where every
+/// line read is written as it is reported to <c>-v</c>, or <see langword="null" /> without <c>-D</c>.
+/// </param>
 /// <remarks>
 /// <para>
 /// Commands and responses are Latin-1. As curl 8.21.0 does (<c>lib/imap.c</c>, measured in
@@ -42,9 +46,20 @@ namespace Curl.Protocol.Imap;
 /// curl's pingpong reader does, a read takes at most 900 bytes, so the part of a
 /// <c>FETCH</c> literal that arrives with its response line is at most what 900 bytes leave.
 /// </para>
+/// <para>
+/// For <c>-D</c> (BL-1132), every line reported as a response header is also written, the
+/// same bytes in the same order, to <c>dumpHeaderOutput</c>, until <see cref="StopReporting" />:
+/// curl 8.21.0's <c>Curl_pp_readresp</c> passes each response line it reads to the client
+/// writer as <c>CLIENTWRITE_INFO</c>, which reaches the <c>-D</c> file but not <c>-i</c>'s
+/// output, and its <c>LOGOUT</c> answer reaches neither (measured 2026-10-01).
+/// </para>
 /// </remarks>
 internal sealed class ImapControlChannel(
-    IConnection connection, ITransferEvents events, CancellationToken cancellationToken, IDiagnosticLog? diagnosticLog = null)
+    IConnection connection,
+    ITransferEvents events,
+    CancellationToken cancellationToken,
+    IDiagnosticLog? diagnosticLog = null,
+    Stream? dumpHeaderOutput = null)
 {
     /// <summary>The most bytes curl 8.21.0's pingpong reader takes in one read (measured, BL-559).</summary>
     private const int ReadBufferSize = 900;
@@ -74,6 +89,9 @@ internal sealed class ImapControlChannel(
 
     /// <summary>Where lines are reported: <c>events</c> until <see cref="StopReporting" />, nowhere after.</summary>
     private ITransferEvents reporting = events;
+
+    /// <summary>Where lines are written for <c>-D</c>: <c>dumpHeaderOutput</c> until <see cref="StopReporting" />, nowhere after.</summary>
+    private Stream? dumpHeader = dumpHeaderOutput;
 
     /// <summary>
     /// The bytes of a literal read after its last LF, reported with the next line read, as
@@ -110,10 +128,14 @@ internal sealed class ImapControlChannel(
     public void SwitchTo(IConnection secured) => connection = secured;
 
     /// <summary>
-    /// Reports nothing more: curl sends <c>LOGOUT</c> once the transfer is over, where
-    /// <c>-v</c> does not see it or its answer.
+    /// Reports and writes nothing more: curl sends <c>LOGOUT</c> once the transfer is over,
+    /// where neither <c>-v</c> nor the <c>-D</c> file sees it or its answer.
     /// </summary>
-    public void StopReporting() => reporting = NoTransferEvents.Instance;
+    public void StopReporting()
+    {
+        reporting = NoTransferEvents.Instance;
+        dumpHeader = null;
+    }
 
     /// <summary>
     /// Tags <paramref name="command" /> with the next tag and sends it followed by CRLF,
@@ -384,7 +406,7 @@ internal sealed class ImapControlChannel(
             read += take;
         }
 
-        ReportLiteral(literal);
+        await ReportLiteralAsync(literal).ConfigureAwait(false);
         return Encoding.Latin1.GetString(literal);
     }
 
@@ -413,7 +435,7 @@ internal sealed class ImapControlChannel(
 
                 string text = Encoding.Latin1.GetString([.. line]);
                 line.Add(next);
-                ReportLine([.. line]);
+                await ReportLineAsync([.. line]).ConfigureAwait(false);
                 return text;
             }
 
@@ -459,35 +481,39 @@ internal sealed class ImapControlChannel(
     }
 
     /// <summary>
-    /// Reports <paramref name="line" /> (up to and including its LF) as a response header,
-    /// after any literal bytes still waiting to be reported with it.
+    /// Reports <paramref name="line" /> (up to and including its LF) as a response header and
+    /// writes it to the <c>-D</c> stream, after any literal bytes still waiting to go with it.
     /// </summary>
-    private void ReportLine(ReadOnlySpan<byte> line)
+    private async ValueTask ReportLineAsync(byte[] line)
     {
-        if (unreportedLineStart.Count == 0)
+        if (unreportedLineStart.Count > 0)
         {
-            reporting.ReportResponseHeader(line);
-            return;
+            unreportedLineStart.AddRange(line);
+            line = [.. unreportedLineStart];
+            unreportedLineStart.Clear();
         }
 
-        unreportedLineStart.AddRange(line);
-        reporting.ReportResponseHeader([.. unreportedLineStart]);
-        unreportedLineStart.Clear();
+        reporting.ReportResponseHeader(line);
+        if (dumpHeader is not null)
+        {
+            await dumpHeader.WriteAsync(line, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
     /// Reports a literal's <paramref name="bytes" /> as curl's line reader sees them: each run
     /// up to an LF as a response header, and what follows the last LF with the next line.
     /// </summary>
-    private void ReportLiteral(ReadOnlySpan<byte> bytes)
+    private async ValueTask ReportLiteralAsync(byte[] bytes)
     {
+        int start = 0;
         int lineFeed;
-        while ((lineFeed = bytes.IndexOf((byte)'\n')) >= 0)
+        while ((lineFeed = Array.IndexOf(bytes, (byte)'\n', start)) >= 0)
         {
-            ReportLine(bytes[..(lineFeed + 1)]);
-            bytes = bytes[(lineFeed + 1)..];
+            await ReportLineAsync(bytes[start..(lineFeed + 1)]).ConfigureAwait(false);
+            start = lineFeed + 1;
         }
 
-        unreportedLineStart.AddRange(bytes);
+        unreportedLineStart.AddRange(bytes.AsSpan(start));
     }
 }

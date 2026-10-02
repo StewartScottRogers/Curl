@@ -115,7 +115,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
         await using (connection.ConfigureAwait(false))
         {
             var session = new ImapSession(
-                new ImapControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog), tlsProvider, saslAuthenticator, context, implicitTls, connectEvents.Opened);
+                new ImapControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput), tlsProvider, saslAuthenticator, context, implicitTls, connectEvents.Opened);
             TransferResult result;
             await using (session.ConfigureAwait(false))
             {
