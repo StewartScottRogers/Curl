@@ -185,10 +185,17 @@ internal static class TlsFailureMessages
 
     /// <summary>
     /// The message for exit 101 when the server did not accept the hand-built client's ECH
-    /// offer: libcurl's text for <c>CURLE_ECH_REQUIRED</c>, since no curl build measured has ECH
-    /// to show OpenSSL's error string (ADR-0327).
+    /// offer: the OpenSSL build's <c>ECH required:</c> and OpenSSL's error string for
+    /// <c>SSL_R_ECH_REQUIRED</c>, on every platform (measured 2026-10-02 with curl 8.21.0 and
+    /// OpenSSL 4.0.0, ADR-0359).
     /// </summary>
-    public const string EchRequired = "ECH attempted but failed";
+    public const string EchRequired = "ECH required: error:0A0001A8:SSL routines::ech required";
+
+    /// <summary>
+    /// The <c>-v</c> line written before exit 101 when the server that refused the ECH offer sent
+    /// no <c>retry_configs</c> (curl 8.21.0's <c>ossl_trace_ech_retry_configs</c>, measured).
+    /// </summary>
+    public const string EchNoRetryConfigsLine = "ECH: no retry_configs (rv = 1)";
 
     /// <summary>
     /// The OpenSSL build's message for exit 35 when the hand-built client's handshake fails

@@ -350,6 +350,11 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         }
 
         var echOffer = await EchOffer.DecideAsync(_options, OffersTls13, _echConfigs, targetHost, PortOf(remoteEndPoint), cancellationToken).ConfigureAwait(false);
+        foreach (var line in echOffer.InfoLines)
+        {
+            events.ReportInfo(line);
+        }
+
         if (echOffer.Failure is not null)
         {
             prepared.ClientCertificate?.Dispose();
@@ -493,9 +498,22 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         await plaintext.DisposeAsync().ConfigureAwait(false);
         RethrowIfCancellation(thrown);
         CertificateStatusText.Report(events, failure?.CertificateStatusRejection);
+        ReportEchRejection(events, failure);
         return thrown is null
             ? FailedHandshake(failure!)
             : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(thrown));
+    }
+
+    // A rejected ECH offer: curl traces the server's retry_configs before its failf, and a
+    // server without ECH sends none (measured with OpenSSL 4.0.0, ADR-0359).
+    private static void ReportEchRejection(ITransferEvents events, TlsHandshakeFailure? failure)
+    {
+        if (failure?.Alert != TlsAlertDescription.EchRequired)
+        {
+            return;
+        }
+
+        events.ReportInfo(TlsFailureMessages.EchNoRetryConfigsLine);
     }
 
     // Everything the handshake needs before a byte is sent, in the order the SslStream

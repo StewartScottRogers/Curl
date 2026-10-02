@@ -34,26 +34,33 @@ public sealed partial class HandBuiltTlsProviderTests
     [TestMethod]
     [DataRow("false")]
     [DataRow(null)]
-    [DataRow("bogus")]
     public async Task AuthenticateAsClientAsync_WithEchOff_SendsNoEchExtension(string? mode)
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Ech: mode, EchPublicName: "pn.test"), OpenSslBuild, EchHost, Http11));
+        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Ech: mode), OpenSslBuild, EchHost, Http11));
 
         Assert.IsFalse(ExtensionTypes(hello).Contains(TlsExtensionType.EncryptedClientHello));
         Assert.AreEqual(EchHost, ServerNameOf(hello));
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithEchFalseAndAList_SendsNoEchExtension()
+    [DataRow("false")]
+    [DataRow(null)]
+    public async Task AuthenticateAsClientAsync_WithOnlyAPublicName_FailsAsHardWithExit35(string? mode)
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Ech: "false", EchConfigList: EchConfigListBase64()), OpenSslBuild, EchHost, Http11));
+        var (plaintext, stream) = Unanswered();
 
-        Assert.IsFalse(ExtensionTypes(hello).Contains(TlsExtensionType.EncryptedClientHello));
+        var result = await Provider(new TlsClientOptions(Insecure: true, Ech: mode, EchPublicName: "pn.test"), OpenSslBuild)
+            .AuthenticateAsClientAsync(plaintext, EchHost, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual("SSL connect error", result.ErrorMessage);
+        Assert.IsTrue(stream.IsDisposed);
     }
 
     [TestMethod]
     [DataRow("true")]
     [DataRow("hard")]
+    [DataRow("false")]
     [DataRow(null)]
     public async Task AuthenticateAsClientAsync_WithAnEclList_SendsTheOuterHelloForItsConfig(string? mode)
     {
@@ -121,24 +128,63 @@ public sealed partial class HandBuiltTlsProviderTests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithEchHardBelowTls13_FailsWithExit35()
+    [DataRow("hard", SchannelBuild)]
+    [DataRow("true", OpenSslBuild)]
+    public async Task AuthenticateAsClientAsync_WithAUsableListBelowTls13_FailsWithOpenSslsNoProtocolsAvailable(string mode, bool matchesSchannelBuild)
     {
-        var (plaintext, _) = Unanswered();
+        var (plaintext, stream) = Unanswered();
 
-        var result = await Provider(Tls12Only(new TlsClientOptions(Insecure: true, Ech: "hard", EchConfigList: EchConfigListBase64())), SchannelBuild)
+        var result = await Provider(Tls12Only(new TlsClientOptions(Insecure: true, Ech: mode, EchConfigList: EchConfigListBase64())), matchesSchannelBuild)
             .AuthenticateAsClientAsync(plaintext, EchHost, CancellationToken.None);
 
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual("TLS connect error: error:0A0000BF:SSL routines::no protocols available", result.ErrorMessage);
+        Assert.IsTrue(stream.IsDisposed);
     }
 
     [TestMethod]
-    [DataRow("grease")]
-    [DataRow("true")]
-    public async Task AuthenticateAsClientAsync_WithEchBelowTls13_SendsAPlainTls12Hello(string mode)
+    public async Task AuthenticateAsClientAsync_WithEchGreaseBelowTls13_SendsAPlainTls12Hello()
     {
-        var record = await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Ech: mode, EchConfigList: EchConfigListBase64())), OpenSslBuild, EchHost, Http11);
+        var record = await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Ech: "grease", EchConfigList: EchConfigListBase64())), OpenSslBuild, EchHost, Http11);
 
         Assert.IsFalse(ExtensionTypes(DecodeClientHello(record)).Contains(TlsExtensionType.EncryptedClientHello));
+    }
+
+    public static IEnumerable<object?[]> MeasuredEchLines =>
+    [
+        [new TlsClientOptions(Ech: "grease"), null, new[] { "ECH: will GREASE ClientHello" }],
+        [Tls12Only(new TlsClientOptions(Ech: "grease")), null, new[] { "ECH: will GREASE ClientHello" }],
+        [new TlsClientOptions(Ech: "grease", EchPublicName: "pn.test", EchConfigList: EchConfigListBase64()), null, new[] { "ECH: will GREASE ClientHello" }],
+        [new TlsClientOptions(Ech: "true"), null, new[] { "ECH: requested but no ECHConfig available" }],
+        [new TlsClientOptions(Ech: "true", EchPublicName: "pn.test"), null, new[] { "ECH: requested but no ECHConfig available" }],
+        [new TlsClientOptions(Ech: "hard"), null, new[] { "ECH: requested but no ECHConfig available" }],
+        [new TlsClientOptions(EchPublicName: "pn.test"), null, new[] { "ECH: requested but no ECHConfig available" }],
+        [new TlsClientOptions(Ech: "true", EchConfigList: EchConfigListBase64()), null, new[] { "ECH: ECHConfig from command line" }],
+        [new TlsClientOptions(EchConfigList: EchConfigListBase64()), null, new[] { "ECH: ECHConfig from command line" }],
+        [new TlsClientOptions(Ech: "hard", EchPublicName: "pn.test", EchConfigList: EchConfigListBase64()), null, new[] { "ECH: ECHConfig from command line", "ECH: inner: 'curl.test', outer: 'pn.test'" }],
+        [Tls12Only(new TlsClientOptions(Ech: "hard", EchConfigList: EchConfigListBase64())), null, new[] { "ECH: ECHConfig from command line" }],
+        [new TlsClientOptions(Ech: "true", EchConfigList: "not base64!"), null, new[] { "ECH: SSL_ECH_set1_ech_config_list failed", "ECH: ECHConfig from command line" }],
+        [new TlsClientOptions(Ech: "true", EchPublicName: "pn.test", EchConfigList: "AAA="), null, new[] { "ECH: SSL_ECH_set1_ech_config_list failed", "ECH: ECHConfig from command line" }],
+        [new TlsClientOptions(Ech: "hard", EchConfigList: "not base64!"), null, new[] { "ECH: SSL_ECH_set1_ech_config_list failed" }],
+        [new TlsClientOptions(Ech: "false", EchConfigList: "not base64!"), null, new[] { "ECH: SSL_ECH_set1_ech_config_list failed" }],
+        [new TlsClientOptions(Ech: "true"), new FakeEchConfigListLookup(null), new[] { "ECH: requested but no ECHConfig available" }],
+        [new TlsClientOptions(Ech: "true"), new FakeEchConfigListLookup(EchConfigListBytes("dns.test")), new[] { "ECH: ECHConfig from HTTPS RR", "ECH: imported ECHConfigList of length 61" }],
+        [new TlsClientOptions(Ech: "hard"), new FakeEchConfigListLookup([0x00, 0x05, 0xfe]), new[] { "ECH: ECHConfig from HTTPS RR", "ECH: SSL_set1_ech_config_list failed" }],
+        [new TlsClientOptions(Ech: "false"), null, Array.Empty<string>()],
+    ];
+
+    [TestMethod]
+    [DynamicData(nameof(MeasuredEchLines))]
+    public async Task AuthenticateAsClientAsync_WithEch_WritesCurlsEchLinesBeforeTheHello(TlsClientOptions options, FakeEchConfigListLookup? lookup, string[] expected)
+    {
+        var events = new RecordingTransferEvents();
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        await server.DisposeAsync();
+
+        _ = await Provider(options with { Insecure = true }, OpenSslBuild, lookup)
+            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), EchHost, events, false, Http11, CancellationToken.None);
+
+        CollectionAssert.AreEqual(expected, events.Info.Where(line => line.StartsWith("ECH:", StringComparison.Ordinal)).ToArray());
     }
 
     [TestMethod]
@@ -172,11 +218,16 @@ public sealed partial class HandBuiltTlsProviderTests
             _ = await sslStream.ReadAsync(new byte[1]);
         });
 
-        var result = await Provider(new TlsClientOptions(Insecure: true, Ech: mode, EchConfigList: EchConfigListBase64()), OpenSslBuild)
-            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        var events = new RecordingTransferEvents();
+
+        var result = await Provider(new TlsClientOptions(Insecure: true, Ech: mode, EchConfigList: EchConfigListBase64()), SchannelBuild)
+            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events, false, Http11, CancellationToken.None);
 
         Assert.AreEqual(CurlExitCode.EchRequired, result.ExitCode);
-        Assert.AreEqual("ECH attempted but failed", result.ErrorMessage);
+        Assert.AreEqual("ECH required: error:0A0001A8:SSL routines::ech required", result.ErrorMessage);
+        CollectionAssert.AreEqual(
+            new[] { "ECH: ECHConfig from command line", "ECH: no retry_configs (rv = 1)" },
+            events.Info.Where(line => line.StartsWith("ECH:", StringComparison.Ordinal)).ToArray());
         await IgnoreFailureAsync(serverTask);
     }
 

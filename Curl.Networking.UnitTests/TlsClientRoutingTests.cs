@@ -94,15 +94,21 @@ public sealed class TlsClientRoutingTests
     [DataRow("true", null)]
     [DataRow("hard", null)]
     [DataRow(null, "AAA=")]
+    [DataRow("false", "AAA=")]
     public void Choose_WithEch_IsTheHandBuiltClient(string? mode, string? configList) =>
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(Ech: mode, EchConfigList: configList)));
 
+    // ADR-0359: pn: alone is hard, as libcurl's setopt_ech makes it.
     [TestMethod]
-    [DataRow("false", "AAA=")]
-    [DataRow("bogus", null)]
-    [DataRow(null, null)]
-    public void Choose_WithEchOff_IsSslStream(string? mode, string? configList) =>
-        Assert.AreEqual(TlsClientRoute.SslStream, TlsClientRouting.Choose(new TlsClientOptions(Ech: mode, EchPublicName: "pn.test", EchConfigList: configList)));
+    public void Choose_WithOnlyAnEchPublicName_IsTheHandBuiltClient() =>
+        Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(EchPublicName: "pn.test")));
+
+    [TestMethod]
+    [DataRow("false")]
+    [DataRow("bogus")]
+    [DataRow(null)]
+    public void Choose_WithEchOff_IsSslStream(string? mode) =>
+        Assert.AreEqual(TlsClientRoute.SslStream, TlsClientRouting.Choose(new TlsClientOptions(Ech: mode)));
 
     [TestMethod]
     [DynamicData(nameof(PlainOptionSets))]
