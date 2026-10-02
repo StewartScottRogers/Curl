@@ -34,7 +34,7 @@ has no limit of its own.
 - A server that marks every nonce stale keeps the transfer going until something else ends
   it (`-m`, the server), as with curl.
 - The `Digest authentication problem, ignoring.` line curl writes for a non-stale refusal is
-  still missing from the HTTP handler; BL-1170 adds it.
+  still missing from the HTTP handler; BL-1175 adds it.
 
 ## Alternatives considered
 

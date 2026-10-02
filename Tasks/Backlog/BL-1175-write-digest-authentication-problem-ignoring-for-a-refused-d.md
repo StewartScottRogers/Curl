@@ -1,5 +1,5 @@
 ---
-id: BL-1170
+id: BL-1175
 title: Write Digest authentication problem, ignoring. for a refused Digest answer in the HTTP handler
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1170 — Write Digest authentication problem, ignoring. for a refused Digest answer in the HTTP handler
+# BL-1175 — Write Digest authentication problem, ignoring. for a refused Digest answer in the HTTP handler
 
 ## Goal
 
