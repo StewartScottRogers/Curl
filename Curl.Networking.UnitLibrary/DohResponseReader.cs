@@ -25,39 +25,69 @@ internal static class DohResponseReader
     /// <param name="connection">The DoH connection the POST was written to.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The body, or <see langword="null" /> when the response is a receive failure.</returns>
-    public static async ValueTask<byte[]?> ReadBodyAsync(IConnection connection, CancellationToken cancellationToken)
+    public static ValueTask<byte[]?> ReadBodyAsync(IConnection connection, CancellationToken cancellationToken) =>
+        ReadBodyAsync(connection, NoTransferEvents.Instance, cancellationToken);
+
+    /// <summary>
+    /// Reads one response from <paramref name="connection" /> and returns its body, reporting each
+    /// head line as it is read and the body once it is whole on <paramref name="events" />, as curl's
+    /// <c>-v</c> shows a DoH sub-transfer's <c>&lt;</c> lines and <c>{ [N bytes data]</c> (BL-1180).
+    /// </summary>
+    /// <param name="connection">The DoH connection the POST was written to.</param>
+    /// <param name="events">The sub-transfer's events.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>The body, or <see langword="null" /> when the response is a receive failure.</returns>
+    public static async ValueTask<byte[]?> ReadBodyAsync(IConnection connection, ITransferEvents events, CancellationToken cancellationToken)
     {
         var reader = new ConnectionByteReader(connection);
-        var head = await ReadHeadAsync(reader, cancellationToken).ConfigureAwait(false);
+        var head = await ReadHeadAsync(reader, events, cancellationToken).ConfigureAwait(false);
         if (head is null)
         {
             return null;
         }
 
-        return head.IsChunked
+        var body = head.IsChunked
             ? await ReadChunkedBodyAsync(reader, cancellationToken).ConfigureAwait(false)
             : await ReadContentLengthBodyAsync(reader, head.ContentLength, cancellationToken).ConfigureAwait(false);
+        if (body is { Length: > 0 })
+        {
+            events.ReportDataReceived(body);
+        }
+
+        return body;
     }
 
-    private static async ValueTask<ResponseHead?> ReadHeadAsync(ConnectionByteReader reader, CancellationToken cancellationToken)
+    private static async ValueTask<ResponseHead?> ReadHeadAsync(ConnectionByteReader reader, ITransferEvents events, CancellationToken cancellationToken)
     {
-        var statusLine = await ReadLineAsync(reader, cancellationToken).ConfigureAwait(false);
+        var statusLine = await ReadHeadLineAsync(reader, events, cancellationToken).ConfigureAwait(false);
         return statusLine?.StartsWith("HTTP/", StringComparison.Ordinal) == true
-            ? await ReadHeaderFieldsAsync(reader, cancellationToken).ConfigureAwait(false)
+            ? await ReadHeaderFieldsAsync(reader, events, cancellationToken).ConfigureAwait(false)
             : null;
     }
 
-    private static async ValueTask<ResponseHead?> ReadHeaderFieldsAsync(ConnectionByteReader reader, CancellationToken cancellationToken)
+    private static async ValueTask<ResponseHead?> ReadHeaderFieldsAsync(ConnectionByteReader reader, ITransferEvents events, CancellationToken cancellationToken)
     {
         var head = new ResponseHead();
         string? line;
         do
         {
-            line = await ReadLineAsync(reader, cancellationToken).ConfigureAwait(false);
+            line = await ReadHeadLineAsync(reader, events, cancellationToken).ConfigureAwait(false);
         }
         while (head.Takes(line));
 
         return line is { Length: 0 } ? head : null;
+    }
+
+    // One head line, reported with its CRLF as curl's -v shows a received header line.
+    private static async ValueTask<string?> ReadHeadLineAsync(ConnectionByteReader reader, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        var line = await ReadLineAsync(reader, cancellationToken).ConfigureAwait(false);
+        if (line is not null)
+        {
+            events.ReportResponseHeader(Encoding.Latin1.GetBytes(line + "\r\n"));
+        }
+
+        return line;
     }
 
     // A body framed by neither Content-Length nor chunked coding ends at the close, which curl

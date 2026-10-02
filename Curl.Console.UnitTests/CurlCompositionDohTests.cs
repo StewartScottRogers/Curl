@@ -89,7 +89,8 @@ public sealed class CurlCompositionDohTests
     {
         // curl -v --trace-config doh (or dns, which writes the same) --doh-url ... http://example.test:P/:
         // the filter's lines, the DoH lines once both queries are done, then the resolve and Trying
-        // (measured, BL-1102 Notes; the DoH lines' texts as BL-850 measured them); network's [HAPPY-EYEBALLS] and [TCP] lines (BL-1161) aside.
+        // (measured, BL-1102 Notes; the DoH lines' texts as BL-850 measured them), each DoH sub-transfer's
+        // [DNS] lines before them (BL-1180; the scripted DoH server reports no connect lines); network's [HAPPY-EYEBALLS] and [TCP] lines (BL-1161) aside.
         ScriptedConnector dohServer = new([AAnswer, AAnswer]);
         RecordingEvents events = new();
 
@@ -102,6 +103,14 @@ public sealed class CurlCompositionDohTests
                 "[DNS] created DNS filter for example.test:48712, transport=3, queries=3",
                 "[DNS] added",
                 "[DNS] cf_dns_start host example.test:48712",
+                "[DNS] using HTTP/1.x",
+                "[DNS] upload completely sent off: 30 bytes",
+                "[DNS] Connection #1 to host 127.0.0.1:48711 left intact",
+                "[DNS] a DoH request is completed, 1 to go",
+                "[DNS] using HTTP/1.x",
+                "[DNS] upload completely sent off: 30 bytes",
+                "[DNS] Connection #2 to host 127.0.0.1:48711 left intact",
+                "[DNS] a DoH request is completed, 0 to go",
                 "[DNS] DoH: Unexpected TYPE type AAAA for example.test",
                 "[DNS] hostname: example.test",
                 "[DoH] TTL: 60 seconds",

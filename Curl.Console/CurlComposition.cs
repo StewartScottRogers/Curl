@@ -358,12 +358,17 @@ internal static class CurlComposition
     /// </param>
     /// <param name="dohTrace">
     /// Receives the <c>--trace-config doh</c> lines, with <see cref="CurlEasyErrorText" />'s texts
-    /// (BL-1102); <see langword="null" /> for none.
+    /// (BL-1102), and each DoH sub-transfer's own lines through a <see cref="DohSubTransferEvents" />
+    /// (BL-1180); <see langword="null" /> for none.
     /// </param>
     /// <returns>The resolver.</returns>
     internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily, ITransferEvents? dohTrace = null) =>
         DohUrlOf(dohUrl) is { } url
-            ? new DohDnsResolver(connector, url, dohTrace ?? NoTransferEvents.Instance, CurlEasyErrorText.Of) { AddressFamily = addressFamily }
+            ? new DohDnsResolver(connector, url, dohTrace ?? NoTransferEvents.Instance, CurlEasyErrorText.Of)
+            {
+                AddressFamily = addressFamily,
+                SubTransferEvents = dohTrace is null ? NoTransferEvents.Instance : new DohSubTransferEvents(dohTrace, PlatformTlsBackend.ForProcess),
+            }
             : new UnusableDohUrlResolver();
 
     /// <summary>
@@ -504,6 +509,8 @@ internal static class CurlComposition
     /// host is), <paramref name="tcpDialer" />, and a TLS provider routed as
     /// <see cref="CreateTlsProvider" /> routes the options <see cref="TlsClientOptionsMapping.DohFromCommandLine" />
     /// maps. No <c>--resolve</c>, <c>--connect-to</c>, proxy or <c>-4</c>/<c>-6</c> applies to it.
+    /// Under <see cref="TracesDns" /> it writes the DNS filter's lines for each DoH sub-transfer too,
+    /// as curl 8.21.0 does (BL-1180).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <param name="tcpDialer">Opens each plaintext connection.</param>
@@ -514,7 +521,10 @@ internal static class CurlComposition
             new SystemDnsResolver(),
             tcpDialer,
             CreateTlsProvider(TlsClientOptionsMapping.DohFromCommandLine(options), timeProvider),
-            timeProvider);
+            timeProvider)
+        {
+            TracesDnsFilter = TracesDns(options),
+        };
 
     /// <summary>
     /// Creates the TLS provider for handshakes run with <paramref name="options" />: the

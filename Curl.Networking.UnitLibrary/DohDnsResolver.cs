@@ -42,6 +42,10 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
     private readonly ITransferEvents _dohTrace;
     private readonly Func<CurlExitCode, string> _describeExitCode;
 
+    // The DoH connections opened so far: curl numbers them after the transfer's own #0, so the
+    // first is #1 (ADR-0380).
+    private long _connectionCount;
+
     /// <summary>Initializes a new instance of the <see cref="DohDnsResolver" /> class.</summary>
     /// <param name="connector">
     /// Opens each DoH connection: a <see cref="TcpConnector" /> of its own, built with the system
@@ -98,6 +102,18 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
     /// </summary>
     public AddressFamily AddressFamily { get; init; } = AddressFamily.Unspecified;
 
+    /// <summary>
+    /// Gets the events each DoH sub-transfer reports its own <c>-v</c> lines on, as curl 8.21.0
+    /// writes them under <c>--trace-config dns</c>, <c>doh</c> or <c>all</c> (BL-1180): the
+    /// connector's connect lines, <c>using HTTP/1.x</c>, the POST's head and body, <c>upload
+    /// completely sent off</c>, the answer's head and body, <c>Connection #N to host H:P left
+    /// intact</c> and <c>a DoH request is completed, K to go</c>. The composition root wraps them so
+    /// each line gets curl's <c>[DNS] </c> prefix. When given, the queries run one after another, A's
+    /// whole before AAAA's, so the lines come in a fixed order (ADR-0380); the default,
+    /// <see cref="NoTransferEvents.Instance" />, reports nothing and runs them in parallel.
+    /// </summary>
+    public ITransferEvents SubTransferEvents { get; init; } = NoTransferEvents.Instance;
+
     /// <inheritdoc />
     public async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
     {
@@ -119,9 +135,28 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
             return [];
         }
 
-        var results = DohQueryResult.AsOneEntry(await Task.WhenAll(StartAddressQueries(host, queryA.Bytes, cancellationToken)).ConfigureAwait(false));
+        var results = DohQueryResult.AsOneEntry(await RunAddressQueriesAsync(AddressQueries(host, queryA.Bytes), cancellationToken).ConfigureAwait(false));
         DohTraceLines.Report(_dohTrace, _describeExitCode, host, results);
         return ResolvedAddresses(results);
+    }
+
+    // Untraced, the queries run in parallel as curl runs them; traced, one after another, so each
+    // sub-transfer's lines come whole, A's first (ADR-0380).
+    private async Task<DohQueryResult[]> RunAddressQueriesAsync(List<(byte[] Query, DnsRecordType Type)> queries, CancellationToken cancellationToken)
+    {
+        if (ReferenceEquals(SubTransferEvents, NoTransferEvents.Instance))
+        {
+            return await Task.WhenAll(queries.Select(query => QueryAsync(query.Query, query.Type, cancellationToken))).ConfigureAwait(false);
+        }
+
+        var results = new DohQueryResult[queries.Count];
+        for (var index = 0; index < queries.Count; index++)
+        {
+            results[index] = await QueryAsync(queries[index].Query, queries[index].Type, cancellationToken).ConfigureAwait(false);
+            SubTransferEvents.ReportInfo($"a DoH request is completed, {queries.Count - index - 1} to go");
+        }
+
+        return results;
     }
 
     // curl resolves from its one entry only when a query counts as answered, and then every
@@ -131,18 +166,18 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
             ? [.. Enumerable.Reverse(results).SelectMany(result => result.Addresses)]
             : [];
 
-    // Starts the A query and the AAAA query, A first, leaving out the one -4 or -6 rules out.
-    private List<Task<DohQueryResult>> StartAddressQueries(string host, byte[] queryA, CancellationToken cancellationToken)
+    // The A query and the AAAA query, A first, leaving out the one -4 or -6 rules out.
+    private List<(byte[] Query, DnsRecordType Type)> AddressQueries(string host, byte[] queryA)
     {
-        List<Task<DohQueryResult>> queries = [];
+        List<(byte[] Query, DnsRecordType Type)> queries = [];
         if (AddressFamily != AddressFamily.InterNetworkV6)
         {
-            queries.Add(QueryAsync(queryA, DnsRecordType.A, cancellationToken));
+            queries.Add((queryA, DnsRecordType.A));
         }
 
         if (AddressFamily != AddressFamily.InterNetwork)
         {
-            queries.Add(QueryAsync(DnsQueryEncoder.Encode(host, DnsRecordType.Aaaa).Bytes, DnsRecordType.Aaaa, cancellationToken));
+            queries.Add((DnsQueryEncoder.Encode(host, DnsRecordType.Aaaa).Bytes, DnsRecordType.Aaaa));
         }
 
         return queries;
@@ -210,10 +245,8 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
     internal static string HttpsQueryName(string host, int port) =>
         port == 443 ? host : $"_{port}._https.{host}";
 
-    /// <summary>Builds the POST curl sends for one DNS query.</summary>
-    /// <param name="query">The DNS query message.</param>
-    /// <returns>The request line, header block and body.</returns>
-    internal byte[] BuildRequest(byte[] query)
+    // The request line and header block of the POST curl sends for one query.
+    private byte[] BuildRequestHead(byte[] query)
     {
         var host = _dohUrl.IsDefaultPort ? _dohUrl.Host : $"{_dohUrl.Host}:{_dohUrl.Port}";
         var head = $"POST {_dohUrl.PathAndQuery} HTTP/1.1\r\n"
@@ -222,12 +255,14 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
             + "Content-Type: application/dns-message\r\n"
             + $"Content-Length: {query.Length}\r\n"
             + "\r\n";
-        return [.. Encoding.Latin1.GetBytes(head), .. query];
+        return Encoding.Latin1.GetBytes(head);
     }
 
     private async Task<DohQueryResult> QueryAsync(byte[] query, DnsRecordType recordType, CancellationToken cancellationToken)
     {
-        var connected = await _connector.ConnectAsync(_dohServer, cancellationToken).ConfigureAwait(false);
+        var events = SubTransferEvents;
+        var connectionNumber = Interlocked.Increment(ref _connectionCount);
+        var connected = await _connector.ConnectAsync(_dohServer with { Events = events }, cancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
             return new DohQueryResult(recordType, connected.ExitCode, null);
@@ -235,22 +270,31 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
 
         await using (connection.ConfigureAwait(false))
         {
-            var body = await ExchangeAsync(connection, BuildRequest(query), cancellationToken).ConfigureAwait(false);
-            return body is null
-                ? new DohQueryResult(recordType, CurlExitCode.RecvError, null)
-                : new DohQueryResult(recordType, CurlExitCode.Ok, DnsAnswerDecoder.Decode(body, recordType));
+            events.ReportInfo("using HTTP/1.x");
+            var body = await ExchangeAsync(connection, BuildRequestHead(query), query, events, cancellationToken).ConfigureAwait(false);
+            if (body is null)
+            {
+                return new DohQueryResult(recordType, CurlExitCode.RecvError, null);
+            }
+
+            events.ReportInfo(FormattableString.Invariant($"Connection #{connectionNumber} to host {_dohServer.Host}:{_dohServer.Port} left intact"));
+            return new DohQueryResult(recordType, CurlExitCode.Ok, DnsAnswerDecoder.Decode(body, recordType));
         }
     }
 
     // Writes the POST and reads the answer's body; null when the connection fails mid-exchange or
     // the response is not read whole, which curl reports as "Failure when receiving data from the peer".
-    private static async ValueTask<byte[]?> ExchangeAsync(IConnection connection, byte[] request, CancellationToken cancellationToken)
+    private static async ValueTask<byte[]?> ExchangeAsync(IConnection connection, byte[] head, byte[] query, ITransferEvents events, CancellationToken cancellationToken)
     {
         try
         {
+            byte[] request = [.. head, .. query];
             await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-            return await DohResponseReader.ReadBodyAsync(connection, cancellationToken).ConfigureAwait(false);
+            events.ReportRequestHeader(head);
+            events.ReportDataSent(query);
+            events.ReportInfo($"upload completely sent off: {query.Length} bytes");
+            return await DohResponseReader.ReadBodyAsync(connection, events, cancellationToken).ConfigureAwait(false);
         }
         catch (IOException)
         {
