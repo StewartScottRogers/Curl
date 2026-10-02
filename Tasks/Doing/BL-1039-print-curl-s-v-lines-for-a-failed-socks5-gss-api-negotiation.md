@@ -31,3 +31,4 @@ Under `-v`, a SOCKS5 proxy that picks GSS-API and whose negotiation fails prints
 ## Log
 
 - 2026-09-30: Created.
+- 2026-10-02: Backlog -> Doing.
