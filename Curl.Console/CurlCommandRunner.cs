@@ -1969,6 +1969,7 @@ internal sealed class CurlCommandRunner(
         }
 
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
+        TraceClientReaderReset(options, eventsBeforeConnecting);
         await LoadCookieFilesAsync(dispatch, options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
         await OpenAltSvcCacheAsync(options, transferUrl).ConfigureAwait(false);
         transferUrl = await SwitchToHttpsForHstsAsync(options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
@@ -2655,6 +2656,8 @@ internal sealed class CurlCommandRunner(
     /// Where <c>-w</c> or <c>--trace-ids</c> prints it, a transfer that reuses a connection takes that connection's <c>%{conn_id}</c> (<see cref="ConnectionIdRecordingTransferEvents" />, BL-1052).
     /// Under <c>--trace-config dns</c> a failed resolve's <c>[DNS] [1] destroy async</c> follows its
     /// <c>closing connection #N</c> (<see cref="AsyncResolveTeardownTraceEvents" />, BL-1157).
+    /// Under <c>--trace-config read</c> a finished transfer's <c>[READ] client_reset, clear readers</c>
+    /// comes before its connection's last line (<see cref="ClientReaderResetTraceEvents" />, BL-1159).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
@@ -2664,12 +2667,43 @@ internal sealed class CurlCommandRunner(
         RunningTransferState state = Running;
         Func<long> takeConnectionId = () => state.ConnectionId ??= nextConnectionId++;
         ITransferEvents output = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
-        ITransferEvents events = CurlComposition.TracesDns(options) ? new AsyncResolveTeardownTraceEvents(output) : output;
+        ITransferEvents events = WithTraceLineEvents(options, output);
         ITransferEvents recorded = options.WriteOut is null ? events : new TlsResultRecordingTransferEvents(events, state);
         state.Events = options.WriteOut is null && !options.TraceIds
             ? recorded
             : new ConnectionIdRecordingTransferEvents(recorded, state, connectionIdsByPoolNumber, takeConnectionId);
         return transferEventOutput.EventsFor(transfer.TransferId, () => null);
+    }
+
+    /// <summary>
+    /// Wraps <paramref name="output" /> in the events that add the trace lines the transfer writes
+    /// after its connect has returned: <see cref="AsyncResolveTeardownTraceEvents" /> under
+    /// <see cref="CurlComposition.TracesDns" /> and <see cref="ClientReaderResetTraceEvents" /> under
+    /// <see cref="CurlComposition.TracesRead" />.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="output">The transfer's own events.</param>
+    /// <returns>The events the transfer reports to.</returns>
+    private static ITransferEvents WithTraceLineEvents(CommandLineOptions options, ITransferEvents output)
+    {
+        ITransferEvents teardown = CurlComposition.TracesDns(options) ? new AsyncResolveTeardownTraceEvents(output) : output;
+        return CurlComposition.TracesRead(options) ? new ClientReaderResetTraceEvents(teardown) : teardown;
+    }
+
+    /// <summary>
+    /// Under <c>--trace-config read</c> (or <c>-vvv</c>, <c>all</c>) writes curl 8.21.0's
+    /// <see cref="ClientReaderResetTraceEvents.ResetLine" /> as the transfer starts: after the
+    /// <c>--resolve</c> entries' lines and before anything it resolves or dials, with <c>[&lt;xfer&gt;-x]</c>
+    /// under <c>--trace-ids</c> (measured, BL-1159 Notes).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="eventsBeforeConnecting">The transfer's events before it has a connection.</param>
+    private static void TraceClientReaderReset(CommandLineOptions options, ITransferEvents eventsBeforeConnecting)
+    {
+        if (CurlComposition.TracesRead(options))
+        {
+            eventsBeforeConnecting.ReportInfo(ClientReaderResetTraceEvents.ResetLine);
+        }
     }
 
     /// <summary>

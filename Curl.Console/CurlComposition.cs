@@ -373,6 +373,16 @@ internal static class CurlComposition
         options.TraceComponents.Contains("setup") || options.TraceComponents.Contains("all");
 
     /// <summary>
+    /// Whether curl 8.21.0's <c>[READ]</c> lines are written: <c>read</c> or <c>all</c> is among the
+    /// trace components, which <c>-vvv</c> and up put there too; <c>network</c> does not turn them on
+    /// (measured, BL-1103 and BL-1159 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesRead(CommandLineOptions options) =>
+        options.TraceComponents.Contains("read") || options.TraceComponents.Contains("all");
+
+    /// <summary>
     /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
     /// and with <c>http://</c> in front when it does not, as curl guesses the scheme of any URL (a
     /// scheme-less DoH URL was measured to reach its server as plain HTTP, BL-642).

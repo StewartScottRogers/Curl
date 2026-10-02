@@ -172,6 +172,59 @@ public sealed class CurlCommandRunnerTransferEventTests
     }
 
     [TestMethod]
+    public async Task RunAsync_TraceConfigRead_WritesTheClientResetLineAsTheTransferStartsAndBeforeTheConnectionIsLeftIntact()
+    {
+        // As curl 8.21.0 wrote -s --trace-config read -v for a 200 (measured 2026-10-02, BL-1159 Notes).
+        int exitCode = await RunAsync(["-s", "--trace-config", "read", "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            ReadResetLine
+            + MeasuredVerboseLines(string.Empty).Replace("* Connection #0", ReadResetLine + "* Connection #0", StringComparison.Ordinal),
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow("network")]
+    [DataRow("setup")]
+    [DataRow("-read")]
+    public async Task RunAsync_TraceConfigWithoutRead_WritesNoReadLine(string components)
+    {
+        await RunAsync(["-s", "--trace-config", components, "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(MeasuredVerboseLines(string.Empty), StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigReadWithoutVerbose_WritesNothing()
+    {
+        await RunAsync(["-s", "--trace-config", "read", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(string.Empty, StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow("-vvv")]
+    [DataRow("-vvvv")]
+    public async Task RunAsync_ThreeOrMoreVs_WriteBothClientResetLines(string verbosity)
+    {
+        await RunAsync(["-s", verbosity, "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(2, StandardErrorText.Split("* [READ] client_reset, clear readers" + InfoEnd).Length - 1);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigReadWithTraceIds_MarksTheFirstClientResetLineWithAnX()
+    {
+        await RunAsync(["-s", "--trace-config", "read", "-v", "--trace-ids", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        StringAssert.StartsWith(StandardErrorText, "[0-x] " + ReadResetLine + "[0-0] *   Trying 127.0.0.1:18441..." + InfoEnd);
+        StringAssert.EndsWith(StandardErrorText, "[0-0] " + ReadResetLine + "[0-0] * Connection #0 to host 127.0.0.1:18441 left intact" + InfoEnd);
+    }
+
+    private const string ReadResetLine = "* [READ] client_reset, clear readers" + InfoEnd;
+
+    [TestMethod]
     public async Task RunAsync_TraceIdsWithResolveEntry_MarksTheLineBeforeTheConnectionWithAnX()
     {
         // curl 8.21.0 wrote "[0-x] * Added a.test:1:127.0.0.1 to DNS cache", then [0-0] (measured 2026-09-29, BL-648 Notes).
