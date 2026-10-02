@@ -358,6 +358,7 @@ choices do not need one.
 | [0346](ADR-0346-a-tftp-connection-is-numbered-with-the-runs-connections.md) | A TFTP transfer's connection is numbered with the run's other connections | Accepted | 2026-10-02 |
 | [0347](ADR-0347-a-file-transfer-is-numbered-with-the-runs-connections.md) | A file:// transfer is numbered with the run's connections, through `IConnectionNumbers` | Accepted | 2026-10-02 |
 | [0348](ADR-0348-a-refused-tunnel-fails-with-the-first-sspi-negotiate-failure.md) | A refused CONNECT tunnel fails with the first SSPI Negotiate failure as its message | Accepted | 2026-10-02 |
+| [0349](ADR-0349-schannel-warns-that-tls13-cipher-lists-are-ignored.md) | The Schannel build warns that `--tls13-ciphers` and `--proxy-tls13-ciphers` are ignored, once per URL | Accepted | 2026-10-02 |
 
 ## Template
 
