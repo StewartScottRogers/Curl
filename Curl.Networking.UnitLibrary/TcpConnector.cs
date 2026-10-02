@@ -631,6 +631,8 @@ public sealed partial class TcpConnector(
                 CurlErrorBuffer.Truncate($"Failed to connect to {target.Host}:{target.Port} over unix://{unixSocket.Path} after {elapsedMilliseconds} ms: Could not connect to server"));
         }
 
+        // A refused dial reaches the diagnostic log at error through ConnectWithinAsync (BL-968).
+        new NetworkDiagnosticLog(target.DiagnosticLog).UnixSocketConnected(unixSocket.Path);
         var dialed = new DialedSocket(connection, null, unixSocket.Path, null, name, unixSocket.Path);
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
         return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken).ConfigureAwait(false);
@@ -1375,26 +1377,45 @@ public sealed partial class TcpConnector(
         if (provider is not IHandshakeReportingTlsProvider reportingProvider)
         {
             var unreported = await provider.AuthenticateAsClientAsync(plaintext, host, cancellationToken).ConfigureAwait(false);
-            LogHandshake(log, host, route: null, handshake: null, unreported);
+            if (!LoggedFailure(log, unreported))
+            {
+                log.HandshakeCompleted(host, null, null, null, unreported.ApplicationProtocol);
+            }
+
             return unreported;
         }
 
-        var capturing = log.IsEnabled(DiagnosticLogLevel.Info) ? new HandshakeCapturingTransferEvents(target.Events) : null;
+        var capturing = log.IsEnabled(DiagnosticLogLevel.Warning) ? new HandshakeCapturingTransferEvents(target.Events) : null;
         var secured = await reportingProvider.AuthenticateAsClientAsync(plaintext, host, capturing ?? target.Events, isProxy, applicationProtocols, cancellationToken).ConfigureAwait(false);
-        LogHandshake(log, host, reportingProvider.Route, capturing?.Handshake, secured);
+        if (!LoggedFailure(log, secured))
+        {
+            LogReportedHandshake(log, host, reportingProvider, capturing, secured);
+        }
+
         return secured;
     }
 
-    private static void LogHandshake(NetworkDiagnosticLog log, string host, TlsClientRoute? route, TlsHandshakeEvent? handshake, ConnectResult secured)
+    private static bool LoggedFailure(NetworkDiagnosticLog log, ConnectResult secured)
     {
-        if (secured.Connection is null)
+        if (secured.Connection is not null)
         {
-            log.Failed(DiagnosticLogComponents.Tls, secured.ExitCode, secured.ErrorMessage);
+            return false;
         }
-        else
+
+        log.Failed(DiagnosticLogComponents.Tls, secured.ExitCode, secured.ErrorMessage);
+        return true;
+    }
+
+    // A best-effort revocation acceptance is a warning before the handshake's info line, which
+    // names why the options chose the provider (BL-968).
+    private static void LogReportedHandshake(NetworkDiagnosticLog log, string host, IHandshakeReportingTlsProvider provider, HandshakeCapturingTransferEvents? capturing, ConnectResult secured)
+    {
+        if (capturing is { RevocationCheckIncomplete: true })
         {
-            log.HandshakeCompleted(host, route, handshake, secured.ApplicationProtocol);
+            log.RevocationCheckIncomplete(host);
         }
+
+        log.HandshakeCompleted(host, provider.Route, provider.RouteReason, capturing?.Handshake, secured.ApplicationProtocol);
     }
 
     /// <summary>

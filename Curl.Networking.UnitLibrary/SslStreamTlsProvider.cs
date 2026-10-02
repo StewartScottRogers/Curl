@@ -30,6 +30,9 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <inheritdoc />
     TlsClientRoute IHandshakeReportingTlsProvider.Route => TlsClientRoute.SslStream;
 
+    /// <inheritdoc />
+    string? IHandshakeReportingTlsProvider.RouteReason => null;
+
     // The one warning curl 8.21.0's Schannel build writes for --capath (ADR-0009), unwrapped:
     // the console wraps it at the terminal width, into two lines at curl's default 79 columns.
     private static readonly string[] SchannelCaCertificateDirectoryWarnings =
@@ -407,6 +410,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 IsProxy = isProxy,
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
             });
+            ReportRevocationCheckIncomplete(events, peerVerification);
             return ConnectResult.Connected(
                 new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), clearsTls: !_matchesSchannelBuild)
                 {
@@ -571,6 +575,17 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         CaCertificateFile = options.CaCertificateFile ?? OpenSslDefaultCaCertificateFile,
         CaCertificateDirectory = options.CaCertificateDirectory,
     };
+
+    // A certificate --ssl-revoke-best-effort accepted with its revocation status offline or
+    // unknown is a warning in the diagnostic log (ADR-0222, decision 2; BL-968), which only
+    // TcpConnector's capturing events collect; curl prints nothing for it.
+    private static void ReportRevocationCheckIncomplete(ITransferEvents events, PeerVerification peerVerification)
+    {
+        if (peerVerification.RevocationCheckIncomplete && events is HandshakeCapturingTransferEvents capturing)
+        {
+            capturing.ReportRevocationCheckIncomplete();
+        }
+    }
 
     /// <summary>
     /// Reports, in the Schannel build only, the trust curl's Schannel build writes before a

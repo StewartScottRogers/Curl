@@ -138,13 +138,15 @@ internal sealed class NetworkDiagnosticLog(IDiagnosticLog log)
     /// </summary>
     /// <param name="host">The host the handshake was with.</param>
     /// <param name="route">The TLS client that ran it, or <see langword="null" /> for a provider that does not say.</param>
+    /// <param name="routeReason">Why the options chose <paramref name="route" />, as <see cref="TlsClientRouting.Reason" /> words it, or <see langword="null" /> when none did.</param>
     /// <param name="handshake">What the provider reported, or <see langword="null" /> when it reported nothing.</param>
     /// <param name="applicationProtocol">The protocol ALPN agreed, or <see langword="null" />.</param>
-    public void HandshakeCompleted(string host, TlsClientRoute? route, TlsHandshakeEvent? handshake, string? applicationProtocol)
+    public void HandshakeCompleted(string host, TlsClientRoute? route, string? routeReason, TlsHandshakeEvent? handshake, string? applicationProtocol)
     {
         if (log.IsEnabled(DiagnosticLogLevel.Info))
         {
-            Write(DiagnosticLogLevel.Info, DiagnosticLogComponents.Tls, HandshakeLine(host, route, handshake, applicationProtocol));
+            var reason = routeReason is null ? string.Empty : $" ({routeReason})";
+            Write(DiagnosticLogLevel.Info, DiagnosticLogComponents.Tls, HandshakeLine(host, route, handshake, applicationProtocol) + reason);
         }
 
         if (handshake is not null && log.IsEnabled(DiagnosticLogLevel.Verbose))
@@ -164,6 +166,39 @@ internal sealed class NetworkDiagnosticLog(IDiagnosticLog log)
 
     private static string RouteName(TlsClientRoute? route) =>
         route is { } known ? known.ToString() : "unreported";
+
+    /// <summary>
+    /// Logs, at <c>warning</c>, a certificate <c>--ssl-revoke-best-effort</c> accepted although its
+    /// revocation status was offline or unknown (ADR-0222, decision 2; BL-968).
+    /// </summary>
+    /// <param name="host">The host the handshake was with.</param>
+    public void RevocationCheckIncomplete(string host)
+    {
+        if (log.IsEnabled(DiagnosticLogLevel.Warning))
+        {
+            Write(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Tls, $"certificate of {host} accepted with its revocation status offline or unknown (--ssl-revoke-best-effort)");
+        }
+    }
+
+    /// <summary>Logs, at <c>info</c>, a connection made through a Unix domain socket (BL-968).</summary>
+    /// <param name="path">The socket's path, <see cref="UnixSocketAddress.Path" />.</param>
+    public void UnixSocketConnected(string path)
+    {
+        if (log.IsEnabled(DiagnosticLogLevel.Info))
+        {
+            Write(DiagnosticLogLevel.Info, DiagnosticLogComponents.Connect, $"connected to Unix socket {path}");
+        }
+    }
+
+    /// <summary>Logs, at <c>info</c>, a UDP channel opened to a server (BL-968).</summary>
+    /// <param name="serverEndPoint">The address and port the channel sends to.</param>
+    public void DatagramChannelOpened(EndPoint serverEndPoint)
+    {
+        if (log.IsEnabled(DiagnosticLogLevel.Info))
+        {
+            Write(DiagnosticLogLevel.Info, DiagnosticLogComponents.Connect, $"UDP channel open to {serverEndPoint}");
+        }
+    }
 
     /// <summary>Logs, at <c>error</c>, a connect that failed with its <see cref="CurlExitCode" />.</summary>
     /// <param name="component">The step that failed, one of the <see cref="DiagnosticLogComponents" /> names.</param>

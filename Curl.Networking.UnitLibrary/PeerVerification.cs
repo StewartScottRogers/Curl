@@ -46,6 +46,12 @@ internal sealed record PeerVerification(bool Verified, long? VerifyResult, ReadO
     /// </summary>
     internal string? PinnedPublicKeyHash { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether <c>--ssl-revoke-best-effort</c> accepted a chain whose only
+    /// faults were an offline or unknown revocation status (BL-968).
+    /// </summary>
+    internal bool RevocationCheckIncomplete { get; init; }
+
     /// <summary>Gets a value indicating whether <c>--pinnedpubkey</c> refused the server's key, exit 90.</summary>
     internal bool PinnedPublicKeyRefused { get; init; }
 

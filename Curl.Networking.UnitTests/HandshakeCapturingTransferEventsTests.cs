@@ -66,6 +66,29 @@ public sealed class HandshakeCapturingTransferEventsTests
         Assert.AreEqual(TlsClientRoute.HandBuilt, handBuilt.Route);
     }
 
+    [TestMethod]
+    public void RouteReason_OfEachProvider_IsTheOneTlsClientRoutingGives()
+    {
+        IHandshakeReportingTlsProvider sslStream = new SslStreamTlsProvider(new TlsClientOptions());
+        IHandshakeReportingTlsProvider handBuilt = new HandBuiltTlsProvider(new TlsClientOptions(MaximumVersion: TlsVersion.Tls11), TimeProvider.System);
+
+        Assert.IsNull(sslStream.RouteReason);
+        Assert.AreEqual("--tls-max caps the versions below TLS 1.2", handBuilt.RouteReason);
+    }
+
+    [TestMethod]
+    public void RevocationCheckIncomplete_IsFalseUntilReportedAndPassesNothingOn()
+    {
+        var inner = new CountingTransferEvents();
+        var capturing = new HandshakeCapturingTransferEvents(inner);
+
+        Assert.IsFalse(capturing.RevocationCheckIncomplete);
+        capturing.ReportRevocationCheckIncomplete();
+
+        Assert.IsTrue(capturing.RevocationCheckIncomplete);
+        Assert.IsEmpty(inner.Calls);
+    }
+
     private sealed class CountingTransferEvents : ITransferEvents
     {
         public List<string> Calls { get; } = [];

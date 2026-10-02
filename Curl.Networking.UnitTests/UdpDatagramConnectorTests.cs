@@ -330,6 +330,58 @@ public sealed class UdpDatagramConnectorTests
         CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Loopback, 47501) }, opened);
     }
 
+    [TestMethod]
+    public async Task OpenAsync_WithADiagnosticLog_LogsTheResolveAndTheChannelAtInfo()
+    {
+        var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
+        var connector = new UdpDatagramConnector(new FakeDnsResolver(IPAddress.Loopback), new ManualTimeProvider(), OpenFake([]), diagnosticLog: log);
+
+        await connector.OpenAsync("tftp.test", 69, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "tftp.test:69 resolved by lookup to 127.0.0.1 in 0 ms" }, log.At(DiagnosticLogLevel.Info, DiagnosticLogComponents.Dns));
+        CollectionAssert.AreEqual(new[] { "UDP channel open to 127.0.0.1:69" }, log.At(DiagnosticLogLevel.Info, DiagnosticLogComponents.Connect));
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WhenAResolveEntryAnswers_LogsTheResolveAsFromTheDnsCache()
+    {
+        var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
+        var connector = new UdpDatagramConnector(
+            new FakeDnsResolver(), new ManualTimeProvider(), OpenFake([]), ResolveOverrides.Parse(["tftp.test:69:127.0.0.1"]), diagnosticLog: log);
+
+        await connector.OpenAsync("tftp.test", 69, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "tftp.test:69 resolved from the DNS cache to 127.0.0.1 in 0 ms" }, log.At(DiagnosticLogLevel.Info, DiagnosticLogComponents.Dns));
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WhenTheNameDoesNotResolve_LogsTheFailureAtErrorForDns()
+    {
+        var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
+        var connector = new UdpDatagramConnector(new FakeDnsResolver(), new ManualTimeProvider(), OpenFake([]), diagnosticLog: log);
+
+        await connector.OpenAsync("nonexistent.invalid", 69, CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[] { "failed with CouldntResolveHost (6): Could not resolve host: nonexistent.invalid" },
+            log.At(DiagnosticLogLevel.Error, DiagnosticLogComponents.Dns));
+        Assert.IsEmpty(log.At(DiagnosticLogLevel.Info, DiagnosticLogComponents.Dns));
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WhenNoChannelOpens_LogsTheFailureAtErrorForConnect()
+    {
+        var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Error);
+        var connector = new UdpDatagramConnector(
+            new FakeDnsResolver(IPAddress.Loopback), new ManualTimeProvider(), _ => throw new SocketException((int)SocketError.AddressFamilyNotSupported), diagnosticLog: log);
+
+        await connector.OpenAsync("tftp.test", 69, CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[] { "failed with CouldntConnect (7): Failed to connect to tftp.test:69 after 0 ms: Could not connect to server" },
+            log.At(DiagnosticLogLevel.Error, DiagnosticLogComponents.Connect));
+    }
+
     private static UdpDatagramConnector CreateConnector(
         IDnsResolver resolver,
         Func<IPEndPoint, IDatagramChannel> openChannel,

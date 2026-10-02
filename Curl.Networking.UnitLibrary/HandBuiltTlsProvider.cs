@@ -48,6 +48,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <inheritdoc />
     TlsClientRoute IHandshakeReportingTlsProvider.Route => TlsClientRoute.HandBuilt;
 
+    /// <inheritdoc />
+    string? IHandshakeReportingTlsProvider.RouteReason => TlsClientRouting.Reason(_options);
+
     private readonly TlsClientOptions _options;
 
     private readonly bool _matchesSchannelBuild;

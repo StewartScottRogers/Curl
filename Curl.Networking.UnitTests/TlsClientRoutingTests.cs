@@ -130,4 +130,32 @@ public sealed class TlsClientRoutingTests
     [TestMethod]
     public void Choose_WithNullOptions_ThrowsArgumentNullException() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => TlsClientRouting.Choose(null!));
+
+    // BL-968: each row of ADR-0140's table names its option, the first row that holds winning.
+    public static IEnumerable<object[]> ReasonsByRow =>
+    [
+        [new TlsClientOptions(MaximumVersion: TlsVersion.Tls11, RequireCertificateStatus: true), "--tls-max caps the versions below TLS 1.2"],
+        [new TlsClientOptions(RequireCertificateStatus: true), "--cert-status asks for the stapled certificate status"],
+        [new TlsClientOptions(Curves: "X25519"), "--curves or --sigalgs names the groups or signature algorithms"],
+        [new TlsClientOptions(SslSessionsFile: "sessions.txt"), "--ssl-sessions imports and exports sessions"],
+        [new TlsClientOptions(Ech: "grease"), "--ech offers Encrypted Client Hello"],
+        [new TlsClientOptions(TlsUser: "alice"), "--tlsuser turns on TLS-SRP"],
+        [new TlsClientOptions(NoSessionId: true), "--no-sessionid turns off the session cache"],
+        [new TlsClientOptions(AllowBeast: true, MinimumVersion: TlsVersion.Tls10), "--ssl-allow-beast with a TLS 1.0 minimum turns off the CBC split"],
+        [new TlsClientOptions(AllowEarlyData: true), "--tls-earlydata sends 0-RTT early data"],
+    ];
+
+    [TestMethod]
+    [DynamicData(nameof(ReasonsByRow))]
+    public void Reason_WhenARowHolds_NamesItsOption(TlsClientOptions options, string expected) =>
+        Assert.AreEqual(expected, TlsClientRouting.Reason(options));
+
+    [TestMethod]
+    [DynamicData(nameof(PlainOptionSets))]
+    public void Reason_WithAPlainOptionSet_IsNull(TlsClientOptions options) =>
+        Assert.IsNull(TlsClientRouting.Reason(options));
+
+    [TestMethod]
+    public void Reason_WithNullOptions_ThrowsArgumentNullException() =>
+        Assert.ThrowsExactly<ArgumentNullException>(() => TlsClientRouting.Reason(null!));
 }

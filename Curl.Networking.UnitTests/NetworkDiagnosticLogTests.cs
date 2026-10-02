@@ -38,7 +38,7 @@ public sealed class NetworkDiagnosticLogTests
             CertificateVerified = true,
         };
 
-        new NetworkDiagnosticLog(recording).HandshakeCompleted("example.com", TlsClientRoute.SslStream, handshake, "h2");
+        new NetworkDiagnosticLog(recording).HandshakeCompleted("example.com", TlsClientRoute.SslStream, null, handshake, "h2");
 
         CollectionAssert.AreEqual(
             new[] { "handshake with example.com complete: Tls13, an unreported cipher suite, ALPN h2, route SslStream" },
@@ -59,7 +59,7 @@ public sealed class NetworkDiagnosticLogTests
             CertificateVerified = true,
         };
 
-        new NetworkDiagnosticLog(recording).HandshakeCompleted("example.com", null, handshake, null);
+        new NetworkDiagnosticLog(recording).HandshakeCompleted("example.com", null, null, handshake, null);
 
         CollectionAssert.AreEqual(new[] { "certificate chain verified" }, recording.At(DiagnosticLogLevel.Verbose, DiagnosticLogComponents.Tls));
     }
@@ -92,7 +92,10 @@ public sealed class NetworkDiagnosticLogTests
         log.TunnelRequested(proxy, "example.com", 80);
         log.SocksHandshakeStarting(proxy, "example.com", 80);
         log.TunnelEstablished(proxy, "example.com", 80, 200);
-        log.HandshakeCompleted("example.com", TlsClientRoute.SslStream, null, null);
+        log.HandshakeCompleted("example.com", TlsClientRoute.SslStream, null, null, null);
+        log.RevocationCheckIncomplete("example.com");
+        log.UnixSocketConnected("/run/curl.sock");
+        log.DatagramChannelOpened(endPoint);
         log.Failed(DiagnosticLogComponents.Connect, CurlExitCode.CouldntConnect, "x");
         log.Threw(new IOException("x"));
         log.PoolDecision(new ConnectTarget("example.com", 80, UseTls: false), null);

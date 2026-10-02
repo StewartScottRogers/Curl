@@ -124,7 +124,10 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     {
         var anchoredErrors = WithTheNameCheckCurlRuns(
             WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
-        var observed = ObservePeerVerification(anchoredErrors, chain, peerCertificates);
+        var observed = ObservePeerVerification(anchoredErrors, chain, peerCertificates) with
+        {
+            RevocationCheckIncomplete = !options.Insecure && RevocationBestEffortTolerates(chain),
+        };
         var refusal = VerifyPeer(anchoredErrors, chain, targetHost, [])
             ?? RevocationListRefusal(revocationLists, chain);
         return refusal is null ? JudgePinnedPublicKey(observed, peerCertificates) : (observed, refusal);

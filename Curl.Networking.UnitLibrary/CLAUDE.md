@@ -425,7 +425,15 @@ message) at `error`; `proxy` the CONNECT or SOCKS handshake at `verbose` and the
 at `info`, each certificate and the chain verdict at `verbose`, a failed handshake at `error`;
 `quic` the dial at `verbose`, the connection at `info`, a failure at `error`. The handshake's details
 come from the `TlsHandshakeEvent` the provider reports, caught by `HandshakeCapturingTransferEvents`,
-which wraps the target's events only when `info` is on. A proxy is named by kind, host and port and
+which wraps the target's events only when `warning` is on. Per BL-968 the `tls` info line ends with
+why the options chose the hand-built client (`IHandshakeReportingTlsProvider.RouteReason`, the first
+row of `TlsClientRouting.Reason`'s table that holds); a certificate `--ssl-revoke-best-effort`
+accepted with its revocation status offline or unknown (`PeerVerification.RevocationCheckIncomplete`,
+passed by `SslStreamTlsProvider` to the capturing events) is a `tls` `warning`; a Unix domain socket
+connection is a `connect` `info` line, a refused one the usual `connect` `error`; and
+`UdpDatagramConnector`, given the run's `IDiagnosticLog`, logs its resolve as `dns` `info` (a
+`--resolve` entry as from the DNS cache), a name with none as `dns` `error`, the channel as
+`connect` `info` and no channel as `connect` `error`. A proxy is named by kind, host and port and
 no credential, pass phrase or `Proxy-Authorization` reaches the log; `Curl.Tls` and `Curl.Quic`
 log nothing themselves. Tests record lines through `Fakes/RecordingDiagnosticLog`.
 

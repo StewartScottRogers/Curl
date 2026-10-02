@@ -17,35 +17,49 @@ namespace Curl.Networking;
 /// </remarks>
 public static class TlsClientRouting
 {
+    // ADR-0140's table, one row per condition, in the order the reason is looked for: the
+    // first row that holds names why the hand-built client was chosen (BL-968).
+    private static readonly (Func<TlsClientOptions, bool> Holds, string Reason)[] HandBuiltRows =
+    [
+        (CapsVersionsBelowTls12, "--tls-max caps the versions below TLS 1.2"),
+        (options => options.RequireCertificateStatus, "--cert-status asks for the stapled certificate status"),
+        (NamesGroupsOrSignatureAlgorithms, "--curves or --sigalgs names the groups or signature algorithms"),
+        (options => options.SslSessionsFile is not null, "--ssl-sessions imports and exports sessions"),
+        (options => EchModes.Of(options) != EchMode.Off, "--ech offers Encrypted Client Hello"),
+        (UsesTlsSrp, "--tlsuser turns on TLS-SRP"),
+        (options => options.NoSessionId, "--no-sessionid turns off the session cache"),
+        (AllowsBeastOnTls10, "--ssl-allow-beast with a TLS 1.0 minimum turns off the CBC split"),
+        (options => options.AllowEarlyData, "--tls-earlydata sends 0-RTT early data"),
+    ];
+
     /// <summary>Chooses the TLS client for a connection made with <paramref name="options" />.</summary>
     /// <param name="options">The connection's TLS options, the origin's or an HTTPS proxy's.</param>
     /// <returns>
     /// <see cref="TlsClientRoute.HandBuilt" /> when a row of ADR-0140's table holds, otherwise
     /// <see cref="TlsClientRoute.SslStream" />.
     /// </returns>
-    public static TlsClientRoute Choose(TlsClientOptions options)
+    public static TlsClientRoute Choose(TlsClientOptions options) =>
+        Reason(options) is null ? TlsClientRoute.SslStream : TlsClientRoute.HandBuilt;
+
+    /// <summary>
+    /// Says why <see cref="Choose" /> chooses the hand-built client for
+    /// <paramref name="options" />, naming the option of the first row of ADR-0140's table that
+    /// holds, for the diagnostic log's handshake line (BL-968).
+    /// </summary>
+    /// <param name="options">The connection's TLS options.</param>
+    /// <returns>The reason, or <see langword="null" /> when no row holds and <c>SslStream</c> runs the handshake.</returns>
+    public static string? Reason(TlsClientOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        return CapsVersionsBelowTls12(options) || options.RequireCertificateStatus || NamesGroupsOrSignatureAlgorithms(options) || UsesSessionsEchOrSrp(options)
-            || ControlsSessionsEarlyDataOrTheBeastSplit(options)
-            ? TlsClientRoute.HandBuilt
-            : TlsClientRoute.SslStream;
+        return HandBuiltRows.FirstOrDefault(row => row.Holds(options)).Reason;
     }
-
-    // The --no-sessionid, --ssl-allow-beast (ADR-0151, BL-713) and --tls-earlydata (BL-1105) rows.
-    private static bool ControlsSessionsEarlyDataOrTheBeastSplit(TlsClientOptions options) =>
-        options.NoSessionId || AllowsBeastOnTls10(options) || options.AllowEarlyData;
 
     // The --ssl-allow-beast row (ADR-0151, BL-713): SslStream cannot turn off the TLS 1.0 CBC
     // split, so a range that reaches TLS 1.0 runs on the hand-built client. A TLS 1.0 or 1.1
     // ceiling is hand-built already; this adds a TLS 1.0 minimum under a higher one.
     private static bool AllowsBeastOnTls10(TlsClientOptions options) =>
         options.AllowBeast && options.MinimumVersion is TlsVersion.Tls10;
-
-    // The --ssl-sessions, --ech and TLS-SRP rows: features SslStream has no API for.
-    private static bool UsesSessionsEchOrSrp(TlsClientOptions options) =>
-        options.SslSessionsFile is not null || EchModes.Of(options) != EchMode.Off || UsesTlsSrp(options);
 
     // The TLS-SRP row (ADR-0229, ADR-0328, BL-712): SslStream has no SRP, and --tlsuser alone
     // turns it on, as libcurl defaults the TLS authentication type to SRP once a user is set.

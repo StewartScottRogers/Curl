@@ -279,6 +279,79 @@ public sealed partial class TcpConnectorTests
         Assert.AreSame(events, tlsProvider.ReceivedEvents, "With info off the provider gets the target's own events.");
     }
 
+    [TestMethod]
+    public async Task ConnectAsync_WhenAHandBuiltHandshakeUnderTlsMax11Completes_LogsWhyItWasHandBuiltAtInfo()
+    {
+        var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
+        var tlsProvider = new FakeTlsProvider
+        {
+            Route = TlsClientRoute.HandBuilt,
+            RouteReason = TlsClientRouting.Reason(new TlsClientOptions(MaximumVersion: TlsVersion.Tls11)),
+            HandshakeToReport = Handshake(verified: true),
+        };
+        var connector = CreateConnector(new FakeDnsResolver(Loopback), ConnectingDialer(), tlsProvider);
+
+        await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { DiagnosticLog = log }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[] { "handshake with example.com complete: Tls12, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, ALPN none, route HandBuilt (--tls-max caps the versions below TLS 1.2)" },
+            log.At(DiagnosticLogLevel.Info, DiagnosticLogComponents.Tls));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheRevocationCheckCouldNotComplete_LogsAWarningForTls()
+    {
+        var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Warning);
+        var tlsProvider = new FakeTlsProvider { RevocationCheckIncomplete = true };
+        var connector = CreateConnector(new FakeDnsResolver(Loopback), ConnectingDialer(), tlsProvider);
+
+        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { DiagnosticLog = log }, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "certificate of example.com accepted with its revocation status offline or unknown (--ssl-revoke-best-effort)" },
+            log.At(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Tls));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithTheLogOff_PassesTheProviderTheTargetsOwnEvents()
+    {
+        var events = new RecordingTransferEvents();
+        var tlsProvider = new FakeTlsProvider { RevocationCheckIncomplete = true };
+        var connector = CreateConnector(new FakeDnsResolver(Loopback), ConnectingDialer(), tlsProvider);
+
+        await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { Events = events }, CancellationToken.None);
+
+        Assert.AreSame(events, tlsProvider.ReceivedEvents);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithAUnixSocket_LogsTheConnectionAtInfo()
+    {
+        var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
+        var dialer = new FakeTcpDialer { UnixSocketDialOutcome = _ => new FakeConnection() };
+        var connector = new TcpConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new ManualTimeProvider(), unixSocket: new UnixSocketAddress("/run/app.sock", IsAbstract: false));
+
+        await connector.ConnectAsync(new ConnectTarget("localhost", 80, UseTls: false) { DiagnosticLog = log }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "connected to Unix socket /run/app.sock" }, log.At(DiagnosticLogLevel.Info, DiagnosticLogComponents.Connect));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheUnixSocketRefuses_LogsTheFailureAtErrorForConnect()
+    {
+        var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
+        var dialer = new FakeTcpDialer { UnixSocketDialOutcome = _ => throw new SocketException((int)SocketError.ConnectionRefused) };
+        var connector = new TcpConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new ManualTimeProvider(), unixSocket: new UnixSocketAddress("s.sock", IsAbstract: false));
+
+        await connector.ConnectAsync(new ConnectTarget("localhost", 80, UseTls: false) { DiagnosticLog = log }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[] { "failed with CouldntConnect (7): Failed to connect to localhost:80 over unix://s.sock after 0 ms: Could not connect to server" },
+            log.At(DiagnosticLogLevel.Error, DiagnosticLogComponents.Connect));
+        Assert.IsEmpty(log.At(DiagnosticLogLevel.Info, DiagnosticLogComponents.Connect));
+    }
+
     private static FakeTcpDialer ConnectingDialer() => new() { DialOutcome = _ => new FakeConnection() };
 
     private static TlsHandshakeEvent Handshake(bool verified) => new()
