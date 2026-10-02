@@ -34,3 +34,4 @@ A `pop3://` or `pop3s://` transfer with `-D` writes every response line it reads
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
