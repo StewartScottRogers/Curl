@@ -32,3 +32,4 @@ Under `-v --trace-config ftp -r 0-1 -Q -<cmd>`, with the post-quote refused, Cur
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
