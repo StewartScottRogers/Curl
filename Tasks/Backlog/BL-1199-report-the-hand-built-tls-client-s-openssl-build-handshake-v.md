@@ -18,9 +18,9 @@ completed:
 
 ## Context
 
-- Follow-up from BL-1178 (ADR-0370), which made the hand-built OpenSSL build report a failed `TlsHandshakeEvent` on a pin refusal only.
+- Follow-up from BL-1178 (ADR-0371), which made the hand-built OpenSSL build report a failed `TlsHandshakeEvent` on a pin refusal only.
 - `HandBuiltTlsProvider.ReportFailedHandshake` returns early in the OpenSSL build unless `PinnedPublicKeyRefused`; `HandBuiltHandshake.NegotiatedBy(verifier.Presented)` already gives the version, suite and ALPN protocol, and a null `Presented` means nothing was negotiated.
-- The measured lines are in ADR-0370's Context; `OpenSslHandshakeText` already words both cases.
+- The measured lines are in ADR-0371's Context; `OpenSslHandshakeText` already words both cases.
 
 ## Acceptance criteria
 
