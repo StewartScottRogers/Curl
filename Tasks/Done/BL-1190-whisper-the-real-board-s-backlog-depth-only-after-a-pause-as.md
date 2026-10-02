@@ -1,5 +1,5 @@
 ---
-id: BL-1186
+id: BL-1190
 title: Whisper the real board's Backlog depth only, after a pause, as Backlog depth N
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed: 2026-10-02
 ---
-# BL-1186 — Whisper the real board's Backlog depth only, after a pause, as Backlog depth N
+# BL-1190 — Whisper the real board's Backlog depth only, after a pause, as Backlog depth N
 
 ## Goal
 
