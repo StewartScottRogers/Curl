@@ -40,6 +40,22 @@ public sealed class DatagramOpenResult
     public string? ErrorMessage { get; }
 
     /// <summary>
+    /// Gets curl's number for the connection the open made, counted from <c>0</c> across the
+    /// run with every other connection (ADR-0109): the <c>N</c> in <c>shutting down connection
+    /// #N</c>. <c>0</c> unless <see cref="WithConnectionNumber(long)" /> gave it another.
+    /// </summary>
+    public long ConnectionNumber { get; private init; }
+
+    /// <summary>
+    /// Returns this result with <paramref name="connectionNumber" /> as its
+    /// <see cref="ConnectionNumber" />, keeping its channel, exit code and message.
+    /// </summary>
+    /// <param name="connectionNumber">curl's number for the connection.</param>
+    /// <returns>The numbered result.</returns>
+    public DatagramOpenResult WithConnectionNumber(long connectionNumber) =>
+        new(Channel, ExitCode, ErrorMessage) { ConnectionNumber = connectionNumber };
+
+    /// <summary>
     /// Creates the result of a successful open.
     /// </summary>
     /// <param name="channel">The open channel.</param>

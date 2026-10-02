@@ -53,6 +53,38 @@ public sealed class DatagramOpenResultTests
         Assert.AreEqual("Could not resolve host: nonexistent.invalid", result.ErrorMessage);
     }
 
+    [TestMethod]
+    public void Opened_WithoutNumber_HasConnectionNumberZero()
+    {
+        var result = DatagramOpenResult.Opened(new UnusedDatagramChannel());
+
+        Assert.AreEqual(0L, result.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public void WithConnectionNumber_OnOpened_KeepsChannelAndCarriesNumber()
+    {
+        var channel = new UnusedDatagramChannel();
+
+        var result = DatagramOpenResult.Opened(channel).WithConnectionNumber(3);
+
+        Assert.AreSame(channel, result.Channel);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNull(result.ErrorMessage);
+        Assert.AreEqual(3L, result.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public void WithConnectionNumber_OnFailed_KeepsCodeAndMessageAndCarriesNumber()
+    {
+        var result = DatagramOpenResult.Failed(CurlExitCode.CouldntConnect, "refused").WithConnectionNumber(2);
+
+        Assert.IsNull(result.Channel);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("refused", result.ErrorMessage);
+        Assert.AreEqual(2L, result.ConnectionNumber);
+    }
+
     private sealed class UnusedDatagramChannel : IDatagramChannel
     {
         public EndPoint ServerEndPoint { get; } = new IPEndPoint(IPAddress.Loopback, 69);

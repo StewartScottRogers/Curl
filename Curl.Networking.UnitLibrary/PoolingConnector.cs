@@ -96,6 +96,19 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         new(innerConnector, _cache, _configuration) { WaitsForMultiplexing = WaitsForMultiplexing };
 
     /// <summary>
+    /// Gives a datagram connector that opens channels through <paramref name="datagramConnector" />
+    /// and numbers each open in this pool's sequence, as curl 8.21.0 numbers a TFTP transfer's
+    /// connection with the TCP connections before it (BL-969).
+    /// </summary>
+    /// <param name="datagramConnector">Opens the channels.</param>
+    /// <returns>The numbering connector.</returns>
+    public IDatagramConnector NumberingDatagrams(IDatagramConnector datagramConnector)
+    {
+        ArgumentNullException.ThrowIfNull(datagramConnector);
+        return new ConnectionNumberingDatagramConnector(datagramConnector, _cache);
+    }
+
+    /// <summary>
     /// Gets the longest a connection may sit idle and still be reused: 118 seconds, curl's
     /// <c>CURLOPT_MAXAGE_CONN</c> default.
     /// </summary>
