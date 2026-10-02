@@ -34,13 +34,37 @@ public static class TlsClientConnection
         TlsClientSettings settings,
         ITlsRandomSource random,
         IServerCertificateVerifier verifier,
+        CancellationToken cancellationToken) =>
+        await ConnectWithEarlyDataAsync(transport, settings, random, verifier, ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
+
+    /// <summary>
+    /// Runs the handshake as <see cref="ConnectAsync" /> does, and sends <paramref name="earlyData" />
+    /// as the application data the server reads first: as TLS 1.3 0-RTT early data when the
+    /// hello offers it (<see cref="Tls13ClientConnection.ConnectWithEarlyDataAsync" />), and
+    /// whatever the server did not accept, all of it when the server chose TLS 1.2, once the
+    /// handshake completes and before the stream is returned.
+    /// </summary>
+    /// <param name="transport">The byte stream to the server, such as a TCP connection's.</param>
+    /// <param name="settings">What the ClientHello offers for each version.</param>
+    /// <param name="random">The source of the random, the session ID, the key shares and CBC records' explicit IVs.</param>
+    /// <param name="verifier">Judges the server's certificate chain.</param>
+    /// <param name="earlyData">The first application data to send, such as the request.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>The connected stream of the chosen version, or the failure.</returns>
+    /// <exception cref="ArgumentException">The settings cannot drive a handshake.</exception>
+    public static async Task<TlsConnectResult> ConnectWithEarlyDataAsync(
+        Stream transport,
+        TlsClientSettings settings,
+        ITlsRandomSource random,
+        IServerCertificateVerifier verifier,
+        ReadOnlyMemory<byte> earlyData,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(transport);
         ArgumentNullException.ThrowIfNull(settings);
         settings.Validate();
         ServerHelloReplayStream replay = new(transport);
-        Tls13ClientConnection tls13 = Tls13ClientConnection.Create(replay, settings.Tls13 with { LowerVersions = settings.Tls12 }, random, verifier);
+        Tls13ClientConnection tls13 = Tls13ClientConnection.Create(replay, settings.Tls13 with { LowerVersions = settings.Tls12 }, random, verifier, earlyData);
         await tls13.SendClientHelloAsync(cancellationToken).ConfigureAwait(false);
         bool serverChoseTls12 = await ReadsTls12ServerHelloAsync(replay, cancellationToken).ConfigureAwait(false);
         replay.Replay();
@@ -52,6 +76,11 @@ public static class TlsClientConnection
 
         tls13.Abandon();
         Tls12ConnectResult tls12 = await Tls12ClientConnection.ContinueAsync(replay, settings.Tls12, random, verifier, tls13.SentClientHello, cancellationToken).ConfigureAwait(false);
+        if (tls12.Stream is not null && !earlyData.IsEmpty)
+        {
+            await tls12.Stream.WriteAsync(earlyData, cancellationToken).ConfigureAwait(false);
+        }
+
         return new TlsConnectResult(null, tls12.Stream, tls12.Failure);
     }
 
