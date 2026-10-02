@@ -30,3 +30,4 @@ Curl writes curl 8.21.0's `[WRITE]` client writer lines under `--trace-config wr
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
