@@ -3,8 +3,8 @@ namespace Curl.Cli;
 /// <summary>
 /// Keeps <see cref="LibcurlSourceCode" /> in step with <see cref="CommandLineOptionTable" />: every option the
 /// table parses is listed here as one whose <c>--libcurl</c> lines the generator writes, one curl 8.21.0
-/// (Schannel) writes nothing for, or one still waiting for BL-1170, so an option added later cannot be
-/// forgotten (BL-654, BL-1106).
+/// (Schannel) writes nothing for, or one still waiting for BL-1177, so an option added later cannot be
+/// forgotten (BL-654, BL-1106, BL-1174).
 /// </summary>
 [TestClass]
 public sealed class LibcurlSourceCodeOptionCoverageTests
@@ -31,10 +31,15 @@ public sealed class LibcurlSourceCodeOptionCoverageTests
         "keepalive-time", "keepalive-cnt", "continue-at", "max-filesize", "happy-eyeballs-timeout-ms",
         "expect100-timeout", "speed-limit", "speed-time", "time-cond", "junk-session-cookies", "follow", "max-redirs",
         "post301", "post302", "post303", "tr-encoding", "ignore-content-length", "path-as-is", "http0.9", "http1.0",
-        "http1.1", "crlf", "write-out",
+        "http1.1", "crlf", "write-out", "verbose", "trace", "trace-ascii", "url-query", "telnet-option", "tftp-blksize",
+        "mail-from", "mail-rcpt", "mail-auth", "mail-rcpt-allowfails", "upload-flags", "tftp-no-options",
+        "ftp-skip-pasv-ip", "ftp-method", "ftp-create-dirs", "ftp-port", "ftp-pasv", "ssl", "ftp-ssl", "ssl-reqd",
+        "ftp-ssl-reqd", "ftp-ssl-control", "ftp-ssl-ccc", "ftp-ssl-ccc-mode", "ftp-account", "ftp-alternative-to-user",
+        "ftp-pret", "quote", "create-file-mode", "ip-tos", "vlan-priority", "mptcp", "pubkey", "hostpubmd5",
+        "hostpubsha256", "compressed-ssh", "proto", "proto-redir", "proto-default", "limit-rate", "parallel",
     ];
 
-    /// <summary>Options curl 8.21.0's Schannel build writes no line for, measured (BL-653, BL-654 and BL-1106 Notes).</summary>
+    /// <summary>Options curl 8.21.0's Schannel build writes no line for, measured (BL-653, BL-654, BL-1106 and BL-1174 Notes; ADR-0326 for the options the Schannel build refuses).</summary>
     private static readonly string[] WritesNothing =
     [
         "output", "remote-name", "include", "fail-with-body", "capath", "crlfile", "tls13-ciphers", "curves", "sigalgs",
@@ -45,28 +50,20 @@ public sealed class LibcurlSourceCodeOptionCoverageTests
         "dump-ca-embed", "retry", "retry-delay", "retry-max-time", "retry-all-errors", "retry-connrefused", "rate",
         "xattr", "show-headers", "fail-early", "parallel-immediate", "parallel-max", "parallel-max-host", "config",
         "next", "variable", "version", "help", "manual", "ai-help", "libcurl", "raw", "sslv2", "sslv3", "metalink",
-        "npn", "ntlm-wb", "false-start", "egd-file", "random-file", "disable",
+        "npn", "ntlm-wb", "false-start", "egd-file", "random-file", "disable", "doh-insecure", "doh-cert-status",
+        "disable-epsv", "epsv", "disable-eprt", "eprt", "krb4", "krb", "ipfs-gateway", "log-level", "log-file",
+        "dns-servers", "dns-interface", "dns-ipv4-addr", "dns-ipv6-addr", "knownhosts", "ech", "ssl-sessions", "tlsuser",
+        "tlspassword", "tlsauthtype", "proxy-tlsuser", "proxy-tlspassword", "proxy-tlsauthtype", "http2",
+        "http2-prior-knowledge", "http3", "http3-only",
     ];
 
-    /// <summary>Options whose lines BL-1170 measures and writes; each moves to one of the lists above as it lands.</summary>
-    private static readonly string[] WaitingForBl1170 =
-    [
-        "verbose", "trace", "trace-ascii", "log-level", "log-file", "upload-file", "url-query", "etag-compare",
-        "telnet-option", "tftp-blksize", "mail-from", "mail-rcpt", "mail-auth", "mail-rcpt-allowfails", "upload-flags",
-        "dns-servers", "dns-interface", "dns-ipv4-addr", "dns-ipv6-addr", "doh-insecure", "doh-cert-status",
-        "tftp-no-options", "disable-epsv", "epsv", "ftp-skip-pasv-ip", "ftp-method", "ftp-create-dirs", "ftp-port",
-        "ftp-pasv", "disable-eprt", "eprt", "ssl", "ftp-ssl", "ssl-reqd", "ftp-ssl-reqd", "ftp-ssl-control",
-        "ftp-ssl-ccc", "ftp-ssl-ccc-mode", "ftp-account", "ftp-alternative-to-user", "ftp-pret", "quote",
-        "create-file-mode", "ip-tos", "vlan-priority", "mptcp", "pubkey", "knownhosts", "hostpubmd5", "hostpubsha256",
-        "compressed-ssh", "proto", "proto-redir", "proto-default", "ech", "ssl-sessions", "tlsuser", "tlspassword",
-        "tlsauthtype", "limit-rate", "parallel", "ipfs-gateway", "http2", "http2-prior-knowledge", "http3",
-        "http3-only", "krb4", "krb", "proxy-tlsuser", "proxy-tlspassword", "proxy-tlsauthtype",
-    ];
+    /// <summary>Options whose lines BL-1177 measures and writes: they need the console's per-transfer file knowledge.</summary>
+    private static readonly string[] WaitingForBl1177 = ["upload-file", "etag-compare"];
 
     [TestMethod]
     public void EveryParsedOption_IsWrittenOrKnownToWriteNothingOrWaitingForItsTask()
     {
-        HashSet<string> listed = [.. Written, .. WritesNothing, .. WaitingForBl1170];
+        HashSet<string> listed = [.. Written, .. WritesNothing, .. WaitingForBl1177];
 
         string[] unlisted = [.. CommandLineOptionTable.Rows.Select(row => row.LongName).Where(name => !listed.Contains(name))];
 
@@ -76,7 +73,7 @@ public sealed class LibcurlSourceCodeOptionCoverageTests
     [TestMethod]
     public void EveryListedOption_IsParsedAndListedOnce()
     {
-        string[] listed = [.. Written, .. WritesNothing, .. WaitingForBl1170];
+        string[] listed = [.. Written, .. WritesNothing, .. WaitingForBl1177];
         HashSet<string> parsed = [.. CommandLineOptionTable.Rows.Select(row => row.LongName)];
 
         Assert.HasCount(parsed.Count, listed);

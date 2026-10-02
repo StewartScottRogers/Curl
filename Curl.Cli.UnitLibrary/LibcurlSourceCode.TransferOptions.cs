@@ -70,6 +70,7 @@ public static partial class LibcurlSourceCode
         List<string> lines = [];
         AddIf(lines, limit > 0, () => Setopt("CURLOPT_LOW_SPEED_LIMIT", $"{limit}L"));
         AddIf(lines, time > 0, () => Setopt("CURLOPT_LOW_SPEED_TIME", $"{time}L"));
+        lines.AddRange(RateLimitLines(options));
         AddIf(lines, options.ResumeFrom > 0, () => Setopt("CURLOPT_RESUME_FROM_LARGE", $"(curl_off_t){options.ResumeFrom}"));
         return lines;
     }
@@ -78,12 +79,13 @@ public static partial class LibcurlSourceCode
     /// The lines after the TLS ones: <c>--path-as-is</c>, the file time <c>-I</c> or <c>-R</c> asks for,
     /// <c>--crlf</c> and the <c>-z</c> condition, its time in seconds since 1970.
     /// </summary>
-    private static List<string> PathFileTimeAndConditionLines(CommandLineOptions options)
+    private static List<string> PathFileTimeAndConditionLines(CommandLineOptions options, LibcurlSourceVariables variables)
     {
         List<string> lines = [];
         AddIf(lines, options.PathAsIs, SetoptOn("CURLOPT_PATH_AS_IS"));
         AddIf(lines, options.NoBody || options.RemoteTime, SetoptOn("CURLOPT_FILETIME"));
         AddIf(lines, options.ConvertLineEndings, SetoptOn("CURLOPT_CRLF"));
+        lines.AddRange(QuoteLines(options, variables));
         if (options.TimeCondition is { } condition)
         {
             string kind = condition.Kind == TimeConditionKind.IfModifiedSince ? "CURL_TIMECOND_IFMODSINCE" : "CURL_TIMECOND_IFUNMODSINCE";
@@ -95,13 +97,15 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>The <c>-X</c>, <c>--interface</c>, <c>--connect-timeout</c>, <c>--doh-url</c>, <c>--max-filesize</c>, <c>-4</c> and <c>-6</c> lines, in that order.</summary>
-    private static List<string> RequestAndConnectionLines(CommandLineOptions options)
+    private static List<string> RequestAndConnectionLines(CommandLineOptions options, LibcurlSourceVariables variables)
     {
         List<string> lines = [];
         AddStringIf(lines, "CURLOPT_CUSTOMREQUEST", options.RequestMethod);
         AddStringIf(lines, "CURLOPT_INTERFACE", options.Interface?.Value);
+        AddStringListIf(lines, "CURLOPT_TELNETOPTIONS", options.TelnetOptions, variables);
         AddIf(lines, options.ConnectTimeout > TimeSpan.Zero, () => SetoptMilliseconds("CURLOPT_CONNECTTIMEOUT_MS", options.ConnectTimeout!.Value));
         AddStringIf(lines, "CURLOPT_DOH_URL", options.DohUrl);
+        AddIf(lines, options.FtpCreateDirectories, () => Setopt("CURLOPT_FTP_CREATE_MISSING_DIRS", "2L"));
         AddIf(lines, options.MaxFileSize > 0, () => Setopt("CURLOPT_MAXFILESIZE_LARGE", $"(curl_off_t){options.MaxFileSize}"));
         AddIf(lines, options.IpAddressFamily != IpAddressFamilyChoice.Either, () => Setopt("CURLOPT_IPRESOLVE", $"{(int)options.IpAddressFamily}L"));
         return lines;
@@ -138,6 +142,8 @@ public static partial class LibcurlSourceCode
     {
         List<string> lines = [];
         AddStringIf(lines, options.UnixSocketIsAbstract ? "CURLOPT_ABSTRACT_UNIX_SOCKET" : "CURLOPT_UNIX_SOCKET_PATH", options.UnixSocketPath);
+        AddStringIf(lines, "CURLOPT_DEFAULT_PROTOCOL", options.DefaultProtocolAsTyped);
+        AddIf(lines, options.TftpNoOptions, SetoptOn("CURLOPT_TFTP_NO_OPTIONS"));
         AddIf(lines, options.HappyEyeballsTimeout > TimeSpan.Zero, () => SetoptMilliseconds("CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS", options.HappyEyeballsTimeout!.Value));
         AddIf(lines, options.DisallowUsernameInUrl, SetoptOn("CURLOPT_DISALLOW_USERNAME_IN_URL"));
         return lines;

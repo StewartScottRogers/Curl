@@ -594,6 +594,7 @@ public static class CommandLineOptionTable
     /// </summary>
     private static void SetFtpFileMethod(CommandLineOptions options, string value)
     {
+        options.FtpFileMethodGiven = true;
         if (Ascii.EqualsIgnoreCase(value, "nocwd"))
         {
             options.FtpFileMethod = FtpFileMethod.NoCwd;
@@ -1223,6 +1224,7 @@ public static class CommandLineOptionTable
         }
 
         options.DefaultProtocol = scheme;
+        options.DefaultProtocolAsTyped = value;
         return null;
     }
 

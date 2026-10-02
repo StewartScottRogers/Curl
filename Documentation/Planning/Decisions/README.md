@@ -371,6 +371,7 @@ choices do not need one.
 | [0359](ADR-0359-ech-v-lines-and-exit-101-text-as-measured-with-openssl-4.md) | `--ech` writes curl's `ECH:` setup lines and exit 101 OpenSSL's `ech required` text, as measured with curl 8.21.0 on OpenSSL 4.0.0; `pn:` or `ecl:` without a mode is `hard` (BL-1107; amends ADR-0327) | Accepted | 2026-10-02 |
 | [0360](ADR-0360-a-tls-1-0-or-1-1-minimum-runs-on-the-hand-built-client.md) | A `--tlsv1.0` or `--tlsv1.1` minimum runs on the hand-built client whatever the ceiling, so a TLS 1.0 or 1.1 server connects where the operating system's stack refuses those versions (BL-1143; amends ADR-0140) | Accepted | 2026-10-02 |
 | [0361](ADR-0361-a-stale-digest-401-or-407-is-answered-again-without-limit.md) | A Digest `401` or forward proxy `407` challenged with `stale=true` is answered afresh with the new nonce, without limit, as curl 8.21.0 does (BL-1148) | Accepted | 2026-10-02 |
+| [0362](ADR-0362-libcurl-writes-nothing-for-options-the-schannel-build-refuses.md) | `--libcurl` writes no line for the options curl's Schannel build refuses, and no `smb`/`smbs` in `--proto all` (BL-1174). | 2026-10-02 |
 
 ## Template
 

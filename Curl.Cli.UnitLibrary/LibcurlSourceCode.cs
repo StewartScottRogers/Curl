@@ -22,8 +22,8 @@ namespace Curl.Cli;
 /// <c>-i</c> write nothing of their own) and the connection options (<c>--connect-timeout</c>, <c>-m</c>,
 /// <c>--resolve</c>, <c>--connect-to</c>, <c>-4</c>, <c>-6</c>). A number curl's default already has, such
 /// as a zero timeout, is not written, as curl does not write it. The proxy, TLS and authentication options'
-/// lines (BL-654) are in <c>LibcurlSourceCode.ProxyTlsAndAuthentication.cs</c>, the transfer, redirect, speed and socket options' lines (BL-1106) in <c>LibcurlSourceCode.TransferOptions.cs</c>; the remaining options' lines
-/// are BL-1170's.
+/// lines (BL-654) are in <c>LibcurlSourceCode.ProxyTlsAndAuthentication.cs</c>, the transfer, redirect, speed and socket options' lines (BL-1106) in <c>LibcurlSourceCode.TransferOptions.cs</c>, the FTP, SSH, TFTP, telnet, mail, verbose, rate-limit and protocol options' lines (BL-1174) in <c>LibcurlSourceCode.ProtocolOptions.cs</c>; the
+/// <c>-T</c> and <c>--etag-compare</c> lines are BL-1177's.
 /// </remarks>
 public static partial class LibcurlSourceCode
 {
@@ -56,13 +56,17 @@ public static partial class LibcurlSourceCode
         "  CURL *curl;",
     ];
 
-    private static readonly string[] UngeneratableOptionLines =
+    private static readonly string[] UngeneratableOptionHeaderLines =
     [
         "",
         "  /* Here is a list of options the curl code used that cannot get generated",
         "     as source easily. You may choose to either not use them or implement",
         "     them yourself.",
         "",
+    ];
+
+    private static readonly string[] StandardUngeneratableOptionLines =
+    [
         "  CURLOPT_WRITEDATA was set to an object pointer",
         "  CURLOPT_INTERLEAVEDATA was set to an object pointer",
         "  CURLOPT_WRITEFUNCTION was set to a function pointer",
@@ -74,6 +78,10 @@ public static partial class LibcurlSourceCode
         "  CURLOPT_HEADERDATA was set to an object pointer",
         "  CURLOPT_ERRORBUFFER was set to an object pointer",
         "  CURLOPT_STDERR was set to an object pointer",
+    ];
+
+    private static readonly string[] UngeneratableOptionFooterLines =
+    [
         "",
         "  */",
         "",
@@ -105,7 +113,7 @@ public static partial class LibcurlSourceCode
         foreach ((CommandLineOptions options, string url) in transfers)
         {
             body.AddRange(TransferLines(options, url, variables));
-            body.AddRange(UngeneratableOptionLines);
+            body.AddRange(UngeneratableOptionLinesFor(options));
         }
 
         List<string> lines = [.. HeaderLines, .. variables.Declarations];
@@ -171,7 +179,10 @@ public static partial class LibcurlSourceCode
 
     private static List<string> TransferLines(CommandLineOptions options, string url, LibcurlSourceVariables variables)
     {
-        List<string> lines = [Setopt("CURLOPT_BUFFERSIZE", "102400L"), Setopt("CURLOPT_URL", QuoteCString(url))];
+        string scheme = SchemeOf(options, url);
+        List<string> lines = [];
+        AddIf(lines, options.Trace != TraceKind.None, SetoptOn("CURLOPT_VERBOSE"));
+        lines.AddRange([BufferSizeLine(options), Setopt("CURLOPT_URL", QuoteCString(QueryUrl.Append(url, options)))]);
         AddIf(lines, options.Silent || options.ProgressMeterOff, SetoptOn("CURLOPT_NOPROGRESS"));
         AddIf(lines, options.NoBody, SetoptOn("CURLOPT_NOBODY"));
         lines.AddRange(BearerAndProxyLines(options));
@@ -187,17 +198,19 @@ public static partial class LibcurlSourceCode
         AddStringListIf(lines, "CURLOPT_HTTPHEADER", HttpHeaderLines(options), variables);
         AddStringIf(lines, "CURLOPT_REFERER", options.Referer);
         lines.Add(Setopt("CURLOPT_USERAGENT", QuoteCString(options.UserAgent ?? DefaultUserAgent)));
-        lines.AddRange(SchemeLines(options, SchemeOf(options, url), variables));
+        lines.AddRange(SchemeLines(options, scheme, variables));
         lines.AddRange(SpeedAndResumeLines(options));
-        lines.AddRange(TlsLines(options));
-        lines.AddRange(PathFileTimeAndConditionLines(options));
-        lines.AddRange(RequestAndConnectionLines(options));
+        lines.AddRange(TlsLines(options, scheme));
+        lines.AddRange(PathFileTimeAndConditionLines(options, variables));
+        lines.AddRange(RequestAndConnectionLines(options, variables));
         lines.AddRange(SocksAndServiceLines(options));
         lines.AddRange(SocketLines(options));
+        lines.AddRange(MailFileModeAndProtocolLines(options, variables));
         AddStringListIf(lines, "CURLOPT_RESOLVE", options.ResolveEntries, variables);
         AddStringListIf(lines, "CURLOPT_CONNECT_TO", options.ConnectToEntries, variables);
         lines.AddRange(DelegationAndSaslLines(options));
         lines.AddRange(UnixSocketAndUrlLines(options));
+        lines.AddRange(UploadFlagLines(options));
         return lines;
     }
 
@@ -332,7 +345,7 @@ public static partial class LibcurlSourceCode
     private static List<string> SchemeLines(CommandLineOptions options, string scheme, LibcurlSourceVariables variables) => scheme switch
     {
         "http" or "https" => HttpLines(options, scheme, variables),
-        "ftp" or "ftps" => [SetoptOn("CURLOPT_FTP_SKIP_PASV_IP")],
+        "ftp" or "ftps" => FtpLines(options),
         _ => [],
     };
 

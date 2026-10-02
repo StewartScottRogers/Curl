@@ -127,13 +127,14 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>The TLS lines for the server and the proxy, written after the scheme's lines in curl's order.</summary>
-    private static List<string> TlsLines(CommandLineOptions options)
+    private static List<string> TlsLines(CommandLineOptions options, string scheme)
     {
         (string? certificate, string? certificatePassword) = SplitCertificate(options.ClientCertificate);
         (string? proxyCertificate, string? proxyCertificatePassword) = SplitCertificate(options.ProxyClientCertificate);
         List<string> lines = [];
         AddStringIf(lines, "CURLOPT_KEYPASSWD", options.Passphrase ?? certificatePassword);
         AddStringIf(lines, "CURLOPT_PROXY_KEYPASSWD", options.ProxyPassphrase ?? proxyCertificatePassword);
+        lines.AddRange(SshLines(options, scheme));
         AddStringIf(lines, "CURLOPT_CAINFO", options.CaCertificateFile);
         AddStringIf(lines, "CURLOPT_PROXY_CAINFO", options.ProxyCaCertificateFile);
         AddStringIf(lines, "CURLOPT_PINNEDPUBLICKEY", options.PinnedPublicKey);
@@ -188,6 +189,7 @@ public static partial class LibcurlSourceCode
         AddIf(lines, proxySslOptions != 0, () => SetoptBitmask("CURLOPT_PROXY_SSL_OPTIONS", proxySslOptions, SslOptionNames));
         AddStringIf(lines, "CURLOPT_SSL_CIPHER_LIST", options.Ciphers);
         AddStringIf(lines, "CURLOPT_PROXY_SSL_CIPHER_LIST", options.ProxyCiphers);
+        lines.AddRange(UseSslLines(options));
         AddIf(lines, !options.UseAlpn, () => Setopt("CURLOPT_SSL_ENABLE_ALPN", "0L"));
         return lines;
     }
@@ -208,6 +210,7 @@ public static partial class LibcurlSourceCode
     {
         List<string> lines = [];
         AddIf(lines, options.GssApiDelegation != GssApiDelegation.None, () => Setopt("CURLOPT_GSSAPI_DELEGATION", $"{(int)options.GssApiDelegation}L"));
+        AddStringIf(lines, "CURLOPT_MAIL_AUTH", options.MailAuth);
         AddStringIf(lines, "CURLOPT_SASL_AUTHZID", options.SaslAuthorizationIdentity);
         AddIf(lines, options.SaslInitialResponse, SetoptOn("CURLOPT_SASL_IR"));
         return lines;

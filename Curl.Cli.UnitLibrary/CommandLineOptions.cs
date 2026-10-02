@@ -976,6 +976,9 @@ public sealed class CommandLineOptions
     /// </summary>
     public FtpFileMethod FtpFileMethod { get; internal set; }
 
+    /// <summary><see langword="true"/> once any <c>--ftp-method</c> was given, which <c>--libcurl</c> writes as <c>CURLOPT_FTP_FILEMETHOD</c> even for <c>multicwd</c>.</summary>
+    internal bool FtpFileMethodGiven { get; set; }
+
     /// <summary><see langword="true"/> when <c>--ftp-create-dirs</c> was given and no <c>--no-ftp-create-dirs</c> came after it.</summary>
     public bool FtpCreateDirectories { get; internal set; }
 
@@ -1406,6 +1409,9 @@ public sealed class CommandLineOptions
     /// when not given. The last value wins.
     /// </summary>
     public string? DefaultProtocol { get; internal set; }
+
+    /// <summary>The last <c>--proto-default</c> value as typed, case kept, which <c>--libcurl</c> writes as <c>CURLOPT_DEFAULT_PROTOCOL</c>; <see langword="null"/> when not given.</summary>
+    internal string? DefaultProtocolAsTyped { get; set; }
 
     /// <summary>The <c>--ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
     public string? Ciphers { get; internal set; }
