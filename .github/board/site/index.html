@@ -23,12 +23,28 @@
     ?findings=url      read each finding's text from this folder (url + file name)
                        instead of raw.githubusercontent.com, e.g.
                        ?findings=../fixtures/findings/
+    ?contents=url      send finding moves to this contents API base (url + path) instead
+                       of https://api.github.com/repos/<repo>/contents/; honoured only
+                       when the page itself is served from localhost and the url is on
+                       the page's own origin, so a crafted link cannot send the token
+                       anywhere else
 
   Tabs: #tasks (also no hash) shows the task kanban and lanes; #audit shows the audit
-  office's findings as a read-only kanban (BL-1184). Findings are listed from the task
-  branch's tree and the audit branch's tree, the audit branch's copy winning, and their
-  texts are read from raw.githubusercontent.com, which costs no API calls; each text is
-  re-read only when its blob SHA changes.
+  office's findings as a kanban (BL-1184). Findings are listed from the task branch's
+  tree and the audit branch's tree, the audit branch's copy winning, and their texts are
+  read from raw.githubusercontent.com, which costs no API calls; each text is re-read
+  only when its blob SHA changes.
+
+  Moving findings (BL-1185): with a GitHub token saved on the Audit tab (a fine-grained
+  personal access token, this repository only, Contents: read and write), each card
+  offers the moves its status allows - proposed: Approve, Defer, Block; deferred: Back
+  to waiting, Reject; blocked: Back to waiting. A move reads the finding from the audit
+  branch through the contents API, changes its status: and reason: lines, appends one
+  line to its ## Log, and writes it back to the audit branch as one commit,
+  "chore(audit): <old> -> <new> <AF-id>". A 409 (the file changed since it was read)
+  reloads the finding and overwrites nothing. The token lives in this browser's
+  localStorage, goes only into the Authorization header of contents API requests, and
+  "Forget token" removes it. Without one the tab is read-only.
 
   Adding a data source: append one { name, url, fetch, render } object to `sources`
   below. `fetch(source)` returns the parsed data (use fetchJson, which records the
@@ -91,6 +107,12 @@
   details.finding h3 { font-size: 13px; margin: 8px 0 2px; }
   details.finding pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.4 ui-monospace, monospace; margin: 0; }
   details.finding .body a { color: inherit; }
+  #audit-token { margin-top: 10px; }
+  #audit-token form, #audit-token p { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
+  details.finding .moves { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+  details.finding .moves input { flex: 1 1 160px; min-width: 0; }
+  details.finding .move-message { margin: 6px 0 0; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--line); }
+  details.finding .move-message.error { border-color: var(--bad); }
   @media (max-width: 700px) {
     #board, #audit-board { grid-template-columns: minmax(0, 1fr); }
   }
@@ -113,6 +135,18 @@
 </div>
 <div id="panel-audit" role="tabpanel" aria-labelledby="tab-audit" hidden>
 <p id="audit-source" class="muted"></p>
+<section id="audit-token">
+  <form id="token-form" hidden>
+    <label for="token-input">GitHub token</label>
+    <input id="token-input" type="password" autocomplete="off" spellcheck="false" size="40">
+    <button type="submit">Save token</button>
+  </form>
+  <p id="token-note" class="muted" hidden></p>
+  <p id="token-saved" hidden>
+    <span id="token-saved-text"></span>
+    <button id="token-forget" type="button">Forget token</button>
+  </p>
+</section>
 <main id="audit-board"></main>
 <section id="audit-folded"></section>
 </div>
@@ -134,9 +168,28 @@ const findingsOverride = params.get('findings') ? new URL(params.get('findings')
 const findingFile = /^Audit\/Findings\/(AF-\d+)(?:-(.*))?\.md$/;
 const findingColumns = [['proposed', 'Waiting for you'], ['accepted', 'Approved'], ['deferred', 'Deferred'], ['blocked', 'Blocked']];
 const findingFolds = [['rejected', 'Rejected'], ['closed', 'Closed']];
+// The moves each status allows (BL-1183): [button label, new status, reason required].
+const findingMoves = {
+  proposed: [['Approve', 'accepted', false], ['Defer', 'deferred', true], ['Block', 'blocked', true]],
+  deferred: [['Back to waiting', 'proposed', false], ['Reject', 'rejected', true]],
+  blocked: [['Back to waiting', 'proposed', false]],
+};
+const tokenKey = 'curl-board-github-token';
+const contentsBase = previewContentsBase() || `https://api.github.com/repos/${repo}/contents/`;
+
+// ?contents= is a local-preview override only: the page must be on localhost and the
+// override on the page's own origin, so a crafted link cannot send the token elsewhere.
+function previewContentsBase() {
+  const value = params.get('contents');
+  if (!value || !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) return null;
+  const url = new URL(value, location.href);
+  return url.origin === location.origin ? url.href : null;
+}
 
 // The tree most recently read, so lane cards can link their task to its file.
 let latestTree = null;
+// The findings most recently read, redrawn in place after a move.
+let latestAudit = null;
 
 function now() { return pinnedNow || new Date(); }
 
@@ -167,7 +220,13 @@ const sources = [
     url: resolveOverride('audit',
       `https://api.github.com/repos/${repo}/git/trees/${encodeURIComponent(auditBranch)}?recursive=1`),
     fetch: async source => readFindings(await fetchJson(source.url, {}, [404])),
-    render: findings => renderAudit(findings),
+    render: audit => {
+      latestAudit = audit;
+      renderAudit();
+      if (audit.truncated) {
+        showMessage('warning', `GitHub truncated the ${auditBranch} branch's tree, so the Audit tab may be missing findings.`);
+      }
+    },
   },
 ];
 
@@ -469,6 +528,9 @@ function findingElement(finding) {
   const link = element('a', null, `${finding.path} on ${finding.ref}`);
   link.href = `https://github.com/${repo}/blob/${encodePath(finding.ref)}/${encodePath(finding.path)}`;
   body.append(link);
+  if (!finding.error && findingMoves[finding.status] && savedToken()) body.append(movesElement(finding));
+  const message = moveMessages.get(finding.id);
+  if (message) body.append(element('p', `move-message ${message.kind}`, message.text));
   if (finding.error) {
     textSection(body, 'Could not read the finding', finding.error, 'p');
   } else {
@@ -491,7 +553,14 @@ function foldedList(key, label, findings) {
   return details;
 }
 
-function renderAudit({ findings, auditBranchFound, truncated }) {
+function renderAudit() {
+  renderTokenControls();
+  if (!latestAudit) return;
+  const { findings, auditBranchFound } = latestAudit;
+  // A redraw replaces the reason fields; the one being typed in keeps focus and caret.
+  const active = document.activeElement;
+  const typing = active && active.dataset && active.dataset.reasonFor
+    ? { id: active.dataset.reasonFor, start: active.selectionStart, end: active.selectionEnd } : null;
   const known = [...findingColumns, ...findingFolds].map(([status]) => status);
   const withStatus = status => findings.filter(finding => !finding.error && finding.status === status);
   const proposed = withStatus('proposed').length;
@@ -516,8 +585,211 @@ function renderAudit({ findings, auditBranchFound, truncated }) {
   for (const [status, label] of findingFolds) folded.append(foldedList(`fold:${status}`, label, withStatus(status)));
   const others = findings.filter(finding => finding.error || !known.includes(finding.status));
   if (others.length > 0) folded.append(foldedList('fold:other', 'Unreadable or unknown status', others));
-  if (truncated) {
-    showMessage('warning', `GitHub truncated the ${auditBranch} branch's tree, so the Audit tab may be missing findings.`);
+  const field = typing && [...document.querySelectorAll('input[data-reason-for]')]
+    .find(input => input.dataset.reasonFor === typing.id);
+  if (field) {
+    field.focus();
+    field.setSelectionRange(typing.start, typing.end);
+  }
+}
+
+function savedToken() {
+  try { return localStorage.getItem(tokenKey) || ''; } catch { return ''; }
+}
+
+// The token is never written back into the page: the field is emptied once it is saved.
+function renderTokenControls() {
+  const saved = savedToken() !== '';
+  document.getElementById('token-form').hidden = saved;
+  document.getElementById('token-note').hidden = saved;
+  document.getElementById('token-saved').hidden = !saved;
+  document.getElementById('token-note').textContent =
+    `Read-only. To approve, defer, block or reject findings here, paste a fine-grained GitHub personal ` +
+    `access token for ${repo} only, with Contents: read and write. It is kept in this browser's local ` +
+    `storage and sent only to the GitHub contents API.`;
+  document.getElementById('token-saved-text').textContent =
+    `Moves commit to the ${auditBranch} branch with the token saved in this browser.`;
+}
+
+document.getElementById('token-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const input = document.getElementById('token-input');
+  const token = input.value.trim();
+  input.value = '';
+  if (token) localStorage.setItem(tokenKey, token);
+  renderAudit();
+});
+
+document.getElementById('token-forget').addEventListener('click', () => {
+  localStorage.removeItem(tokenKey);
+  renderAudit();
+});
+
+// Per finding ID: the reason being typed, the last move's message, and moves in flight.
+// Kept outside the cards so a refresh's redraw loses none of them.
+const draftReasons = new Map();
+const moveMessages = new Map();
+const movesInFlight = new Set();
+
+function movesElement(finding) {
+  const box = element('div', 'moves');
+  const reason = element('input');
+  reason.type = 'text';
+  reason.placeholder = 'One-line reason';
+  reason.setAttribute('aria-label', `Reason for moving ${finding.id}`);
+  reason.dataset.reasonFor = finding.id;
+  reason.value = draftReasons.get(finding.id) || '';
+  reason.addEventListener('input', () => draftReasons.set(finding.id, reason.value));
+  box.append(reason);
+  for (const [label, to, reasonRequired] of findingMoves[finding.status]) {
+    const button = element('button', null, label);
+    button.type = 'button';
+    button.dataset.to = to;
+    button.disabled = movesInFlight.has(finding.id);
+    button.addEventListener('click', () => moveFinding(finding.id, label, to, reasonRequired));
+    box.append(button);
+  }
+  return box;
+}
+
+function setMoveMessage(id, kind, text) {
+  moveMessages.set(id, { kind, text });
+  renderAudit();
+}
+
+class ConflictError extends Error {}
+
+function contentsUrl(path) {
+  return new URL(encodePath(path), contentsBase).href;
+}
+
+async function contentsRequest(method, path, token, body) {
+  const url = method === 'GET' ? `${contentsUrl(path)}?ref=${encodeURIComponent(auditBranch)}` : contentsUrl(path);
+  const headers = { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}` };
+  if (body) headers['Content-Type'] = 'application/json';
+  const response = await fetch(url, { method, cache: 'no-store', headers, body: body ? JSON.stringify(body) : undefined });
+  const answer = await response.json().catch(() => ({}));
+  if (response.ok) return answer;
+  const said = answer.message ? `: ${answer.message}` : '';
+  if (response.status === 409) throw new ConflictError(`GitHub answered 409${said}`);
+  if (response.status === 401) throw new Error(`GitHub refused the token (401${said}); forget it and save a new one`);
+  if (method === 'GET' && response.status === 404) throw new Error(`${path} is not on the ${auditBranch} branch, or the token cannot read it (404)`);
+  throw new Error(`GitHub answered ${response.status} ${response.statusText}${said}`);
+}
+
+// The contents API sends base64 of the file's bytes; a BOM, if any, is kept.
+function fromBase64(text) {
+  const bytes = Uint8Array.from(atob(text.replace(/\s/g, '')), character => character.charCodeAt(0));
+  return new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes);
+}
+
+function toBase64(text) {
+  let binary = '';
+  for (const byte of new TextEncoder().encode(text)) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function isoDate(date) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// The finding's text with only its status: and reason: lines changed and one line
+// appended to its ## Log section; line endings are kept.
+function movedFindingText(text, from, to, reason, date) {
+  const newline = text.includes('\r\n') ? '\r\n' : '\n';
+  const lines = text.split(newline);
+  if (lines[0].replace(/^﻿/, '') !== '---') throw new Error('the finding has no front matter');
+  const end = lines.indexOf('---', 1);
+  if (end < 0) throw new Error('the finding\'s front matter is not closed');
+  const statusIndex = lines.findIndex((line, index) => index > 0 && index < end && /^status:/i.test(line));
+  if (statusIndex < 0) throw new Error('the finding has no status: line');
+  lines[statusIndex] = `status: ${to}`;
+  const reasonLine = `reason: ${reason}`;
+  const reasonIndex = lines.findIndex((line, index) => index > 0 && index < end && /^reason:/i.test(line));
+  if (reasonIndex >= 0) lines[reasonIndex] = reasonLine; else lines.splice(statusIndex + 1, 0, reasonLine);
+  const entry = `- ${isoDate(date)}: ${from} -> ${to}.${reason ? ` ${reason}` : ''}`;
+  const logIndex = lines.findIndex((line, index) => index > end && /^## Log\s*$/.test(line));
+  if (logIndex < 0) {
+    let last = lines.length - 1;
+    while (last > end && lines[last].trim() === '') last--;
+    lines.splice(last + 1, 0, '', '## Log', '', entry);
+    return lines.join(newline);
+  }
+  const next = lines.findIndex((line, index) => index > logIndex && /^## /.test(line));
+  let last = (next < 0 ? lines.length : next) - 1;
+  while (last > logIndex && lines[last].trim() === '') last--;
+  lines.splice(last + 1, 0, ...(last === logIndex ? ['', entry] : [entry]));
+  return lines.join(newline);
+}
+
+function currentFinding(id) {
+  return ((latestAudit && latestAudit.findings) || []).find(finding => finding.id === id);
+}
+
+// Points the finding at its text on the audit branch, so the card redraws in its new
+// column and the next refresh finds the new blob's text already read.
+function adoptFindingText(id, path, sha, text) {
+  findingTexts.set(sha, text);
+  const finding = currentFinding(id);
+  if (!finding) return;
+  const { fields, log } = parseFinding(text);
+  Object.assign(finding, {
+    path, sha, text, log, ref: auditBranch, error: undefined,
+    status: (fields.status || '').toLowerCase(), reason: fields.reason || '',
+  });
+}
+
+async function moveFinding(id, label, to, reasonRequired) {
+  const token = savedToken();
+  const finding = currentFinding(id);
+  if (!token || !finding || movesInFlight.has(id)) return;
+  const reason = (draftReasons.get(id) || '').replace(/\s+/g, ' ').trim();
+  if (reasonRequired && !reason) {
+    setMoveMessage(id, 'error', `${label} needs a one-line reason.`);
+    return;
+  }
+  const from = finding.status;
+  const path = finding.path;
+  movesInFlight.add(id);
+  setMoveMessage(id, 'info', `${label}: committing to ${auditBranch}…`);
+  try {
+    const read = await contentsRequest('GET', path, token);
+    const text = fromBase64(read.content);
+    const readStatus = (parseFinding(text).fields.status || '').toLowerCase();
+    if (readStatus !== from) {
+      adoptFindingText(id, path, read.sha, text);
+      throw new Error(`the finding is ${readStatus || 'without a status'} on ${auditBranch}, not ${from}; reloaded it, nothing was changed`);
+    }
+    const moved = movedFindingText(text, from, to, reason, now());
+    const written = await contentsRequest('PUT', path, token, {
+      message: `chore(audit): ${from} -> ${to} ${id}`,
+      content: toBase64(moved),
+      sha: read.sha,
+      branch: auditBranch,
+    });
+    adoptFindingText(id, path, written.content.sha, moved);
+    draftReasons.delete(id);
+    const commit = written.commit && written.commit.sha ? ` in ${written.commit.sha.slice(0, 7)}` : '';
+    movesInFlight.delete(id);
+    setMoveMessage(id, 'info', to === 'accepted'
+      ? `Approved${commit}. Its tasks are filed by an interactive session running ` +
+        `Audit\\Tools\\New-TasksFromAcceptedFindings.ps1 (Audit/Triage.md, step 3).`
+      : `Moved ${from} -> ${to}${commit}.`);
+  } catch (error) {
+    let text = `${label} failed: ${error.message}.`;
+    if (error instanceof ConflictError) {
+      text = `${label} failed: the finding changed on ${auditBranch} since it was read (409). ` +
+        'Reloaded it; nothing was overwritten.';
+      try {
+        const reread = await contentsRequest('GET', path, token);
+        adoptFindingText(id, path, reread.sha, fromBase64(reread.content));
+      } catch (reloadError) {
+        text += ` The reload failed too: ${reloadError.message}.`;
+      }
+    }
+    movesInFlight.delete(id);
+    setMoveMessage(id, 'error', text);
   }
 }
 
@@ -570,6 +842,7 @@ async function refresh() {
 
 window.addEventListener('hashchange', showTab);
 showTab();
+renderTokenControls();
 document.getElementById('source').textContent = `${repo} · ${branch}`;
 document.getElementById('cadence').textContent =
   `Refreshes every ${refreshSeconds} s (minimum ${minimumSeconds} s: ${secondsPerCall} s per API call, ` +
