@@ -253,7 +253,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     }
 
     private HandBuiltTlsConnection ConnectionOver(HandBuiltHandshake handshake, HandshakeRun run) =>
-        new(handshake.Stream!, run.Plaintext, run.Prepared.ClientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild));
+        new(handshake.Stream!, run.Plaintext, run.Prepared.ClientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), !_matchesSchannelBuild);
 
     // --tls-earlydata (BL-1105): the ALPN protocol of a resumed TLS 1.3 session that allows
     // early data, when the connection offers it, as curl's Curl_on_session_reuse decides; else null.
