@@ -8,7 +8,7 @@ depends-on: [BL-915]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-10-02
 ---
 # BL-966 — Fill HttpAuthRequest.ServerCertificate from the HTTPS connection so hand-built Negotiate sends channel bindings
 
@@ -25,15 +25,19 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A `Curl.Protocol.Http.UnitTests` test pins that an HTTPS transfer's `HttpAuthRequest.ServerCertificate` is the server certificate's DER.
-- [ ] A test pins that a plain HTTP transfer's `HttpAuthRequest.ServerCertificate` is empty.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] A `Curl.Protocol.Http.UnitTests` test pins that an HTTPS transfer's `HttpAuthRequest.ServerCertificate` is the server certificate's DER.
+- [x] A test pins that a plain HTTP transfer's `HttpAuthRequest.ServerCertificate` is empty.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
 
 - Filed by BL-915.
+- Plan: once connected, `HttpRequestPlan.TakeServerCertificateFrom(connect)` sets the origin `AuthRequest.ServerCertificate` to the first peer certificate for an `https` URL; retry plans carry it forward, so every challenge answer (where Negotiate runs) sees it. The pre-connect first value has none; curl sends Negotiate only after a challenge.
+- Decision (ADR-0341): the proxy request never carries a certificate and an `http` URL through an HTTPS proxy sends none, because curl's `Curl_ssl_get_channel_binding` reads only the origin TLS filter (`Curl_cft_ssl`), never `Curl_cft_ssl_proxy`. Not measured: it needs an MIT build and a realm behind an HTTPS proxy, which the loopback harness lacks.
+- Tests: `ExecuteAsync_HttpsChallenge_AsksWithTheServerCertificateDer`, `ExecuteAsync_HttpChallenge_AsksWithNoServerCertificate`. Build clean, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. HTTPS transfers hand the origin's server certificate DER to the authenticator, so hand-built Negotiate sends tls-server-end-point channel bindings

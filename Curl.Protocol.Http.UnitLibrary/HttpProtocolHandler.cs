@@ -493,6 +493,7 @@ public sealed class HttpProtocolHandler(
             };
         }
 
+        plan.TakeServerCertificateFrom(connect);
         plan.Progress.ReportTransferStarted();
 
         HttpAttemptOutcome outcome;
@@ -2161,8 +2162,11 @@ public sealed class HttpProtocolHandler(
         /// <summary>Gets the request's method and body framing.</summary>
         public HttpRequestFraming Framing { get; } = Framing;
 
-        /// <summary>Gets the request as the authenticator is asked about it.</summary>
-        public HttpAuthRequest AuthRequest { get; } = AuthRequest;
+        /// <summary>
+        /// Gets the request as the authenticator is asked about it, carrying the connection's
+        /// TLS server certificate once <see cref="TakeServerCertificateFrom" /> has run.
+        /// </summary>
+        public HttpAuthRequest AuthRequest { get; private set; } = AuthRequest;
 
         /// <summary>
         /// Gets the <c>Authorization</c> value to send, or <see langword="null" /> to send none.
@@ -2343,6 +2347,22 @@ public sealed class HttpProtocolHandler(
             retry.UploadCannotRewind = uploadCannotRewind;
             return retry;
         }
+
+        /// <summary>
+        /// Sets <see cref="HttpAuthRequest.ServerCertificate" /> on <see cref="AuthRequest" /> to
+        /// the DER of <paramref name="connect" />'s TLS server certificate, the first of its
+        /// <see cref="ConnectResult.PeerCertificates" />, for an <c>https</c> URL, so hand-built
+        /// Negotiate sends <c>tls-server-end-point</c> channel bindings as curl 8.18.0 with MIT
+        /// does; empty for an <c>http</c> URL, even through an HTTPS proxy, and the proxy's
+        /// request never carries one, as curl takes the bindings only from the origin's TLS
+        /// (ADR-0341).
+        /// </summary>
+        /// <param name="connect">The connection the request goes over.</param>
+        public void TakeServerCertificateFrom(ConnectResult connect) =>
+            AuthRequest = AuthRequest with
+            {
+                ServerCertificate = Context.Url.Scheme == "https" && connect.PeerCertificates is [var certificate, ..] ? certificate : default,
+            };
 
         private HttpRequestPlan With(HttpRequestFraming framing, string? authorization) =>
             With(framing, authorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge);
