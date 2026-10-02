@@ -32,3 +32,4 @@ Under `-v --trace-config ftp`, `--ftp-pret` (`PRET`), the `SITE NAMEFMT 1` curl 
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
