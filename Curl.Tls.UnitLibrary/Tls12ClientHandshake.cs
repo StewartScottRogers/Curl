@@ -583,7 +583,12 @@ public sealed class Tls12ClientHandshake
     private TlsAlertDescription? VerifyServerCertificates()
     {
         certificateAwaitsVerification = false;
-        ServerCertificateVerdict verdict = verifier.Verify(new ServerCertificateChain(ServerCertificates, settings.ServerName, OcspResponse));
+        ServerCertificateVerdict verdict = verifier.Verify(new ServerCertificateChain(ServerCertificates, settings.ServerName, OcspResponse)
+        {
+            ProtocolVersion = (ushort)Version!.Value,
+            CipherSuite = CipherSuite!.Code,
+            ApplicationProtocol = ApplicationProtocol,
+        });
         if (verdict.IsAccepted)
         {
             return CheckCertificateStatus();

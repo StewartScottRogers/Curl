@@ -843,7 +843,12 @@ public sealed class Tls13ClientHandshake : IDisposable
     {
         // RFC 9849 section 6.1.6: after a rejection the server is authenticated as the public name.
         string? name = ech is { Rejected: true } ? ech.Config.PublicName : settings.ServerName;
-        ServerCertificateVerdict verdict = verifier.Verify(new ServerCertificateChain(ServerCertificates, name, ocspResponse));
+        ServerCertificateVerdict verdict = verifier.Verify(new ServerCertificateChain(ServerCertificates, name, ocspResponse)
+        {
+            ProtocolVersion = Tls13ClientHelloBuilder.Tls13Version,
+            CipherSuite = CipherSuite!.Code,
+            ApplicationProtocol = ApplicationProtocol,
+        });
         if (!verdict.IsAccepted)
         {
             certificateRejection = verdict.Rejection;
