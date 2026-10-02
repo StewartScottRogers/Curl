@@ -34,3 +34,4 @@ Audit paths and their guards change only through the audit branch (ADR-0267). In
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
