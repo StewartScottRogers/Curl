@@ -156,7 +156,7 @@ public sealed class MqttProtocolHandler : IProtocolHandler
         TransferResult result;
         await using (connection.ConfigureAwait(false))
         {
-            MqttSession session = new(connection, context.Output, context.Progress, context.Events, log, context.MaxFileSize, context.CancellationToken);
+            MqttSession session = new(connection, context.Output, context.Progress, context.Events, log, context.MaxFileSize, context.TimeProvider, context.CancellationToken);
             try
             {
                 await session

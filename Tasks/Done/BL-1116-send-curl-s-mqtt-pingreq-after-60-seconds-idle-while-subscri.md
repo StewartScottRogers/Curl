@@ -8,7 +8,7 @@ depends-on: [BL-1115]
 touches: [Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1116 — Send curl's MQTT PINGREQ after 60 seconds idle while subscribed
 
@@ -26,15 +26,40 @@ While an `mqtt://` transfer waits for the next packet, it sends a PINGREQ (`C0 0
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Protocol.Mqtt.UnitTests`: after SUBACK, advancing the time provider by 60 s sends nothing and by 60.001 s sends exactly `C0 00` and reports `mqtt_ping: sent ping request.`; a second PINGREQ is not sent before a PINGRESP arrives, and is sent again 60 s after the PINGRESP.
-- [ ] A test pins that a PUBLISH arriving at 59 s restarts the 60-second count.
-- [ ] A test pins that a publish (`-d`) transfer, which ends with DISCONNECT, never pings.
-- [ ] Every existing MQTT test passes unchanged.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Mqtt.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] New tests in `Curl.Protocol.Mqtt.UnitTests`: after SUBACK, advancing the time provider by 60 s sends nothing and by 60.001 s sends exactly `C0 00` and reports `mqtt_ping: sent ping request.`; a second PINGREQ is not sent before a PINGRESP arrives, and is sent again 60 s after the PINGRESP.
+- [x] A test pins that a PUBLISH arriving at 59 s restarts the 60-second count.
+- [x] A test pins that a publish (`-d`) transfer, which ends with DISCONNECT, never pings.
+- [x] Every existing MQTT test passes unchanged.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Mqtt.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- Delivered directly in the session (one library and its tests; the plan was the task's Context).
+- `MqttPacketReader.WhenFirstByteReadyAsync` starts the connection read and keeps it in
+  `pendingRead`; `FillAsync` takes that same task, so the read racing the timer is never
+  lost or doubled. The returned task never faults; a failed read throws from
+  `ReadFixedHeaderAsync` as before.
+- `MqttSession` races it against `Task.Delay(60.001 s, TimeProvider)`: curl pings when the
+  whole-millisecond difference exceeds 60000, so 60.001 s is the first instant it does.
+  After the PINGREQ it reports `mqtt_ping: sent ping request.` then one
+  `mqtt_doing: state [0]`, the order curl's `mqtt_doing` writes them in.
+- Choice: the idle count starts when the wait for a first byte begins, not at a stored
+  `lastTime`. Every moment curl sets `lastTime` (a send, a packet's first byte, PUBLISH
+  bytes) is followed at once by that wait, so the two differ only by processing time; and
+  reading the clock only when a wait begins keeps the existing diagnostic-log tests, whose
+  clock steps 250 ms per read, unchanged.
+- Like curl, the PINGREQ can also go out while the CONNACK or SUBACK is awaited (curl's
+  state is `MQTT_FIRST` there too); a `-d` publish ends with DISCONNECT straight after the
+  CONNACK and never waits, so never pings.
+- Out of scope: curl's `mqtt_doing: state [0]` line for each idle poll of the tool's
+  one-second loop between packets is not reproduced.
+- Tests: `MqttProtocolHandlerKeepAliveTests` (4), with `Fakes/ManualTimeProvider.cs`
+  (copied from Curl.Conformance.UnitTests, plus a lock and `NextTimerDueAt`) and
+  `Fakes/GatedConnection.cs` (reads wait on a channel the test feeds). MQTT tests 108/108;
+  Measure-CodeQuality: 100% line, 100% branch, 0 failing members.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. An idle mqtt:// transfer sends PINGREQ C0 00 after 60.001 s and reports mqtt_ping: sent ping request., as curl 8.21.0 does

@@ -37,6 +37,14 @@ then `MqttProtocolHandler` reports the failure's message unless curl prints it w
 `failf` (`MqttTransferMessages.IsStrerrorText`), and `closing connection #N` after exit 23
 or `shutting down connection #N` after anything else.
 
+Keep-alive (BL-1116): while a packet's first byte is awaited, `MqttSession` races the
+read (`MqttPacketReader.WhenFirstByteReadyAsync`, which keeps the read it starts for the
+next fixed header) against a 60.001-second delay on `ITransferContext.TimeProvider`; if
+the delay wins and no PINGREQ is outstanding it sends `C0 00` and reports
+`mqtt_ping: sent ping request.`, as curl's `mqtt_ping` does with the default 60000 ms
+upkeep interval. A PINGRESP clears the outstanding PINGREQ. The clock is read only when a
+wait begins.
+
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and nothing
 else horizontal. Referencing another protocol library is a build break, and
 `Curl.Protocol.Abstractions.UnitTests` fails if one appears.

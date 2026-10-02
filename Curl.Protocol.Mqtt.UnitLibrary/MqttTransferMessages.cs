@@ -63,6 +63,9 @@ internal static class MqttTransferMessages
     /// <summary>The <c>-v</c> line for a PINGRESP received.</summary>
     internal const string ReceivedPingResponse = "Received ping response.";
 
+    /// <summary>The <c>-v</c> line for a PINGREQ sent after the connection sat idle.</summary>
+    internal const string SentPingRequest = "mqtt_ping: sent ping request.";
+
     /// <summary>The <c>-v</c> line for a peer that closed inside a PUBLISH body.</summary>
     internal const string ServerDisconnected = "server disconnected";
 

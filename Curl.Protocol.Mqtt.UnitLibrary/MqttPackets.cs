@@ -105,6 +105,13 @@ internal static class MqttPackets
     internal static byte[] BuildDisconnect() => [DisconnectType, 0x00];
 
     /// <summary>
+    /// Builds the PINGREQ curl's <c>mqtt_ping</c> sends once the connection has been idle
+    /// longer than its upkeep interval.
+    /// </summary>
+    /// <returns>The packet: <c>C0 00</c>.</returns>
+    internal static byte[] BuildPingRequest() => [0xC0, 0x00];
+
+    /// <summary>
     /// Builds the SUBSCRIBE curl sends: packet identifier 1 and one topic filter at QoS 0.
     /// </summary>
     /// <param name="topic">The decoded topic.</param>
