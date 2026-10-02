@@ -184,7 +184,7 @@ internal static class TlsFailureMessages
     /// <summary>
     /// The message for exit 101 when the server did not accept the hand-built client's ECH
     /// offer: libcurl's text for <c>CURLE_ECH_REQUIRED</c>, since no curl build measured has ECH
-    /// to show OpenSSL's error string (ADR-0326).
+    /// to show OpenSSL's error string (ADR-0327).
     /// </summary>
     public const string EchRequired = "ECH attempted but failed";
 

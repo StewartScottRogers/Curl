@@ -10,7 +10,7 @@ using Curl.Tls;
 namespace Curl.Networking;
 
 /// <summary>
-/// <c>--ech</c> through the hand-built client (ADR-0326, BL-711): the ClientHello each mode
+/// <c>--ech</c> through the hand-built client (ADR-0327, BL-711): the ClientHello each mode
 /// sends, where its configuration comes from, and how <c>hard</c> and a rejected offer fail.
 /// </summary>
 public sealed partial class HandBuiltTlsProviderTests

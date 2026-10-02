@@ -1,6 +1,6 @@
 namespace Curl.Networking;
 
-/// <summary>Pins how <see cref="EchModes.Of" /> combines <c>--ech</c>'s mode and <c>ecl:</c> list as libcurl does (ADR-0326).</summary>
+/// <summary>Pins how <see cref="EchModes.Of" /> combines <c>--ech</c>'s mode and <c>ecl:</c> list as libcurl does (ADR-0327).</summary>
 [TestClass]
 public sealed class EchModesTests
 {

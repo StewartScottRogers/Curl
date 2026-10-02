@@ -56,7 +56,7 @@ below comes from curl 8.21.0's source: `src/tool_operate.c`, `lib/setopt.c` (`CU
 - `--ech` works on every platform: GREASE, `ecl:` and DoH configurations, `pn:`, `hard`'s exit
   35 and a rejection's exit 101.
 - Not measured yet: the `-v` `ECH:` information lines and OpenSSL's error text for exit 101.
-  BL-1106 measures them once a curl build with ECH can be run.
+  BL-1107 measures them once a curl build with ECH can be run.
 
 ## Alternatives considered
 

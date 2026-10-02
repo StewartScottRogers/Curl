@@ -10,7 +10,7 @@ namespace Curl.Networking;
 /// <see cref="TlsClientOptions" /> are present; the option tasks that carry the others
 /// (BL-713 and the rest) add a condition each; <c>--cert-status</c>'s row is ADR-0191's and <c>--curves</c> and
 /// <c>--sigalgs</c>' is ADR-0151's (BL-709), and <c>--ssl-sessions</c>' is ADR-0319's (BL-710):
-/// <c>SslStream</c> can neither export nor import a session, and <c>--ech</c>'s is ADR-0326's (BL-711): <c>SslStream</c> offers no
+/// <c>SslStream</c> can neither export nor import a session, and <c>--ech</c>'s is ADR-0327's (BL-711): <c>SslStream</c> offers no
 /// Encrypted Client Hello. QUIC is not routed here: it has no
 /// <c>SslStream</c> route at all.
 /// </remarks>

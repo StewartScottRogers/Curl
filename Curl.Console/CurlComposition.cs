@@ -386,7 +386,7 @@ internal static class CurlComposition
     /// </param>
     /// <param name="echConfigs">
     /// Finds a host's ECHConfigList for <c>--ech true</c> or <c>hard</c> without <c>ecl:</c>: the run's
-    /// <see cref="DohDnsResolver" /> under <c>--doh-url</c> (ADR-0326); <see langword="null" /> for none.
+    /// <see cref="DohDnsResolver" /> under <c>--doh-url</c> (ADR-0327); <see langword="null" /> for none.
     /// </param>
     internal static ITlsProviderWithWarnings CreateTlsProvider(TlsClientOptions options, TimeProvider timeProvider, TlsSessionCache? sessions = null, IEchConfigListLookup? echConfigs = null) =>
         TlsClientRouting.Choose(options) != TlsClientRoute.HandBuilt ? new SslStreamTlsProvider(options, timeProvider)

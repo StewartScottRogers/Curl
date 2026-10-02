@@ -35,8 +35,8 @@ completed: 2026-10-01
   - `true` with no configuration: a plain hello.
   - `grease`: a GREASE extension.
 
-  BL-1106 measures the real texts and the `-v` `ECH:` lines once a build with ECH is available.
-- Design (ADR-0326, decided by Claude under Stewart's delegation):
+  BL-1107 measures the real texts and the `-v` `ECH:` lines once a build with ECH is available.
+- Design (ADR-0327, decided by Claude under Stewart's delegation):
   - `EchModes.Of` combines libcurl's mode bits: `ecl:` alone turns ECH on, and `false` and `grease` win over a list.
   - `EchOffer.DecideAsync` takes the `ecl:` list first, else the `ech` of the host's HTTPS record through the new `IEchConfigListLookup`. `DohDnsResolver` implements it, and `CurlComposition.CreateTransports` passes the run's resolver to the origin's provider.
   - `pn:` replaces each configuration's public name.
@@ -54,7 +54,7 @@ completed: 2026-10-01
 - Quality: `Measure-CodeQuality.ps1`
   - Curl.Networking.UnitLibrary: 100% line, 100% branch, 1083 members, 0 failing, worst CRAP 10.
   - Curl.Console: 100%/100%, 0 failing.
-- Filed: BL-1106.
+- Filed: BL-1107.
 
 ## Log
 

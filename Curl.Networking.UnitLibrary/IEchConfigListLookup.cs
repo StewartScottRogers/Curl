@@ -3,7 +3,7 @@ namespace Curl.Networking;
 /// <summary>
 /// Finds a host's ECHConfigList in DNS, as curl 8.21.0 does under <c>--ech true</c> or <c>hard</c>
 /// with no <c>ecl:</c> list: from the <c>ech</c> parameter of the host's HTTPS record, which curl
-/// asks the DoH server for (ADR-0312, ADR-0326).
+/// asks the DoH server for (ADR-0312, ADR-0327).
 /// </summary>
 public interface IEchConfigListLookup
 {

@@ -148,7 +148,7 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
 
     /// <summary>
     /// Finds <paramref name="host" />'s ECHConfigList for <c>--ech true</c> or <c>hard</c>: the
-    /// <c>ech</c> parameter of the HTTPS record <see cref="ResolveHttpsRecordAsync" /> fetches (ADR-0326).
+    /// <c>ech</c> parameter of the HTTPS record <see cref="ResolveHttpsRecordAsync" /> fetches (ADR-0327).
     /// </summary>
     /// <param name="host">The host the transfer connects to.</param>
     /// <param name="port">The port it connects to.</param>

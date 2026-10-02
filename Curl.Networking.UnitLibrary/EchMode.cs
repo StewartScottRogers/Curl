@@ -1,7 +1,7 @@
 namespace Curl.Networking;
 
 /// <summary>
-/// What curl 8.21.0's <c>--ech</c> asks of a handshake (ADR-0326): its <c>CURLOPT_ECH</c> bits as
+/// What curl 8.21.0's <c>--ech</c> asks of a handshake (ADR-0327): its <c>CURLOPT_ECH</c> bits as
 /// <c>lib/setopt.c</c> sets them from the mode and the <c>ecl:</c> list the tool passes after it.
 /// </summary>
 public enum EchMode

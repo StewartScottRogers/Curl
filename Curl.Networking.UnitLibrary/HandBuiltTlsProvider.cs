@@ -79,7 +79,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// 1.3 handshake a session from <paramref name="sessions" /> and keeping the session
     /// tickets it receives there (<c>--ssl-sessions</c>, ADR-0319), and finding a
     /// host's ECHConfigList for <c>--ech true</c> or <c>hard</c> without <c>ecl:</c> through
-    /// <paramref name="echConfigs" /> (ADR-0326).
+    /// <paramref name="echConfigs" /> (ADR-0327).
     /// </summary>
     /// <param name="options">The settings applied to every handshake.</param>
     /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
@@ -231,7 +231,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     private static bool Completed([NotNullWhen(true)] HandBuiltHandshake? handshake) => handshake is { Failure: null };
 
-    // Prepare, then the --ech offer (ADR-0326): --ech hard with no usable configuration fails
+    // Prepare, then the --ech offer (ADR-0327): --ech hard with no usable configuration fails
     // here, before a byte is sent, and the --cert certificate is disposed.
     private async ValueTask<(PreparedHandshake? Prepared, ConnectResult? Failure, bool SendsInternalErrorAlert)> PrepareWithEchAsync(
         ITransferEvents events,
@@ -454,7 +454,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     // A certificate the verifier rejected fails as the SslStream provider fails it, a stapled
     // OCSP response --cert-status rejected is exit 91 (ADR-0191), a server that did not accept
-    // the ECH offer is exit 101 (ADR-0326), and any other handshake failure is exit 35.
+    // the ECH offer is exit 101 (ADR-0327), and any other handshake failure is exit 35.
     private ConnectResult FailedHandshake(TlsHandshakeFailure failure) =>
         failure.Alert == TlsAlertDescription.EchRequired
             ? ConnectResult.Failed(CurlExitCode.EchRequired, TlsFailureMessages.EchRequired)
@@ -622,7 +622,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             SendEncryptedClientHelloGrease = SendEchGrease,
         };
 
-        // encrypted_client_hello goes last, after the profile's measured extensions (ADR-0326).
+        // encrypted_client_hello goes last, after the profile's measured extensions (ADR-0327).
         private IReadOnlyList<TlsExtensionType> WithEncryptedClientHello(IReadOnlyList<TlsExtensionType> order) =>
             EchConfigs is null && !SendEchGrease ? order : [.. order, TlsExtensionType.EncryptedClientHello];
 

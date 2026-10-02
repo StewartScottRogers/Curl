@@ -4,7 +4,7 @@ using Curl.Tls;
 namespace Curl.Networking;
 
 /// <summary>
-/// What the hand-built ClientHello offers for <c>--ech</c> (ADR-0326), as curl 8.21.0's OpenSSL
+/// What the hand-built ClientHello offers for <c>--ech</c> (ADR-0327), as curl 8.21.0's OpenSSL
 /// build sets it up in <c>ossl_init_ech</c>: GREASE under <c>grease</c>; otherwise the
 /// <c>ecl:</c> list, or, without one, the host's list from DNS; a list that does not decode or
 /// names no configuration the client can seal for is no ECH, and under <c>hard</c> exit 35.
