@@ -51,6 +51,9 @@ public sealed class TransferContext : ITransferContext
     public Stream? HeaderOutput { get; init; }
 
     /// <inheritdoc />
+    public Stream? DumpHeaderOutput { get; init; }
+
+    /// <inheritdoc />
     public ReadOnlyMemory<byte>? PostData { get; init; }
 
     /// <inheritdoc />

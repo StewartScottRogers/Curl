@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1129 — Give transfers a -D-only header stream that -i does not print
 
@@ -29,14 +29,20 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `ITransferContext` and `TransferContext` have the new property, documented as above; `HeaderOutput`'s remarks point to it.
-- [ ] Tests in `Curl.Console.UnitTests` pin, through `TransferContextFactory`: with `-D <file>` the property is the `-D` stream; with `-i` alone it is `null`; with neither it is `null`; with `-D <file> -i` it is the `-D` stream, not standard output.
-- [ ] A test pins that a write to the new property and a write to `HeaderOutput` under `-D <file>` land in the file in the order they were made.
-- [ ] Every existing test passes unchanged; `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Protocol.Abstractions.UnitLibrary` and `Curl.Console`.
+- [x] `ITransferContext` and `TransferContext` have the new property, documented as above; `HeaderOutput`'s remarks point to it.
+- [x] Tests in `Curl.Console.UnitTests` pin, through `TransferContextFactory`: with `-D <file>` the property is the `-D` stream; with `-i` alone it is `null`; with neither it is `null`; with `-D <file> -i` it is the `-D` stream, not standard output.
+- [x] A test pins that a write to the new property and a write to `HeaderOutput` under `-D <file>` land in the file in the order they were made.
+- [x] Every existing test passes unchanged; `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Protocol.Abstractions.UnitLibrary` and `Curl.Console`.
 
 ## Notes
+
+- Property is `DumpHeaderOutput`, set by `TransferContextFactory.Create` straight from its `headerOutput` argument, which `CurlCommandRunner` already makes the `DumpHeaderOutputStream` around the `-D` destination. `HeaderOutput` without `-i` is that same stream, and with `-i` a `HeaderLineTeeStream` writing each whole line through to it, so writes to either keep their order in the file.
+- Decisions: under `-D -` it is standard output (wrapped as `-D` always is), as curl writes the `-D` stream there; under `-D <file> -i` it is the file alone, never standard output, since curl's `-i` shows only HTTP-style headers. `-J`'s header watcher wraps `HeaderOutput` only: it reads `Content-Disposition`, an HTTP header, which never goes to the new stream.
+- `Curl.Core.UnitLibrary/RedirectFollower.cs` copies a context for each HTTP redirect and does not copy the new property; left so, as it is outside `touches` and only HTTP follows redirects, which never writes to it.
+- Tests: 5 new in `TransferContextFactoryTests`, plus the property in `TransferContextTests` and `ForwardingTransferContext`. Fast tests green; `Measure-CodeQuality.ps1 -Library` reports 0 failing members for both libraries.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. Transfers carry DumpHeaderOutput, the -D stream alone that -i does not print
