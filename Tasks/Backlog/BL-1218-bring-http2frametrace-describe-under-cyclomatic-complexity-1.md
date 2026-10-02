@@ -1,0 +1,32 @@
+---
+id: BL-1218
+title: Bring Http2FrameTrace.Describe under cyclomatic complexity 10
+priority: Normal
+assignee: Claude
+pipeline: direct
+depends-on: []
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+requirement: none
+created: 2026-10-02
+completed:
+---
+# BL-1218 — Bring Http2FrameTrace.Describe under cyclomatic complexity 10
+
+## Goal
+
+`Http2FrameTrace.Describe` measures at most 10 cyclomatic complexity, so `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports no failing member.
+
+## Context
+
+- Found in BL-1215: `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports `Http2FrameTrace.Describe(Curl.Http2.Http2Frame)` (Http2FrameTrace.cs:72, added by BL-1167) failing on complexity 12, though the build's CA1502 does not flag its switch expression. Extract the per-type descriptions into helpers; the output must not change.
+
+## Acceptance criteria
+
+- [ ] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports 0 failing members, with 100% line and branch coverage.
+- [ ] Every existing `Http2FrameTrace` test passes unchanged.
+
+## Notes
+
+## Log
+
+- 2026-10-02: Created.
