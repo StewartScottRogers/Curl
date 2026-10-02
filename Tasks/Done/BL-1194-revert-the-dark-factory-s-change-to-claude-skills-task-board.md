@@ -9,7 +9,7 @@ touches: [.claude/skills/task-board/task-board.ps1]
 lane: no
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1194 — Revert the dark factory's change to .claude/skills/task-board/task-board.ps1
 
@@ -27,11 +27,14 @@ Audit paths and their guards change only through the audit branch (ADR-0267). In
 
 ## Acceptance criteria
 
-- [ ] The `audit-guard` job passes on work/dark-factory for the commit that lands the fix.
+- [x] The `audit-guard` job passes on work/dark-factory for the commit that lands the fix.
 
 ## Notes
+
+- 2026-10-02: Resolved without a revert. The change was the Backlog-depth whisper (BL-1182, BL-1190), which Stewart asked for, so instead of reverting it the same task-board.ps1 reached master through the audit branch (PR #48, merged as aa2dbb29), and master was merged into work/dark-factory. CI run 37053125816 on 6188f4ac passed, the audit guard included.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. Audit guard green: task-board.ps1 reached master through the audit branch (PR #48) instead of a revert
