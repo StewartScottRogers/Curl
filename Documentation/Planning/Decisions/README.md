@@ -357,6 +357,7 @@ choices do not need one.
 | [0345](ADR-0345-http2-and-http3-frame-lines-go-to-the-transfers-log.md) | HTTP/2 and HTTP/3 frame lines go to the log of the transfer they belong to; the connection's SETTINGS and GOAWAY to the transfer that last opened a stream | Accepted | 2026-10-02 |
 | [0346](ADR-0346-a-tftp-connection-is-numbered-with-the-runs-connections.md) | A TFTP transfer's connection is numbered with the run's other connections | Accepted | 2026-10-02 |
 | [0347](ADR-0347-a-file-transfer-is-numbered-with-the-runs-connections.md) | A file:// transfer is numbered with the run's connections, through `IConnectionNumbers` | Accepted | 2026-10-02 |
+| [0348](ADR-0348-a-refused-tunnel-fails-with-the-first-sspi-negotiate-failure.md) | A refused CONNECT tunnel fails with the first SSPI Negotiate failure as its message | Accepted | 2026-10-02 |
 
 ## Template
 
