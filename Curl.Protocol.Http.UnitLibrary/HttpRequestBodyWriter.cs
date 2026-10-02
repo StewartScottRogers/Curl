@@ -119,6 +119,16 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal bool CutShort { get; private set; }
 
     /// <summary>
+    /// Gets a value indicating whether the body's reads are reported as curl 8.21.0's
+    /// <c>--trace-config read</c> lines (<see cref="HttpClientReaderTraceLines" />, BL-1189): only for a
+    /// body sent unchunked without waiting for <c>100 Continue</c>, the shapes measured. A traced body of
+    /// bytes is sent in the pieces curl's upload buffer reads it in.
+    /// </summary>
+    internal bool TracesReaders { get; init; }
+
+    private bool tracing;
+
+    /// <summary>
     /// Writes <paramref name="body" /> and flushes the connection, then, when the connection is
     /// an HTTP/2 or HTTP/3 stream, ends the stream unless the last write already did
     /// (<see cref="HttpConnectionSend.EndStreamRequestAsync" />).
@@ -136,6 +146,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     {
         expectedLength = body is BytesBody known ? known.Content.Length : ((StreamBody)body).Length;
         Progress.ReportUploaded(BytesWritten, expectedLength);
+        ReportReaderAdded(body, isChunked);
         if (body is BytesBody bytes)
         {
             await WriteBytesAsync(bytes.Content, isChunked, cancellationToken).ConfigureAwait(false);
@@ -207,7 +218,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </summary>
     private async ValueTask WriteBytesAsync(ReadOnlyMemory<byte> content, bool isChunked, CancellationToken cancellationToken)
     {
-        if (EarlyResponseWatch is null)
+        if (EarlyResponseWatch is null && !tracing)
         {
             await WritePieceAsync(content, isChunked, cancellationToken).ConfigureAwait(false);
             return;
@@ -215,7 +226,9 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
         while (BytesWritten < content.Length && !CutShort)
         {
-            int length = (int)Math.Min(NextReadRoom(isChunked), content.Length - BytesWritten);
+            int room = NextReadRoom(isChunked);
+            int length = (int)Math.Min(room, content.Length - BytesWritten);
+            ReportBufferRead(room, length, BytesWritten + length == content.Length);
             await WritePieceAsync(content.Slice((int)BytesWritten, length), isChunked, cancellationToken).ConfigureAwait(false);
         }
     }
@@ -233,8 +246,10 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
                 return;
             }
 
-            int read = await ReadAsync(body.Content, buffer.AsMemory(0, (int)Math.Min(remaining, room)), cancellationToken)
+            int requested = (int)Math.Min(remaining, room);
+            int read = await ReadAsync(body.Content, buffer.AsMemory(0, requested), cancellationToken)
                 .ConfigureAwait(false);
+            ReportInputRead(room, requested, body.Length, read);
             if (read == 0)
             {
                 ThrowIfShort(body.Length);
@@ -242,6 +257,46 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             }
 
             await WritePieceAsync(buffer.AsMemory(0, read), isChunked, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Reports the reader curl adds for the body under <see cref="TracesReaders" />, and from then on
+    /// traces its reads; nothing for a chunked body, one that waits for <c>100 Continue</c>, or one
+    /// <see cref="HttpClientReaderTraceLines.AddReader" /> gives no line for.
+    /// </summary>
+    private void ReportReaderAdded(HttpRequestBody body, bool isChunked)
+    {
+        if (TracesReaders && !isChunked && EarlyResponseWatch is null
+            && HttpClientReaderTraceLines.AddReader(body, IsUpload) is { } line)
+        {
+            Events.ReportInfo(line);
+            tracing = true;
+        }
+    }
+
+    /// <summary>Reports one read of a traced body of bytes.</summary>
+    private void ReportBufferRead(int room, int read, bool endOfBody)
+    {
+        if (tracing)
+        {
+            Events.ReportInfo(HttpClientReaderTraceLines.BufferRead(room, read, endOfBody));
+            Events.ReportInfo(HttpClientReaderTraceLines.ClientRead(room, read, endOfBody));
+        }
+    }
+
+    /// <summary>
+    /// Reports one read of a traced <c>-T</c> upload, whose length is known; nothing for a read that
+    /// gave no bytes, which fails the transfer.
+    /// </summary>
+    private void ReportInputRead(int room, int requested, long? length, int read)
+    {
+        if (tracing && read > 0)
+        {
+            long total = length.GetValueOrDefault();
+            long readSoFar = BytesWritten + read;
+            Events.ReportInfo(HttpClientReaderTraceLines.InputRead(requested, total, readSoFar, read));
+            Events.ReportInfo(HttpClientReaderTraceLines.ClientRead(room, read, readSoFar == total));
         }
     }
 

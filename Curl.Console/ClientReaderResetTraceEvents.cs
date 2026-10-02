@@ -1,3 +1,4 @@
+using Curl.Core;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -7,8 +8,9 @@ namespace Curl.Console;
 /// writes under <c>-v --trace-config read</c> (or <c>-vvv</c>, <c>all</c>) as a finished transfer resets
 /// its client readers: <see cref="ResetLine" /> before the connection's <c>Connection #N to host
 /// &lt;host&gt;:&lt;port&gt; left intact</c> or <c>shutting down connection #N</c> line, and not before a
-/// failed transfer's <c>closing connection #N</c> (measured, BL-1159 Notes). The runner writes the same
-/// line once more itself, as the transfer starts.
+/// failed transfer's <c>closing connection #N</c> (measured, BL-1159 Notes); and again after each followed
+/// redirect's <c>Issue another request to this URL: '...'</c>, as the next hop starts (measured, BL-1189
+/// Notes). The runner writes the same line once more itself, as the transfer starts.
 /// </summary>
 /// <param name="inner">The transfer's own events.</param>
 internal sealed class ClientReaderResetTraceEvents(ITransferEvents inner) : ITransferEvents
@@ -29,6 +31,10 @@ internal sealed class ClientReaderResetTraceEvents(ITransferEvents inner) : ITra
         }
 
         inner.ReportInfo(text);
+        if (text.StartsWith(RedirectFollower.IssueAnotherRequestMessagePrefix, StringComparison.Ordinal))
+        {
+            inner.ReportInfo(ResetLine);
+        }
     }
 
     /// <inheritdoc />

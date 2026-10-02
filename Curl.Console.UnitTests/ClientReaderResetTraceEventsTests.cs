@@ -23,6 +23,19 @@ public sealed class ClientReaderResetTraceEventsTests
     }
 
     [TestMethod]
+    public void ReportInfo_TheRedirectsIssueAnotherRequestLine_IsFollowedByTheResetLine()
+    {
+        // curl -v --trace-config read -L on a 302 to /b: the next hop's reset comes straight after (BL-1189 Notes).
+        CallRecordingEvents inner = new();
+
+        new ClientReaderResetTraceEvents(inner).ReportInfo("Issue another request to this URL: 'http://127.0.0.1:47811/b'");
+
+        CollectionAssert.AreEqual(
+            new[] { "Info Issue another request to this URL: 'http://127.0.0.1:47811/b'", "Info [READ] client_reset, clear readers" },
+            inner.Calls);
+    }
+
+    [TestMethod]
     [DataRow("closing connection #0")]
     [DataRow("Connection #0 to host 127.0.0.1:47811 was reset")]
     [DataRow("Request completely sent off")]

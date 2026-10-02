@@ -252,6 +252,13 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     public bool TracesHttp3Streams { get; init; }
 
+    /// <summary>
+    /// Gets or sets whether an HTTP/1.x request body's reads write curl 8.21.0's <c>--trace-config read</c>
+    /// lines (<see cref="HttpClientReaderTraceLines" />, BL-1189): the reader added for a <c>-d</c> body or a
+    /// <c>-T</c> upload of known length, and each read into the upload buffer. Off by default.
+    /// </summary>
+    public bool TracesClientReaders { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException"><paramref name="context" /> is <see langword="null" />.</exception>
     /// <exception cref="OperationCanceledException">
@@ -982,6 +989,7 @@ public sealed class HttpProtocolHandler(
             Progress = plan.Progress,
             Events = context.Events,
             EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
+            TracesReaders = TracesReadersOf(requestStream),
         };
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
         {
@@ -1126,6 +1134,12 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private bool TracesStreamsOf(IHttpStreamSession streams) =>
         streams is Http3Session ? TracesHttp3Streams : TracesHttp2Frames;
+
+    /// <summary>
+    /// Whether the request body's reads write <see cref="TracesClientReaders" />' lines: only over
+    /// HTTP/1.x, without a <paramref name="requestStream" />, the version they were measured on.
+    /// </summary>
+    private bool TracesReadersOf(IHttpStreamConnection? requestStream) => TracesClientReaders && requestStream is null;
 
     /// <summary>
     /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one;
