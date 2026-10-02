@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-717, BL-732]
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Quic.UnitLibrary, Curl.Quic.UnitTests]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-10-01
 ---
 # BL-735 — Multiplex -Z parallel transfers to one origin over one HTTP/3 connection
 
@@ -24,8 +24,8 @@ With `-Z` and HTTP/3, transfers to the same origin share one QUIC connection as 
 ## Acceptance criteria
 
 - [x] Measured first as above; copied into Notes.
-- [ ] Tests with a fake multiplexed connection show three `-Z` transfers on one QUIC connection with client stream IDs 0, 4, 8, `%{num_connects}` as measured, and a new connection when `MAX_STREAMS` is reached.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for each library changed.
+- [x] Tests with a fake multiplexed connection show three `-Z` transfers on one QUIC connection with client stream IDs 0, 4, 8, `%{num_connects}` as measured, and a new connection when `MAX_STREAMS` is reached.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for each library changed.
 
 ## Notes
 
@@ -49,6 +49,23 @@ With `-Z` and HTTP/3, transfers to the same origin share one QUIC connection as 
   `IConnector`/`IConnectionSession` in Curl.Protocol.Abstractions.UnitLibrary). `touches` widened to
   Curl.Networking.UnitLibrary/.UnitTests and Curl.Protocol.Abstractions.UnitLibrary/.UnitTests for that.
   BL-824 (in Doing) touches Curl.Networking.UnitTests, so the task went back to Backlog until it is done.
+- 2026-10-01, delivered (ADR-0338): `IConnector.ConnectMultiplexedSessionAsync` hands the pool the
+  function that builds the HTTP/3 session, and `PoolingConnector` pools that session under a QUIC-only
+  key with the same share / idle / open path as TCP. `Http3Session` is an `IConnectionSession` whose
+  limit is the server's MAX_STREAMS for bidirectional streams (new `IMultiplexedConnection.BidirectionalStreamLimit`,
+  read by `QuicConnection`); it opens request streams one transfer at a time. The handler marks an
+  HTTP/3 connection reusable while it takes new requests. A failed QUIC connect is not numbered, so
+  `--http3`'s TCP fallback keeps `#0`.
+- touches widened to Curl.Quic.UnitLibrary/.UnitTests (the stream limit lives in `QuicStreamSet`);
+  no task in Doing on origin/work/dark-factory named them.
+- Tests: `PoolingConnectorQuicSessionTests` (12, incl. the MAX_STREAMS skip and new connection),
+  `CurlCommandRunnerHttp3Tests.RunAsync_ParallelHttp3OnlyToOneOrigin_...` (streams 0/4/8, num_connects
+  1/0/0, two `Multiplexed connection found`, one `left intact`), plus Http3Session, Abstractions, Quic
+  and EndPointRecordingConnector tests. Measure-CodeQuality: Console, Abstractions, Http, Quic 100/100;
+  Networking 100% branch, its one failing member `UdpChannelOpener.OpenFrom` line 53 is in a file this
+  task did not touch.
+- Not done, as for HTTP/2 (BL-717): the three "not open enough / pending candidate / Waiting on
+  connection to negotiate" lines curl writes before the connection is up.
 
 ## Log
 
@@ -56,3 +73,4 @@ With `-Z` and HTTP/3, transfers to the same origin share one QUIC connection as 
 - 2026-10-01: Backlog -> Doing.
 - 2026-10-01: Doing -> Backlog. touches now include Curl.Networking.UnitTests (QUIC pooling lives in PoolingConnector), which BL-824 in Doing also touches; resume once BL-824 is Done
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. -Z HTTP/3 transfers to one origin share one pooled QUIC connection up to the server's MAX_STREAMS
