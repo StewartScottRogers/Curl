@@ -8,7 +8,7 @@ depends-on: [BL-1226]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1227 — Carry curl's 'aws_sigv4: picked service/region from host' -v lines on AwsSigV4SigningResult
 
@@ -25,14 +25,20 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `AwsSigV4SigningResult` has a member, named for what it holds, listing the picked-from-host lines; it is empty for a failed or unsigned result.
-- [ ] Tests in `Curl.Authentication.UnitTests` pin: `aws:amz` with host `s3.eu-west-1.localhost` gives both lines in order; `aws:amz:us-east-1` with the same host gives only the service line (`s3`); `aws:amz:us-east-1:s3` gives none; the exit 3 failures give none.
-- [ ] Every existing SigV4 test passes unchanged.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `AwsSigV4SigningResult` has a member, named for what it holds, listing the picked-from-host lines; it is empty for a failed or unsigned result.
+- [x] Tests in `Curl.Authentication.UnitTests` pin: `aws:amz` with host `s3.eu-west-1.localhost` gives both lines in order; `aws:amz:us-east-1` with the same host gives only the service line (`s3`); `aws:amz:us-east-1:s3` gives none; the exit 3 failures give none.
+- [x] Every existing SigV4 test passes unchanged.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- The member is `AwsSigV4SigningResult.PickedFromHostLines`. `AwsSigV4Scope.FromHost` records the lines on the scope as it picks each part, and `Signed` copies them to the result. `Failed` and `NotSigned` carry an empty list.
+- Divergence from curl, kept on purpose: when the service comes from the host and the region then fails (`s3.localhost`), curl has already written `picked service s3 from host` before the exit 3 error. The criteria say a failed result carries no lines, so this one carries none. A failed result has no lines to print, and the line before the error is only `-v` noise. If byte parity on that path matters, it needs a separate task.
+- Follow-up: BL-1244 prints the lines in `Curl.Console`.
+- Measured: Curl.Authentication.UnitLibrary 100% line, 100% branch, 0 failing members, worst CRAP 10. Curl.Authentication.UnitTests: 785 passed, 4 skipped.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. AwsSigV4SigningResult.PickedFromHostLines carries curl's 'aws_sigv4: picked service/region from host' -v lines

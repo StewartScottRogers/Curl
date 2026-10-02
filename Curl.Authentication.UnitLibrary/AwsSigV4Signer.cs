@@ -112,7 +112,7 @@ public sealed class AwsSigV4Signer(TimeProvider timeProvider, Encoding argumentE
             + ", SignedHeaders=" + signedHeaders
             + ", Signature=" + Convert.ToHexStringLower(key);
         string[] headerLines = new[] { authorization, inputs.DateHeaderLine, inputs.ContentHashLine }.OfType<string>().ToArray();
-        return AwsSigV4SigningResult.Signed(headerLines, canonicalRequest, stringToSign);
+        return AwsSigV4SigningResult.Signed(headerLines, canonicalRequest, stringToSign, scope.PickedFromHostLines);
     }
 
     /// <summary>

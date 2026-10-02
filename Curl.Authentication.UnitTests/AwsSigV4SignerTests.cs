@@ -422,6 +422,55 @@ public sealed class AwsSigV4SignerTests
     }
 
     [TestMethod]
+    public void Sign_ServiceAndRegionFromHost_ListsBothPickedLinesInCurlsOrder()
+    {
+        AwsSigV4SigningResult result = SignAt("20260929T060411Z", Loopback("aws:amz") with { HostName = "s3.eu-west-1.localhost" });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "aws_sigv4: picked service s3 from host", "aws_sigv4: picked region eu-west-1 from host" },
+            result.PickedFromHostLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Sign_RegionGivenServiceFromHost_ListsOnlyThePickedServiceLine()
+    {
+        AwsSigV4SigningResult result = SignAt("20260929T060411Z", Loopback("aws:amz:us-east-1") with { HostName = "s3.eu-west-1.localhost" });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "aws_sigv4: picked service s3 from host" }, result.PickedFromHostLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Sign_RegionAndServiceGiven_ListsNoPickedLines()
+    {
+        AwsSigV4SigningResult result = SignAt("20260929T060411Z", Loopback("aws:amz:us-east-1:s3") with { HostName = "s3.eu-west-1.localhost" });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsEmpty(result.PickedFromHostLines);
+    }
+
+    [TestMethod]
+    [DataRow("localhost", "aws-sigv4: service missing in parameters and hostname", DisplayName = "Service missing")]
+    [DataRow("s3.localhost", "aws-sigv4: region missing in parameters and hostname", DisplayName = "Region missing")]
+    public void Sign_HostLacksServiceOrRegion_FailsWithNoPickedLines(string hostName, string errorMessage)
+    {
+        AwsSigV4SigningResult result = SignAt("20260929T060411Z", Loopback("aws:amz") with { HostName = hostName });
+
+        Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        Assert.AreEqual(errorMessage, result.ErrorMessage);
+        Assert.IsEmpty(result.PickedFromHostLines);
+    }
+
+    [TestMethod]
+    public void Sign_CustomAuthorizationHeader_ListsNoPickedLines()
+    {
+        AwsSigV4SigningResult result = SignAt("20260929T060411Z", Loopback("aws:amz") with { CustomHeaders = ["Authorization: Bearer x"] });
+
+        Assert.IsEmpty(result.PickedFromHostLines);
+    }
+
+    [TestMethod]
     public void Sign_NullRequest_Throws()
     {
         AwsSigV4Signer signer = new(TimeProvider.System, Encoding.UTF8);
