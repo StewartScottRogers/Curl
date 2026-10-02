@@ -60,3 +60,24 @@ The Linux and macOS OpenSSL builds can be compiled with more protocols (such as 
   and the `--proto-default ipfs` refusal.
 - **Keeping the names as given (ordered list, original case):** nothing downstream needs order
   or case, and curl itself matches case-insensitively.
+
+## Amendment — 2026-10-01: `smb` and `smbs` join the list (BL-1099)
+
+Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions").
+
+Curl now serves `smb` and `smbs` (BL-598), so decision 1's list gains both: `KnownSchemes` is
+the Schannel `Protocols:` line less `ipfs` and `ipns`, plus `smb` and `smbs`, still one list on
+every platform. `RedirectFollower`'s schemes-curl-parses list gains them too, so a redirect to
+`smb://` reaches the `--proto-redir` check instead of failing as an unsupported URL scheme.
+
+Measured with WSL's Ubuntu curl 8.18.0 (OpenSSL 3.5.5, `Protocols:` includes `smb smbs`) on
+2026-10-01: `--proto smb,bogus` warns only about `bogus`; `--proto -ftp smb://127.0.0.1:1/s/f`
+fails to connect (exit 7), so `smb` stays allowed; `--proto =http smb://...` exits 1 with
+`Protocol "smb" disabled`; and with `Record-CurlExchange.ps1 -Curl wsl.exe -ListenAddress
+172.26.96.1`, `-L` to `Location: smb://h/s/f` exits 1 with `Protocol "smb" disabled (in
+redirect)`, with or without `--proto-redir http` (curl's default redirect set has no SMB).
+
+Consequence: on Windows, `--proto smb` is now silent where the Schannel curl warns, and
+`--proto-default smb` is taken where it refuses. That is the cost of serving a protocol the
+Schannel build lacks; matching that build's warning for a transfer Curl can do would make
+`--proto smb` useless. The message keeps curl 8.21.0's wording, `is disabled`.

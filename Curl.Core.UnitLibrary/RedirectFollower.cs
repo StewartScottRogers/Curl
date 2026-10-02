@@ -138,7 +138,7 @@ public sealed class RedirectFollower(
     private static readonly HashSet<string> SchemesCurlParses = new(
         [
             "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap",
-            "imaps", "ldap", "ldaps", "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp",
+            "imaps", "ldap", "ldaps", "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smb", "smbs",
             "smtp", "smtps", "telnet", "tftp", "ws", "wss",
         ],
         StringComparer.Ordinal);
