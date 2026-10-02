@@ -196,7 +196,31 @@ public sealed record CurlUrl
         bool pathAsIs,
         [NotNullWhen(true)] out CurlUrl? url,
         out CurlUrlRejection rejection) =>
-        TryParse(text, pathAsIs, OperatingSystem.IsWindows(), out url, out rejection);
+        TryParse(text, pathAsIs, OperatingSystem.IsWindows(), disallowUser: false, out url, out rejection);
+
+    /// <summary>
+    /// Parses <paramref name="text" /> as <see cref="TryParse(string, bool, out CurlUrl, out CurlUrlRejection)" />
+    /// does, but rejects user information in the authority, even an empty user, with
+    /// <see cref="CurlUrlRejection.UserNotAllowed" /> before its host and port are checked, as
+    /// curl's <c>--disallow-username-in-url</c> does (curl 8.21.0, measured, BL-910).
+    /// </summary>
+    /// <param name="text">The URL as typed.</param>
+    /// <param name="pathAsIs">
+    /// <see langword="true" /> to keep <c>.</c> and <c>..</c> path segments, as curl's
+    /// <c>--path-as-is</c> does.
+    /// </param>
+    /// <param name="url">The parsed URL, or <see langword="null" /> when curl rejects the text.</param>
+    /// <param name="rejection">
+    /// Why curl rejects the text, or <see cref="CurlUrlRejection.None" /> when it accepts it.
+    /// </param>
+    /// <returns><see langword="true" /> when curl accepts the text.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="text" /> is <see langword="null" />.</exception>
+    public static bool TryParseDisallowingUser(
+        string text,
+        bool pathAsIs,
+        [NotNullWhen(true)] out CurlUrl? url,
+        out CurlUrlRejection rejection) =>
+        TryParse(text, pathAsIs, OperatingSystem.IsWindows(), disallowUser: true, out url, out rejection);
 
     /// <summary>
     /// Parses <paramref name="text" /> with the drive-letter rules of the chosen platform,
@@ -218,11 +242,25 @@ public sealed record CurlUrl
         bool pathAsIs,
         bool driveLetters,
         [NotNullWhen(true)] out CurlUrl? url,
+        out CurlUrlRejection rejection) =>
+        TryParse(text, pathAsIs, driveLetters, disallowUser: false, out url, out rejection);
+
+    /// <summary>
+    /// Parses <paramref name="text" /> with the drive-letter rules of the chosen platform,
+    /// rejecting user information when <paramref name="disallowUser" /> is set, and says why
+    /// curl rejects it when it does.
+    /// </summary>
+    internal static bool TryParse(
+        string text,
+        bool pathAsIs,
+        bool driveLetters,
+        bool disallowUser,
+        [NotNullWhen(true)] out CurlUrl? url,
         out CurlUrlRejection rejection)
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        url = CurlUrlParser.Parse(text, pathAsIs, driveLetters, out rejection);
+        url = CurlUrlParser.Parse(text, pathAsIs, driveLetters, disallowUser, out rejection);
 
         return url is not null;
     }

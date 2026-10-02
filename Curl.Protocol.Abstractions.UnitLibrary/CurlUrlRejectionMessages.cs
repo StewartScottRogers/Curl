@@ -2,7 +2,8 @@ namespace Curl.Protocol.Abstractions;
 
 /// <summary>
 /// The text curl 8.21.0's <c>curl_url_strerror</c> gives each <see cref="CurlUrlRejection" />,
-/// which curl prints as <c>curl: (3) URL rejected: </c> and the text.
+/// which curl prints as <c>curl: (3) URL rejected: </c> and the text (exit 67 for
+/// <see cref="CurlUrlRejection.UserNotAllowed" />).
 /// </summary>
 public static class CurlUrlRejectionMessages
 {
@@ -21,6 +22,7 @@ public static class CurlUrlRejectionMessages
         CurlUrlRejection.BadIPv6 => "Bad IPv6 address",
         CurlUrlRejection.BadHostname => "Bad hostname",
         CurlUrlRejection.BadFileUrl => "Bad file:// URL",
+        CurlUrlRejection.UserNotAllowed => "Credentials was passed in the URL when prohibited",
         _ => throw new ArgumentOutOfRangeException(nameof(rejection), rejection, "The URL was not rejected."),
     };
 }

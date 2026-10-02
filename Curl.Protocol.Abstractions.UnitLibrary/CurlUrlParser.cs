@@ -22,9 +22,15 @@ internal static class CurlUrlParser
 
     /// <summary>
     /// Parses <paramref name="text" />, or returns <see langword="null" /> when curl rejects
-    /// it, with <paramref name="rejection" /> saying why.
+    /// it, with <paramref name="rejection" /> saying why. With <paramref name="disallowUser" />,
+    /// user information in the authority is rejected before its host and port are checked.
     /// </summary>
-    public static CurlUrl? Parse(string text, bool pathAsIs, bool driveLetters, out CurlUrlRejection rejection)
+    public static CurlUrl? Parse(
+        string text,
+        bool pathAsIs,
+        bool driveLetters,
+        bool disallowUser,
+        out CurlUrlRejection rejection)
     {
         if (Encoding.UTF8.GetByteCount(text) > MaximumLength || text.Any(IsControlOrSpace))
         {
@@ -36,7 +42,7 @@ internal static class CurlUrlParser
         string? scheme = CurlUrlScheme.Read(text, driveLetters);
         if (scheme != FileScheme)
         {
-            return ParseWithAuthority(text, scheme, pathAsIs, out rejection);
+            return ParseWithAuthority(text, scheme, pathAsIs, disallowUser, out rejection);
         }
 
         CurlUrl? url = ParseFile(text, pathAsIs, driveLetters);
@@ -51,7 +57,12 @@ internal static class CurlUrlParser
     /// Parses a URL whose scheme is not <c>file</c>, or that has no scheme: one to three
     /// slashes, then an authority that must name a host.
     /// </summary>
-    private static CurlUrl? ParseWithAuthority(string text, string? scheme, bool pathAsIs, out CurlUrlRejection rejection)
+    private static CurlUrl? ParseWithAuthority(
+        string text,
+        string? scheme,
+        bool pathAsIs,
+        bool disallowUser,
+        out CurlUrlRejection rejection)
     {
         string? rest = scheme is null ? text : SkipSchemeAndSlashes(text, scheme);
         if (rest is null)
@@ -69,7 +80,7 @@ internal static class CurlUrlParser
             return null;
         }
 
-        CurlUrlAuthority? authority = CurlUrlAuthority.Parse(rest[..hostEnd], scheme, out rejection);
+        CurlUrlAuthority? authority = CurlUrlAuthority.Parse(rest[..hostEnd], scheme, disallowUser, out rejection);
 
         return authority is null
             ? null

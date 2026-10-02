@@ -33,4 +33,10 @@ public enum CurlUrlRejection
 
     /// <summary>A <c>file</c> URL names a host, or a drive letter where curl refuses one (<c>CURLUE_BAD_FILE_URL</c>).</summary>
     BadFileUrl,
+
+    /// <summary>
+    /// The authority has user information, even an empty user, and the caller disallowed it, as curl's
+    /// <c>--disallow-username-in-url</c> does (<c>CURLUE_USER_NOT_ALLOWED</c>).
+    /// </summary>
+    UserNotAllowed,
 }
