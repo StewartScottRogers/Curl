@@ -1528,6 +1528,13 @@ public sealed class CommandLineOptions
     public bool RemoteTime { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when <c>--xattr</c> was given and no <c>--no-xattr</c> came after it:
+    /// store the transfer's URL, <c>Referer</c> and content type as extended attributes of the output
+    /// file, on the operating systems where curl does (ADR-0320).
+    /// </summary>
+    public bool ExtendedAttributes { get; internal set; }
+
+    /// <summary>
     /// The <c>-z</c> / <c>--time-cond</c> condition: the date read by <see cref="CurlDateParser"/> and
     /// its direction; <see langword="null"/> when not given, or when the last value was not a date,
     /// which curl 8.21.0 warns about and then transfers unconditionally. The last value wins.

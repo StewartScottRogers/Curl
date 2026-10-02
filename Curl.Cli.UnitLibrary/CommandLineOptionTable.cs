@@ -279,6 +279,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("speed-limit", 'Y', SetSpeedLimit),
         CommandLineOption.Value("speed-time", 'y', SetSpeedTime),
         CommandLineOption.NegatableFlag("remote-time", 'R', (options, on) => options.RemoteTime = on),
+        CommandLineOption.NegatableFlag("xattr", null, (options, on) => options.ExtendedAttributes = on),
         CommandLineOption.Value("time-cond", 'z', SetTimeCondition),
         CommandLineOption.Text("request", 'X', (options, method) => options.RequestMethod = method),
         CommandLineOption.Value("header", 'H', AddHeaders),
