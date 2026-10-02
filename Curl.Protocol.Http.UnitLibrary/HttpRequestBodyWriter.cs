@@ -357,8 +357,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         ReadOnlyMemory<byte> framed = Framed(piece, isChunked);
         if (EarlyResponseWatch is not { } watch)
         {
-            await WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
-            await WriteFramedAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
+            await WriteAfterHeldHeadAsync(piece, framed, isChunked, cancellationToken).ConfigureAwait(false);
         }
         else if (!await watch.SendUnlessStoppedAsync(framed, cancellationToken).ConfigureAwait(false))
         {
@@ -370,6 +369,34 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         ReportSent(framed.Span);
         BytesWritten += piece.Length;
         Progress.ReportUploaded(BytesWritten, expectedLength);
+    }
+
+    /// <summary>
+    /// Writes a piece after <see cref="HeldHead" />. On an HTTP/1.x connection a head still held
+    /// goes out in one write with the start of the framed piece, as many of its bytes as fill
+    /// <see cref="UploadBufferSize" />, as curl 8.21.0 sends its head and first body bytes from one
+    /// upload buffer: a server that answers after its first read and closes would otherwise reset a
+    /// connection whose body came after it (measured, BL-1215 Notes). An HTTP/2 or HTTP/3 stream
+    /// takes its first write as the head, so there the head is written on its own.
+    /// </summary>
+    private async ValueTask WriteAfterHeldHeadAsync(ReadOnlyMemory<byte> piece, ReadOnlyMemory<byte> framed, bool isChunked, CancellationToken cancellationToken)
+    {
+        if (heldHead.IsEmpty || connection is IHttpStreamConnection)
+        {
+            await WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
+            await WriteFramedAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        ReadOnlyMemory<byte> head = heldHead;
+        heldHead = ReadOnlyMemory<byte>.Empty;
+        int shared = Math.Min(framed.Length, Math.Max(UploadBufferSize - head.Length, 0));
+        await HttpConnectionSend.WriteAsync(connection, (byte[])[.. head.Span, .. framed.Span[..shared]], cancellationToken).ConfigureAwait(false);
+        Events.ReportRequestHeader(head.Span);
+        if (shared < framed.Length)
+        {
+            await HttpConnectionSend.WriteAsync(connection, framed[shared..], cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>

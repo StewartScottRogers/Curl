@@ -156,6 +156,62 @@ public sealed class HttpRequestBodyWriterTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_HeldHeadAndSmallBytesBody_SendsThemAsOneWrite()
+    {
+        // curl -d ab sent its 148-byte head and the body in one write; a server that answered
+        // after its first read reset Curl's connection when the body came in a write of its own
+        // (BL-1215 Notes).
+        ScriptedConnection connection = new([], 1);
+        HttpRequestBodyWriter writer = new(connection) { HeldHead = "HEAD\r\n\r\n"u8.ToArray(), SharedHeadLength = 8 };
+
+        await writer.WriteAsync(new BytesBody("ab"u8.ToArray(), "a/b"), false, CancellationToken.None);
+
+        Assert.AreEqual("HEAD\r\n\r\nab", Encoding.Latin1.GetString(connection.Written));
+        CollectionAssert.AreEqual(new[] { 10 }, connection.WriteLengths.ToArray());
+        Assert.AreEqual(2L, writer.BytesSent);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_HeldHeadAndLargeBytesBody_FirstWriteFillsTheUploadBuffer()
+    {
+        // curl -d @file of 100000 bytes after a 153-byte head: [65383 bytes data] went out with the
+        // head, 65536 bytes, then the rest (measured, BL-1215 Notes).
+        ScriptedConnection connection = new([], 1);
+        byte[] head = new byte[153];
+        HttpRequestBodyWriter writer = new(connection) { HeldHead = head, SharedHeadLength = head.Length };
+
+        await writer.WriteAsync(new BytesBody(new byte[100000], "a/b"), false, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { 65536, 34617 }, connection.WriteLengths.ToArray());
+        Assert.AreEqual(100153, connection.Written.Length);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_HeldHeadAndChunkedBody_SendsTheHeadWithTheFirstChunk()
+    {
+        ScriptedConnection connection = new([], 1);
+        HttpRequestBodyWriter writer = new(connection) { HeldHead = "HEAD\r\n\r\n"u8.ToArray(), SharedHeadLength = 8 };
+
+        await writer.WriteAsync(new BytesBody("x=1"u8.ToArray(), "a/b"), true, CancellationToken.None);
+
+        Assert.AreEqual("HEAD\r\n\r\n3\r\nx=1\r\n0\r\n\r\n", Encoding.Latin1.GetString(connection.Written));
+        CollectionAssert.AreEqual(new[] { 16, 5 }, connection.WriteLengths.ToArray());
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_HeldHeadAndStreamBody_ReportsTheHeadBeforeTheFirstPiece()
+    {
+        ScriptedConnection connection = new([], 1);
+        RecordingTransferEvents events = new();
+        HttpRequestBodyWriter writer = new(connection) { HeldHead = "HEAD\r\n\r\n"u8.ToArray(), SharedHeadLength = 8, Events = events };
+
+        await writer.WriteAsync(new StreamBody(new MemoryStream("hello"u8.ToArray()), 5, "a/b"), false, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { 13 }, connection.WriteLengths.ToArray());
+        CollectionAssert.AreEqual(new[] { "> HEAD\r\n\r\n", "} hello" }, events.Events);
+    }
+
+    [TestMethod]
     public async Task WriteAsync_HeadSharesTheBuffer_FirstReadTakesWhatTheHeadLeaves()
     {
         FailingReadStream stream = new(new byte[200000], int.MaxValue, new IOException("Not reached."), 200000);
