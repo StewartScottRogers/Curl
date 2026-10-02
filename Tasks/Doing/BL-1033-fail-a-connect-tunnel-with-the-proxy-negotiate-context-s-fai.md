@@ -33,3 +33,4 @@ A CONNECT tunnel refused with `407` after a `--proxy-negotiate` context failed e
 ## Log
 
 - 2026-09-30: Created.
+- 2026-10-02: Backlog -> Doing.
