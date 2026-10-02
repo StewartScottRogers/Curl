@@ -33,3 +33,4 @@ With `--doh-url`, `--ech true` and `--ech hard` write the `ECH: ECHConfig from H
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
