@@ -36,13 +36,14 @@ public sealed class HandshakeCapturingTransferEventsTests
         capturing.ReportTlsMessage(new TlsMessageEvent { ProtocolVersion = 0x0303, ContentType = default, Bytes = new byte[] { 2 }, Sent = false });
         capturing.ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = true });
         capturing.ReportCertificateVerifyResult(18, isProxy: true);
+        capturing.ReportTlsEarlyData(-36);
         capturing.ReportRequestHeader([3]);
         capturing.ReportResponseHeader([4]);
         capturing.ReportDataSent([5]);
         capturing.ReportDataReceived([6]);
 
         CollectionAssert.AreEqual(
-            new[] { "info", "opened", "reused", "handshake", "tls-data", "tls-message", "trust", "verify 18 True", "request", "response", "sent", "received" },
+            new[] { "info", "opened", "reused", "handshake", "tls-data", "tls-message", "trust", "verify 18 True", "early-data -36", "request", "response", "sent", "received" },
             inner.Calls);
         Assert.AreSame(handshake, capturing.Handshake);
     }
@@ -84,6 +85,8 @@ public sealed class HandshakeCapturingTransferEventsTests
         public void ReportTlsTrust(TlsTrustEvent trust) => Calls.Add("trust");
 
         public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) => Calls.Add($"verify {verifyResult} {isProxy}");
+
+        public void ReportTlsEarlyData(long bytes) => Calls.Add($"early-data {bytes}");
 
         public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => Calls.Add("request");
 

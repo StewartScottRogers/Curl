@@ -34,6 +34,17 @@ public sealed partial class HandBuiltTlsProviderTests
             },
             run.Events.Info.Where(line => line.Contains("early data", StringComparison.Ordinal)).ToArray());
         Assert.AreEqual(1, run.Events.Handshakes.Count);
+        CollectionAssert.AreEqual(new long[] { EarlyRequest.Length }, run.Events.EarlyDataSent, "%{tls_earlydata}");
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithEarlyDataToAnHttpsProxy_ReportsNoEarlyDataCount()
+    {
+        var run = await RunEarlyDataAsync(new EarlyDataCase { IsProxy = true });
+
+        Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode, run.Result.ErrorMessage);
+        Assert.IsTrue(run.Server.EarlyDataAccepted);
+        Assert.IsEmpty(run.Events.EarlyDataSent);
     }
 
     [TestMethod]
@@ -47,6 +58,7 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.AreEqual(1, run.Records.SkippedRecords, "the rejected early data record");
         Assert.AreEqual(EarlyRequest, run.ReceivedAfterHandshake);
         Assert.AreEqual("Server rejected TLS early data.", run.Events.Info[^1]);
+        CollectionAssert.AreEqual(new long[] { -EarlyRequest.Length }, run.Events.EarlyDataSent, "negative when rejected");
     }
 
     [TestMethod]
@@ -59,6 +71,7 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.AreEqual(EarlyRequest[4..], run.ReceivedAfterHandshake);
         CollectionAssert.Contains(run.Events.Info, "SSL sending 4 bytes of early data");
         CollectionAssert.Contains(run.Events.Info, "Server accepted 4 bytes of TLS early data.");
+        CollectionAssert.AreEqual(new long[] { 4 }, run.Events.EarlyDataSent);
     }
 
     [TestMethod]
@@ -71,6 +84,7 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.IsFalse(run.Server.EarlyDataOffered);
         Assert.AreEqual(EarlyRequest, run.ReceivedAfterHandshake);
         Assert.IsFalse(run.Events.Info.Any(line => line.Contains("early data", StringComparison.Ordinal)));
+        Assert.IsEmpty(run.Events.EarlyDataSent);
     }
 
     [TestMethod]
@@ -136,6 +150,8 @@ public sealed partial class HandBuiltTlsProviderTests
         public uint MaxEarlyDataSize { get; init; } = 16384;
 
         public string? SessionApplicationProtocol { get; init; } = "http/1.1";
+
+        public bool IsProxy { get; init; }
     }
 
     // Connects with the session the case seeds, writes the request, and reads what reached the
@@ -167,7 +183,7 @@ public sealed partial class HandBuiltTlsProviderTests
         var events = new RecordingTransferEvents();
 
         var result = await EarlyDataProvider(sessions, testCase.AllowEarlyData).AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), CertificateHost, events, isProxy: false, Http2AndHttp11, CancellationToken.None);
+            new StreamConnection(client, ServerEndPoint), CertificateHost, events, isProxy: testCase.IsProxy, Http2AndHttp11, CancellationToken.None);
         await result.Connection!.WriteAsync(Encoding.ASCII.GetBytes(EarlyRequest), CancellationToken.None);
         byte[] received = await serverTask;
         await result.Connection.DisposeAsync();

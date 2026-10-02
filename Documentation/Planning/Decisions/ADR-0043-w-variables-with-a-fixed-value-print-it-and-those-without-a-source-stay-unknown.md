@@ -118,3 +118,33 @@ Now given a source:
 
 The warning in Consequences still holds for the three fixed values: BL-661 and BL-906
 must replace the constant in `TransferWriteOutVariables` when they land.
+
+## Amendment, 2026-10-01 (BL-906): where `tls_earlydata` comes from
+
+Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions").
+
+`tls_earlydata` is no longer a constant. It prints
+`TransferWriteOutVariables.TlsEarlyDataSent`, set by the caller and `0` by default. Its
+source is a new `ITransferEvents.ReportTlsEarlyData(long bytes)` (default: does nothing),
+which `HandBuiltTlsProvider` reports once its deferred `--tls-earlydata` handshake
+(BL-1105, ADR-0337) completes, as curl 8.21.0's `lib/vtls/openssl.c` calls
+`Curl_pgrsEarlyData`:
+
+- the bytes sent as 0-RTT early data when the server accepted them;
+- their negation when it rejected them (`CURLINFO_EARLYDATA_SENT_T`'s documented
+  "negative when the sent data was rejected");
+- nothing for an HTTPS proxy's connection, nor without early data, so `0` stays.
+
+Measured 2026-10-01 with `Record-CurlExchange.ps1 -Tls`: curl 8.21.0's Schannel build
+refuses `--ssl-sessions` ("the installed libcurl version does not support this", exit 2)
+and printed `0|0|` for `-sk --tls-earlydata -w "%{tls_earlydata}|"` over two transfers, so
+`0` is the Windows answer. No OpenSSL-build curl was available, so the OpenSSL value is
+pinned from the curl-8_21_0 source and documentation above.
+
+`ConnectionOpenedCapturingTransferEvents` (Abstractions) and
+`HandshakeCapturingTransferEvents` (Networking) pass the event on. `Curl.Console`'s own
+event decorators and `RunningTransferState`, which must carry it to
+`TransferWriteOutVariables` as BL-661 carries the verify result, were held by another lane
+when this landed; BL-1150 finishes that wiring, and until it does `curl -w` still prints
+`0`. With `ssl_verify_result` and `proxy_ssl_verify_result` sourced by BL-661 and this, only
+`time_queue` remains fixed.

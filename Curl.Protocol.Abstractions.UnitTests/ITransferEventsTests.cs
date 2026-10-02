@@ -58,6 +58,16 @@ public sealed class ITransferEventsTests
     }
 
     [TestMethod]
+    public void ReportTlsEarlyData_NotOverridden_DoesNothing()
+    {
+        var sink = new TlsDataRecordingEvents();
+
+        ((ITransferEvents)sink).ReportTlsEarlyData(36);
+
+        Assert.IsNull(sink.Bytes);
+    }
+
+    [TestMethod]
     public void TlsTrustEvent_OnlyVerificationGiven_HasNoTrustAnchorSource()
     {
         TlsTrustEvent trust = new() { VerifiesPeer = false };

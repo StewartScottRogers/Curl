@@ -291,10 +291,22 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             throw new DeferredTlsHandshakeFailedException(failure.ExitCode, failure.ErrorMessage!);
         }
 
-        run.Events.ReportInfo(EarlyDataAccepted(handshake!.Stream!)
+        var accepted = EarlyDataAccepted(handshake!.Stream!);
+        ReportEarlyDataSent(run, accepted ? sent : -sent);
+        run.Events.ReportInfo(accepted
             ? string.Create(CultureInfo.InvariantCulture, $"Server accepted {sent} bytes of TLS early data.")
             : "Server rejected TLS early data.");
         return ConnectionOver(handshake, run);
+    }
+
+    // %{tls_earlydata} (BL-906): openssl.c's Curl_pgrsEarlyData call, the bytes sent and
+    // negative when rejected, made only for the origin's connection, never a proxy's.
+    private static void ReportEarlyDataSent(HandshakeRun run, long bytes)
+    {
+        if (!run.IsProxy)
+        {
+            run.Events.ReportTlsEarlyData(bytes);
+        }
     }
 
     // Whether the server accepted the early data; a TLS 1.2 connection accepts none.
