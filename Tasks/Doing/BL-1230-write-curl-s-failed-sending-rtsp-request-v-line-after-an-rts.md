@@ -34,3 +34,4 @@ When an `rtsp://` request cannot be sent, the transfer's `-v` output gets curl 8
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
