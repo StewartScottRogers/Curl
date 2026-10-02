@@ -1252,9 +1252,9 @@ public sealed partial class TcpConnector(
     /// Discards the body of a reply that leaves the connection reusable, so
     /// <paramref name="answer" /> goes on it: a <c>Content-Length</c> body that ends early sends
     /// the answer on a new connection instead, and a chunked body that is malformed or cut
-    /// short is the tunnel's exit 56, as curl 8.21.0 gives up on it (BL-862 Notes). A chunked
-    /// body's <c>-v</c> lines go to <paramref name="events" /> as <see cref="ConnectTunnelVerboseLines" />
-    /// words them (BL-1144).
+    /// short is the tunnel's exit 56, as curl 8.21.0 gives up on it (BL-862 Notes). The body's
+    /// <c>-v</c> lines go to <paramref name="events" /> as <see cref="ConnectTunnelVerboseLines" />
+    /// words them (BL-1144, BL-1146).
     /// </summary>
     private static async ValueTask<(string? Answer, bool OnThisConnection, ConnectResult? Failure)> DiscardRejectedBodyAsync(
         IConnection connection,
@@ -1265,6 +1265,7 @@ public sealed partial class TcpConnector(
     {
         if (!reply.IsChunked)
         {
+            ConnectTunnelVerboseLines.ReportIgnoredBody(events, reply.ContentLength);
             return (answer, await HttpProxyTunnel.DiscardBodyAsync(connection, reply.ContentLength, cancellationToken).ConfigureAwait(false), null);
         }
 

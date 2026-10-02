@@ -87,6 +87,7 @@ public sealed partial class TcpConnectorTests
     [TestMethod]
     public async Task ConnectAsync_WithProxyDigestOnAKeptOpenConnection_ReportsBothConnectsWithoutConnectingAgain()
     {
+        // Measured (BL-863, BL-1146): curl 8.21.0 writes "Ignore 6 bytes of response-body" after the 407's blank line.
         var events = new RecordingTransferEvents();
         var (connector, _) = CreateAuthenticatingConnector(
             HttpAuthSchemes.Digest,
@@ -101,6 +102,30 @@ public sealed partial class TcpConnectorTests
                 [Trying, NoAlpnNegotiated, "* Proxy auth using Digest with user 'u'", Establishing],
                 RequestLines(UnauthenticatedConnect),
                 ["< HTTP/1.1 407 Proxy Authentication Required", "< Proxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"", "< Content-Length: 6", "< "],
+                ["* Ignore 6 bytes of response-body", "* Proxy auth using Digest with user 'u'", Establishing],
+                RequestLines(DigestConnect),
+                EstablishedLines),
+            events.Transcript);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithProxyDigestAfterAnEmpty407Body_ReportsNoIgnoreLine()
+    {
+        // Measured (BL-1146): curl 8.21.0 writes no Ignore line for Content-Length: 0.
+        var events = new RecordingTransferEvents();
+        var (connector, _) = CreateAuthenticatingConnector(
+            HttpAuthSchemes.Digest,
+            new ScriptedConnection(Encoding.Latin1.GetBytes(
+                "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"\r\nContent-Length: 0\r\n\r\n"
+                + EstablishedReply)));
+
+        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+
+        AssertTranscript(
+            Lines(
+                [Trying, NoAlpnNegotiated, "* Proxy auth using Digest with user 'u'", Establishing],
+                RequestLines(UnauthenticatedConnect),
+                ["< HTTP/1.1 407 Proxy Authentication Required", "< Proxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"", "< Content-Length: 0", "< "],
                 ["* Proxy auth using Digest with user 'u'", Establishing],
                 RequestLines(DigestConnect),
                 EstablishedLines),

@@ -16,7 +16,8 @@ namespace Curl.Networking;
 /// <c>allocate connect buffer</c> before a proxy connection's first CONNECT (BL-964, ADR-0342).
 /// A non-<c>2xx</c> chunked reply adds <c>CONNECT responded chunked</c> after its
 /// <c>Transfer-Encoding</c> line, and a discarded chunked body <c>Ignore chunked response-body</c>
-/// and how it ended (BL-1144).
+/// and how it ended (BL-1144); a discarded <c>Content-Length</c> body that is not empty
+/// <c>Ignore &lt;n&gt; bytes of response-body</c> (BL-1146).
 /// </summary>
 internal static class ConnectTunnelVerboseLines
 {
@@ -46,6 +47,21 @@ internal static class ConnectTunnelVerboseLines
 
     /// <summary>The line curl writes once a discarded chunked body has ended (BL-1144 Notes).</summary>
     internal const string ChunkReadingDone = "chunk reading DONE";
+
+    /// <summary>
+    /// Reports the line curl writes after a <c>407</c>'s head, before it discards a
+    /// <c>Content-Length</c> body: <c>Ignore &lt;n&gt; bytes of response-body</c>, and nothing for
+    /// an empty body (measured with curl 8.21.0, BL-1146 Notes).
+    /// </summary>
+    /// <param name="events">Where the line goes.</param>
+    /// <param name="length">The body's <c>Content-Length</c>.</param>
+    internal static void ReportIgnoredBody(ITransferEvents events, long length)
+    {
+        if (length > 0)
+        {
+            events.ReportInfo($"Ignore {length} bytes of response-body");
+        }
+    }
 
     /// <summary>
     /// Reports the line curl writes when it stops reading a discarded chunked body:
@@ -128,19 +144,24 @@ internal static class ConnectTunnelVerboseLines
         {
             var lineFeed = head.IndexOf((byte)'\n');
             var end = lineFeed < 0 ? head.Length : lineFeed + 1;
-            var line = head[..end];
-            events.ReportResponseHeader(line);
-            if (statusCode / 100 != 2 && IsChunkedTransferEncoding(line))
-            {
-                events.ReportInfo(RespondedChunked);
-            }
-
-            if (refusedScheme is not null)
-            {
-                ReportProblemLines(events, Encoding.Latin1.GetString(line), refusedScheme);
-            }
-
+            ReportReplyLine(events, head[..end], statusCode, refusedScheme);
             head = head[end..];
+        }
+    }
+
+    // One reply header line, then the lines curl writes after it: RespondedChunked for a
+    // non-2xx chunked Transfer-Encoding, the problem lines for a refused scheme's challenge.
+    private static void ReportReplyLine(ITransferEvents events, ReadOnlySpan<byte> line, int statusCode, string? refusedScheme)
+    {
+        events.ReportResponseHeader(line);
+        if (statusCode / 100 != 2 && IsChunkedTransferEncoding(line))
+        {
+            events.ReportInfo(RespondedChunked);
+        }
+
+        if (refusedScheme is not null)
+        {
+            ReportProblemLines(events, Encoding.Latin1.GetString(line), refusedScheme);
         }
     }
 
