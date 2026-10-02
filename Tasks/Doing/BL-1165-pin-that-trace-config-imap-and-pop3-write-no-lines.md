@@ -33,3 +33,4 @@ Measured 2026-10-02 (BL-1104), curl 8.21.0 Schannel: `Record-CurlExchange.ps1 -I
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
