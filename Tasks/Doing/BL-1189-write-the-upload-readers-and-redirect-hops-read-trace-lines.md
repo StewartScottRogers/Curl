@@ -31,3 +31,4 @@ Curl writes curl 8.21.0's `[READ]` lines for an upload body's readers and for ea
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
