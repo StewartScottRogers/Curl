@@ -439,6 +439,16 @@ internal static class CurlComposition
         options.TraceComponents.Contains("read") || options.TraceComponents.Contains("all");
 
     /// <summary>
+    /// Whether curl 8.21.0's <c>[MULTI]</c> transfer engine lines are written: <c>multi</c>, <c>network</c>
+    /// or <c>all</c> is among the trace components, which <c>-vvvv</c> puts there too (measured, BL-1103
+    /// and BL-1188 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesMulti(CommandLineOptions options) =>
+        options.TraceComponents.Contains("multi") || options.TraceComponents.Contains("network") || options.TraceComponents.Contains("all");
+
+    /// <summary>
     /// Whether curl 8.21.0's <c>[WRITE]</c> client writer lines are written: <c>write</c> or <c>all</c> is
     /// among the trace components, which <c>-vvv</c> and up put there too; <c>network</c> does not turn them
     /// on (measured, BL-1103 and BL-1187 Notes).

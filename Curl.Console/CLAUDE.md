@@ -342,6 +342,10 @@ Under `--trace-config read` (or `all`, `-vvv`, `-vvvv`) the runner writes curl's
 `[READ] client_reset, clear readers` as each transfer starts, after the `--resolve` lines, and
 `ClientReaderResetTraceEvents` writes it again before a finished transfer's `left intact` or
 `shutting down connection` line (ADR-0357's BL-1159 amendment).
+Under `--trace-config multi` (or `network`, `all`, `-vvvv`) the runner writes curl's `[MULTI] [INIT]`
+lines up to `[SETUP] -> [CONNECT]` before that, and `MultiStateTraceEvents`, inside the `[READ]` and
+`[WRITE]` events, writes each later group of `[MULTI]` lines beside the transfer line curl writes it
+next to (ADR-0382, BL-1188).
 The lines are only as complete as what the
 handler and connector report (BL-242 Notes name the follow-ups).
 

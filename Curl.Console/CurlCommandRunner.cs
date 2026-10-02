@@ -2000,7 +2000,7 @@ internal sealed class CurlCommandRunner(
         }
 
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
-        TraceClientReaderReset(options, eventsBeforeConnecting);
+        TraceTransferStart(options, eventsBeforeConnecting);
         await LoadCookieFilesAsync(dispatch, options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
         await OpenAltSvcCacheAsync(options, transferUrl).ConfigureAwait(false);
         transferUrl = await SwitchToHttpsForHstsAsync(options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
@@ -2700,7 +2700,7 @@ internal sealed class CurlCommandRunner(
         RunningTransferState state = Running;
         Func<long> takeConnectionId = () => state.ConnectionId ??= nextConnectionId++;
         ITransferEvents output = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
-        ITransferEvents events = WithTraceLineEvents(options, output);
+        ITransferEvents events = WithTraceLineEvents(options, output, takeConnectionId);
         ITransferEvents recorded = options.WriteOut is null ? events : new TlsResultRecordingTransferEvents(events, state);
         state.Events = options.WriteOut is null && !options.TraceIds
             ? recorded
@@ -2711,30 +2711,43 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Wraps <paramref name="output" /> in the events that add the trace lines the transfer writes
     /// after its connect has returned: <see cref="AsyncResolveTeardownTraceEvents" /> under
-    /// <see cref="CurlComposition.TracesDns" />, <see cref="ClientReaderResetTraceEvents" /> under
+    /// <see cref="CurlComposition.TracesDns" />, <see cref="MultiStateTraceEvents" /> under
+    /// <see cref="CurlComposition.TracesMulti" />, <see cref="ClientReaderResetTraceEvents" /> under
     /// <see cref="CurlComposition.TracesRead" /> and, outermost so its <c>[WRITE] [OUT] done</c> comes before
     /// the <c>[READ]</c> line, <see cref="ClientWriterTraceEvents" /> under <see cref="CurlComposition.TracesWrite" />.
+    /// The <c>[MULTI]</c> lines sit inside the other two, which is what lets them find their place among those lines.
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="output">The transfer's own events.</param>
+    /// <param name="takeConnectionId">Gives the number of the connection the transfer opens.</param>
     /// <returns>The events the transfer reports to.</returns>
-    private static ITransferEvents WithTraceLineEvents(CommandLineOptions options, ITransferEvents output)
+    private ITransferEvents WithTraceLineEvents(CommandLineOptions options, ITransferEvents output, Func<long> takeConnectionId)
     {
         ITransferEvents teardown = CurlComposition.TracesDns(options) ? new AsyncResolveTeardownTraceEvents(output) : output;
-        ITransferEvents readers = CurlComposition.TracesRead(options) ? new ClientReaderResetTraceEvents(teardown) : teardown;
+        ITransferEvents multi = CurlComposition.TracesMulti(options) ? new MultiStateTraceEvents(teardown, timeProvider, takeConnectionId) : teardown;
+        ITransferEvents readers = CurlComposition.TracesRead(options) ? new ClientReaderResetTraceEvents(multi) : multi;
         return CurlComposition.TracesWrite(options) ? new ClientWriterTraceEvents(readers) : readers;
     }
 
     /// <summary>
-    /// Under <c>--trace-config read</c> (or <c>-vvv</c>, <c>all</c>) writes curl 8.21.0's
-    /// <see cref="ClientReaderResetTraceEvents.ResetLine" /> as the transfer starts: after the
-    /// <c>--resolve</c> entries' lines and before anything it resolves or dials, with <c>[&lt;xfer&gt;-x]</c>
-    /// under <c>--trace-ids</c> (measured, BL-1159 Notes).
+    /// Writes the trace lines curl 8.21.0 writes as the transfer starts, after the <c>--resolve</c> entries'
+    /// lines and before anything it resolves or dials, with <c>[&lt;xfer&gt;-x]</c> under <c>--trace-ids</c>:
+    /// under <c>--trace-config multi</c> (or <c>network</c>, <c>all</c>, <c>-vvvv</c>)
+    /// <see cref="MultiStateTraceEvents.StartLines" /> (BL-1188 Notes), then under <c>--trace-config read</c>
+    /// (or <c>-vvv</c>, <c>all</c>) <see cref="ClientReaderResetTraceEvents.ResetLine" /> (BL-1159 Notes).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="eventsBeforeConnecting">The transfer's events before it has a connection.</param>
-    private static void TraceClientReaderReset(CommandLineOptions options, ITransferEvents eventsBeforeConnecting)
+    private static void TraceTransferStart(CommandLineOptions options, ITransferEvents eventsBeforeConnecting)
     {
+        if (CurlComposition.TracesMulti(options))
+        {
+            foreach (string line in MultiStateTraceEvents.StartLines)
+            {
+                eventsBeforeConnecting.ReportInfo(line);
+            }
+        }
+
         if (CurlComposition.TracesRead(options))
         {
             eventsBeforeConnecting.ReportInfo(ClientReaderResetTraceEvents.ResetLine);
