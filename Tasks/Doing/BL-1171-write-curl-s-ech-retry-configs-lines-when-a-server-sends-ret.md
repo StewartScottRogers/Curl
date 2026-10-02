@@ -37,3 +37,4 @@ When a server sends `retry_configs`, `-v` writes curl 8.21.0's `ECH: retry_confi
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
