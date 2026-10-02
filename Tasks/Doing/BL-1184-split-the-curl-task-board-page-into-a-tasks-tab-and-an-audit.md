@@ -41,3 +41,4 @@ The Curl task board page has two tabs: **Tasks**, the page as it is today, and *
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
