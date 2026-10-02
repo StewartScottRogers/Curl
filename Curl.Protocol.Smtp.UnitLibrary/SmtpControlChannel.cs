@@ -16,6 +16,11 @@ namespace Curl.Protocol.Smtp;
 /// Where each command sent and each complete reply's code are logged at <c>verbose</c>
 /// (ADR-0222), a command as its sender says it may be logged.
 /// </param>
+/// <param name="dumpHeaderOutput">
+/// The <c>-D</c> stream, which gets every line read before <c>QUIT</c>, skipped or not, byte
+/// for byte with its line end, as curl 8.21.0 writes each there (BL-1134); or
+/// <see langword="null" /> without <c>-D</c>.
+/// </param>
 /// <remarks>
 /// Commands and replies are Latin-1, so every byte of a percent-decoded <c>EHLO</c> domain
 /// reaches the server unchanged, as curl sends it. As measured on curl 8.21.0 (BL-540): a
@@ -27,7 +32,11 @@ namespace Curl.Protocol.Smtp;
 /// transfer is over (BL-546).
 /// </remarks>
 internal sealed class SmtpControlChannel(
-    IConnection connection, ITransferEvents events, CancellationToken cancellationToken, IDiagnosticLog diagnosticLog)
+    IConnection connection,
+    ITransferEvents events,
+    CancellationToken cancellationToken,
+    IDiagnosticLog diagnosticLog,
+    Stream? dumpHeaderOutput = null)
 {
     private const int ReadBufferSize = 4096;
 
@@ -45,6 +54,9 @@ internal sealed class SmtpControlChannel(
 
     /// <summary>Where lines are reported: <c>events</c> until <see cref="QuitAsync" />, nowhere after.</summary>
     private ITransferEvents reporting = events;
+
+    /// <summary>Where lines are dumped: the <c>-D</c> stream until <see cref="QuitAsync" />, nowhere after.</summary>
+    private Stream? dumping = dumpHeaderOutput;
 
     /// <summary>
     /// Gets whether <see cref="QuitAsync" /> has sent <c>QUIT</c>, so a failed transfer ends
@@ -175,6 +187,7 @@ internal sealed class SmtpControlChannel(
     public async ValueTask QuitAsync()
     {
         reporting = NoTransferEvents.Instance;
+        dumping = null;
         QuitSent = true;
         await SendAsync("QUIT").ConfigureAwait(false);
         try
@@ -210,7 +223,7 @@ internal sealed class SmtpControlChannel(
     /// <summary>
     /// Reads one line up to its LF, without the LF but with any CR before it, so that the
     /// caller can tell <c>220</c> and a CR, a complete reply, from <c>220</c> alone. The line
-    /// is reported with its LF as a response header.
+    /// is reported with its LF as a response header and written to the <c>-D</c> stream.
     /// </summary>
     private async ValueTask<string?> ReadLineAsync()
     {
@@ -233,6 +246,11 @@ internal sealed class SmtpControlChannel(
                 }
 
                 reporting.ReportResponseHeader(bytes);
+                if (dumping is { } dump)
+                {
+                    await dump.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+                }
+
                 return Encoding.Latin1.GetString(bytes, 0, bytes.Length - 1);
             }
         }
