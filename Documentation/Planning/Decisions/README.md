@@ -378,6 +378,7 @@ choices do not need one.
 | [0366](ADR-0366-a-failed-resolve-writes-curls-could-not-resolve-and-dns-filter-lines.md) | A failed resolve writes curl's `Could not resolve` lines and, under `--trace-config dns`, the filter's exit 6 and async teardown lines (BL-1157) | Accepted | 2026-10-02 |
 | [0367](ADR-0367-a-completed-ech-handshake-writes-curls-ech-result-line.md) | A completed `--ech` handshake writes curl's `ECH: result:` line after `SSL connection using` (BL-1170) | Accepted | 2026-10-02 |
 | [0368](ADR-0368-trace-config-smtp-writes-curls-smtp-state-machine-lines.md) | `--trace-config smtp` (and `protocol`, `all`) writes curl 8.21.0's `[SMTP]` state machine lines from the SMTP handler; under the trace the body and its end-of-data mark are separate data events, as measured (BL-1163) | Accepted | 2026-10-02 |
+| [0369](ADR-0369-curl-does-not-write-the-httpsrr-builds-https-rr-lines.md) | Curl does not write the `--enable-httpsrr` build's `Some HTTPS RR to process` and `HTTPS-RR:` lines, and asks the HTTPS query only under `--ech true` or `hard` (BL-1173) | Accepted | 2026-10-02 |
 
 ## Template
 

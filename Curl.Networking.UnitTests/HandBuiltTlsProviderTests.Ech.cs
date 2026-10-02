@@ -194,8 +194,19 @@ public sealed partial class HandBuiltTlsProviderTests
         [new TlsClientOptions(Ech: "true"), new FakeEchConfigListLookup(null), new[] { "ECH: requested but no ECHConfig available" }],
         [new TlsClientOptions(Ech: "true"), new FakeEchConfigListLookup(EchConfigListBytes("dns.test")), new[] { "ECH: ECHConfig from HTTPS RR", "ECH: imported ECHConfigList of length 61" }],
         [new TlsClientOptions(Ech: "hard"), new FakeEchConfigListLookup([0x00, 0x05, 0xfe]), new[] { "ECH: ECHConfig from HTTPS RR", "ECH: SSL_set1_ech_config_list failed" }],
+        // Through --doh-url, measured with curl 8.21.0 and OpenSSL 4.0.0 against the recorder's DoH server (BL-1173).
+        [new TlsClientOptions(Ech: "true"), new FakeEchConfigListLookup(Convert.FromBase64String(MeasuredDnsEchConfigList)), new[] { "ECH: ECHConfig from HTTPS RR", "ECH: imported ECHConfigList of length 64" }],
+        [new TlsClientOptions(Ech: "hard"), new FakeEchConfigListLookup(Convert.FromBase64String(MeasuredDnsEchConfigList)), new[] { "ECH: ECHConfig from HTTPS RR", "ECH: imported ECHConfigList of length 64" }],
+        [new TlsClientOptions(Ech: "true"), new FakeEchConfigListLookup([0x00, 0x04, 0xfe, 0x0d, 0x00, 0x00]), new[] { "ECH: ECHConfig from HTTPS RR", "ECH: SSL_set1_ech_config_list failed" }],
+        [new TlsClientOptions(Ech: "hard"), new FakeEchConfigListLookup([0x00, 0x04, 0xfe, 0x0d, 0x00, 0x00]), new[] { "ECH: ECHConfig from HTTPS RR", "ECH: SSL_set1_ech_config_list failed" }],
+        [new TlsClientOptions(Ech: "hard"), new FakeEchConfigListLookup(null), new[] { "ECH: requested but no ECHConfig available" }],
+        [new TlsClientOptions(Ech: "grease"), new FakeEchConfigListLookup(Convert.FromBase64String(MeasuredDnsEchConfigList)), new[] { "ECH: will GREASE ClientHello" }],
         [new TlsClientOptions(Ech: "false"), null, Array.Empty<string>()],
     ];
+
+    // The ECHConfigList `openssl ech -public_name example.com` made for the BL-1173 measurement
+    // (X25519, HKDF-SHA256, AES-128-GCM): 64 bytes with its length prefix.
+    private const string MeasuredDnsEchConfigList = "AD7+DQA6kwAgACC51/Ma8uuiPkyir5tuURRmE6scOVYKdlidZZStbLY0ZgAEAAEAAQALZXhhbXBsZS5jb20AAA==";
 
     [TestMethod]
     [DynamicData(nameof(MeasuredEchLines))]

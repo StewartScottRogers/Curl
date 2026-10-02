@@ -37,10 +37,10 @@ internal sealed record EchOffer(EchConfigList? Configs, bool SendGrease, Connect
     /// <summary>The line an <c>ecl:</c> list OpenSSL cannot load writes first.</summary>
     internal const string CommandLineListFailedLine = "ECH: SSL_ECH_set1_ech_config_list failed";
 
-    /// <summary>The line a list from the host's HTTPS record writes (curl 8.21.0's source; not measured).</summary>
+    /// <summary>The line a list from the host's HTTPS record writes, then its length or <see cref="DnsListFailedLine" /> (measured through <c>--doh-url</c>, BL-1173).</summary>
     internal const string DnsListLine = "ECH: ECHConfig from HTTPS RR";
 
-    /// <summary>The line a list from the host's HTTPS record that OpenSSL cannot load writes (curl 8.21.0's source; not measured).</summary>
+    /// <summary>The line a list from the host's HTTPS record that OpenSSL cannot load writes (measured, BL-1173).</summary>
     internal const string DnsListFailedLine = "ECH: SSL_set1_ech_config_list failed";
 
     /// <summary>The line written when neither <c>ecl:</c> nor DNS gives a list.</summary>

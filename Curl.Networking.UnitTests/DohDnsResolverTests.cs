@@ -416,6 +416,22 @@ public sealed class DohDnsResolverTests
         CollectionAssert.AreEqual(expected, connector.Opened[0].Written.TakeLast(expected.Length).ToArray());
     }
 
+    // The DoH query bytes curl 8.21.0 (OpenSSL 4.0.0, ECH build) POSTed under --ech true for
+    // https://ech.example:9443/ and https://ech.example/, measured with Record-CurlExchange.ps1 -DohPort (BL-1173).
+    [TestMethod]
+    [DataRow(9443, "000001000001000000000000055F39343433065F687474707303656368076578616D706C650000410001")]
+    [DataRow(443, "00000100000100000000000003656368076578616D706C650000410001")]
+    public async Task ResolveHttpsRecordAsync_WritesTheMeasuredQueryBytes(int port, string expectedHex)
+    {
+        var connector = new FakeConnector();
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl);
+
+        _ = await resolver.ResolveHttpsRecordAsync("ech.example", port, CancellationToken.None);
+
+        var expected = Convert.FromHexString(expectedHex);
+        CollectionAssert.AreEqual(expected, connector.Opened[0].Written.TakeLast(expected.Length).ToArray());
+    }
+
     [TestMethod]
     [DataRow("127.0.0.1")]
     [DataRow("[::1]")]
