@@ -32,3 +32,4 @@ With `--retry` and `--rate` together, the `--rate` wait before the next transfer
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-02: Backlog -> Doing.
