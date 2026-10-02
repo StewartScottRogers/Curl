@@ -118,6 +118,51 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_TracingTheHappyEyeballsTimerAcrossTwoFamilies_WritesTheTimerSetAndCleared()
+    {
+        // curl -s -v --trace-config timer http://localhost:47862/, IPv4 winning (BL-1186 Notes).
+        var time = new ManualTimeProvider();
+        var dialer = new GatedTcpDialer(time);
+        var events = new RecordingTransferEvents();
+        var connector = new TcpConnector(new FakeDnsResolver(System.Net.IPAddress.IPv6Loopback, Loopback), dialer, new FakeTlsProvider(), time, happyEyeballsTimeout: TimeSpan.FromMilliseconds(200))
+        {
+            TracesHappyEyeballsTimer = true,
+        };
+
+        var connecting = connector.ConnectAsync(DualTarget(events), CancellationToken.None).AsTask();
+        time.Advance(200);
+        await dialer.WaitForDialsAsync(2);
+        dialer.Connect(IPv4Attempt, new StallingConnection());
+        await connecting;
+
+        var lines = events.Info.Where(line => line.StartsWith("  Trying ", StringComparison.Ordinal) || line.StartsWith('[')).ToList();
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "  Trying [::1]:18644...",
+                "[TIMER] [HAPPY_EYEBALLS] set for 200000ns",
+                "[TIMER] [HAPPY_EYEBALLS] gives multi timeout in 200ms",
+                "  Trying 127.0.0.1:18644...",
+                "[TIMER] [HAPPY_EYEBALLS] cleared",
+            },
+            lines);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_TracingTheHappyEyeballsTimerWhenTheDialIsRefused_WritesNoTimerLine()
+    {
+        // curl -s -v --trace-config timer http://127.0.0.1:1/ (BL-1159 and BL-1186 Notes).
+        var events = new CountingTransferEvents();
+        var dialer = new FakeTcpDialer { DialOutcome = _ => throw new SocketException((int)SocketError.ConnectionRefused) };
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider()) { TracesHappyEyeballsTimer = true };
+
+        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = events }, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsFalse(events.Calls.Any(line => line.StartsWith('[')));
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_TracingOnlyTheTcpFilter_WritesNoHappyEyeballsLine()
     {
         // curl -s -v --trace-config tcp http://127.0.0.1:48761/ (BL-1161 Notes).

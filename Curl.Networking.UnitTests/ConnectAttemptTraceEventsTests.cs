@@ -161,6 +161,51 @@ public sealed class ConnectAttemptTraceEventsTests
     }
 
     [TestMethod]
+    public void TwoFamiliesRacingUnderNetwork_WritesTheTimerLinesAmongTheFilterLines()
+    {
+        // curl -s -v --trace-config network http://localhost:47863/, IPv4 winning (BL-1186 Notes);
+        // the [TIMER] ... expires in line is the multi's, not this filter's.
+        var inner = new CountingTransferEvents();
+        var events = new ConnectAttemptTraceEvents(inner, "localhost", tracesHappyEyeballs: true, tracesTcp: false, tracesTimer: true);
+
+        events.RaceStarting(TimeSpan.FromMilliseconds(200));
+        events.ReportInfo("  Trying [::1]:48763...");
+        events.SecondFamilyDue();
+        events.ReportInfo("  Trying 127.0.0.1:48763...");
+        events.AttemptConnected(IPv4);
+
+        CollectionAssert.IsSubsetOf(
+            new[]
+            {
+                "[HAPPY-EYEBALLS] next HAPPY_EYEBALLS timeout in 200ms",
+                "[TIMER] [HAPPY_EYEBALLS] set for 200000ns",
+                "[TIMER] [HAPPY_EYEBALLS] gives multi timeout in 200ms",
+                "[HAPPY-EYEBALLS] connect attempt #1 successful",
+                "[TIMER] [HAPPY_EYEBALLS] cleared",
+                "[HAPPY-EYEBALLS] Connected to localhost (127.0.0.1) port 48763",
+            },
+            inner.Calls);
+        var timeoutAt = inner.Calls.IndexOf("[HAPPY-EYEBALLS] next HAPPY_EYEBALLS timeout in 200ms");
+        Assert.AreEqual("[TIMER] [HAPPY_EYEBALLS] set for 200000ns", inner.Calls[timeoutAt + 1]);
+        Assert.AreEqual("[TIMER] [HAPPY_EYEBALLS] gives multi timeout in 200ms", inner.Calls[timeoutAt + 2]);
+        var connectedAt = inner.Calls.IndexOf("[HAPPY-EYEBALLS] Connected to localhost (127.0.0.1) port 48763");
+        Assert.AreEqual("[TIMER] [HAPPY_EYEBALLS] cleared", inner.Calls[connectedAt - 1]);
+    }
+
+    [TestMethod]
+    public void TimerAloneOnAPlainConnect_WritesOnlyCleared()
+    {
+        // curl -s -v --trace-config timer http://127.0.0.1:47861/ (BL-1186 Notes).
+        var inner = new CountingTransferEvents();
+        var events = new ConnectAttemptTraceEvents(inner, "127.0.0.1", tracesHappyEyeballs: false, tracesTcp: false, tracesTimer: true);
+
+        events.ReportInfo("  Trying 127.0.0.1:48763...");
+        events.AttemptConnected(IPv4);
+
+        CollectionAssert.AreEqual(new[] { "  Trying 127.0.0.1:48763...", "[TIMER] [HAPPY_EYEBALLS] cleared" }, inner.Calls);
+    }
+
+    [TestMethod]
     public void EveryOtherReport_IsPassedOnUnchanged()
     {
         var inner = new CountingTransferEvents();

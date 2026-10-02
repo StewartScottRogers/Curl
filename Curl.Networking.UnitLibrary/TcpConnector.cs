@@ -249,6 +249,13 @@ public sealed partial class TcpConnector(
     public bool TracesTcpFilter { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a direct connect writes the <c>[TIMER] [HAPPY_EYEBALLS]</c>
+    /// lines curl 8.21.0 writes as it sets and clears its second-family timer under
+    /// <c>--trace-config timer</c>, <c>network</c> or <c>all</c> (<see cref="ConnectAttemptTraceEvents" />, BL-1186).
+    /// </summary>
+    public bool TracesHappyEyeballsTimer { get; init; }
+
+    /// <summary>
     /// The line curl 8.21.0's setup filter writes, under <see cref="TracesSetupFilter" />, as it adds
     /// the PROXY protocol filter once the socket connected, before <c>Established connection</c>.
     /// </summary>
@@ -602,10 +609,11 @@ public sealed partial class TcpConnector(
         return new ConnectDestination(alternative.Host, alternative.Port, IsMapped: true, ParseError: null);
     }
 
-    // Under TracesSetupFilter, TracesDnsFilter, TracesHappyEyeballsFilter and TracesTcpFilter a
-    // direct connect reports through SetupFilterTraceEvents over DnsFilterTraceEvents over
-    // ConnectAttemptTraceEvents, which write curl's [SETUP], [DNS], [HAPPY-EYEBALLS] and [TCP] lines
-    // in curl's order around its own (BL-1102, BL-1103, BL-1161), the last also given back for the
+    // Under TracesSetupFilter, TracesDnsFilter, TracesHappyEyeballsFilter, TracesTcpFilter and
+    // TracesHappyEyeballsTimer a direct connect reports through SetupFilterTraceEvents over
+    // DnsFilterTraceEvents over ConnectAttemptTraceEvents, which write curl's [SETUP], [DNS],
+    // [HAPPY-EYEBALLS], [TCP] and [TIMER] lines in curl's order around its own (BL-1102, BL-1103,
+    // BL-1161, BL-1186), the last also given back for the
     // race to tell; otherwise the target is as given.
     private (ConnectTarget Target, ConnectAttemptTraceEvents? Trace) TracingConnectionFilters(ConnectTarget target, ConnectDestination destination)
     {
@@ -619,7 +627,9 @@ public sealed partial class TcpConnector(
     }
 
     private ConnectAttemptTraceEvents? ConnectAttemptTraceOf(ITransferEvents events, string host) =>
-        TracesHappyEyeballsFilter || TracesTcpFilter ? new ConnectAttemptTraceEvents(events, host, TracesHappyEyeballsFilter, TracesTcpFilter) : null;
+        TracesHappyEyeballsFilter || TracesTcpFilter || TracesHappyEyeballsTimer
+            ? new ConnectAttemptTraceEvents(events, host, TracesHappyEyeballsFilter, TracesTcpFilter, TracesHappyEyeballsTimer)
+            : null;
 
     // The [SETUP] filter's events over the [DNS] filter's over the given ones, each when traced; the
     // setup filter's first line is written before the DNS filter's.

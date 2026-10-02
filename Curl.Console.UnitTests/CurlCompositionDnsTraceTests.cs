@@ -211,8 +211,46 @@ public sealed class CurlCompositionDnsTraceTests
             lines);
     }
 
+    [TestMethod]
+    [DataRow("-v", "--trace-config", "timer")]
+    [DataRow("-v", "--trace-config", "network")]
+    [DataRow("-v", "--trace-config", "all")]
+    [DataRow("-vvvv")]
+    public async Task Connect_WithTheTimerComponent_WritesTheHappyEyeballsTimerClearedLine(params string[] arguments)
+    {
+        // curl -s -v --trace-config timer http://127.0.0.1:P/ (BL-1186 Notes): cleared once connected.
+        List<string> lines = await ConnectAsync(arguments);
+
+        Assert.AreEqual(1, lines.Count(line => line == "[TIMER] [HAPPY_EYEBALLS] cleared"));
+        Assert.IsGreaterThan(lines.IndexOf("[TIMER] [HAPPY_EYEBALLS] cleared"), lines.IndexOf("Established connection"));
+    }
+
+    [TestMethod]
+    public async Task Connect_UnderTraceConfigTimer_WritesClearedBetweenTryingAndEstablished()
+    {
+        // curl -s -v --trace-config timer http://127.0.0.1:P/ (BL-1186 Notes).
+        List<string> lines = await ConnectAsync("-v", "--trace-config", "timer");
+
+        CollectionAssert.AreEqual(
+            new[] { "  Trying 127.0.0.1:47110...", "[TIMER] [HAPPY_EYEBALLS] cleared", "Established connection" },
+            lines);
+    }
+
+    [TestMethod]
+    [DataRow("-v")]
+    [DataRow("-vvv")]
+    [DataRow("-v", "--trace-config", "happy-eyeballs,tcp,dns,setup")]
+    [DataRow("-v", "--trace-config", "timer,-timer")]
+    [DataRow("-v", "--trace-config", "all,-all")]
+    public async Task Connect_WithoutTheTimerComponent_WritesNoTimerLine(params string[] arguments)
+    {
+        List<string> lines = await ConnectAsync(arguments);
+
+        Assert.IsFalse(lines.Any(line => line.StartsWith("[TIMER]", StringComparison.Ordinal)));
+    }
+
     private static string[] WithoutConnectAttemptLines(List<string> lines) =>
-        [.. lines.Where(line => !line.StartsWith("[HAPPY-EYEBALLS]", StringComparison.Ordinal) && !line.StartsWith("[TCP]", StringComparison.Ordinal))];
+        [.. lines.Where(line => !line.StartsWith("[HAPPY-EYEBALLS]", StringComparison.Ordinal) && !line.StartsWith("[TCP]", StringComparison.Ordinal) && !line.StartsWith("[TIMER]", StringComparison.Ordinal))];
 
     private static async Task<List<string>> ConnectAsync(params string[] arguments)
     {

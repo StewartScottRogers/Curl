@@ -8,7 +8,9 @@ namespace Curl.Networking;
 /// <summary>
 /// Passes every event on to <paramref name="inner" /> and adds the <c>[HAPPY-EYEBALLS]</c> and
 /// <c>[TCP]</c> lines curl 8.21.0 writes around its connect attempts under <c>--trace-config
-/// happy-eyeballs</c>, <c>tcp</c>, <c>network</c> or <c>all</c> (measured, BL-1161 Notes). It sits below
+/// happy-eyeballs</c>, <c>tcp</c>, <c>network</c> or <c>all</c> (measured, BL-1161 Notes), and the
+/// <c>[TIMER] [HAPPY_EYEBALLS]</c> lines of its second-family timer under <c>timer</c>, <c>network</c> or
+/// <c>all</c> (measured, BL-1186 Notes). It sits below
 /// the <c>[DNS]</c> and <c>[SETUP]</c> filters' events, so the lines it writes as a <c>Trying</c> line
 /// passes through come before theirs; the <see cref="AddressFamilyRace" /> tells it the rest
 /// (<see cref="RaceStarting" />, <see cref="SecondFamilyDue" />, <see cref="AttemptFailing" />,
@@ -25,7 +27,8 @@ namespace Curl.Networking;
 /// <param name="host">The host the connection dials, after any <c>--connect-to</c> mapping.</param>
 /// <param name="tracesHappyEyeballs">Whether the <c>[HAPPY-EYEBALLS]</c> lines are written.</param>
 /// <param name="tracesTcp">Whether the <c>[TCP]</c> lines are written.</param>
-internal sealed class ConnectAttemptTraceEvents(ITransferEvents inner, string host, bool tracesHappyEyeballs, bool tracesTcp) : ITransferEvents
+/// <param name="tracesTimer">Whether the <c>[TIMER] [HAPPY_EYEBALLS]</c> lines are written.</param>
+internal sealed class ConnectAttemptTraceEvents(ITransferEvents inner, string host, bool tracesHappyEyeballs, bool tracesTcp, bool tracesTimer = false) : ITransferEvents
 {
     /// <summary>The descriptor the first socket of a connect is written with.</summary>
     public const int FirstSocketDescriptor = 3;
@@ -104,6 +107,7 @@ internal sealed class ConnectAttemptTraceEvents(ITransferEvents inner, string ho
 
         WriteHappyEyeballs($"connect attempt #{winner.Number} successful");
         CloseLosers(winner);
+        WriteTimer("cleared");
         WriteHappyEyeballs($"Connected to {host} ({remoteEndPoint.Address}) port {remoteEndPoint.Port}");
     }
 
@@ -182,6 +186,8 @@ internal sealed class ConnectAttemptTraceEvents(ITransferEvents inner, string ho
         if (_attempts == 0 && _secondFamilyTimeout is { } timeout)
         {
             WriteHappyEyeballs($"next HAPPY_EYEBALLS timeout in {(long)timeout.TotalMilliseconds}ms");
+            WriteTimer($"set for {(long)timeout.TotalMicroseconds}ns");
+            WriteTimer($"gives multi timeout in {(long)timeout.TotalMilliseconds}ms");
         }
 
         _attempts++;
@@ -207,6 +213,15 @@ internal sealed class ConnectAttemptTraceEvents(ITransferEvents inner, string ho
         if (tracesHappyEyeballs)
         {
             inner.ReportInfo($"[HAPPY-EYEBALLS] {text}");
+        }
+    }
+
+    // curl names its timers in microseconds followed by "ns" (measured, BL-1186 Notes).
+    private void WriteTimer(string text)
+    {
+        if (tracesTimer)
+        {
+            inner.ReportInfo($"[TIMER] [HAPPY_EYEBALLS] {text}");
         }
     }
 
