@@ -117,6 +117,10 @@ public sealed partial class TcpConnector(
 {
     private const string AnyHost = "*";
 
+    // curl 8.21.0 dials an HTTP proxy that keeps closing on a 407 at most five more times, then
+    // fails with "Could not connect to server" (measured with stale Digest challenges, BL-864 Notes).
+    private const int MaxProxyReconnects = 5;
+
     /// <summary>
     /// Gets curl's <c>DEFAULT_CONNECT_TIMEOUT</c>, 300 seconds: the connect timeout when no
     /// <c>--connect-timeout</c>, or 0, was given.
@@ -813,6 +817,7 @@ public sealed partial class TcpConnector(
         var nameResolved = timeProvider.GetTimestamp();
         var proxyAuthorization = await CreateProxyAuthorizationAsync(destination, proxy, [], cancellationToken).ConfigureAwait(false);
         var answersChallenge = false;
+        var reconnects = 0;
         while (true)
         {
             // A 407 answered on a connection the proxy closes is sent again on a new one, as
@@ -825,6 +830,11 @@ public sealed partial class TcpConnector(
             }
 
             target.Events.ReportInfo(ConnectTunnelVerboseLines.ConnectAgain);
+            if (++reconnects > MaxProxyReconnects)
+            {
+                return ConnectResult.Failed(CurlExitCode.CouldntConnect, "Could not connect to server");
+            }
+
             proxyAuthorization = redialAuthorization;
             answersChallenge = true;
         }
@@ -1102,7 +1112,7 @@ public sealed partial class TcpConnector(
         string? answer;
         try
         {
-            answer = sentAuthorization is null
+            answer = sentAuthorization is null || AnswersStaleDigest(sentAuthorization, reply)
                 ? await CreateProxyAuthorizationAsync(tunnel.Destination, tunnel.Proxy, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false)
                 : await ProxyAuthenticator.ContinueAuthorizationAsync(ProxyAuthRequestOf(tunnel.Destination, tunnel.Proxy), sentAuthorization, !sentAnswersChallenge, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false);
         }
@@ -1120,6 +1130,14 @@ public sealed partial class TcpConnector(
             ? await DiscardRejectedBodyAsync(connection, reply, answer, cancellationToken).ConfigureAwait(false)
             : (answer, false, null);
     }
+
+    /// <summary>
+    /// Decides whether <paramref name="reply" /> marks the nonce of the Digest answer
+    /// <paramref name="sentAuthorization" /> stale, so it is answered afresh with the new nonce,
+    /// as curl 8.21.0 does (BL-864 Notes).
+    /// </summary>
+    private static bool AnswersStaleDigest(string sentAuthorization, HttpProxyTunnelReply reply) =>
+        sentAuthorization.StartsWith("Digest ", StringComparison.Ordinal) && DigestStaleChallenge.IsOfferedIn(reply.ProxyAuthenticate);
 
     /// <summary>
     /// Discards the body of a reply that leaves the connection reusable, so
@@ -1167,7 +1185,7 @@ public sealed partial class TcpConnector(
             await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
             var reply = await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false);
-            ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization);
+            ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization, DigestStaleChallenge.IsOfferedIn(reply.ProxyAuthenticate));
             if (tunnel.Target.Events is IConnectReplyHeadWritingEvents headOutput && !reply.Head.IsEmpty)
             {
                 await headOutput.WriteConnectReplyHeadAsync(reply.Head, cancellationToken).ConfigureAwait(false);

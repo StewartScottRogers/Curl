@@ -44,9 +44,13 @@ internal static class ConnectTunnelVerboseLines
     /// <param name="head">The reply head, its final blank line included.</param>
     /// <param name="statusCode">The reply's status code.</param>
     /// <param name="authorization">The <c>Proxy-Authorization</c> value the CONNECT sent, or <see langword="null" />.</param>
-    internal static void ReportReplyHead(ITransferEvents events, ReadOnlySpan<byte> head, int statusCode, string? authorization)
+    /// <param name="digestNonceIsStale">
+    /// <see langword="true" /> when the reply marks the Digest nonce stale, which curl answers
+    /// again without a problem line (BL-864 Notes).
+    /// </param>
+    internal static void ReportReplyHead(ITransferEvents events, ReadOnlySpan<byte> head, int statusCode, string? authorization, bool digestNonceIsStale = false)
     {
-        var refusedScheme = statusCode == 407 ? RefusedScheme(authorization) : null;
+        var refusedScheme = statusCode == 407 ? RefusedScheme(authorization, digestNonceIsStale) : null;
         while (!head.IsEmpty)
         {
             var lineFeed = head.IndexOf((byte)'\n');
@@ -94,9 +98,19 @@ internal static class ConnectTunnelVerboseLines
 
     private static string? NamedScheme(string scheme) => scheme is "Basic" or "Digest" or "NTLM" ? scheme : null;
 
-    /// <summary>The scheme a sent value starts with when a <c>407</c> to it is given up on: Basic or Digest; else none.</summary>
-    private static string? RefusedScheme(string? authorization) =>
-        authorization is not null && SchemeOf(authorization) is "Basic" or "Digest" ? SchemeOf(authorization) : null;
+    /// <summary>
+    /// The scheme a sent value starts with when a <c>407</c> to it is given up on: Basic, or
+    /// Digest unless the <c>407</c> marks its nonce stale; else none.
+    /// </summary>
+    private static string? RefusedScheme(string? authorization, bool digestNonceIsStale) =>
+        authorization is null
+            ? null
+            : SchemeOf(authorization) switch
+            {
+                "Basic" => "Basic",
+                "Digest" when !digestNonceIsStale => "Digest",
+                _ => null,
+            };
 
     private static string SchemeOf(string authorization) => authorization.Split(' ', 2)[0];
 
