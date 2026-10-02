@@ -30,3 +30,4 @@ ADR-0284 states what the hand-built client does with ML-DSA, ed448 and brainpool
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
