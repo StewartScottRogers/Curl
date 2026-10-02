@@ -65,3 +65,4 @@ Re-record the full stderr to place them among the `-v` lines, and measure AUTH a
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
