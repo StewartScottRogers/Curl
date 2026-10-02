@@ -359,6 +359,7 @@ choices do not need one.
 | [0347](ADR-0347-a-file-transfer-is-numbered-with-the-runs-connections.md) | A file:// transfer is numbered with the run's connections, through `IConnectionNumbers` | Accepted | 2026-10-02 |
 | [0348](ADR-0348-a-refused-tunnel-fails-with-the-first-sspi-negotiate-failure.md) | A refused CONNECT tunnel fails with the first SSPI Negotiate failure as its message | Accepted | 2026-10-02 |
 | [0349](ADR-0349-schannel-warns-that-tls13-cipher-lists-are-ignored.md) | The Schannel build warns that `--tls13-ciphers` and `--proxy-tls13-ciphers` are ignored, once per URL | Accepted | 2026-10-02 |
+| [0350](ADR-0350-the-openssl-builds-tls13-hello-pads-and-drops-ec-point-formats-as-measured.md) | The OpenSSL build's TLS 1.3 hello pads and drops `ec_point_formats` as measured | Accepted | 2026-10-02 |
 
 ## Template
 

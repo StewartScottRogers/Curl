@@ -762,12 +762,16 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             KeyShareGroups = Profile.KeyShareGroups,
             SignatureAlgorithms = ClientHelloProfileMapping.CheckableSignatureAlgorithms(Profile),
             CertificateCompressionAlgorithms = Profile.CertificateCompressionAlgorithms,
-            ExtensionOrder = WithEncryptedClientHello(WithEarlyData(ClientHelloProfileMapping.ExtensionOrder(Profile, RequestOcspStatus))),
+            ExtensionOrder = WithEncryptedClientHello(WithPadding(WithEarlyData(ClientHelloProfileMapping.ExtensionOrder(Profile, RequestOcspStatus)))),
             FixedExtensions = ClientHelloProfileMapping.FixedExtensions(Profile),
             SendLegacySessionId = true,
             EncryptedClientHelloConfigs = EchConfigs,
             SendEncryptedClientHelloGrease = SendEchGrease,
         };
+
+        // padding follows the measured extensions and early_data, where OpenSSL sends it (BL-1048).
+        private IReadOnlyList<TlsExtensionType> WithPadding(IReadOnlyList<TlsExtensionType> order) =>
+            Profile.PadsTcpHello ? [.. order, TlsExtensionType.Padding] : order;
 
         // early_data follows the profile's measured extensions, where OpenSSL sends it (BL-1105).
         private IReadOnlyList<TlsExtensionType> WithEarlyData(IReadOnlyList<TlsExtensionType> order) =>

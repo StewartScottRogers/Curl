@@ -122,7 +122,10 @@ public sealed record ClientHelloProfile(
         ["h2", "http/1.1"],
         [0, 1, 2],
         [1],
-        [0x0001, 0x0003]);
+        [0x0001, 0x0003])
+    {
+        PadsTcpHello = true,
+    };
 
     /// <summary>
     /// The hello of curl.se's official Windows build (curl 8.18.0, LibreSSL 4.2.1): used
@@ -161,6 +164,14 @@ public sealed record ClientHelloProfile(
         get => field ?? ExtensionOrder;
         init;
     }
+
+    /// <summary>
+    /// Gets a value indicating whether the build ends its TLS 1.3 ClientHello over TCP with
+    /// <c>padding</c>, bringing a hello of 256 to 511 bytes up to 512 (OpenSSL's
+    /// <c>tls_construct_ctos_padding</c>, measured under <c>--curves X25519</c>, BL-1048).
+    /// QUIC's hello, built from <see cref="ExtensionOrder" />, is not padded.
+    /// </summary>
+    public bool PadsTcpHello { get; init; }
 
     /// <summary>Builds the profile's ClientHello for one connection.</summary>
     /// <param name="hostName">The host name sent in <c>server_name</c>.</param>

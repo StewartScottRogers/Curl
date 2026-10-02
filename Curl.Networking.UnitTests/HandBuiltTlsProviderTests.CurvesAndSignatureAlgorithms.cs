@@ -50,7 +50,31 @@ public sealed partial class HandBuiltTlsProviderTests
         CollectionAssert.AreEqual(
             ClientHelloProfileMapping.CheckableSignatureAlgorithms(profile).ToArray(),
             SignatureAlgorithmsExtension.Decode(ExtensionData(hello, TlsExtensionType.SignatureAlgorithms)).Value.ToArray());
-        CollectionAssert.AreEqual(profile.ExtensionOrder.ToArray(), ExtensionTypes(hello));
+        CollectionAssert.AreEqual(
+            profile.ExtensionOrder.Where(type => type != TlsExtensionType.EcPointFormats).ToArray(),
+            ExtensionTypes(hello).Where(type => type is not TlsExtensionType.EcPointFormats and not TlsExtensionType.Padding).ToArray());
+    }
+
+    // The OpenSSL build's hello under --curves, as measured (BL-709 Notes, Ubuntu curl 8.18.0,
+    // OpenSSL 3.5.5): ec_point_formats only while an EC group remains, padding last when the
+    // hello is 256 to 511 bytes (OpenSSL's tls_construct_ctos_padding), and brainpool TLS 1.2
+    // groups kept beside TLS 1.3 (BL-1048).
+    [TestMethod]
+    [DataRow("X25519", new ushort[] { 0xff01, 0x0000, 0x000b, 0x000a, 0x0010, 0x0016, 0x0017, 0x0031, 0x000d, 0x002b, 0x002d, 0x0033, 0x001b, 0x0015 }, new ushort[] { 0x001d })]
+    [DataRow("P-384:X25519", new ushort[] { 0xff01, 0x0000, 0x000b, 0x000a, 0x0010, 0x0016, 0x0017, 0x0031, 0x000d, 0x002b, 0x002d, 0x0033, 0x001b, 0x0015 }, new ushort[] { 0x0018, 0x001d })]
+    [DataRow("X25519MLKEM768", new ushort[] { 0xff01, 0x0000, 0x000a, 0x0010, 0x0016, 0x0017, 0x0031, 0x000d, 0x002b, 0x002d, 0x0033, 0x001b }, new ushort[] { 0x11ec })]
+    [DataRow("brainpoolP256r1:X25519", new ushort[] { 0xff01, 0x0000, 0x000b, 0x000a, 0x0010, 0x0016, 0x0017, 0x0031, 0x000d, 0x002b, 0x002d, 0x0033, 0x001b, 0x0015 }, new ushort[] { 0x001a, 0x001d })]
+    public async Task AuthenticateAsClientAsync_WithCurvesInTheOpenSslBuild_SendsTheMeasuredExtensionsAndGroups(string curves, ushort[] extensionTypes, ushort[] groups)
+    {
+        var record = await CaptureClientHelloAsync(new TlsClientOptions(Curves: curves), OpenSslBuild, ProfileHost, Http11);
+        var hello = DecodeClientHello(record);
+
+        CollectionAssert.AreEqual(extensionTypes, ExtensionTypes(hello).Select(type => (ushort)type).ToArray());
+        CollectionAssert.AreEqual(groups, SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray());
+        if (extensionTypes[^1] == (ushort)TlsExtensionType.Padding)
+        {
+            Assert.AreEqual(512, hello.Encode().Length);
+        }
     }
 
     [TestMethod]

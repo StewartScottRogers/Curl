@@ -44,9 +44,7 @@ internal static class ClientHelloProfileMapping
     /// <returns>The extensions, for <see cref="Tls12ClientSettings.FixedExtensions" />.</returns>
     public static IReadOnlyList<TlsExtension> Tls12FixedExtensions(ClientHelloProfile profile)
     {
-        TlsExtension[] candidates = Tls12SupportedGroups(profile).Count > 0
-            ? [EcPointFormatsExtension.Encode(profile.EcPointFormats), OcspStatusRequest]
-            : [OcspStatusRequest];
+        TlsExtension[] candidates = [.. EcPointFormats(profile), OcspStatusRequest];
         return [.. candidates.Where(extension => profile.Tls12ExtensionOrder.Contains(extension.Type))];
     }
 
@@ -67,9 +65,10 @@ internal static class ClientHelloProfileMapping
 
     /// <summary>
     /// Returns the profile's extensions the TLS 1.3 handshake does not build, as the profile
-    /// sends them: <c>renegotiation_info</c>, <c>ec_point_formats</c>, <c>session_ticket</c>,
-    /// <c>encrypt_then_mac</c>, <c>extended_master_secret</c>, <c>status_request</c> and
-    /// <c>psk_key_exchange_modes</c>, each only when the profile sends it.
+    /// sends them: <c>renegotiation_info</c>, <c>ec_point_formats</c> (only while a group TLS
+    /// 1.2 agrees ECDHE on remains: OpenSSL drops it under <c>--curves X25519MLKEM768</c>,
+    /// BL-1048), <c>session_ticket</c>, <c>encrypt_then_mac</c>, <c>extended_master_secret</c>,
+    /// <c>status_request</c> and <c>psk_key_exchange_modes</c>, each only when the profile sends it.
     /// </summary>
     /// <param name="profile">The platform curl's profile.</param>
     /// <returns>The extensions, for <see cref="Tls13ClientSettings.FixedExtensions" />.</returns>
@@ -78,7 +77,7 @@ internal static class ClientHelloProfileMapping
         TlsExtension[] candidates =
         [
             RenegotiationInfoExtension.Encode([]),
-            EcPointFormatsExtension.Encode(profile.EcPointFormats),
+            .. EcPointFormats(profile),
             SessionTicketExtension.Encode([]),
             EncryptThenMacExtension.Encode(),
             ExtendedMasterSecretExtension.Encode(),
@@ -87,6 +86,10 @@ internal static class ClientHelloProfileMapping
         ];
         return [.. candidates.Where(extension => profile.ExtensionOrder.Contains(extension.Type))];
     }
+
+    // The profile's ec_point_formats, or none when no group TLS 1.2 agrees ECDHE on remains.
+    private static TlsExtension[] EcPointFormats(ClientHelloProfile profile) =>
+        Tls12SupportedGroups(profile).Count > 0 ? [EcPointFormatsExtension.Encode(profile.EcPointFormats)] : [];
 
     /// <summary>
     /// Returns the profile's signature schemes that a TLS 1.3 CertificateVerify or a TLS 1.2
