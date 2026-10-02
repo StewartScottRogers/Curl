@@ -8,7 +8,7 @@ depends-on: [BL-710]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1105 — Send --tls-earlydata as 0-RTT early data on a resumed --ssl-sessions session
 
@@ -25,11 +25,11 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A `TlsClientRoutingTests` row sends `--tls-earlydata` to the hand-built client.
-- [ ] A test resumes a session through `HandBuiltTlsProvider` (second handshake offers the ticket the first received) and pins the early-data request bytes and the `-v` lines.
-- [ ] Without a resumable session, or when the server rejects early data, the request is sent after the handshake and the transfer still succeeds, pinned by a test.
-- [ ] `--ai-help` describes `--tls-earlydata` as honoured.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for each library changed.
+- [x] A `TlsClientRoutingTests` row sends `--tls-earlydata` to the hand-built client.
+- [x] A test resumes a session through `HandBuiltTlsProvider` (second handshake offers the ticket the first received) and pins the early-data request bytes and the `-v` lines.
+- [x] Without a resumable session, or when the server rejects early data, the request is sent after the handshake and the transfer still succeeds, pinned by a test.
+- [x] `--ai-help` describes `--tls-earlydata` as honoured.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for each library changed.
 
 ## Notes
 
@@ -55,6 +55,21 @@ completed:
     (Curl.Output, still a fixed 0).
   - Touches widened: Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Curl.Protocol.Abstractions.UnitLibrary,
     Curl.Protocol.Abstractions.UnitTests (no task in Doing on origin/work/dark-factory named them).
+- 2026-10-01 (lane 6): restored lane 1's work from its stash entry by diff (no stash command), then:
+  - Fixed `ClientSettings.ToTls13` not passing `OfferEarlyData` on, so the deferred hello offered no early_data.
+  - Added `HandBuiltTlsProviderTests.EarlyData` (accepted, rejected, partly over `max_early_data_size`, no
+    session, a session allowing none, without ALPN, of another ALPN, a TLS 1.2 ceiling, `--tls-earlydata` off,
+    a failing deferred handshake) and `EarlyDataTlsConnectionTests`; and
+    `CurlAiHelpTextTests.TryGetMarkdown_TlsEarlyData_DescribesItAsHonoured` (the `--ai-help` section already
+    described it as supported, since the option parses; the test pins it).
+  - Complexity: the early-data row moved into `TlsClientRouting.ControlsSessionsEarlyDataOrTheBeastSplit`, and
+    `EarlyDataProtocolOf` split out of `EarlyDataApplicationProtocol`; its TLS 1.3 version check dropped, as
+    `TlsSessionCache.Take` returns only TLS 1.3 sessions.
+  - No OpenSSL-build curl was available to `Record-CurlExchange.ps1`; the `-v` lines are pinned from the
+    curl-8_21_0 source reading above (ADR-0337 says so).
+  - ADR-0337 records the design. Follow-up filed: BL-1150 (`-w tls_earlydata` still prints 0).
+  - Coverage: Curl.Networking, Curl.Tls, Curl.Protocol.Abstractions, Curl.Protocol.Http and Curl.Cli are all
+    100% line and branch with no failing member.
 
 ## Log
 
@@ -62,3 +77,4 @@ completed:
 - 2026-10-01: Backlog -> Doing.
 - 2026-10-01: Doing -> Backlog. Run ended on its budget mid-implementation; code is in the shift stash, remaining steps under Notes
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. --tls-earlydata sends the first request as 0-RTT early data on a resumed --ssl-sessions session through the hand-built TLS client
