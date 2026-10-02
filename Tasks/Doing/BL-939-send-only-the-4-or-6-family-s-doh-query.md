@@ -33,3 +33,4 @@ Under `-4` `DohDnsResolver` POSTs only the A query, and under `-6` only the AAAA
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
