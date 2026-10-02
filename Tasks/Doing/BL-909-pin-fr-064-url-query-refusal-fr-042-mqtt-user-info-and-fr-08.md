@@ -34,3 +34,4 @@ Three requirement rows that BL-665 found built but untested, or with stale wordi
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
