@@ -235,6 +235,20 @@ public sealed partial class TcpConnector(
     public bool TracesHaproxyFilter { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a direct connect writes the <c>[HAPPY-EYEBALLS]</c> lines curl
+    /// 8.21.0 writes around its connect attempts under <c>--trace-config happy-eyeballs</c>,
+    /// <c>network</c> or <c>all</c> (<see cref="ConnectAttemptTraceEvents" />, BL-1161).
+    /// </summary>
+    public bool TracesHappyEyeballsFilter { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a direct connect writes the <c>[TCP]</c> lines curl 8.21.0
+    /// writes for its sockets as they open, connect or fail under <c>--trace-config tcp</c>,
+    /// <c>network</c> or <c>all</c> (<see cref="ConnectAttemptTraceEvents" />, BL-1161).
+    /// </summary>
+    public bool TracesTcpFilter { get; init; }
+
+    /// <summary>
     /// The line curl 8.21.0's setup filter writes, under <see cref="TracesSetupFilter" />, as it adds
     /// the PROXY protocol filter once the socket connected, before <c>Established connection</c>.
     /// </summary>
@@ -549,7 +563,7 @@ public sealed partial class TcpConnector(
             {
                 ({ } unixSocketAddress, _) => await ConnectOverUnixSocketAsync(target, unixSocketAddress, started, limited.Token).ConfigureAwait(false),
                 (null, { } proxy) => await ConnectThroughProxyAsync(target, destination, proxy, started, limited.Token).ConfigureAwait(false),
-                _ => await ConnectDirectlyAsync(TracingConnectionFilters(target, destination), destination, started, limited.Token).ConfigureAwait(false),
+                _ => await ConnectDirectlyAsync(target, destination, started, limited.Token).ConfigureAwait(false),
             };
         }
         catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= connectLimit)
@@ -588,23 +602,36 @@ public sealed partial class TcpConnector(
         return new ConnectDestination(alternative.Host, alternative.Port, IsMapped: true, ParseError: null);
     }
 
-    // Under TracesSetupFilter and TracesDnsFilter a direct connect reports through
-    // SetupFilterTraceEvents over DnsFilterTraceEvents, which write curl's [SETUP] and [DNS] filter
-    // lines in curl's order around its own (BL-1102, BL-1103); otherwise the target is as given.
-    private ConnectTarget TracingConnectionFilters(ConnectTarget target, ConnectDestination destination)
+    // Under TracesSetupFilter, TracesDnsFilter, TracesHappyEyeballsFilter and TracesTcpFilter a
+    // direct connect reports through SetupFilterTraceEvents over DnsFilterTraceEvents over
+    // ConnectAttemptTraceEvents, which write curl's [SETUP], [DNS], [HAPPY-EYEBALLS] and [TCP] lines
+    // in curl's order around its own (BL-1102, BL-1103, BL-1161), the last also given back for the
+    // race to tell; otherwise the target is as given.
+    private (ConnectTarget Target, ConnectAttemptTraceEvents? Trace) TracingConnectionFilters(ConnectTarget target, ConnectDestination destination)
     {
-        if (!TracesSetupFilter && !TracesDnsFilter)
+        var trace = ConnectAttemptTraceOf(target.Events, destination.Host);
+        if (!TracesSetupFilter && !TracesDnsFilter && trace is null)
         {
-            return target;
+            return (target, null);
         }
 
+        return (target with { Events = SetupAndDnsFilterEvents(trace ?? target.Events, destination) }, trace);
+    }
+
+    private ConnectAttemptTraceEvents? ConnectAttemptTraceOf(ITransferEvents events, string host) =>
+        TracesHappyEyeballsFilter || TracesTcpFilter ? new ConnectAttemptTraceEvents(events, host, TracesHappyEyeballsFilter, TracesTcpFilter) : null;
+
+    // The [SETUP] filter's events over the [DNS] filter's over the given ones, each when traced; the
+    // setup filter's first line is written before the DNS filter's.
+    private ITransferEvents SetupAndDnsFilterEvents(ITransferEvents events, ConnectDestination destination)
+    {
         if (TracesSetupFilter)
         {
-            target.Events.ReportInfo(SetupFilterTraceEvents.AddedLine);
+            events.ReportInfo(SetupFilterTraceEvents.AddedLine);
         }
 
-        ITransferEvents events = TracesDnsFilter ? DnsFilterTraceEvents.Start(target.Events, destination.Host, destination.Port, addressFamily) : target.Events;
-        return target with { Events = TracesSetupFilter ? new SetupFilterTraceEvents(events, destination.Host, destination.Port) : events };
+        events = TracesDnsFilter ? DnsFilterTraceEvents.Start(events, destination.Host, destination.Port, addressFamily) : events;
+        return TracesSetupFilter ? new SetupFilterTraceEvents(events, destination.Host, destination.Port) : events;
     }
 
     private static TimeSpan ConnectTimeoutOrDefault(TimeSpan? connectTimeout) =>
@@ -627,6 +654,7 @@ public sealed partial class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
+        (target, var trace) = TracingConnectionFilters(target, destination);
         var ((addresses, failure), fromCache) = await ResolveNotingCacheAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
@@ -634,7 +662,7 @@ public sealed partial class TcpConnector(
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var (dialed, lastDialError, lastBindFailure) = await DialFirstReachableAsync(addresses, destination.Port, destination.Host, target, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError, lastBindFailure) = await DialFirstReachableAsync(addresses, destination.Port, destination.Host, target, cancellationToken, trace).ConfigureAwait(false);
         if (dialed is null)
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
@@ -1407,9 +1435,9 @@ public sealed partial class TcpConnector(
 
         if (!target.UseTls)
         {
-            return WithHaproxyFilterRemoved(
+            return WithSetupFiltersRemoved(
                 Opened(dialed, target.Events, dialed.Connection, timings, proxyConnectResponseCode, peerCertificates: null, applicationProtocol: null),
-                target.Events);
+                dialed, target.Events);
         }
 
         var secured = await AuthenticateTargetAsync(dialed.Connection, target, cancellationToken).ConfigureAwait(false);
@@ -1421,7 +1449,7 @@ public sealed partial class TcpConnector(
         // A provider that measured its handshake is trusted for the moment it completed; for
         // one that did not, the moment it returned is that moment.
         var handshakeCompleted = secured.Timings?.TlsHandshakeCompleted ?? timeProvider.GetTimestamp();
-        return WithHaproxyFilterRemoved(
+        return WithSetupFiltersRemoved(
             Opened(
                 dialed,
                 target.Events,
@@ -1430,6 +1458,7 @@ public sealed partial class TcpConnector(
                 proxyConnectResponseCode,
                 secured.PeerCertificates,
                 secured.ApplicationProtocol),
+            dialed,
             target.Events);
     }
 
@@ -1446,13 +1475,21 @@ public sealed partial class TcpConnector(
     }
 
     // Under TracesHaproxyFilter a connection that wrote the PROXY line reports curl 8.21.0's
-    // [HAPROXY] filter removal after Established connection and any [SETUP] removal (BL-1160 Notes).
-    private ConnectResult WithHaproxyFilterRemoved(ConnectResult opened, ITransferEvents events)
+    // [HAPROXY] filter removal after Established connection and any [SETUP] removal (BL-1160 Notes),
+    // and a connection dialled under TracesHappyEyeballsFilter the [HAPPY-EYEBALLS] filter's after it
+    // (BL-1161 Notes).
+    private ConnectResult WithSetupFiltersRemoved(ConnectResult opened, DialedSocket dialed, ITransferEvents events)
     {
         if (haproxyProtocol is not null && TracesHaproxyFilter)
         {
             events.ReportInfo("[HAPROXY] removing connected setup filter");
             events.ReportInfo("[HAPROXY] destroy");
+        }
+
+        if (dialed.TracesHappyEyeballsFilter)
+        {
+            events.ReportInfo(ConnectAttemptTraceEvents.RemovingLine);
+            events.ReportInfo(ConnectAttemptTraceEvents.DestroyLine);
         }
 
         return opened;
@@ -1603,13 +1640,14 @@ public sealed partial class TcpConnector(
         int port,
         string hostName,
         ConnectTarget target,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ConnectAttemptTraceEvents? trace = null)
     {
-        var race = new AddressFamilyRace(BindingDialer(target.Events), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog));
+        var race = new AddressFamilyRace(BindingDialer(target.Events), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog), trace);
         var (dialed, remoteEndPoint, lastError, lastBindFailure) = await race.DialAsync(addresses, port, cancellationToken).ConfigureAwait(false);
         return dialed is null
             ? (null, lastError, lastBindFailure)
-            : (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint), SocketError.Success, null);
+            : (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint) { TracesHappyEyeballsFilter = trace?.TracesHappyEyeballs == true }, SocketError.Success, null);
     }
 
     /// <summary>
@@ -1682,6 +1720,12 @@ public sealed partial class TcpConnector(
         /// line (BL-975); <see langword="null" /> when the socket went to the target itself or a proxy.
         /// </summary>
         public ConnectDestination? MappedDestination { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether the socket was dialled with the <c>[HAPPY-EYEBALLS]</c>
+        /// lines written, so its filter's removal is written once the connection is established (BL-1161).
+        /// </summary>
+        public bool TracesHappyEyeballsFilter { get; init; }
     }
 
     /// <summary>

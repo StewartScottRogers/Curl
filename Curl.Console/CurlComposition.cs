@@ -383,6 +383,25 @@ internal static class CurlComposition
         options.TraceComponents.Contains("haproxy") || options.TraceComponents.Contains("proxy") || options.TraceComponents.Contains("all");
 
     /// <summary>
+    /// Whether curl 8.21.0's <c>[HAPPY-EYEBALLS]</c> lines are written: <c>happy-eyeballs</c>,
+    /// <c>network</c> or <c>all</c> is among the trace components, which <c>-vvvv</c> puts there too
+    /// (measured, BL-1161 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesHappyEyeballs(CommandLineOptions options) =>
+        options.TraceComponents.Contains("happy-eyeballs") || options.TraceComponents.Contains("network") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[TCP]</c> lines are written: <c>tcp</c>, <c>network</c> or <c>all</c> is
+    /// among the trace components, which <c>-vvvv</c> puts there too (measured, BL-1161 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesTcp(CommandLineOptions options) =>
+        options.TraceComponents.Contains("tcp") || options.TraceComponents.Contains("network") || options.TraceComponents.Contains("all");
+
+    /// <summary>
     /// Whether curl 8.21.0's <c>[READ]</c> lines are written: <c>read</c> or <c>all</c> is among the
     /// trace components, which <c>-vvv</c> and up put there too; <c>network</c> does not turn them on
     /// (measured, BL-1103 and BL-1159 Notes).
@@ -620,6 +639,8 @@ internal static class CurlComposition
             TracesDnsFilter = TracesDns(options),
             TracesSetupFilter = TracesSetup(options),
             TracesHaproxyFilter = TracesHaproxy(options),
+            TracesHappyEyeballsFilter = TracesHappyEyeballs(options),
+            TracesTcpFilter = TracesTcp(options),
             ResolverEvents = resolverEvents,
         };
 

@@ -102,7 +102,7 @@ public sealed class CurlCompositionDnsTraceTests
                 "[SETUP] removing connected setup filter",
                 "[SETUP] destroy",
             },
-            lines);
+            WithoutConnectAttemptLines(lines));
     }
 
     [TestMethod]
@@ -142,7 +142,7 @@ public sealed class CurlCompositionDnsTraceTests
                 "[HAPROXY] removing connected setup filter",
                 "[HAPROXY] destroy",
             },
-            lines.Where(line => !line.StartsWith("[DNS]", StringComparison.Ordinal)).ToArray());
+            WithoutConnectAttemptLines(lines).Where(line => !line.StartsWith("[DNS]", StringComparison.Ordinal)).ToArray());
     }
 
     [TestMethod]
@@ -180,6 +180,39 @@ public sealed class CurlCompositionDnsTraceTests
         Assert.IsFalse(plain.TcpConnector.TracesDnsFilter);
         Assert.IsNull(plain.TcpConnector.ResolverEvents);
     }
+
+    [TestMethod]
+    [DataRow("happy-eyeballs", true, false)]
+    [DataRow("tcp", false, true)]
+    [DataRow("network", true, true)]
+    [DataRow("all", true, true)]
+    [DataRow("dns,setup", false, false)]
+    public async Task Connect_UnderTraceConfig_WritesTheHappyEyeballsAndTcpLinesOfItsComponents(string components, bool happyEyeballs, bool tcp)
+    {
+        // curl -s -v --trace-config happy-eyeballs, tcp and network (BL-1161 Notes).
+        List<string> lines = await ConnectAsync("-v", "--trace-config", components);
+
+        Assert.AreEqual(happyEyeballs, lines.Contains("[HAPPY-EYEBALLS] Connected to 127.0.0.1 (127.0.0.1) port 47110"));
+        Assert.AreEqual(happyEyeballs, lines.Contains("[HAPPY-EYEBALLS] destroy"));
+        Assert.AreEqual(tcp, lines.Contains("[TCP] connected on fd=3"));
+        Assert.AreEqual(happyEyeballs || tcp, lines.Any(line => line.StartsWith("[HAPPY-EYEBALLS]", StringComparison.Ordinal) || line.StartsWith("[TCP]", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    [DataRow("-vvvv")]
+    [DataRow("-v", "--trace-config", "network")]
+    public async Task Connect_UnderVvvvOrNetwork_WritesBothComponentsLines(params string[] arguments)
+    {
+        // curl -s -vvvv and -v --trace-config network (BL-1103 and BL-1161 Notes).
+        List<string> lines = await ConnectAsync(arguments);
+
+        CollectionAssert.IsSubsetOf(
+            new[] { "[HAPPY-EYEBALLS] starting first attempt for ipv4 -> 0", "[TCP] cf_socket_open() -> 0, fd=3", "[HAPPY-EYEBALLS] removing connected setup filter" },
+            lines);
+    }
+
+    private static string[] WithoutConnectAttemptLines(List<string> lines) =>
+        [.. lines.Where(line => !line.StartsWith("[HAPPY-EYEBALLS]", StringComparison.Ordinal) && !line.StartsWith("[TCP]", StringComparison.Ordinal))];
 
     private static async Task<List<string>> ConnectAsync(params string[] arguments)
     {

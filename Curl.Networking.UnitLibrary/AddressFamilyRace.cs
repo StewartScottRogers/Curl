@@ -23,12 +23,18 @@ namespace Curl.Networking;
 /// <param name="happyEyeballsTimeout">How long the first family runs alone.</param>
 /// <param name="events">Where the <c>Trying</c> and <c>connect to ... failed</c> lines go.</param>
 /// <param name="log">Where each dial is logged.</param>
+/// <param name="trace">
+/// The <c>[HAPPY-EYEBALLS]</c> and <c>[TCP]</c> lines' writer, below <paramref name="events" />, told
+/// what the race does between its <c>Trying</c> lines (BL-1161); <see langword="null" /> when neither
+/// is traced.
+/// </param>
 internal sealed class AddressFamilyRace(
     ITcpDialer tcpDialer,
     TimeProvider timeProvider,
     TimeSpan happyEyeballsTimeout,
     ITransferEvents events,
-    NetworkDiagnosticLog log)
+    NetworkDiagnosticLog log,
+    ConnectAttemptTraceEvents? trace = null)
 {
     private readonly List<Attempt> _running = [];
     private SocketError _lastError = SocketError.Success;
@@ -66,7 +72,7 @@ internal sealed class AddressFamilyRace(
                     // A delay cancelled by the caller is no reason to start the other family.
                     race.Token.ThrowIfCancellationRequested();
                     secondFamilyDue = null;
-                    StartNext(second, race.Token);
+                    StartSecondFamilyOnTime(second, race.Token);
                     continue;
                 }
 
@@ -86,13 +92,27 @@ internal sealed class AddressFamilyRace(
                 }
             }
 
-            return (null, null, _lastError, _lastBindFailure);
+            return NoConnection();
         }
         finally
         {
             await race.CancelAsync().ConfigureAwait(false);
             await CloseAbandonedAsync().ConfigureAwait(false);
         }
+    }
+
+    // The second family's delay ran out with the first still running.
+    private void StartSecondFamilyOnTime(Queue<IPEndPoint> second, CancellationToken cancellationToken)
+    {
+        trace?.SecondFamilyDue();
+        StartNext(second, cancellationToken);
+    }
+
+    // Every address failed.
+    private (DialedTcpConnection? Dialed, IPEndPoint? RemoteEndPoint, SocketError LastError, LocalBindFailure? LastBindFailure) NoConnection()
+    {
+        trace?.NoMoreAttempts();
+        return (null, null, _lastError, _lastBindFailure);
     }
 
     private IEnumerable<Task> RunningTasks(Task? secondFamilyDue)
@@ -115,6 +135,11 @@ internal sealed class AddressFamilyRace(
     /// </summary>
     private Task? StartFirst(Queue<IPEndPoint> first, Queue<IPEndPoint> second, CancellationToken cancellationToken)
     {
+        if (second.Count > 0)
+        {
+            trace?.RaceStarting(happyEyeballsTimeout);
+        }
+
         StartNext(first, cancellationToken);
         if (_running.Count == 0)
         {
@@ -186,6 +211,7 @@ internal sealed class AddressFamilyRace(
         {
             var dialed = await attempt.Dial.ConfigureAwait(false);
             log.Connected(attempt.RemoteEndPoint, dialed.LocalEndPoint);
+            trace?.AttemptConnected(attempt.RemoteEndPoint);
             return dialed;
         }
         catch (SocketException exception)
@@ -193,7 +219,9 @@ internal sealed class AddressFamilyRace(
             // curl moves on to the next address; only when every one fails is it exit 7.
             _lastError = exception.SocketErrorCode;
             _lastBindFailure = (exception as LocalBindException)?.Failure;
+            trace?.AttemptFailing(attempt.RemoteEndPoint);
             events.ReportInfo(ConnectFailedLine(attempt.RemoteEndPoint, exception));
+            trace?.AttemptFailed(attempt.RemoteEndPoint);
             log.DialFailed(attempt.RemoteEndPoint, exception);
             return null;
         }

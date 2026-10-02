@@ -89,7 +89,7 @@ public sealed class CurlCompositionDohTests
     {
         // curl -v --trace-config doh (or dns, which writes the same) --doh-url ... http://example.test:P/:
         // the filter's lines, the DoH lines once both queries are done, then the resolve and Trying
-        // (measured, BL-1102 Notes; the DoH lines' texts as BL-850 measured them).
+        // (measured, BL-1102 Notes; the DoH lines' texts as BL-850 measured them); network's [HAPPY-EYEBALLS] and [TCP] lines (BL-1161) aside.
         ScriptedConnector dohServer = new([AAnswer, AAnswer]);
         RecordingEvents events = new();
 
@@ -116,7 +116,7 @@ public sealed class CurlCompositionDohTests
                 "[DNS] removing connected setup filter",
                 "[DNS] destroy",
             },
-            events.Info);
+            events.Info.Where(line => !line.StartsWith("[HAPPY-EYEBALLS]", StringComparison.Ordinal) && !line.StartsWith("[TCP]", StringComparison.Ordinal)).ToArray());
     }
 
     [TestMethod]

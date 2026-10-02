@@ -90,3 +90,33 @@ go to a follow-up task (BL-1193, BL-1191, BL-1192), each a filter of its own wit
 - `TcpConnector` writes the added line beside the PROXY line it sends and the removal lines after it
   reports the connection opened, over TLS too, where their place is unmeasured (BL-1192 measures it).
 - The `[SETUP]` and `[HAPROXY]` lines carry no volatile value: no descriptor, stamp or repetition.
+
+## Amendment, 2026-10-02 (BL-1161): the `[HAPPY-EYEBALLS]` and `[TCP]` lines
+
+Decided by Claude under Stewart's delegation.
+
+BL-1161 delivers the `[HAPPY-EYEBALLS]` lines and the `[TCP]` lines of the connect attempts; the
+`[TCP]` lines of the connection's I/O (`query ALPN`, `send(...)`, `recv(...)`) go to a follow-up task
+(BL-1194), since they come from the transfer, not the connect.
+
+- Measured (BL-1161 Notes): `happy-eyeballs`, `network` and `all` (so `-vvvv`) turn the
+  `[HAPPY-EYEBALLS]` lines on; `tcp`, `network` and `all` the `[TCP]` lines
+  (`CurlComposition.TracesHappyEyeballs`/`TracesTcp`, `TcpConnector.TracesHappyEyeballsFilter`/`TracesTcpFilter`).
+- `ConnectAttemptTraceEvents` sits below the `[DNS]` and `[SETUP]` filters' events, so the lines it
+  writes as a `Trying` line passes through land where curl's do: the ballers' `want to do more` and
+  `check for next ... address` lines before it, the socket's opening and `checked connect attempts`
+  after it and before `[DNS] Curl_conn_connect(block=0) -> 0, done=0`. `AddressFamilyRace` tells it
+  the rest: the second family's timeout, each failure, the winner, and giving up. `TcpConnector`
+  writes `[HAPPY-EYEBALLS] removing connected setup filter` and `destroy` after `[SETUP]`'s and
+  `[HAPROXY]`'s removal, as measured.
+- Volatile values: curl's `fd=` is its operating system's socket descriptor; Curl numbers each
+  connect's sockets from 3 (`ConnectAttemptTraceEvents.FirstSocketDescriptor`), as the dialler does
+  not expose the socket. The `local address` line, written as the socket opens, names its family's
+  unspecified address and port `0`, as .NET binds the local end only as it connects (as ADR-0100's
+  failed-connect line does); curl names the bound end. curl repeats `not connected yet`,
+  `checked connect attempts` and `adjust_pollset` once per poll of the system, a number that varies
+  run to run; Curl writes one poll round per wake-up of the race (the timeout, a failure, the
+  winner). No nanosecond stamp appears in these lines without `--trace-time`.
+- Unmeasured and so not written: a `--no-keepalive` connect (Curl always writes `Set TCP_KEEP*`),
+  the lines through a proxy or a Unix socket (only a direct connect is traced, as for `[DNS]`), and
+  `baller N` for more than one family giving up (Curl writes `baller 0: result=7`).
