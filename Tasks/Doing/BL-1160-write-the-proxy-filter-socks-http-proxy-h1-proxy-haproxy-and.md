@@ -32,3 +32,4 @@ Curl writes curl 8.21.0's `[SOCKS]`, `[HTTP-PROXY]`, `[H1-PROXY]`, `[HAPROXY]` a
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
