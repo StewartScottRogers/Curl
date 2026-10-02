@@ -18,6 +18,8 @@ internal static class ClientCertificateLoader
 
     private const string PrivateKeyLabel = "PRIVATE KEY";
 
+    private const string EncryptedPrivateKeyLabel = "ENCRYPTED PRIVATE KEY";
+
     // A PKCS#12 key is loaded exportable: on Windows the default refuses to export its private
     // parameters, and TLS 1.0 and 1.1 sign their MD5 and SHA-1 block with them (BL-946).
     private const X509KeyStorageFlags Pkcs12KeyStorage = X509KeyStorageFlags.Exportable;
@@ -375,7 +377,7 @@ internal static class ClientCertificateLoader
         var keyAlgorithm = certificate.PublicKey.Oid.Value;
         if (HandBuiltPrivateKeyReader.Reads(keyAlgorithm))
         {
-            var privateKeyInfo = isDer ? File.ReadAllBytes(keyPath) : PemPrivateKeyInfo(File.ReadAllText(keyPath));
+            var privateKeyInfo = isDer ? File.ReadAllBytes(keyPath) : PemPrivateKeyInfo(File.ReadAllText(keyPath), passphrase);
             var signingKey = HandBuiltPrivateKeyReader.Read(privateKeyInfo, keyAlgorithm!, certificate.PublicKey.EncodedKeyValue.RawData);
             return new HandBuiltKeyCertificate(certificate, signingKey);
         }
@@ -386,15 +388,22 @@ internal static class ClientCertificateLoader
         return Reimport(withKey);
     }
 
-    // The first unencrypted PKCS#8 block in the file.
-    private static byte[] PemPrivateKeyInfo(string keyPem)
+    // The first PKCS#8 block in the file: an unencrypted one, or with a passphrase an
+    // encrypted one, decrypted by hand (ADR-0354).
+    private static byte[] PemPrivateKeyInfo(string keyPem, string? passphrase)
     {
         var remaining = keyPem.AsSpan();
         while (PemEncoding.TryFind(remaining, out var fields))
         {
-            if (remaining[fields.Label].SequenceEqual(PrivateKeyLabel))
+            var label = remaining[fields.Label];
+            if (label.SequenceEqual(PrivateKeyLabel))
             {
                 return Convert.FromBase64String(remaining[fields.Base64Data].ToString());
+            }
+
+            if (passphrase is not null && label.SequenceEqual(EncryptedPrivateKeyLabel))
+            {
+                return EncryptedPrivateKeyInfoDecryption.Decrypt(Convert.FromBase64String(remaining[fields.Base64Data].ToString()), passphrase);
             }
 
             remaining = remaining[fields.Location.End..];
