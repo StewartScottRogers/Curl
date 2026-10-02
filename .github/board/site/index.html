@@ -17,6 +17,18 @@
                        ?status=../fixtures/status.json
     ?now=ISO-8601      pin the clock the page reads (the refresh stamp, run times,
                        heartbeat ages and staleness)
+    ?auditBranch=name  branch the Audit tab reads findings from (default audit)
+    ?audit=url         fetch this URL instead of the audit branch's recursive tree call,
+                       e.g. ?audit=../fixtures/audit-tree.json
+    ?findings=url      read each finding's text from this folder (url + file name)
+                       instead of raw.githubusercontent.com, e.g.
+                       ?findings=../fixtures/findings/
+
+  Tabs: #tasks (also no hash) shows the task kanban and lanes; #audit shows the audit
+  office's findings as a read-only kanban (BL-1184). Findings are listed from the task
+  branch's tree and the audit branch's tree, the audit branch's copy winning, and their
+  texts are read from raw.githubusercontent.com, which costs no API calls; each text is
+  re-read only when its blob SHA changes.
 
   Adding a data source: append one { name, url, fetch, render } object to `sources`
   below. `fetch(source)` returns the parsed data (use fetchJson, which records the
@@ -63,6 +75,25 @@
   summary { cursor: pointer; }
   details .card { margin-top: 6px; }
   footer { margin-top: 16px; font-size: 12px; }
+  nav.tabs { display: flex; gap: 4px; margin-top: 10px; border-bottom: 1px solid var(--line); }
+  nav.tabs a { padding: 6px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; color: inherit; text-decoration: none; margin-bottom: -1px; }
+  nav.tabs a[aria-selected="true"] { border-color: var(--line); background: Canvas; font-weight: 600; }
+  [hidden] { display: none !important; }
+  #audit-board { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 12px; margin-top: 12px; }
+  #audit-folded { margin-top: 12px; }
+  #audit-folded > details { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; margin-bottom: 8px; }
+  details.finding { border-top: none; padding: 0; margin-bottom: 6px; border-radius: 4px; background: var(--card); }
+  details.finding > summary { padding: 6px 8px; list-style: none; }
+  details.finding > summary::-webkit-details-marker { display: none; }
+  details.finding .id { font-weight: 600; margin-right: 6px; }
+  details.finding .facts { display: block; font-size: 12px; }
+  details.finding .body { padding: 0 8px 8px; }
+  details.finding h3 { font-size: 13px; margin: 8px 0 2px; }
+  details.finding pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.4 ui-monospace, monospace; margin: 0; }
+  details.finding .body a { color: inherit; }
+  @media (max-width: 700px) {
+    #board, #audit-board { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>
 </head>
 <body>
@@ -71,9 +102,20 @@
   <span id="source" class="muted"></span>
   <span id="refreshed" class="muted">Loading…</span>
 </header>
+<nav class="tabs" role="tablist">
+  <a id="tab-tasks" href="#tasks" role="tab" aria-controls="panel-tasks">Tasks</a>
+  <a id="tab-audit" href="#audit" role="tab" aria-controls="panel-audit">Audit</a>
+</nav>
 <div id="messages"></div>
+<div id="panel-tasks" role="tabpanel" aria-labelledby="tab-tasks">
 <section id="lanes"></section>
 <main id="board"></main>
+</div>
+<div id="panel-audit" role="tabpanel" aria-labelledby="tab-audit" hidden>
+<p id="audit-source" class="muted"></p>
+<main id="audit-board"></main>
+<section id="audit-folded"></section>
+</div>
 <footer class="muted"><span id="cadence"></span></footer>
 <script>
 'use strict';
@@ -87,6 +129,11 @@ const archiveFolder = /^\d{4}-\d{2}-\d{2}_\d{4}$/;
 const taskFile = /^(BL-\d+)(?:-(.*))?\.md$/;
 const secondsPerCall = 60;
 const staleMs = 10 * 60 * 1000;
+const auditBranch = params.get('auditBranch') || 'audit';
+const findingsOverride = params.get('findings') ? new URL(params.get('findings'), location.href).href : null;
+const findingFile = /^Audit\/Findings\/(AF-\d+)(?:-(.*))?\.md$/;
+const findingColumns = [['proposed', 'Waiting for you'], ['accepted', 'Approved'], ['deferred', 'Deferred'], ['blocked', 'Blocked']];
+const findingFolds = [['rejected', 'Rejected'], ['closed', 'Closed']];
 
 // The tree most recently read, so lane cards can link their task to its file.
 let latestTree = null;
@@ -112,6 +159,15 @@ const sources = [
       `https://api.github.com/repos/${repo}/contents/status.json?ref=board`),
     fetch: source => fetchJson(source.url, { Accept: 'application/vnd.github.raw+json' }, [404]),
     render: status => renderLanes(status),
+  },
+  {
+    // The audit branch's tree is the one extra API call; finding texts come from
+    // raw.githubusercontent.com, which has no API rate limit (BL-1184).
+    name: 'audit findings',
+    url: resolveOverride('audit',
+      `https://api.github.com/repos/${repo}/git/trees/${encodeURIComponent(auditBranch)}?recursive=1`),
+    fetch: async source => readFindings(await fetchJson(source.url, {}, [404])),
+    render: findings => renderAudit(findings),
   },
 ];
 
@@ -313,6 +369,166 @@ function renderLanes(status) {
   section.append(cards);
 }
 
+// Finding texts already read, by blob SHA, so a refresh re-reads only changed findings.
+const findingTexts = new Map();
+// Findings and folded lists the viewer has opened, kept open across refreshes.
+const openFindings = new Set();
+
+function encodePath(path) {
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
+function findingTextUrl(ref, path) {
+  if (findingsOverride) return new URL(encodeURIComponent(path.split('/').pop()), findingsOverride).href;
+  return `https://raw.githubusercontent.com/${repo}/refs/heads/${encodePath(ref)}/${encodePath(path)}`;
+}
+
+async function findingText(finding) {
+  if (findingTexts.has(finding.sha)) return findingTexts.get(finding.sha);
+  const response = await fetch(findingTextUrl(finding.ref, finding.path), { cache: 'no-store' });
+  if (!response.ok) throw new Error(`${finding.path} answered ${response.status} ${response.statusText}`);
+  const text = await response.text();
+  findingTexts.set(finding.sha, text);
+  return text;
+}
+
+// Front matter as a map of lower-case keys, the body after it, and the body's `## Log` section.
+function parseFinding(text) {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const fields = {};
+  let bodyStart = 0;
+  if (lines[0] === '---') {
+    const end = lines.indexOf('---', 1);
+    if (end > 0) {
+      for (const line of lines.slice(1, end)) {
+        const match = /^([A-Za-z][\w-]*):\s*(.*)$/.exec(line);
+        if (match) fields[match[1].toLowerCase()] = match[2].trim();
+      }
+      bodyStart = end + 1;
+    }
+  }
+  const body = lines.slice(bodyStart);
+  const heading = body.find(line => /^# /.test(line));
+  const logStart = body.findIndex(line => /^## Log\s*$/.test(line));
+  let log = '';
+  if (logStart >= 0) {
+    const next = body.findIndex((line, index) => index > logStart && /^## /.test(line));
+    log = body.slice(logStart + 1, next < 0 ? undefined : next).join('\n').trim();
+  }
+  return { fields, heading: heading ? heading.slice(2).trim() : '', log };
+}
+
+// Findings listed in the task branch's tree (master's copies, merged in) and the audit
+// branch's tree; the audit branch's copy wins when both have one.
+async function readFindings(auditTree) {
+  const byId = new Map();
+  const collect = (tree, ref) => {
+    for (const entry of (tree && tree.tree) || []) {
+      const match = entry.type === 'blob' && findingFile.exec(entry.path);
+      if (match) byId.set(match[1], { id: match[1], slug: match[2], path: entry.path, sha: entry.sha, ref });
+    }
+  };
+  collect(latestTree, branch);
+  collect(auditTree, auditBranch);
+  const findings = [...byId.values()].sort((a, b) => parseInt(a.id.slice(3), 10) - parseInt(b.id.slice(3), 10));
+  await Promise.all(findings.map(async finding => {
+    try {
+      finding.text = await findingText(finding);
+      const { fields, heading, log } = parseFinding(finding.text);
+      finding.status = (fields.status || '').toLowerCase();
+      finding.title = fields.title || heading.replace(/^AF-\d+\s*[—-]\s*/, '') || titleFromSlug(finding.slug);
+      finding.auditor = fields.auditor || '';
+      finding.severity = fields.severity || '';
+      finding.reason = fields.reason || '';
+      finding.log = log;
+    } catch (error) {
+      finding.error = error.message;
+      finding.title = titleFromSlug(finding.slug);
+    }
+  }));
+  return { findings, auditBranchFound: auditTree !== null, truncated: Boolean(auditTree && auditTree.truncated) };
+}
+
+function textSection(parent, title, text, tag) {
+  parent.append(element('h3', null, title), element(tag, null, text));
+}
+
+function findingElement(finding) {
+  const details = element('details', 'finding');
+  details.dataset.id = finding.id;
+  details.open = openFindings.has(finding.id);
+  details.addEventListener('toggle', () => {
+    if (details.open) openFindings.add(finding.id); else openFindings.delete(finding.id);
+  });
+  const summary = element('summary');
+  summary.append(element('span', 'id', finding.id), element('span', 'title', finding.title));
+  const facts = [finding.auditor, finding.severity].filter(Boolean).join(' · ');
+  summary.append(element('span', 'facts muted', facts || 'auditor and severity not read'));
+  details.append(summary);
+  const body = element('div', 'body');
+  const link = element('a', null, `${finding.path} on ${finding.ref}`);
+  link.href = `https://github.com/${repo}/blob/${encodePath(finding.ref)}/${encodePath(finding.path)}`;
+  body.append(link);
+  if (finding.error) {
+    textSection(body, 'Could not read the finding', finding.error, 'p');
+  } else {
+    textSection(body, 'Reason', finding.reason || 'None given.', 'p');
+    textSection(body, 'Log', finding.log || 'No Log section.', 'pre');
+    textSection(body, 'Full text', finding.text, 'pre');
+  }
+  details.append(body);
+  return details;
+}
+
+function foldedList(key, label, findings) {
+  const details = element('details', 'fold');
+  details.open = openFindings.has(key);
+  details.addEventListener('toggle', () => {
+    if (details.open) openFindings.add(key); else openFindings.delete(key);
+  });
+  details.append(element('summary', null, `${label} · ${findings.length}`));
+  for (const finding of findings) details.append(findingElement(finding));
+  return details;
+}
+
+function renderAudit({ findings, auditBranchFound, truncated }) {
+  const known = [...findingColumns, ...findingFolds].map(([status]) => status);
+  const withStatus = status => findings.filter(finding => !finding.error && finding.status === status);
+  const proposed = withStatus('proposed').length;
+  document.getElementById('tab-audit').textContent = `Audit (${proposed})`;
+  document.getElementById('audit-source').textContent = auditBranchFound
+    ? `Findings from ${auditBranch}, and ${branch} for any the ${auditBranch} branch lacks.`
+    : `No ${auditBranch} branch; findings from ${branch}.`;
+  const board = document.getElementById('audit-board');
+  board.replaceChildren();
+  for (const [status, label] of findingColumns) {
+    const cards = withStatus(status);
+    const column = element('section', 'column');
+    column.dataset.status = status;
+    const heading = element('h2');
+    heading.append(element('span', 'name', label), element('span', 'count muted', String(cards.length)));
+    column.append(heading);
+    for (const finding of cards) column.append(findingElement(finding));
+    board.append(column);
+  }
+  const folded = document.getElementById('audit-folded');
+  folded.replaceChildren();
+  for (const [status, label] of findingFolds) folded.append(foldedList(`fold:${status}`, label, withStatus(status)));
+  const others = findings.filter(finding => finding.error || !known.includes(finding.status));
+  if (others.length > 0) folded.append(foldedList('fold:other', 'Unreadable or unknown status', others));
+  if (truncated) {
+    showMessage('warning', `GitHub truncated the ${auditBranch} branch's tree, so the Audit tab may be missing findings.`);
+  }
+}
+
+function showTab() {
+  const audit = location.hash === '#audit';
+  document.getElementById('panel-tasks').hidden = audit;
+  document.getElementById('panel-audit').hidden = !audit;
+  document.getElementById('tab-tasks').setAttribute('aria-selected', String(!audit));
+  document.getElementById('tab-audit').setAttribute('aria-selected', String(audit));
+}
+
 function clockTime(date, withSeconds) {
   const pad = n => String(n).padStart(2, '0');
   const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -352,6 +568,8 @@ async function refresh() {
   setTimeout(refresh, delayMs);
 }
 
+window.addEventListener('hashchange', showTab);
+showTab();
 document.getElementById('source').textContent = `${repo} · ${branch}`;
 document.getElementById('cadence').textContent =
   `Refreshes every ${refreshSeconds} s (minimum ${minimumSeconds} s: ${secondsPerCall} s per API call, ` +
