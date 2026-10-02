@@ -31,3 +31,4 @@ BL-862 (ADR-0333) made `TcpConnector` read a chunked `407` through `HttpProxyTun
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-02: Backlog -> Doing.
