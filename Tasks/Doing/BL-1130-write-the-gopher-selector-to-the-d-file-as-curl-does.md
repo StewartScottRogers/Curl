@@ -33,3 +33,4 @@ A `gopher://` or `gophers://` transfer with `-D` writes the selector it sent, fo
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
