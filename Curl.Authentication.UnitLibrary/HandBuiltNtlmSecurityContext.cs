@@ -31,6 +31,13 @@ internal sealed class HandBuiltNtlmSecurityContext(SecurityContextRequest reques
     /// </summary>
     public NtlmMessageFailure AnswerRefusedBecause { get; private set; }
 
+    /// <summary>
+    /// Gets why the CHALLENGE message could not be read: <see cref="NtlmMessageFailure.None" />
+    /// until one cannot, then the <see cref="NtlmChallengeDecoding.Failure" /> that refused it,
+    /// so the authenticator can write the line curl writes for that check.
+    /// </summary>
+    public NtlmMessageFailure ChallengeUnreadableBecause { get; private set; }
+
     /// <inheritdoc />
     public ValueTask<SecurityContextStep> NextTokenAsync(ReadOnlyMemory<byte> incomingToken, CancellationToken cancellationToken)
     {
@@ -67,13 +74,16 @@ internal sealed class HandBuiltNtlmSecurityContext(SecurityContextRequest reques
 
     /// <summary>
     /// Answers the CHALLENGE message: <see cref="SecurityContextStatus.MalformedToken" /> when
-    /// it cannot be read, <see cref="SecurityContextStatus.Refused" /> when the answer passes
-    /// curl's 1024-byte buffer, keeping which check refused it in <see cref="AnswerRefusedBecause" />.
+    /// it cannot be read, keeping why in <see cref="ChallengeUnreadableBecause" />;
+    /// <see cref="SecurityContextStatus.Refused" /> when the answer passes curl's 1024-byte
+    /// buffer, keeping which check refused it in <see cref="AnswerRefusedBecause" />.
     /// </summary>
     private SecurityContextStep Answer(ReadOnlySpan<byte> incomingToken)
     {
-        if (NtlmChallengeMessage.Decode(incomingToken).Message is not { } challenge)
+        NtlmChallengeDecoding decoding = NtlmChallengeMessage.Decode(incomingToken);
+        if (decoding.Message is not { } challenge)
         {
+            ChallengeUnreadableBecause = decoding.Failure;
             return new SecurityContextStep(SecurityContextStatus.MalformedToken, []);
         }
 

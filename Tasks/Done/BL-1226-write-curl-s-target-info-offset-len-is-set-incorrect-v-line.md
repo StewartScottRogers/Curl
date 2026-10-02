@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1226 — Write curl's 'Target Info Offset Len is set incorrect' -v line for an NTLM challenge whose target info is out of range
 
@@ -25,14 +25,19 @@ When the hand-built NTLM path (curl's OpenSSL build, Linux and macOS) refuses a 
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Authentication.UnitTests`, with the authenticator built as for the OpenSSL build, pin both lines in order for a Type 2 whose target info runs past the message end and for one whose offset is inside the header, and only `NTLM handshake failure (bad type-2 message)` for a Type 2 shorter than 32 bytes and for one with the wrong signature.
-- [ ] A test pins that the SSPI-build authenticator writes neither line for the out-of-range message (it keeps today's Type 3 failure path).
-- [ ] The decode reason reaches the authenticator through a member whose name says what it holds; `Curl.Ntlm.UnitLibrary` is not changed.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] Tests in `Curl.Authentication.UnitTests`, with the authenticator built as for the OpenSSL build, pin both lines in order for a Type 2 whose target info runs past the message end and for one whose offset is inside the header, and only `NTLM handshake failure (bad type-2 message)` for a Type 2 shorter than 32 bytes and for one with the wrong signature.
+- [x] A test pins that the SSPI-build authenticator writes neither line for the out-of-range message (it keeps today's Type 3 failure path).
+- [x] The decode reason reaches the authenticator through a member whose name says what it holds; `Curl.Ntlm.UnitLibrary` is not changed.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- `HandBuiltNtlmSecurityContext.ChallengeUnreadableBecause` keeps the `NtlmChallengeDecoding.Failure` that refused the Type 2; `NtlmHttpAuthenticator.ReportTargetInfoOutOfRange` writes `NtlmHandshakeLines.TargetInfoOutOfRange` before the bad type-2 line when it is `TargetInfoOutOfRange`. The SSPI branch returns before it, so Windows is unchanged. `Curl.Ntlm.UnitLibrary` untouched.
+- Pinned from curl 8.21.0's source (`lib/vauth/ntlm.c`), not measured: the Windows Schannel build reads Type 2 in SSPI. Tests in `NtlmHttpAuthenticatorTests.VerboseLines.cs` drive the real hand-built context.
+- Verified 2026-10-02: build -warnaserror clean, fast tests green (Authentication 779 passed, 4 skipped), Measure-CodeQuality 0 failing members.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. curl's own NTLM writes the Target Info Offset Len -v line before the bad type-2 line

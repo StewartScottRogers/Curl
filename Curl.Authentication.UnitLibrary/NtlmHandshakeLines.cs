@@ -20,6 +20,14 @@ internal static class NtlmHandshakeLines
     /// <summary>A Type 2 message curl's own NTLM cannot read.</summary>
     internal const string BadType2 = "NTLM handshake failure (bad type-2 message)";
 
+    /// <summary>
+    /// What curl's own NTLM writes before <see cref="BadType2" /> for a Type 2 message whose
+    /// target information lies past its end or starts inside its 48-byte header, from curl
+    /// 8.21.0's <c>lib/vauth/ntlm.c</c> <c>ntlm_decode_type2_target</c> (BL-1226). The SSPI
+    /// build reads Type 2 in SSPI and never writes it.
+    /// </summary>
+    internal const string TargetInfoOutOfRange = "NTLM handshake failure (bad type-2 message). Target Info Offset Len is set incorrect by the peer";
+
     /// <summary>What curl writes after each challenge its NTLM refused to read, and alone for one that is not base64.</summary>
     internal const string ProblemIgnored = "NTLM authentication problem, ignoring.";
 
