@@ -32,3 +32,4 @@ On macOS, `--tcp-fastopen` connects through `connectx` with `CONNECT_DATA_IDEMPO
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-02: Backlog -> Doing.
