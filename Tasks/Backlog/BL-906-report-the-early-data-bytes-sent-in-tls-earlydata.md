@@ -4,7 +4,7 @@ title: Report the early-data bytes sent in %{tls_earlydata}
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-710]
+depends-on: [BL-710, BL-1105]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Output.UnitLibrary, Curl.Output.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-29
@@ -31,7 +31,10 @@ completed:
 
 ## Notes
 
+- 2026-10-01 (lane 1): BL-710 finished `--ssl-sessions` but split sending 0-RTT early data into BL-1105 (still in Backlog). Until that lands, no provider sends early data, so there is no byte count to carry to `%{tls_earlydata}` and the fixed `0` is still correct. Added BL-1105 to `depends-on` and returned the task to Backlog; nothing else changed.
+
 ## Log
 
 - 2026-09-29: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Backlog. Waits on BL-1105: no provider sends TLS 1.3 early data yet, so there is no byte count to report
