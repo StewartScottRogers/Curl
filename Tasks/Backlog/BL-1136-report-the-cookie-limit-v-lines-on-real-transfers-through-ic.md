@@ -1,5 +1,5 @@
 ---
-id: BL-1127
+id: BL-1136
 title: Report the cookie-limit -v lines on real transfers through ICookieStore
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-01
 completed:
 ---
-# BL-1127 — Report the cookie-limit -v lines on real transfers through ICookieStore
+# BL-1136 — Report the cookie-limit -v lines on real transfers through ICookieStore
 
 ## Goal
 

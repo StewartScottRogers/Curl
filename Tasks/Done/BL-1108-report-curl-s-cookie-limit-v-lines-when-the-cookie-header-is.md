@@ -36,7 +36,7 @@ completed: 2026-10-01
 - Choice: the lines are collected under the store's lock and reported after it, as the project's CLAUDE.md asks; "Included max" comes first because curl's `Curl_cookie_getlist` runs before `http.c` builds the header.
 - Choice: the existing limit arithmetic (`> LongestCookieHeader` = 8183, measured on curl 8.21.0) is kept as is rather than re-derived from curl's `clen + add >= MAX_COOKIE_HEADER_LEN`, since the measured tests pin it.
 - Tests: `GetCookieHeader_ManyCookies_ReportsTheMostCookiesSent` (151, 150, 149), `GetCookieHeader_HeaderTooLong_ReportsTheFirstCookieLeftOut`, `GetCookieHeader_WithinTheLimits_ReportsNothingAndSendsTheStrings`, `GetCookieHeader_NullEvents_Throws`. Cookies tests 352 total; `Measure-CodeQuality.ps1 -Library Curl.Cookies.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10.
-- Follow-up filed: BL-1127 passes the transfer's events through `ICookieStore`, `HttpProtocolHandler` and `Curl.Console`.
+- Follow-up filed: BL-1136 passes the transfer's events through `ICookieStore`, `HttpProtocolHandler` and `Curl.Console`.
 
 ## Log
 
