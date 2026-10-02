@@ -53,6 +53,11 @@ internal sealed class SmtpCommandTransfer(
         try
         {
             result = await SendCommandsAsync(mail).ConfigureAwait(false);
+            if (result.ExitCode == CurlExitCode.Ok)
+            {
+                channel.Trace.DoingDone();
+            }
+
             await channel.QuitAsync().ConfigureAwait(false);
         }
         catch (SmtpReplyMissingException)
@@ -115,6 +120,7 @@ internal sealed class SmtpCommandTransfer(
     private async ValueTask<TransferResult?> ExchangeAsync(string command, bool recipientCommand)
     {
         await channel.SendAsync(command).ConfigureAwait(false);
+        channel.Trace.CommandSent("COMMAND");
         SmtpReply reply = await channel.ReadReplyAsync(WriteAsync).ConfigureAwait(false) ?? throw new SmtpReplyMissingException();
         responseCode = reply.Code;
         if (!reply.IsCompletion && !(recipientCommand && reply.Code == AmbiguousRecipient))

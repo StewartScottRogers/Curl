@@ -107,6 +107,7 @@ internal static class CurlComposition
     /// <returns>Every registered handler.</returns>
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
     /// <param name="tracesFtp">Whether the FTP handler writes the <c>--trace-config ftp</c> lines (<see cref="TracesFtp" />, BL-1162).</param>
+    /// <param name="tracesSmtp">Whether the SMTP handler writes the <c>--trace-config smtp</c> lines (<see cref="TracesSmtp" />, BL-1163).</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -119,7 +120,8 @@ internal static class CurlComposition
         TimeProvider? signingClock = null,
         IConnector? ftpDataConnector = null,
         IDiagnosticLog? diagnosticLog = null,
-        bool tracesFtp = false)
+        bool tracesFtp = false,
+        bool tracesSmtp = false)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
@@ -140,7 +142,7 @@ internal static class CurlComposition
             new MqttProtocolHandler(recordingConnector),
             new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
             new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
-            new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
+            new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)) { TracesStateMachine = tracesSmtp },
             new LdapProtocolHandler(recordingConnector, OperatingSystem.IsWindows() ? LdapDialect.WinLdap : LdapDialect.OpenLdap),
             new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()),
             new RtspProtocolHandler(recordingConnector, httpAuthenticator),
@@ -425,6 +427,15 @@ internal static class CurlComposition
         options.TraceComponents.Contains("ftp") || options.TraceComponents.Contains("protocol") || options.TraceComponents.Contains("all");
 
     /// <summary>
+    /// Whether curl 8.21.0's <c>[SMTP]</c> lines are written: <c>smtp</c>, <c>protocol</c> or
+    /// <c>all</c> is among the trace components, which <c>-vv</c> and up put there too (BL-1163).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesSmtp(CommandLineOptions options) =>
+        options.TraceComponents.Contains("smtp") || options.TraceComponents.Contains("protocol") || options.TraceComponents.Contains("all");
+
+    /// <summary>
     /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
     /// and with <c>http://</c> in front when it does not, as curl guesses the scheme of any URL (a
     /// scheme-less DoH URL was measured to reach its server as plain HTTP, BL-642).
@@ -540,7 +551,8 @@ internal static class CurlComposition
             udpDatagramConnector,
             poolingConnector,
             diagnosticLog,
-            TracesFtp(options));
+            TracesFtp(options),
+            TracesSmtp(options));
     }
 
     /// <summary>
@@ -1004,7 +1016,7 @@ internal static class CurlComposition
     /// <param name="transports">The run's connectors.</param>
     /// <returns>The dispatcher.</returns>
     internal static ProtocolDispatcher CreateDispatcher(CurlTransports transports) =>
-        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp));
+        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp));
 
     /// <summary>
     /// Creates what one run transfers through: the production handler set, every TCP handler
@@ -1071,7 +1083,7 @@ internal static class CurlComposition
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp)),
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp)),
             WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild),
             cookies,
             new ProxySelector(Environment.GetEnvironmentVariable),

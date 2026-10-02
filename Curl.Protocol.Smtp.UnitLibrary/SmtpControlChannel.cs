@@ -59,6 +59,12 @@ internal sealed class SmtpControlChannel(
     private Stream? dumping = dumpHeaderOutput;
 
     /// <summary>
+    /// Gets the <c>--trace-config smtp</c> lines the session writes as it steps (BL-1163);
+    /// <see cref="SmtpStateTrace.Off" /> unless the handler traces its state machine.
+    /// </summary>
+    public SmtpStateTrace Trace { get; init; } = SmtpStateTrace.Off;
+
+    /// <summary>
     /// Gets whether <see cref="QuitAsync" /> has sent <c>QUIT</c>, so a failed transfer ends
     /// with curl's <c>shutting down</c> line rather than its <c>closing</c> one.
     /// </summary>

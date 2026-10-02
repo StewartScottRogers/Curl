@@ -377,6 +377,7 @@ choices do not need one.
 | [0365](ADR-0365-the-openssl-builds-tls12-hello-pads-and-its-quic-hello-never-does.md) | The OpenSSL build's TLS 1.2-ceiling hello pads a 256-to-511-byte hello to 512, and its QUIC hello never pads (BL-1156) | Accepted | 2026-10-02 |
 | [0366](ADR-0366-a-failed-resolve-writes-curls-could-not-resolve-and-dns-filter-lines.md) | A failed resolve writes curl's `Could not resolve` lines and, under `--trace-config dns`, the filter's exit 6 and async teardown lines (BL-1157) | Accepted | 2026-10-02 |
 | [0367](ADR-0367-a-completed-ech-handshake-writes-curls-ech-result-line.md) | A completed `--ech` handshake writes curl's `ECH: result:` line after `SSL connection using` (BL-1170) | Accepted | 2026-10-02 |
+| [0368](ADR-0368-trace-config-smtp-writes-curls-smtp-state-machine-lines.md) | `--trace-config smtp` (and `protocol`, `all`) writes curl 8.21.0's `[SMTP]` state machine lines from the SMTP handler; under the trace the body and its end-of-data mark are separate data events, as measured (BL-1163) | Accepted | 2026-10-02 |
 
 ## Template
 

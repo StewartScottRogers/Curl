@@ -96,6 +96,7 @@ internal sealed class SmtpSession(
             return TransferResult.Failure(failure.ExitCode, failure.Message);
         }
 
+        channel.Trace.PerformStarts();
         return await SendMailOrCommandsAsync().ConfigureAwait(false);
     }
 
@@ -141,6 +142,7 @@ internal sealed class SmtpSession(
 
     private async ValueTask<TransferResult?> OpenAsync()
     {
+        channel.Trace.Enter("SERVERGREET");
         SmtpReply greeting = await ReadReplyAsync().ConfigureAwait(false);
         if (!greeting.IsCompletion)
         {
@@ -153,7 +155,7 @@ internal sealed class SmtpSession(
 
     private async ValueTask<TransferResult?> GreetAsync()
     {
-        SmtpReply ehlo = await ExchangeAsync("EHLO " + domain).ConfigureAwait(false);
+        SmtpReply ehlo = await ExchangeAsync("EHLO " + domain, "EHLO").ConfigureAwait(false);
         capabilities = ehlo.IsCompletion ? ehlo : null;
         if (ehlo.IsCompletion)
         {
@@ -167,7 +169,7 @@ internal sealed class SmtpSession(
 
     private async ValueTask<TransferResult?> HeloAsync()
     {
-        SmtpReply helo = await ExchangeAsync("HELO " + domain).ConfigureAwait(false);
+        SmtpReply helo = await ExchangeAsync("HELO " + domain, "HELO").ConfigureAwait(false);
         return helo.IsCompletion
             ? null
             : TransferResult.Failure(CurlExitCode.RemoteAccessDenied, SmtpSessionMessages.RemoteAccessDenied(helo.Code));
@@ -196,7 +198,7 @@ internal sealed class SmtpSession(
     /// </summary>
     private async ValueTask<TransferResult?> StartTlsAsync()
     {
-        SmtpReply startTls = await ExchangeAsync(StartTlsKeyword).ConfigureAwait(false);
+        SmtpReply startTls = await ExchangeAsync(StartTlsKeyword, StartTlsKeyword).ConfigureAwait(false);
         if (startTls.Code == StartTlsAccepted)
         {
             return await UpgradeAsync().ConfigureAwait(false);
@@ -216,6 +218,7 @@ internal sealed class SmtpSession(
     /// </summary>
     private async ValueTask<TransferResult?> UpgradeAsync()
     {
+        channel.Trace.Enter("UPGRADETLS");
         ConnectResult secured = await tlsProvider
             .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.Events, context.CancellationToken)
             .ConfigureAwait(false);
@@ -236,9 +239,11 @@ internal sealed class SmtpSession(
         return await GreetAsync().ConfigureAwait(false);
     }
 
-    private async ValueTask<SmtpReply> ExchangeAsync(string command)
+    /// <summary>Sends <paramref name="command" />, which puts curl's state machine in <paramref name="state" />, and reads its reply.</summary>
+    private async ValueTask<SmtpReply> ExchangeAsync(string command, string state)
     {
         await channel.SendAsync(command).ConfigureAwait(false);
+        channel.Trace.Enter(state);
         return await ReadReplyAsync().ConfigureAwait(false);
     }
 

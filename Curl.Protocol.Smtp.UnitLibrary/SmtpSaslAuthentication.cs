@@ -320,6 +320,7 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
         await (inline is null
             ? channel.SendAsync(command)
             : channel.SendAsync(command + " " + inline, command + " " + SmtpDiagnosticLogLines.SaslResponseNotLogged)).ConfigureAwait(false);
+        channel.Trace.Enter("AUTH");
         return inline is null ? (initialResponse, false) : (null, true);
     }
 
