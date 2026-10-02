@@ -1,5 +1,5 @@
 ---
-id: BL-1170
+id: BL-1174
 title: Write the --libcurl setopt lines for the FTP, TFTP, telnet, mail, SSH, verbose, upload, protocol and remaining options
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1170 — Write the --libcurl setopt lines for the FTP, TFTP, telnet, mail, SSH, verbose, upload, protocol and remaining options
+# BL-1174 — Write the --libcurl setopt lines for the FTP, TFTP, telnet, mail, SSH, verbose, upload, protocol and remaining options
 
 ## Goal
 
