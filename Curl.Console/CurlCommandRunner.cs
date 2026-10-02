@@ -2480,6 +2480,7 @@ internal sealed class CurlCommandRunner(
             RetryCount = Running.RetryCount,
             SslVerifyResult = Running.SslVerifyResult,
             ProxySslVerifyResult = Running.ProxySslVerifyResult,
+            TlsEarlyDataSent = Running.TlsEarlyDataSent,
         };
     }
 
@@ -2648,8 +2649,9 @@ internal sealed class CurlCommandRunner(
     /// connects, whose lines carry <c>[&lt;xfer&gt;-x] </c>, as curl 8.21.0 marked
     /// <c>Added a.test:1:127.0.0.1 to DNS cache</c> <c>[0-x]</c> and the lines after it <c>[0-0]</c>
     /// (measured 2026-09-29, BL-648 Notes). With <c>-w</c> the events also record the certificate
-    /// verify codes <c>%{ssl_verify_result}</c> and <c>%{proxy_ssl_verify_result}</c> print
-    /// (<see cref="VerifyResultRecordingTransferEvents" />, BL-661); nothing else reads them.
+    /// verify codes <c>%{ssl_verify_result}</c> and <c>%{proxy_ssl_verify_result}</c> print and the
+    /// early data bytes <c>%{tls_earlydata}</c> prints (<see cref="TlsResultRecordingTransferEvents" />,
+    /// BL-661, BL-1150); nothing else reads them.
     /// Where <c>-w</c> or <c>--trace-ids</c> prints it, a transfer that reuses a connection takes that connection's <c>%{conn_id}</c> (<see cref="ConnectionIdRecordingTransferEvents" />, BL-1052).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
@@ -2660,7 +2662,7 @@ internal sealed class CurlCommandRunner(
         RunningTransferState state = Running;
         Func<long> takeConnectionId = () => state.ConnectionId ??= nextConnectionId++;
         ITransferEvents events = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
-        ITransferEvents recorded = options.WriteOut is null ? events : new VerifyResultRecordingTransferEvents(events, state);
+        ITransferEvents recorded = options.WriteOut is null ? events : new TlsResultRecordingTransferEvents(events, state);
         state.Events = options.WriteOut is null && !options.TraceIds
             ? recorded
             : new ConnectionIdRecordingTransferEvents(recorded, state, connectionIdsByPoolNumber, takeConnectionId);

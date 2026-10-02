@@ -59,7 +59,7 @@ public sealed partial class CurlCompositionTests
         // http://example.invalid/ -> "0 18" (curl 8.18.0, OpenSSL 3.5.5, 2026-09-30, BL-661 Notes).
         RunningTransferState state = NewRunningTransferState();
 
-        ConnectResult result = await LoopbackProxyHandshakeAsync(_ => [], new VerifyResultRecordingTransferEvents(NoTransferEvents.Instance, state));
+        ConnectResult result = await LoopbackProxyHandshakeAsync(_ => [], new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         Assert.AreEqual(18L, state.ProxySslVerifyResult);
@@ -74,7 +74,7 @@ public sealed partial class CurlCompositionTests
         // curl 8.21.0 (Schannel) prints 0 for both, whatever it found (ADR-0043).
         RunningTransferState state = NewRunningTransferState();
 
-        ConnectResult result = await LoopbackProxyHandshakeAsync(_ => [], new VerifyResultRecordingTransferEvents(NoTransferEvents.Instance, state));
+        ConnectResult result = await LoopbackProxyHandshakeAsync(_ => [], new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         Assert.AreEqual(0L, state.ProxySslVerifyResult);

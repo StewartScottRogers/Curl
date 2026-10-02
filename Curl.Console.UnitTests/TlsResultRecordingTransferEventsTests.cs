@@ -4,18 +4,18 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins <see cref="VerifyResultRecordingTransferEvents" />: each certificate verify code lands on
+/// Pins <see cref="TlsResultRecordingTransferEvents" />: each certificate verify code lands on
 /// the running transfer, the origin's and the proxy's apart, and every event goes on to the
-/// transfer's own events unchanged (BL-661).
+/// transfer's own events unchanged (BL-661); so do the early data bytes sent (BL-1150).
 /// </summary>
 [TestClass]
-public sealed class VerifyResultRecordingTransferEventsTests
+public sealed class TlsResultRecordingTransferEventsTests
 {
     [TestMethod]
     public void ReportCertificateVerifyResult_OriginsAndProxys_RecordsEachOnTheRunningTransfer()
     {
         RunningTransferState state = NewState();
-        ITransferEvents events = new VerifyResultRecordingTransferEvents(NoTransferEvents.Instance, state);
+        ITransferEvents events = new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state);
 
         events.ReportCertificateVerifyResult(20, isProxy: true);
         events.ReportCertificateVerifyResult(18, isProxy: false);
@@ -25,20 +25,34 @@ public sealed class VerifyResultRecordingTransferEventsTests
     }
 
     [TestMethod]
-    public void NoCodeReported_LeavesBothZero()
+    [DataRow(512L)]
+    [DataRow(-512L)]
+    public void ReportTlsEarlyData_RecordsTheBytesOnTheRunningTransfer(long bytes)
     {
         RunningTransferState state = NewState();
-        _ = new VerifyResultRecordingTransferEvents(NoTransferEvents.Instance, state);
+        ITransferEvents events = new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state);
+
+        events.ReportTlsEarlyData(bytes);
+
+        Assert.AreEqual(bytes, state.TlsEarlyDataSent);
+    }
+
+    [TestMethod]
+    public void NothingReported_LeavesEveryResultZero()
+    {
+        RunningTransferState state = NewState();
+        _ = new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state);
 
         Assert.AreEqual(0L, state.SslVerifyResult);
         Assert.AreEqual(0L, state.ProxySslVerifyResult);
+        Assert.AreEqual(0L, state.TlsEarlyDataSent);
     }
 
     [TestMethod]
     public void EveryEvent_GoesOnToTheInnerEvents()
     {
         CallRecordingEvents inner = new();
-        ITransferEvents events = new VerifyResultRecordingTransferEvents(inner, NewState());
+        ITransferEvents events = new TlsResultRecordingTransferEvents(inner, NewState());
 
         events.ReportInfo("text");
         events.ReportConnectionOpened(null!);
@@ -48,6 +62,7 @@ public sealed class VerifyResultRecordingTransferEventsTests
         events.ReportTlsMessage(null!);
         events.ReportTlsTrust(null!);
         events.ReportCertificateVerifyResult(18, isProxy: false);
+        events.ReportTlsEarlyData(-7);
         events.ReportRequestHeader([2]);
         events.ReportResponseHeader([3]);
         events.ReportDataSent([4]);
@@ -57,7 +72,7 @@ public sealed class VerifyResultRecordingTransferEventsTests
             new[]
             {
                 "Info text", "Opened", "Reused", "Handshake", "TlsData 1 True", "TlsMessage", "TlsTrust",
-                "VerifyResult 18 False", "RequestHeader 2", "ResponseHeader 3", "DataSent 4", "DataReceived 5",
+                "VerifyResult 18 False", "EarlyData -7", "RequestHeader 2", "ResponseHeader 3", "DataSent 4", "DataReceived 5",
             },
             inner.Calls);
     }
@@ -88,6 +103,8 @@ public sealed class VerifyResultRecordingTransferEventsTests
         public void ReportTlsTrust(TlsTrustEvent trust) => Calls.Add("TlsTrust");
 
         public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) => Calls.Add($"VerifyResult {verifyResult} {isProxy}");
+
+        public void ReportTlsEarlyData(long bytes) => Calls.Add($"EarlyData {bytes}");
 
         public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => Calls.Add($"RequestHeader {bytes[0]}");
 

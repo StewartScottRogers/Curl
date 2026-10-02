@@ -46,6 +46,9 @@ internal sealed class ConnectionIdRecordingTransferEvents(
     public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) => inner.ReportCertificateVerifyResult(verifyResult, isProxy);
 
     /// <inheritdoc />
+    public void ReportTlsEarlyData(long bytes) => inner.ReportTlsEarlyData(bytes);
+
+    /// <inheritdoc />
     public void ReportInfo(string text) => inner.ReportInfo(text);
 
     /// <inheritdoc />

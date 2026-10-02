@@ -3,15 +3,23 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Console;
 
 /// <summary>
-/// Passes every event on to <paramref name="inner" /> unchanged and records each reported
-/// certificate verify code on <paramref name="state" />, the origin's as
-/// <see cref="RunningTransferState.SslVerifyResult" /> and an HTTPS proxy's as
-/// <see cref="RunningTransferState.ProxySslVerifyResult" />, for <c>-w</c> to print (BL-661).
+/// Passes every event on to <paramref name="inner" /> unchanged and records the TLS results
+/// <c>-w</c> prints on <paramref name="state" />: each reported certificate verify code, the
+/// origin's as <see cref="RunningTransferState.SslVerifyResult" /> and an HTTPS proxy's as
+/// <see cref="RunningTransferState.ProxySslVerifyResult" /> (BL-661), and the TLS 1.3 early data
+/// bytes sent as <see cref="RunningTransferState.TlsEarlyDataSent" /> (BL-1150).
 /// </summary>
 /// <param name="inner">The transfer's own events.</param>
-/// <param name="state">The running transfer the codes belong to.</param>
-internal sealed class VerifyResultRecordingTransferEvents(ITransferEvents inner, RunningTransferState state) : ITransferEvents
+/// <param name="state">The running transfer the results belong to.</param>
+internal sealed class TlsResultRecordingTransferEvents(ITransferEvents inner, RunningTransferState state) : ITransferEvents
 {
+    /// <inheritdoc />
+    public void ReportTlsEarlyData(long bytes)
+    {
+        state.TlsEarlyDataSent = bytes;
+        inner.ReportTlsEarlyData(bytes);
+    }
+
     /// <inheritdoc />
     public void ReportCertificateVerifyResult(long verifyResult, bool isProxy)
     {
