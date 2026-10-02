@@ -1,5 +1,5 @@
 ---
-id: BL-1199
+id: BL-1202
 title: Report the hand-built TLS client's OpenSSL-build handshake -v lines before its exit 60 and exit 35
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1199 — Report the hand-built TLS client's OpenSSL-build handshake -v lines before its exit 60 and exit 35
+# BL-1202 — Report the hand-built TLS client's OpenSSL-build handshake -v lines before its exit 60 and exit 35
 
 ## Goal
 

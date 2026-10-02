@@ -46,7 +46,7 @@ OpenSSL build prints them before a `--pinnedpubkey` refusal, as `SslStreamTlsPro
 - Hand-built: `Curl.Tls` now hands the verifier the version, suite and ALPN protocol (`ServerCertificateChain` init properties), kept as `HandBuiltCertificateVerifier.Presented`; `HandBuiltHandshake.NegotiatedBy` turns it into the event's facts. Every failed event now carries the hash, so `PeerVerification.ReportPinnedPublicKeyRefusal` lost its `failedHandshakeReported` parameter and hash line.
 - Complexity: `SslStreamTlsProvider.AuthenticateAsClientAsync` and `OpenSslHandshakeText.Lines` went to 12; the choice moved into `ReportFailedHandshake` (`certificateRefused`) and the certificate lines into `AddCertificateLines`.
 - Gates: build clean with `-warnaserror`, all fast tests green, `Measure-CodeQuality.ps1` 100/100 and 0 failing members for Networking, Tls and Output.
-- Follow-up filed: BL-1199, the hand-built client's own exit 60 and exit 35 lines.
+- Follow-up filed: BL-1202, the hand-built client's own exit 60 and exit 35 lines.
 
 ## Log
 
