@@ -35,3 +35,4 @@ A subscribed `mqtt://` transfer that receives a PUBLISH whose remaining length i
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
