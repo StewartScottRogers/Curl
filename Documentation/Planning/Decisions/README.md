@@ -372,6 +372,7 @@ choices do not need one.
 | [0360](ADR-0360-a-tls-1-0-or-1-1-minimum-runs-on-the-hand-built-client.md) | A `--tlsv1.0` or `--tlsv1.1` minimum runs on the hand-built client whatever the ceiling, so a TLS 1.0 or 1.1 server connects where the operating system's stack refuses those versions (BL-1143; amends ADR-0140) | Accepted | 2026-10-02 |
 | [0361](ADR-0361-a-stale-digest-401-or-407-is-answered-again-without-limit.md) | A Digest `401` or forward proxy `407` challenged with `stale=true` is answered afresh with the new nonce, without limit, as curl 8.21.0 does (BL-1148) | Accepted | 2026-10-02 |
 | [0362](ADR-0362-libcurl-writes-nothing-for-options-the-schannel-build-refuses.md) | `--libcurl` writes no line for the options curl's Schannel build refuses, and no `smb`/`smbs` in `--proto all` (BL-1174). | 2026-10-02 |
+| [0363](ADR-0363-a-failed-tls-handshake-reports-the-lines-curl-prints-before-it.md) | A failed TLS handshake is reported as a `TlsHandshakeEvent` marked `Failed`, so `-v` prints the Schannel build's ALPN offer and the OpenSSL build's certificate details before a `--pinnedpubkey` refusal (BL-1149) | Accepted | 2026-10-02 |
 
 ## Template
 

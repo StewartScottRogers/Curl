@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Security;
 using System.Runtime.ExceptionServices;
+using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
@@ -237,7 +238,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     {
         var (handshake, thrown) = await TryHandshakeAsync(run.Plaintext, run.Prepared, earlyData, cancellationToken).ConfigureAwait(false);
         run.Prepared.Verifier.Observed.ReportVerifyResult(run.Events, run.IsProxy, _matchesSchannelBuild);
-        run.Prepared.Verifier.Observed.ReportPinnedPublicKeyRefusal(run.Events, _matchesSchannelBuild);
+        var failedHandshakeReported = !Completed(handshake) && ReportFailedHandshake(run);
+        run.Prepared.Verifier.Observed.ReportPinnedPublicKeyRefusal(run.Events, _matchesSchannelBuild, failedHandshakeReported);
         if (!Completed(handshake))
         {
             return (null, await FailAsync(run.Plaintext, run.Events, run.Prepared, handshake?.Failure, thrown).ConfigureAwait(false));
@@ -251,6 +253,31 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         });
         CertificateStatusText.Report(run.Events, handshake.CertificateStatus);
         return (handshake, null);
+    }
+
+    // The Schannel build prints its ALPN offer, and a refused pin's hash, before a failed
+    // handshake (ADR-0363, BL-1149). The OpenSSL build's lines need the version and suite a
+    // failed hand-built handshake does not keep, so it reports the hash line alone, as before.
+    private bool ReportFailedHandshake(HandshakeRun run)
+    {
+        if (!_matchesSchannelBuild)
+        {
+            return false;
+        }
+
+        run.Events.ReportTlsHandshake(new TlsHandshakeEvent
+        {
+            ProtocolVersion = SslProtocols.None,
+            CipherSuite = null,
+            NegotiatedApplicationProtocol = null,
+            OfferedApplicationProtocols = run.OfferedApplicationProtocols,
+            ServerCertificate = null,
+            CertificateVerified = false,
+            PinnedPublicKeyHash = run.Prepared.Verifier.Observed.PinnedPublicKeyHash,
+            IsProxy = run.IsProxy,
+            Failed = true,
+        });
+        return true;
     }
 
     private HandBuiltTlsConnection ConnectionOver(HandBuiltHandshake handshake, HandshakeRun run) =>

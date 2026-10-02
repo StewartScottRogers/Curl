@@ -42,7 +42,8 @@ internal static class TransferEventInfoText
 
     /// <summary>
     /// Returns the lines a curl build prints for a finished handshake: for Schannel the ALPN
-    /// lines, none when no protocol was offered; for OpenSSL those and
+    /// lines, none when no protocol was offered, and only the offer for a
+    /// <see cref="TlsHandshakeEvent.Failed"/> one (BL-1149); for OpenSSL those and
     /// <see cref="OpenSslHandshakeText"/>'s. A QUIC handshake under Schannel gets curl.se's
     /// LibreSSL lines, since that is the build that speaks HTTP/3 on Windows (ADR-0144).
     /// </summary>
@@ -108,8 +109,9 @@ internal static class TransferEventInfoText
 
     private static IReadOnlyList<string> SchannelLines(TlsHandshakeEvent handshake, IReadOnlyList<string> alpnLines)
     {
+        // A failed handshake never reached the server's ALPN answer (BL-1149).
         var hashLines = PinnedPublicKeyHashLines(handshake);
-        return [.. alpnLines.Take(1), .. hashLines, .. alpnLines.Skip(1)];
+        return [.. alpnLines.Take(1), .. hashLines, .. alpnLines.Skip(handshake.Failed ? 2 : 1)];
     }
 
     private static IReadOnlyList<string> AlpnLines(TlsHandshakeEvent handshake)

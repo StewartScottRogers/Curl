@@ -101,4 +101,11 @@ public sealed record TlsHandshakeEvent
     /// or <see langword="null" /> when no <c>sha256//</c> pin was checked (ADR-0336, BL-877).
     /// </summary>
     public string? PinnedPublicKeyHash { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the handshake failed, so that only the lines a curl build
+    /// prints before its failure are printed: the Schannel build's ALPN offer and
+    /// <c> public key hash:</c> line, all of the OpenSSL build's (ADR-0363, BL-1149).
+    /// </summary>
+    public bool Failed { get; init; }
 }

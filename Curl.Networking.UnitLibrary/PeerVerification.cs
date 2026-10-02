@@ -58,20 +58,22 @@ internal sealed record PeerVerification(bool Verified, long? VerifyResult, ReadO
     /// <summary>
     /// Reports the <c>-v</c> lines curl prints when <c>--pinnedpubkey</c> refuses the server's
     /// key, before the exit 90 failure (ADR-0336, BL-877): <c> public key hash:</c> for a
-    /// <c>sha256//</c> pin, then <c>SSL: public key does not match pinned public key</c>, twice
-    /// in the Schannel build (its own line and its error echoed) and once in the OpenSSL build
-    /// (the error echoed). Nothing is reported when the pin did not refuse the key.
+    /// <c>sha256//</c> pin, unless the failed handshake's event already carries it (ADR-0363,
+    /// BL-1149), then <c>SSL: public key does not match pinned public key</c>, twice in the
+    /// Schannel build (its own line and its error echoed) and once in the OpenSSL build (the
+    /// error echoed). Nothing is reported when the pin did not refuse the key.
     /// </summary>
     /// <param name="events">Where the lines go.</param>
     /// <param name="matchesSchannelBuild">Whether the provider behaves as curl's Schannel build.</param>
-    internal void ReportPinnedPublicKeyRefusal(ITransferEvents events, bool matchesSchannelBuild)
+    /// <param name="failedHandshakeReported">Whether a failed <see cref="TlsHandshakeEvent" /> carrying the hash was reported.</param>
+    internal void ReportPinnedPublicKeyRefusal(ITransferEvents events, bool matchesSchannelBuild, bool failedHandshakeReported)
     {
         if (!PinnedPublicKeyRefused)
         {
             return;
         }
 
-        if (PinnedPublicKeyHash is { } hash)
+        if (!failedHandshakeReported && PinnedPublicKeyHash is { } hash)
         {
             events.ReportInfo(PinnedPublicKeyHashLinePrefix + hash);
         }

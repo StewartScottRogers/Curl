@@ -71,6 +71,47 @@ public sealed class TransferEventInfoTextPinnedPublicKeyTests
         Assert.AreEqual(" SSL certificate verification failed, continuing anyway!", lines[^1]);
     }
 
+    [TestMethod]
+    public void TlsHandshake_SchannelFailedWithAHashPin_PrintsTheAlpnOfferThenTheHash()
+    {
+        // curl 8.21.0 Schannel -v -k --pinnedpubkey sha256//<wrong>, measured 2026-10-02 (BL-1149).
+        var lines = TransferEventInfoText.TlsHandshake(Handshake(null, ["http/1.1"]) with { PinnedPublicKeyHash = Hash, Failed = true }, TlsBackend.Schannel);
+
+        CollectionAssert.AreEqual(new[] { "ALPN: curl offers http/1.1", " public key hash: " + Hash }, lines.ToArray());
+    }
+
+    [TestMethod]
+    public void TlsHandshake_SchannelFailedWithoutAPin_PrintsOnlyTheAlpnOffer()
+    {
+        // curl 8.21.0 Schannel -v, an untrusted certificate, exit 60, measured 2026-10-02 (BL-1149).
+        var lines = TransferEventInfoText.TlsHandshake(Handshake(null, ["http/1.1"]) with { Failed = true }, TlsBackend.Schannel);
+
+        CollectionAssert.AreEqual(new[] { "ALPN: curl offers http/1.1" }, lines.ToArray());
+    }
+
+    [TestMethod]
+    public void TlsHandshake_OpenSslFailedWithAHashPin_PrintsTheCertificateDetailsBeforeTheHash()
+    {
+        // curl 8.18.0 OpenSSL -v -k --pinnedpubkey sha256//<wrong>, measured 2026-10-02 (BL-1149).
+        using var certificate = SelfSigned();
+
+        var lines = TransferEventInfoText.TlsHandshake(Handshake(certificate, ["http/1.1"]) with { PinnedPublicKeyHash = Hash, Failed = true }, TlsBackend.OpenSsl);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "ALPN: curl offers http/1.1",
+                "SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384 / [blank] / UNDEF",
+                "ALPN: server did not agree on a protocol. Uses default.",
+                "Server certificate:",
+                "  subject: CN=localhost",
+            },
+            lines.Take(5).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { " SSL certificate verification failed, continuing anyway!", " public key hash: " + Hash },
+            lines.TakeLast(2).ToArray());
+    }
+
     private static TlsHandshakeEvent Handshake(X509Certificate2? certificate, IReadOnlyList<string> offered)
     {
         return new TlsHandshakeEvent

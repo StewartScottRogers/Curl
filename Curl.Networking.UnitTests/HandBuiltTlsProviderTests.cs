@@ -668,13 +668,14 @@ public sealed partial class HandBuiltTlsProviderTests
     private static async Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeAsync(
         IHandshakeReportingTlsProvider provider,
         string targetHost,
-        RecordingTransferEvents? events = null)
+        RecordingTransferEvents? events = null,
+        IReadOnlyList<string>? applicationProtocols = null)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunEchoServerAsync(server, SslProtocols.Tls12);
 
         var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), targetHost, events ?? new RecordingTransferEvents(), false, [], CancellationToken.None);
+            new StreamConnection(client, ServerEndPoint), targetHost, events ?? new RecordingTransferEvents(), false, applicationProtocols ?? [], CancellationToken.None);
 
         var plaintextDisposed = client.IsDisposed;
         if (plaintextDisposed)
