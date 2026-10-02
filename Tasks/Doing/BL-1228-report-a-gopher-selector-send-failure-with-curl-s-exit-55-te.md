@@ -34,3 +34,4 @@ A `gopher://` or `gophers://` transfer whose selector cannot be sent ends with e
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
