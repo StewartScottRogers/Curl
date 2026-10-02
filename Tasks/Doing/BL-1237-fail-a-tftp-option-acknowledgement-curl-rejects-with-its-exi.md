@@ -41,3 +41,4 @@ A `tftp://` download or upload whose server answers with an OACK that curl 8.21.
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
