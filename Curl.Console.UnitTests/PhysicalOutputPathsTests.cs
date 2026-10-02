@@ -10,6 +10,9 @@ namespace Curl.Console;
 public sealed class PhysicalOutputPathsTests
 {
     private readonly PhysicalOutputPaths outputPaths = new();
+
+    // No regular-file test, as on Windows: every platform reaches the delete itself.
+    private readonly PhysicalOutputPaths windowsOutputPaths = new(isRegularFile: null);
     private readonly string root = Path.Combine(Path.GetTempPath(), "curl-output-paths-" + Guid.NewGuid().ToString("N"));
 
     [TestInitialize]
@@ -65,41 +68,68 @@ public sealed class PhysicalOutputPathsTests
     public void Exists_NothingThere_IsFalse() => Assert.IsFalse(outputPaths.Exists(Path.Combine(root, "missing")));
 
     [TestMethod]
-    public void TryDeleteFile_FileThere_DeletesIt()
+    public void RemoveFile_FileThere_RemovesIt()
     {
         string file = Path.Combine(root, "f");
         File.WriteAllText(file, "x");
 
-        Assert.IsTrue(outputPaths.TryDeleteFile(file));
+        Assert.AreEqual(OutputFileRemoval.Removed, windowsOutputPaths.RemoveFile(file));
         Assert.IsFalse(File.Exists(file));
     }
 
     [TestMethod]
-    public void TryDeleteFile_NothingThere_IsFalse() => Assert.IsFalse(outputPaths.TryDeleteFile(Path.Combine(root, "missing")));
+    public void RemoveFile_NothingThereNoRegularFileTest_Fails() => Assert.AreEqual(OutputFileRemoval.Failed, windowsOutputPaths.RemoveFile(Path.Combine(root, "missing")));
 
     [TestMethod]
-    public void TryDeleteFile_Directory_IsFalseAndLeavesIt()
+    public void RemoveFile_DirectoryNoRegularFileTest_FailsAndLeavesIt()
     {
-        Assert.IsFalse(outputPaths.TryDeleteFile(root));
+        Assert.AreEqual(OutputFileRemoval.Failed, windowsOutputPaths.RemoveFile(root));
         Assert.IsTrue(Directory.Exists(root));
     }
+
+    [TestMethod]
+    public void RemoveFile_RegularFileTestSaysNotRegular_IsNotRegularFileAndLeavesIt()
+    {
+        string file = Path.Combine(root, "dev");
+        File.WriteAllText(file, "x");
+        PhysicalOutputPaths outputPathsSeeingADevice = new(path => path != file);
+
+        Assert.AreEqual(OutputFileRemoval.NotRegularFile, outputPathsSeeingADevice.RemoveFile(file));
+        Assert.IsTrue(File.Exists(file));
+    }
+
+    [TestMethod]
+    public void RemoveFile_RegularFileTestSaysRegular_RemovesIt()
+    {
+        string file = Path.Combine(root, "f");
+        File.WriteAllText(file, "x");
+        PhysicalOutputPaths outputPathsSeeingAFile = new(path => path == file);
+
+        Assert.AreEqual(OutputFileRemoval.Removed, outputPathsSeeingAFile.RemoveFile(file));
+        Assert.IsFalse(File.Exists(file));
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void RemoveFile_DevNullOffWindows_IsNotRegularFile() =>
+        Assert.AreEqual(OutputFileRemoval.NotRegularFile, outputPaths.RemoveFile("/dev/null"));
 
     // Windows refuses to delete a file another handle holds open without FILE_SHARE_DELETE;
     // elsewhere the unlink succeeds, so the refusal is only reachable there.
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
-    public void TryDeleteFile_FileHeldOpen_IsFalseAndLeavesIt()
+    public void RemoveFile_FileHeldOpen_FailsAndLeavesIt()
     {
         string file = Path.Combine(root, "held");
         File.WriteAllText(file, "x");
 
-        bool deleted;
+        OutputFileRemoval removal;
         using (File.Open(file, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
         {
-            deleted = outputPaths.TryDeleteFile(file);
+            removal = windowsOutputPaths.RemoveFile(file);
         }
 
-        Assert.IsFalse(deleted);
+        Assert.AreEqual(OutputFileRemoval.Failed, removal);
         Assert.IsTrue(File.Exists(file));
     }
 

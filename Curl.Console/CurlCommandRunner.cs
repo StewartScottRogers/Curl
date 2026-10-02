@@ -1873,7 +1873,9 @@ internal sealed class CurlCommandRunner(
     /// <c>-v</c> or a <c>--trace</c> option, <c>-s</c> or not, standard error then gets
     /// <c>Note: Removed output file: &lt;file&gt;</c>, wrapped as a note is, and a file that
     /// cannot be deleted gets <c>Warning: Failed removing: &lt;file&gt;</c> unless <c>-s</c> was
-    /// given. A file the transfer never opened - a <c>-f</c> failure with no body written, a
+    /// given, and off Windows one that is not a regular file, such as <c>/dev/null</c>, is left
+    /// alone with <c>Warning: Skipping removal; not a regular file: &lt;file&gt;</c> unless
+    /// <c>-s</c> was given (measured 2026-10-01, BL-752 Notes). A file the transfer never opened - a <c>-f</c> failure with no body written, a
     /// failed connect - is left as it is, even one there before the transfer (measured
     /// 2026-09-28, BL-494 Notes). The transfer's exit code and message are unchanged.
     /// </summary>
@@ -1887,9 +1889,10 @@ internal sealed class CurlCommandRunner(
             return;
         }
 
-        if (!OutputPaths.TryDeleteFile(openedFile))
+        OutputFileRemoval removal = OutputPaths.RemoveFile(openedFile);
+        if (removal != OutputFileRemoval.Removed)
         {
-            await WriteWarningUnlessSilentAsync(options, $"Warning: Failed removing: {openedFile}").ConfigureAwait(false);
+            await WriteWarningUnlessSilentAsync(options, RemovalWarningLine(removal, openedFile)).ConfigureAwait(false);
         }
         else if (options.Trace != TraceKind.None)
         {
@@ -1897,6 +1900,17 @@ internal sealed class CurlCommandRunner(
                 .ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Gives curl 8.21.0's warning for a <c>--remove-on-error</c> output file that was not removed.
+    /// </summary>
+    /// <param name="removal">What became of the file: not a regular file, or a failed delete.</param>
+    /// <param name="file">The file.</param>
+    /// <returns>The warning line.</returns>
+    private static string RemovalWarningLine(OutputFileRemoval removal, string file) =>
+        removal == OutputFileRemoval.NotRegularFile
+            ? $"Warning: Skipping removal; not a regular file: {file}"
+            : $"Warning: Failed removing: {file}";
 
     /// <summary>
     /// Performs one transfer: rewrites an <c>ipfs://</c> or <c>ipns://</c> URL to its gateway URL,

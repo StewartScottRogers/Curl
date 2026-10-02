@@ -429,12 +429,14 @@ wrapped as a note is. The check comes before the proxy is chosen, so a bad `-x` 
 skipped transfer; later URLs still run, as in curl 8.21.0 (BL-493 Notes).
 
 Under `--remove-on-error` a transfer that fails deletes the output file it opened, through
-`IOutputPaths.TryDeleteFile`, after its failure lines and progress-bar newline and before its
+`IOutputPaths.RemoveFile`, after its failure lines and progress-bar newline and before its
 `-w` output; the exit code and message stay the failure's. A file the transfer never opened - a
 `-f` failure that wrote no body, a failed connect - is left alone, even one there before. Under
 `-v` or a `--trace` option, even with `-s`, standard error gets `Note: Removed output file:
 <file>`, wrapped as a note is; a file that cannot be deleted (`NUL` included) gets `Warning:
-Failed removing: <file>` unless `-s`. `--remove-on-error` beside `-C` is refused while parsing,
+Failed removing: <file>` unless `-s`. Off Windows a path that is not a regular file
+(`/dev/null`, as `NativeRegularFileTest`'s `stat` tells) is not deleted and gets `Warning:
+Skipping removal; not a regular file: <file>` unless `-s` (ADR-0332, BL-752 Notes). `--remove-on-error` beside `-C` is refused while parsing,
 as in curl 8.21.0 (BL-494 Notes).
 
 A URL paired with `--out-null` (or `--no-out-null`, which curl 8.21.0 treats the same) sends its

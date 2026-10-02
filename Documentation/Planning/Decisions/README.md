@@ -341,6 +341,7 @@ choices do not need one.
 | [0329](ADR-0329-ftp-reply-lines-go-to-the-d-file.md) | FTP control reply lines go to the `-D` file in arrival order, `QUIT`'s excepted; a refused write is exit 23 | Accepted | 2026-10-01 |
 | [0330](ADR-0330-no-sessionid-and-ssl-allow-beast-run-on-the-hand-built-client-which-resumes-by-default.md) | `--no-sessionid` and `--ssl-allow-beast` run on the hand-built client, which offers the run's sessions by default; `--ssl-allow-beast` routes only a range reaching TLS 1.0 | Accepted | 2026-10-01 |
 | [0331](ADR-0331-a-tls-1-0-or-1-1-ceiling-connects-through-the-hand-built-client-on-every-platform.md) | A TLS 1.0 or 1.1 ceiling connects through the hand-built client on every platform, as curl's Schannel build does, though the LibreSSL and OpenSSL builds refuse (measured) | Accepted | 2026-10-01 |
+| [0332](ADR-0332-remove-on-error-tells-a-non-regular-output-file-through-the-runtimes-stat-shim.md) | `--remove-on-error` tells a non-regular output file apart through the runtime's `stat` shim and prints curl's `Skipping removal` warning off Windows (measured) | Accepted | 2026-10-01 |
 
 ## Template
 
