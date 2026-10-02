@@ -8,7 +8,7 @@ depends-on: [BL-714]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-02
 ---
 # BL-1143 — Connect with a TLS 1.0 or 1.1 minimum alone where the operating system's TLS stack refuses those versions
 
@@ -24,13 +24,17 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Networking.UnitTests` completes a transfer with `MinimumVersion: Tls10` (and `Tls11`) and no ceiling against `LegacyTlsTestServer`, as both builds, with no operating-system TLS stack involved.
-- [ ] A test shows the same options against a TLS 1.2-or-later server still negotiating TLS 1.2 or later.
-- [ ] An ADR records the routing choice; `dotnet build` is clean and the fast tests pass.
+- [x] A test in `Curl.Networking.UnitTests` completes a transfer with `MinimumVersion: Tls10` (and `Tls11`) and no ceiling against `LegacyTlsTestServer`, as both builds, with no operating-system TLS stack involved.
+- [x] A test shows the same options against a TLS 1.2-or-later server still negotiating TLS 1.2 or later.
+- [x] An ADR records the routing choice; `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decision (ADR-0360): route every TLS 1.0 or 1.1 minimum to the hand-built client in `TlsClientRouting` (a new last row of ADR-0140's table) rather than retry after an `SslStream` refusal; a retry needs a fresh connection from the connector, a platform-specific refusal classification and a second connect trace. Cost: `--tlsv1.0`/`--tlsv1.1` against a modern server now send the hand-built ClientHello, still negotiating TLS 1.2 or 1.3.
+- Tests: `TlsClientRoutingTests.Choose_WithATls10OrTls11Minimum_IsTheHandBuiltClient` replaces `Choose_WithATls10MinimumAlone_IsSslStream`; `HandBuiltTlsProviderTests.LegacyVersions.cs` adds a legacy-server transfer test and a modern-server (TLS 1.2 / 1.3 `SslStream` server) negotiation test, both builds.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. --tlsv1.0/--tlsv1.1 alone run on the hand-built client and connect to TLS 1.0/1.1 servers on every platform (ADR-0360)
