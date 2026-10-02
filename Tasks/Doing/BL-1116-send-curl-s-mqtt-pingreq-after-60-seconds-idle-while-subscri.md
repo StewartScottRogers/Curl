@@ -37,3 +37,4 @@ While an `mqtt://` transfer waits for the next packet, it sends a PINGREQ (`C0 0
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
