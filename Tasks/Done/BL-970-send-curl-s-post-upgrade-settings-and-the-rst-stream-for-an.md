@@ -59,7 +59,7 @@ HTTP/1.1 upgrade request; every case starts with the preface
 ### Decisions
 
 - The RST_STREAM applies to every HTTP/2 stream whose body is discarded (retry or followed
-  redirect), not just upgraded ones, and the discarded body is no longer read: ADR-0342.
+  redirect), not just upgraded ones, and the discarded body is no longer read: ADR-0343.
   HTTP/3 is unchanged (unmeasured).
 - The post-upgrade SETTINGS is written by `Http2Session` straight to the connection before
   the first stream it opens after `StartUpgradedStreamAsync`; `Curl.Http2.UnitLibrary` (not
