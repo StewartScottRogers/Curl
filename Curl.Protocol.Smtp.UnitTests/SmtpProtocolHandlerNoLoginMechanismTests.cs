@@ -34,6 +34,7 @@ public sealed class SmtpProtocolHandlerNoLoginMechanismTests
     [DataRow("FOO", "user", null, "AUTH=PLAIN", Offered, DisplayName = "AUTH=PLAIN against AUTH FOO")]
     [DataRow(DefaultMechanisms, null, "tok", null, Overlap, DisplayName = "--oauth2-bearer against AUTH PLAIN LOGIN CRAM-MD5")]
     [DataRow("LOGIN", "user", null, "AUTH=PLAIN", Overlap, DisplayName = "AUTH=PLAIN against AUTH LOGIN")]
+    [DataRow("PLAIN", "user", null, "AUTH=EXTERNAL", Overlap, DisplayName = "AUTH=EXTERNAL against AUTH PLAIN")]
     [DataRow("SCRAM-SHA-256", null, "tok", null, Overlap, DisplayName = "--oauth2-bearer against AUTH SCRAM-SHA-256")]
     [DataRow("SCRAM-SHA-256 PLAIN", "user", null, "AUTH=PLAIN", Overlap, DisplayName = "AUTH=PLAIN against AUTH SCRAM-SHA-256 PLAIN")]
     public async Task ExecuteAsync_NoMechanismUsable_WritesTheSaslLineBeforeClosing(
@@ -63,6 +64,69 @@ public sealed class SmtpProtocolHandlerNoLoginMechanismTests
         CollectionAssert.AreEqual(
             (string[])["< 250 AUTH " + mechanisms + "\r\n", Selectable, .. notBuiltIn, Closing],
             events.Transcript.TakeLast(notBuiltIn.Length + 3).ToArray());
+    }
+
+    /// <summary>
+    /// Pins the reasons curl 8.21.0 gives after <c>no auth mechanism offered could be selected</c>,
+    /// recorded on 2026-10-02 with <c>-v -u user:secret</c> (BL-1242 Notes).
+    /// </summary>
+    [TestMethod]
+    [DataRow("XOAUTH2", null, new[] { "XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER" }, DisplayName = "AUTH XOAUTH2")]
+    [DataRow("OAUTHBEARER", null, new[] { "OAUTHBEARER is missing CURLOPT_XOAUTH2_BEARER" }, DisplayName = "AUTH OAUTHBEARER")]
+    [DataRow(
+        "OAUTHBEARER XOAUTH2 SCRAM-SHA-1",
+        null,
+        new[] { "SCRAM-SHA-1 not builtin", "OAUTHBEARER is missing CURLOPT_XOAUTH2_BEARER", "XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER" },
+        DisplayName = "AUTH OAUTHBEARER XOAUTH2 SCRAM-SHA-1")]
+    [DataRow("EXTERNAL", "AUTH=EXTERNAL", new[] { "auth EXTERNAL not chosen with password" }, DisplayName = "AUTH=EXTERNAL against AUTH EXTERNAL")]
+    [DataRow("EXTERNAL XOAUTH2", "AUTH=*", new[] { "XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER" }, DisplayName = "AUTH=* against AUTH EXTERNAL XOAUTH2")]
+    [DataRow("EXTERNAL XOAUTH2", null, new[] { "XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER" }, DisplayName = "AUTH EXTERNAL XOAUTH2")]
+    public async Task ExecuteAsync_UserGivenAndNoneChosen_WritesThatNoneCouldBeSelectedAndWhy(
+        string mechanisms, string? loginOptions, string[] reasons)
+    {
+        (SmtpRun run, RecordingTransferEvents events) = await RunAsync(mechanisms, "user", null, loginOptions);
+
+        string[] expected = ["< 250 AUTH " + mechanisms + "\r\n", Selectable, .. reasons.Select(reason => "* SASL: " + reason), Closing];
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
+        Assert.AreEqual("EHLO x\r\n", run.Sent);
+        CollectionAssert.AreEqual(expected, events.Transcript.TakeLast(expected.Length).ToArray());
+    }
+
+    /// <summary>
+    /// With <c>--oauth2-bearer</c> beside <c>-u</c>, curl 8.21.0 writes <c>no overlap</c> for
+    /// an offered SCRAM-SHA-1 rather than naming it (recorded 2026-10-02, BL-1242 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_UserAndBearerTokenAgainstScram_WritesNoOverlap()
+    {
+        (SmtpRun run, RecordingTransferEvents events) = await RunAsync("SCRAM-SHA-1", "user", "tok", null);
+
+        Assert.AreEqual(CurlExitCode.LoginDenied, run.Result.ExitCode);
+        CollectionAssert.AreEqual((string[])[Overlap, Closing], events.Transcript.TakeLast(2).ToArray());
+    }
+
+    /// <summary>
+    /// <c>-u user:</c> gives no password, so <c>AUTH=EXTERNAL</c> leaves curl no reason to
+    /// name; an authenticator that still chooses nothing gets <c>no overlap</c>.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ExternalRequiredWithoutPasswordAndNoneChosen_WritesNoOverlap()
+    {
+        var events = new RecordingTransferEvents();
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(Url),
+            Output = Stream.Null,
+            Credentials = new NetworkCredential("user", string.Empty),
+            Mail = new MailRequestOptions { LoginOptions = "AUTH=EXTERNAL" },
+            Events = events,
+        };
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(
+            context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + Ehlo("EXTERNAL"))), new FakeSaslAuthenticator(null, null));
+
+        Assert.AreEqual(CurlExitCode.LoginDenied, run.Result.ExitCode);
+        CollectionAssert.AreEqual((string[])[Overlap, Closing], events.Transcript.TakeLast(2).ToArray());
     }
 
     [TestMethod]

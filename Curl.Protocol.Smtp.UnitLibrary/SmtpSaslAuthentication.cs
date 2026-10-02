@@ -1,3 +1,4 @@
+using System.Net;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Smtp;
@@ -14,7 +15,7 @@ namespace Curl.Protocol.Smtp;
 /// <item>Nothing to authenticate with - no <c>-u</c>, no <c>--oauth2-bearer</c>, and not
 /// <c>AUTH=EXTERNAL</c> with <c>EXTERNAL</c> offered: no authentication.</item>
 /// <item>No usable mechanism among those offered: exit 67 <c>Login denied</c>, nothing sent,
-/// after the <c>-v</c> <c>SASL:</c> line curl writes for it (BL-1061).</item>
+/// after the <c>-v</c> <c>SASL:</c> lines curl writes for it (BL-1061, BL-1242).</item>
 /// <item>Under <c>--sasl-ir</c> the initial response goes on the <c>AUTH</c> line while the
 /// mechanism's name and the base64 fit in 504 characters; otherwise it answers the first
 /// <c>334</c>. An empty message is sent as <c>=</c>.</item>
@@ -59,6 +60,12 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     /// its <c>-v</c> names them when one of them is all that could be used (BL-1061).
     /// </summary>
     private static readonly string[] NotBuiltInMechanisms = ["SCRAM-SHA-256", "SCRAM-SHA-1"];
+
+    /// <summary>
+    /// The mechanisms that need <c>--oauth2-bearer</c>, in the order curl 8.21.0's <c>-v</c>
+    /// names them when one of them was offered without it (BL-1242).
+    /// </summary>
+    private static readonly string[] BearerTokenMechanisms = ["OAUTHBEARER", "XOAUTH2"];
 
     /// <summary>How many challenges the current exchange has been handed.</summary>
     private int challengesHanded;
@@ -259,23 +266,21 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     }
 
     /// <summary>
-    /// Writes the <c>-v</c> lines curl 8.21.0's SASL code writes when no mechanism can be used
-    /// (BL-1061): when the only offered mechanisms a user and the login options allow are
-    /// SCRAM, which curl's Schannel build does not build in, that none could be selected and
-    /// one line naming each; otherwise <c>no overlap</c> once a mechanism curl knows was
-    /// offered, and <c>no auth mechanism was offered or recognized</c> when none was.
+    /// Writes the <c>-v</c> lines curl 8.21.0's <c>Curl_sasl_is_blocked</c> writes when no
+    /// mechanism can be used (BL-1061, BL-1242): when a user was given and a mechanism the
+    /// login options allow was offered but not chosen, that none could be selected and why
+    /// each was not; otherwise <c>no overlap</c> once a mechanism curl knows was offered, and
+    /// <c>no auth mechanism was offered or recognized</c> when none was.
     /// </summary>
     private void ReportNoWayToLogIn(SaslRequest request, List<string> offered)
     {
-        string[] notBuiltIn = request.Credential is null
-            ? []
-            : [.. NotBuiltInMechanisms.Where(mechanism => Allows(request.RequiredMechanism, mechanism) && offered.Contains(mechanism, StringComparer.OrdinalIgnoreCase))];
-        if (notBuiltIn.Length > 0)
+        List<string> reasons = ReasonsNoneWasChosen(request, offered);
+        if (reasons.Count > 0)
         {
             context.Events.ReportInfo(SmtpConnectionInfoLines.NoSaslMechanismSelectable);
-            foreach (string mechanism in notBuiltIn)
+            foreach (string reason in reasons)
             {
-                context.Events.ReportInfo(SmtpConnectionInfoLines.SaslMechanismNotBuiltIn(mechanism));
+                context.Events.ReportInfo(reason);
             }
         }
         else
@@ -284,6 +289,38 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
                 offered.Any(KnownMechanisms.Contains) ? SmtpConnectionInfoLines.NoSaslMechanismOverlap : SmtpConnectionInfoLines.NoSaslMechanismOffered);
         }
     }
+
+    /// <summary>
+    /// Lists, in curl's order, why each offered mechanism the login options allow was not
+    /// chosen when a user was given without <c>--oauth2-bearer</c>: EXTERNAL named by
+    /// <c>AUTH=EXTERNAL</c> with a password, SCRAM not built in, and OAUTHBEARER and XOAUTH2
+    /// missing the token. curl offers nothing but the bearer mechanisms once a token is
+    /// given, so then there is no reason to list (measured 2026-10-02, BL-1242).
+    /// </summary>
+    /// <returns>The lines, empty without a user, with a token, or when none applies.</returns>
+    private static List<string> ReasonsNoneWasChosen(SaslRequest request, List<string> offered) =>
+        request is { Credential: { } credential, BearerToken: null }
+            ? [.. ExternalReason(request, credential, offered),
+                .. MechanismReasons(request, offered, NotBuiltInMechanisms, SmtpConnectionInfoLines.SaslMechanismNotBuiltIn),
+                .. MechanismReasons(request, offered, BearerTokenMechanisms, SmtpConnectionInfoLines.SaslMechanismMissingBearerToken)]
+            : [];
+
+    /// <summary>
+    /// curl passes over EXTERNAL, named by <c>AUTH=EXTERNAL</c> and offered, when <c>-u</c>
+    /// gave a password (<c>sasl_choose_external</c>).
+    /// </summary>
+    private static string[] ExternalReason(SaslRequest request, NetworkCredential credential, List<string> offered) =>
+        credential.Password.Length > 0 && External.Equals(request.RequiredMechanism, StringComparison.OrdinalIgnoreCase) && IsOffered(offered, External)
+            ? [SmtpConnectionInfoLines.SaslExternalNotChosenWithPassword]
+            : [];
+
+    private static IEnumerable<string> MechanismReasons(SaslRequest request, List<string> offered, string[] mechanisms, Func<string, string> line) =>
+        mechanisms.Where(mechanism => IsAllowedAndOffered(request, offered, mechanism)).Select(line);
+
+    private static bool IsAllowedAndOffered(SaslRequest request, List<string> offered, string mechanism) =>
+        Allows(request.RequiredMechanism, mechanism) && IsOffered(offered, mechanism);
+
+    private static bool IsOffered(List<string> offered, string mechanism) => offered.Contains(mechanism, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Whether <c>AUTH=</c> allows <paramref name="mechanism" />: absent, <c>*</c>, or naming it.</summary>
     private static bool Allows(string? requiredMechanism, string mechanism) =>
