@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Ntlm.UnitLibrary, Curl.Ntlm.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1114 — Tell an NTLM AUTHENTICATE message too big for its responses from one too big for its names
 
@@ -24,14 +24,20 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Ntlm.UnitTests/NtlmAuthenticateMessageTests.cs`: an NT response that takes the message past 1024 bytes after the header gives the responses value; responses that fit but names that reach 1024 bytes give the names value; a message of exactly 1023 bytes encodes, one of 1024 does not (the `>=` check), and responses ending at exactly 1024 bytes pass the first check (the `>` check).
-- [ ] The existing `TryEncode(out byte[]? message)` returns what it returned before for every case (existing tests unchanged and passing).
-- [ ] `NtlmMessageFailure.TooLarge` no longer exists, and no file in the solution names it.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Ntlm.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] New tests in `Curl.Ntlm.UnitTests/NtlmAuthenticateMessageTests.cs`: an NT response that takes the message past 1024 bytes after the header gives the responses value; responses that fit but names that reach 1024 bytes give the names value; a message of exactly 1023 bytes encodes, one of 1024 does not (the `>=` check), and responses ending at exactly 1024 bytes pass the first check (the `>` check).
+- [x] The existing `TryEncode(out byte[]? message)` returns what it returned before for every case (existing tests unchanged and passing).
+- [x] `NtlmMessageFailure.TooLarge` no longer exists, and no file in the solution names it.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Ntlm.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- Added `TryEncode(out byte[]? message, out NtlmMessageFailure failure)`; the old overload forwards to it and discards the failure, so its results are unchanged. `TooLarge` is split into `ResponsesTooLarge` (curl's `>` check) and `NamesTooLarge` (its `>=` check), checked in curl's order.
+- Responses ending at exactly 1024 bytes pass the first check; with empty names the message is then 1024 bytes and the second check refuses it as `NamesTooLarge`, as in curl.
+- Measured: Curl.Ntlm.UnitLibrary 100% line, 100% branch, 46 members, 0 failing, worst CRAP 10. Ntlm tests: 66 passed; fast suite green.
+- Follow-up filed: BL-1135 (use the new overload in Curl.Authentication.UnitLibrary so Curl prints `incoming NTLM message too big`).
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. NtlmAuthenticateMessage.TryEncode reports ResponsesTooLarge or NamesTooLarge, telling curl's two NTLM_BUFSIZE checks apart

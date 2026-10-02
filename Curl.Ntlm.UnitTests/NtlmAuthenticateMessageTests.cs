@@ -100,4 +100,58 @@ public sealed class NtlmAuthenticateMessageTests
         Assert.IsTrue(message.TryEncode(out byte[]? encoded));
         Assert.HasCount(NtlmAuthenticateMessage.CurlBufferSize - 1, encoded);
     }
+
+    [TestMethod]
+    public void TryEncodeWithFailure_ResponsesPastTheBuffer_ReportsResponsesTooLarge()
+    {
+        byte[] ntResponse = new byte[NtlmAuthenticateMessage.CurlBufferSize - NtlmAuthenticateMessage.HeaderLength - 24 + 1];
+        NtlmAuthenticateMessage message = new(NtlmNegotiateFlags.None, LmResponse, ntResponse, string.Empty, string.Empty, string.Empty);
+
+        Assert.IsFalse(message.TryEncode(out byte[]? encoded, out NtlmMessageFailure failure));
+        Assert.IsNull(encoded);
+        Assert.AreEqual(NtlmMessageFailure.ResponsesTooLarge, failure);
+    }
+
+    [TestMethod]
+    public void TryEncodeWithFailure_ResponsesFitButNamesReachTheBuffer_ReportsNamesTooLarge()
+    {
+        NtlmAuthenticateMessage message = new(NtlmNegotiateFlags.None, LmResponse, NtResponse, "DOM", new string('u', 1000), string.Empty);
+
+        Assert.IsFalse(message.TryEncode(out byte[]? encoded, out NtlmMessageFailure failure));
+        Assert.IsNull(encoded);
+        Assert.AreEqual(NtlmMessageFailure.NamesTooLarge, failure);
+    }
+
+    [TestMethod]
+    public void TryEncodeWithFailure_MessageOf1023Bytes_EncodesWithNoFailure()
+    {
+        byte[] ntResponse = new byte[NtlmAuthenticateMessage.CurlBufferSize - NtlmAuthenticateMessage.HeaderLength - 24 - 2];
+        NtlmAuthenticateMessage message = new(NtlmNegotiateFlags.None, LmResponse, ntResponse, string.Empty, "u", string.Empty);
+
+        Assert.IsTrue(message.TryEncode(out byte[]? encoded, out NtlmMessageFailure failure));
+        Assert.HasCount(1023, encoded);
+        Assert.AreEqual(NtlmMessageFailure.None, failure);
+    }
+
+    [TestMethod]
+    public void TryEncodeWithFailure_MessageOf1024Bytes_ReportsNamesTooLarge()
+    {
+        byte[] ntResponse = new byte[NtlmAuthenticateMessage.CurlBufferSize - NtlmAuthenticateMessage.HeaderLength - 24 - 1];
+        NtlmAuthenticateMessage message = new(NtlmNegotiateFlags.None, LmResponse, ntResponse, string.Empty, "u", string.Empty);
+
+        Assert.IsFalse(message.TryEncode(out _, out NtlmMessageFailure failure));
+        Assert.AreEqual(NtlmMessageFailure.NamesTooLarge, failure);
+    }
+
+    [TestMethod]
+    public void TryEncodeWithFailure_ResponsesEndingAtExactly1024Bytes_PassTheResponsesCheck()
+    {
+        // curl's first check is ntresplen + size > NTLM_BUFSIZE, so responses ending at 1024 pass
+        // it; the empty names still make a 1024-byte message, which the second (>=) check refuses.
+        byte[] ntResponse = new byte[NtlmAuthenticateMessage.CurlBufferSize - NtlmAuthenticateMessage.HeaderLength - 24];
+        NtlmAuthenticateMessage message = new(NtlmNegotiateFlags.None, LmResponse, ntResponse, string.Empty, string.Empty, string.Empty);
+
+        Assert.IsFalse(message.TryEncode(out _, out NtlmMessageFailure failure));
+        Assert.AreEqual(NtlmMessageFailure.NamesTooLarge, failure);
+    }
 }

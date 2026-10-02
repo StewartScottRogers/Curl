@@ -32,8 +32,17 @@ public enum NtlmMessageFailure
     AvPairListUnterminated,
 
     /// <summary>
-    /// The AUTHENTICATE message would exceed the 1024 bytes curl's <c>NTLM_BUFSIZE</c>
-    /// allows; curl fails such a message with <c>CURLE_TOO_LARGE</c>.
+    /// The AUTHENTICATE message's LM and NT responses run past the 1024 bytes of curl's
+    /// <c>NTLM_BUFSIZE</c> after the header; curl fails such a message with
+    /// <c>CURLE_TOO_LARGE</c> and prints <c>incoming NTLM message too big</c>.
     /// </summary>
-    TooLarge,
+    ResponsesTooLarge,
+
+    /// <summary>
+    /// The AUTHENTICATE message's responses fit, but the domain, user and workstation after
+    /// them do not fit strictly inside curl's 1024-byte <c>NTLM_BUFSIZE</c>; curl fails such
+    /// a message with <c>CURLE_TOO_LARGE</c> and prints
+    /// <c>user + domain + hostname too big for NTLM</c>.
+    /// </summary>
+    NamesTooLarge,
 }
