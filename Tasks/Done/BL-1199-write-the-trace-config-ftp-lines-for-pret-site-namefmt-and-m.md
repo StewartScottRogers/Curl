@@ -38,7 +38,7 @@ Measured 2026-10-02, curl 8.21.0 Schannel, `Record-CurlExchange.ps1 -Ftp -FtpDat
 
 Delivered: `FtpStateTrace.StateOf` maps `PRET`, `MKD` and `SITE` (only `SITE NAMEFMT 1` goes through `ExchangeAsync`; `-Q` quotes use `QuoteSent`). 3 new trace tests, 1 new and 2 changed server-system rows; the test `MutableContext` gained `FtpSendPret`. FTP tests 562 green.
 
-Not done here: the `-r` range with a refused `-` post-quote (Context's last bullet) is not in this task's criteria; filed as BL-1200.
+Not done here: the `-r` range with a refused `-` post-quote (Context's last bullet) is not in this task's criteria; filed as BL-1201.
 
 ## Log
 

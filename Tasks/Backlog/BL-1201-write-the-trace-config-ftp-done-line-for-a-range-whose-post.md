@@ -1,5 +1,5 @@
 ---
-id: BL-1200
+id: BL-1201
 title: Write the --trace-config ftp done line for a range whose post-quote is refused
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1200 — Write the --trace-config ftp done line for a range whose post-quote is refused
+# BL-1201 — Write the --trace-config ftp done line for a range whose post-quote is refused
 
 ## Goal
 
