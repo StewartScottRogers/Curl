@@ -210,6 +210,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
         var peerKey = SessionPeerKey(targetHost, plaintext.RemoteEndPoint);
         var session = OfferedSession(peerKey);
+        ReportReusedSession(events, session);
         prepared = prepared with { Settings = prepared.Settings with { ResumptionSession = session } };
         var handshakeStarted = _timeProvider.GetTimestamp();
         var handshakeRun = new HandshakeRun(plaintext, targetHost, events, isProxy, prepared, offeredApplicationProtocols, peerKey);
@@ -257,6 +258,16 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         {
             TicketEvents = _matchesSchannelBuild ? run.Events : null,
         };
+
+    // The OpenSSL build's line for a session it offers (openssl.c, after SSL_set_session; BL-1142),
+    // with the session's ALPN protocol or '-', as measured; the Schannel build prints none.
+    private void ReportReusedSession(ITransferEvents events, TlsSessionRecord? session)
+    {
+        if (session is not null && !_matchesSchannelBuild)
+        {
+            events.ReportInfo($"SSL reusing session with ALPN '{session.ApplicationProtocol ?? "-"}'");
+        }
+    }
 
     // --tls-earlydata (BL-1105): the ALPN protocol of a resumed TLS 1.3 session that allows
     // early data, when the connection offers it, as curl's Curl_on_session_reuse decides; else null.
