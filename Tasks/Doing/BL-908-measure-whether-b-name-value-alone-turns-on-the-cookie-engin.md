@@ -32,3 +32,4 @@ FR-098 and `Curl.Console/CookieEngine.cs` agree, by a measurement of real curl 8
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
