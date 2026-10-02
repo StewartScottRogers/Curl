@@ -24,8 +24,9 @@ namespace Curl.Protocol.Imap;
 /// kept; a line starting with the tag and a space completes the response; a line starting
 /// <c>* </c> is kept when the caller is interested in it and skipped otherwise; a
 /// continuation (<c>+ </c>, or <c>+</c> and one character) is refused unless
-/// <c>AUTHENTICATE</c> or <c>APPEND</c> is waiting for one; and any other line
-/// is skipped.
+/// <c>AUTHENTICATE</c> or <c>APPEND</c> is waiting for one; any other line
+/// is skipped; and a line holding a NUL byte is refused before it is reported (BL-1119),
+/// as <c>lib/pingpong.c</c> refuses it, while a streamed literal's bytes are not checked.
 /// </para>
 /// <para>
 /// A kept untagged line ending in a literal, <c>{n}</c>, is followed by its n bytes and the
@@ -404,12 +405,16 @@ internal sealed class ImapControlChannel(
             byte next = buffer[bufferStart++];
             if (next == (byte)'\n')
             {
-                byte[] text = [.. line];
+                // curl's pingpong reader refuses the line before -v sees it.
+                if (line.Contains(0))
+                {
+                    throw new ImapWeirdResponseException(ImapSessionMessages.NulByteInLine);
+                }
+
+                string text = Encoding.Latin1.GetString([.. line]);
                 line.Add(next);
                 ReportLine([.. line]);
-                return text.Contains((byte)0)
-                    ? throw new ImapWeirdResponseException(ImapSessionMessages.NulByteInLine)
-                    : Encoding.Latin1.GetString(text);
+                return text;
             }
 
             line.Add(next);

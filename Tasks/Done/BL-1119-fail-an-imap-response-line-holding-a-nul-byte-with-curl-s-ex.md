@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1119 — Fail an IMAP response line holding a NUL byte with curl's exit 8
 
@@ -24,13 +24,17 @@ An IMAP response line that contains a NUL byte ends the transfer with exit 8 `Nu
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Protocol.Imap.UnitTests` pin the two measured cases: exit 8 `Nul byte in server response line`, the `-v` events as measured (none for the NUL line), and no `LOGOUT` written to the scripted connection.
-- [ ] A test pins that a NUL inside an untagged `* LIST` line fails the same way, and one that a NUL inside a FETCH literal is written to the output unchanged and the transfer succeeds.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Imap.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] New tests in `Curl.Protocol.Imap.UnitTests` pin the two measured cases: exit 8 `Nul byte in server response line`, the `-v` events as measured (none for the NUL line), and no `LOGOUT` written to the scripted connection.
+- [x] A test pins that a NUL inside an untagged `* LIST` line fails the same way, and one that a NUL inside a FETCH literal is written to the output unchanged and the transfer succeeds.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Imap.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- The NUL refusal (`ImapWeirdResponseException` with `ImapSessionMessages.NulByteInLine`, exit 8, no LOGOUT) already existed from BL-553, but the line was reported to `-v` before the check. `ImapControlChannel.ReadLineAsync` now checks before `ReportLine`. New tests: `ImapProtocolHandlerNulByteTests` (greeting, CAPABILITY completion, `* LIST` line, FETCH literal).
+- The `* LIST` case pins the result, the commands sent and that the line is not reported; its closing `-v` line was not measured, so it is not pinned.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. An IMAP response line holding a NUL byte fails with exit 8 before -v reports it, with no LOGOUT; FETCH literals pass unchecked
