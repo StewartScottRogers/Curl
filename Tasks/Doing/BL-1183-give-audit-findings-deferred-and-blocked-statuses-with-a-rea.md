@@ -40,3 +40,4 @@ An audit finding can be `deferred` or `blocked` as well as `proposed`, `accepted
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
