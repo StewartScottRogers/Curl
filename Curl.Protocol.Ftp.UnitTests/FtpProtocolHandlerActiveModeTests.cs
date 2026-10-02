@@ -329,13 +329,14 @@ public sealed class FtpProtocolHandlerActiveModeTests
     public async Task ExecuteAsync_PortAddressNotLocalAndEprtRefused_RetriesTheBindAgainForPort()
     {
         // curl -v -P 192.0.2.1 ftp://127.0.0.1:47464/f.txt, EPRT and PORT answered 500 no
-        // (measured 2026-09-27, BL-464): each bind retries once, so the line is printed twice.
+        // (measured 2026-09-27, BL-464): each bind retries once, so the line is printed twice,
+        // with curl's "disabling EPRT usage" between them (BL-1239).
         var events = new RecordingTransferEvents();
         var listener = new QueuedListener(NotLocal, ListenResult.Listening(Pending(61200)), NotLocal, ListenResult.Listening(Pending(61201)));
         ActiveRun run = await RunAsync("/a.txt", "192.0.2.1", LoggedIn + Refused + Refused + Bye, context => context.Events = events, listener);
 
         Assert.AreEqual(LogInSent + "EPRT |1|192.0.2.1|61200|\r\nPORT 192,0,2,1,239,17\r\nQUIT\r\n", run.Sent);
-        CollectionAssert.AreEqual(new[] { NotLocalLine, NotLocalLine }, events.InfoPastTheEntryPath);
+        CollectionAssert.AreEqual(new[] { NotLocalLine, "disabling EPRT usage", NotLocalLine }, events.InfoPastTheEntryPath);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "Failed to do PORT"), run.Result);
     }
 

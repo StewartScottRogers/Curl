@@ -519,6 +519,29 @@ public sealed class FtpProtocolHandlerStateTraceTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_TracedAlternativeToUser_StaysInUserWithNoStateLine()
+    {
+        // curl --trace-config ftp -v --ftp-alternative-to-user "XALT alt", USER answered 530:
+        // curl's ftp_state_user_resp sends the alternative in state USER and stays there.
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            "220 Recorder ready\r\n530 No\r\n331 Password required\r\n230 Logged in\r\n221 Bye\r\n",
+            context => context.FtpAlternativeToUser = "XALT alt");
+
+        string[] expected =
+        [
+            "> USER anonymous",
+            "* [FTP] [WAIT220] -> [USER]",
+            "< 530 No",
+            "> XALT alt",
+            "< 331 Password required",
+            "> PASS ftp@example.com",
+            "* [FTP] [USER] -> [PASS]",
+        ];
+        CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "> USER anonymous").Take(expected.Length).ToArray());
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TracedQuotes_WritesTheQuoteAndPrequoteStatesAndThePostQuoteReply()
     {
         // curl -sS --trace-config ftp -v -Q NOOP -Q '-SITE x' -Q +HELP ftp://127.0.0.1:P/a.txt (BL-1197)

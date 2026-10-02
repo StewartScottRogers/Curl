@@ -685,7 +685,22 @@ public sealed class FtpProtocolHandlerTests
         FtpRun run = await FtpRun.ExecuteAsync(Url, control, new ScriptedConnection());
 
         Assert.AreEqual("USER anonymous\r\n", run.Sent);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failure when sending data to the peer"), run.Result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CommandSendReset_FailsWithExit55SendFailureConnectionWasReset()
+    {
+        var control = new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn))
+        {
+            WritesBeforeFailure = 1,
+            WriteFailure = new IOException("reset", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset)),
+        };
+
+        FtpRun run = await FtpRun.ExecuteAsync(Url, control, new ScriptedConnection());
+
+        Assert.AreEqual("USER anonymous\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), run.Result);
     }
 
     [TestMethod]

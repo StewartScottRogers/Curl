@@ -90,10 +90,10 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
     /// </summary>
     /// <param name="command">The command line without its line end, such as <c>TYPE I</c>.</param>
     /// <returns>
-    /// <see langword="true" /> when it was sent; <see langword="false" /> when the
-    /// connection failed with an <see cref="IOException" />.
+    /// <see langword="null" /> when it was sent; the <see cref="IOException" /> the
+    /// connection failed with otherwise, so a reset can be told from any other failure.
     /// </returns>
-    public async ValueTask<bool> TrySendAsync(string command)
+    public async ValueTask<IOException?> SendAsync(string command)
     {
         byte[] line = Encoding.Latin1.GetBytes(command + "\r\n");
         try
@@ -101,14 +101,14 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
             await connection.WriteAsync(line, CancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(CancellationToken).ConfigureAwait(false);
         }
-        catch (IOException)
+        catch (IOException failure)
         {
-            return false;
+            return failure;
         }
 
         reporting.ReportRequestHeader(line);
         diagnostics.CommandSent(command);
-        return true;
+        return null;
     }
 
     /// <summary>

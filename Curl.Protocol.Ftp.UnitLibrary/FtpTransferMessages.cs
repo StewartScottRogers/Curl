@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using System.Net.Sockets;
 
 namespace Curl.Protocol.Ftp;
 
@@ -68,8 +69,37 @@ internal static class FtpTransferMessages
         _ => UnsupportedModificationTimeReply,
     };
 
-    /// <summary>The exit 55 message for a command that could not be sent.</summary>
-    internal const string SendFailed = "Failure when sending data to the peer";
+    /// <summary>The exit 55 message for a command or upload write the peer reset.</summary>
+    internal const string SendConnectionReset = "Send failure: Connection was reset";
+
+    /// <summary>
+    /// The exit 55 message for any other failed command or upload write: curl 8.21.0's
+    /// <c>curl_easy_strerror(CURLE_SEND_ERROR)</c>.
+    /// </summary>
+    internal const string SendFailedToPeer = "Failed sending data to the peer";
+
+    /// <summary>
+    /// The exit 55 message for a write that threw <paramref name="exception" />: the reset
+    /// text for a <see cref="SocketError.ConnectionReset" />, otherwise curl's text for the code.
+    /// </summary>
+    /// <param name="exception">What the connection threw.</param>
+    /// <returns>The message.</returns>
+    internal static string SendFailed(IOException exception) =>
+        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
+            ? SendConnectionReset
+            : SendFailedToPeer;
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.21.0's <c>ftp_readresp</c> writes for a <c>421</c> reply,
+    /// before it fails the transfer with exit 28.
+    /// </summary>
+    internal const string Got421Timeout = "We got a 421 - timeout";
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.21.0's <c>ftp_state_port_resp</c> writes when <c>EPRT</c> is
+    /// refused and <c>PORT</c> follows.
+    /// </summary>
+    internal const string DisablingEprt = "disabling EPRT usage";
 
     /// <summary>The exit 56 message for a data connection that failed mid-transfer.</summary>
     internal const string ReceiveFailed = "Failure when receiving data from the peer";

@@ -769,9 +769,9 @@ internal sealed class FtpSession(
                 await data.WriteAsync(chunk, context.CancellationToken).ConfigureAwait(false);
                 await data.FlushAsync(context.CancellationToken).ConfigureAwait(false);
             }
-            catch (IOException)
+            catch (IOException failure)
             {
-                return TransferResult.Failure(CurlExitCode.SendError, FtpTransferMessages.SendFailed, bytesTransferred);
+                return TransferResult.Failure(CurlExitCode.SendError, FtpTransferMessages.SendFailed(failure), bytesTransferred);
             }
 
             context.Events.ReportDataSent(chunk.Span);
@@ -1049,11 +1049,15 @@ internal sealed class FtpSession(
         return null;
     }
 
-    /// <summary>Logs a refused <c>EPRT</c> that <c>PORT</c> follows, which only IPv4 has.</summary>
+    /// <summary>
+    /// Reports curl 8.21.0's <c>-v</c> line for, and logs, a refused <c>EPRT</c> that
+    /// <c>PORT</c> follows, which only IPv4 has.
+    /// </summary>
     private void WarnEprtRefused(bool ipv6)
     {
         if (!ipv6)
         {
+            context.Events.ReportInfo(FtpTransferMessages.DisablingEprt);
             log.EprtRefused();
         }
     }
@@ -1799,7 +1803,7 @@ internal sealed class FtpSession(
     /// </returns>
     private async ValueTask<FtpReply?> SendIgnoringReplyAsync(string command, Action? afterSent = null)
     {
-        if (!await control.TrySendAsync(command).ConfigureAwait(false))
+        if (await control.SendAsync(command).ConfigureAwait(false) is not null)
         {
             return null;
         }
@@ -1845,9 +1849,9 @@ internal sealed class FtpSession(
     /// <summary>Sends <paramref name="command" />, ending the conversation with exit 55 when it cannot be sent.</summary>
     private async ValueTask SendAsync(string command)
     {
-        if (!await control.TrySendAsync(command).ConfigureAwait(false))
+        if (await control.SendAsync(command).ConfigureAwait(false) is { } failure)
         {
-            throw Failed(CurlExitCode.SendError, FtpTransferMessages.SendFailed);
+            throw Failed(CurlExitCode.SendError, FtpTransferMessages.SendFailed(failure));
         }
     }
 
@@ -1882,7 +1886,13 @@ internal sealed class FtpSession(
         }
 
         lastReplyCode = reply.Code;
-        return reply.Code == 421 ? throw Failed(CurlExitCode.OperationTimedOut, closingMessage) : reply;
+        if (reply.Code == 421)
+        {
+            context.Events.ReportInfo(FtpTransferMessages.Got421Timeout);
+            throw Failed(CurlExitCode.OperationTimedOut, closingMessage);
+        }
+
+        return reply;
     }
 
     private FtpControlConversationFailedException Failed(CurlExitCode exitCode, string message) =>

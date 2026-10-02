@@ -144,6 +144,46 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_EprtRefused_ReportsDisablingEprtUsageBeforePort()
+    {
+        // curl -v -P 127.0.0.1 ftp://127.0.0.1:<port>/f.txt, EPRT answered 500 no (BL-1239).
+        DataRun run = await RunAsync(
+            "/file.txt",
+            LoggedIn + "500 no\r\n200 PORT command successful\r\n" + Retrieved,
+            context => context.FtpPort = "-",
+            pending: new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 55822), ConnectResult.Connected(new ScriptedConnection())),
+            portPending: new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 55823), ConnectResult.Connected(new ScriptedConnection(Encoding.Latin1.GetBytes(File)))));
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "> EPRT |1|127.0.0.1|55822|\r\n",
+                "< 500 no\r\n",
+                "* disabling EPRT usage",
+                "> PORT 127,0,0,1,218,15\r\n",
+                "< 200 PORT command successful\r\n",
+                "* Connect data stream actively",
+            },
+            run.Events.Transcript.SkipWhile(line => !line.StartsWith("> EPRT", StringComparison.Ordinal)).Take(6).ToArray());
+        Assert.AreEqual(TransferResult.Success(11), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Pwd421_ReportsWeGotA421TimeoutAndSendsNothingMore()
+    {
+        // curl -v ftp://127.0.0.1:<port>/f.txt, PWD answered 421 Timeout (BL-1239).
+        DataRun run = await RunAsync(
+            "/file.txt",
+            "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n421 Timeout\r\n",
+            _ => { });
+
+        CollectionAssert.AreEqual(
+            new[] { "> PWD\r\n", "< 421 Timeout\r\n", "* We got a 421 - timeout" },
+            run.Events.Transcript.Skip(5).ToArray());
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.OperationTimedOut, "Timeout was reached"), run.Result);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ActiveWithPort_ReportsTheActiveLineAfterPort()
     {
         // curl -v -P - --disable-eprt ftp://127.0.0.1:47931/file.txt
@@ -434,7 +474,8 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         ScriptedPendingConnection? pending = null,
         string host = Host,
         IPEndPoint? controlPeer = null,
-        long connectionNumber = 0)
+        long connectionNumber = 0,
+        ScriptedPendingConnection? portPending = null)
     {
         var events = new RecordingTransferEvents();
         var control = new ScriptedConnection(Encoding.Latin1.GetBytes(replies))
@@ -445,7 +486,8 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         var connector = new QueuedConnector(
             ConnectResult.Connected(control, timings: null, connectionNumber: connectionNumber),
             ConnectResult.Connected(data ?? new ScriptedConnection(Encoding.Latin1.GetBytes(File))));
-        var listener = pending is null ? new QueuedListener() : new QueuedListener(ListenResult.Listening(pending));
+        var listener = new QueuedListener(
+            new[] { pending, portPending }.OfType<ScriptedPendingConnection>().Select(p => ListenResult.Listening(p)).ToArray());
         var context = MutableContext.Build(
             new TransferContext { Url = CurlUrl.Parse($"ftp://{host}:{ControlPort}{path}"), Output = new MemoryStream() },
             mutable =>

@@ -278,7 +278,28 @@ public sealed class FtpProtocolHandlerUploadTests
             c => new TransferContext { Url = c.Url, Output = c.Output, Upload = Seekable(Upload) });
 
         Assert.AreEqual(LogInSent + PassiveSent + "STOR f.txt\r\n", run.Sent);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failure when sending data to the peer"), run.Result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), run.Result);
+        Assert.IsTrue(data.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DataConnectionResetMidUpload_FailsWithExit55ConnectionWasResetCountingTheBytesSent()
+    {
+        // The first 16384-byte chunk is sent; the second write is reset.
+        string upload = new('x', 16384 + 12);
+        var data = new ScriptedConnection
+        {
+            WritesBeforeFailure = 1,
+            WriteFailure = new IOException("reset", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset)),
+        };
+        FtpRun run = await FtpRun.ExecuteAsync(
+            Url,
+            new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn + Passive + Opened + Complete + Bye)),
+            data,
+            c => new TransferContext { Url = c.Url, Output = c.Output, Upload = Seekable(upload) });
+
+        Assert.AreEqual(16384, data.Sent.Length);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset", 16384), run.Result);
         Assert.IsTrue(data.IsDisposed);
     }
 

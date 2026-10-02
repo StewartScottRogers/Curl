@@ -37,6 +37,8 @@ public sealed class MutableContext
 
     public string? FtpAccount { get; set; }
 
+    public string? FtpAlternativeToUser { get; set; }
+
     public string? FtpPort { get; set; }
 
     public bool FtpUseEprt { get; set; } = true;
@@ -82,6 +84,7 @@ public sealed class MutableContext
             NoBody = mutable.NoBody,
             RemoteTime = mutable.RemoteTime,
             FtpAccount = mutable.FtpAccount,
+            FtpAlternativeToUser = mutable.FtpAlternativeToUser,
             HeaderOutput = mutable.HeaderOutput,
             FtpPort = mutable.FtpPort,
             FtpUseEprt = mutable.FtpUseEprt,
