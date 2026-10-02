@@ -41,7 +41,7 @@ Measured 2026-10-02, curl 8.21.0 Schannel, `Record-CurlExchange.ps1 -Ftp -FtpDat
 
 Delivered: `FtpStateTrace` maps the verbs above, writes the perform note once per DO phase, skips same-state changes, writes `EpsvRefused`, the quote states (`FtpQuoteStage`, new) and `Ended(CurlExitCode)` once per session (from `QuitAndSucceedAsync` after the post-quotes, from `EndRangeAsync`, and from `RunAsync` for any failure). `FtpSession` moved `ftp_state_retr()` to after `SIZE`, traces `ABOR`'s reply for a range, and sends quotes through `SendAsync` so their states are traced. 14 new tests in `FtpProtocolHandlerStateTraceTests`, two updated (the `CWD` state and the refused greeting's `done, result=8`); the test `MutableContext` gained `RemoteTime` and `FtpAccount`.
 
-Left as is, not measured: `PRET`, `SITE NAMEFMT 1` and `MKD` write no state change; a range whose post-quote is refused writes `done, result=0` (the end is written before the quotes there). Filed as BL-1198.
+Left as is, not measured: `PRET`, `SITE NAMEFMT 1` and `MKD` write no state change; a range whose post-quote is refused writes `done, result=0` (the end is written before the quotes there). Filed as BL-1199.
 
 ## Log
 

@@ -1,5 +1,5 @@
 ---
-id: BL-1198
+id: BL-1199
 title: Write the --trace-config ftp lines for PRET, SITE NAMEFMT and MKD
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1198 — Write the --trace-config ftp lines for PRET, SITE NAMEFMT and MKD
+# BL-1199 — Write the --trace-config ftp lines for PRET, SITE NAMEFMT and MKD
 
 ## Goal
 
