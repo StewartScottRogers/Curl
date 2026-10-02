@@ -22,6 +22,9 @@ public sealed class CurlCommandRunnerCookieTests
 
     private const string SetsCookie = "HTTP/1.1 200 OK\r\nSet-Cookie: got=g1\r\nContent-Length: 0\r\n\r\n";
 
+    private const string RedirectSetsCookie =
+        "HTTP/1.1 302 Found\r\nLocation: /2\r\nSet-Cookie: got=g1\r\nContent-Length: 0\r\n\r\n";
+
     private const string CookieFile =
         "# Netscape HTTP Cookie File\n127.0.0.1\tFALSE\t/\tFALSE\t0\tsess\ts1\n127.0.0.1\tFALSE\t/\tFALSE\t4102444800\tkeep\tk1\n";
 
@@ -252,6 +255,42 @@ public sealed class CurlCommandRunnerCookieTests
         ScriptedConnector server = Serve(SetsCookie, SetsCookie);
 
         await RunAsync(server, ["-s", "-b", "a=1", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
+
+        Assert.StartsWith(
+            $"GET /1 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\n",
+            Latin1(server.Written));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EmptyCookieFileNameForTwoUrls_SendsTheReceivedCookieOnTheSecond()
+    {
+        ScriptedConnector server = Serve(SetsCookie, SetsCookie);
+
+        await RunAsync(server, ["-s", "-b", "", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
+
+        Assert.StartsWith(
+            $"GET /1 HTTP/1.1\r\n{Head}\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: got=g1\r\n\r\n",
+            Latin1(server.Written));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_FollowedRedirectWithEmptyCookieFileName_SendsTheCookieSetByTheFirstHop()
+    {
+        ScriptedConnector server = Serve(RedirectSetsCookie, "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+
+        await RunAsync(server, ["-s", "-L", "-b", "", "http://127.0.0.1:18231/1"]);
+
+        Assert.StartsWith(
+            $"GET /1 HTTP/1.1\r\n{Head}\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: got=g1\r\n\r\n",
+            Latin1(server.Written));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_FollowedRedirectWithCookieStringOnly_NeverSendsTheCookieSetByTheFirstHop()
+    {
+        ScriptedConnector server = Serve(RedirectSetsCookie, "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+
+        await RunAsync(server, ["-s", "-L", "-b", "a=1", "http://127.0.0.1:18231/1"]);
 
         Assert.StartsWith(
             $"GET /1 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\n",
