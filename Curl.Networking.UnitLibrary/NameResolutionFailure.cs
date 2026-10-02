@@ -4,7 +4,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// The exit code and message for a host or proxy name that did not resolve, shared by
-/// <see cref="TcpConnector" /> and <see cref="UdpDatagramConnector" />: curl 8.21.0's
+/// <see cref="TcpConnector" />, <see cref="UdpDatagramConnector" /> and <see cref="SocksProxyTunnel" />: curl 8.21.0's
 /// <c>Could not resolve host: &lt;host&gt;</c> (or <c>proxy</c>), followed, when the resolver said
 /// why, by the reason in brackets as curl's c-ares build prints it, or exit 43
 /// <c>Error 43 resolving &lt;host&gt;:&lt;port&gt;</c> when the c-ares options did not parse

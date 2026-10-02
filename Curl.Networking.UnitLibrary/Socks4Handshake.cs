@@ -43,7 +43,7 @@ internal static class Socks4Handshake
         ProxyEndpoint proxy,
         string host,
         int port,
-        Func<string, int, CancellationToken, ValueTask<IReadOnlyList<IPAddress>>> resolve,
+        Func<string, int, CancellationToken, ValueTask<DnsResolution>> resolve,
         CancellationToken cancellationToken)
     {
         var userId = Encoding.UTF8.GetBytes(proxy.Credential?.UserName ?? string.Empty);
@@ -79,15 +79,15 @@ internal static class Socks4Handshake
     private static async ValueTask<(Socks4Destination Destination, ConnectResult? Failure)> LocallyResolvedDestinationAsync(
         string host,
         int port,
-        Func<string, int, CancellationToken, ValueTask<IReadOnlyList<IPAddress>>> resolve,
+        Func<string, int, CancellationToken, ValueTask<DnsResolution>> resolve,
         CancellationToken cancellationToken)
     {
-        var addresses = SocksProxyTunnel.ParseAddressLiteral(host) is { } literal
-            ? [literal]
+        var (addresses, failure) = SocksProxyTunnel.ParseAddressLiteral(host) is { } literal
+            ? new DnsResolution([literal], DnsLookupFailure.None)
             : await resolve(host, port, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
-            return (default, SocksProxyTunnel.CouldNotResolve(host));
+            return (default, SocksProxyTunnel.CouldNotResolve(host, port, failure));
         }
 
         return addresses.FirstOrDefault(address => address.AddressFamily == AddressFamily.InterNetwork) is { } ipv4

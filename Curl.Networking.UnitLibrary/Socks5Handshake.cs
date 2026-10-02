@@ -49,7 +49,7 @@ internal static class Socks5Handshake
         ProxyEndpoint proxy,
         string host,
         int port,
-        Func<string, int, CancellationToken, ValueTask<IReadOnlyList<IPAddress>>> resolve,
+        Func<string, int, CancellationToken, ValueTask<DnsResolution>> resolve,
         Socks5AuthenticationOptions authentication,
         CancellationToken cancellationToken)
     {
@@ -156,7 +156,7 @@ internal static class Socks5Handshake
         int port,
         byte[]? hostName,
         IPAddress? literal,
-        Func<string, int, CancellationToken, ValueTask<IReadOnlyList<IPAddress>>> resolve,
+        Func<string, int, CancellationToken, ValueTask<DnsResolution>> resolve,
         CancellationToken cancellationToken)
     {
         var (address, failure) = hostName is not null
@@ -176,15 +176,15 @@ internal static class Socks5Handshake
         string host,
         int port,
         IPAddress? literal,
-        Func<string, int, CancellationToken, ValueTask<IReadOnlyList<IPAddress>>> resolve,
+        Func<string, int, CancellationToken, ValueTask<DnsResolution>> resolve,
         CancellationToken cancellationToken)
     {
-        var addresses = literal is not null
-            ? [literal]
+        var (addresses, failure) = literal is not null
+            ? new DnsResolution([literal], DnsLookupFailure.None)
             : await resolve(host, port, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
-            return ([], SocksProxyTunnel.CouldNotResolve(host));
+            return ([], SocksProxyTunnel.CouldNotResolve(host, port, failure));
         }
 
         var address = addresses[0];

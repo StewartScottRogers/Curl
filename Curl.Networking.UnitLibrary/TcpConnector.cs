@@ -744,10 +744,6 @@ public sealed partial class TcpConnector(
         }
     }
 
-    /// <summary>Resolves as <see cref="ResolveWithFailureReasonAsync" /> does, for a SOCKS handshake, which needs only the addresses.</summary>
-    private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken) =>
-        (await ResolveWithFailureReasonAsync(host, port, target, cancellationToken).ConfigureAwait(false)).Addresses;
-
     /// <summary>Asks the resolver, with its failure reason when it gives one.</summary>
     private async ValueTask<DnsResolution> LookUpAsync(string host, CancellationToken cancellationToken) =>
         dnsResolver is IDnsResolverWithFailureReason withFailureReason
@@ -1167,7 +1163,7 @@ public sealed partial class TcpConnector(
                 proxy,
                 destination.Host,
                 destination.Port,
-                (host, port, token) => ResolveAsync(host, port, target, token),
+                (host, port, token) => ResolveWithFailureReasonAsync(host, port, target, token),
                 Socks5Authentication,
                 cancellationToken).ConfigureAwait(false), null);
         }

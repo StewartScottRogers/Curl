@@ -59,6 +59,50 @@ public sealed partial class TcpConnectorTests
         CollectionAssert.AreEqual(new[] { new IPEndPoint(Loopback, 47500) }, dialer.DialedEndPoints);
     }
 
+    [TestMethod]
+    [DataRow(ProxyKind.Socks4)]
+    [DataRow(ProxyKind.Socks5)]
+    public async Task ConnectAsync_ThroughALocallyResolvingSocksProxyToAHostTheResolverExplains_AddsTheReason(ProxyKind kind)
+    {
+        // curl -x socks5://172.26.96.1:15380 --dns-servers <NXDOMAIN> http://bl829.example:1/ ->
+        // curl: (6) Could not resolve host: bl829.example (Domain name not found), socks4 alike (BL-829)
+        var (result, proxyConnection) = await ConnectThroughExplainedSocksAsync(kind, DnsLookupFailure.NotFound);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.AreEqual("Could not resolve host: bl829.example (Domain name not found)", result.ErrorMessage);
+        Assert.IsTrue(proxyConnection.IsDisposed);
+    }
+
+    [TestMethod]
+    [DataRow(ProxyKind.Socks4)]
+    [DataRow(ProxyKind.Socks5)]
+    public async Task ConnectAsync_ThroughALocallyResolvingSocksProxyWithABadDnsConfiguration_FailsWithExit43(ProxyKind kind)
+    {
+        // curl -x socks4://172.26.96.1:15380 --dns-servers bogus http://bl829.example:1/ ->
+        // curl: (43) Error 43 resolving bl829.example:1, socks5 alike (BL-829)
+        var (result, proxyConnection) = await ConnectThroughExplainedSocksAsync(kind, DnsLookupFailure.BadConfiguration);
+
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
+        Assert.AreEqual("Error 43 resolving bl829.example:1", result.ErrorMessage);
+        Assert.IsTrue(proxyConnection.IsDisposed);
+    }
+
+    private static async Task<(ConnectResult Result, ScriptedConnection ProxyConnection)> ConnectThroughExplainedSocksAsync(ProxyKind kind, DnsLookupFailure failure)
+    {
+        var proxyConnection = new ScriptedConnection([0x05, 0x00]);
+        var connector = new TcpConnector(
+            new ReasoningDnsResolver(new DnsResolution([], failure)),
+            new FakeTcpDialer { DialOutcome = _ => proxyConnection },
+            new FakeTlsProvider(),
+            new ManualTimeProvider(),
+            resolveOverrides: ResolveOverrides.Parse(["socks.example:1080:192.0.2.10"]));
+
+        var result = await connector.ConnectAsync(
+            new ConnectTarget("bl829.example", 1, UseTls: false) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, null) },
+            CancellationToken.None);
+        return (result, proxyConnection);
+    }
+
     private static TcpConnector CreateExplainedConnector(ReasoningDnsResolver resolver, FakeTcpDialer dialer) =>
         new(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider());
 }

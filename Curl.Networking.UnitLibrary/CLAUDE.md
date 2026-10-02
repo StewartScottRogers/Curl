@@ -370,7 +370,7 @@ parse is `DnsLookupFailure.BadConfiguration`, exit 43. Without `--dns-servers` i
 over UDP), to the servers in list order for `Rounds` rounds, waiting `FirstTimeout` doubled each
 round on its `TimeProvider`; a truncated reply is asked again over TCP. Replies are matched
 (`DnsReplyMatch`) and read through `DnsAnswerDecoder` into a `DnsQueryOutcome`. It implements
-`IDnsResolverWithFailureReason`, so `TcpConnector` and `UdpDatagramConnector` add c-ares' reason
+`IDnsResolverWithFailureReason`, so `TcpConnector` (the SOCKS4 and SOCKS5 local resolve included, BL-829) and `UdpDatagramConnector` add c-ares' reason
 (`DnsLookupFailureText`) in brackets, or make it exit 43, through `NameResolutionFailure`.
 `ResolveServiceAsync` looks up SRV records for Kerberos KDC location (BL-689). Sockets come from
 `IDnsSocketOpener`; tests use `Fakes/ScriptedDnsSocketOpener` and `ManualTimeProvider`.
