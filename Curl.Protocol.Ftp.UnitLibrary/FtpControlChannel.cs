@@ -82,6 +82,9 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
 
     private int bufferEnd;
 
+    /// <summary>The bytes the reply being read has taken so far, line ends included.</summary>
+    private int replyByteCount;
+
     /// <summary>
     /// Sends <paramref name="command" /> followed by CRLF.
     /// </summary>
@@ -127,13 +130,14 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
     public async ValueTask<FtpReply?> ReadReplyAsync()
     {
         string? firstLine = null;
+        replyByteCount = 0;
         while (await ReadLineAsync().ConfigureAwait(false) is { } line)
         {
             firstLine ??= line;
             if (TryParseLastLine(line, out int code))
             {
                 diagnostics.ReplyRead(code, firstLine);
-                return new FtpReply(code, line);
+                return new FtpReply(code, line) { ByteCount = replyByteCount };
             }
         }
 
@@ -168,6 +172,7 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
                     throw new FtpReplyNulByteException();
                 }
 
+                replyByteCount += bytes.Length;
                 reporting.ReportResponseHeader(bytes);
                 await WriteToDumpHeaderOutputAsync(bytes).ConfigureAwait(false);
                 return Encoding.Latin1.GetString(bytes, 0, bytes.Length - 1).TrimEnd('\r');

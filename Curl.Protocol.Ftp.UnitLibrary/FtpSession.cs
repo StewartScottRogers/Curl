@@ -20,6 +20,7 @@ namespace Curl.Protocol.Ftp;
 /// Holds the greeting, the login and <c>PWD</c> to <c>--connect-timeout</c>, as curl holds its
 /// states before <c>DO</c> (BL-512); the caller owns it.
 /// </param>
+/// <param name="trace">Writes the <c>--trace-config ftp</c> lines as the session steps (BL-1162).</param>
 /// <remarks>
 /// <para>
 /// TLS (ADR-0102's BL-437 addendum): under <c>--ssl</c>, <c>--ftp-ssl-control</c> or
@@ -129,7 +130,8 @@ internal sealed class FtpSession(
     FtpControlConnectionName controlName,
     ITransferContext context,
     bool implicitTls,
-    FtpConnectPhaseLimit connectPhase)
+    FtpConnectPhaseLimit connectPhase,
+    FtpStateTrace trace)
     : IAsyncDisposable
 {
     private const string AnonymousUser = "anonymous";
@@ -291,10 +293,16 @@ internal sealed class FtpSession(
     {
         try
         {
-            return await GreetAndLogInAsync().ConfigureAwait(false)
+            TransferResult? failed = await GreetAndLogInAsync().ConfigureAwait(false)
                 ?? await ProtectDataAsync().ConfigureAwait(false)
                 ?? await ClearControlTlsAsync().ConfigureAwait(false)
                 ?? await ReadEntryPathAsync().ConfigureAwait(false);
+            if (failed is null)
+            {
+                trace.ConnectPhaseDone();
+            }
+
+            return failed;
         }
         catch (OperationCanceledException) when (connectPhase.HasPassed)
         {
@@ -353,6 +361,7 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult?> GreetAndLogInAsync()
     {
+        trace.AwaitingGreeting();
         FtpReply greeting = await ReadReplyAsync().ConfigureAwait(false);
         return greeting.Code switch
         {
@@ -575,6 +584,7 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult> RetrieveFromPathAsync(FtpUrlPath path)
     {
         ReportWhetherInEntryDirectory(path);
+        trace.DoPhaseStarts(IsListing(path) ? "LIST" : "RETR");
         return await SendQuotesAsync(quotes.AfterLogin).ConfigureAwait(false)
             ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
             ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
@@ -592,7 +602,7 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult> DownloadAsync(FtpUrlPath path)
     {
-        bool listing = path.FileName.Length == 0 || typeCode.ListOnly;
+        bool listing = IsListing(path);
         bool ascii = listing || typeCode.UseAscii;
         window = DownloadWindowOf(listing);
         return await OpenDataConnectionAsync(DownloadPretArgument(path, listing)).ConfigureAwait(false)
@@ -603,6 +613,9 @@ internal sealed class FtpSession(
             ?? await PositionAsync().ConfigureAwait(false)
             ?? await RetrieveAsync(listing ? ListCommand(path) : "RETR " + path.FileName, listing).ConfigureAwait(false);
     }
+
+    /// <summary>Whether a download is a listing: the path names a directory, or <c>-l</c> or <c>;type=d</c> asks for one.</summary>
+    private bool IsListing(FtpUrlPath path) => path.FileName.Length == 0 || typeCode.ListOnly;
 
     /// <summary>
     /// The window a download reads: none for a listing, and for an ASCII file the
@@ -645,6 +658,7 @@ internal sealed class FtpSession(
         }
 
         ReportWhetherInEntryDirectory(path);
+        trace.DoPhaseStarts("STOR");
         return await SendQuotesAsync(quotes.AfterLogin).ConfigureAwait(false)
             ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
             ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
@@ -699,6 +713,7 @@ internal sealed class FtpSession(
         }
 
         log.TransferStarted(command);
+        trace.TransferInitiated();
 
         if (await ReadyDataConnectionAsync().ConfigureAwait(false) is { } notReady)
         {
@@ -1313,11 +1328,12 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult?> ConnectDataAsync(string host, string shownHost, int port)
     {
         context.Events.ReportInfo(FtpTransferMessages.ConnectingTo(shownHost, port));
+        trace.DoPhaseComplete();
         var failure = new FtpDataConnectFailure(host, shownHost, port, controlName);
         var target = new ConnectTarget(host, port, false)
         {
             Proxy = context.Proxy,
-            Events = new FtpDataConnectEvents(context.Events, failure, controlName.Host),
+            Events = new FtpDataConnectEvents(context.Events, failure, controlName.Host, trace),
             DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
@@ -1443,6 +1459,11 @@ internal sealed class FtpSession(
 
     private async ValueTask<TransferResult> RetrieveAsync(string command, bool listing)
     {
+        if (!listing)
+        {
+            trace.RetrieveNext();
+        }
+
         FtpReply opened = await ExchangeAsync(command).ConfigureAwait(false);
         if (opened.Code is 125 or 150)
         {
@@ -1452,6 +1473,8 @@ internal sealed class FtpSession(
             {
                 context.Events.ReportInfo(FtpTransferMessages.GettingFile(expectedSize));
             }
+
+            trace.TransferInitiated();
 
             if (await ReadyDataConnectionAsync().ConfigureAwait(false) is { } notReady)
             {
@@ -1590,7 +1613,9 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult> ReadTransferCompleteAsync()
     {
         context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
+        trace.ClosingDataConnection();
         FtpReply complete = await ReadReplyAsync(FtpTransferMessages.ControlConnectionLooksDead).ConfigureAwait(false);
+        trace.TransferReplyRead(complete);
         if (expectedSize is { } expected && bytesTransferred < expected)
         {
             return TransferResult.Failure(CurlExitCode.PartialFile, FtpTransferMessages.ClosedWithBytesRemaining(expected - bytesTransferred), bytesTransferred);
@@ -1602,6 +1627,7 @@ internal sealed class FtpSession(
             return await QuitAndFailAsync(exitCode, message).ConfigureAwait(false);
         }
 
+        trace.Done();
         return await QuitAndKeepConnectionAsync().ConfigureAwait(false);
     }
 
@@ -1765,7 +1791,9 @@ internal sealed class FtpSession(
             throw Failed(CurlExitCode.SendError, FtpTransferMessages.SendFailed);
         }
 
+        trace.Sent(command);
         ReportInfo(afterSent);
+        trace.AwaitingReply();
         return await ReadReplyAsync().ConfigureAwait(false);
     }
 

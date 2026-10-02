@@ -13,14 +13,21 @@ namespace Curl.Protocol.Ftp;
 /// <param name="transferEvents">The transfer's own events.</param>
 /// <param name="failure">The rewrite for the data connection's failure line.</param>
 /// <param name="urlHost">The URL's host, as given.</param>
-internal sealed class FtpDataConnectEvents(ITransferEvents transferEvents, FtpDataConnectFailure failure, string urlHost) : ITransferEvents
+/// <param name="trace">
+/// Writes the DO_MORE phase's <c>--trace-config ftp</c> poll line just before the connection
+/// opened, between the <c>Trying</c> and <c>Established</c> lines, as curl 8.21.0 writes it (BL-1162).
+/// </param>
+internal sealed class FtpDataConnectEvents(ITransferEvents transferEvents, FtpDataConnectFailure failure, string urlHost, FtpStateTrace trace) : ITransferEvents
 {
     /// <inheritdoc />
     public void ReportInfo(string text) => transferEvents.ReportInfo(failure.Rewrite(text));
 
     /// <inheritdoc />
-    public void ReportConnectionOpened(ConnectionOpenedEvent opened) =>
+    public void ReportConnectionOpened(ConnectionOpenedEvent opened)
+    {
+        trace.DataConnectionPending();
         transferEvents.ReportConnectionOpened(opened with { HostName = urlHost, IsSecondConnection = true });
+    }
 
     /// <inheritdoc />
     public void ReportConnectionReused(ConnectionReusedEvent reused) => transferEvents.ReportConnectionReused(reused);

@@ -413,14 +413,14 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// The trace components curl 8.21.0 turns on at each <see cref="Verbosity"/> (measured 2026-10-02 with
-    /// <c>Record-CurlExchange.ps1</c>, BL-1103 Notes): <c>-vv</c> writes the <c>[SETUP]</c> lines, <c>-vvv</c>
+    /// <c>Record-CurlExchange.ps1</c>, BL-1103 Notes): <c>-vv</c> writes the <c>[SETUP]</c> lines and the protocols' (<c>[FTP]</c>, measured BL-1162), <c>-vvv</c>
     /// adds <c>[READ]</c> and <c>[WRITE]</c>, and <c>-vvvv</c> every component, as <c>all</c> does.
     /// </summary>
     /// <param name="verbosity">The verbosity just reached, 2 to 4.</param>
     /// <returns>The component names to turn on.</returns>
     private static string[] VerbosityTraceComponentsAt(int verbosity) => verbosity switch
     {
-        2 => ["setup"],
+        2 => ["setup", "protocol"],
         3 => ["read", "write"],
         _ => ["all"],
     };
