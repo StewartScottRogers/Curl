@@ -33,3 +33,4 @@ The keyed checksums of `aes128-cts-hmac-sha1-96`, `aes256-cts-hmac-sha1-96` and 
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
