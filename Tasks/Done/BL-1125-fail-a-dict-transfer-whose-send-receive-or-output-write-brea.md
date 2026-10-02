@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Dict.UnitLibrary, Curl.Protocol.Dict.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1125 — Fail a dict transfer whose send, receive or output write breaks with curl's exit 55, 56 or 23
 
@@ -25,14 +25,19 @@ A `dict://` transfer whose request write, reply read or output write throws an `
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Protocol.Dict.UnitTests` with a fake connection whose write throws: a reset (`IOException` wrapping `SocketException` `ConnectionReset`) returns exit 55 `Send failure: Connection was reset`, any other `IOException` returns exit 55 `Failed sending data to the peer`; `-v` events then report `Failed sending DICT request` and `closing connection #N`.
-- [ ] New tests with a fake connection whose read throws return exit 56 (`Recv failure: Connection was reset` for a reset, `Failure when receiving data from the peer` otherwise) with the bytes written before the failure counted.
-- [ ] A new test with an output stream that refuses a write returns exit 23 `Failure writing output to destination, passed N returned M`, N being the bytes passed and M those `OutputWriteFailedException.BytesAccepted` reports (0 for a plain `IOException`).
-- [ ] The existing Dict tests still pass unchanged; `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Dict.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] New tests in `Curl.Protocol.Dict.UnitTests` with a fake connection whose write throws: a reset (`IOException` wrapping `SocketException` `ConnectionReset`) returns exit 55 `Send failure: Connection was reset`, any other `IOException` returns exit 55 `Failed sending data to the peer`; `-v` events then report `Failed sending DICT request` and `closing connection #N`.
+- [x] New tests with a fake connection whose read throws return exit 56 (`Recv failure: Connection was reset` for a reset, `Failure when receiving data from the peer` otherwise) with the bytes written before the failure counted.
+- [x] A new test with an output stream that refuses a write returns exit 23 `Failure writing output to destination, passed N returned M`, N being the bytes passed and M those `OutputWriteFailedException.BytesAccepted` reports (0 for a plain `IOException`).
+- [x] The existing Dict tests still pass unchanged; `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Dict.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- Copied the RTSP/gopher pattern into a new internal `DictIoFailures` (a protocol library never references another). Send and flush share one try; each read and each output write has its own. No new measurement: the texts are the ones the sibling handlers measured against curl 8.21.0, as the task's Context says.
+- `-v` after a failure (default chosen, matching gopher plus dict.c's own failf): the result's message unless it is the fallback text for a send or receive, then `Failed sending DICT request` for exit 55, then `closing connection #N`.
+- Tests: `DictProtocolHandlerIoFailureTests` (6) with `Fakes/FailingConnection`; Dict suite 67 passing; Measure-CodeQuality reports 100/100 and 0 failing members.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. A dict transfer whose send, receive or output write breaks returns curl's exit 55, 56 or 23 and message instead of throwing
