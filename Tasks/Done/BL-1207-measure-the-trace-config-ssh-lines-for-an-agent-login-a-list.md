@@ -46,7 +46,7 @@ Under `-v --trace-config ssh` Curl writes the `[SSH]` lines curl 8.21.0 writes f
   `STAT`), `-> [SSH_SFTP_TRANS_INIT]`, `-> [SSH_SFTP_READDIR_INIT]`, `-> [SSH_STOP]`, rest, `DO phase is complete`, then the SFTP
   close as a listing. Exit 0, nothing on stdout. sshd's internal-sftp logged nothing at DEBUG3, so the `STAT` is inferred from
   the `block=1` in `SSH_SFTP_FILETIME` and curl's source, not seen on the server.
-- Decided (ADR-0375): the agent line is written at each identity's start and after each server answer it reads; `-I` on an
+- Decided (ADR-0377): the agent line is written at each identity's start and after each server answer it reads; `-I` on an
   SFTP directory now sends that `STAT` (answer ignored), so the trace and the wire agree. Two tests that pinned no request
   after `REALPATH` were renamed and now expect the `STAT`.
 - `InMemorySshServer` gained `SymbolicLinks` (listed `lrwxrwxrwx`, mode 0120777, `READLINK` answers the file's bytes).
