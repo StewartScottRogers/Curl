@@ -45,10 +45,12 @@ namespace Curl.Console;
 /// for <c>HOME</c> and, on Windows, <c>USERPROFILE</c>.
 /// </param>
 /// <param name="runsOnWindows">Whether the default location is looked for as curl's Windows build does.</param>
+/// <param name="diagnosticLog">Where a matching netrc entry is logged, by host and login only (BL-1151); <see langword="null" /> logs nothing.</param>
 internal sealed class TransferCredentialLookup(
     IDataFileReader fileReader,
     Func<string, string?> readEnvironmentVariable,
-    bool runsOnWindows)
+    bool runsOnWindows,
+    IDiagnosticLog? diagnosticLog = null)
 {
     /// <summary>The message curl 8.21.0 prints after <c>curl: (26) </c> when a required netrc file is missing.</summary>
     internal const string NoSuchFileMessage = ".netrc error: no such file";
@@ -86,7 +88,7 @@ internal sealed class TransferCredentialLookup(
 
         string? urlUser = DecodedUserInformation(url.User);
         string? text = ReadNetrcText(options);
-        NetrcLookupResult result = text is null ? NetrcLookupResult.NotFound : NetrcFile.Find(text, url.Host, urlUser);
+        NetrcLookupResult result = text is null ? NetrcLookupResult.NotFound : NetrcFile.Find(text, url.Host, urlUser, diagnosticLog);
         failure = FailureOf(options.NetrcUse, FailureMessageOf(text, result));
         credentials = CredentialsOf(result, urlUser, DecodedUserInformation(url.Password));
         return failure is null;

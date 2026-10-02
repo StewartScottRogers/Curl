@@ -125,7 +125,7 @@ internal static class CurlComposition
         ISecurityContextFactory contexts = securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog);
         RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(contexts, negotiateOptions, diagnosticLog);
         SecurityDelegation saslDelegation = (negotiateOptions ?? NegotiateOptions.Default).Delegation;
-        AwsSigV4Signer signer = new(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
+        AwsSigV4Signer signer = new(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), diagnosticLog);
         HttpProtocolHandler http = new(recordingConnector, new AwsSigV4HttpAuthenticator(httpAuthenticator, signer), cookieStore, proxyAuthSchemes);
 
         IProtocolHandler[] handlers =
@@ -209,7 +209,7 @@ internal static class CurlComposition
         return new RankedHttpAuthenticator(
             new BasicAndBearerAuthenticator(credentialEncoding),
             new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom, diagnosticLog),
-            new NegotiateHttpAuthenticator(securityContexts, negotiateOptions),
+            new NegotiateHttpAuthenticator(securityContexts, negotiateOptions, diagnosticLog: diagnosticLog),
             new NtlmHttpAuthenticator(securityContexts, matchesSspiBuild: OperatingSystem.IsWindows(), diagnosticLog),
             diagnosticLog);
     }
@@ -243,7 +243,7 @@ internal static class CurlComposition
         return new RoutingSecurityContextFactory(
             OperatingSystem.IsWindows(),
             new SystemSecurityContextFactory(),
-            new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), TimeProvider.System, new SystemKerberosRandomSource(), new SystemNtlmRandomSource()),
+            new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), TimeProvider.System, new SystemKerberosRandomSource(), new SystemNtlmRandomSource(), diagnosticLog),
             diagnosticLog);
     }
 

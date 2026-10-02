@@ -16,8 +16,11 @@ namespace Curl.Authentication;
 /// Turns the credentials, URL and headers into the bytes curl hashes and escapes: the encoding
 /// its arguments reach it in (<see cref="CredentialEncoding.ForPlatform" />).
 /// </param>
-public sealed class AwsSigV4Signer(TimeProvider timeProvider, Encoding argumentEncoding)
+/// <param name="diagnosticLog">Where the scope a request is signed in is logged (BL-1151); <see langword="null" /> logs nothing.</param>
+public sealed class AwsSigV4Signer(TimeProvider timeProvider, Encoding argumentEncoding, IDiagnosticLog? diagnosticLog = null)
 {
+    private readonly AuthDiagnosticLog log = new(diagnosticLog);
+
     private const string UnsignedPayload = "UNSIGNED-PAYLOAD";
 
     /// <summary>Signs <paramref name="request" />.</summary>
@@ -53,6 +56,7 @@ public sealed class AwsSigV4Signer(TimeProvider timeProvider, Encoding argumentE
 
     private AwsSigV4SigningResult SignInScope(AwsSigV4Request request, AwsSigV4Scope scope)
     {
+        log.AwsSigV4ScopeChosen(scope.Provider0 + ":" + scope.Provider1, scope.Region, scope.Service);
         (string payloadHash, string? contentHashLine) = PayloadHash(request, scope);
         List<string> lines = CollectLines(request, contentHashLine);
         string provider1 = AsciiCase.ToLower(scope.Provider1);

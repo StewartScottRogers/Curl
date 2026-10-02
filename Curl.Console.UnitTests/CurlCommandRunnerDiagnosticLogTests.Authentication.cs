@@ -31,4 +31,26 @@ public sealed partial class CurlCommandRunnerDiagnosticLogTests
         StringAssert.Contains(log, "Digest algorithm MD5 (not named), qop none");
         Assert.DoesNotContain("s3cret", log);
     }
+
+    [TestMethod]
+    public async Task RunAsync_NetrcFileAndAwsSigV4AtLogLevelInfo_LogsTheNetrcMatchAndTheScopeButNotThePassword()
+    {
+        string directory = CreateTemporaryDirectory();
+        string logFile = Path.Combine(directory, "auth.log");
+        string netrcFile = Path.Combine(directory, "netrc");
+        File.WriteAllText(netrcFile, "machine 127.0.0.1 login alice password s3cret\n");
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")]);
+        using MemoryStream output = new();
+        using MemoryStream error = new();
+        using MemoryStream input = new();
+
+        await CurlComposition
+            .CreateRunner(output, error, input, server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"))
+            .RunAsync(["--netrc-file", netrcFile, "--aws-sigv4", "aws:amz:us-east-1:s3", "--log-level", "info", "--log-file", logFile, Url]);
+
+        string log = File.ReadAllText(logFile);
+        StringAssert.Contains(log, "netrc entry matched for host 127.0.0.1, login alice");
+        StringAssert.Contains(log, "AWS SigV4 scope: provider aws:amz, region us-east-1, service s3");
+        Assert.DoesNotContain("s3cret", log);
+    }
 }

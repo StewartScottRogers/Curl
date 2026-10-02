@@ -308,7 +308,7 @@ internal sealed class CurlCommandRunner(
     /// <see cref="DataFileReader" /> and the home directory from the runner's environment (BL-505, BL-791).
     /// </summary>
     private TransferCredentialLookup CredentialLookup =>
-        new(DataFileReader, EnvironmentVariables, runsOnWindows);
+        new(DataFileReader, EnvironmentVariables, runsOnWindows, diagnosticLog);
 
     /// <summary>
     /// Gets where an <c>scp</c> or <c>sftp</c> transfer looks for its known-hosts file, from the runner's

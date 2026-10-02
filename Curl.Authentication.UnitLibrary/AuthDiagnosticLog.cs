@@ -15,8 +15,9 @@ namespace Curl.Authentication;
 /// <remarks>
 /// Every method tests <see cref="IDiagnosticLog.IsEnabled" /> before it builds its message, so a
 /// disabled level costs no formatting. Every message is built from scheme, mechanism, algorithm
-/// and status names and the host only: never a user name, password, token or message byte
-/// (ADR-0222, decision 7).
+/// and status names, the host and the SigV4 scope only: never a password, key, signature, token
+/// or message byte (ADR-0222, decision 7), and a user name only as the login of the netrc entry
+/// that matched, which ADR-0222 logs at <c>info</c> (BL-1151).
 /// </remarks>
 internal sealed class AuthDiagnosticLog(IDiagnosticLog? log)
 {
@@ -96,6 +97,24 @@ internal sealed class AuthDiagnosticLog(IDiagnosticLog? log)
     /// <param name="why">Why that one.</param>
     public void SecurityContextChosen(SecurityContextRequest request, string context, string why) =>
         Verbose(() => $"{request.Mechanism} context for {request.HostName}: {context} ({why})");
+
+    /// <summary>Logs, at <c>info</c>, the netrc entry that matched, by host and login only (BL-1151).</summary>
+    /// <param name="hostName">The host the entry was looked up for.</param>
+    /// <param name="login">The entry's login, or <see langword="null" /> for an entry with none.</param>
+    public void NetrcEntryMatched(string hostName, string? login) =>
+        Info(() => $"netrc entry matched for host {hostName}, login {login ?? "(none)"}");
+
+    /// <summary>Logs, at <c>info</c>, the AWS SigV4 scope a request is signed in: never the key or signature (BL-1151).</summary>
+    /// <param name="provider">The providers, such as <c>aws:amz</c>.</param>
+    /// <param name="region">The region.</param>
+    /// <param name="service">The service.</param>
+    public void AwsSigV4ScopeChosen(string provider, string region, string service) =>
+        Info(() => $"AWS SigV4 scope: provider {provider}, region {region}, service {service}");
+
+    /// <summary>Logs, at <c>warning</c>, a Negotiate context step that failed, with its status (BL-1151).</summary>
+    /// <param name="status">The step's status.</param>
+    public void NegotiateContextFailed(SecurityContextStatus status) =>
+        Warning(() => $"Negotiate context failed: {status}");
 
     private void Info(Func<string> message)
     {

@@ -64,6 +64,8 @@ so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network.
 
 Diagnostic log (BL-923, ADR-0339): `RankedHttpAuthenticator`, `DigestAuthenticator`, `NtlmHttpAuthenticator`,
-`SaslAuthenticator` and `RoutingSecurityContextFactory` take an optional `IDiagnosticLog` and write their
+`SaslAuthenticator`, `RoutingSecurityContextFactory`, `NegotiateHttpAuthenticator`, `HandBuiltSecurityContextFactory`,
+`AwsSigV4Signer` and `NetrcFile.Find` (BL-1151) take an optional `IDiagnosticLog` and write their
 choices through `AuthDiagnosticLog` (component `auth`), by scheme, mechanism and status name only, never a
-credential or token byte. Netrc, SigV4 and Negotiate rounds follow in BL-1151.
+credential or token byte: the netrc entry matched by host and login and the SigV4 scope at `info`, each
+Negotiate round and the hand-built context chosen at `verbose`, a failed Negotiate context at `warning`.
