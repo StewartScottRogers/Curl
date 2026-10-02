@@ -393,7 +393,11 @@ Per ADR-0356 (BL-1102) its `--trace-config doh` lines go to a `FlowScopedTransfe
 `AsyncLocal` view that `TcpConnector.ResolverEvents` points at the resolving target's events before
 each look-up; and `TcpConnector.TracesDnsFilter` wraps a direct connect's events in
 `DnsFilterTraceEvents`, which writes curl 8.21.0's `[DNS]` filter lines around `Trying`,
-`Established connection` and `Failed to connect to`. Per ADR-0357 (BL-1103)
+`Established connection` and `Failed to connect to`. Per ADR-0366 (BL-1157) a direct connect whose
+resolver answered nothing writes `Could not resolve host:` (twice, once under DoH) and
+`Could not resolve: H:P`, which `DnsFilterTraceEvents` brackets with the negative cache entry and the
+exit 6 lines up to `[DNS] [1] shutdown async`; `AsyncResolveTeardownTraceEvents`, wrapped around each
+transfer's events by the console, writes `[DNS] [1] destroy async` after `closing connection #N`. Per ADR-0357 (BL-1103)
 `TcpConnector.TracesSetupFilter` writes `[SETUP] added` and wraps those events in turn in
 `SetupFilterTraceEvents`, which writes the setup filter's `happy eyeballing to origin` line before
 the first `Trying` and its removal after `Established connection`, so `-vv` prints curl's order.

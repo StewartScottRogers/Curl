@@ -67,7 +67,9 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, first.ExitCode);
         Assert.AreEqual("Could not resolve host: github.com", first.ErrorMessage);
         Assert.IsEmpty(dialer.DialedEndPoints);
-        Assert.IsEmpty(events.Info);
+        CollectionAssert.AreEqual(
+            new[] { "Could not resolve host: github.com", "Could not resolve host: github.com", "Could not resolve: github.com:47500" },
+            events.Info.ToArray());
         CollectionAssert.AreEqual(new[] { "github.com", "github.com" }, resolver.ResolvedHosts);
     }
 

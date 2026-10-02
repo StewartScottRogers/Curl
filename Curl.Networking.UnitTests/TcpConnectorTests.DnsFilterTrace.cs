@@ -44,6 +44,65 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_TracingTheDnsFilterWhenTheNameDoesNotResolve_WritesCurlsFailedResolveLines()
+    {
+        // curl 8.21.0 -s -v --trace-config dns http://nonexistent.invalid:47114/, leaving out the
+        // threaded resolver's poll-timed lines (BL-1157 Notes).
+        var events = new CountingTransferEvents();
+        var connector = new TcpConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider())
+        {
+            TracesDnsFilter = true,
+        };
+
+        var result = await connector.ConnectAsync(new ConnectTarget("nonexistent.invalid", 47114, UseTls: false) { Events = events }, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[DNS] created DNS filter for nonexistent.invalid:47114, transport=3, queries=3",
+                "[DNS] added",
+                "[DNS] cf_dns_start host nonexistent.invalid:47114",
+                "Could not resolve host: nonexistent.invalid",
+                "Could not resolve host: nonexistent.invalid",
+                "[DNS] cache negative name resolve for nonexistent.invalid:47114 type=A+AAAA",
+                "Could not resolve: nonexistent.invalid:47114",
+                "[DNS] error resolving: 6",
+                "[DNS] Curl_conn_connect(block=0) -> 6, done=0",
+                "[DNS] Curl_conn_connect(), filter returned 6",
+                "[DNS] [1] shutdown async",
+            },
+            events.Calls);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheDohResolverAnswersNothing_WritesCouldNotResolveHostOnce()
+    {
+        // curl 8.21.0 -s -v --doh-url https://127.0.0.1:47112/dns-query http://example.test:47113/
+        // with a 3-byte answer (BL-1157 Notes; BL-642 Notes without --trace-config).
+        var doh = new DohDnsResolver(new FakeConnector { Failure = ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect") }, new Uri("https://127.0.0.1:47112/dns-query"));
+        var events = new CountingTransferEvents();
+        var connector = new TcpConnector(doh, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
+
+        await connector.ConnectAsync(new ConnectTarget("example.test", 47113, UseTls: false) { Events = events }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "Could not resolve host: example.test", "Could not resolve: example.test:47113" }, events.Calls);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheResolverOptionsDoNotParse_WritesNoFailedResolveLines()
+    {
+        // Exit 43 "Error 43 resolving h:p" is c-ares' configuration error, not a name that did not resolve.
+        var events = new CountingTransferEvents();
+        var connector = new TcpConnector(new ReasoningDnsResolver(new DnsResolution([], DnsLookupFailure.BadConfiguration)), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
+
+        var result = await connector.ConnectAsync(new ConnectTarget("h", 1, UseTls: false) { Events = events }, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
+        Assert.IsEmpty(events.Calls);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_TracingTheDnsFilterWhenTheDialIsRefused_EndsWithTheFiltersExit7()
     {
         var events = new CountingTransferEvents();

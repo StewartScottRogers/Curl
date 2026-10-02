@@ -588,7 +588,7 @@ public sealed partial class TcpConnector(
             target.Events.ReportInfo(SetupFilterTraceEvents.AddedLine);
         }
 
-        ITransferEvents events = TracesDnsFilter ? DnsFilterTraceEvents.Start(target.Events, destination.Host, destination.Port) : target.Events;
+        ITransferEvents events = TracesDnsFilter ? DnsFilterTraceEvents.Start(target.Events, destination.Host, destination.Port, addressFamily) : target.Events;
         return target with { Events = TracesSetupFilter ? new SetupFilterTraceEvents(events, destination.Host, destination.Port) : events };
     }
 
@@ -612,11 +612,10 @@ public sealed partial class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        var (addresses, failure) = await ResolveWithFailureReasonAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
+        var ((addresses, failure), fromCache) = await ResolveNotingCacheAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
-            var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
-            return ConnectResult.Failed(exitCode, message);
+            return HostNotResolved(target.Events, destination, failure, fromCache);
         }
 
         var nameResolved = timeProvider.GetTimestamp();
@@ -760,7 +759,41 @@ public sealed partial class TcpConnector(
     /// whole, and one left with no address of the family is reported as <c>Negative DNS
     /// entry</c> instead, and so fails the resolve (measured on curl 8.21.0, BL-500).
     /// </remarks>
-    private async ValueTask<DnsResolution> ResolveWithFailureReasonAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken)
+    private async ValueTask<DnsResolution> ResolveWithFailureReasonAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken) =>
+        (await ResolveNotingCacheAsync(host, port, target, cancellationToken).ConfigureAwait(false)).Resolution;
+
+    /// <summary>
+    /// Fails a connect whose host did not resolve with exit 6 (or 43), first writing, unless the DNS
+    /// cache answered, the <c>-v</c> lines curl 8.21.0 writes once its resolver answered nothing for a host
+    /// (measured, BL-1157 Notes): <c>Could not resolve host: &lt;host&gt;</c>, twice from the
+    /// system's threaded resolver and so from every resolver but DoH, which writes it once (ADR-0366), then
+    /// <c>Could not resolve: &lt;host&gt;:&lt;port&gt;</c>, around which a
+    /// <see cref="DnsFilterTraceEvents" /> writes its own.
+    /// </summary>
+    private ConnectResult HostNotResolved(ITransferEvents events, ConnectDestination destination, DnsLookupFailure failure, bool fromCache)
+    {
+        var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
+        if (!fromCache && exitCode == CurlExitCode.CouldntResolveHost)
+        {
+            ReportLookUpFailed(events, destination, message);
+        }
+
+        return ConnectResult.Failed(exitCode, message);
+    }
+
+    private void ReportLookUpFailed(ITransferEvents events, ConnectDestination destination, string message)
+    {
+        events.ReportInfo(message);
+        if (dnsResolver is not DohDnsResolver)
+        {
+            events.ReportInfo(message);
+        }
+
+        events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine(destination.Host, destination.Port));
+    }
+
+    // Resolves as ResolveWithFailureReasonAsync does, and says whether the DNS cache answered.
+    private async ValueTask<(DnsResolution Resolution, bool FromCache)> ResolveNotingCacheAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken)
     {
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);
         var resolveStarted = log.IsEnabled(DiagnosticLogLevel.Info) ? timeProvider.GetTimestamp() : 0;
@@ -769,7 +802,7 @@ public sealed partial class TcpConnector(
         {
             var fromCache = AnswerFromCache(host, cached, target.Events);
             LogResolution(log, host, port, fromCache, fromCache: true, resolveStarted);
-            return new DnsResolution(fromCache, DnsLookupFailure.None);
+            return (new DnsResolution(fromCache, DnsLookupFailure.None), true);
         }
 
         var (addresses, failure) = await LookUpAsync(host, target.Events, cancellationToken).ConfigureAwait(false);
@@ -783,7 +816,7 @@ public sealed partial class TcpConnector(
 
         var dialable = AddressFamilyFilter.Dialable(host, answered, addressFamily);
         LogResolution(log, host, port, dialable, fromCache: false, resolveStarted);
-        return new DnsResolution(dialable, failure);
+        return (new DnsResolution(dialable, failure), false);
     }
 
     /// <summary>

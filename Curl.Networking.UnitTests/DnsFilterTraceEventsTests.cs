@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Security.Authentication;
 
 using Curl.Protocol.Abstractions;
@@ -29,6 +30,45 @@ public sealed class DnsFilterTraceEventsTests
                 "[DNS] created DNS filter for 127.0.0.1:47110, transport=3, queries=3",
                 "[DNS] added",
                 "[DNS] cf_dns_start host 127.0.0.1:47110",
+            },
+            inner.Calls);
+    }
+
+    [TestMethod]
+    [DataRow(AddressFamily.InterNetwork, 1)]
+    [DataRow(AddressFamily.InterNetworkV6, 2)]
+    public void Start_UnderOneFamily_CountsOnlyItsQuery(AddressFamily family, int queries)
+    {
+        // curl -s -v -4 --trace-config dns http://nonexistent.invalid:47114/ -> queries=1; -6 -> queries=2.
+        var inner = new CountingTransferEvents();
+
+        DnsFilterTraceEvents.Start(inner, "h", 1, family);
+
+        Assert.AreEqual($"[DNS] created DNS filter for h:1, transport=3, queries={queries}", inner.Calls[0]);
+    }
+
+    [TestMethod]
+    [DataRow(AddressFamily.Unspecified, "A+AAAA")]
+    [DataRow(AddressFamily.InterNetwork, "A")]
+    [DataRow(AddressFamily.InterNetworkV6, "AAAA")]
+    public void ReportInfo_TheCouldNotResolveLine_IsBracketedByTheNegativeCacheEntryAndTheExit6(AddressFamily family, string types)
+    {
+        // curl 8.21.0 -s -v --trace-config dns http://nonexistent.invalid:47114/ (BL-1157 Notes).
+        var inner = new CountingTransferEvents();
+        var events = DnsFilterTraceEvents.Start(inner, "nonexistent.invalid", 47114, family);
+        inner.Calls.Clear();
+
+        events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine("nonexistent.invalid", 47114));
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                $"[DNS] cache negative name resolve for nonexistent.invalid:47114 type={types}",
+                "Could not resolve: nonexistent.invalid:47114",
+                "[DNS] error resolving: 6",
+                "[DNS] Curl_conn_connect(block=0) -> 6, done=0",
+                "[DNS] Curl_conn_connect(), filter returned 6",
+                "[DNS] [1] shutdown async",
             },
             inner.Calls);
     }
