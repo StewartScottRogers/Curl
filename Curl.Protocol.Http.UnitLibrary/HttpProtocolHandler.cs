@@ -1870,7 +1870,9 @@ public sealed class HttpProtocolHandler(
     /// <see cref="IHttpAuthenticator.ContinueAuthorizationAsync" /> when the request that drew
     /// them already sent <paramref name="sent" />, even an empty one, an empty answer to which
     /// sends nothing more, so the request is never sent again without a header twice
-    /// (ADR-0232); and else afresh.
+    /// (ADR-0232); and else afresh - as is a Digest answer whose nonce the challenges mark
+    /// <c>stale=true</c>, which curl 8.21.0 answers again with the new nonce, without limit
+    /// (measured, BL-1148 Notes).
     /// </summary>
     /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
     private async ValueTask<string?> AnswerChallengesAsync(HttpAuthRequest request, string? sent, bool sentAnswersChallenge, string[] challenges, CancellationToken cancellationToken)
@@ -1882,7 +1884,7 @@ public sealed class HttpProtocolHandler(
 
         try
         {
-            return sent is not null
+            return sent is not null && !RenewsStaleDigest(sent, challenges)
                 ? NullIfEmpty(await Authenticator.ContinueAuthorizationAsync(request, sent, !sentAnswersChallenge, challenges, cancellationToken).ConfigureAwait(false))
                 : await Authenticator.CreateAuthorizationAsync(request, challenges, cancellationToken).ConfigureAwait(false);
         }
@@ -1891,6 +1893,13 @@ public sealed class HttpProtocolHandler(
             throw new HttpTransferException(failure.ExitCode, failure.Message);
         }
     }
+
+    /// <summary>
+    /// Decides whether <paramref name="challenges" /> mark the nonce of the Digest answer
+    /// <paramref name="sent" /> stale, so it is answered afresh with the new nonce.
+    /// </summary>
+    private static bool RenewsStaleDigest(string sent, string[] challenges) =>
+        sent.StartsWith("Digest ", StringComparison.Ordinal) && HttpDigestStaleChallenge.IsOfferedIn(challenges);
 
     /// <summary>Gives <paramref name="value" />, or <see langword="null" /> when it is empty.</summary>
     private static string? NullIfEmpty(string? value) =>
