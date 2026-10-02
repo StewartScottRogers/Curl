@@ -615,8 +615,8 @@ public sealed partial class HandBuiltTlsProviderTests
 
     private static TlsClientOptions Tls12Only(TlsClientOptions options) => options with { MaximumVersion = TlsVersion.Tls12 };
 
-    private static HandBuiltTlsProvider Provider(TlsClientOptions options, bool matchesSchannelBuild) =>
-        new(options, matchesSchannelBuild, TimeProvider.System, new FakeClientCertificateStore(), SystemTlsRandomSource.Instance);
+    private static HandBuiltTlsProvider Provider(TlsClientOptions options, bool matchesSchannelBuild, IEchConfigListLookup? echConfigs = null) =>
+        new(options, matchesSchannelBuild, TimeProvider.System, new FakeClientCertificateStore(), SystemTlsRandomSource.Instance, echConfigs: echConfigs);
 
     // A plaintext connection the test watches for disposal; nothing answers on it.
     private static (StreamConnection Plaintext, InMemoryDuplexStream Stream) Unanswered()

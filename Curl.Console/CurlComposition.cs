@@ -384,10 +384,13 @@ internal static class CurlComposition
     /// sessions in when <see cref="TlsClientOptions.SslSessionsFile" /> is given (ADR-0319);
     /// <see langword="null" /> for none.
     /// </param>
-    internal static ITlsProviderWithWarnings CreateTlsProvider(TlsClientOptions options, TimeProvider timeProvider, TlsSessionCache? sessions = null) =>
+    /// <param name="echConfigs">
+    /// Finds a host's ECHConfigList for <c>--ech true</c> or <c>hard</c> without <c>ecl:</c>: the run's
+    /// <see cref="DohDnsResolver" /> under <c>--doh-url</c> (ADR-0326); <see langword="null" /> for none.
+    /// </param>
+    internal static ITlsProviderWithWarnings CreateTlsProvider(TlsClientOptions options, TimeProvider timeProvider, TlsSessionCache? sessions = null, IEchConfigListLookup? echConfigs = null) =>
         TlsClientRouting.Choose(options) != TlsClientRoute.HandBuilt ? new SslStreamTlsProvider(options, timeProvider)
-            : sessions is not null && options.SslSessionsFile is not null ? new HandBuiltTlsProvider(options, timeProvider, sessions)
-            : new HandBuiltTlsProvider(options, timeProvider);
+            : new HandBuiltTlsProvider(options, timeProvider, options.SslSessionsFile is null ? null : sessions, echConfigs);
 
     /// <summary>
     /// Creates the network transports as <see cref="CreateTransports(CommandLineOptions)" /> does,
@@ -416,7 +419,7 @@ internal static class CurlComposition
         });
         IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
-        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions);
+        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(proxyTlsClientOptions, timeProvider);
         LateBoundSecurityContextFactory proxyContexts = new();

@@ -343,6 +343,25 @@ public sealed class DohDnsResolverTests
     }
 
     [TestMethod]
+    [DataRow("00010003026832" + "00050006AABBCCDDEEFF", "AABBCCDDEEFF")]
+    [DataRow("00010003026832", null)]
+    public async Task FindEchConfigListAsync_IsTheHttpsRecordsEchParameter(string parameters, string? expected)
+    {
+        var question = "076578616D706C650474657374000041" + "0001";
+        var recordData = "000100" + parameters;
+        var answer = Convert.FromHexString("000081800001000100000000" + question + "C00C004100010000003C" + (recordData.Length / 2).ToString("X4") + recordData);
+        var resolver = new DohDnsResolver(Answering(Ok(answer)), MeasuredDohUrl);
+
+        var list = await resolver.FindEchConfigListAsync("example.test", 443, CancellationToken.None);
+
+        Assert.AreEqual(expected, list is null ? null : Convert.ToHexString(list));
+    }
+
+    [TestMethod]
+    public async Task FindEchConfigListAsync_WithNoRecord_IsNull() =>
+        Assert.IsNull(await new DohDnsResolver(new FakeConnector(), MeasuredDohUrl).FindEchConfigListAsync("example.test", 443, CancellationToken.None));
+
+    [TestMethod]
     public async Task ResolveHttpsRecordAsync_OnAnotherPort_AsksForThePortPrefixedName()
     {
         var connector = new FakeConnector();

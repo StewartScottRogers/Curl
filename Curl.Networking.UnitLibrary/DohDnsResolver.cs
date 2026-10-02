@@ -32,7 +32,7 @@ namespace Curl.Networking;
 /// only for that option.
 /// </para>
 /// </remarks>
-public sealed class DohDnsResolver : IDnsResolver
+public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
 {
     private readonly IConnector _connector;
     private readonly Uri _dohUrl;
@@ -145,6 +145,19 @@ public sealed class DohDnsResolver : IDnsResolver
             ? ServiceBindingRecordDecoder.Decode(first).Record
             : null;
     }
+
+    /// <summary>
+    /// Finds <paramref name="host" />'s ECHConfigList for <c>--ech true</c> or <c>hard</c>: the
+    /// <c>ech</c> parameter of the HTTPS record <see cref="ResolveHttpsRecordAsync" /> fetches (ADR-0326).
+    /// </summary>
+    /// <param name="host">The host the transfer connects to.</param>
+    /// <param name="port">The port it connects to.</param>
+    /// <param name="cancellationToken">Cancels the query.</param>
+    /// <returns>The list's bytes, or <see langword="null" /> when there is no record or it has no <c>ech</c>.</returns>
+    public async ValueTask<byte[]?> FindEchConfigListAsync(string host, int port, CancellationToken cancellationToken) =>
+        await ResolveHttpsRecordAsync(host, port, cancellationToken).ConfigureAwait(false) is { EchConfigList.IsEmpty: false } record
+            ? record.EchConfigList.ToArray()
+            : null;
 
     /// <summary>The HTTPS query for <paramref name="host" />, or <see langword="null" /> for a literal, <c>localhost</c> or a name that does not encode.</summary>
     private static byte[]? HttpsQueryFor(string host, int port)

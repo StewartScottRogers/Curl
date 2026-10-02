@@ -182,6 +182,13 @@ internal static class TlsFailureMessages
             : SchannelFatalAlertReceived;
 
     /// <summary>
+    /// The message for exit 101 when the server did not accept the hand-built client's ECH
+    /// offer: libcurl's text for <c>CURLE_ECH_REQUIRED</c>, since no curl build measured has ECH
+    /// to show OpenSSL's error string (ADR-0326).
+    /// </summary>
+    public const string EchRequired = "ECH attempted but failed";
+
+    /// <summary>
     /// The OpenSSL build's message for exit 35 when the hand-built client's handshake fails
     /// for a reason other than verification: the server closing is OpenSSL's unexpected-EOF
     /// error string, and an alert is OpenSSL's error string for it, reason code 1000 plus the

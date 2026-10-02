@@ -153,7 +153,8 @@ public sealed partial class HandBuiltTlsProviderTests
         TlsClientOptions options,
         bool matchesSchannelBuild,
         string targetHost,
-        IReadOnlyList<string> applicationProtocols)
+        IReadOnlyList<string> applicationProtocols,
+        IEchConfigListLookup? echConfigs = null)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = Task.Run(async () =>
@@ -166,7 +167,7 @@ public sealed partial class HandBuiltTlsProviderTests
             return (byte[])[.. header, .. body];
         });
 
-        var result = await Provider(options with { Insecure = true }, matchesSchannelBuild).AuthenticateAsClientAsync(
+        var result = await Provider(options with { Insecure = true }, matchesSchannelBuild, echConfigs).AuthenticateAsClientAsync(
             new StreamConnection(client, ServerEndPoint), targetHost, new RecordingTransferEvents(), false, applicationProtocols, CancellationToken.None);
 
         Assert.AreNotEqual(Protocol.Abstractions.CurlExitCode.Ok, result.ExitCode);

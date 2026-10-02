@@ -65,6 +65,22 @@ public sealed class TlsClientRoutingTests
     public void Choose_WithSslSessions_IsTheHandBuiltClient() =>
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(SslSessionsFile: "sessions.txt")));
 
+    // ADR-0326's row: --ech in any mode but false, since SslStream offers no Encrypted Client Hello.
+    [TestMethod]
+    [DataRow("grease", null)]
+    [DataRow("true", null)]
+    [DataRow("hard", null)]
+    [DataRow(null, "AAA=")]
+    public void Choose_WithEch_IsTheHandBuiltClient(string? mode, string? configList) =>
+        Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(Ech: mode, EchConfigList: configList)));
+
+    [TestMethod]
+    [DataRow("false", "AAA=")]
+    [DataRow("bogus", null)]
+    [DataRow(null, null)]
+    public void Choose_WithEchOff_IsSslStream(string? mode, string? configList) =>
+        Assert.AreEqual(TlsClientRoute.SslStream, TlsClientRouting.Choose(new TlsClientOptions(Ech: mode, EchPublicName: "pn.test", EchConfigList: configList)));
+
     [TestMethod]
     [DynamicData(nameof(PlainOptionSets))]
     public void Choose_WithAPlainOptionSet_IsSslStream(TlsClientOptions options) =>

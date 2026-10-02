@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Security;
 using System.Runtime.ExceptionServices;
@@ -60,6 +61,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     private readonly TlsSessionCache? _sessions;
 
+    private readonly IEchConfigListLookup? _echConfigs;
+
     /// <summary>
     /// Creates the provider for the curl build this platform usually runs: Schannel on
     /// Windows, OpenSSL elsewhere.
@@ -74,13 +77,16 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <summary>
     /// Creates the provider for the curl build this platform usually runs, offering each TLS
     /// 1.3 handshake a session from <paramref name="sessions" /> and keeping the session
-    /// tickets it receives there (<c>--ssl-sessions</c>, ADR-0319).
+    /// tickets it receives there (<c>--ssl-sessions</c>, ADR-0319), and finding a
+    /// host's ECHConfigList for <c>--ech true</c> or <c>hard</c> without <c>ecl:</c> through
+    /// <paramref name="echConfigs" /> (ADR-0326).
     /// </summary>
     /// <param name="options">The settings applied to every handshake.</param>
     /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
-    /// <param name="sessions">The run's session cache.</param>
-    public HandBuiltTlsProvider(TlsClientOptions options, TimeProvider timeProvider, TlsSessionCache sessions)
-        : this(options, OperatingSystem.IsWindows(), timeProvider, new SystemClientCertificateStore(), SystemTlsRandomSource.Instance, sessions ?? throw new ArgumentNullException(nameof(sessions)))
+    /// <param name="sessions">The run's session cache under <c>--ssl-sessions</c>, or <see langword="null" /> to neither offer nor keep sessions.</param>
+    /// <param name="echConfigs">Finds a host's ECHConfigList through DoH, or <see langword="null" /> when no DoH server is used.</param>
+    public HandBuiltTlsProvider(TlsClientOptions options, TimeProvider timeProvider, TlsSessionCache? sessions, IEchConfigListLookup? echConfigs)
+        : this(options, OperatingSystem.IsWindows(), timeProvider, new SystemClientCertificateStore(), SystemTlsRandomSource.Instance, sessions, echConfigs)
     {
     }
 
@@ -97,6 +103,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <param name="certificateStore">Opens the store a Schannel <c>--cert</c> store path names.</param>
     /// <param name="random">The source of the client's randoms and key shares.</param>
     /// <param name="sessions">The run's session cache under <c>--ssl-sessions</c>, or <see langword="null" /> to neither offer nor keep sessions.</param>
+    /// <param name="echConfigs">Finds a host's ECHConfigList for <c>--ech</c>, or <see langword="null" /> when no DoH server is used.</param>
     /// <exception cref="ArgumentException">
     /// <see cref="TlsClientOptions.MinimumVersion" /> is above <see cref="TlsClientOptions.MaximumVersion" />.
     /// </exception>
@@ -106,9 +113,11 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         TimeProvider timeProvider,
         IClientCertificateStore certificateStore,
         ITlsRandomSource random,
-        TlsSessionCache? sessions = null)
+        TlsSessionCache? sessions = null,
+        IEchConfigListLookup? echConfigs = null)
     {
         _sessions = sessions;
+        _echConfigs = echConfigs;
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _ = TlsVersionRange.ToSslProtocols(options.MinimumVersion, options.MaximumVersion);
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
@@ -187,8 +196,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ArgumentException.ThrowIfNullOrWhiteSpace(targetHost);
         ArgumentNullException.ThrowIfNull(applicationProtocols);
 
-        var offeredApplicationProtocols = _options.UseAlpn ? applicationProtocols : [];
-        var (prepared, preparationFailure, sendsInternalErrorAlert) = Prepare(events, targetHost, offeredApplicationProtocols);
+        var offeredApplicationProtocols = OfferedApplicationProtocols(applicationProtocols);
+        var (prepared, preparationFailure, sendsInternalErrorAlert) = await PrepareWithEchAsync(events, targetHost, offeredApplicationProtocols, plaintext.RemoteEndPoint, cancellationToken).ConfigureAwait(false);
         if (prepared is null)
         {
             return await FailBeforeHandshakeAsync(plaintext, preparationFailure!, sendsInternalErrorAlert, cancellationToken).ConfigureAwait(false);
@@ -199,7 +208,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var handshakeStarted = _timeProvider.GetTimestamp();
         var (handshake, thrown) = await TryHandshakeAsync(plaintext, prepared, cancellationToken).ConfigureAwait(false);
         prepared.Verifier.Observed.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
-        if (handshake is not { Failure: null })
+        if (!Completed(handshake))
         {
             return await FailAsync(plaintext, prepared, handshake?.Failure, thrown).ConfigureAwait(false);
         }
@@ -215,6 +224,36 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
             peerCertificates: prepared.Verifier.PeerCertificates,
             applicationProtocol: handshake.ApplicationProtocol);
+    }
+
+    private IReadOnlyList<string> OfferedApplicationProtocols(IReadOnlyList<string> applicationProtocols) =>
+        _options.UseAlpn ? applicationProtocols : [];
+
+    private static bool Completed([NotNullWhen(true)] HandBuiltHandshake? handshake) => handshake is { Failure: null };
+
+    // Prepare, then the --ech offer (ADR-0326): --ech hard with no usable configuration fails
+    // here, before a byte is sent, and the --cert certificate is disposed.
+    private async ValueTask<(PreparedHandshake? Prepared, ConnectResult? Failure, bool SendsInternalErrorAlert)> PrepareWithEchAsync(
+        ITransferEvents events,
+        string targetHost,
+        IReadOnlyList<string> offeredApplicationProtocols,
+        EndPoint? remoteEndPoint,
+        CancellationToken cancellationToken)
+    {
+        var preparation = Prepare(events, targetHost, offeredApplicationProtocols);
+        if (preparation.Prepared is not { } prepared)
+        {
+            return preparation;
+        }
+
+        var echOffer = await EchOffer.DecideAsync(_options, OffersTls13, _echConfigs, targetHost, PortOf(remoteEndPoint), cancellationToken).ConfigureAwait(false);
+        if (echOffer.Failure is not null)
+        {
+            prepared.ClientCertificate?.Dispose();
+            return (null, echOffer.Failure, false);
+        }
+
+        return (prepared with { Settings = prepared.Settings with { EchConfigs = echOffer.Configs, SendEchGrease = echOffer.SendGrease } }, null, false);
     }
 
     /// <summary>
@@ -414,10 +453,12 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     }
 
     // A certificate the verifier rejected fails as the SslStream provider fails it, a stapled
-    // OCSP response --cert-status rejected is exit 91 (ADR-0191), and any other handshake
-    // failure is exit 35.
+    // OCSP response --cert-status rejected is exit 91 (ADR-0191), a server that did not accept
+    // the ECH offer is exit 101 (ADR-0326), and any other handshake failure is exit 35.
     private ConnectResult FailedHandshake(TlsHandshakeFailure failure) =>
-        failure.CertificateRejection is ValueTuple<CurlExitCode, string> rejected
+        failure.Alert == TlsAlertDescription.EchRequired
+            ? ConnectResult.Failed(CurlExitCode.EchRequired, TlsFailureMessages.EchRequired)
+            : failure.CertificateRejection is ValueTuple<CurlExitCode, string> rejected
             ? ConnectResult.Failed(rejected.Item1, rejected.Item2)
             : failure.CertificateStatusRejection is { } statusRejection
             ? ConnectResult.Failed(CurlExitCode.SslInvalidCertStatus, CertificateStatusFailureMessages.For(statusRejection))
@@ -540,6 +581,12 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         // --ssl-sessions: the session the TLS 1.3 ClientHello offers to resume, if any.
         internal TlsSessionRecord? ResumptionSession { get; init; }
 
+        // --ech: the configurations the TLS 1.3 ClientHello seals its inner hello for, if any.
+        internal EchConfigList? EchConfigs { get; init; }
+
+        // --ech grease: a GREASE encrypted_client_hello in the TLS 1.3 ClientHello.
+        internal bool SendEchGrease { get; init; }
+
         internal TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
         private IReadOnlyList<ushort> OfferedSuites => CipherSuites ?? Profile.CipherSuites;
@@ -568,10 +615,16 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             KeyShareGroups = Profile.KeyShareGroups,
             SignatureAlgorithms = ClientHelloProfileMapping.CheckableSignatureAlgorithms(Profile),
             CertificateCompressionAlgorithms = Profile.CertificateCompressionAlgorithms,
-            ExtensionOrder = ClientHelloProfileMapping.ExtensionOrder(Profile, RequestOcspStatus),
+            ExtensionOrder = WithEncryptedClientHello(ClientHelloProfileMapping.ExtensionOrder(Profile, RequestOcspStatus)),
             FixedExtensions = ClientHelloProfileMapping.FixedExtensions(Profile),
             SendLegacySessionId = true,
+            EncryptedClientHelloConfigs = EchConfigs,
+            SendEncryptedClientHelloGrease = SendEchGrease,
         };
+
+        // encrypted_client_hello goes last, after the profile's measured extensions (ADR-0326).
+        private IReadOnlyList<TlsExtensionType> WithEncryptedClientHello(IReadOnlyList<TlsExtensionType> order) =>
+            EchConfigs is null && !SendEchGrease ? order : [.. order, TlsExtensionType.EncryptedClientHello];
 
         // Whether the suites to offer include one the predicate accepts; the profiles always do.
         internal bool OffersSuiteFor(Func<ushort, bool> canProtect) => CipherSuites?.Any(canProtect) ?? true;

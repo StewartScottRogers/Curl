@@ -114,7 +114,7 @@ namespace Curl.Networking;
 /// <param name="Ech">
 /// curl's <c>--ech</c> mode, verbatim (<c>false</c>, <c>grease</c>, <c>true</c> or <c>hard</c>);
 /// <see langword="null" /> when not given. ADR-0151 gives every mode but <c>false</c> to the
-/// hand-built client (BL-711); neither provider applies it yet.
+/// hand-built client, which offers GREASE or ECH as <see cref="EchModes.Of" /> reads it (ADR-0326, BL-711).
 /// </param>
 /// <param name="EchPublicName">
 /// The public name of curl's <c>--ech pn:&lt;name&gt;</c>, without the prefix; <see langword="null" />

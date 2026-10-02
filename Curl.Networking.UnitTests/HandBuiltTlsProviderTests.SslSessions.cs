@@ -11,8 +11,8 @@ namespace Curl.Networking;
 public sealed partial class HandBuiltTlsProviderTests
 {
     [TestMethod]
-    public void Constructor_WithoutSessionCache_Throws() =>
-        Assert.AreEqual("sessions", Assert.ThrowsExactly<ArgumentNullException>(() => new HandBuiltTlsProvider(new TlsClientOptions(), TimeProvider.System, null!)).ParamName);
+    public void Constructor_WithNeitherSessionCacheNorEchLookup_IsAProviderThatKeepsNoSessions() =>
+        Assert.IsEmpty(new HandBuiltTlsProvider(new TlsClientOptions(), TimeProvider.System, null, null).Warnings);
 
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithSessionCache_TracksTheConnectionsTickets()
