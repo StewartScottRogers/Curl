@@ -38,6 +38,9 @@ public sealed class CommandLineOptions
     /// <summary>The single proxy schemes curl 8.21.0's tool picks from, first match wins, after <c>--proxy-anyauth</c>.</summary>
     private static readonly HttpAuthSchemes[] ProxyAuthSchemePrecedence = [HttpAuthSchemes.Negotiate, HttpAuthSchemes.Ntlm, HttpAuthSchemes.Digest];
 
+    /// <summary>The <c>--ech</c> modes libcurl's <c>setopt_ech</c> accepts that take no value, case-sensitive.</summary>
+    private static readonly HashSet<string> EchModesWithoutValue = new(["false", "grease", "true", "hard"], StringComparer.Ordinal);
+
     /// <summary>
     /// Creates the first option group of a command line, with nothing set, and so its own
     /// global settings, which every group <see cref="StartNextGroup"/> adds after it shares.
@@ -2321,9 +2324,11 @@ public sealed class CommandLineOptions
 
     /// <summary>Whether libcurl's <c>setopt_ech</c> accepts <paramref name="mode"/> (see <see cref="EchModeIsMalformed"/>).</summary>
     private static bool LibcurlAcceptsEchMode(string mode) =>
-        mode is "false" or "grease" or "true" or "hard"
-        || (mode.Length > 4 && mode.StartsWith("ecl:", StringComparison.Ordinal))
-        || (mode.Length > 3 && mode.StartsWith("pn:", StringComparison.Ordinal));
+        EchModesWithoutValue.Contains(mode) || HasValueAfter(mode, "ecl:") || HasValueAfter(mode, "pn:");
+
+    /// <summary>Whether <paramref name="mode"/> starts with <paramref name="prefix"/> and goes on past it.</summary>
+    private static bool HasValueAfter(string mode, string prefix) =>
+        mode.Length > prefix.Length && mode.StartsWith(prefix, StringComparison.Ordinal);
 
     /// <summary>
     /// Asks <paramref name="passwordPrompt"/> for each password the command line left out, with
