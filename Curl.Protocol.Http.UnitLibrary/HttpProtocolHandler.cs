@@ -245,6 +245,13 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     public bool TracesHttp2Frames { get; init; }
 
+    /// <summary>
+    /// Gets or sets whether an HTTP/3 transfer writes curl 8.21.0's <c>--trace-config http/3</c> lines
+    /// (<see cref="Http3StreamTrace" />, BL-1168): each response head's end, each piece of body and
+    /// the stream's close. Off by default.
+    /// </summary>
+    public bool TracesHttp3Streams { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException"><paramref name="context" /> is <see langword="null" />.</exception>
     /// <exception cref="OperationCanceledException">
@@ -1111,7 +1118,14 @@ public sealed class HttpProtocolHandler(
             plan.Context.NoBody,
             new HttpStreamOpenedLines(plan.Context.Events, HttpUrlText.Effective(plan.Context.Url)),
             plan.Context.DiagnosticLog,
-            TracesHttp2Frames ? plan.Context.Events : null);
+            TracesStreamsOf(streams) ? plan.Context.Events : null);
+
+    /// <summary>
+    /// Whether the session's version is traced: <see cref="TracesHttp3Streams" /> for HTTP/3,
+    /// <see cref="TracesHttp2Frames" /> for HTTP/2.
+    /// </summary>
+    private bool TracesStreamsOf(IHttpStreamSession streams) =>
+        streams is Http3Session ? TracesHttp3Streams : TracesHttp2Frames;
 
     /// <summary>
     /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one;

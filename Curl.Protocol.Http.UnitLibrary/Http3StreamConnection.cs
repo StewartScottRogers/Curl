@@ -42,7 +42,8 @@ namespace Curl.Protocol.Http;
 /// </param>
 /// <param name="openedLines">Reports curl's <c>-v</c> lines for the stream once it is opened, or <see langword="null" /> for none.</param>
 /// <param name="frameLog">Where the stream's frames are logged (BL-1073), or <see langword="null" /> for nowhere.</param>
-internal sealed class Http3StreamConnection(Http3Session session, string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null, HttpFrameLog? frameLog = null) : IHttpStreamConnection
+/// <param name="trace">Writes the stream's <c>--trace-config http/3</c> lines (BL-1168); one made with no events writes none.</param>
+internal sealed class Http3StreamConnection(Http3Session session, string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines, HttpFrameLog? frameLog, Http3StreamTrace trace) : IHttpStreamConnection
 {
     private readonly HttpFrameLog frameLog = frameLog ?? HttpFrameLog.Silent;
 
@@ -91,6 +92,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     /// <exception cref="HttpTransferException">The stream or connection failed (exit 18, 56, 95 or the connection's own).</exception>
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
+        trace.Flush();
         while (unread.IsEmpty)
         {
             if (received.TryDequeue(out unread))
@@ -100,6 +102,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
 
             if (isResponseEnded)
             {
+                trace.Flush();
                 return 0;
             }
 
@@ -159,6 +162,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
             received.Clear();
         }
 
+        trace.Flush();
         unread = ReadOnlyMemory<byte>.Empty;
     }
 
@@ -316,6 +320,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         }
 
         isResponseEnded = true;
+        trace.StreamClosed(stream!.StreamId);
     }
 
     /// <summary>
@@ -338,6 +343,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         }
 
         received.Enqueue(Http2ResponseHead.Format(session.VersionName, statusCode, fields));
+        trace.HeadReceived(stream!.StreamId, statusCode);
         isFinalHeadReceived = statusCode >= 200;
     }
 
@@ -355,6 +361,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
 
         received.Enqueue(dataBuffer.AsMemory(0, count));
         bodyBytesReceived += count;
+        trace.DataReceived(stream!.StreamId, count);
     }
 
     /// <summary>
