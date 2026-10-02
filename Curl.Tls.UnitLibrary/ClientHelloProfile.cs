@@ -81,7 +81,17 @@ public sealed record ClientHelloProfile(
         ["http/1.1"],
         [0],
         [1],
-        []);
+        [])
+    {
+        // Measured with --tls-max 1.2 and --tls-max 1.0 (BL-941): Schannel moves
+        // supported_groups and ec_point_formats ahead of signature_algorithms.
+        Tls12ExtensionOrder =
+        [
+            TlsExtensionType.ServerName, TlsExtensionType.StatusRequest, TlsExtensionType.SupportedGroups,
+            TlsExtensionType.EcPointFormats, TlsExtensionType.SignatureAlgorithms, TlsExtensionType.SessionTicket,
+            TlsExtensionType.ApplicationLayerProtocolNegotiation, TlsExtensionType.ExtendedMasterSecret, TlsExtensionType.RenegotiationInfo,
+        ],
+    };
 
     /// <summary>
     /// The hello of Ubuntu's curl 8.18.0 with OpenSSL 3.5.5: used over TCP on Linux and
@@ -140,6 +150,17 @@ public sealed record ClientHelloProfile(
         [0],
         [],
         []);
+
+    /// <summary>
+    /// Gets the extensions, in the order sent, of the hello the build sends when its version
+    /// range's ceiling is below TLS 1.3. By default <see cref="ExtensionOrder" />: the OpenSSL
+    /// build sends the same order and leaves out the TLS 1.3 extensions (measured, BL-941).
+    /// </summary>
+    public IReadOnlyList<TlsExtensionType> Tls12ExtensionOrder
+    {
+        get => field ?? ExtensionOrder;
+        init;
+    }
 
     /// <summary>Builds the profile's ClientHello for one connection.</summary>
     /// <param name="hostName">The host name sent in <c>server_name</c>.</param>

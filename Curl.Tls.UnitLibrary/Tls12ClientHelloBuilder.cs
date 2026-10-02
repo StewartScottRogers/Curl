@@ -4,7 +4,7 @@ namespace Curl.Tls;
 
 /// <summary>
 /// Builds the TLS 1.2 and below ClientHello from <see cref="Tls12ClientSettings" />, its
-/// extensions in the order OpenSSL sends them.
+/// extensions in <see cref="Tls12ClientSettings.ExtensionOrder" />.
 /// </summary>
 internal static class Tls12ClientHelloBuilder
 {
@@ -36,7 +36,19 @@ internal static class Tls12ClientHelloBuilder
 
         AddSessionAndStatusExtensions(settings, extensions);
         AddNegotiatedExtensions(settings, extensions);
-        return new ClientHello((ushort)settings.MaximumVersion, random, sessionId, settings.OfferedCipherSuites, [0], extensions);
+        return new ClientHello((ushort)settings.MaximumVersion, random, sessionId, settings.OfferedCipherSuites, [0], InOrder(settings, extensions));
+    }
+
+    // The built extensions with the fixed ones in place of their types, in the settings' order,
+    // and those whose type the order does not list after it.
+    private static List<TlsExtension> InOrder(Tls12ClientSettings settings, List<TlsExtension> built)
+    {
+        List<TlsExtension> sent = [.. built.Where(extension => settings.FixedExtensions.All(fixedExtension => fixedExtension.Type != extension.Type)), .. settings.FixedExtensions];
+        return
+        [
+            .. settings.ExtensionOrder.SelectMany(type => sent.Where(extension => extension.Type == type)),
+            .. sent.Where(extension => !settings.ExtensionOrder.Contains(extension.Type)),
+        ];
     }
 
     private static void AddSessionAndStatusExtensions(Tls12ClientSettings settings, List<TlsExtension> extensions)

@@ -349,6 +349,7 @@ choices do not need one.
 | [0337](ADR-0337-tls-earlydata-defers-the-handshake-to-the-first-write.md) | `--tls-earlydata` routes to the hand-built client, which defers the handshake on a resumed session allowing early data to the first write and sends that write as 0-RTT early data | Accepted | 2026-10-01 |
 | [0338](ADR-0338-http3-sessions-are-pooled-and-shared-by-z-transfers.md) | HTTP/3 sessions are pooled under a key of their own and `-Z` transfers share one up to the server's MAX_STREAMS | Accepted | 2026-10-01 |
 | [0339](ADR-0339-authenticators-log-through-a-late-bound-run-log.md) | The authenticators log through a late-bound run log, by scheme name and status only | Accepted | 2026-10-01 |
+| [0340](ADR-0340-the-tls-1-2-only-hello-follows-the-measured-platform-order.md) | The TLS 1.2-only hand-built hello follows the platform curl's measured extension order | Accepted | 2026-10-02 |
 
 ## Template
 

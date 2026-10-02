@@ -794,6 +794,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             OfferSessionTicket = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.SessionTicket),
             OfferExtendedMasterSecret = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.ExtendedMasterSecret),
             OfferEncryptThenMac = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.EncryptThenMac),
+            ExtensionOrder = ClientHelloProfileMapping.Tls12ExtensionOrder(Profile, RequestOcspStatus),
+            FixedExtensions = ClientHelloProfileMapping.Tls12FixedExtensions(Profile),
             SrpCredentials = SrpCredentials,
             InsertEmptyFragment = InsertsEmptyFragment(options),
         };
