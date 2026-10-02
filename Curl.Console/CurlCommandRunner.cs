@@ -2653,6 +2653,8 @@ internal sealed class CurlCommandRunner(
     /// early data bytes <c>%{tls_earlydata}</c> prints (<see cref="TlsResultRecordingTransferEvents" />,
     /// BL-661, BL-1150); nothing else reads them.
     /// Where <c>-w</c> or <c>--trace-ids</c> prints it, a transfer that reuses a connection takes that connection's <c>%{conn_id}</c> (<see cref="ConnectionIdRecordingTransferEvents" />, BL-1052).
+    /// Under <c>--trace-config dns</c> a failed resolve's <c>[DNS] [1] destroy async</c> follows its
+    /// <c>closing connection #N</c> (<see cref="AsyncResolveTeardownTraceEvents" />, BL-1157).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
@@ -2661,7 +2663,8 @@ internal sealed class CurlCommandRunner(
     {
         RunningTransferState state = Running;
         Func<long> takeConnectionId = () => state.ConnectionId ??= nextConnectionId++;
-        ITransferEvents events = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
+        ITransferEvents output = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
+        ITransferEvents events = CurlComposition.TracesDns(options) ? new AsyncResolveTeardownTraceEvents(output) : output;
         ITransferEvents recorded = options.WriteOut is null ? events : new TlsResultRecordingTransferEvents(events, state);
         state.Events = options.WriteOut is null && !options.TraceIds
             ? recorded
