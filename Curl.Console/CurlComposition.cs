@@ -440,7 +440,7 @@ internal static class CurlComposition
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider);
         TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts);
-        UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider);
+        UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider, diagnosticLog);
         PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, timeProvider, runConnections);
 
         // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
@@ -678,17 +678,20 @@ internal static class CurlComposition
     /// <param name="options">The parsed command line.</param>
     /// <param name="dnsResolver">Resolves a host no <c>--resolve</c> entry answers for.</param>
     /// <param name="timeProvider">The clock the connector times on.</param>
+    /// <param name="diagnosticLog">Where the resolve and the channel are logged (<c>--log-level</c>, BL-968); <see langword="null" /> logs nothing.</param>
     /// <returns>The connector.</returns>
     internal static UdpDatagramConnector CreateUdpDatagramConnector(
         CommandLineOptions options,
         IDnsResolver dnsResolver,
-        TimeProvider timeProvider) =>
+        TimeProvider timeProvider,
+        IDiagnosticLog? diagnosticLog = null) =>
         new(
             dnsResolver,
             timeProvider,
             ResolveOverrides.Parse(options.ResolveEntries),
             new ConnectToMappings(options.ConnectToEntries),
-            AddressFamilyOf(options));
+            AddressFamilyOf(options),
+            diagnosticLog);
 
     /// <summary>
     /// Maps the command line to what the CONNECT request through an HTTP proxy carries: the
