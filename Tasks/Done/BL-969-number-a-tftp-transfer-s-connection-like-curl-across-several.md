@@ -42,7 +42,7 @@ completed: 2026-10-02
     * Connection #0 to host 127.0.0.1:46997 left intact, then
     *   Trying 127.0.0.1:46998... ... * shutting down connection #1.
   - curl 8.18.0 (LibreSSL, WinGet) printed the same numbers.
-- Decision (ADR-0345): DatagramOpenResult.ConnectionNumber + WithConnectionNumber;
+- Decision (ADR-0346): DatagramOpenResult.ConnectionNumber + WithConnectionNumber;
   PoolingConnector.NumberingDatagrams wraps a datagram connector so each open (failed ones
   too, as ADR-0109 numbers failed TCP connects) takes the next number from the pool's
   ConnectionCache; CurlComposition.NumberedDatagramsOf gives only the TFTP handler that
