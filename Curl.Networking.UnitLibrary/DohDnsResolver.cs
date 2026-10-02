@@ -119,10 +119,17 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
             return [];
         }
 
-        DohQueryResult[] results = await Task.WhenAll(StartAddressQueries(host, queryA.Bytes, cancellationToken)).ConfigureAwait(false);
+        var results = DohQueryResult.AsOneEntry(await Task.WhenAll(StartAddressQueries(host, queryA.Bytes, cancellationToken)).ConfigureAwait(false));
         DohTraceLines.Report(_dohTrace, _describeExitCode, host, results);
-        return [.. Enumerable.Reverse(results).SelectMany(result => result.Addresses)];
+        return ResolvedAddresses(results);
     }
+
+    // curl resolves from its one entry only when a query counts as answered, and then every
+    // address in it counts, a failed decode's too (measured, BL-958); IPv6 first.
+    private static IPAddress[] ResolvedAddresses(DohQueryResult[] results) =>
+        results.Any(result => result.CountsAsAnswered)
+            ? [.. Enumerable.Reverse(results).SelectMany(result => result.Addresses)]
+            : [];
 
     // Starts the A query and the AAAA query, A first, leaving out the one -4 or -6 rules out.
     private List<Task<DohQueryResult>> StartAddressQueries(string host, byte[] queryA, CancellationToken cancellationToken)

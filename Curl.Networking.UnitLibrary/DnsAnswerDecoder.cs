@@ -15,6 +15,8 @@ namespace Curl.Networking;
 /// does (BL-694), SRV records are stored as <see cref="DnsAnswer.ServiceRecords" /> and count as content.
 /// For a <see cref="DnsRecordType.Https" /> query (BL-707), the first 4 HTTPS records' data are stored
 /// undecoded as <see cref="DnsAnswer.HttpsRecordData" />, as curl's <c>doh_store_https</c> does, and count as content.
+/// A failed decode keeps the addresses, CNAMEs and TTL it read before it stopped, as curl's
+/// <c>struct dohentry</c> does (BL-958).
 /// </summary>
 public static class DnsAnswerDecoder
 {
@@ -26,9 +28,10 @@ public static class DnsAnswerDecoder
     {
         var reader = new DnsAnswerReader(message.ToArray(), askedType);
         var failure = reader.Read();
+        var answer = new DnsAnswer(failure, reader.Addresses, reader.CanonicalNames, reader.TimeToLiveSeconds);
         return failure == DnsMessageFailure.None
-            ? new DnsAnswer(failure, reader.Addresses, reader.CanonicalNames, reader.TimeToLiveSeconds) { ServiceRecords = reader.ServiceRecords, HttpsRecordData = reader.HttpsRecordData }
-            : new DnsAnswer(failure, [], [], reader.TimeToLiveSeconds);
+            ? answer with { ServiceRecords = reader.ServiceRecords, HttpsRecordData = reader.HttpsRecordData }
+            : answer;
     }
 
     /// <summary>

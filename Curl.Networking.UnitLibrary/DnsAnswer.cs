@@ -5,7 +5,8 @@ namespace Curl.Networking;
 /// <summary>The outcome of <see cref="DnsAnswerDecoder.Decode" />.</summary>
 /// <param name="Failure">
 /// <see cref="DnsMessageFailure.None" /> when the answer decoded; otherwise why it did not, and
-/// then <paramref name="Addresses" /> and <paramref name="CanonicalNames" /> are empty.
+/// then <paramref name="Addresses" /> and <paramref name="CanonicalNames" /> hold what the decode
+/// read before it stopped, as curl's DoH entry keeps them (BL-958).
 /// </param>
 /// <param name="Addresses">The addresses of the type asked for, in answer order, at most 24.</param>
 /// <param name="CanonicalNames">The CNAME targets, dotted and in answer order, at most 4.</param>

@@ -119,7 +119,22 @@ public sealed class DnsAnswerDecoderTests
 
         Assert.AreEqual(DnsMessageFailure.LabelLoop, answer.Failure);
         Assert.IsEmpty(answer.Addresses);
-        Assert.IsEmpty(answer.CanonicalNames);
+        CollectionAssert.AreEqual(new[] { string.Empty }, answer.CanonicalNames.ToArray());
+    }
+
+    [TestMethod]
+    public void Decode_AnAddressBeforeAnUnexpectedType_KeepsTheAddressAndTtl()
+    {
+        // curl's dohentry keeps what a failed decode stored (BL-958).
+        var message = Message(Header("8180", 1, 2) + QuestionA + "C00C0001000100000E100004C0000201" + "C00C001C0001000000780010" + "00000000000000000000000000000001");
+
+        var answer = DnsAnswerDecoder.Decode(message, DnsRecordType.A);
+
+        Assert.AreEqual(DnsMessageFailure.UnexpectedType, answer.Failure);
+        CollectionAssert.AreEqual(new[] { IPAddress.Parse("192.0.2.1") }, answer.Addresses.ToArray());
+
+        // The AAAA record's TTL (120) is never read: the type check stops the decode first.
+        Assert.AreEqual(3600u, answer.TimeToLiveSeconds);
     }
 
     [TestMethod]
