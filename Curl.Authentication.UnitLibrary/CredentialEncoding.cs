@@ -25,7 +25,23 @@ public static class CredentialEncoding
     /// for on a host that has no ANSI code page; UTF-8 elsewhere.
     /// </returns>
     public static Encoding ForPlatform(bool isWindows) =>
-        ForPlatformGivenSystemAnsiCodePage(isWindows, CodePagesEncodingProvider.Instance.GetEncoding(0));
+        ForPlatformGivenSystemAnsiCodePage(isWindows, ReadSystemAnsiCodePage(() => CodePagesEncodingProvider.Instance.GetEncoding(0)));
+
+    /// <summary>
+    /// Reads the host's system ANSI code page, asking a second time when the first answer is
+    /// <see langword="null" />.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="CodePagesEncodingProvider" /> answers code page 0 by calling Windows'
+    /// <c>GetCPInfoExW(CP_ACP)</c> afresh each time, and when several threads make their first
+    /// call at once, Windows fails one of them with no error code, so the provider answers
+    /// <see langword="null" /> as if the host had no ANSI code page. The second call succeeds
+    /// (BL-1200). On Linux and macOS both answers are <see langword="null" />.
+    /// </remarks>
+    /// <param name="readCodePageZero">Asks the code page provider for code page 0.</param>
+    /// <returns>The system ANSI code page, or <see langword="null" /> when the host has none.</returns>
+    internal static Encoding? ReadSystemAnsiCodePage(Func<Encoding?> readCodePageZero) =>
+        readCodePageZero() ?? readCodePageZero();
 
     /// <summary>
     /// Gets the encoding the platform's curl sends credentials in, given the host's system
