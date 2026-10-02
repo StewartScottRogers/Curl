@@ -44,6 +44,14 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// <summary>The debug data of curl's closing GOAWAY: <c>shutdown</c> and its terminating NUL (measured, BL-817 Notes).</summary>
     private static readonly byte[] ShutdownDebugData = "shutdown\0"u8.ToArray();
 
+    /// <summary>
+    /// The SETTINGS curl 8.18.0 sends once after an h2c upgrade, right before the first stream it
+    /// opens on the connection, <c>000006 04 00 00000000 0004 00010000</c>: INITIAL_WINDOW_SIZE
+    /// 65536 again (measured, BL-970 Notes).
+    /// </summary>
+    private static readonly byte[] UpgradedStreamSettingsFrame = Http2FrameCodec.Serialize(
+        Http2FrameFactory.CreateSettings([new(Http2SettingIdentifier.InitialWindowSize, Http2Connection.ClientInitialWindowSize)]));
+
     private readonly HpackEncoder encoder = new();
 
     private readonly HpackDecoder decoder = new();
@@ -57,6 +65,8 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     private uint peerHeaderTableSize = HpackEncoder.DefaultMaximumTableSize;
 
     private bool isPrefaceSent;
+
+    private bool isUpgradeSettingsDue;
 
     private ExceptionDispatchInfo? connectionFailure;
 
@@ -194,7 +204,8 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// closed by the client, whose response arrives on it (RFC 7540 section 3.2), as curl sends
     /// the preface once the <c>101</c> has arrived (measured, BL-716 Notes). Once the response
     /// ends the stream is closed, so later requests on the session open streams 3, 5, ... within
-    /// the peer's concurrency limit (BL-866).
+    /// the peer's concurrency limit (BL-866); the first of them is preceded by curl's
+    /// post-upgrade SETTINGS (<see cref="UpgradedStreamSettingsFrame" />, BL-970).
     /// </summary>
     /// <param name="receiver">The stream the response's frames are handed to.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
@@ -206,6 +217,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         {
             await Frames.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
             isPrefaceSent = true;
+            isUpgradeSettingsDue = true;
             return Register(Frames.OpenUpgradedStream(), receiver);
         }
         finally
@@ -320,6 +332,12 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         {
             await Frames.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
             isPrefaceSent = true;
+        }
+
+        if (isUpgradeSettingsDue)
+        {
+            await Connection.WriteAsync(UpgradedStreamSettingsFrame, cancellationToken).ConfigureAwait(false);
+            isUpgradeSettingsDue = false;
         }
 
         int streamId = Register(Frames.OpenStream(), receiver);

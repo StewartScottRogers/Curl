@@ -33,7 +33,9 @@ Its `Http2Session` then carries the transfer's later requests (BL-866): a 401 re
 as HEADERS on stream 3 of the same connection, the session is handed to the connection like
 any HTTP/2 session so the next URL continues it, and `-v` ends with `left intact`. Stream 1
 is opened half closed (`Http2Connection.OpenUpgradedStream`) and read to its end, so it
-closes with its response.
+closes with its response; a body the handler ignores (the 401 before a retry) is not read
+but reset with STREAM_CLOSED, as on any HTTP/2 stream (BL-970, ADR-0342). The first stream
+opened after the upgrade is preceded by curl's extra SETTINGS, INITIAL_WINDOW_SIZE 65536.
 
 HTTP/3 (BL-731, ADR-0172) does the same over QUIC: for `--http3-only`, and for `--http3`
 before falling back to TCP, the handler asks the connector for an `IMultiplexedConnection`

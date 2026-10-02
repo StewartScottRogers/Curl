@@ -1552,7 +1552,9 @@ public sealed class HttpProtocolHandler(
     /// Reads the body into the transfer's output, or into nothing when it is discarded, as
     /// <see cref="SetBodyLimitAndSinks" /> sets it up, then writes a chunked body's trailers; or reads
     /// nothing when <paramref name="delivery" /> says there is no body to deliver. Over HTTP/2 and HTTP/3
-    /// the trailers are the stream's trailing field section, read once the stream has ended.
+    /// the trailers are the stream's trailing field section, read once the stream has ended. An
+    /// HTTP/2 stream's discarded body is not read at all: the stream is given up
+    /// (<see cref="Http2StreamConnection.AbandonResponseAsync" />), as curl resets it (BL-970).
     /// </summary>
     private static async ValueTask ReadBodyAsync(
         HttpRequestPlan plan,
@@ -1565,6 +1567,12 @@ public sealed class HttpProtocolHandler(
     {
         if (delivery != HttpBodyDelivery.Deliver)
         {
+            return;
+        }
+
+        if (discardsBody && requestStream is Http2StreamConnection http2Stream)
+        {
+            await http2Stream.AbandonResponseAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 

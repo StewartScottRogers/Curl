@@ -165,6 +165,25 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     }
 
     /// <summary>
+    /// Gives up the response's body without reading it, as curl does with a body it ignores
+    /// before a retry or a followed redirect: unless the stream has already ended, it is reset
+    /// with STREAM_CLOSED, <c>000004 03 00 00000001 00000005</c> on stream 1 (measured, BL-970
+    /// Notes), and the frames the peer still sends on it are dropped.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the reset is written, or at once when none is due.</returns>
+    public async ValueTask AbandonResponseAsync(CancellationToken cancellationToken)
+    {
+        if (isResponseEnded)
+        {
+            return;
+        }
+
+        await session.ResetStreamAsync(streamId, Http2ErrorCode.StreamClosed, cancellationToken).ConfigureAwait(false);
+        isResponseEnded = true;
+    }
+
+    /// <summary>
     /// Does nothing: the stream's connection is disposed by the handler that opened it.
     /// </summary>
     /// <returns>A completed task.</returns>
