@@ -352,6 +352,7 @@ choices do not need one.
 | [0340](ADR-0340-the-tls-1-2-only-hello-follows-the-measured-platform-order.md) | The TLS 1.2-only hand-built hello follows the platform curl's measured extension order | Accepted | 2026-10-02 |
 | [0341](ADR-0341-negotiate-channel-bindings-come-from-the-origin-tls-only.md) | Negotiate's channel bindings come from the origin's TLS only, never an HTTPS proxy's | Accepted | 2026-10-02 |
 | [0342](ADR-0342-connect-phase-lines-follow-the-platform-build.md) | A proxy tunnel's CONNECT-phase lines follow the platform build, with curl 8.21.0's text | Accepted | 2026-10-02 |
+| [0343](ADR-0343-an-ignored-http2-body-resets-its-stream.md) | An ignored HTTP/2 body resets its stream with STREAM_CLOSED instead of being read | Accepted | 2026-10-02 |
 
 ## Template
 
