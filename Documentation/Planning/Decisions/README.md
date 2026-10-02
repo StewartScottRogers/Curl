@@ -339,6 +339,7 @@ choices do not need one.
 | [0327](ADR-0327-ech-modes-through-the-hand-built-client.md) | `--ech` through the hand-built client: libcurl's mode bits, the `ecl:` list or the DoH HTTPS record's `ech`, `pn:` as the outer name, `hard` without a usable list exit 35 and a rejected offer exit 101 | Accepted | 2026-10-01 |
 | [0328](ADR-0328-tlsuser-runs-tls-srp-through-the-hand-built-client-as-curls-openssl-build.md) | `--tlsuser` runs TLS-SRP through the hand-built client on every platform: OpenSSL's `SRP` cipher list without `--ciphers`, exit 43 without `--tlspassword`, the OpenSSL build's alert lines | Accepted | 2026-10-01 |
 | [0329](ADR-0329-ftp-reply-lines-go-to-the-d-file.md) | FTP control reply lines go to the `-D` file in arrival order, `QUIT`'s excepted; a refused write is exit 23 | Accepted | 2026-10-01 |
+| [0330](ADR-0330-no-sessionid-and-ssl-allow-beast-run-on-the-hand-built-client-which-resumes-by-default.md) | `--no-sessionid` and `--ssl-allow-beast` run on the hand-built client, which offers the run's sessions by default; `--ssl-allow-beast` routes only a range reaching TLS 1.0 | Accepted | 2026-10-01 |
 
 ## Template
 
