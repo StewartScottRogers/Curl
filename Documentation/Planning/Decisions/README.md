@@ -369,6 +369,7 @@ choices do not need one.
 | [0357](ADR-0357-vv-and-trace-config-setup-write-the-setup-filter-lines.md) | `-vv` to `-vvvv` turn on curl's trace components in the parser, and `-vv` or `--trace-config setup` write the setup filter's `[SETUP]` lines around a direct connect (BL-1103) | Accepted | 2026-10-02 |
 | [0358](ADR-0358-a-deferred-connectx-socket-is-read-through-its-own-stream.md) | A socket `connectx` left connecting is read and written through `DeferredConnectSocketStream`, as `NetworkStream` refuses it (BL-1158; amends ADR-0355) | Accepted | 2026-10-02 |
 | [0359](ADR-0359-ech-v-lines-and-exit-101-text-as-measured-with-openssl-4.md) | `--ech` writes curl's `ECH:` setup lines and exit 101 OpenSSL's `ech required` text, as measured with curl 8.21.0 on OpenSSL 4.0.0; `pn:` or `ecl:` without a mode is `hard` (BL-1107; amends ADR-0327) | Accepted | 2026-10-02 |
+| [0360](ADR-0360-a-tls-1-0-or-1-1-minimum-runs-on-the-hand-built-client.md) | A `--tlsv1.0` or `--tlsv1.1` minimum runs on the hand-built client whatever the ceiling, so a TLS 1.0 or 1.1 server connects where the operating system's stack refuses those versions (BL-1143; amends ADR-0140) | Accepted | 2026-10-02 |
 
 ## Template
 

@@ -12,7 +12,7 @@ namespace Curl.Networking;
 /// <c>SslStream</c> can neither stop the system's session cache nor the TLS 1.0 CBC split; <c>--cert-status</c>'s row is ADR-0191's and <c>--curves</c> and
 /// <c>--sigalgs</c>' is ADR-0151's (BL-709), and <c>--ssl-sessions</c>' is ADR-0319's (BL-710):
 /// <c>SslStream</c> can neither export nor import a session, and <c>--ech</c>'s is ADR-0327's (BL-711): <c>SslStream</c> offers no
-/// Encrypted Client Hello, and <c>--tls-earlydata</c>'s is BL-1105's: <c>SslStream</c> sends no 0-RTT early data. QUIC is not routed here: it has no
+/// Encrypted Client Hello, and <c>--tls-earlydata</c>'s is BL-1105's: <c>SslStream</c> sends no 0-RTT early data, and a TLS 1.0 or 1.1 minimum's is ADR-0360's (BL-1143): an operating-system stack may refuse those versions. QUIC is not routed here: it has no
 /// <c>SslStream</c> route at all.
 /// </remarks>
 public static class TlsClientRouting
@@ -30,6 +30,7 @@ public static class TlsClientRouting
         (options => options.NoSessionId, "--no-sessionid turns off the session cache"),
         (AllowsBeastOnTls10, "--ssl-allow-beast with a TLS 1.0 minimum turns off the CBC split"),
         (options => options.AllowEarlyData, "--tls-earlydata sends 0-RTT early data"),
+        (LetsVersionsReachBelowTls12, "--tlsv1.0 or --tlsv1.1 lets the versions reach below TLS 1.2"),
     ];
 
     /// <summary>Chooses the TLS client for a connection made with <paramref name="options" />.</summary>
@@ -69,6 +70,12 @@ public static class TlsClientRouting
     // signature schemes the operating system chooses.
     private static bool NamesGroupsOrSignatureAlgorithms(TlsClientOptions options) =>
         options.Curves is not null || options.SignatureAlgorithms is not null;
+
+    // The legacy-minimum row (ADR-0360, BL-1143): --tlsv1.0 or --tlsv1.1 with no legacy ceiling,
+    // which the hand-built client offers from TLS 1.3 down, so a TLS 1.0 or 1.1 server connects even
+    // where the operating system's stack refuses those versions, as curl with Schannel does.
+    private static bool LetsVersionsReachBelowTls12(TlsClientOptions options) =>
+        options.MinimumVersion is TlsVersion.Tls10 or TlsVersion.Tls11;
 
     // The legacy-versions row: --tls-max 1.0 or 1.1, which the operating system's stack
     // refuses (ADR-0138 measured exit 35).

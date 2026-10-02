@@ -16,13 +16,10 @@ public sealed class TlsClientRoutingTests
         [new TlsClientOptions(ClientCertificate: "client.p12", Passphrase: "secret")],
         [new TlsClientOptions(Ciphers: "ECDHE-RSA-AES128-GCM-SHA256", Tls13Ciphers: "TLS_AES_128_GCM_SHA256")],
         [new TlsClientOptions(SkipRevocationCheck: true, RevocationCheckBestEffort: true, UseAlpn: false)],
-        [new TlsClientOptions(MinimumVersion: TlsVersion.Tls10)],
-        [new TlsClientOptions(MinimumVersion: TlsVersion.Tls11)],
         [new TlsClientOptions(MinimumVersion: TlsVersion.Tls12)],
         [new TlsClientOptions(MinimumVersion: TlsVersion.Tls13)],
         [new TlsClientOptions(MaximumVersion: TlsVersion.Tls12)],
         [new TlsClientOptions(MaximumVersion: TlsVersion.Tls13)],
-        [new TlsClientOptions(MinimumVersion: TlsVersion.Tls10, MaximumVersion: TlsVersion.Tls12)],
         [new TlsClientOptions(AutoClientCertificate: true)],
     ];
 
@@ -84,9 +81,15 @@ public sealed class TlsClientRoutingTests
     public void Choose_WithSslAllowBeast_IsTheHandBuiltClientOnlyWhenTheRangeReachesTls10(TlsVersion minimum, TlsClientRoute expected) =>
         Assert.AreEqual(expected, TlsClientRouting.Choose(new TlsClientOptions(MinimumVersion: minimum, AllowBeast: true)));
 
+    // ADR-0360's row (BL-1143): a TLS 1.0 or 1.1 minimum, alone or under a modern ceiling, since an
+    // operating-system stack may refuse those versions.
     [TestMethod]
-    public void Choose_WithATls10MinimumAlone_IsSslStream() =>
-        Assert.AreEqual(TlsClientRoute.SslStream, TlsClientRouting.Choose(new TlsClientOptions(MinimumVersion: TlsVersion.Tls10)));
+    [DataRow(TlsVersion.Tls10, TlsVersion.SystemDefault)]
+    [DataRow(TlsVersion.Tls11, TlsVersion.SystemDefault)]
+    [DataRow(TlsVersion.Tls10, TlsVersion.Tls12)]
+    [DataRow(TlsVersion.Tls11, TlsVersion.Tls13)]
+    public void Choose_WithATls10OrTls11Minimum_IsTheHandBuiltClient(TlsVersion minimum, TlsVersion maximum) =>
+        Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(MinimumVersion: minimum, MaximumVersion: maximum)));
 
     // ADR-0327's row: --ech in any mode but false, since SslStream offers no Encrypted Client Hello.
     [TestMethod]
@@ -149,6 +152,7 @@ public sealed class TlsClientRoutingTests
         [new TlsClientOptions(NoSessionId: true), "--no-sessionid turns off the session cache"],
         [new TlsClientOptions(AllowBeast: true, MinimumVersion: TlsVersion.Tls10), "--ssl-allow-beast with a TLS 1.0 minimum turns off the CBC split"],
         [new TlsClientOptions(AllowEarlyData: true), "--tls-earlydata sends 0-RTT early data"],
+        [new TlsClientOptions(MinimumVersion: TlsVersion.Tls11), "--tlsv1.0 or --tlsv1.1 lets the versions reach below TLS 1.2"],
     ];
 
     [TestMethod]
