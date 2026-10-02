@@ -35,3 +35,4 @@ An `ftp://` or `ftps://` transfer with `-D` writes every control-connection repl
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
