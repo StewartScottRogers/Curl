@@ -93,6 +93,7 @@ public sealed class NoTransferEventsTests
         Assert.IsNull(Handshake.CertificateVerifyResult);
         Assert.IsEmpty(Handshake.PeerCertificateChain);
         Assert.IsNull(Handshake.EchResult);
+        Assert.IsEmpty(Handshake.EchRetryConfigLines);
     }
 
     [TestMethod]
@@ -104,6 +105,7 @@ public sealed class NoTransferEventsTests
             PeerSignatureTypeName = "RSASSA-PSS",
             CertificateVerifyResult = 18,
             EchResult = "status is sent GREASE, inner is NULL, outer is NULL",
+            EchRetryConfigLines = ["ECH: retry_configs for NULL from NULL, 0 3"],
             PeerCertificateChain = [],
         };
 
@@ -111,6 +113,7 @@ public sealed class NoTransferEventsTests
         Assert.AreEqual("RSASSA-PSS", handshake.PeerSignatureTypeName);
         Assert.AreEqual(18L, handshake.CertificateVerifyResult);
         Assert.AreEqual("status is sent GREASE, inner is NULL, outer is NULL", handshake.EchResult);
+        Assert.AreEqual("ECH: retry_configs for NULL from NULL, 0 3", handshake.EchRetryConfigLines.Single());
         Assert.IsEmpty(handshake.PeerCertificateChain);
     }
 }

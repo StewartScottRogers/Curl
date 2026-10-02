@@ -246,7 +246,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         run.Prepared.Verifier.Observed.ReportPinnedPublicKeyRefusal(run.Events, _matchesSchannelBuild, failedHandshakeReported);
         if (!Completed(handshake))
         {
-            return (null, await FailAsync(run.Plaintext, run.Events, run.Prepared, handshake?.Failure, thrown).ConfigureAwait(false));
+            return (null, await FailAsync(run, handshake?.Failure, thrown).ConfigureAwait(false));
         }
 
         KeepReceivedSessions(run.PeerKey, handshake.Stream!);
@@ -254,7 +254,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         {
             IsProxy = run.IsProxy,
             VerifiedHostName = SslStreamTlsProvider.VerifiedHostName(run.TargetHost, _options.Insecure),
-            EchResult = EchResultText.Of(_options, run.Prepared.Settings.EchConfigs, run.TargetHost),
+            EchResult = EchResultText.Of(_options, run.Prepared.Settings.EchConfigs, run.TargetHost, handshake.EchRetryConfigs),
+            EchRetryConfigLines = EchRetryConfigsText.Grease(handshake.EchRetryConfigs),
         });
         CertificateStatusText.Report(run.Events, handshake.CertificateStatus);
         return (handshake, null);
@@ -542,33 +543,31 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     // A handshake that failed or threw: the plaintext and the --cert certificate are
     // disposed, cancellation escapes, and anything else is the build's failure.
-    private async ValueTask<ConnectResult> FailAsync(
-        IConnection plaintext,
-        ITransferEvents events,
-        PreparedHandshake prepared,
-        TlsHandshakeFailure? failure,
-        Exception? thrown)
+    private async ValueTask<ConnectResult> FailAsync(HandshakeRun run, TlsHandshakeFailure? failure, Exception? thrown)
     {
-        prepared.ClientCertificate?.Dispose();
-        await plaintext.DisposeAsync().ConfigureAwait(false);
+        run.Prepared.ClientCertificate?.Dispose();
+        await run.Plaintext.DisposeAsync().ConfigureAwait(false);
         RethrowIfCancellation(thrown);
-        CertificateStatusText.Report(events, failure?.CertificateStatusRejection);
-        ReportEchRejection(events, failure);
+        CertificateStatusText.Report(run.Events, failure?.CertificateStatusRejection);
+        ReportEchRejection(run, failure);
         return thrown is null
             ? FailedHandshake(failure!)
             : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(thrown));
     }
 
-    // A rejected ECH offer: curl traces the server's retry_configs before its failf, and a
-    // server without ECH sends none (measured with OpenSSL 4.0.0, ADR-0359).
-    private static void ReportEchRejection(ITransferEvents events, TlsHandshakeFailure? failure)
+    // A rejected ECH offer: curl traces the server's retry_configs before its failf, or
+    // says there were none (measured with OpenSSL 4.0.0, ADR-0359, BL-1171).
+    private static void ReportEchRejection(HandshakeRun run, TlsHandshakeFailure? failure)
     {
         if (failure?.Alert != TlsAlertDescription.EchRequired)
         {
             return;
         }
 
-        events.ReportInfo(TlsFailureMessages.EchNoRetryConfigsLine);
+        foreach (var line in EchRetryConfigsText.Rejected(failure.EchRetryConfigs, run.TargetHost, run.Prepared.Settings.EchConfigs!.SupportedConfig!.PublicName))
+        {
+            run.Events.ReportInfo(line);
+        }
     }
 
     // Everything the handshake needs before a byte is sent, in the order the SslStream

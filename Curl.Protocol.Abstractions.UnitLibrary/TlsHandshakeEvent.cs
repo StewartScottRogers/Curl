@@ -116,4 +116,11 @@ public sealed record TlsHandshakeEvent
     /// when <c>--ech</c> is off or the platform does not report it (ADR-0359, BL-1170).
     /// </summary>
     public string? EchResult { get; init; }
+
+    /// <summary>
+    /// Gets the lines curl's OpenSSL ECH build writes straight after the <c>ECH: result: </c>
+    /// line when the server sent <c>retry_configs</c> in answer to GREASE, such as
+    /// <c>ECH: retry_configs for NULL from NULL, 0 3</c>; empty when it sent none (BL-1171).
+    /// </summary>
+    public IReadOnlyList<string> EchRetryConfigLines { get; init; } = [];
 }

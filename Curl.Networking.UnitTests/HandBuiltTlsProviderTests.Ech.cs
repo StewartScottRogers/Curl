@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 using Curl.Networking.Fakes;
+using Curl.Networking.Fakes.Tls13Server;
 using Curl.Protocol.Abstractions;
 using Curl.Tls;
 
@@ -252,6 +253,54 @@ public sealed partial class HandBuiltTlsProviderTests
             new[] { "ECH: ECHConfig from command line", "ECH: no retry_configs (rv = 1)" },
             events.Info.Where(line => line.StartsWith("ECH:", StringComparison.Ordinal)).ToArray());
         await IgnoreFailureAsync(serverTask);
+    }
+
+    // A rejecting server's retry_configs: the list, then the inner and outer names, before
+    // exit 101 (measured with curl 8.21.0 and OpenSSL 4.0.0, BL-1171).
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WhenTheServerRejectsTheEchOfferWithRetryConfigs_WritesThemAndFailsWithExit101()
+    {
+        using var pki = new OcspTestPki();
+        var retryConfigs = EchConfigListBytes("other.test");
+        var events = new RecordingTransferEvents();
+
+        var (result, _) = await HandshakeWithTestServerAsync(
+            Provider(new TlsClientOptions(Insecure: true, Ech: "hard", EchConfigList: EchConfigListBase64()), OpenSslBuild),
+            new Tls13TestServer(pki.LeafCredential) { EchRetryConfigs = retryConfigs },
+            events);
+
+        Assert.AreEqual(CurlExitCode.EchRequired, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "ECH: ECHConfig from command line",
+                "ECH: retry_configs " + Convert.ToBase64String(retryConfigs),
+                "ECH: retry_configs for " + CertificateHost + " from " + EchPublicName + ", 424 -106",
+            },
+            events.Info.Where(line => line.StartsWith("ECH:", StringComparison.Ordinal)).ToArray());
+    }
+
+    // GREASE an ECH server answers with retry_configs: the result says so and the lines follow
+    // it (measured with curl 8.21.0 and OpenSSL 4.0.0, BL-1171).
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithEchGreaseAnsweredWithRetryConfigs_ReportsThemAfterTheResult()
+    {
+        using var pki = new OcspTestPki();
+        var retryConfigs = EchConfigListBytes("other.test");
+        var events = new RecordingTransferEvents();
+
+        var (result, _) = await HandshakeWithTestServerAsync(
+            Provider(new TlsClientOptions(Insecure: true, Ech: "grease"), OpenSslBuild),
+            new Tls13TestServer(pki.LeafCredential) { EchRetryConfigs = retryConfigs },
+            events);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        var handshake = events.Handshakes.Single();
+        Assert.AreEqual("status is sent GREASE, got retry-configs, inner is NULL, outer is NULL", handshake.EchResult);
+        CollectionAssert.AreEqual(
+            new[] { "ECH: retry_configs " + Convert.ToBase64String(retryConfigs), "ECH: retry_configs for NULL from NULL, 0 3" },
+            handshake.EchRetryConfigLines.ToArray());
+        await result.Connection!.DisposeAsync();
     }
 
     /// <summary>An ECHConfigList with one config: X25519, HKDF-SHA256 and AES-128-GCM, the test config ID.</summary>

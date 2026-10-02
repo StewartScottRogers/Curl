@@ -16,6 +16,9 @@ internal static class EchResultText
     /// <summary>The text <c>grease</c> writes, at TLS 1.2 as well as TLS 1.3.</summary>
     internal const string Grease = "status is sent GREASE, inner is NULL, outer is NULL";
 
+    /// <summary>The text <c>grease</c> writes when the server answered with <c>retry_configs</c> (BL-1171).</summary>
+    internal const string GreaseGotRetryConfigs = "status is sent GREASE, got retry-configs, inner is NULL, outer is NULL";
+
     /// <summary>The text <c>true</c> writes when it had no usable list to offer.</summary>
     internal const string NotConfigured = "status is not configured, inner is NULL, outer is NULL";
 
@@ -28,12 +31,13 @@ internal static class EchResultText
     /// <param name="options">The connection's TLS options.</param>
     /// <param name="offeredConfigs">The configurations the hello sealed its inner hello for, or <see langword="null" />.</param>
     /// <param name="host">The host the inner hello names.</param>
+    /// <param name="retryConfigs">The <c>retry_configs</c> the server sent, or <see langword="null" />.</param>
     /// <returns>The text, or <see langword="null" /> when <c>--ech</c> is off.</returns>
-    internal static string? Of(TlsClientOptions options, EchConfigList? offeredConfigs, string host) =>
+    internal static string? Of(TlsClientOptions options, EchConfigList? offeredConfigs, string host, EchConfigList? retryConfigs = null) =>
         EchModes.Of(options) switch
         {
             EchMode.Off => null,
-            EchMode.Grease => Grease,
+            EchMode.Grease => retryConfigs is null ? Grease : GreaseGotRetryConfigs,
             _ => offeredConfigs?.SupportedConfig is { } config ? Accepted(options.Insecure, host, config.PublicName) : NotConfigured,
         };
 

@@ -341,6 +341,27 @@ public sealed class VerboseTransferEventWriterTests
             Written());
     }
 
+    // A server that answers GREASE with retry_configs: curl traces them straight after the
+    // result line (measured with curl 8.21.0 and OpenSSL 4.0.0, BL-1171).
+    [TestMethod]
+    public void ReportTlsHandshake_OpenSslWithEchRetryConfigLines_WritesThemAfterTheResultLine()
+    {
+        new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.OpenSsl).ReportTlsHandshake(Handshake(["h2", "http/1.1"], null) with
+        {
+            EchResult = "status is sent GREASE, got retry-configs, inner is NULL, outer is NULL",
+            EchRetryConfigLines = ["ECH: retry_configs AAA=", "ECH: retry_configs for NULL from NULL, 0 3"],
+        });
+
+        Assert.AreEqual(
+            "* ALPN: curl offers h2,http/1.1\n" +
+            "* SSL connection using TLSv1.3 / (NONE) / [blank] / UNDEF\n" +
+            "* ECH: result: status is sent GREASE, got retry-configs, inner is NULL, outer is NULL\n" +
+            "* ECH: retry_configs AAA=\n" +
+            "* ECH: retry_configs for NULL from NULL, 0 3\n" +
+            "* ALPN: server did not agree on a protocol. Uses default.\n",
+            Written());
+    }
+
     [TestMethod]
     public void ReportTlsHandshake_OpenSslFactsUnknown_UsesCurlsFallbacks()
     {

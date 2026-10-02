@@ -17,19 +17,24 @@ namespace Curl.Networking;
 /// What <c>--cert-status</c> found in the stapled OCSP response of a completed handshake, or
 /// <see langword="null" /> when it was not given (BL-875).
 /// </param>
+/// <param name="EchRetryConfigs">
+/// The <c>retry_configs</c> a server that completed a TLS 1.3 handshake sent in answer to
+/// GREASE, or <see langword="null" /> when it sent none (BL-1171).
+/// </param>
 internal sealed record HandBuiltHandshake(
     Stream? Stream,
     SslProtocols ProtocolVersion,
     ushort CipherSuite,
     string? ApplicationProtocol,
     TlsHandshakeFailure? Failure,
-    OcspStapleOutcome? CertificateStatus = null)
+    OcspStapleOutcome? CertificateStatus = null,
+    EchConfigList? EchRetryConfigs = null)
 {
     /// <summary>Describes a completed TLS 1.3 handshake.</summary>
     /// <param name="stream">The connected stream.</param>
     /// <returns>The outcome.</returns>
     internal static HandBuiltHandshake Completed(Tls13ClientStream stream) =>
-        new(stream, SslProtocols.Tls13, stream.Handshake.CipherSuite!.Code, stream.Handshake.ApplicationProtocol, null, stream.Handshake.CertificateStatus);
+        new(stream, SslProtocols.Tls13, stream.Handshake.CipherSuite!.Code, stream.Handshake.ApplicationProtocol, null, stream.Handshake.CertificateStatus, stream.Handshake.EncryptedClientHelloRetryConfigs);
 
     /// <summary>Describes a completed TLS 1.2, 1.1 or 1.0 handshake.</summary>
     /// <param name="stream">The connected stream.</param>

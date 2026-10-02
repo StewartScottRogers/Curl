@@ -25,6 +25,13 @@ public sealed record TlsHandshakeFailure(TlsAlertDescription Alert, object? Cert
     public OcspStapleOutcome? CertificateStatusRejection { get; init; }
 
     /// <summary>
+    /// Gets the <c>retry_configs</c> the server sent in its EncryptedExtensions before the
+    /// handshake failed, such as those of a server that rejected Encrypted Client Hello
+    /// (alert <c>ech_required</c>), or <see langword="null" /> when it sent none.
+    /// </summary>
+    public EchConfigList? EchRetryConfigs { get; init; }
+
+    /// <summary>
     /// Gets where the failure came from. The I/O-free handshakes only ever send an alert;
     /// <see cref="Tls13ClientConnection" /> and <see cref="Tls12ClientConnection" /> also
     /// report an alert the server sent and a transport that closed.

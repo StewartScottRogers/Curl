@@ -29,6 +29,14 @@ public sealed class EchResultTextTests
     }
 
     [TestMethod]
+    public void Of_WithGreaseAnsweredWithRetryConfigs_IsSentGreaseGotRetryConfigs()
+    {
+        Assert.AreEqual(
+            "status is sent GREASE, got retry-configs, inner is NULL, outer is NULL",
+            EchResultText.Of(new TlsClientOptions(Ech: "grease"), null, Host, Configs("public.test")));
+    }
+
+    [TestMethod]
     public void Of_WithTrueAndNothingOffered_IsNotConfigured()
     {
         Assert.AreEqual(

@@ -96,6 +96,8 @@ internal static class OpenSslHandshakeText
             lines.Add("ECH: result: " + echResult);
         }
 
+        lines.AddRange(handshake.EchRetryConfigLines);
+
         lines.AddRange(alpnLines.Skip(1));
         if (handshake.ServerCertificate is { } certificate)
         {
