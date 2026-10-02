@@ -32,3 +32,4 @@ BL-864 measured curl 8.21.0 (mingw, Schannel) re-answering a CONNECT's stale Dig
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-02: Backlog -> Doing.
