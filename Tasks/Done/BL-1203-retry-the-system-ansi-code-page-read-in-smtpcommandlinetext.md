@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1203 — Retry the system ANSI code page read in SmtpCommandLineText when Windows fails a concurrent first read
 
@@ -23,13 +23,16 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `SmtpCommandLineText` retries a `null` read of code page 0 once, with unit tests for: first read answers, first read fails then answers, both fail.
-- [ ] `SmtpProtocolHandlerAddressEncodingTests` line 129's expected value retries the same way.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] `SmtpCommandLineText` retries a `null` read of code page 0 once, with unit tests for: first read answers, first read fails then answers, both fail.
+- [x] `SmtpProtocolHandlerAddressEncodingTests` line 129's expected value retries the same way.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
+
+- Added `SmtpCommandLineText.ReadSystemAnsiCodePage(Func<Encoding?>)`, the same `read() ?? read()` as `CredentialEncoding` (protocol libraries cannot see Authentication internals). Three unit tests mirror CredentialEncodingTests; `Platform_IsTheHostsArgvEncoding` computes its expected value through the retry.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. SmtpCommandLineText retries a null read of the system ANSI code page once, with tests

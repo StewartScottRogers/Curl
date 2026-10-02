@@ -20,7 +20,23 @@ internal sealed class SmtpCommandLineText(Encoding encoding)
     /// Windows, UTF-8 elsewhere.
     /// </summary>
     public static SmtpCommandLineText Platform { get; } =
-        ForPlatform(OperatingSystem.IsWindows(), CodePagesEncodingProvider.Instance.GetEncoding(0));
+        ForPlatform(OperatingSystem.IsWindows(), ReadSystemAnsiCodePage(() => CodePagesEncodingProvider.Instance.GetEncoding(0)));
+
+    /// <summary>
+    /// Reads the host's system ANSI code page, asking a second time when the first answer is
+    /// <see langword="null" />.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="CodePagesEncodingProvider" /> answers code page 0 by calling Windows'
+    /// <c>GetCPInfoExW(CP_ACP)</c> afresh each time, and when several threads make their first
+    /// call at once, Windows fails one of them with no error code, so the provider answers
+    /// <see langword="null" /> as if the host had no ANSI code page. The second call succeeds
+    /// (BL-1200, BL-1203). On Linux and macOS both answers are <see langword="null" />.
+    /// </remarks>
+    /// <param name="readCodePageZero">Asks the code page provider for code page 0.</param>
+    /// <returns>The system ANSI code page, or <see langword="null" /> when the host has none.</returns>
+    internal static Encoding? ReadSystemAnsiCodePage(Func<Encoding?> readCodePageZero) =>
+        readCodePageZero() ?? readCodePageZero();
 
     /// <summary>
     /// Chooses the command-line text of a platform, given the host's system ANSI code page.
