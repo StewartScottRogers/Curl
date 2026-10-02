@@ -32,3 +32,4 @@ Curl writes curl 8.21.0's `[SOCKS]` lines for a SOCKS4, SOCKS4a, SOCKS5 and SOCK
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
