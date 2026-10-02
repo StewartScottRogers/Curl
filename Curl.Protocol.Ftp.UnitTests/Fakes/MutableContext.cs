@@ -17,6 +17,8 @@ public sealed class MutableContext
 
     public bool FtpCreateDirectories { get; set; }
 
+    public bool FtpSendPret { get; set; }
+
     public bool ListOnly { get; set; }
 
     public List<string> QuoteCommands { get; } = [];
@@ -70,6 +72,7 @@ public sealed class MutableContext
             FtpSkipPasvIp = mutable.FtpSkipPasvIp,
             FtpFileMethod = mutable.FtpFileMethod,
             FtpCreateDirectories = mutable.FtpCreateDirectories,
+            FtpSendPret = mutable.FtpSendPret,
             ListOnly = mutable.ListOnly,
             QuoteCommands = mutable.QuoteCommands,
             Upload = mutable.Upload,

@@ -939,6 +939,7 @@ internal sealed class FtpSession(
         }
 
         await ExchangeAsync("MKD " + directory).ConfigureAwait(false);
+        trace.ChangingDirectoryAgain();
         return (await ExchangeAsync("CWD " + directory).ConfigureAwait(false)).IsCompletion;
     }
 

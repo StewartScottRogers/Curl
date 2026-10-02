@@ -16,8 +16,7 @@ namespace Curl.Protocol.Ftp;
 /// active-mode download and upload with <c>EPRT</c> and <c>PORT</c> (BL-1196 Notes), and for
 /// <c>CWD</c>, <c>MDTM</c>, <c>REST</c>, <c>AUTH</c>, <c>PBSZ</c>, <c>PROT</c>, <c>CCC</c>,
 /// <c>SYST</c>, <c>ACCT</c>, quotes, a refused <c>EPSV</c> and the end of a failed transfer
-/// (BL-1197 Notes). A command whose state was not measured (<c>PRET</c>, <c>SITE NAMEFMT</c>,
-/// <c>MKD</c>) writes no state change.
+/// (BL-1197 Notes), and for <c>PRET</c>, <c>SITE NAMEFMT 1</c> and <c>MKD</c> (BL-1199 Notes).
 /// </remarks>
 internal sealed class FtpStateTrace(ITransferEvents events, bool enabled)
 {
@@ -88,6 +87,12 @@ internal sealed class FtpStateTrace(ITransferEvents events, bool enabled)
             Enter(next);
         }
     }
+
+    /// <summary>
+    /// Writes the change back to <c>CWD</c> after the reply to <c>MKD</c>, which curl writes
+    /// before it sends <c>CWD</c> again rather than after (BL-1199).
+    /// </summary>
+    public void ChangingDirectoryAgain() => Enter("CWD");
 
     /// <summary>
     /// Writes the state change a <c>-Q</c> command makes once it is sent, and before its reply
@@ -278,7 +283,8 @@ internal sealed class FtpStateTrace(ITransferEvents events, bool enabled)
         return verb switch
         {
             "USER" or "PASS" or "PWD" or "ACCT" or "SYST" or "CWD" or "MDTM" => verb,
-            "AUTH" or "PBSZ" or "PROT" or "CCC" => verb,
+            "AUTH" or "PBSZ" or "PROT" or "CCC" or "PRET" or "MKD" => verb,
+            "SITE" => "NAMEFMT",
             "EPSV" or "PASV" => "PASV",
             "EPRT" or "PORT" => "PORT",
             "TYPE" or "SIZE" or "REST" => transfer + "_" + verb,

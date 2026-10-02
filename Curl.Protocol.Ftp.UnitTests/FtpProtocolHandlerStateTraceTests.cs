@@ -596,6 +596,87 @@ public sealed class FtpProtocolHandlerStateTraceTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_TracedOs400_EntersTheNamefmtStateAndThePwdStateAgain()
+    {
+        // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, PWD=257 "QSYS.LIB" then "/QSYS.LIB",
+        // SYST=215 OS/400 V7R4, SITE=250 OK (BL-1199)
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n257 \"QSYS.LIB\"\r\n215 OS/400 V7R4\r\n250 OK\r\n257 \"/QSYS.LIB\"\r\n"
+                + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            _ => { });
+
+        string[] expected =
+        [
+            "> SYST",
+            "* [FTP] [PWD] -> [SYST]",
+            "< 215 OS/400 V7R4",
+            "> SITE NAMEFMT 1",
+            "* [FTP] [SYST] -> [NAMEFMT]",
+            "< 250 OK",
+            "> PWD",
+            "* [FTP] [NAMEFMT] -> [PWD]",
+            "< 257 \"/QSYS.LIB\"",
+            "* [FTP] [PWD] -> [STOP]",
+            "* [FTP] [STOP] protocol connect phase DONE",
+        ];
+        CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "> SYST").Take(expected.Length).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedPret_EntersThePretStateAndAwaitsTheDataAfterIt()
+    {
+        // curl -sS --trace-config ftp -v --ftp-pret ftp://127.0.0.1:P/a.txt, PRET=200 OK (BL-1199)
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            LoggedIn + "200 OK\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            context => context.FtpSendPret = true);
+
+        string[] expected =
+        [
+            "* [FTP] [STOP] DO phase starts",
+            "> PRET RETR a.txt",
+            "* [FTP] [STOP] -> [PRET]",
+            "* [FTP] [PRET] perform, awaiting DATA connect",
+            "< 200 OK",
+            "> EPSV",
+            "* [FTP] [PRET] -> [PASV]",
+            "* Connect data stream passively",
+            "< 229 Entering Extended Passive Mode (|||53990|)",
+        ];
+        CollectionAssert.AreEqual(expected, Slice(events, "* [FTP] [STOP] DO phase starts", expected.Length));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedCreateDirs_EntersTheMkdStateAndTheCwdStateBeforeTheSecondCwd()
+    {
+        // curl -sS --trace-config ftp -v --ftp-create-dirs ftp://127.0.0.1:P/d/a.txt,
+        // CWD=550 no then 250 OK, MKD=257 created (BL-1199)
+        TraceRecordingEvents events = await RunAsync(
+            "/d/a.txt",
+            LoggedIn + "550 no\r\n257 created\r\n250 OK\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            context => context.FtpCreateDirectories = true);
+
+        string[] expected =
+        [
+            "* [FTP] [STOP] DO phase starts",
+            "> CWD d",
+            "* [FTP] [STOP] -> [CWD]",
+            "* [FTP] [CWD] perform, awaiting DATA connect",
+            "< 550 no",
+            "> MKD d",
+            "* [FTP] [CWD] -> [MKD]",
+            "< 257 created",
+            "* [FTP] [MKD] -> [CWD]",
+            "> CWD d",
+            "< 250 OK",
+            "> EPSV",
+            "* [FTP] [CWD] -> [PASV]",
+        ];
+        CollectionAssert.AreEqual(expected, Slice(events, "* [FTP] [STOP] DO phase starts", expected.Length));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TracedAccount_EntersTheAcctState()
     {
         // curl -sS --trace-config ftp -v --ftp-account bob ftp://127.0.0.1:P/a.txt, PASS=332 (BL-1197)
