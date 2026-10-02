@@ -181,12 +181,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     private async ValueTask<TransferResult> RunSessionAsync(ITransferContext context, SshSessionTarget target, IConnection connection, long connectionNumber)
     {
         ITransferEvents events = context.Events;
-        if (preferences.CryptographyBackend is { } backend)
-        {
-            events.ReportInfo(SshInfoLines.CryptographyBackend(backend));
-        }
-
-        events.ReportInfo(SshInfoLines.User(context.Credentials?.UserName ?? string.Empty));
+        ReportSessionStart(context);
         SshDiagnosticLog log = new(context.DiagnosticLog);
         try
         {
@@ -206,6 +201,23 @@ public sealed class SshProtocolHandler : IProtocolHandler
 
             events.ReportInfo(SshInfoLines.ClosingConnection(connectionNumber));
             return TransferResult.Failure(exception.ExitCode, exception.Message);
+        }
+    }
+
+    // libssh2.c ssh_connect's lines: the backend, the user, and, through an HTTPS proxy
+    // only, that libssh2 sends through the proxy's TLS tunnel (BL-1124).
+    private void ReportSessionStart(ITransferContext context)
+    {
+        ITransferEvents events = context.Events;
+        if (preferences.CryptographyBackend is { } backend)
+        {
+            events.ReportInfo(SshInfoLines.CryptographyBackend(backend));
+        }
+
+        events.ReportInfo(SshInfoLines.User(context.Credentials?.UserName ?? string.Empty));
+        if (context.Proxy?.Kind == ProxyKind.Https)
+        {
+            events.ReportInfo(SshInfoLines.UsingHttpsProxy);
         }
     }
 

@@ -51,6 +51,9 @@ internal static class SshInfoLines
     /// <summary>The <c>scp</c> line after <see cref="AuthenticationComplete" />.</summary>
     internal const string ConnectionEstablished = "SSH: connection established";
 
+    /// <summary>The line after <see cref="User" /> when the transfer goes through an HTTPS proxy (BL-1124).</summary>
+    internal const string UsingHttpsProxy = "SSH: using HTTPS proxy";
+
     /// <summary>
     /// The WinCNG build's <c>publickey</c> denial reason when, with no <c>--pubkey</c>, the
     /// public key cannot be derived from the private key (ADR-0262, ADR-0281).
