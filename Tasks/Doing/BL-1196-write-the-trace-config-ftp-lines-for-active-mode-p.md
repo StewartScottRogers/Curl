@@ -32,3 +32,4 @@ Under `-v --trace-config ftp` an active-mode (`-P`) FTP download writes curl 8.2
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
