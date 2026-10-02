@@ -35,3 +35,4 @@ When a POP3 login fails with exit 67 because no offered SASL mechanism can be us
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
