@@ -636,6 +636,43 @@ public sealed class Http2ConnectionTests
     }
 
     [TestMethod]
+    public async Task ReadStreamFrameAsync_SettingsOfMoreThan32Entries_SendsGoAwayWithEnhanceYourCalmAndNoAcknowledgement()
+    {
+        var settings = Enumerable.Repeat(new Http2Setting(Http2SettingIdentifier.InitialWindowSize, 1000), Http2Connection.MaximumSettingsEntries + 1).ToArray();
+        var (connection, peer) = Connect(CreateSettings(settings));
+
+        Assert.AreEqual(198, settings.Length * 6);
+        Assert.AreEqual(Http2ErrorCode.EnhanceYourCalm, await ProtocolErrorOf(connection));
+        AssertFrame(CreateGoAway(0, Http2ErrorCode.EnhanceYourCalm, ReadOnlyMemory<byte>.Empty), (await peer.WrittenFrames()).Single());
+    }
+
+    [TestMethod]
+    public async Task ReadStreamFrameAsync_SettingsOfMoreThan32Entries_AppliesNoneOfThem()
+    {
+        var settings = Enumerable.Repeat(new Http2Setting(Http2SettingIdentifier.InitialWindowSize, 1000), Http2Connection.MaximumSettingsEntries + 1).ToArray();
+        var (connection, _) = Connect(CreateSettings(settings));
+
+        var exception = await Assert.ThrowsExactlyAsync<Http2ProtocolException>(() => connection.ReadStreamFrameAsync(None));
+
+        StringAssert.Contains(exception.Message, "SETTINGS: too many setting entries");
+        Assert.AreEqual(Http2Settings.DefaultInitialWindowSize, connection.PeerSettings.InitialWindowSize);
+        Assert.IsFalse(connection.IsPeerSettingsReceived);
+    }
+
+    [TestMethod]
+    public async Task ReadStreamFrameAsync_SettingsOfExactly32Entries_IsAppliedAndAcknowledged()
+    {
+        var settings = Enumerable.Repeat(new Http2Setting(Http2SettingIdentifier.InitialWindowSize, 1000), Http2Connection.MaximumSettingsEntries).ToArray();
+        var (connection, peer) = Connect(CreateSettings(settings));
+
+        Assert.IsNull(await connection.ReadStreamFrameAsync(None));
+
+        Assert.IsTrue(connection.IsPeerSettingsReceived);
+        Assert.AreEqual(1000, connection.PeerSettings.InitialWindowSize);
+        AssertFrame(CreateSettingsAcknowledgement(), (await peer.WrittenFrames()).Single());
+    }
+
+    [TestMethod]
     public async Task ReadStreamFrameAsync_Ping_IsAnsweredWithTheSameOpaqueData()
     {
         var (connection, peer) = Connect(CreatePing(0xdeadbeef, isAcknowledgement: false), CreatePing(0x1, isAcknowledgement: true));

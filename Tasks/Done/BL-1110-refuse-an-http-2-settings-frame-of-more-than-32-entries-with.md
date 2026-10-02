@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Http2.UnitLibrary, Curl.Http2.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1110 — Refuse an HTTP/2 SETTINGS frame of more than 32 entries with ENHANCE_YOUR_CALM, as nghttp2 does
 
@@ -25,13 +25,17 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Http2.UnitTests/Http2ConnectionTests.cs`: a SETTINGS frame of 33 entries (198-byte payload) fails with `Http2ErrorCode.EnhanceYourCalm` and the connection writes a GOAWAY with that code and no SETTINGS acknowledgement; a frame of exactly 32 entries is applied and acknowledged.
-- [ ] A test pins that the 33-entry frame's settings are not applied (for example `PeerSettings.InitialWindowSize` keeps its value).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Http2.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] New tests in `Curl.Http2.UnitTests/Http2ConnectionTests.cs`: a SETTINGS frame of 33 entries (198-byte payload) fails with `Http2ErrorCode.EnhanceYourCalm` and the connection writes a GOAWAY with that code and no SETTINGS acknowledgement; a frame of exactly 32 entries is applied and acknowledged.
+- [x] A test pins that the 33-entry frame's settings are not applied (for example `PeerSettings.InitialWindowSize` keeps its value).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Http2.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- The check sits in `Http2Connection.ReceiveSettingsAsync` after `ParseSettings`, so a length that is not a multiple of 6 stays a FRAME_SIZE_ERROR first and an acknowledgement (always empty) is never counted - the order nghttp2 uses. The limit is `Http2Connection.MaximumSettingsEntries` = 32; the GOAWAY carries no debug data, like the other GOAWAYs, and the exception message keeps nghttp2's reason "SETTINGS: too many setting entries".
+- Verified: `dotnet build Curl.slnx -warnaserror` clean, fast tests green (Curl.Http2.UnitTests 224), Measure-CodeQuality: Curl.Http2.UnitLibrary 100% line, 100% branch, 0 failing members.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. A SETTINGS frame of more than 32 entries ends the HTTP/2 connection with GOAWAY ENHANCE_YOUR_CALM, as nghttp2 does
