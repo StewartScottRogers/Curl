@@ -148,7 +148,7 @@ public sealed class CurlCommandRunnerCookieTests
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(
             Latin1(standardError.ToArray()),
-            NativeLines("* using HTTP/1.x\n* Included max number of cookies (150) in request!\n> GET / HTTP/1.1\r\n"));
+            "* using HTTP/1.x\r\n* Included max number of cookies (150) in request!\r\n> GET / HTTP/1.1\r\r\n");
         Assert.HasCount(150, SentCookies(server));
     }
 
