@@ -756,6 +756,38 @@ public sealed class FtpProtocolHandlerStateTraceTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_TracedRangeWithRefusedPostQuote_WritesDoneWithResult21AfterTheQuote()
+    {
+        // curl -sS --trace-config ftp -v -r 0-1 -Q -NOOP ftp://127.0.0.1:P/a.txt (BL-1201):
+        // ABOR reads RETR's 226, so NOOP reads ABOR's 502.
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            LoggedIn + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + "502 Command not implemented\r\n500 no\r\n" + Bye,
+            context =>
+            {
+                context.Range = ByteRange.Bounded(0, 1);
+                context.QuoteCommands.Add("-NOOP");
+            });
+
+        string[] expected =
+        [
+            "> ABOR",
+            "* [FTP] [STOP] closing DATA connection",
+            "* [FTP] getftpresponse start",
+            "< 226 Transfer complete",
+            "* [FTP] getftpresponse -> result=0, nread=23, ftpcode=226",
+            "* partial download completed, closing connection",
+            "> NOOP",
+            "* [FTP] getftpresponse start",
+            "< 502 Command not implemented",
+            "* [FTP] getftpresponse -> result=0, nread=29, ftpcode=502",
+            "* [FTP] [STOP] done, result=21",
+            "* shutting down connection #0",
+        ];
+        CollectionAssert.AreEqual(expected, events.Transcript.Skip(events.Transcript.IndexOf("> ABOR")).ToArray());
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TracedUploadResumedFromTheRemoteSize_EntersTheStorSizeState()
     {
         // curl -sS --trace-config ftp -v -T up.txt -C - ftp://127.0.0.1:P/a.txt (BL-1197)

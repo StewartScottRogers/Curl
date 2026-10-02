@@ -1610,7 +1610,9 @@ internal sealed class FtpSession(
     /// <summary>
     /// Ends a download that had a byte limit: exit 18 with no <c>QUIT</c> when the data
     /// fell short of what was expected, otherwise <c>ABOR</c>, whose reply curl reads
-    /// without checking it, the post-transfer quotes and <c>QUIT</c>.
+    /// without checking it, the post-transfer quotes and <c>QUIT</c>. As curl 8.21.0 does,
+    /// the quotes run before the <c>--trace-config ftp</c> <c>done</c> line, which carries
+    /// their result, and the <c>-v</c> line saying the connection is shut down (BL-1201).
     /// </summary>
     private async ValueTask<TransferResult> EndRangeAsync()
     {
@@ -1622,9 +1624,9 @@ internal sealed class FtpSession(
         context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
         await AbortRangeAsync().ConfigureAwait(false);
         context.Events.ReportInfo(FtpTransferMessages.PartialDownloadClosing);
-        trace.Ended(CurlExitCode.Ok);
+        (FtpQuoteCommand Command, int Code)? refused = await RunPostQuotesAsync().ConfigureAwait(false);
         context.Events.ReportInfo(FtpTransferMessages.ShuttingDownConnection(controlName.Number));
-        return await QuitAndSucceedAsync().ConfigureAwait(false);
+        return await QuitAfterPostQuotesAsync(refused).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1689,10 +1691,27 @@ internal sealed class FtpSession(
     /// Ends a transfer that succeeded: the post-transfer quotes, then <c>QUIT</c>. A refused
     /// quote is exit 21, <c>QUIT</c> still sent.
     /// </summary>
-    private async ValueTask<TransferResult> QuitAndSucceedAsync()
+    private async ValueTask<TransferResult> QuitAndSucceedAsync() =>
+        await QuitAfterPostQuotesAsync(await RunPostQuotesAsync().ConfigureAwait(false)).ConfigureAwait(false);
+
+    /// <summary>
+    /// Sends the post-transfer quotes and writes the <c>--trace-config ftp</c> <c>done</c>
+    /// line with their result: 21 when one was refused, otherwise 0.
+    /// </summary>
+    /// <returns>The refused quote and its reply's code, or <see langword="null" /> when none was refused.</returns>
+    private async ValueTask<(FtpQuoteCommand Command, int Code)?> RunPostQuotesAsync()
     {
         (FtpQuoteCommand Command, int Code)? refused = await FindRefusedQuoteAsync(quotes.AfterTransfer, FtpQuoteStage.AfterTransfer).ConfigureAwait(false);
         trace.Ended(refused is null ? CurlExitCode.Ok : CurlExitCode.QuoteError);
+        return refused;
+    }
+
+    /// <summary>
+    /// Sends <c>QUIT</c> and ends the transfer: exit 21 naming <paramref name="refused" />
+    /// when a post-transfer quote was refused, otherwise a success.
+    /// </summary>
+    private async ValueTask<TransferResult> QuitAfterPostQuotesAsync((FtpQuoteCommand Command, int Code)? refused)
+    {
         await QuitAsync().ConfigureAwait(false);
         return refused is { } quote
             ? TransferResult.Failure(CurlExitCode.QuoteError, FtpTransferMessages.QuoteNotAccepted(quote.Command.Command), bytesTransferred)
