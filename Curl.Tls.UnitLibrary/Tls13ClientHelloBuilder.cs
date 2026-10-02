@@ -2,8 +2,8 @@ namespace Curl.Tls;
 
 /// <summary>
 /// Builds the TLS 1.3 ClientHello from <see cref="Tls13ClientSettings" />: the extensions
-/// in the settings' order, and the <c>padding</c> rule that brings a hello of 256 to 511
-/// bytes up to 512 (the rule of RFC 7685's F5 workaround, as NSS and BoringSSL apply it).
+/// in the settings' order, and <see cref="PaddingExtension.DataLengthFor" />'s rule where
+/// the order lists <c>padding</c>.
 /// </summary>
 internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte[] random, byte[] legacySessionId)
 {
@@ -13,9 +13,6 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
     /// <summary>The <c>legacy_version</c> every TLS 1.3 hello carries.</summary>
     public const ushort LegacyVersion = 0x0303;
 
-    private const int PaddingFloor = 0x100;
-    private const int PaddingTarget = 0x200;
-    private const int ExtensionHeaderLength = 4;
 
     /// <summary>
     /// Returns the ClientHello offering <paramref name="shares" />, echoing <paramref name="cookie" />
@@ -64,20 +61,10 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
         return paddingIndex;
     }
 
-    private static int? PaddingLength(int unpaddedLength)
-    {
-        if (unpaddedLength < PaddingFloor || unpaddedLength >= PaddingTarget)
-        {
-            return null;
-        }
-
-        int padding = PaddingTarget - unpaddedLength;
-        return padding > ExtensionHeaderLength ? padding - ExtensionHeaderLength : 1;
-    }
 
     private ClientHello Pad(ClientHello hello, List<TlsExtension> extensions, int paddingIndex)
     {
-        if (PaddingLength(hello.Encode().Length) is not { } length)
+        if (PaddingExtension.DataLengthFor(hello.Encode().Length) is not { } length)
         {
             return hello;
         }
@@ -110,7 +97,7 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
     private IEnumerable<TlsExtension> LowerVersionExtensions() =>
         settings.LowerVersions is not { } lower
             ? []
-            : Tls12ClientHelloBuilder.Build(lower, random, legacySessionId).Extensions.Where(extension =>
+            : Tls12ClientHelloBuilder.BuildUnpadded(lower, random, legacySessionId).Extensions.Where(extension =>
                 !settings.ExtensionOrder.Contains(extension.Type) && settings.FixedExtensions.All(fixedExtension => fixedExtension.Type != extension.Type));
 
     private TlsExtension? BuildExtension(TlsExtensionType type, IReadOnlyList<KeyShareEntry> shares, byte[]? cookie, bool earlyData) => type switch

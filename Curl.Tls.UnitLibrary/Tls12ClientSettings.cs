@@ -111,6 +111,12 @@ public sealed record Tls12ClientSettings
     public bool OfferEncryptThenMac { get; init; } = true;
 
     /// <summary>
+    /// Gets a value indicating whether a hello of 256 to 511 bytes ends in <c>padding</c> that
+    /// brings it to 512, as OpenSSL's does (measured under <c>--tls-max 1.2 --curves X25519</c>, BL-1156).
+    /// </summary>
+    public bool PadHello { get; init; }
+
+    /// <summary>
     /// Gets the session to resume, or <see langword="null" /> for a full handshake: its
     /// ticket goes in <c>session_ticket</c> with a fresh random session ID, otherwise its
     /// session ID is offered.

@@ -150,7 +150,8 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   groups, TLS 1.2 signature algorithms, ALPN, `status_request`, whether to offer
   `session_ticket`, `extended_master_secret` and `encrypt_then_mac`, the session to
   resume, the client certificate, TLS 1.0 CBC's empty fragment
-  (`InsertEmptyFragment`, off for `--ssl-allow-beast`), and `SrpCredentials`. The
+  (`InsertEmptyFragment`, off for `--ssl-allow-beast`), `SrpCredentials`, and `PadHello`
+  (a 256-to-511-byte hello padded to 512, `padding` last, ADR-0365). The
   ClientHello's extensions follow OpenSSL's order.
 - TLS-SRP (RFC 5054, ADR-0229): `SrpGroup` holds Appendix A's seven groups (`Find` by N
   and g), `SrpClient` SRP-6a's pure functions (k, x, v, A, u and the premaster secret S,
