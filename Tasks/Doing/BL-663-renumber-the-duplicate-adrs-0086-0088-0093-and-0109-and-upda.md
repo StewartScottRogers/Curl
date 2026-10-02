@@ -39,3 +39,4 @@ Every ADR number in `Documentation/Planning/Decisions` names exactly one ADR: th
 ## Log
 
 - 2026-09-28: Created.
+- 2026-10-01: Backlog -> Doing.
