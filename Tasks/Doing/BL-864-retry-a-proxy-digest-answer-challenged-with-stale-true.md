@@ -37,3 +37,4 @@ ADR-0186 decision 5: a `407` to a CONNECT that already sent a credential ends wi
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
