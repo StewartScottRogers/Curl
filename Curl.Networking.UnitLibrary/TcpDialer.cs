@@ -216,14 +216,18 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         return socket;
     }
 
+    /// <summary>
+    /// Wraps the dialed <paramref name="socket" />: in a <see cref="NetworkStream" /> when it is connected, or
+    /// in a <see cref="DeferredConnectSocketStream" /> when <c>connectx</c> left its connect to the first write
+    /// (BL-1158), as <see cref="NetworkStream" /> refuses a socket that is not yet connected.
+    /// </summary>
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
     private static DialedTcpConnection Connected(Socket socket, IPEndPoint endPoint)
     {
         var localEndPoint = (IPEndPoint)socket.LocalEndPoint!;
+        Stream stream = socket.Connected ? new NetworkStream(socket, ownsSocket: true) : new DeferredConnectSocketStream(socket);
 
-        return new DialedTcpConnection(
-            new StreamConnection(new NetworkStream(socket, ownsSocket: true), endPoint, localEndPoint),
-            localEndPoint);
+        return new DialedTcpConnection(new StreamConnection(stream, endPoint, localEndPoint), localEndPoint);
     }
 
     /// <inheritdoc />

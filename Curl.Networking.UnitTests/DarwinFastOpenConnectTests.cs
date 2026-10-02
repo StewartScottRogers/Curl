@@ -32,11 +32,13 @@ public sealed class DarwinFastOpenConnectTests
         var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         new TcpDialer(new TcpSocketOptions(FastOpen: true)).ApplySocketOptions(socket);
 
-        using var connected = DarwinFastOpenConnect.TryConnect(socket, (IPEndPoint)listener.LocalEndPoint!);
+        var connected = DarwinFastOpenConnect.TryConnect(socket, (IPEndPoint)listener.LocalEndPoint!);
 
         Assert.IsNotNull(connected);
-        Assert.IsTrue(connected.Connected);
-        await connected.SendAsync("GET"u8.ToArray(), cancellation.Token);
+        Assert.IsNotNull(connected.LocalEndPoint);
+        // No SYN has left yet, so the socket is not connected until the first write (BL-1158, ADR-0358).
+        await using var stream = new DeferredConnectSocketStream(connected);
+        await stream.WriteAsync("GET"u8.ToArray(), cancellation.Token);
         using var accepted = await listener.AcceptAsync(cancellation.Token);
         var received = new byte[3];
         await new NetworkStream(accepted).ReadExactlyAsync(received, cancellation.Token);

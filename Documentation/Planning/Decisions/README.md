@@ -367,6 +367,7 @@ choices do not need one.
 | [0355](ADR-0355-tcp-fastopen-on-macos-connects-through-connectx.md) | `--tcp-fastopen` on macOS connects through `connectx` with `CONNECT_DATA_IDEMPOTENT`, as libcurl does, falling back to a plain connect when it refuses (BL-1101; amends ADR-0317) | Accepted | 2026-10-02 |
 | [0356](ADR-0356-trace-config-dns-writes-the-dns-filter-and-doh-lines-around-the-connect.md) | `--trace-config dns`, `doh` and `all` write the DNS filter's `[DNS]` lines around a direct connect and route the DoH resolver's lines to the resolving transfer through an `AsyncLocal` view (BL-1102) | Accepted | 2026-10-02 |
 | [0357](ADR-0357-vv-and-trace-config-setup-write-the-setup-filter-lines.md) | `-vv` to `-vvvv` turn on curl's trace components in the parser, and `-vv` or `--trace-config setup` write the setup filter's `[SETUP]` lines around a direct connect (BL-1103) | Accepted | 2026-10-02 |
+| [0358](ADR-0358-a-deferred-connectx-socket-is-read-through-its-own-stream.md) | A socket `connectx` left connecting is read and written through `DeferredConnectSocketStream`, as `NetworkStream` refuses it (BL-1158; amends ADR-0355) | Accepted | 2026-10-02 |
 
 ## Template
 

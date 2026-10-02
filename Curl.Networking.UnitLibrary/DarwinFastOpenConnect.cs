@@ -25,14 +25,15 @@ internal static partial class DarwinFastOpenConnect
 
     /// <summary>
     /// Connects <paramref name="socket" /> to <paramref name="endPoint" /> through <c>connectx</c> and answers
-    /// a <see cref="Socket" /> that knows it is connected, over a duplicate of the same descriptor, disposing
-    /// <paramref name="socket" />; or <see langword="null" />, leaving <paramref name="socket" /> as it was,
-    /// when not on macOS or when <c>connectx</c> refuses, so the caller connects as usual.
+    /// a <see cref="Socket" /> over a duplicate of the same descriptor, disposing <paramref name="socket" />;
+    /// or <see langword="null" />, leaving <paramref name="socket" /> as it was, when not on macOS or when
+    /// <c>connectx</c> refuses, so the caller connects as usual.
     /// </summary>
     /// <remarks>
-    /// The connect is deferred until the first write, which carries the SYN. A managed <see cref="Socket" />
-    /// learns it is connected only from its own connect or from the peer name it reads when made from a
-    /// handle, hence the duplicate descriptor.
+    /// The connect is deferred until the first write, which carries the SYN, so the socket answered reports
+    /// itself not connected and is read and written through <see cref="DeferredConnectSocketStream" />
+    /// (BL-1158, ADR-0358). The duplicate descriptor gives a managed <see cref="Socket" /> that reads its
+    /// local end point from the kernel.
     /// </remarks>
     /// <param name="socket">A TCP socket with its options set, not yet connected.</param>
     /// <param name="endPoint">The server's end point.</param>
