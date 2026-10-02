@@ -35,3 +35,4 @@ With `smb` and `smbs` served (BL-598), `--proto` and `--proto-redir` know them a
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
