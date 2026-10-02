@@ -32,3 +32,4 @@ Under `-v --trace-config dns` (or `doh`, `all`) with `--doh-url`, each DoH sub-t
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
