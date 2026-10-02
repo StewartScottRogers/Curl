@@ -34,3 +34,4 @@ In a run that mixes `file://` with a networked scheme, `* shutting down connecti
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-02: Backlog -> Doing.
