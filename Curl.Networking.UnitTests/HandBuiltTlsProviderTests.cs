@@ -603,6 +603,20 @@ public sealed partial class HandBuiltTlsProviderTests
     }
 
     [TestMethod]
+    public void ToTlsClientCertificate_OfALoadedPkcs12RsaKey_CanSignTheLegacyRsaRule()
+    {
+        var path = ClientCertificateLoaderTests.WriteRsaPkcs12File(_directory);
+        var (loaded, failure) = ClientCertificateLoader.LoadAsSchannelBuild(path, "secret", null, new FakeClientCertificateStore());
+        Assert.IsNull(failure);
+        using (loaded)
+        {
+            var signingKey = HandBuiltTlsProvider.ToTlsClientCertificate(loaded)!.SigningKey;
+
+            Assert.IsTrue(CanSignLegacyRsaRule(signingKey));
+        }
+    }
+
+    [TestMethod]
     [DataRow("localhost", "localhost")]
     [DataRow("127.0.0.1", null)]
     [DataRow("[::1]", null)]
@@ -612,6 +626,18 @@ public sealed partial class HandBuiltTlsProviderTests
     [TestMethod]
     public void ServerCertificateOf_WithNoCertificate_IsNull() =>
         Assert.IsNull(HandBuiltTlsProvider.ServerCertificateOf([]));
+
+    // TLS 1.0 and 1.1's RSA rule and TlsSigningKey.CanSign(rule) are internal to Curl.Tls, so
+    // the test reaches them by reflection.
+    private static bool CanSignLegacyRsaRule(TlsSigningKey signingKey)
+    {
+        var legacyRules = (System.Collections.IList)typeof(TlsSignatureScheme)
+            .GetProperty("LegacyRules", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .GetValue(null)!;
+        var canSign = typeof(TlsSigningKey).GetMethods(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            .Single(method => method.Name == nameof(TlsSigningKey.CanSign));
+        return (bool)canSign.Invoke(signingKey, [legacyRules[0]])!;
+    }
 
     private static TlsClientOptions Tls12Only(TlsClientOptions options) => options with { MaximumVersion = TlsVersion.Tls12 };
 
