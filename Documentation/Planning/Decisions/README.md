@@ -335,6 +335,7 @@ choices do not need one.
 | [0323](ADR-0323-ftp-downloads-hold-curls-measured-conversation-in-passive-mode-only.md) | FTP downloads hold curl's measured conversation (`USER`, `PASS`, `PWD`, `CWD`, `EPSV`/`PASV`, `TYPE`, `SIZE`, `RETR` or `LIST`, `QUIT`), in passive mode only, with curl's exit code and message for every failure (renumbered from 0093 by BL-663) | Accepted | 2026-09-27 |
 | [0324](ADR-0324-an-http-1-0-keep-alive-body-read-to-the-close-is-reported-left-intact.md) | The HTTP handler reports `left intact` for an HTTP/1.0 `Connection: keep-alive` response whose body ran to the close, as curl 8.21.0 does, but does not mark the closed connection reusable (renumbered from 0109 by BL-663) | Accepted; marking not reusable superseded by ADR-0112 | 2026-09-27 |
 | [0325](ADR-0325-alt-svc-seams-a-route-on-the-connect-target-and-a-store-on-the-http-options.md) | Alt-svc seams: `AltSvcRoute` on the connect target and `IAltSvcStore` on the HTTP options; the handler sends `Alt-Used`, hands each `https` `Alt-Svc` header to the store and writes the `Added alt-svc` lines (renumbered from 0208 by BL-663) | Accepted | 2026-09-29 |
+| [0326](ADR-0326-libcurl-writes-the-schannel-builds-proxy-tls-and-authentication-lines.md) | `--libcurl` writes curl 8.21.0 Schannels proxy, TLS and authentication setopt lines in its order and bitmask format on every platform, and a test keeps every parsed option classified (BL-654) | Accepted | 2026-10-01 |
 
 ## Template
 

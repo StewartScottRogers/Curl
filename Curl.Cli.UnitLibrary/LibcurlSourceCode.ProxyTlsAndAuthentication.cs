@@ -7,7 +7,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// The <c>curl_easy_setopt</c> lines curl 8.21.0 (Schannel) writes for the proxy, TLS and authentication
-/// options, measured 2026-10-01 (BL-654 Notes, ADR-0321).
+/// options, measured 2026-10-01 (BL-654 Notes, ADR-0326).
 /// </summary>
 public static partial class LibcurlSourceCode
 {
