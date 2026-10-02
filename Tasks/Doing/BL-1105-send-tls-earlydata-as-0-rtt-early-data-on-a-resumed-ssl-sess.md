@@ -61,3 +61,4 @@ completed:
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
 - 2026-10-01: Doing -> Backlog. Run ended on its budget mid-implementation; code is in the shift stash, remaining steps under Notes
+- 2026-10-01: Backlog -> Doing.
