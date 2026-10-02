@@ -1,7 +1,8 @@
-# ADR-0208 — Alt-svc seams: a route on the connect target, a store on the HTTP options
+# ADR-0325 — Alt-svc seams: a route on the connect target, a store on the HTTP options
 
 - **Status:** Accepted
 - **Date:** 2026-09-29
+- **Renumbered:** from ADR-0208, a number another ADR also held (BL-663)
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-878.
 Builds on ADR-0175 (`AltSvcCache`) and ADR-0079 (`--connect-to`); BL-623 wires the two together.

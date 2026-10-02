@@ -8,7 +8,7 @@ namespace Curl.Protocol.Ftp;
 /// commands sent, the bytes written and the exit code and message of each outcome. Every
 /// case was recorded from real curl on 2026-09-27 with <c>Record-CurlExchange.ps1 -Ftp
 /// -FtpData 0123456789</c> against <c>ftp://127.0.0.1:port/dir/f.txt</c> (BL-438,
-/// ADR-0093's addendum) and is replayed here with the recorder's replies. The recorder
+/// ADR-0323's addendum) and is replayed here with the recorder's replies. The recorder
 /// serves the data from the last <c>REST</c> offset, as the scripted data does here.
 /// </summary>
 [TestClass]

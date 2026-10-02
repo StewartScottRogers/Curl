@@ -4,7 +4,7 @@
 - **Date:** 2026-09-29
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-623.
-Builds on ADR-0175 (`AltSvcCache`) and ADR-0208 (the route and store seams).
+Builds on ADR-0175 (`AltSvcCache`) and ADR-0325 (the route and store seams).
 
 ## Context
 

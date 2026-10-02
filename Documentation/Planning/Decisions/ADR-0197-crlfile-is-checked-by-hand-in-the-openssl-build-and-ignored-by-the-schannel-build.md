@@ -21,7 +21,7 @@ which may now sign CRLs), `-sS --cacert root.pem --crlfile <file>`:
 
 | Case | curl 8.21.0 Schannel (Windows) | curl 8.18.0 OpenSSL 3.5.5 (Ubuntu, WSL) |
 | --- | --- | --- |
-| no `--crlfile` | exit 60 `schannel: the revocation status is unknown` (ADR-0086) | exit 0 |
+| no `--crlfile` | exit 60 `schannel: the revocation status is unknown` (ADR-0321) | exit 0 |
 | a missing file | exit 2, the parser's refusal | exit 2, the parser's refusal |
 | garbage, an empty file, a DER list, a directory | as without `--crlfile` | exit 82 `error loading CRL file: <path>` |
 | an empty list from the root | as without `--crlfile` | exit 0 |

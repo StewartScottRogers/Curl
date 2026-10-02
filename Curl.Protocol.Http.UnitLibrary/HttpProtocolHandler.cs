@@ -1425,7 +1425,7 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Decides whether the connection is reported left intact although the server closed it
     /// to end the body, as curl 8.21.0 does for an HTTP/1.0 keep-alive response with no length
-    /// (measured, BL-471 Notes; ADR-0109). It is marked reusable, as curl pools it, and the pool
+    /// (measured, BL-471 Notes; ADR-0324). It is marked reusable, as curl pools it, and the pool
     /// reports it dead before any reuse (ADR-0112).
     /// </summary>
     private static bool LeftIntactAfterServerClosed(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
@@ -2416,7 +2416,7 @@ public sealed class HttpProtocolHandler(
 
         /// <summary>
         /// Gets a value indicating whether the connection is reported left intact although the
-        /// server closed it to end the body (ADR-0109); it is marked reusable all the same, and
+        /// server closed it to end the body (ADR-0324); it is marked reusable all the same, and
         /// the pool finds it dead (ADR-0112).
         /// </summary>
         public bool LeftIntactAfterServerClosed { get; init; }

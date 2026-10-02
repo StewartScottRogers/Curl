@@ -192,7 +192,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// system store, as exit 35 with Schannel's <c>SEC_E_CERT_EXPIRED</c>. With
     /// <see cref="TlsClientOptions.CaCertificateFile" /> the Schannel build also checks
     /// revocation, unless <see cref="TlsClientOptions.SkipRevocationCheck" /> is set, and an
-    /// unknown revocation status is exit 60 (ADR-0086). Any other failure,
+    /// unknown revocation status is exit 60 (ADR-0321). Any other failure,
     /// such as no TLS version both sides allow or the server closing mid-handshake, is
     /// exit 35 (<see cref="CurlExitCode.SslConnectError" />). The handshake offers the
     /// versions from <see cref="TlsClientOptions.MinimumVersion" /> up to

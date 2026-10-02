@@ -1,7 +1,8 @@
-# ADR-0093 — FTP downloads hold curl's measured conversation, in passive mode only
+# ADR-0323 — FTP downloads hold curl's measured conversation, in passive mode only
 
 - **Status:** Accepted
 - **Date:** 2026-09-27
+- **Renumbered:** from ADR-0093, a number another ADR also held (BL-663)
 - **Decided by Claude under Stewart's delegation** (root `CLAUDE.md`, "Decisions").
 
 ## Context

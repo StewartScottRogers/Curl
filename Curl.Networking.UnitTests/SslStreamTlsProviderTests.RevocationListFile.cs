@@ -20,7 +20,7 @@ namespace Curl.Networking;
 /// exit 82 <c>error loading CRL file: &lt;path&gt;</c>; under <c>-k</c> the garbage file and the
 /// revoking list, exit 0.</item>
 /// <item>curl 8.21.0's Schannel build ignores the option: with <c>--ssl-no-revoke</c> the revoking
-/// list and the garbage file, exit 0; without it every case is ADR-0086's exit 60
+/// list and the garbage file, exit 0; without it every case is ADR-0321's exit 60
 /// <c>schannel: the revocation status is unknown</c>, as with no <c>--crlfile</c>.</item>
 /// </list>
 /// A missing file is refused by the parser, exit 2, in both builds.

@@ -1,7 +1,8 @@
-# ADR-0088 — The Windows `-z` file lookup calls `CreateFile` and `GetFileTime` as curl does
+# ADR-0322 — The Windows `-z` file lookup calls `CreateFile` and `GetFileTime` as curl does
 
 - **Status:** Accepted; replaces the Windows lookup of [ADR-0037](ADR-0037-a-z-value-that-is-not-a-date-is-read-as-a-file-through-idatafilereader.md)
 - **Date:** 2026-09-27
+- **Renumbered:** from ADR-0088, a number another ADR also held (BL-663)
 - **Decided by Claude under Stewart's delegation** (root `CLAUDE.md`, "Decisions").
 
 ## Context

@@ -61,7 +61,7 @@ internal static class CurlComposition
     /// encoding (ADR-0056, rule 4); and <c>ftp</c> and <c>ftps</c>, which
     /// <see cref="RoutingFtpProtocolHandler" /> hands to the HTTP handler when an <c>ftp</c>
     /// transfer is forwarded through an HTTP proxy without <c>-p</c> (ADR-0056, rule 3) and
-    /// otherwise to <see cref="CreateFtpProtocolHandler" />'s handler (ADR-0093, ADR-0102).
+    /// otherwise to <see cref="CreateFtpProtocolHandler" />'s handler (ADR-0323, ADR-0102).
     /// Each scheme is claimed by exactly one handler. Every handler connects through an
     /// <see cref="EndPointRecordingConnector" /> and an <see cref="EndPointRecordingDatagramConnector" />
     /// sharing one <see cref="ConnectionEndPointRecorder" />, and is wrapped in an

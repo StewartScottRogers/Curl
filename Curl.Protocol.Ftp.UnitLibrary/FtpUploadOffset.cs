@@ -2,7 +2,7 @@ namespace Curl.Protocol.Ftp;
 
 /// <summary>
 /// Skips the part of a <c>-T</c> upload a <c>-C</c> offset says the server already holds,
-/// as curl 8.21.0 does before <c>APPE</c> (measured, ADR-0093's BL-439 addendum).
+/// as curl 8.21.0 does before <c>APPE</c> (measured, ADR-0323's BL-439 addendum).
 /// </summary>
 /// <remarks>
 /// A source that can seek, and is not empty, is moved past the offset; when the offset

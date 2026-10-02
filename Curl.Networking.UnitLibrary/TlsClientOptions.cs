@@ -74,7 +74,7 @@ namespace Curl.Networking;
 /// check whether a certificate in a <paramref name="CaCertificateFile" /> chain is revoked.
 /// Without it the Schannel build checks, and a chain whose revocation status is unknown,
 /// such as one from a private CA with no revocation endpoint, fails with exit 60, as
-/// ADR-0086 decides. The OpenSSL build never checks, so ignores it.
+/// ADR-0321 decides. The OpenSSL build never checks, so ignores it.
 /// </param>
 /// <param name="RevocationCheckBestEffort">
 /// <see langword="true" /> for curl's <c>--ssl-revoke-best-effort</c>: the Schannel build

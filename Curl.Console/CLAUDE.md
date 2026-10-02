@@ -277,7 +277,7 @@ the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so 
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
 other transfer, `ftps` through an HTTP proxy included (curl 8.21.0 tunnels it with
 `CONNECT host:990`, BL-458), goes to `FtpProtocolHandler` over the pooling connector
-(ADR-0093, BL-434), its passive data connections over `CurlComposition.FtpDataConnectorOf`'s
+(ADR-0323, BL-434), its passive data connections over `CurlComposition.FtpDataConnectorOf`'s
 `PoolingConnector.Over(TcpConnector.WithoutConnectTimeout())`, which `--connect-timeout` does not
 limit (ADR-0286, BL-797). `CurlComposition.CreateFtpProtocolHandler` builds it with a
 `TcpConnectionListener` for `-P`, the run's TLS provider and DNS resolver, and a

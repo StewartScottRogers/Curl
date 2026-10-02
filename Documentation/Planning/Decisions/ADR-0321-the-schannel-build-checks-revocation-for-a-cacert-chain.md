@@ -1,7 +1,8 @@
-# ADR-0086 — The Schannel build checks revocation for a `--cacert` chain
+# ADR-0321 — The Schannel build checks revocation for a `--cacert` chain
 
 - **Status:** Accepted
 - **Date:** 2026-09-27
+- **Renumbered:** from ADR-0086, a number another ADR also held (BL-663)
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-368.
 

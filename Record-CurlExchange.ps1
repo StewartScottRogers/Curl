@@ -412,7 +412,7 @@
     self-signed one, and write that root's PEM to this path so curl can be given
     --cacert <path> (BL-490); the root may sign certificates and CRLs. Neither certificate
     names a revocation endpoint, so the Schannel build's revocation check of the leaf ends
-    "status unknown", as ADR-0086 describes. The root's key is never written; the file is left for the caller to delete.
+    "status unknown", as ADR-0321 describes. The root's key is never written; the file is left for the caller to delete.
 
 .PARAMETER TlsEmptyCrlFile
     With -TlsRootCertificateFile, also write a PEM "X509 CRL" signed by the throwaway root

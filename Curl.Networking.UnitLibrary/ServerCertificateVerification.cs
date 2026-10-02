@@ -31,7 +31,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// the <c>--capath</c> roots trusted beside it when there is no <c>--cacert</c>. With
     /// <c>--cacert</c> the Schannel build checks revocation below the root unless
     /// <see cref="TlsClientOptions.SkipRevocationCheck" /> is set, so a private CA with no
-    /// revocation endpoint fails with exit 60 as in curl (ADR-0086); the OpenSSL build never
+    /// revocation endpoint fails with exit 60 as in curl (ADR-0321); the OpenSSL build never
     /// checks it. The OpenSSL build then loads the <c>--crlfile</c> lists, as curl loads them
     /// after the <c>--cacert</c> file (BL-609); the Schannel build ignores <c>--crlfile</c>.
     /// Under <c>-k</c> nothing is read.

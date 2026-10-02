@@ -9,7 +9,7 @@ namespace Curl.Protocol.Ftp;
 /// curl 8.21.0: where each quote is sent, which replies end the transfer, and the output and
 /// exit code. Every case was recorded from real curl on 2026-09-27 with
 /// <c>Record-CurlExchange.ps1 -Ftp</c> serving the three bytes <c>abc</c> and uploading
-/// <c>hello</c> (BL-436, ADR-0093's BL-436 addendum); the recorder answers <c>502</c> to a
+/// <c>hello</c> (BL-436, ADR-0323's BL-436 addendum); the recorder answers <c>502</c> to a
 /// command it has no reply for.
 /// </summary>
 [TestClass]

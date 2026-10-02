@@ -9,7 +9,7 @@ namespace Curl.Protocol.Ftp;
 /// connection, the bytes written to the data connection, and the exit code and message of
 /// each outcome. Every case was recorded from real curl on 2026-09-27 with
 /// <c>Record-CurlExchange.ps1 -Ftp</c> uploading the twelve bytes <c>hello world\n</c>
-/// (BL-439, ADR-0093's BL-439 addendum) and is replayed here with the recorder's replies.
+/// (BL-439, ADR-0323's BL-439 addendum) and is replayed here with the recorder's replies.
 /// </summary>
 [TestClass]
 public sealed class FtpProtocolHandlerUploadTests

@@ -73,7 +73,7 @@ adapter and returns an `SslStreamConnection`. With `--cacert` (`TlsClientOptions
 it trusts only the certificates in that PEM file; there the Schannel build also checks
 revocation below the root unless `TlsClientOptions.SkipRevocationCheck` (`--ssl-no-revoke`)
 is set, and names the first of a certificate out of date, an incomplete chain, an untrusted
-root and an unknown revocation status (ADR-0086, BL-368). There too the Schannel build accepts
+root and an unknown revocation status (ADR-0321, BL-368). There too the Schannel build accepts
 a certificate with no DNS subjectAltName whose CN matches the host, as `SchannelCommonNameCheck`
 matches it the way curl's `Curl_cert_hostcheck` does (ADR-0103, BL-415). Against the system store a
 certificate that is only out of date is exit 35 with `SEC_E_CERT_EXPIRED`. Per ADR-0009 it behaves like the curl
@@ -226,7 +226,7 @@ parses them (measured; BL-214). The first `--connect-to` mapping matching the UR
 and port gives the `ConnectDestination` that is resolved, dialled and named in the CONNECT
 request; TLS still verifies the URL's host. A `--resolve` entry for the host and port being
 resolved, the proxy's included, answers in place of `IDnsResolver`. An entry or a matching
-mapping that does not parse fails the connect with exit 49 and curl's message. Per ADR-0208
+mapping that does not parse fails the connect with exit 49 and curl's message. Per ADR-0325
 (BL-878) a target's `AltSvcRoute` (`--alt-svc`) is dialled the same way when no mapping matched,
 after curl's `Alt-svc connecting from [h1]H:P to [h1]H2:P2` line, and `ConnectionPoolKey` keys on
 the alternative too.

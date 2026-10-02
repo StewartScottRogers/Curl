@@ -66,7 +66,7 @@ namespace Curl.Protocol.Ftp;
 /// <c>-I</c> no data connection is opened: a file sends <c>MDTM</c>, <c>TYPE I</c>,
 /// <c>SIZE</c> and <c>REST 0</c> and writes curl's <c>Last-Modified</c>,
 /// <c>Content-Length</c> and <c>Accept-ranges</c> lines to the header output; a directory
-/// sends nothing more. ADR-0093's BL-438 addendum records the measurements.
+/// sends nothing more. ADR-0323's BL-438 addendum records the measurements.
 /// </para>
 /// <para>
 /// <c>--max-filesize</c> (BL-638): a <c>SIZE</c> count over the limit, the whole file's
@@ -82,11 +82,11 @@ namespace Curl.Protocol.Ftp;
 /// <c>APPE</c> instead of <c>STOR</c> through <see cref="FtpUploadOffset" />, after
 /// <c>SIZE</c> for <c>-C -</c>. A URL with no file name is exit 3 before the first
 /// <c>CWD</c>, a refused <c>STOR</c> or <c>APPE</c> exit 25, and an end-of-transfer reply
-/// other than <c>226</c> or <c>250</c> exit 18. ADR-0093's BL-439 addendum records the
+/// other than <c>226</c> or <c>250</c> exit 18. ADR-0323's BL-439 addendum records the
 /// measurements.
 /// </para>
 /// <para>
-/// The FTP control options change that conversation as ADR-0093's BL-436 addendum records:
+/// The FTP control options change that conversation as ADR-0323's BL-436 addendum records:
 /// <c>--disable-epsv</c> goes straight to <c>PASV</c>, except over IPv6, where curl ignores
 /// it (BL-903); <c>--no-ftp-skip-pasv-ip</c>
 /// connects to the address a <c>227</c> reply names; <c>--ftp-method</c> picks the
