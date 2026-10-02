@@ -28,7 +28,7 @@ Record-CurlExchange.ps1 reads a request's whole body before answering when the h
 
 ## Notes
 
-- 2026-10-02: Changed the Content-Length pattern to `[ 	]*?$`. Verified with real curl 8.21.0: `-d @` a 100000-byte file of `a` (a file of NULs is sent as an empty body by `-d`, so it cannot be used) recorded request.bin at 100153 bytes, stdout `hi`, exit 0; `-d ab` recorded the head and `ab`, exit 0.
+- 2026-10-02: Changed the Content-Length pattern to `[ \t]*\r?$`. Verified with real curl 8.21.0: `-d @` a 100000-byte file of `a` (a file of NULs is sent as an empty body by `-d`, so it cannot be used) recorded request.bin at 100153 bytes, stdout `hi`, exit 0; `-d ab` recorded the head and `ab`, exit 0.
 
 ## Log
 
