@@ -76,6 +76,24 @@ function Get-OffendingPaths([string]$BaseRef, [string]$HeadRef, [string]$Repo) {
     return @($mine | Where-Object { ($differs -contains $_) -and (Test-GuardedPath $_) } | Sort-Object -Unique)
 }
 
+function Get-BoardMisses([string]$BoardScript) {
+    # The guarded paths task-board.ps1's Test-AuditPath does not call audit paths. Each
+    # pattern gives one sample path: a prefix pattern (ending / or -) a file under it,
+    # an exact one the path itself. A guarded path the board misses lets a lane claim a
+    # task this guard will fail (BL-1209).
+    $ast = [Management.Automation.Language.Parser]::ParseFile($BoardScript, [ref]$null, [ref]$null)
+    $function = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Test-AuditPath' }, $true)
+    if (-not $function) { return @('(no Test-AuditPath in the board script)') }
+    $test = [scriptblock]::Create("$($function.Extent.Text)`nTest-AuditPath `$args[0]")
+    $misses = @()
+    foreach ($pattern in $GuardedPatterns) {
+        $sample = $pattern.TrimStart('^').TrimEnd('$') -replace '\\(.)', '$1'
+        if ($sample.EndsWith('/') -or $sample.EndsWith('-')) { $sample += 'x.md' }
+        if (-not (& $test $sample)) { $misses += $sample }
+    }
+    return $misses
+}
+
 function Invoke-SelfTest {
     $failures = 0
     $scratch = Join-Path ([IO.Path]::GetTempPath()) ('audit-guard-' + [guid]::NewGuid().ToString('N'))
@@ -170,6 +188,22 @@ function Invoke-SelfTest {
             $r = New-ScratchRepo ('h' + [guid]::NewGuid().ToString('N').Substring(0, 6)); Invoke-FactoryCommit $r @($p)
             Assert-Case "h: factory changes $p" $r $true
         }
+
+        # The board must refuse lanes every guarded path, or a lane builds work this
+        # guard then fails (BL-1209). Checked on the real board script, then on a copy
+        # with ci.yml taken out of its list, which must be caught.
+        $board = Join-Path $PSScriptRoot '../../.claude/skills/task-board/task-board.ps1'
+        $misses = @(Get-BoardMisses $board)
+        $ok = $misses.Count -eq 0
+        if (-not $ok) { $script:selfTestFailures++ }
+        Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) (i: task-board.ps1 calls every guarded path an audit path) missed: $(if ($misses) { $misses -join ', ' } else { 'none' })"
+        New-Item -ItemType Directory -Force $scratch | Out-Null
+        $weakened = Join-Path $scratch 'task-board.ps1'
+        [IO.File]::WriteAllText($weakened, ([IO.File]::ReadAllText($board) -replace "(?m)^\s*'\.github/workflows/ci\.yml',\r?\n", ''))
+        $misses = @(Get-BoardMisses $weakened)
+        $ok = ($misses -join ',') -eq '.github/workflows/ci.yml'
+        if (-not $ok) { $script:selfTestFailures++ }
+        Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) (j: a board missing ci.yml is caught) missed: $(if ($misses) { $misses -join ', ' } else { 'none' })"
     }
     finally {
         Remove-Item -Recurse -Force $scratch -ErrorAction SilentlyContinue

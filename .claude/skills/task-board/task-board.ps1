@@ -194,14 +194,25 @@ function ConvertTo-TouchPath([string] $Item) {
 }
 
 # An audit path is the audit office's, outside the dark factory's reach (ADR-0267):
-# Audit or anything under it, or an auditor agent .claude/agents/audit-*, in any case.
-# Takes a path ConvertTo-TouchPath has normalised. An ancestor such as .claude or * is
-# not one: the hook and CI catch real writes, and refusing * would refuse every task
-# filed without touches.
+# Audit or anything under it, an auditor agent .claude/agents/audit-*, or one of the
+# guard files that protect them, in any case. Takes a path ConvertTo-TouchPath has
+# normalised. An ancestor such as .claude or * is not one: the hook and CI catch real
+# writes, and refusing * would refuse every task filed without touches.
+# The guard files are the ones Audit/Guard/Test-AuditPathsUntouched.ps1's
+# $GuardedPatterns names, in its order: a lane that changes one turns CI's audit guard
+# red (BL-1209). That script's -SelfTest fails when this list misses one of them, so
+# the list stays inside this function, where the self-test reads it.
 function Test-AuditPath([string] $TouchPath) {
+    $guardFiles = @(
+        '.claude/hooks/guard-audit-paths.ps1',
+        '.claude/settings.json',
+        '.github/workflows/ci.yml',
+        '.claude/skills/task-board/task-board.ps1'
+    )
     return $TouchPath -ieq 'Audit' -or
         $TouchPath.StartsWith('Audit/', [StringComparison]::OrdinalIgnoreCase) -or
-        $TouchPath -ilike '.claude/agents/audit-*'
+        $TouchPath -ilike '.claude/agents/audit-*' -or
+        @($guardFiles | Where-Object { $_ -ieq $TouchPath }).Count -gt 0
 }
 
 # True while this process runs inside a dark factory shift (RunDarkFactory.ps1's LANE
