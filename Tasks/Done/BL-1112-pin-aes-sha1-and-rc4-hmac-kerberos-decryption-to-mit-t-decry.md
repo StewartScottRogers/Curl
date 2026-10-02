@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Kerberos.UnitLibrary, Curl.Kerberos.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1112 — Pin AES-SHA1 and RC4-HMAC Kerberos decryption to MIT t_decrypt.c's cases
 
@@ -25,14 +25,20 @@ The hand-built `aes128-cts-hmac-sha1-96` (17), `aes256-cts-hmac-sha1-96` (18) an
 
 ## Acceptance criteria
 
-- [ ] `AesSha1KerberosEncryptionTests.cs` gains `Decrypt_MitTDecryptCase_GivesThePlaintext` with all five `ENCTYPE_AES128_CTS_HMAC_SHA1_96` and all five `ENCTYPE_AES256_CTS_HMAC_SHA1_96` cases, passing.
-- [ ] `Rc4HmacKerberosEncryptionTests.cs` gains the same test with all five `ENCTYPE_ARCFOUR_HMAC` cases, passing.
-- [ ] Each test also decrypts one case with one ciphertext bit flipped and asserts `KerberosCryptographyError.IntegrityCheckFailed`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Kerberos.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `AesSha1KerberosEncryptionTests.cs` gains `Decrypt_MitTDecryptCase_GivesThePlaintext` with all five `ENCTYPE_AES128_CTS_HMAC_SHA1_96` and all five `ENCTYPE_AES256_CTS_HMAC_SHA1_96` cases, passing.
+- [x] `Rc4HmacKerberosEncryptionTests.cs` gains the same test with all five `ENCTYPE_ARCFOUR_HMAC` cases, passing.
+- [x] Each test also decrypts one case with one ciphertext bit flipped and asserts `KerberosCryptographyError.IntegrityCheckFailed`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Kerberos.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- Vectors copied from MIT krb5 `src/lib/crypto/crypto_tests/t_decrypt.c` at commit 50588db5d26e81f3d564d1f69435af34ae80d9b2 (the latest commit touching that file on 2026-10-01); the commit is named in each test comment.
+- All fifteen cases (aes128, aes256, rc4-hmac, usages 0 to 4) decrypted correctly on the first run: no library defect found, so `Curl.Kerberos.UnitLibrary` is unchanged.
+- The bit-flip cases flip the last byte (the MAC for AES, the encrypted plaintext for RC4, whose HMAC sits at the front), so both MAC placements are exercised.
+- Gates: `dotnet build Curl.slnx -warnaserror` clean; fast tests green (Curl.Kerberos.UnitTests 704 passed); `Measure-CodeQuality.ps1 -Library Curl.Kerberos.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. aes128/aes256-cts-hmac-sha1-96 and rc4-hmac decrypt all 15 MIT t_decrypt.c cases; a flipped bit fails integrity
