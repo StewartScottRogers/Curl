@@ -33,6 +33,15 @@ internal sealed class HandBuiltTlsConnection(
     string missingCloseNotifyMessage,
     bool clearsTls) : IConnection
 {
+    private int _ticketsReported;
+
+    /// <summary>
+    /// Gets where each TLS 1.3 <c>NewSessionTicket</c> a read takes in is reported, as a received
+    /// <c>NewSessionTicket</c> <see cref="TlsMessageEvent" />, or <see langword="null" /> to report
+    /// none: the Schannel build reports them, as <see cref="SslStreamConnection" /> does (BL-1096).
+    /// </summary>
+    internal ITransferEvents? TicketEvents { get; init; }
+
     public bool IsSecure => true;
 
     public EndPoint? RemoteEndPoint => plaintext.RemoteEndPoint;
@@ -48,7 +57,23 @@ internal sealed class HandBuiltTlsConnection(
             throw new MissingCloseNotifyException(missingCloseNotifyMessage);
         }
 
+        ReportNewTickets();
         return read;
+    }
+
+    // The client stream takes each ticket in the clear, one per record from the servers curl
+    // meets, so each ticket received since the last read is reported as one ticket record.
+    private void ReportNewTickets()
+    {
+        if (TicketEvents is null || tlsStream is not Tls13ClientStream tls13)
+        {
+            return;
+        }
+
+        for (; _ticketsReported < tls13.Handshake.ReceivedTickets.Count; _ticketsReported++)
+        {
+            TicketEvents.ReportTlsMessage(SessionTicketRecordDetector.NewSessionTicketReceived);
+        }
     }
 
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) =>

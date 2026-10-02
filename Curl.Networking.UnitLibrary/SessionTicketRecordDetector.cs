@@ -29,7 +29,11 @@ internal sealed class SessionTicketRecordDetector
 
     private const int Tls13RecordOverhead = 17;
 
-    private static readonly TlsMessageEvent NewSessionTicketReceived = new()
+    /// <summary>
+    /// Gets the event a received ticket record is reported as: a TLS 1.3 <c>NewSessionTicket</c>,
+    /// of which only the handshake type is given, as curl's Schannel build words no more of it.
+    /// </summary>
+    internal static readonly TlsMessageEvent NewSessionTicketReceived = new()
     {
         ProtocolVersion = 0x0304,
         ContentType = TlsContentType.Handshake,
