@@ -32,3 +32,4 @@ Curl writes curl 8.21.0's `[SETUP]`, `[HAPPY-EYEBALLS]`, `[TCP]`, `[UDP]`, `[MUL
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-02: Backlog -> Doing.
