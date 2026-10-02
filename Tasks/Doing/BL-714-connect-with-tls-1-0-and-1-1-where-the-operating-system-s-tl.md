@@ -32,3 +32,4 @@ When the command line allows TLS 1.0 or 1.1 (`--tlsv1.0`, `--tlsv1.1`, `--tls-ma
 ## Log
 
 - 2026-09-28: Created.
+- 2026-10-01: Backlog -> Doing.
