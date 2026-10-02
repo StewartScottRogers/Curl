@@ -45,6 +45,12 @@ public sealed record Tls12ClientSettings
     public TlsProtocolVersion MaximumVersion { get; init; } = TlsProtocolVersion.Tls12;
 
     /// <summary>
+    /// Gets the version in the header of the records written before the server picks one,
+    /// the ClientHello's among them: TLS 1.0 by default, as OpenSSL sends it.
+    /// </summary>
+    public TlsProtocolVersion ClientHelloRecordVersion { get; init; } = TlsProtocolVersion.Tls10;
+
+    /// <summary>
     /// Gets the cipher suites offered, in preference order: codes <see cref="Tls12CipherSuite.Find" />
     /// knows, and optionally <see cref="Tls12CipherSuite.EmptyRenegotiationInfoScsv" />.
     /// </summary>

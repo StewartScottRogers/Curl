@@ -21,7 +21,7 @@ public sealed class Tls12ClientConnection
         this.settings = settings;
         this.random = random;
         this.handshake = handshake;
-        layer = new Tls12RecordLayer(transport);
+        layer = new Tls12RecordLayer(transport, settings.ClientHelloRecordVersion);
     }
 
     /// <summary>

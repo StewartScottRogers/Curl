@@ -49,6 +49,16 @@ public sealed class Tls12ClientConnectionTests
     }
 
     [TestMethod]
+    public async Task ClientHelloRecordVersionIsTheVersionOfTheHellosRecord()
+    {
+        Tls12TestServer testServer = new(Credential("rsa")) { Version = TlsProtocolVersion.Tls12, CipherSuite = 0xc02f };
+        (Tls12ClientStream client, Tls12RecordTestServer server, _) = await ConnectAsync(testServer, DefaultSettings with { ClientHelloRecordVersion = TlsProtocolVersion.Tls12 });
+        await using Tls12ClientStream stream = client;
+
+        Assert.AreEqual((ushort)0x0303, server.RecordVersions[0]);
+    }
+
+    [TestMethod]
     [DataRow(true, new[] { 0, 3 })]
     [DataRow(false, new[] { 3 })]
     public async Task TlsOneZeroCbcWritesAnEmptyRecordFirstUnlessTurnedOff(bool insertEmptyFragment, int[] recordLengths)

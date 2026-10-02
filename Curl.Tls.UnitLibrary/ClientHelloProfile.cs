@@ -91,6 +91,7 @@ public sealed record ClientHelloProfile(
             TlsExtensionType.EcPointFormats, TlsExtensionType.SignatureAlgorithms, TlsExtensionType.SessionTicket,
             TlsExtensionType.ApplicationLayerProtocolNegotiation, TlsExtensionType.ExtendedMasterSecret, TlsExtensionType.RenegotiationInfo,
         ],
+        Tls12RecordVersionIsTheCeiling = true,
     };
 
     /// <summary>
@@ -164,6 +165,14 @@ public sealed record ClientHelloProfile(
         get => field ?? ExtensionOrder;
         init;
     }
+
+    /// <summary>
+    /// Gets a value indicating whether the hello the build sends below a TLS 1.3 ceiling is in
+    /// a record carrying that ceiling, as Schannel's is (<c>0x0303</c> under <c>--tls-max 1.2</c>,
+    /// <c>0x0301</c> under <c>--tls-max 1.0</c>); otherwise it carries <see cref="RecordVersion" />,
+    /// as OpenSSL's does (measured, BL-1152).
+    /// </summary>
+    public bool Tls12RecordVersionIsTheCeiling { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether the build ends its TLS 1.3 ClientHello over TCP with
