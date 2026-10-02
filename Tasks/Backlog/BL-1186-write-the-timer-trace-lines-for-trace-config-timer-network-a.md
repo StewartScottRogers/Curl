@@ -1,5 +1,5 @@
 ---
-id: BL-1190
+id: BL-1186
 title: Write the [TIMER] trace lines for --trace-config timer, network and -vvvv
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1190 — Write the [TIMER] trace lines for --trace-config timer, network and -vvvv
+# BL-1186 — Write the [TIMER] trace lines for --trace-config timer, network and -vvvv
 
 ## Goal
 
