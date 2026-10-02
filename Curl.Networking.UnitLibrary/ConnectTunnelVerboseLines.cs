@@ -10,12 +10,47 @@ namespace Curl.Networking;
 /// &lt;host&gt;:&lt;port&gt;</c> before it, the request head, each reply header line, and after a
 /// <c>407</c>'s <c>Proxy-Authenticate</c> line, when the CONNECT sent a Basic or Digest value,
 /// <c>&lt;scheme&gt; authentication problem, ignoring.</c> once for each challenge offering that
-/// scheme.
+/// scheme. After a <c>2xx</c> come <c>CONNECT phase completed for HTTP proxy</c> and
+/// <c>CONNECT tunnel established, response &lt;code&gt;</c>, and the OpenSSL build writes
+/// <c>allocate connect buffer</c> before a proxy connection's first CONNECT (BL-964, ADR-0342).
 /// </summary>
 internal static class ConnectTunnelVerboseLines
 {
     /// <summary>The line curl writes before dialling the proxy again after a <c>407</c> that closed the connection.</summary>
     internal const string ConnectAgain = "Connect me again please";
+
+    /// <summary>
+    /// The line curl's OpenSSL build writes once per proxy connection, before its first CONNECT's
+    /// lines; the Schannel build writes none (measured, BL-964 Notes).
+    /// </summary>
+    internal const string AllocateConnectBuffer = "allocate connect buffer";
+
+    /// <summary>
+    /// Reports the line curl writes once a proxy connection is ready for its first CONNECT:
+    /// <see cref="AllocateConnectBuffer" /> in the OpenSSL build, nothing in the Schannel build.
+    /// </summary>
+    /// <param name="events">Where the line goes.</param>
+    /// <param name="matchesSchannelBuild">Whether the lines are the Schannel build's.</param>
+    internal static void ReportNewProxyConnection(ITransferEvents events, bool matchesSchannelBuild)
+    {
+        if (!matchesSchannelBuild)
+        {
+            events.ReportInfo(AllocateConnectBuffer);
+        }
+    }
+
+    /// <summary>
+    /// Reports the lines curl writes once a CONNECT's <c>2xx</c> reply head has been read:
+    /// <c>CONNECT phase completed for HTTP proxy</c> and <c>CONNECT tunnel established,
+    /// response &lt;code&gt;</c> (curl 8.21.0, BL-964 Notes).
+    /// </summary>
+    /// <param name="events">Where the lines go.</param>
+    /// <param name="statusCode">The reply's status code.</param>
+    internal static void ReportTunnelEstablished(ITransferEvents events, int statusCode)
+    {
+        events.ReportInfo("CONNECT phase completed for HTTP proxy");
+        events.ReportInfo($"CONNECT tunnel established, response {statusCode}");
+    }
 
     /// <summary>
     /// Reports the lines curl writes before a CONNECT to <paramref name="request" />'s target: the

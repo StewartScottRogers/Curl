@@ -219,16 +219,20 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
-    [DataRow("http/1.1", "CONNECT: 'http/1.1' negotiated")]
-    [DataRow(null, "CONNECT: no ALPN negotiated")]
+    [DataRow("http/1.1", "CONNECT: 'http/1.1' negotiated", true, DisplayName = "http/1.1, Schannel build")]
+    [DataRow(null, "CONNECT: no ALPN negotiated", true, DisplayName = "no ALPN, Schannel build")]
+    [DataRow("http/1.1", "CONNECT: 'http/1.1' negotiated", false, DisplayName = "http/1.1, OpenSSL build")]
     public async Task ConnectAsync_ThroughAnHttpsProxy_ReportsTheProxysAlpnAfterItsHandshakeAndBeforeTheConnect(
         string? agreedProtocol,
-        string expectedLine)
+        string expectedLine,
+        bool matchesSchannelBuild)
     {
         // curl -v --proxy-insecure -p -x https://127.0.0.1:18872 http://example.test/ says, after the
         // proxy's handshake and before the CONNECT, CONNECT: 'http/1.1' negotiated when the proxy
         // agrees on http/1.1 and CONNECT: no ALPN negotiated when it agrees on nothing
-        // (8.21.0 Schannel and 8.18.0 OpenSSL, measured, BL-872).
+        // (8.21.0 Schannel and 8.18.0 OpenSSL, measured, BL-872); the OpenSSL build then says
+        // allocate connect buffer, and both end the CONNECT with the phase-completed and
+        // tunnel-established lines (BL-964).
         var proxyTls = new ScriptedConnection(Encoding.Latin1.GetBytes(EstablishedReply));
         var writtenWhenReported = -1;
         var events = new RecordingTransferEvents
@@ -236,14 +240,20 @@ public sealed partial class TcpConnectorTests
             OnInfo = text => writtenWhenReported = text.StartsWith("CONNECT:", StringComparison.Ordinal) ? proxyTls.Written.Count : writtenWhenReported,
         };
         var tlsProvider = new SequencedTlsProvider(ConnectResult.Connected(proxyTls, null, applicationProtocol: agreedProtocol));
-        var connector = CreateHttpsProxyConnector(tlsProvider);
+        var connector = CreateHttpsProxyConnector(tlsProvider, matchesSchannelBuild);
 
         var result = await connector.ConnectAsync(
             new ConnectTarget("example.test", 80, UseTls: false) { Events = events, Proxy = HttpsProxy },
             CancellationToken.None);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        CollectionAssert.AreEqual(ProxyResolvedAndTriedLines.Append(expectedLine).Append("Establishing HTTP proxy tunnel to example.test:80").ToArray(), events.Info);
+        string[] connectLines = matchesSchannelBuild ? [expectedLine] : [expectedLine, "allocate connect buffer"];
+        CollectionAssert.AreEqual(
+            ProxyResolvedAndTriedLines
+                .Concat(connectLines)
+                .Concat(["Establishing HTTP proxy tunnel to example.test:80", "CONNECT phase completed for HTTP proxy", "CONNECT tunnel established, response 200"])
+                .ToArray(),
+            events.Info);
         Assert.AreEqual(0, writtenWhenReported);
         Assert.IsNotEmpty(proxyTls.Written);
     }
@@ -263,10 +273,11 @@ public sealed partial class TcpConnectorTests
         CollectionAssert.AreEqual(ProxyResolvedAndTriedLines, events.Info);
     }
 
-    private static TcpConnector CreateHttpsProxyConnector(SequencedTlsProvider tlsProvider) =>
+    private static TcpConnector CreateHttpsProxyConnector(SequencedTlsProvider tlsProvider, bool matchesSchannelBuild = true) =>
         new(
             new FakeDnsResolver(ProxyAddress),
             new FakeTcpDialer { DialOutcome = _ => new ScriptedConnection([]) },
             tlsProvider,
-            new ManualTimeProvider());
+            new ManualTimeProvider(),
+            HttpProxyTunnelOptions.Default with { MatchesSchannelBuild = matchesSchannelBuild });
 }

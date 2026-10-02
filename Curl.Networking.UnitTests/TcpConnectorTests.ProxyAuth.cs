@@ -228,10 +228,12 @@ public sealed partial class TcpConnectorTests
     }
 
     // The proxy authenticator the composition builds, with the measured cnonce.
-    private static HttpProxyTunnelOptions AuthenticatingOptions(HttpAuthSchemes schemes) =>
+    // The Schannel build's -v lines unless matchesSchannelBuild says otherwise, so a transcript pins one build on every platform.
+    private static HttpProxyTunnelOptions AuthenticatingOptions(HttpAuthSchemes schemes, bool matchesSchannelBuild = true) =>
         HttpProxyTunnelOptions.Default with
         {
             ProxyAuthSchemes = schemes,
+            MatchesSchannelBuild = matchesSchannelBuild,
             ProxyAuthenticator = new RankedHttpAuthenticator(
                 new BasicAndBearerAuthenticator(Encoding.UTF8),
                 new DigestAuthenticator(Encoding.UTF8, () => MeasuredClientNonce),

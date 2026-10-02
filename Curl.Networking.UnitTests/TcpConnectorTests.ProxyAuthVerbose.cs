@@ -10,8 +10,10 @@ namespace Curl.Networking;
 /// cases, in curl 8.21.0's order and text (measured with <c>Record-CurlExchange.ps1</c> as the
 /// proxy; BL-863 Notes): <c>Proxy auth using</c>, <c>Establishing HTTP proxy tunnel to</c>, the
 /// CONNECT head, the reply's header lines, <c>Connect me again please</c> and
-/// <c>&lt;scheme&gt; authentication problem, ignoring.</c>. Lines BL-964 covers, and the
-/// <c>CONNECT: no ALPN negotiated</c> line before a plain proxy's CONNECT, are not reported yet.
+/// <c>&lt;scheme&gt; authentication problem, ignoring.</c>, and after a <c>2xx</c> the
+/// <c>CONNECT phase completed</c> and <c>CONNECT tunnel established</c> lines (BL-964), in the
+/// Schannel build unless a test says otherwise. The <c>CONNECT: no ALPN negotiated</c> line
+/// before a plain proxy's CONNECT is not reported yet.
 /// </summary>
 public sealed partial class TcpConnectorTests
 {
@@ -19,7 +21,8 @@ public sealed partial class TcpConnectorTests
 
     private const string Establishing = "* Establishing HTTP proxy tunnel to example.test:80";
 
-    private static readonly string[] EstablishedLines = ["< HTTP/1.1 200 Connection established", "< "];
+    private static readonly string[] EstablishedLines =
+        ["< HTTP/1.1 200 Connection established", "< ", "* CONNECT phase completed for HTTP proxy", "* CONNECT tunnel established, response 200"];
 
     private static readonly string[] BasicChallengeLines =
         ["< HTTP/1.1 407 Proxy Authentication Required", "< Proxy-Authenticate: Basic realm=\"r\"", "< Content-Length: 0", "< Connection: close", "< "];
@@ -144,6 +147,59 @@ public sealed partial class TcpConnectorTests
             events.Transcript);
     }
 
+
+    [TestMethod]
+    public async Task ConnectAsync_InTheOpenSslBuild_ReportsAllocateConnectBufferOnEachProxyConnection()
+    {
+        // curl 8.18.0 (OpenSSL) -v -p -x http://127.0.0.1:18966 --proxy-anyauth -U u:p: allocate
+        // connect buffer before the first CONNECT's lines; a redial opens a new tunnel filter, so
+        // it comes again (BL-964 Notes).
+        var events = new RecordingTransferEvents();
+        var queue = new Queue<ScriptedConnection>([
+            new ScriptedConnection(Encoding.Latin1.GetBytes(DigestChallengeClosing)),
+            new ScriptedConnection(Encoding.Latin1.GetBytes(EstablishedReply))]);
+        var connector = new TcpConnector(
+            new FakeDnsResolver(ProxyAddress),
+            new FakeTcpDialer { DialOutcome = _ => queue.Dequeue() },
+            new FakeTlsProvider(),
+            new ManualTimeProvider(),
+            AuthenticatingOptions(HttpAuthSchemes.Digest, matchesSchannelBuild: false));
+
+        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+
+        AssertTranscript(
+            Lines(
+                [Trying, "* allocate connect buffer", "* Proxy auth using Digest with user 'u'", Establishing],
+                RequestLines(UnauthenticatedConnect),
+                DigestChallengeLines,
+                ["* Connect me again please", Trying, "* allocate connect buffer", "* Proxy auth using Digest with user 'u'", Establishing],
+                RequestLines(DigestConnect),
+                EstablishedLines),
+            events.Transcript);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_InTheOpenSslBuildOnAKeptOpenConnection_ReportsAllocateConnectBufferOnce()
+    {
+        // A second CONNECT on the same connection reuses curl's tunnel state (tunnel_reinit), so
+        // allocate connect buffer is not written again (curl 8.21.0's lib/cf-h1-proxy.c).
+        var events = new RecordingTransferEvents();
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(
+            "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"\r\nContent-Length: 0\r\n\r\n"
+            + EstablishedReply));
+        var connector = new TcpConnector(
+            new FakeDnsResolver(ProxyAddress),
+            new FakeTcpDialer { DialOutcome = _ => connection },
+            new FakeTlsProvider(),
+            new ManualTimeProvider(),
+            AuthenticatingOptions(HttpAuthSchemes.Digest, matchesSchannelBuild: false));
+
+        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+
+        Assert.AreEqual(1, events.Transcript.Count(line => line == "* allocate connect buffer"));
+        Assert.AreEqual("* allocate connect buffer", events.Transcript[1]);
+        CollectionAssert.AreEqual(EstablishedLines, events.Transcript.TakeLast(4).ToArray());
+    }
 
     private static void AssertTranscript(string[] expected, List<string> transcript) =>
         Assert.AreEqual(string.Join("\n", expected), string.Join("\n", transcript));

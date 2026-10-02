@@ -202,7 +202,10 @@ CONNECT reports curl 8.21.0's `-v` lines on the target's `Events` through `Conne
 `--proxy-digest` CONNECT too), `Establishing HTTP proxy tunnel to <host>:<port>`, the request head
 (`ReportRequestHeader`), each reply line (`ReportResponseHeader`) with `<scheme> authentication
 problem, ignoring.` after a `407`'s `Proxy-Authenticate` line refusing a sent Basic or Digest value,
-and `Connect me again please` before a redial. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
+and `Connect me again please` before a redial. Per ADR-0342 (BL-964) a `2xx` reply is followed by
+`CONNECT phase completed for HTTP proxy` and `CONNECT tunnel established, response <code>`, and the
+OpenSSL build (`HttpProxyTunnelOptions.MatchesSchannelBuild` false, the default off Windows) writes
+`allocate connect buffer` once per proxy connection before its first CONNECT's lines. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
 `Socks5Hostname`) `SocksProxyTunnel` runs curl 8.21.0's handshake, measured byte for byte
 (BL-213): `Socks4Handshake` resolves the target locally and sends its first IPv4 address,
 SOCKS4a sends the host as written; `Socks5Handshake` offers no authentication and GSSAPI (and

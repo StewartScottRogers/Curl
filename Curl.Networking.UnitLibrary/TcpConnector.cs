@@ -1007,6 +1007,27 @@ public sealed partial class TcpConnector(
     }
 
     /// <summary>
+    /// Ends the CONNECT a <c>2xx</c> with <paramref name="statusCode" /> answered: its proxy
+    /// authorization, curl's <c>CONNECT phase completed</c> and <c>CONNECT tunnel established</c>
+    /// lines (BL-964), and the tunnel's diagnostic line; then runs the target's TLS when asked.
+    /// </summary>
+    private async ValueTask<ConnectResult> SecureOpenedTunnelAsync(
+        DialedSocket dialed,
+        TunnelRequest tunnel,
+        int statusCode,
+        string? proxyAuthorization,
+        CancellationToken cancellationToken)
+    {
+        EndProxyAuthorization(proxyAuthorization);
+        ConnectTunnelVerboseLines.ReportTunnelEstablished(tunnel.Target.Events, statusCode);
+
+        // For a tunnel, %{time_connect} is when the tunnel is open (ConnectTimings.Connected).
+        var timings = new ConnectTimings(tunnel.Started, tunnel.NameResolved, timeProvider.GetTimestamp(), null);
+        new NetworkDiagnosticLog(tunnel.Target.DiagnosticLog).TunnelEstablished(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port, statusCode);
+        return await SecureWhenAskedAsync(dialed, tunnel.Target, timings, statusCode, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Sends CONNECT with <paramref name="proxyAuthorization" /> and, when the proxy answers
     /// <c>407</c> and the authenticator answers its challenge, sends it again with that answer,
     /// as curl 8.21.0 does (BL-602): on this connection when the reply leaves it reusable, else
@@ -1023,18 +1044,14 @@ public sealed partial class TcpConnector(
         var connection = dialed.Connection;
         var log = new NetworkDiagnosticLog(tunnel.Target.DiagnosticLog);
         var answersChallenge = tunnel.AuthorizationAnswersChallenge;
+        ConnectTunnelVerboseLines.ReportNewProxyConnection(tunnel.Target.Events, _proxyTunnelOptions.MatchesSchannelBuild);
         while (true)
         {
             log.TunnelRequested(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port);
             var (reply, exception) = await RequestTunnelAsync(connection, tunnel, proxyAuthorization, answersChallenge, cancellationToken).ConfigureAwait(false);
             if (exception is null && reply.OpensTunnel)
             {
-                EndProxyAuthorization(proxyAuthorization);
-
-                // For a tunnel, %{time_connect} is when the tunnel is open (ConnectTimings.Connected).
-                var timings = new ConnectTimings(tunnel.Started, tunnel.NameResolved, timeProvider.GetTimestamp(), null);
-                log.TunnelEstablished(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port, reply.StatusCode);
-                return (await SecureWhenAskedAsync(dialed, tunnel.Target, timings, reply.StatusCode, cancellationToken).ConfigureAwait(false), null);
+                return (await SecureOpenedTunnelAsync(dialed, tunnel, reply.StatusCode, proxyAuthorization, cancellationToken).ConfigureAwait(false), null);
             }
 
             var (answer, onThisConnection, failure) = exception is null
