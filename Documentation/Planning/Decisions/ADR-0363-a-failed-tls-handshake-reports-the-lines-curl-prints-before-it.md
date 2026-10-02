@@ -42,7 +42,7 @@ Curl printed only the hash and mismatch lines.
 - The Schannel build now prints its ALPN offer before every handshake failure, exit 60 and
   exit 35 included.
 - The OpenSSL build still prints nothing of the handshake before an exit 60 or exit 35, and
-  the hand-built provider's OpenSSL build nothing but the hash before an exit 90; BL-1177
+  the hand-built provider's OpenSSL build nothing but the hash before an exit 90; BL-1178
   covers both.
 
 ## Alternatives considered

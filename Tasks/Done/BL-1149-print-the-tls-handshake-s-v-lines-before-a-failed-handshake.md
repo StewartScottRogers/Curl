@@ -46,8 +46,8 @@ ALPN offer, `SSL connection using`, certificate details and verify result.
     ALPN offer, TLS message lines, `SSL connection using`, `ALPN: server did not agree ...`,
     `Server certificate:` and details, ` SSL certificate verification failed, continuing anyway!`,
     the hash line, the mismatch line once. Its exit 60 prints the certificate details too
-    (left to BL-1177).
-- Design (ADR-0362): `TlsHandshakeEvent.Failed`; `TransferEventInfoText` gives a failed Schannel
+    (left to BL-1178).
+- Design (ADR-0363): `TlsHandshakeEvent.Failed`; `TransferEventInfoText` gives a failed Schannel
   handshake only the ALPN offer and hash, the OpenSSL text is unchanged. `SslStreamTlsProvider`
   keeps the negotiation from its certificate callback and reports a failed event always in the
   Schannel build and on a pin refusal in the OpenSSL build; `HandBuiltTlsProvider` reports one in
@@ -55,7 +55,7 @@ ALPN offer, `SSL connection using`, certificate details and verify result.
   `ReportPinnedPublicKeyRefusal` skips the hash line when the event carries it.
 - The end-to-end run of the built `Curl.Console` against the recorder was skipped: this lane may
   not read `bin/`. Each layer is pinned by its unit tests instead.
-- Follow-up filed: BL-1177 (OpenSSL build's lines before exit 60/35, hand-built OpenSSL pin refusal).
+- Follow-up filed: BL-1178 (OpenSSL build's lines before exit 60/35, hand-built OpenSSL pin refusal).
 - Quality: Curl.Networking.UnitLibrary, Curl.Output.UnitLibrary, Curl.Protocol.Abstractions.UnitLibrary
   100% line and branch, 0 failing members, worst CRAP 10.
 

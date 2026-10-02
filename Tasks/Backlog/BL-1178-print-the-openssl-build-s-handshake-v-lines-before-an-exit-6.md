@@ -1,5 +1,5 @@
 ---
-id: BL-1177
+id: BL-1178
 title: Print the OpenSSL build's handshake -v lines before an exit 60 or 35, and before the hand-built client's pin refusal
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1177 — Print the OpenSSL build's handshake -v lines before an exit 60 or 35, and before the hand-built client's pin refusal
+# BL-1178 — Print the OpenSSL build's handshake -v lines before an exit 60 or 35, and before the hand-built client's pin refusal
 
 ## Goal
 
@@ -20,7 +20,7 @@ OpenSSL build prints them before a `--pinnedpubkey` refusal, as `SslStreamTlsPro
 
 ## Context
 
-- Follow-up from BL-1149 (ADR-0362): a failed handshake is reported as a `TlsHandshakeEvent` with
+- Follow-up from BL-1149 (ADR-0363): a failed handshake is reported as a `TlsHandshakeEvent` with
   `Failed` set. The OpenSSL build reports one only for an `SslStreamTlsProvider` pin refusal.
 - Measured 2026-10-02, curl 8.18.0 OpenSSL 3.5.5 in WSL (`Record-CurlExchange.ps1 -Curl wsl.exe
   -ListenAddress <host> -Tls`, `-v`, no `-k`): the ALPN offer, the TLS message lines, `SSL connection
