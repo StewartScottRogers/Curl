@@ -1442,6 +1442,15 @@ public sealed class CommandLineOptions
     public string? Ech { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when <see cref="Ech"/> is a value libcurl's <c>setopt_ech</c> refuses when curl sets
+    /// it: anything but <c>false</c>, <c>grease</c>, <c>true</c> or <c>hard</c>, compared case-sensitively, a
+    /// value longer than four characters starting <c>ecl:</c> or one longer than three starting <c>pn:</c>
+    /// (curl 8.21.0, <c>lib/setopt.c</c>). curl then fails the transfer with exit 43 and
+    /// <c>curl: (43) setopt 0x2855 got bad argument</c> (measured 2026-10-02, BL-1107; ADR-0378).
+    /// </summary>
+    public bool EchModeIsMalformed => Ech is { } mode && !LibcurlAcceptsEchMode(mode);
+
+    /// <summary>
     /// The public name of the last <c>--ech pn:&lt;name&gt;</c>, without its <c>pn:</c> prefix;
     /// <see langword="null"/> when none was given.
     /// </summary>
@@ -2309,6 +2318,12 @@ public sealed class CommandLineOptions
     /// </summary>
     private static string? UserWhosePasswordIsMissing(string userAndPassword) =>
         !userAndPassword.Contains(':', StringComparison.Ordinal) && !userAndPassword.StartsWith(';') ? userAndPassword : null;
+
+    /// <summary>Whether libcurl's <c>setopt_ech</c> accepts <paramref name="mode"/> (see <see cref="EchModeIsMalformed"/>).</summary>
+    private static bool LibcurlAcceptsEchMode(string mode) =>
+        mode is "false" or "grease" or "true" or "hard"
+        || (mode.Length > 4 && mode.StartsWith("ecl:", StringComparison.Ordinal))
+        || (mode.Length > 3 && mode.StartsWith("pn:", StringComparison.Ordinal));
 
     /// <summary>
     /// Asks <paramref name="passwordPrompt"/> for each password the command line left out, with

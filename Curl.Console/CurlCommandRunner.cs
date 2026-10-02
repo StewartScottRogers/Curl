@@ -517,6 +517,17 @@ internal sealed class CurlCommandRunner(
     private const string InterfaceSetoptMessage = "setopt 0x274e got bad argument";
 
     /// <summary>
+    /// The result of a transfer whose <c>--ech</c> mode libcurl refuses when curl sets it
+    /// (<c>CURLOPT_ECH</c>, option 10325, 0x2855): exit 43 with curl 8.21.0's message, before any
+    /// connection (measured with curl's ECH build 2026-10-02, BL-1107; ADR-0378). It is compared by
+    /// reference, so that <see cref="TransferAllAsync" /> stops before the remaining URLs, as curl does.
+    /// </summary>
+    private static readonly TransferResult EchSetoptFailure =
+        TransferResult.Failure(CurlExitCode.BadFunctionArgument, EchSetoptMessage);
+
+    private const string EchSetoptMessage = "setopt 0x2855 got bad argument";
+
+    /// <summary>
     /// Standard output, deferring a write failure as curl's stdio buffer does and recording
     /// it for the current transfer: every transfer's without <c>-Z</c>, and a <c>--trace -</c>
     /// dump's; under <c>-Z</c> each transfer has one of its own (task BL-773).
@@ -1963,7 +1974,7 @@ internal sealed class CurlCommandRunner(
         }
 
         ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(options, transfer);
-        if (RefuseMalformedInterface(options, eventsBeforeConnecting) is { } setoptFailure)
+        if ((RefuseMalformedInterface(options, eventsBeforeConnecting) ?? RefuseMalformedEchMode(options, eventsBeforeConnecting)) is { } setoptFailure)
         {
             return (setoptFailure, givenUrl, transferUrl);
         }
@@ -2727,6 +2738,27 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Refuses an <c>--ech</c> mode libcurl refuses when curl sets it
+    /// (<see cref="CommandLineOptions.EchModeIsMalformed" />): curl 8.21.0's ECH build reports
+    /// <c>setopt 0x2855 got bad argument</c> and fails the transfer with exit 43 (BL-1107), as it
+    /// fails a malformed <c>--interface</c>, so the <c>-v</c> line and the <c>-w</c> output follow that
+    /// measurement (ADR-0378).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="events">Where the <c>-v</c> line goes.</param>
+    /// <returns><see cref="EchSetoptFailure" />, or <see langword="null" /> when the mode was accepted.</returns>
+    private static TransferResult? RefuseMalformedEchMode(CommandLineOptions options, ITransferEvents events)
+    {
+        if (!options.EchModeIsMalformed)
+        {
+            return null;
+        }
+
+        events.ReportInfo(EchSetoptMessage);
+        return EchSetoptFailure;
+    }
+
+    /// <summary>
     /// The scheme <c>%{scheme}</c> prints: the URL's, in lower case, or <see langword="null" />
     /// (printed as nothing) when the URL cannot be parsed or no handler serves its scheme, as
     /// curl 8.21.0 prints it for <c>dict://exa mple.com/</c> and <c>xyz://a/b</c>.
@@ -2782,7 +2814,8 @@ internal sealed class CurlCommandRunner(
     /// The results, compared by reference, after which no further URL is transferred whatever
     /// the options: a resumed <c>-o</c> file, a <c>-T</c> or <c>-D</c> file that cannot be opened,
     /// a <c>--create-dirs</c> directory that cannot be created, an IPFS URL that cannot be
-    /// rewritten or asked for its remote name, and an SSH transfer with no known-hosts file.
+    /// rewritten or asked for its remote name, an SSH transfer with no known-hosts file, and an
+    /// <c>--interface</c> value or <c>--ech</c> mode libcurl refuses when curl sets it.
     /// </summary>
     private static readonly HashSet<TransferResult> RunEndingFailures = new(ReferenceEqualityComparer.Instance)
     {
@@ -2796,6 +2829,7 @@ internal sealed class CurlCommandRunner(
         IpfsRemoteNameFailure,
         KnownHostsFileMissingFailure,
         InterfaceSetoptFailure,
+        EchSetoptFailure,
     };
 
     /// <summary>

@@ -175,6 +175,47 @@ public sealed class CommandLineTlsHandshakeOptionTests
     }
 
     [TestMethod]
+    [DataRow("false")]
+    [DataRow("grease")]
+    [DataRow("true")]
+    [DataRow("hard")]
+    [DataRow("pn:x")]
+    [DataRow("ecl:x")]
+    public void Parse_EchModeLibcurlAccepts_IsNotMalformed(string value)
+    {
+        // libcurl's setopt_ech (curl 8.21.0) accepts the four keywords, "pn:" with a name and "ecl:" with a list.
+        CommandLineOptions options = CommandLineParser.Parse(["--ech", value, Url]).Options!;
+
+        Assert.IsFalse(options.EchModeIsMalformed);
+    }
+
+    [TestMethod]
+    [DataRow("bogus")]
+    [DataRow("TRUE")]
+    [DataRow("Hard")]
+    [DataRow("ecl:")]
+    [DataRow("pn:")]
+    [DataRow("PN:x")]
+    [DataRow("ECL:x")]
+    public void Parse_EchModeLibcurlRefuses_IsMalformed(string value)
+    {
+        // curl --ech bogus https://... -> curl: (43) setopt 0x2855 got bad argument (ECH build, BL-1107);
+        // setopt_ech compares case-sensitively, so a keyword or prefix in another case is refused too.
+        CommandLineParseResult result = CommandLineParser.Parse(["--ech", value, Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.EchModeIsMalformed);
+    }
+
+    [TestMethod]
+    public void Parse_NoEchMode_IsNotMalformed()
+    {
+        CommandLineOptions options = CommandLineParser.Parse(["--ech", "pn:example.com", Url]).Options!;
+
+        Assert.IsFalse(options.EchModeIsMalformed);
+    }
+
+    [TestMethod]
     [DataRow("pn:example.com", "example.com")]
     [DataRow("PN:ab", "ab")]
     public void Parse_EchPublicName_RecordsTheNameWithoutItsPrefix(string value, string expected)

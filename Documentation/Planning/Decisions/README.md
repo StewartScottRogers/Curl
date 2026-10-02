@@ -387,6 +387,7 @@ choices do not need one.
 | [0375](ADR-0375-trace-config-http3-writes-curls-stream-lines.md) | `--trace-config http/3` (and `protocol`, `all`) writes curl's `[HTTP/3]` `end_headers`, `DATA len`, `ACK`, `CLOSED` and `quic close` stream lines in curl's places, without curl's I/O loop lines; the connection lines and header echoes are BL-1208 (BL-1168) | Accepted | 2026-10-02 |
 | [0376](ADR-0376-trace-config-quic-writes-no-lines-of-its-own.md) | `--trace-config quic` writes no lines of its own: curl's ngtcp2 build writes no `[QUIC]` line under `quic`, `network`, `protocol` or `all` (measured); pinned as none (BL-1169) | Accepted | 2026-10-02 |
 | [0377](ADR-0377-trace-config-ssh-agent-lines-follow-the-server-answers.md) | The `--trace-config ssh` agent line `auth user ... for key ...` is written once per identity attempt plus once per server answer; a listed link goes through `SSH_SFTP_READDIR_LINK`; `-I` on an SFTP directory sends `STAT` in `SSH_SFTP_FILETIME`, all as measured (BL-1207) | Accepted | 2026-10-02 |
+| [0378](ADR-0378-an-unknown-ech-mode-fails-the-transfer-with-exit-43-as-the-ech-build-does.md) | An `--ech` mode libcurl's `setopt_ech` refuses (anything but `false`, `grease`, `true`, `hard`, `ecl:<list>`, `pn:<name>`, case-sensitive) fails the transfer with exit 43 and `setopt 0x2855 got bad argument`, as curls ECH build does, not exit 2 as the platform builds without ECH do (BL-1172) | Accepted | 2026-10-02 |
 
 ## Template
 
