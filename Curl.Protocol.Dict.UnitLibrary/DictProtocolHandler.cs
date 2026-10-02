@@ -25,7 +25,9 @@ namespace Curl.Protocol.Dict;
 /// After connecting, <see cref="ITransferContext.Events" /> gets what curl 8.21.0's <c>-v</c>
 /// and <c>--trace</c> show (measured, BL-934): the whole request as one block of data sent,
 /// each read as data received, the server's close as a zero-byte block, and then
-/// <c>shutting down connection #N</c>, which a refused path reports too.
+/// <c>shutting down connection #N</c>, which a refused path reports too. A <c>MATCH</c> or
+/// <c>DEFINE</c> lookup whose word is empty or missing first reports <c>lookup word is
+/// missing</c>, before the request is sent, as curl does (BL-1126).
 /// A failed send is exit 55, a failed receive exit 56 and a failed output write exit 23,
 /// all returned rather than thrown, with the texts of <see cref="DictIoFailures" />; such a
 /// transfer reports its message (unless it is curl's fallback text), <c>Failed sending DICT
@@ -34,6 +36,9 @@ namespace Curl.Protocol.Dict;
 /// </remarks>
 public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
 {
+    /// <summary>The <c>-v</c> line curl 8.21.0 reports before sending a lookup whose word is empty or missing.</summary>
+    private const string LookupWordMissingMessage = "lookup word is missing";
+
     /// <summary>The port a <c>dict</c> URL without one connects to.</summary>
     private const int DefaultPort = 2628;
 
@@ -127,9 +132,14 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
 
     private static async Task<TransferResult> ExchangeAsync(IConnection connection, ITransferContext context, DictDiagnosticLog log)
     {
-        if (!DictRequest.TryEncode(context.Url.AbsolutePath, out byte[] request))
+        if (!DictRequest.TryEncode(context.Url.AbsolutePath, out byte[] request, out bool wordMissing))
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, UrlMalformatMessage);
+        }
+
+        if (wordMissing)
+        {
+            context.Events.ReportInfo(LookupWordMissingMessage);
         }
 
         try

@@ -8,7 +8,7 @@ depends-on: [BL-1125]
 touches: [Curl.Protocol.Dict.UnitLibrary, Curl.Protocol.Dict.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1126 — Report curl's lookup word is missing -v line for a dict lookup without a word
 
@@ -25,14 +25,17 @@ Under `-v`, a `dict://` `MATCH` or `DEFINE` URL whose word is empty or missing r
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.Dict.UnitTests` (for example in `DictProtocolHandlerTransferEventsTests.cs`) pin, for `/d:`, `/d::db`, `/m:`, `/m::db:strat`, `/find:` and `/lookup:`, the info line `lookup word is missing` reported before the request's data-sent event.
-- [ ] Tests pin that `/d:word`, `/m:word` and `/help` report no such line.
-- [ ] The bytes sent for every existing `DictProtocolHandlerTests` case are unchanged.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Dict.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] Tests in `Curl.Protocol.Dict.UnitTests` (for example in `DictProtocolHandlerTransferEventsTests.cs`) pin, for `/d:`, `/d::db`, `/m:`, `/m::db:strat`, `/find:` and `/lookup:`, the info line `lookup word is missing` reported before the request's data-sent event.
+- [x] Tests pin that `/d:word`, `/m:word` and `/help` report no such line.
+- [x] The bytes sent for every existing `DictProtocolHandlerTests` case are unchanged.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Dict.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- 2026-10-01: `DictRequest.TryEncode` gained an `out bool wordMissing` (true for a `MATCH`/`DEFINE` lookup whose word is empty or missing). `DictProtocolHandler.ExchangeAsync` reports `lookup word is missing` before writing the request, so the line also appears when the send then fails, because curl's `infof` comes before its send. Bytes sent are unchanged. Dict tests: 76 pass. Dict library: 100% line and branch coverage, 0 failing members.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. dict -v reports 'lookup word is missing' for a MATCH/DEFINE lookup without a word
