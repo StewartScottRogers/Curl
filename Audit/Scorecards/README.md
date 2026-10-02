@@ -43,7 +43,7 @@ than leaving its row out.
 | New Critical, New High, New Medium, New Low | Finding files this audit created for that auditor, by severity. A catch of a planted defect and a repeat of an open finding are not new findings. |
 | Re-audited | Findings of that auditor its report re-audited. |
 | Closed | Of those, the findings this audit closed under the [closure rule](../Findings/README.md#rules). |
-| Still open | That auditor's findings in `Audit/Findings/` whose status is `proposed` or `accepted` after this audit, new ones included. |
+| Still open | That auditor's findings in `Audit/Findings/` that are open (`proposed`, `accepted`, `deferred` or `blocked`) after this audit, new ones included. |
 | Planted assigned | Planted defects the manifest assigns to that auditor. |
 | Planted caught | Of those, the ones it caught: its report has a finding in the defect's file whose title, key or evidence contains the manifest's catch text. A catch by a different auditor does not count for either. |
 | Catch rate | Planted caught divided by planted assigned, as a whole percent. |

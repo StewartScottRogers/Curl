@@ -4,6 +4,7 @@ title: 31 tasks cost over 3x the median task cost; the costliest are BL-703, BL-
 auditor: process
 severity: Low
 status: accepted
+reason: Stewart accepted it on 2026-09-30.
 key: process:logs:task-costs:cost-outlier
 task: BL-1070
 found: 2026-09-30
@@ -37,3 +38,7 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 
 ## Re-audits
 
+## Log
+
+- 2026-09-30: filed proposed.
+- 2026-09-30: proposed -> accepted. Stewart accepted it on 2026-09-30 (log written 2026-10-02, BL-1183).

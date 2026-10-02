@@ -20,7 +20,7 @@
                    report block, or is named in -ChangedTree (it changed the audited tree).
       counts       New Critical..Low: finding files whose scorecard is this one, by severity.
                    Re-audited: the report's reaudits entries. Closed: findings closed-by this
-                   scorecard. Still open: that auditor's proposed or accepted findings.
+                   scorecard. Still open: that auditor's open (proposed, accepted, deferred or blocked) findings.
       metrics      the performance and process tables come from those auditors' report
                    metrics; a number from an unreliable auditor is followed by " (unreliable)".
       change       deltas against the newest earlier scorecard in -ScorecardsDirectory, parsed
@@ -190,7 +190,7 @@ function Get-Values($State, [string]$ScorecardName, [string]$FingerprintValue) {
         foreach ($sev in 'Critical', 'High', 'Medium', 'Low') { $v["${p}_NEW_$($sev.ToUpperInvariant())"] = [double]@($new | Where-Object { $_.Severity -eq $sev }).Count }
         $v["${p}_REAUDITED"] = if ($s.Report) { [double]@($s.Report.reaudits | Where-Object { $_ }).Count } else { '-' }
         $v["${p}_CLOSED"] = [double]@($findings | Where-Object { $_.Auditor -eq $a -and $_.ClosedBy -eq $ScorecardName }).Count
-        $v["${p}_STILL_OPEN"] = [double]@($findings | Where-Object { $_.Auditor -eq $a -and $_.Status -in 'proposed', 'accepted' }).Count
+        $v["${p}_STILL_OPEN"] = [double]@($findings | Where-Object { $_.Auditor -eq $a -and $_.Status -in 'proposed', 'accepted', 'deferred', 'blocked' }).Count
         $v["${p}_PLANTED_ASSIGNED"] = [double]$s.Assigned
         $v["${p}_PLANTED_CAUGHT"] = [double]$s.Caught
         $v["${p}_CATCH_RATE"] = if ($s.Assigned) { 100.0 * $s.Caught / $s.Assigned } else { '-' }

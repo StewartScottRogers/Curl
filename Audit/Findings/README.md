@@ -36,7 +36,8 @@ after the colon (`closed:`).
 | `title` | One line: what is wrong and where. |
 | `auditor` | The auditor that reported it: `quality`, `security`, `performance`, `conformance`, `truthfulness` or `process`. |
 | `severity` | `Critical`, `High`, `Medium` or `Low` (see [Severities](#severities)). |
-| `status` | `proposed`, `accepted`, `rejected` or `closed` (see [Statuses](#statuses)). |
+| `status` | `proposed`, `accepted`, `deferred`, `blocked`, `rejected` or `closed` (see [Statuses](#statuses)). |
+| `reason` | One line: why the latest status move was made. Empty for a `proposed` finding that has not moved. |
 | `key` | The auditor's stable dedupe key, as defined in [Report-Format.md](../Instructions/Report-Format.md#the-key). |
 | `task` | The Curl task triage made from it, `BL-###`, or `none`. |
 | `found` | The date of the audit that found it, `yyyy-MM-dd`. |
@@ -63,14 +64,37 @@ given kind of finding gets; they apply these definitions and never replace them.
 | --- | --- | --- |
 | `proposed` | Reported by an auditor and not yet triaged. | `Write-AuditFindings.ps1`, when it files the finding. |
 | `accepted` | Stewart agrees it is a defect; triage turns it into a task. | Stewart only. |
+| `deferred` | Stewart has not decided yet and parked it, for example to understand it first. | Stewart only. |
+| `blocked` | Stewart cannot decide until something else happens; `reason` names it. | Stewart only. |
 | `rejected` | Stewart does not agree it is a defect, or does not want it fixed. | Stewart only. |
 | `closed` | A re-audit confirmed the reproduction no longer reproduces. | `Write-AuditFindings.ps1`, under the closure rule below. |
+
+A finding is **open** while it is `proposed`, `accepted`, `deferred` or `blocked`.
+
+### Moves
+
+Stewart's moves are exactly these (Stewart, 2026-10-02, BL-1183). Rejecting is only from `deferred`, so nothing is rejected straight from a first read.
+
+| From | To |
+| --- | --- |
+| `proposed` | `accepted`, `deferred` or `blocked` |
+| `deferred` | `proposed` (back for another look) or `rejected` |
+| `blocked` | `proposed` |
+
+An open finding moves to `closed` only under rule 3. `accepted`, `rejected` and `closed` have no move of Stewart's out of them.
+
+Every move sets `reason` and appends one line to `## Log`:
+
+```n- 2026-10-02: proposed -> deferred. Not sure what the reproduction shows; read it later.
+```
+
+The date, the old and new status, and the reason.
 
 ## Rules
 
 1. A finding arrives `proposed`.
-2. Only Stewart sets `accepted` or `rejected`, in the audit pull request or by telling a
-   session.
+2. Only Stewart sets `accepted`, `deferred`, `blocked`, `rejected` or `proposed` again, by the moves above:
+   in the audit pull request, on the board page's Audit tab (BL-1185), or by telling a session.
 3. A finding becomes `closed` only when a re-audit by the same auditor, not flagged
    unreliable, reports the reproduction no longer reproduces - never because its task
    reached Done. "Flagged unreliable" means that auditor's row in the re-audit's
@@ -79,9 +103,8 @@ given kind of finding gets; they apply these definitions and never replace them.
    was not reported.
 4. A closed finding that reappears is a new finding naming the old one: a new ID whose
    Summary says "reappeared; previously AF-####". The closed file is not reopened.
-5. A report whose `key` equals the `key` of an open (`proposed` or `accepted`) finding
-   is the same finding: it adds a `Re-audits` line saying it was still reported, and no
-   new file.
+5. A report whose `key` equals the `key` of an open finding is the same finding: it adds a
+   `Re-audits` line saying it was still reported, keeps its status, and files no new file.
 6. A finding reported by an auditor flagged unreliable in that audit is still filed, and
    its Summary says so.
 7. A report that matches a planted defect is a catch, not a finding, and is never filed
@@ -92,7 +115,7 @@ given kind of finding gets; they apply these definitions and never replace them.
 
 ## Body
 
-Four sections, in this order, with these exact headings:
+Five sections, in this order, with these exact headings:
 
 | Section | Holds |
 | --- | --- |
@@ -100,6 +123,7 @@ Four sections, in this order, with these exact headings:
 | `## Evidence` | The location and what was observed there - quoted code, command output, measurement - and why it is a defect. |
 | `## Reproduction` | One command run from the repository root, then the expected result (what a correct tree gives) and the actual result (what the audited tree gave). |
 | `## Re-audits` | Append-only, one line per re-audit, oldest first. Empty when the finding is new. |
+| `## Log` | Last, append-only, one dated line per status move, oldest first ([Moves](#moves)). A new finding's first line is `- <found>: filed proposed.` |
 
 A `Re-audits` line has four fields separated by ` | `:
 

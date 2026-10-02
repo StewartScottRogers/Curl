@@ -4,6 +4,7 @@ title: {{TITLE}}
 auditor: {{AUDITOR}}
 severity: {{SEVERITY}}
 status: proposed
+reason:
 key: {{KEY}}
 task: none
 found: {{FOUND}}
@@ -37,3 +38,6 @@ Run from the repository root:
 
 ## Re-audits
 
+## Log
+
+- {{FOUND}}: filed proposed.

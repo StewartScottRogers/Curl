@@ -5,10 +5,13 @@ order:
 
 1. **Findings arrive `proposed`**, on the `audit` branch, in the audit pull request. Each is one
    file in `Audit/Findings/` ([README](Findings/README.md)).
-2. **Stewart decides each one.** He sets `status: accepted` or `status: rejected` in the
-   finding's file - in the pull request, or by telling an interactive session which to set.
-   Only Stewart accepts or rejects a finding; Claude never sets either status on its own
-   judgement, however clear a finding looks.
+2. **Stewart decides each one.** He accepts it, defers it to decide later, or blocks it until
+   something else happens; a deferred finding goes back to `proposed` or is rejected, and a
+   blocked one goes back to `proposed` ([Moves](Findings/README.md#moves)). Each move sets the
+   finding's `status` and `reason` and adds a `## Log` line - on the board page's Audit tab
+   (BL-1185), in the pull request, or by telling an interactive session which to set. Only
+   Stewart makes these moves; Claude never makes one on its own judgement, however clear a
+   finding looks. A deferred or blocked finding is not turned into a task.
 3. **Accepted findings become tasks.** An interactive session sets the status on the `audit`
    branch, then runs the script from the audit branch's worktree against the factory's board:
 
