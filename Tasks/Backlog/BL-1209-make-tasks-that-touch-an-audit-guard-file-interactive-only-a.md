@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [.claude/skills/task-board/task-board.ps1, .claude/skills/task-board/SKILL.md]
+touches: [.claude/skills/task-board/task-board.ps1, .claude/skills/task-board/SKILL.md, Audit/Guard/Test-AuditPathsUntouched.ps1]
 lane: no
 requirement: none
 created: 2026-10-02
