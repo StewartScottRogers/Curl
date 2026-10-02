@@ -494,6 +494,19 @@
     The RCODE every DNS answer carries, e.g. 3 (NXDOMAIN) or 2 (SERVFAIL); any value but 0
     sends no answer records. Default 0 (NOERROR).
 
+.PARAMETER DohPort
+    Also serve DNS over HTTPS, HTTP/1.1 over TLS 1.2, on ListenAddress on each of these ports
+    (BL-1173), for measuring curl's --doh-url. A release curl refuses an http:// DoH URL
+    ("Protocol "http" is disabled"), so the server presents the same throwaway certificate
+    as -Tls, and curl needs --doh-insecure (or --cacert with TlsRootCertificateFile). A POST body (application/dns-message) or a GET's dns= parameter (base64url) is answered
+    by the same responder as DnsPort, with 200 and Content-Type application/dns-message,
+    and logged in dns.txt with the transport doh. Works in every mode, -NoServer included.
+
+.PARAMETER DnsEchConfigList
+    Answer HTTPS (type 65) queries with one ServiceMode record, priority 1, target ".",
+    whose only parameter is ech (key 5) holding this base64 ECHConfigList (BL-1173). Without
+    it an HTTPS query gets no answer record.
+
 .PARAMETER UnixSocket
     Listen on a Unix domain socket at this path instead of TCP, for --unix-socket (BL-507).
     Any file already at the path is deleted first, and the socket file is deleted at the
@@ -593,6 +606,8 @@ param(
     [System.Net.IPAddress[]] $DnsAnswerAddress = @([System.Net.IPAddress]::Loopback),
     [switch] $DnsTruncate,
     [ValidateRange(0, 15)] [int] $DnsResponseCode = 0,
+    [int[]] $DohPort = @(),
+    [string] $DnsEchConfigList = '',
     [string] $UnixSocket
 )
 
@@ -1943,7 +1958,7 @@ $uploadedData = New-Object System.IO.MemoryStream
 $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $OutDirectory))
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
-$tlsCertificate = if ($Tls -or $Ftp -or $Smtp -or $Imap -or $Pop3) { New-ThrowawayTlsCertificate -RootCertificateFile $TlsRootCertificateFile } else { $null }
+$tlsCertificate = if ($Tls -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $DohPort.Count -gt 0) { New-ThrowawayTlsCertificate -RootCertificateFile $TlsRootCertificateFile } else { $null }
 if ($null -ne $tlsCertificate) {
     $publicKeyInfo = Get-SubjectPublicKeyInfo -Certificate $tlsCertificate
     $publicKeySha256 = [System.Convert]::ToBase64String([System.Security.Cryptography.SHA256]::Create().ComputeHash($publicKeyInfo))
@@ -2012,7 +2027,7 @@ public sealed class RecorderUnixSocketListener
     $server = [System.Management.Automation.PowerShell]::Create()
 }
 $dnsResponder = $null
-if ($DnsPort.Count -gt 0) {
+if ($DnsPort.Count -gt 0 -or $DohPort.Count -gt 0) {
     # C#, not a PowerShell class, so its threads need no runspace; Windows PowerShell 5.1
     # compiles it as C# 5.
     Add-Type -TypeDefinition @'
@@ -2032,13 +2047,25 @@ public sealed class RecorderDnsResponder
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly IPAddress[] _answers;
     private readonly bool _truncate;
+    private readonly byte[] _echConfigList;
+    private readonly System.Security.Cryptography.X509Certificates.X509Certificate2 _dohCertificate;
     private int _responseCode;
 
-    public RecorderDnsResponder(IPAddress address, int[] ports, int[] silentPorts, IPAddress[] answers, bool truncate, int responseCode)
+    public RecorderDnsResponder(IPAddress address, int[] ports, int[] silentPorts, IPAddress[] answers, bool truncate, int responseCode, int[] dohPorts, byte[] echConfigList, System.Security.Cryptography.X509Certificates.X509Certificate2 dohCertificate)
     {
         _responseCode = responseCode;
         _answers = answers;
         _truncate = truncate;
+        _echConfigList = echConfigList;
+        _dohCertificate = dohCertificate;
+        foreach (int port in dohPorts)
+        {
+            var doh = new TcpListener(address, port);
+            doh.Start();
+            _listeners.Add(doh);
+            int dohPort = port;
+            new Thread(delegate() { ServeDoh(doh, dohPort); }) { IsBackground = true }.Start();
+        }
         foreach (int port in ports)
         {
             var udp = new Socket(address.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
@@ -2131,7 +2158,81 @@ public sealed class RecorderDnsResponder
         catch (ObjectDisposedException) { }
     }
 
-    private static byte[] ReadExactly(NetworkStream stream, int count)
+    private void ServeDoh(TcpListener listener, int port)
+    {
+        try
+        {
+            while (true)
+            {
+                TcpClient client = listener.AcceptTcpClient();
+                new Thread(delegate() { ServeDohClient(client, port); }) { IsBackground = true }.Start();
+            }
+        }
+        catch (SocketException) { }
+        catch (ObjectDisposedException) { }
+        catch (InvalidOperationException) { }
+    }
+
+    /// One DoH exchange per HTTPS/1.1 request: a POST's body or a GET's dns= parameter is the query.
+    /// TLS, because a release curl only lets a DoH request use HTTPS.
+    private void ServeDohClient(TcpClient client, int port)
+    {
+        try
+        {
+            using (client)
+            {
+                var stream = new System.Net.Security.SslStream(client.GetStream(), false);
+                stream.AuthenticateAsServer(_dohCertificate, false, System.Security.Authentication.SslProtocols.Tls12, false);
+                while (true)
+                {
+                    string head = ReadHead(stream);
+                    if (head == null) { return; }
+                    string[] lines = head.Split(new[] { "\r\n" }, StringSplitOptions.None);
+                    string[] requestLine = lines[0].Split(' ');
+                    byte[] query;
+                    if (requestLine[0] == "POST")
+                    {
+                        int length = 0;
+                        foreach (string line in lines)
+                        {
+                            if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)) { length = int.Parse(line.Substring(15).Trim()); }
+                        }
+                        query = ReadExactly(stream, length);
+                        if (query == null) { return; }
+                    }
+                    else
+                    {
+                        string target = requestLine[1];
+                        int at = target.IndexOf("dns=", StringComparison.Ordinal);
+                        string encoded = target.Substring(at + 4).Split('&')[0].Replace('-', '+').Replace('_', '/');
+                        query = Convert.FromBase64String(encoded.PadRight(encoded.Length + (4 - encoded.Length % 4) % 4, '='));
+                    }
+                    Record("doh", port, query, query.Length);
+                    byte[] reply = Answer(query, query.Length, false);
+                    byte[] header = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nContent-Length: " + reply.Length + "\r\n\r\n");
+                    stream.Write(header, 0, header.Length);
+                    stream.Write(reply, 0, reply.Length);
+                }
+            }
+        }
+        catch (System.IO.IOException) { }
+        catch (System.Security.Authentication.AuthenticationException) { }
+        catch (ObjectDisposedException) { }
+    }
+
+    private static string ReadHead(System.IO.Stream stream)
+    {
+        var head = new StringBuilder();
+        while (!head.ToString().EndsWith("\r\n\r\n", StringComparison.Ordinal))
+        {
+            int b = stream.ReadByte();
+            if (b < 0) { return null; }
+            head.Append((char)b);
+        }
+        return head.ToString(0, head.Length - 4);
+    }
+
+    private static byte[] ReadExactly(System.IO.Stream stream, int count)
     {
         var bytes = new byte[count];
         int read = 0;
@@ -2169,13 +2270,23 @@ public sealed class RecorderDnsResponder
                 reply.AddRange(data);
                 answers++;
             }
+            if (type == 65 && _echConfigList != null)
+            {
+                // ServiceMode, priority 1, target ".", then ech=<list> (RFC 9460, key 5).
+                int dataLength = 2 + 1 + 4 + _echConfigList.Length;
+                reply.AddRange(new byte[] { 0xC0, 0x0C, 0, 65, 0, 1, 0, 0, 0, 60, (byte)(dataLength >> 8), (byte)dataLength });
+                reply.AddRange(new byte[] { 0, 1, 0, 0, 5, (byte)(_echConfigList.Length >> 8), (byte)_echConfigList.Length });
+                reply.AddRange(_echConfigList);
+                answers++;
+            }
         }
         reply[7] = (byte)answers;
         return reply.ToArray();
     }
 }
 '@
-    $dnsResponder = New-Object RecorderDnsResponder($ListenAddress, $DnsPort, $DnsSilentPort, $DnsAnswerAddress, [bool] $DnsTruncate, $DnsResponseCode)
+    $echConfigListBytes = if ($DnsEchConfigList) { [System.Convert]::FromBase64String($DnsEchConfigList) } else { $null }
+    $dnsResponder = New-Object RecorderDnsResponder($ListenAddress, $DnsPort, $DnsSilentPort, $DnsAnswerAddress, [bool] $DnsTruncate, $DnsResponseCode, $DohPort, $echConfigListBytes, $tlsCertificate)
 }
 $tftpResponder = $null
 if ($Tftp) {
