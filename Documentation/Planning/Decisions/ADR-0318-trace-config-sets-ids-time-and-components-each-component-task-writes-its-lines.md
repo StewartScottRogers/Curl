@@ -40,7 +40,7 @@ reference Schannel build (BL-649 Notes):
 | `http/1` | none beyond `-v` | BL-649: pinned as none |
 | `dns`, `doh` | `[DNS]` filter lines; DoH `[DNS]` / `[DoH]` lines (BL-850) | BL-1102 |
 | `setup`, `happy-eyeballs`, `tcp`, `udp`, `unix`, `tcp-accept`, `multi`, `read`, `write`, `timer`, `ssls`, `socks`, `http-proxy`, `h1-proxy`, `h2-proxy`, `haproxy`, `https-connect`, `network`; the components of `-vv` to `-vvvv` | connection-filter and transfer-engine lines | BL-1103 |
-| `http/2`, `http/3`, `quic`, `ssh`, `ftp`, `smtp`, `imap`, `pop3`, `ws`, `protocol` | each protocol's own lines | BL-1104 (to be split per protocol) |
+| `http/2`, `http/3`, `quic`, `ssh`, `ftp`, `smtp`, `imap`, `pop3`, `ws`, `protocol` | each protocol's own lines; `imap` and `pop3` none (measured) | split by BL-1104: `ftp` BL-1162, `smtp` BL-1163, `ws` BL-1164, `imap` and `pop3` pinned as none BL-1165, `ssh` BL-1166, `http/2` BL-1167, `http/3` BL-1168, `quic` BL-1169; `protocol` turns on each protocol's lines (measured for `ftp`) |
 | any other name | none: ignored as curl ignores it | BL-649 |
 
 ## Consequences
