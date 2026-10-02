@@ -226,6 +226,21 @@ public sealed partial class TcpConnector(
     public bool TracesSetupFilter { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a connection that writes the <see cref="HaproxyProtocol" />
+    /// line reports curl 8.21.0's <c>[HAPROXY] removing connected setup filter</c> and
+    /// <c>[HAPROXY] destroy</c> after <c>Established connection</c>, under <c>--trace-config
+    /// haproxy</c>, <c>proxy</c> or <c>all</c> (measured, BL-1160 Notes). The setup filter's own
+    /// <see cref="HaproxyFilterAddedLine" /> follows <see cref="TracesSetupFilter" /> instead.
+    /// </summary>
+    public bool TracesHaproxyFilter { get; init; }
+
+    /// <summary>
+    /// The line curl 8.21.0's setup filter writes, under <see cref="TracesSetupFilter" />, as it adds
+    /// the PROXY protocol filter once the socket connected, before <c>Established connection</c>.
+    /// </summary>
+    public const string HaproxyFilterAddedLine = "[SETUP] added HAPROXY filter";
+
+    /// <summary>
     /// Gets the events a resolver built once per run reports to, such as the
     /// <see cref="DohDnsResolver" />'s <c>--trace-config doh</c> lines: before each look-up the
     /// connector points them at the resolving transfer's events (BL-1102); <see langword="null" />
@@ -1387,13 +1402,14 @@ public sealed partial class TcpConnector(
     {
         if (haproxyProtocol is { } header)
         {
-            // curl 8.21.0 writes the line after any tunnel and before TLS, from the socket's own ends (BL-616).
-            await dialed.Connection.WriteAsync(header.Build(dialed.LocalEndPoint, dialed.RemoteEndPoint), cancellationToken).ConfigureAwait(false);
+            await WriteHaproxyLineAsync(header, dialed, target.Events, cancellationToken).ConfigureAwait(false);
         }
 
         if (!target.UseTls)
         {
-            return Opened(dialed, target.Events, dialed.Connection, timings, proxyConnectResponseCode, peerCertificates: null, applicationProtocol: null);
+            return WithHaproxyFilterRemoved(
+                Opened(dialed, target.Events, dialed.Connection, timings, proxyConnectResponseCode, peerCertificates: null, applicationProtocol: null),
+                target.Events);
         }
 
         var secured = await AuthenticateTargetAsync(dialed.Connection, target, cancellationToken).ConfigureAwait(false);
@@ -1405,14 +1421,41 @@ public sealed partial class TcpConnector(
         // A provider that measured its handshake is trusted for the moment it completed; for
         // one that did not, the moment it returned is that moment.
         var handshakeCompleted = secured.Timings?.TlsHandshakeCompleted ?? timeProvider.GetTimestamp();
-        return Opened(
-            dialed,
-            target.Events,
-            securedConnection,
-            timings with { TlsHandshakeCompleted = handshakeCompleted },
-            proxyConnectResponseCode,
-            secured.PeerCertificates,
-            secured.ApplicationProtocol);
+        return WithHaproxyFilterRemoved(
+            Opened(
+                dialed,
+                target.Events,
+                securedConnection,
+                timings with { TlsHandshakeCompleted = handshakeCompleted },
+                proxyConnectResponseCode,
+                secured.PeerCertificates,
+                secured.ApplicationProtocol),
+            target.Events);
+    }
+
+    // curl 8.21.0 writes the PROXY line after any tunnel and before TLS, from the socket's own ends
+    // (BL-616), its setup filter first reporting that it added the HAPROXY filter (BL-1160 Notes).
+    private async ValueTask WriteHaproxyLineAsync(HaproxyProtocolHeader header, DialedSocket dialed, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        if (TracesSetupFilter)
+        {
+            events.ReportInfo(HaproxyFilterAddedLine);
+        }
+
+        await dialed.Connection.WriteAsync(header.Build(dialed.LocalEndPoint, dialed.RemoteEndPoint), cancellationToken).ConfigureAwait(false);
+    }
+
+    // Under TracesHaproxyFilter a connection that wrote the PROXY line reports curl 8.21.0's
+    // [HAPROXY] filter removal after Established connection and any [SETUP] removal (BL-1160 Notes).
+    private ConnectResult WithHaproxyFilterRemoved(ConnectResult opened, ITransferEvents events)
+    {
+        if (haproxyProtocol is not null && TracesHaproxyFilter)
+        {
+            events.ReportInfo("[HAPROXY] removing connected setup filter");
+            events.ReportInfo("[HAPROXY] destroy");
+        }
+
+        return opened;
     }
 
     /// <summary>

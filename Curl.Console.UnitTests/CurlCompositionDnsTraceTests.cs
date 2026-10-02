@@ -7,7 +7,8 @@ namespace Curl.Console;
 /// <summary>
 /// Pins curl 8.21.0's <c>[DNS]</c> lines under <c>-v --trace-config dns</c>, <c>doh</c> or <c>all</c>
 /// for a plain transfer to <c>127.0.0.1</c>, measured with <c>Record-CurlExchange.ps1</c> on 2026-10-02
-/// (BL-1102 Notes), and their absence without one of those components. The server is a
+/// (BL-1102 Notes), and their absence without one of those components; beside them the <c>[SETUP]</c>
+/// lines (BL-1103) and the <c>[HAPROXY]</c> lines of <c>--haproxy-protocol</c> (BL-1160). The server is a
 /// <see cref="ScriptedConnector" />, so no socket is opened.
 /// </summary>
 [TestClass]
@@ -116,6 +117,56 @@ public sealed class CurlCompositionDnsTraceTests
         List<string> lines = await ConnectAsync(arguments);
 
         Assert.IsFalse(lines.Any(line => line.StartsWith("[SETUP]", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    [DataRow("-v", "--trace-config", "setup,haproxy")]
+    [DataRow("-v", "--trace-config", "setup,proxy")]
+    [DataRow("-vvvv")]
+    public async Task Connect_WithTheSetupAndHaproxyComponents_WritesTheHaproxyFilterLinesAfterTheSetupLines(params string[] arguments)
+    {
+        // curl -s -v --trace-config setup,haproxy --haproxy-protocol http://127.0.0.1:18475/x (BL-1160 Notes),
+        // [DNS] lines (on under -vvvv) aside.
+        List<string> lines = await ConnectAsync([.. arguments, "--haproxy-protocol"]);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[SETUP] added",
+                "[SETUP] happy eyeballing to origin 127.0.0.1:47110",
+                "  Trying 127.0.0.1:47110...",
+                "[SETUP] added HAPROXY filter",
+                "Established connection",
+                "[SETUP] removing connected setup filter",
+                "[SETUP] destroy",
+                "[HAPROXY] removing connected setup filter",
+                "[HAPROXY] destroy",
+            },
+            lines.Where(line => !line.StartsWith("[DNS]", StringComparison.Ordinal)).ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("-v", "--trace-config", "haproxy")]
+    [DataRow("-v", "--trace-config", "proxy")]
+    public async Task Connect_WithTheHaproxyComponent_WritesItsRemovalAfterTheConnection(params string[] arguments)
+    {
+        // curl -s -v --trace-config haproxy --haproxy-protocol http://127.0.0.1:18471/x (BL-1160 Notes).
+        List<string> lines = await ConnectAsync([.. arguments, "--haproxy-protocol"]);
+
+        CollectionAssert.AreEqual(
+            new[] { "  Trying 127.0.0.1:47110...", "Established connection", "[HAPROXY] removing connected setup filter", "[HAPROXY] destroy" },
+            lines);
+    }
+
+    [TestMethod]
+    [DataRow("-v", "--haproxy-protocol")]
+    [DataRow("-v", "--trace-config", "network", "--haproxy-protocol")]
+    [DataRow("-v", "--trace-config", "haproxy")]
+    public async Task Connect_WithoutTheHaproxyComponentOrProtocol_WritesNoHaproxyLine(params string[] arguments)
+    {
+        List<string> lines = await ConnectAsync(arguments);
+
+        Assert.IsFalse(lines.Any(line => line.StartsWith("[HAPROXY]", StringComparison.Ordinal)));
     }
 
     [TestMethod]

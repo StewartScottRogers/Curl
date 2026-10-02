@@ -401,6 +401,9 @@ transfer's events by the console, writes `[DNS] [1] destroy async` after `closin
 `TcpConnector.TracesSetupFilter` writes `[SETUP] added` and wraps those events in turn in
 `SetupFilterTraceEvents`, which writes the setup filter's `happy eyeballing to origin` line before
 the first `Trying` and its removal after `Established connection`, so `-vv` prints curl's order.
+Per ADR-0357's BL-1160 amendment, with a `HaproxyProtocolHeader` the setup filter also writes
+`HaproxyFilterAddedLine` beside the PROXY line, and `TcpConnector.TracesHaproxyFilter` writes the
+`[HAPROXY]` filter's removal after the connection is reported opened.
 
 Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
 `--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr`, measured against curl 8.22.0's c-ares
