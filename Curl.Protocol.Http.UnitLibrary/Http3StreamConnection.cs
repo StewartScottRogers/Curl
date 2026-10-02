@@ -195,7 +195,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         isRequestEnded = bodyLength == 0;
         try
         {
-            stream = await session.OpenRequestStreamAsync(cancellationToken).ConfigureAwait(false);
+            stream = await session.OpenRequestStreamAsync(frameLog, cancellationToken).ConfigureAwait(false);
         }
         catch (MultiplexedConnectionFailedException lost)
         {

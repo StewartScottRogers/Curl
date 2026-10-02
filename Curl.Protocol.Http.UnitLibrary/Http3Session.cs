@@ -48,6 +48,9 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
 
     private readonly SemaphoreSlim openingStreams = new(1, 1);
 
+    /// <summary>The server's SETTINGS and GOAWAY that arrived before any transfer opened a stream.</summary>
+    private readonly List<Http3Frame> unloggedConnectionFrames = [];
+
     private volatile Http3ControlStreamReader? controlStream;
 
     private HttpTransferException? connectionError;
@@ -55,6 +58,12 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
     private long connectionErrorCode;
 
     private volatile bool isStoppedByRefusedStream;
+
+    /// <summary>
+    /// The frame log of the transfer that last opened a stream, which the server's SETTINGS and
+    /// GOAWAY go to (ADR-0345 point 3), or <see langword="null" /> until one has.
+    /// </summary>
+    private HttpFrameLog? connectionLog;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Http3Session" /> class and starts reading
@@ -150,15 +159,19 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
     /// Opens the client's control stream with curl's <c>SETTINGS</c> and its QPACK encoder
     /// and decoder streams, unless they are open already, then opens a request stream; one
     /// transfer at a time, as the <c>-Z</c> transfers a pool shares the session between open
-    /// theirs concurrently (BL-735).
+    /// theirs concurrently (BL-735). The server's SETTINGS and GOAWAY are logged to
+    /// <paramref name="transferLog" /> from now on, those that arrived before it included
+    /// (ADR-0345, BL-1155).
     /// </summary>
+    /// <param name="transferLog">The frame log of the transfer opening the stream.</param>
     /// <param name="cancellationToken">Cancels the opens and writes.</param>
     /// <returns>The request stream.</returns>
-    internal async ValueTask<IMultiplexedStream> OpenRequestStreamAsync(CancellationToken cancellationToken)
+    internal async ValueTask<IMultiplexedStream> OpenRequestStreamAsync(HttpFrameLog transferLog, CancellationToken cancellationToken)
     {
         await openingStreams.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            UseConnectionLog(transferLog);
             return await OpenRequestStreamOneAtATimeAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -355,7 +368,7 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
             case Http3UnidirectionalStreamType.Control:
                 Http3ControlStreamReader reader = new(peer);
                 controlStream = reader;
-                return ReadUntilFailureAsync(async () => await reader.ReadFrameAsync(cancellationToken).ConfigureAwait(false));
+                return ReadUntilFailureAsync(async () => LogConnectionFrame(await reader.ReadFrameAsync(cancellationToken).ConfigureAwait(false)));
             case Http3UnidirectionalStreamType.QpackEncoder:
                 return ReadUntilFailureAsync(async () => await Http3PeerQpackStreams.ReadEncoderStreamAsync(peer, Decoder, buffer, cancellationToken).ConfigureAwait(false));
             case Http3UnidirectionalStreamType.QpackDecoder:
@@ -385,6 +398,58 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
         }
 
         stopReadingPeerStreams.Cancel();
+    }
+
+    /// <summary>
+    /// Makes <paramref name="transferLog" /> the log the server's SETTINGS and GOAWAY go to,
+    /// and writes there those that arrived while no transfer had opened a stream.
+    /// </summary>
+    private void UseConnectionLog(HttpFrameLog transferLog)
+    {
+        lock (gate)
+        {
+            connectionLog = transferLog;
+            foreach (Http3Frame frame in unloggedConnectionFrames)
+            {
+                WriteConnectionFrame(transferLog, frame);
+            }
+
+            unloggedConnectionFrames.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Logs a SETTINGS or GOAWAY frame from the server's control stream to the transfer that
+    /// last opened a stream, or holds it until one does; other control frames are not logged.
+    /// </summary>
+    internal void LogConnectionFrame(Http3Frame frame)
+    {
+        if (frame is not (Http3SettingsFrame or Http3GoawayFrame))
+        {
+            return;
+        }
+
+        lock (gate)
+        {
+            if (connectionLog is null)
+            {
+                unloggedConnectionFrames.Add(frame);
+                return;
+            }
+
+            WriteConnectionFrame(connectionLog, frame);
+        }
+    }
+
+    private static void WriteConnectionFrame(HttpFrameLog log, Http3Frame frame)
+    {
+        if (frame is Http3SettingsFrame settings)
+        {
+            log.Http3SettingsReceived(settings);
+            return;
+        }
+
+        log.Http3GoawayReceived(((Http3GoawayFrame)frame).Id);
     }
 
     private async ValueTask CloseAsync(long errorCode)

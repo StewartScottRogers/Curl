@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using Curl.Http2;
+using Curl.Http3;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http.Fakes;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -144,6 +145,20 @@ public sealed partial class HttpProtocolHandlerTests
         await Handler(QuicConnector(new FakeMultiplexedConnection(stream))).ExecuteAsync(Http3LogContext(log));
 
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Warning), "RESET_STREAM received on stream 0: error 0x10c");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http3ServerSettingsAndGoaway_LogsTheSettingsAtInfoAndTheGoawayStreamAtWarningUnderHttp3()
+    {
+        RecordingDiagnosticLog log = new();
+        FakeMultiplexedStream control = new(3, [0x00, .. new Http3SettingsFrame([new Http3Setting(0x06, 100)]).ToBytes(), .. new Http3GoawayFrame(4).ToBytes()]) { StaysOpen = true };
+        FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200", ("content-length", "5")), Http3Data("hello")), 65536);
+
+        TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream) { ServerStreams = [control] })).ExecuteAsync(Http3LogContext(log));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.Contains(log.Lines, (DiagnosticLogLevel.Info, DiagnosticLogComponents.Http3, "SETTINGS received: MAX_FIELD_SECTION_SIZE 100"));
+        CollectionAssert.Contains(log.Lines, (DiagnosticLogLevel.Warning, DiagnosticLogComponents.Http3, "GOAWAY received: stream 4"));
     }
 
     private static byte[] Http2HelloResponse()
