@@ -55,3 +55,4 @@ completed:
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-02: Doing -> Backlog. Needs Curl.Console.UnitTests (a test runs -C with --no-clobber, which curl refuses), held by BL-1191 in Doing; code is ready in Notes
+- 2026-10-02: Backlog -> Doing.
