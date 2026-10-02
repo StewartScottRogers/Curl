@@ -89,7 +89,7 @@ public sealed class HandshakeCapturingTransferEventsTests
         Assert.IsEmpty(inner.Calls);
     }
 
-    private sealed class CountingTransferEvents : ITransferEvents
+    internal sealed class CountingTransferEvents : ITransferEvents
     {
         public List<string> Calls { get; } = [];
 

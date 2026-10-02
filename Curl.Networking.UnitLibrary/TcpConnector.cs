@@ -817,7 +817,8 @@ public sealed partial class TcpConnector(
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var proxyAuthorization = await CreateProxyAuthorizationAsync(destination, proxy, [], cancellationToken).ConfigureAwait(false);
+        var authenticatorEvents = new SspiFailureRecordingTransferEvents(target.Events);
+        var proxyAuthorization = await CreateProxyAuthorizationAsync(destination, proxy, [], authenticatorEvents, cancellationToken).ConfigureAwait(false);
         var answersChallenge = false;
         var reconnects = 0;
         while (true)
@@ -825,7 +826,7 @@ public sealed partial class TcpConnector(
             // A 407 answered on a connection the proxy closes is sent again on a new one, as
             // curl 8.21.0 connects again ("Connect me again please", BL-602 Notes).
             var (result, redialAuthorization) = await DialAndOpenThroughProxyAsync(
-                addresses, new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge), proxyAuthorization, cancellationToken).ConfigureAwait(false);
+                addresses, new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge, authenticatorEvents), proxyAuthorization, cancellationToken).ConfigureAwait(false);
             if (result is not null)
             {
                 return result;
@@ -854,7 +855,7 @@ public sealed partial class TcpConnector(
         string? proxyAuthorization,
         CancellationToken cancellationToken)
     {
-        var (target, destination, proxy, started, nameResolved, _) = tunnel;
+        var (target, destination, proxy, started, nameResolved, _, _) = tunnel;
         var firstHop = FirstHopTo(proxy);
         var (dialed, lastDialError, lastBindFailure) = await DialFirstReachableAsync(addresses, firstHop.Port, firstHop.Host, target, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
@@ -887,14 +888,17 @@ public sealed partial class TcpConnector(
     /// <summary>
     /// Asks <see cref="HttpProxyTunnelOptions.ProxyAuthenticator" /> for the CONNECT's
     /// <c>Proxy-Authorization</c> to <paramref name="destination" />: with no challenges for the
-    /// first CONNECT, with a <c>407</c>'s <c>Proxy-Authenticate</c> values after one.
+    /// first CONNECT, with a <c>407</c>'s <c>Proxy-Authenticate</c> values after one. The
+    /// authenticator reports its <c>-v</c> lines, such as a Negotiate context's failure, to
+    /// <paramref name="authenticatorEvents" />.
     /// </summary>
     private ValueTask<string?> CreateProxyAuthorizationAsync(
         ConnectDestination destination,
         ProxyEndpoint proxy,
         IReadOnlyList<string> challenges,
+        ITransferEvents authenticatorEvents,
         CancellationToken cancellationToken) =>
-        ProxyAuthenticator.CreateAuthorizationAsync(ProxyAuthRequestOf(destination, proxy), challenges, cancellationToken);
+        ProxyAuthenticator.CreateAuthorizationAsync(ProxyAuthRequestOf(destination, proxy) with { Events = authenticatorEvents }, challenges, cancellationToken);
 
     /// <summary>
     /// The authenticator that answers the proxy: <see cref="HttpProxyTunnelOptions.ProxyAuthenticator" />,
@@ -1067,7 +1071,7 @@ public sealed partial class TcpConnector(
 
             if (!onThisConnection)
             {
-                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer).ConfigureAwait(false);
+                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer, tunnel.AuthenticatorEvents.FirstSspiFailure).ConfigureAwait(false);
             }
 
             proxyAuthorization = answer;
@@ -1091,17 +1095,20 @@ public sealed partial class TcpConnector(
     /// <summary>
     /// Disposes the proxy connection whether CONNECT failed, could not be sent or read, or is
     /// to be sent again on a new connection; then rethrows, or returns the tunnel's failure, or
-    /// <paramref name="redialAuthorization" /> for the new connection.
+    /// <paramref name="redialAuthorization" /> for the new connection. The failure's message is
+    /// <paramref name="firstSspiFailure" /> when the authenticator reported one, as curl
+    /// 8.21.0's error buffer keeps the transfer's first <c>failf</c> (BL-1033).
     /// </summary>
     private static async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> CloseUnopenedTunnelAsync(
         IConnection connection,
         HttpProxyTunnelReply reply,
         ExceptionDispatchInfo? exception,
-        string? redialAuthorization)
+        string? redialAuthorization,
+        string? firstSspiFailure)
     {
         await connection.DisposeAsync().ConfigureAwait(false);
         exception?.Throw();
-        return redialAuthorization is null ? (TunnelFailure(reply), null) : (null, redialAuthorization);
+        return redialAuthorization is null ? (TunnelFailure(reply, firstSspiFailure), null) : (null, redialAuthorization);
     }
 
     /// <summary>
@@ -1132,8 +1139,8 @@ public sealed partial class TcpConnector(
         try
         {
             answer = sentAuthorization is null || AnswersStaleDigest(sentAuthorization, reply)
-                ? await CreateProxyAuthorizationAsync(tunnel.Destination, tunnel.Proxy, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false)
-                : await ProxyAuthenticator.ContinueAuthorizationAsync(ProxyAuthRequestOf(tunnel.Destination, tunnel.Proxy), sentAuthorization, !sentAnswersChallenge, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false);
+                ? await CreateProxyAuthorizationAsync(tunnel.Destination, tunnel.Proxy, reply.ProxyAuthenticate, tunnel.AuthenticatorEvents, cancellationToken).ConfigureAwait(false)
+                : await ProxyAuthenticator.ContinueAuthorizationAsync(ProxyAuthRequestOf(tunnel.Destination, tunnel.Proxy) with { Events = tunnel.AuthenticatorEvents }, sentAuthorization, !sentAnswersChallenge, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false);
         }
         catch (HttpAuthenticationFailedException failure)
         {
@@ -1242,10 +1249,10 @@ public sealed partial class TcpConnector(
         }
     }
 
-    private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply) =>
+    private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure) =>
         reply.RecvErrorMessage is { } recvErrorMessage
-            ? ConnectResult.Failed(CurlExitCode.RecvError, recvErrorMessage)
-            : ConnectResult.Failed(CurlExitCode.CouldntConnect, $"CONNECT tunnel failed, response {reply.StatusCode}");
+            ? ConnectResult.Failed(CurlExitCode.RecvError, firstSspiFailure ?? recvErrorMessage)
+            : ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? $"CONNECT tunnel failed, response {reply.StatusCode}");
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(
         DialedSocket dialed,
@@ -1514,7 +1521,8 @@ public sealed partial class TcpConnector(
     /// What a CONNECT tunnel is opened for: the target, the destination named in the CONNECT,
     /// the proxy, the connect's start and lookup timestamps, and whether the first CONNECT's
     /// <c>Proxy-Authorization</c> answers a <c>407</c> the proxy sent on a connection it closed,
-    /// rather than being the value made before any challenge.
+    /// rather than being the value made before any challenge, and the events the proxy
+    /// authenticator reports to, which keep its first SSPI failure for the tunnel's (BL-1033).
     /// </summary>
     private sealed record TunnelRequest(
         ConnectTarget Target,
@@ -1522,7 +1530,8 @@ public sealed partial class TcpConnector(
         ProxyEndpoint Proxy,
         long Started,
         long NameResolved,
-        bool AuthorizationAnswersChallenge);
+        bool AuthorizationAnswersChallenge,
+        SspiFailureRecordingTransferEvents AuthenticatorEvents);
 
     /// <summary>
     /// One key of curl's DNS cache: the host as it was cached (the name looked up, or a
