@@ -9,7 +9,7 @@ touches: [.claude/skills/task-board/task-board.ps1, .claude/skills/task-board/SK
 lane: no
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1209 — Make tasks that touch an audit guard file interactive only, as the CI audit guard requires
 
@@ -27,15 +27,21 @@ A task whose `touches` names an audit guard file is interactive only, like one t
 
 ## Acceptance criteria
 
-- [ ] `Test-AuditPath` is true for each of the four guard files above (any letter case) as well as for the three paths it covers today, and false for a neighbour such as `.claude/hooks/whisper-milestone.ps1` or `.github/workflows/gource.yml`.
-- [ ] In a scratch board, `status` marks a task touching `.github/workflows/ci.yml` as interactive only, `next` and `capacity` never offer it, and with `CURL_DARK_FACTORY_LANE` set, `new` without `-NoLane` and `move -To Doing` refuse it.
-- [ ] `Test-AuditPathsUntouched.ps1 -SelfTest` has a passing case that compares `$GuardedPatterns` with `task-board.ps1`'s `Test-AuditPath`, and it fails when one of the guard files is removed from `Test-AuditPath` (checked by hand, then restored; Notes records it).
-- [ ] SKILL.md's paragraph defining an audit path names the guard files.
-- [ ] Merged to `master` through the `audit` branch, and the next CI run on `work/dark-factory` passes the audit guard.
-- [ ] `dotnet build` is clean and the fast tests are green.
+- [x] `Test-AuditPath` is true for each of the four guard files above (any letter case) as well as for the three paths it covers today, and false for a neighbour such as `.claude/hooks/whisper-milestone.ps1` or `.github/workflows/gource.yml`.
+- [x] In a scratch board, `status` marks a task touching `.github/workflows/ci.yml` as interactive only, `next` and `capacity` never offer it, and with `CURL_DARK_FACTORY_LANE` set, `new` without `-NoLane` and `move -To Doing` refuse it.
+- [x] `Test-AuditPathsUntouched.ps1 -SelfTest` has a passing case that compares `$GuardedPatterns` with `task-board.ps1`'s `Test-AuditPath`, and it fails when one of the guard files is removed from `Test-AuditPath` (checked by hand, then restored; Notes records it).
+- [x] SKILL.md's paragraph defining an audit path names the guard files.
+- [x] Merged to `master` through the `audit` branch, and the next CI run on `work/dark-factory` passes the audit guard.
+- [x] `dotnet build` is clean and the fast tests are green.
 
 ## Notes
+
+- 2026-10-02: Done on the `audit` branch, PR #49, merged as 11ec9250 once CI passed on Windows, Linux and macOS for 3d29357f; `master` merged into `work/dark-factory`, and CI run 37062281943 on a7e406d5 passed, audit guard included.
+- The removed-guard-file check is automated, not by hand: `Test-AuditPathsUntouched.ps1 -SelfTest` case j drops `ci.yml` from a copy of the board and passes only when that miss is reported; case i passes on the real board.
+- Scratch board: a `ci.yml` task and a `.CLAUDE/Settings.json` task show as interactive only, and `next` and `capacity` offer only a `gource.yml` one. With `CURL_DARK_FACTORY_LANE=1`, `new` refuses a `guard-audit-paths.ps1` task and `move -To Doing` refuses the `ci.yml` one, while a `whisper-milestone.ps1` task files.
+- Root `CLAUDE.md` names the guard files too (a7e406d5).
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. Tasks touching an audit guard file are interactive only; merged in PR #49, factory CI green
