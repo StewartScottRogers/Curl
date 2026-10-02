@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1201 — Write the --trace-config ftp done line for a range whose post-quote is refused
 
@@ -24,8 +24,8 @@ Under `-v --trace-config ftp -r 0-1 -Q -<cmd>`, with the post-quote refused, Cur
 
 ## Acceptance criteria
 
-- [ ] A test in `FtpProtocolHandlerStateTraceTests` pins the measured `[FTP]` lines from `> ABOR` to the end for a range whose `-` post-quote is refused.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] A test in `FtpProtocolHandlerStateTraceTests` pins the measured `[FTP]` lines from `> ABOR` to the end for a range whose `-` post-quote is refused.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
 
@@ -33,3 +33,4 @@ Under `-v --trace-config ftp -r 0-1 -Q -<cmd>`, with the post-quote refused, Cur
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. A range whose - post-quote is refused writes [STOP] done, result=21 after the quote's lines, before shutting down, as curl 8.21.0 does
