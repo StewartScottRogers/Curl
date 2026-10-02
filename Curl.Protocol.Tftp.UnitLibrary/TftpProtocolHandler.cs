@@ -167,7 +167,7 @@ public sealed class TftpProtocolHandler(
                 : await new TftpDownload(context, channel, startTimestamp).RunAsync(fileName).ConfigureAwait(false);
         }
 
-        events.ShuttingDown();
+        events.ShuttingDown(opened.ConnectionNumber);
         return result;
     }
 

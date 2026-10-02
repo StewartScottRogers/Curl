@@ -121,7 +121,7 @@ internal static class CurlComposition
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
-        EndPointRecordingDatagramConnector recordingDatagramConnector = new(datagramConnector, recorder);
+        EndPointRecordingDatagramConnector recordingDatagramConnector = new(NumberedDatagramsOf(connector, datagramConnector), recorder);
         ISecurityContextFactory contexts = securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog);
         RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(contexts, negotiateOptions, diagnosticLog);
         SecurityDelegation saslDelegation = (negotiateOptions ?? NegotiateOptions.Default).Delegation;
@@ -833,6 +833,18 @@ internal static class CurlComposition
             runConnectionCache: runConnections,
             lateBoundDiagnosticLog: runLog);
     }
+
+    /// <summary>
+    /// The datagram connector TFTP opens its channel through: over a
+    /// <see cref="PoolingConnector" />, one that numbers each open in that pool's sequence, as
+    /// curl 8.21.0 numbers a TFTP transfer's connection with the connections before it
+    /// (BL-969); over any other connector, <paramref name="datagramConnector" /> itself.
+    /// </summary>
+    /// <param name="connector">The connector the TCP protocols connect through.</param>
+    /// <param name="datagramConnector">Opens the channels.</param>
+    /// <returns>The datagram connector.</returns>
+    internal static IDatagramConnector NumberedDatagramsOf(IConnector connector, IDatagramConnector datagramConnector) =>
+        connector is PoolingConnector pool ? pool.NumberingDatagrams(datagramConnector) : datagramConnector;
 
     /// <summary>
     /// The connector an option group of a runner over fake connectors connects through:
