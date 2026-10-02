@@ -219,6 +219,28 @@ public sealed class MqttProtocolHandlerTransferEventsTests
             run.Transcript.TakeLast(2).ToArray());
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_PublishOverMaxFileSize_ReportsRemainingLengthThenMaximumFileSizeExceeded()
+    {
+        // Measured on curl 8.21.0 (BL-1115): -v --max-filesize 9 against a 10-byte PUBLISH to t/x.
+        ScriptedConnection connection = new(Hex(Connack), Hex(Suback), Hex("30 0A 00 03 74 2F 78 68 65 6C 6C 6F"));
+        TranscriptTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("mqtt://h/t/x"),
+            Output = new RecordingStream(),
+            Events = events,
+            MaxFileSize = 9,
+        };
+
+        TransferResult result = await Handler(connection, 0).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { State(5), "* Remaining length: 10 bytes", "* Maximum file size exceeded", "* shutting down connection #0" },
+            events.Transcript.TakeLast(4).ToArray());
+    }
+
     /// <summary>What every transfer reports up to and including the CONNECT sent.</summary>
     private static string[] ConnectSent() =>
         ["* Using client id 'curl" + FixedSuffix + "'", Sent(Connect), State(0)];

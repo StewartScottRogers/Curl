@@ -23,6 +23,11 @@ namespace Curl.Protocol.Mqtt;
 /// slice as data, and each <c>mqtt_doing: state [N]</c> line curl's state machine writes.
 /// </param>
 /// <param name="log">Where each packet sent and received and each step is logged (ADR-0222, BL-928).</param>
+/// <param name="maxFileSize">
+/// The most bytes one PUBLISH body may hold (<c>--max-filesize</c>), or <see langword="null" />
+/// or 0 for no limit. A PUBLISH whose remaining length is larger fails the transfer with exit 63
+/// before any of its body is read, as curl 8.21.0's <c>mqtt_doing</c> does (BL-1115).
+/// </param>
 /// <param name="cancellationToken">Cancels every read and write.</param>
 /// <remarks>
 /// <para>
@@ -52,6 +57,7 @@ internal sealed class MqttSession(
     ITransferProgress progress,
     ITransferEvents events,
     MqttDiagnosticLog log,
+    long? maxFileSize,
     CancellationToken cancellationToken)
 {
     /// <summary><c>MQTT_FIRST</c>: awaiting a packet's first byte.</summary>
@@ -305,6 +311,11 @@ internal sealed class MqttSession(
     {
         publishLength = header.RemainingLength;
         events.ReportInfo(MqttTransferMessages.RemainingLength(header.RemainingLength));
+        if (maxFileSize is > 0 and long limit && header.RemainingLength > limit)
+        {
+            throw new MqttTransferException(CurlExitCode.FilesizeExceeded, MqttTransferMessages.MaximumFileSizeExceeded);
+        }
+
         using MemoryStream body = new();
         while (body.Length < header.RemainingLength)
         {

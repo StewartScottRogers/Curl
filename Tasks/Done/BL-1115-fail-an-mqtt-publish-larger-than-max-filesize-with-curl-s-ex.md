@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1115 — Fail an MQTT PUBLISH larger than --max-filesize with curl's exit 63
 
@@ -25,14 +25,19 @@ A subscribed `mqtt://` transfer that receives a PUBLISH whose remaining length i
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Protocol.Mqtt.UnitTests/MqttProtocolHandlerTests.cs`: with `MaxFileSize = 9` and the exchange above the result is exit 63 `Maximum file size exceeded` with 0 bytes written; with `MaxFileSize = 10`, and with `MaxFileSize` null or 0, the PUBLISH is written.
-- [ ] A test in `MqttProtocolHandlerTransferEventsTests.cs` pins the measured `-v` info lines in order: `Remaining length: 10 bytes`, `Maximum file size exceeded`, `shutting down connection #0`.
-- [ ] A test pins that the limit applies to each PUBLISH on its own: two PUBLISHes of 10 bytes each under `MaxFileSize = 10` are both written.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Mqtt.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] New tests in `Curl.Protocol.Mqtt.UnitTests/MqttProtocolHandlerTests.cs`: with `MaxFileSize = 9` and the exchange above the result is exit 63 `Maximum file size exceeded` with 0 bytes written; with `MaxFileSize = 10`, and with `MaxFileSize` null or 0, the PUBLISH is written.
+- [x] A test in `MqttProtocolHandlerTransferEventsTests.cs` pins the measured `-v` info lines in order: `Remaining length: 10 bytes`, `Maximum file size exceeded`, `shutting down connection #0`.
+- [x] A test pins that the limit applies to each PUBLISH on its own: two PUBLISHes of 10 bytes each under `MaxFileSize = 10` are both written.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Mqtt.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- `MqttSession` takes `long? maxFileSize` (from `ITransferContext.MaxFileSize`) and, right after reporting `Remaining length`, throws `MqttTransferException(FilesizeExceeded, "Maximum file size exceeded")` when the limit is above 0 and the remaining length is larger; none of that PUBLISH is read or written.
+- The `-v` lines need no new code: `Maximum file size exceeded` is a `failf` message, not a strerror text, so the handler's existing `ReportConnectionEnd` writes it and then `shutting down connection #0`, the measured order.
+- Measure-CodeQuality: Curl.Protocol.Mqtt.UnitLibrary 100% line, 100% branch, 0 failing members. Mqtt tests 98 -> 104.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. An mqtt:// PUBLISH over --max-filesize ends with exit 63 Maximum file size exceeded and writes nothing of it
