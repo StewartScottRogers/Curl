@@ -2711,8 +2711,9 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Wraps <paramref name="output" /> in the events that add the trace lines the transfer writes
     /// after its connect has returned: <see cref="AsyncResolveTeardownTraceEvents" /> under
-    /// <see cref="CurlComposition.TracesDns" /> and <see cref="ClientReaderResetTraceEvents" /> under
-    /// <see cref="CurlComposition.TracesRead" />.
+    /// <see cref="CurlComposition.TracesDns" />, <see cref="ClientReaderResetTraceEvents" /> under
+    /// <see cref="CurlComposition.TracesRead" /> and, outermost so its <c>[WRITE] [OUT] done</c> comes before
+    /// the <c>[READ]</c> line, <see cref="ClientWriterTraceEvents" /> under <see cref="CurlComposition.TracesWrite" />.
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="output">The transfer's own events.</param>
@@ -2720,7 +2721,8 @@ internal sealed class CurlCommandRunner(
     private static ITransferEvents WithTraceLineEvents(CommandLineOptions options, ITransferEvents output)
     {
         ITransferEvents teardown = CurlComposition.TracesDns(options) ? new AsyncResolveTeardownTraceEvents(output) : output;
-        return CurlComposition.TracesRead(options) ? new ClientReaderResetTraceEvents(teardown) : teardown;
+        ITransferEvents readers = CurlComposition.TracesRead(options) ? new ClientReaderResetTraceEvents(teardown) : teardown;
+        return CurlComposition.TracesWrite(options) ? new ClientWriterTraceEvents(readers) : readers;
     }
 
     /// <summary>

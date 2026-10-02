@@ -225,6 +225,68 @@ public sealed class CurlCommandRunnerTransferEventTests
     private const string ReadResetLine = "* [READ] client_reset, clear readers" + InfoEnd;
 
     [TestMethod]
+    public async Task RunAsync_TraceConfigWrite_WritesTheClientWriterLinesAfterEachHeaderAndTheBody()
+    {
+        // The lines curl 8.21.0 wrote under -s -v --trace-config write (measured 2026-10-02, BL-1187 Notes).
+        int exitCode = await RunAsync(["-s", "--trace-config", "write", "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(
+            StandardErrorText,
+            "< HTTP/1.1 200 OK" + HeaderEnd
+            + "* [WRITE] [OUT] wrote 17 header bytes -> 17" + InfoEnd
+            + "* [WRITE] [PAUSE] writing 17/17 bytes of type c -> 0" + InfoEnd
+            + "* [WRITE] download_write header(type=c, blen=17) -> 0" + InfoEnd
+            + "* [WRITE] client_write(type=c, len=17) -> 0" + InfoEnd
+            + "< Content-Type: text/plain" + HeaderEnd
+            + "* [WRITE] header_collect pushed(type=1, len=26) -> 0" + InfoEnd
+            + "* [WRITE] [OUT] wrote 26 header bytes -> 26" + InfoEnd
+            + "* [WRITE] [PAUSE] writing 26/26 bytes of type 4 -> 0" + InfoEnd
+            + "* [WRITE] download_write header(type=4, blen=26) -> 0" + InfoEnd
+            + "* [WRITE] client_write(type=4, len=26) -> 0" + InfoEnd
+            + "< Content-Length: 6" + HeaderEnd);
+        StringAssert.EndsWith(
+            StandardErrorText,
+            "{ [6 bytes data]" + InfoEnd
+            + "* [WRITE] [OUT] wrote 6 body bytes -> 6" + InfoEnd
+            + "* [WRITE] [PAUSE] writing 6/6 bytes of type 1 -> 0" + InfoEnd
+            + "* [WRITE] download_write body(type=1, blen=6) -> 0" + InfoEnd
+            + "* [WRITE] client_write(type=1, len=6) -> 0" + InfoEnd
+            + "* [WRITE] xfer_write_resp(len=70, eos=0) -> 0" + InfoEnd
+            + "* [WRITE] [OUT] done" + InfoEnd
+            + "* Connection #0 to host 127.0.0.1:18441 left intact" + InfoEnd);
+    }
+
+    [TestMethod]
+    [DataRow("network")]
+    [DataRow("read")]
+    [DataRow("-write")]
+    public async Task RunAsync_TraceConfigWithoutWrite_WritesNoWriteLine(string components)
+    {
+        await RunAsync(["-s", "--trace-config", components, "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.DoesNotContain("[WRITE]", StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigWriteWithoutVerbose_WritesNothing()
+    {
+        await RunAsync(["-s", "--trace-config", "write", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(string.Empty, StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow("-vvv")]
+    [DataRow("-vvvv")]
+    public async Task RunAsync_ThreeOrMoreVs_WriteTheClientWriterDoneLine(string verbosity)
+    {
+        await RunAsync(["-s", verbosity, "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(1, StandardErrorText.Split("* [WRITE] [OUT] done" + InfoEnd).Length - 1);
+    }
+
+    [TestMethod]
     public async Task RunAsync_TraceIdsWithResolveEntry_MarksTheLineBeforeTheConnectionWithAnX()
     {
         // curl 8.21.0 wrote "[0-x] * Added a.test:1:127.0.0.1 to DNS cache", then [0-0] (measured 2026-09-29, BL-648 Notes).

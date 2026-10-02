@@ -120,3 +120,26 @@ BL-1161 delivers the `[HAPPY-EYEBALLS]` lines and the `[TCP]` lines of the conne
 - Unmeasured and so not written: a `--no-keepalive` connect (Curl always writes `Set TCP_KEEP*`),
   the lines through a proxy or a Unix socket (only a direct connect is traced, as for `[DNS]`), and
   `baller N` for more than one family giving up (Curl writes `baller 0: result=7`).
+
+## Amendment (BL-1187): the `[WRITE]` client writer lines
+
+Decided by Claude under Stewart's delegation, 2026-10-02.
+
+BL-1187 delivers the `[WRITE]` lines of a transfer's response in `Curl.Console`, as
+`ClientWriterTraceEvents`, a wrapper over the transfer's events that `CurlCommandRunner.WithTraceLineEvents`
+puts outermost under `CurlComposition.TracesWrite` (`write` or `all`, so `-vvv` and `-vvvv`; not
+`network`). No change to `Curl.Protocol.Http` was needed: its handler already reports each response
+header line and each body block as an event, which is where curl's client writers take them.
+
+- Measured (BL-1187 Notes): after each `< ` header line, four lines of type `c` for the status line
+  and, for every later line, `header_collect pushed(type=1, len=N)` and four of type `4`; after each
+  body block `[OUT] wrote N body bytes -> N` and three of type `1`, then `xfer_write_resp`; before the
+  connection's `left intact` (or `shutting down`) line `[WRITE] [OUT] done`, which comes before
+  `[READ] client_reset`, so the wrapper sits outside `ClientReaderResetTraceEvents`.
+- `xfer_write_resp(len=N)`: curl's `N` is the bytes of the one socket read it handed on (40 for a
+  17 + 19 + 2 byte head and a 2 byte body, 38 for the same head with no body). Curl's handler reports
+  lines and blocks rather than reads, so `N` is every header byte reported since the last
+  `xfer_write_resp` plus the body block's bytes: curl's number whenever the head and the first body
+  block arrive in one read, as they do for a small response. A response with no body writes its
+  `xfer_write_resp` for the head before `[OUT] done`. `eos` is always `0`, as measured.
+- Not written: `[OUT] done` before a failed transfer's `closing connection #N` (unmeasured).
