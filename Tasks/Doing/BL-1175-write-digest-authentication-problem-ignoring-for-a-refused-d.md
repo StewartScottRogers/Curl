@@ -31,3 +31,4 @@ Measured in BL-1148 (curl 8.21.0, mingw, Schannel): `curl -s -S -v --digest -u u
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
