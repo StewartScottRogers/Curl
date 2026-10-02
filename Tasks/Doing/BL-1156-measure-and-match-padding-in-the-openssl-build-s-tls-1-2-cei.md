@@ -33,3 +33,4 @@ The OpenSSL build's hand-built ClientHello under `--tls-max 1.2 --curves X25519`
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
