@@ -34,3 +34,4 @@ Under `-v --trace-config dns` Curl writes curl 8.21.0's `[DNS]` lines for a conn
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
