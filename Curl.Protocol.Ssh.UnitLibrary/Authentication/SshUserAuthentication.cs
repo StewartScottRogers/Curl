@@ -194,23 +194,45 @@ internal sealed class SshUserAuthentication(
     private async ValueTask AuthenticateWithMethodsAsync(string methods, UserCredentials credentials, CancellationToken cancellationToken)
     {
         bool offersPublicKey = methods.Contains(PublicKeyMethod, StringComparison.Ordinal);
+        Trace.Enter("SSH_AUTH_PKEY_INIT");
         if (offersPublicKey && await TryLoggedAsync(PublicKeyMethod, () => TryPublicKeyAsync(credentials.User, cancellationToken)).ConfigureAwait(false))
         {
             return;
         }
 
-        if (methods.Contains(PasswordMethod, StringComparison.Ordinal) && await TryLoggedAsync(PasswordMethod, () => TryPasswordAsync(credentials.User, credentials.Password, cancellationToken)).ConfigureAwait(false))
+        Trace.Enter("SSH_AUTH_PASS_INIT");
+        if (await TryPasswordIfOfferedAsync(methods, credentials, cancellationToken).ConfigureAwait(false))
         {
-            events.ReportInfo(SshInfoLines.PasswordAuthenticated);
             return;
         }
 
+        Trace.Enter("SSH_AUTH_HOST_INIT");
+        Trace.Enter("SSH_AUTH_AGENT_INIT");
         if (offersPublicKey && await TryLoggedAsync(AgentMethod, () => TryAgentAsync(credentials, cancellationToken)).ConfigureAwait(false))
         {
             return;
         }
 
+        Trace.Enter("SSH_AUTH_KEY_INIT");
         await RequireKeyboardInteractiveAsync(methods, credentials.User, credentials.Password, cancellationToken).ConfigureAwait(false);
+    }
+
+    // curl's SSH_AUTH_PASS state, entered only when the server offers password (BL-1204).
+    private async ValueTask<bool> TryPasswordIfOfferedAsync(string methods, UserCredentials credentials, CancellationToken cancellationToken)
+    {
+        if (!methods.Contains(PasswordMethod, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        Trace.Enter("SSH_AUTH_PASS");
+        if (!await TryLoggedAsync(PasswordMethod, () => TryPasswordAsync(credentials.User, credentials.Password, cancellationToken)).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        events.ReportInfo(SshInfoLines.PasswordAuthenticated);
+        return true;
     }
 
     // curl's agent step (ADR-0271): connect, list the identities, then try each in the
@@ -225,6 +247,7 @@ internal sealed class SshUserAuthentication(
             return false;
         }
 
+        Trace.Enter("SSH_AUTH_AGENT_LIST");
         SshAgentClient agent = new(connection);
         await using (agent.ConfigureAwait(false))
         {
@@ -235,6 +258,7 @@ internal sealed class SshUserAuthentication(
                 return false;
             }
 
+            Trace.Enter("SSH_AUTH_AGENT");
             return await TryAgentIdentitiesAsync(agent, identities, credentials, cancellationToken).ConfigureAwait(false);
         }
     }
@@ -370,9 +394,11 @@ internal sealed class SshUserAuthentication(
     {
         if (!methods.Contains(KeyboardInteractiveMethod, StringComparison.Ordinal))
         {
+            Trace.Enter(AuthDoneState);
             throw SshTransferException.AuthenticationFailure();
         }
 
+        Trace.Enter("SSH_AUTH_KEY");
         if (!await TryLoggedAsync(KeyboardInteractiveMethod, () => TryKeyboardInteractiveAsync(user, password, cancellationToken)).ConfigureAwait(false))
         {
             throw SshTransferException.LoginDenied();
@@ -495,7 +521,6 @@ internal sealed class SshUserAuthentication(
         }
 
         SshUserKeyFiles files = await userKeys.LocateAsync(cancellationToken).ConfigureAwait(false);
-        Trace.Enter("SSH_AUTH_PKEY_INIT");
         if (files.PublicKeyPath is { } publicKeyPath)
         {
             events.ReportInfo(SshInfoLines.TryingPublicKeyFile(publicKeyPath));
@@ -505,7 +530,6 @@ internal sealed class SshUserAuthentication(
         Trace.Enter("SSH_AUTH_PKEY");
         string? denial = await DenyPublicKeyAsync(user, files, cancellationToken).ConfigureAwait(false);
         events.ReportInfo(denial is null ? SshInfoLines.AuthenticatedViaPublicKey : SshInfoLines.PublicKeyDenied(denial));
-        Trace.Enter(denial is null ? AuthDoneState : "SSH_AUTH_PASS_INIT");
         return denial is null;
     }
 

@@ -209,6 +209,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
                 events.ReportInfo(exception.Message);
             }
 
+            trace.Fail(exception.ExitCode);
             events.ReportInfo(SshInfoLines.ClosingConnection(connectionNumber));
             return TransferResult.Failure(exception.ExitCode, exception.Message);
         }
@@ -329,11 +330,17 @@ public sealed class SshProtocolHandler : IProtocolHandler
                 context.Events.ReportInfo(exception.Message);
             }
 
+            trace.Fail(exception.ExitCode);
             return TransferResult.Failure(exception.ExitCode, exception.Message);
         }
 
         log.TransferEnded(result, context.TimeProvider.GetElapsedTime(started));
         ReportReturnedFailure(context.Events, result);
+        if (!result.IsSuccess)
+        {
+            trace.Fail(result.ExitCode);
+        }
+
         return result;
     }
 
@@ -355,7 +362,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     // An upload is sent (ADR-0258); otherwise the file is downloaded (ADR-0225).
     private static async ValueTask<TransferResult> TransferOverScpAsync(ITransferContext context, SshTransport transport, Stream output, SshStateTrace trace) =>
         context.Upload is { } upload
-            ? await new ScpFileUpload(transport, context.Events).UploadAsync(context.Url.AbsolutePath, context.CreateFileMode, upload, context.Progress, context.CancellationToken).ConfigureAwait(false)
+            ? await new ScpFileUpload(transport, context.Events) { Trace = trace }.UploadAsync(context.Url.AbsolutePath, context.CreateFileMode, upload, context.Progress, context.CancellationToken).ConfigureAwait(false)
             : await new ScpFileDownload(transport) { Trace = trace }.DownloadAsync(context.Url.AbsolutePath, output, context.Progress, context.CancellationToken).ConfigureAwait(false);
 
     // An upload is sent (ADR-0244); otherwise a path ending with a slash is listed and any
@@ -364,14 +371,14 @@ public sealed class SshProtocolHandler : IProtocolHandler
     private static async ValueTask<TransferResult> TransferOverSftpAsync(ITransferContext context, SshTransport transport, Stream output, SshStateTrace trace)
     {
         string urlPath = context.Url.AbsolutePath;
-        SftpQuoteCommands quotes = SftpQuoteCommands.From(context, OperatingSystem.IsWindows());
+        SftpQuoteCommands quotes = SftpQuoteCommands.From(context, OperatingSystem.IsWindows(), trace);
         if (context.Upload is { } upload)
         {
-            return await new SftpFileUpload(transport, context.Events).UploadAsync(urlPath, SftpUploadOptions.From(context), upload, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false);
+            return await new SftpFileUpload(transport, context.Events) { Trace = trace }.UploadAsync(urlPath, SftpUploadOptions.From(context), upload, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false);
         }
 
         return SftpRemotePath.NamesDirectory(urlPath)
-            ? await new SftpDirectoryListing(transport).ListAsync(urlPath, context.ListOnly, context.NoBody, output, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false)
+            ? await new SftpDirectoryListing(transport) { Trace = trace }.ListAsync(urlPath, context.ListOnly, context.NoBody, output, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false)
             : await new SftpFileDownload(transport) { Trace = trace }.DownloadAsync(urlPath, context.CreateFileMode, output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom).ConfigureAwait(false);
     }
 

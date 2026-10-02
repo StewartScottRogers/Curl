@@ -68,7 +68,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
                 byte[] path = SftpRemotePath.ResolveUrlPath(urlPath, homeDirectory);
-                TraceConnectPhaseDone();
+                Trace.EndSftpConnectPhase();
                 Trace.Enter("SSH_SFTP_QUOTE_INIT");
                 await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
                 Trace.Enter("SSH_SFTP_GETINFO");
@@ -87,20 +87,10 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 TransferResult result = await CopyPartAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
                 Trace.Enter("SSH_SFTP_CLOSE");
                 result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
-                Trace.Write("SFTP DONE done");
-                Trace.Rest();
+                Trace.EndSftpDonePhase();
                 return result;
             },
             cancellationToken).ConfigureAwait(false);
-    }
-
-    // curl's CONNECT phase ends once REALPATH has answered; its DO phase starts at once (BL-1166).
-    private void TraceConnectPhaseDone()
-    {
-        Trace.Enter(SshStateTrace.Stop);
-        Trace.Write("CONNECT phase done");
-        Trace.Rest();
-        Trace.Write("DO phase starts");
     }
 
     // Measured (BL-1046): curl takes a connection closed or reset while it waits for the
