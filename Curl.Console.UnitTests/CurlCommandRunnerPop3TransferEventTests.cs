@@ -56,6 +56,26 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
     }
 
     [TestMethod]
+    [DataRow("pop3")]
+    [DataRow("POP3")]
+    public async Task RunAsync_VerboseRetrUnderTraceConfigPop3_WritesExactlyTheVerboseLines(string component)
+    {
+        // curl 8.21.0's POP3 handler writes no trace lines of its own (BL-1104, BL-1165 Notes).
+        string[] replies = [Greeting, CapaReply, .. AuthPlainReplies, RetrReply, Bye];
+        int verboseExitCode = await RunAsync(["-sv"], 18115, 64809, replies);
+        string verboseLines = Encoding.ASCII.GetString(standardError.ToArray());
+        standardError.SetLength(0);
+        standardOutput.SetLength(0);
+
+        int tracedExitCode = await RunAsync(["-sv", "--trace-config", component], 18115, 64809, replies);
+
+        Assert.AreEqual(0, verboseExitCode);
+        Assert.AreEqual(0, tracedExitCode);
+        Assert.AreEqual(verboseLines, Encoding.ASCII.GetString(standardError.ToArray()));
+        Assert.AreEqual(Message, Encoding.ASCII.GetString(standardOutput.ToArray()));
+    }
+
+    [TestMethod]
     public async Task RunAsync_VerboseRetrWithUserAndPass_WritesThePasswordUnmasked()
     {
         const string greeting = "+OK POP3 ready\r\n";

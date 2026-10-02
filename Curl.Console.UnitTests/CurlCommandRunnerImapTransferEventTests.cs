@@ -52,6 +52,26 @@ public sealed class CurlCommandRunnerImapTransferEventTests
     }
 
     [TestMethod]
+    [DataRow("imap")]
+    [DataRow("IMAP")]
+    public async Task RunAsync_VerboseUidFetchUnderTraceConfigImap_WritesExactlyTheVerboseLines(string component)
+    {
+        // curl 8.21.0's IMAP handler writes no trace lines of its own (BL-1104, BL-1165 Notes).
+        string[] replies = [Greeting, CapabilityReply, .. AuthPlain("A002"), Select("A003"), Fetch("A004"), Logout("A005")];
+        int verboseExitCode = await RunAsync(["-sv"], "INBOX;UID=1", 18148, 59454, replies);
+        string verboseLines = Encoding.ASCII.GetString(standardError.ToArray());
+        standardError.SetLength(0);
+        standardOutput.SetLength(0);
+
+        int tracedExitCode = await RunAsync(["-sv", "--trace-config", component], "INBOX;UID=1", 18148, 59454, replies);
+
+        Assert.AreEqual(0, verboseExitCode);
+        Assert.AreEqual(0, tracedExitCode);
+        Assert.AreEqual(verboseLines, Encoding.ASCII.GetString(standardError.ToArray()));
+        Assert.AreEqual(Message, Encoding.ASCII.GetString(standardOutput.ToArray()));
+    }
+
+    [TestMethod]
     public async Task RunAsync_VerboseUidFetchWithLogin_WritesThePasswordUnmasked()
     {
         const string greeting = "* OK ready\r\n";
