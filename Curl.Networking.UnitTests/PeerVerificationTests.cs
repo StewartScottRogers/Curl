@@ -56,7 +56,7 @@ public sealed class PeerVerificationTests
     {
         var events = new RecordingTransferEvents();
 
-        new PeerVerification(true, 0, []) { PinnedPublicKeyHash = "sha256//AAAA" }.ReportPinnedPublicKeyRefusal(events, matchesSchannelBuild: true, failedHandshakeReported: false);
+        new PeerVerification(true, 0, []) { PinnedPublicKeyHash = "sha256//AAAA" }.ReportPinnedPublicKeyRefusal(events, matchesSchannelBuild: true);
 
         Assert.IsEmpty(events.Info);
     }
@@ -66,7 +66,7 @@ public sealed class PeerVerificationTests
     {
         var events = new RecordingTransferEvents();
 
-        new PeerVerification(true, 0, []) { PinnedPublicKeyRefused = true }.ReportPinnedPublicKeyRefusal(events, matchesSchannelBuild: true, failedHandshakeReported: false);
+        new PeerVerification(true, 0, []) { PinnedPublicKeyRefused = true }.ReportPinnedPublicKeyRefusal(events, matchesSchannelBuild: true);
 
         CollectionAssert.AreEqual(
             new[] { "SSL: public key does not match pinned public key", "SSL: public key does not match pinned public key" },
@@ -74,13 +74,13 @@ public sealed class PeerVerificationTests
     }
 
     [TestMethod]
-    public void ReportPinnedPublicKeyRefusal_HashCarriedByTheFailedHandshake_ReportsOnlyTheMismatchLine()
+    public void ReportPinnedPublicKeyRefusal_HashPinRefusedInTheOpenSslBuild_ReportsOnlyTheMismatchLine()
     {
         // The failed handshake's event prints the " public key hash:" line (BL-1149).
         var events = new RecordingTransferEvents();
 
         new PeerVerification(true, 0, []) { PinnedPublicKeyHash = "sha256//AAAA", PinnedPublicKeyRefused = true }
-            .ReportPinnedPublicKeyRefusal(events, matchesSchannelBuild: false, failedHandshakeReported: true);
+            .ReportPinnedPublicKeyRefusal(events, matchesSchannelBuild: false);
 
         CollectionAssert.AreEqual(new[] { "SSL: public key does not match pinned public key" }, events.Info);
     }

@@ -204,14 +204,43 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithAnUntrustedCertificateInTheOpenSslBuild_ReportsNoHandshake()
+    public async Task AuthenticateAsClientAsync_WithAnUntrustedCertificateInTheOpenSslBuild_ReportsTheCertificateDetailsInAFailedHandshake()
     {
+        // curl 8.18.0 OpenSSL -v, untrusted self-signed certificate: "SSL connection using", the
+        // ALPN answer, "Server certificate:" and its details, then the verify result as the
+        // exit 60 message (measured 2026-10-02, BL-1178).
         var events = new RecordingTransferEvents();
 
         var result = await PinReportingHandshakeAsync(new TlsClientOptions(), events, OpenSslBuild, ["http/1.1"]);
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
-        Assert.IsEmpty(events.Handshakes);
+        var handshake = Assert.ContainsSingle(events.Handshakes);
+        Assert.IsTrue(handshake.Failed);
+        Assert.AreEqual(SslProtocols.Tls12, handshake.ProtocolVersion);
+        Assert.IsNotNull(handshake.CipherSuite);
+        Assert.AreEqual(s_serverCertificate.Thumbprint, handshake.ServerCertificate?.Thumbprint);
+        Assert.AreEqual(CertificateHost, handshake.VerifiedHostName);
+        Assert.IsFalse(handshake.CertificateVerified);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WhenTheServerHangsUpInTheOpenSslBuild_ReportsAFailedHandshakeThatNegotiatedNothing()
+    {
+        // curl 8.18.0 OpenSSL -v -k --tlsv1.3 against a TLS 1.2 server: "ALPN: curl offers
+        // h2,http/1.1" before the ClientHello, then exit 35 with no "SSL connection using"
+        // (measured 2026-10-02, BL-1178).
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        await server.DisposeAsync();
+        var events = new RecordingTransferEvents();
+
+        var result = await new SslStreamTlsProvider(new TlsClientOptions(Insecure: true), OpenSslBuild).AuthenticateAsClientAsync(
+            new StreamConnection(client, ServerEndPoint), CertificateHost, events, isProxy: false, ["http/1.1"], CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        var handshake = Assert.ContainsSingle(events.Handshakes);
+        Assert.IsTrue(handshake.Failed);
+        Assert.AreEqual(SslProtocols.None, handshake.ProtocolVersion);
+        CollectionAssert.AreEqual(new[] { "http/1.1" }, handshake.OfferedApplicationProtocols.ToArray());
     }
 
     private static async Task<ConnectResult> PinReportingHandshakeAsync(TlsClientOptions options, RecordingTransferEvents events, bool matchesSchannelBuild, IReadOnlyList<string>? applicationProtocols = null)

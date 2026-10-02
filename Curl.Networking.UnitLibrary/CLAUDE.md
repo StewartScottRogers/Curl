@@ -55,12 +55,16 @@ builds the chain and the `SslPolicyErrors` `SslStream` would. Both load `--cert`
 does, and a mismatch is exit 90 in both providers. Per ADR-0336 (BL-877) `Judge` also records on
 `PeerVerification` the server key's `sha256//` hash for a hash pin, which a completed handshake
 carries as `TlsHandshakeEvent.PinnedPublicKeyHash` (`-v`'s ` public key hash:` line) and a refusal
-reports through `ReportPinnedPublicKeyRefusal`: the hash line and the mismatch line, twice in the
-Schannel build and once in the OpenSSL build. Per ADR-0363 (BL-1149) a failed handshake is
+reports through `ReportPinnedPublicKeyRefusal`: the mismatch line, twice in the Schannel build and
+once in the OpenSSL build, after the failed handshake event carrying the hash line. Per ADR-0363 (BL-1149) a failed handshake is
 reported as a `TlsHandshakeEvent` with `Failed` set (`ReportFailedHandshake` in each provider), which
 then carries the hash line: always in the Schannel build, whose `-v` prints its ALPN offer before
-any failure, and in `SslStreamTlsProvider`'s OpenSSL build on a pin refusal, with the version, suite
-and ALPN answer kept from the certificate callback, so `-v` prints the certificate details first. Per ADR-0197 the OpenSSL build, unless `-k`,
+any failure, and in the OpenSSL build (ADR-0370, BL-1178) in `SslStreamTlsProvider` before every
+failure, with the version, suite and ALPN answer kept from the certificate callback when the
+certificate or pin was refused (`-v` prints the certificate details first) and nothing negotiated
+otherwise (only the ALPN offer, exit 35), and in `HandBuiltTlsProvider` on a pin refusal, from the
+version, suite and ALPN protocol `Curl.Tls` hands the verifier in `ServerCertificateChain`
+(`HandBuiltHandshake.NegotiatedBy`). Per ADR-0197 the OpenSSL build, unless `-k`,
 reads `--crlfile` (`TlsClientOptions.CertificateRevocationListFile`) in `ReadTrustAnchors` through
 `CertificateRevocationListFile` (exit 82 through `CertificateRevocationListFileException` and
 `TrustAnchorsUnusable`) and `Judge` checks every chain certificate against a list from its issuer,

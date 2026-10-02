@@ -242,10 +242,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     {
         var (handshake, thrown) = await TryHandshakeAsync(run.Plaintext, run.Prepared, earlyData, cancellationToken).ConfigureAwait(false);
         run.Prepared.Verifier.Observed.ReportVerifyResult(run.Events, run.IsProxy, _matchesSchannelBuild);
-        var failedHandshakeReported = !Completed(handshake) && ReportFailedHandshake(run);
-        run.Prepared.Verifier.Observed.ReportPinnedPublicKeyRefusal(run.Events, _matchesSchannelBuild, failedHandshakeReported);
         if (!Completed(handshake))
         {
+            ReportFailedHandshake(run);
+            run.Prepared.Verifier.Observed.ReportPinnedPublicKeyRefusal(run.Events, _matchesSchannelBuild);
             return (null, await FailAsync(run, handshake?.Failure, thrown).ConfigureAwait(false));
         }
 
@@ -262,28 +262,23 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     }
 
     // The Schannel build prints its ALPN offer, and a refused pin's hash, before a failed
-    // handshake (ADR-0363, BL-1149). The OpenSSL build's lines need the version and suite a
-    // failed hand-built handshake does not keep, so it reports the hash line alone, as before.
-    private bool ReportFailedHandshake(HandshakeRun run)
+    // handshake (ADR-0363, BL-1149). The OpenSSL build finishes the handshake before curl checks
+    // the pin, so before a pin refusal it prints every line of it, from what had been negotiated
+    // when the verifier was presented the chain (BL-1178).
+    private void ReportFailedHandshake(HandshakeRun run)
     {
-        if (!_matchesSchannelBuild)
+        var verifier = run.Prepared.Verifier;
+        if (!_matchesSchannelBuild && !verifier.Observed.PinnedPublicKeyRefused)
         {
-            return false;
+            return;
         }
 
-        run.Events.ReportTlsHandshake(new TlsHandshakeEvent
+        run.Events.ReportTlsHandshake(DescribeHandshake(HandBuiltHandshake.NegotiatedBy(verifier.Presented), verifier, run.OfferedApplicationProtocols) with
         {
-            ProtocolVersion = SslProtocols.None,
-            CipherSuite = null,
-            NegotiatedApplicationProtocol = null,
-            OfferedApplicationProtocols = run.OfferedApplicationProtocols,
-            ServerCertificate = null,
-            CertificateVerified = false,
-            PinnedPublicKeyHash = run.Prepared.Verifier.Observed.PinnedPublicKeyHash,
             IsProxy = run.IsProxy,
+            VerifiedHostName = SslStreamTlsProvider.VerifiedHostName(run.TargetHost, _options.Insecure),
             Failed = true,
         });
-        return true;
     }
 
     private HandBuiltTlsConnection ConnectionOver(HandBuiltHandshake handshake, HandshakeRun run) =>

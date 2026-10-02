@@ -37,6 +37,12 @@ internal sealed class HandBuiltCertificateVerifier(
     /// <summary>Gets the DER of every certificate the server sent, its own first, once it has been judged.</summary>
     public ReadOnlyMemory<byte>[] PeerCertificates { get; private set; } = [];
 
+    /// <summary>
+    /// Gets the chain as it was presented, with the version, suite and ALPN protocol the
+    /// handshake had negotiated by then, or <see langword="null" /> before it is judged.
+    /// </summary>
+    public ServerCertificateChain? Presented { get; private set; }
+
     /// <inheritdoc />
     /// <remarks>
     /// A rejection carries the exit code and message as a <c>(CurlExitCode, string)</c> tuple,
@@ -46,6 +52,7 @@ internal sealed class HandBuiltCertificateVerifier(
     {
         ArgumentNullException.ThrowIfNull(presented);
 
+        Presented = presented;
         PeerCertificates = [.. presented.Certificates.Select(der => new ReadOnlyMemory<byte>(der))];
         var sent = LoadAll(presented.Certificates);
         try

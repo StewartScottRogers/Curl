@@ -52,14 +52,14 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WhenTheHandshakeFails_ReportsNoHandshake()
+    public async Task AuthenticateAsClientAsync_WhenTheCertificateIsRefused_ReportsAFailedHandshake()
     {
         var events = new RecordingTransferEvents();
 
         var result = await ReportingHandshakeAsync(new TlsClientOptions(), events);
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
-        Assert.IsEmpty(events.Handshakes);
+        Assert.IsTrue(Assert.ContainsSingle(events.Handshakes).Failed);
     }
 
     [TestMethod]
@@ -123,7 +123,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await ReportingHandshakeAsync(new TlsClientOptions(), events);
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
-        var trust = Assert.IsInstanceOfType<TlsTrustEvent>(Assert.ContainsSingle(events.TlsEvents));
+        var trust = Assert.IsInstanceOfType<TlsTrustEvent>(events.TlsEvents[0]);
         Assert.AreEqual("/cacert.pem", trust.CaCertificateFile);
         Assert.IsNull(trust.CaCertificateDirectory);
     }

@@ -432,9 +432,9 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         await DisposeAfterFailedHandshakeAsync(sslStream, plaintext).ConfigureAwait(false);
         RethrowIfCancellation(failure);
         peerVerification.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
-        var failedHandshakeReported = ReportFailedHandshake(
-            events, judgedHandshake, peerVerification, peerCertificates, isProxy, targetHost);
-        peerVerification.ReportPinnedPublicKeyRefusal(events, _matchesSchannelBuild, failedHandshakeReported);
+        ReportFailedHandshake(
+            events, judgedHandshake, verificationFailure.HasValue, peerVerification, peerCertificates, isProxy, targetHost);
+        peerVerification.ReportPinnedPublicKeyRefusal(events, _matchesSchannelBuild);
 
         return verificationFailure is { } rejected
             ? ConnectResult.Failed(rejected.ExitCode, rejected.Message)
@@ -554,32 +554,29 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     /// <summary>
     /// Reports the <c>-v</c> lines curl prints before a failed handshake as a
-    /// <see cref="TlsHandshakeEvent.Failed" /> event (ADR-0363, BL-1149): in the Schannel build
-    /// always, whose ALPN offer is printed before the ClientHello; in the OpenSSL build only when
-    /// <c>--pinnedpubkey</c> refused the key, since OpenSSL finished the handshake, and printed
-    /// every line of it, before curl checked the pin.
+    /// <see cref="TlsHandshakeEvent.Failed" /> event (ADR-0363, BL-1149), in both builds: the
+    /// Schannel build prints its ALPN offer before the ClientHello, and the OpenSSL build every
+    /// line of a handshake it finished before curl refused the certificate or the pin, or only the
+    /// ALPN offer when the handshake failed without refusing either, inside OpenSSL (exit 35, BL-1178).
     /// </summary>
     /// <param name="events">Where the event goes.</param>
     /// <param name="judgedHandshake">What was negotiated when the certificate was judged.</param>
+    /// <param name="certificateRefused">Whether the certificate or the pin was refused.</param>
     /// <param name="peerVerification">What the judgement found.</param>
     /// <param name="peerCertificates">The DER of what the server sent, its own first.</param>
     /// <param name="isProxy">Whether the handshake was with an HTTPS proxy.</param>
     /// <param name="targetHost">The host the certificate was checked against.</param>
-    /// <returns>Whether the event was reported.</returns>
-    internal bool ReportFailedHandshake(
+    internal void ReportFailedHandshake(
         ITransferEvents events,
         TlsHandshakeEvent judgedHandshake,
+        bool certificateRefused,
         PeerVerification peerVerification,
         ReadOnlyMemory<byte>[] peerCertificates,
         bool isProxy,
         string targetHost)
     {
-        if (!_matchesSchannelBuild && !peerVerification.PinnedPublicKeyRefused)
-        {
-            return false;
-        }
-
-        events.ReportTlsHandshake(judgedHandshake with
+        var negotiated = certificateRefused ? judgedHandshake : Unnegotiated(judgedHandshake.OfferedApplicationProtocols);
+        events.ReportTlsHandshake(negotiated with
         {
             ServerCertificate = HandBuiltTlsProvider.ServerCertificateOf(peerCertificates),
             CertificateVerified = peerVerification.Verified,
@@ -590,7 +587,6 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
             Failed = true,
         });
-        return true;
     }
 
     /// <summary>
