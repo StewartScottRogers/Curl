@@ -107,6 +107,7 @@ public static partial class LibcurlSourceCode
         List<string> lines = [];
         AddIf(lines, options.NetrcUse != NetrcUse.Ignored, () => Setopt("CURLOPT_NETRC", options.NetrcUse == NetrcUse.Optional ? "(long)CURL_NETRC_OPTIONAL" : "(long)CURL_NETRC_REQUIRED"));
         AddStringIf(lines, "CURLOPT_NETRC_FILE", options.NetrcFile);
+        AddIf(lines, options.UseAscii, SetoptOn("CURLOPT_TRANSFERTEXT"));
         AddStringIf(lines, "CURLOPT_LOGIN_OPTIONS", options.LoginOptions);
         return lines;
     }
@@ -137,6 +138,7 @@ public static partial class LibcurlSourceCode
         AddStringIf(lines, "CURLOPT_PROXY_CAINFO", options.ProxyCaCertificateFile);
         AddStringIf(lines, "CURLOPT_PINNEDPUBLICKEY", options.PinnedPublicKey);
         AddStringIf(lines, "CURLOPT_PROXY_PINNEDPUBLICKEY", options.ProxyPinnedPublicKey);
+        AddIf(lines, options.WriteOut is not null, SetoptOn("CURLOPT_CERTINFO"));
         lines.AddRange(CertificateAndKeyLines(options, certificate, proxyCertificate));
         lines.AddRange(VerificationAndVersionLines(options));
         lines.AddRange(SslOptionAndCipherLines(options));
