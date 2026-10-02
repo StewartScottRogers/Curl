@@ -1,3 +1,4 @@
+using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Transport;
 
@@ -18,7 +19,7 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// off</c> line before the <c>-Q</c> commands that follow it, as measured (BL-988).
 /// </summary>
 /// <param name="transport">The transport, after the user is authenticated.</param>
-/// <param name="events">Where the sent bytes and the line after them are reported.</param>
+/// <param name="events">Where the sent bytes, the line after them and each <c>SFTP: creating directory</c> line are reported.</param>
 internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents events)
 {
     /// <summary>How many bytes of the source curl reads at a time: its 64 KiB upload buffer, as measured.</summary>
@@ -112,7 +113,7 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
             : offset > 0 ? SftpOpenFlags.Write
             : SftpOpenFlags.Write | SftpOpenFlags.Create | SftpOpenFlags.Truncate;
 
-    private static async ValueTask<(byte[] Handle, long Offset)> OpenAsync(SftpSession session, byte[] path, SftpUploadOptions options, CancellationToken cancellationToken)
+    private async ValueTask<(byte[] Handle, long Offset)> OpenAsync(SftpSession session, byte[] path, SftpUploadOptions options, CancellationToken cancellationToken)
     {
         long offset = options.ResumeFromRemoteSize
             ? await session.StatSizeAsync(path, cancellationToken).ConfigureAwait(false) ?? 0
@@ -129,9 +130,9 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
         return (handle, offset);
     }
 
-    // Measured: one MKDIR for every slash after the first, from the root down, then the
-    // same open again.
-    private static async ValueTask<byte[]> CreateDirectoriesAndOpenAsync(SftpSession session, byte[] path, uint flags, UnixFileMode createFileMode, CancellationToken cancellationToken)
+    // Measured: one MKDIR for every slash after the first, from the root down, each after
+    // curl's "SFTP: creating directory" line, then the same open again.
+    private async ValueTask<byte[]> CreateDirectoriesAndOpenAsync(SftpSession session, byte[] path, uint flags, UnixFileMode createFileMode, CancellationToken cancellationToken)
     {
         for (int index = 1; index < path.Length; index++)
         {
@@ -145,8 +146,9 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
         return handle ?? throw SshTransferException.SftpCreateFailed(status);
     }
 
-    private static async ValueTask MakeDirectoryAsync(SftpSession session, byte[] directory, CancellationToken cancellationToken)
+    private async ValueTask MakeDirectoryAsync(SftpSession session, byte[] directory, CancellationToken cancellationToken)
     {
+        events.ReportInfo(SshInfoLines.CreatingDirectory(Encoding.UTF8.GetString(directory)));
         uint status = await session.MakeDirectoryAsync(directory, cancellationToken).ConfigureAwait(false);
         if (!MakeDirectoryStatusesPassed.Contains(status))
         {

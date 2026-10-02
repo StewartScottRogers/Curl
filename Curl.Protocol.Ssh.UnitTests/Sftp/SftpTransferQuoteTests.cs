@@ -176,7 +176,7 @@ public sealed class SftpTransferQuoteTests
         AssertChannelClosedLast(connection);
     }
 
-    private static SftpQuoteCommands Quotes(Stream? header, string[] before, string[] after) => new(before, after, header, cLongIs32Bits: true);
+    private static SftpQuoteCommands Quotes(Stream? header, string[] before, string[] after) => new(before, after, header, cLongIs32Bits: true, NoTransferEvents.Instance);
 
     // Every SFTP request after INIT.
     private static void AssertRequests(ScriptedConnection connection, params byte[][] expected)

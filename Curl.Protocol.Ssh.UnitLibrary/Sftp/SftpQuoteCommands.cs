@@ -35,6 +35,8 @@ internal sealed class SftpQuoteCommands
 
     private readonly bool cLongIs32Bits;
 
+    private readonly ITransferEvents events;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="SftpQuoteCommands" /> class.
     /// </summary>
@@ -47,8 +49,10 @@ internal sealed class SftpQuoteCommands
     /// <c>long</c> overflows its own parser so that no number is ever read, and refuses a
     /// date past 32 bits only when <c>long</c> cannot hold one, as measured on each platform.
     /// </param>
-    internal SftpQuoteCommands(IReadOnlyList<string> beforeTransfer, IReadOnlyList<string> afterTransfer, Stream? headerOutput, bool cLongIs32Bits)
+    /// <param name="events">Where the <c>SSH: sending quote commands</c> line is reported.</param>
+    internal SftpQuoteCommands(IReadOnlyList<string> beforeTransfer, IReadOnlyList<string> afterTransfer, Stream? headerOutput, bool cLongIs32Bits, ITransferEvents events)
     {
+        this.events = events;
         BeforeTransfer = beforeTransfer;
         AfterTransfer = afterTransfer;
         this.headerOutput = headerOutput;
@@ -56,7 +60,7 @@ internal sealed class SftpQuoteCommands
     }
 
     /// <summary>Gets no commands at all.</summary>
-    internal static SftpQuoteCommands None { get; } = new([], [], null, cLongIs32Bits: true);
+    internal static SftpQuoteCommands None { get; } = new([], [], null, cLongIs32Bits: true, NoTransferEvents.Instance);
 
     /// <summary>Gets the commands to run before the transfer, each with any <c>*</c>.</summary>
     internal IReadOnlyList<string> BeforeTransfer { get; }
@@ -68,7 +72,7 @@ internal sealed class SftpQuoteCommands
     /// Sorts the transfer's <c>-Q</c> values as the curl tool does: a first <c>-</c> runs the
     /// rest after the transfer, a first <c>+</c> is dropped, and any other runs before it.
     /// </summary>
-    /// <param name="context">The transfer's context, with its <see cref="ITransferContext.QuoteCommands" /> and <see cref="ITransferContext.HeaderOutput" />.</param>
+    /// <param name="context">The transfer's context, with its <see cref="ITransferContext.QuoteCommands" />, <see cref="ITransferContext.HeaderOutput" /> and <see cref="ITransferContext.Events" />.</param>
     /// <param name="cLongIs32Bits">Whether the platform's C <c>long</c> is 32 bits, as on Windows.</param>
     /// <returns>The commands.</returns>
     internal static SftpQuoteCommands From(ITransferContext context, bool cLongIs32Bits)
@@ -87,7 +91,7 @@ internal sealed class SftpQuoteCommands
             }
         }
 
-        return new SftpQuoteCommands(before, after, context.HeaderOutput, cLongIs32Bits);
+        return new SftpQuoteCommands(before, after, context.HeaderOutput, cLongIs32Bits, context.Events);
     }
 
     /// <summary>
@@ -169,8 +173,14 @@ internal sealed class SftpQuoteCommands
         }
     }
 
+    // curl announces a list before its first command, and an empty list not at all.
     private async ValueTask RunAsync(IReadOnlyList<string> commands, SftpSession session, byte[] homeDirectory, byte[] workingPath, CancellationToken cancellationToken)
     {
+        if (commands.Count > 0)
+        {
+            events.ReportInfo(SshInfoLines.SendingQuoteCommands);
+        }
+
         foreach (string value in commands)
         {
             SftpQuoteCommand command = SftpQuoteCommand.Parse(value, homeDirectory);

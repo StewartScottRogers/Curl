@@ -407,6 +407,35 @@ public sealed class SftpFileUploadTests
         Assert.AreEqual("Error in the SSH layer", failure.Message);
     }
 
+    [TestMethod]
+    public async Task UploadAsync_CreateDirectories_ReportsEachDirectoryBeforeItsMakeDirectoryIsSent()
+    {
+        SftpServerScript script = SftpServerScript.Started()
+            .HomeDirectory()
+            .Status(1, 2)
+            .Status(2, SftpStatusCode.Ok)
+            .Status(3, SftpStatusCode.Ok)
+            .Handle(4)
+            .Status(5, SftpStatusCode.Ok)
+            .Status(6, SftpStatusCode.Ok);
+        ScriptedConnection connection = new(script.Bytes);
+        RequestCountingTransferEvents events = new(connection);
+        SftpUploadOptions options = new(0, false, false, true, 0);
+
+        TransferResult result = await new SftpFileUpload(SftpSessionTests.Transport(connection), events)
+            .UploadAsync("/a/b/c.txt", options, new MemoryStream("x"u8.ToArray()), NoTransferProgress.Instance, CancellationToken.None);
+
+        Assert.IsTrue(result.IsSuccess, result.ErrorMessage);
+
+        // INIT, REALPATH and the failed OPEN come before the first line; its MKDIR before the second.
+        CollectionAssert.AreEqual(
+            new[] { "3: SFTP: creating directory '/a'", "4: SFTP: creating directory '/a/b'", "7: upload completely sent off: 1 bytes" },
+            events.Lines);
+        List<byte[]> requests = SftpServerScript.SftpRequests(connection.Written);
+        CollectionAssert.AreEqual(SftpServerScript.MakeDirectoryRequest("/a", 2), requests[3]);
+        CollectionAssert.AreEqual(SftpServerScript.MakeDirectoryRequest("/a/b", 3), requests[4]);
+    }
+
     private static ValueTask<TransferResult> Upload(ScriptedConnection connection, string urlPath, SftpUploadOptions options) =>
         new SftpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
             .UploadAsync(urlPath, options, new MemoryStream(Content), new RecordingProgress(), CancellationToken.None);

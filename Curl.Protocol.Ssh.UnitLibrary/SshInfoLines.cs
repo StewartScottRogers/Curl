@@ -205,6 +205,17 @@ internal static class SshInfoLines
             ? "Request completely sent off"
             : string.Create(CultureInfo.InvariantCulture, $"upload completely sent off: {bytesSent} bytes");
 
+    /// <summary>
+    /// The SFTP line before the <c>-Q</c> commands that run before the transfer, and again
+    /// before those that run after it; none when there are no commands of that kind (BL-1123).
+    /// </summary>
+    internal const string SendingQuoteCommands = "SSH: sending quote commands";
+
+    /// <summary>The SFTP line before each <c>MKDIR</c> that <c>--ftp-create-dirs</c> sends (BL-1123).</summary>
+    /// <param name="path">The directory's path, as the <c>MKDIR</c> carries it.</param>
+    /// <returns>The line, such as <c>SFTP: creating directory '/a'</c>.</returns>
+    internal static string CreatingDirectory(string path) => $"SFTP: creating directory '{path}'";
+
     /// <summary>The line after a transfer that leaves the connection for reuse.</summary>
     /// <param name="connectionNumber">The connection's number.</param>
     /// <param name="host">The URL's host.</param>
