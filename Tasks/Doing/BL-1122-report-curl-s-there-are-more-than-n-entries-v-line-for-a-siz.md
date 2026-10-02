@@ -34,3 +34,4 @@ An LDAP search answered with result code 4 (`sizeLimitExceeded`) still succeeds,
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
