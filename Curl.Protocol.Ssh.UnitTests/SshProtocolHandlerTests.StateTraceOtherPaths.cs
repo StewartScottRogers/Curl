@@ -224,7 +224,7 @@ public sealed partial class SshProtocolHandlerTests
         Assert.IsEmpty(events.Transcript);
     }
 
-    private static async Task<string> RunTracedAsync(string url, TraceSetup setup, string? upload = null, IReadOnlyList<string>? quotes = null, bool listOnly = false)
+    private static async Task<string> RunTracedAsync(string url, TraceSetup setup, string? upload = null, IReadOnlyList<string>? quotes = null, bool listOnly = false, bool noBody = false)
     {
         TranscriptTransferEvents events = new();
         TransferContext context = TracedContext(url, setup, events);
@@ -238,6 +238,7 @@ public sealed partial class SshProtocolHandlerTests
             Upload = upload is null ? null : new MemoryStream(System.Text.Encoding.ASCII.GetBytes(upload)),
             QuoteCommands = quotes ?? [],
             ListOnly = listOnly,
+            NoBody = noBody,
         };
         await HandlerFor(setup, tracesStateMachine: true).ExecuteAsync(context);
         await setup.Server.WhenSessionsEndAsync();

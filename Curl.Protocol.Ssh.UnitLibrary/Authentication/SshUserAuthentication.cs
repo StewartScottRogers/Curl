@@ -110,6 +110,10 @@ internal sealed class SshUserAuthentication(
     // later agent identity starts from it instead of its own key type (ADR-0271).
     private string? leftoverMethod;
 
+    // The --trace-config ssh line for the agent identity being tried (BL-1207), or null
+    // outside the agent step.
+    private string? agentAttemptLine;
+
     /// <summary>
     /// Gets where the <c>--trace-config ssh</c> state changes of the <c>publickey</c> attempt go
     /// (BL-1166); <see cref="SshStateTrace.Off" /> when not given.
@@ -267,6 +271,8 @@ internal sealed class SshUserAuthentication(
     {
         foreach (SshAgentIdentity identity in identities)
         {
+            agentAttemptLine = $"[SSH_AUTH_AGENT_LIST] auth user '{credentials.UserName}' for key '{identity.DisplayComment}'";
+            Trace.Write(agentAttemptLine);
             if (await TryAgentIdentityAsync(agent, credentials.User, identity.Blob, cancellationToken).ConfigureAwait(false))
             {
                 events.ReportInfo(SshInfoLines.AgentAuthenticated(credentials.UserName, identity.DisplayComment));
@@ -297,6 +303,7 @@ internal sealed class SshUserAuthentication(
             PublicKeyRequest(user, algorithm, blob, signed: false),
             [SshAuthenticationMessageNumber.Success, SshAuthenticationMessageNumber.Failure, SshAuthenticationMessageNumber.PublicKeyOk],
             cancellationToken).ConfigureAwait(false);
+        TraceAgentAnswer();
         byte answerType = MessageTypeOf(answer);
         return answerType == SshAuthenticationMessageNumber.PublicKeyOk
             ? await SendAgentSignedRequestAsync(agent, user, blob, algorithm, firstAttempt, cancellationToken).ConfigureAwait(false)
@@ -331,8 +338,13 @@ internal sealed class SshUserAuthentication(
             message.ToArray(),
             [SshAuthenticationMessageNumber.Success, SshAuthenticationMessageNumber.Failure],
             cancellationToken).ConfigureAwait(false);
+        TraceAgentAnswer();
         return answer?[0] == SshAuthenticationMessageNumber.Success;
     }
+
+    // Measured (BL-1207): curl writes the identity's line each time it calls libssh2 for it,
+    // once to start and again after each server answer libssh2 waited for.
+    private void TraceAgentAnswer() => Trace.Write(agentAttemptLine!);
 
     // The key type a public key blob names first, or null when its length overruns the blob.
     private static string? KeyTypeOf(byte[] blob)

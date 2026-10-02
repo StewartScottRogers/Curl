@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
@@ -135,11 +136,11 @@ public sealed partial class SshProtocolHandlerTests
             new SystemSshRandomSource(),
             new SystemSshEphemeralKeySource(),
             Environment.GetEnvironmentVariable,
-            new UnreachableSshAgent())
+            setup.Agent ?? new UnreachableSshAgent())
         {
             TracesStateMachine = tracesStateMachine,
         };
 
-    // The server, the login and the key files one traced transfer runs with.
-    private sealed record TraceSetup(InMemorySshServer Server, NetworkCredential Credentials, SshOptions Options, Dictionary<string, string> Files);
+    // The server, the login, the key files and the agent one traced transfer runs with.
+    private sealed record TraceSetup(InMemorySshServer Server, NetworkCredential Credentials, SshOptions Options, Dictionary<string, string> Files, ISshAgentConnector? Agent = null);
 }

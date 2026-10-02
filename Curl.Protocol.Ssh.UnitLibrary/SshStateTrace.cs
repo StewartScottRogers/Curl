@@ -15,7 +15,8 @@ namespace Curl.Protocol.Ssh;
 /// <remarks>
 /// Measured for an SFTP and an SCP download authenticated with <c>publickey</c> (BL-1166 Notes),
 /// and for uploads, listings, <c>-Q</c> commands, password and <c>keyboard-interactive</c>
-/// logins, a failed agent, fingerprints and failed transfers (BL-1204 Notes, ADR-0374).
+/// logins, a failed agent, fingerprints and failed transfers (BL-1204 Notes, ADR-0374), and
+/// for an agent login, a listed symbolic link and <c>-I</c> on a directory (BL-1207, ADR-0377).
 /// curl also writes <c>[STATE] statemachine() -&gt; 0, block=1</c> and <c>pollset, flags=1</c>
 /// each time libssh2 would block on the socket; how many depends on when the server's packets
 /// arrive, so they are not written, as for a server that always answers before curl asks

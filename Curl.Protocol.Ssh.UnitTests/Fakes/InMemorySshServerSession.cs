@@ -397,6 +397,7 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
             SftpPacketType.Read => ReadAnswer(id, file!, request.ReadBytes(8), request.ReadUInt32()),
             SftpPacketType.OpenDirectory => FilesIn(argument).Any() ? Join([SftpPacketType.Handle], UInt32(id), Name(argument)) : Status(id, 2),
             SftpPacketType.ReadDirectory => ReadDirectoryAnswer(id, argument),
+            SftpPacketType.ReadLink when file is not null => Join([SftpPacketType.Name], UInt32(id), UInt32(1), String(file), String(file), UInt32(0)),
             _ => Status(id, 0),
         };
         await SendSftpAsync(answer).ConfigureAwait(false);
@@ -438,8 +439,8 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
     private IEnumerable<KeyValuePair<string, byte[]>> FilesIn(string directory) =>
         server.Files.Where(file => file.Key.StartsWith(directory, StringComparison.Ordinal) && !file.Key[directory.Length..].Contains('/'));
 
-    // Every file of the directory in one SSH_FXP_NAME, each a regular file 0644 with an
-    // ls -l-style long name, then SSH_FX_EOF.
+    // Every file of the directory in one SSH_FXP_NAME, each a regular file 0644, or a
+    // symbolic link 0777, with an ls -l-style long name, then SSH_FX_EOF.
     private byte[] ReadDirectoryAnswer(uint id, string directory)
     {
         if (!listedDirectories.Add(directory))
@@ -448,12 +449,19 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         }
 
         KeyValuePair<string, byte[]>[] files = [.. FilesIn(directory).OrderBy(file => file.Key, StringComparer.Ordinal)];
-        byte[] names = [.. files.SelectMany(file => Join(
-            Name(file.Key[directory.Length..]),
-            Name($"-rw-r--r--    1 {server.UserName} {server.UserName} {file.Value.Length,8} Jan  1  2026 {file.Key[directory.Length..]}"),
-            UInt32(4),
-            UInt32(0x81A4)))];
+        byte[] names = [.. files.SelectMany(file => DirectoryEntry(file.Key, file.Key[directory.Length..], file.Value.Length))];
         return Join([SftpPacketType.Name], UInt32(id), UInt32((uint)files.Length), names);
+    }
+
+    private byte[] DirectoryEntry(string path, string name, int length)
+    {
+        bool isLink = server.SymbolicLinks.Contains(path);
+        string permissions = isLink ? "lrwxrwxrwx" : "-rw-r--r--";
+        return Join(
+            Name(name),
+            Name($"{permissions}    1 {server.UserName} {server.UserName} {length,8} Jan  1  2026 {name}"),
+            UInt32(4),
+            UInt32(isLink ? 0xA1FFu : 0x81A4u));
     }
 
     private static byte[] Status(uint id, uint code) =>

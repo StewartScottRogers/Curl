@@ -50,6 +50,13 @@ public sealed class InMemorySshServer(string userName, string password) : IConne
     public IDictionary<string, byte[]> Files { get; } = new ConcurrentDictionary<string, byte[]>(StringComparer.Ordinal);
 
     /// <summary>
+    /// Gets the paths of <see cref="Files" /> that are symbolic links: a listing names them
+    /// <c>lrwxrwxrwx</c> with mode <c>0120777</c>, and <c>READLINK</c> answers the file's
+    /// bytes as the target.
+    /// </summary>
+    public ISet<string> SymbolicLinks { get; } = new HashSet<string>(StringComparer.Ordinal);
+
+    /// <summary>
     /// Gets the paths every SFTP request naming them is refused for with status 2,
     /// <c>SSH_FX_NO_SUCH_FILE</c>, as OpenSSH refuses them: <c>.</c> fails
     /// <c>REALPATH</c>, a file path an upload's <c>OPEN</c> or a <c>-Q</c> command.
