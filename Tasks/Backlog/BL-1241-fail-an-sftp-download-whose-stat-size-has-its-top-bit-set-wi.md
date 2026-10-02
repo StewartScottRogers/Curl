@@ -1,5 +1,5 @@
 ---
-id: BL-1216
+id: BL-1241
 title: Fail an SFTP download whose STAT size has its top bit set with curl's exit 36 'Bad file size'
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1216 — Fail an SFTP download whose STAT size has its top bit set with curl's exit 36 'Bad file size'
+# BL-1241 — Fail an SFTP download whose STAT size has its top bit set with curl's exit 36 'Bad file size'
 
 ## Goal
 

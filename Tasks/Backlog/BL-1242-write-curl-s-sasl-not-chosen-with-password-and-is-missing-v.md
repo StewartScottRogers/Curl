@@ -1,5 +1,5 @@
 ---
-id: BL-1217
+id: BL-1242
 title: Write curl's SASL 'not chosen with password' and 'is missing' -v lines when no SMTP mechanism can be used
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1217 — Write curl's SASL 'not chosen with password' and 'is missing' -v lines when no SMTP mechanism can be used
+# BL-1242 — Write curl's SASL 'not chosen with password' and 'is missing' -v lines when no SMTP mechanism can be used
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-1214
+id: BL-1239
 title: Match curl's FTP exit 55 send-failure text and its 421 and refused-EPRT -v lines
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1214 — Match curl's FTP exit 55 send-failure text and its 421 and refused-EPRT -v lines
+# BL-1239 — Match curl's FTP exit 55 send-failure text and its 421 and refused-EPRT -v lines
 
 ## Goal
 

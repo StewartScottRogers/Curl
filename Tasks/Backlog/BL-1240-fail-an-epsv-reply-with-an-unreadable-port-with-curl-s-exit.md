@@ -1,16 +1,16 @@
 ---
-id: BL-1215
+id: BL-1240
 title: Fail an EPSV reply with an unreadable port with curl's exit 13 'Illegal port number in EPSV reply'
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1214]
+depends-on: [BL-1239]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1215 — Fail an EPSV reply with an unreadable port with curl's exit 13 'Illegal port number in EPSV reply'
+# BL-1240 — Fail an EPSV reply with an unreadable port with curl's exit 13 'Illegal port number in EPSV reply'
 
 ## Goal
 

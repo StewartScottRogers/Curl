@@ -1,5 +1,5 @@
 ---
-id: BL-1212
+id: BL-1237
 title: Fail a TFTP option acknowledgement curl rejects with its exit 71 messages
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-033
 created: 2026-10-02
 completed:
 ---
-# BL-1212 — Fail a TFTP option acknowledgement curl rejects with its exit 71 messages
+# BL-1237 — Fail a TFTP option acknowledgement curl rejects with its exit 71 messages
 
 ## Goal
 

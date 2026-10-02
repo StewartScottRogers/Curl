@@ -1,16 +1,16 @@
 ---
-id: BL-1218
+id: BL-1243
 title: Fail an SMTP command or message whose send breaks with curl's exit 55
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1217]
+depends-on: [BL-1242]
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1218 — Fail an SMTP command or message whose send breaks with curl's exit 55
+# BL-1243 — Fail an SMTP command or message whose send breaks with curl's exit 55
 
 ## Goal
 

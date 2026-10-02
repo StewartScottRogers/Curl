@@ -1,16 +1,16 @@
 ---
-id: BL-1213
+id: BL-1238
 title: Build the TFTP request's file name and transfer mode as curl does
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1212]
+depends-on: [BL-1237]
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
 requirement: FR-032
 created: 2026-10-02
 completed:
 ---
-# BL-1213 — Build the TFTP request's file name and transfer mode as curl does
+# BL-1238 — Build the TFTP request's file name and transfer mode as curl does
 
 ## Goal
 
