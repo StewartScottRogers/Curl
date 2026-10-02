@@ -366,6 +366,7 @@ choices do not need one.
 | [0354](ADR-0354-encrypted-pkcs8-keys-for-hand-built-client-certificates-are-decrypted-by-hand.md) | An `ENCRYPTED PRIVATE KEY` for an Ed25519, Ed448 or ML-DSA client certificate is decrypted by hand: PBES2 with PBKDF2 and AES or DES-EDE3 CBC (amends ADR-0301) | Accepted | 2026-10-02 |
 | [0355](ADR-0355-tcp-fastopen-on-macos-connects-through-connectx.md) | `--tcp-fastopen` on macOS connects through `connectx` with `CONNECT_DATA_IDEMPOTENT`, as libcurl does, falling back to a plain connect when it refuses (BL-1101; amends ADR-0317) | Accepted | 2026-10-02 |
 | [0356](ADR-0356-trace-config-dns-writes-the-dns-filter-and-doh-lines-around-the-connect.md) | `--trace-config dns`, `doh` and `all` write the DNS filter's `[DNS]` lines around a direct connect and route the DoH resolver's lines to the resolving transfer through an `AsyncLocal` view (BL-1102) | Accepted | 2026-10-02 |
+| [0357](ADR-0357-vv-and-trace-config-setup-write-the-setup-filter-lines.md) | `-vv` to `-vvvv` turn on curl's trace components in the parser, and `-vv` or `--trace-config setup` write the setup filter's `[SETUP]` lines around a direct connect (BL-1103) | Accepted | 2026-10-02 |
 
 ## Template
 
