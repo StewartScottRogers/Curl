@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 using Curl.Networking.Fakes;
@@ -144,6 +145,47 @@ public sealed class DohDnsResolverTests
         var addresses = await new DohDnsResolver(connector, MeasuredDohUrl).ResolveAsync("example.test", CancellationToken.None);
 
         CollectionAssert.AreEqual(new[] { IPAddress.Loopback }, addresses.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(AddressFamily.InterNetwork, (byte)0x01)]
+    [DataRow(AddressFamily.InterNetworkV6, (byte)0x1C)]
+    public async Task ResolveAsync_WithOneAddressFamily_PostsOnlyThatFamilysQuery(AddressFamily family, byte queryType)
+    {
+        // BL-642: curl 8.21.0 -4 sent one POST with QTYPE 00 01, and -6 one with QTYPE 00 1C.
+        var connector = new FakeConnector();
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl) { AddressFamily = family };
+
+        await resolver.ResolveAsync("example.test", CancellationToken.None);
+
+        Assert.HasCount(1, connector.Opened);
+        byte[] written = [.. connector.Opened[0].Written];
+        CollectionAssert.AreEqual(new byte[] { 0x00, queryType, 0x00, 0x01 }, written[^4..]);
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_WithIpv6Only_ReturnsTheAaaaAnswersAddresses()
+    {
+        var connector = Answering(Ok(AnswerTo(DnsRecordType.Aaaa, IPv6Address)));
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl) { AddressFamily = AddressFamily.InterNetworkV6 };
+
+        var addresses = await resolver.ResolveAsync("example.test", CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { IPv6Address }, addresses.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_WithUnspecifiedAddressFamily_PostsBothQueriesAFirst()
+    {
+        var connector = new FakeConnector();
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl) { AddressFamily = AddressFamily.Unspecified };
+
+        await resolver.ResolveAsync("example.test", CancellationToken.None);
+
+        Assert.AreEqual(AddressFamily.Unspecified, new DohDnsResolver(connector, MeasuredDohUrl).AddressFamily);
+        Assert.HasCount(2, connector.Opened);
+        Assert.AreEqual((byte)0x01, connector.Opened[0].Written[^3]);
+        Assert.AreEqual((byte)0x1C, connector.Opened[1].Written[^3]);
     }
 
     [TestMethod]

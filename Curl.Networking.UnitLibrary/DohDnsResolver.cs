@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 using Curl.Protocol.Abstractions;
@@ -8,7 +9,8 @@ namespace Curl.Networking;
 /// <summary>
 /// Resolves a host name through an RFC 8484 DNS-over-HTTPS server, as curl 8.21.0 does for
 /// <c>--doh-url</c> (ADR-0152, BL-641): it POSTs an A query and an AAAA query in parallel, each on
-/// a connection of its own, and returns the AAAA answer's addresses and then the A answer's.
+/// a connection of its own, and returns the AAAA answer's addresses and then the A answer's. Under
+/// <c>-4</c> or <c>-6</c> (<see cref="AddressFamily" />) it sends only that family's query (BL-939).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -88,6 +90,14 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
         _dohServer = new ConnectTarget(dohUrl.IdnHost, dohUrl.Port, isHttps) { PoolScheme = dohUrl.Scheme };
     }
 
+    /// <summary>
+    /// Gets the address family <c>-4</c> or <c>-6</c> limits the transfer to:
+    /// <see cref="AddressFamily.InterNetwork" /> sends only the A query and
+    /// <see cref="AddressFamily.InterNetworkV6" /> only the AAAA query, as curl 8.21.0 was measured to
+    /// (BL-939); any other value, the default, sends both.
+    /// </summary>
+    public AddressFamily AddressFamily { get; init; } = AddressFamily.Unspecified;
+
     /// <inheritdoc />
     public async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
     {
@@ -109,11 +119,26 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
             return [];
         }
 
-        var ipv4 = QueryAsync(queryA.Bytes, DnsRecordType.A, cancellationToken);
-        var ipv6 = QueryAsync(DnsQueryEncoder.Encode(host, DnsRecordType.Aaaa).Bytes, DnsRecordType.Aaaa, cancellationToken);
-        DohQueryResult[] results = await Task.WhenAll(ipv4, ipv6).ConfigureAwait(false);
+        DohQueryResult[] results = await Task.WhenAll(StartAddressQueries(host, queryA.Bytes, cancellationToken)).ConfigureAwait(false);
         DohTraceLines.Report(_dohTrace, _describeExitCode, host, results);
-        return [.. results[1].Addresses, .. results[0].Addresses];
+        return [.. Enumerable.Reverse(results).SelectMany(result => result.Addresses)];
+    }
+
+    // Starts the A query and the AAAA query, A first, leaving out the one -4 or -6 rules out.
+    private List<Task<DohQueryResult>> StartAddressQueries(string host, byte[] queryA, CancellationToken cancellationToken)
+    {
+        List<Task<DohQueryResult>> queries = [];
+        if (AddressFamily != AddressFamily.InterNetworkV6)
+        {
+            queries.Add(QueryAsync(queryA, DnsRecordType.A, cancellationToken));
+        }
+
+        if (AddressFamily != AddressFamily.InterNetwork)
+        {
+            queries.Add(QueryAsync(DnsQueryEncoder.Encode(host, DnsRecordType.Aaaa).Bytes, DnsRecordType.Aaaa, cancellationToken));
+        }
+
+        return queries;
     }
 
     /// <summary>

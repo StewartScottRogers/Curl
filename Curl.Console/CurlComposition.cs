@@ -314,7 +314,7 @@ internal static class CurlComposition
     {
         if (options.DohUrl is { } dohUrl)
         {
-            return CreateDohResolver(dohUrl, CreateDohConnector(options, tcpDialer, timeProvider));
+            return CreateDohResolver(dohUrl, CreateDohConnector(options, tcpDialer, timeProvider), AddressFamilyOf(options));
         }
 
 
@@ -337,9 +337,14 @@ internal static class CurlComposition
     /// </summary>
     /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
     /// <param name="connector">Opens each DoH connection: <see cref="CreateDohConnector" />'s in production.</param>
+    /// <param name="addressFamily">
+    /// The <c>-4</c> or <c>-6</c> family (<see cref="AddressFamilyOf" />), whose query alone is sent (BL-939).
+    /// </param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector) =>
-        DohUrlOf(dohUrl) is { } url ? new DohDnsResolver(connector, url) : new UnusableDohUrlResolver();
+    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily) =>
+        DohUrlOf(dohUrl) is { } url
+            ? new DohDnsResolver(connector, url) { AddressFamily = addressFamily }
+            : new UnusableDohUrlResolver();
 
     /// <summary>
     /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
