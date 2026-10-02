@@ -34,3 +34,4 @@ A peer SETTINGS frame carrying `SETTINGS_ENABLE_CONNECT_PROTOCOL` (`0x08`) or `S
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
