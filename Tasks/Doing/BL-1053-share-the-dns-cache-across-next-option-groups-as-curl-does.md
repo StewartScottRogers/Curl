@@ -33,3 +33,4 @@ A later `-:`/`--next` option group answers a host an earlier group resolved from
 ## Log
 
 - 2026-09-30: Created.
+- 2026-10-02: Backlog -> Doing.
