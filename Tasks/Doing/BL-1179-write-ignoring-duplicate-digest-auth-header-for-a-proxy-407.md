@@ -31,3 +31,4 @@ BL-1175 made `HttpAuthProblemLines` write the duplicate line, but `HttpProtocolH
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
