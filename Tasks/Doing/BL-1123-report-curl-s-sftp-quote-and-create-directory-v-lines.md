@@ -35,3 +35,4 @@ Under `-v`, an `sftp://` transfer reports the two info lines curl 8.21.0's libss
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
