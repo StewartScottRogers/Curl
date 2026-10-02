@@ -3,15 +3,15 @@ id: AF-0004
 title: 31 tasks cost over 3x the median task cost; the costliest are BL-703, BL-527, BL-568, BL-658 and BL-708
 auditor: process
 severity: Low
-status: accepted
-reason: Stewart accepted it on 2026-09-30.
+status: closed
+reason: Re-audit 2026-10-02_1400.md: the reproduction no longer reproduces.
 key: process:logs:task-costs:cost-outlier
 task: BL-1070
 found: 2026-09-30
 found-at: d065d6d3507e2ed87905d40a24233af193913378
 scorecard: 2026-09-30_1754.md
-closed:
-closed-by:
+closed: 2026-10-02
+closed-by: 2026-10-02_1400.md
 ---
 # AF-0004 - 31 tasks cost over 3x the median task cost; the costliest are BL-703, BL-527, BL-568, BL-658 and BL-708
 
@@ -38,7 +38,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 
 ## Re-audits
 
+- 2026-10-02 | 2026-10-02_1400.md | reproduces: no | The five costliest tasks are BL-1105 8.52, BL-710 7.29, BL-942 7.12, BL-988 6.80 and BL-1049 6.74 USD. BL-703, BL-527, BL-568, BL-658 and BL-708 are absent. 17 tasks are over 3x the median of 1.67 USD, not 31.
+
 ## Log
 
 - 2026-09-30: filed proposed.
 - 2026-09-30: proposed -> accepted. Stewart accepted it on 2026-09-30 (log written 2026-10-02, BL-1183).
+- 2026-10-02: accepted -> closed. Re-audit 2026-10-02_1400.md: the reproduction no longer reproduces.
