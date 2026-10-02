@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Http3.UnitLibrary, Curl.Http3.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1111 — Refuse HTTP/3 ENABLE_CONNECT_PROTOCOL and H3_DATAGRAM settings other than 0 or 1
 
@@ -25,13 +25,18 @@ A peer SETTINGS frame carrying `SETTINGS_ENABLE_CONNECT_PROTOCOL` (`0x08`) or `S
 
 ## Acceptance criteria
 
-- [ ] `Curl.Http3.UnitTests/Http3FrameTests.Settings_ForbiddenIdentifier_IsSettingsError` (or a new data-driven test beside it) gains cases `04 02 08 02` (ENABLE_CONNECT_PROTOCOL 2), `04 03 08 40 40` (64), `04 02 33 02` (H3_DATAGRAM 2) and an eight-byte-varint value, each `Http3ErrorCode.SettingsError`.
-- [ ] A test pins that the values 0 and 1 of both settings are read and kept in `Http3SettingsFrame.Settings`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Http3.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `Curl.Http3.UnitTests/Http3FrameTests.Settings_ForbiddenIdentifier_IsSettingsError` (or a new data-driven test beside it) gains cases `04 02 08 02` (ENABLE_CONNECT_PROTOCOL 2), `04 03 08 40 40` (64), `04 02 33 02` (H3_DATAGRAM 2) and an eight-byte-varint value, each `Http3ErrorCode.SettingsError`.
+- [x] A test pins that the values 0 and 1 of both settings are read and kept in `Http3SettingsFrame.Settings`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Http3.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- `Http3SettingIdentifier` gains `EnableConnectProtocol` (0x08) and `H3Datagram` (0x33) and `IsZeroOrOneSetting`; `Http3SettingsFrame.ThrowIfForbidden` now also takes the value and refuses any but 0 or 1 for those two with `SettingsError`, as nghttp3 does. The check runs before the duplicate check, so either violation is the same error.
+- The eight-byte-varint case is `c0 00 00 00 00 00 01 00` (256): an eight-byte encoding of 1 is legal and kept.
+- Coverage: 100% line, 100% branch, 0 failing members; fast tests all green.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. HTTP/3 SETTINGS_ENABLE_CONNECT_PROTOCOL and SETTINGS_H3_DATAGRAM values other than 0 or 1 are H3_SETTINGS_ERROR

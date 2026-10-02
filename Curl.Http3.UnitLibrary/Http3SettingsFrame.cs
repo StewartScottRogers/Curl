@@ -50,7 +50,7 @@ public sealed class Http3SettingsFrame(IReadOnlyList<Http3Setting> settings) : H
         {
             var identifier = ReadInteger(payload, ref position, Http3FrameType.Settings);
             var value = ReadInteger(payload, ref position, Http3FrameType.Settings);
-            ThrowIfForbidden(identifier, identifiers);
+            ThrowIfForbidden(identifier, value, identifiers);
             if (!Http3ReservedIdentifier.IsReserved(identifier))
             {
                 settings.Add(new Http3Setting(identifier, value));
@@ -70,11 +70,16 @@ public sealed class Http3SettingsFrame(IReadOnlyList<Http3Setting> settings) : H
         }
     }
 
-    private static void ThrowIfForbidden(long identifier, HashSet<long> identifiers)
+    private static void ThrowIfForbidden(long identifier, long value, HashSet<long> identifiers)
     {
         if (Http3SettingIdentifier.IsReservedHttp2Setting(identifier))
         {
             throw new Http3Exception(Http3ErrorCode.SettingsError, $"setting 0x{identifier:x} is an HTTP/2 setting");
+        }
+
+        if (Http3SettingIdentifier.IsZeroOrOneSetting(identifier) && value is not (0 or 1))
+        {
+            throw new Http3Exception(Http3ErrorCode.SettingsError, $"setting 0x{identifier:x} has value {value}, not 0 or 1");
         }
 
         if (!identifiers.Add(identifier))
