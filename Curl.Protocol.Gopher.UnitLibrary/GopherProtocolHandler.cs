@@ -14,7 +14,10 @@ namespace Curl.Protocol.Gopher;
 /// constructed here.
 /// </para>
 /// <para>
-/// The selector is built by <see cref="GopherSelector" /> and sent followed by CRLF. The
+/// The selector is built by <see cref="GopherSelector" /> and sent followed by CRLF; each
+/// of the two pieces, once sent, is also written to
+/// <see cref="ITransferContext.DumpHeaderOutput" /> when there is one (<c>-D</c>), as curl
+/// passes them to its client as headers, and a refusal there is exit 23. The
 /// reply is copied to <see cref="ITransferContext.Output" /> until the server closes the
 /// connection, which ends the transfer with exit 0, even when nothing was received. A
 /// selector that decodes to a NUL byte is exit 3 (<see cref="CurlExitCode.UrlMalformat" />),
@@ -118,9 +121,17 @@ public sealed class GopherProtocolHandler : IProtocolHandler
             return TransferResult.Failure(CurlExitCode.UrlMalformat, GopherTransferMessages.SelectorMalformed);
         }
 
-        if (!await TrySendAsync(connection, selector, context.CancellationToken).ConfigureAwait(false))
+        foreach (byte[] piece in (byte[][])[selector, LineEnd])
         {
-            return TransferResult.Failure(CurlExitCode.SendError, GopherTransferMessages.SendFailed);
+            if (!await TrySendAsync(connection, piece, context.CancellationToken).ConfigureAwait(false))
+            {
+                return TransferResult.Failure(CurlExitCode.SendError, GopherTransferMessages.SendFailed);
+            }
+
+            if (await TryDumpSentAsync(context.DumpHeaderOutput, piece, context.CancellationToken).ConfigureAwait(false) is { } refused)
+            {
+                return refused;
+            }
         }
 
         log.SelectorSent(selector);
@@ -171,19 +182,48 @@ public sealed class GopherProtocolHandler : IProtocolHandler
 
     private static async ValueTask<bool> TrySendAsync(
         IConnection connection,
-        byte[] selector,
+        byte[] piece,
         CancellationToken cancellationToken)
     {
         try
         {
-            await connection.WriteAsync(selector, cancellationToken).ConfigureAwait(false);
-            await connection.WriteAsync(LineEnd, cancellationToken).ConfigureAwait(false);
+            await connection.WriteAsync(piece, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (IOException)
         {
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Writes a piece of the request just sent to the <c>-D</c> stream, as curl 8.21.0's
+    /// <c>gopher_do</c> passes each piece it sends to the client as a header (measured,
+    /// BL-1130): <c>-D</c> gets the selector and its CRLF, <c>-i</c> alone gets nothing.
+    /// </summary>
+    /// <returns>
+    /// <see langword="null" /> when there is no <c>-D</c> stream or it took the piece, and an
+    /// exit 23 result naming the piece's length when it refused it.
+    /// </returns>
+    private static async ValueTask<TransferResult?> TryDumpSentAsync(
+        Stream? dumpHeaderOutput,
+        byte[] piece,
+        CancellationToken cancellationToken)
+    {
+        if (dumpHeaderOutput is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            await dumpHeaderOutput.WriteAsync(piece, cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+        catch (IOException)
+        {
+            return TransferResult.Failure(CurlExitCode.WriteError, GopherTransferMessages.HeaderWriteFailed(piece.Length));
         }
     }
 

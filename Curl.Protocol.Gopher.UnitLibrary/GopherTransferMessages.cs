@@ -39,6 +39,15 @@ internal static class GopherTransferMessages
             $"Failure writing output to destination, passed {passed} returned {returned}");
 
     /// <summary>
+    /// The exit 23 message for a piece of the sent request the <c>-D</c> stream refused, as
+    /// curl's client writer words a refused header write.
+    /// </summary>
+    /// <param name="passed">The length of the refused piece: the selector, or its CRLF.</param>
+    /// <returns>The message to report.</returns>
+    internal static string HeaderWriteFailed(int passed) =>
+        string.Create(CultureInfo.InvariantCulture, $"client returned ERROR on write of {passed} bytes");
+
+    /// <summary>
     /// The <c>-v</c> line that ends a finished transfer's connection, or one whose selector
     /// was malformed.
     /// </summary>
