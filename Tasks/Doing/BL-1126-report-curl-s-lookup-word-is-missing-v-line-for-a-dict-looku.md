@@ -35,3 +35,4 @@ Under `-v`, a `dict://` `MATCH` or `DEFINE` URL whose word is empty or missing r
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
