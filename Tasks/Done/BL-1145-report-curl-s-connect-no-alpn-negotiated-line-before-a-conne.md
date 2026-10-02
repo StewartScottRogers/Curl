@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-02
 ---
 # BL-1145 — Report curl's CONNECT: no ALPN negotiated line before a CONNECT through a plain HTTP proxy
 
@@ -22,8 +22,8 @@ Measured in BL-863 (Notes): curl 8.21.0 mingw Schannel, `Record-CurlExchange.ps1
 
 ## Acceptance criteria
 
-- [ ] A plain HTTP proxy tunnel reports `CONNECT: no ALPN negotiated` right after `Trying` and before `Proxy auth using`/`Establishing HTTP proxy tunnel to`, on each dial, pinned by the BL-863 transcript tests.
-- [ ] `dotnet build -warnaserror` clean, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` 100% line and branch, no failing member.
+- [x] A plain HTTP proxy tunnel reports `CONNECT: no ALPN negotiated` right after `Trying` and before `Proxy auth using`/`Establishing HTTP proxy tunnel to`, on each dial, pinned by the BL-863 transcript tests.
+- [x] `dotnet build -warnaserror` clean, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` 100% line and branch, no failing member.
 
 ## Notes
 
@@ -31,3 +31,4 @@ Measured in BL-863 (Notes): curl 8.21.0 mingw Schannel, `Record-CurlExchange.ps1
 
 - 2026-10-01: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. A plain HTTP proxy tunnel reports CONNECT: no ALPN negotiated after each Trying, as curl 8.21.0 does
