@@ -175,8 +175,11 @@ internal sealed class SmtpMailTransaction(
     {
         // The last piece goes out with the end-of-data mark, one send and one data event, as
         // curl sends a message that fits its buffer (measured, BL-546). Under --trace-config smtp
-        // each piece goes out as it is read and the mark on its own, as curl then sends them (BL-1163).
+        // each piece goes out as it is read and the mark on its own, as curl then sends them (BL-1163),
+        // and so does an upload of unknown size such as standard input, whose end curl learns only
+        // from a read that returns nothing (BL-1198).
         SmtpStateTrace trace = channel.Trace;
+        bool sendsEachRead = trace.Enabled || expected is null;
         var stuffer = new SmtpDotStuffer();
         byte[] buffer = new byte[ReadBufferSize];
         byte[] pending = [];
@@ -186,7 +189,7 @@ internal sealed class SmtpMailTransaction(
             trace.BodyRead(read);
             await SendMessageBytesAsync(pending, expected).ConfigureAwait(false);
             pending = stuffer.Encode(buffer.AsSpan(0, read));
-            if (trace.Enabled)
+            if (sendsEachRead)
             {
                 await SendMessageBytesAsync(pending, expected).ConfigureAwait(false);
                 pending = [];
