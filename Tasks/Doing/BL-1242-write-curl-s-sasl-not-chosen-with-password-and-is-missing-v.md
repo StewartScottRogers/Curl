@@ -39,3 +39,4 @@ When an SMTP login fails with exit 67 because no offered mechanism can be used, 
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
