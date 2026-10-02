@@ -38,3 +38,4 @@ completed:
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-02: Doing -> Backlog. Needs Curl.Console (setopt-time refusal beside RefuseMalformedInterface), which BL-1150 in Doing touches
+- 2026-10-02: Backlog -> Doing.
