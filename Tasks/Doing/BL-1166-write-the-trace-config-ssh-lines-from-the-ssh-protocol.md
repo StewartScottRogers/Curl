@@ -33,3 +33,4 @@ Under `-v --trace-config ssh` (and `protocol`, `all`) Curl writes the `* [SSH] .
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
