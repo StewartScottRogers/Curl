@@ -285,4 +285,90 @@ public sealed partial class TcpConnectorTests
         AssertProxyFailure(result, proxyConnection, message);
         Assert.HasCount(4, proxyConnection.Written);
     }
+
+    // The -v lines
+
+    [TestMethod]
+    [DataRow(true, new[] { Socks5GssapiFailureText.SspiTargetUnknown, "Failed to initialize security context.", "Unable to negotiate SOCKS5 GSS-API context." }, DisplayName = "SSPI build (measured)")]
+    [DataRow(
+        false,
+        new[]
+        {
+            "GSS-API error: gss_init_sec_context failed: No credentials were supplied, or the credentials were unavailable or inaccessible.\nNo Kerberos credentials available (default cache: FILE:/tmp/krb5cc_1000)",
+            "Failed to initial GSS-API token.",
+            "Unable to negotiate SOCKS5 GSS-API context.",
+        },
+        DisplayName = "GSS-API build (measured)")]
+    public async Task ConnectAsync_WhenTheGssapiContextHasNoCredential_ReportsThePlatformCurlsVerboseLinesInOrder(bool usesSspi, string[] lines)
+    {
+        // Measured (BL-615's Notes): curl -v --socks5-gssapi, the proxy picking 01 with no Kerberos ticket at hand.
+        var contexts = new ScriptedSecurityContextFactory(new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
+        var events = new RecordingTransferEvents();
+
+        await ConnectThroughSocksAsync(
+            ProxyKind.Socks5,
+            "127.0.0.1",
+            Socks5PicksGssapi,
+            socks5Authentication: GssapiOnly with { SecurityContexts = contexts, UsesSspiTexts = usesSspi, CredentialCacheName = "FILE:/tmp/krb5cc_1000" },
+            events: events);
+
+        CollectionAssert.AreEqual(lines, events.Info[^lines.Length..]);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheSocks5ProxyPicksGssapiAndNoContextFactoryIsGiven_ReportsTheContextFailureLines()
+    {
+        var events = new RecordingTransferEvents();
+
+        await ConnectThroughSocksAsync(
+            ProxyKind.Socks5,
+            "127.0.0.1",
+            Socks5PicksGssapi,
+            socks5Authentication: Socks5AuthenticationOptions.Default with { UsesSspiTexts = false, CredentialCacheName = "FILE:/tmp/krb5cc_0" },
+            events: events);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "GSS-API error: gss_init_sec_context failed: No credentials were supplied, or the credentials were unavailable or inaccessible.\nNo Kerberos credentials available (default cache: FILE:/tmp/krb5cc_0)",
+                "Failed to initial GSS-API token.",
+                "Unable to negotiate SOCKS5 GSS-API context.",
+            },
+            events.Info[^3..]);
+    }
+
+    [TestMethod]
+    [DataRow(true, "Invalid SSPI encryption response type (1 1).", DisplayName = "SSPI build")]
+    [DataRow(false, "Invalid GSS-API encryption response type (1 1).", DisplayName = "GSS-API build")]
+    public async Task ConnectAsync_WhenTheGssapiNegotiationFailsAfterTheContext_ReportsItsMessageThenUnableToNegotiate(bool usesSspi, string message)
+    {
+        // curl's socks.c follows every failed negotiation with this failf; the failure's own failf comes first.
+        var contexts = new ScriptedSecurityContextFactory(new SecurityContextStep(SecurityContextStatus.Completed, []));
+        var events = new RecordingTransferEvents();
+
+        await ConnectThroughSocksAsync(
+            ProxyKind.Socks5,
+            "127.0.0.1",
+            [.. Socks5PicksGssapi, 0x01, 0x01, 0x00, 0x00],
+            socks5Authentication: GssapiOnly with { SecurityContexts = contexts, UsesSspiTexts = usesSspi, GssapiNec = true },
+            events: events);
+
+        CollectionAssert.AreEqual(new[] { message, "Unable to negotiate SOCKS5 GSS-API context." }, events.Info[^2..]);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheGssapiNegotiationSucceeds_ReportsNoNegotiationLine()
+    {
+        var contexts = new ScriptedSecurityContextFactory(new SecurityContextStep(SecurityContextStatus.Completed, []));
+        var events = new RecordingTransferEvents();
+
+        await ConnectThroughSocksAsync(
+            ProxyKind.Socks5,
+            "127.0.0.1",
+            [.. Socks5PicksGssapi, .. GssapiGrantsNoProtection, .. Socks5Succeeded],
+            socks5Authentication: GssapiOnly with { SecurityContexts = contexts },
+            events: events);
+
+        Assert.IsFalse(events.Info.Any(line => line.Contains("GSS-API context", StringComparison.Ordinal)));
+    }
 }

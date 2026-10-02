@@ -42,6 +42,7 @@ internal static class Socks5Handshake
     /// <param name="port">The port the tunnel reaches.</param>
     /// <param name="resolve">Resolves the host for SOCKS5.</param>
     /// <param name="authentication">The methods allowed, and how GSS-API runs.</param>
+    /// <param name="events">Receives the <c>-v</c> lines a failed GSS-API negotiation prints.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns><see langword="null" /> when the tunnel is open, else the failure.</returns>
     public static async ValueTask<ConnectResult?> RunAsync(
@@ -51,6 +52,7 @@ internal static class Socks5Handshake
         int port,
         Func<string, int, CancellationToken, ValueTask<DnsResolution>> resolve,
         Socks5AuthenticationOptions authentication,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         var literal = SocksProxyTunnel.ParseAddressLiteral(host);
@@ -60,7 +62,7 @@ internal static class Socks5Handshake
             return SocksProxyTunnel.Failed("SOCKS5: the destination hostname is too long to be resolved remotely by the proxy.");
         }
 
-        return await NegotiateAuthenticationAsync(connection, proxy, authentication, cancellationToken).ConfigureAwait(false)
+        return await NegotiateAuthenticationAsync(connection, proxy, authentication, events, cancellationToken).ConfigureAwait(false)
             ?? await RequestConnectAsync(connection, host, port, hostName, literal, resolve, cancellationToken).ConfigureAwait(false);
     }
 
@@ -68,6 +70,7 @@ internal static class Socks5Handshake
         IConnection connection,
         ProxyEndpoint proxy,
         Socks5AuthenticationOptions authentication,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         // Without user name and password allowed, curl forgets the credential (measured).
@@ -84,7 +87,7 @@ internal static class Socks5Handshake
             [_, UserNameAndPassword] => await AuthenticateAsync(connection, credential, cancellationToken).ConfigureAwait(false),
             [_, Gssapi] when !authentication.AllowGssapi =>
                 SocksProxyTunnel.Failed("SOCKS5 GSSAPI per-message authentication is not enabled."),
-            [_, Gssapi] => await Socks5GssapiNegotiation.RunAsync(connection, proxy.Host, authentication, cancellationToken).ConfigureAwait(false),
+            [_, Gssapi] => await Socks5GssapiNegotiation.RunAsync(connection, proxy.Host, authentication, events, cancellationToken).ConfigureAwait(false),
             [_, NoAcceptableMethod] => SocksProxyTunnel.Failed("No authentication method was acceptable."),
             _ => SocksProxyTunnel.Failed("Unknown SOCKS5 mode attempted to be used by server."),
         };

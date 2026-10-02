@@ -1250,6 +1250,7 @@ public sealed partial class TcpConnector(
                 destination.Port,
                 (host, port, token) => ResolveWithFailureReasonAsync(host, port, target, token),
                 Socks5Authentication,
+                target.Events,
                 cancellationToken).ConfigureAwait(false), null);
         }
         catch (Exception exception)

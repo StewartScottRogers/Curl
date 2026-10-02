@@ -30,6 +30,7 @@ internal static class SocksProxyTunnel
     /// <param name="port">The port the tunnel reaches.</param>
     /// <param name="resolve">Resolves <paramref name="host" /> when the kind resolves it locally (SOCKS4 and SOCKS5).</param>
     /// <param name="socks5Authentication">The methods a SOCKS5 greeting offers, and how GSS-API runs (BL-615).</param>
+    /// <param name="events">Receives the <c>-v</c> lines a failed SOCKS5 GSS-API negotiation prints (BL-1039).</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns>
     /// <see langword="null" /> when the tunnel is open; else the failure, exit 97
@@ -43,10 +44,11 @@ internal static class SocksProxyTunnel
         int port,
         Func<string, int, CancellationToken, ValueTask<DnsResolution>> resolve,
         Socks5AuthenticationOptions socks5Authentication,
+        ITransferEvents events,
         CancellationToken cancellationToken) =>
         proxy.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a
             ? Socks4Handshake.RunAsync(connection, proxy, host, port, resolve, cancellationToken)
-            : Socks5Handshake.RunAsync(connection, proxy, host, port, resolve, socks5Authentication, cancellationToken);
+            : Socks5Handshake.RunAsync(connection, proxy, host, port, resolve, socks5Authentication, events, cancellationToken);
 
     /// <summary>
     /// Reads exactly <paramref name="buffer" />'s length from the connection.

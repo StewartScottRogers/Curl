@@ -610,7 +610,8 @@ public sealed partial class TcpConnectorTests
         NetworkCredential? credential = null,
         string? resolveEntry = null,
         FakeDnsResolver? resolver = null,
-        Socks5AuthenticationOptions? socks5Authentication = null)
+        Socks5AuthenticationOptions? socks5Authentication = null,
+        RecordingTransferEvents? events = null)
     {
         var proxyConnection = new ScriptedConnection(proxyReply);
         string[] entries = resolveEntry is null ? ["socks.example:1080:192.0.2.10"] : ["socks.example:1080:192.0.2.10", resolveEntry];
@@ -623,7 +624,7 @@ public sealed partial class TcpConnectorTests
             socks5Authentication: socks5Authentication);
 
         var result = await connector.ConnectAsync(
-            new ConnectTarget(host, 8080, UseTls: false) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, credential) },
+            new ConnectTarget(host, 8080, UseTls: false) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, credential), Events = events ?? new RecordingTransferEvents() },
             CancellationToken.None);
         return (result, proxyConnection);
     }

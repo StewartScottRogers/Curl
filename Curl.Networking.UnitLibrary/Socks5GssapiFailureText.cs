@@ -68,10 +68,28 @@ internal sealed class Socks5GssapiFailureText(bool usesSspi, string credentialCa
     /// <returns>The text.</returns>
     public string ContextFailed(SecurityContextStatus status) => usesSspi
         ? SspiContextFailurePrefix + SspiStatusTexts.GetValueOrDefault(status, SspiTargetUnknown[SspiContextFailurePrefix.Length..])
-        : "GSS-API error: gss_init_sec_context failed: " + GssStatusTexts.GetValueOrDefault(status, GssUnspecifiedFailure)
+        : GssContextFailurePrefix + GssStatusTexts.GetValueOrDefault(status, GssUnspecifiedFailure)
             .Replace(CredentialCachePlaceholder, credentialCacheName, StringComparison.Ordinal);
 
+    /// <summary>
+    /// Gets the <c>-v</c> lines curl prints when the negotiation fails with <paramref name="failureMessage" />:
+    /// each of its <c>failf</c> calls echoed in turn (BL-1039). The message itself; after a failed
+    /// context step, the step's own line (<c>Failed to initialize security context.</c> in the SSPI
+    /// build, <c>Failed to initial GSS-API token.</c> in the GSS-API build, both measured); then
+    /// <c>socks.c</c>'s <c>Unable to negotiate SOCKS5 GSS-API context.</c> (measured).
+    /// </summary>
+    /// <param name="failureMessage">The exit 97 message the negotiation failed with.</param>
+    /// <returns>The lines, in order.</returns>
+    public IReadOnlyList<string> VerboseLines(string failureMessage) =>
+        failureMessage.StartsWith(usesSspi ? SspiContextFailurePrefix : GssContextFailurePrefix, StringComparison.Ordinal)
+            ? [failureMessage, usesSspi ? "Failed to initialize security context." : "Failed to initial GSS-API token.", NegotiationFailed]
+            : [failureMessage, NegotiationFailed];
+
+    private const string NegotiationFailed = "Unable to negotiate SOCKS5 GSS-API context.";
+
     private const string SspiContextFailurePrefix = "SSPI error: InitializeSecurityContext failed: ";
+
+    private const string GssContextFailurePrefix = "GSS-API error: gss_init_sec_context failed: ";
 
     private const string GssUnspecifiedFailure = "Unspecified GSS failure.  Minor code may provide more information.";
 
