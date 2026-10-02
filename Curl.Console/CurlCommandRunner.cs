@@ -3075,16 +3075,12 @@ internal sealed class CurlCommandRunner(
             selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
             selectHopCredentials: CredentialLookup.ForRedirectHops(options));
 
-        if (!CurlUrl.TryParse(
-            QueryUrl.Append(url, options),
-            options.PathAsIs,
-            out CurlUrl? transferUrl,
-            out CurlUrlRejection rejection))
+        if (!TryParseTransferUrl(QueryUrl.Append(url, options), options, out CurlUrl? transferUrl, out CurlUrlRejection rejection))
         {
-            return TransferResult.Failure(CurlExitCode.UrlMalformat, UrlRejectedPrefix + rejection.ToCurlMessage());
+            return UrlRejectedFailure(rejection);
         }
 
-        if (ParsedUrlRefusal(options, transferUrl) is { } refusal)
+        if (ParsedUrlRefusal(transferUrl) is { } refusal)
         {
             return refusal;
         }
@@ -3121,19 +3117,37 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Parses the transfer's URL; under <c>--disallow-username-in-url</c> a URL with user information,
+    /// even an empty user, is rejected with <see cref="CurlUrlRejection.UserNotAllowed" /> before its
+    /// host and port are checked, so it fails with exit 67 even when its host or port is bad (curl
+    /// 8.21.0, measured, BL-626 and BL-910 Notes).
+    /// </summary>
+    private static bool TryParseTransferUrl(
+        string text,
+        CommandLineOptions options,
+        [NotNullWhen(true)] out CurlUrl? url,
+        out CurlUrlRejection rejection) =>
+        options.DisallowUsernameInUrl
+            ? CurlUrl.TryParseDisallowingUser(text, options.PathAsIs, out url, out rejection)
+            : CurlUrl.TryParse(text, options.PathAsIs, out url, out rejection);
+
+    /// <summary>
+    /// The failure for a transfer URL curl's parser rejects: exit 67 for
+    /// <see cref="CurlUrlRejection.UserNotAllowed" />, exit 3 for every other rejection, each with
+    /// <c>URL rejected: </c> and curl's message.
+    /// </summary>
+    private static TransferResult UrlRejectedFailure(CurlUrlRejection rejection) =>
+        TransferResult.Failure(
+            rejection == CurlUrlRejection.UserNotAllowed ? CurlExitCode.LoginDenied : CurlExitCode.UrlMalformat,
+            UrlRejectedPrefix + rejection.ToCurlMessage());
+
+    /// <summary>
     /// Why the parsed URL is refused before any connection, or <see langword="null" /> when it is not:
-    /// under <c>--disallow-username-in-url</c> a URL with user information, even an empty user, fails
-    /// with exit 67 and <see cref="RedirectFollower.CredentialsInUrlMessage" /> (curl 8.21.0, measured,
-    /// BL-626 Notes); a host longer than <see cref="MaximumHostLength" /> fails with exit 3 and
+    /// a host longer than <see cref="MaximumHostLength" /> fails with exit 3 and
     /// <see cref="TooLongHostnameMessage" />.
     /// </summary>
-    private static TransferResult? ParsedUrlRefusal(CommandLineOptions options, CurlUrl url)
+    private static TransferResult? ParsedUrlRefusal(CurlUrl url)
     {
-        if (options.DisallowUsernameInUrl && url.User is not null)
-        {
-            return TransferResult.Failure(CurlExitCode.LoginDenied, RedirectFollower.CredentialsInUrlMessage);
-        }
-
         return Encoding.UTF8.GetByteCount(url.Host) > MaximumHostLength
             ? TransferResult.Failure(CurlExitCode.UrlMalformat, TooLongHostnameMessage)
             : null;
