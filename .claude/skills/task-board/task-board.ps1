@@ -29,7 +29,9 @@
       next-id  The next free task ID.
       new      Create a task in Backlog from TASK-TEMPLATE.md. -NoLane writes
                'lane: no' so no dark factory lane is offered it.
-      move     Move a task to another state, appending a Log line.
+      move     Move a task to another state, appending a Log line. A move out of
+               Backlog also whispers the Backlog's depth ("Backlog, 63.") a minute
+               later, once per burst of moves, without waiting for it (BL-1182).
       archive  Move finished tasks into Done\<yyyy-MM-dd_HHmm>\. With -WhenDoneIsLong,
                move all of them, but only once Done holds more than 20.
       dedupe   Renumber tasks that share an ID with another. A task file that exists
@@ -345,6 +347,26 @@ function Set-FrontMatterField([string] $Text, [string] $Name, [string] $Value) {
     return $closing.Replace($Text, "`$1`n${Name}: $Value`$2", 1)
 }
 
+function Start-BacklogDepthWhisper {
+    # Tells Stewart the Backlog's depth ("Backlog, 63.") after a move out of Backlog
+    # (BL-1182). The phrase is spoken by whisper-milestone.ps1, detached and hidden, a
+    # minute later and only if no later move has restamped the shared file, so a burst
+    # of moves across lanes gives one phrase with the latest depth. The move never
+    # waits for it and never fails because of it; off Windows and in CI it is silent.
+    try {
+        if ($env:CI -or [Environment]::OSVersion.Platform -ne 'Win32NT') { return }
+        $speaker = Join-Path $RepoRoot '.claude\hooks\whisper-milestone.ps1'
+        if (-not (Test-Path -LiteralPath $speaker)) { return }
+        $depth = @(Get-ChildItem -LiteralPath (Join-Path $Board 'Backlog') -Filter 'BL-*.md' -File).Count
+        $stampFile = Join-Path ([IO.Path]::GetTempPath()) 'CurlBacklogDepthWhisper.txt'
+        $stamp = [Guid]::NewGuid().ToString('N')
+        [IO.File]::WriteAllText($stampFile, "$stamp|$depth", $Utf8NoBom)
+        $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$speaker`"",
+            '-Phrase', "`"Backlog, $depth.`"", '-DelaySeconds', '60', '-StampFile', "`"$stampFile`"", '-Stamp', $stamp)
+        Start-Process -FilePath (Get-Process -Id $PID).Path -ArgumentList $arguments -WindowStyle Hidden | Out-Null
+    } catch { }
+}
+
 function Add-LogLine([string] $Text, [string] $Line) {
     if ($Text.Contains("`r`n")) { $newline = "`r`n" } else { $newline = "`n" }
     $body = $Text.TrimEnd()
@@ -524,6 +546,7 @@ switch ($Command) {
         Write-Text $task.Path $text
         Move-Item -LiteralPath $task.Path -Destination $destination
         Write-Output "$($task.Id)  $from -> $To  Tasks\$To\$fileName"
+        if ($from -eq 'Backlog') { Start-BacklogDepthWhisper }
     }
 
     'dedupe' {
