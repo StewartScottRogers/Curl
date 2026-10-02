@@ -124,11 +124,26 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     {
         var anchoredErrors = WithTheNameCheckCurlRuns(
             WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
+        var observed = ObservePeerVerification(anchoredErrors, chain, peerCertificates);
+        var refusal = VerifyPeer(anchoredErrors, chain, targetHost, [])
+            ?? RevocationListRefusal(revocationLists, chain);
+        return refusal is null ? JudgePinnedPublicKey(observed, peerCertificates) : (observed, refusal);
+    }
+
+    // The pin is checked only once the certificate is accepted, and only then does curl print
+    // the " public key hash:" line (ADR-0336, BL-877).
+    private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) JudgePinnedPublicKey(
+        PeerVerification observed,
+        ReadOnlyMemory<byte>[] peerCertificates)
+    {
+        var refusal = PinnedPublicKey.Refusal(options.PinnedPublicKey, peerCertificates);
         return (
-            ObservePeerVerification(anchoredErrors, chain, peerCertificates),
-            VerifyPeer(anchoredErrors, chain, targetHost, [])
-                ?? RevocationListRefusal(revocationLists, chain)
-                ?? PinnedPublicKey.Refusal(options.PinnedPublicKey, peerCertificates));
+            observed with
+            {
+                PinnedPublicKeyHash = PinnedPublicKey.ReportedHash(options.PinnedPublicKey, peerCertificates),
+                PinnedPublicKeyRefused = refusal is not null,
+            },
+            refusal);
     }
 
     // Reached only for a chain VerifyPeer accepted without -k, so a chain was built.

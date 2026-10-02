@@ -426,6 +426,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         await DisposeAfterFailedHandshakeAsync(sslStream, plaintext).ConfigureAwait(false);
         RethrowIfCancellation(failure);
         peerVerification.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
+        peerVerification.ReportPinnedPublicKeyRefusal(events, _matchesSchannelBuild);
 
         return verificationFailure is { } rejected
             ? ConnectResult.Failed(rejected.ExitCode, rejected.Message)
@@ -519,6 +520,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             CertificateVerified = peerVerification.Verified,
             CertificateVerifyResult = peerVerification.VerifyResult,
             PeerCertificateChain = [.. peerVerification.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
+            PinnedPublicKeyHash = peerVerification.PinnedPublicKeyHash,
         };
 
     /// <summary>

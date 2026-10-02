@@ -345,6 +345,7 @@ choices do not need one.
 | [0333](ADR-0333-a-chunked-407-to-connect-is-discarded-and-the-connection-reused.md) | A chunked `407` to CONNECT is read through and the answer sent on the same connection; a malformed one is exit 56 with curl's chunk parser message (measured) | Accepted | 2026-10-01 |
 | [0334](ADR-0334-a-stale-digest-407-to-connect-is-answered-again-five-reconnects-at-most.md) | A stale Digest `407` to CONNECT is answered again with the new nonce, and the proxy is dialled again five times at most, then exit 7 `Could not connect to server` (measured) | Accepted | 2026-10-01 |
 | [0335](ADR-0335-cert-status-prints-its-status-line-on-every-platform.md) | `--cert-status` prints `* SSL certificate status: good (0)` (or `revoked (1)`, `unknown (2)`) under `-v` on every platform, reported by the hand-built provider as an info line | Accepted | 2026-10-01 |
+| [0336](ADR-0336-pinnedpubkey-hash-line-rides-the-handshake-event-mismatch-lines-are-info-lines.md) | `--pinnedpubkey`'s `-v` ` public key hash:` line rides `TlsHandshakeEvent`, placed per build; a refusal's hash and mismatch lines (twice for Schannel, once for OpenSSL) are info lines | Accepted | 2026-10-01 |
 
 ## Template
 

@@ -57,7 +57,7 @@ internal static class TransferEventInfoText
             return OpenSslHandshakeText.Lines(handshake, alpnLines);
         }
 
-        return handshake.IsQuic ? OpenSslHandshakeText.LibreSslLines(handshake, alpnLines) : alpnLines;
+        return handshake.IsQuic ? OpenSslHandshakeText.LibreSslLines(handshake, alpnLines) : SchannelLines(handshake, alpnLines);
     }
 
     /// <summary>
@@ -91,6 +91,25 @@ internal static class TransferEventInfoText
         }
 
         return OpenSslMessageText.Line(message) is { } line ? [line] : [];
+    }
+
+    /// <summary>
+    /// Returns curl's <c> public key hash: sha256//...</c> line, leading space and all, when a
+    /// <c>sha256//</c> <c>--pinnedpubkey</c> was checked, and none otherwise (ADR-0336, BL-877).
+    /// The Schannel build prints it between the two ALPN lines, the OpenSSL build after the
+    /// verify result.
+    /// </summary>
+    /// <param name="handshake">The facts the handshake negotiated.</param>
+    /// <returns>The line, or none.</returns>
+    internal static IReadOnlyList<string> PinnedPublicKeyHashLines(TlsHandshakeEvent handshake)
+    {
+        return handshake.PinnedPublicKeyHash is { } hash ? [" public key hash: " + hash] : [];
+    }
+
+    private static IReadOnlyList<string> SchannelLines(TlsHandshakeEvent handshake, IReadOnlyList<string> alpnLines)
+    {
+        var hashLines = PinnedPublicKeyHashLines(handshake);
+        return [.. alpnLines.Take(1), .. hashLines, .. alpnLines.Skip(1)];
     }
 
     private static IReadOnlyList<string> AlpnLines(TlsHandshakeEvent handshake)

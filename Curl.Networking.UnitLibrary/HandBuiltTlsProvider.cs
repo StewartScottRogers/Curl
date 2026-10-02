@@ -209,6 +209,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var handshakeStarted = _timeProvider.GetTimestamp();
         var (handshake, thrown) = await TryHandshakeAsync(plaintext, prepared, cancellationToken).ConfigureAwait(false);
         prepared.Verifier.Observed.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
+        prepared.Verifier.Observed.ReportPinnedPublicKeyRefusal(events, _matchesSchannelBuild);
         if (!Completed(handshake))
         {
             return await FailAsync(plaintext, events, prepared, handshake?.Failure, thrown).ConfigureAwait(false);
@@ -333,6 +334,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             CertificateVerified = verifier.Observed.Verified,
             CertificateVerifyResult = verifier.Observed.VerifyResult,
             PeerCertificateChain = [.. verifier.Observed.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
+            PinnedPublicKeyHash = verifier.Observed.PinnedPublicKeyHash,
         };
 
     /// <summary>
