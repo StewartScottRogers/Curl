@@ -161,7 +161,7 @@ each dial, `connect to ... failed: <reason>` after each failed one (the reason f
 TLS handshake are done, numbering its connections from `0` in `ConnectResult.ConnectionNumber`.
 Per ADR-0109 a connect that fails after its options parse takes the next number too, through
 `NumberedConnectFailure`, as curl 8.21.0 numbers the connection it tried.
-Per ADR-0113 it keeps curl's DNS cache for its life (one command line): a host and port it
+Per ADR-0113 it keeps curl's DNS cache, a `DnsCache` it is given (one per run, shared by every `--next` option group, BL-1053) or one of its own: a host and port it
 resolved before, or one a `--resolve` entry answers, is answered without `IDnsResolver` and
 reported as `Hostname H was found in DNS cache` before `Trying`. Per ADR-0114 every answer is
 then reported as `Host H:P was resolved.`, `IPv6: ...` and `IPv4: ...`, naming the host as

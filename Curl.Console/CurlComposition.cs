@@ -421,7 +421,8 @@ internal static class CurlComposition
     /// </param>
     /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache, which the origin's TLS provider uses (ADR-0319); <see langword="null" /> for none.</param>
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
-    internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null)
+    /// <param name="runDnsCache">The run's DNS cache, which every option group's TCP connector answers from and adds to as curl 8.21.0 shares its cache (BL-1053); <see langword="null" /> for a cache of the group's own.</param>
+    internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null)
     {
         TcpDialer tcpDialer = new(TcpSocketOptions.FromCommandLine(options.TcpNoDelay, options.TcpKeepAlive, options.TcpKeepAliveSeconds, options.TcpKeepAliveProbeCount)
             with
@@ -439,7 +440,7 @@ internal static class CurlComposition
         LateBoundSecurityContextFactory proxyContexts = new();
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider);
-        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts);
+        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache);
         UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider, diagnosticLog);
         PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, timeProvider, runConnections);
 
@@ -525,6 +526,10 @@ internal static class CurlComposition
     /// Makes the Kerberos contexts SOCKS5 GSS-API runs on, with the <c>--socks5-*</c> options of
     /// <see cref="Socks5AuthenticationMapping.FromCommandLine" /> (BL-615); <see langword="null" /> for none.
     /// </param>
+    /// <param name="runDnsCache">
+    /// The run's DNS cache, shared by every option group's connector (BL-1053); <see langword="null" /> for
+    /// a cache of the connector's own.
+    /// </param>
     /// <returns>The connector.</returns>
     internal static TcpConnector CreateTcpConnector(
         CommandLineOptions options,
@@ -535,7 +540,8 @@ internal static class CurlComposition
         HttpProxyTunnelOptions proxyTunnelOptions,
         ITlsProvider? proxyTlsProvider = null,
         QuicDialer? quicDialer = null,
-        ISecurityContextFactory? socks5SecurityContexts = null) =>
+        ISecurityContextFactory? socks5SecurityContexts = null,
+        DnsCache? runDnsCache = null) =>
         new(
             dnsResolver,
             tcpDialer,
@@ -554,7 +560,8 @@ internal static class CurlComposition
             localBinding: LocalBindingOf(options),
             preProxy: PreProxyOf(options),
             socks5Authentication: Socks5AuthenticationMapping.FromCommandLine(options, socks5SecurityContexts, OperatingSystem.IsWindows()),
-            haproxyProtocol: HaproxyProtocolOf(options));
+            haproxyProtocol: HaproxyProtocolOf(options),
+            dnsCache: runDnsCache);
 
     /// <summary>
     /// The SOCKS proxy the connector reaches an HTTP or HTTPS proxy through: the <c>--preproxy</c>
@@ -733,7 +740,7 @@ internal static class CurlComposition
     /// the real disk, the real network and the given standard streams, wrapping warnings at
     /// the width <see cref="TerminalColumns.Resolve()" /> gives. The network
     /// transports are built for each option group by
-    /// <see cref="CreateTransports(CommandLineOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?)" /> once the
+    /// <see cref="CreateTransports(CommandLineOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?)" /> once the
     /// command line is parsed, because their TLS settings come from it, over one
     /// <see cref="ConnectionCache" /> the runner closes when the run ends, so a later group reuses
     /// an earlier group's connection when their settings match (ADR-0285, BL-754).
@@ -759,9 +766,10 @@ internal static class CurlComposition
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         TlsSessionCache tlsSessions = new(TimeProvider.System);
+        DnsCache runDnsCache = new();
         LateBoundDiagnosticLog runLog = new();
         return new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, TimeProvider.System, runConnections, tlsSessions, runLog), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,

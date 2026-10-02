@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
@@ -94,6 +93,11 @@ namespace Curl.Networking;
 /// written first on every new connection once it is dialled and any proxy tunnel is open, before the
 /// target's TLS handshake, from the socket's own ends (BL-616); <see langword="null" /> to send none.
 /// </param>
+/// <param name="dnsCache">
+/// The DNS cache this connector answers from and adds to, which the connectors of every
+/// <c>-:</c>/<c>--next</c> option group of one run share as curl 8.21.0 shares its cache (BL-1053);
+/// <see langword="null" /> for a cache of this connector's own.
+/// </param>
 public sealed partial class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -113,7 +117,8 @@ public sealed partial class TcpConnector(
     INetworkInterfaceLookup? networkInterfaceLookup = null,
     ProxyEndpoint? preProxy = null,
     Socks5AuthenticationOptions? socks5Authentication = null,
-    HaproxyProtocolHeader? haproxyProtocol = null) : IConnector
+    HaproxyProtocolHeader? haproxyProtocol = null,
+    DnsCache? dnsCache = null) : IConnector
 {
     private const string AnyHost = "*";
 
@@ -198,7 +203,13 @@ public sealed partial class TcpConnector(
     private readonly HttpProxyTunnelOptions _proxyTunnelOptions = proxyTunnelOptions ?? HttpProxyTunnelOptions.Default;
     private readonly ResolveOverrides _resolveOverrides = resolveOverrides ?? ResolveOverrides.None;
     private readonly ConnectToMappings _connectToMappings = connectToMappings ?? ConnectToMappings.None;
-    private readonly ConcurrentDictionary<string, DnsCacheEntry> _dnsCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly DnsCache _dnsCache = dnsCache ?? new DnsCache();
+
+    /// <summary>
+    /// Gets the DNS cache this connector answers from and adds to: the <c>dnsCache</c> it was
+    /// given, or one of its own.
+    /// </summary>
+    public DnsCache DnsCache => _dnsCache;
     private readonly ConditionalWeakTable<ConnectTarget, object> _altSvcReported = new();
     private int _resolveEntriesLoaded;
     private long _nextConnectionNumber;
@@ -319,7 +330,7 @@ public sealed partial class TcpConnector(
     /// connector opened from <c>0</c> (<see cref="ConnectResult.ConnectionNumber" />). A connect
     /// that fails after its options parse takes the next number too, as curl 8.21.0 numbers the
     /// connection it tried (ADR-0109). A host and port answered by a <c>--resolve</c> entry, or
-    /// resolved before by this connector (to the host, the proxy or a SOCKS target), are
+    /// resolved before through its <see cref="DnsCache" /> (to the host, the proxy or a SOCKS target), are
     /// answered from that cache and reported first as <c>Hostname &lt;host&gt; was found in DNS
     /// cache</c>, as curl 8.21.0 reports them (measured, BL-481). Every answer, cached or
     /// looked up, is then reported as <c>Host &lt;name&gt;:&lt;port&gt; was resolved.</c>,
@@ -673,16 +684,16 @@ public sealed partial class TcpConnector(
         var cacheKey = DnsCacheKey(entry.Host, entry.Port);
         if (entry.IsRemoval)
         {
-            _dnsCache.TryRemove(cacheKey, out _);
+            _dnsCache.Remove(cacheKey);
             return;
         }
 
-        if (_dnsCache.ContainsKey(cacheKey))
+        if (_dnsCache.Contains(cacheKey))
         {
             events.ReportInfo($"RESOLVE {entry.Host}:{entry.Port} - old addresses discarded");
         }
 
-        _dnsCache[cacheKey] = new DnsCacheEntry(entry.Host, entry.Port, entry.Addresses);
+        _dnsCache.Store(cacheKey, new DnsCacheEntry(entry.Host, entry.Port, entry.Addresses));
         events.ReportInfo($"Added {entry.Host}:{entry.Port}:{entry.AddressText} to DNS cache{(entry.IsPermanent ? string.Empty : " (non-permanent)")}");
         if (entry.Host == AnyHost)
         {
@@ -712,7 +723,7 @@ public sealed partial class TcpConnector(
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);
         var resolveStarted = log.IsEnabled(DiagnosticLogLevel.Info) ? timeProvider.GetTimestamp() : 0;
         var cacheKey = DnsCacheKey(host, port);
-        if ((_dnsCache.GetValueOrDefault(cacheKey) ?? _dnsCache.GetValueOrDefault(DnsCacheKey(AnyHost, port))) is { } cached)
+        if ((_dnsCache.Find(cacheKey) ?? _dnsCache.Find(DnsCacheKey(AnyHost, port))) is { } cached)
         {
             var fromCache = AnswerFromCache(host, cached, target.Events);
             LogResolution(log, host, port, fromCache, fromCache: true, resolveStarted);
@@ -724,7 +735,7 @@ public sealed partial class TcpConnector(
         if (answered.Count > 0)
         {
             var resolved = new DnsCacheEntry(host, port, answered);
-            _dnsCache[cacheKey] = resolved;
+            _dnsCache.Store(cacheKey, resolved);
             ReportResolved(resolved, target.Events);
         }
 
@@ -1542,10 +1553,4 @@ public sealed partial class TcpConnector(
         long NameResolved,
         bool AuthorizationAnswersChallenge,
         SspiFailureRecordingTransferEvents AuthenticatorEvents);
-
-    /// <summary>
-    /// One key of curl's DNS cache: the host as it was cached (the name looked up, or a
-    /// <c>--resolve</c> entry's host as written), the port and the addresses.
-    /// </summary>
-    private sealed record DnsCacheEntry(string Name, int Port, IReadOnlyList<IPAddress> Addresses);
 }
