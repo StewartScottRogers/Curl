@@ -49,3 +49,4 @@ The Audit tab tells Stewart when his saved token expires, warns him a week befor
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
