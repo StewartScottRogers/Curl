@@ -120,6 +120,17 @@ public sealed class CurlAiHelpTextTests
     }
 
     [TestMethod]
+    public void TryGetMarkdown_TlsEarlyData_DescribesItAsHonoured()
+    {
+        // BL-1105: the hand-built TLS client sends the request as 0-RTT early data on a resumed session.
+        string section = OptionSection(AllMarkdown, "tls-earlydata");
+
+        Assert.DoesNotContain("\n- Not supported by this build yet", section);
+        Assert.Contains("\n- Turn off with: `--no-tls-earlydata`\n", section);
+        Assert.Contains("early data", section);
+    }
+
+    [TestMethod]
     public void TryGetMarkdown_OptionThisBuildDoesNotParse_SaysSo()
     {
         string unparsed = HelpLongNames("all")

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Net;
 using System.Net.Security;
 using System.Runtime.ExceptionServices;
@@ -205,29 +206,110 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         }
 
         var peerKey = SessionPeerKey(targetHost, plaintext.RemoteEndPoint);
-        prepared = prepared with { Settings = prepared.Settings with { ResumptionSession = OfferedSession(peerKey) } };
+        var session = OfferedSession(peerKey);
+        prepared = prepared with { Settings = prepared.Settings with { ResumptionSession = session } };
         var handshakeStarted = _timeProvider.GetTimestamp();
-        var (handshake, thrown) = await TryHandshakeAsync(plaintext, prepared, cancellationToken).ConfigureAwait(false);
-        prepared.Verifier.Observed.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
-        prepared.Verifier.Observed.ReportPinnedPublicKeyRefusal(events, _matchesSchannelBuild);
-        if (!Completed(handshake))
+        var handshakeRun = new HandshakeRun(plaintext, targetHost, events, isProxy, prepared, offeredApplicationProtocols, peerKey);
+        if (EarlyDataApplicationProtocol(session, offeredApplicationProtocols) is { } earlyDataProtocol)
         {
-            return await FailAsync(plaintext, events, prepared, handshake?.Failure, thrown).ConfigureAwait(false);
+            return DeferHandshake(handshakeRun, session!, earlyDataProtocol, handshakeStarted);
         }
 
-        KeepReceivedSessions(peerKey, handshake.Stream!);
-        events.ReportTlsHandshake(DescribeHandshake(handshake, prepared.Verifier, offeredApplicationProtocols) with
-        {
-            IsProxy = isProxy,
-            VerifiedHostName = SslStreamTlsProvider.VerifiedHostName(targetHost, _options.Insecure),
-        });
-        CertificateStatusText.Report(events, handshake.CertificateStatus);
-        return ConnectResult.Connected(
-            new HandBuiltTlsConnection(handshake.Stream!, plaintext, prepared.ClientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild)),
+        var (handshake, failure) = await CompleteHandshakeAsync(handshakeRun, ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
+        return failure ?? ConnectResult.Connected(
+            ConnectionOver(handshake!, handshakeRun),
             new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
             peerCertificates: prepared.Verifier.PeerCertificates,
-            applicationProtocol: handshake.ApplicationProtocol);
+            applicationProtocol: handshake!.ApplicationProtocol);
     }
+
+    // Runs the prepared handshake, sending earlyData first (as 0-RTT early data when the hello
+    // offers it), and reports it as a connect does: the verify result, then on success the
+    // handshake and the stapled status; a failure disposes the plaintext and is the result.
+    private async ValueTask<(HandBuiltHandshake? Handshake, ConnectResult? Failure)> CompleteHandshakeAsync(
+        HandshakeRun run,
+        ReadOnlyMemory<byte> earlyData,
+        CancellationToken cancellationToken)
+    {
+        var (handshake, thrown) = await TryHandshakeAsync(run.Plaintext, run.Prepared, earlyData, cancellationToken).ConfigureAwait(false);
+        run.Prepared.Verifier.Observed.ReportVerifyResult(run.Events, run.IsProxy, _matchesSchannelBuild);
+        run.Prepared.Verifier.Observed.ReportPinnedPublicKeyRefusal(run.Events, _matchesSchannelBuild);
+        if (!Completed(handshake))
+        {
+            return (null, await FailAsync(run.Plaintext, run.Events, run.Prepared, handshake?.Failure, thrown).ConfigureAwait(false));
+        }
+
+        KeepReceivedSessions(run.PeerKey, handshake.Stream!);
+        run.Events.ReportTlsHandshake(DescribeHandshake(handshake, run.Prepared.Verifier, run.OfferedApplicationProtocols) with
+        {
+            IsProxy = run.IsProxy,
+            VerifiedHostName = SslStreamTlsProvider.VerifiedHostName(run.TargetHost, _options.Insecure),
+        });
+        CertificateStatusText.Report(run.Events, handshake.CertificateStatus);
+        return (handshake, null);
+    }
+
+    private HandBuiltTlsConnection ConnectionOver(HandBuiltHandshake handshake, HandshakeRun run) =>
+        new(handshake.Stream!, run.Plaintext, run.Prepared.ClientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild));
+
+    // --tls-earlydata (BL-1105): the ALPN protocol of a resumed TLS 1.3 session that allows
+    // early data, when the connection offers it, as curl's Curl_on_session_reuse decides; else null.
+    private string? EarlyDataApplicationProtocol(TlsSessionRecord? session, IReadOnlyList<string> offeredApplicationProtocols) =>
+        _options.AllowEarlyData && OffersTls13 && EarlyDataProtocolOf(session) is { } protocol && offeredApplicationProtocols.Contains(protocol)
+            ? protocol
+            : null;
+
+    // The ALPN protocol of a session that allows early data, or null; the cache holds only TLS 1.3 sessions.
+    private static string? EarlyDataProtocolOf(TlsSessionRecord? session) =>
+        session is { MaxEarlyDataSize: > 0 } ? session.ApplicationProtocol : null;
+
+    // curl's deferred connect (vtls.c, ssl_connection_deferred): the connection is up at once
+    // with the session's ALPN protocol, the only one the hello then offers, and the handshake
+    // runs on the first write, carrying it as 0-RTT early data.
+    private ConnectResult DeferHandshake(HandshakeRun run, TlsSessionRecord session, string protocol, long handshakeStarted)
+    {
+        run.Events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"SSL session allows {session.MaxEarlyDataSize} bytes of early data, reusing ALPN '{protocol}'"));
+        var deferred = run with
+        {
+            Prepared = run.Prepared with { Settings = run.Prepared.Settings with { ApplicationProtocols = [protocol], OfferEarlyData = true } },
+        };
+        return ConnectResult.Connected(
+            new EarlyDataTlsConnection(run.Plaintext, (earlyData, cancellationToken) => HandshakeWithEarlyDataAsync(deferred, session.MaxEarlyDataSize, earlyData, cancellationToken)),
+            new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
+            applicationProtocol: protocol);
+    }
+
+    // The deferred handshake, with curl's early data lines (openssl.c's ossl_send_earlydata,
+    // vtls.c's ssl_cf_connect_deferred); a failure is the connect's exit code and message.
+    private async ValueTask<IConnection> HandshakeWithEarlyDataAsync(HandshakeRun run, uint maxEarlyDataSize, ReadOnlyMemory<byte> earlyData, CancellationToken cancellationToken)
+    {
+        var sent = (int)Math.Min((uint)earlyData.Length, maxEarlyDataSize);
+        run.Events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"SSL sending {sent} bytes of early data"));
+        var (handshake, failure) = await CompleteHandshakeAsync(run, earlyData, cancellationToken).ConfigureAwait(false);
+        if (failure is not null)
+        {
+            throw new DeferredTlsHandshakeFailedException(failure.ExitCode, failure.ErrorMessage!);
+        }
+
+        run.Events.ReportInfo(EarlyDataAccepted(handshake!.Stream!)
+            ? string.Create(CultureInfo.InvariantCulture, $"Server accepted {sent} bytes of TLS early data.")
+            : "Server rejected TLS early data.");
+        return ConnectionOver(handshake, run);
+    }
+
+    // Whether the server accepted the early data; a TLS 1.2 connection accepts none.
+    internal static bool EarlyDataAccepted(Stream stream) =>
+        stream is Tls13ClientStream { Handshake.EarlyDataAccepted: true };
+
+    // One connection's handshake: what it runs over, for whom, and what it reports.
+    private sealed record HandshakeRun(
+        IConnection Plaintext,
+        string TargetHost,
+        ITransferEvents Events,
+        bool IsProxy,
+        PreparedHandshake Prepared,
+        IReadOnlyList<string> OfferedApplicationProtocols,
+        string? PeerKey);
 
     private IReadOnlyList<string> OfferedApplicationProtocols(IReadOnlyList<string> applicationProtocols) =>
         _options.UseAlpn ? applicationProtocols : [];
@@ -479,11 +561,12 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     private async Task<(HandBuiltHandshake? Handshake, Exception? Thrown)> TryHandshakeAsync(
         IConnection plaintext,
         PreparedHandshake prepared,
+        ReadOnlyMemory<byte> earlyData,
         CancellationToken cancellationToken)
     {
         try
         {
-            return (await HandshakeAsync(new ConnectionStream(plaintext), prepared.Settings, prepared.Verifier, cancellationToken).ConfigureAwait(false), null);
+            return (await HandshakeAsync(new ConnectionStream(plaintext), prepared.Settings, prepared.Verifier, earlyData, cancellationToken).ConfigureAwait(false), null);
         }
         catch (Exception exception)
         {
@@ -507,14 +590,15 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         Stream transport,
         ClientSettings settings,
         IServerCertificateVerifier verifier,
+        ReadOnlyMemory<byte> earlyData,
         CancellationToken cancellationToken)
     {
         // Every TLS 1.3 suite is runnable (BL-811), and a --tls13-ciphers list naming none
         // is exit 59 before this, so a range reaching TLS 1.3 always offers it.
         var runsTls13 = OffersTls13;
         var runsTls12 = OffersBelowTls13 && settings.OffersSuiteFor(IsTls12Suite);
-        return runsTls13 && runsTls12 ? await HandshakeTls13OrTls12Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false)
-            : runsTls13 ? await HandshakeTls13Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false)
+        return runsTls13 && runsTls12 ? await HandshakeTls13OrTls12Async(transport, settings, verifier, earlyData, cancellationToken).ConfigureAwait(false)
+            : runsTls13 ? await HandshakeTls13Async(transport, settings, verifier, earlyData, cancellationToken).ConfigureAwait(false)
             : await HandshakeTls12Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false);
     }
 
@@ -530,19 +614,21 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         Stream transport,
         ClientSettings settings,
         IServerCertificateVerifier verifier,
+        ReadOnlyMemory<byte> earlyData,
         CancellationToken cancellationToken)
     {
         var offer = new TlsClientSettings(settings.ToTls13(alongsideTls12: true), settings.ToTls12(_options));
-        return Describe(await TlsClientConnection.ConnectAsync(transport, offer, _random, verifier, cancellationToken).ConfigureAwait(false));
+        return Describe(await TlsClientConnection.ConnectWithEarlyDataAsync(transport, offer, _random, verifier, earlyData, cancellationToken).ConfigureAwait(false));
     }
 
     private async Task<HandBuiltHandshake> HandshakeTls13Async(
         Stream transport,
         ClientSettings settings,
         IServerCertificateVerifier verifier,
+        ReadOnlyMemory<byte> earlyData,
         CancellationToken cancellationToken)
     {
-        var tls13 = await Tls13ClientConnection.ConnectAsync(transport, settings.ToTls13(alongsideTls12: false), _random, verifier, cancellationToken).ConfigureAwait(false);
+        var tls13 = await Tls13ClientConnection.ConnectWithEarlyDataAsync(transport, settings.ToTls13(alongsideTls12: false), _random, verifier, earlyData, cancellationToken).ConfigureAwait(false);
         return tls13.Stream is { } tls13Stream ? HandBuiltHandshake.Completed(tls13Stream) : HandBuiltHandshake.Failed(tls13.Failure!);
     }
 
@@ -626,6 +712,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         // --ech grease: a GREASE encrypted_client_hello in the TLS 1.3 ClientHello.
         internal bool SendEchGrease { get; init; }
 
+        // --tls-earlydata: offer early_data on the resumed session (BL-1105).
+        internal bool OfferEarlyData { get; init; }
+
         // --tlsuser and --tlspassword: the TLS-SRP login the TLS 1.2 ClientHello offers (ADR-0229).
         internal TlsSrpCredentials? SrpCredentials { get; init; }
 
@@ -652,17 +741,22 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             RequestOcspStatus = RequestOcspStatus,
             TimeProvider = TimeProvider,
             ResumptionSession = ResumptionSession,
+            OfferEarlyData = OfferEarlyData,
             CipherSuites = [.. OfferedSuites.Where(Tls13RecordProtection.CanProtect)],
             SupportedGroups = alongsideTls12 ? Profile.SupportedGroups : [.. Profile.SupportedGroups.Where(TlsNamedGroup.CanShare)],
             KeyShareGroups = Profile.KeyShareGroups,
             SignatureAlgorithms = ClientHelloProfileMapping.CheckableSignatureAlgorithms(Profile),
             CertificateCompressionAlgorithms = Profile.CertificateCompressionAlgorithms,
-            ExtensionOrder = WithEncryptedClientHello(ClientHelloProfileMapping.ExtensionOrder(Profile, RequestOcspStatus)),
+            ExtensionOrder = WithEncryptedClientHello(WithEarlyData(ClientHelloProfileMapping.ExtensionOrder(Profile, RequestOcspStatus))),
             FixedExtensions = ClientHelloProfileMapping.FixedExtensions(Profile),
             SendLegacySessionId = true,
             EncryptedClientHelloConfigs = EchConfigs,
             SendEncryptedClientHelloGrease = SendEchGrease,
         };
+
+        // early_data follows the profile's measured extensions, where OpenSSL sends it (BL-1105).
+        private IReadOnlyList<TlsExtensionType> WithEarlyData(IReadOnlyList<TlsExtensionType> order) =>
+            OfferEarlyData ? [.. order, TlsExtensionType.EarlyData] : order;
 
         // encrypted_client_hello goes last, after the profile's measured extensions (ADR-0327).
         private IReadOnlyList<TlsExtensionType> WithEncryptedClientHello(IReadOnlyList<TlsExtensionType> order) =>

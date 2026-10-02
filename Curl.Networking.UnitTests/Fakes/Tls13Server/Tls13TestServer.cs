@@ -53,6 +53,20 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
 
     public List<byte[]> ClientCertificates { get; } = [];
 
+    /// <summary>Gets the resumption PSK of each ticket the server takes, by ticket in hex, or <see langword="null" /> to resume nothing (BL-1105).</summary>
+    public Dictionary<string, byte[]>? Tickets { get; init; }
+
+    /// <summary>Gets a value indicating whether a resuming server accepts offered early data.</summary>
+    public bool AcceptEarlyData { get; init; } = true;
+
+    public bool IsResumed { get; private set; }
+
+    public bool EarlyDataOffered { get; private set; }
+
+    public bool EarlyDataAccepted { get; private set; }
+
+    public byte[] ClientEarlyTrafficSecret { get; private set; } = [];
+
     /// <summary>Answers a ClientHello: either a HelloRetryRequest alone, or the ServerHello and the encrypted flight.</summary>
     public TestServerFlight Answer(byte[] clientHelloBytes)
     {
@@ -66,17 +80,46 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
             return RetryRequest(hello);
         }
 
+        byte[]? preSharedKey = FindResumption(hello, clientHelloBytes);
         using Tls13KeyShare serverShare = SystemTlsRandomSource.Instance.CreateKeyShare(Group);
-        byte[] serverHello = new ServerHello(
-            0x0303,
-            RandomNumberGenerator.GetBytes(32),
-            hello.LegacySessionId,
-            CipherSuite,
-            0,
-            [KeyShareExtension.EncodeServerShare(serverShare.Entry), SupportedVersionsExtension.EncodeSelected(0x0304)]).Encode();
+        List<TlsExtension> extensions = [KeyShareExtension.EncodeServerShare(serverShare.Entry), SupportedVersionsExtension.EncodeSelected(0x0304)];
+        if (preSharedKey is not null)
+        {
+            extensions.Add(PreSharedKeyExtension.EncodeSelected(0));
+        }
+
+        byte[] serverHello = new ServerHello(0x0303, RandomNumberGenerator.GetBytes(32), hello.LegacySessionId, CipherSuite, 0, extensions).Encode();
         transcriptMessages.Add(serverHello);
         byte[] sharedSecret = clientShare is null ? new byte[32] : serverShare.ComputeSharedSecret(clientShare.KeyExchange)!;
-        return new TestServerFlight(serverHello, EncryptedFlight(hello, sharedSecret));
+        return new TestServerFlight(serverHello, EncryptedFlight(hello, sharedSecret, preSharedKey));
+    }
+
+    /// <summary>Checks the client's EndOfEarlyData, sent under the early keys after accepted early data.</summary>
+    public void ReceiveEndOfEarlyData(byte[] message)
+    {
+        CollectionAssert.AreEqual(new byte[] { 5, 0, 0, 0 }, message);
+        transcriptMessages.Add(message);
+    }
+
+    // The PSK of the offered ticket when the server knows it, its binder checked; notes early data.
+    private byte[]? FindResumption(ClientHello hello, byte[] clientHelloBytes)
+    {
+        byte[]? data = Find(hello.Extensions, TlsExtensionType.PreSharedKey);
+        EarlyDataOffered = Find(hello.Extensions, TlsExtensionType.EarlyData) is not null;
+        if (data is null || Tickets?.GetValueOrDefault(Convert.ToHexString(PreSharedKeyExtension.DecodeOffered(data).Value.Identities[0].Identity)) is not { } preSharedKey)
+        {
+            return null;
+        }
+
+        Tls13KeySchedule schedule = suite.KeySchedule;
+        byte[] earlySecret = schedule.ComputeEarlySecret(preSharedKey);
+        byte[] binder = PreSharedKeyExtension.DecodeOffered(data).Value.Binders[0];
+        List<byte[]> prefix = [.. transcriptMessages.SkipLast(1), clientHelloBytes[..^(3 + binder.Length)]];
+        CollectionAssert.AreEqual(schedule.ComputePskBinder(schedule.DeriveResumptionBinderKey(earlySecret), Hash(prefix)), binder);
+        IsResumed = true;
+        EarlyDataAccepted = EarlyDataOffered && AcceptEarlyData;
+        ClientEarlyTrafficSecret = schedule.DeriveClientEarlyTrafficSecret(earlySecret, TranscriptHash());
+        return preSharedKey;
     }
 
     /// <summary>Checks the client's second flight: its Certificate and CertificateVerify when asked for, then its Finished.</summary>
@@ -116,10 +159,10 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         return new TestServerFlight(retry, []);
     }
 
-    private List<byte[]> EncryptedFlight(ClientHello hello, byte[] sharedSecret)
+    private List<byte[]> EncryptedFlight(ClientHello hello, byte[] sharedSecret, byte[]? preSharedKey)
     {
         Tls13KeySchedule schedule = suite.KeySchedule;
-        byte[] handshakeSecret = schedule.ComputeHandshakeSecret(schedule.ComputeEarlySecret(null), sharedSecret);
+        byte[] handshakeSecret = schedule.ComputeHandshakeSecret(schedule.ComputeEarlySecret(preSharedKey), sharedSecret);
         byte[] serverHelloHash = TranscriptHash();
         ClientHandshakeTrafficSecret = schedule.DeriveClientHandshakeTrafficSecret(handshakeSecret, serverHelloHash);
         ServerHandshakeTrafficSecret = schedule.DeriveServerHandshakeTrafficSecret(handshakeSecret, serverHelloHash);
@@ -132,10 +175,14 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
             Add(flight, new CertificateRequest([], [SignatureAlgorithmsExtension.Encode(ClientCertificateSchemes)]).Encode());
         }
 
-        CertificateEntry[] chain = [new CertificateEntry(credential.Certificate, LeafExtensions), .. IssuerCertificates.Select(issuer => new CertificateEntry(issuer, []))];
-        Add(flight, new CertificateMessage([], chain).Encode());
-        byte[] content = TlsSignatureScheme.BuildCertificateVerifyContent(true, TranscriptHash());
-        Add(flight, new CertificateVerify(credential.Scheme, credential.SigningKey.Sign(credential.Scheme, content)).Encode());
+        if (preSharedKey is null)
+        {
+            CertificateEntry[] chain = [new CertificateEntry(credential.Certificate, LeafExtensions), .. IssuerCertificates.Select(issuer => new CertificateEntry(issuer, []))];
+            Add(flight, new CertificateMessage([], chain).Encode());
+            byte[] content = TlsSignatureScheme.BuildCertificateVerifyContent(true, TranscriptHash());
+            Add(flight, new CertificateVerify(credential.Scheme, credential.SigningKey.Sign(credential.Scheme, content)).Encode());
+        }
+
         Add(flight, new Finished(schedule.ComputeFinishedVerifyData(ServerHandshakeTrafficSecret, TranscriptHash())).Encode());
         byte[] serverFinishedHash = TranscriptHash();
         ClientApplicationTrafficSecret = schedule.DeriveClientApplicationTrafficSecret(masterSecret, serverFinishedHash);
@@ -154,6 +201,11 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         if (QuicTransportParameters is not null)
         {
             extensions.Add(QuicTransportParametersExtension.Encode(QuicTransportParameters));
+        }
+
+        if (EarlyDataAccepted)
+        {
+            extensions.Add(EarlyDataExtension.EncodeIndication());
         }
 
         return extensions;
@@ -188,10 +240,12 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         transcriptMessages.Add(message);
     }
 
-    private byte[] TranscriptHash()
+    private byte[] TranscriptHash() => Hash(transcriptMessages);
+
+    private byte[] Hash(List<byte[]> messages)
     {
         using IncrementalHash hash = IncrementalHash.CreateHash(suite.KeySchedule.HashAlgorithm);
-        foreach (byte[] message in transcriptMessages)
+        foreach (byte[] message in messages)
         {
             hash.AppendData(message);
         }

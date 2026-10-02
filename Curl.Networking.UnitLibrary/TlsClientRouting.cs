@@ -12,7 +12,7 @@ namespace Curl.Networking;
 /// <c>SslStream</c> can neither stop the system's session cache nor the TLS 1.0 CBC split; <c>--cert-status</c>'s row is ADR-0191's and <c>--curves</c> and
 /// <c>--sigalgs</c>' is ADR-0151's (BL-709), and <c>--ssl-sessions</c>' is ADR-0319's (BL-710):
 /// <c>SslStream</c> can neither export nor import a session, and <c>--ech</c>'s is ADR-0327's (BL-711): <c>SslStream</c> offers no
-/// Encrypted Client Hello. QUIC is not routed here: it has no
+/// Encrypted Client Hello, and <c>--tls-earlydata</c>'s is BL-1105's: <c>SslStream</c> sends no 0-RTT early data. QUIC is not routed here: it has no
 /// <c>SslStream</c> route at all.
 /// </remarks>
 public static class TlsClientRouting
@@ -28,14 +28,14 @@ public static class TlsClientRouting
         ArgumentNullException.ThrowIfNull(options);
 
         return CapsVersionsBelowTls12(options) || options.RequireCertificateStatus || NamesGroupsOrSignatureAlgorithms(options) || UsesSessionsEchOrSrp(options)
-            || ControlsSessionsOrTheBeastSplit(options)
+            || ControlsSessionsEarlyDataOrTheBeastSplit(options)
             ? TlsClientRoute.HandBuilt
             : TlsClientRoute.SslStream;
     }
 
-    // The --no-sessionid and --ssl-allow-beast rows (ADR-0151, BL-713).
-    private static bool ControlsSessionsOrTheBeastSplit(TlsClientOptions options) =>
-        options.NoSessionId || AllowsBeastOnTls10(options);
+    // The --no-sessionid, --ssl-allow-beast (ADR-0151, BL-713) and --tls-earlydata (BL-1105) rows.
+    private static bool ControlsSessionsEarlyDataOrTheBeastSplit(TlsClientOptions options) =>
+        options.NoSessionId || AllowsBeastOnTls10(options) || options.AllowEarlyData;
 
     // The --ssl-allow-beast row (ADR-0151, BL-713): SslStream cannot turn off the TLS 1.0 CBC
     // split, so a range that reaches TLS 1.0 runs on the hand-built client. A TLS 1.0 or 1.1

@@ -61,6 +61,11 @@ public sealed class TlsClientRoutingTests
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(options));
 
     // ADR-0319's row: --ssl-sessions, since SslStream can neither export nor import a session.
+    // The --tls-earlydata row (BL-1105): SslStream sends no 0-RTT early data.
+    [TestMethod]
+    public void Choose_WithTlsEarlyData_IsTheHandBuiltClient() =>
+        Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(AllowEarlyData: true)));
+
     [TestMethod]
     public void Choose_WithSslSessions_IsTheHandBuiltClient() =>
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(SslSessionsFile: "sessions.txt")));
