@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Pop3;
@@ -32,12 +33,13 @@ namespace Curl.Protocol.Pop3;
 /// was refused; either refused, exit 67 <c>Access denied. &lt;c&gt;</c>, c being <c>-</c>
 /// or <c>*</c> as above.</item>
 /// <item>None of these possible, or <c>AUTH=</c> ruling out the one that is: exit 67
-/// <c>Login denied</c>, after the <c>-v</c> line <c>SASL: no overlap between offered and
-/// configured auth mechanisms</c> when <c>CAPA</c> listed a SASL mechanism curl knows and
-/// <c>SASL: no auth mechanism was offered or recognized</c> otherwise; when the only offered
-/// mechanisms the credentials and options allow are SCRAM, which curl's Schannel build does
-/// not build in, <c>SASL: no auth mechanism offered could be selected</c> and one
-/// <c>SASL: &lt;mechanism&gt; not builtin</c> line each instead (BL-810).</item>
+/// <c>Login denied</c>, after the <c>-v</c> line <c>SASL: no auth mechanism was offered or
+/// recognized</c> when <c>CAPA</c> listed no SASL mechanism curl knows, <c>SASL: no overlap
+/// between offered and configured auth mechanisms</c> when it listed none the credentials and
+/// options allow, and otherwise <c>SASL: no auth mechanism offered could be selected</c>
+/// followed by curl's reason for each allowed one, such as <c>SASL: SCRAM-SHA-1 not
+/// builtin</c> or <c>SASL: XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER</c> (BL-810,
+/// BL-1221).</item>
 /// </list>
 /// A login failure sends no <c>QUIT</c>.
 /// </remarks>
@@ -55,11 +57,26 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// <summary>What curl sends for an empty SASL message (RFC 5034 section 4).</summary>
     private const string EmptyMessage = "=";
 
+    /// <summary>The SASL mechanism curl enables only when <c>AUTH=EXTERNAL</c> names it.</summary>
+    private const string ExternalMechanism = "EXTERNAL";
+
     /// <summary>
-    /// The mechanisms curl 8.21.0's Schannel build knows but does not build in, in the order
-    /// its <c>-v</c> names them when one of them is all that was offered (BL-810).
+    /// The mechanisms curl 8.21.0's <c>Curl_sasl_is_blocked</c> explains when none was chosen,
+    /// in the order its <c>-v</c> names them (BL-1221).
     /// </summary>
-    private static readonly string[] NotBuiltInMechanisms = ["SCRAM-SHA-256", "SCRAM-SHA-1"];
+    private static readonly string[] UnchosenMechanisms =
+        ["GSSAPI", "SCRAM-SHA-256", "SCRAM-SHA-1", "DIGEST-MD5", "CRAM-MD5", "NTLM", "OAUTHBEARER", "XOAUTH2"];
+
+    /// <summary>
+    /// The mechanisms curl 8.21.0's Schannel build calls <c>not builtin</c>: SCRAM, which it
+    /// lacks (measured, BL-810), and DIGEST-MD5, CRAM-MD5 and NTLM, which its
+    /// <c>Curl_sasl_is_blocked</c> reports so although it would have chosen them (read from
+    /// <c>lib/curl_sasl.c</c>, BL-1221).
+    /// </summary>
+    private static readonly string[] NotBuiltInMechanisms = ["SCRAM-SHA-256", "SCRAM-SHA-1", "DIGEST-MD5", "CRAM-MD5", "NTLM"];
+
+    /// <summary>The mechanisms that need <c>--oauth2-bearer</c>.</summary>
+    private static readonly string[] BearerMechanisms = ["OAUTHBEARER", "XOAUTH2"];
 
     private readonly MailRequestOptions mail = context.Mail ?? new MailRequestOptions();
 
@@ -237,39 +254,94 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     }
 
     /// <summary>
-    /// Writes the <c>-v</c> line curl 8.21.0's SASL code writes when no way of logging in is
-    /// possible, and fails with exit 67 <c>Login denied</c> (BL-810): <c>no overlap</c> once
-    /// <c>CAPA</c> listed a mechanism curl knows, <c>no auth mechanism was offered or
-    /// recognized</c> when it listed none or was refused.
+    /// Writes the <c>-v</c> lines curl 8.21.0's <c>Curl_sasl_is_blocked</c> writes when no way
+    /// of logging in is possible, and fails with exit 67 <c>Login denied</c> (BL-810,
+    /// BL-1221): <c>no auth mechanism was offered or recognized</c> when <c>CAPA</c> listed no
+    /// mechanism curl knows or was refused, <c>no overlap</c> when it listed none the
+    /// credentials and login options allow, and otherwise <c>no auth mechanism offered could
+    /// be selected</c> followed by why each allowed one was not.
     /// </summary>
     private TransferResult NoWayToLogIn(Pop3LoginOptions options, Pop3Capabilities? capabilities)
     {
-        IReadOnlyList<string> offered = capabilities?.SaslMechanisms ?? [];
-        string[] notBuiltIn = [.. NotBuiltInMechanisms.Where(mechanism => IsAllowed(options, mechanism) && offered.Contains(mechanism, StringComparer.OrdinalIgnoreCase))];
-        if (notBuiltIn.Length > 0)
+        string[] known = KnownOfferedMechanisms(capabilities);
+        string[] enabled = known.Where(mechanism => IsAllowed(options, mechanism)).ToArray();
+        if (enabled.Length > 0 && context.Credentials is { } credential)
         {
-            context.Events.ReportInfo(Pop3SessionMessages.NoSaslMechanismSelectable);
-            foreach (string mechanism in notBuiltIn)
-            {
-                context.Events.ReportInfo(string.Format(CultureInfo.InvariantCulture, Pop3SessionMessages.SaslMechanismNotBuiltIn, mechanism));
-            }
+            ReportWhyNoneWasChosen(credential, mechanism => enabled.Contains(mechanism, StringComparer.OrdinalIgnoreCase));
         }
         else
         {
-            context.Events.ReportInfo(
-                offered.Any(Pop3LoginOptions.IsKnownMechanism) ? Pop3SessionMessages.NoSaslMechanismOverlap : Pop3SessionMessages.NoSaslMechanismOffered);
+            context.Events.ReportInfo(known.Length == 0 ? Pop3SessionMessages.NoSaslMechanismOffered : Pop3SessionMessages.NoSaslMechanismOverlap);
         }
 
         return LoginDenied();
     }
 
     /// <summary>
-    /// Whether curl would try <paramref name="mechanism" />: it needs a user name and password,
-    /// and the login options allow every way or name it.
+    /// The SASL mechanisms <c>CAPA</c> listed that curl 8.21.0 knows; none when it was refused.
     /// </summary>
-    private bool IsAllowed(Pop3LoginOptions options, string mechanism) =>
-        context.Credentials is not null
-        && (options.Method == Pop3LoginMethod.Any || mechanism.Equals(options.RequiredMechanism, StringComparison.OrdinalIgnoreCase));
+    private static string[] KnownOfferedMechanisms(Pop3Capabilities? capabilities) =>
+        (capabilities?.SaslMechanisms ?? []).Where(Pop3LoginOptions.IsKnownMechanism).ToArray();
+
+    /// <summary>
+    /// Writes <c>no auth mechanism offered could be selected</c>, then, as curl 8.21.0's
+    /// Schannel build does: <c>auth EXTERNAL not chosen with password</c> when EXTERNAL is
+    /// enabled and a password was given, and each enabled mechanism's reason in
+    /// <see cref="UnchosenMechanisms" /> order (measured 2026-10-02, BL-1221 Notes).
+    /// </summary>
+    /// <param name="credential">The user name and password given with <c>-u</c>.</param>
+    /// <param name="isEnabled">Whether a mechanism was both offered and allowed, in any case.</param>
+    private void ReportWhyNoneWasChosen(NetworkCredential credential, Func<string, bool> isEnabled)
+    {
+        context.Events.ReportInfo(Pop3SessionMessages.NoSaslMechanismSelectable);
+        if (isEnabled(ExternalMechanism) && credential.Password.Length > 0)
+        {
+            context.Events.ReportInfo(Pop3SessionMessages.SaslExternalNotChosenWithPassword);
+        }
+
+        foreach (string mechanism in UnchosenMechanisms.Where(isEnabled))
+        {
+            foreach (string line in WhyUnchosen(mechanism, credential))
+            {
+                context.Events.ReportInfo(string.Format(CultureInfo.InvariantCulture, line, mechanism));
+            }
+        }
+    }
+
+    /// <summary>
+    /// The <c>-v</c> lines curl 8.21.0's <c>sasl_unchosen</c> writes for an enabled
+    /// <paramref name="mechanism" />, each a format with <c>{0}</c> for its name: <c>not
+    /// builtin</c> for those its Schannel build reports so; otherwise <c>is missing
+    /// CURLOPT_XOAUTH2_BEARER</c> for a bearer mechanism without <c>--oauth2-bearer</c>, and
+    /// <c>is missing username</c> when the user name is empty.
+    /// </summary>
+    private IEnumerable<string> WhyUnchosen(string mechanism, NetworkCredential credential)
+    {
+        if (NotBuiltInMechanisms.Contains(mechanism))
+        {
+            yield return Pop3SessionMessages.SaslMechanismNotBuiltIn;
+            yield break;
+        }
+
+        if (BearerMechanisms.Contains(mechanism) && mail.BearerToken is null)
+        {
+            yield return Pop3SessionMessages.SaslMechanismMissingBearer;
+        }
+
+        if (credential.UserName.Length == 0)
+        {
+            yield return Pop3SessionMessages.SaslMechanismMissingUserName;
+        }
+    }
+
+    /// <summary>
+    /// Whether curl would enable <paramref name="mechanism" />: the login options name it, or
+    /// allow every way and it is not EXTERNAL, which curl tries only when named.
+    /// </summary>
+    private static bool IsAllowed(Pop3LoginOptions options, string mechanism) =>
+        options.Method == Pop3LoginMethod.Any
+            ? !mechanism.Equals(ExternalMechanism, StringComparison.OrdinalIgnoreCase)
+            : mechanism.Equals(options.RequiredMechanism, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Whether <c>USER</c>/<c>PASS</c> may be sent: the login options allow any way, and

@@ -70,6 +70,55 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
             events.Transcript.TakeLast(notBuiltIn.Length + 3).ToArray());
     }
 
+    /// <summary>
+    /// Pins curl 8.21.0's <c>Curl_sasl_is_blocked</c> lines, measured on 2026-10-02 with
+    /// <c>Record-CurlExchange.ps1 -Pop3 -Pop3Reply 'GREETING=+OK POP3 ready','CAPA=...' -CurlArgs
+    /// '-v',...</c> (BL-1221 Notes): nothing is sent after <c>CAPA</c>, and the explanations
+    /// follow <c>could be selected</c> in curl's order, whatever order <c>CAPA</c> used.
+    /// </summary>
+    [TestMethod]
+    [DataRow("+OK\r\nSASL XOAUTH2\r\n.\r\n", "user", null,
+        (string[])["* SASL: XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER"], DisplayName = "SASL XOAUTH2, -u user:secret")]
+    [DataRow("+OK\r\nSASL EXTERNAL\r\n.\r\n", "user", "AUTH=EXTERNAL",
+        (string[])["* SASL: auth EXTERNAL not chosen with password"], DisplayName = "SASL EXTERNAL, AUTH=EXTERNAL, -u user:secret")]
+    [DataRow("+OK\r\nSASL OAUTHBEARER SCRAM-SHA-1\r\n.\r\n", "user", null,
+        (string[])["* SASL: SCRAM-SHA-1 not builtin", "* SASL: OAUTHBEARER is missing CURLOPT_XOAUTH2_BEARER"], DisplayName = "SASL OAUTHBEARER SCRAM-SHA-1, -u user:secret")]
+    [DataRow("+OK\r\nSASL XOAUTH2\r\n.\r\n", "", null,
+        (string[])["* SASL: XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER", "* SASL: XOAUTH2 is missing username"], DisplayName = "SASL XOAUTH2, -u :secret")]
+    [DataRow("+OK\r\nSASL GSSAPI\r\n.\r\n", "user", null, (string[])[], DisplayName = "SASL GSSAPI, -u user:secret")]
+    [DataRow("+OK\r\nSASL EXTERNAL GSSAPI SCRAM-SHA-256 OAUTHBEARER XOAUTH2\r\n.\r\n", "user", null,
+        (string[])["* SASL: SCRAM-SHA-256 not builtin", "* SASL: OAUTHBEARER is missing CURLOPT_XOAUTH2_BEARER", "* SASL: XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER"],
+        DisplayName = "Five offered, EXTERNAL not enabled")]
+    public async Task ExecuteAsync_OfferedMechanismsNoneChosen_WritesWhyEachWasNotChosen(
+        string capaReply, string user, string? loginOptions, string[] reasons)
+    {
+        (TransferResult result, RecordingTransferEvents events, byte[] sent) = await RunAsync(Greeting + capaReply, user, null, loginOptions);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
+        Assert.AreEqual("CAPA\r\n", Encoding.Latin1.GetString(sent));
+        CollectionAssert.AreEqual(
+            (string[])["< .\r\n", "* SASL: no auth mechanism offered could be selected", .. reasons, Closing],
+            events.Transcript.TakeLast(reasons.Length + 3).ToArray());
+    }
+
+    /// <summary>
+    /// The reasons curl leaves out: no EXTERNAL line without a password, and no bearer or user
+    /// name line when both were given (read from <c>lib/curl_sasl.c</c>; curl itself would have
+    /// chosen these mechanisms, so the fake authenticator stands in for one that did not).
+    /// </summary>
+    [TestMethod]
+    [DataRow("+OK\r\nSASL EXTERNAL\r\n.\r\n", "", null, "AUTH=EXTERNAL", DisplayName = "EXTERNAL without a password")]
+    [DataRow("+OK\r\nSASL OAUTHBEARER\r\n.\r\n", "secret", "tok", null, DisplayName = "OAUTHBEARER with a bearer token and user")]
+    public async Task ExecuteAsync_NothingMissing_WritesOnlyThatNoneCouldBeSelected(
+        string capaReply, string password, string? bearerToken, string? loginOptions)
+    {
+        (_, RecordingTransferEvents events, _) = await RunAsync(Greeting + capaReply, "user", bearerToken, loginOptions, password: password);
+
+        CollectionAssert.AreEqual(
+            (string[])["< .\r\n", "* SASL: no auth mechanism offered could be selected", Closing],
+            events.Transcript.TakeLast(3).ToArray());
+    }
+
     [TestMethod]
     [DataRow(null, "tok", null, DisplayName = "--oauth2-bearer")]
     [DataRow("user", null, "AUTH=PLAIN", DisplayName = "AUTH=PLAIN")]
@@ -104,7 +153,7 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
     }
 
     private static async Task<(TransferResult Result, RecordingTransferEvents Events, byte[] Sent)> RunAsync(
-        string replies, string? user, string? bearerToken, string? loginOptions, string path = "1")
+        string replies, string? user, string? bearerToken, string? loginOptions, string path = "1", string password = "secret")
     {
         var events = new RecordingTransferEvents();
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(replies));
@@ -113,7 +162,7 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
             Url = CurlUrl.Parse(Url + path),
             Output = Stream.Null,
             Events = events,
-            Credentials = user is null ? null : new NetworkCredential(user, "secret"),
+            Credentials = user is null ? null : new NetworkCredential(user, password),
             Mail = new MailRequestOptions { BearerToken = bearerToken, LoginOptions = loginOptions },
         };
         // As curl's, the authenticator offers PLAIN for a user name and XOAUTH2 for a bearer token.
