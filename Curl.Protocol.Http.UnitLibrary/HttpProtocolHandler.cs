@@ -238,6 +238,13 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     internal HttpAuthSchemes ProxyAuthSchemes { get; } = proxyAuthSchemes;
 
+    /// <summary>
+    /// Gets or sets whether an HTTP/2 transfer writes curl 8.21.0's <c>--trace-config http/2</c> lines
+    /// (<see cref="Http2FrameTrace" />, BL-1167): the session's creation, every frame sent and received,
+    /// the server's settings and each stream's close. Off by default.
+    /// </summary>
+    public bool TracesHttp2Frames { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException"><paramref name="context" /> is <see langword="null" />.</exception>
     /// <exception cref="OperationCanceledException">
@@ -1097,13 +1104,14 @@ public sealed class HttpProtocolHandler(
     /// none), reporting curl's <c>OPENED stream</c> lines once it is opened (<see cref="HttpStreamOpenedLines" />),
     /// or gives <see langword="null" /> when the connection speaks HTTP/1.x.
     /// </summary>
-    private static IHttpStreamConnection? CreateRequestStream(HttpRequestPlan plan, IHttpStreamSession? streams) =>
+    private IHttpStreamConnection? CreateRequestStream(HttpRequestPlan plan, IHttpStreamSession? streams) =>
         streams?.CreateStream(
             plan.Context.Url.Scheme,
             plan.Framing.Body is null ? 0 : plan.Framing.KnownLength,
             plan.Context.NoBody,
             new HttpStreamOpenedLines(plan.Context.Events, HttpUrlText.Effective(plan.Context.Url)),
-            plan.Context.DiagnosticLog);
+            plan.Context.DiagnosticLog,
+            TracesHttp2Frames ? plan.Context.Events : null);
 
     /// <summary>
     /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one;

@@ -152,7 +152,7 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
     public EndPoint? LocalEndPoint => Connection.LocalEndPoint;
 
     /// <inheritdoc />
-    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null, IDiagnosticLog? diagnosticLog = null) =>
+    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null, IDiagnosticLog? diagnosticLog = null, ITransferEvents? traceEvents = null) =>
         new Http3StreamConnection(this, scheme, bodyLength, ignoresBody, openedLines, HttpFrameLog.For(diagnosticLog, VersionName));
 
     /// <summary>

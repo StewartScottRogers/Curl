@@ -45,6 +45,7 @@ namespace Curl.Console;
 /// <param name="TracesSmtp">Whether the SMTP handler writes the <c>--trace-config smtp</c> lines (<see cref="CurlComposition.TracesSmtp" />, BL-1163).</param>
 /// <param name="TracesWs">Whether the WebSocket handler writes the <c>--trace-config ws</c> lines (<see cref="CurlComposition.TracesWs" />, BL-1164).</param>
 /// <param name="TracesSsh">Whether the SSH handler writes the <c>--trace-config ssh</c> lines (<see cref="CurlComposition.TracesSsh" />, BL-1166).</param>
+/// <param name="TracesHttp2">Whether the HTTP handler writes the <c>--trace-config http/2</c> lines (<see cref="CurlComposition.TracesHttp2" />, BL-1167).</param>
 internal sealed record CurlTransports(
     IDnsResolver DnsResolver,
     TimeProvider TimeProvider,
@@ -62,4 +63,5 @@ internal sealed record CurlTransports(
     bool TracesFtp = false,
     bool TracesSmtp = false,
     bool TracesWs = false,
-    bool TracesSsh = false);
+    bool TracesSsh = false,
+    bool TracesHttp2 = false);

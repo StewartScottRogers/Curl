@@ -136,9 +136,10 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// <param name="ignoresBody">Not used: HTTP/2 fails a reset stream whatever the request wanted.</param>
     /// <param name="openedLines">Reports curl's <c>-v</c> lines for the stream once its HEADERS are sent, or <see langword="null" /> for none.</param>
     /// <param name="diagnosticLog">The transfer's diagnostic log, which the stream's frames are written to, or <see langword="null" /> for none.</param>
+    /// <param name="traceEvents">Where the <c>--trace-config http/2</c> lines go while the stream is the latest opened, or <see langword="null" /> for none.</param>
     /// <returns>The stream.</returns>
-    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null, IDiagnosticLog? diagnosticLog = null) =>
-        new Http2StreamConnection(this, scheme, bodyLength, openedLines, HttpFrameLog.For(diagnosticLog, VersionName));
+    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null, IDiagnosticLog? diagnosticLog = null, ITransferEvents? traceEvents = null) =>
+        new Http2StreamConnection(this, scheme, bodyLength, openedLines, HttpFrameLog.For(diagnosticLog, VersionName), traceEvents is null ? null : new Http2FrameTrace(traceEvents));
 
     /// <summary>
     /// Sends GOAWAY with NO_ERROR, last stream 0 and debug data <c>shutdown</c> and a NUL, as
@@ -158,6 +159,8 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
                 return;
             }
 
+            // curl writes no trace line for the GOAWAY it closes with: its transfer is over (BL-1167 Notes).
+            Frames.FrameObserver = null;
             await Frames.SendGoAwayAsync(Http2ErrorCode.NoError, ShutdownDebugData, cancellationToken).ConfigureAwait(false);
             await Connection.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -335,8 +338,10 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
 
     private async ValueTask<int> OpenStreamAsync(Http2StreamConnection receiver, IReadOnlyList<HeaderField> fields, bool isEndStream, CancellationToken cancellationToken)
     {
+        TraceFramesFor(receiver);
         if (!isPrefaceSent)
         {
+            receiver.FrameTrace?.SessionCreated();
             await Frames.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
             isPrefaceSent = true;
         }
@@ -348,11 +353,18 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         }
 
         int streamId = Register(Frames.OpenStream(), receiver);
+        receiver.ReportOpened(streamId, fields);
         byte[] headerBlock = Encode(fields);
         await Frames.WriteHeadersAsync(streamId, headerBlock, isEndStream, cancellationToken).ConfigureAwait(false);
         receiver.FrameLog.FrameSent("HEADERS", streamId, headerBlock.Length);
         return streamId;
     }
+
+    /// <summary>
+    /// Makes <paramref name="receiver" />'s <c>--trace-config http/2</c> trace the one every frame of
+    /// the connection is reported to from now on, or none when its transfer traces nothing (BL-1167).
+    /// </summary>
+    private void TraceFramesFor(Http2StreamConnection receiver) => Frames.FrameObserver = receiver.FrameTrace;
 
     /// <summary>
     /// Registers <paramref name="receiver" /> as the owner of <paramref name="streamId" />, and
@@ -436,6 +448,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         if (frame.IsEndStream)
         {
             _ = openStreams.Remove(frame.StreamId);
+            owner.FrameTrace?.StreamClosed(frame.StreamId);
         }
     }
 
