@@ -37,3 +37,4 @@ Today `HttpProxyTunnelReply.LeavesConnectionReusable` (`Curl.Networking.UnitLibr
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
