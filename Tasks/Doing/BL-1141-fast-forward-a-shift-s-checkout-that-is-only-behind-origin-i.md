@@ -36,3 +36,4 @@ A coordinator whose checkout is only behind `origin/<branch>` fast-forwards it a
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
