@@ -1,6 +1,6 @@
 # ADR-0186 — A CONNECT tunnel answers a 407 through the injected proxy authenticator
 
-- **Status:** Accepted
+- **Status:** Accepted; amended by [ADR-0333](ADR-0333-a-chunked-407-to-connect-is-discarded-and-the-connection-reused.md) (a chunked `407` is discarded and the connection reused) and [ADR-0334](ADR-0334-a-stale-digest-407-to-connect-is-answered-again-five-reconnects-at-most.md) (a stale Digest `407` is answered again)
 - **Date:** 2026-09-29
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-602.
@@ -51,9 +51,10 @@ it needs from the composition.
    early, makes the connector dial the proxy again (TLS to an HTTPS proxy included) and send
    the answer there; otherwise it discards the body and sends it on the same connection.
 5. **One answer per connect.** A `407` to a CONNECT that sent a credential is the tunnel's
-   exit 7, as curl gives up on a credential sent and challenged again. A Digest `stale=true`
-   retry is not made, as the stateless Digest authenticator (ADR-0025) has no nonce count to go
-   on; curl would retry it.
+   exit 7, as curl gives up on a credential sent and challenged again. The one exception is a
+   Digest challenge carrying `stale=true`: since BL-864 the connector dials again and answers
+   it afresh, at most five reconnects, as curl 8.21.0 does
+   ([ADR-0334](ADR-0334-a-stale-digest-407-to-connect-is-answered-again-five-reconnects-at-most.md)).
 
 ## Consequences
 
