@@ -378,6 +378,11 @@ IP literals and `localhost` (`TcpConnector.IsLocalhost`) are answered without a 
 `_<port>._https.<host>` on any other, and returns the answer's first record decoded, its
 `EchConfigList` the configuration `--ech` uses, or `null`. Its tests
 drive it through `Fakes/FakeConnector`'s `BytesToRead` and through a `TcpConnector` over fakes.
+Per ADR-0356 (BL-1102) its `--trace-config doh` lines go to a `FlowScopedTransferEvents`, an
+`AsyncLocal` view that `TcpConnector.ResolverEvents` points at the resolving target's events before
+each look-up; and `TcpConnector.TracesDnsFilter` wraps a direct connect's events in
+`DnsFilterTraceEvents`, which writes curl 8.21.0's `[DNS]` filter lines around `Trying`,
+`Established connection` and `Failed to connect to`.
 
 Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
 `--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr`, measured against curl 8.22.0's c-ares

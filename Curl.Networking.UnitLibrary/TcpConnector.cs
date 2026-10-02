@@ -210,6 +210,22 @@ public sealed partial class TcpConnector(
     /// given, or one of its own.
     /// </summary>
     public DnsCache DnsCache => _dnsCache;
+
+    /// <summary>
+    /// Gets a value indicating whether a direct connect writes the <c>[DNS]</c> lines curl 8.21.0
+    /// writes for its DNS connection filter under <c>--trace-config dns</c>, <c>doh</c> or <c>all</c>
+    /// (<see cref="DnsFilterTraceEvents" />, BL-1102).
+    /// </summary>
+    public bool TracesDnsFilter { get; init; }
+
+    /// <summary>
+    /// Gets the events a resolver built once per run reports to, such as the
+    /// <see cref="DohDnsResolver" />'s <c>--trace-config doh</c> lines: before each look-up the
+    /// connector points them at the resolving transfer's events (BL-1102); <see langword="null" />
+    /// for none.
+    /// </summary>
+    public FlowScopedTransferEvents? ResolverEvents { get; init; }
+
     private readonly ConditionalWeakTable<ConnectTarget, object> _altSvcReported = new();
     private int _resolveEntriesLoaded;
     private long _nextConnectionNumber;
@@ -511,7 +527,7 @@ public sealed partial class TcpConnector(
             {
                 ({ } unixSocketAddress, _) => await ConnectOverUnixSocketAsync(target, unixSocketAddress, started, limited.Token).ConfigureAwait(false),
                 (null, { } proxy) => await ConnectThroughProxyAsync(target, destination, proxy, started, limited.Token).ConfigureAwait(false),
-                _ => await ConnectDirectlyAsync(target, destination, started, limited.Token).ConfigureAwait(false),
+                _ => await ConnectDirectlyAsync(TracingDnsFilter(target, destination), destination, started, limited.Token).ConfigureAwait(false),
             };
         }
         catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= connectLimit)
@@ -549,6 +565,13 @@ public sealed partial class TcpConnector(
 
         return new ConnectDestination(alternative.Host, alternative.Port, IsMapped: true, ParseError: null);
     }
+
+    // Under TracesDnsFilter a direct connect reports through DnsFilterTraceEvents, which writes
+    // curl's [DNS] filter lines around its own (BL-1102); otherwise the target is as given.
+    private ConnectTarget TracingDnsFilter(ConnectTarget target, ConnectDestination destination) =>
+        TracesDnsFilter
+            ? target with { Events = DnsFilterTraceEvents.Start(target.Events, destination.Host, destination.Port) }
+            : target;
 
     private static TimeSpan ConnectTimeoutOrDefault(TimeSpan? connectTimeout) =>
         connectTimeout is { } given && given > TimeSpan.Zero ? given : DefaultConnectTimeout;
@@ -730,7 +753,7 @@ public sealed partial class TcpConnector(
             return new DnsResolution(fromCache, DnsLookupFailure.None);
         }
 
-        var (addresses, failure) = await LookUpAsync(host, cancellationToken).ConfigureAwait(false);
+        var (addresses, failure) = await LookUpAsync(host, target.Events, cancellationToken).ConfigureAwait(false);
         var answered = IsLocalhost(host) ? addresses : AddressFamilyFilter.Dialable(host, addresses, addressFamily);
         if (answered.Count > 0)
         {
@@ -762,10 +785,17 @@ public sealed partial class TcpConnector(
     }
 
     /// <summary>Asks the resolver, with its failure reason when it gives one.</summary>
-    private async ValueTask<DnsResolution> LookUpAsync(string host, CancellationToken cancellationToken) =>
-        dnsResolver is IDnsResolverWithFailureReason withFailureReason
+    /// <summary>
+    /// Asks the resolver, with its failure reason when it gives one, with <see cref="ResolverEvents" />
+    /// pointed at <paramref name="events" /> for the look-up.
+    /// </summary>
+    private async ValueTask<DnsResolution> LookUpAsync(string host, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        ResolverEvents?.Current = events;
+        return dnsResolver is IDnsResolverWithFailureReason withFailureReason
             ? await withFailureReason.ResolveWithFailureReasonAsync(host, cancellationToken).ConfigureAwait(false)
             : new DnsResolution(await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false), DnsLookupFailure.None);
+    }
 
     private IReadOnlyList<IPAddress> AnswerFromCache(string host, DnsCacheEntry cached, ITransferEvents events)
     {
