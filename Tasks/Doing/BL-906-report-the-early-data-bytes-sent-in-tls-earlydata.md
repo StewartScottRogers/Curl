@@ -38,3 +38,4 @@ completed:
 - 2026-09-29: Created.
 - 2026-10-01: Backlog -> Doing.
 - 2026-10-01: Doing -> Backlog. Waits on BL-1105: no provider sends TLS 1.3 early data yet, so there is no byte count to report
+- 2026-10-01: Backlog -> Doing.
