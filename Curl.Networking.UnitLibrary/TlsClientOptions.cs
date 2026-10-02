@@ -174,6 +174,18 @@ namespace Curl.Networking;
 /// <see cref="Networking.CertificateRevocationListFile" />, ADR-0197). The Schannel build ignores it,
 /// as curl 8.21.0's does (measured, BL-609).
 /// </param>
+/// <param name="NoSessionId">
+/// <see langword="true" /> for curl's <c>--no-sessionid</c>: no TLS session is offered or kept, so every
+/// connection of the run makes a full handshake. <c>SslStream</c> cannot stop the operating system's
+/// process-wide session cache, so <see cref="TlsClientRouting" /> sends such a connection to
+/// <see cref="HandBuiltTlsProvider" />, which then neither offers nor keeps a session (ADR-0151, BL-713).
+/// </param>
+/// <param name="AllowBeast">
+/// <see langword="true" /> for curl's <c>--ssl-allow-beast</c> (<c>--proxy-ssl-allow-beast</c> for an HTTPS
+/// proxy): a TLS 1.0 CBC write goes out whole, without the empty application data record OpenSSL sends
+/// before it (ADR-0150). <see cref="TlsClientRouting" /> sends a connection with it whose range reaches
+/// TLS 1.0 to <see cref="HandBuiltTlsProvider" />, since <c>SslStream</c> has no control for the split.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsVersion MinimumVersion = TlsVersion.SystemDefault,
@@ -204,4 +216,6 @@ public sealed record TlsClientOptions(
     bool RequireCertificateStatus = false,
     bool AutoClientCertificate = false,
     string? PinnedPublicKey = null,
-    string? CertificateRevocationListFile = null);
+    string? CertificateRevocationListFile = null,
+    bool NoSessionId = false,
+    bool AllowBeast = false);

@@ -380,8 +380,9 @@ internal static class CurlComposition
     /// <param name="timeProvider">The clock the provider times its handshakes on.</param>
     /// <returns>The provider.</returns>
     /// <param name="sessions">
-    /// The run's <c>--ssl-sessions</c> cache, which the hand-built provider offers and keeps
-    /// sessions in when <see cref="TlsClientOptions.SslSessionsFile" /> is given (ADR-0319);
+    /// The run's TLS session cache, which the hand-built provider offers and keeps sessions in,
+    /// so a later connection resumes as curl's does, unless <see cref="TlsClientOptions.NoSessionId" />
+    /// (BL-713); <c>--ssl-sessions</c> loads and saves it (ADR-0319);
     /// <see langword="null" /> for none.
     /// </param>
     /// <param name="echConfigs">
@@ -390,7 +391,7 @@ internal static class CurlComposition
     /// </param>
     internal static ITlsProviderWithWarnings CreateTlsProvider(TlsClientOptions options, TimeProvider timeProvider, TlsSessionCache? sessions = null, IEchConfigListLookup? echConfigs = null) =>
         TlsClientRouting.Choose(options) != TlsClientRoute.HandBuilt ? new SslStreamTlsProvider(options, timeProvider)
-            : new HandBuiltTlsProvider(options, timeProvider, options.SslSessionsFile is null ? null : sessions, echConfigs);
+            : new HandBuiltTlsProvider(options, timeProvider, sessions, echConfigs);
 
     /// <summary>
     /// Creates the network transports as <see cref="CreateTransports(CommandLineOptions)" /> does,

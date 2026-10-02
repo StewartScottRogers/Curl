@@ -95,7 +95,7 @@ public sealed partial class CurlCompositionTests
     }
 
     [TestMethod]
-    public void CreateTransports_ProxyCaNativeAndProxySslAllowBeast_ChangeNeitherHandshake()
+    public void CreateTransports_ProxyCaNativeAndProxySslAllowBeast_LeaveTheTargetAndChangeOnlyTheProxysSplit()
     {
         // curl ... --proxy-ca-native (without --proxy-insecure) against a self-signed proxy is exit 60, as
         // without it; --proxy-ssl-allow-beast is exit 0 (curl 8.21.0, 2026-09-30).
@@ -103,7 +103,7 @@ public sealed partial class CurlCompositionTests
         CurlTransports with = CurlComposition.CreateTransports(
             Parse("-x", HttpsProxyUrl, "--proxy-ca-native", "--proxy-ssl-allow-beast", ProxiedUrl));
 
-        Assert.AreEqual(without.ProxyTlsClientOptions, with.ProxyTlsClientOptions);
+        Assert.AreEqual(without.ProxyTlsClientOptions with { AllowBeast = true }, with.ProxyTlsClientOptions);
         Assert.AreEqual(without.TlsClientOptions, with.TlsClientOptions);
     }
 

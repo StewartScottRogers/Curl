@@ -58,7 +58,9 @@ internal static class TlsClientOptionsMapping
     /// ADR-0191's <see cref="CommandLineOptions.RequireCertificateStatus" /> (<c>--cert-status</c>) and
     /// <see cref="CommandLineOptions.AutoClientCertificate" /> (<c>--ssl-auto-client-cert</c>); and
     /// ADR-0193's <see cref="CommandLineOptions.PinnedPublicKey" /> (<c>--pinnedpubkey</c>); and ADR-0197's
-    /// <see cref="CommandLineOptions.CertificateRevocationListFile" /> (<c>--crlfile</c>).
+    /// <see cref="CommandLineOptions.CertificateRevocationListFile" /> (<c>--crlfile</c>); and, by ADR-0151 (BL-713),
+    /// <see cref="CommandLineOptions.ReuseSessionIds" /> negated as <see cref="TlsClientOptions.NoSessionId" />
+    /// (<c>--no-sessionid</c>) and <see cref="CommandLineOptions.AllowBeast" /> (<c>--ssl-allow-beast</c>).
     /// </returns>
     internal static TlsClientOptions FromCommandLine(CommandLineOptions options) =>
         new(
@@ -91,7 +93,9 @@ internal static class TlsClientOptionsMapping
             options.RequireCertificateStatus,
             options.AutoClientCertificate,
             options.PinnedPublicKey,
-            options.CertificateRevocationListFile);
+            options.CertificateRevocationListFile,
+            !options.ReuseSessionIds,
+            options.AllowBeast);
 
     /// <summary>
     /// Maps the proxy TLS options of a parsed command line onto the <see cref="TlsClientOptions" />
@@ -122,8 +126,9 @@ internal static class TlsClientOptionsMapping
     /// and, as the target's counterparts map (BL-611), <see cref="CommandLineOptions.ProxyPinnedPublicKey" />
     /// (<c>--proxy-pinnedpubkey</c>) as <see cref="TlsClientOptions.PinnedPublicKey" /> and
     /// <see cref="CommandLineOptions.ProxyCertificateRevocationListFile" /> (<c>--proxy-crlfile</c>) as
-    /// <see cref="TlsClientOptions.CertificateRevocationListFile" />, verbatim. <c>--proxy-ca-native</c> and
-    /// <c>--proxy-ssl-allow-beast</c> map to nothing, as <c>--ca-native</c> (ADR-0124) and <c>--ssl-allow-beast</c> do;
+    /// <see cref="TlsClientOptions.CertificateRevocationListFile" />, verbatim. <c>--proxy-ca-native</c> maps to nothing,
+    /// as <c>--ca-native</c> does (ADR-0124); <see cref="CommandLineOptions.ProxyAllowBeast" /> (<c>--proxy-ssl-allow-beast</c>)
+    /// as <see cref="TlsClientOptions.AllowBeast" /> and <c>--no-sessionid</c> as <see cref="TlsClientOptions.NoSessionId" />, as for the target (BL-713);
     /// <see cref="CommandLineOptions.UseAlpn" /> (<c>--no-alpn</c>) as <see cref="TlsClientOptions.UseAlpn" />,
     /// since curl 8.21.0 offers no ALPN to the proxy under <c>--no-alpn</c> (measured, ADR-0190, BL-871);
     /// every other setting is its default. Neither the target's minimum nor <c>--tls-max</c> reaches the proxy: curl 8.21.0
@@ -146,7 +151,9 @@ internal static class TlsClientOptionsMapping
             AutoClientCertificate: options.ProxyAutoClientCertificate,
             PinnedPublicKey: options.ProxyPinnedPublicKey,
             CertificateRevocationListFile: options.ProxyCertificateRevocationListFile,
-            UseAlpn: options.UseAlpn);
+            UseAlpn: options.UseAlpn,
+            NoSessionId: !options.ReuseSessionIds,
+            AllowBeast: options.ProxyAllowBeast);
 
     /// <summary>
     /// Maps the TLS options that reach the DNS-over-HTTPS server onto the <see cref="TlsClientOptions" />

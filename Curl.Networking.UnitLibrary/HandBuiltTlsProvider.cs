@@ -77,13 +77,14 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <summary>
     /// Creates the provider for the curl build this platform usually runs, offering each TLS
     /// 1.3 handshake a session from <paramref name="sessions" /> and keeping the session
-    /// tickets it receives there (<c>--ssl-sessions</c>, ADR-0319), and finding a
+    /// tickets it receives there (the run's cache, which <c>--ssl-sessions</c> also loads and saves,
+    /// ADR-0319; none under <c>--no-sessionid</c>, BL-713), and finding a
     /// host's ECHConfigList for <c>--ech true</c> or <c>hard</c> without <c>ecl:</c> through
     /// <paramref name="echConfigs" /> (ADR-0327).
     /// </summary>
     /// <param name="options">The settings applied to every handshake.</param>
     /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
-    /// <param name="sessions">The run's session cache under <c>--ssl-sessions</c>, or <see langword="null" /> to neither offer nor keep sessions.</param>
+    /// <param name="sessions">The run's session cache, or <see langword="null" /> to neither offer nor keep sessions.</param>
     /// <param name="echConfigs">Finds a host's ECHConfigList through DoH, or <see langword="null" /> when no DoH server is used.</param>
     public HandBuiltTlsProvider(TlsClientOptions options, TimeProvider timeProvider, TlsSessionCache? sessions, IEchConfigListLookup? echConfigs)
         : this(options, OperatingSystem.IsWindows(), timeProvider, new SystemClientCertificateStore(), SystemTlsRandomSource.Instance, sessions, echConfigs)
@@ -102,7 +103,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
     /// <param name="certificateStore">Opens the store a Schannel <c>--cert</c> store path names.</param>
     /// <param name="random">The source of the client's randoms and key shares.</param>
-    /// <param name="sessions">The run's session cache under <c>--ssl-sessions</c>, or <see langword="null" /> to neither offer nor keep sessions.</param>
+    /// <param name="sessions">The run's session cache, or <see langword="null" /> to neither offer nor keep sessions.</param>
     /// <param name="echConfigs">Finds a host's ECHConfigList for <c>--ech</c>, or <see langword="null" /> when no DoH server is used.</param>
     /// <exception cref="ArgumentException">
     /// <see cref="TlsClientOptions.MinimumVersion" /> is above <see cref="TlsClientOptions.MaximumVersion" />.
@@ -274,9 +275,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             : certificate.GetECDsaPrivateKey() is { } ecdsa ? new EcdsaTlsSigningKey(ecdsa)
             : null;
 
-    // The connection's peer key in the --ssl-sessions cache, or null when there is no cache.
+    // The connection's peer key in the run's session cache, or null when there is no cache or,
+    // under --no-sessionid, sessions are neither offered nor kept (BL-713).
     private string? SessionPeerKey(string targetHost, EndPoint? remoteEndPoint) =>
-        _sessions is null ? null : TlsSessionCache.PeerKey(targetHost, PortOf(remoteEndPoint), _options);
+        _sessions is null || _options.NoSessionId ? null : TlsSessionCache.PeerKey(targetHost, PortOf(remoteEndPoint), _options);
 
     // The session the ClientHello offers to resume: taken out of the cache, as curl takes a TLS 1.3 one.
     private TlsSessionRecord? OfferedSession(string? peerKey) => peerKey is null ? null : _sessions!.Take(peerKey);
@@ -289,6 +291,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             _sessions!.Track(peerKey, () => ReceivedSessionsOf(stream));
         }
     }
+
+    // Whether a TLS 1.0 CBC write is preceded by OpenSSL's empty application data record (ADR-0150):
+    // always, unless --ssl-allow-beast or --proxy-ssl-allow-beast turns the split off (BL-713).
+    internal static bool InsertsEmptyFragment(TlsClientOptions options) => !options.AllowBeast;
 
     // The port the session cache's peer key names: the connection's, or https's when the
     // connection does not know its address.
@@ -678,6 +684,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             OfferExtendedMasterSecret = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.ExtendedMasterSecret),
             OfferEncryptThenMac = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.EncryptThenMac),
             SrpCredentials = SrpCredentials,
+            InsertEmptyFragment = InsertsEmptyFragment(options),
         };
 
         private static bool ReachesTls13(TlsClientOptions options) => options.MaximumVersion is TlsVersion.SystemDefault or TlsVersion.Tls13;

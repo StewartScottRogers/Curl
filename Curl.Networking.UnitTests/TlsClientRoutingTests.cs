@@ -65,6 +65,24 @@ public sealed class TlsClientRoutingTests
     public void Choose_WithSslSessions_IsTheHandBuiltClient() =>
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(SslSessionsFile: "sessions.txt")));
 
+    // ADR-0151's --no-sessionid row (BL-713): SslStream cannot stop the system's session cache.
+    [TestMethod]
+    public void Choose_WithNoSessionId_IsTheHandBuiltClient() =>
+        Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(NoSessionId: true)));
+
+    // ADR-0151's --ssl-allow-beast row (BL-713): only a range reaching TLS 1.0 can split, and a
+    // TLS 1.0 or 1.1 ceiling is hand-built already, so a TLS 1.0 minimum below a higher one routes.
+    [TestMethod]
+    [DataRow(TlsVersion.Tls10, TlsClientRoute.HandBuilt)]
+    [DataRow(TlsVersion.SystemDefault, TlsClientRoute.SslStream)]
+    [DataRow(TlsVersion.Tls12, TlsClientRoute.SslStream)]
+    public void Choose_WithSslAllowBeast_IsTheHandBuiltClientOnlyWhenTheRangeReachesTls10(TlsVersion minimum, TlsClientRoute expected) =>
+        Assert.AreEqual(expected, TlsClientRouting.Choose(new TlsClientOptions(MinimumVersion: minimum, AllowBeast: true)));
+
+    [TestMethod]
+    public void Choose_WithATls10MinimumAlone_IsSslStream() =>
+        Assert.AreEqual(TlsClientRoute.SslStream, TlsClientRouting.Choose(new TlsClientOptions(MinimumVersion: TlsVersion.Tls10)));
+
     // ADR-0327's row: --ech in any mode but false, since SslStream offers no Encrypted Client Hello.
     [TestMethod]
     [DataRow("grease", null)]

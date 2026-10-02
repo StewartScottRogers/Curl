@@ -1031,7 +1031,8 @@ public sealed class CommandLineOptions
     /// <summary>
     /// <see langword="true"/> when <c>--ssl-allow-beast</c> was given and no <c>--no-ssl-allow-beast</c> came after it:
     /// leave the TLS 1.0 BEAST workaround (record splitting) off, for servers that cannot handle it.
-    /// Parsed only: <c>SslStream</c> has no control for it, so the hand-built TLS client of BL-713 honours it.
+    /// <c>SslStream</c> has no control for it, so a connection whose range reaches TLS 1.0 runs on the hand-built
+    /// TLS client, which then writes each TLS 1.0 CBC record whole (ADR-0151, BL-713).
     /// </summary>
     public bool AllowBeast { get; internal set; }
 
@@ -1051,7 +1052,8 @@ public sealed class CommandLineOptions
     /// <summary>
     /// <see langword="false"/> when the last of <c>--sessionid</c> and <c>--no-sessionid</c> was <c>--no-sessionid</c>:
     /// never resume a cached TLS session. <see langword="true"/> otherwise, as curl caches session IDs by default.
-    /// Parsed only: <c>SslStream</c> has no control for it, so the hand-built TLS client of BL-713 honours it.
+    /// <c>SslStream</c> cannot stop the system's session cache, so with it every connection runs on the hand-built
+    /// TLS client, which neither offers nor keeps a session (ADR-0151, BL-713).
     /// </summary>
     public bool ReuseSessionIds { get; internal set; } = true;
 

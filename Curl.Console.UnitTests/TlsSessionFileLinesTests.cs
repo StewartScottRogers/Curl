@@ -106,6 +106,7 @@ public sealed class TlsSessionFileLinesTests
         Assert.IsInstanceOfType<HandBuiltTlsProvider>(CurlComposition.CreateTlsProvider(new TlsClientOptions(Curves: "X25519"), TimeProvider.System, sessions));
         Assert.IsInstanceOfType<HandBuiltTlsProvider>(CurlComposition.CreateTlsProvider(new TlsClientOptions(SslSessionsFile: "s"), TimeProvider.System));
         Assert.IsInstanceOfType<SslStreamTlsProvider>(CurlComposition.CreateTlsProvider(new TlsClientOptions(), TimeProvider.System, sessions));
+        Assert.IsInstanceOfType<HandBuiltTlsProvider>(CurlComposition.CreateTlsProvider(new TlsClientOptions(NoSessionId: true), TimeProvider.System, sessions));
     }
 
     private static CommandLineOptions Parse(params string[] arguments) =>
