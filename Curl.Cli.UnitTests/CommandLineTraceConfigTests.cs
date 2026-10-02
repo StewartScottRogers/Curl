@@ -106,7 +106,28 @@ public sealed class CommandLineTraceConfigTests
     [TestMethod]
     public void Parse_NoTraceConfig_TurnsOnNoComponent()
     {
-        Assert.AreEqual(0, Accept("-vvvv").TraceComponents.Count);
+        Assert.AreEqual(0, Accept("-v").TraceComponents.Count);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-vv" }, new[] { "setup" })]
+    [DataRow(new[] { "-vsv" }, new[] { "setup" })]
+    [DataRow(new[] { "-vvv" }, new[] { "setup", "read", "write" })]
+    [DataRow(new[] { "-vvvv" }, new[] { "setup", "read", "write", "all" })]
+    [DataRow(new[] { "-vvvvv" }, new[] { "setup", "read", "write", "all" })]
+    [DataRow(new[] { "--trace-config", "-setup", "-vv" }, new[] { "setup" })]
+    [DataRow(new[] { "-vv", "--trace-config", "-network" }, new[] { "setup" })]
+    [DataRow(new[] { "-vvv", "--trace-config", "-read" }, new[] { "setup", "write" })]
+    [DataRow(new[] { "-vv", "--trace-config", "-setup" }, new string[0])]
+    [DataRow(new[] { "-vv", "--trace-config", "-all" }, new string[0])]
+    [DataRow(new[] { "-vv", "-v" }, new string[0])]
+    [DataRow(new[] { "-vv", "--no-verbose", "-v" }, new string[0])]
+    [DataRow(new[] { "--trace-config", "setup", "-v", "--no-verbose", "-v" }, new string[0])]
+    [DataRow(new[] { "--trace-config", "dns", "-v", "-v" }, new[] { "dns" })]
+    [DataRow(new[] { "-vv", "--trace-config", "setup", "-v" }, new[] { "setup" })]
+    public void Parse_VerbosityAndTraceConfig_TurnOnTheComponentsCurlTurnsOn(string[] arguments, string[] expected)
+    {
+        CollectionAssert.AreEquivalent(expected, Accept(arguments).TraceComponents.ToArray());
     }
 
     [TestMethod]

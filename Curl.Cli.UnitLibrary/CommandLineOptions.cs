@@ -294,6 +294,9 @@ public sealed class CommandLineOptions
     /// The trace component names <c>--trace-config</c> turned on and did not turn off again, in lower
     /// case: <c>tls</c>, <c>http/1</c>, <c>dns</c>, <c>doh</c> and the rest, with <c>all</c> standing for
     /// every component. Names curl does not know are kept too, since curl 8.21.0 ignores them silently.
+    /// <c>-vv</c> adds <c>setup</c>, <c>-vvv</c> <c>read</c> and <c>write</c>, and <c>-vvvv</c> <c>all</c>; a
+    /// first <c>-v</c> takes those out again unless a <c>--trace-config</c> named them since, and
+    /// <c>--no-verbose</c> and <c>--trace-config -all</c> empty the set (measured, BL-1103 Notes).
     /// </summary>
     public IReadOnlySet<string> TraceComponents => globals.TraceComponents;
 
@@ -379,9 +382,67 @@ public sealed class CommandLineOptions
         globals.TraceConfigTime = on;
     }
 
-    /// <summary>Adds <paramref name="name"/> to <see cref="TraceComponents"/>, or takes it out when <paramref name="on"/> is <see langword="false"/>.</summary>
-    private void SetTraceComponent(string name, bool on) =>
-        _ = on ? globals.TraceComponents.Add(name) : globals.TraceComponents.Remove(name);
+    /// <summary>
+    /// Adds <paramref name="name"/> to <see cref="TraceComponents"/>, or takes it out when <paramref name="on"/>
+    /// is <see langword="false"/>; <c>-all</c> takes every name out, the <c>-vv</c> ones included (measured
+    /// 2026-10-02: <c>-vv --trace-config -all</c> writes no <c>[SETUP]</c> lines, BL-1103 Notes).
+    /// </summary>
+    private void SetTraceComponent(string name, bool on)
+    {
+        globals.VerbosityTraceComponents.Remove(name);
+        if (on)
+        {
+            globals.TraceComponents.Add(name);
+        }
+        else if (name == "all")
+        {
+            ClearTraceComponents();
+        }
+        else
+        {
+            globals.TraceComponents.Remove(name);
+        }
+    }
+
+    /// <summary>Empties <see cref="TraceComponents"/>, as <c>--no-verbose</c> and <c>--trace-config -all</c> do.</summary>
+    private void ClearTraceComponents()
+    {
+        globals.TraceComponents.Clear();
+        globals.VerbosityTraceComponents.Clear();
+    }
+
+    /// <summary>
+    /// The trace components curl 8.21.0 turns on at each <see cref="Verbosity"/> (measured 2026-10-02 with
+    /// <c>Record-CurlExchange.ps1</c>, BL-1103 Notes): <c>-vv</c> writes the <c>[SETUP]</c> lines, <c>-vvv</c>
+    /// adds <c>[READ]</c> and <c>[WRITE]</c>, and <c>-vvvv</c> every component, as <c>all</c> does.
+    /// </summary>
+    /// <param name="verbosity">The verbosity just reached, 2 to 4.</param>
+    /// <returns>The component names to turn on.</returns>
+    private static string[] VerbosityTraceComponentsAt(int verbosity) => verbosity switch
+    {
+        2 => ["setup"],
+        3 => ["read", "write"],
+        _ => ["all"],
+    };
+
+    /// <summary>Turns on the components <paramref name="verbosity"/> brings, remembering them as <c>-v</c>'s own.</summary>
+    private void AddVerbosityTraceComponents(int verbosity)
+    {
+        foreach (string name in VerbosityTraceComponentsAt(verbosity))
+        {
+            if (globals.TraceComponents.Add(name))
+            {
+                globals.VerbosityTraceComponents.Add(name);
+            }
+        }
+    }
+
+    /// <summary>Takes out the components <c>-vv</c> and up turned on, as a first <c>-v</c> does (<c>-vv -v</c> writes no <c>[SETUP]</c>).</summary>
+    private void RemoveVerbosityTraceComponents()
+    {
+        globals.TraceComponents.ExceptWith(globals.VerbosityTraceComponents);
+        globals.VerbosityTraceComponents.Clear();
+    }
 
     /// <summary>
     /// The file the last <c>--stderr</c> names, to which curl writes what it would write to standard
@@ -1926,6 +1987,7 @@ public sealed class CommandLineOptions
             Verbosity = 0;
             TraceTime = false;
             TraceIds = false;
+            RemoveVerbosityTraceComponents();
         }
 
         if (!on)
@@ -1934,6 +1996,7 @@ public sealed class CommandLineOptions
             TraceFile = null;
             globals.TraceConfigIds = false;
             globals.TraceConfigTime = false;
+            ClearTraceComponents();
             return;
         }
 
@@ -1969,7 +2032,14 @@ public sealed class CommandLineOptions
             TraceIds = true;
         }
 
-        Verbosity = Math.Min(Verbosity + 1, MostVerbose);
+        if (Verbosity < MostVerbose)
+        {
+            Verbosity++;
+            if (Verbosity > 1)
+            {
+                AddVerbosityTraceComponents(Verbosity);
+            }
+        }
     }
 
     /// <summary>
