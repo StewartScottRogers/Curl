@@ -239,6 +239,7 @@ namespace Curl.Console;
 /// does (measured 2026-09-26, BL-237).
 /// </para>
 /// </remarks>
+/// <param name="lateBoundDiagnosticLog">The log the authenticators were composed with, bound to the run's diagnostic log once it is open (BL-923); <see langword="null" /> when none was composed.</param>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
     IFileSystem fileSystem,
@@ -262,7 +263,8 @@ internal sealed class CurlCommandRunner(
     string? accountHomeDirectory = null,
     IAsyncDisposable? runConnectionCache = null,
     TlsSessionCache? tlsSessions = null,
-    IExtendedAttributeWriter? extendedAttributeWriter = null)
+    IExtendedAttributeWriter? extendedAttributeWriter = null,
+    LateBoundDiagnosticLog? lateBoundDiagnosticLog = null)
 {
     /// <summary>
     /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
@@ -719,6 +721,7 @@ internal sealed class CurlCommandRunner(
 
         diagnosticLog = runDiagnosticLog.Log;
         transferContextFactory.DiagnosticLog = diagnosticLog;
+        lateBoundDiagnosticLog?.Bind(diagnosticLog);
         LogCommandLine(parsed, filesTriedWhileParsing);
     }
 

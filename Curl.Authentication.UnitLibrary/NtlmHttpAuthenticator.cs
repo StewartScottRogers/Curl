@@ -23,9 +23,16 @@ namespace Curl.Authentication;
 /// Type 1 message and then the challenge; both routes write the same Type 1 for the same
 /// credential every time, so SSPI's message integrity code over the three messages still
 /// covers the Type 1 that was sent.
+/// Each round, each refused round and each failure that ends the transfer is written to the
+/// diagnostic log, never a message byte (BL-923).
 /// </remarks>
-public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContexts, bool refusedChallengeFailsTransfer)
+/// <param name="diagnosticLog">Where the rounds and refusals are logged; <see langword="null" /> logs nothing.</param>
+public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContexts, bool refusedChallengeFailsTransfer, IDiagnosticLog? diagnosticLog = null)
 {
+    private const string SchemeName = "NTLM";
+
+    private readonly AuthDiagnosticLog log = new(diagnosticLog);
+
     /// <summary>The message curl prints for exit 94, <see cref="CurlExitCode.AuthError" />.</summary>
     public const string AuthErrorMessage = "An authentication function returned an error";
 
@@ -78,6 +85,7 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
         string? token = HttpChallengeSchemes.NtlmTokenOf(challenges);
         if (sentAuthorization is not null && CarriesAuthenticateMessage(sentAuthorization))
         {
+            log.Skipped(SchemeName, "the server answered the type 3 message with another challenge");
             ReportRefusedIfBare(request.Events, token, NtlmHandshakeLines.Rejected);
             return null;
         }
@@ -168,7 +176,22 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
     private async ValueTask<string?> CreateNegotiateAsync(HttpAuthRequest request, CancellationToken cancellationToken)
     {
         using ISecurityContext context = securityContexts.Create(ContextRequestFor(request));
-        return HeaderOf(await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false));
+        SecurityContextStep negotiate = await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
+        string? header = HeaderOf(negotiate);
+        LogRound(header, "type 1 sent", negotiate.Status);
+        return header;
+    }
+
+    // Logs a round that made a header at verbose, and one that made none at warning, by status.
+    private void LogRound(string? header, string round, SecurityContextStatus status)
+    {
+        if (header is not null)
+        {
+            log.Round(SchemeName + " " + round);
+            return;
+        }
+
+        log.Skipped(SchemeName, $"the security context made no message ({status})");
     }
 
     private async ValueTask<string?> CreateAuthenticateAsync(HttpAuthRequest request, byte[] challenge, CancellationToken cancellationToken)
@@ -179,6 +202,7 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
             ? await context.NextTokenAsync(challenge, cancellationToken).ConfigureAwait(false)
             : negotiate;
         string? header = HeaderOf(authenticate);
+        LogRound(header, "type 2 received, type 3 sent", authenticate.Status);
         if (header is not null)
         {
             return header;
@@ -187,12 +211,12 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
         if (refusedChallengeFailsTransfer)
         {
             request.Events.ReportInfo(NtlmHandshakeLines.Type3Failure(authenticate.Status));
-            throw new HttpAuthenticationFailedException(CurlExitCode.AuthError, AuthErrorMessage);
+            throw Failed(CurlExitCode.AuthError, AuthErrorMessage);
         }
 
         if (authenticate.Status == SecurityContextStatus.Refused)
         {
-            throw new HttpAuthenticationFailedException(CurlExitCode.TooLarge, TooLargeMessageFor(context));
+            throw Failed(CurlExitCode.TooLarge, TooLargeMessageFor(context));
         }
 
         ReportRefused(request.Events, NtlmHandshakeLines.BadType2);
@@ -203,6 +227,12 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
     /// Gets the message curl prints for the buffer check that refused the Type 3 message: the
     /// responses check for curl's own NTLM that says so, the names check otherwise.
     /// </summary>
+    private HttpAuthenticationFailedException Failed(CurlExitCode exitCode, string message)
+    {
+        log.Failed(SchemeName, exitCode, message);
+        return new HttpAuthenticationFailedException(exitCode, message);
+    }
+
     private static string TooLargeMessageFor(ISecurityContext context) =>
         context is HandBuiltNtlmSecurityContext { AnswerRefusedBecause: NtlmMessageFailure.ResponsesTooLarge }
             ? ResponsesTooLargeMessage

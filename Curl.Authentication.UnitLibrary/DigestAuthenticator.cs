@@ -28,10 +28,14 @@ namespace Curl.Authentication;
 /// state (ADR-0014), every answer to a challenge is the first for its nonce: <c>nc=00000001</c>.
 /// An answer sent again on a request that keeps it (<see cref="RepeatAuthorization" />) is
 /// read back from the value as sent and counted on, as curl counts its kept nonce (BL-869).
-/// <c>auth-int</c> hashes an empty body, as curl does whatever the body.
+/// <c>auth-int</c> hashes an empty body, as curl does whatever the body. The algorithm and qop
+/// each first answer uses are written to the diagnostic log at <c>verbose</c> (BL-923).
 /// </remarks>
-public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string> createClientNonce) : IHttpAuthenticator
+/// <param name="diagnosticLog">Where the algorithm and qop chosen are logged; <see langword="null" /> logs nothing.</param>
+public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string> createClientNonce, IDiagnosticLog? diagnosticLog = null) : IHttpAuthenticator
 {
+    private readonly AuthDiagnosticLog log = new(diagnosticLog);
+
     private const string SchemeName = "Digest";
 
     private const uint FirstNonceCount = 1;
@@ -45,8 +49,14 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
         return (request.AllowedSchemes & HttpAuthSchemes.Digest) != 0
             && request.Credential is { } credential
             && DigestChallenge.ReadFirst(challenges) is { } challenge
-                ? SchemeName + " " + CreateResponse(challenge, credential, request, createClientNonce(), FirstNonceCount)
+                ? CreateFirstAnswer(challenge, credential, request)
                 : null;
+    }
+
+    private string CreateFirstAnswer(DigestChallenge challenge, NetworkCredential credential, HttpAuthRequest request)
+    {
+        log.DigestParametersChosen(challenge.AlgorithmName, challenge.Qop);
+        return SchemeName + " " + CreateResponse(challenge, credential, request, createClientNonce(), FirstNonceCount);
     }
 
     /// <summary>

@@ -61,3 +61,8 @@ curl 8.21.0's `http_aws_sigv4.c`, quirks included; `AwsSigV4Scope` parses `--aws
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network.
+
+Diagnostic log (BL-923, ADR-0339): `RankedHttpAuthenticator`, `DigestAuthenticator`, `NtlmHttpAuthenticator`,
+`SaslAuthenticator` and `RoutingSecurityContextFactory` take an optional `IDiagnosticLog` and write their
+choices through `AuthDiagnosticLog` (component `auth`), by scheme, mechanism and status name only, never a
+credential or token byte. Netrc, SigV4 and Negotiate rounds follow in BL-1151.

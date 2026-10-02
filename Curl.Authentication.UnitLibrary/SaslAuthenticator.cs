@@ -50,13 +50,19 @@ namespace Curl.Authentication;
 /// answers from the server's challenge; DIGEST-MD5 answers the server's <c>rspauth</c>
 /// with an empty response, as curl does.
 /// </para>
+/// The mechanism chosen from the server's list, each exchange begun, and a DIGEST-MD5 answer
+/// that fails the transfer are written to the diagnostic log, never a credential (BL-923).
 /// </remarks>
+/// <param name="diagnosticLog">Where the mechanism choices are logged; <see langword="null" /> logs nothing.</param>
 public sealed class SaslAuthenticator(
     Encoding credentialEncoding,
     Func<string> createClientNonce,
     bool answerDigestMd5AsSspi,
-    ISecurityContextFactory? securityContexts) : ISaslAuthenticator
+    ISecurityContextFactory? securityContexts,
+    IDiagnosticLog? diagnosticLog = null) : ISaslAuthenticator
 {
+    private readonly AuthDiagnosticLog log = new(diagnosticLog);
+
     /// <summary>
     /// Initializes an authenticator that answers DIGEST-MD5 as the platform's curl does, with
     /// a random client nonce, and treats GSSAPI and NTLM as not offered.
@@ -79,8 +85,9 @@ public sealed class SaslAuthenticator(
     /// see <see cref="CredentialEncoding.ForPlatform" />.
     /// </param>
     /// <param name="securityContexts">Makes the Kerberos and NTLM contexts; ADR-0142's router in production.</param>
-    public SaslAuthenticator(Encoding credentialEncoding, ISecurityContextFactory securityContexts)
-        : this(credentialEncoding, DigestClientNonce.CreateRandomHex, OperatingSystem.IsWindows(), securityContexts)
+    /// <param name="diagnosticLog">Where the mechanism choices are logged; <see langword="null" /> logs nothing.</param>
+    public SaslAuthenticator(Encoding credentialEncoding, ISecurityContextFactory securityContexts, IDiagnosticLog? diagnosticLog = null)
+        : this(credentialEncoding, DigestClientNonce.CreateRandomHex, OperatingSystem.IsWindows(), securityContexts, diagnosticLog)
     {
     }
 
@@ -115,8 +122,12 @@ public sealed class SaslAuthenticator(
     public SecurityDelegation GssapiDelegation { get; init; }
 
     /// <inheritdoc />
-    public string? ChooseMechanism(SaslRequest request, IReadOnlyList<string> offeredMechanisms) =>
-        SaslMechanismRanking.PickFirst(request, offeredMechanisms, securityContexts is not null);
+    public string? ChooseMechanism(SaslRequest request, IReadOnlyList<string> offeredMechanisms)
+    {
+        string? picked = SaslMechanismRanking.PickFirst(request, offeredMechanisms, securityContexts is not null);
+        log.SaslMechanismPicked(offeredMechanisms, picked);
+        return picked;
+    }
 
     /// <inheritdoc />
     /// <exception cref="ArgumentException">
@@ -126,6 +137,7 @@ public sealed class SaslAuthenticator(
     public ISaslExchange Begin(string mechanism, SaslRequest request)
     {
         string name = mechanism.ToUpperInvariant();
+        log.Round("SASL " + name + " exchange begun");
         if (MessagesByMechanism.TryGetValue(name, out Func<SaslRequest, string[]>? buildMessages))
         {
             byte[][] messages = [.. buildMessages(request).Select(credentialEncoding.GetBytes)];
@@ -190,8 +202,14 @@ public sealed class SaslAuthenticator(
         string digestUri = request.ServiceName + "/" + request.Host;
         return answerDigestMd5AsSspi
             ? SaslDigestMd5.AnswerAsSspi(challenge, credentialEncoding, UserOf(request), PasswordOf(request), digestUri, createClientNonce())
-                ?? throw new SaslAuthenticationFailedException(CurlExitCode.AuthError, AuthErrorMessage)
+                ?? throw DigestMd5Failed()
             : SaslDigestMd5.AnswerAsCurl(challenge, credentialEncoding, UserOf(request), PasswordOf(request), digestUri, createClientNonce());
+    }
+
+    private SaslAuthenticationFailedException DigestMd5Failed()
+    {
+        log.Failed(SaslMechanismRanking.DigestMd5, CurlExitCode.AuthError, AuthErrorMessage);
+        return new SaslAuthenticationFailedException(CurlExitCode.AuthError, AuthErrorMessage);
     }
 
     // curl sends an empty user name, password or token for one that was not given.

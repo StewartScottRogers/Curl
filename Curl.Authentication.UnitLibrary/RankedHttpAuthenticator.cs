@@ -25,20 +25,23 @@ namespace Curl.Authentication;
 /// on the first request. Only NTLM, and Negotiate when the 401 carries the acceptor's token
 /// (ADR-0227), go on after a request that sent a credential. A proxy's request is answered on
 /// the same terms, <c>--proxy-ntlm</c> and <c>--proxy-negotiate</c> for a <c>407</c> as
-/// <c>--ntlm</c> and <c>--negotiate</c> for a 401 (ADR-0270).
+/// <c>--ntlm</c> and <c>--negotiate</c> for a 401 (ADR-0270). Each pick after a challenge, the
+/// schemes offered and allowed, and a Negotiate context that makes no token are written to
+/// <paramref name="diagnosticLog" />, component <c>auth</c> (BL-923).
 /// </remarks>
-public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAndBearer, DigestAuthenticator digest, NegotiateHttpAuthenticator negotiate, NtlmHttpAuthenticator ntlm) : IHttpAuthenticator
+/// <param name="diagnosticLog">Where the scheme picks are logged; <see langword="null" /> logs nothing.</param>
+public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAndBearer, DigestAuthenticator digest, NegotiateHttpAuthenticator negotiate, NtlmHttpAuthenticator ntlm, IDiagnosticLog? diagnosticLog = null) : IHttpAuthenticator
 {
+    private readonly AuthDiagnosticLog log = new(diagnosticLog);
+
     /// <inheritdoc />
     public string? CreateAuthorization(HttpAuthRequest request, IReadOnlyList<string> challenges)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(challenges);
 
-        IHttpAuthenticator answerer = challenges.Count != 0 && PickOf(request, challenges) == HttpAuthSchemes.Digest
-            ? digest
-            : basicAndBearer;
-        return answerer.CreateAuthorization(request, challenges);
+        LogPick(request, challenges);
+        return CreateAuthorizationWithoutIo(request, challenges);
     }
 
     /// <inheritdoc />
@@ -47,10 +50,11 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(challenges);
 
+        LogPick(request, challenges);
         if (AnswersWithNegotiate(request, challenges))
         {
             string? value = await negotiate.CreateAuthorizationAsync(request, cancellationToken).ConfigureAwait(false);
-            return value ?? (PicksNegotiateAfterTheChallenge(request, challenges) ? string.Empty : null);
+            return value ?? NoNegotiateToken(request, challenges);
         }
 
         if (StepsNegotiateWithoutAnswering(request, challenges))
@@ -61,7 +65,32 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
 
         return AnswersWithNtlm(request, challenges)
             ? await ntlm.CreateAuthorizationAsync(request, null, sentBeforeAnyChallenge: false, challenges, cancellationToken).ConfigureAwait(false)
-            : CreateAuthorization(request, challenges);
+            : CreateAuthorizationWithoutIo(request, challenges);
+    }
+
+    // What is sent when the Negotiate context made no token: the empty value when Negotiate was
+    // picked only after the challenge, else nothing (ADR-0232).
+    private string? NoNegotiateToken(HttpAuthRequest request, IReadOnlyList<string> challenges)
+    {
+        log.NegotiateMadeNoToken();
+        return PicksNegotiateAfterTheChallenge(request, challenges) ? string.Empty : null;
+    }
+
+    // Logs the pick a challenge leads to; a request before any challenge picks nothing.
+    private void LogPick(HttpAuthRequest request, IReadOnlyList<string> challenges)
+    {
+        if (challenges.Count != 0)
+        {
+            log.HttpSchemePicked(HttpChallengeSchemes.Offered(challenges), request.AllowedSchemes, PickOf(request, challenges));
+        }
+    }
+
+    private string? CreateAuthorizationWithoutIo(HttpAuthRequest request, IReadOnlyList<string> challenges)
+    {
+        IHttpAuthenticator answerer = challenges.Count != 0 && PickOf(request, challenges) == HttpAuthSchemes.Digest
+            ? digest
+            : basicAndBearer;
+        return answerer.CreateAuthorization(request, challenges);
     }
 
     /// <inheritdoc />
