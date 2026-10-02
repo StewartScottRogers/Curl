@@ -368,6 +368,7 @@ choices do not need one.
 | [0356](ADR-0356-trace-config-dns-writes-the-dns-filter-and-doh-lines-around-the-connect.md) | `--trace-config dns`, `doh` and `all` write the DNS filter's `[DNS]` lines around a direct connect and route the DoH resolver's lines to the resolving transfer through an `AsyncLocal` view (BL-1102) | Accepted | 2026-10-02 |
 | [0357](ADR-0357-vv-and-trace-config-setup-write-the-setup-filter-lines.md) | `-vv` to `-vvvv` turn on curl's trace components in the parser, and `-vv` or `--trace-config setup` write the setup filter's `[SETUP]` lines around a direct connect (BL-1103) | Accepted | 2026-10-02 |
 | [0358](ADR-0358-a-deferred-connectx-socket-is-read-through-its-own-stream.md) | A socket `connectx` left connecting is read and written through `DeferredConnectSocketStream`, as `NetworkStream` refuses it (BL-1158; amends ADR-0355) | Accepted | 2026-10-02 |
+| [0359](ADR-0359-ech-v-lines-and-exit-101-text-as-measured-with-openssl-4.md) | `--ech` writes curl's `ECH:` setup lines and exit 101 OpenSSL's `ech required` text, as measured with curl 8.21.0 on OpenSSL 4.0.0; `pn:` or `ecl:` without a mode is `hard` (BL-1107; amends ADR-0327) | Accepted | 2026-10-02 |
 
 ## Template
 
