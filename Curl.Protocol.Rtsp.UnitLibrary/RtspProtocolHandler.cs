@@ -181,16 +181,26 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
     private static string SequenceMismatch(long sent, long received) =>
         string.Create(CultureInfo.InvariantCulture, $"The CSeq of this request {sent} did not match the response {received}");
 
-    private static async ValueTask SendAsync(IConnection connection, byte[] request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Sends <paramref name="request" />. A failed send is reported as curl 8.21.0's
+    /// <c>rtsp_do</c> reports it: the send failure's message, then <c>Failed sending RTSP
+    /// request</c> as a <c>-v</c> line only, the message staying the transfer's (BL-1230).
+    /// </summary>
+    /// <returns>The exit 55 failure, or <see langword="null" /> when the request was sent.</returns>
+    private static async ValueTask<TransferResult?> SendAsync(IConnection connection, byte[] request, ITransferEvents events, CancellationToken cancellationToken)
     {
         try
         {
             await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            return null;
         }
         catch (IOException exception)
         {
-            throw RtspIoFailures.SendFailed(exception);
+            RtspTransferException failure = RtspIoFailures.SendFailed(exception);
+            TransferResult result = Fail(events, failure.ExitCode, failure.Message);
+            events.ReportInfo(RtspVerboseLines.RequestSendFailed);
+            return result;
         }
     }
 
@@ -233,7 +243,11 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
             options,
             Authorization(context, options));
         events.ReportRequestHeader(request);
-        await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
+        if (await SendAsync(connection, request, events, context.CancellationToken).ConfigureAwait(false) is { } sendFailure)
+        {
+            return sendFailure;
+        }
+
         events.ReportInfo(RtspVerboseLines.RequestSent);
         var log = new RtspTransferLog(context.DiagnosticLog);
         log.RequestSent(RtspMethod.Options.Name, sequenceNumber);
