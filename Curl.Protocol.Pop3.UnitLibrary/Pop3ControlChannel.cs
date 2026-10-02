@@ -103,6 +103,7 @@ internal sealed class Pop3ControlChannel(
     /// <returns>The status line.</returns>
     /// <exception cref="Pop3ReplyMissingException">The server closed the connection first.</exception>
     /// <exception cref="InvalidDataException">A line reached 65536 bytes, its CR and LF included.</exception>
+    /// <exception cref="Pop3NulByteInLineException">A line held a NUL byte.</exception>
     public async ValueTask<Pop3Response> ReadResponseAsync()
     {
         while (true)
@@ -126,6 +127,7 @@ internal sealed class Pop3ControlChannel(
     /// </returns>
     /// <exception cref="Pop3ReplyMissingException">The server closed the connection first.</exception>
     /// <exception cref="InvalidDataException">A line reached 65536 bytes, its CR and LF included.</exception>
+    /// <exception cref="Pop3NulByteInLineException">A line held a NUL byte.</exception>
     public async ValueTask<Pop3Capabilities?> ReadCapabilitiesAsync()
     {
         var lines = new List<string>();
@@ -169,7 +171,9 @@ internal sealed class Pop3ControlChannel(
 
     /// <summary>
     /// Reads one line up to its LF, without the LF or a CR before it. The line is reported
-    /// with its line end as a response header.
+    /// with its line end as a response header, unless it holds a NUL byte: then it is not
+    /// reported and <see cref="Pop3NulByteInLineException" /> is thrown, as curl 8.21.0
+    /// checks every response line before <c>-v</c> shows it (BL-1120).
     /// </summary>
     private async ValueTask<string> ReadLineAsync()
     {
@@ -182,19 +186,31 @@ internal sealed class Pop3ControlChannel(
             }
 
             byte next = buffer[bufferStart++];
+            line.Add(next);
             if (next == (byte)'\n')
             {
-                int length = line.Count > 0 && line[^1] == (byte)'\r' ? line.Count - 1 : line.Count;
-                line.Add(next);
-                byte[] bytes = [.. line];
-                reporting.ReportResponseHeader(bytes);
-                return Encoding.Latin1.GetString(bytes, 0, length);
+                return EndLine(line);
             }
-
-            line.Add(next);
         }
 
         throw new Pop3ReplyMissingException();
+    }
+
+    /// <summary>
+    /// Ends <paramref name="line" />, which holds its LF: refuses it when it holds a NUL byte,
+    /// else reports it as a response header and returns it without its LF or a CR before it.
+    /// </summary>
+    private string EndLine(List<byte> line)
+    {
+        if (line.Contains(0))
+        {
+            throw new Pop3NulByteInLineException();
+        }
+
+        int length = line.Count > 1 && line[^2] == (byte)'\r' ? line.Count - 2 : line.Count - 1;
+        byte[] bytes = [.. line];
+        reporting.ReportResponseHeader(bytes);
+        return Encoding.Latin1.GetString(bytes, 0, length);
     }
 
     private async ValueTask<bool> TryFillAsync()
