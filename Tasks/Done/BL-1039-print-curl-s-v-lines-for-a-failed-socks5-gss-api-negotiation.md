@@ -8,7 +8,7 @@ depends-on: [BL-615]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-30
-completed:
+completed: 2026-10-02
 ---
 # BL-1039 — Print curl's -v lines for a failed SOCKS5 GSS-API negotiation
 
@@ -23,8 +23,8 @@ Under `-v`, a SOCKS5 proxy that picks GSS-API and whose negotiation fails prints
 
 ## Acceptance criteria
 
-- [ ] `Curl.Networking.UnitTests` pin the measured `-v` lines, in order, for a context with no credential on each build (`UsesSspiTexts` true and false).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `Curl.Networking.UnitTests` pin the measured `-v` lines, in order, for a context with no credential on each build (`UsesSspiTexts` true and false).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
 
@@ -32,3 +32,4 @@ Under `-v`, a SOCKS5 proxy that picks GSS-API and whose negotiation fails prints
 
 - 2026-09-30: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. A failed SOCKS5 GSS-API negotiation prints curl's -v lines for each platform's build (SSPI and GSS-API)
