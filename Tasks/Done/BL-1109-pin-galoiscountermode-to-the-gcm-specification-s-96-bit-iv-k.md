@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cryptography.UnitLibrary, Curl.Cryptography.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1109 — Pin GaloisCounterMode to the GCM specification's 96-bit-IV known answers
 
@@ -25,14 +25,19 @@ The hand-built `GaloisCounterMode` is checked against published known answers, n
 
 ## Acceptance criteria
 
-- [ ] A data-driven test in `GaloisCounterModeTests.cs`, for example `EncryptAndTryDecrypt_GcmSpecificationTestCase_GiveThePublishedCiphertextAndTag`, pins all twelve 96-bit-IV cases: `Encrypt` gives the published ciphertext and tag and `TryDecrypt` gives the plaintext back.
-- [ ] A test flips one bit of the tag, of the ciphertext and of the associated data of Test Case 4 in turn and asserts `TryDecrypt` returns `false`.
-- [ ] The tests pass on Windows, Linux and macOS (they use only `Aes` in ECB, which all three support).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] A data-driven test in `GaloisCounterModeTests.cs`, for example `EncryptAndTryDecrypt_GcmSpecificationTestCase_GiveThePublishedCiphertextAndTag`, pins all twelve 96-bit-IV cases: `Encrypt` gives the published ciphertext and tag and `TryDecrypt` gives the plaintext back.
+- [x] A test flips one bit of the tag, of the ciphertext and of the associated data of Test Case 4 in turn and asserts `TryDecrypt` returns `false`.
+- [x] The tests pass on Windows, Linux and macOS (they use only `Aes` in ECB, which all three support).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- Vectors typed from the GCM specification's Appendix B and cross-checked before pinning: a throwaway PowerShell run of the BCL's `AesGcm` over all twelve cases reproduced every published ciphertext and tag (Test Case 15's tag is `b094dac5d93471bdec1a502270e3cc6c`).
+- Bit-flip test flips the first and last bit of each of Test Case 4's tag, ciphertext and associated data (six cases).
+- Fast tests green. `Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary` reports 100% line, 100% branch, 0 failing members (read with `-SkipTestRun`: the full coverage run hit one `Curl.Conformance.UnitTests` failure under load that passed on rerun, unrelated to this test-only change).
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. GaloisCounterMode pinned to all twelve 96-bit-IV GCM specification known answers, with one-bit tamper refusal over Test Case 4
