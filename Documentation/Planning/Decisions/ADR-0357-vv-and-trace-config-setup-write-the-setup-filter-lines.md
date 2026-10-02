@@ -49,3 +49,24 @@ its connection filters and transfer engine. Measured on 2026-10-02 with `Record-
 
 `curl -vv` now prints curl's four `[SETUP]` lines for every direct TCP connect, and `--trace-config`
 names that the console does not yet write lines for are already in the set, ready for their tasks.
+
+## Amendment, 2026-10-02 (BL-1159): the `[READ]` lines
+
+Decided by Claude under Stewart's delegation.
+
+BL-1159 split again (its Context allows it): this run delivers the `[READ]` lines of a plain
+transfer; `[TIMER]`, `[WRITE]` and `[MULTI]` each go to a follow-up task of their own, because
+`[TIMER]` is written inside `Curl.Networking`'s connector and `[WRITE]` and `[MULTI]` from the HTTP
+handler's client writer stack and a transfer engine Curl does not have as such.
+
+- Measured (BL-1159 Notes): `[READ] client_reset, clear readers` is written once as the transfer
+  starts - after the `--resolve` entries' `Added ... to DNS cache` lines, before anything resolved or
+  dialled, `[<xfer>-x]` under `--trace-ids` - and once more as a finished transfer resets, before its
+  connection's `left intact` or `shutting down connection #N` line; a failed transfer (a refused
+  connect, `-f` on a 404) writes no second line.
+- `Curl.Console` writes the first line itself (`CurlCommandRunner.TraceClientReaderReset`) and wraps
+  the transfer's events in `ClientReaderResetTraceEvents` for the second, under
+  `CurlComposition.TracesRead` (`read` or `all`, which `-vvv` and `-vvvv` put there; `network` does not).
+- The `[READ]` lines carry no volatile value. The upload readers' lines (`add buf reader`,
+  `cr_buf_read(len=65388)`, `client_read(...)`) of a `-d` body, and the lines of each followed
+  redirect's hop, were not delivered here and are a follow-up task.
