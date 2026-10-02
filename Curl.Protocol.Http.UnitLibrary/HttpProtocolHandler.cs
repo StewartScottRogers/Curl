@@ -284,10 +284,23 @@ public sealed class HttpProtocolHandler(
             ProxyAuthorizationInfoLines = proxyAuthorizationLines.Lines,
             RedirectsFollowed = options.RedirectsFollowed,
         };
-        return Http3RefusalOf(plan) is { } refusal
+        TransferResult result = Http3RefusalOf(plan) is { } refusal
             ? await ExchangeWithoutHttp3Async(plan, refusal).ConfigureAwait(false)
             : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
+        return WithFirstAuthorizationFailure(result, authorizationLines.Lines);
     }
+
+    /// <summary>
+    /// Gives a failed transfer the message of the first line the authenticator reported while
+    /// it made the first request's <c>Authorization</c> value, a Negotiate context's failure, as
+    /// curl 8.21.0 does: its <c>failf</c> for the context fills the error buffer before any later
+    /// one, so <c>curl: (22)</c> after <c>-f</c> meets the 401 carries it rather than
+    /// <c>The requested URL returned error: 401</c> (measured, BL-955 Notes; ADR-0344).
+    /// </summary>
+    private static TransferResult WithFirstAuthorizationFailure(TransferResult result, IReadOnlyList<string> authorizationLines) =>
+        result.ExitCode != CurlExitCode.Ok && authorizationLines.Count > 0
+            ? result with { ErrorMessage = authorizationLines[0] }
+            : result;
 
     /// <summary>
     /// Gives why HTTP/3 is refused for <paramref name="plan" />, in the order curl 8.21.0's
