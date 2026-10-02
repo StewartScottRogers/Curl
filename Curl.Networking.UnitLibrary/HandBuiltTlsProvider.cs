@@ -211,7 +211,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         prepared.Verifier.Observed.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
         if (!Completed(handshake))
         {
-            return await FailAsync(plaintext, prepared, handshake?.Failure, thrown).ConfigureAwait(false);
+            return await FailAsync(plaintext, events, prepared, handshake?.Failure, thrown).ConfigureAwait(false);
         }
 
         KeepReceivedSessions(peerKey, handshake.Stream!);
@@ -220,6 +220,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             IsProxy = isProxy,
             VerifiedHostName = SslStreamTlsProvider.VerifiedHostName(targetHost, _options.Insecure),
         });
+        CertificateStatusText.Report(events, handshake.CertificateStatus);
         return ConnectResult.Connected(
             new HandBuiltTlsConnection(handshake.Stream!, plaintext, prepared.ClientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild)),
             new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
@@ -381,6 +382,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // disposed, cancellation escapes, and anything else is the build's failure.
     private async ValueTask<ConnectResult> FailAsync(
         IConnection plaintext,
+        ITransferEvents events,
         PreparedHandshake prepared,
         TlsHandshakeFailure? failure,
         Exception? thrown)
@@ -388,6 +390,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         prepared.ClientCertificate?.Dispose();
         await plaintext.DisposeAsync().ConfigureAwait(false);
         RethrowIfCancellation(thrown);
+        CertificateStatusText.Report(events, failure?.CertificateStatusRejection);
         return thrown is null
             ? FailedHandshake(failure!)
             : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(thrown));

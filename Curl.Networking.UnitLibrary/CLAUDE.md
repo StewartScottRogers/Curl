@@ -29,7 +29,9 @@ and `--sigalgs` through `OpenSslSignatureAlgorithmList` (OpenSSL 3.5's syntax on
 and swaps the result into the profile's `supported_groups`, `key_share` and `signature_algorithms`;
 a refused value is exit 59 and an empty list exit 35, with OpenSSL's text. With `--cert-status` the hand-built
 client asks for the stapled OCSP response and a rejected one is exit 91 with
-`CertificateStatusFailureMessages`' text on every platform. Per ADR-0191 `--ssl-auto-client-cert`
+`CertificateStatusFailureMessages`' text on every platform; a good, revoked or unknown status is
+also reported as `-v`'s `SSL certificate status: ...` info line by `CertificateStatusText`
+(ADR-0335), after the handshake event or before the exit 91 failure. Per ADR-0191 `--ssl-auto-client-cert`
 (`TlsClientOptions.AutoClientCertificate`) without `--cert` makes `ClientCertificateLoader.Load`
 present the certificate `AutomaticClientCertificate.Choose` takes from `CurrentUser\MY`, in both
 providers; `HandBuiltTlsProviderTests.CertificateStatus` drives it against `Fakes/Tls13Server`,

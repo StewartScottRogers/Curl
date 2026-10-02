@@ -58,6 +58,42 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.AreEqual("No OCSP response received", result.ErrorMessage);
     }
 
+    // -v's status line, after the handshake's own lines, as curl's verifystatus() prints it
+    // (BL-875): an accepted response, a revoked certificate and an unknown one, each read.
+    [TestMethod]
+    [DataRow(OcspStapleStatus.Good, "SSL certificate status: good (0)", CurlExitCode.Ok)]
+    [DataRow(OcspStapleStatus.Revoked, "SSL certificate status: revoked (1)", CurlExitCode.SslInvalidCertStatus)]
+    [DataRow(OcspStapleStatus.Unknown, "SSL certificate status: unknown (2)", CurlExitCode.SslInvalidCertStatus)]
+    public async Task AuthenticateAsClientAsync_WithCertStatus_ReportsTheCertificateStatusLine(OcspStapleStatus status, string expectedLine, CurlExitCode expectedExitCode)
+    {
+        using var pki = new OcspTestPki();
+        var response = (pki.Response(DateTimeOffset.UtcNow) with { CertStatus = status, RevocationReason = 1 }).Build();
+        var events = new RecordingTransferEvents();
+
+        var (result, _) = await HandshakeWithStaplingServerAsync(pki, response, OpenSslBuild, events);
+
+        Assert.AreEqual(expectedExitCode, result.ExitCode, result.ErrorMessage);
+        Assert.AreEqual(expectedLine, events.Info.Single());
+        Assert.HasCount(status == OcspStapleStatus.Good ? 1 : 0, events.Handshakes);
+        if (result.Connection is { } connection)
+        {
+            await connection.DisposeAsync();
+        }
+    }
+
+    // curl stops before the status line for a response it never found the certificate in.
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCertStatusAndNoStapledResponse_ReportsNoStatusLine()
+    {
+        using var pki = new OcspTestPki();
+        var events = new RecordingTransferEvents();
+
+        var (result, _) = await HandshakeWithStaplingServerAsync(pki, null, SchannelBuild, events);
+
+        Assert.AreEqual(CurlExitCode.SslInvalidCertStatus, result.ExitCode);
+        Assert.IsEmpty(events.Info);
+    }
+
     // The TLS 1.2 client asks too: a server-side SslStream staples nothing.
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCertStatusOverTls12AndNoStapledResponse_FailsWithExit91()
@@ -96,7 +132,8 @@ public sealed partial class HandBuiltTlsProviderTests
     private static Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeWithStaplingServerAsync(
         OcspTestPki pki,
         byte[]? response,
-        bool matchesSchannelBuild)
+        bool matchesSchannelBuild,
+        RecordingTransferEvents? events = null)
     {
         var testServer = new Tls13TestServer(pki.LeafCredential)
         {
@@ -104,17 +141,21 @@ public sealed partial class HandBuiltTlsProviderTests
             LeafExtensions = response is null ? [] : [StatusRequestExtension.EncodeOcspResponse(response)],
         };
         return HandshakeWithTestServerAsync(
-            Provider(new TlsClientOptions(Insecure: true, RequireCertificateStatus: true), matchesSchannelBuild), testServer);
+            Provider(new TlsClientOptions(Insecure: true, RequireCertificateStatus: true), matchesSchannelBuild), testServer, events);
     }
 
     private static async Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeWithTestServerAsync(
         HandBuiltTlsProvider provider,
-        Tls13TestServer testServer)
+        Tls13TestServer testServer,
+        RecordingTransferEvents? events = null)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = Task.Run(() => new Tls13RecordTestServer(server, testServer).HandshakeAsync());
 
-        var result = await provider.AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        var plaintext = new StreamConnection(client, ServerEndPoint);
+        var result = events is null
+            ? await provider.AuthenticateAsClientAsync(plaintext, CertificateHost, CancellationToken.None)
+            : await provider.AuthenticateAsClientAsync(plaintext, CertificateHost, events, CancellationToken.None);
 
         var plaintextDisposed = client.IsDisposed;
         if (result.Connection is null)
