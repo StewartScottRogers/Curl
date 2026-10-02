@@ -8,7 +8,7 @@ depends-on: []
 touches: [Record-CurlExchange.ps1]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1217 — Make Record-CurlExchange.ps1 wait for a request body whose Content-Length header ends in CRLF
 
@@ -23,12 +23,15 @@ Record-CurlExchange.ps1 reads a request's whole body before answering when the h
 
 ## Acceptance criteria
 
-- [ ] `Record-CurlExchange.ps1 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi' -CurlArgs '-sS,-d,@<file of 100000 bytes>,http://127.0.0.1:<port>/'` with real curl writes a request.bin of 100153 bytes (the head and the whole body).
-- [ ] A `-d ab` recording still writes the head and `ab`, and curl exits 0.
+- [x] `Record-CurlExchange.ps1 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi' -CurlArgs '-sS,-d,@<file of 100000 bytes>,http://127.0.0.1:<port>/'` with real curl writes a request.bin of 100153 bytes (the head and the whole body).
+- [x] A `-d ab` recording still writes the head and `ab`, and curl exits 0.
 
 ## Notes
+
+- 2026-10-02: Changed the Content-Length pattern to `[ 	]*?$`. Verified with real curl 8.21.0: `-d @` a 100000-byte file of `a` (a file of NULs is sent as an empty body by `-d`, so it cannot be used) recorded request.bin at 100153 bytes, stdout `hi`, exit 0; `-d ab` recorded the head and `ab`, exit 0.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. Record-CurlExchange.ps1 waits for the whole Content-Length body before answering

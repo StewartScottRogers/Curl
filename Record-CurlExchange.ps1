@@ -711,7 +711,7 @@ $serveConnections = {
         $bodyStart = $headerEnd + 4
         if ($EarlyResponseBodyBytes -ge 0) { return ($Length - $bodyStart) -ge $EarlyResponseBodyBytes }
         $headers = $text.Substring(0, $headerEnd)
-        $contentLength = [regex]::Match($headers, '(?im)^Content-Length:[ \t]*(\d+)[ \t]*$')
+        $contentLength = [regex]::Match($headers, '(?im)^Content-Length:[ \t]*(\d+)[ \t]*\r?$')
         if ($contentLength.Success) {
             return ($Length - $bodyStart) -ge [long] $contentLength.Groups[1].Value
         }
