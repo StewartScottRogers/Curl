@@ -1100,7 +1100,8 @@ public sealed class HttpProtocolHandler(
             plan.Context.Url.Scheme,
             plan.Framing.Body is null ? 0 : plan.Framing.KnownLength,
             plan.Context.NoBody,
-            new HttpStreamOpenedLines(plan.Context.Events, HttpUrlText.Effective(plan.Context.Url)));
+            new HttpStreamOpenedLines(plan.Context.Events, HttpUrlText.Effective(plan.Context.Url)),
+            plan.Context.DiagnosticLog);
 
     /// <summary>
     /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one;

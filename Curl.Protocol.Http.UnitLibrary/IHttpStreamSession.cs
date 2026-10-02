@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Protocol.Http;
 
 /// <summary>
@@ -40,6 +42,10 @@ internal interface IHttpStreamSession
     /// <param name="openedLines">
     /// Reports curl's <c>-v</c> lines for the stream once its head is sent, or <see langword="null" /> for none.
     /// </param>
+    /// <param name="diagnosticLog">
+    /// The transfer's diagnostic log, which the stream's frames are written to (<see cref="HttpFrameLog" />),
+    /// or <see langword="null" /> for none.
+    /// </param>
     /// <returns>The stream.</returns>
-    IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null);
+    IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null, IDiagnosticLog? diagnosticLog = null);
 }
