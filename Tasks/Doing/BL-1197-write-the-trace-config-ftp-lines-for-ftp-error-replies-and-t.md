@@ -32,3 +32,4 @@ Under `-v --trace-config ftp` every FTP path BL-1162 left unmeasured writes curl
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
