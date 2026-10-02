@@ -23,12 +23,15 @@
     and reads nothing from standard input. task-board.ps1 runs it this way, detached and
     hidden, after every move that takes a task out of Backlog (BL-1182):
 
-      task-board.ps1 move, from Backlog       "Backlog, 63."
-                                              (the BL-*.md files left in Tasks/Backlog)
+      task-board.ps1 move, from Backlog       "Backlog depth, 63."
+                                              (the BL-*.md files left in Tasks/Backlog
+                                              of the real board, never a scratch copy)
 
     With -DelaySeconds and -StampFile it first waits, then speaks only if the stamp file
     still starts with -Stamp, so a burst of moves across lanes gives one phrase, with the
-    latest depth, a minute after the last move.
+    latest depth, a minute after the last move. With -PauseSeconds it holds the queue
+    silent that long before speaking, so the phrase never runs on from another one
+    (Stewart, 2026-10-02: the depth must be heard apart from everything else).
 #>
 param(
     # Speak these phrases instead of reading a hook's JSON from standard input.
@@ -37,11 +40,13 @@ param(
     [int] $DelaySeconds = 0,
     # Speak only if this file still starts with -Stamp after the wait.
     [string] $StampFile = '',
-    [string] $Stamp = ''
+    [string] $Stamp = '',
+    # Once the queue is ours, stay silent this long before the first phrase.
+    [int] $PauseSeconds = 0
 )
 $ErrorActionPreference = 'Stop'
 
-function Invoke-Whisper([string[]] $Phrases) {
+function Invoke-Whisper([string[]] $Phrases, [int] $PauseSeconds = 0) {
     # "BL-199" reads as "B L 199"; slashes, dashes and colons as pauses.
     function Get-Spoken([string]$Text) {
         $Text = $Text -replace '\bBL-(\d+)', 'B L $1'
@@ -51,6 +56,8 @@ function Invoke-Whisper([string[]] $Phrases) {
     $mutex = New-Object System.Threading.Mutex($false, 'Global\CurlWhisper')
     if (-not $mutex.WaitOne(120000)) { return }
     try {
+        # Held inside the mutex, so no other phrase can fill the silence.
+        if ($PauseSeconds -gt 0) { Start-Sleep -Seconds $PauseSeconds }
         $voice = New-Object System.Speech.Synthesis.SpeechSynthesizer
         $voice.SetOutputToDefaultAudioDevice()
         try { $voice.SelectVoice('Microsoft Zira Desktop') } catch { }
@@ -71,7 +78,7 @@ if ($Phrase.Count) {
             $current = [IO.File]::ReadAllText($StampFile)
             if (-not $Stamp -or -not $current.StartsWith("$Stamp|")) { exit 0 }
         }
-        Invoke-Whisper $Phrase
+        Invoke-Whisper $Phrase $PauseSeconds
     } catch { }
     exit 0
 }

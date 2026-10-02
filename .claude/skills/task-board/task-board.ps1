@@ -30,7 +30,7 @@
       new      Create a task in Backlog from TASK-TEMPLATE.md. -NoLane writes
                'lane: no' so no dark factory lane is offered it.
       move     Move a task to another state, appending a Log line. A move out of
-               Backlog also whispers the Backlog's depth ("Backlog, 63.") a minute
+               Backlog also whispers the Backlog's depth ("Backlog depth, 63.") a minute
                later, once per burst of moves, without waiting for it (BL-1182).
       archive  Move finished tasks into Done\<yyyy-MM-dd_HHmm>\. With -WhenDoneIsLong,
                move all of them, but only once Done holds more than 20.
@@ -348,13 +348,19 @@ function Set-FrontMatterField([string] $Text, [string] $Name, [string] $Value) {
 }
 
 function Start-BacklogDepthWhisper {
-    # Tells Stewart the Backlog's depth ("Backlog, 63.") after a move out of Backlog
+    # Tells Stewart the Backlog's depth ("Backlog depth, 63.") after a move out of Backlog
     # (BL-1182). The phrase is spoken by whisper-milestone.ps1, detached and hidden, a
     # minute later and only if no later move has restamped the shared file, so a burst
-    # of moves across lanes gives one phrase with the latest depth. The move never
-    # waits for it and never fails because of it; off Windows and in CI it is silent.
+    # of moves across lanes gives one phrase with the latest depth, after two silent
+    # seconds holding the queue so it is heard apart from any other phrase (BL-1186).
+    # Only the real board speaks: a scratch, temporary or test board is not a checkout
+    # of StewartScottRogers/Curl, and its depth is not one Stewart wants to hear. The
+    # move never waits for it and never fails because of it; off Windows and in CI it
+    # is silent.
     try {
         if ($env:CI -or [Environment]::OSVersion.Platform -ne 'Win32NT') { return }
+        $origin = "$(& git -C $RepoRoot config --get remote.origin.url 2>$null)".Trim()
+        if ($origin -notmatch '[/:]StewartScottRogers/Curl(\.git)?$') { return }
         $speaker = Join-Path $RepoRoot '.claude\hooks\whisper-milestone.ps1'
         if (-not (Test-Path -LiteralPath $speaker)) { return }
         $depth = @(Get-ChildItem -LiteralPath (Join-Path $Board 'Backlog') -Filter 'BL-*.md' -File).Count
@@ -362,7 +368,8 @@ function Start-BacklogDepthWhisper {
         $stamp = [Guid]::NewGuid().ToString('N')
         [IO.File]::WriteAllText($stampFile, "$stamp|$depth", $Utf8NoBom)
         $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$speaker`"",
-            '-Phrase', "`"Backlog, $depth.`"", '-DelaySeconds', '60', '-StampFile', "`"$stampFile`"", '-Stamp', $stamp)
+            '-Phrase', "`"Backlog depth, $depth.`"", '-DelaySeconds', '60', '-PauseSeconds', '2',
+            '-StampFile', "`"$stampFile`"", '-Stamp', $stamp)
         Start-Process -FilePath (Get-Process -Id $PID).Path -ArgumentList $arguments -WindowStyle Hidden | Out-Null
     } catch { }
 }
