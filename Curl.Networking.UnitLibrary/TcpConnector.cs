@@ -872,7 +872,7 @@ public sealed partial class TcpConnector(
         }
 
         if (!ReferenceEquals(firstHop, proxy)
-            && await OpenSocksHopAsync(dialed.Connection, target, new ConnectDestination(proxy.Host, proxy.Port, IsMapped: false, ParseError: null), firstHop, cancellationToken).ConfigureAwait(false) is { } preProxyFailure)
+            && await OpenSocksHopAsync(dialed, target, new ConnectDestination(proxy.Host, proxy.Port, IsMapped: false, ParseError: null), firstHop, cancellationToken).ConfigureAwait(false) is { } preProxyFailure)
         {
             return (preProxyFailure, null);
         }
@@ -961,7 +961,7 @@ public sealed partial class TcpConnector(
         ConnectTimings timings,
         CancellationToken cancellationToken)
     {
-        if (await OpenSocksHopAsync(dialed.Connection, target, destination, proxy, cancellationToken).ConfigureAwait(false) is { } failure)
+        if (await OpenSocksHopAsync(dialed, target, destination, proxy, cancellationToken).ConfigureAwait(false) is { } failure)
         {
             return failure;
         }
@@ -987,16 +987,18 @@ public sealed partial class TcpConnector(
         PreProxy is { } socks && proxy.Kind is ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https ? socks : proxy;
 
     /// <summary>
-    /// Runs the SOCKS handshake to <paramref name="destination" /> over <paramref name="connection" />:
-    /// <see langword="null" /> once the tunnel is open, else the failure, with the connection disposed.
+    /// Runs the SOCKS handshake to <paramref name="destination" /> over <paramref name="dialed" />'s connection:
+    /// <see langword="null" /> once the tunnel is open, after curl's <c>Opened SOCKS connection</c>
+    /// line, else the failure, with the connection disposed and no line.
     /// </summary>
     private async ValueTask<ConnectResult?> OpenSocksHopAsync(
-        IConnection connection,
+        DialedSocket dialed,
         ConnectTarget target,
         ConnectDestination destination,
         ProxyEndpoint socks,
         CancellationToken cancellationToken)
     {
+        var connection = dialed.Connection;
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);
         log.SocksHandshakeStarting(socks, destination.Host, destination.Port);
         var (failure, exception) = await RunSocksHandshakeAsync(connection, destination, socks, target, cancellationToken).ConfigureAwait(false);
@@ -1008,6 +1010,13 @@ public sealed partial class TcpConnector(
             return failure!;
         }
 
+        // curl 8.21.0 names the destination as given, not the address SOCKS4 or SOCKS5 sent for it,
+        // and the proxy by the address it dialled (measured for every kind and --preproxy, BL-1038).
+        // A SOCKS hop is always dialled over TCP, so both end points are known.
+        var local = dialed.LocalEndPoint!;
+        var via = dialed.RemoteEndPoint!;
+        target.Events.ReportInfo(
+            $"Opened SOCKS connection from {local.Address} port {local.Port} to {destination.Host} port {destination.Port} (via {via.Address} port {via.Port})");
         log.TunnelEstablished(socks, destination.Host, destination.Port, statusCode: 0);
         return null;
     }
