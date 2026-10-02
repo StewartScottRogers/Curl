@@ -34,3 +34,4 @@ When the version range's ceiling is below TLS 1.3, `HandBuiltTlsProvider`'s Clie
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-02: Backlog -> Doing.
