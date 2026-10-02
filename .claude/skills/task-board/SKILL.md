@@ -106,8 +106,13 @@ The script refuses:
   claiming with `move -To Doing` a task that is interactive only
 
 An **audit path** belongs to the audit office, outside the factory's reach (ADR-0267):
-`Audit`, anything under `Audit/`, or an auditor agent `.claude/agents/audit-*`, in any
-letter case. A task is **interactive only** when it says `lane: no` or any of its
+`Audit`, anything under `Audit/`, an auditor agent `.claude/agents/audit-*`, or one of the
+guard files that protect them - `.claude/hooks/guard-audit-paths.ps1`,
+`.claude/settings.json`, `.github/workflows/ci.yml` and
+`.claude/skills/task-board/task-board.ps1` - in any letter case. The guard files are the
+ones CI's audit guard (`Audit/Guard/Test-AuditPathsUntouched.ps1`) fails the factory's
+branch for changing, so a lane must never be given one (BL-1209); that script's
+`-SelfTest` fails if this script's list misses any. A task is **interactive only** when it says `lane: no` or any of its
 `touches` is an audit path; `next` and `capacity` never offer it to anyone, and
 `status` shows it as interactive only. An ancestor such as `.claude` or `*` is not an
 audit path here; the PreToolUse hook (BL-997) and CI (BL-998) catch real writes.
