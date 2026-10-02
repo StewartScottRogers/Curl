@@ -32,3 +32,4 @@ Under `-v --trace-config ssh` Curl writes the `[SSH]` lines curl 8.21.0 writes f
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
