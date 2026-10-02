@@ -21,9 +21,11 @@ namespace Curl.Cli;
 /// <c>--compressed</c>, <c>-I</c>, <c>-R</c>, <c>-f</c>), the output options (<c>-o</c>, <c>-O</c> and
 /// <c>-i</c> write nothing of their own) and the connection options (<c>--connect-timeout</c>, <c>-m</c>,
 /// <c>--resolve</c>, <c>--connect-to</c>, <c>-4</c>, <c>-6</c>). A number curl's default already has, such
-/// as a zero timeout, is not written, as curl does not write it. The lines other options add are BL-654's.
+/// as a zero timeout, is not written, as curl does not write it. The proxy, TLS and authentication options'
+/// lines (BL-654) are in <c>LibcurlSourceCode.ProxyTlsAndAuthentication.cs</c>; the remaining options' lines
+/// are BL-1106's.
 /// </remarks>
-public static class LibcurlSourceCode
+public static partial class LibcurlSourceCode
 {
     /// <summary>The longest string, in bytes, a <c>curl_easy_setopt</c> line quotes in full; a longer one is cut and ends in <c>...</c>.</summary>
     public const int LongestQuotedString = 2000;
@@ -172,22 +174,27 @@ public static class LibcurlSourceCode
         List<string> lines = [Setopt("CURLOPT_BUFFERSIZE", "102400L"), Setopt("CURLOPT_URL", QuoteCString(url))];
         AddIf(lines, options.Silent || options.ProgressMeterOff, SetoptOn("CURLOPT_NOPROGRESS"));
         AddIf(lines, options.NoBody, SetoptOn("CURLOPT_NOBODY"));
+        lines.AddRange(BearerAndProxyLines(options));
         AddIf(lines, options.FailMode == HttpFailMode.Fail, SetoptOn("CURLOPT_FAILONERROR"));
+        lines.AddRange(NetrcLines(options));
         AddIf(lines, options.Credentials is not null, () => Setopt("CURLOPT_USERPWD", QuoteCString($"{options.Credentials!.UserName}:{options.Credentials.Password}")));
         AddIf(lines, options.MaxTime > TimeSpan.Zero, () => SetoptMilliseconds("CURLOPT_TIMEOUT_MS", options.MaxTime!.Value));
         lines.AddRange(RequestBodyLines(options, variables));
+        lines.AddRange(HttpAuthLines(options));
         AddStringListIf(lines, "CURLOPT_HTTPHEADER", HttpHeaderLines(options), variables);
         AddIf(lines, options.Referer is not null, () => Setopt("CURLOPT_REFERER", QuoteCString(options.Referer!)));
         lines.Add(Setopt("CURLOPT_USERAGENT", QuoteCString(options.UserAgent ?? DefaultUserAgent)));
-        lines.AddRange(SchemeLines(options, SchemeOf(options, url)));
-        lines.Add(Setopt("CURLOPT_SSLVERSION", "(long)CURL_SSLVERSION_TLSv1_2"));
+        lines.AddRange(SchemeLines(options, SchemeOf(options, url), variables));
+        lines.AddRange(TlsLines(options));
         AddIf(lines, options.NoBody || options.RemoteTime, SetoptOn("CURLOPT_FILETIME"));
         AddIf(lines, options.RequestMethod is not null, () => Setopt("CURLOPT_CUSTOMREQUEST", QuoteCString(options.RequestMethod!)));
         AddIf(lines, options.ConnectTimeout > TimeSpan.Zero, () => SetoptMilliseconds("CURLOPT_CONNECTTIMEOUT_MS", options.ConnectTimeout!.Value));
         AddIf(lines, options.IpAddressFamily != IpAddressFamilyChoice.Either, () => Setopt("CURLOPT_IPRESOLVE", $"{(int)options.IpAddressFamily}L"));
+        lines.AddRange(SocksAndServiceLines(options));
         lines.Add(SetoptOn("CURLOPT_TCP_KEEPALIVE"));
         AddStringListIf(lines, "CURLOPT_RESOLVE", options.ResolveEntries, variables);
         AddStringListIf(lines, "CURLOPT_CONNECT_TO", options.ConnectToEntries, variables);
+        lines.AddRange(DelegationAndSaslLines(options));
         return lines;
     }
 
@@ -319,24 +326,28 @@ public static class LibcurlSourceCode
     /// The lines curl 8.21.0 writes for the scheme: for HTTP the redirect, <c>--compressed</c> and cookie
     /// options and the redirect limit, which it writes for no other scheme; for FTP the passive-IP skip.
     /// </summary>
-    private static List<string> SchemeLines(CommandLineOptions options, string scheme) => scheme switch
+    private static List<string> SchemeLines(CommandLineOptions options, string scheme, LibcurlSourceVariables variables) => scheme switch
     {
-        "http" or "https" => HttpLines(options),
+        "http" or "https" => HttpLines(options, scheme, variables),
         "ftp" or "ftps" => [SetoptOn("CURLOPT_FTP_SKIP_PASV_IP")],
         _ => [],
     };
 
-    private static List<string> HttpLines(CommandLineOptions options)
+    private static List<string> HttpLines(CommandLineOptions options, string scheme, LibcurlSourceVariables variables)
     {
         List<string> lines = [];
         AddIf(lines, options.FollowRedirects, SetoptOn("CURLOPT_FOLLOWLOCATION"));
+        AddIf(lines, options.SendCredentialsToRedirectHosts, SetoptOn("CURLOPT_UNRESTRICTED_AUTH"));
+        AddStringIf(lines, "CURLOPT_AWS_SIGV4", options.AwsSigV4);
         AddIf(lines, options.AutoReferer, SetoptOn("CURLOPT_AUTOREFERER"));
+        AddStringListIf(lines, "CURLOPT_PROXYHEADER", options.ProxyHeaders, variables);
         lines.Add(Setopt("CURLOPT_MAXREDIRS", "50L"));
         AddIf(lines, options.Compressed, Setopt("CURLOPT_ACCEPT_ENCODING", "\"\""));
         string[] cookieStrings = [.. options.Cookies.Where(cookie => cookie.IsCookieString).Select(cookie => cookie.Value)];
         AddIf(lines, cookieStrings.Length > 0, () => Setopt("CURLOPT_COOKIE", QuoteCString(string.Join("; ", cookieStrings))));
         lines.AddRange(options.Cookies.Where(cookie => !cookie.IsCookieString).Select(cookie => Setopt("CURLOPT_COOKIEFILE", QuoteCString(cookie.Value))));
         AddIf(lines, options.CookieJar is not null, () => Setopt("CURLOPT_COOKIEJAR", QuoteCString(options.CookieJar!)));
+        AddIf(lines, SeparatesProxyHeaders(options, scheme), SetoptOn("CURLOPT_HEADEROPT"));
         return lines;
     }
 

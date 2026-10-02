@@ -33,6 +33,7 @@ public sealed class CommandLineOptions
     private HttpAuthSchemes wantedAuthSchemes;
     private HttpAuthSchemes wantedProxyAuthSchemes;
     private bool proxyAnyAuthWanted;
+    private bool everyAuthSchemeWanted;
 
     /// <summary>The single proxy schemes curl 8.21.0's tool picks from, first match wins, after <c>--proxy-anyauth</c>.</summary>
     private static readonly HttpAuthSchemes[] ProxyAuthSchemePrecedence = [HttpAuthSchemes.Negotiate, HttpAuthSchemes.Ntlm, HttpAuthSchemes.Digest];
@@ -2266,8 +2267,30 @@ public sealed class CommandLineOptions
         wantedAuthSchemes = on ? wantedAuthSchemes | scheme : wantedAuthSchemes & ~scheme;
 
     /// <summary>Replaces every scheme asked for so far with every scheme there is, for <c>--anyauth</c>.</summary>
-    internal void WantEveryAuthScheme() =>
+    internal void WantEveryAuthScheme()
+    {
         wantedAuthSchemes = HttpAuthSchemes.Any | HttpAuthSchemes.Bearer;
+        everyAuthSchemeWanted = true;
+    }
+
+    /// <summary>
+    /// The schemes the authentication options asked for, before <see cref="AuthSchemes"/> drops a Bearer
+    /// with no token and falls back to Basic; <see cref="HttpAuthSchemes.None"/> when none was asked for.
+    /// </summary>
+    internal HttpAuthSchemes RequestedAuthSchemes => wantedAuthSchemes;
+
+    /// <summary>
+    /// <see langword="true"/> once <c>--anyauth</c> was given: curl 8.21.0's tool then starts from libcurl's
+    /// <c>CURLAUTH_ANY</c>, which a later <c>--no-</c> scheme option takes bits out of.
+    /// </summary>
+    internal bool EveryAuthSchemeRequested => everyAuthSchemeWanted;
+
+    /// <summary>
+    /// <see langword="true"/> when any of <c>--proxy-basic</c>, <c>--proxy-digest</c>, <c>--proxy-ntlm</c>,
+    /// <c>--proxy-negotiate</c> and <c>--proxy-anyauth</c> is on, so curl 8.21.0's tool sets the proxy's
+    /// schemes rather than leaving libcurl's default.
+    /// </summary>
+    internal bool ProxyAuthSchemeRequested => proxyAnyAuthWanted || wantedProxyAuthSchemes != HttpAuthSchemes.None;
 
     /// <summary>
     /// Turns on, or for its <c>--no-</c> spelling off, the switch <c>--proxy-basic</c>,
