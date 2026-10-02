@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ldap.UnitLibrary, Curl.Protocol.Ldap.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1122 — Report curl's There are more than N entries -v line for a size-limited LDAP search
 
@@ -25,13 +25,17 @@ An LDAP search answered with result code 4 (`sizeLimitExceeded`) still succeeds,
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Protocol.Ldap.UnitTests` for both `LdapDialect.WinLdap` and `LdapDialect.OpenLdap`: a search answered with two entries and a `sizeLimitExceeded` done reports `There are more than 2 entries` after the entries are written; with no entries, `There are more than 0 entries`.
-- [ ] A test pins that a search done with result code 0 reports no such line.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ldap.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] New tests in `Curl.Protocol.Ldap.UnitTests` for both `LdapDialect.WinLdap` and `LdapDialect.OpenLdap`: a search answered with two entries and a `sizeLimitExceeded` done reports `There are more than 2 entries` after the entries are written; with no entries, `There are more than 0 entries`.
+- [x] A test pins that a search done with result code 0 reports no such line.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ldap.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- `LdapSearch.OutcomeAsync` reports `LdapVerboseLines.MoreThan(entries.EntryCount)` through `ITransferContext.Events` after the held entries are written and before the UnbindRequest, matching both builds; a write failure while writing held entries returns first, as curl's `rc` would then not be `LDAP_SIZELIMIT_EXCEEDED`.
+- Tests in `LdapProtocolHandlerTests.Verbose.cs`: two entries, no entries, and a `success` done, each for both dialects. Ldap: 528 tests, 100% line and branch, 0 failing members.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. A sizeLimitExceeded LDAP search reports curl's There are more than N entries -v line after its entries, for WinLDAP and OpenLDAP

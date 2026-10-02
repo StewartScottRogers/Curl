@@ -47,7 +47,10 @@ internal static class LdapSearch
     /// <summary>WinLDAP's <c>LDAP_FILTER_ERROR</c>.</summary>
     private const int WinLdapFilterError = 87;
 
-    private const string WinLdapRemotePrefix = "LDAP remote: ";
+    /// <summary>The SearchResultDone's <c>sizeLimitExceeded</c> result code (RFC 4511 section 4.1.9).</summary>
+    private const int SizeLimitExceeded = 4;
+
+    private const string WinLdapRemotePrefix ="LDAP remote: ";
 
     private const string OpenLdapSearchFailedPrefix = "LDAP remote: search failed ";
 
@@ -94,7 +97,7 @@ internal static class LdapSearch
         exchange.Log.EntriesReturned(entries.EntryCount);
         TransferResult result = entries.WriteFailure is { } writeFailure
             ? await AbandonAndUnbindAsync(exchange, messageId, writeFailure, cancellationToken).ConfigureAwait(false)
-            : await FinishAsync(dialect, exchange, messageId, reply, entries, cancellationToken).ConfigureAwait(false);
+            : await FinishAsync(dialect, exchange, messageId, reply, entries, context).ConfigureAwait(false);
 
         // Entries the OpenLDAP build wrote before a failure count too, as curl's size_download does.
         return result with { BytesTransferred = entries.BytesWritten };
@@ -107,14 +110,17 @@ internal static class LdapSearch
         int messageId,
         LdapSearchReply reply,
         LdapEntryWriter entries,
-        CancellationToken cancellationToken) =>
-        reply.Kind switch
+        ITransferContext context)
+    {
+        CancellationToken cancellationToken = context.CancellationToken;
+        return reply.Kind switch
         {
             LdapSearchReplyKind.Lost => Lost(dialect),
             LdapSearchReplyKind.Entry => await AbandonAsync(exchange, messageId, TransferResult.Failure(CurlExitCode.RecvError, ReceiveFailed), cancellationToken).ConfigureAwait(false),
             LdapSearchReplyKind.OtherResponse => await AbandonAndUnbindAsync(exchange, messageId, TransferResult.Success(0), cancellationToken).ConfigureAwait(false),
-            _ => await UnbindAndReturnAsync(exchange, await OutcomeAsync(dialect, reply, entries).ConfigureAwait(false), cancellationToken).ConfigureAwait(false),
+            _ => await UnbindAndReturnAsync(exchange, await OutcomeAsync(dialect, reply, entries, context.Events).ConfigureAwait(false), cancellationToken).ConfigureAwait(false),
         };
+    }
 
     /// <summary>
     /// Reads replies, handing each entry to <paramref name="entries" />, until the one that
@@ -164,11 +170,26 @@ internal static class LdapSearch
             ? TransferResult.Failure(CurlExitCode.LdapSearchFailed, WinLdapRemotePrefix + WinLdapResultText.Of(WinLdapServerDown))
             : TransferResult.Failure(CurlExitCode.RecvError, OpenLdapCannotContactServer);
 
-    private static async ValueTask<TransferResult> OutcomeAsync(LdapDialect dialect, LdapSearchReply done, LdapEntryWriter entries)
+    /// <summary>
+    /// Leaves the search as <paramref name="dialect" />'s build leaves on <paramref name="done" />:
+    /// a success writes the held entries and, after a <c>sizeLimitExceeded</c>, then reports how
+    /// many were written, as both builds do (<c>lib/ldap.c</c> and <c>lib/openldap.c</c>, BL-1122).
+    /// </summary>
+    private static async ValueTask<TransferResult> OutcomeAsync(LdapDialect dialect, LdapSearchReply done, LdapEntryWriter entries, ITransferEvents events)
     {
         if (done.IsSuccess)
         {
-            return await entries.WriteHeldAsync().ConfigureAwait(false) ? TransferResult.Success(0) : entries.WriteFailure!;
+            if (!await entries.WriteHeldAsync().ConfigureAwait(false))
+            {
+                return entries.WriteFailure!;
+            }
+
+            if (done.ResultCode == SizeLimitExceeded)
+            {
+                events.ReportInfo(LdapVerboseLines.MoreThan(entries.EntryCount));
+            }
+
+            return TransferResult.Success(0);
         }
 
         string message = dialect == LdapDialect.WinLdap
