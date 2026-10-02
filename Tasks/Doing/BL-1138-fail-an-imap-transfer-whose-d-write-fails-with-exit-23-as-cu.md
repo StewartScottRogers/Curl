@@ -31,3 +31,4 @@ An `imap://` transfer whose write of a response line to the `-D` stream fails en
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
