@@ -40,3 +40,4 @@ Each time `task-board.ps1 move` takes a task out of `Backlog`, Stewart hears the
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
