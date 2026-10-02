@@ -103,7 +103,7 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
         await using (connection.ConfigureAwait(false))
         {
             var session = new Pop3Session(
-                new Pop3ControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog), tlsProvider, context, implicitTls, saslAuthenticator, connectEvents.Opened);
+                new Pop3ControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput), tlsProvider, context, implicitTls, saslAuthenticator, connectEvents.Opened);
             TransferResult result;
             await using (session.ConfigureAwait(false))
             {
