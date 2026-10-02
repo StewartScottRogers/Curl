@@ -29,6 +29,10 @@ Under `-v --trace-config ftp -r 0-1 -Q -<cmd>`, with the post-quote refused, Cur
 
 ## Notes
 
+- Measured curl 8.21.0 (Schannel) with `Record-CurlExchange.ps1 -Ftp -FtpData "hello`n" -CurlArgs '-sS','--trace-config','ftp','-v','-r','0-1','-Q','-NOOP',...`: after `partial download completed, closing connection` curl sends the post-quote, writes its `getftpresponse` lines, then `[STOP] done, result=21`, then `shutting down connection #0`; exit 21. ABOR reads the stale 226, so NOOP reads ABOR's reply.
+- `FtpSession.EndRangeAsync` now runs the post-quotes (`RunPostQuotesAsync`, which writes the done line with their result) before the shutting-down line, then `QuitAfterPostQuotesAsync`; `QuitAndSucceedAsync` composes the two.
+- curl also writes `* QUOT string not accepted: NOOP` (its failf under -v) just before the done line. The handler returns that text as the failure message, not as a -v line, as for every other FTP failure, so the test pins the handler's lines without it.
+
 ## Log
 
 - 2026-10-02: Created.
