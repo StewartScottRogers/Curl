@@ -32,3 +32,4 @@ With `-Z` and HTTP/3, transfers to the same origin share one QUIC connection as 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-10-01: Backlog -> Doing.
