@@ -1,5 +1,5 @@
 ---
-id: BL-1194
+id: BL-1195
 title: Write the [TCP] send, recv and query ALPN trace lines for --trace-config tcp, network, all and -vvvv
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1194 — Write the [TCP] send, recv and query ALPN trace lines for --trace-config tcp, network, all and -vvvv
+# BL-1195 — Write the [TCP] send, recv and query ALPN trace lines for --trace-config tcp, network, all and -vvvv
 
 ## Goal
 

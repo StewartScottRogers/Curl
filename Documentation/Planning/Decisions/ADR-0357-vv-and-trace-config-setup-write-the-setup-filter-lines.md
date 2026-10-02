@@ -97,7 +97,7 @@ Decided by Claude under Stewart's delegation.
 
 BL-1161 delivers the `[HAPPY-EYEBALLS]` lines and the `[TCP]` lines of the connect attempts; the
 `[TCP]` lines of the connection's I/O (`query ALPN`, `send(...)`, `recv(...)`) go to a follow-up task
-(BL-1194), since they come from the transfer, not the connect.
+(BL-1195), since they come from the transfer, not the connect.
 
 - Measured (BL-1161 Notes): `happy-eyeballs`, `network` and `all` (so `-vvvv`) turn the
   `[HAPPY-EYEBALLS]` lines on; `tcp`, `network` and `all` the `[TCP]` lines
