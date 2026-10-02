@@ -34,3 +34,4 @@ Under `-v --trace-config dns` (or `doh`, `all`) Curl also writes the `[DNS]` lin
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
