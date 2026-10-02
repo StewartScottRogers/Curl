@@ -35,3 +35,4 @@ When the hand-built NTLM context refuses an AUTHENTICATE message because the res
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
