@@ -338,6 +338,7 @@ choices do not need one.
 | [0326](ADR-0326-libcurl-writes-the-schannel-builds-proxy-tls-and-authentication-lines.md) | `--libcurl` writes curl 8.21.0 Schannels proxy, TLS and authentication setopt lines in its order and bitmask format on every platform, and a test keeps every parsed option classified (BL-654) | Accepted | 2026-10-01 |
 | [0327](ADR-0327-ech-modes-through-the-hand-built-client.md) | `--ech` through the hand-built client: libcurl's mode bits, the `ecl:` list or the DoH HTTPS record's `ech`, `pn:` as the outer name, `hard` without a usable list exit 35 and a rejected offer exit 101 | Accepted | 2026-10-01 |
 | [0328](ADR-0328-tlsuser-runs-tls-srp-through-the-hand-built-client-as-curls-openssl-build.md) | `--tlsuser` runs TLS-SRP through the hand-built client on every platform: OpenSSL's `SRP` cipher list without `--ciphers`, exit 43 without `--tlspassword`, the OpenSSL build's alert lines | Accepted | 2026-10-01 |
+| [0329](ADR-0329-ftp-reply-lines-go-to-the-d-file.md) | FTP control reply lines go to the `-D` file in arrival order, `QUIT`'s excepted; a refused write is exit 23 | Accepted | 2026-10-01 |
 
 ## Template
 

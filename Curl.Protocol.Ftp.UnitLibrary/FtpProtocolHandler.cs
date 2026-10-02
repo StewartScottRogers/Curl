@@ -273,7 +273,7 @@ public sealed class FtpProtocolHandler : IProtocolHandler
     {
         var connections = new FtpSessionConnections(dataConnector, listener, tlsProvider, dnsResolver, interfaceLookup, controlOpened);
         using var connectPhase = new FtpConnectPhaseLimit(context, started);
-        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog)), name, context, implicitTls, connectPhase);
+        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput), name, context, implicitTls, connectPhase);
         await using (session.ConfigureAwait(false))
         {
             return await session.RunAsync().ConfigureAwait(false);

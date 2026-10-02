@@ -1745,6 +1745,11 @@ internal sealed class FtpSession(
             // Nor does one holding a NUL byte: curl's ftp_quit ends the connection on any read error.
             return null;
         }
+        catch (FtpReplyLineWriteException)
+        {
+            // Nor does ABOR's reply refused by the -D stream; QUIT's is never written there.
+            return null;
+        }
     }
 
     private ValueTask<FtpReply> ExchangeAsync(string command) => ExchangeAsync(command, afterSent: null);
@@ -1783,6 +1788,10 @@ internal sealed class FtpSession(
         catch (InvalidDataException)
         {
             throw Failed(CurlExitCode.TooLarge, FtpTransferMessages.ReplyLineTooLarge);
+        }
+        catch (FtpReplyLineWriteException refused)
+        {
+            throw Failed(CurlExitCode.WriteError, refused.Message);
         }
 
         if (reply is null)

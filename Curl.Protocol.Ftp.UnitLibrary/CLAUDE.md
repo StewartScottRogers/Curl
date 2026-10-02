@@ -31,7 +31,9 @@ the OpenSSL build, exit 81 with no `QUIT` on the Schannel build, ADR-0280, BL-63
 `--connect-timeout` (300 s when not given), as curl holds its states before `DO`. `-v` and
 `--trace` (BL-930, BL-931): every control command and reply line but `QUIT`'s is reported
 as a header, curl's `* ` lines about the data connection and the transfer as info lines, and
-every data-connection byte as data. Curl's own diagnostic log (`--log-level`, ADR-0222,
+every data-connection byte as data. `-D` (BL-1131, ADR-0329): the same reply lines,
+`QUIT`'s excepted, are written byte for byte to `ITransferContext.DumpHeaderOutput`, which
+`-i` never prints; a refused write is exit 23. Curl's own diagnostic log (`--log-level`, ADR-0222,
 BL-924): `FtpDiagnosticLog` writes component `ftp` from `ITransferContext.DiagnosticLog` -
 the failure that ends a session as `error` with its `CurlExitCode`, the EPSV-to-PASV and
 EPRT-to-PORT fallbacks, a skipped `227` address, a refused `AUTH` or `PROT P` and an

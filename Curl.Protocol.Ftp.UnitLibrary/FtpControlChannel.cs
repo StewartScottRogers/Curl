@@ -17,6 +17,11 @@ namespace Curl.Protocol.Ftp;
 /// Where the diagnostic log learns of each command sent and each reply read, at
 /// <c>verbose</c>, <c>QUIT</c> included (BL-924).
 /// </param>
+/// <param name="dumpHeaderOutput">
+/// The <c>-D</c> stream alone, <see cref="ITransferContext.DumpHeaderOutput" />, or
+/// <see langword="null" /> without <c>-D</c>: each reply line reported is also written there,
+/// as curl 8.21.0 passes it as <c>CLIENTWRITE_INFO</c> (BL-1131).
+/// </param>
 /// <remarks>
 /// Commands and replies are Latin-1, so every byte of a percent-decoded path reaches the
 /// server unchanged, as curl sends it. A reply ends at the first line that starts with
@@ -26,16 +31,23 @@ namespace Curl.Protocol.Ftp;
 /// sent is reported with its CRLF, <c>PASS</c>'s password in clear, and every complete line
 /// read with its line end, skipped or not, until <see cref="StopReporting" />.
 /// </remarks>
-internal sealed class FtpControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken, FtpDiagnosticLog diagnostics)
+internal sealed class FtpControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken, FtpDiagnosticLog diagnostics, Stream? dumpHeaderOutput)
 {
     /// <summary>Where lines are reported: <c>events</c> until <see cref="StopReporting" />, nowhere after.</summary>
     private ITransferEvents reporting = events;
 
+    /// <summary>Where reply lines are written: <c>dumpHeaderOutput</c> until <see cref="StopReporting" />, nowhere after.</summary>
+    private Stream? dumping = dumpHeaderOutput;
+
     /// <summary>
-    /// Reports nothing more: curl sends <c>QUIT</c> as it closes the connection, where
-    /// <c>-v</c> does not see it or its reply.
+    /// Reports and writes nothing more: curl sends <c>QUIT</c> as it closes the connection,
+    /// where neither <c>-v</c> nor the <c>-D</c> file sees it or its reply.
     /// </summary>
-    public void StopReporting() => reporting = NoTransferEvents.Instance;
+    public void StopReporting()
+    {
+        reporting = NoTransferEvents.Instance;
+        dumping = null;
+    }
 
     private const int ReadBufferSize = 4096;
 
@@ -109,6 +121,9 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
     /// <exception cref="FtpReplyNulByteException">
     /// A complete line held a NUL byte, as curl refuses with exit 8; the line is not reported.
     /// </exception>
+    /// <exception cref="FtpReplyLineWriteException">
+    /// The <c>-D</c> stream refused a line, as curl ends with exit 23.
+    /// </exception>
     public async ValueTask<FtpReply?> ReadReplyAsync()
     {
         string? firstLine = null;
@@ -154,6 +169,7 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
                 }
 
                 reporting.ReportResponseHeader(bytes);
+                await WriteToDumpHeaderOutputAsync(bytes).ConfigureAwait(false);
                 return Encoding.Latin1.GetString(bytes, 0, bytes.Length - 1).TrimEnd('\r');
             }
 
@@ -161,6 +177,23 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
         }
 
         return null;
+    }
+
+    private async ValueTask WriteToDumpHeaderOutputAsync(byte[] line)
+    {
+        if (dumping is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await dumping.WriteAsync(line, CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException refused)
+        {
+            throw new FtpReplyLineWriteException(line.Length, refused);
+        }
     }
 
     private async ValueTask<bool> TryFillAsync()
