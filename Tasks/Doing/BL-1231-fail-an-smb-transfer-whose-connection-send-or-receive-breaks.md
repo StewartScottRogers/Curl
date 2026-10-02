@@ -34,3 +34,4 @@ An `smb://` or `smbs://` transfer whose connection write or read throws an `IOEx
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
