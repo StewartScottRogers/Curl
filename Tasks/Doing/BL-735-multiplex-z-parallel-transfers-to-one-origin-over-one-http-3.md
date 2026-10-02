@@ -55,3 +55,4 @@ With `-Z` and HTTP/3, transfers to the same origin share one QUIC connection as 
 - 2026-09-28: Created.
 - 2026-10-01: Backlog -> Doing.
 - 2026-10-01: Doing -> Backlog. touches now include Curl.Networking.UnitTests (QUIC pooling lives in PoolingConnector), which BL-824 in Doing also touches; resume once BL-824 is Done
+- 2026-10-01: Backlog -> Doing.
