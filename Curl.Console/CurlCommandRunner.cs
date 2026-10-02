@@ -567,7 +567,8 @@ internal sealed class CurlCommandRunner(
     private TransferResult? previousTransferResult;
 
     /// <summary>
-    /// When the run's last serial transfer started, as a <see cref="TimeProvider.GetTimestamp" />, which
+    /// When the run's last serial transfer started - its last <c>--retry</c> attempt's start, set by
+    /// <see cref="RecordSerialAttemptStart" /> - as a <see cref="TimeProvider.GetTimestamp" />, which
     /// <see cref="WaitForTransferStartRateAsync" /> measures <c>--rate</c> from; <see langword="null" />
     /// before the first.
     /// </summary>
@@ -4075,6 +4076,7 @@ internal sealed class CurlCommandRunner(
         TransferRetrier retrier = new(async _ =>
         {
             await retryLinesWritten.ConfigureAwait(false);
+            RecordSerialAttemptStart();
             TransferContext context = firstContext ?? createAttemptContext();
             firstContext = null;
             TransferResult attemptResult = await FollowWatchingSpeedAsync(follower, context, redirectPolicy).ConfigureAwait(false);
@@ -4097,6 +4099,21 @@ internal sealed class CurlCommandRunner(
         await retryLinesWritten.ConfigureAwait(false);
 
         return result;
+    }
+
+    /// <summary>
+    /// Moves <see cref="previousSerialTransferStart" /> to now as a serial transfer's attempt starts, after any
+    /// <c>--retry</c> wait, so <c>--rate</c> measures from the last attempt's start, as curl 8.21.0's
+    /// <c>serial_transfers</c> resets its start on every retry: 503 then 200 with <c>--retry-delay 1</c> and
+    /// 300 ms answers printed <c>Note: Transfer took 315 ms</c> (measured 2026-10-02, BL-971 Notes). Under
+    /// <c>-Z</c>, where <c>--rate</c> waits for nothing, it is left alone.
+    /// </summary>
+    private void RecordSerialAttemptStart()
+    {
+        if (parallelRun is null)
+        {
+            previousSerialTransferStart = timeProvider.GetTimestamp();
+        }
     }
 
     /// <summary>

@@ -139,6 +139,28 @@ public sealed class CurlCommandRunnerRateTests
             clock.Waits.ToArray());
     }
 
+    [TestMethod]
+    public async Task RunAsync_RetriedTransfer_WaitsFromTheLastAttemptsStart()
+    {
+        int attempts = 0;
+        RecordingProtocolHandler timingOutOnce = new("dict", _ =>
+        {
+            starts.Add(clock.GetTimestamp());
+            clock.Advance(300);
+            return ValueTask.FromResult(++attempts == 1
+                ? TransferResult.Failure(CurlExitCode.OperationTimedOut, "Operation timed out")
+                : TransferResult.Success(0));
+        });
+
+        int exitCode = await RunAsync(timingOutOnce, "-v", "--retry", "1", "--retry-delay", "1", "--rate", "1/5s", "dict://h/a", "dict://h/b");
+
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(new long[] { 0, 1300, 6300 }, starts);
+        CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(4700) }, clock.Waits.ToArray());
+        string[] notes = StandardErrorText.Split(Environment.NewLine).Where(line => line.StartsWith("Note: ", StringComparison.Ordinal)).ToArray();
+        CollectionAssert.AreEqual(new[] { "Note: Transfer took 300 ms, waits 4700ms as set by --rate" }, notes);
+    }
+
     /// <summary>A dict handler that records when each transfer starts and takes <paramref name="milliseconds" />.</summary>
     private RecordingProtocolHandler Taking(long milliseconds) =>
         new("dict", _ =>
