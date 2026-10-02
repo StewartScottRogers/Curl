@@ -171,7 +171,7 @@ function Get-OpenFindings([string]$Findings, [string]$Auditor) {
     $lines = @()
     foreach ($f in @(Get-ChildItem -LiteralPath $Findings -Filter 'AF-*.md' -ErrorAction SilentlyContinue | Sort-Object Name)) {
         $t = [IO.File]::ReadAllText($f.FullName)
-        if ($t -notmatch "(?m)^auditor: $Auditor\s*$" -or $t -notmatch '(?m)^status: (proposed|accepted)\s*$') { continue }
+        if ($t -notmatch "(?m)^auditor: $Auditor\s*$" -or $t -notmatch '(?m)^status: (proposed|accepted|deferred|blocked)\s*$') { continue }
         $id = if ($t -match '(?m)^id: (\S+)') { $Matches[1] } else { continue }
         $title = if ($t -match '(?m)^title: (.+)$') { $Matches[1].Trim() } else { '' }
         $command = if ($t -match '(?s)```powershell\r?\n(.*?)```') { $Matches[1].Trim() } else { '' }

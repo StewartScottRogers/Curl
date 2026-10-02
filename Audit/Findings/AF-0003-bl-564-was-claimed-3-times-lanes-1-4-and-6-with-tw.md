@@ -4,6 +4,7 @@ title: BL-564 was claimed 3 times: lanes 1, 4 and 6, with two conflict-resolve r
 auditor: process
 severity: Medium
 status: accepted
+reason: Stewart accepted it on 2026-09-30.
 key: process:BL-564:BL-564:redone-work
 task: BL-1069
 found: 2026-09-30
@@ -37,3 +38,7 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 
 ## Re-audits
 
+## Log
+
+- 2026-09-30: filed proposed.
+- 2026-09-30: proposed -> accepted. Stewart accepted it on 2026-09-30 (log written 2026-10-02, BL-1183).
