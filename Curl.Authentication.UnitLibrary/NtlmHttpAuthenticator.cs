@@ -10,7 +10,7 @@ namespace Curl.Authentication;
 /// <c>HTTP</c> on the URL's host that <paramref name="securityContexts" /> makes.
 /// </summary>
 /// <param name="securityContexts">Makes the NTLM contexts; ADR-0142's router in production.</param>
-/// <param name="refusedChallengeFailsTransfer">
+/// <param name="matchesSspiBuild">
 /// <see langword="true" /> where curl's SSPI build is matched (Windows): a Type 2 message the
 /// context cannot answer fails the transfer with exit 94. <see langword="false" /> where
 /// curl's own NTLM is (elsewhere): a Type 2 message it cannot read ends the transfer on the
@@ -27,7 +27,7 @@ namespace Curl.Authentication;
 /// diagnostic log, never a message byte (BL-923).
 /// </remarks>
 /// <param name="diagnosticLog">Where the rounds and refusals are logged; <see langword="null" /> logs nothing.</param>
-public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContexts, bool refusedChallengeFailsTransfer, IDiagnosticLog? diagnosticLog = null)
+public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContexts, bool matchesSspiBuild, IDiagnosticLog? diagnosticLog = null)
 {
     private const string SchemeName = "NTLM";
 
@@ -74,7 +74,7 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
     /// <param name="cancellationToken">Cancels the context's steps.</param>
     /// <returns>The header value, or <see langword="null" /> to send none.</returns>
     /// <exception cref="HttpAuthenticationFailedException">
-    /// The context cannot answer the Type 2 message and <c>refusedChallengeFailsTransfer</c> is set
+    /// The context cannot answer the Type 2 message and <c>matchesSspiBuild</c> is set
     /// (exit 94), or it is not set and the context refuses the answer because the Type 3 message
     /// would not fit curl's buffer (exit 100).
     /// </exception>
@@ -208,7 +208,7 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
             return header;
         }
 
-        if (refusedChallengeFailsTransfer)
+        if (matchesSspiBuild)
         {
             request.Events.ReportInfo(NtlmHandshakeLines.Type3Failure(authenticate.Status));
             throw Failed(CurlExitCode.AuthError, AuthErrorMessage);

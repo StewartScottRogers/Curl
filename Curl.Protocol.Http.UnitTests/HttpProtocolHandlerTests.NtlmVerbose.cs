@@ -142,7 +142,7 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     private static HttpProtocolHandler SspiNtlmHandler(QueueConnector connector, ScriptedTokenSource tokens) =>
-        new(connector, new RankedHttpAuthenticator(new BasicAndBearerAuthenticator(System.Text.Encoding.UTF8), new DigestAuthenticator(System.Text.Encoding.UTF8, () => "0"), new NegotiateHttpAuthenticator(tokens), new NtlmHttpAuthenticator(tokens, refusedChallengeFailsTransfer: true)));
+        new(connector, new RankedHttpAuthenticator(new BasicAndBearerAuthenticator(System.Text.Encoding.UTF8), new DigestAuthenticator(System.Text.Encoding.UTF8, () => "0"), new NegotiateHttpAuthenticator(tokens), new NtlmHttpAuthenticator(tokens, matchesSspiBuild: true)));
 
     /// <summary>
     /// Runs one <c>--ntlm -u u:p -v</c> transfer of <see cref="AuthUrl" /> against

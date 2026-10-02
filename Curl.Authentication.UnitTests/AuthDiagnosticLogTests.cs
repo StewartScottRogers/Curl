@@ -105,7 +105,7 @@ public sealed class AuthDiagnosticLogTests
             new ScriptedSecurityContext(
                 new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
                 new SecurityContextStep(SecurityContextStatus.Completed, Type3)));
-        NtlmHttpAuthenticator ntlm = new(contexts, refusedChallengeFailsTransfer: false, log);
+        NtlmHttpAuthenticator ntlm = new(contexts, matchesSspiBuild: false, log);
 
         string? type1 = await ntlm.CreateAuthorizationAsync(HttpRequest(HttpAuthSchemes.Ntlm), null, sentBeforeAnyChallenge: false, [], CancellationToken.None);
         string? type3 = await ntlm.CreateAuthorizationAsync(HttpRequest(HttpAuthSchemes.Ntlm), type1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None);
@@ -120,7 +120,7 @@ public sealed class AuthDiagnosticLogTests
     public async Task CreateAuthorizationAsync_ServerChallengesTheType3Again_LogsNtlmSkipped()
     {
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Warning);
-        NtlmHttpAuthenticator ntlm = new(new ScriptedSecurityContextFactory(), refusedChallengeFailsTransfer: false, log);
+        NtlmHttpAuthenticator ntlm = new(new ScriptedSecurityContextFactory(), matchesSspiBuild: false, log);
 
         await ntlm.CreateAuthorizationAsync(HttpRequest(HttpAuthSchemes.Ntlm), "NTLM " + Convert.ToBase64String(Type3), sentBeforeAnyChallenge: false, ["NTLM"], CancellationToken.None);
 
@@ -133,7 +133,7 @@ public sealed class AuthDiagnosticLogTests
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Warning);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.NoCredentials, [])));
 
-        await new NtlmHttpAuthenticator(contexts, refusedChallengeFailsTransfer: false, log)
+        await new NtlmHttpAuthenticator(contexts, matchesSspiBuild: false, log)
             .CreateAuthorizationAsync(HttpRequest(HttpAuthSchemes.Ntlm), null, sentBeforeAnyChallenge: false, [], CancellationToken.None);
 
         CollectionAssert.AreEqual(new[] { "NTLM skipped: the security context made no message (NoCredentials)" }, log.At(DiagnosticLogLevel.Warning));
@@ -148,7 +148,7 @@ public sealed class AuthDiagnosticLogTests
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.MalformedToken, [])));
-        RankedHttpAuthenticator ranked = Ranked(log, contexts, refusedChallengeFailsTransfer: true);
+        RankedHttpAuthenticator ranked = Ranked(log, contexts, matchesSspiBuild: true);
 
         await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => ranked.ContinueAuthorizationAsync(HttpRequest(HttpAuthSchemes.Ntlm), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
@@ -223,11 +223,11 @@ public sealed class AuthDiagnosticLogTests
         }
     }
 
-    private static RankedHttpAuthenticator Ranked(IDiagnosticLog log, ScriptedSecurityContextFactory contexts, bool refusedChallengeFailsTransfer = false) => new(
+    private static RankedHttpAuthenticator Ranked(IDiagnosticLog log, ScriptedSecurityContextFactory contexts, bool matchesSspiBuild = false) => new(
         new BasicAndBearerAuthenticator(Encoding.UTF8),
         new DigestAuthenticator(Encoding.UTF8, () => "c", log),
         new NegotiateHttpAuthenticator(contexts),
-        new NtlmHttpAuthenticator(contexts, refusedChallengeFailsTransfer, log),
+        new NtlmHttpAuthenticator(contexts, matchesSspiBuild, log),
         log);
 
     private static HttpAuthRequest HttpRequest(HttpAuthSchemes allowed) =>

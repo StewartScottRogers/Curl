@@ -210,7 +210,7 @@ internal static class CurlComposition
             new BasicAndBearerAuthenticator(credentialEncoding),
             new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom, diagnosticLog),
             new NegotiateHttpAuthenticator(securityContexts, negotiateOptions),
-            new NtlmHttpAuthenticator(securityContexts, refusedChallengeFailsTransfer: OperatingSystem.IsWindows(), diagnosticLog),
+            new NtlmHttpAuthenticator(securityContexts, matchesSspiBuild: OperatingSystem.IsWindows(), diagnosticLog),
             diagnosticLog);
     }
 

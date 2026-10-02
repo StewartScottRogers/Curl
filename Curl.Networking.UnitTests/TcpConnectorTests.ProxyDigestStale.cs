@@ -123,7 +123,7 @@ public sealed partial class TcpConnectorTests
                 new BasicAndBearerAuthenticator(Encoding.UTF8),
                 new DigestAuthenticator(Encoding.UTF8, nonces.Dequeue),
                 new NegotiateHttpAuthenticator(new SystemSecurityContextFactory()),
-                new NtlmHttpAuthenticator(new SystemSecurityContextFactory(), refusedChallengeFailsTransfer: false)),
+                new NtlmHttpAuthenticator(new SystemSecurityContextFactory(), matchesSspiBuild: false)),
         };
         return (new TcpConnector(new FakeDnsResolver(ProxyAddress), dialer, new FakeTlsProvider(), new ManualTimeProvider(), options), dialer);
     }

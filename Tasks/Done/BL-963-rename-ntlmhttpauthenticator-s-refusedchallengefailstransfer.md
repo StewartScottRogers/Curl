@@ -8,7 +8,7 @@ depends-on: [BL-849]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Console, Curl.Networking.UnitTests, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-10-02
 ---
 # BL-963 — Rename NtlmHttpAuthenticator's refusedChallengeFailsTransfer to say it picks the SSPI build
 
@@ -31,15 +31,18 @@ other lanes.
 
 ## Acceptance criteria
 
-- [ ] `grep -rn refusedChallengeFailsTransfer --include=*.cs` finds nothing; the new
+- [x] `grep -rn refusedChallengeFailsTransfer --include=*.cs` finds nothing; the new
       name is used at every call site and in the XML doc and
       `Curl.Authentication.UnitLibrary/CLAUDE.md`.
-- [ ] `dotnet build -warnaserror` is clean and
+- [x] `dotnet build -warnaserror` is clean and
       `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+- Renamed to `matchesSspiBuild` (the name the task suggested): `true` matches the SSPI build (exit 94), `false` curl's own NTLM (exit 100 only for an oversized Type 3). Pure rename, 13 .cs files plus `Curl.Authentication.UnitLibrary/CLAUDE.md`, which now names the parameter. Build clean, fast tests green.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. NtlmHttpAuthenticator's SSPI-build switch is named matchesSspiBuild at every call site

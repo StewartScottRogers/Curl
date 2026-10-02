@@ -164,7 +164,7 @@ public sealed partial class HttpProtocolHandlerTests
                 new BasicAndBearerAuthenticator(Encoding.UTF8),
                 new DigestAuthenticator(Encoding.UTF8, () => "0"),
                 new NegotiateHttpAuthenticator(tokens, null, wordsFailuresAsSspi: true),
-                new NtlmHttpAuthenticator(tokens, refusedChallengeFailsTransfer: false)),
+                new NtlmHttpAuthenticator(tokens, matchesSspiBuild: false)),
             null,
             proxySchemes);
 }

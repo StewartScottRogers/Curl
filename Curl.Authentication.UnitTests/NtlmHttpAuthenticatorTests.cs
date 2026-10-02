@@ -101,11 +101,11 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     [DataRow(false, DisplayName = "curl's own NTLM")]
     [DataRow(true, DisplayName = "SSPI: curl's base64 decoder rejects it first")]
-    public async Task CreateAuthorizationAsync_ChallengeNotBase64_SendsNothing(bool refusedChallengeFailsTransfer)
+    public async Task CreateAuthorizationAsync_ChallengeNotBase64_SendsNothing(bool matchesSspiBuild)
     {
         ScriptedSecurityContextFactory contexts = new();
 
-        string? value = await new NtlmHttpAuthenticator(contexts, refusedChallengeFailsTransfer).CreateAuthorizationAsync(Request("u:p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, ["NTLM @@@notbase64"], CancellationToken.None);
+        string? value = await new NtlmHttpAuthenticator(contexts, matchesSspiBuild).CreateAuthorizationAsync(Request("u:p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, ["NTLM @@@notbase64"], CancellationToken.None);
 
         Assert.IsNull(value);
         Assert.IsEmpty(contexts.Requests);
@@ -199,7 +199,7 @@ public sealed partial class NtlmHttpAuthenticatorTests
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.MalformedToken, [])));
-        NtlmHttpAuthenticator authenticator = new(contexts, refusedChallengeFailsTransfer: true);
+        NtlmHttpAuthenticator authenticator = new(contexts, matchesSspiBuild: true);
 
         HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => authenticator.CreateAuthorizationAsync(Request("u:p"), "NTLM x", sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
@@ -211,14 +211,14 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     [DataRow(false, DisplayName = "curl's own NTLM")]
     [DataRow(true, DisplayName = "SSPI")]
-    public async Task CreateAuthorizationAsync_NoType1ForAType2Challenge_SendsNothingOrFails(bool refusedChallengeFailsTransfer)
+    public async Task CreateAuthorizationAsync_NoType1ForAType2Challenge_SendsNothingOrFails(bool matchesSspiBuild)
     {
         ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
-        NtlmHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(context), refusedChallengeFailsTransfer);
+        NtlmHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(context), matchesSspiBuild);
 
         Task<string?> answer = authenticator.CreateAuthorizationAsync(Request("u:p"), null, sentBeforeAnyChallenge: false, [Type2Challenge], CancellationToken.None).AsTask();
 
-        if (refusedChallengeFailsTransfer)
+        if (matchesSspiBuild)
         {
             await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(() => answer);
         }
@@ -235,7 +235,7 @@ public sealed partial class NtlmHttpAuthenticatorTests
     {
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.NoCredentials, [])));
 
-        string? value = await new NtlmHttpAuthenticator(contexts, refusedChallengeFailsTransfer: true).CreateAuthorizationAsync(Request("u:p"), null, sentBeforeAnyChallenge: false, [], CancellationToken.None);
+        string? value = await new NtlmHttpAuthenticator(contexts, matchesSspiBuild: true).CreateAuthorizationAsync(Request("u:p"), null, sentBeforeAnyChallenge: false, [], CancellationToken.None);
 
         Assert.IsNull(value);
     }
@@ -285,7 +285,7 @@ public sealed partial class NtlmHttpAuthenticatorTests
         Assert.AreEqual("::1", contextRequest.HostName);
     }
 
-    private static NtlmHttpAuthenticator Authenticator(ISecurityContextFactory contexts) => new(contexts, refusedChallengeFailsTransfer: false);
+    private static NtlmHttpAuthenticator Authenticator(ISecurityContextFactory contexts) => new(contexts, matchesSspiBuild: false);
 
     /// <summary>
     /// Makes the measured Type 2 challenge with <paramref name="targetInformationLength" /> zero

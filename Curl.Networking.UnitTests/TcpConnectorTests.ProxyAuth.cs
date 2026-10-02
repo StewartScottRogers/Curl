@@ -236,6 +236,6 @@ public sealed partial class TcpConnectorTests
                 new BasicAndBearerAuthenticator(Encoding.UTF8),
                 new DigestAuthenticator(Encoding.UTF8, () => MeasuredClientNonce),
                 new NegotiateHttpAuthenticator(new SystemSecurityContextFactory()),
-                new NtlmHttpAuthenticator(new SystemSecurityContextFactory(), refusedChallengeFailsTransfer: false)),
+                new NtlmHttpAuthenticator(new SystemSecurityContextFactory(), matchesSspiBuild: false)),
         };
 }

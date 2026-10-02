@@ -399,7 +399,7 @@ public sealed partial class HttpProtocolHandlerTests
             new BasicAndBearerAuthenticator(Encoding.UTF8),
             new DigestAuthenticator(Encoding.UTF8, nonces.Dequeue),
             new NegotiateHttpAuthenticator(new SystemSecurityContextFactory()),
-            new NtlmHttpAuthenticator(new SystemSecurityContextFactory(), refusedChallengeFailsTransfer: false));
+            new NtlmHttpAuthenticator(new SystemSecurityContextFactory(), matchesSspiBuild: false));
         return new HttpProtocolHandler(connector, authenticator, null, proxySchemes);
     }
 
