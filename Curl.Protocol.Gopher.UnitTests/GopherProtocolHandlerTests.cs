@@ -330,7 +330,7 @@ public sealed class GopherProtocolHandlerTests
         TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection))
             .ExecuteAsync(Context("gopher://h/", output));
 
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failure when sending data to the peer"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
         Assert.AreEqual(0, output.Length);
     }
 

@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Gopher;
@@ -36,7 +37,10 @@ namespace Curl.Protocol.Gopher;
 /// it. The connection then ends with <c>shutting down connection #N</c> for a finished
 /// transfer or a malformed selector, and <c>closing connection #N</c> for any other
 /// failure, after the failure's message unless it is curl's fallback text for a failed
-/// send or receive.
+/// send or receive. A failed send of the selector or its CRLF also reports
+/// <c>Failed sending Gopher request</c> just before the closing line, as
+/// <c>lib/gopher.c</c> does; its exit 55 message is <c>Send failure: Connection was reset</c>
+/// for a reset and <c>Failed sending data to the peer</c> otherwise.
 /// </para>
 /// <para>
 /// Each step goes to Curl's own diagnostic log, component <c>gopher</c> (ADR-0222, BL-928):
@@ -123,9 +127,9 @@ public sealed class GopherProtocolHandler : IProtocolHandler
 
         foreach (byte[] piece in (byte[][])[selector, LineEnd])
         {
-            if (!await TrySendAsync(connection, piece, context.CancellationToken).ConfigureAwait(false))
+            if (await TrySendAsync(connection, piece, context.CancellationToken).ConfigureAwait(false) is { } sendFailure)
             {
-                return TransferResult.Failure(CurlExitCode.SendError, GopherTransferMessages.SendFailed);
+                return TransferResult.Failure(CurlExitCode.SendError, SendFailure(sendFailure));
             }
 
             if (await TryDumpSentAsync(context.DumpHeaderOutput, piece, context.CancellationToken).ConfigureAwait(false) is { } refused)
@@ -144,7 +148,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
     /// <c>shutting down connection #N</c> after a finished transfer or a malformed selector,
     /// and otherwise <c>closing connection #N</c>, after the failure's own message when curl
     /// reports it through <c>failf</c> - every failure but the fallback texts for a failed
-    /// send or receive.
+    /// send or receive - and, for a failed send, after <c>Failed sending Gopher request</c>.
     /// </summary>
     private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, long connectionNumber)
     {
@@ -157,6 +161,11 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         if (!IsFallbackText(result.ErrorMessage!))
         {
             events.ReportInfo(result.ErrorMessage!);
+        }
+
+        if (result.ExitCode == CurlExitCode.SendError)
+        {
+            events.ReportInfo(GopherTransferMessages.GopherRequestNotSent);
         }
 
         events.ReportInfo(GopherTransferMessages.ClosingConnection(connectionNumber));
@@ -180,7 +189,14 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         };
     }
 
-    private static async ValueTask<bool> TrySendAsync(
+    /// <summary>
+    /// Sends one piece of the request: the selector, or its CRLF.
+    /// </summary>
+    /// <returns>
+    /// <see langword="null" /> when the piece was sent, and what the connection threw when
+    /// it was not.
+    /// </returns>
+    private static async ValueTask<IOException?> TrySendAsync(
         IConnection connection,
         byte[] piece,
         CancellationToken cancellationToken)
@@ -189,13 +205,22 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         {
             await connection.WriteAsync(piece, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-            return true;
+            return null;
         }
-        catch (IOException)
+        catch (IOException exception)
         {
-            return false;
+            return exception;
         }
     }
+
+    /// <summary>
+    /// The exit 55 message for a failed send: the socket filter's <c>Send failure:</c> text
+    /// for a reset, and curl's fallback text for anything else.
+    /// </summary>
+    private static string SendFailure(IOException exception) =>
+        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
+            ? GopherTransferMessages.SendConnectionReset
+            : GopherTransferMessages.SendFailed;
 
     /// <summary>
     /// Writes a piece of the request just sent to the <c>-D</c> stream, as curl 8.21.0's

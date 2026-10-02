@@ -23,9 +23,22 @@ internal static class GopherTransferMessages
     internal const string ReceiveFailed = "Failure when receiving data from the peer";
 
     /// <summary>
-    /// The exit 55 message curl falls back to for a failed send.
+    /// The exit 55 message for a selector write the peer reset, which curl's socket filter
+    /// reports through <c>failf</c>.
     /// </summary>
-    internal const string SendFailed = "Failure when sending data to the peer";
+    internal const string SendConnectionReset = "Send failure: Connection was reset";
+
+    /// <summary>
+    /// The exit 55 message curl falls back to for any other failed send:
+    /// <c>curl_easy_strerror(CURLE_SEND_ERROR)</c>.
+    /// </summary>
+    internal const string SendFailed = "Failed sending data to the peer";
+
+    /// <summary>
+    /// The <c>-v</c> line <c>lib/gopher.c</c> reports through <c>failf</c> after a failed
+    /// send of the selector or of its CRLF.
+    /// </summary>
+    internal const string GopherRequestNotSent = "Failed sending Gopher request";
 
     /// <summary>
     /// The exit 23 message for an output that stopped accepting bytes, as curl words it.

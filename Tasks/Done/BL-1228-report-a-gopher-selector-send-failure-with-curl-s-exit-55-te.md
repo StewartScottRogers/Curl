@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Gopher.UnitLibrary, Curl.Protocol.Gopher.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1228 — Report a gopher selector send failure with curl's exit 55 texts and its 'Failed sending Gopher request' -v line
 
@@ -24,14 +24,17 @@ A `gopher://` or `gophers://` transfer whose selector cannot be sent ends with e
 
 ## Acceptance criteria
 
-- [ ] `GopherTransferMessages` holds no `Failure when sending data to the peer`.
-- [ ] Tests in `Curl.Protocol.Gopher.UnitTests` with a fake connection whose write throws pin, for the selector and for its CRLF: a reset gives exit 55 `Send failure: Connection was reset` and the `-v` lines `Send failure: Connection was reset`, `Failed sending Gopher request`, `closing connection #N`; any other `IOException` gives exit 55 `Failed sending data to the peer` and the `-v` lines `Failed sending Gopher request`, `closing connection #N`.
-- [ ] The diagnostic-log test and the other tests that pinned the old text are updated; every other gopher test passes unchanged.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Gopher.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `GopherTransferMessages` holds no `Failure when sending data to the peer`.
+- [x] Tests in `Curl.Protocol.Gopher.UnitTests` with a fake connection whose write throws pin, for the selector and for its CRLF: a reset gives exit 55 `Send failure: Connection was reset` and the `-v` lines `Send failure: Connection was reset`, `Failed sending Gopher request`, `closing connection #N`; any other `IOException` gives exit 55 `Failed sending data to the peer` and the `-v` lines `Failed sending Gopher request`, `closing connection #N`.
+- [x] The diagnostic-log test and the other tests that pinned the old text are updated; every other gopher test passes unchanged.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Gopher.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- Texts and reset test copied from DictIoFailures (BL-1125) without referencing it. `TrySendAsync` now returns the IOException; `ReportConnectionEnd` adds `Failed sending Gopher request` for any exit 55. ScriptedConnection gained `FailingWriteNumber` and `WriteFailure` to fail the selector (write 0) or CRLF (write 1). Gopher: 74 tests, 100% line and branch.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. A gopher selector send failure is exit 55 with curl's Send failure / Failed sending data texts and the Failed sending Gopher request -v line

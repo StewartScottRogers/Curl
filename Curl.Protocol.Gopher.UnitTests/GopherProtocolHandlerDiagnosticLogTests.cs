@@ -47,7 +47,7 @@ public sealed class GopherProtocolHandlerDiagnosticLogTests
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.HasCount(1, log.Lines);
         CollectionAssert.AreEqual(
-            new[] { "failed with SendError (55): Failure when sending data to the peer" },
+            new[] { "failed with SendError (55): Failed sending data to the peer" },
             log.At(DiagnosticLogLevel.Error));
     }
 
