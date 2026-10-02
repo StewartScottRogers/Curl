@@ -14,6 +14,9 @@ public sealed class FakeDnsResolver(params IPAddress[] addresses) : IDnsResolver
     /// <summary>Gets or sets an exception every lookup throws instead of returning.</summary>
     public Exception? ExceptionToThrow { get; init; }
 
+    /// <summary>Gets the hosts every lookup of which returns no address, as a name that does not resolve.</summary>
+    public IReadOnlySet<string> HostsWithNoAddress { get; init; } = new HashSet<string>();
+
     /// <summary>Gets the hosts looked up, in order.</summary>
     public List<string> ResolvedHosts { get; } = [];
 
@@ -26,6 +29,6 @@ public sealed class FakeDnsResolver(params IPAddress[] addresses) : IDnsResolver
             throw ExceptionToThrow;
         }
 
-        return ValueTask.FromResult<IReadOnlyList<IPAddress>>(addresses);
+        return ValueTask.FromResult<IReadOnlyList<IPAddress>>(HostsWithNoAddress.Contains(host) ? [] : addresses);
     }
 }

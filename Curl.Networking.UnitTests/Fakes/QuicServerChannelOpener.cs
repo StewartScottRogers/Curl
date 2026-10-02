@@ -52,10 +52,13 @@ public sealed class QuicServerChannelOpener : IUdpChannelOpener
     internal List<(IPEndPoint LocalEndPoint, int LocalPortCount)> BoundFrom { get; } = [];
 
     /// <inheritdoc />
-    public IDatagramChannel OpenFrom(IPEndPoint serverEndPoint, IPEndPoint localEndPoint, int localPortCount)
+    /// <remarks>Writes the <c>Local port: N</c> line <see cref="UdpChannelOpener" /> writes for the first port.</remarks>
+    public IDatagramChannel OpenFrom(IPEndPoint serverEndPoint, IPEndPoint localEndPoint, int localPortCount, ITransferEvents events)
     {
         BoundFrom.Add((localEndPoint, localPortCount));
-        return Open(serverEndPoint);
+        var channel = Open(serverEndPoint);
+        events.ReportInfo(LocalBindLines.LocalPort(localEndPoint.Port));
+        return channel;
     }
 
     /// <summary>Gets whether each device bind <see cref="OpenFromDeviceAsync" /> asks for succeeds, as on Linux.</summary>
@@ -72,6 +75,7 @@ public sealed class QuicServerChannelOpener : IUdpChannelOpener
         bool bindsAddressAfterDevice,
         Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
         int localPortCount,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         DeviceBoundTo.Add((deviceName, bindsAddressAfterDevice));
@@ -80,8 +84,12 @@ public sealed class QuicServerChannelOpener : IUdpChannelOpener
             bindsAddressAfterDevice,
             _ => DeviceBinds,
             chooseLocalEndAsync,
-            localEndPoint => BoundFrom.Add((localEndPoint, localPortCount)),
-            NoTransferEvents.Instance,
+            localEndPoint =>
+            {
+                BoundFrom.Add((localEndPoint, localPortCount));
+                events.ReportInfo(LocalBindLines.LocalPort(localEndPoint.Port));
+            },
+            events,
             cancellationToken);
         return Open(serverEndPoint);
     }

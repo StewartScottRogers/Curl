@@ -41,13 +41,14 @@ public sealed class UdpChannelOpener : IUdpChannelOpener
     public IDatagramChannel Open(IPEndPoint serverEndPoint) => new UdpDatagramChannel(serverEndPoint, _localAddress, _localPort);
 
     /// <inheritdoc />
-    public IDatagramChannel OpenFrom(IPEndPoint serverEndPoint, IPEndPoint localEndPoint, int localPortCount)
+    public IDatagramChannel OpenFrom(IPEndPoint serverEndPoint, IPEndPoint localEndPoint, int localPortCount, ITransferEvents events)
     {
         ArgumentNullException.ThrowIfNull(localEndPoint);
+        ArgumentNullException.ThrowIfNull(events);
 
         return new UdpDatagramChannel(
             serverEndPoint,
-            (socket, firstLocalEndPoint) => TcpDialer.BindLocalEnd(socket, (IPEndPoint)firstLocalEndPoint, localPortCount, NoTransferEvents.Instance),
+            (socket, firstLocalEndPoint) => TcpDialer.BindLocalEnd(socket, (IPEndPoint)firstLocalEndPoint, localPortCount, events),
             localEndPoint.Address,
             localEndPoint.Port);
     }
@@ -56,7 +57,7 @@ public sealed class UdpChannelOpener : IUdpChannelOpener
     /// <remarks>
     /// A socket bound to its device alone is then bound to any address on an ephemeral port, as the
     /// kernel binds an unbound UDP socket on its first send, so it can receive before it sends. The
-    /// <c>-v</c> bind lines are not written, as <see cref="OpenFrom" /> writes none: QUIC's were not measured.
+    /// <c>-v</c> bind lines go to <paramref name="events" /> as the TCP path writes them (BL-1078).
     /// </remarks>
     public async ValueTask<IDatagramChannel> OpenFromDeviceAsync(
         IPEndPoint serverEndPoint,
@@ -64,11 +65,13 @@ public sealed class UdpChannelOpener : IUdpChannelOpener
         bool bindsAddressAfterDevice,
         Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
         int localPortCount,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(serverEndPoint);
         ArgumentNullException.ThrowIfNull(deviceName);
         ArgumentNullException.ThrowIfNull(chooseLocalEndAsync);
+        ArgumentNullException.ThrowIfNull(events);
 
         var socket = new Socket(serverEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
         try
@@ -78,8 +81,8 @@ public sealed class UdpChannelOpener : IUdpChannelOpener
                 bindsAddressAfterDevice,
                 name => _tryBindToDevice(socket, name),
                 chooseLocalEndAsync,
-                localEndPoint => TcpDialer.BindLocalEnd(socket, localEndPoint, localPortCount, NoTransferEvents.Instance),
-                NoTransferEvents.Instance,
+                localEndPoint => TcpDialer.BindLocalEnd(socket, localEndPoint, localPortCount, events),
+                events,
                 cancellationToken).ConfigureAwait(false);
 
             if (!socket.IsBound)

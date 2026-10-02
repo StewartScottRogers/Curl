@@ -29,10 +29,11 @@ public interface IUdpChannelOpener
     /// <param name="serverEndPoint">The resolved server endpoint.</param>
     /// <param name="localEndPoint">The local address and the first port; port 0 for an ephemeral one.</param>
     /// <param name="localPortCount">How many ports to try; fewer than 1 is taken as 1.</param>
+    /// <param name="events">Where curls <c>-v</c> bind lines go: <c>Local port: N</c>, <c>Bind to local port N failed, trying next</c> and <c>bind failed with errno N: reason</c> (BL-1078).</param>
     /// <returns>The open channel, which the caller disposes.</returns>
     /// <exception cref="LocalBindException">No port of the range bound (<see cref="LocalBindFailure.InterfaceFailed" />).</exception>
     /// <exception cref="SocketException">The socket could not be opened.</exception>
-    IDatagramChannel OpenFrom(IPEndPoint serverEndPoint, IPEndPoint localEndPoint, int localPortCount);
+    IDatagramChannel OpenFrom(IPEndPoint serverEndPoint, IPEndPoint localEndPoint, int localPortCount, ITransferEvents events);
 
     /// <summary>
     /// Opens a channel whose datagrams go to <paramref name="serverEndPoint" />, its socket first bound to
@@ -47,6 +48,7 @@ public interface IUdpChannelOpener
     /// <param name="bindsAddressAfterDevice"><see langword="true" /> for <c>ifhost!</c>.</param>
     /// <param name="chooseLocalEndAsync">Chooses the local address and first port, only when one is to be bound.</param>
     /// <param name="localPortCount">How many ports to try; fewer than 1 is taken as 1.</param>
+    /// <param name="events">Where curls <c>-v</c> device and port bind lines go, as the TCP path writes them (BL-1078).</param>
     /// <param name="cancellationToken">Cancels the choice of local end.</param>
     /// <returns>The open channel, which the caller disposes.</returns>
     /// <exception cref="LocalBindException">The local end could not be bound, as its <see cref="LocalBindException.Failure" /> says.</exception>
@@ -57,5 +59,6 @@ public interface IUdpChannelOpener
         bool bindsAddressAfterDevice,
         Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
         int localPortCount,
+        ITransferEvents events,
         CancellationToken cancellationToken);
 }

@@ -196,7 +196,7 @@ public sealed partial class TcpConnector(
     /// <summary>
     /// Gets what the handshake for HTTP over TLS to the origin offers through ALPN (ADR-0141).
     /// </summary>
-    public IReadOnlyList<string> HttpOverTlsApplicationProtocols { get; } =
+    public IReadOnlyList<string> HttpOverTlsApplicationProtocols =>
         httpOverTlsApplicationProtocols ?? HttpApplicationProtocols.Http11Only;
 
     private readonly ITlsProvider _proxyTlsProvider = proxyTlsProvider ?? tlsProvider;

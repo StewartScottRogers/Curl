@@ -331,8 +331,9 @@ Per BL-1077 an `--interface` name is first bound as a device there too, through
 `IUdpChannelOpener.OpenFromDeviceAsync`, whose `UdpChannelOpener` runs the same
 `TcpDialer.BindDeviceOrLocalEndAsync` with `TcpDialer.TryBindToDevice` (internal constructor seam for
 tests): a plain or `if!` name bound so binds no address or port (the socket then binds any address on
-an ephemeral port, as the kernel would on the first send), `ifhost!` goes on to bind its host. QUIC
-writes none of the bind's `-v` lines yet.
+an ephemeral port, as the kernel would on the first send), `ifhost!` goes on to bind its host. Per ADR-0352
+(BL-1078) `QuicDialer` passes the target's `Events` to the chooser and to both `IUdpChannelOpener`
+methods, so a QUIC bind writes the TCP path's `-v` lines, as curl.se's ngtcp2 build does (measured, BL-1025).
 
 Per ADR-0149 (BL-507) `TcpConnector` takes an optional `UnixSocketAddress` (`--unix-socket`,
 `--abstract-unix-socket`, whose name starts with a NUL). With one, every connect dials it through

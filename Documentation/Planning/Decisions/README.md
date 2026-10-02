@@ -361,6 +361,7 @@ choices do not need one.
 | [0349](ADR-0349-schannel-warns-that-tls13-cipher-lists-are-ignored.md) | The Schannel build warns that `--tls13-ciphers` and `--proxy-tls13-ciphers` are ignored, once per URL | Accepted | 2026-10-02 |
 | [0350](ADR-0350-the-openssl-builds-tls13-hello-pads-and-drops-ec-point-formats-as-measured.md) | The OpenSSL build's TLS 1.3 hello pads and drops `ec_point_formats` as measured | Accepted | 2026-10-02 |
 | [0351](ADR-0351-next-option-groups-share-one-dns-cache.md) | The `--next` option groups share one run-wide `DnsCache`: a later group answers a host an earlier group resolved, or an earlier group's `--resolve` entry, from it, and its own entry replaces the cached answer with `old addresses discarded` | Accepted | 2026-10-02 |
+| [0352](ADR-0352-quic-s-udp-socket-bind-writes-the-tcp-path-s-v-bind-lines.md) | QUIC's UDP socket bind writes the TCP path's `-v` bind lines, as curl.se's ngtcp2 build does (amends ADR-0295 Decision 4) | Accepted | 2026-10-02 |
 
 ## Template
 

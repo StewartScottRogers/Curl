@@ -288,7 +288,7 @@ public sealed class QuicDialer
 
         try
         {
-            return (await OpenBoundChannelAsync(request.LocalBinding, endPoint, cancellationToken).ConfigureAwait(false), null);
+            return (await OpenBoundChannelAsync(request.LocalBinding, endPoint, request.Target.Events, cancellationToken).ConfigureAwait(false), null);
         }
         catch (LocalBindException exception)
         {
@@ -302,9 +302,9 @@ public sealed class QuicDialer
     }
 
     // Unbound without a LocalBinding; else on the address chosen for the family dialled and the
-    // first free port of the --local-port range, as libcurl's bindlocal binds a QUIC socket. Its -v
-    // bind lines are not written for QUIC yet: the TCP path's (BL-1027) were not measured over QUIC.
-    private async ValueTask<IDatagramChannel> OpenBoundChannelAsync(LocalBindingAddressChooser? localBinding, IPEndPoint endPoint, CancellationToken cancellationToken)
+    // first free port of the --local-port range, as libcurl's bindlocal binds a QUIC socket, writing the TCP path's -v bind lines to events
+    // (BL-1078): curl.se's ngtcp2 build writes the same lines for its UDP socket (measured, BL-1025).
+    private async ValueTask<IDatagramChannel> OpenBoundChannelAsync(LocalBindingAddressChooser? localBinding, IPEndPoint endPoint, ITransferEvents events, CancellationToken cancellationToken)
     {
         if (localBinding is null)
         {
@@ -319,18 +319,19 @@ public sealed class QuicDialer
                 endPoint,
                 deviceName,
                 bindsAddressAfterDevice: binding.InterfaceName is null,
-                token => ChooseLocalEndAsync(localBinding, endPoint.AddressFamily, token),
+                token => ChooseLocalEndAsync(localBinding, endPoint.AddressFamily, events, token),
                 binding.PortCount,
+                events,
                 cancellationToken).ConfigureAwait(false);
         }
 
-        var localEndPoint = await ChooseLocalEndAsync(localBinding, endPoint.AddressFamily, cancellationToken).ConfigureAwait(false);
-        return _channelOpener.OpenFrom(endPoint, localEndPoint, binding.PortCount);
+        var localEndPoint = await ChooseLocalEndAsync(localBinding, endPoint.AddressFamily, events, cancellationToken).ConfigureAwait(false);
+        return _channelOpener.OpenFrom(endPoint, localEndPoint, binding.PortCount, events);
     }
 
-    private static async ValueTask<IPEndPoint> ChooseLocalEndAsync(LocalBindingAddressChooser localBinding, AddressFamily family, CancellationToken cancellationToken)
+    private static async ValueTask<IPEndPoint> ChooseLocalEndAsync(LocalBindingAddressChooser localBinding, AddressFamily family, ITransferEvents events, CancellationToken cancellationToken)
     {
-        var localAddress = await localBinding.ChooseAsync(family, NoTransferEvents.Instance, cancellationToken).ConfigureAwait(false);
+        var localAddress = await localBinding.ChooseAsync(family, events, cancellationToken).ConfigureAwait(false);
         return new IPEndPoint(localAddress, localBinding.Binding.FirstPort);
     }
 
