@@ -5,7 +5,7 @@ namespace Curl.Protocol.Http;
 
 /// <summary>
 /// Pins the <c>[HTTP/3]</c> stream lines an HTTP/3 exchange writes when the handler traces HTTP/3
-/// streams (<c>-v --trace-config http/3</c>, BL-1168, ADR-0374), placed among the <c>&lt;</c> and
+/// streams (<c>-v --trace-config http/3</c>, BL-1168, ADR-0375), placed among the <c>&lt;</c> and
 /// <c>{</c> lines as curl 8.18.0's ngtcp2 build placed them against cloudflare-quic.com (BL-1168
 /// Notes), and that it writes none of them otherwise.
 /// </summary>

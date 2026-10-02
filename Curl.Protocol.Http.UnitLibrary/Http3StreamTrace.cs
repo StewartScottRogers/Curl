@@ -5,7 +5,7 @@ namespace Curl.Protocol.Http;
 
 /// <summary>
 /// Writes the <c>[HTTP/3]</c> lines curl 8.21.0's ngtcp2/nghttp3 layer writes about a request
-/// stream under <c>-v --trace-config http/3</c> (BL-1168, ADR-0374):
+/// stream under <c>-v --trace-config http/3</c> (BL-1168, ADR-0375):
 /// <c>[&lt;stream&gt;] end_headers, status=&lt;code&gt;</c> for each response head,
 /// <c>[&lt;stream&gt;] DATA len=&lt;n&gt;</c> and <c>[&lt;stream&gt;] ACK &lt;n&gt;/&lt;n&gt; bytes of DATA</c>
 /// for each piece of body, and <c>[&lt;stream&gt;] CLOSED</c> and

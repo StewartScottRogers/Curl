@@ -384,6 +384,7 @@ choices do not need one.
 | [0372](ADR-0372-trace-config-ssh-writes-curls-ssh-state-lines.md) | `--trace-config ssh` (and `protocol`, `all`) writes curl 8.21.0's `[SSH]` state changes and phase lines for a `publickey` login and an SFTP or SCP download, without the timing-dependent `block=1` and `pollset` lines (BL-1166) | Accepted | 2026-10-02 |
 | [0373](ADR-0373-trace-config-http2-writes-curls-frame-lines.md) | `--trace-config http/2` (and `protocol`, `all`) writes curl's `[HTTP/2]` session, frame, settings and stream-closed lines from the HTTP/2 framing, without curl's run-to-run buffering lines (BL-1167) | Accepted | 2026-10-02 |
 | [0374](ADR-0374-trace-config-ssh-failures-leave-through-the-freeing-state.md) | A failed SSH transfer's `--trace-config ssh` lines leave the failed state for `SSH_SFTP_CLOSE`, `SSH_SCP_CHANNEL_FREE` or `SSH_SESSION_FREE` with the exit code; uploads, listings, `-Q`, password and `keyboard-interactive` logins traced as measured (BL-1204) | Accepted | 2026-10-02 |
+| [0375](ADR-0375-trace-config-http3-writes-curls-stream-lines.md) | `--trace-config http/3` (and `protocol`, `all`) writes curl's `[HTTP/3]` `end_headers`, `DATA len`, `ACK`, `CLOSED` and `quic close` stream lines in curl's places, without curl's I/O loop lines; the connection lines and header echoes are BL-1208 (BL-1168) | Accepted | 2026-10-02 |
 
 ## Template
 
