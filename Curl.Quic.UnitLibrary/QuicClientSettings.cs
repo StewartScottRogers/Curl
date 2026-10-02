@@ -33,7 +33,7 @@ public sealed record QuicClientSettings
 
     /// <summary>
     /// Returns the TLS settings of curl.se's ngtcp2 build's ClientHello as ADR-0144 section 5
-    /// measured it (LibreSSL 4.2.1), the QUIC hello on Windows: suites <c>1302 1303 1301</c>,
+    /// measured it (LibreSSL 4.2.1), the QUIC hello on Windows: suites <c>1302 1303 1301</c> then the renegotiation SCSV <c>00ff</c>,
     /// groups <c>001d 0017 0018 0019</c> with an X25519 share, its nine signature algorithms,
     /// <c>ec_point_formats</c> uncompressed, ALPN <c>h3</c> then <c>h3-29</c>, and the
     /// extensions in the measured order.
@@ -44,6 +44,7 @@ public sealed record QuicClientSettings
     {
         ServerName = serverName,
         CipherSuites = [0x1302, 0x1303, 0x1301],
+        OfferEmptyRenegotiationInfoScsv = true,
         SupportedGroups = [TlsNamedGroup.X25519, TlsNamedGroup.Secp256r1, TlsNamedGroup.Secp384r1, TlsNamedGroup.Secp521r1],
         KeyShareGroups = [TlsNamedGroup.X25519],
         SignatureAlgorithms = [0x0806, 0x0601, 0x0603, 0x0805, 0x0501, 0x0503, 0x0804, 0x0401, 0x0403],
