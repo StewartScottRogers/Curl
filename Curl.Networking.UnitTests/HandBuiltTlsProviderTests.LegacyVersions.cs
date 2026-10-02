@@ -95,11 +95,28 @@ public sealed partial class HandBuiltTlsProviderTests
 
     // ADR-0360 (BL-1143): the same options against a modern server still negotiate TLS 1.2 or 1.3.
     [TestMethod]
-    [DataRow(SchannelBuild, TlsVersion.Tls10, SslProtocols.Tls12)]
-    [DataRow(OpenSslBuild, TlsVersion.Tls10, SslProtocols.Tls12)]
-    [DataRow(SchannelBuild, TlsVersion.Tls11, SslProtocols.Tls13)]
-    [DataRow(OpenSslBuild, TlsVersion.Tls11, SslProtocols.Tls13)]
-    public async Task AuthenticateAsClientAsync_WithALegacyMinimumAgainstAModernServer_NegotiatesTheServersVersion(
+    [DataRow(SchannelBuild, TlsVersion.Tls10)]
+    [DataRow(OpenSslBuild, TlsVersion.Tls10)]
+    [DataRow(SchannelBuild, TlsVersion.Tls11)]
+    [DataRow(OpenSslBuild, TlsVersion.Tls11)]
+    public Task AuthenticateAsClientAsync_WithALegacyMinimumAgainstAModernServer_NegotiatesTheServersVersion(
+        bool matchesSchannelBuild,
+        TlsVersion legacyVersion) =>
+        AssertLegacyMinimumNegotiatesTheServersVersionAsync(matchesSchannelBuild, legacyVersion, SslProtocols.Tls12);
+
+    // The SslStream test server cannot speak TLS 1.3 on macOS (BL-1176).
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)]
+    [DataRow(SchannelBuild, TlsVersion.Tls10)]
+    [DataRow(OpenSslBuild, TlsVersion.Tls10)]
+    [DataRow(SchannelBuild, TlsVersion.Tls11)]
+    [DataRow(OpenSslBuild, TlsVersion.Tls11)]
+    public Task AuthenticateAsClientAsync_WithALegacyMinimumAgainstATls13Server_NegotiatesTls13(
+        bool matchesSchannelBuild,
+        TlsVersion legacyVersion) =>
+        AssertLegacyMinimumNegotiatesTheServersVersionAsync(matchesSchannelBuild, legacyVersion, SslProtocols.Tls13);
+
+    private static async Task AssertLegacyMinimumNegotiatesTheServersVersionAsync(
         bool matchesSchannelBuild,
         TlsVersion legacyVersion,
         SslProtocols serverVersion)
