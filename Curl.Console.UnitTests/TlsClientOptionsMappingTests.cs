@@ -232,6 +232,22 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
+    public void ProxyFromCommandLine_TheProxyTlsSrpOptions_CopiesEachVerbatim()
+    {
+        Assert.AreEqual(
+            new TlsClientOptions(TlsUser: "proxyuser", TlsPassword: "proxysecret", TlsAuthType: "SRP"),
+            MapProxy("--proxy-tlsuser", "proxyuser", "--proxy-tlspassword", "proxysecret", "--proxy-tlsauthtype", "SRP", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_TheProxyTlsSrpOptions_NeverReachTheTarget()
+    {
+        Assert.AreEqual(
+            new TlsClientOptions(),
+            Map("--proxy-tlsuser", "proxyuser", "--proxy-tlspassword", "proxysecret", "--proxy-tlsauthtype", "SRP", Url));
+    }
+
+    [TestMethod]
     public void ProxyFromCommandLine_TargetTlsOptionsOnly_VerifiesTheProxyAgainstTheSystemStore()
     {
         // curl -s -S -k -x https://localhost:18462 https://example.com/ and the same with

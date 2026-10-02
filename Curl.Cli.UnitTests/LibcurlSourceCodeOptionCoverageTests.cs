@@ -60,7 +60,7 @@ public sealed class LibcurlSourceCodeOptionCoverageTests
         "create-file-mode", "ip-tos", "vlan-priority", "mptcp", "pubkey", "knownhosts", "hostpubmd5", "hostpubsha256",
         "compressed-ssh", "proto", "proto-redir", "proto-default", "ech", "ssl-sessions", "tlsuser", "tlspassword",
         "tlsauthtype", "limit-rate", "parallel", "ipfs-gateway", "http2", "http2-prior-knowledge", "http3",
-        "http3-only", "krb4", "krb",
+        "http3-only", "krb4", "krb", "proxy-tlsuser", "proxy-tlspassword", "proxy-tlsauthtype",
     ];
 
     [TestMethod]

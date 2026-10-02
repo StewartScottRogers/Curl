@@ -343,20 +343,13 @@ public static class CommandLineParser
 
     /// <summary>
     /// Refuses <c>--no-&lt;name&gt;</c> where <see cref="CommandLineOptionTable"/> has no row for
-    /// <paramref name="negatedName"/>, as ADR-0137 decides: not reversible when curl 8.21.0 knows the name
-    /// but gives it no <c>--no-</c> prefix, not implemented yet when it gives it one, and unknown otherwise.
+    /// <paramref name="negatedName"/>, as ADR-0137 decides: not implemented yet when curl 8.21.0 knows the
+    /// name, and unknown otherwise. Every curl name that takes no <c>--no-</c> prefix has a row since BL-1135,
+    /// so its "cannot be reversed" refusal comes from the row; <c>CommandLineUnimplementedOptionTests</c>
+    /// fails should a row for such a name ever be removed.
     /// </summary>
-    private static CommandLineRefusal RefuseUnlistedNegation(string argument, string negatedName)
-    {
-        if (!CurlOptionAliasTable.TryFindName(negatedName, out CurlOptionAlias? alias))
-        {
-            return CommandLineRefusal.UnknownOption(argument);
-        }
-
-        return alias.NoPrefix == CurlOptionNoPrefix.NotAccepted
-            ? CommandLineRefusal.CannotBeReversed(argument)
-            : CommandLineRefusal.InstalledLibcurlDoesNotSupport(argument);
-    }
+    private static CommandLineRefusal RefuseUnlistedNegation(string argument, string negatedName) =>
+        RefuseUnlistedName(argument, negatedName);
 
     /// <summary>
     /// Refuses the short letter at <paramref name="letter"/> that <see cref="CommandLineOptionTable"/> has no

@@ -1287,6 +1287,25 @@ public sealed class CommandLineOptions
     public bool ProxyAllowBeast { get; internal set; }
 
     /// <summary>
+    /// The <c>--proxy-tlsuser</c> TLS-SRP user name for the HTTPS proxy, verbatim, empty included, as curl 8.18.0
+    /// accepts it (measured, BL-1135), unlike <c>--tlsuser</c>; <see langword="null"/> when not given.
+    /// </summary>
+    public string? ProxyTlsUser { get; internal set; }
+
+    /// <summary>
+    /// The <c>--proxy-tlspassword</c> TLS-SRP password for the HTTPS proxy, verbatim; <see langword="null"/> when
+    /// not given. An empty value is refused as blank, as curl 8.18.0 refuses it (measured, BL-1135), unlike
+    /// <c>--tlspassword</c>.
+    /// </summary>
+    public string? ProxyTlsPassword { get; internal set; }
+
+    /// <summary>
+    /// The <c>--proxy-tlsauthtype</c> value: <c>SRP</c>, the only type curl accepts (case-sensitively), or
+    /// <see langword="null"/> when not given.
+    /// </summary>
+    public string? ProxyTlsAuthType { get; internal set; }
+
+    /// <summary>
     /// The <c>-E</c> / <c>--cert</c> value, verbatim, with <c>certificate[:password]</c> not yet split;
     /// <see langword="null"/> when not given. The last value wins.
     /// </summary>
