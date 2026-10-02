@@ -43,6 +43,7 @@ namespace Curl.Console;
 /// <param name="DiagnosticLog">The run's diagnostic log the authenticators were composed with (BL-923); <see langword="null" /> for none.</param>
 /// <param name="TracesFtp">Whether the FTP handler writes the <c>--trace-config ftp</c> lines (<see cref="CurlComposition.TracesFtp" />, BL-1162).</param>
 /// <param name="TracesSmtp">Whether the SMTP handler writes the <c>--trace-config smtp</c> lines (<see cref="CurlComposition.TracesSmtp" />, BL-1163).</param>
+/// <param name="TracesWs">Whether the WebSocket handler writes the <c>--trace-config ws</c> lines (<see cref="CurlComposition.TracesWs" />, BL-1164).</param>
 internal sealed record CurlTransports(
     IDnsResolver DnsResolver,
     TimeProvider TimeProvider,
@@ -58,4 +59,5 @@ internal sealed record CurlTransports(
     PoolingConnector PoolingConnector,
     IDiagnosticLog? DiagnosticLog = null,
     bool TracesFtp = false,
-    bool TracesSmtp = false);
+    bool TracesSmtp = false,
+    bool TracesWs = false);

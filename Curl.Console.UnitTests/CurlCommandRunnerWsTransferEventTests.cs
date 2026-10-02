@@ -67,6 +67,51 @@ public sealed class CurlCommandRunnerWsTransferEventTests
         Assert.AreEqual("hello\x03\xe8", Encoding.Latin1.GetString(standardOutput.ToArray()));
     }
 
+    /// <summary>
+    /// curl 8.21.0 under <c>-sS --trace-config ws -v</c> against a <c>101</c> head followed by a
+    /// text frame <c>hi</c> and an empty close frame in one read, measured 2026-10-02 (BL-1164 Notes).
+    /// </summary>
+    [TestMethod]
+    [DataRow("ws")]
+    [DataRow("protocol")]
+    public async Task RunAsync_VerboseWithTheWsTraceComponent_WritesTheMeasuredWsLines(string component)
+    {
+        int exitCode = await RunAsync(["-sSv", "--trace-config", component], Head101 + "\x81\x02hi\x88\x00", 59511);
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.EndsWith(
+            WithMeasuredKey(Encoding.ASCII.GetString(standardError.ToArray())),
+            "< " + HeaderEnd
+            + "* Received 101, Switching to WebSocket" + InfoEnd
+            + "* [WS] WS, using chunk size 65535" + InfoEnd
+            + "* [WS] Received 101, switch to WebSocket" + InfoEnd
+            + "{ [6 bytes data]" + InfoEnd
+            + "* [WS] decoded decoded [TEXT payload=0/2]" + InfoEnd
+            + "* [WS] passed 2 bytes payload, 0 remain" + InfoEnd
+            + "* [WS] decoded passing [TEXT payload=2/2]" + InfoEnd
+            + "* [WS] decoded decoded [CLOSE payload=0/0]" + InfoEnd
+            + "* [WS] websocket established, callback mode" + InfoEnd
+            + "{ [0 bytes data]" + InfoEnd
+            + "* shutting down connection #0" + InfoEnd);
+        Assert.AreEqual("hi", Encoding.Latin1.GetString(standardOutput.ToArray()));
+    }
+
+    [TestMethod]
+    [DataRow("-sv")]
+    [DataRow("-sv", "--trace-config", "smtp")]
+    [DataRow("-sv", "--trace-config", "ws,-ws")]
+    [DataRow("-s", "--trace-config", "ws")]
+    public async Task RunAsync_WithoutTheWsTraceComponentOrVerbose_WritesNoWsTraceLines(params string[] arguments)
+    {
+        int exitCode = await RunAsync(arguments, Head101 + "\x81\x02hi\x88\x00", 59512);
+
+        Assert.AreEqual(0, exitCode);
+        string standardErrorText = Encoding.ASCII.GetString(standardError.ToArray());
+        Assert.DoesNotContain("[WS] WS, using chunk size", standardErrorText);
+        Assert.DoesNotContain("[WS] decoded", standardErrorText);
+        Assert.DoesNotContain("[WS] websocket established", standardErrorText);
+    }
+
     [TestMethod]
     public async Task RunAsync_Include_WritesOnlyThePayloads()
     {
@@ -161,9 +206,9 @@ public sealed class CurlCommandRunnerWsTransferEventTests
         var files = new InMemoryFileSystem();
 
         return new CurlCommandRunner(
-                _ => new TransferDispatch(
+                parsed => new TransferDispatch(
                     new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
-                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesWs: CurlComposition.TracesWs(parsed)))),
                 files,
                 files,
                 standardOutput,

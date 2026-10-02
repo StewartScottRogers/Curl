@@ -20,7 +20,11 @@ namespace Curl.Protocol.Ws;
 /// Receives each frame's opcode, FIN bit and length, and a close frame with an unexpected code
 /// (<see cref="WsTransferLog" />); nothing is written when it is <see langword="null" />.
 /// </param>
-internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null)
+/// <param name="trace">
+/// Receives curl's <c>--trace-config ws</c> lines for each frame decoded and each run of payload
+/// passed on (<see cref="WsFrameTrace" />, BL-1164); <see langword="null" /> writes none.
+/// </param>
+internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFrameTrace? trace = null)
 {
     private const byte FinalFragment = 0x80;
 
@@ -44,10 +48,14 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null)
 
     private readonly WsTransferLog log = new(diagnosticLog ?? NoDiagnosticLog.Instance);
 
+    private readonly WsFrameTrace trace = trace ?? WsFrameTrace.Off;
+
     // A ping's payload, echoed in a pong, or a close frame's, whose code is logged.
     private readonly ArrayBufferWriter<byte> controlPayload = new(Longest7BitLength);
 
     private int headCount;
+
+    private long payloadLength;
 
     private long payloadRemaining;
 
@@ -97,7 +105,7 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null)
 
         if (headCount == HeadLength())
         {
-            OpenFrame();
+            OpenFrame(isLastByteOfRead: received.Length == 1);
         }
 
         return received[1..];
@@ -114,6 +122,7 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null)
         }
 
         payloadRemaining -= length;
+        trace.PayloadPassed(opcode, IsFinal(), length, payloadLength - payloadRemaining, payloadLength);
         if (payloadRemaining == 0)
         {
             CloseFrame();
@@ -204,11 +213,22 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null)
             _ => 2,
         };
 
-    private void OpenFrame()
+    /// <summary>
+    /// Opens the frame whose head is complete. When its head ends the read and a payload is still
+    /// to come, curl 8.21.0 already writes the frame as passing with none of it passed (BL-1164).
+    /// </summary>
+    private void OpenFrame(bool isLastByteOfRead)
     {
         opcode = (WsOpcode)(head[0] & OpcodeBits);
-        payloadRemaining = PayloadLength();
-        log.Frame("received", opcode, (head[0] & FinalFragment) != 0, payloadRemaining);
+        payloadLength = PayloadLength();
+        payloadRemaining = payloadLength;
+        log.Frame("received", opcode, IsFinal(), payloadRemaining);
+        trace.FrameDecoded(opcode, IsFinal(), payloadLength);
+        if (opcode == WsOpcode.Ping)
+        {
+            trace.AutoPong(payloadLength);
+        }
+
         headCount = 0;
         isFrameOpen = true;
         controlPayload.ResetWrittenCount();
@@ -216,7 +236,13 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null)
         {
             CloseFrame();
         }
+        else if (isLastByteOfRead)
+        {
+            trace.Passing(opcode, IsFinal(), 0, payloadLength);
+        }
     }
+
+    private bool IsFinal() => (head[0] & FinalFragment) != 0;
 
     private long PayloadLength()
     {

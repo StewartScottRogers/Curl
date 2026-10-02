@@ -65,6 +65,13 @@ public sealed class WsProtocolHandler(
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => Schemes;
 
+    /// <summary>
+    /// Gets a value indicating whether each transfer writes curl 8.21.0's <c>--trace-config ws</c>
+    /// lines, <c>[WS] ...</c>, as frames are decoded and sent, through the transfer's events
+    /// (<see cref="WsFrameTrace" />, BL-1164).
+    /// </summary>
+    public bool TracesFrames { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context" /> is <see langword="null" />.
@@ -277,11 +284,18 @@ public sealed class WsProtocolHandler(
 
         ReportHead(context.Events, response.Head, refusal: null, challengeLines: [], problemScheme: null);
         log.UpgradeAccepted();
+        var trace = new WsFrameTrace(context.Events, TracesFrames);
         context.Events.ReportInfo(WsInfoLines.SwitchingToWebSocket);
+        trace.UsingChunkSize();
         context.Events.ReportInfo(WsInfoLines.SwitchedToWebSocket);
+        if (context.Upload is not null)
+        {
+            trace.UploadReaderAdded();
+        }
+
         TransferResult result = context.NoBody
-            ? EndWithoutFrames(context, response.Remaining, report)
-            : await ExchangeFramesAsync(connection, context, response.Remaining, report).ConfigureAwait(false);
+            ? EndWithoutFrames(context, response.Remaining, report, trace)
+            : await ExchangeFramesAsync(connection, context, response.Remaining, report, trace).ConfigureAwait(false);
         ReportTransferEnd(context.Events, result, connectionNumber);
         return result;
     }
@@ -358,12 +372,14 @@ public sealed class WsProtocolHandler(
     /// or written, and the transfer fails with 52 <c>Empty reply from server</c> and
     /// <c>%{size_download}</c> 0.
     /// </summary>
-    private static TransferResult EndWithoutFrames(ITransferContext context, byte[] alreadyReceived, TransferReport report)
+    private static TransferResult EndWithoutFrames(ITransferContext context, byte[] alreadyReceived, TransferReport report, WsFrameTrace trace)
     {
         if (alreadyReceived.Length > 0)
         {
             context.Events.ReportDataReceived(alreadyReceived);
         }
+
+        trace.Established();
 
         TransferResult result = TransferResult.Failure(CurlExitCode.GotNothing, WsUpgradeResponseReader.EmptyReply);
         ReportFailure(context.Events, result, isFrameViolation: false);
@@ -391,9 +407,10 @@ public sealed class WsProtocolHandler(
         IConnection connection,
         ITransferContext context,
         byte[] alreadyReceived,
-        TransferReport report)
+        TransferReport report,
+        WsFrameTrace trace)
     {
-        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events, context.DiagnosticLog);
+        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events, context.DiagnosticLog, trace);
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload =
             (payload, token) => WriteAsync(context.Output, payload, token);
         long uploaded = 0;
@@ -402,7 +419,8 @@ public sealed class WsProtocolHandler(
         try
         {
             await receiver.DeliverAlreadyReceivedAsync(alreadyReceived, writePayload, context.CancellationToken).ConfigureAwait(false);
-            uploaded = await SendUploadAsync(connection, context).ConfigureAwait(false);
+            trace.Established();
+            uploaded = await SendUploadAsync(connection, context, trace).ConfigureAwait(false);
             await receiver.ReceiveUntilClosedAsync(writePayload, context.CancellationToken).ConfigureAwait(false);
             result = receiver.BytesReceived == 0
                 ? TransferResult.Failure(CurlExitCode.GotNothing, WsUpgradeResponseReader.EmptyReply)
@@ -435,7 +453,7 @@ public sealed class WsProtocolHandler(
     /// a file read that fails.
     /// </summary>
     /// <returns>The frame's length, or 0 when there is no upload.</returns>
-    private async ValueTask<long> SendUploadAsync(IConnection connection, ITransferContext context)
+    private async ValueTask<long> SendUploadAsync(IConnection connection, ITransferContext context, WsFrameTrace trace)
     {
         if (context.Upload is not { } upload)
         {
@@ -453,6 +471,7 @@ public sealed class WsProtocolHandler(
         }
 
         byte[] frame = WsFrameEncoder.Encode(WsOpcode.Binary, payload.GetBuffer().AsSpan(0, (int)payload.Length), randomSource);
+        trace.FrameEncoded(WsOpcode.Binary, payload.Length);
         context.Events.ReportDataSent(frame);
         await SendAsync(connection, frame, context.CancellationToken).ConfigureAwait(false);
         new WsTransferLog(context.DiagnosticLog).Frame("sent", WsOpcode.Binary, isFinal: true, payload.Length);
