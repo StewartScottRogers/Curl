@@ -19,7 +19,10 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
 ## What is implemented
 
 - Download with curl 8.21.0's default read request (`tsize 0`, `blksize 512`,
-  `timeout 6` when no time limit is given), OACK handling (ACK 0, then the acknowledged `blksize`), ACKs sent to
+  `timeout 6` when no time limit is given), OACK handling (ACK 0, then the acknowledged `blksize`;
+  `TftpOptionAcknowledgement` rejects what curl 8.21.0's `tftp_parse_option_ack` rejects - a
+  malformed pair, a `blksize` that is not 8 to 65464 or exceeds the one requested, a download's
+  `tsize` of 0 - with exit 71 and curl's message, sending nothing, for both directions), ACKs sent to
   the endpoint the DATA came from, and every TFTP ERROR code mapped to curl's exit code
   and message (`TftpErrorMapping`).
 - Upload (`-T`) with curl 8.21.0's default write request (`tsize` = the upload's

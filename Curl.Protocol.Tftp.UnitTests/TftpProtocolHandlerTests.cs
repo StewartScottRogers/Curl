@@ -125,7 +125,8 @@ public sealed class TftpProtocolHandlerTests
             Data(1, Payload(1024, 'a')),
             Data(2, Payload(512, 'b')));
 
-        var result = await new TftpProtocolHandler(Connector(channel)).ExecuteAsync(Context("tftp://h/file.txt"));
+        var result = await new TftpProtocolHandler(Connector(channel))
+            .ExecuteAsync(Context("tftp://h/file.txt", tftpBlockSize: 1024));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(1536, result.BytesTransferred);
@@ -133,25 +134,80 @@ public sealed class TftpProtocolHandlerTests
         Assert.AreEqual(TransferEndPoint, channel.Sent[1].Destination);
     }
 
+    /// <summary>
+    /// The OACK cases are pinned from curl 8.21.0's source, <c>tftp_parse_option_ack</c> in
+    /// <c>lib/tftp.c</c> lines 259-330 at tag <c>curl-8_21_0</c>, because
+    /// <c>Record-CurlExchange.ps1 -Tftp</c> cannot send a chosen OACK: a <c>blksize</c> up to
+    /// the one requested is granted (its leading digits, trailing text ignored), an
+    /// acknowledgement without one keeps 512, and a <c>tsize</c> that does not parse is ignored.
+    /// </summary>
     [TestMethod]
-    [DataRow("tsize\01234\0blksize\08\0", 8, DisplayName = "blksize after another option")]
-    [DataRow("BLKSIZE\065464\0", 65464, DisplayName = "name is case-insensitive, largest size")]
-    [DataRow("tsize\01234\0", 512, DisplayName = "no blksize keeps 512")]
-    [DataRow("blksize\0abc\0", 512, DisplayName = "unparsable blksize keeps 512")]
-    [DataRow("blksize\07\0", 512, DisplayName = "blksize below 8 keeps 512")]
-    [DataRow("blksize\065465\0", 512, DisplayName = "blksize above 65464 keeps 512")]
-    public async Task ExecuteAsync_OptionAcknowledgement_DecidesBlockSize(string options, int expectedBlockSize)
+    [DataRow("tsize\01234\0blksize\08\0", null, 8, DisplayName = "blksize after another option")]
+    [DataRow("BLKSIZE\065464\0", 65464, 65464, DisplayName = "name is case-insensitive, largest size")]
+    [DataRow("tsize\01234\0", null, 512, DisplayName = "no blksize keeps 512")]
+    [DataRow("blksize\0512\0", null, 512, DisplayName = "blksize equal to the default 512 requested")]
+    [DataRow("blksize\01024x\0", 1024, 1024, DisplayName = "1024x with --tftp-blksize 1024 is 1024")]
+    [DataRow("tsize\0many\0", null, 512, DisplayName = "unparsable tsize is ignored")]
+    [DataRow("tsize\099999999999999999999\0", null, 512, DisplayName = "tsize too large to read is ignored")]
+    [DataRow("\0\0", null, 512, DisplayName = "an empty name and value are ignored")]
+    public async Task ExecuteAsync_OptionAcknowledgement_DecidesBlockSize(string options, int? tftpBlockSize, int expectedBlockSize)
     {
         var channel = Channel(
             OptionAcknowledgement(options),
             Data(1, Payload(expectedBlockSize, 'a')),
             Data(2, string.Empty));
 
-        var result = await new TftpProtocolHandler(Connector(channel)).ExecuteAsync(Context("tftp://h/file.txt"));
+        var result = await new TftpProtocolHandler(Connector(channel))
+            .ExecuteAsync(Context("tftp://h/file.txt", tftpBlockSize: tftpBlockSize));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(expectedBlockSize, result.BytesTransferred);
         CollectionAssert.AreEqual(new ushort[] { 0, 1, 2 }, AcknowledgedBlocks(channel));
+    }
+
+    /// <summary>
+    /// curl 8.21.0's <c>tftp_parse_option_ack</c> (<c>lib/tftp.c</c> lines 259-330 at tag
+    /// <c>curl-8_21_0</c>) rejects these acknowledgements with exit 71 and returns at once
+    /// from <c>tftp_receive_packet</c>, so neither an ACK nor an ERROR packet follows the
+    /// request. Pinned from the source because <c>Record-CurlExchange.ps1 -Tftp</c> cannot
+    /// send a chosen OACK.
+    /// </summary>
+    [TestMethod]
+    [DataRow("blksize\0abc\0", "blksize is larger than max supported (65464)", DisplayName = "unparsable blksize")]
+    [DataRow("blksize\065465\0", "blksize is larger than max supported (65464)", DisplayName = "blksize above 65464")]
+    [DataRow("blksize\00\0", "invalid blocksize value in OACK packet", DisplayName = "blksize 0")]
+    [DataRow("blksize\07\0", "blksize is smaller than min supported (8)", DisplayName = "blksize below 8")]
+    [DataRow("blksize\01024\0", "server requested blksize larger than allocated (1024)", DisplayName = "blksize above the 512 requested")]
+    [DataRow("tsize\00\0", "invalid tsize -::- value in OACK packet", DisplayName = "tsize 0")]
+    [DataRow("tsize\00abc\0", "invalid tsize -:abc:- value in OACK packet", DisplayName = "tsize 0 with trailing text")]
+    [DataRow("blksize\0512", "Malformed ACK packet, rejecting", DisplayName = "value without its terminator")]
+    [DataRow("blksize\0", "Malformed ACK packet, rejecting", DisplayName = "name with no value after it")]
+    [DataRow("blksize", "Malformed ACK packet, rejecting", DisplayName = "name without its terminator")]
+    [DataRow("tsize\05\0blksize\0", "Malformed ACK packet, rejecting", DisplayName = "malformed after a good option")]
+    public async Task ExecuteAsync_OptionAcknowledgementCurlRejects_ReturnsExit71AndSendsNothingMore(string options, string expectedMessage)
+    {
+        var channel = Channel(OptionAcknowledgement(options), Data(1, "hello"));
+
+        var result = await new TftpProtocolHandler(Connector(channel)).ExecuteAsync(Context("tftp://h/file.txt"));
+
+        Assert.AreEqual(CurlExitCode.TftpIllegal, result.ExitCode);
+        Assert.AreEqual(71, (int)result.ExitCode);
+        Assert.AreEqual(expectedMessage, result.ErrorMessage);
+        Assert.HasCount(1, channel.Sent);
+        Assert.IsTrue(channel.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BlockSizeAboveTheOneRequestedWithTftpBlockSize_ReturnsExit71()
+    {
+        var channel = Channel(OptionAcknowledgement("blksize\02048\0"));
+
+        var result = await new TftpProtocolHandler(Connector(channel))
+            .ExecuteAsync(Context("tftp://h/file.txt", tftpBlockSize: 1024));
+
+        Assert.AreEqual(CurlExitCode.TftpIllegal, result.ExitCode);
+        Assert.AreEqual("server requested blksize larger than allocated (2048)", result.ErrorMessage);
+        Assert.HasCount(1, channel.Sent);
     }
 
     [TestMethod]
@@ -220,8 +276,8 @@ public sealed class TftpProtocolHandlerTests
         CollectionAssert.AreEqual(new ushort[] { 1 }, AcknowledgedBlocks(channel));
     }
 
-    private static TransferContext Context(string url, Stream? output = null) =>
-        new() { Url = CurlUrl.Parse(url), Output = output ?? new MemoryStream() };
+    private static TransferContext Context(string url, Stream? output = null, int? tftpBlockSize = null) =>
+        new() { Url = CurlUrl.Parse(url), Output = output ?? new MemoryStream(), TftpBlockSize = tftpBlockSize };
 
     private static ScriptedDatagramChannel Channel(params (byte[] Datagram, EndPoint Source)[] script) =>
         new(ServerEndPoint, script);

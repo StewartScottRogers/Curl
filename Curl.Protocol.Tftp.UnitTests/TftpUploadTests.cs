@@ -145,6 +145,42 @@ public sealed class TftpUploadTests
         CollectionAssert.AreEqual(Data(2, "ijk"), channel.Sent[2].Datagram);
     }
 
+    /// <summary>
+    /// curl 8.21.0 parses the OACK to a write request with the same
+    /// <c>tftp_parse_option_ack</c> (<c>lib/tftp.c</c> lines 259-330 at tag
+    /// <c>curl-8_21_0</c>) and returns its exit 71 at once, so no DATA 1 follows. Pinned
+    /// from the source because <c>Record-CurlExchange.ps1 -Tftp</c> cannot send a chosen OACK.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_OptionAcknowledgementWithBlockSizeBelow8_ReturnsExit71AndSendsNoData()
+    {
+        var channel = Channel(OptionAcknowledgement("blksize\07\0"), Ack(1));
+
+        var result = await Run(channel, new MemoryStream("abc"u8.ToArray()));
+
+        Assert.AreEqual(CurlExitCode.TftpIllegal, result.ExitCode);
+        Assert.AreEqual("blksize is smaller than min supported (8)", result.ErrorMessage);
+        Assert.HasCount(1, channel.Sent);
+        Assert.IsTrue(channel.IsDisposed);
+    }
+
+    /// <summary>
+    /// curl 8.21.0 ignores <c>tsize</c> in the OACK to a write request, even the 0 a
+    /// download rejects (<c>lib/tftp.c</c> lines 259-330 at tag <c>curl-8_21_0</c>).
+    /// </summary>
+    [TestMethod]
+    [DataRow("tsize\00\0", DisplayName = "tsize 0")]
+    [DataRow("tsize\0many\0", DisplayName = "unparsable tsize")]
+    public async Task ExecuteAsync_OptionAcknowledgementWithTsize_IgnoresIt(string options)
+    {
+        var channel = Channel(OptionAcknowledgement(options), Ack(1));
+
+        var result = await Run(channel, new MemoryStream("abc"u8.ToArray()));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(Data(1, "abc"), channel.Sent[1].Datagram);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_ErrorCode6InReplyToWriteRequest_ReturnsExit73RemoteFileAlreadyExists()
     {

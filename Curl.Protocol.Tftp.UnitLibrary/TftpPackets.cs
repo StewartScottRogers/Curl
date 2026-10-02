@@ -7,8 +7,9 @@ namespace Curl.Protocol.Tftp;
 
 /// <summary>
 /// Builds and reads the TFTP packets a transfer uses: the read and write requests,
-/// DATA packets and acknowledgements it sends (RFC 1350 section 5), and the block size
-/// an option acknowledgement carries (RFC 2347, RFC 2348).
+/// DATA packets and acknowledgements it sends (RFC 1350 section 5), and the opcode and
+/// block number fields of the packets it receives. <see cref="TftpOptionAcknowledgement" />
+/// reads an option acknowledgement's body (RFC 2347, RFC 2348).
 /// </summary>
 internal static class TftpPackets
 {
@@ -136,32 +137,6 @@ internal static class TftpPackets
     /// <returns>The field's value.</returns>
     internal static ushort ReadField(ReadOnlySpan<byte> packet, int offset) =>
         BinaryPrimitives.ReadUInt16BigEndian(packet[offset..]);
-
-    /// <summary>
-    /// Reads the block size an option acknowledgement grants.
-    /// </summary>
-    /// <param name="options">
-    /// The OACK's body after its opcode: null-terminated name and value pairs.
-    /// </param>
-    /// <returns>
-    /// The <c>blksize</c> value when it is present and within 8 to 65464, otherwise
-    /// <see cref="DefaultBlockSize" />.
-    /// </returns>
-    internal static int ReadAcknowledgedBlockSize(ReadOnlySpan<byte> options)
-    {
-        var fields = Encoding.UTF8.GetString(options).Split('\0');
-        for (var index = 0; index + 1 < fields.Length; index += 2)
-        {
-            if (string.Equals(fields[index], "blksize", StringComparison.OrdinalIgnoreCase)
-                && int.TryParse(fields[index + 1], NumberStyles.None, CultureInfo.InvariantCulture, out var blockSize)
-                && blockSize is >= MinimumBlockSize and <= MaximumBlockSize)
-            {
-                return blockSize;
-            }
-        }
-
-        return DefaultBlockSize;
-    }
 
     /// <summary>
     /// Builds a read or write request with curl 8.21.0's options, or none.

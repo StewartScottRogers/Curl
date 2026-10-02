@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
 requirement: FR-033
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1237 — Fail a TFTP option acknowledgement curl rejects with its exit 71 messages
 
@@ -28,17 +28,22 @@ A `tftp://` download or upload whose server answers with an OACK that curl 8.21.
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Protocol.Tftp.UnitTests` drive a download through the fake datagram channel with each OACK above (`blksize\0abc\0`, `blksize\065465\0`, `blksize\00\0`, `blksize\07\0`, `blksize\01024\0` with no `--tftp-blksize`, `tsize\00\0`, and an option with no value terminator) and assert exit 71, curl's exact message, and that nothing is sent after the request.
-- [ ] A test pins that a `blksize` of `1024x` with `--tftp-blksize 1024` is accepted as 1024, and that an unparsable `tsize` on a download and any `tsize` on an upload are ignored.
-- [ ] The same rejection applies to the OACK answering a write request: a test drives an upload whose OACK carries `blksize\07\0` and asserts exit 71 `blksize is smaller than min supported (8)` with no DATA 1 sent.
-- [ ] The three fallback rows of `ExecuteAsync_OptionAcknowledgement_DecidesBlockSize`, and any other test that relied on the fallback or on accepting a `blksize` larger than the one requested, are replaced by the rejections; the test comments cite `lib/tftp.c` lines 259-330 at `curl-8_21_0` and say the OACK cases are pinned from the source because the recorder cannot send one.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Tftp.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] New tests in `Curl.Protocol.Tftp.UnitTests` drive a download through the fake datagram channel with each OACK above (`blksize\0abc\0`, `blksize\065465\0`, `blksize\00\0`, `blksize\07\0`, `blksize\01024\0` with no `--tftp-blksize`, `tsize\00\0`, and an option with no value terminator) and assert exit 71, curl's exact message, and that nothing is sent after the request.
+- [x] A test pins that a `blksize` of `1024x` with `--tftp-blksize 1024` is accepted as 1024, and that an unparsable `tsize` on a download and any `tsize` on an upload are ignored.
+- [x] The same rejection applies to the OACK answering a write request: a test drives an upload whose OACK carries `blksize\07\0` and asserts exit 71 `blksize is smaller than min supported (8)` with no DATA 1 sent.
+- [x] The three fallback rows of `ExecuteAsync_OptionAcknowledgement_DecidesBlockSize`, and any other test that relied on the fallback or on accepting a `blksize` larger than the one requested, are replaced by the rejections; the test comments cite `lib/tftp.c` lines 259-330 at `curl-8_21_0` and say the OACK cases are pinned from the source because the recorder cannot send one.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Tftp.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
 
 - No new measurement: `Record-CurlExchange.ps1 -Tftp` answers a request with its own OACK and cannot be told to send another. Extending it touches the root script, which is outside this task's `touches`; leave that to a separate task.
+- Done (2026-10-02): new `TftpOptionAcknowledgement` (with `TftpAcknowledgedOption`) reads an OACK as `tftp_parse_option_ack` does - `tftp_option_get`'s split (a name with nothing after its NUL is malformed too), `curlx_str_number`'s leading digits with its overflow check - and stops at the first rejection. `TftpDownload` and `TftpUpload` both use it and return exit 71 with the message before sending anything; `TftpPackets.ReadAcknowledgedBlockSize` is gone. `TftpTransferEvents.OptionsAcknowledged` now takes the parsed options, so `-v` shows the `got option` lines up to and including the rejected one and no `parsed` line for it, as curl does.
+- Choice: the requested block size for the "larger than allocated" check is `RequestedBlockSize ?? 512`, so `--tftp-no-options` compares against 512, as the task's Context states curl does.
+- Two log tests that relied on granting 1024 against a 512 request now grant 256 (still a changed blksize, so the warning is still pinned).
+- Gates: `dotnet build Curl.slnx -warnaserror` clean; fast tests green (Tftp 172); `Measure-CodeQuality.ps1 -Library Curl.Protocol.Tftp.UnitLibrary` reports 0 failing members.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. A tftp:// OACK curl 8.21.0 rejects (malformed, bad blksize, download tsize 0) now ends with exit 71 and curl's message, sending nothing
