@@ -28,6 +28,13 @@ Under `-v`, a SOCKS5 proxy that picks GSS-API and whose negotiation fails prints
 
 ## Notes
 
+- Done directly rather than through the full `/feature` stages: a small change in one library, with BL-615's measurements as the specification.
+- `target.Events` now reaches `Socks5GssapiNegotiation.RunAsync` through `SocksProxyTunnel.OpenAsync` and `Socks5Handshake.RunAsync` (the same `Events` BL-1038's `Opened SOCKS connection` line uses).
+- `Socks5GssapiFailureText.VerboseLines` gives the lines: the exit 97 message (curl's `failf` echoes under `-v`); after a failed context step, `Failed to initialize security context.` (SSPI) or `Failed to initial GSS-API token.` (GSS-API); then `Unable to negotiate SOCKS5 GSS-API context.`. The GSS-API build's two-line message is one info text with its line feed, the same as the exit message.
+- Choice (sensible default): every failed GSS-API negotiation, not only a missing credential, prints its message and then `Unable to negotiate SOCKS5 GSS-API context.`, because curl's `socks.c` calls that `failf` after any failure of `Curl_SOCKS5_gssapi_negotiate`. Only the no-credential case was measured. Other SOCKS failures (for example `cannot complete SOCKS5 connection`) still print no `-v` line, which is outside this task.
+- Tests: `TcpConnectorTests.Socks5Authentication.cs`, four new tests (6 cases). They compare the last lines, because the `Trying` and connect lines come first.
+- Gates: `dotnet build Curl.slnx -warnaserror` clean, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 100% line, 100% branch, 0 failing of 1206 members.
+
 ## Log
 
 - 2026-09-30: Created.
