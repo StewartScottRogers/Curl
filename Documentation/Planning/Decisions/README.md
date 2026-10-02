@@ -336,6 +336,7 @@ choices do not need one.
 | [0324](ADR-0324-an-http-1-0-keep-alive-body-read-to-the-close-is-reported-left-intact.md) | The HTTP handler reports `left intact` for an HTTP/1.0 `Connection: keep-alive` response whose body ran to the close, as curl 8.21.0 does, but does not mark the closed connection reusable (renumbered from 0109 by BL-663) | Accepted; marking not reusable superseded by ADR-0112 | 2026-09-27 |
 | [0325](ADR-0325-alt-svc-seams-a-route-on-the-connect-target-and-a-store-on-the-http-options.md) | Alt-svc seams: `AltSvcRoute` on the connect target and `IAltSvcStore` on the HTTP options; the handler sends `Alt-Used`, hands each `https` `Alt-Svc` header to the store and writes the `Added alt-svc` lines (renumbered from 0208 by BL-663) | Accepted | 2026-09-29 |
 | [0326](ADR-0326-libcurl-writes-the-schannel-builds-proxy-tls-and-authentication-lines.md) | `--libcurl` writes curl 8.21.0 Schannels proxy, TLS and authentication setopt lines in its order and bitmask format on every platform, and a test keeps every parsed option classified (BL-654) | Accepted | 2026-10-01 |
+| [0327](ADR-0327-ech-modes-through-the-hand-built-client.md) | `--ech` through the hand-built client: libcurl's mode bits, the `ecl:` list or the DoH HTTPS record's `ech`, `pn:` as the outer name, `hard` without a usable list exit 35 and a rejected offer exit 101 | Accepted | 2026-10-01 |
 
 ## Template
 
