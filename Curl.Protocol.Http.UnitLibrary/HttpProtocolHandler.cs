@@ -949,6 +949,10 @@ public sealed class HttpProtocolHandler(
         HttpRequestOptions options = plan.Options;
         HttpRequestFraming framing = plan.Framing;
         CancellationToken cancellationToken = plan.Deadline.Token;
+
+        // curl 8.21.0 says which version it uses before it builds the request, so the cookie
+        // store's limit lines come after it (measured, BL-1136 Notes).
+        ReportProtocolChosen(context.Events, newConnection, streams);
         IHttpStreamConnection? requestStream = CreateRequestStream(plan, streams);
         IConnection connection = ExchangeConnectionOf(plan, requestStream, transport);
         byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection);
@@ -999,7 +1003,6 @@ public sealed class HttpProtocolHandler(
         HttpRequestPlan? retry = null;
         HttpResponseHead? actedOn = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
-        ReportProtocolChosen(context.Events, newConnection, streams);
         LogVersionChosen(exchangeLog, plan, transport, newConnection, streams);
         ReportAuthorizationLines(plan);
         try
