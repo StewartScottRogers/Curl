@@ -23,8 +23,6 @@ internal static class UpstreamTestInstructions
     private static readonly (string Marker, string Name, StringComparison Comparison)[] UnsupportedMarkers =
     [
         ("%days[", "%days", StringComparison.OrdinalIgnoreCase),
-        ("%include ", "%include", StringComparison.Ordinal),
-        ("%includetext ", "%includetext", StringComparison.Ordinal),
         ("%sha256b64file[", "%sha256b64file", StringComparison.OrdinalIgnoreCase),
         ("%strippemfile[", "%strippemfile", StringComparison.OrdinalIgnoreCase),
     ];
@@ -47,9 +45,9 @@ internal static class UpstreamTestInstructions
 
     /// <summary>
     /// Adds the name of every instruction in the line that this harness does not carry out
-    /// (<c>%days</c>, <c>%include</c>, <c>%includetext</c>, <c>%sha256b64file</c>,
-    /// <c>%strippemfile</c>) to the list, once each. <c>%include</c> and <c>%includetext</c> match
-    /// case-sensitively, the others case-insensitively, as upstream's expressions do.
+    /// (<c>%days</c>, <c>%sha256b64file</c>, <c>%strippemfile</c>) to the list, once each, matching
+    /// case-insensitively as upstream's expressions do. <c>%include</c> and <c>%includetext</c> are
+    /// <see cref="UpstreamTestFileInclusions"/>'s.
     /// </summary>
     /// <param name="line">The expanded line.</param>
     /// <param name="unsupported">The names found so far.</param>

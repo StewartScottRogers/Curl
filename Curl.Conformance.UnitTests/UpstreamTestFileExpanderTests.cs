@@ -311,6 +311,99 @@ public sealed class UpstreamTestFileExpanderTests
     }
 
     [TestMethod]
+    [DataRow("\r\n")]
+    [DataRow("\n")]
+    public void Expand_IncludeIsReplacedByTheFileBytesAndConsumesTheLineBreak(string lineBreak)
+    {
+        Dictionary<string, byte[]> files = new() { ["log/5/a.txt"] = Encoding.Latin1.GetBytes("raw\r\nbytes\xff") };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles($"<data>\n%include %LOGDIR/a.txt%{lineBreak}</data>\n", files);
+
+        Assert.AreEqual("<data>\nraw\r\nbytes\xff</data>\n", Text(expansion));
+        Assert.IsEmpty(expansion.UnsupportedInstructions);
+    }
+
+    [TestMethod]
+    public void Expand_IncludeTextTurnsCrlfIntoLfAndSubstitutesTheFileVariables()
+    {
+        Dictionary<string, byte[]> files = new() { ["log/5/t.txt"] = Encoding.Latin1.GetBytes("test %TESTNUMBER\r\nend\rx\r\n") };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("%includetext %LOGDIR/t.txt%\r\n", files);
+
+        Assert.AreEqual("test 5\nend\rx\n", Text(expansion));
+        Assert.IsEmpty(expansion.UnsupportedInstructions);
+    }
+
+    [TestMethod]
+    public void Expand_IncludeRunsAfterMacrosAndBase64SoTheIncludedBytesAreNotExpanded()
+    {
+        Dictionary<string, byte[]> files = new() { ["m"] = Encoding.Latin1.GetBytes("%SP %b64[a]b64% %TESTNUMBER %include m%\n") };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("%b64[a]b64%%SP%include m%\n", files);
+
+        Assert.AreEqual("YQ== %SP %b64[a]b64% %TESTNUMBER %include m%\n", Text(expansion));
+    }
+
+    [TestMethod]
+    public void Expand_IncludeTextBytesGoThroughMacrosButNotAnotherIncludeText()
+    {
+        Dictionary<string, byte[]> files = new() { ["t"] = Encoding.Latin1.GetBytes("a%SPb %includetext t%\n") };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("%includetext t%\n", files);
+
+        Assert.AreEqual("a b %includetext t%\n", Text(expansion));
+    }
+
+    [TestMethod]
+    public void Expand_MissingFileIsIncludedAsNothing()
+    {
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("a\n%include gone%\n%includetext gone%\nb\n", []);
+
+        Assert.AreEqual("a\nb\n", Text(expansion));
+        Assert.IsEmpty(expansion.UnsupportedInstructions);
+    }
+
+    [TestMethod]
+    public void Expand_IncludeWithoutALineBreakAfterIt_IsLeftAsWritten()
+    {
+        Dictionary<string, byte[]> files = new() { ["x"] = "X"u8.ToArray(), ["y"] = "Y"u8.ToArray() };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("%include x% %include y%\r\r\n%include x%", files);
+
+        Assert.AreEqual("%include x% Y%include x%", Text(expansion));
+    }
+
+    [TestMethod]
+    public void Expand_IncludeWithNoClosingPercent_IsLeftAsWritten()
+    {
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("%include x\n%includetext y\n", new() { ["x\n"] = "X"u8.ToArray() });
+
+        Assert.AreEqual("%include x\n%includetext y\n", Text(expansion));
+    }
+
+    [TestMethod]
+    public void Expand_IncludePathIsGivenToTheReaderAsUtf8Text()
+    {
+        List<string> paths = [];
+
+        UpstreamTestFileExpander.Expand(Encoding.Latin1.GetBytes("%include %LOGDIR/f%\n"), new Dictionary<string, string> { ["LOGDIR"] = "d\u00e9" }, NoFeatures, path =>
+        {
+            paths.Add(path);
+            return null;
+        });
+
+        CollectionAssert.AreEqual(new[] { "d\u00e9/f" }, paths);
+    }
+
+    [TestMethod]
+    public void Expand_WithoutAReader_ListsEachIncludeOnce()
+    {
+        UpstreamTestFileExpansion expansion = Expand("%includetext a%\n%include b%\n%includetext c% %include d%\n", NoVariables);
+
+        CollectionAssert.AreEqual(new[] { "%includetext", "%include" }, expansion.UnsupportedInstructions.ToArray());
+    }
+
+    [TestMethod]
     public void Expand_KeepsAFinalLineWithoutALineFeed()
     {
         UpstreamTestFileExpansion expansion = Expand("a\nb", NoVariables);
@@ -334,6 +427,13 @@ public sealed class UpstreamTestFileExpanderTests
 
     private static UpstreamTestFileExpansion Expand(string file, IReadOnlyDictionary<string, string> variables, params string[] features) =>
         UpstreamTestFileExpander.Expand(Encoding.Latin1.GetBytes(file), variables, features.ToHashSet(StringComparer.Ordinal));
+
+    private static UpstreamTestFileExpansion ExpandWithFiles(string file, Dictionary<string, byte[]> files) =>
+        UpstreamTestFileExpander.Expand(
+            Encoding.Latin1.GetBytes(file),
+            new Dictionary<string, string> { ["LOGDIR"] = "log/5", ["TESTNUMBER"] = "5" },
+            NoFeatures,
+            path => files.GetValueOrDefault(path));
 
     private static string Text(UpstreamTestFileExpansion expansion) => Encoding.Latin1.GetString(expansion.File.Span);
 }

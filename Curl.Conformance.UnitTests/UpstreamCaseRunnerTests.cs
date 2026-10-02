@@ -207,6 +207,20 @@ public sealed class UpstreamCaseRunnerTests
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => runner.RunAsync(1, ReadOnlyMemory<byte>.Empty, null!));
     }
 
+    [TestMethod]
+    public async Task RunAsync_IncludesReadFilesAndAMissingOneIsNothing()
+    {
+        string logDirectory = CreateLogDirectory();
+        File.WriteAllText(Path.Combine(logDirectory, "code.txt"), "7\r\n");
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(7));
+        string testFile = "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n<verify>\n<errorcode>\n"
+            + "%include %LOGDIR/missing.txt%\n%includetext %LOGDIR/code.txt%\n</errorcode>\n</verify>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), logDirectory);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
     private static UpstreamCaseRunner Runner(Func<UpstreamCurlInvocation, Task<int>> runCurl) =>
         new(runCurl, UpstreamCurlPlatform.Unix, TimeProvider.System, TimeSpan.FromSeconds(10));
 
