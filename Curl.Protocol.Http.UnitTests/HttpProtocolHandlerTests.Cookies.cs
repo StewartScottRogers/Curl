@@ -36,7 +36,7 @@ public sealed partial class HttpProtocolHandlerTests
                 .ExecuteAsync(CookieContext(CookieUrl, options));
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
-            Assert.AreEqual((CurlUrl.Parse(CookieUrl), false, CookieTime), store.Requests.Single(), $"Chunk size {chunkSize}");
+            Assert.AreEqual((CurlUrl.Parse(CookieUrl), false, CookieTime, NoTransferEvents.Instance), store.Requests.Single(), $"Chunk size {chunkSize}");
             Assert.IsEmpty(store.Responses, $"Chunk size {chunkSize}");
         }
     }
@@ -62,7 +62,33 @@ public sealed partial class HttpProtocolHandlerTests
         await CookieHandler(QueueConnector.For(Connection(EmptyOkHead, 65536)), store)
             .ExecuteAsync(CookieContext("https://example.com/p"));
 
-        Assert.AreEqual((CurlUrl.Parse("https://example.com/p"), true, CookieTime), store.Requests.Single());
+        Assert.AreEqual((CurlUrl.Parse("https://example.com/p"), true, CookieTime, NoTransferEvents.Instance), store.Requests.Single());
+    }
+
+    /// <summary>
+    /// curl 8.21.0 prints its cookie-limit lines while it builds the request (<c>lib/cookie.c</c>,
+    /// <c>lib/http.c</c>, BL-1108), so the store gets the transfer's events and a line it reports
+    /// comes before the request's first header line.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_CookieStoreReportsALine_ReportsItBeforeTheRequestHeader()
+    {
+        const string limitLine = "Included max number of cookies (150) in request!";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedCookieStore store = new("j=k") { RequestLine = limitLine };
+            RecordingTransferEvents events = new();
+
+            TransferResult result = await CookieHandler(QueueConnector.For(Connection(EmptyOkHead, chunkSize)), store)
+                .ExecuteAsync(CookieContext(CookieUrl, events: events));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreSame(events, store.Requests.Single().Events, $"Chunk size {chunkSize}");
+            int lineAt = events.Events.IndexOf("* " + limitLine);
+            int requestAt = events.Events.FindIndex(line => line.StartsWith("> ", StringComparison.Ordinal));
+            Assert.IsGreaterThanOrEqualTo(0, lineAt, $"Chunk size {chunkSize}");
+            Assert.IsLessThan(requestAt, lineAt, $"Chunk size {chunkSize}");
+        }
     }
 
     /// <summary>

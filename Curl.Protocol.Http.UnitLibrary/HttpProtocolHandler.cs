@@ -1629,10 +1629,11 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Asks the cookie store for the <c>Cookie</c> value to send to the transfer's URL, or
-    /// gives <see langword="null" /> when cookies are off.
+    /// gives <see langword="null" /> when cookies are off. The store reports a limit that cut
+    /// the value short to the transfer's events, before the request's header lines, as curl does.
     /// </summary>
     private string? CookieHeaderFor(ITransferContext context) =>
-        CookieStore?.GetCookieHeader(context.Url, TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow());
+        CookieStore?.GetCookieHeader(context.Url, TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow(), context.Events);
 
     /// <summary>
     /// Hands <paramref name="header" />, when it is a <c>Set-Cookie</c> header and cookies are

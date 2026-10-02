@@ -127,6 +127,34 @@ public sealed class CurlCommandRunnerCookieTests
     }
 
     /// <summary>
+    /// curl 8.21.0 sends at most 150 cookies and, under <c>-v</c>, says so while it builds the request,
+    /// before the request's header lines (<c>lib/cookie.c</c>, BL-1108): a <c>-b</c> file holding 151
+    /// cookies for the host prints the line and sends 150 of them.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_VerboseCookieFileWithMoreThanTheMostCookiesSent_PrintsCurlsLimitLineBeforeTheRequest()
+    {
+        StringBuilder cookieFile = new();
+        foreach (int number in Enumerable.Range(1, 151))
+        {
+            cookieFile.Append(System.Globalization.CultureInfo.InvariantCulture, $"127.0.0.1\tFALSE\t/\tFALSE\t0\tk{number}\tv\n");
+        }
+
+        fileSystem.ExistingContent["many.txt"] = Encoding.Latin1.GetBytes(cookieFile.ToString());
+        ScriptedConnector server = Serve(SetsCookie);
+
+        int exitCode = await RunAsync(server, ["-s", "-v", "-b", "many.txt", Url]);
+
+        Assert.AreEqual(0, exitCode);
+        string error = Latin1(standardError.ToArray());
+        int lineAt = error.IndexOf("* Included max number of cookies (150) in request!\r\n", StringComparison.Ordinal);
+        Assert.IsGreaterThanOrEqualTo(0, lineAt);
+        Assert.IsLessThan(error.IndexOf("> GET / HTTP/1.1", StringComparison.Ordinal), lineAt);
+        string cookieHeader = Latin1(server.Written).Split("\r\n").Single(line => line.StartsWith("Cookie: ", StringComparison.Ordinal));
+        Assert.HasCount(150, cookieHeader["Cookie: ".Length..].Split("; "));
+    }
+
+    /// <summary>
     /// Measured 2026-09-27 with <c>curl -s -v -b sub\missing.txt http://127.0.0.1:&lt;port&gt;/</c>: the warning is
     /// the first line on standard error, with the path as given, and the transfer goes on to exit 0 (BL-487 Notes).
     /// </summary>

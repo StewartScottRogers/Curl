@@ -90,6 +90,21 @@ public sealed class CookieStore : ICookieStore
 
     /// <summary>
     /// Builds the <c>Cookie</c> header value as <see cref="GetCookieHeader(CurlUrl, bool, DateTimeOffset)"/>
+    /// does, reporting to <paramref name="events"/> the <c>-v</c> lines
+    /// <see cref="GetCookieHeader(CurlUrl, bool, DateTimeOffset, IReadOnlyList{string}, ITransferEvents)"/>
+    /// reports when a limit cuts the header short.
+    /// </summary>
+    /// <param name="url">The request URL.</param>
+    /// <param name="secure">Whether the request goes over TLS.</param>
+    /// <param name="now">The time that decides which stored cookies have expired.</param>
+    /// <param name="events">Where the <c>-v</c> lines are reported.</param>
+    /// <returns>The header value, or <see langword="null"/> when there is nothing to send.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="url"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
+    public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, ITransferEvents events) =>
+        GetCookieHeader(url, secure, now, cookieStrings, events);
+
+    /// <summary>
+    /// Builds the <c>Cookie</c> header value as <see cref="GetCookieHeader(CurlUrl, bool, DateTimeOffset)"/>
     /// does, with <paramref name="cookieStrings"/> in place of the strings given to
     /// <see cref="AddCookieString"/>: the <c>-b name=value</c> strings of one <c>-:</c> / <c>--next</c>
     /// option group, whose stored cookies every group shares while its strings are its own, as curl

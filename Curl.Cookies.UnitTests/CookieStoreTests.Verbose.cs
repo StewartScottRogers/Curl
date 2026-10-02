@@ -220,6 +220,32 @@ public sealed partial class CookieStoreTests
     }
 
     [TestMethod]
+    public void GetCookieHeader_EventsHeaderTooLong_ReportsTheFirstCookieLeftOut()
+    {
+        CookieStore store = new();
+        store.StoreFromResponse(Loopback, ["aaa=" + new string('x', 4000), "bb=" + new string('x', 4000), "c=" + new string('x', 165), "dd=1"], Now, NoTransferEvents.Instance);
+        store.AddCookieString("s=1");
+        RecordingTransferEvents events = new();
+
+        string header = store.GetCookieHeader(Loopback, secure: false, Now, events)!;
+
+        Assert.AreEqual("aaa,dd,bb", string.Join(',', header.Split("; ").Select(pair => pair.Split('=')[0])));
+        CollectionAssert.AreEqual(new[] { "Restricted outgoing cookies due to header size, 'c' not sent" }, events.Info);
+    }
+
+    [TestMethod]
+    public void GetCookieHeader_EventsWithinTheLimits_SendsTheAddedCookieStrings()
+    {
+        CookieStore store = new();
+        store.StoreFromResponse(Loopback, ["a=1"], Now, NoTransferEvents.Instance);
+        store.AddCookieString("s=1");
+        RecordingTransferEvents events = new();
+
+        Assert.AreEqual("a=1; s=1", store.GetCookieHeader(Loopback, secure: false, Now, events));
+        Assert.IsEmpty(events.Info);
+    }
+
+    [TestMethod]
     public void GetCookieHeader_NullEvents_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => new CookieStore().GetCookieHeader(Loopback, secure: false, Now, [], null!));
 }
