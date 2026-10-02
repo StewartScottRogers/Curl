@@ -355,6 +355,7 @@ choices do not need one.
 | [0343](ADR-0343-an-ignored-http2-body-resets-its-stream.md) | An ignored HTTP/2 body resets its stream with STREAM_CLOSED instead of being read | Accepted | 2026-10-02 |
 | [0344](ADR-0344-a-failed-negotiate-context-names-curls-error.md) | A failed Negotiate context's first-request line is the error message of an HTTP transfer that then fails | Accepted | 2026-10-02 |
 | [0345](ADR-0345-http2-and-http3-frame-lines-go-to-the-transfers-log.md) | HTTP/2 and HTTP/3 frame lines go to the log of the transfer they belong to; the connection's SETTINGS and GOAWAY to the transfer that last opened a stream | Accepted | 2026-10-02 |
+| [0346](ADR-0346-a-tftp-connection-is-numbered-with-the-runs-connections.md) | A TFTP transfer's connection is numbered with the run's other connections | Accepted | 2026-10-02 |
 
 ## Template
 
