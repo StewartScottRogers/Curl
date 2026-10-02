@@ -32,3 +32,4 @@ Curl writes curl 8.21.0's `[HAPPY-EYEBALLS]` and `[TCP]` lines under `--trace-co
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
