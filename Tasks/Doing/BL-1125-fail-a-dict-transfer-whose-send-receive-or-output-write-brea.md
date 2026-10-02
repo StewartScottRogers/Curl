@@ -35,3 +35,4 @@ A `dict://` transfer whose request write, reply read or output write throws an `
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
