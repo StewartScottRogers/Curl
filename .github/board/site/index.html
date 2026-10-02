@@ -46,6 +46,16 @@
   localStorage, goes only into the Authorization header of contents API requests, and
   "Forget token" removes it. Without one the tab is read-only.
 
+  Token expiry and renewal (BL-1211): the tab shows "Token expires <date> (in N days)".
+  GitHub's CORS answer does not expose GitHub-Authentication-Token-Expiration to scripts,
+  so the date is the day the token was saved plus 30 days, labelled as an estimate; the
+  header is used instead if GitHub ever exposes it. From 7 days before, the line is a
+  warning and the renewal steps open under it. A 401, or a 403 whose message names the
+  token, on any request made with it shows "Your token has expired or was refused" and the
+  steps, and hides the move buttons until a new token is saved. "How do I make a token?"
+  shows the steps at any time. Saving a token, and each page load with one saved, costs
+  one GET of the repository (the URL above ?contents= in a local preview) to learn this.
+
   Adding a data source: append one { name, url, fetch, render } object to `sources`
   below. `fetch(source)` returns the parsed data (use fetchJson, which records the
   rate-limit headers and throws on 403 and 429); `render(data)` draws it. The refresh
@@ -113,6 +123,12 @@
   details.finding .moves input { flex: 1 1 160px; min-width: 0; }
   details.finding .move-message { margin: 6px 0 0; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--line); }
   details.finding .move-message.error { border-color: var(--bad); }
+  #audit-token .token-alert { display: block; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--warn); }
+  #audit-token .token-alert.error { border-color: var(--bad); }
+  #token-help { border-top: none; padding: 0; margin: 4px 0; }
+  #token-help ol { margin: 4px 0; padding-left: 24px; }
+  #token-help li { margin: 2px 0; overflow-wrap: anywhere; }
+  #token-help a { color: inherit; }
   @media (max-width: 700px) {
     #board, #audit-board { grid-template-columns: minmax(0, 1fr); }
   }
@@ -146,6 +162,12 @@
     <span id="token-saved-text"></span>
     <button id="token-forget" type="button">Forget token</button>
   </p>
+  <p id="token-refused" class="token-alert error" hidden>Your token has expired or was refused. Make a new one with the steps below; moves stay off until it is saved.</p>
+  <p id="token-expiry" hidden></p>
+  <details id="token-help">
+    <summary>How do I make a token?</summary>
+    <ol id="token-steps"></ol>
+  </details>
 </section>
 <main id="audit-board"></main>
 <section id="audit-folded"></section>
@@ -175,7 +197,31 @@ const findingMoves = {
   blocked: [['Back to waiting', 'proposed', false]],
 };
 const tokenKey = 'curl-board-github-token';
+const tokenSavedAtKey = 'curl-board-github-token-saved-at';
 const contentsBase = previewContentsBase() || `https://api.github.com/repos/${repo}/contents/`;
+// The repository's own API URL (or the preview folder above ?contents=), read once when a
+// token is saved and once per page load with one saved, to learn whether it still works.
+const tokenCheckUrl = new URL('..', contentsBase).href;
+const tokenLifetimeDays = 30;
+const tokenWarningDays = 7;
+const dayMs = 24 * 60 * 60 * 1000;
+// The renewal steps (BL-1211), word for word as Claude's memory has them; [text, link] pairs.
+const tokenSteps = [
+  [['Open ', ''], ['https://github.com/settings/personal-access-tokens/new', 'https://github.com/settings/personal-access-tokens/new']],
+  [['Name: Curl board audit tab', '']],
+  [['Expiration: 30 days', '']],
+  [['Resource owner: StewartScottRogers', '']],
+  [['Repository access: Only select repositories, then Curl', '']],
+  [['Permissions, Repository permissions, Contents: Read and write (Metadata read-only is added by itself; everything else No access)', '']],
+  [['Generate token and copy it', '']],
+  [['Here: press Forget token, paste the new token, save', '']],
+  [['Optional: delete the expired token at ', ''], ['https://github.com/settings/personal-access-tokens', 'https://github.com/settings/personal-access-tokens']],
+];
+// What the last request made with the token said about it: refused (401, or a 403 naming
+// the token) and the expiry GitHub sent, when the browser lets the page read it.
+let tokenRefused = false;
+let tokenExpiresAt = null;
+let tokenHelpForcedFor = '';
 
 // ?contents= is a local-preview override only: the page must be on localhost and the
 // override on the page's own origin, so a crafted link cannot send the token elsewhere.
@@ -528,7 +574,7 @@ function findingElement(finding) {
   const link = element('a', null, `${finding.path} on ${finding.ref}`);
   link.href = `https://github.com/${repo}/blob/${encodePath(finding.ref)}/${encodePath(finding.path)}`;
   body.append(link);
-  if (!finding.error && findingMoves[finding.status] && savedToken()) body.append(movesElement(finding));
+  if (!finding.error && findingMoves[finding.status] && savedToken() && !tokenRefused) body.append(movesElement(finding));
   const message = moveMessages.get(finding.id);
   if (message) body.append(element('p', `move-message ${message.kind}`, message.text));
   if (finding.error) {
@@ -607,8 +653,104 @@ function renderTokenControls() {
     `Read-only. To approve, defer, block or reject findings here, paste a fine-grained GitHub personal ` +
     `access token for ${repo} only, with Contents: read and write. It is kept in this browser's local ` +
     `storage and sent only to the GitHub contents API.`;
-  document.getElementById('token-saved-text').textContent =
-    `Moves commit to the ${auditBranch} branch with the token saved in this browser.`;
+  document.getElementById('token-saved-text').textContent = tokenRefused
+    ? 'The saved token was refused; moves are off.'
+    : `Moves commit to the ${auditBranch} branch with the token saved in this browser.`;
+  document.getElementById('token-refused').hidden = !(saved && tokenRefused);
+  const expiry = saved && !tokenRefused ? tokenExpiry() : null;
+  const line = document.getElementById('token-expiry');
+  line.hidden = !expiry;
+  if (expiry) {
+    line.className = expiry.warn ? 'token-alert' : 'muted';
+    line.textContent = expiry.text;
+  }
+  // The steps open by themselves once per warning or refusal; the viewer may close them.
+  const help = document.getElementById('token-help');
+  const forcedFor = saved && tokenRefused ? 'refused' : expiry && expiry.warn ? 'warning' : '';
+  if (forcedFor && forcedFor !== tokenHelpForcedFor) help.open = true;
+  tokenHelpForcedFor = forcedFor;
+}
+
+function renderTokenSteps() {
+  const list = document.getElementById('token-steps');
+  for (const parts of tokenSteps) {
+    const item = element('li');
+    for (const [text, href] of parts) {
+      if (!href) { item.append(text); continue; }
+      const link = element('a', null, text);
+      link.href = href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      item.append(link);
+    }
+    list.append(item);
+  }
+}
+
+function savedAt() {
+  try {
+    const value = new Date(localStorage.getItem(tokenSavedAtKey) || '');
+    return Number.isNaN(value.getTime()) ? null : value;
+  } catch { return null; }
+}
+
+// "Token expires <date> (in N days)" from GitHub's header, else the saved date plus 30
+// days, labelled as an estimate: GitHub's CORS answer does not expose
+// GitHub-Authentication-Token-Expiration to scripts (checked 2026-10-02, BL-1211).
+function tokenExpiry() {
+  let expiresAt = tokenExpiresAt;
+  const estimated = !expiresAt;
+  if (estimated) {
+    const saved = savedAt();
+    if (!saved) return null;
+    expiresAt = new Date(saved.getTime() + tokenLifetimeDays * dayMs);
+  }
+  const days = Math.ceil((expiresAt - now()) / dayMs);
+  const when = days > 1 ? `in ${days} days` : days === 1 ? 'in 1 day' : days === 0 ? 'today' : `${-days} day${days === -1 ? '' : 's'} ago`;
+  const verb = days < 0 ? 'expired' : 'expires';
+  const label = estimated
+    ? `; an estimate, saved ${isoDate(savedAt())} plus ${tokenLifetimeDays} days, as GitHub does not let this page read the real date`
+    : '';
+  const advice = days <= tokenWarningDays ? ' Make a new one with the steps below.' : '';
+  return { warn: days <= tokenWarningDays, text: `Token ${verb} ${isoDate(expiresAt)} (${when}${label}).${advice}` };
+}
+
+// GitHub sends "2026-11-01 12:00:00 -0700"; null when absent or unreadable.
+function parseTokenExpiration(value) {
+  const match = value && /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) ([+-]\d{2})(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const date = new Date(`${match[1]}T${match[2]}${match[3]}:${match[4]}`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+// Learns from any answer to a request made with the token whether GitHub refused it
+// (401, or 403 with a message naming the token) and, when readable, when it expires.
+function noteTokenAnswer(response, message) {
+  const expiresAt = parseTokenExpiration(response.headers.get('GitHub-Authentication-Token-Expiration'));
+  if (expiresAt) tokenExpiresAt = expiresAt;
+  const refused = response.status === 401 || (response.status === 403 && /token/i.test(message || ''));
+  if (refused && !tokenRefused) {
+    tokenRefused = true;
+    renderAudit();
+  }
+  return refused;
+}
+
+// The one request a saved token costs per page load, and the one saving a token costs.
+async function checkToken() {
+  const token = savedToken();
+  if (!token) return;
+  try {
+    const response = await fetch(tokenCheckUrl, {
+      cache: 'no-store', headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}` },
+    });
+    const answer = await response.json().catch(() => ({}));
+    if (token !== savedToken()) return;
+    noteTokenAnswer(response, answer.message);
+  } catch {
+    // A network failure says nothing about the token; the next move or page load asks again.
+  }
+  renderAudit();
 }
 
 document.getElementById('token-form').addEventListener('submit', event => {
@@ -616,12 +758,21 @@ document.getElementById('token-form').addEventListener('submit', event => {
   const input = document.getElementById('token-input');
   const token = input.value.trim();
   input.value = '';
-  if (token) localStorage.setItem(tokenKey, token);
+  if (token) {
+    localStorage.setItem(tokenKey, token);
+    localStorage.setItem(tokenSavedAtKey, now().toISOString());
+    tokenRefused = false;
+    tokenExpiresAt = null;
+    checkToken();
+  }
   renderAudit();
 });
 
 document.getElementById('token-forget').addEventListener('click', () => {
   localStorage.removeItem(tokenKey);
+  localStorage.removeItem(tokenSavedAtKey);
+  tokenRefused = false;
+  tokenExpiresAt = null;
   renderAudit();
 });
 
@@ -669,10 +820,11 @@ async function contentsRequest(method, path, token, body) {
   if (body) headers['Content-Type'] = 'application/json';
   const response = await fetch(url, { method, cache: 'no-store', headers, body: body ? JSON.stringify(body) : undefined });
   const answer = await response.json().catch(() => ({}));
+  const refused = noteTokenAnswer(response, answer.message);
   if (response.ok) return answer;
   const said = answer.message ? `: ${answer.message}` : '';
   if (response.status === 409) throw new ConflictError(`GitHub answered 409${said}`);
-  if (response.status === 401) throw new Error(`GitHub refused the token (401${said}); forget it and save a new one`);
+  if (refused) throw new Error(`GitHub refused the token (${response.status}${said}); make a new one with the steps above`);
   if (method === 'GET' && response.status === 404) throw new Error(`${path} is not on the ${auditBranch} branch, or the token cannot read it (404)`);
   throw new Error(`GitHub answered ${response.status} ${response.statusText}${said}`);
 }
@@ -842,7 +994,13 @@ async function refresh() {
 
 window.addEventListener('hashchange', showTab);
 showTab();
+renderTokenSteps();
+// A token saved before the page recorded save dates counts from the first load that sees it.
+if (savedToken() && !savedAt()) {
+  try { localStorage.setItem(tokenSavedAtKey, now().toISOString()); } catch { /* storage unavailable */ }
+}
 renderTokenControls();
+checkToken();
 document.getElementById('source').textContent = `${repo} · ${branch}`;
 document.getElementById('cadence').textContent =
   `Refreshes every ${refreshSeconds} s (minimum ${minimumSeconds} s: ${secondsPerCall} s per API call, ` +
