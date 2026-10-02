@@ -33,3 +33,4 @@ When the NTLMv2 response (which carries the challenge's whole target information
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
