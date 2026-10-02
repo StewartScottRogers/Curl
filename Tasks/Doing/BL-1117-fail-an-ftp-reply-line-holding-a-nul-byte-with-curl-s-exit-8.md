@@ -34,3 +34,4 @@ An FTP control-connection reply line that contains a NUL byte ends the transfer 
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
