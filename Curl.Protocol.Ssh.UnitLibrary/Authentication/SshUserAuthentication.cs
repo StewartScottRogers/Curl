@@ -100,12 +100,21 @@ internal sealed class SshUserAuthentication(
 
     private const string SkEd25519Method = "sk-ssh-ed25519@openssh.com";
 
+    /// <summary>The state curl's state machine enters once the user is authenticated.</summary>
+    internal const string AuthDoneState = "SSH_AUTH_DONE";
+
     // The last server-sig-algs value an SSH_MSG_EXT_INFO carried, or null before one did.
     private string? serverSignatureAlgorithms;
 
     // The method an RSA key found no signature algorithm for. libssh2 keeps it, and every
     // later agent identity starts from it instead of its own key type (ADR-0271).
     private string? leftoverMethod;
+
+    /// <summary>
+    /// Gets where the <c>--trace-config ssh</c> state changes of the <c>publickey</c> attempt go
+    /// (BL-1166); <see cref="SshStateTrace.Off" /> when not given.
+    /// </summary>
+    internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
 
     /// <summary>
     /// Sends <c>SSH_MSG_SERVICE_REQUEST</c> for <c>ssh-userauth</c> and waits for the
@@ -486,14 +495,17 @@ internal sealed class SshUserAuthentication(
         }
 
         SshUserKeyFiles files = await userKeys.LocateAsync(cancellationToken).ConfigureAwait(false);
+        Trace.Enter("SSH_AUTH_PKEY_INIT");
         if (files.PublicKeyPath is { } publicKeyPath)
         {
             events.ReportInfo(SshInfoLines.TryingPublicKeyFile(publicKeyPath));
         }
 
         events.ReportInfo(SshInfoLines.TryingPrivateKeyFile(files.PrivateKeyPath));
+        Trace.Enter("SSH_AUTH_PKEY");
         string? denial = await DenyPublicKeyAsync(user, files, cancellationToken).ConfigureAwait(false);
         events.ReportInfo(denial is null ? SshInfoLines.AuthenticatedViaPublicKey : SshInfoLines.PublicKeyDenied(denial));
+        Trace.Enter(denial is null ? AuthDoneState : "SSH_AUTH_PASS_INIT");
         return denial is null;
     }
 

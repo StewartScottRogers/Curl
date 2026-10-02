@@ -19,6 +19,12 @@ internal sealed class SftpFileDownload(SshTransport transport)
     private static readonly byte[] HomeDirectory = "."u8.ToArray();
 
     /// <summary>
+    /// Gets where the download's <c>--trace-config ssh</c> state changes go (BL-1166);
+    /// <see cref="SshStateTrace.Off" /> when not given.
+    /// </summary>
+    internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
+
+    /// <summary>
     /// Downloads the file at <paramref name="urlPath" /> into <paramref name="output" />.
     /// </summary>
     /// <param name="urlPath">The URL's path, with its percent-escapes.</param>
@@ -53,25 +59,48 @@ internal sealed class SftpFileDownload(SshTransport transport)
         long? resumeFrom = null)
     {
         quotes ??= SftpQuoteCommands.None;
+        Trace.Enter("SSH_SFTP_INIT");
         SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
         return await session.CloseChannelOnFailureAsync(
             async () =>
             {
+                Trace.Enter("SSH_SFTP_REALPATH");
                 byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
                 byte[] path = SftpRemotePath.ResolveUrlPath(urlPath, homeDirectory);
+                TraceConnectPhaseDone();
+                Trace.Enter("SSH_SFTP_QUOTE_INIT");
                 await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
+                Trace.Enter("SSH_SFTP_GETINFO");
+                Trace.Enter("SSH_SFTP_TRANS_INIT");
+                Trace.Enter("SSH_SFTP_DOWNLOAD_INIT");
                 if (await OpenUnlessTheConnectionEndsAsync(session, path, createFileMode, cancellationToken).ConfigureAwait(false) is not { } handle)
                 {
                     return await quotes.FinishAsync(session, null, homeDirectory, TransferResult.Success(0), cancellationToken).ConfigureAwait(false);
                 }
 
+                Trace.Enter("SSH_SFTP_DOWNLOAD_STAT");
                 long? size = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.StatSizeAsync(path, cancellationToken)).ConfigureAwait(false);
+                Trace.Rest();
+                Trace.Write("DO phase is complete");
                 TransferResult result = await CopyPartAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
-                return await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+                Trace.Enter("SSH_SFTP_CLOSE");
+                result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+                Trace.Write("SFTP DONE done");
+                Trace.Rest();
+                return result;
             },
             cancellationToken).ConfigureAwait(false);
+    }
+
+    // curl's CONNECT phase ends once REALPATH has answered; its DO phase starts at once (BL-1166).
+    private void TraceConnectPhaseDone()
+    {
+        Trace.Enter(SshStateTrace.Stop);
+        Trace.Write("CONNECT phase done");
+        Trace.Rest();
+        Trace.Write("DO phase starts");
     }
 
     // Measured (BL-1046): curl takes a connection closed or reset while it waits for the

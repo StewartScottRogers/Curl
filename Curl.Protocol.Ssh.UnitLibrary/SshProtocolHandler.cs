@@ -126,6 +126,13 @@ public sealed class SshProtocolHandler : IProtocolHandler
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => Schemes;
 
+    /// <summary>
+    /// Gets a value indicating whether each transfer writes curl 8.21.0's <c>--trace-config ssh</c>
+    /// lines, <c>[SSH] ...</c>, from the session's state changes through the transfer's events
+    /// (<see cref="SshStateTrace" />, BL-1166).
+    /// </summary>
+    public bool TracesStateMachine { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException"><paramref name="context" /> is <see langword="null" />.</exception>
     /// <exception cref="OperationCanceledException"><see cref="ITransferContext.CancellationToken" /> was cancelled.</exception>
@@ -182,10 +189,13 @@ public sealed class SshProtocolHandler : IProtocolHandler
     {
         ITransferEvents events = context.Events;
         ReportSessionStart(context);
+        SshStateTrace trace = new(events, TracesStateMachine);
+        trace.Enter("SSH_INIT");
+        trace.Enter("SSH_S_STARTUP");
         SshDiagnosticLog log = new(context.DiagnosticLog);
         try
         {
-            TransferResult result = await HandshakeAndTransferAsync(context, target, connection, log).ConfigureAwait(false);
+            TransferResult result = await HandshakeAndTransferAsync(context, target, connection, log, trace).ConfigureAwait(false);
             events.ReportInfo(FailedWhileTransferring(result, ListsDirectory(context))
                 ? SshInfoLines.ClosingConnection(connectionNumber)
                 : SshInfoLines.ConnectionLeftIntact(connectionNumber, target.Host, target.Port));
@@ -240,7 +250,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         context.Url.Scheme != ScpScheme && context.Upload is null && SftpRemotePath.NamesDirectory(context.Url.AbsolutePath);
 
     // The handshake, then the rest of the session, which always ends with DISCONNECT.
-    private async ValueTask<TransferResult> HandshakeAndTransferAsync(ITransferContext context, SshSessionTarget target, IConnection connection, SshDiagnosticLog log)
+    private async ValueTask<TransferResult> HandshakeAndTransferAsync(ITransferContext context, SshSessionTarget target, IConnection connection, SshDiagnosticLog log, SshStateTrace trace)
     {
         SshAlgorithmPreferences offered = SshHostKeyChecker.NarrowHostKeys(
             preferences.WithCompression(target.Options.Compression), target.Host, target.Port, target.Options, target.KnownHosts, context.Events);
@@ -252,7 +262,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         log.KeysExchanged(handshake.Algorithms.KeyExchange, context.TimeProvider.GetElapsedTime(started));
         try
         {
-            return await AuthenticateAndTransferAsync(context, target, transport, keys.HostKey).ConfigureAwait(false);
+            return await AuthenticateAndTransferAsync(context, target, transport, keys.HostKey, trace).ConfigureAwait(false);
         }
         finally
         {
@@ -260,29 +270,45 @@ public sealed class SshProtocolHandler : IProtocolHandler
         }
     }
 
-    private async ValueTask<TransferResult> AuthenticateAndTransferAsync(ITransferContext context, SshSessionTarget target, SshTransport transport, byte[] hostKey)
+    private async ValueTask<TransferResult> AuthenticateAndTransferAsync(ITransferContext context, SshSessionTarget target, SshTransport transport, byte[] hostKey, SshStateTrace trace)
     {
         ITransferEvents events = context.Events;
         SshUserKeySource userKeys = new(fileSystem, readEnvironmentVariable, target.Options, credentialEncoding);
-        SshUserAuthentication authentication = new(transport, credentialEncoding, userKeys, events, agentConnector);
+        SshUserAuthentication authentication = new(transport, credentialEncoding, userKeys, events, agentConnector) { Trace = trace };
         await authentication.RequestServiceAsync(context.CancellationToken).ConfigureAwait(false);
         transport.DiagnosticLog.HostKeyPresented(hostKey);
-        SshHostKeyChecker.Check(hostKey, target.Host, target.Port, target.Options, target.KnownHosts, events);
+        CheckHostKey(hostKey, target, events, trace);
         transport.DiagnosticLog.HostKeyAccepted(target.Options, target.KnownHosts);
         await authentication.AuthenticateAsync(context.Credentials, context.CancellationToken).ConfigureAwait(false);
+        trace.Enter(SshUserAuthentication.AuthDoneState);
         events.ReportInfo(SshInfoLines.AuthenticationComplete);
         bool overScp = context.Url.Scheme == ScpScheme;
         if (overScp)
         {
             events.ReportInfo(SshInfoLines.ConnectionEstablished);
+            trace.Rest();
         }
 
-        return await TransferAsync(context, transport, overScp).ConfigureAwait(false);
+        return await TransferAsync(context, transport, overScp, trace).ConfigureAwait(false);
+    }
+
+    // curl's SSH_HOSTKEY state, which with neither --hostpubsha256 nor --hostpubmd5 says it
+    // checks the known-hosts file (measured, BL-1166).
+    private static void CheckHostKey(byte[] hostKey, SshSessionTarget target, ITransferEvents events, SshStateTrace trace)
+    {
+        trace.Enter("SSH_HOSTKEY");
+        if (target.Options.HostPublicKeySha256 is null && target.Options.HostPublicKeyMd5 is null)
+        {
+            trace.Write("no host key checksum given, checking knownhosts");
+        }
+
+        SshHostKeyChecker.Check(hostKey, target.Host, target.Port, target.Options, target.KnownHosts, events);
+        trace.Enter("SSH_AUTHLIST");
     }
 
     // The transfer's failure message is a -v line too, as curl's failf writes it, unless
     // curl returns it without one.
-    private static async ValueTask<TransferResult> TransferAsync(ITransferContext context, SshTransport transport, bool overScp)
+    private static async ValueTask<TransferResult> TransferAsync(ITransferContext context, SshTransport transport, bool overScp, SshStateTrace trace)
     {
         TransferResult result;
         SshDiagnosticLog log = transport.DiagnosticLog;
@@ -292,8 +318,8 @@ public sealed class SshProtocolHandler : IProtocolHandler
         {
             ReceivedDataReportingStream output = new(context.Output, context.Events);
             result = overScp
-                ? await TransferOverScpAsync(context, transport, output).ConfigureAwait(false)
-                : await TransferOverSftpAsync(context, transport, output).ConfigureAwait(false);
+                ? await TransferOverScpAsync(context, transport, output, trace).ConfigureAwait(false)
+                : await TransferOverSftpAsync(context, transport, output, trace).ConfigureAwait(false);
         }
         catch (SshTransferException exception) when (!exception.EndsConnection)
         {
@@ -327,15 +353,15 @@ public sealed class SshProtocolHandler : IProtocolHandler
     }
 
     // An upload is sent (ADR-0258); otherwise the file is downloaded (ADR-0225).
-    private static async ValueTask<TransferResult> TransferOverScpAsync(ITransferContext context, SshTransport transport, Stream output) =>
+    private static async ValueTask<TransferResult> TransferOverScpAsync(ITransferContext context, SshTransport transport, Stream output, SshStateTrace trace) =>
         context.Upload is { } upload
             ? await new ScpFileUpload(transport, context.Events).UploadAsync(context.Url.AbsolutePath, context.CreateFileMode, upload, context.Progress, context.CancellationToken).ConfigureAwait(false)
-            : await new ScpFileDownload(transport).DownloadAsync(context.Url.AbsolutePath, output, context.Progress, context.CancellationToken).ConfigureAwait(false);
+            : await new ScpFileDownload(transport) { Trace = trace }.DownloadAsync(context.Url.AbsolutePath, output, context.Progress, context.CancellationToken).ConfigureAwait(false);
 
     // An upload is sent (ADR-0244); otherwise a path ending with a slash is listed and any
     // other is downloaded (ADR-0241). Each runs the -Q commands around it (ADR-0247), with
     // Windows' 32-bit C long deciding how curl reads their numbers and dates.
-    private static async ValueTask<TransferResult> TransferOverSftpAsync(ITransferContext context, SshTransport transport, Stream output)
+    private static async ValueTask<TransferResult> TransferOverSftpAsync(ITransferContext context, SshTransport transport, Stream output, SshStateTrace trace)
     {
         string urlPath = context.Url.AbsolutePath;
         SftpQuoteCommands quotes = SftpQuoteCommands.From(context, OperatingSystem.IsWindows());
@@ -346,7 +372,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
 
         return SftpRemotePath.NamesDirectory(urlPath)
             ? await new SftpDirectoryListing(transport).ListAsync(urlPath, context.ListOnly, context.NoBody, output, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false)
-            : await new SftpFileDownload(transport).DownloadAsync(urlPath, context.CreateFileMode, output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom).ConfigureAwait(false);
+            : await new SftpFileDownload(transport) { Trace = trace }.DownloadAsync(urlPath, context.CreateFileMode, output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom).ConfigureAwait(false);
     }
 
     // What the host-key check and the key files need to know about the session.

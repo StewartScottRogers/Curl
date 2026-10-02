@@ -109,6 +109,7 @@ internal static class CurlComposition
     /// <param name="tracesFtp">Whether the FTP handler writes the <c>--trace-config ftp</c> lines (<see cref="TracesFtp" />, BL-1162).</param>
     /// <param name="tracesSmtp">Whether the SMTP handler writes the <c>--trace-config smtp</c> lines (<see cref="TracesSmtp" />, BL-1163).</param>
     /// <param name="tracesWs">Whether the WebSocket handler writes the <c>--trace-config ws</c> lines (<see cref="TracesWs" />, BL-1164).</param>
+    /// <param name="tracesSsh">Whether the SSH handler writes the <c>--trace-config ssh</c> lines (<see cref="TracesSsh" />, BL-1166).</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -123,7 +124,8 @@ internal static class CurlComposition
         IDiagnosticLog? diagnosticLog = null,
         bool tracesFtp = false,
         bool tracesSmtp = false,
-        bool tracesWs = false)
+        bool tracesWs = false,
+        bool tracesSsh = false)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
@@ -153,7 +155,7 @@ internal static class CurlComposition
                 recordingConnector,
                 new PhysicalFileSystem(),
                 OperatingSystem.IsWindows() ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference,
-                CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
+                CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())) { TracesStateMachine = tracesSsh },
             http,
             new RoutingFtpProtocolHandler(
                 http,
@@ -447,6 +449,15 @@ internal static class CurlComposition
         options.TraceComponents.Contains("ws") || options.TraceComponents.Contains("protocol") || options.TraceComponents.Contains("all");
 
     /// <summary>
+    /// Whether curl 8.21.0's <c>[SSH]</c> lines are written: <c>ssh</c>, <c>protocol</c> or <c>all</c>
+    /// is among the trace components, which <c>-vv</c> and up put there too (BL-1166).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesSsh(CommandLineOptions options) =>
+        options.TraceComponents.Contains("ssh") || options.TraceComponents.Contains("protocol") || options.TraceComponents.Contains("all");
+
+    /// <summary>
     /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
     /// and with <c>http://</c> in front when it does not, as curl guesses the scheme of any URL (a
     /// scheme-less DoH URL was measured to reach its server as plain HTTP, BL-642).
@@ -564,7 +575,8 @@ internal static class CurlComposition
             diagnosticLog,
             TracesFtp(options),
             TracesSmtp(options),
-            TracesWs(options));
+            TracesWs(options),
+            TracesSsh(options));
     }
 
     /// <summary>
@@ -1028,7 +1040,7 @@ internal static class CurlComposition
     /// <param name="transports">The run's connectors.</param>
     /// <returns>The dispatcher.</returns>
     internal static ProtocolDispatcher CreateDispatcher(CurlTransports transports) =>
-        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs));
+        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs, tracesSsh: transports.TracesSsh));
 
     /// <summary>
     /// Creates what one run transfers through: the production handler set, every TCP handler
@@ -1095,7 +1107,7 @@ internal static class CurlComposition
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs)),
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs, tracesSsh: transports.TracesSsh)),
             WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild),
             cookies,
             new ProxySelector(Environment.GetEnvironmentVariable),

@@ -381,6 +381,7 @@ choices do not need one.
 | [0369](ADR-0369-curl-does-not-write-the-httpsrr-builds-https-rr-lines.md) | Curl does not write the `--enable-httpsrr` build's `Some HTTPS RR to process` and `HTTPS-RR:` lines, and asks the HTTPS query only under `--ech true` or `hard` (BL-1173) | Accepted | 2026-10-02 |
 | [0370](ADR-0370-trace-config-ws-writes-curls-websocket-frame-lines.md) | `--trace-config ws` (and `protocol`, `all`) writes curl 8.21.0's `[WS]` frame decode, pong, upload and established lines from the WebSocket handler (BL-1164) | Accepted | 2026-10-02 |
 | [0371](ADR-0371-the-openssl-build-reports-a-failed-handshake-before-every-tls-failure.md) | The OpenSSL build reports a failed `TlsHandshakeEvent` before every TLS failure: the certificate lines before an exit 60, the ALPN offer before an exit 35, and the hand-built client's lines before a pin refusal (BL-1178) | Accepted | 2026-10-02 |
+| [0372](ADR-0372-trace-config-ssh-writes-curls-ssh-state-lines.md) | `--trace-config ssh` (and `protocol`, `all`) writes curl 8.21.0's `[SSH]` state changes and phase lines for a `publickey` login and an SFTP or SCP download, without the timing-dependent `block=1` and `pollset` lines (BL-1166) | Accepted | 2026-10-02 |
 
 ## Template
 
