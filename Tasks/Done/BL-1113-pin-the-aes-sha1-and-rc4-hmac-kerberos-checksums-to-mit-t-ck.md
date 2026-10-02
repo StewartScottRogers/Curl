@@ -8,7 +8,7 @@ depends-on: [BL-1112]
 touches: [Curl.Kerberos.UnitLibrary, Curl.Kerberos.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-01
 ---
 # BL-1113 — Pin the AES-SHA1 and RC4-HMAC Kerberos checksums to MIT t_cksums.c's cases
 
@@ -24,13 +24,18 @@ The keyed checksums of `aes128-cts-hmac-sha1-96`, `aes256-cts-hmac-sha1-96` and 
 
 ## Acceptance criteria
 
-- [ ] `AesSha1KerberosEncryptionTests.cs` gains `ComputeChecksum_MitTCksumsCase_MatchesVectorAndVerifies` for the AES-128 and AES-256 cases above, passing, each also verifying the published checksum and refusing it with one bit flipped.
-- [ ] `Rc4HmacKerberosEncryptionTests.cs` gains the same test for the `HMAC_MD5_ARCFOUR` case, passing.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Kerberos.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `AesSha1KerberosEncryptionTests.cs` gains `ComputeChecksum_MitTCksumsCase_MatchesVectorAndVerifies` for the AES-128 and AES-256 cases above, passing, each also verifying the published checksum and refusing it with one bit flipped.
+- [x] `Rc4HmacKerberosEncryptionTests.cs` gains the same test for the `HMAC_MD5_ARCFOUR` case, passing.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Kerberos.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- Hex checked against MIT krb5 `t_cksums.c` at commit 50588db5d26e81f3d564d1f69435af34ae80d9b2 (the commit BL-1112 pinned for `t_decrypt.c`); the commit is named in each test comment.
+- All three cases passed first time: no defect in the AES-SHA1 or RC4-HMAC checksum (RC4 usage 6 is not remapped by the Microsoft usage table, as MIT expects).
+- Gates: `dotnet build Curl.slnx -warnaserror` clean, fast tests green (Kerberos 707), `Measure-CodeQuality.ps1 -Library Curl.Kerberos.UnitLibrary` 100% line, 100% branch, 0 failing members.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-01: Backlog -> Doing.
+- 2026-10-01: Doing -> Done. AES-128, AES-256 and RC4-HMAC checksums are pinned to MIT t_cksums.c vectors

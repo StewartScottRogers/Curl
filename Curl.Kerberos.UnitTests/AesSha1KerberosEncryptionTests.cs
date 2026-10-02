@@ -171,6 +171,25 @@ public sealed class AesSha1KerberosEncryptionTests
         Assert.IsFalse(encryption.VerifyChecksum(key, 16, data, checksum));
     }
 
+    // MIT Kerberos t_cksums.c at commit 50588db5d26e81f3d564d1f69435af34ae80d9b2: its
+    // CKSUMTYPE_HMAC_SHA1_96_AES128 and CKSUMTYPE_HMAC_SHA1_96_AES256 cases.
+    [TestMethod]
+    [DataRow(KerberosEncryptionType.Aes128CtsHmacSha196, "eight nine ten eleven twelve thirteen", 3, "9062430C8CDA3388922E6D6A509F5B7A", "01A4B088D45628F6946614E3")]
+    [DataRow(KerberosEncryptionType.Aes256CtsHmacSha196, "fourteen", 4, "B1AE4CD8462AFF1677053CC9279AAC30B796FB81CE21474DD3DDBCFEA4EC76D7", "E08739E3279E2903EC8E3836")]
+    public void ComputeChecksum_MitTCksumsCase_MatchesVectorAndVerifies(KerberosEncryptionType encryptionType, string data, int usage, string key, string expected)
+    {
+        KerberosEncryption encryption = KerberosEncryption.Create(encryptionType, new FixedKerberosRandomSource(Confounder));
+        byte[] published = Hex.Bytes(expected);
+        byte[] flipped = Hex.Bytes(expected);
+        flipped[^1] ^= 0x01;
+
+        byte[] checksum = encryption.ComputeChecksum(Hex.Bytes(key), usage, Encoding.ASCII.GetBytes(data));
+
+        CollectionAssert.AreEqual(published, checksum);
+        Assert.IsTrue(encryption.VerifyChecksum(Hex.Bytes(key), usage, Encoding.ASCII.GetBytes(data), published));
+        Assert.IsFalse(encryption.VerifyChecksum(Hex.Bytes(key), usage, Encoding.ASCII.GetBytes(data), flipped));
+    }
+
     [TestMethod]
     public void ComputePseudoRandom_IsSha1BlockEncryptedUnderDkPrf()
     {

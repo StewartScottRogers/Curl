@@ -105,6 +105,24 @@ public sealed class Rc4HmacKerberosEncryptionTests
         CollectionAssert.AreEqual(HMACSHA1.HashData(FooKey, "test"u8), Rc4Hmac().ComputePseudoRandom(FooKey, "test"u8));
     }
 
+    // MIT Kerberos t_cksums.c at commit 50588db5d26e81f3d564d1f69435af34ae80d9b2: its
+    // CKSUMTYPE_HMAC_MD5_ARCFOUR case, key usage 6.
+    [TestMethod]
+    public void ComputeChecksum_MitTCksumsCase_MatchesVectorAndVerifies()
+    {
+        byte[] key = Hex.Bytes("F7D3A155AF5E238A0B7A871A96BA2AB2");
+        byte[] data = Encoding.ASCII.GetBytes("seventeen eighteen nineteen twenty");
+        byte[] published = Hex.Bytes("EB38CC97E2230F59DA4117DC5859D7EC");
+        byte[] flipped = Hex.Bytes("EB38CC97E2230F59DA4117DC5859D7EC");
+        flipped[^1] ^= 0x01;
+
+        byte[] checksum = Rc4Hmac().ComputeChecksum(key, 6, data);
+
+        CollectionAssert.AreEqual(published, checksum);
+        Assert.IsTrue(Rc4Hmac().VerifyChecksum(key, 6, data, published));
+        Assert.IsFalse(Rc4Hmac().VerifyChecksum(key, 6, data, flipped));
+    }
+
     // MIT Kerberos t_decrypt.c at commit 50588db5d26e81f3d564d1f69435af34ae80d9b2: its five
     // rc4-hmac (ENCTYPE_ARCFOUR_HMAC) cases, key usages 0 to 4.
     [TestMethod]
