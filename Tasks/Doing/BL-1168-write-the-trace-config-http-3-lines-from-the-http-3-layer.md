@@ -33,3 +33,4 @@ Under `-v --trace-config http/3` (and `protocol`, `all`) Curl writes the `* [HTT
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
