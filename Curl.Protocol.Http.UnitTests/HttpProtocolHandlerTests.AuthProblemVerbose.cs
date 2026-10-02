@@ -106,6 +106,30 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// Measured (BL-1179 Notes): <c>curl -s -S -v -x http://127.0.0.1:P http://example.invalid/</c>
+    /// with no <c>-U</c> against a <c>407</c> carrying two Digest challenges in one header writes
+    /// the duplicate line before that header and no problem line.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ProxyDigest407WithoutProxyCredentialsVerbose_WritesDuplicateDigestLineBeforeTheProxyChallengeHeader()
+    {
+        TurnTakingConnection connection = new(65536, "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Digest realm=\"r\", nonce=\"a\", Digest realm=\"s\", nonce=\"c\"\r\nContent-Length: 0\r\n\r\n");
+        ProxyEndpoint proxyWithoutCredential = new(ProxyKind.Http, "127.0.0.1", 18603, null);
+
+        List<string> lines = await AuthProblemLinesAsync(connection, new HttpRequestOptions { ForwardProxy = proxyWithoutCredential }, credential: null, ProxyAuthUrl);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "< HTTP/1.1 407 Proxy Authentication Required",
+                "* Ignoring duplicate digest auth header.",
+                "< Proxy-Authenticate: Digest realm=\"r\", nonce=\"a\", Digest realm=\"s\", nonce=\"c\"",
+                "< Content-Length: 0",
+            },
+            LastHeadLines(lines));
+    }
+
+    /// <summary>
     /// Measured (BL-1175 Notes): <c>curl -s -S -v --digest -u u:p</c> against a Digest
     /// <c>401</c> and then a second one without <c>stale=true</c> writes the Digest problem line,
     /// then the duplicate line for the header's second Digest challenge, before that header.
