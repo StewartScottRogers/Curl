@@ -382,7 +382,10 @@ Per ADR-0356 (BL-1102) its `--trace-config doh` lines go to a `FlowScopedTransfe
 `AsyncLocal` view that `TcpConnector.ResolverEvents` points at the resolving target's events before
 each look-up; and `TcpConnector.TracesDnsFilter` wraps a direct connect's events in
 `DnsFilterTraceEvents`, which writes curl 8.21.0's `[DNS]` filter lines around `Trying`,
-`Established connection` and `Failed to connect to`.
+`Established connection` and `Failed to connect to`. Per ADR-0357 (BL-1103)
+`TcpConnector.TracesSetupFilter` writes `[SETUP] added` and wraps those events in turn in
+`SetupFilterTraceEvents`, which writes the setup filter's `happy eyeballing to origin` line before
+the first `Trying` and its removal after `Established connection`, so `-vv` prints curl's order.
 
 Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
 `--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr`, measured against curl 8.22.0's c-ares

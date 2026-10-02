@@ -219,6 +219,13 @@ public sealed partial class TcpConnector(
     public bool TracesDnsFilter { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a direct connect writes the <c>[SETUP]</c> lines curl 8.21.0
+    /// writes for its connection setup filter under <c>-vv</c> and up, <c>--trace-config setup</c> or
+    /// <c>all</c> (<see cref="SetupFilterTraceEvents" />, BL-1103).
+    /// </summary>
+    public bool TracesSetupFilter { get; init; }
+
+    /// <summary>
     /// Gets the events a resolver built once per run reports to, such as the
     /// <see cref="DohDnsResolver" />'s <c>--trace-config doh</c> lines: before each look-up the
     /// connector points them at the resolving transfer's events (BL-1102); <see langword="null" />
@@ -527,7 +534,7 @@ public sealed partial class TcpConnector(
             {
                 ({ } unixSocketAddress, _) => await ConnectOverUnixSocketAsync(target, unixSocketAddress, started, limited.Token).ConfigureAwait(false),
                 (null, { } proxy) => await ConnectThroughProxyAsync(target, destination, proxy, started, limited.Token).ConfigureAwait(false),
-                _ => await ConnectDirectlyAsync(TracingDnsFilter(target, destination), destination, started, limited.Token).ConfigureAwait(false),
+                _ => await ConnectDirectlyAsync(TracingConnectionFilters(target, destination), destination, started, limited.Token).ConfigureAwait(false),
             };
         }
         catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= connectLimit)
@@ -566,12 +573,24 @@ public sealed partial class TcpConnector(
         return new ConnectDestination(alternative.Host, alternative.Port, IsMapped: true, ParseError: null);
     }
 
-    // Under TracesDnsFilter a direct connect reports through DnsFilterTraceEvents, which writes
-    // curl's [DNS] filter lines around its own (BL-1102); otherwise the target is as given.
-    private ConnectTarget TracingDnsFilter(ConnectTarget target, ConnectDestination destination) =>
-        TracesDnsFilter
-            ? target with { Events = DnsFilterTraceEvents.Start(target.Events, destination.Host, destination.Port) }
-            : target;
+    // Under TracesSetupFilter and TracesDnsFilter a direct connect reports through
+    // SetupFilterTraceEvents over DnsFilterTraceEvents, which write curl's [SETUP] and [DNS] filter
+    // lines in curl's order around its own (BL-1102, BL-1103); otherwise the target is as given.
+    private ConnectTarget TracingConnectionFilters(ConnectTarget target, ConnectDestination destination)
+    {
+        if (!TracesSetupFilter && !TracesDnsFilter)
+        {
+            return target;
+        }
+
+        if (TracesSetupFilter)
+        {
+            target.Events.ReportInfo(SetupFilterTraceEvents.AddedLine);
+        }
+
+        ITransferEvents events = TracesDnsFilter ? DnsFilterTraceEvents.Start(target.Events, destination.Host, destination.Port) : target.Events;
+        return target with { Events = TracesSetupFilter ? new SetupFilterTraceEvents(events, destination.Host, destination.Port) : events };
+    }
 
     private static TimeSpan ConnectTimeoutOrDefault(TimeSpan? connectTimeout) =>
         connectTimeout is { } given && given > TimeSpan.Zero ? given : DefaultConnectTimeout;
