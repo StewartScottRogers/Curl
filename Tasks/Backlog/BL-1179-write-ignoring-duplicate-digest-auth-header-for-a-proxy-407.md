@@ -1,5 +1,5 @@
 ---
-id: BL-1177
+id: BL-1179
 title: Write Ignoring duplicate digest auth header. for a proxy 407 when no proxy credentials were given
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1177 — Write Ignoring duplicate digest auth header. for a proxy 407 when no proxy credentials were given
+# BL-1179 — Write Ignoring duplicate digest auth header. for a proxy 407 when no proxy credentials were given
 
 ## Goal
 
