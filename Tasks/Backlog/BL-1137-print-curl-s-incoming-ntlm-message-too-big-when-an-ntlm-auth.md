@@ -1,5 +1,5 @@
 ---
-id: BL-1135
+id: BL-1137
 title: Print curl's incoming NTLM message too big when an NTLM AUTHENTICATE message's responses overflow
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-01
 completed:
 ---
-# BL-1135 — Print curl's incoming NTLM message too big when an NTLM AUTHENTICATE message's responses overflow
+# BL-1137 — Print curl's incoming NTLM message too big when an NTLM AUTHENTICATE message's responses overflow
 
 ## Goal
 

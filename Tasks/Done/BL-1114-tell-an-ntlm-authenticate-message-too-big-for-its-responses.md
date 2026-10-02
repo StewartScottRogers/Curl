@@ -34,7 +34,7 @@ completed: 2026-10-01
 - Added `TryEncode(out byte[]? message, out NtlmMessageFailure failure)`; the old overload forwards to it and discards the failure, so its results are unchanged. `TooLarge` is split into `ResponsesTooLarge` (curl's `>` check) and `NamesTooLarge` (its `>=` check), checked in curl's order.
 - Responses ending at exactly 1024 bytes pass the first check; with empty names the message is then 1024 bytes and the second check refuses it as `NamesTooLarge`, as in curl.
 - Measured: Curl.Ntlm.UnitLibrary 100% line, 100% branch, 46 members, 0 failing, worst CRAP 10. Ntlm tests: 66 passed; fast suite green.
-- Follow-up filed: BL-1135 (use the new overload in Curl.Authentication.UnitLibrary so Curl prints `incoming NTLM message too big`).
+- Follow-up filed: BL-1137 (use the new overload in Curl.Authentication.UnitLibrary so Curl prints `incoming NTLM message too big`).
 
 ## Log
 
