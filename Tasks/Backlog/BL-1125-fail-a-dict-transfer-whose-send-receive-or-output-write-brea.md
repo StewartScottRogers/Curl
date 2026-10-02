@@ -1,5 +1,5 @@
 ---
-id: BL-1106
+id: BL-1125
 title: Fail a dict transfer whose send, receive or output write breaks with curl's exit 55, 56 or 23
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-01
 completed:
 ---
-# BL-1106 — Fail a dict transfer whose send, receive or output write breaks with curl's exit 55, 56 or 23
+# BL-1125 — Fail a dict transfer whose send, receive or output write breaks with curl's exit 55, 56 or 23
 
 ## Goal
 

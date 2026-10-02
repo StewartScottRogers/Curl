@@ -1,16 +1,16 @@
 ---
-id: BL-1107
+id: BL-1126
 title: Report curl's lookup word is missing -v line for a dict lookup without a word
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1106]
+depends-on: [BL-1125]
 touches: [Curl.Protocol.Dict.UnitLibrary, Curl.Protocol.Dict.UnitTests]
 requirement: none
 created: 2026-10-01
 completed:
 ---
-# BL-1107 — Report curl's lookup word is missing -v line for a dict lookup without a word
+# BL-1126 — Report curl's lookup word is missing -v line for a dict lookup without a word
 
 ## Goal
 
