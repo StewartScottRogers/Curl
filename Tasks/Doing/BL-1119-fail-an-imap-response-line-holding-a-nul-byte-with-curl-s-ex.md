@@ -33,3 +33,4 @@ An IMAP response line that contains a NUL byte ends the transfer with exit 8 `Nu
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
