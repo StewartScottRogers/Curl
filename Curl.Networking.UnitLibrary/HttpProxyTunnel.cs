@@ -193,6 +193,7 @@ internal static class HttpProxyTunnel
         List<string> proxyAuthenticate = [];
         long contentLength = 0;
         var reusable = true;
+        var chunked = false;
         foreach (var (name, value) in HeaderFields(header))
         {
             switch (name.ToUpperInvariant())
@@ -207,7 +208,7 @@ internal static class HttpProxyTunnel
                     reusable &= !HasToken(value, "close");
                     break;
                 case "TRANSFER-ENCODING":
-                    reusable &= !HasToken(value, "chunked");
+                    chunked |= HasToken(value, "chunked");
                     break;
             }
         }
@@ -216,6 +217,7 @@ internal static class HttpProxyTunnel
         {
             ProxyAuthenticate = proxyAuthenticate,
             ContentLength = contentLength,
+            IsChunked = chunked,
             LeavesConnectionReusable = reusable,
             Head = header.ToArray(),
         };
@@ -268,6 +270,39 @@ internal static class HttpProxyTunnel
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Reads and discards the chunked body of a reply that does not open the tunnel, one byte
+    /// at a time so the next reply stays on the connection, as curl 8.21.0 ignores a chunked
+    /// <c>407</c>'s body before it sends the next CONNECT on the same connection (BL-862 Notes).
+    /// </summary>
+    /// <param name="connection">The connection to the proxy.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>
+    /// <see langword="null" /> once the body has ended; else the exit 56 message curl prints:
+    /// the chunk parser's for a malformed body, <c>Proxy CONNECT aborted</c> when the proxy
+    /// closed the connection first or reading it failed.
+    /// </returns>
+    public static async ValueTask<string?> DiscardChunkedBodyAsync(IConnection connection, CancellationToken cancellationToken)
+    {
+        var body = new HttpProxyTunnelChunkedBody();
+        var oneByte = new byte[1];
+        try
+        {
+            while (await connection.ReadAsync(oneByte, cancellationToken).ConfigureAwait(false) == 1)
+            {
+                if (!body.Accept(oneByte[0]))
+                {
+                    return body.MalformedMessage;
+                }
+            }
+        }
+        catch (IOException)
+        {
+        }
+
+        return "Proxy CONNECT aborted";
     }
 
     internal static string FormatAuthority(string host, int port) =>

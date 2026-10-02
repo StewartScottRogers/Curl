@@ -1115,8 +1115,31 @@ public sealed partial class TcpConnector(
             return (null, false, null);
         }
 
-        return (answer, reply.LeavesConnectionReusable
-            && await HttpProxyTunnel.DiscardBodyAsync(connection, reply.ContentLength, cancellationToken).ConfigureAwait(false), null);
+        return reply.LeavesConnectionReusable
+            ? await DiscardRejectedBodyAsync(connection, reply, answer, cancellationToken).ConfigureAwait(false)
+            : (answer, false, null);
+    }
+
+    /// <summary>
+    /// Discards the body of a reply that leaves the connection reusable, so
+    /// <paramref name="answer" /> goes on it: a <c>Content-Length</c> body that ends early sends
+    /// the answer on a new connection instead, and a chunked body that is malformed or cut
+    /// short is the tunnel's exit 56, as curl 8.21.0 gives up on it (BL-862 Notes).
+    /// </summary>
+    private static async ValueTask<(string? Answer, bool OnThisConnection, ConnectResult? Failure)> DiscardRejectedBodyAsync(
+        IConnection connection,
+        HttpProxyTunnelReply reply,
+        string answer,
+        CancellationToken cancellationToken)
+    {
+        if (!reply.IsChunked)
+        {
+            return (answer, await HttpProxyTunnel.DiscardBodyAsync(connection, reply.ContentLength, cancellationToken).ConfigureAwait(false), null);
+        }
+
+        return await HttpProxyTunnel.DiscardChunkedBodyAsync(connection, cancellationToken).ConfigureAwait(false) is { } failure
+            ? (null, false, ConnectResult.Failed(CurlExitCode.RecvError, failure))
+            : (answer, true, null);
     }
 
     /// <summary>

@@ -274,7 +274,7 @@ public sealed class HttpProxyTunnelTests
     [DataRow("Connection: keep-alive\r\n", 0L, true)]
     [DataRow("Connection: close\r\n", 0L, false)]
     [DataRow("Proxy-Connection: Keep-Alive, Close\r\n", 0L, false)]
-    [DataRow("Transfer-Encoding: gzip, chunked\r\n", 0L, false)]
+    [DataRow("Transfer-Encoding: gzip, chunked\r\n", 0L, true)]
     [DataRow("Transfer-Encoding: gzip\r\n", 0L, true)]
     [DataRow(": close\r\nno colon\r\n", 0L, true)]
     public async Task ReadReplyAsync_ReadsTheBodyLengthAndWhetherTheConnectionIsReusable(string fields, long contentLength, bool reusable)
@@ -323,6 +323,83 @@ public sealed class HttpProxyTunnelTests
         var discarded = await HttpProxyTunnel.DiscardBodyAsync(connection, 1, CancellationToken.None);
 
         Assert.IsFalse(discarded);
+    }
+
+    [TestMethod]
+    [DataRow("Transfer-Encoding: chunked\r\n", true)]
+    [DataRow("Transfer-Encoding: gzip, Chunked\r\nContent-Length: 3\r\n", true)]
+    [DataRow("Transfer-Encoding: gzip\r\n", false)]
+    [DataRow("", false)]
+    public async Task ReadReplyAsync_ReadsWhetherTheBodyIsChunked(string fields, bool chunked)
+    {
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes($"HTTP/1.1 407 Proxy Authentication Required\r\n{fields}\r\n"));
+
+        var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+
+        Assert.AreEqual(chunked, result.IsChunked);
+    }
+
+    [TestMethod]
+    [DataRow("5;ext=1\r\nhello\r\n3\r\nabc\r\n0\r\nX-Trailer: t\r\n\r\n")]
+    [DataRow("5 ;e\r\nhello\r\n0\r\n\r\n")]
+    [DataRow("5\nhello\n0\n\n")]
+    [DataRow("A\r\n0123456789\r\r\n0\r\nA: b\nB: c\r\n\r\n")]
+    [DataRow("10\r\n0123456789abcdef\r\n0\r\n\n")]
+    [DataRow("0\r\n\r\n")]
+    public async Task DiscardChunkedBodyAsync_ReadsExactlyTheChunkedBody(string body)
+    {
+        // Measured: curl 8.21.0 ignores each of these 407 bodies and sends the next CONNECT on the same connection.
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(body + "HTTP/1.1 200 Connection established\r\n\r\n"));
+
+        var failure = await HttpProxyTunnel.DiscardChunkedBodyAsync(connection, CancellationToken.None);
+
+        Assert.IsNull(failure);
+        Assert.AreEqual("HTTP/1.1 200 Connection established\r\n\r\n".Length, connection.UnreadCount);
+    }
+
+    [TestMethod]
+    [DataRow("zz\r\nhello\r\n0\r\n\r\n", "chunk hex-length char not a hex digit: 0x7a")]
+    [DataRow("11111111111111111\r\nx\r\n0\r\n\r\n", "chunk hex-length longer than 16")]
+    [DataRow("ffffffffffffffff\r\nx\r\n0\r\n\r\n", "invalid chunk size: 'ffffffffffffffff'")]
+    [DataRow("5\r\nhelloX\r\n0\r\n\r\n", "Failure when receiving data from the peer")]
+    [DataRow("5\r\nhello\rX0\r\n\r\n", "Failure when receiving data from the peer")]
+    [DataRow("0\r\nA: b\rX\r\n\r\n", "Failure when receiving data from the peer")]
+    [DataRow("0\r\n\rX", "Failure when receiving data from the peer")]
+    [DataRow("5\r\nhel", "Proxy CONNECT aborted")]
+    public async Task DiscardChunkedBodyAsync_ForAMalformedOrCutShortBody_ReturnsCurlsMessage(string body, string expected)
+    {
+        // Measured: curl 8.21.0 exits 56 with each of these messages.
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(body));
+
+        var failure = await HttpProxyTunnel.DiscardChunkedBodyAsync(connection, CancellationToken.None);
+
+        Assert.AreEqual(expected, failure);
+    }
+
+    [TestMethod]
+    public async Task DiscardChunkedBodyAsync_WhenReadingFails_ReturnsProxyConnectAborted()
+    {
+        var connection = new ScriptedConnection([]) { ReadException = new IOException("reset") };
+
+        var failure = await HttpProxyTunnel.DiscardChunkedBodyAsync(connection, CancellationToken.None);
+
+        Assert.AreEqual("Proxy CONNECT aborted", failure);
+    }
+
+    [TestMethod]
+    [DataRow("0\r\n\r\n", true, null)]
+    [DataRow("zz", false, "chunk hex-length char not a hex digit: 0x7a")]
+    public void Accept_AfterTheBodyIsCompleteOrMalformed_KeepsItSo(string body, bool complete, string? malformedMessage)
+    {
+        var chunkedBody = new HttpProxyTunnelChunkedBody();
+        foreach (var value in Encoding.Latin1.GetBytes(body))
+        {
+            chunkedBody.Accept(value);
+        }
+
+        Assert.IsFalse(chunkedBody.Accept((byte)'5'));
+        Assert.AreEqual(complete, chunkedBody.IsComplete);
+        Assert.AreEqual(malformedMessage, chunkedBody.MalformedMessage);
     }
 
     [TestMethod]

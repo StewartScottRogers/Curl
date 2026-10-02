@@ -342,6 +342,7 @@ choices do not need one.
 | [0330](ADR-0330-no-sessionid-and-ssl-allow-beast-run-on-the-hand-built-client-which-resumes-by-default.md) | `--no-sessionid` and `--ssl-allow-beast` run on the hand-built client, which offers the run's sessions by default; `--ssl-allow-beast` routes only a range reaching TLS 1.0 | Accepted | 2026-10-01 |
 | [0331](ADR-0331-a-tls-1-0-or-1-1-ceiling-connects-through-the-hand-built-client-on-every-platform.md) | A TLS 1.0 or 1.1 ceiling connects through the hand-built client on every platform, as curl's Schannel build does, though the LibreSSL and OpenSSL builds refuse (measured) | Accepted | 2026-10-01 |
 | [0332](ADR-0332-remove-on-error-tells-a-non-regular-output-file-through-the-runtimes-stat-shim.md) | `--remove-on-error` tells a non-regular output file apart through the runtime's `stat` shim and prints curl's `Skipping removal` warning off Windows (measured) | Accepted | 2026-10-01 |
+| [0333](ADR-0333-a-chunked-407-to-connect-is-discarded-and-the-connection-reused.md) | A chunked `407` to CONNECT is read through and the answer sent on the same connection; a malformed one is exit 56 with curl's chunk parser message (measured) | Accepted | 2026-10-01 |
 
 ## Template
 
