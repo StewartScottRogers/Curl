@@ -483,14 +483,14 @@ public sealed partial class SshUserAuthenticationTests
     private static Task<KeyedPeer> ConnectWithBackendAsync(string backend, SshUserKeySource keys, params byte[][] payloads) =>
         ConnectWithPresetAsync(SshAlgorithmPreferences.Full with { CryptographyBackend = backend }, null, keys, payloads);
 
-    private static async Task<KeyedPeer> ConnectWithPresetAsync(SshAlgorithmPreferences preferences, ISshAgentConnector? agent, SshUserKeySource? keys, byte[][] payloads)
+    private static async Task<KeyedPeer> ConnectWithPresetAsync(SshAlgorithmPreferences preferences, ISshAgentConnector? agent, SshUserKeySource? keys, byte[][] payloads, string serverIdentification = TestKeyExchangeServer.ServerIdentification)
     {
         TestHostKey hostKey = TestHostKey.Ecdsa("nistp256", TestHostKey.FixedNistP256);
         SshKexInit serverKexInit = ServerKexInit("ecdh-sha2-nistp256", hostKey.Algorithm);
         TestEphemeralKeys ephemeralKeys = new();
-        TestKeyExchangeServer exchange = TestKeyExchangeServer.Answer("ecdh-sha2-nistp256", hostKey, ephemeralKeys, ClientKexInit, serverKexInit.ToPayload());
+        TestKeyExchangeServer exchange = TestKeyExchangeServer.Answer("ecdh-sha2-nistp256", hostKey, ephemeralKeys, ClientKexInit, serverKexInit.ToPayload(), serverIdentification: serverIdentification);
         SshNegotiatedAlgorithms ctr = SshTestAlgorithms.With("aes128-ctr", "hmac-sha2-256");
-        SshServerScript script = new SshServerScript().Line(TestKeyExchangeServer.ServerIdentification).KexInit(serverKexInit);
+        SshServerScript script = new SshServerScript().Line(serverIdentification).KexInit(serverKexInit);
         exchange.ServerPayloads.ForEach(payload => script.Packet(payload));
         script.Packet(SshMessageNumber.NewKeys).Protect(SshPacketProtections.ForServerToClient(ctr, exchange.Keys(exchange.ExchangeHash)), resetSequenceNumber: false);
         foreach (byte[] payload in payloads)

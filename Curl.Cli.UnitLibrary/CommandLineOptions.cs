@@ -33,6 +33,7 @@ public sealed class CommandLineOptions
     private HttpAuthSchemes wantedAuthSchemes;
     private HttpAuthSchemes wantedProxyAuthSchemes;
     private bool proxyAnyAuthWanted;
+    private bool everyAuthSchemeWanted;
 
     /// <summary>The single proxy schemes curl 8.21.0's tool picks from, first match wins, after <c>--proxy-anyauth</c>.</summary>
     private static readonly HttpAuthSchemes[] ProxyAuthSchemePrecedence = [HttpAuthSchemes.Negotiate, HttpAuthSchemes.Ntlm, HttpAuthSchemes.Digest];
@@ -276,15 +277,111 @@ public sealed class CommandLineOptions
     /// <c>--trace-time</c> and by the second <c>v</c> of <c>-vv</c>, cleared by <c>--no-trace-time</c>,
     /// by <c>--no-verbose</c> and by a <c>-v</c> or <c>--verbose</c> that is the first option of its
     /// argument (<c>--trace-time -v</c> shows no times; <c>--trace-time -sv</c> and <c>-v --trace-time</c> do).
+    /// <c>--trace-config time</c> (or <c>all</c>) also sets it, and that a first <c>-v</c> does not
+    /// clear: <c>--trace-config time -v</c> shows times (measured 2026-10-01, BL-649 Notes).
     /// </summary>
-    public bool TraceTime { get => globals.TraceTime; internal set => globals.TraceTime = value; }
+    public bool TraceTime { get => globals.TraceTime || globals.TraceConfigTime; internal set => globals.TraceTime = value; }
 
     /// <summary>
     /// <see langword="true"/> when every verbose or trace line carries its transfer and connection
     /// IDs, <c>[0-0] </c>: set by <c>--trace-ids</c> and by the second <c>v</c> of <c>-vv</c>, cleared
-    /// as <see cref="TraceTime"/> is (measured 2026-09-29, BL-648 Notes).
+    /// as <see cref="TraceTime"/> is (measured 2026-09-29, BL-648 Notes); set by
+    /// <c>--trace-config ids</c> (or <c>all</c>) as <see cref="TraceTime"/> is by <c>time</c>.
     /// </summary>
-    public bool TraceIds { get => globals.TraceIds; internal set => globals.TraceIds = value; }
+    public bool TraceIds { get => globals.TraceIds || globals.TraceConfigIds; internal set => globals.TraceIds = value; }
+
+    /// <summary>
+    /// The trace component names <c>--trace-config</c> turned on and did not turn off again, in lower
+    /// case: <c>tls</c>, <c>http/1</c>, <c>dns</c>, <c>doh</c> and the rest, with <c>all</c> standing for
+    /// every component. Names curl does not know are kept too, since curl 8.21.0 ignores them silently.
+    /// </summary>
+    public IReadOnlySet<string> TraceComponents => globals.TraceComponents;
+
+    /// <summary>
+    /// Applies <c>--trace-ids</c>, or <c>--no-trace-ids</c> when <paramref name="on"/> is
+    /// <see langword="false"/>, which also turns off <c>--trace-config ids</c>.
+    /// </summary>
+    /// <param name="on"><see langword="false"/> for <c>--no-trace-ids</c>.</param>
+    internal void SetTraceIds(bool on)
+    {
+        TraceIds = on;
+        globals.TraceConfigIds &= on;
+    }
+
+    /// <summary>
+    /// Applies <c>--trace-time</c>, or <c>--no-trace-time</c> when <paramref name="on"/> is
+    /// <see langword="false"/>, which also turns off <c>--trace-config time</c>.
+    /// </summary>
+    /// <param name="on"><see langword="false"/> for <c>--no-trace-time</c>.</param>
+    internal void SetTraceTime(bool on)
+    {
+        TraceTime = on;
+        globals.TraceConfigTime &= on;
+    }
+
+    /// <summary>
+    /// Applies <c>--trace-config &lt;list&gt;</c> as curl 8.21.0 reads it (measured 2026-10-01, BL-649
+    /// Notes): the list splits at commas, a name after a comma may start with blanks, a leading
+    /// <c>-</c> turns the name off and a leading <c>+</c> is dropped, and names are case-insensitive.
+    /// <c>ids</c> and <c>time</c> turn <see cref="TraceIds"/> and <see cref="TraceTime"/> on or off,
+    /// <c>all</c> both of them and every component; any other name, known to curl or not, goes into
+    /// or out of <see cref="TraceComponents"/>. Nothing is ever refused or warned about.
+    /// </summary>
+    /// <param name="list">The option's value, possibly empty.</param>
+    internal void ApplyTraceConfig(string list)
+    {
+        string[] tokens = list.Split(',');
+        for (int index = 0; index < tokens.Length; index++)
+        {
+            string token = index == 0 ? tokens[index] : tokens[index].TrimStart(' ', '\t');
+            bool on = !token.StartsWith('-');
+            string name = token.TrimStart('-', '+').ToLowerInvariant();
+            if (name.Length > 0)
+            {
+                ApplyTraceConfigName(name, on);
+            }
+        }
+    }
+
+    /// <summary>Turns one <c>--trace-config</c> name on or off: see <see cref="ApplyTraceConfig"/>.</summary>
+    private void ApplyTraceConfigName(string name, bool on)
+    {
+        switch (name)
+        {
+            case "ids":
+                SetTraceConfigIds(on);
+                break;
+            case "time":
+                SetTraceConfigTime(on);
+                break;
+            case "all":
+                SetTraceConfigIds(on);
+                SetTraceConfigTime(on);
+                SetTraceComponent(name, on);
+                break;
+            default:
+                SetTraceComponent(name, on);
+                break;
+        }
+    }
+
+    /// <summary>Turns <c>--trace-config ids</c> on or off, with <see cref="TraceIds"/>.</summary>
+    private void SetTraceConfigIds(bool on)
+    {
+        TraceIds = on;
+        globals.TraceConfigIds = on;
+    }
+
+    /// <summary>Turns <c>--trace-config time</c> on or off, with <see cref="TraceTime"/>.</summary>
+    private void SetTraceConfigTime(bool on)
+    {
+        TraceTime = on;
+        globals.TraceConfigTime = on;
+    }
+
+    /// <summary>Adds <paramref name="name"/> to <see cref="TraceComponents"/>, or takes it out when <paramref name="on"/> is <see langword="false"/>.</summary>
+    private void SetTraceComponent(string name, bool on) =>
+        _ = on ? globals.TraceComponents.Add(name) : globals.TraceComponents.Remove(name);
 
     /// <summary>
     /// The file the last <c>--stderr</c> names, to which curl writes what it would write to standard
@@ -934,7 +1031,8 @@ public sealed class CommandLineOptions
     /// <summary>
     /// <see langword="true"/> when <c>--ssl-allow-beast</c> was given and no <c>--no-ssl-allow-beast</c> came after it:
     /// leave the TLS 1.0 BEAST workaround (record splitting) off, for servers that cannot handle it.
-    /// Parsed only: <c>SslStream</c> has no control for it, so the hand-built TLS client of BL-713 honours it.
+    /// <c>SslStream</c> has no control for it, so a connection whose range reaches TLS 1.0 runs on the hand-built
+    /// TLS client, which then writes each TLS 1.0 CBC record whole (ADR-0151, BL-713).
     /// </summary>
     public bool AllowBeast { get; internal set; }
 
@@ -954,7 +1052,8 @@ public sealed class CommandLineOptions
     /// <summary>
     /// <see langword="false"/> when the last of <c>--sessionid</c> and <c>--no-sessionid</c> was <c>--no-sessionid</c>:
     /// never resume a cached TLS session. <see langword="true"/> otherwise, as curl caches session IDs by default.
-    /// Parsed only: <c>SslStream</c> has no control for it, so the hand-built TLS client of BL-713 honours it.
+    /// <c>SslStream</c> cannot stop the system's session cache, so with it every connection runs on the hand-built
+    /// TLS client, which neither offers nor keeps a session (ADR-0151, BL-713).
     /// </summary>
     public bool ReuseSessionIds { get; internal set; } = true;
 
@@ -984,6 +1083,32 @@ public sealed class CommandLineOptions
     /// apply.
     /// </summary>
     public long TcpKeepAliveProbeCount { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--ip-tos</c>: the IPv4 Type of Service or IPv6 Traffic Class byte, 0 to 255, from a
+    /// name such as <c>CS1</c> or a number. Zero, the default, sets nothing, as curl passes libcurl only a
+    /// value above 0.
+    /// </summary>
+    public int IpTypeOfService { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--vlan-priority</c>: the socket priority, 0 to 7, that Linux maps to the VLAN priority.
+    /// Zero, the default, sets nothing, as curl passes libcurl only a value above 0.
+    /// </summary>
+    public int VlanPriority { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when the last of <c>--tcp-fastopen</c> and <c>--no-tcp-fastopen</c> was
+    /// <c>--tcp-fastopen</c>: ask the operating system for TCP Fast Open on every TCP connection.
+    /// <see langword="false"/> otherwise, curl's default.
+    /// </summary>
+    public bool TcpFastOpen { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when the last of <c>--mptcp</c> and <c>--no-mptcp</c> was <c>--mptcp</c>: open every
+    /// TCP connection's socket as Multipath TCP. <see langword="false"/> otherwise, curl's default.
+    /// </summary>
+    public bool MultipathTcp { get; internal set; }
 
     /// <summary>
     /// <see langword="false"/> when the last of <c>--styled-output</c> and <c>--no-styled-output</c> was
@@ -1269,6 +1394,13 @@ public sealed class CommandLineOptions
     public string? SslSessionsFile { get => globals.SslSessionsFile; internal set => globals.SslSessionsFile = value; }
 
     /// <summary>
+    /// The <c>--libcurl</c> file the C source for the command line is written to once the transfers are
+    /// done (<see cref="LibcurlSourceCode" />), <c>-</c> for standard output; <see langword="null" /> when not
+    /// given. Global, as curl 8.21.0 keeps it: every option group shares the last value given.
+    /// </summary>
+    public string? LibcurlFile { get => globals.LibcurlFile; internal set => globals.LibcurlFile = value; }
+
+    /// <summary>
     /// The <c>-r</c> / <c>--range</c> text as curl keeps it, not yet parsed; <see langword="null"/>
     /// when not given. A value that starts with a digit and has no dash is kept as that leading
     /// number with a dash appended (<c>5abc</c> becomes <c>5-</c>); anything else is kept verbatim.
@@ -1397,6 +1529,13 @@ public sealed class CommandLineOptions
     /// <c>--no-remote-time</c> came after it: give the output file the remote file's time.
     /// </summary>
     public bool RemoteTime { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--xattr</c> was given and no <c>--no-xattr</c> came after it:
+    /// store the transfer's URL, <c>Referer</c> and content type as extended attributes of the output
+    /// file, on the operating systems where curl does (ADR-0320).
+    /// </summary>
+    public bool ExtendedAttributes { get; internal set; }
 
     /// <summary>
     /// The <c>-z</c> / <c>--time-cond</c> condition: the date read by <see cref="CurlDateParser"/> and
@@ -1793,6 +1932,8 @@ public sealed class CommandLineOptions
         {
             Trace = TraceKind.None;
             TraceFile = null;
+            globals.TraceConfigIds = false;
+            globals.TraceConfigTime = false;
             return;
         }
 
@@ -2128,8 +2269,30 @@ public sealed class CommandLineOptions
         wantedAuthSchemes = on ? wantedAuthSchemes | scheme : wantedAuthSchemes & ~scheme;
 
     /// <summary>Replaces every scheme asked for so far with every scheme there is, for <c>--anyauth</c>.</summary>
-    internal void WantEveryAuthScheme() =>
+    internal void WantEveryAuthScheme()
+    {
         wantedAuthSchemes = HttpAuthSchemes.Any | HttpAuthSchemes.Bearer;
+        everyAuthSchemeWanted = true;
+    }
+
+    /// <summary>
+    /// The schemes the authentication options asked for, before <see cref="AuthSchemes"/> drops a Bearer
+    /// with no token and falls back to Basic; <see cref="HttpAuthSchemes.None"/> when none was asked for.
+    /// </summary>
+    internal HttpAuthSchemes RequestedAuthSchemes => wantedAuthSchemes;
+
+    /// <summary>
+    /// <see langword="true"/> once <c>--anyauth</c> was given: curl 8.21.0's tool then starts from libcurl's
+    /// <c>CURLAUTH_ANY</c>, which a later <c>--no-</c> scheme option takes bits out of.
+    /// </summary>
+    internal bool EveryAuthSchemeRequested => everyAuthSchemeWanted;
+
+    /// <summary>
+    /// <see langword="true"/> when any of <c>--proxy-basic</c>, <c>--proxy-digest</c>, <c>--proxy-ntlm</c>,
+    /// <c>--proxy-negotiate</c> and <c>--proxy-anyauth</c> is on, so curl 8.21.0's tool sets the proxy's
+    /// schemes rather than leaving libcurl's default.
+    /// </summary>
+    internal bool ProxyAuthSchemeRequested => proxyAnyAuthWanted || wantedProxyAuthSchemes != HttpAuthSchemes.None;
 
     /// <summary>
     /// Turns on, or for its <c>--no-</c> spelling off, the switch <c>--proxy-basic</c>,

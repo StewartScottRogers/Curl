@@ -234,15 +234,18 @@ public sealed class VerboseTransferEventWriterOpenSslTlsTests
     }
 
     [TestMethod]
-    public void TlsEvents_Schannel_WriteNothing()
+    public void TlsEvents_Schannel_WriteOnlyTheSchannelTrustLines()
     {
         var writer = new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.Schannel);
 
-        writer.ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = false });
+        writer.ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = false, TargetsIpAddress = true });
         writer.ReportTlsMessage(Message(Tls13, TlsContentType.Handshake, sent: true, 1566, 1));
         writer.ReportTlsData(new byte[5], sent: false);
 
-        Assert.AreEqual(string.Empty, Written());
+        Assert.AreEqual(
+            "* schannel: disabled automatic use of client certificate\n" +
+            "* schannel: using IP address, SNI is not supported by OS.\n",
+            Written());
     }
 
     private static TlsMessageEvent Message(int version, TlsContentType contentType, bool sent, int length, params byte[] start)

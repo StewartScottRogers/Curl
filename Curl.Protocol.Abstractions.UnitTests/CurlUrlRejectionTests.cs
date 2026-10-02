@@ -100,6 +100,53 @@ public sealed class CurlUrlRejectionTests
         Assert.AreEqual(CurlUrlRejection.BadSlashes, rejection);
     }
 
+    // curl 8.21.0 checks CURLU_DISALLOW_USER while parsing the login, before the host and port
+    // (measured 2026-10-01, BL-910 Notes).
+    [TestMethod]
+    [DataRow("http://u@h/")]
+    [DataRow("http://@h/")]
+    [DataRow("http://u:p@h:abc/")]
+    [DataRow("http://u@127.0.0.1:99999/")]
+    [DataRow("http://u@exa%20mple.com/")]
+    [DataRow("http://u@[::1]x/")]
+    [DataRow("http://u@:80/")]
+    [DataRow("http://u@/")]
+    [DataRow("foo://u@h/")]
+    public void TryParseDisallowingUser_WithUserInformation_SaysTheUserIsNotAllowed(string text)
+    {
+        bool parsed = CurlUrl.TryParseDisallowingUser(text, pathAsIs: false, out CurlUrl? url, out CurlUrlRejection rejection);
+
+        Assert.IsFalse(parsed);
+        Assert.IsNull(url);
+        Assert.AreEqual(CurlUrlRejection.UserNotAllowed, rejection);
+    }
+
+    [TestMethod]
+    [DataRow("http://h:99999/", CurlUrlRejection.BadPortNumber)]
+    [DataRow("http:////u@h/", CurlUrlRejection.BadSlashes)]
+    [DataRow("http://u@h/a b", CurlUrlRejection.MalformedInput)]
+    public void TryParseDisallowingUser_WithARejectionBeforeOrWithoutALogin_SaysThatRejection(string text, CurlUrlRejection expected)
+    {
+        bool parsed = CurlUrl.TryParseDisallowingUser(text, pathAsIs: false, out _, out CurlUrlRejection rejection);
+
+        Assert.IsFalse(parsed);
+        Assert.AreEqual(expected, rejection);
+    }
+
+    [TestMethod]
+    [DataRow("http://h/")]
+    [DataRow("http://h/a@b")]
+    [DataRow("file:///x")]
+    public void TryParseDisallowingUser_WithoutUserInformation_Parses(string text)
+    {
+        bool parsed = CurlUrl.TryParseDisallowingUser(text, pathAsIs: false, out CurlUrl? url, out CurlUrlRejection rejection);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(url);
+        Assert.AreEqual(text, url.OriginalString);
+        Assert.AreEqual(CurlUrlRejection.None, rejection);
+    }
+
     [TestMethod]
     public void TryParse_OnThePublicOverloadWithAReasonAndNullText_ThrowsArgumentNullException()
     {
@@ -119,6 +166,7 @@ public sealed class CurlUrlRejectionTests
     [DataRow(CurlUrlRejection.BadIPv6, "Bad IPv6 address")]
     [DataRow(CurlUrlRejection.BadHostname, "Bad hostname")]
     [DataRow(CurlUrlRejection.BadFileUrl, "Bad file:// URL")]
+    [DataRow(CurlUrlRejection.UserNotAllowed, "Credentials was passed in the URL when prohibited")]
     public void ToCurlMessage_ForEachRejection_ReturnsCurlsText(CurlUrlRejection rejection, string expected)
     {
         Assert.AreEqual(expected, rejection.ToCurlMessage());

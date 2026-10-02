@@ -1,5 +1,4 @@
 using System.Net;
-using System.Threading.Channels;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Ssh.Fakes;
@@ -12,9 +11,9 @@ namespace Curl.Protocol.Ssh.Fakes;
 /// </summary>
 public sealed class InMemoryDuplexConnection : IConnection
 {
-    private readonly Channel<byte[]> inbound;
+    private readonly CancelSafeChunkQueue inbound;
 
-    private readonly Channel<byte[]> outbound;
+    private readonly CancelSafeChunkQueue outbound;
 
     private InMemoryDuplexConnection? peer;
 
@@ -22,7 +21,7 @@ public sealed class InMemoryDuplexConnection : IConnection
 
     private volatile bool isClosed;
 
-    private InMemoryDuplexConnection(Channel<byte[]> inbound, Channel<byte[]> outbound)
+    private InMemoryDuplexConnection(CancelSafeChunkQueue inbound, CancelSafeChunkQueue outbound)
     {
         this.inbound = inbound;
         this.outbound = outbound;
@@ -40,8 +39,8 @@ public sealed class InMemoryDuplexConnection : IConnection
     /// <returns>The client's end and the server's end.</returns>
     public static (InMemoryDuplexConnection Client, InMemoryDuplexConnection Server) CreatePair()
     {
-        Channel<byte[]> toServer = Channel.CreateUnbounded<byte[]>();
-        Channel<byte[]> toClient = Channel.CreateUnbounded<byte[]>();
+        CancelSafeChunkQueue toServer = new();
+        CancelSafeChunkQueue toClient = new();
         InMemoryDuplexConnection client = new(toClient, toServer);
         InMemoryDuplexConnection server = new(toServer, toClient);
         client.peer = server;
@@ -54,7 +53,7 @@ public sealed class InMemoryDuplexConnection : IConnection
     {
         if (pending.IsEmpty)
         {
-            if (!await inbound.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false) || !inbound.Reader.TryRead(out byte[]? chunk))
+            if (await inbound.DequeueAsync(cancellationToken).ConfigureAwait(false) is not { } chunk)
             {
                 return 0;
             }
@@ -72,7 +71,7 @@ public sealed class InMemoryDuplexConnection : IConnection
     /// <exception cref="IOException">The other end has closed.</exception>
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
-        if (isClosed || peer!.isClosed || !outbound.Writer.TryWrite(buffer.ToArray()))
+        if (isClosed || peer!.isClosed || !outbound.TryEnqueue(buffer.ToArray()))
         {
             throw new IOException("The in-memory peer has closed the connection.");
         }
@@ -87,7 +86,7 @@ public sealed class InMemoryDuplexConnection : IConnection
     public ValueTask DisposeAsync()
     {
         isClosed = true;
-        outbound.Writer.TryComplete();
+        outbound.Complete();
         return ValueTask.CompletedTask;
     }
 }

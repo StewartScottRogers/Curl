@@ -1007,6 +1007,52 @@ public sealed class MqttProtocolHandlerTests
         CollectionAssert.AreEqual(new[] { "started", "downloaded 5 of 5", "downloaded 13 of 8" }, progress.Reports);
     }
 
+    /// <summary>
+    /// Replays <c>curl --max-filesize 9 mqtt://127.0.0.1/t/x</c> against a 10-byte PUBLISH, as
+    /// measured on curl 8.21.0 (BL-1115): exit 63 and nothing written.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_PublishLongerThanMaxFileSize_IsFilesizeExceededWithNothingWritten()
+    {
+        ScriptedConnection connection = new(Connack, Suback, Publish("t/x", "hello"));
+        RecordingStream output = new();
+
+        TransferResult result = await RunAsync(FakeConnector.For(connection), MaxFileSizeContext(output, 9));
+
+        Assert.AreEqual(new TransferResult(CurlExitCode.FilesizeExceeded, 0, "Maximum file size exceeded"), result);
+        Assert.AreEqual(0, output.ToArray().Length);
+    }
+
+    [TestMethod]
+    [DataRow(10L)]
+    [DataRow(0L)]
+    [DataRow(null)]
+    public async Task ExecuteAsync_PublishWithinMaxFileSizeOrNoLimit_WritesThePublish(long? maxFileSize)
+    {
+        ScriptedConnection connection = new(Connack, Suback, Publish("t/x", "hello"));
+        RecordingStream output = new();
+
+        TransferResult result = await RunAsync(FakeConnector.For(connection), MaxFileSizeContext(output, maxFileSize));
+
+        CollectionAssert.AreEqual(Bytes("00 03", "t/xhello"), output.ToArray());
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 10, ConnectionDisconnected), result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TwoPublishesEachAtMaxFileSize_WritesBothAsTheLimitIsPerPublish()
+    {
+        ScriptedConnection connection = new(Connack, Suback, Publish("t/x", "hello"), Publish("t/x", "world"), Disconnect);
+        RecordingStream output = new();
+
+        TransferResult result = await RunAsync(FakeConnector.For(connection), MaxFileSizeContext(output, 10));
+
+        CollectionAssert.AreEqual(Bytes("00 03", "t/xhello", "00 03", "t/xworld"), output.ToArray());
+        Assert.AreEqual(TransferResult.Success(20), result);
+    }
+
+    private static TransferContext MaxFileSizeContext(Stream output, long? maxFileSize) =>
+        new() { Url = CurlUrl.Parse("mqtt://127.0.0.1/t/x"), Output = output, MaxFileSize = maxFileSize };
+
     private static TransferContext Context(string url, Stream output) =>
         new() { Url = CurlUrl.Parse(url), Output = output };
 

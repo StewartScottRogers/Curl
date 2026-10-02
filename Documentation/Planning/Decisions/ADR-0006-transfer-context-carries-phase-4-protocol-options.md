@@ -108,7 +108,7 @@ rows onto `CommandLineOptions` and copied by `Curl.Console`'s `TransferContextFa
 | Option | Context member | Not given |
 | --- | --- | --- |
 | `--disable-epsv` / `--no-disable-epsv` | `bool FtpDisableEpsv` | `false` |
-| `--ftp-skip-pasv-ip` / `--no-ftp-skip-pasv-ip` | `bool FtpSkipPasvIp` | `true`, curl 8.21.0's default (ADR-0093 relies on it) |
+| `--ftp-skip-pasv-ip` / `--no-ftp-skip-pasv-ip` | `bool FtpSkipPasvIp` | `true`, curl 8.21.0's default (ADR-0323 relies on it) |
 | `--ftp-method <multicwd\|nocwd\|singlecwd>` | `FtpFileMethod FtpFileMethod` | `FtpFileMethod.MultiCwd` |
 | `--ftp-create-dirs` / `--no-ftp-create-dirs` | `bool FtpCreateDirectories` | `false` |
 | `-l`, `--list-only` / `--no-list-only` | `bool ListOnly` | `false` |

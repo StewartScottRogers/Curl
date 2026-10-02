@@ -112,6 +112,47 @@ public sealed class TlsClientConnectionTests
     }
 
     [TestMethod]
+    public async Task ConnectWithEarlyDataToATls12ServerSendsTheDataAfterTheHandshake()
+    {
+        (Stream clientEnd, Stream serverEnd) = InMemoryPipe.Create();
+        Tls12RecordTestServer server = new(serverEnd, new Tls12TestServer(TestServerCredential.Ed25519()));
+        Task serverHandshake = server.HandshakeAsync();
+
+        TlsConnectResult result = await TlsClientConnection.ConnectWithEarlyDataAsync(
+            clientEnd, Settings, SystemTlsRandomSource.Instance, new RecordingCertificateVerifier(), "early"u8.ToArray(), CancellationToken.None);
+        await serverHandshake;
+
+        Assert.IsNotNull(result.Tls12Stream);
+        CollectionAssert.AreEqual("early"u8.ToArray(), await server.ReceiveApplicationDataAsync(5));
+    }
+
+    [TestMethod]
+    public async Task ConnectWithEarlyDataResumingATls13SessionSendsItAsEarlyData()
+    {
+        Tls13TestTicketCache tickets = new();
+        TlsSessionRecord session = await Tls13ResumptionConnectionTests.FirstSessionAsync(tickets);
+        (Stream clientEnd, Stream serverEnd) = InMemoryPipe.Create();
+        Tls13RecordTestServer server = new(serverEnd, new Tls13TestServer(TestServerCredential.Ed25519()) { Tickets = tickets });
+        Task serverHandshake = server.HandshakeAsync();
+        TlsClientSettings settings = Settings with
+        {
+            Tls13 = Tls13PipeDriver.DefaultSettings with
+            {
+                ExtensionOrder = [.. Tls13ClientSettings.DefaultExtensionOrder, TlsExtensionType.EarlyData, TlsExtensionType.PskKeyExchangeModes],
+                ResumptionSession = session,
+                OfferEarlyData = true,
+            },
+        };
+
+        TlsConnectResult result = await TlsClientConnection.ConnectWithEarlyDataAsync(
+            clientEnd, settings, SystemTlsRandomSource.Instance, new RecordingCertificateVerifier(), "early"u8.ToArray(), CancellationToken.None);
+        await serverHandshake;
+
+        Assert.IsTrue(result.Tls13Stream!.Handshake.EarlyDataAccepted);
+        CollectionAssert.AreEqual("early"u8.ToArray(), server.EarlyData.ToArray());
+    }
+
+    [TestMethod]
     [DataRow(TlsProtocolVersion.Tls12, false, true)]
     [DataRow(TlsProtocolVersion.Tls11, true, false)]
     public async Task Tls12ServerHelloCarryingADowngradeSentinelFailsWithIllegalParameter(TlsProtocolVersion version, bool tls11Sentinel, bool tls12Sentinel)

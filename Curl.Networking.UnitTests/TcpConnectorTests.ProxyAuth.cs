@@ -96,6 +96,45 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WithProxyDigest_AfterAChunked407_AnswersTheChallengeOnTheSameConnection()
+    {
+        // Measured (BL-862): curl -p -x http://127.0.0.1:18862 -U u:p --proxy-digest http://example.test/ against a
+        // chunked 407 with no Connection: close - "Ignore chunked response-body", one connection, both CONNECTs on it.
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(
+            "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"\r\nTransfer-Encoding: chunked\r\n\r\n"
+            + "5;ext=1\r\nhello\r\n3\r\nabc\r\n0\r\nX-Trailer: t\r\n\r\n"
+            + EstablishedReply));
+        var (connector, dialer) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, connection);
+
+        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreSame(connection, result.Connection);
+        Assert.AreEqual(UnauthenticatedConnect + DigestConnect, Encoding.Latin1.GetString([.. connection.Written]));
+        Assert.AreEqual(0, connection.UnreadCount);
+        Assert.IsFalse(connection.IsDisposed);
+        Assert.HasCount(1, dialer.DialedEndPoints);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithProxyDigest_AfterAMalformedChunked407_FailsWithExit56()
+    {
+        // Measured (BL-862): curl: (56) chunk hex-length char not a hex digit: 0x7a, no second CONNECT, no second connection.
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(
+            "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"\r\nTransfer-Encoding: chunked\r\n\r\n"
+            + "zz\r\nhello\r\n0\r\n\r\n"));
+        var (connector, dialer) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, connection);
+
+        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("chunk hex-length char not a hex digit: 0x7a", result.ErrorMessage);
+        Assert.AreEqual(UnauthenticatedConnect, Encoding.Latin1.GetString([.. connection.Written]));
+        Assert.IsTrue(connection.IsDisposed);
+        Assert.HasCount(1, dialer.DialedEndPoints);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenAKeptOpenChallengesBodyIsCutShort_AnswersOnANewConnection()
     {
         var first = new ScriptedConnection(Encoding.Latin1.GetBytes(
@@ -189,14 +228,16 @@ public sealed partial class TcpConnectorTests
     }
 
     // The proxy authenticator the composition builds, with the measured cnonce.
-    private static HttpProxyTunnelOptions AuthenticatingOptions(HttpAuthSchemes schemes) =>
+    // The Schannel build's -v lines unless matchesSchannelBuild says otherwise, so a transcript pins one build on every platform.
+    private static HttpProxyTunnelOptions AuthenticatingOptions(HttpAuthSchemes schemes, bool matchesSchannelBuild = true) =>
         HttpProxyTunnelOptions.Default with
         {
             ProxyAuthSchemes = schemes,
+            MatchesSchannelBuild = matchesSchannelBuild,
             ProxyAuthenticator = new RankedHttpAuthenticator(
                 new BasicAndBearerAuthenticator(Encoding.UTF8),
                 new DigestAuthenticator(Encoding.UTF8, () => MeasuredClientNonce),
                 new NegotiateHttpAuthenticator(new SystemSecurityContextFactory()),
-                new NtlmHttpAuthenticator(new SystemSecurityContextFactory(), refusedChallengeFailsTransfer: false)),
+                new NtlmHttpAuthenticator(new SystemSecurityContextFactory(), matchesSspiBuild: false)),
         };
 }

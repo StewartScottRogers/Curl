@@ -12,6 +12,9 @@ internal static class Pop3SessionMessages
     /// <summary>A response line reached 65536 bytes (exit 100).</summary>
     internal const string ResponseLineTooLarge = "A value or data field grew larger than allowed";
 
+    /// <summary>A response line held a NUL byte (exit 8, BL-1120).</summary>
+    internal const string NulByteInLine = "Nul byte in server response line";
+
     /// <summary>The greeting was not <c>+OK</c> (exit 8).</summary>
     internal const string UnexpectedResponse = "Got unexpected pop3-server response";
 

@@ -9,7 +9,7 @@ namespace Curl.Protocol.Ftp;
 /// connection, the bytes written to the data connection, and the exit code and message of
 /// each outcome. Every case was recorded from real curl on 2026-09-27 with
 /// <c>Record-CurlExchange.ps1 -Ftp</c> uploading the twelve bytes <c>hello world\n</c>
-/// (BL-439, ADR-0093's BL-439 addendum) and is replayed here with the recorder's replies.
+/// (BL-439, ADR-0323's BL-439 addendum) and is replayed here with the recorder's replies.
 /// </summary>
 [TestClass]
 public sealed class FtpProtocolHandlerUploadTests
@@ -181,11 +181,25 @@ public sealed class FtpProtocolHandlerUploadTests
     public async Task ExecuteAsync_ContinueAtOrPastTheEnd_SendsOnlyQuitAndSucceeds(long offset)
     {
         // curl -C 12 -T up.txt and -C 20 -T up.txt: "File already completely uploaded", exit 0.
-        FtpRun run = await RunAsync(Url, LoggedIn + Passive + Bye, Seekable(Upload), resumeFrom: offset);
+        var events = new RecordingTransferEvents();
+        FtpRun run = await RunAsync(Url, LoggedIn + Passive + Bye, Seekable(Upload), resumeFrom: offset, events: events);
 
         Assert.AreEqual(LogInSent + PassiveSent + "QUIT\r\n", run.Sent);
         Assert.AreEqual(0, run.Data.Sent.Length);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.Contains("File already completely uploaded", events.Info);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EndOfUploadAnswered552_FailsWithExit70AfterQuit()
+    {
+        // curl 8.21.0 ftp_done: 552 is "Exceeded storage allocation", CURLE_REMOTE_DISK_FULL.
+        FtpRun run = await RunAsync(Url, LoggedIn + Passive + Opened + "552 Quota exceeded\r\n" + Bye, Seekable(Upload));
+
+        Assert.AreEqual(LogInSent + PassiveSent + "STOR f.txt\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual(Upload, Encoding.Latin1.GetString(run.Data.Sent));
+        Assert.AreEqual(CurlExitCode.RemoteDiskFull, run.Result.ExitCode);
+        Assert.AreEqual("Exceeded storage allocation", run.Result.ErrorMessage);
     }
 
     [TestMethod]
@@ -298,7 +312,8 @@ public sealed class FtpProtocolHandlerUploadTests
         Stream upload,
         long? resumeFrom = null,
         bool fromUnknownOffset = false,
-        RecordingProgress? progress = null) =>
+        RecordingProgress? progress = null,
+        RecordingTransferEvents? events = null) =>
         FtpRun.ExecuteAsync(
             url,
             replies,
@@ -310,5 +325,6 @@ public sealed class FtpProtocolHandlerUploadTests
                 ResumeFrom = resumeFrom,
                 ResumeUploadFromUnknownOffset = fromUnknownOffset,
                 Progress = (ITransferProgress?)progress ?? NoTransferProgress.Instance,
+                Events = (ITransferEvents?)events ?? NoTransferEvents.Instance,
             });
 }

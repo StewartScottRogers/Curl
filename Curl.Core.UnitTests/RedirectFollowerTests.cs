@@ -771,8 +771,12 @@ public sealed class RedirectFollowerTests
     [DataRow("file:///Windows/win.ini", "file")]
     [DataRow("dict://127.0.0.1:18203/x", "dict")]
     [DataRow("scp://127.0.0.1/x", "scp")]
+    [DataRow("smb://h/s/f", "smb")]
+    [DataRow("smbs://h/s/f", "smbs")]
     public async Task FollowAsync_SchemeNotAllowed_Exits1ProtocolDisabledInRedirect(string target, string scheme)
     {
+        // Linux curl 8.18.0 (OpenSSL), measured 2026-10-01 (BL-1099 Notes): curl -sS -L with
+        // Location: smb://h/s/f -> exit 1, "Protocol "smb" disabled (in redirect)"; this build has SMB.
         // curl -sS -L, Location: file:///C:/Windows/win.ini
         // -> exit 1, "curl: (1) Protocol "file" is disabled (in redirect)".
         // The file row is drive-less so it reaches the scheme check on every platform.

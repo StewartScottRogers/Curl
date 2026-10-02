@@ -120,11 +120,12 @@ public sealed class TraceTransferEventWriter(
     /// <remarks>
     /// The OpenSSL build writes the message's line (<see cref="OpenSslMessageText"/>), when it
     /// has one, then dumps its bytes as <see cref="ReportTlsData"/> does, record headers and
-    /// TLS 1.3 inner content types included; the Schannel build writes nothing.
+    /// TLS 1.3 inner content types included; the Schannel build writes only its renegotiation
+    /// lines for a received session ticket (<see cref="SchannelRenegotiationText"/>).
     /// </remarks>
     public void ReportTlsMessage(TlsMessageEvent message)
     {
-        if (tlsBackend == TlsBackend.OpenSsl && OpenSslMessageText.Line(message) is { } line)
+        foreach (string line in TransferEventInfoText.TlsMessage(message, tlsBackend))
         {
             WriteInfoLine(line);
         }
@@ -135,7 +136,7 @@ public sealed class TraceTransferEventWriter(
     /// <inheritdoc />
     /// <remarks>
     /// The OpenSSL build writes its <c>SSL Trust</c> lines (<see cref="OpenSslTrustText"/>);
-    /// the Schannel build writes nothing, except for a QUIC connect, where curl.se's LibreSSL
+    /// the Schannel build its <c>schannel:</c> lines (<see cref="SchannelTrustText"/>), except for a QUIC connect, where curl.se's LibreSSL
     /// build writes the OpenSSL lines (<see cref="TransferEventInfoText.TlsTrust"/>).
     /// </remarks>
     public void ReportTlsTrust(TlsTrustEvent trust)

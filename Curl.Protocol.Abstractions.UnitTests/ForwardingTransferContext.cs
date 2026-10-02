@@ -19,6 +19,7 @@ internal sealed class ForwardingTransferContext(ITransferContext inner) : ITrans
     public TimeCondition? TimeCondition => inner.TimeCondition;
     public bool RemoteTime => inner.RemoteTime;
     public Stream? HeaderOutput => inner.HeaderOutput;
+    public Stream? DumpHeaderOutput => inner.DumpHeaderOutput;
     public ReadOnlyMemory<byte>? PostData => inner.PostData;
     public System.Net.NetworkCredential? Credentials => inner.Credentials;
     public IReadOnlyList<string> TelnetOptions => inner.TelnetOptions;

@@ -270,7 +270,7 @@ public sealed class SftpQuoteCommandsTests
         ScriptedConnection connection = new(Script().Bytes);
         SftpSession session = await SftpSession.StartAsync(SftpSessionTests.Transport(connection), CancellationToken.None);
 
-        await new SftpQuoteCommands(["pwd"], [], null, cLongIs32Bits: true).RunBeforeTransferAsync(session, Home, "/p"u8.ToArray(), CancellationToken.None);
+        await new SftpQuoteCommands(["pwd"], [], null, cLongIs32Bits: true, NoTransferEvents.Instance).RunBeforeTransferAsync(session, Home, "/p"u8.ToArray(), CancellationToken.None);
 
         Assert.HasCount(1, SftpServerScript.SftpRequests(connection.Written));
     }
@@ -344,6 +344,49 @@ public sealed class SftpQuoteCommandsTests
         Assert.IsEmpty(SftpQuoteCommands.None.AfterTransfer);
     }
 
+    [TestMethod]
+    public async Task RunBeforeTransferAsync_Commands_ReportsTheQuoteLineOnceBeforeTheFirstIsSent()
+    {
+        ScriptedConnection connection = new(SftpServerScript.Started().Status(0, SftpStatusCode.Ok).Status(1, SftpStatusCode.Ok).Bytes);
+        SftpSession session = await SftpSession.StartAsync(SftpSessionTests.Transport(connection), CancellationToken.None);
+        RequestCountingTransferEvents events = new(connection);
+
+        await new SftpQuoteCommands(["rm /a", "rm /b"], [], null, cLongIs32Bits: true, events)
+            .RunBeforeTransferAsync(session, Home, "/p"u8.ToArray(), CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "1: SSH: sending quote commands" }, events.Lines, "after the SFTP INIT alone");
+        Assert.HasCount(3, SftpServerScript.SftpRequests(connection.Written));
+    }
+
+    [TestMethod]
+    public async Task FinishAsync_CommandsAfterTheTransfer_ReportsTheQuoteLineOnceBeforeTheFirstIsSent()
+    {
+        ScriptedConnection connection = new(SftpServerScript.Started().Status(0, SftpStatusCode.Ok).Status(1, SftpStatusCode.Ok).Bytes);
+        SftpSession session = await SftpSession.StartAsync(SftpSessionTests.Transport(connection), CancellationToken.None);
+        RequestCountingTransferEvents events = new(connection);
+
+        TransferResult result = await new SftpQuoteCommands([], ["rm /a", "rm /b"], null, cLongIs32Bits: true, events)
+            .FinishAsync(session, null, Home, TransferResult.Success(0), CancellationToken.None);
+
+        Assert.IsTrue(result.IsSuccess, result.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { "1: SSH: sending quote commands" }, events.Lines, "after the SFTP INIT alone");
+        Assert.HasCount(3, SftpServerScript.SftpRequests(connection.Written));
+    }
+
+    [TestMethod]
+    public async Task RunBeforeTransferAndFinishAsync_NoCommands_ReportNoQuoteLine()
+    {
+        ScriptedConnection connection = new(SftpServerScript.Started().Bytes);
+        SftpSession session = await SftpSession.StartAsync(SftpSessionTests.Transport(connection), CancellationToken.None);
+        RequestCountingTransferEvents events = new(connection);
+        SftpQuoteCommands quotes = new([], [], null, cLongIs32Bits: true, events);
+
+        await quotes.RunBeforeTransferAsync(session, Home, "/p"u8.ToArray(), CancellationToken.None);
+        await quotes.FinishAsync(session, null, Home, TransferResult.Success(0), CancellationToken.None);
+
+        Assert.IsEmpty(events.Lines);
+    }
+
     internal static byte[] PathRequest(byte type, uint id, params string[] paths) =>
         Join([type], UInt32(id), Join([.. paths.Select(Name)]));
 
@@ -361,7 +404,7 @@ public sealed class SftpQuoteCommandsTests
         ScriptedConnection connection = new(script.Bytes);
         MemoryStream header = new();
         SftpSession session = await SftpSession.StartAsync(SftpSessionTests.Transport(connection), CancellationToken.None);
-        SftpQuoteCommands quotes = new(commands, [], header, cLongIs32Bits);
+        SftpQuoteCommands quotes = new(commands, [], header, cLongIs32Bits, NoTransferEvents.Instance);
         SshTransferException? failure = null;
         try
         {

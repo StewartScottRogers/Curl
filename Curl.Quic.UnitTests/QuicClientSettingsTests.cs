@@ -101,5 +101,6 @@ public sealed class QuicClientSettingsTests
 
         Assert.AreEqual(TlsExtensionType.QuicTransportParameters, settings.ExtensionOrder[0]);
         CollectionAssert.AreEqual(new ushort[] { 0x1302, 0x1303, 0x1301 }, settings.CipherSuites.ToArray());
+        Assert.IsTrue(settings.OfferEmptyRenegotiationInfoScsv);
     }
 }

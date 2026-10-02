@@ -30,10 +30,11 @@ internal static class SocksProxyTunnel
     /// <param name="port">The port the tunnel reaches.</param>
     /// <param name="resolve">Resolves <paramref name="host" /> when the kind resolves it locally (SOCKS4 and SOCKS5).</param>
     /// <param name="socks5Authentication">The methods a SOCKS5 greeting offers, and how GSS-API runs (BL-615).</param>
+    /// <param name="events">Receives the <c>-v</c> lines a failed SOCKS5 GSS-API negotiation prints (BL-1039).</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns>
     /// <see langword="null" /> when the tunnel is open; else the failure, exit 97
-    /// (<see cref="CurlExitCode.Proxy" />) with curl's message, or exit 6 when the host does
+    /// (<see cref="CurlExitCode.Proxy" />) with curl's message, or exit 6 (43 for bad <c>--dns-servers</c> options) when the host does
     /// not resolve.
     /// </returns>
     public static ValueTask<ConnectResult?> OpenAsync(
@@ -41,12 +42,13 @@ internal static class SocksProxyTunnel
         ProxyEndpoint proxy,
         string host,
         int port,
-        Func<string, int, CancellationToken, ValueTask<IReadOnlyList<IPAddress>>> resolve,
+        Func<string, int, CancellationToken, ValueTask<DnsResolution>> resolve,
         Socks5AuthenticationOptions socks5Authentication,
+        ITransferEvents events,
         CancellationToken cancellationToken) =>
         proxy.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a
             ? Socks4Handshake.RunAsync(connection, proxy, host, port, resolve, cancellationToken)
-            : Socks5Handshake.RunAsync(connection, proxy, host, port, resolve, socks5Authentication, cancellationToken);
+            : Socks5Handshake.RunAsync(connection, proxy, host, port, resolve, socks5Authentication, events, cancellationToken);
 
     /// <summary>
     /// Reads exactly <paramref name="buffer" />'s length from the connection.
@@ -118,10 +120,18 @@ internal static class SocksProxyTunnel
     public static ConnectResult? Failed(string message) => ConnectResult.Failed(CurlExitCode.Proxy, message);
 
     /// <summary>
-    /// Creates the exit 6 failure for a host that does not resolve.
+    /// Creates the failure for a host that does not resolve: exit 6 with the resolver's reason
+    /// when it gave one, or exit 43 when the <c>--dns-servers</c> options did not parse, as a
+    /// direct connect reports it (<see cref="NameResolutionFailure" />, measured on curl 8.22.0
+    /// with c-ares 1.34.8, BL-829).
     /// </summary>
     /// <param name="host">The host.</param>
+    /// <param name="port">The port the host was resolved for.</param>
+    /// <param name="failure">Why, as the resolver reported it; <see cref="DnsLookupFailure.None" /> when it did not say.</param>
     /// <returns>A failed <see cref="ConnectResult" />.</returns>
-    public static ConnectResult? CouldNotResolve(string host) =>
-        ConnectResult.Failed(CurlExitCode.CouldntResolveHost, CurlErrorBuffer.Truncate($"Could not resolve host: {host}"));
+    public static ConnectResult? CouldNotResolve(string host, int port, DnsLookupFailure failure)
+    {
+        var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", host, port, failure);
+        return ConnectResult.Failed(exitCode, message);
+    }
 }

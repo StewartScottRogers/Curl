@@ -16,6 +16,14 @@ internal sealed class Tls13RecordTestServer(Stream transport, Tls13TestServer se
     private Tls13RecordProtection? writer;
     private byte[] readSecret = [];
     private byte[] writeSecret = [];
+    private bool skipUnreadable;
+    private byte[]? lastHandshake;
+
+    /// <summary>Gets the early data the server accepted, in order (BL-1105).</summary>
+    public List<byte> EarlyData { get; } = [];
+
+    /// <summary>Gets the number of records skipped because they did not open under the handshake keys: rejected early data.</summary>
+    public int SkippedRecords { get; private set; }
 
     /// <summary>Gets or sets a value indicating whether the server sends a compatibility change_cipher_spec after its ServerHello.</summary>
     public bool SendChangeCipherSpec { get; set; }
@@ -33,7 +41,24 @@ internal sealed class Tls13RecordTestServer(Stream transport, Tls13TestServer se
     {
         TestServerFlight flight = await SendServerHelloAsync();
         await SendAsync(TlsContentType.Handshake, flight.Handshake);
+        if (server.EarlyDataAccepted)
+        {
+            await ReceiveEarlyDataAsync();
+        }
+
         await ReceiveClientFinishedAsync();
+    }
+
+    private async Task ReceiveEarlyDataAsync()
+    {
+        while ((await ReceiveAsync())! is { Type: TlsContentType.ApplicationData } content)
+        {
+            EarlyData.AddRange(content.Content);
+        }
+
+        // ReceiveAsync returned the EndOfEarlyData, read under the early keys.
+        server.ReceiveEndOfEarlyData(lastHandshake!);
+        InstallReader(server.ClientHandshakeTrafficSecret);
     }
 
     /// <summary>Answers the ClientHello (through a HelloRetryRequest when there is one) with the ServerHello, and puts the handshake keys in force.</summary>
@@ -53,7 +78,8 @@ internal sealed class Tls13RecordTestServer(Stream transport, Tls13TestServer se
         }
 
         InstallWriter(server.ServerHandshakeTrafficSecret);
-        InstallReader(server.ClientHandshakeTrafficSecret);
+        InstallReader(server.EarlyDataAccepted ? server.ClientEarlyTrafficSecret : server.ClientHandshakeTrafficSecret);
+        skipUnreadable = server.EarlyDataOffered && !server.EarlyDataAccepted;
         return flight;
     }
 
@@ -132,7 +158,23 @@ internal sealed class Tls13RecordTestServer(Stream transport, Tls13TestServer se
                 continue;
             }
 
-            return reader is null ? new Tls13RecordContent((TlsContentType)record[0], record[5..]) : reader.Unprotect(record).Value;
+            if (reader is null)
+            {
+                return new Tls13RecordContent((TlsContentType)record[0], record[5..]);
+            }
+
+            TlsDecodeResult<Tls13RecordContent> content = reader.Unprotect(record);
+            if (!content.Succeeded && skipUnreadable)
+            {
+                // Rejected early data; a skipped record does not count against the handshake keys' sequence numbers.
+                SkippedRecords++;
+                InstallReader(readSecret);
+                continue;
+            }
+
+            skipUnreadable = false;
+            lastHandshake = content.Value.Type == TlsContentType.Handshake ? content.Value.Content : null;
+            return content.Value;
         }
     }
 

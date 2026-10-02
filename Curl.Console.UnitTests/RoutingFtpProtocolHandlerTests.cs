@@ -9,7 +9,7 @@ namespace Curl.Console;
 /// <summary>
 /// Pins which <c>ftp</c> transfers <see cref="RoutingFtpProtocolHandler" /> hands to the HTTP
 /// handler (ADR-0056, rule 3): those through an HTTP or HTTP/1.0 proxy without <c>-p</c>; and
-/// that every other goes to the FTP handler (ADR-0093).
+/// that every other goes to the FTP handler (ADR-0323).
 /// </summary>
 [TestClass]
 public sealed class RoutingFtpProtocolHandlerTests
@@ -62,7 +62,7 @@ public sealed class RoutingFtpProtocolHandlerTests
     public async Task ExecuteAsync_NoProxyWithTheFtpProtocolHandler_WritesTheServedFileAndSucceeds()
     {
         // The control replies arrive in one read, then the data connection serves the file
-        // (the ADR-0093 conversation, as FtpProtocolHandlerTests records it).
+        // (the ADR-0323 conversation, as FtpProtocolHandlerTests records it).
         const string ControlReplies =
             "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n257 \"/\" is current directory\r\n"
             + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n213 5\r\n"

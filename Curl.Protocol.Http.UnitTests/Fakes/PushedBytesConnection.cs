@@ -1,5 +1,5 @@
+using System.Collections.Concurrent;
 using System.Net;
-using System.Threading.Channels;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Http.Fakes;
@@ -10,9 +10,16 @@ namespace Curl.Protocol.Http.Fakes;
 /// for them (BL-717). <see cref="Close" /> ends the reads; <see cref="Fail" /> makes the next
 /// read throw.
 /// </summary>
+/// <remarks>
+/// The chunks queue in a <see cref="ConcurrentQueue{T}" /> counted by a <see cref="SemaphoreSlim" />,
+/// not a <c>System.Threading.Channels</c> channel: on .NET 10.0.12 an unbounded channel can lose an
+/// item written just after a waiting read is cancelled, and the test then hangs (BL-1068).
+/// </remarks>
 public sealed class PushedBytesConnection : IConnection
 {
-    private readonly Channel<Func<byte[]>> chunks = Channel.CreateUnbounded<Func<byte[]>>();
+    private readonly ConcurrentQueue<Func<byte[]>> chunks = new();
+
+    private readonly SemaphoreSlim chunkCount = new(0);
 
     private readonly MemoryStream written = new();
 
@@ -57,14 +64,14 @@ public sealed class PushedBytesConnection : IConnection
 
     /// <summary>Makes <paramref name="bytes" /> the answer to the next read.</summary>
     /// <param name="bytes">The bytes.</param>
-    public void Push(byte[] bytes) => chunks.Writer.TryWrite(() => bytes);
+    public void Push(byte[] bytes) => Enqueue(() => bytes);
 
     /// <summary>Makes the next read return zero, the server's close.</summary>
-    public void Close() => chunks.Writer.TryWrite(() => []);
+    public void Close() => Enqueue(() => []);
 
     /// <summary>Makes the next read throw <paramref name="exception" />.</summary>
     /// <param name="exception">The exception.</param>
-    public void Fail(Exception exception) => chunks.Writer.TryWrite(() => throw exception);
+    public void Fail(Exception exception) => Enqueue(() => throw exception);
 
     /// <inheritdoc />
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
@@ -75,7 +82,10 @@ public sealed class PushedBytesConnection : IConnection
             SignalReads();
         }
 
-        byte[] chunk = (await chunks.Reader.ReadAsync(cancellationToken))();
+        // A wait that is cancelled takes no count, so the chunk stays queued for the next read.
+        await chunkCount.WaitAsync(cancellationToken);
+        chunks.TryDequeue(out Func<byte[]>? next);
+        byte[] chunk = next!();
         chunk.CopyTo(buffer);
         return chunk.Length;
     }
@@ -96,6 +106,13 @@ public sealed class PushedBytesConnection : IConnection
 
     /// <inheritdoc />
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    // Queues the answer to a read, then counts it.
+    private void Enqueue(Func<byte[]> chunk)
+    {
+        chunks.Enqueue(chunk);
+        chunkCount.Release();
+    }
 
     private void SignalReads()
     {

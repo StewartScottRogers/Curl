@@ -84,6 +84,22 @@ public sealed class PinnedPublicKeyTests
     }
 
     [TestMethod]
+    public void ReportedHash_WithAHashPinMatchingOrNot_IsTheServerKeysHash()
+    {
+        Assert.AreEqual("sha256//" + Hash, PinnedPublicKey.ReportedHash("sha256//" + Hash, [s_certificate.RawData]));
+        Assert.AreEqual("sha256//" + Hash, PinnedPublicKey.ReportedHash("sha256//AAAA", [s_certificate.RawData]));
+    }
+
+    [TestMethod]
+    public void ReportedHash_WithNoPinAFilePinNoCertificateOrOneThatDoesNotParse_IsNull()
+    {
+        Assert.IsNull(PinnedPublicKey.ReportedHash(null, [s_certificate.RawData]));
+        Assert.IsNull(PinnedPublicKey.ReportedHash(Path.Combine(_directory, "key.pem"), [s_certificate.RawData]));
+        Assert.IsNull(PinnedPublicKey.ReportedHash("sha256//AAAA", []));
+        Assert.IsNull(PinnedPublicKey.ReportedHash("sha256//AAAA", [new byte[] { 0x30, 0x03, 0x02, 0x01, 0x00 }]));
+    }
+
+    [TestMethod]
     public void Matches_WithTheRightHash_Matches()
     {
         Assert.IsTrue(PinnedPublicKey.Matches("sha256//" + Hash, s_subjectPublicKeyInfo));

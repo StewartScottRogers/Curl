@@ -101,6 +101,7 @@ internal static class OpenSslHandshakeText
             if (HostNameMatches(handshake, certificate, lines))
             {
                 lines.AddRange(VerifyResult(handshake, isLibreSsl));
+                lines.AddRange(TransferEventInfoText.PinnedPublicKeyHashLines(handshake));
             }
         }
 

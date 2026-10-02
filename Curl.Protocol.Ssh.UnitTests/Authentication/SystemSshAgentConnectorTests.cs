@@ -73,6 +73,7 @@ public sealed class SystemSshAgentConnectorTests
 
     [TestMethod]
     [TestCategory("Integration")]
+    [OSCondition(OperatingSystems.Windows)]
     [DataRow(true, DisplayName = "named by SSH_AUTH_SOCK")]
     [DataRow(false, DisplayName = "the default, SSH_AUTH_SOCK unset")]
     public async Task ConnectAsync_WindowsPipeServed_ConnectsToIt(bool named)
@@ -121,11 +122,14 @@ public sealed class SystemSshAgentConnectorTests
         }
     }
 
+    // The read starts before the write is awaited: the test's pipe has no buffer, so a
+    // write to it completes only once the peer reads, and awaiting it first hangs.
     private static async Task AssertCarriesBytesAsync(Stream connection, Stream peer)
     {
-        await connection.WriteAsync(new byte[] { 0, 0, 0, 1, 11 });
         byte[] received = new byte[5];
-        await peer.ReadExactlyAsync(received);
+        Task read = peer.ReadExactlyAsync(received).AsTask();
+        await connection.WriteAsync(new byte[] { 0, 0, 0, 1, 11 });
+        await read;
         CollectionAssert.AreEqual(new byte[] { 0, 0, 0, 1, 11 }, received);
     }
 }

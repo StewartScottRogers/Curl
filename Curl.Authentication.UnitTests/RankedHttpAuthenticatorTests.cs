@@ -430,7 +430,7 @@ public sealed class RankedHttpAuthenticatorTests
         new BasicAndBearerAuthenticator(Encoding.UTF8),
         new DigestAuthenticator(Encoding.UTF8, () => "c"),
         new NegotiateHttpAuthenticator(contexts),
-        new NtlmHttpAuthenticator(contexts, refusedChallengeFailsTransfer: false));
+        new NtlmHttpAuthenticator(contexts, matchesSspiBuild: false));
 
     private static HttpAuthRequest Request(HttpAuthSchemes allowed) =>
         new("GET", CurlUrl.Parse("http://127.0.0.1:18218/a"), "/a", new NetworkCredential("u", "p"), null, allowed, IsProxy: false);

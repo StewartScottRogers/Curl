@@ -277,7 +277,7 @@ the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so 
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
 other transfer, `ftps` through an HTTP proxy included (curl 8.21.0 tunnels it with
 `CONNECT host:990`, BL-458), goes to `FtpProtocolHandler` over the pooling connector
-(ADR-0093, BL-434), its passive data connections over `CurlComposition.FtpDataConnectorOf`'s
+(ADR-0323, BL-434), its passive data connections over `CurlComposition.FtpDataConnectorOf`'s
 `PoolingConnector.Over(TcpConnector.WithoutConnectTimeout())`, which `--connect-timeout` does not
 limit (ADR-0286, BL-797). `CurlComposition.CreateFtpProtocolHandler` builds it with a
 `TcpConnectionListener` for `-P`, the run's TLS provider and DNS resolver, and a
@@ -319,6 +319,14 @@ Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result ca
 `SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
 failed stamp is ignored for now; curl's warning lines for it are BL-139.
+
+Under `--xattr`, just before that stamp, a successful transfer to an `-o`/`-O` file it opened itself
+(not one created empty afterwards) gets curl's four extended attributes - `user.creator`,
+`user.xdg.referrer.url`, `user.mime_type`, `user.xdg.origin.url` without credentials - from
+`OutputFileExtendedAttributes` through the runner's `IExtendedAttributeWriter`. The composition
+passes `NativeExtendedAttributeWriter.ForCurrentPlatform()`: libc `setxattr` on Linux and macOS,
+`extattr_set_file` on FreeBSD, none on Windows, as curl's builds do. A failure prints
+`Warning: Error setting extended attributes on '<file>': <strerror>` unless `-s` (ADR-0320, BL-651).
 
 Under `-v`, `--trace` or `--trace-ascii` every transfer's context carries the run's
 `ITransferEvents`, which `TransferEventOutput` opens once the first command-line URL has parsed
@@ -421,12 +429,14 @@ wrapped as a note is. The check comes before the proxy is chosen, so a bad `-x` 
 skipped transfer; later URLs still run, as in curl 8.21.0 (BL-493 Notes).
 
 Under `--remove-on-error` a transfer that fails deletes the output file it opened, through
-`IOutputPaths.TryDeleteFile`, after its failure lines and progress-bar newline and before its
+`IOutputPaths.RemoveFile`, after its failure lines and progress-bar newline and before its
 `-w` output; the exit code and message stay the failure's. A file the transfer never opened - a
 `-f` failure that wrote no body, a failed connect - is left alone, even one there before. Under
 `-v` or a `--trace` option, even with `-s`, standard error gets `Note: Removed output file:
 <file>`, wrapped as a note is; a file that cannot be deleted (`NUL` included) gets `Warning:
-Failed removing: <file>` unless `-s`. `--remove-on-error` beside `-C` is refused while parsing,
+Failed removing: <file>` unless `-s`. Off Windows a path that is not a regular file
+(`/dev/null`, as `NativeRegularFileTest`'s `stat` tells) is not deleted and gets `Warning:
+Skipping removal; not a regular file: <file>` unless `-s` (ADR-0332, BL-752 Notes). `--remove-on-error` beside `-C` is refused while parsing,
 as in curl 8.21.0 (BL-494 Notes).
 
 A URL paired with `--out-null` (or `--no-out-null`, which curl 8.21.0 treats the same) sends its

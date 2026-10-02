@@ -280,7 +280,7 @@ public sealed partial class CookieStoreTests
 
     [TestMethod]
     public void GetCookieHeader_NullCookieStrings_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => new CookieStore().GetCookieHeader(Www, secure: false, Now, null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new CookieStore().GetCookieHeader(Www, secure: false, Now, (IReadOnlyList<string>)null!));
 
     [TestMethod]
     public void StoreFromResponse_NullUri_Throws() =>

@@ -27,8 +27,12 @@ namespace Curl.Protocol.Http;
 /// <param name="scheme">The URL's scheme, sent as <c>:scheme</c>.</param>
 /// <param name="bodyLength">The request body's length, 0 when there is none, or <see langword="null" /> when unknown.</param>
 /// <param name="openedLines">Reports curl's <c>-v</c> lines for the stream once its HEADERS are sent, or <see langword="null" /> for none.</param>
-internal sealed class Http2StreamConnection(Http2Session session, string scheme, long? bodyLength, HttpStreamOpenedLines? openedLines = null) : IHttpStreamConnection
+/// <param name="frameLog">Where the stream's frames are logged (BL-1073), or <see langword="null" /> for nowhere.</param>
+internal sealed class Http2StreamConnection(Http2Session session, string scheme, long? bodyLength, HttpStreamOpenedLines? openedLines = null, HttpFrameLog? frameLog = null) : IHttpStreamConnection
 {
+    /// <summary>The length of an RST_STREAM frame's payload: its error code.</summary>
+    private const int ResetPayloadLength = 4;
+
     private readonly Queue<ReadOnlyMemory<byte>> received = new();
 
     private readonly MemoryStream trailers = new();
@@ -70,6 +74,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     /// <summary>Gets the stream's identifier, 0 until its head is written.</summary>
     internal int StreamId => streamId;
+
+    /// <summary>Gets where the stream's frames are logged: its transfer's diagnostic log.</summary>
+    internal HttpFrameLog FrameLog { get; } = frameLog ?? HttpFrameLog.Silent;
 
     /// <inheritdoc />
     /// <exception cref="HttpTransferException">The stream failed (exit 16, 18, 56 or 92).</exception>
@@ -127,6 +134,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         }
 
         _ = await session.WriteDataAsync(streamId, ReadOnlyMemory<byte>.Empty, isEndStream: true, cancellationToken).ConfigureAwait(false);
+        FrameLog.FrameSent("DATA", streamId, 0);
         isRequestEnded = true;
         await GrowReceiveWindowOnceAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -162,6 +170,25 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         streamId = await session.StartUpgradedStreamAsync(this, cancellationToken).ConfigureAwait(false);
         isRequestEnded = true;
         isReceiveWindowGrown = true;
+    }
+
+    /// <summary>
+    /// Gives up the response's body without reading it, as curl does with a body it ignores
+    /// before a retry or a followed redirect: unless the stream has already ended, it is reset
+    /// with STREAM_CLOSED, <c>000004 03 00 00000001 00000005</c> on stream 1 (measured, BL-970
+    /// Notes), and the frames the peer still sends on it are dropped.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the reset is written, or at once when none is due.</returns>
+    public async ValueTask AbandonResponseAsync(CancellationToken cancellationToken)
+    {
+        if (isResponseEnded)
+        {
+            return;
+        }
+
+        await ResetAsync(Http2ErrorCode.StreamClosed, cancellationToken).ConfigureAwait(false);
+        isResponseEnded = true;
     }
 
     /// <summary>
@@ -221,6 +248,10 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             if (sent == 0)
             {
                 await ReceiveFrameAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                FrameLog.FrameSent("DATA", streamId, sent);
             }
         }
 
@@ -361,7 +392,14 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// </summary>
     private async ValueTask<HttpTransferException> ResetMalformedAsync(CancellationToken cancellationToken)
     {
-        await session.ResetStreamAsync(streamId, Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+        await ResetAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
         return new HttpTransferException(CurlExitCode.Http2Stream, HttpTransferMessages.Http2StreamNotClosedCleanly(streamId, Http2ErrorCode.ProtocolError));
+    }
+
+    /// <summary>Resets the stream with <paramref name="errorCode" /> and logs the RST_STREAM sent.</summary>
+    private async ValueTask ResetAsync(Http2ErrorCode errorCode, CancellationToken cancellationToken)
+    {
+        await session.ResetStreamAsync(streamId, errorCode, cancellationToken).ConfigureAwait(false);
+        FrameLog.FrameSent("RST_STREAM", streamId, ResetPayloadLength);
     }
 }

@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR-0093 scoped `FtpProtocolHandler` to passive mode over plaintext `ftp://`. BL-437 adds
+ADR-0323 scoped `FtpProtocolHandler` to passive mode over plaintext `ftp://`. BL-437 adds
 active mode (`-P`/`--ftp-port`) and TLS (`ftps://` and `AUTH` on `ftp://`). Checked on
 2026-09-27, the handler cannot do either with the contracts it has:
 

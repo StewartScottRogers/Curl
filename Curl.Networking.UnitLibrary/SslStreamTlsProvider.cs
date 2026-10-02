@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Security;
 using System.Runtime.ExceptionServices;
 using System.Security.Authentication;
@@ -28,6 +29,9 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 {
     /// <inheritdoc />
     TlsClientRoute IHandshakeReportingTlsProvider.Route => TlsClientRoute.SslStream;
+
+    /// <inheritdoc />
+    string? IHandshakeReportingTlsProvider.RouteReason => null;
 
     // The one warning curl 8.21.0's Schannel build writes for --capath (ADR-0009), unwrapped:
     // the console wraps it at the terminal width, into two lines at curl's default 79 columns.
@@ -191,7 +195,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// system store, as exit 35 with Schannel's <c>SEC_E_CERT_EXPIRED</c>. With
     /// <see cref="TlsClientOptions.CaCertificateFile" /> the Schannel build also checks
     /// revocation, unless <see cref="TlsClientOptions.SkipRevocationCheck" /> is set, and an
-    /// unknown revocation status is exit 60 (ADR-0086). Any other failure,
+    /// unknown revocation status is exit 60 (ADR-0321). Any other failure,
     /// such as no TLS version both sides allow or the server closing mid-handshake, is
     /// exit 35 (<see cref="CurlExitCode.SslConnectError" />). The handshake offers the
     /// versions from <see cref="TlsClientOptions.MinimumVersion" /> up to
@@ -286,7 +290,10 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <see cref="TlsHandshakeEvent.VerifiedHostName" /> the target host without IPv6
     /// brackets, or <see langword="null" /> under <see cref="TlsClientOptions.Insecure" />.
     /// <see cref="SslStream" /> exposes no TLS records, so no <see cref="TlsMessageEvent" /> is
-    /// reported (ADR-0085).
+    /// reported (ADR-0085), except in the Schannel build after a TLS 1.3 handshake: each session
+    /// ticket record <see cref="SessionTicketRecordDetector" /> finds before the first
+    /// application data is reported, from the connection's first read, as a received
+    /// <c>NewSessionTicket</c> (ADR-0309, BL-1089).
     /// </para>
     /// </remarks>
     /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
@@ -349,11 +356,12 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var (clientCertificate, clientCertificateFailure) = LoadClientCertificate();
         if (clientCertificateFailure is not null)
         {
+            ReportTrustBeforeClientCertificateFailure(events, _options, targetHost, _matchesSchannelBuild);
             await plaintext.DisposeAsync().ConfigureAwait(false);
             return clientCertificateFailure;
         }
 
-        events.ReportTlsTrust(DescribeTrust());
+        events.ReportTlsTrust(DescribeTrust(_options, targetHost));
         X509ChainPolicy? chainPolicy;
         X509Certificate2Collection anchorsBesideSystemStore;
         CertificateRevocationListFile? revocationLists;
@@ -389,7 +397,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             },
         };
 
-        var transport = new ConnectionStream(plaintext);
+        var transport = OpenTransport(plaintext);
         var sslStream = new SslStream(transport, leaveInnerStreamOpen: true);
         Exception failure;
         try
@@ -402,8 +410,13 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 IsProxy = isProxy,
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
             });
+            ReportRevocationCheckIncomplete(events, peerVerification);
             return ConnectResult.Connected(
-                new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), clearsTls: !_matchesSchannelBuild),
+                new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), clearsTls: !_matchesSchannelBuild)
+                {
+                    TicketRecords = FollowTicketRecordsAfterHandshake(transport, sslStream.SslProtocol),
+                    TicketEvents = events,
+                },
                 new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
                 peerCertificates: peerCertificates,
                 applicationProtocol: NegotiatedApplicationProtocol(sslStream.NegotiatedApplicationProtocol));
@@ -417,6 +430,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         await DisposeAfterFailedHandshakeAsync(sslStream, plaintext).ConfigureAwait(false);
         RethrowIfCancellation(failure);
         peerVerification.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
+        peerVerification.ReportPinnedPublicKeyRefusal(events, _matchesSchannelBuild);
 
         return verificationFailure is { } rejected
             ? ConnectResult.Failed(rejected.ExitCode, rejected.Message)
@@ -474,6 +488,29 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return [.. sent];
     }
 
+    // The Schannel build watches the records read for TLS 1.3 session tickets (BL-1089).
+    private ConnectionStream OpenTransport(IConnection plaintext) =>
+        new(plaintext) { TicketRecords = _matchesSchannelBuild ? new SessionTicketRecordDetector() : null };
+
+    /// <summary>
+    /// Keeps the transport's <see cref="SessionTicketRecordDetector" /> watching after a TLS 1.3
+    /// handshake, the only version whose tickets curl's Schannel build reports (measured with
+    /// <c>--tls-max 1.2</c>, BL-1089), and drops it otherwise.
+    /// </summary>
+    /// <param name="transport">The stream the handshake ran over.</param>
+    /// <param name="negotiated">The version the handshake negotiated.</param>
+    /// <returns>The detector still watching, or <see langword="null" /> when none is.</returns>
+    internal static SessionTicketRecordDetector? FollowTicketRecordsAfterHandshake(ConnectionStream transport, SslProtocols negotiated)
+    {
+        if (negotiated != SslProtocols.Tls13)
+        {
+            transport.TicketRecords = null;
+        }
+
+        transport.TicketRecords?.MarkHandshakeComplete();
+        return transport.TicketRecords;
+    }
+
     private static TlsHandshakeEvent DescribeHandshake(
         SslStream sslStream,
         PeerVerification peerVerification,
@@ -487,6 +524,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             CertificateVerified = peerVerification.Verified,
             CertificateVerifyResult = peerVerification.VerifyResult,
             PeerCertificateChain = [.. peerVerification.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
+            PinnedPublicKeyHash = peerVerification.PinnedPublicKeyHash,
         };
 
     /// <summary>
@@ -520,21 +558,54 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return _options.UseAlpn ? applicationProtocols : [];
     }
 
-    private TlsTrustEvent DescribeTrust() => DescribeTrust(_options);
-
     /// <summary>
     /// Describes the trust a handshake with <paramref name="options" /> verifies against, as
     /// both TLS clients report it before the handshake: <c>-k</c>, the <c>--cacert</c> file or
-    /// else <see cref="OpenSslDefaultCaCertificateFile" />, and the <c>--capath</c> directory.
+    /// else <see cref="OpenSslDefaultCaCertificateFile" />, the <c>--capath</c> directory,
+    /// <c>--ssl-auto-client-cert</c>, and whether <paramref name="targetHost" /> is an IP address.
     /// </summary>
     /// <param name="options">The handshake's settings.</param>
+    /// <param name="targetHost">The host the handshake connects to; an IPv6 literal may keep its brackets.</param>
     /// <returns>The event.</returns>
-    internal static TlsTrustEvent DescribeTrust(TlsClientOptions options) => new()
+    internal static TlsTrustEvent DescribeTrust(TlsClientOptions options, string targetHost) => new()
     {
+        UsesAutomaticClientCertificate = options.AutoClientCertificate,
+        TargetsIpAddress = IPAddress.TryParse(targetHost.Trim('[', ']'), out _),
         VerifiesPeer = !options.Insecure,
         CaCertificateFile = options.CaCertificateFile ?? OpenSslDefaultCaCertificateFile,
         CaCertificateDirectory = options.CaCertificateDirectory,
     };
+
+    // A certificate --ssl-revoke-best-effort accepted with its revocation status offline or
+    // unknown is a warning in the diagnostic log (ADR-0222, decision 2; BL-968), which only
+    // TcpConnector's capturing events collect; curl prints nothing for it.
+    private static void ReportRevocationCheckIncomplete(ITransferEvents events, PeerVerification peerVerification)
+    {
+        if (peerVerification.RevocationCheckIncomplete && events is HandshakeCapturingTransferEvents capturing)
+        {
+            capturing.ReportRevocationCheckIncomplete();
+        }
+    }
+
+    /// <summary>
+    /// Reports, in the Schannel build only, the trust curl's Schannel build writes before a
+    /// <c>--cert</c> that does not load: its <c>schannel_acquire_credential_handle</c> writes
+    /// whether the client certificate is picked automatically, then fails on the certificate,
+    /// before <c>schannel_connect_step1</c> would write the SNI line, so the event carries
+    /// <see cref="TlsTrustEvent.TargetsIpAddress" /> <see langword="false" /> whatever the host
+    /// (measured with curl 8.21.0, BL-1088, ADR-0305). The OpenSSL build reports nothing.
+    /// </summary>
+    /// <param name="events">Where the trust is reported.</param>
+    /// <param name="options">The handshake's settings.</param>
+    /// <param name="targetHost">The host the handshake connects to.</param>
+    /// <param name="matchesSchannelBuild">Whether the Schannel build is reproduced.</param>
+    internal static void ReportTrustBeforeClientCertificateFailure(ITransferEvents events, TlsClientOptions options, string targetHost, bool matchesSchannelBuild)
+    {
+        if (matchesSchannelBuild)
+        {
+            events.ReportTlsTrust(DescribeTrust(options, targetHost) with { TargetsIpAddress = false });
+        }
+    }
 
     /// <summary>
     /// Returns the host name a handshake checks the certificate against, as

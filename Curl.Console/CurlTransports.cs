@@ -40,6 +40,7 @@ namespace Curl.Console;
 /// group's dispatch disposes it when the group ends, which closes a pool of its own and leaves the
 /// run's shared <see cref="ConnectionCache" /> to the runner (ADR-0050, ADR-0285).
 /// </param>
+/// <param name="DiagnosticLog">The run's diagnostic log the authenticators were composed with (BL-923); <see langword="null" /> for none.</param>
 internal sealed record CurlTransports(
     IDnsResolver DnsResolver,
     TimeProvider TimeProvider,
@@ -52,4 +53,5 @@ internal sealed record CurlTransports(
     QuicDialer QuicDialer,
     TcpConnector TcpConnector,
     UdpDatagramConnector UdpDatagramConnector,
-    PoolingConnector PoolingConnector);
+    PoolingConnector PoolingConnector,
+    IDiagnosticLog? DiagnosticLog = null);

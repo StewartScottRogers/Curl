@@ -1,6 +1,7 @@
 using System.Security.Authentication;
 using System.Security.Cryptography;
 
+using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;
@@ -97,5 +98,76 @@ public sealed partial class SslStreamTlsProviderTests
             new TlsClientOptions(PinnedPublicKey: WrongPin), CertificateHost, SslProtocols.Tls12, SchannelBuild);
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+    }
+
+    [TestMethod]
+    [DataRow(SchannelBuild)]
+    [DataRow(OpenSslBuild)]
+    public async Task AuthenticateAsClientAsync_WithTheServerKeysHashPinned_ReportsTheHashInTheHandshakeEvent(bool matchesSchannelBuild)
+    {
+        // curl -v -k --pinnedpubkey sha256//<right> ... -> "*  public key hash: sha256//<right>" (BL-877).
+        var events = new RecordingTransferEvents();
+
+        var result = await PinReportingHandshakeAsync(new TlsClientOptions(Insecure: true, PinnedPublicKey: $"{WrongPin};{ServerKeyPin}"), events, matchesSchannelBuild);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.AreEqual(ServerKeyPin, Assert.ContainsSingle(events.Handshakes).PinnedPublicKeyHash);
+        Assert.IsEmpty(events.Info);
+        await result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithTheServerKeysFilePinned_ReportsNoHash()
+    {
+        // curl -v -k --pinnedpubkey key.pem ... prints no "public key hash" line (BL-877).
+        var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        File.WriteAllBytes(path, s_serverCertificate.PublicKey.ExportSubjectPublicKeyInfo());
+        var events = new RecordingTransferEvents();
+        try
+        {
+            var result = await PinReportingHandshakeAsync(new TlsClientOptions(Insecure: true, PinnedPublicKey: path), events, SchannelBuild);
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+            Assert.IsNull(Assert.ContainsSingle(events.Handshakes).PinnedPublicKeyHash);
+            await result.Connection!.DisposeAsync();
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
+    [DataRow(SchannelBuild, 2)]
+    [DataRow(OpenSslBuild, 1)]
+    public async Task AuthenticateAsClientAsync_WithAnotherKeysHashPinned_ReportsTheHashAndEachBuildsMismatchLines(bool matchesSchannelBuild, int mismatchLines)
+    {
+        // curl -v -k --pinnedpubkey sha256//<wrong> ... -> "*  public key hash: sha256//<right>", then
+        // "* SSL: public key does not match pinned public key" twice (Schannel) or once (OpenSSL) (BL-877).
+        var events = new RecordingTransferEvents();
+
+        var result = await PinReportingHandshakeAsync(new TlsClientOptions(Insecure: true, PinnedPublicKey: WrongPin), events, matchesSchannelBuild);
+
+        Assert.AreEqual(CurlExitCode.SslPinnedPubKeyNotMatch, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { " public key hash: " + ServerKeyPin }.Concat(Enumerable.Repeat("SSL: public key does not match pinned public key", mismatchLines)).ToArray(),
+            events.Info);
+        Assert.IsEmpty(events.Handshakes);
+    }
+
+    private static async Task<ConnectResult> PinReportingHandshakeAsync(TlsClientOptions options, RecordingTransferEvents events, bool matchesSchannelBuild)
+    {
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var serverTask = RunEchoServerAsync(server, SslProtocols.Tls12);
+
+        var result = await new SslStreamTlsProvider(options, matchesSchannelBuild).AuthenticateAsClientAsync(
+            new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);
+
+        if (result.Connection is null)
+        {
+            await IgnoreFailureAsync(serverTask);
+        }
+
+        return result;
     }
 }

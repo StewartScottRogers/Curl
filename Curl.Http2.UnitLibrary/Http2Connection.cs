@@ -34,6 +34,13 @@ public sealed class Http2Connection
     /// </summary>
     public const int MaximumContinuationFrames = 8;
 
+    /// <summary>
+    /// The most entries one SETTINGS frame may carry, against SETTINGS floods: nghttp2's
+    /// default (NGHTTP2_DEFAULT_MAX_SETTINGS), which curl's library uses. A frame with more
+    /// ends the connection with ENHANCE_YOUR_CALM before any of its settings is applied.
+    /// </summary>
+    public const int MaximumSettingsEntries = 32;
+
     private static readonly byte[] ClientPrefaceBytes = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"u8.ToArray();
 
     private readonly Stream stream;
@@ -652,6 +659,11 @@ public sealed class Http2Connection
         {
             IsClientSettingsAcknowledged = true;
             return;
+        }
+
+        if (settings.Count > MaximumSettingsEntries)
+        {
+            throw new Http2ProtocolException(Http2ErrorCode.EnhanceYourCalm, $"SETTINGS: too many setting entries ({settings.Count}, more than {MaximumSettingsEntries})");
         }
 
         foreach (var setting in settings)

@@ -1,5 +1,4 @@
 using System.Net;
-using System.Threading.Channels;
 using Curl.Http2;
 using Curl.Protocol.Abstractions;
 
@@ -10,7 +9,7 @@ internal sealed class Http2ServerConnection : IConnection
 {
     private static readonly int PrefaceLength = Http2Connection.ClientPreface.Length;
 
-    private readonly Channel<byte[]> toClient = Channel.CreateUnbounded<byte[]>();
+    private readonly CancelSafeChunkQueue toClient = new();
 
     private readonly List<byte> fromClient = [];
 
@@ -35,7 +34,7 @@ internal sealed class Http2ServerConnection : IConnection
         Host = host;
         this.holdsResponses = holdsResponses;
         Http2Setting[] settings = maxConcurrentStreams is { } limit ? [new(Http2SettingIdentifier.MaxConcurrentStreams, limit)] : [];
-        toClient.Writer.TryWrite(Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettings(settings)));
+        toClient.TryEnqueue(Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettings(settings)));
     }
 
     /// <summary>Gets the host the connection was opened to.</summary>
@@ -88,7 +87,7 @@ internal sealed class Http2ServerConnection : IConnection
 
         if (unread.Length == 0)
         {
-            unread = await toClient.Reader.WaitToReadAsync(cancellationToken) && toClient.Reader.TryRead(out byte[]? chunk) ? chunk : [];
+            unread = await toClient.DequeueAsync(cancellationToken) ?? [];
         }
 
         int count = Math.Min(unread.Length, buffer.Length);
@@ -116,7 +115,7 @@ internal sealed class Http2ServerConnection : IConnection
     public ValueTask DisposeAsync()
     {
         IsDisposed = true;
-        toClient.Writer.TryComplete();
+        toClient.Complete();
         return ValueTask.CompletedTask;
     }
 
@@ -178,5 +177,5 @@ internal sealed class Http2ServerConnection : IConnection
     }
 
     private void Respond(int streamId) =>
-        toClient.Writer.TryWrite(Http2FrameCodec.Serialize(Http2FrameFactory.CreateHeaders(streamId, encoder.Encode([new(":status", "200")]), isEndStream: true, isEndHeaders: true)));
+        toClient.TryEnqueue(Http2FrameCodec.Serialize(Http2FrameFactory.CreateHeaders(streamId, encoder.Encode([new(":status", "200")]), isEndStream: true, isEndHeaders: true)));
 }

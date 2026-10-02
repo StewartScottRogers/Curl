@@ -51,6 +51,9 @@ internal static class SshInfoLines
     /// <summary>The <c>scp</c> line after <see cref="AuthenticationComplete" />.</summary>
     internal const string ConnectionEstablished = "SSH: connection established";
 
+    /// <summary>The line after <see cref="User" /> when the transfer goes through an HTTPS proxy (BL-1124).</summary>
+    internal const string UsingHttpsProxy = "SSH: using HTTPS proxy";
+
     /// <summary>
     /// The WinCNG build's <c>publickey</c> denial reason when, with no <c>--pubkey</c>, the
     /// public key cannot be derived from the private key (ADR-0262, ADR-0281).
@@ -204,6 +207,17 @@ internal static class SshInfoLines
         bytesSent == 0
             ? "Request completely sent off"
             : string.Create(CultureInfo.InvariantCulture, $"upload completely sent off: {bytesSent} bytes");
+
+    /// <summary>
+    /// The SFTP line before the <c>-Q</c> commands that run before the transfer, and again
+    /// before those that run after it; none when there are no commands of that kind (BL-1123).
+    /// </summary>
+    internal const string SendingQuoteCommands = "SSH: sending quote commands";
+
+    /// <summary>The SFTP line before each <c>MKDIR</c> that <c>--ftp-create-dirs</c> sends (BL-1123).</summary>
+    /// <param name="path">The directory's path, as the <c>MKDIR</c> carries it.</param>
+    /// <returns>The line, such as <c>SFTP: creating directory '/a'</c>.</returns>
+    internal static string CreatingDirectory(string path) => $"SFTP: creating directory '{path}'";
 
     /// <summary>The line after a transfer that leaves the connection for reuse.</summary>
     /// <param name="connectionNumber">The connection's number.</param>

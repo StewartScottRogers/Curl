@@ -41,6 +41,8 @@ internal sealed class CommandLineGlobalState
 
     public string? SslSessionsFile { get; set; }
 
+    public string? LibcurlFile { get; set; }
+
     public bool Silent { get; set; }
 
     public bool ShowError { get; set; }
@@ -58,6 +60,15 @@ internal sealed class CommandLineGlobalState
     public bool TraceTime { get; set; }
 
     public bool TraceIds { get; set; }
+
+    /// <summary><see langword="true"/> while <c>--trace-config ids</c> (or <c>all</c>) is in effect, which a first <c>-v</c> does not clear.</summary>
+    public bool TraceConfigIds { get; set; }
+
+    /// <summary><see langword="true"/> while <c>--trace-config time</c> (or <c>all</c>) is in effect, which a first <c>-v</c> does not clear.</summary>
+    public bool TraceConfigTime { get; set; }
+
+    /// <summary>The trace component names <c>--trace-config</c> turned on, lower case; <c>all</c> among them for every component.</summary>
+    public HashSet<string> TraceComponents { get; } = new(StringComparer.Ordinal);
 
     public string? StandardErrorFile { get; set; }
 

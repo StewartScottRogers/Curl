@@ -6,7 +6,8 @@ namespace Curl.Protocol.Abstractions;
 /// </summary>
 /// <remarks>
 /// curl's OpenSSL build words it as <c>SSL Trust: peer verification disabled</c>, or
-/// <c>SSL Trust Anchors:</c> and one line per source of trust anchors.
+/// <c>SSL Trust Anchors:</c> and one line per source of trust anchors; its Schannel build as
+/// whether a client certificate is picked automatically and whether the target is an IP address.
 /// </remarks>
 public sealed record TlsTrustEvent
 {
@@ -45,4 +46,18 @@ public sealed record TlsTrustEvent
     /// Windows curl.se's LibreSSL build words rather than the Schannel build (ADR-0144).
     /// </summary>
     public bool IsQuic { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the client may present a certificate the operating
+    /// system picks by itself (<c>--ssl-auto-client-cert</c>, <c>--proxy-ssl-auto-client-cert</c>),
+    /// which curl's Schannel build words as <c>schannel: enabled automatic use of client certificate</c>.
+    /// </summary>
+    public bool UsesAutomaticClientCertificate { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the handshake's target host is an IPv4 or IPv6 address
+    /// rather than a host name, which curl's Schannel build words as
+    /// <c>schannel: using IP address, SNI is not supported by OS.</c>
+    /// </summary>
+    public bool TargetsIpAddress { get; init; }
 }

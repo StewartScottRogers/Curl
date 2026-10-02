@@ -39,7 +39,7 @@ reached through `-ListenAddress` and `--connect-to`.
    setting lives in `TcpDialer.ApplySocketOptions`, measured by unit tests on an unconnected
    socket, so `DialAsync` stays the thin adapter ADR-0083 excludes.
 3. **`--ssl-revoke-best-effort`.** The Schannel build still checks revocation for a
-   `--cacert` chain (ADR-0086) but accepts a chain whose every fault is
+   `--cacert` chain (ADR-0321) but accepts a chain whose every fault is
    `RevocationStatusUnknown` or `OfflineRevocation`, as curl masks those two trust errors.
    The OpenSSL build never checks revocation, so ignores it.
 4. **`--ca-native` changes nothing.** Without `--cacert` the provider already verifies

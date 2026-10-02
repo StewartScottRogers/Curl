@@ -27,6 +27,20 @@ public sealed class DohDnsResolverTraceTests
         + "C00C000500010000001E000801610474657374" + "00"
         + "C02A001C00010000005A001000000000000000000000000000000001";
 
+    // BL-958's answers, one per query (Record-CurlExchange.ps1 -Response gives connection N the Nth).
+    private const string QuestionHeader = "000081800001";
+    private const string ExampleTest = "076578616D706C650474657374";
+    private const string ARecord = "C00C00010001000000" + "3C00047F000002";
+    private const string AaaaRecord = "C00C001C00010000005A0010" + "00000000000000000000000000000001";
+    private const string CnameRecord = "C00C000500010000001E000801610474657374" + "00";
+    private const string AThenAaaaAnswerToA = QuestionHeader + "000200000000" + ExampleTest + "0000010001" + ARecord + AaaaRecord;
+    private const string AaaaThenAAnswerToAaaa = QuestionHeader + "000200000000" + ExampleTest + "00001C0001" + AaaaRecord + ARecord;
+    private const string AaaaAnswerToAaaa = QuestionHeader + "000100000000" + ExampleTest + "00001C0001" + AaaaRecord;
+    private const string CnameAnswerToA = QuestionHeader + "000100000000" + ExampleTest + "0000010001" + CnameRecord;
+    private const string CnameAnswerToAaaa = QuestionHeader + "000100000000" + ExampleTest + "00001C0001" + CnameRecord;
+    private const string EmptyAnswerToA = QuestionHeader + "000000000000" + ExampleTest + "0000010001";
+    private const string EmptyAnswerToAaaa = QuestionHeader + "000000000000" + ExampleTest + "00001C0001";
+
     [TestMethod]
     public void Constructor_WithNullTrace_Throws()
     {
@@ -168,11 +182,10 @@ public sealed class DohDnsResolverTraceTests
     }
 
     [TestMethod]
-    public async Task ResolveAsync_ACnameAndAaaaAnswer_ReportsTheSmallestTtlTheUncompressedAddressAndTheName()
+    public async Task ResolveAsync_ACnameAndAaaaAnswer_ReportsTheFailedADecodesCnameAsWellAsTheAaaaDecodes()
     {
-        // curl printed "CNAME: a.test" twice: its one entry for both queries keeps the CNAME the
-        // failed A decode read before the AAAA record stopped it. The failed decode here drops its
-        // names, so the name is printed once (BL-958 matches curl).
+        // curl's one entry for both queries keeps the CNAME the failed A decode read before the
+        // AAAA record stopped it, so "CNAME: a.test" is printed twice (BL-958).
         var lines = await TraceAsync(Ok(Convert.FromHexString(MeasuredCnameAndAaaaAnswer)));
 
         CollectionAssert.AreEqual(
@@ -182,6 +195,93 @@ public sealed class DohDnsResolverTraceTests
                 "[DNS] hostname: example.test",
                 "[DoH] TTL: 30 seconds",
                 "[DoH] AAAA: 0000:0000:0000:0000:0000:0000:0000:0001",
+                "CNAME: a.test",
+                "CNAME: a.test",
+            },
+            lines);
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_AFailedADecodeAfterAnAddress_ReportsAndResolvesThatAddress()
+    {
+        // Measured 2026-10-02 (BL-958), the A query answered A 127.0.0.2 then AAAA ::1, the AAAA
+        // query AAAA ::1: curl traced "[DoH] A: 127.0.0.2" and then printed "IPv6: ::1",
+        // "IPv4: 127.0.0.2" and tried both, so the failed decode's address reaches the resolved list.
+        var connector = new FakeConnector();
+        connector.BytesToRead.Add(Ok(Convert.FromHexString(AThenAaaaAnswerToA)));
+        connector.BytesToRead.Add(Ok(Convert.FromHexString(AaaaAnswerToAaaa)));
+        var trace = new RecordingTransferEvents();
+
+        var addresses = await new DohDnsResolver(connector, MeasuredDohUrl, trace, DescribeExitCode).ResolveAsync("example.test", CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[DNS] DoH: Unexpected TYPE type A for example.test",
+                "[DNS] hostname: example.test",
+                "[DoH] TTL: 60 seconds",
+                "[DoH] A: 127.0.0.2",
+                "[DoH] AAAA: 0000:0000:0000:0000:0000:0000:0000:0001",
+            },
+            trace.Info.ToArray());
+        CollectionAssert.AreEqual(new[] { "::1", "127.0.0.2" }, addresses.Select(address => address.ToString()).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_BothDecodesFailingAfterAnAddress_ResolvesNothing()
+    {
+        // Measured 2026-10-02 (BL-958): the A query answered A then AAAA, the AAAA query AAAA then
+        // A; curl printed both failures, no entry, and exited 6.
+        var connector = new FakeConnector();
+        connector.BytesToRead.Add(Ok(Convert.FromHexString(AThenAaaaAnswerToA)));
+        connector.BytesToRead.Add(Ok(Convert.FromHexString(AaaaThenAAnswerToAaaa)));
+        var trace = new RecordingTransferEvents();
+
+        var addresses = await new DohDnsResolver(connector, MeasuredDohUrl, trace, DescribeExitCode).ResolveAsync("example.test", CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[DNS] DoH: Unexpected TYPE type A for example.test",
+                "[DNS] DoH: Unexpected TYPE type AAAA for example.test",
+            },
+            trace.Info.ToArray());
+        Assert.IsEmpty(addresses);
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_AnEmptyAaaaAnswerAfterACnameAnswer_DecodesIntoTheSharedEntry()
+    {
+        // Measured 2026-10-02 (BL-958): curl decodes A first into its one entry, so the empty AAAA
+        // answer finds the A answer's CNAME there and is not "No content".
+        var connector = new FakeConnector();
+        connector.BytesToRead.Add(Ok(Convert.FromHexString(CnameAnswerToA)));
+        connector.BytesToRead.Add(Ok(Convert.FromHexString(EmptyAnswerToAaaa)));
+
+        var lines = await TraceAsync(connector);
+
+        CollectionAssert.AreEqual(
+            new[] { "[DNS] hostname: example.test", "[DoH] TTL: 30 seconds", "CNAME: a.test" },
+            lines);
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_AnEmptyAAnswerBeforeACnameAnswer_IsNoContent()
+    {
+        // Measured 2026-10-02 (BL-958): the A answer is decoded before the AAAA one fills the
+        // entry, so it is still "No content".
+        var connector = new FakeConnector();
+        connector.BytesToRead.Add(Ok(Convert.FromHexString(EmptyAnswerToA)));
+        connector.BytesToRead.Add(Ok(Convert.FromHexString(CnameAnswerToAaaa)));
+
+        var lines = await TraceAsync(connector);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[DNS] DoH: No content type A for example.test",
+                "[DNS] hostname: example.test",
+                "[DoH] TTL: 30 seconds",
                 "CNAME: a.test",
             },
             lines);

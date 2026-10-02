@@ -20,6 +20,21 @@ public sealed partial class TcpConnectorTests
 
     private static readonly byte[] BytesAfterTheHandshake = [0xAA, 0xBB];
 
+    [TestMethod]
+    [DataRow(ProxyKind.Socks4)]
+    [DataRow(ProxyKind.Socks5)]
+    public async Task ConnectAsync_ThroughSocks_ReportsNoMappedDestinationSoTheOriginIsNamedLeftIntact(ProxyKind kind)
+    {
+        // curl -v --socks5 127.0.0.1:18535 http://localhost:8080/ ->
+        // * Connection #0 to host localhost:8080 left intact (the origin, not the proxy; BL-1074)
+        byte[] reply = kind == ProxyKind.Socks4 ? Socks4Granted : [.. Socks5NoAuthentication, .. Socks5Succeeded];
+        var (result, _) = await ConnectThroughSocksAsync(kind, "127.0.0.1", reply);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNull(result.MappedHost);
+        Assert.AreEqual(0, result.MappedPort);
+    }
+
     // SOCKS4
 
     [TestMethod]
@@ -459,6 +474,54 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual(BytesAfterTheHandshake.Length, proxyConnection.UnreadCount);
     }
 
+    // The -v line
+
+    [TestMethod]
+    [DataRow(ProxyKind.Socks4)]
+    [DataRow(ProxyKind.Socks4a)]
+    [DataRow(ProxyKind.Socks5)]
+    [DataRow(ProxyKind.Socks5Hostname)]
+    public async Task ConnectAsync_ThroughSocksToAName_ReportsTheOpenedSocksConnectionNamingTheHostAsGiven(ProxyKind kind)
+    {
+        // curl -sS -v -x socks5://127.0.0.1:41080 --resolve h.test:80:10.0.0.1 http://h.test/ (and socks4, socks4a, socks5h) ->
+        // * Opened SOCKS connection from 127.0.0.1 port 60392 to h.test port 80 (via 127.0.0.1 port 41080) (BL-1038)
+        byte[] reply = kind is ProxyKind.Socks4 or ProxyKind.Socks4a ? Socks4Granted : [.. Socks5NoAuthentication, .. Socks5Succeeded];
+        var events = new RecordingTransferEvents();
+        var connector = new TcpConnector(
+            new FakeDnsResolver(),
+            new FakeTcpDialer { DialOutcome = _ => new ScriptedConnection(reply) },
+            new FakeTlsProvider(),
+            new ManualTimeProvider(),
+            resolveOverrides: ResolveOverrides.Parse(["socks.example:1080:192.0.2.10", "target.example:8080:10.1.2.3"]));
+
+        var result = await connector.ConnectAsync(
+            new ConnectTarget("target.example", 8080, UseTls: false) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, null), Events = events },
+            CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.Contains(events.Info, "Opened SOCKS connection from 127.0.0.1 port 50000 to target.example port 8080 (via 192.0.2.10 port 1080)");
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheSocksHandshakeFails_ReportsNoOpenedSocksConnection()
+    {
+        // curl -sS -v -x socks5h://127.0.0.1:41080 http://h.test/, the proxy answering 05 05 ... ->
+        // * cannot complete SOCKS5 connection to h.test. (5), and no Opened SOCKS connection line (BL-1038)
+        var events = new RecordingTransferEvents();
+        var connector = new TcpConnector(
+            new FakeDnsResolver(ProxyAddress),
+            new FakeTcpDialer { DialOutcome = _ => new ScriptedConnection([.. Socks5NoAuthentication, 0x05, 0x05, 0x00, 0x01, 0x7F, 0x00, 0x00, 0x01, 0x1F, 0x90]) },
+            new FakeTlsProvider(),
+            new ManualTimeProvider());
+
+        var result = await connector.ConnectAsync(
+            new ConnectTarget("h.test", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Socks5Hostname, "socks.example", 1080, null), Events = events },
+            CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Proxy, result.ExitCode);
+        Assert.IsFalse(events.Info.Any(line => line.StartsWith("Opened SOCKS connection", StringComparison.Ordinal)));
+    }
+
     // Through the connector
 
     [TestMethod]
@@ -547,7 +610,8 @@ public sealed partial class TcpConnectorTests
         NetworkCredential? credential = null,
         string? resolveEntry = null,
         FakeDnsResolver? resolver = null,
-        Socks5AuthenticationOptions? socks5Authentication = null)
+        Socks5AuthenticationOptions? socks5Authentication = null,
+        RecordingTransferEvents? events = null)
     {
         var proxyConnection = new ScriptedConnection(proxyReply);
         string[] entries = resolveEntry is null ? ["socks.example:1080:192.0.2.10"] : ["socks.example:1080:192.0.2.10", resolveEntry];
@@ -560,7 +624,7 @@ public sealed partial class TcpConnectorTests
             socks5Authentication: socks5Authentication);
 
         var result = await connector.ConnectAsync(
-            new ConnectTarget(host, 8080, UseTls: false) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, credential) },
+            new ConnectTarget(host, 8080, UseTls: false) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, credential), Events = events ?? new RecordingTransferEvents() },
             CancellationToken.None);
         return (result, proxyConnection);
     }

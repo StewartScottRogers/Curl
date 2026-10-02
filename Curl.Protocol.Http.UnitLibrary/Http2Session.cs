@@ -44,6 +44,14 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// <summary>The debug data of curl's closing GOAWAY: <c>shutdown</c> and its terminating NUL (measured, BL-817 Notes).</summary>
     private static readonly byte[] ShutdownDebugData = "shutdown\0"u8.ToArray();
 
+    /// <summary>
+    /// The SETTINGS curl 8.18.0 sends once after an h2c upgrade, right before the first stream it
+    /// opens on the connection, <c>000006 04 00 00000000 0004 00010000</c>: INITIAL_WINDOW_SIZE
+    /// 65536 again (measured, BL-970 Notes).
+    /// </summary>
+    private static readonly byte[] UpgradedStreamSettingsFrame = Http2FrameCodec.Serialize(
+        Http2FrameFactory.CreateSettings([new(Http2SettingIdentifier.InitialWindowSize, Http2Connection.ClientInitialWindowSize)]));
+
     private readonly HpackEncoder encoder = new();
 
     private readonly HpackDecoder decoder = new();
@@ -58,7 +66,15 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
 
     private bool isPrefaceSent;
 
+    private bool isUpgradeSettingsDue;
+
     private ExceptionDispatchInfo? connectionFailure;
+
+    /// <summary>
+    /// Where the connection's own frames are logged: the log of the transfer that last opened a
+    /// stream on the session, which a pooled session hands on to each transfer it carries (ADR-0345).
+    /// </summary>
+    private HttpFrameLog connectionLog = HttpFrameLog.Silent;
 
     /// <summary>Initializes a new instance of the <see cref="Http2Session" /> class.</summary>
     /// <param name="connection">The connection; the handler keeps ownership.</param>
@@ -119,9 +135,10 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// </param>
     /// <param name="ignoresBody">Not used: HTTP/2 fails a reset stream whatever the request wanted.</param>
     /// <param name="openedLines">Reports curl's <c>-v</c> lines for the stream once its HEADERS are sent, or <see langword="null" /> for none.</param>
+    /// <param name="diagnosticLog">The transfer's diagnostic log, which the stream's frames are written to, or <see langword="null" /> for none.</param>
     /// <returns>The stream.</returns>
-    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null) =>
-        new Http2StreamConnection(this, scheme, bodyLength, openedLines);
+    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null, IDiagnosticLog? diagnosticLog = null) =>
+        new Http2StreamConnection(this, scheme, bodyLength, openedLines, HttpFrameLog.For(diagnosticLog, VersionName));
 
     /// <summary>
     /// Sends GOAWAY with NO_ERROR, last stream 0 and debug data <c>shutdown</c> and a NUL, as
@@ -194,7 +211,8 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// closed by the client, whose response arrives on it (RFC 7540 section 3.2), as curl sends
     /// the preface once the <c>101</c> has arrived (measured, BL-716 Notes). Once the response
     /// ends the stream is closed, so later requests on the session open streams 3, 5, ... within
-    /// the peer's concurrency limit (BL-866).
+    /// the peer's concurrency limit (BL-866); the first of them is preceded by curl's
+    /// post-upgrade SETTINGS (<see cref="UpgradedStreamSettingsFrame" />, BL-970).
     /// </summary>
     /// <param name="receiver">The stream the response's frames are handed to.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
@@ -206,6 +224,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         {
             await Frames.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
             isPrefaceSent = true;
+            isUpgradeSettingsDue = true;
             return Register(Frames.OpenUpgradedStream(), receiver);
         }
         finally
@@ -322,19 +341,35 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
             isPrefaceSent = true;
         }
 
+        if (isUpgradeSettingsDue)
+        {
+            await Connection.WriteAsync(UpgradedStreamSettingsFrame, cancellationToken).ConfigureAwait(false);
+            isUpgradeSettingsDue = false;
+        }
+
         int streamId = Register(Frames.OpenStream(), receiver);
-        await Frames.WriteHeadersAsync(streamId, Encode(fields), isEndStream, cancellationToken).ConfigureAwait(false);
+        byte[] headerBlock = Encode(fields);
+        await Frames.WriteHeadersAsync(streamId, headerBlock, isEndStream, cancellationToken).ConfigureAwait(false);
+        receiver.FrameLog.FrameSent("HEADERS", streamId, headerBlock.Length);
         return streamId;
     }
 
+    /// <summary>
+    /// Registers <paramref name="receiver" /> as the owner of <paramref name="streamId" />, and
+    /// makes its transfer's log the one the connection's own frames - the server's SETTINGS and
+    /// GOAWAY - are written to from now on (ADR-0345).
+    /// </summary>
     private int Register(int streamId, Http2StreamConnection receiver)
     {
         openStreams[streamId] = receiver;
+        connectionLog = receiver.FrameLog;
         return streamId;
     }
 
     private async ValueTask ReadAndRouteFrameAsync(Http2StreamConnection? receiver, CancellationToken cancellationToken)
     {
+        bool wasSettingsReceived = Frames.IsPeerSettingsReceived;
+        bool wasGoAwayReceived = Frames.PeerGoAway is not null;
         Http2StreamFrame? frame;
         try
         {
@@ -344,20 +379,47 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         {
             if (openStreams.Remove(reset.StreamId, out Http2StreamConnection? owner))
             {
+                owner.FrameLog.ResetReceived(reset);
                 owner.TakeReset(reset);
             }
 
             return;
         }
-        catch (Exception exception) when (exception is not (OperationCanceledException or Http2StreamResetException))
+        catch (Http2StreamResetException reset)
+        {
+            receiver!.FrameLog.ResetReceived(reset);
+            throw;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             connectionFailure = ExceptionDispatchInfo.Capture(exception);
             throw;
+        }
+        finally
+        {
+            LogPeerConnectionFrames(wasSettingsReceived, wasGoAwayReceived);
         }
 
         if (frame is not null)
         {
             Route(frame);
+        }
+    }
+
+    /// <summary>
+    /// Logs the server's first SETTINGS and its GOAWAY when the frame just read brought them;
+    /// the frame layer applies both itself, so their arrival shows as a change of its state.
+    /// </summary>
+    private void LogPeerConnectionFrames(bool wasSettingsReceived, bool wasGoAwayReceived)
+    {
+        if (!wasSettingsReceived && Frames.IsPeerSettingsReceived)
+        {
+            connectionLog.SettingsReceived(Frames.PeerSettings);
+        }
+
+        if (!wasGoAwayReceived && Frames.PeerGoAway is { } goAway)
+        {
+            connectionLog.GoAwayReceived(goAway);
         }
     }
 
@@ -369,6 +431,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
             return;
         }
 
+        owner.FrameLog.FrameReceived(frame.Type.ToString().ToUpperInvariant(), frame.StreamId, frame.Content.Length);
         owner.Take(frame, fields);
         if (frame.IsEndStream)
         {

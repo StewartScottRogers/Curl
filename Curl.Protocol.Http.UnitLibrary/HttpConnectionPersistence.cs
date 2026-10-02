@@ -52,7 +52,7 @@ internal static class HttpConnectionPersistence
     /// a <c>Connection: keep-alive</c> header, not named <c>close</c>, whose body has no
     /// Content-Length it stops at and no chunked coding (measured, BL-471 Notes). curl reports
     /// <c>Connection #N to host H:P left intact</c> for it and pools it, then finds it dead
-    /// before reusing it (ADR-0109, ADR-0112).
+    /// before reusing it (ADR-0324, ADR-0112).
     /// </summary>
     /// <param name="head">The response head.</param>
     /// <param name="noBody"><see langword="true" /> for a request made with HEAD (<c>-I</c>).</param>

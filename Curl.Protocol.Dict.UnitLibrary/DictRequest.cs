@@ -57,8 +57,13 @@ internal static class DictRequest
     /// percent-encoded.
     /// </param>
     /// <param name="request">The whole request, or empty when refused.</param>
+    /// <param name="wordMissing">
+    /// <see langword="true" /> when the path is a <c>MATCH</c> or <c>DEFINE</c> lookup whose
+    /// word is empty or missing, so <c>default</c> was sent in its place and curl reports
+    /// <c>lookup word is missing</c>.
+    /// </param>
     /// <returns><see langword="true" /> unless the decoded path holds a byte below <c>0x20</c>.</returns>
-    public static bool TryEncode(string escapedPath, out byte[] request)
+    public static bool TryEncode(string escapedPath, out byte[] request, out bool wordMissing)
     {
         ArgumentNullException.ThrowIfNull(escapedPath);
 
@@ -66,13 +71,14 @@ internal static class DictRequest
         if (path.Any(static value => value < 0x20))
         {
             request = [];
+            wordMissing = false;
             return false;
         }
 
         request =
         [
             .. Line(Encoding.ASCII.GetBytes(ClientLine)),
-            .. Line(EncodeCommand(path)),
+            .. Line(EncodeCommand(path, out wordMissing)),
             .. Line(Encoding.ASCII.GetBytes(QuitLine)),
         ];
         return true;
@@ -80,17 +86,20 @@ internal static class DictRequest
 
     private static byte[] Line(byte[] text) => [.. text, (byte)'\r', (byte)'\n'];
 
-    private static byte[] EncodeCommand(byte[] path)
+    private static byte[] EncodeCommand(byte[] path, out bool wordMissing)
     {
+        wordMissing = false;
         if (StartsWithAny(path, MatchPrefixes))
         {
             byte[][] fields = Fields(path);
+            wordMissing = fields[0].Length == 0;
             return Join("MATCH"u8.ToArray(), OrDefault(fields, 1, AnyDatabase), OrDefault(fields, 2, DefaultStrategy), Word(fields));
         }
 
         if (StartsWithAny(path, DefinePrefixes))
         {
             byte[][] fields = Fields(path);
+            wordMissing = fields[0].Length == 0;
             return Join("DEFINE"u8.ToArray(), OrDefault(fields, 1, AnyDatabase), Word(fields));
         }
 

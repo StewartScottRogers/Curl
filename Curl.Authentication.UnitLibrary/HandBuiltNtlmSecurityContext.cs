@@ -22,6 +22,15 @@ internal sealed class HandBuiltNtlmSecurityContext(SecurityContextRequest reques
     /// <inheritdoc />
     public bool IsCompleted { get; private set; }
 
+    /// <summary>
+    /// Gets which of curl's two buffer checks refused the AUTHENTICATE message:
+    /// <see cref="NtlmMessageFailure.None" /> until one does, then
+    /// <see cref="NtlmMessageFailure.ResponsesTooLarge" /> or
+    /// <see cref="NtlmMessageFailure.NamesTooLarge" />, so the authenticator can fail with the
+    /// message curl prints for that check.
+    /// </summary>
+    public NtlmMessageFailure AnswerRefusedBecause { get; private set; }
+
     /// <inheritdoc />
     public ValueTask<SecurityContextStep> NextTokenAsync(ReadOnlyMemory<byte> incomingToken, CancellationToken cancellationToken)
     {
@@ -59,7 +68,7 @@ internal sealed class HandBuiltNtlmSecurityContext(SecurityContextRequest reques
     /// <summary>
     /// Answers the CHALLENGE message: <see cref="SecurityContextStatus.MalformedToken" /> when
     /// it cannot be read, <see cref="SecurityContextStatus.Refused" /> when the answer passes
-    /// curl's 1024-byte buffer.
+    /// curl's 1024-byte buffer, keeping which check refused it in <see cref="AnswerRefusedBecause" />.
     /// </summary>
     private SecurityContextStep Answer(ReadOnlySpan<byte> incomingToken)
     {
@@ -68,8 +77,9 @@ internal sealed class HandBuiltNtlmSecurityContext(SecurityContextRequest reques
             return new SecurityContextStep(SecurityContextStatus.MalformedToken, []);
         }
 
-        if (!answerer.Answer(challenge, CurlUserName(), request.Password ?? string.Empty).TryEncode(out byte[]? message))
+        if (!answerer.Answer(challenge, CurlUserName(), request.Password ?? string.Empty).TryEncode(out byte[]? message, out NtlmMessageFailure failure))
         {
+            AnswerRefusedBecause = failure;
             return new SecurityContextStep(SecurityContextStatus.Refused, []);
         }
 

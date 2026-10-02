@@ -54,11 +54,18 @@ internal sealed class ConnectionStream(IConnection connection, bool ownsConnecti
     /// </summary>
     public bool TransportEnded { get; private set; }
 
+    /// <summary>
+    /// Gets or sets the detector every byte read is shown to, so the Schannel build can tell a
+    /// TLS 1.3 session ticket arrived (BL-1089); <see langword="null" /> shows them to none.
+    /// </summary>
+    public SessionTicketRecordDetector? TicketRecords { get; set; }
+
     /// <inheritdoc />
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
         var read = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         TransportEnded |= read == 0 && !buffer.IsEmpty;
+        TicketRecords?.ObserveReceived(buffer.Span[..read]);
         return read;
     }
 

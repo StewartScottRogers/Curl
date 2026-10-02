@@ -68,6 +68,23 @@ internal static class PinnedPublicKey
         return subjectPublicKeyInfo is not null && Matches(pinnedPublicKey, subjectPublicKeyInfo);
     }
 
+    /// <summary>
+    /// Returns what curl's <c>-v</c> line <c> public key hash:</c> names for a <c>sha256//</c>
+    /// pin, matching or not (ADR-0336, BL-877): <c>sha256//</c> and the base64 SHA-256 of the
+    /// server key. A file pin, no pin, and a server certificate that is missing or does not
+    /// parse print no line.
+    /// </summary>
+    /// <param name="pinnedPublicKey">The <c>--pinnedpubkey</c> value, or <see langword="null" /> when not given.</param>
+    /// <param name="peerCertificates">The DER of what the server sent, its own certificate first.</param>
+    /// <returns>The hash with its prefix, or <see langword="null" /> when curl prints no line.</returns>
+    internal static string? ReportedHash(string? pinnedPublicKey, ReadOnlyMemory<byte>[] peerCertificates) =>
+        pinnedPublicKey is not null
+        && pinnedPublicKey.StartsWith(HashPrefix, StringComparison.Ordinal)
+        && peerCertificates is [var serverCertificate, ..]
+        && SubjectPublicKeyInfoOf(serverCertificate) is { } subjectPublicKeyInfo
+            ? HashPrefix + HashOf(subjectPublicKeyInfo)
+            : null;
+
     // Under -k the hand-built client goes on with a server certificate that does not parse,
     // whose key then matches nothing.
     private static byte[]? SubjectPublicKeyInfoOf(ReadOnlyMemory<byte> certificateDer)

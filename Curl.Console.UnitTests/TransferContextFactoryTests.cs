@@ -443,6 +443,75 @@ public sealed class TransferContextFactoryTests
         Assert.AreEqual("Operation timed out after 1000 milliseconds with 7 bytes received", maxTime.Failure.ErrorMessage);
     }
 
+    [TestMethod]
+    public void Create_DumpHeader_DumpHeaderOutputIsTheDumpHeaderStream()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        using MemoryStream dumpHeader = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("-D", "h.txt", "gopher://h/1sel"), CurlUrl.Parse("gopher://h/1sel"), output, null, null, dumpHeader);
+
+        Assert.AreSame(dumpHeader, context.DumpHeaderOutput);
+    }
+
+    [TestMethod]
+    public void Create_IncludeAlone_DumpHeaderOutputIsNull()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("-i", "gopher://h/1sel"), CurlUrl.Parse("gopher://h/1sel"), output, null, null, null);
+
+        Assert.IsNotNull(context.HeaderOutput);
+        Assert.IsNull(context.DumpHeaderOutput);
+    }
+
+    [TestMethod]
+    public void Create_NeitherDumpHeaderNorInclude_DumpHeaderOutputIsNull()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("gopher://h/1sel"), CurlUrl.Parse("gopher://h/1sel"), output, null, null, null);
+
+        Assert.IsNull(context.DumpHeaderOutput);
+    }
+
+    [TestMethod]
+    public void Create_DumpHeaderWithInclude_DumpHeaderOutputIsTheDumpHeaderStreamNotStandardOutput()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        using MemoryStream dumpHeader = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("-D", "h.txt", "-i", "ftp://h/"), CurlUrl.Parse("ftp://h/"), output, null, null, dumpHeader);
+        context.DumpHeaderOutput!.Write("220 hi\r\n"u8);
+
+        Assert.AreSame(dumpHeader, context.DumpHeaderOutput);
+        Assert.AreEqual(0L, output.Length);
+    }
+
+    [TestMethod]
+    public void Create_DumpHeader_WritesToDumpHeaderOutputAndHeaderOutputLandInOrder()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        using MemoryStream dumpHeader = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("-D", "h.txt", "ftp://h/"), CurlUrl.Parse("ftp://h/"), output, null, null, dumpHeader);
+        context.DumpHeaderOutput!.Write("220 hi\r\n"u8);
+        context.HeaderOutput!.Write("Content-Length: 3\r\n"u8);
+        context.DumpHeaderOutput.Write("226 done\r\n"u8);
+
+        Assert.AreEqual("220 hi\r\nContent-Length: 3\r\n226 done\r\n", System.Text.Encoding.ASCII.GetString(dumpHeader.ToArray()));
+    }
+
     private static CommandLineOptions Parse(params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);

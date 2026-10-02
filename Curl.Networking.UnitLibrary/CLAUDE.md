@@ -22,14 +22,16 @@ anchor that cannot be loaded included, is an `IOException`, so the sender tries 
 Per ADR-0140 and ADR-0162 (BL-708) there are two TLS providers, and `TlsClientRouting.Choose`
 picks one from a `TlsClientOptions` as one pure function: `HandBuiltTlsProvider` when a row of
 ADR-0140's table holds (today a `MaximumVersion` of TLS 1.0 or 1.1, `RequireCertificateStatus`
-for `--cert-status` by ADR-0191, and `Curves` or `SignatureAlgorithms` by ADR-0151; each option task
+for `--cert-status` by ADR-0191, and `Curves` or `SignatureAlgorithms` by ADR-0151, and `SslSessionsFile` for `--ssl-sessions` by ADR-0319, whose `TlsSessionCache` the hand-built provider offers and keeps TLS 1.3 sessions in, and `Ech` (any mode `EchModes.Of` does not read as `Off`) for `--ech` by ADR-0327, where `EchOffer` decides the TLS 1.3 hello's GREASE or ECH configuration (the `ecl:` list, else the host's HTTPS record through `IEchConfigListLookup`, which `DohDnsResolver` implements), `hard` without a usable one is exit 35 and a rejected offer exit 101, and `TlsUser` for `--tlsuser` by ADR-0328, where `TlsSrp` builds the SRP login, swaps the TLS 1.2 suites for OpenSSL's `SRP` list unless `--ciphers` is given and writes curl's two `-v` lines, no `--tlspassword` being exit 43 and every exit 35 the OpenSSL build's line, and `NoSessionId` for `--no-sessionid` and `AllowBeast` with a TLS 1.0 minimum for `--ssl-allow-beast` by ADR-0330 (BL-713): the hand-built provider offers and keeps the run's `TlsSessionCache` sessions by default, `--ssl-sessions` or not, none under `NoSessionId`, and `AllowBeast` turns off the TLS 1.0 CBC empty fragment (`InsertsEmptyFragment`), and `AllowEarlyData` for `--tls-earlydata` by ADR-0337 (BL-1105): on a resumed TLS 1.3 session allowing early data with an offered ALPN protocol the provider returns an `EarlyDataTlsConnection`, whose first write runs the handshake carrying it as 0-RTT early data, a failure thrown as `DeferredTlsHandshakeFailedException`; each option task
 adds its row and a data row in `TlsClientRoutingTests`), `SslStreamTlsProvider` otherwise. Per
 ADR-0284 (BL-709) `CurvesAndSignatureAlgorithms.Apply` reads `--curves` through `OpenSslGroupList`
 and `--sigalgs` through `OpenSslSignatureAlgorithmList` (OpenSSL 3.5's syntax on every platform)
 and swaps the result into the profile's `supported_groups`, `key_share` and `signature_algorithms`;
 a refused value is exit 59 and an empty list exit 35, with OpenSSL's text. With `--cert-status` the hand-built
 client asks for the stapled OCSP response and a rejected one is exit 91 with
-`CertificateStatusFailureMessages`' text on every platform. Per ADR-0191 `--ssl-auto-client-cert`
+`CertificateStatusFailureMessages`' text on every platform; a good, revoked or unknown status is
+also reported as `-v`'s `SSL certificate status: ...` info line by `CertificateStatusText`
+(ADR-0335), after the handshake event or before the exit 91 failure. Per ADR-0191 `--ssl-auto-client-cert`
 (`TlsClientOptions.AutoClientCertificate`) without `--cert` makes `ClientCertificateLoader.Load`
 present the certificate `AutomaticClientCertificate.Choose` takes from `CurrentUser\MY`, in both
 providers; `HandBuiltTlsProviderTests.CertificateStatus` drives it against `Fakes/Tls13Server`,
@@ -50,7 +52,11 @@ builds the chain and the `SslPolicyErrors` `SslStream` would. Both load `--cert`
 `ClientCertificateLoader.Load`. Per ADR-0193 `ServerCertificateVerification.Judge` also checks
 `--pinnedpubkey` (`TlsClientOptions.PinnedPublicKey`) once the certificate is accepted, `-k` included:
 `PinnedPublicKey` matches `sha256//` hashes or a PEM or DER key file as curl's `Curl_pin_peer_pubkey`
-does, and a mismatch is exit 90 in both providers. Per ADR-0197 the OpenSSL build, unless `-k`,
+does, and a mismatch is exit 90 in both providers. Per ADR-0336 (BL-877) `Judge` also records on
+`PeerVerification` the server key's `sha256//` hash for a hash pin, which a completed handshake
+carries as `TlsHandshakeEvent.PinnedPublicKeyHash` (`-v`'s ` public key hash:` line) and a refusal
+reports through `ReportPinnedPublicKeyRefusal`: the hash line and the mismatch line, twice in the
+Schannel build and once in the OpenSSL build. Per ADR-0197 the OpenSSL build, unless `-k`,
 reads `--crlfile` (`TlsClientOptions.CertificateRevocationListFile`) in `ReadTrustAnchors` through
 `CertificateRevocationListFile` (exit 82 through `CertificateRevocationListFileException` and
 `TrustAnchorsUnusable`) and `Judge` checks every chain certificate against a list from its issuer,
@@ -73,7 +79,7 @@ adapter and returns an `SslStreamConnection`. With `--cacert` (`TlsClientOptions
 it trusts only the certificates in that PEM file; there the Schannel build also checks
 revocation below the root unless `TlsClientOptions.SkipRevocationCheck` (`--ssl-no-revoke`)
 is set, and names the first of a certificate out of date, an incomplete chain, an untrusted
-root and an unknown revocation status (ADR-0086, BL-368). There too the Schannel build accepts
+root and an unknown revocation status (ADR-0321, BL-368). There too the Schannel build accepts
 a certificate with no DNS subjectAltName whose CN matches the host, as `SchannelCommonNameCheck`
 matches it the way curl's `Curl_cert_hostcheck` does (ADR-0103, BL-415). Against the system store a
 certificate that is only out of date is exit 35 with `SEC_E_CERT_EXPIRED`. Per ADR-0009 it behaves like the curl
@@ -133,22 +139,29 @@ and client certificate are ready (`-k`, the `--cacert` file or else the referenc
 default bundle name `/cacert.pem`, which is named but never read, and `--capath`), sets the
 event's `VerifiedHostName` (the host without IPv6 brackets, `null` with `-k`) and `IsProxy`;
 `TcpConnector` reports the HTTPS proxy's handshake, and a forward proxy's, with `IsProxy` set
-through `IHandshakeReportingTlsProvider`'s `isProxy` argument. `SslStream` exposes no TLS
-records, so no `TlsMessageEvent` is reported. Per ADR-0124 the origin handshake of an `https://`
+through `IHandshakeReportingTlsProvider`'s `isProxy` argument. Per ADR-0305 (BL-1088) a `--cert`
+that does not load still reports the trust first in the Schannel build, with `TargetsIpAddress`
+`false` (curl writes no SNI line), through `ReportTrustBeforeClientCertificateFailure`, in both
+providers; the OpenSSL build reports none. `SslStream` exposes no TLS
+records, so no `TlsMessageEvent` is reported, with one exception (ADR-0309, BL-1089): in the Schannel
+build after a TLS 1.3 handshake, `ConnectionStream.TicketRecords` (a `SessionTicketRecordDetector`)
+follows the record boundaries read, and at the first read returning plaintext `SslStreamConnection`
+reports each leading record no application data accounts for as a received `NewSessionTicket`, so
+`-v` writes curl's `schannel:` renegotiation lines. Per ADR-0124 the origin handshake of an `https://`
 transfer offers `http/1.1` through ALPN (`TcpConnector.ApplicationProtocolsFor`), none under `--no-alpn`
 (`TlsClientOptions.UseAlpn`); the Schannel build under `--ssl-revoke-best-effort`
 (`TlsClientOptions.RevocationCheckBestEffort`) accepts a `--cacert` chain whose only faults are an
 unknown or offline revocation status; and `TcpDialer` sets `TCP_NODELAY` and `SO_KEEPALIVE` from
 `TcpSocketOptions` (`--no-tcp-nodelay`, `--no-keepalive`), with the keepalive idle time, interval and probe
 count from `--keepalive-time` and `--keepalive-cnt` (`TcpSocketOptions.FromCommandLine`), in `ApplySocketOptions`,
-which unit tests measure; a timer the platform refuses is skipped, as libcurl skips it.
+which unit tests measure; a timer the platform refuses is skipped, as libcurl skips it. Per ADR-0316 (BL-646) it also sets `--ip-tos` as `IP_TOS` or `IPV6_TCLASS` and `--vlan-priority` as `SO_PRIORITY` (Linux only), raw in each system's numbers, as `QualityOfServiceSocketOptions.For` lists them. Per ADR-0317 (BL-647) `--tcp-fastopen` adds the Fast Open option `FastOpenSocketOption.For` lists (Windows, Linux, macOS), and `--mptcp` opens the socket with protocol 262 (`TcpSocketOptions.SocketProtocol`); where the system refuses that socket, `AddressFamilyRace` asks `ITcpDialer.FailureToOpenSocket` first and writes curl's `failed to open socket` lines (`SocketOpenFailedLines`) in place of `Trying`, ending in exit 7.
 Per ADR-0100 it also reports curl's `-v` connect lines on the target's `Events`: `Trying` before
 each dial, `connect to ... failed: <reason>` after each failed one (the reason from
 `ConnectFailureReason`), the exit 7 message, and `ReportConnectionOpened` once any tunnel and
 TLS handshake are done, numbering its connections from `0` in `ConnectResult.ConnectionNumber`.
 Per ADR-0109 a connect that fails after its options parse takes the next number too, through
 `NumberedConnectFailure`, as curl 8.21.0 numbers the connection it tried.
-Per ADR-0113 it keeps curl's DNS cache for its life (one command line): a host and port it
+Per ADR-0113 it keeps curl's DNS cache, a `DnsCache` it is given (one per run, shared by every `--next` option group, BL-1053) or one of its own: a host and port it
 resolved before, or one a `--resolve` entry answers, is answered without `IDnsResolver` and
 reported as `Hostname H was found in DNS cache` before `Trying`. Per ADR-0114 every answer is
 then reported as `Host H:P was resolved.`, `IPv6: ...` and `IPv4: ...`, naming the host as
@@ -183,7 +196,16 @@ comes from `HttpProxyTunnelOptions.ProxyAuthenticator` (`PreemptiveBasicProxyAut
 when none is given) for `ProxyAuthSchemes`: asked first with no challenge, and after a `407` to a
 CONNECT that sent none with its `Proxy-Authenticate` values, the answer sent on the same
 connection after the `Content-Length` body unless the reply closes it or is chunked, else on a
-newly dialled one. A `407` to a CONNECT that sent a credential goes on through `ContinueAuthorizationAsync`, which only NTLM (Type 3 for the Type 2) and Negotiate (the next token) answer (ADR-0270, BL-604); otherwise it is exit 7, or the authenticator's exit code (94) when it fails. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
+newly dialled one. A `407` to a CONNECT that sent a credential goes on through `ContinueAuthorizationAsync`, which only NTLM (Type 3 for the Type 2) and Negotiate (the next token) answer (ADR-0270, BL-604); otherwise it is exit 7, or the authenticator's exit code (94) when it fails. Per BL-863 each
+CONNECT reports curl 8.21.0's `-v` lines on the target's `Events` through `ConnectTunnelVerboseLines`:
+`Proxy auth using <scheme> with user '<user>'` when a scheme is picked (Digest before the first
+`--proxy-digest` CONNECT too), `Establishing HTTP proxy tunnel to <host>:<port>`, the request head
+(`ReportRequestHeader`), each reply line (`ReportResponseHeader`) with `<scheme> authentication
+problem, ignoring.` after a `407`'s `Proxy-Authenticate` line refusing a sent Basic or Digest value,
+and `Connect me again please` before a redial. Per ADR-0342 (BL-964) a `2xx` reply is followed by
+`CONNECT phase completed for HTTP proxy` and `CONNECT tunnel established, response <code>`, and the
+OpenSSL build (`HttpProxyTunnelOptions.MatchesSchannelBuild` false, the default off Windows) writes
+`allocate connect buffer` once per proxy connection before its first CONNECT's lines. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
 `Socks5Hostname`) `SocksProxyTunnel` runs curl 8.21.0's handshake, measured byte for byte
 (BL-213): `Socks4Handshake` resolves the target locally and sends its first IPv4 address,
 SOCKS4a sends the host as written; `Socks5Handshake` offers no authentication and GSSAPI (and
@@ -219,7 +241,7 @@ parses them (measured; BL-214). The first `--connect-to` mapping matching the UR
 and port gives the `ConnectDestination` that is resolved, dialled and named in the CONNECT
 request; TLS still verifies the URL's host. A `--resolve` entry for the host and port being
 resolved, the proxy's included, answers in place of `IDnsResolver`. An entry or a matching
-mapping that does not parse fails the connect with exit 49 and curl's message. Per ADR-0208
+mapping that does not parse fails the connect with exit 49 and curl's message. Per ADR-0325
 (BL-878) a target's `AltSvcRoute` (`--alt-svc`) is dialled the same way when no mapping matched,
 after curl's `Alt-svc connecting from [h1]H:P to [h1]H2:P2` line, and `ConnectionPoolKey` keys on
 the alternative too.
@@ -267,6 +289,9 @@ one, closed by its `DisposeAsync`; `new PoolingConnector(inner, cache, configura
 given cache, which only its owner closes, and puts `configuration` into `ConnectionPoolKey`
 (`Configuration`, compared with `Equals`), so connectors over one cache - the `--next` option groups
 of one run - reuse each other's connections only when their configurations are equal.
+The cache is also the run's `IConnectionNumbers`, which `PoolingConnector.ConnectionNumbers`
+hands to `FileProtocolHandler`, so a `file://` transfer takes the next number in the same count
+(ADR-0347, BL-977), as `NumberingDatagrams` does for a TFTP channel (ADR-0346).
 
 Per BL-717 a pooled connection whose `IConnectionSession` multiplexes (HTTP/2) is shared, not
 checked out: while its session's `ConcurrentTransferLimit` has streams to spare, a transfer with the
@@ -294,13 +319,21 @@ Per ADR-0295 (BL-1027) the bind writes curl's `-v` lines, texts in `LocalBindLin
 `Events`, which `TcpConnector` gives each race's `LocalBindingTcpDialer`: the chooser writes
 `Name ... resolved to` and the `Could not resolve host`/`Could not bind to` lines, and `TcpDialer`,
 through the `ITcpDialer.DialFromAsync` overload taking `ITransferEvents` (whose default writes nothing)
-and `DialFromDeviceAsync`, writes `socket successfully bound to interface`, and `BindLocalEnd` the
+and `DialFromDeviceAsync`, writes `socket successfully bound to interface` (decided in the covered
+`TcpDialer.BindDeviceOrLocalEndAsync`, which the test fake `FakeDeviceBindingTcpDialer` runs too, BL-1076), and `BindLocalEnd` the
 `Bind to local port N failed, trying next`, `Local port: N` and `bind failed with errno N` lines.
 Per ADR-0292 (BL-1025) QUIC's UDP sockets bind the same way: `TcpConnector` puts the chooser on
 `QuicDialRequest.LocalBinding`, and `QuicDialer` binds each socket through
 `IUdpChannelOpener.OpenFrom` (`TcpDialer.BindLocalEnd` walks the range) before it reports the trust
 anchors; a failed bind moves on to the next address and ends with exit 45, 43 or 7 and the one line
 `Failed to connect to <host> port <port> after N ms: <words>`, with no `QUIC connect to` line.
+Per BL-1077 an `--interface` name is first bound as a device there too, through
+`IUdpChannelOpener.OpenFromDeviceAsync`, whose `UdpChannelOpener` runs the same
+`TcpDialer.BindDeviceOrLocalEndAsync` with `TcpDialer.TryBindToDevice` (internal constructor seam for
+tests): a plain or `if!` name bound so binds no address or port (the socket then binds any address on
+an ephemeral port, as the kernel would on the first send), `ifhost!` goes on to bind its host. Per ADR-0352
+(BL-1078) `QuicDialer` passes the target's `Events` to the chooser and to both `IUdpChannelOpener`
+methods, so a QUIC bind writes the TCP path's `-v` lines, as curl.se's ngtcp2 build does (measured, BL-1025).
 
 Per ADR-0149 (BL-507) `TcpConnector` takes an optional `UnixSocketAddress` (`--unix-socket`,
 `--abstract-unix-socket`, whose name starts with a NUL). With one, every connect dials it through
@@ -324,7 +357,12 @@ bytes and a query over 272 bytes. `DnsAnswerDecoder` returns a `DnsAnswer`: the 
 type asked for (at most 24), the CNAME targets followed through compression pointers (at most 4),
 the smallest TTL, or a `DnsMessageFailure`, a pointer loop ending as `LabelLoop` after 128 steps.
 `DnsMessageFailureText` gives curl's `--trace-config doh` text for each failure. For an SRV query
-the decoder also keeps each SRV record as `DnsAnswer.ServiceRecords` (`DnsServiceRecord`).
+the decoder also keeps each SRV record as `DnsAnswer.ServiceRecords` (`DnsServiceRecord`). Per
+ADR-0312 (BL-707), for an HTTPS (type 65) query it keeps the first four HTTPS records' data
+undecoded as `DnsAnswer.HttpsRecordData`, as curl's `doh_store_https` does, and
+`ServiceBindingRecordDecoder` decodes one into a `ServiceBindingRecord` (RFC 9460: priority, target,
+`alpn`, `no-default-alpn`, `port`, `ipv4hint`, `ech`, `ipv6hint`; other keys skipped), refusing a
+malformed one with a `ServiceBindingFailure`.
 
 `DohDnsResolver` (ADR-0152 and its BL-641 amendment) is the `IDnsResolver` behind `--doh-url`. It
 takes an `IConnector` for the DoH connections (a `TcpConnector` of its own, built with the system
@@ -335,7 +373,10 @@ carries `PoolScheme` `https`, so the handshake offers ALPN `http/1.1`. `DohRespo
 response as curl does: status and `Content-Type` ignored, a `Content-Length` or chunked body of at
 most 3000 bytes, anything else a failure. It returns the AAAA answer's addresses, then the A
 answer's; a query that fails yields none, and none from both makes `TcpConnector` fail with exit 6.
-IP literals and `localhost` (`TcpConnector.IsLocalhost`) are answered without a query. Its tests
+IP literals and `localhost` (`TcpConnector.IsLocalhost`) are answered without a query.
+`ResolveHttpsRecordAsync` (ADR-0312, BL-707) POSTs one HTTPS query, for the host on port 443 and
+`_<port>._https.<host>` on any other, and returns the answer's first record decoded, its
+`EchConfigList` the configuration `--ech` uses, or `null`. Its tests
 drive it through `Fakes/FakeConnector`'s `BytesToRead` and through a `TcpConnector` over fakes.
 
 Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
@@ -348,7 +389,7 @@ parse is `DnsLookupFailure.BadConfiguration`, exit 43. Without `--dns-servers` i
 over UDP), to the servers in list order for `Rounds` rounds, waiting `FirstTimeout` doubled each
 round on its `TimeProvider`; a truncated reply is asked again over TCP. Replies are matched
 (`DnsReplyMatch`) and read through `DnsAnswerDecoder` into a `DnsQueryOutcome`. It implements
-`IDnsResolverWithFailureReason`, so `TcpConnector` and `UdpDatagramConnector` add c-ares' reason
+`IDnsResolverWithFailureReason`, so `TcpConnector` (the SOCKS4 and SOCKS5 local resolve included, BL-829) and `UdpDatagramConnector` add c-ares' reason
 (`DnsLookupFailureText`) in brackets, or make it exit 43, through `NameResolutionFailure`.
 `ResolveServiceAsync` looks up SRV records for Kerberos KDC location (BL-689). Sockets come from
 `IDnsSocketOpener`; tests use `Fakes/ScriptedDnsSocketOpener` and `ManualTimeProvider`.
@@ -370,7 +411,7 @@ recvfrom() ...`. This project therefore references `Curl.Quic.UnitLibrary`, whic
 `Curl.Networking.UnitTests` see its internals: `Fakes/QuicTestServer` and `QuicTestTlsServer` are
 copies of `Curl.Quic.UnitTests`' in-memory server, reached through `Fakes/QuicServerChannelOpener`.
 `PoolingConnector.ConnectMultiplexedAsync` passes straight through to its inner connector.
-Per ADR-0289 (BL-942) a target whose `Proxy` is an HTTP, HTTP/1.0 or HTTPS proxy is not
+Per ADR-0250 (BL-942) a target whose `Proxy` is an HTTP, HTTP/1.0 or HTTPS proxy is not
 resolved: `TcpConnector.UdpTunnel.cs` dials the proxy, sends curl 8.22.0's CONNECT-UDP request
 (`HttpProxyTunnel.BuildConnectUdpRequest`), takes a `101` or `2xx` (`OpensUdpTunnel`), and hands
 `QuicDialer.DialThroughTunnelAsync` a `CapsuleDatagramChannel`, which carries each datagram as an
@@ -388,7 +429,15 @@ message) at `error`; `proxy` the CONNECT or SOCKS handshake at `verbose` and the
 at `info`, each certificate and the chain verdict at `verbose`, a failed handshake at `error`;
 `quic` the dial at `verbose`, the connection at `info`, a failure at `error`. The handshake's details
 come from the `TlsHandshakeEvent` the provider reports, caught by `HandshakeCapturingTransferEvents`,
-which wraps the target's events only when `info` is on. A proxy is named by kind, host and port and
+which wraps the target's events only when `warning` is on. Per BL-968 the `tls` info line ends with
+why the options chose the hand-built client (`IHandshakeReportingTlsProvider.RouteReason`, the first
+row of `TlsClientRouting.Reason`'s table that holds); a certificate `--ssl-revoke-best-effort`
+accepted with its revocation status offline or unknown (`PeerVerification.RevocationCheckIncomplete`,
+passed by `SslStreamTlsProvider` to the capturing events) is a `tls` `warning`; a Unix domain socket
+connection is a `connect` `info` line, a refused one the usual `connect` `error`; and
+`UdpDatagramConnector`, given the run's `IDiagnosticLog`, logs its resolve as `dns` `info` (a
+`--resolve` entry as from the DNS cache), a name with none as `dns` `error`, the channel as
+`connect` `info` and no channel as `connect` `error`. A proxy is named by kind, host and port and
 no credential, pass phrase or `Proxy-Authorization` reaches the log; `Curl.Tls` and `Curl.Quic`
 log nothing themselves. Tests record lines through `Fakes/RecordingDiagnosticLog`.
 

@@ -47,4 +47,26 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
 
         return connect;
     }
+
+    /// <summary>
+    /// Opens the QUIC session through the wrapped connector, so its pool shares it, recording
+    /// the endpoints of a new or reused one as <see cref="ConnectAsync" /> does (BL-735).
+    /// </summary>
+    /// <param name="target">What to connect to.</param>
+    /// <param name="openSession">Builds the session over a new QUIC connection.</param>
+    /// <param name="cancellationToken">Cancels the connect.</param>
+    /// <returns>The wrapped connector's result.</returns>
+    public async ValueTask<ConnectResult> ConnectMultiplexedSessionAsync(
+        ConnectTarget target,
+        Func<IMultiplexedConnection, IConnection> openSession,
+        CancellationToken cancellationToken)
+    {
+        ConnectResult connect = await connector.ConnectMultiplexedSessionAsync(target, openSession, cancellationToken).ConfigureAwait(false);
+        if (connect.Connection is { } connection)
+        {
+            recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint);
+        }
+
+        return connect;
+    }
 }

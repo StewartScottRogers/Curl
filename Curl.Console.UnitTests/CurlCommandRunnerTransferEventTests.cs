@@ -137,6 +137,31 @@ public sealed class CurlCommandRunnerTransferEventTests
     }
 
     [TestMethod]
+    public async Task RunAsync_TraceConfigIdsBeforeV_MarksEachTransfersLinesWithItsIds()
+    {
+        // curl 8.21.0 kept --trace-config ids through the first -v that clears --trace-ids (measured 2026-10-01, BL-649 Notes).
+        int exitCode = await RunAsync(
+            ["-s", "--trace-config", "ids", "-v", "http://127.0.0.1:18441/f.txt", "http://127.0.0.1:18441/f.txt", "-o", "o", "-o", "p"],
+            MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(MeasuredVerboseLines("[0-0] ") + MeasuredVerboseLines("[1-1] "), StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigTlsHttp1AndUnknownName_WritesNoLinesBeyondV()
+    {
+        // curl 8.21.0's Schannel build wrote nothing more for --trace-config tls, http/1 or bogus
+        // than for -v alone, over HTTP and over HTTPS (measured 2026-10-01, BL-649 Notes, ADR-0318).
+        int exitCode = await RunAsync(
+            ["-s", "-v", "--trace-config", "tls,http/1,bogus", "http://127.0.0.1:18441/f.txt", "http://127.0.0.1:18441/f.txt", "-o", "o", "-o", "p"],
+            MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(MeasuredVerboseLines(string.Empty) + MeasuredVerboseLines(string.Empty), StandardErrorText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_TraceIdsAndConnId_PrintTheSameConnectionNumbers()
     {
         await RunAsync(

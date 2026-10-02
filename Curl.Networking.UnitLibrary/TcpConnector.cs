@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
@@ -94,6 +93,11 @@ namespace Curl.Networking;
 /// written first on every new connection once it is dialled and any proxy tunnel is open, before the
 /// target's TLS handshake, from the socket's own ends (BL-616); <see langword="null" /> to send none.
 /// </param>
+/// <param name="dnsCache">
+/// The DNS cache this connector answers from and adds to, which the connectors of every
+/// <c>-:</c>/<c>--next</c> option group of one run share as curl 8.21.0 shares its cache (BL-1053);
+/// <see langword="null" /> for a cache of this connector's own.
+/// </param>
 public sealed partial class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -113,9 +117,14 @@ public sealed partial class TcpConnector(
     INetworkInterfaceLookup? networkInterfaceLookup = null,
     ProxyEndpoint? preProxy = null,
     Socks5AuthenticationOptions? socks5Authentication = null,
-    HaproxyProtocolHeader? haproxyProtocol = null) : IConnector
+    HaproxyProtocolHeader? haproxyProtocol = null,
+    DnsCache? dnsCache = null) : IConnector
 {
     private const string AnyHost = "*";
+
+    // curl 8.21.0 dials an HTTP proxy that keeps closing on a 407 at most five more times, then
+    // fails with "Could not connect to server" (measured with stale Digest challenges, BL-864 Notes).
+    private const int MaxProxyReconnects = 5;
 
     /// <summary>
     /// Gets curl's <c>DEFAULT_CONNECT_TIMEOUT</c>, 300 seconds: the connect timeout when no
@@ -187,14 +196,20 @@ public sealed partial class TcpConnector(
     /// <summary>
     /// Gets what the handshake for HTTP over TLS to the origin offers through ALPN (ADR-0141).
     /// </summary>
-    public IReadOnlyList<string> HttpOverTlsApplicationProtocols { get; } =
+    public IReadOnlyList<string> HttpOverTlsApplicationProtocols =>
         httpOverTlsApplicationProtocols ?? HttpApplicationProtocols.Http11Only;
 
     private readonly ITlsProvider _proxyTlsProvider = proxyTlsProvider ?? tlsProvider;
     private readonly HttpProxyTunnelOptions _proxyTunnelOptions = proxyTunnelOptions ?? HttpProxyTunnelOptions.Default;
     private readonly ResolveOverrides _resolveOverrides = resolveOverrides ?? ResolveOverrides.None;
     private readonly ConnectToMappings _connectToMappings = connectToMappings ?? ConnectToMappings.None;
-    private readonly ConcurrentDictionary<string, DnsCacheEntry> _dnsCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly DnsCache _dnsCache = dnsCache ?? new DnsCache();
+
+    /// <summary>
+    /// Gets the DNS cache this connector answers from and adds to: the <c>dnsCache</c> it was
+    /// given, or one of its own.
+    /// </summary>
+    public DnsCache DnsCache => _dnsCache;
     private readonly ConditionalWeakTable<ConnectTarget, object> _altSvcReported = new();
     private int _resolveEntriesLoaded;
     private long _nextConnectionNumber;
@@ -315,7 +330,7 @@ public sealed partial class TcpConnector(
     /// connector opened from <c>0</c> (<see cref="ConnectResult.ConnectionNumber" />). A connect
     /// that fails after its options parse takes the next number too, as curl 8.21.0 numbers the
     /// connection it tried (ADR-0109). A host and port answered by a <c>--resolve</c> entry, or
-    /// resolved before by this connector (to the host, the proxy or a SOCKS target), are
+    /// resolved before through its <see cref="DnsCache" /> (to the host, the proxy or a SOCKS target), are
     /// answered from that cache and reported first as <c>Hostname &lt;host&gt; was found in DNS
     /// cache</c>, as curl 8.21.0 reports them (measured, BL-481). Every answer, cached or
     /// looked up, is then reported as <c>Host &lt;name&gt;:&lt;port&gt; was resolved.</c>,
@@ -627,6 +642,8 @@ public sealed partial class TcpConnector(
                 CurlErrorBuffer.Truncate($"Failed to connect to {target.Host}:{target.Port} over unix://{unixSocket.Path} after {elapsedMilliseconds} ms: Could not connect to server"));
         }
 
+        // A refused dial reaches the diagnostic log at error through ConnectWithinAsync (BL-968).
+        new NetworkDiagnosticLog(target.DiagnosticLog).UnixSocketConnected(unixSocket.Path);
         var dialed = new DialedSocket(connection, null, unixSocket.Path, null, name, unixSocket.Path);
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
         return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken).ConfigureAwait(false);
@@ -667,16 +684,16 @@ public sealed partial class TcpConnector(
         var cacheKey = DnsCacheKey(entry.Host, entry.Port);
         if (entry.IsRemoval)
         {
-            _dnsCache.TryRemove(cacheKey, out _);
+            _dnsCache.Remove(cacheKey);
             return;
         }
 
-        if (_dnsCache.ContainsKey(cacheKey))
+        if (_dnsCache.Contains(cacheKey))
         {
             events.ReportInfo($"RESOLVE {entry.Host}:{entry.Port} - old addresses discarded");
         }
 
-        _dnsCache[cacheKey] = new DnsCacheEntry(entry.Host, entry.Port, entry.Addresses);
+        _dnsCache.Store(cacheKey, new DnsCacheEntry(entry.Host, entry.Port, entry.Addresses));
         events.ReportInfo($"Added {entry.Host}:{entry.Port}:{entry.AddressText} to DNS cache{(entry.IsPermanent ? string.Empty : " (non-permanent)")}");
         if (entry.Host == AnyHost)
         {
@@ -706,7 +723,7 @@ public sealed partial class TcpConnector(
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);
         var resolveStarted = log.IsEnabled(DiagnosticLogLevel.Info) ? timeProvider.GetTimestamp() : 0;
         var cacheKey = DnsCacheKey(host, port);
-        if ((_dnsCache.GetValueOrDefault(cacheKey) ?? _dnsCache.GetValueOrDefault(DnsCacheKey(AnyHost, port))) is { } cached)
+        if ((_dnsCache.Find(cacheKey) ?? _dnsCache.Find(DnsCacheKey(AnyHost, port))) is { } cached)
         {
             var fromCache = AnswerFromCache(host, cached, target.Events);
             LogResolution(log, host, port, fromCache, fromCache: true, resolveStarted);
@@ -718,7 +735,7 @@ public sealed partial class TcpConnector(
         if (answered.Count > 0)
         {
             var resolved = new DnsCacheEntry(host, port, answered);
-            _dnsCache[cacheKey] = resolved;
+            _dnsCache.Store(cacheKey, resolved);
             ReportResolved(resolved, target.Events);
         }
 
@@ -743,10 +760,6 @@ public sealed partial class TcpConnector(
             log.Resolved(host, port, dialable, fromCache, timeProvider.GetElapsedTime(resolveStarted));
         }
     }
-
-    /// <summary>Resolves as <see cref="ResolveWithFailureReasonAsync" /> does, for a SOCKS handshake, which needs only the addresses.</summary>
-    private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken) =>
-        (await ResolveWithFailureReasonAsync(host, port, target, cancellationToken).ConfigureAwait(false)).Addresses;
 
     /// <summary>Asks the resolver, with its failure reason when it gives one.</summary>
     private async ValueTask<DnsResolution> LookUpAsync(string host, CancellationToken cancellationToken) =>
@@ -815,17 +828,25 @@ public sealed partial class TcpConnector(
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var proxyAuthorization = await CreateProxyAuthorizationAsync(destination, proxy, [], cancellationToken).ConfigureAwait(false);
+        var authenticatorEvents = new SspiFailureRecordingTransferEvents(target.Events);
+        var proxyAuthorization = await CreateProxyAuthorizationAsync(destination, proxy, [], authenticatorEvents, cancellationToken).ConfigureAwait(false);
         var answersChallenge = false;
+        var reconnects = 0;
         while (true)
         {
             // A 407 answered on a connection the proxy closes is sent again on a new one, as
             // curl 8.21.0 connects again ("Connect me again please", BL-602 Notes).
             var (result, redialAuthorization) = await DialAndOpenThroughProxyAsync(
-                addresses, new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge), proxyAuthorization, cancellationToken).ConfigureAwait(false);
+                addresses, new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge, authenticatorEvents), proxyAuthorization, cancellationToken).ConfigureAwait(false);
             if (result is not null)
             {
                 return result;
+            }
+
+            target.Events.ReportInfo(ConnectTunnelVerboseLines.ConnectAgain);
+            if (++reconnects > MaxProxyReconnects)
+            {
+                return ConnectResult.Failed(CurlExitCode.CouldntConnect, "Could not connect to server");
             }
 
             proxyAuthorization = redialAuthorization;
@@ -845,7 +866,7 @@ public sealed partial class TcpConnector(
         string? proxyAuthorization,
         CancellationToken cancellationToken)
     {
-        var (target, destination, proxy, started, nameResolved, _) = tunnel;
+        var (target, destination, proxy, started, nameResolved, _, _) = tunnel;
         var firstHop = FirstHopTo(proxy);
         var (dialed, lastDialError, lastBindFailure) = await DialFirstReachableAsync(addresses, firstHop.Port, firstHop.Host, target, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
@@ -862,7 +883,7 @@ public sealed partial class TcpConnector(
         }
 
         if (!ReferenceEquals(firstHop, proxy)
-            && await OpenSocksHopAsync(dialed.Connection, target, new ConnectDestination(proxy.Host, proxy.Port, IsMapped: false, ParseError: null), firstHop, cancellationToken).ConfigureAwait(false) is { } preProxyFailure)
+            && await OpenSocksHopAsync(dialed, target, new ConnectDestination(proxy.Host, proxy.Port, IsMapped: false, ParseError: null), firstHop, cancellationToken).ConfigureAwait(false) is { } preProxyFailure)
         {
             return (preProxyFailure, null);
         }
@@ -878,14 +899,17 @@ public sealed partial class TcpConnector(
     /// <summary>
     /// Asks <see cref="HttpProxyTunnelOptions.ProxyAuthenticator" /> for the CONNECT's
     /// <c>Proxy-Authorization</c> to <paramref name="destination" />: with no challenges for the
-    /// first CONNECT, with a <c>407</c>'s <c>Proxy-Authenticate</c> values after one.
+    /// first CONNECT, with a <c>407</c>'s <c>Proxy-Authenticate</c> values after one. The
+    /// authenticator reports its <c>-v</c> lines, such as a Negotiate context's failure, to
+    /// <paramref name="authenticatorEvents" />.
     /// </summary>
     private ValueTask<string?> CreateProxyAuthorizationAsync(
         ConnectDestination destination,
         ProxyEndpoint proxy,
         IReadOnlyList<string> challenges,
+        ITransferEvents authenticatorEvents,
         CancellationToken cancellationToken) =>
-        ProxyAuthenticator.CreateAuthorizationAsync(ProxyAuthRequestOf(destination, proxy), challenges, cancellationToken);
+        ProxyAuthenticator.CreateAuthorizationAsync(ProxyAuthRequestOf(destination, proxy) with { Events = authenticatorEvents }, challenges, cancellationToken);
 
     /// <summary>
     /// The authenticator that answers the proxy: <see cref="HttpProxyTunnelOptions.ProxyAuthenticator" />,
@@ -948,7 +972,7 @@ public sealed partial class TcpConnector(
         ConnectTimings timings,
         CancellationToken cancellationToken)
     {
-        if (await OpenSocksHopAsync(dialed.Connection, target, destination, proxy, cancellationToken).ConfigureAwait(false) is { } failure)
+        if (await OpenSocksHopAsync(dialed, target, destination, proxy, cancellationToken).ConfigureAwait(false) is { } failure)
         {
             return failure;
         }
@@ -974,16 +998,18 @@ public sealed partial class TcpConnector(
         PreProxy is { } socks && proxy.Kind is ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https ? socks : proxy;
 
     /// <summary>
-    /// Runs the SOCKS handshake to <paramref name="destination" /> over <paramref name="connection" />:
-    /// <see langword="null" /> once the tunnel is open, else the failure, with the connection disposed.
+    /// Runs the SOCKS handshake to <paramref name="destination" /> over <paramref name="dialed" />'s connection:
+    /// <see langword="null" /> once the tunnel is open, after curl's <c>Opened SOCKS connection</c>
+    /// line, else the failure, with the connection disposed and no line.
     /// </summary>
     private async ValueTask<ConnectResult?> OpenSocksHopAsync(
-        IConnection connection,
+        DialedSocket dialed,
         ConnectTarget target,
         ConnectDestination destination,
         ProxyEndpoint socks,
         CancellationToken cancellationToken)
     {
+        var connection = dialed.Connection;
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);
         log.SocksHandshakeStarting(socks, destination.Host, destination.Port);
         var (failure, exception) = await RunSocksHandshakeAsync(connection, destination, socks, target, cancellationToken).ConfigureAwait(false);
@@ -995,8 +1021,36 @@ public sealed partial class TcpConnector(
             return failure!;
         }
 
+        // curl 8.21.0 names the destination as given, not the address SOCKS4 or SOCKS5 sent for it,
+        // and the proxy by the address it dialled (measured for every kind and --preproxy, BL-1038).
+        // A SOCKS hop is always dialled over TCP, so both end points are known.
+        var local = dialed.LocalEndPoint!;
+        var via = dialed.RemoteEndPoint!;
+        target.Events.ReportInfo(
+            $"Opened SOCKS connection from {local.Address} port {local.Port} to {destination.Host} port {destination.Port} (via {via.Address} port {via.Port})");
         log.TunnelEstablished(socks, destination.Host, destination.Port, statusCode: 0);
         return null;
+    }
+
+    /// <summary>
+    /// Ends the CONNECT a <c>2xx</c> with <paramref name="statusCode" /> answered: its proxy
+    /// authorization, curl's <c>CONNECT phase completed</c> and <c>CONNECT tunnel established</c>
+    /// lines (BL-964), and the tunnel's diagnostic line; then runs the target's TLS when asked.
+    /// </summary>
+    private async ValueTask<ConnectResult> SecureOpenedTunnelAsync(
+        DialedSocket dialed,
+        TunnelRequest tunnel,
+        int statusCode,
+        string? proxyAuthorization,
+        CancellationToken cancellationToken)
+    {
+        EndProxyAuthorization(proxyAuthorization);
+        ConnectTunnelVerboseLines.ReportTunnelEstablished(tunnel.Target.Events, statusCode);
+
+        // For a tunnel, %{time_connect} is when the tunnel is open (ConnectTimings.Connected).
+        var timings = new ConnectTimings(tunnel.Started, tunnel.NameResolved, timeProvider.GetTimestamp(), null);
+        new NetworkDiagnosticLog(tunnel.Target.DiagnosticLog).TunnelEstablished(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port, statusCode);
+        return await SecureWhenAskedAsync(dialed, tunnel.Target, timings, statusCode, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1016,18 +1070,14 @@ public sealed partial class TcpConnector(
         var connection = dialed.Connection;
         var log = new NetworkDiagnosticLog(tunnel.Target.DiagnosticLog);
         var answersChallenge = tunnel.AuthorizationAnswersChallenge;
+        ConnectTunnelVerboseLines.ReportNewProxyConnection(tunnel.Target.Events, _proxyTunnelOptions.MatchesSchannelBuild);
         while (true)
         {
             log.TunnelRequested(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port);
-            var (reply, exception) = await RequestTunnelAsync(connection, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false);
+            var (reply, exception) = await RequestTunnelAsync(connection, tunnel, proxyAuthorization, answersChallenge, cancellationToken).ConfigureAwait(false);
             if (exception is null && reply.OpensTunnel)
             {
-                EndProxyAuthorization(proxyAuthorization);
-
-                // For a tunnel, %{time_connect} is when the tunnel is open (ConnectTimings.Connected).
-                var timings = new ConnectTimings(tunnel.Started, tunnel.NameResolved, timeProvider.GetTimestamp(), null);
-                log.TunnelEstablished(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port, reply.StatusCode);
-                return (await SecureWhenAskedAsync(dialed, tunnel.Target, timings, reply.StatusCode, cancellationToken).ConfigureAwait(false), null);
+                return (await SecureOpenedTunnelAsync(dialed, tunnel, reply.StatusCode, proxyAuthorization, cancellationToken).ConfigureAwait(false), null);
             }
 
             var (answer, onThisConnection, failure) = exception is null
@@ -1041,7 +1091,7 @@ public sealed partial class TcpConnector(
 
             if (!onThisConnection)
             {
-                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer).ConfigureAwait(false);
+                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer, tunnel.AuthenticatorEvents.FirstSspiFailure).ConfigureAwait(false);
             }
 
             proxyAuthorization = answer;
@@ -1065,17 +1115,20 @@ public sealed partial class TcpConnector(
     /// <summary>
     /// Disposes the proxy connection whether CONNECT failed, could not be sent or read, or is
     /// to be sent again on a new connection; then rethrows, or returns the tunnel's failure, or
-    /// <paramref name="redialAuthorization" /> for the new connection.
+    /// <paramref name="redialAuthorization" /> for the new connection. The failure's message is
+    /// <paramref name="firstSspiFailure" /> when the authenticator reported one, as curl
+    /// 8.21.0's error buffer keeps the transfer's first <c>failf</c> (BL-1033).
     /// </summary>
     private static async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> CloseUnopenedTunnelAsync(
         IConnection connection,
         HttpProxyTunnelReply reply,
         ExceptionDispatchInfo? exception,
-        string? redialAuthorization)
+        string? redialAuthorization,
+        string? firstSspiFailure)
     {
         await connection.DisposeAsync().ConfigureAwait(false);
         exception?.Throw();
-        return redialAuthorization is null ? (TunnelFailure(reply), null) : (null, redialAuthorization);
+        return redialAuthorization is null ? (TunnelFailure(reply, firstSspiFailure), null) : (null, redialAuthorization);
     }
 
     /// <summary>
@@ -1105,9 +1158,9 @@ public sealed partial class TcpConnector(
         string? answer;
         try
         {
-            answer = sentAuthorization is null
-                ? await CreateProxyAuthorizationAsync(tunnel.Destination, tunnel.Proxy, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false)
-                : await ProxyAuthenticator.ContinueAuthorizationAsync(ProxyAuthRequestOf(tunnel.Destination, tunnel.Proxy), sentAuthorization, !sentAnswersChallenge, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false);
+            answer = sentAuthorization is null || AnswersStaleDigest(sentAuthorization, reply)
+                ? await CreateProxyAuthorizationAsync(tunnel.Destination, tunnel.Proxy, reply.ProxyAuthenticate, tunnel.AuthenticatorEvents, cancellationToken).ConfigureAwait(false)
+                : await ProxyAuthenticator.ContinueAuthorizationAsync(ProxyAuthRequestOf(tunnel.Destination, tunnel.Proxy) with { Events = tunnel.AuthenticatorEvents }, sentAuthorization, !sentAnswersChallenge, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false);
         }
         catch (HttpAuthenticationFailedException failure)
         {
@@ -1119,27 +1172,66 @@ public sealed partial class TcpConnector(
             return (null, false, null);
         }
 
-        return (answer, reply.LeavesConnectionReusable
-            && await HttpProxyTunnel.DiscardBodyAsync(connection, reply.ContentLength, cancellationToken).ConfigureAwait(false), null);
+        return reply.LeavesConnectionReusable
+            ? await DiscardRejectedBodyAsync(connection, reply, answer, cancellationToken).ConfigureAwait(false)
+            : (answer, false, null);
+    }
+
+    /// <summary>
+    /// Decides whether <paramref name="reply" /> marks the nonce of the Digest answer
+    /// <paramref name="sentAuthorization" /> stale, so it is answered afresh with the new nonce,
+    /// as curl 8.21.0 does (BL-864 Notes).
+    /// </summary>
+    private static bool AnswersStaleDigest(string sentAuthorization, HttpProxyTunnelReply reply) =>
+        sentAuthorization.StartsWith("Digest ", StringComparison.Ordinal) && DigestStaleChallenge.IsOfferedIn(reply.ProxyAuthenticate);
+
+    /// <summary>
+    /// Discards the body of a reply that leaves the connection reusable, so
+    /// <paramref name="answer" /> goes on it: a <c>Content-Length</c> body that ends early sends
+    /// the answer on a new connection instead, and a chunked body that is malformed or cut
+    /// short is the tunnel's exit 56, as curl 8.21.0 gives up on it (BL-862 Notes).
+    /// </summary>
+    private static async ValueTask<(string? Answer, bool OnThisConnection, ConnectResult? Failure)> DiscardRejectedBodyAsync(
+        IConnection connection,
+        HttpProxyTunnelReply reply,
+        string answer,
+        CancellationToken cancellationToken)
+    {
+        if (!reply.IsChunked)
+        {
+            return (answer, await HttpProxyTunnel.DiscardBodyAsync(connection, reply.ContentLength, cancellationToken).ConfigureAwait(false), null);
+        }
+
+        return await HttpProxyTunnel.DiscardChunkedBodyAsync(connection, cancellationToken).ConfigureAwait(false) is { } failure
+            ? (null, false, ConnectResult.Failed(CurlExitCode.RecvError, failure))
+            : (answer, true, null);
     }
 
     /// <summary>
     /// Sends one CONNECT and reads the proxy's reply, whose complete head goes to the
     /// transfer's header output when its events take it (<see cref="IConnectReplyHeadWritingEvents" />),
     /// whatever the status, as curl 8.21.0 writes a <c>407</c>'s and a <c>403</c>'s too (BL-613 Notes).
+    /// The CONNECT's <c>-v</c> lines, its request head and the reply's header lines go to the
+    /// target's events as <see cref="ConnectTunnelVerboseLines" /> words them (BL-863).
     /// </summary>
     private async ValueTask<(HttpProxyTunnelReply Reply, ExceptionDispatchInfo? Exception)> RequestTunnelAsync(
         IConnection connection,
         TunnelRequest tunnel,
         string? proxyAuthorization,
+        bool answersChallenge,
         CancellationToken cancellationToken)
     {
         try
         {
             var destination = tunnel.Destination;
-            await connection.WriteAsync(HttpProxyTunnel.BuildConnectRequest(destination.Host, destination.Port, tunnel.Proxy, _proxyTunnelOptions, proxyAuthorization), cancellationToken).ConfigureAwait(false);
+            var events = tunnel.Target.Events;
+            ConnectTunnelVerboseLines.ReportBeforeConnect(events, ProxyAuthRequestOf(destination, tunnel.Proxy), proxyAuthorization, answersChallenge);
+            var request = HttpProxyTunnel.BuildConnectRequest(destination.Host, destination.Port, tunnel.Proxy, _proxyTunnelOptions, proxyAuthorization);
+            events.ReportRequestHeader(request);
+            await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
             var reply = await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false);
+            ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization, DigestStaleChallenge.IsOfferedIn(reply.ProxyAuthenticate));
             if (tunnel.Target.Events is IConnectReplyHeadWritingEvents headOutput && !reply.Head.IsEmpty)
             {
                 await headOutput.WriteConnectReplyHeadAsync(reply.Head, cancellationToken).ConfigureAwait(false);
@@ -1167,8 +1259,9 @@ public sealed partial class TcpConnector(
                 proxy,
                 destination.Host,
                 destination.Port,
-                (host, port, token) => ResolveAsync(host, port, target, token),
+                (host, port, token) => ResolveWithFailureReasonAsync(host, port, target, token),
                 Socks5Authentication,
+                target.Events,
                 cancellationToken).ConfigureAwait(false), null);
         }
         catch (Exception exception)
@@ -1177,10 +1270,10 @@ public sealed partial class TcpConnector(
         }
     }
 
-    private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply) =>
+    private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure) =>
         reply.RecvErrorMessage is { } recvErrorMessage
-            ? ConnectResult.Failed(CurlExitCode.RecvError, recvErrorMessage)
-            : ConnectResult.Failed(CurlExitCode.CouldntConnect, $"CONNECT tunnel failed, response {reply.StatusCode}");
+            ? ConnectResult.Failed(CurlExitCode.RecvError, firstSspiFailure ?? recvErrorMessage)
+            : ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? $"CONNECT tunnel failed, response {reply.StatusCode}");
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(
         DialedSocket dialed,
@@ -1312,26 +1405,45 @@ public sealed partial class TcpConnector(
         if (provider is not IHandshakeReportingTlsProvider reportingProvider)
         {
             var unreported = await provider.AuthenticateAsClientAsync(plaintext, host, cancellationToken).ConfigureAwait(false);
-            LogHandshake(log, host, route: null, handshake: null, unreported);
+            if (!LoggedFailure(log, unreported))
+            {
+                log.HandshakeCompleted(host, null, null, null, unreported.ApplicationProtocol);
+            }
+
             return unreported;
         }
 
-        var capturing = log.IsEnabled(DiagnosticLogLevel.Info) ? new HandshakeCapturingTransferEvents(target.Events) : null;
+        var capturing = log.IsEnabled(DiagnosticLogLevel.Warning) ? new HandshakeCapturingTransferEvents(target.Events) : null;
         var secured = await reportingProvider.AuthenticateAsClientAsync(plaintext, host, capturing ?? target.Events, isProxy, applicationProtocols, cancellationToken).ConfigureAwait(false);
-        LogHandshake(log, host, reportingProvider.Route, capturing?.Handshake, secured);
+        if (!LoggedFailure(log, secured))
+        {
+            LogReportedHandshake(log, host, reportingProvider, capturing, secured);
+        }
+
         return secured;
     }
 
-    private static void LogHandshake(NetworkDiagnosticLog log, string host, TlsClientRoute? route, TlsHandshakeEvent? handshake, ConnectResult secured)
+    private static bool LoggedFailure(NetworkDiagnosticLog log, ConnectResult secured)
     {
-        if (secured.Connection is null)
+        if (secured.Connection is not null)
         {
-            log.Failed(DiagnosticLogComponents.Tls, secured.ExitCode, secured.ErrorMessage);
+            return false;
         }
-        else
+
+        log.Failed(DiagnosticLogComponents.Tls, secured.ExitCode, secured.ErrorMessage);
+        return true;
+    }
+
+    // A best-effort revocation acceptance is a warning before the handshake's info line, which
+    // names why the options chose the provider (BL-968).
+    private static void LogReportedHandshake(NetworkDiagnosticLog log, string host, IHandshakeReportingTlsProvider provider, HandshakeCapturingTransferEvents? capturing, ConnectResult secured)
+    {
+        if (capturing is { RevocationCheckIncomplete: true })
         {
-            log.HandshakeCompleted(host, route, handshake, secured.ApplicationProtocol);
+            log.RevocationCheckIncomplete(host);
         }
+
+        log.HandshakeCompleted(host, provider.Route, provider.RouteReason, capturing?.Handshake, secured.ApplicationProtocol);
     }
 
     /// <summary>
@@ -1430,7 +1542,8 @@ public sealed partial class TcpConnector(
     /// What a CONNECT tunnel is opened for: the target, the destination named in the CONNECT,
     /// the proxy, the connect's start and lookup timestamps, and whether the first CONNECT's
     /// <c>Proxy-Authorization</c> answers a <c>407</c> the proxy sent on a connection it closed,
-    /// rather than being the value made before any challenge.
+    /// rather than being the value made before any challenge, and the events the proxy
+    /// authenticator reports to, which keep its first SSPI failure for the tunnel's (BL-1033).
     /// </summary>
     private sealed record TunnelRequest(
         ConnectTarget Target,
@@ -1438,11 +1551,6 @@ public sealed partial class TcpConnector(
         ProxyEndpoint Proxy,
         long Started,
         long NameResolved,
-        bool AuthorizationAnswersChallenge);
-
-    /// <summary>
-    /// One key of curl's DNS cache: the host as it was cached (the name looked up, or a
-    /// <c>--resolve</c> entry's host as written), the port and the addresses.
-    /// </summary>
-    private sealed record DnsCacheEntry(string Name, int Port, IReadOnlyList<IPAddress> Addresses);
+        bool AuthorizationAnswersChallenge,
+        SspiFailureRecordingTransferEvents AuthenticatorEvents);
 }

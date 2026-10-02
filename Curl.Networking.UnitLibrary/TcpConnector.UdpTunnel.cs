@@ -193,7 +193,7 @@ public sealed partial class TcpConnector
     {
         try
         {
-            var proxyAuthorization = await CreateProxyAuthorizationAsync(destination, proxy, [], cancellationToken).ConfigureAwait(false);
+            var proxyAuthorization = await CreateProxyAuthorizationAsync(destination, proxy, [], NoTransferEvents.Instance, cancellationToken).ConfigureAwait(false);
             await connection.WriteAsync(HttpProxyTunnel.BuildConnectUdpRequest(destination.Host, destination.Port, proxy, _proxyTunnelOptions, proxyAuthorization), cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
             var reply = await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false);

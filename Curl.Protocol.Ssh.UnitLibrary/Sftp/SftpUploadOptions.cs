@@ -9,7 +9,7 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// <param name="ResumeFromRemoteSize">Whether <c>-C -</c> asked to resume from the size <c>STAT</c> gives the remote file.</param>
 /// <param name="Append">Whether <c>-a</c> asked to append to the remote file.</param>
 /// <param name="CreateDirectories">Whether <c>--ftp-create-dirs</c> asked to create the missing directories.</param>
-/// <param name="CreateFileMode">The permission bits the open carries, curl's <c>--create-file-mode</c>.</param>
+/// <param name="CreateFileMode">The permission bits the open carries, curl's <c>--create-file-mode</c>; 0 opens with curl's default, 0644.</param>
 internal sealed record SftpUploadOptions(long ResumeFrom, bool ResumeFromRemoteSize, bool Append, bool CreateDirectories, UnixFileMode CreateFileMode)
 {
     /// <summary>

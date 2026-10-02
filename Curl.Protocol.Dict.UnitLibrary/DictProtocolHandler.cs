@@ -25,10 +25,20 @@ namespace Curl.Protocol.Dict;
 /// After connecting, <see cref="ITransferContext.Events" /> gets what curl 8.21.0's <c>-v</c>
 /// and <c>--trace</c> show (measured, BL-934): the whole request as one block of data sent,
 /// each read as data received, the server's close as a zero-byte block, and then
-/// <c>shutting down connection #N</c>, which a refused path reports too.
+/// <c>shutting down connection #N</c>, which a refused path reports too. A <c>MATCH</c> or
+/// <c>DEFINE</c> lookup whose word is empty or missing first reports <c>lookup word is
+/// missing</c>, before the request is sent, as curl does (BL-1126).
+/// A failed send is exit 55, a failed receive exit 56 and a failed output write exit 23,
+/// all returned rather than thrown, with the texts of <see cref="DictIoFailures" />; such a
+/// transfer reports its message (unless it is curl's fallback text), <c>Failed sending DICT
+/// request</c> after a failed send, and <c>closing connection #N</c> (BL-1125). Cancellation
+/// still leaves as an exception.
 /// </remarks>
 public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
 {
+    /// <summary>The <c>-v</c> line curl 8.21.0 reports before sending a lookup whose word is empty or missing.</summary>
+    private const string LookupWordMissingMessage = "lookup word is missing";
+
     /// <summary>The port a <c>dict</c> URL without one connects to.</summary>
     private const int DefaultPort = 2628;
 
@@ -89,19 +99,59 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
             result = await ExchangeAsync(connection, context, log).ConfigureAwait(false);
         }
 
-        context.Events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"shutting down connection #{connect.ConnectionNumber}"));
+        ReportConnectionEnd(context.Events, result, connect.ConnectionNumber);
         return result;
+    }
+
+    /// <summary>
+    /// Reports the lines curl 8.21.0 ends a dict connection with: <c>shutting down connection #N</c>
+    /// after a finished transfer or a refused path, and otherwise the failure's message (unless
+    /// it is curl's fallback text for a failed send or receive), <c>Failed sending DICT request</c>
+    /// after a failed send, and <c>closing connection #N</c>.
+    /// </summary>
+    private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, long connectionNumber)
+    {
+        if (result.ExitCode is CurlExitCode.Ok or CurlExitCode.UrlMalformat)
+        {
+            events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"shutting down connection #{connectionNumber}"));
+            return;
+        }
+
+        if (!DictIoFailures.IsFallbackText(result.ErrorMessage!))
+        {
+            events.ReportInfo(result.ErrorMessage!);
+        }
+
+        if (result.ExitCode == CurlExitCode.SendError)
+        {
+            events.ReportInfo(DictIoFailures.DictRequestNotSent);
+        }
+
+        events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"closing connection #{connectionNumber}"));
     }
 
     private static async Task<TransferResult> ExchangeAsync(IConnection connection, ITransferContext context, DictDiagnosticLog log)
     {
-        if (!DictRequest.TryEncode(context.Url.AbsolutePath, out byte[] request))
+        if (!DictRequest.TryEncode(context.Url.AbsolutePath, out byte[] request, out bool wordMissing))
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, UrlMalformatMessage);
         }
 
-        await connection.WriteAsync(request, context.CancellationToken).ConfigureAwait(false);
-        await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
+        if (wordMissing)
+        {
+            context.Events.ReportInfo(LookupWordMissingMessage);
+        }
+
+        try
+        {
+            await connection.WriteAsync(request, context.CancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException exception)
+        {
+            return DictIoFailures.SendFailed(exception);
+        }
+
         context.Events.ReportDataSent(request);
         log.CommandSent(request);
         return await CopyReplyAsync(connection, context).ConfigureAwait(false);
@@ -111,16 +161,35 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
     {
         var buffer = new byte[BufferSize];
         long bytesWritten = 0;
-        int read;
-        while ((read = await connection.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false)) > 0)
+        while (true)
         {
+            int read;
+            try
+            {
+                read = await connection.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException exception)
+            {
+                return DictIoFailures.ReceiveFailed(bytesWritten, exception);
+            }
+
             context.Events.ReportDataReceived(buffer.AsSpan(0, read));
-            await context.Output.WriteAsync(buffer.AsMemory(0, read), context.CancellationToken).ConfigureAwait(false);
+            if (read == 0)
+            {
+                return TransferResult.Success(bytesWritten);
+            }
+
+            try
+            {
+                await context.Output.WriteAsync(buffer.AsMemory(0, read), context.CancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException exception)
+            {
+                return DictIoFailures.WriteFailed(bytesWritten, read, exception);
+            }
+
             bytesWritten += read;
             context.Progress.ReportDownloaded(bytesWritten, null);
         }
-
-        context.Events.ReportDataReceived([]);
-        return TransferResult.Success(bytesWritten);
     }
 }

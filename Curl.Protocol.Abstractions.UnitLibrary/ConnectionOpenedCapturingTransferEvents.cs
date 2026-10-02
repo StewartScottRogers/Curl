@@ -51,6 +51,9 @@ public sealed class ConnectionOpenedCapturingTransferEvents(ITransferEvents inne
         inner.ReportCertificateVerifyResult(verifyResult, isProxy);
 
     /// <inheritdoc />
+    public void ReportTlsEarlyData(long bytes) => inner.ReportTlsEarlyData(bytes);
+
+    /// <inheritdoc />
     public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => inner.ReportRequestHeader(bytes);
 
     /// <inheritdoc />

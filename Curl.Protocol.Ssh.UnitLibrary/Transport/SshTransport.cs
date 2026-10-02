@@ -45,12 +45,14 @@ internal sealed class SshTransport
     /// <param name="catalogue">The algorithms this build implements.</param>
     /// <param name="randomSource">Where the cookie and padding bytes come from.</param>
     /// <param name="ephemeralKeySource">Where the key exchange's ephemeral key pairs come from.</param>
+    /// <param name="diagnosticLog">Where the session's steps are logged, or <see langword="null" /> for nowhere.</param>
     internal SshTransport(
         IConnection connection,
         SshAlgorithmPreferences preferences,
         SshAlgorithmCatalogue catalogue,
         ISshRandomSource randomSource,
-        ISshEphemeralKeySource ephemeralKeySource)
+        ISshEphemeralKeySource ephemeralKeySource,
+        SshDiagnosticLog? diagnosticLog = null)
     {
         this.connection = connection;
         this.preferences = preferences;
@@ -60,7 +62,16 @@ internal sealed class SshTransport
         connectionReader = new SshConnectionReader(connection);
         PacketReader = new SshPacketReader(connectionReader);
         PacketWriter = new SshPacketWriter(connection, randomSource);
+        DiagnosticLog = diagnosticLog ?? SshDiagnosticLog.None;
+        PacketReader.DiagnosticLog = DiagnosticLog;
+        PacketWriter.DiagnosticLog = DiagnosticLog;
     }
+
+    /// <summary>
+    /// Gets where the sessions steps are logged: the packet reader and writer, the
+    /// authentication, the channel and the SFTP session all write to it.
+    /// </summary>
+    internal SshDiagnosticLog DiagnosticLog { get; }
 
     /// <summary>
     /// Gets the reader of the server's packets.
@@ -76,6 +87,12 @@ internal sealed class SshTransport
     /// Gets the preset's libssh2 cryptography backend, <see langword="null" /> when it names none.
     /// </summary>
     internal string? CryptographyBackend => preferences.CryptographyBackend;
+
+    /// <summary>
+    /// Gets the server's identification string, without CR LF, once the first key exchange has
+    /// finished; <see langword="null" /> before.
+    /// </summary>
+    internal string? ServerIdentification => serverIdentification;
 
     /// <summary>
     /// Gets the session identifier: the exchange hash of the first key exchange, which a
@@ -115,7 +132,7 @@ internal sealed class SshTransport
 
             return handshake;
         }
-        catch (Exception exception) when (exception is InvalidDataException or IOException)
+        catch (Exception exception) when (exception is InvalidDataException or SshPacketLengthException or IOException)
         {
             throw SshTransferException.SessionEstablishmentFailed(Libssh2ErrorCode.SocketNone, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
         }
@@ -140,7 +157,8 @@ internal sealed class SshTransport
     /// message, a public value outside its group, a host key or signature of another type,
     /// or a signature that does not verify; with <c>-4</c> (a MAC) or <c>-12</c> (an AES-GCM
     /// tag) in place of <c>-8</c> when a re-exchange reads a packet that fails its check
-    /// (ADR-0212).
+    /// (ADR-0212), and <c>-12</c> (a zero length) or <c>-41</c> (a length over the maximum)
+    /// when it reads one whose length libssh2 refuses (BL-1081, ADR-0206).
     /// </exception>
     /// <exception cref="NotSupportedException">The agreed method, host key, cipher or MAC is not implemented.</exception>
     internal async ValueTask<SshKeyExchangeResult> ExchangeKeysAsync(SshNegotiatedHandshake handshake, CancellationToken cancellationToken)
@@ -169,6 +187,10 @@ internal sealed class SshTransport
             sessionIdentifier = session;
             serverIdentification = handshake.ServerIdentification;
             return new SshKeyExchangeResult(handshake.Algorithms, outcome.HostKey, outcome.ExchangeHash, session, keys);
+        }
+        catch (SshPacketLengthException exception)
+        {
+            throw SshTransferException.SessionEstablishmentFailed(exception.Libssh2ErrorCode, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
         }
         catch (Exception exception) when (exception is InvalidDataException or IOException or CryptographicException)
         {
@@ -209,6 +231,7 @@ internal sealed class SshTransport
             throw KeyExchangeMethodFailed();
         }
 
+        DiagnosticLog.KeysReExchanged(handshake.Algorithms);
         return await ExchangeKeysAsync(handshake, cancellationToken).ConfigureAwait(false);
     }
 

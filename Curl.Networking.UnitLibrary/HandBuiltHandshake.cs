@@ -13,18 +13,23 @@ namespace Curl.Networking;
 /// <param name="CipherSuite">The suite negotiated, by its code point.</param>
 /// <param name="ApplicationProtocol">The protocol the server selected through ALPN, or <see langword="null" />.</param>
 /// <param name="Failure">Why the handshake failed, or <see langword="null" /> when it completed.</param>
+/// <param name="CertificateStatus">
+/// What <c>--cert-status</c> found in the stapled OCSP response of a completed handshake, or
+/// <see langword="null" /> when it was not given (BL-875).
+/// </param>
 internal sealed record HandBuiltHandshake(
     Stream? Stream,
     SslProtocols ProtocolVersion,
     ushort CipherSuite,
     string? ApplicationProtocol,
-    TlsHandshakeFailure? Failure)
+    TlsHandshakeFailure? Failure,
+    OcspStapleOutcome? CertificateStatus = null)
 {
     /// <summary>Describes a completed TLS 1.3 handshake.</summary>
     /// <param name="stream">The connected stream.</param>
     /// <returns>The outcome.</returns>
     internal static HandBuiltHandshake Completed(Tls13ClientStream stream) =>
-        new(stream, SslProtocols.Tls13, stream.Handshake.CipherSuite!.Code, stream.Handshake.ApplicationProtocol, null);
+        new(stream, SslProtocols.Tls13, stream.Handshake.CipherSuite!.Code, stream.Handshake.ApplicationProtocol, null, stream.Handshake.CertificateStatus);
 
     /// <summary>Describes a completed TLS 1.2, 1.1 or 1.0 handshake.</summary>
     /// <param name="stream">The connected stream.</param>
@@ -35,7 +40,8 @@ internal sealed record HandBuiltHandshake(
             ToSslProtocols(stream.Handshake.Version!.Value),
             stream.Handshake.CipherSuite!.Code,
             stream.Handshake.ApplicationProtocol,
-            null);
+            null,
+            stream.Handshake.CertificateStatus);
 
     /// <summary>Describes a failed handshake.</summary>
     /// <param name="failure">Why it failed.</param>

@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Globalization;
 
 namespace Curl.Protocol.Smb;
@@ -50,4 +51,29 @@ internal static class SmbMessages
     /// <returns>curl's message.</returns>
     public static string OutputWriteFailed(int passed, int returned) =>
         string.Create(CultureInfo.InvariantCulture, $"Failure writing output to destination, passed {passed} returned {returned}");
+
+    /// <summary>
+    /// The texts above that are <c>curl_easy_strerror</c>'s for their exit code, which curl
+    /// prints without a <c>failf</c> and so without a <c>-v</c> line of their own.
+    /// </summary>
+    private static readonly FrozenSet<string> StrerrorTexts = FrozenSet.Create(
+        StringComparer.Ordinal,
+        UrlMalformat,
+        NegotiateFailed,
+        UploadFailed,
+        ReceiveFailed,
+        MessageTooLarge,
+        LoginDenied,
+        WeirdServerReply,
+        RemoteAccessDenied,
+        RemoteFileNotFound);
+
+    /// <summary>
+    /// Whether curl 8.21.0 reports <paramref name="message" /> through <c>failf</c>, which
+    /// also writes it as a <c>-v</c> line: every text but <c>curl_easy_strerror</c>'s
+    /// (measured, BL-598 Notes).
+    /// </summary>
+    /// <param name="message">A failure's text.</param>
+    /// <returns><see langword="true" /> when <c>-v</c> shows the text as an info line.</returns>
+    public static bool IsVerboseLine(string message) => !StrerrorTexts.Contains(message);
 }

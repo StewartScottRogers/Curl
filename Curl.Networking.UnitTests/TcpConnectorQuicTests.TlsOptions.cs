@@ -98,7 +98,7 @@ public sealed partial class TcpConnectorQuicTests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await using var connection = result.Connection!;
-        CollectionAssert.AreEqual(new ushort[] { 0x1302, 0x1303, 0x1301 }, opener.Opened.Single().Server!.Tls!.ClientHello!.CipherSuites.ToArray());
+        CollectionAssert.AreEqual(new ushort[] { 0x1302, 0x1303, 0x1301, 0x00ff }, opener.Opened.Single().Server!.Tls!.ClientHello!.CipherSuites.ToArray());
     }
 
     [TestMethod]

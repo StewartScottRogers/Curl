@@ -52,11 +52,19 @@ internal static class MqttTransferMessages
     /// </summary>
     internal const string TooLarge = "A value or data field grew larger than allowed";
 
+    /// <summary>
+    /// The exit 63 message for a PUBLISH whose remaining length is over <c>--max-filesize</c>.
+    /// </summary>
+    internal const string MaximumFileSizeExceeded = "Maximum file size exceeded";
+
     /// <summary>The <c>-v</c> line for a DISCONNECT received.</summary>
     internal const string GotDisconnect = "Got DISCONNECT";
 
     /// <summary>The <c>-v</c> line for a PINGRESP received.</summary>
     internal const string ReceivedPingResponse = "Received ping response.";
+
+    /// <summary>The <c>-v</c> line for a PINGREQ sent after the connection sat idle.</summary>
+    internal const string SentPingRequest = "mqtt_ping: sent ping request.";
 
     /// <summary>The <c>-v</c> line for a peer that closed inside a PUBLISH body.</summary>
     internal const string ServerDisconnected = "server disconnected";

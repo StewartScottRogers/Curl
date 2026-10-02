@@ -136,9 +136,26 @@ public interface ITransferContext
     /// means, or a separate one, which is what <c>-D</c> means. A handler writes headers
     /// here before any body and never inspects which case it has. For <c>file://</c> the
     /// headers are curl's synthesised <c>Content-Length</c>, <c>Accept-ranges</c> and
-    /// <c>Last-Modified</c> lines rather than anything received from a peer.
+    /// <c>Last-Modified</c> lines rather than anything received from a peer. Lines curl
+    /// writes to the <c>-D</c> file but not under <c>-i</c> go to
+    /// <see cref="DumpHeaderOutput" /> instead.
     /// </remarks>
     Stream? HeaderOutput { get; }
+
+    /// <summary>
+    /// Gets the <c>-D</c>/<c>--dump-header</c> stream alone, or <see langword="null" />
+    /// without <c>-D</c>; never standard output because of <c>-i</c>.
+    /// </summary>
+    /// <remarks>
+    /// A handler writes here what curl 8.21.0 writes to the <c>-D</c> file but does not
+    /// print under <c>-i</c>: the gopher selector, which libcurl passes as
+    /// <c>CLIENTWRITE_HEADER</c>, and each FTP, IMAP, POP3 and SMTP server response
+    /// line, which it passes as <c>CLIENTWRITE_INFO</c> (BL-1129). Headers that
+    /// <c>-i</c> also shows still go to <see cref="HeaderOutput" />. Under <c>-D</c> both
+    /// write to the same file, so writes to either land in the order they were made;
+    /// under <c>-D -</c> this is standard output, as curl writes there.
+    /// </remarks>
+    Stream? DumpHeaderOutput { get; }
 
     /// <summary>
     /// Gets the data given with <c>-d</c>/<c>--data</c>, or <see langword="null" /> when

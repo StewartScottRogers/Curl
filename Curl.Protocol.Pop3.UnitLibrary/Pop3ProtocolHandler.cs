@@ -84,10 +84,11 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
     {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
+        var connectEvents = new ConnectionOpenedCapturingTransferEvents(context.Events);
         var target = new ConnectTarget(url.IdnHost, url.Port, implicitTls)
         {
             Proxy = context.Proxy,
-            Events = context.Events,
+            Events = connectEvents,
             DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connected = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
@@ -102,7 +103,7 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
         await using (connection.ConfigureAwait(false))
         {
             var session = new Pop3Session(
-                new Pop3ControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog), tlsProvider, context, implicitTls, saslAuthenticator);
+                new Pop3ControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput), tlsProvider, context, implicitTls, saslAuthenticator, connectEvents.Opened);
             TransferResult result;
             await using (session.ConfigureAwait(false))
             {

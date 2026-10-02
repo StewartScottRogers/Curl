@@ -52,9 +52,45 @@ public sealed class QuicServerChannelOpener : IUdpChannelOpener
     internal List<(IPEndPoint LocalEndPoint, int LocalPortCount)> BoundFrom { get; } = [];
 
     /// <inheritdoc />
-    public IDatagramChannel OpenFrom(IPEndPoint serverEndPoint, IPEndPoint localEndPoint, int localPortCount)
+    /// <remarks>Writes the <c>Local port: N</c> line <see cref="UdpChannelOpener" /> writes for the first port.</remarks>
+    public IDatagramChannel OpenFrom(IPEndPoint serverEndPoint, IPEndPoint localEndPoint, int localPortCount, ITransferEvents events)
     {
         BoundFrom.Add((localEndPoint, localPortCount));
+        var channel = Open(serverEndPoint);
+        events.ReportInfo(LocalBindLines.LocalPort(localEndPoint.Port));
+        return channel;
+    }
+
+    /// <summary>Gets whether each device bind <see cref="OpenFromDeviceAsync" /> asks for succeeds, as on Linux.</summary>
+    public bool DeviceBinds { get; init; }
+
+    /// <summary>Gets the device name and <c>ifhost!</c> choice each <see cref="OpenFromDeviceAsync" /> was asked for, in order.</summary>
+    internal List<(string DeviceName, bool BindsAddressAfterDevice)> DeviceBoundTo { get; } = [];
+
+    /// <inheritdoc />
+    /// <remarks>Decides as <see cref="UdpChannelOpener" /> does, through <see cref="TcpDialer.BindDeviceOrLocalEndAsync" />, recording the local end it binds in <see cref="BoundFrom" />.</remarks>
+    public async ValueTask<IDatagramChannel> OpenFromDeviceAsync(
+        IPEndPoint serverEndPoint,
+        string deviceName,
+        bool bindsAddressAfterDevice,
+        Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
+        int localPortCount,
+        ITransferEvents events,
+        CancellationToken cancellationToken)
+    {
+        DeviceBoundTo.Add((deviceName, bindsAddressAfterDevice));
+        await TcpDialer.BindDeviceOrLocalEndAsync(
+            deviceName,
+            bindsAddressAfterDevice,
+            _ => DeviceBinds,
+            chooseLocalEndAsync,
+            localEndPoint =>
+            {
+                BoundFrom.Add((localEndPoint, localPortCount));
+                events.ReportInfo(LocalBindLines.LocalPort(localEndPoint.Port));
+            },
+            events,
+            cancellationToken);
         return Open(serverEndPoint);
     }
 

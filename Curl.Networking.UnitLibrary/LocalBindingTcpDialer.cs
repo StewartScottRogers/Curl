@@ -69,4 +69,7 @@ internal sealed class LocalBindingTcpDialer(ITcpDialer inner, LocalBindingAddres
     /// <inheritdoc />
     public ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken) =>
         inner.DialUnixSocketAsync(address, cancellationToken);
+
+    /// <inheritdoc />
+    public SocketException? FailureToOpenSocket(AddressFamily family) => inner.FailureToOpenSocket(family);
 }

@@ -28,6 +28,9 @@ public sealed class FakeMultiplexedConnection(params FakeMultiplexedStream[] req
     /// <inheritdoc />
     public string ApplicationProtocol { get; init; } = "h3";
 
+    /// <inheritdoc />
+    public long? BidirectionalStreamLimit { get; init; }
+
     /// <summary>
     /// Gets the exception opening a stream throws, or <see langword="null" /> to open streams.
     /// </summary>

@@ -67,6 +67,84 @@ public sealed class MultiplexedConnectResultTests
         Assert.AreEqual("QUIC is not available on this connector", result.ErrorMessage);
     }
 
+    [TestMethod]
+    public void ToConnectResult_OfASuccess_CarriesTheSessionTimingsLocalEndPointAndProtocol()
+    {
+        var quic = new UnusedMultiplexedConnection { LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 4433) };
+        var timings = new ConnectTimings(1, null, 2, 2);
+        var session = new SessionConnection();
+        IMultiplexedConnection? opened = null;
+
+        var result = MultiplexedConnectResult.Connected(quic, timings).ToConnectResult(connection =>
+        {
+            opened = connection;
+            return session;
+        });
+
+        Assert.AreSame(quic, opened);
+        Assert.AreSame(session, result.Connection);
+        Assert.AreSame(timings, result.Timings);
+        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 4433), result.LocalEndPoint);
+        Assert.AreEqual("h3", result.ApplicationProtocol);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    public void ToConnectResult_OfAFailure_CarriesItsExitCodeAndMessageAndOpensNoSession()
+    {
+        var result = MultiplexedConnectResult.Failed(CurlExitCode.QuicConnectError, "no").ToConnectResult(_ => throw new AssertFailedException("opened"));
+
+        Assert.IsNull(result.Connection);
+        Assert.AreEqual(CurlExitCode.QuicConnectError, result.ExitCode);
+        Assert.AreEqual("no", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public void ToConnectResult_WithoutASessionBuilder_Throws()
+    {
+        var result = MultiplexedConnectResult.Failed(CurlExitCode.QuicConnectError, "no");
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => result.ToConnectResult(null!));
+    }
+
+    [TestMethod]
+    public async Task ConnectMultiplexedSessionAsync_WhenNotOverridden_GivesTheQuicConnectAsAConnectResult()
+    {
+        IConnector connector = new TcpOnlyConnector();
+
+        var result = await connector.ConnectMultiplexedSessionAsync(new ConnectTarget("example.com", 443, true), _ => new SessionConnection(), CancellationToken.None);
+
+        Assert.IsNull(result.Connection);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("QUIC is not available on this connector", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public void BidirectionalStreamLimit_WhenNotOverridden_IsUnknown()
+    {
+        IMultiplexedConnection quic = new UnusedMultiplexedConnection();
+
+        Assert.IsNull(quic.BidirectionalStreamLimit);
+    }
+
+    private sealed class SessionConnection : IConnection
+    {
+        public bool IsSecure => true;
+
+        public EndPoint? RemoteEndPoint => null;
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
     private sealed class TcpOnlyConnector : IConnector
     {
         public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
@@ -77,7 +155,7 @@ public sealed class MultiplexedConnectResultTests
     {
         public EndPoint? RemoteEndPoint => null;
 
-        public EndPoint? LocalEndPoint => null;
+        public EndPoint? LocalEndPoint { get; init; }
 
         public string ApplicationProtocol => "h3";
 

@@ -36,6 +36,18 @@ internal sealed class SslStreamConnection(
     string missingCloseNotifyMessage,
     bool clearsTls) : IConnection
 {
+    /// <summary>
+    /// Gets the detector that tells, at the first read returning plaintext, how many session
+    /// ticket records came before it; <see langword="null" /> when none is watching (BL-1089).
+    /// </summary>
+    internal SessionTicketRecordDetector? TicketRecords { get; init; }
+
+    /// <summary>
+    /// Gets where each session ticket record <see cref="TicketRecords" /> counts is reported, as
+    /// a received <c>NewSessionTicket</c> <see cref="TlsMessageEvent" />, the handshake's events.
+    /// </summary>
+    internal ITransferEvents TicketEvents { get; init; } = NoTransferEvents.Instance;
+
     /// <summary>Gets <see langword="true" />: traffic is encrypted.</summary>
     public bool IsSecure => true;
 
@@ -67,6 +79,7 @@ internal sealed class SslStreamConnection(
             throw new MissingCloseNotifyException(missingCloseNotifyMessage);
         }
 
+        TicketRecords?.ReportTicketRecords(read, TicketEvents);
         return read;
     }
 

@@ -94,4 +94,11 @@ public sealed record TlsHandshakeEvent
     /// Windows curl.se's LibreSSL build words rather than the Schannel build (ADR-0144).
     /// </summary>
     public bool IsQuic { get; init; }
+
+    /// <summary>
+    /// Gets the server key's hash as a <c>sha256//</c> <c>--pinnedpubkey</c> names it, such as
+    /// <c>sha256//7VmZ...=</c>, which curl prints as <c>-v</c>'s <c> public key hash:</c> line,
+    /// or <see langword="null" /> when no <c>sha256//</c> pin was checked (ADR-0336, BL-877).
+    /// </summary>
+    public string? PinnedPublicKeyHash { get; init; }
 }

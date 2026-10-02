@@ -22,6 +22,9 @@ public sealed class CurlCommandRunnerCookieTests
 
     private const string SetsCookie = "HTTP/1.1 200 OK\r\nSet-Cookie: got=g1\r\nContent-Length: 0\r\n\r\n";
 
+    private const string RedirectSetsCookie =
+        "HTTP/1.1 302 Found\r\nLocation: /2\r\nSet-Cookie: got=g1\r\nContent-Length: 0\r\n\r\n";
+
     private const string CookieFile =
         "# Netscape HTTP Cookie File\n127.0.0.1\tFALSE\t/\tFALSE\t0\tsess\ts1\n127.0.0.1\tFALSE\t/\tFALSE\t4102444800\tkeep\tk1\n";
 
@@ -127,6 +130,58 @@ public sealed class CurlCommandRunnerCookieTests
     }
 
     /// <summary>
+    /// curl 8.21.0 sends at most 150 cookies and, under <c>-v</c>, says so while it builds the request,
+    /// before the request's header lines (<c>lib/cookie.c</c>, BL-1108): a <c>-b</c> file holding 151
+    /// cookies for the host prints the line and sends 150 of them.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_VerboseCookieFileWithMoreThanTheMostCookiesSent_PrintsCurlsLimitLineBeforeTheRequest()
+    {
+        StringBuilder cookieFile = new();
+        foreach (int number in Enumerable.Range(1, 151))
+        {
+            cookieFile.Append(System.Globalization.CultureInfo.InvariantCulture, $"127.0.0.1\tFALSE\t/\tFALSE\t0\tk{number}\tv\n");
+        }
+
+        fileSystem.ExistingContent["many.txt"] = Encoding.Latin1.GetBytes(cookieFile.ToString());
+        ScriptedConnector server = Serve(SetsCookie);
+
+        int exitCode = await RunAsync(server, ["-s", "-v", "-b", "many.txt", Url]);
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(
+            Latin1(standardError.ToArray()),
+            "* using HTTP/1.x\r\n* Included max number of cookies (150) in request!\r\n> GET / HTTP/1.1\r\r\n");
+        Assert.HasCount(150, SentCookies(server));
+    }
+
+    /// <summary>
+    /// Measured 2026-10-01 with <c>curl -s -v -b big.txt http://127.0.0.1:&lt;port&gt;/</c>, <c>big.txt</c>
+    /// holding the cookies <c>aaa</c>, <c>bb</c> and <c>c</c> of 4000 characters each for the host: curl
+    /// 8.21.0 sends <c>aaa</c> and <c>bb</c>, leaves <c>c</c> out because the header would pass 8183
+    /// characters, and prints the line between <c>* using HTTP/1.x</c> and <c>&gt; GET</c> (BL-1136 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_VerboseCookieFileLongerThanTheLongestCookieHeader_PrintsCurlsRestrictedLineBeforeTheRequest()
+    {
+        string value = new('x', 4000);
+        fileSystem.ExistingContent["big.txt"] = Encoding.Latin1.GetBytes(
+            $"127.0.0.1\tFALSE\t/\tFALSE\t0\taaa\t{value}\n127.0.0.1\tFALSE\t/\tFALSE\t0\tbb\t{value}\n127.0.0.1\tFALSE\t/\tFALSE\t0\tc\t{value}\n");
+        ScriptedConnector server = Serve(SetsCookie);
+
+        int exitCode = await RunAsync(server, ["-s", "-v", "-b", "big.txt", Url]);
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(
+            Latin1(standardError.ToArray()),
+            "* using HTTP/1.x\r\n* Restricted outgoing cookies due to header size, 'c' not sent\r\n> GET / HTTP/1.1\r\r\n");
+        CollectionAssert.AreEqual(new[] { $"aaa={value}", $"bb={value}" }, SentCookies(server));
+    }
+
+    private static string[] SentCookies(ScriptedConnector server) =>
+        Latin1(server.Written).Split("\r\n").Single(line => line.StartsWith("Cookie: ", StringComparison.Ordinal))["Cookie: ".Length..].Split("; ");
+
+    /// <summary>
     /// Measured 2026-09-27 with <c>curl -s -v -b sub\missing.txt http://127.0.0.1:&lt;port&gt;/</c>: the warning is
     /// the first line on standard error, with the path as given, and the transfer goes on to exit 0 (BL-487 Notes).
     /// </summary>
@@ -200,6 +255,42 @@ public sealed class CurlCommandRunnerCookieTests
         ScriptedConnector server = Serve(SetsCookie, SetsCookie);
 
         await RunAsync(server, ["-s", "-b", "a=1", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
+
+        Assert.StartsWith(
+            $"GET /1 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\n",
+            Latin1(server.Written));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EmptyCookieFileNameForTwoUrls_SendsTheReceivedCookieOnTheSecond()
+    {
+        ScriptedConnector server = Serve(SetsCookie, SetsCookie);
+
+        await RunAsync(server, ["-s", "-b", "", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
+
+        Assert.StartsWith(
+            $"GET /1 HTTP/1.1\r\n{Head}\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: got=g1\r\n\r\n",
+            Latin1(server.Written));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_FollowedRedirectWithEmptyCookieFileName_SendsTheCookieSetByTheFirstHop()
+    {
+        ScriptedConnector server = Serve(RedirectSetsCookie, "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+
+        await RunAsync(server, ["-s", "-L", "-b", "", "http://127.0.0.1:18231/1"]);
+
+        Assert.StartsWith(
+            $"GET /1 HTTP/1.1\r\n{Head}\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: got=g1\r\n\r\n",
+            Latin1(server.Written));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_FollowedRedirectWithCookieStringOnly_NeverSendsTheCookieSetByTheFirstHop()
+    {
+        ScriptedConnector server = Serve(RedirectSetsCookie, "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+
+        await RunAsync(server, ["-s", "-L", "-b", "a=1", "http://127.0.0.1:18231/1"]);
 
         Assert.StartsWith(
             $"GET /1 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\n",

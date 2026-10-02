@@ -57,6 +57,9 @@ public sealed class QuicStreamSet
     /// <summary>Gets how many bytes the connection's flow control still lets the client send.</summary>
     public ulong ConnectionSendAvailable => connectionSend.Available;
 
+    /// <summary>Gets the servers latest MAX_STREAMS for the clients bidirectional streams.</summary>
+    public ulong ClientBidirectionalStreamLimit => clientBidirectionalStreams.Limit;
+
     /// <summary>Gets the MAX_DATA the client has advertised.</summary>
     public ulong ConnectionReceiveLimit => connectionReceive.Limit;
 

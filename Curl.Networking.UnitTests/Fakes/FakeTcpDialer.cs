@@ -67,6 +67,15 @@ public sealed class FakeTcpDialer : ITcpDialer
     public Func<UnixSocketAddress, IConnection> UnixSocketDialOutcome { get; init; } =
         _ => throw new SocketException((int)SocketError.ConnectionRefused);
 
+    /// <summary>
+    /// Gets or sets the refusal a socket of each address family meets before any dial, as an operating
+    /// system without Multipath TCP refuses <c>--mptcp</c>'s; none by default.
+    /// </summary>
+    public Func<AddressFamily, SocketException?> SocketOpenOutcome { get; init; } = _ => null;
+
+    /// <inheritdoc />
+    public SocketException? FailureToOpenSocket(AddressFamily family) => SocketOpenOutcome(family);
+
     /// <summary>Gets the Unix sockets dialed, in order.</summary>
     public List<UnixSocketAddress> DialedUnixSockets { get; } = [];
 

@@ -41,7 +41,7 @@ public sealed class QuicClientConnectionStateTests
         Assert.AreEqual(0UL, crypto.Offset);
         Assert.IsInstanceOfType<QuicPaddingFrame>(frames[1]);
         Assert.HasCount(2, frames);
-        CollectionAssert.AreEqual(new ushort[] { 0x1302, 0x1303, 0x1301 }, hello.CipherSuites.ToArray());
+        CollectionAssert.AreEqual(new ushort[] { 0x1302, 0x1303, 0x1301, 0x00ff }, hello.CipherSuites.ToArray());
         Assert.IsEmpty(hello.LegacySessionId);
         CollectionAssert.AreEqual(
             new[] { TlsExtensionType.QuicTransportParameters, TlsExtensionType.ServerName, TlsExtensionType.EcPointFormats, TlsExtensionType.SupportedGroups, TlsExtensionType.KeyShare, TlsExtensionType.ApplicationLayerProtocolNegotiation, TlsExtensionType.SupportedVersions, TlsExtensionType.SignatureAlgorithms },
@@ -592,5 +592,5 @@ public sealed class QuicClientConnectionStateTests
         return keys.Protect(new QuicLongHeaderPacket(type, QuicPacketCodec.Version1, destination, source, ReadOnlyMemory<byte>.Empty, 1, packetNumber, payload), packetNumber);
     }
 
-    private const string FirstInitialSha256 = "1a71b2d54d9d99a9c515ed375e55360931eb534b723bcf45e30079bdc1e67d51";
+    private const string FirstInitialSha256 = "530afe73663df1785920663f9982fc1a0a655bdb7e5574ae2ac6eeb05ec0b8f9";
 }

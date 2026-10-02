@@ -1,5 +1,3 @@
-using System.Threading.Channels;
-
 namespace Curl.Networking.Fakes;
 
 /// <summary>
@@ -10,11 +8,11 @@ namespace Curl.Networking.Fakes;
 /// </summary>
 public sealed class InMemoryDuplexStream : Stream
 {
-    private readonly Channel<byte[]> _incoming;
-    private readonly Channel<byte[]> _outgoing;
+    private readonly CancelSafeChunkQueue _incoming;
+    private readonly CancelSafeChunkQueue _outgoing;
     private ReadOnlyMemory<byte> _unread;
 
-    private InMemoryDuplexStream(Channel<byte[]> incoming, Channel<byte[]> outgoing)
+    private InMemoryDuplexStream(CancelSafeChunkQueue incoming, CancelSafeChunkQueue outgoing)
     {
         _incoming = incoming;
         _outgoing = outgoing;
@@ -46,8 +44,8 @@ public sealed class InMemoryDuplexStream : Stream
     /// <returns>The client end and the server end.</returns>
     public static (InMemoryDuplexStream Client, InMemoryDuplexStream Server) CreatePair()
     {
-        var clientToServer = Channel.CreateUnbounded<byte[]>();
-        var serverToClient = Channel.CreateUnbounded<byte[]>();
+        var clientToServer = new CancelSafeChunkQueue();
+        var serverToClient = new CancelSafeChunkQueue();
 
         return (new InMemoryDuplexStream(serverToClient, clientToServer),
                 new InMemoryDuplexStream(clientToServer, serverToClient));
@@ -59,8 +57,7 @@ public sealed class InMemoryDuplexStream : Stream
         ObjectDisposedException.ThrowIf(IsDisposed, this);
         if (_unread.IsEmpty)
         {
-            if (!await _incoming.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false)
-                || !_incoming.Reader.TryRead(out var chunk))
+            if (await _incoming.DequeueAsync(cancellationToken).ConfigureAwait(false) is not { } chunk)
             {
                 return 0;
             }
@@ -82,7 +79,7 @@ public sealed class InMemoryDuplexStream : Stream
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(IsDisposed, this);
-        _outgoing.Writer.TryWrite(buffer.ToArray());
+        _outgoing.TryEnqueue(buffer.ToArray());
         return ValueTask.CompletedTask;
     }
 
@@ -114,7 +111,7 @@ public sealed class InMemoryDuplexStream : Stream
     protected override void Dispose(bool disposing)
     {
         IsDisposed = true;
-        _outgoing.Writer.TryComplete();
+        _outgoing.Complete();
         base.Dispose(disposing);
     }
 }

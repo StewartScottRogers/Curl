@@ -138,7 +138,7 @@ public sealed class RedirectFollower(
     private static readonly HashSet<string> SchemesCurlParses = new(
         [
             "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap",
-            "imaps", "ldap", "ldaps", "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp",
+            "imaps", "ldap", "ldaps", "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smb", "smbs",
             "smtp", "smtps", "telnet", "tftp", "ws", "wss",
         ],
         StringComparer.Ordinal);
@@ -370,7 +370,7 @@ public sealed class RedirectFollower(
 
         first.Events.ReportInfo(IssueAnotherRequestMessagePrefix + target + "'");
         next = SwitchedToHttps(ref target, next, first);
-        return ProtocolDisabledRefusal(next.Scheme, policy);
+        return ProtocolDisabledRefusal(next.Scheme, policy, first);
     }
 
     /// <summary>
@@ -389,10 +389,26 @@ public sealed class RedirectFollower(
         return CurlUrl.Parse(httpsUrl, first.PathAsIs);
     }
 
-    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? ProtocolDisabledRefusal(string scheme, RedirectPolicy policy) =>
-        policy.AllowedSchemes.Contains(scheme) && policy.AllowedTransferSchemes?.Contains(scheme) != false
-            ? null
-            : (CurlExitCode.UnsupportedProtocol, $"Protocol \"{scheme}\" is disabled (in redirect)", false);
+    /// <summary>
+    /// The <c>--proto-redir</c> or <c>--proto</c> refusal of a target whose scheme is
+    /// <paramref name="scheme" />, or <see langword="null" /> when it is allowed. A refusal is also
+    /// reported to the hop's events, as curl 8.21.0's <c>-v</c> writes it before its
+    /// <c>curl: (1)</c> line (measured, BL-805 Notes).
+    /// </summary>
+    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? ProtocolDisabledRefusal(
+        string scheme,
+        RedirectPolicy policy,
+        ITransferContext first)
+    {
+        if (policy.AllowedSchemes.Contains(scheme) && policy.AllowedTransferSchemes?.Contains(scheme) != false)
+        {
+            return null;
+        }
+
+        string message = $"Protocol \"{scheme}\" is disabled (in redirect)";
+        first.Events.ReportInfo(message);
+        return (CurlExitCode.UnsupportedProtocol, message, false);
+    }
 
     private static string UnparsableUrlReason(string target)
     {

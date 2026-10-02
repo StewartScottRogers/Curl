@@ -196,6 +196,7 @@ public sealed class CurlCommandRunnerDumpHeaderTests
         Assert.AreEqual(
             "curl: Failed writing headers to -" + NewLine
             + "* client returned ERROR on write of 20 bytes" + "\n"
+            + "* closing connection #0" + "\n"
             + "curl: (23) client returned ERROR on write of 20 bytes" + NewLine,
             StandardErrorText);
     }

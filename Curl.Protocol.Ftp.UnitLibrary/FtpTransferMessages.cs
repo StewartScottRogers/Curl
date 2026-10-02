@@ -18,6 +18,12 @@ internal static class FtpTransferMessages
     /// </summary>
     internal const string ReplyLineTooLarge = "A value or data field grew larger than allowed";
 
+    /// <summary>
+    /// The exit 8 message for a reply line holding a NUL byte, as curl 8.21.0's
+    /// <c>Curl_pp_readresp</c> fails it (BL-1117).
+    /// </summary>
+    internal const string NulByteInReplyLine = "Nul byte in server response line";
+
     /// <summary>The exit 28 message for a <c>421</c> reply before the data transfer.</summary>
     internal const string TimeoutReached = "Timeout was reached";
 
@@ -341,6 +347,18 @@ internal static class FtpTransferMessages
     /// directory is the entry directory, so no <c>CWD</c> is needed (BL-945).
     /// </summary>
     internal const string SamePathAsPreviousTransfer = "Request has same path as previous transfer";
+
+    /// <summary>The exit 70 message for an end-of-transfer reply of <c>552</c> (BL-1118).</summary>
+    internal const string StorageAllocationExceeded = "Exceeded storage allocation";
+
+    /// <summary>The <c>-v</c> line for a <c>-C</c> download whose offset leaves nothing to fetch (BL-1118).</summary>
+    internal const string AlreadyCompletelyDownloaded = "File already completely downloaded";
+
+    /// <summary>The <c>-v</c> line for a <c>-C</c> upload whose offset covers the whole source (BL-1118).</summary>
+    internal const string AlreadyCompletelyUploaded = "File already completely uploaded";
+
+    /// <summary>The <c>-v</c> line for a <c>-C</c> download whose <c>SIZE</c> gave no count (BL-1118).</summary>
+    internal const string SizeNotSupported = "ftp server does not support SIZE";
 
     /// <summary>
     /// The <c>-v</c> line curl 8.21.0 writes for a reply to <c>PWD</c> (BL-945): the

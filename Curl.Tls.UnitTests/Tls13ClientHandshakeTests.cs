@@ -114,6 +114,27 @@ public sealed class Tls13ClientHandshakeTests
     }
 
     [TestMethod]
+    public void ClientHelloOffersTheRenegotiationScsvAfterTheTls13SuitesWhenAsked()
+    {
+        using Tls13ClientHandshake client = Client(DefaultSettings with { CipherSuites = [0x1302, 0x1303, 0x1301], OfferEmptyRenegotiationInfoScsv = true });
+
+        ClientHello hello = ClientHello.Decode(HandshakeMessageReader.Read(client.Start().BytesToSend[0].Bytes).Message!.Body).Value;
+
+        CollectionAssert.AreEqual(new ushort[] { 0x1302, 0x1303, 0x1301, 0x00ff }, hello.CipherSuites.ToArray());
+    }
+
+    [TestMethod]
+    public void ClientHelloOffersTheRenegotiationScsvOnceWhenTheLowerVersionsAlsoOfferIt()
+    {
+        Tls12ClientSettings lower = Tls12PipeDriver.DefaultSettings with { CipherSuites = [0xc02f, Tls12CipherSuite.EmptyRenegotiationInfoScsv] };
+        using Tls13ClientHandshake client = Client(DefaultSettings with { CipherSuites = [0x1301], OfferEmptyRenegotiationInfoScsv = true, LowerVersions = lower });
+
+        ClientHello hello = ClientHello.Decode(HandshakeMessageReader.Read(client.Start().BytesToSend[0].Bytes).Message!.Body).Value;
+
+        CollectionAssert.AreEqual(new ushort[] { 0x1301, 0xc02f, 0x00ff }, hello.CipherSuites.ToArray());
+    }
+
+    [TestMethod]
     public void HelloRetryRequestWithOnlyACookieKeepsTheKeyShares()
     {
         using Tls13ClientHandshake client = Client();

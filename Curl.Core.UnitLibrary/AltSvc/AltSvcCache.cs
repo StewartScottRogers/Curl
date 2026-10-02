@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Core.AltSvc;
 
@@ -17,8 +18,15 @@ namespace Curl.Core.AltSvc;
 /// entry already held is written back whether or not it has expired, as curl does.
 /// </remarks>
 /// <param name="timeProvider">The clock expiries are counted on.</param>
-public sealed class AltSvcCache(TimeProvider timeProvider)
+/// <param name="diagnosticLog">
+/// Where the cache writes its work, component <see cref="DiagnosticLogComponents.AltSvc" />
+/// (BL-1072): an alternative <see cref="FindForOrigin" /> finds as <c>info</c>, each alternative
+/// stored from a header and each origin with none as <c>verbose</c>; <see langword="null" /> for none.
+/// </param>
+public sealed class AltSvcCache(TimeProvider timeProvider, IDiagnosticLog? diagnosticLog = null)
 {
+    private readonly AltSvcDiagnosticLog log = new(diagnosticLog ?? NoDiagnosticLog.Instance);
+
     /// <summary>The two comment lines curl writes at the top of the file, without line endings.</summary>
     public static readonly IReadOnlyList<string> FileHeaderLines =
     [
@@ -167,10 +175,12 @@ public sealed class AltSvcCache(TimeProvider timeProvider)
         {
             if (Find(sourceAlpn, sourceHost, sourcePort, allowedDestinationAlpns) is { } entry)
             {
+                log.Used(entry);
                 return new AltSvcMatch(sourceAlpn, entry, entry.IsDestination(sourceHost, sourcePort));
             }
         }
 
+        log.Missed(sourceHost, sourcePort);
         return null;
     }
 
@@ -222,6 +232,7 @@ public sealed class AltSvcCache(TimeProvider timeProvider)
         if (entry is not null)
         {
             entries.Add(entry);
+            log.Stored(entry);
         }
     }
 

@@ -18,6 +18,10 @@ internal static class ClientCertificateLoader
 
     private const string PrivateKeyLabel = "PRIVATE KEY";
 
+    // A PKCS#12 key is loaded exportable: on Windows the default refuses to export its private
+    // parameters, and TLS 1.0 and 1.1 sign their MD5 and SHA-1 block with them (BL-946).
+    private const X509KeyStorageFlags Pkcs12KeyStorage = X509KeyStorageFlags.Exportable;
+
     private static readonly string[] DerPrivateKeyLabels = ["PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY"];
 
     /// <summary>
@@ -175,7 +179,7 @@ internal static class ClientCertificateLoader
 
         try
         {
-            return (X509CertificateLoader.LoadPkcs12(contents, passphrase), null);
+            return (X509CertificateLoader.LoadPkcs12(contents, passphrase, Pkcs12KeyStorage), null);
         }
         catch (CryptographicException)
         {
@@ -306,7 +310,7 @@ internal static class ClientCertificateLoader
 
         try
         {
-            return (X509CertificateLoader.LoadPkcs12(contents, passphrase), null);
+            return (X509CertificateLoader.LoadPkcs12(contents, passphrase, Pkcs12KeyStorage), null);
         }
         catch (CryptographicException)
         {
@@ -426,7 +430,7 @@ internal static class ClientCertificateLoader
     // A key loaded from PEM is ephemeral, and Schannel will not sign with one on Windows;
     // a round trip through PKCS#12 gives it one every platform can use.
     private static X509Certificate2 Reimport(X509Certificate2 certificate) =>
-        X509CertificateLoader.LoadPkcs12(certificate.Export(X509ContentType.Pkcs12), null);
+        X509CertificateLoader.LoadPkcs12(certificate.Export(X509ContentType.Pkcs12), null, Pkcs12KeyStorage);
 
     private static (X509Certificate2? Certificate, ConnectResult? Failure) Failed(string message) =>
         (null, SslCertProblem(message));

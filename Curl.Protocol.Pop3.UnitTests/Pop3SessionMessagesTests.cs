@@ -11,6 +11,7 @@ public sealed class Pop3SessionMessagesTests
     [DataRow(Pop3SessionMessages.UnexpectedResponse, true)]
     [DataRow(Pop3SessionMessages.StlsNotSupported, true)]
     [DataRow(Pop3SessionMessages.StartTlsDenied, true)]
+    [DataRow(Pop3SessionMessages.NulByteInLine, true)]
     [DataRow("Access denied. -", true)]
     [DataRow("Authentication failed: 45", true)]
     [DataRow(Pop3SessionMessages.WeirdServerReply, false)]

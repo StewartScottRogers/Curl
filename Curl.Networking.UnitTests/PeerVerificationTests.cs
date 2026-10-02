@@ -50,4 +50,26 @@ public sealed class PeerVerificationTests
 
         Assert.IsEmpty(events.VerifyResults);
     }
+
+    [TestMethod]
+    public void ReportPinnedPublicKeyRefusal_NotRefused_ReportsNothing()
+    {
+        var events = new RecordingTransferEvents();
+
+        new PeerVerification(true, 0, []) { PinnedPublicKeyHash = "sha256//AAAA" }.ReportPinnedPublicKeyRefusal(events, matchesSchannelBuild: true);
+
+        Assert.IsEmpty(events.Info);
+    }
+
+    [TestMethod]
+    public void ReportPinnedPublicKeyRefusal_FilePinRefused_ReportsOnlyTheMismatchLines()
+    {
+        var events = new RecordingTransferEvents();
+
+        new PeerVerification(true, 0, []) { PinnedPublicKeyRefused = true }.ReportPinnedPublicKeyRefusal(events, matchesSchannelBuild: true);
+
+        CollectionAssert.AreEqual(
+            new[] { "SSL: public key does not match pinned public key", "SSL: public key does not match pinned public key" },
+            events.Info);
+    }
 }

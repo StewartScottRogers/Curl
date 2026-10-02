@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using System.Text;
 
 using Curl.Cli;
@@ -81,6 +82,22 @@ public sealed class CurlCompositionDohTests
     }
 
     [TestMethod]
+    public async Task Connect_WithIpv4Only_PostsOnlyTheAQuery()
+    {
+        // curl -sS -4 --doh-url https://127.0.0.1:P1/dns-query --doh-insecure http://example.test:P2/
+        // -> one POST to the DoH server, QTYPE A (measured, BL-642).
+        ScriptedConnector dohServer = new([AAnswer]);
+        ScriptedConnector webServer = new([]);
+
+        ConnectResult result = await ConnectAsync(DohUrl, dohServer, webServer, new RecordingEvents(), "--doh-insecure", "-4");
+
+        Assert.IsNotNull(result.Connection);
+        Assert.HasCount(1, dohServer.Targets);
+        Assert.AreEqual(MeasuredPost(0x01), Encoding.Latin1.GetString(dohServer.Written));
+        Assert.AreEqual("127.0.0.1", webServer.Targets[0].Host);
+    }
+
+    [TestMethod]
     public async Task Connect_WithResolveForTheSameHost_DialsTheEntryWithoutAskingTheDohServer()
     {
         // curl -v --resolve example.test:48712:127.0.0.1 --doh-url ... --doh-insecure http://example.test:48712/
@@ -129,7 +146,7 @@ public sealed class CurlCompositionDohTests
     [TestMethod]
     public void CreateDohResolver_WithAUrlThatDoesNotParse_ResolvesNothing()
     {
-        Assert.IsInstanceOfType<UnusableDohUrlResolver>(CurlComposition.CreateDohResolver("http://[bad/", new ScriptedConnector([])));
+        Assert.IsInstanceOfType<UnusableDohUrlResolver>(CurlComposition.CreateDohResolver("http://[bad/", new ScriptedConnector([]), AddressFamily.Unspecified));
     }
 
     [TestMethod]
@@ -235,7 +252,7 @@ public sealed class CurlCompositionDohTests
         CommandLineOptions options = Parse([.. arguments, "--doh-url", dohUrl]);
         TcpConnector connector = CurlComposition.CreateTcpConnector(
             options,
-            CurlComposition.CreateDohResolver(dohUrl, dohServer),
+            CurlComposition.CreateDohResolver(dohUrl, dohServer, CurlComposition.AddressFamilyOf(options)),
             new ScriptedTcpDialer(webServer),
             new PassThroughTlsProvider(),
             TimeProvider.System,

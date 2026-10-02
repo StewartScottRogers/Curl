@@ -177,6 +177,34 @@ internal static class FileTransferMessages
         $"cannot open {osPath} for writing";
 
     /// <summary>
+    /// The information line that ends a <c>file://</c> transfer which got past its open,
+    /// when libcurl keeps nothing it has to tear down in a hurry.
+    /// </summary>
+    /// <param name="connectionNumber">The number libcurl gave the transfer's connection.</param>
+    /// <returns>The line, without the <c>* </c> prefix.</returns>
+    /// <remarks>
+    /// Measured against curl 8.21.0 on Windows on 2026-09-29 (BL-936): a download, a
+    /// <c>-T</c> upload, <c>-I</c>, an unmet <c>-z</c>, exit 36, exit 55 and exit 63 all end
+    /// <c>* shutting down connection #0</c> under <c>-v</c> and <c>--trace</c>.
+    /// </remarks>
+    internal static string ShuttingDownConnection(long connectionNumber) =>
+        "shutting down connection #" + connectionNumber.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// The information line that ends a <c>file://</c> transfer which got past its open and
+    /// then failed in a way libcurl's <c>multi_done</c> counts as premature.
+    /// </summary>
+    /// <param name="connectionNumber">The number libcurl gave the transfer's connection.</param>
+    /// <returns>The line, without the <c>* </c> prefix.</returns>
+    /// <remarks>
+    /// Measured against curl 8.21.0 on Windows on 2026-09-29 (BL-936): exit 23 (an upload
+    /// destination that would not open, an output that refused a write) and exit 26 (an
+    /// upload source that ran short) end <c>* closing connection #0</c>.
+    /// </remarks>
+    internal static string ClosingConnection(long connectionNumber) =>
+        "closing connection #" + connectionNumber.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>
     /// The pseudo-header lines curl synthesises for a local file, each with its CRLF,
     /// followed by the blank line that ends a header block. They are kept apart because
     /// curl writes them apart, and a failing header output reports the length of the line

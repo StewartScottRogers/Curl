@@ -17,6 +17,8 @@ public sealed partial class LdapProtocolHandlerTests
 
     private const string EntryOuX2 = "30 1e 02 01 02 64 19 04 0a 64 63 3d 65 78 61 6d 70 6c 65 30 0b 30 09 04 02 6f 75 31 03 04 01 78";
 
+    private const string SearchSizeLimitExceeded2 = "30 0c 02 01 02 65 07 0a 01 04 04 00 04 00";
+
     [TestMethod]
     public async Task ExecuteAsync_WinLdapSearch_ReportsTheVendorTheUrlTheConnectionTheDataAndShutsDown()
     {
@@ -114,6 +116,38 @@ public sealed partial class LdapProtocolHandlerTests
         List<string> lines = await VerboseLinesAsync(LdapDialect.OpenLdap, "ldap://127.0.0.1:18389/dc=x?a?bogus");
 
         CollectionAssert.AreEqual(new[] { "LDAP local: bad or missing scope", "closing connection #-1" }, lines);
+    }
+
+    [TestMethod]
+    [DataRow(LdapDialect.WinLdap)]
+    [DataRow(LdapDialect.OpenLdap)]
+    public async Task ExecuteAsync_SizeLimitExceededAfterTwoEntries_ReportsMoreThanTwoEntriesAfterTheEntries(LdapDialect dialect)
+    {
+        List<string> lines = await VerboseLinesAsync(dialect, Url, BindSuccess1, EntryOuX2, EntryOuX2, SearchSizeLimitExceeded2);
+
+        int moreThan = lines.IndexOf("There are more than 2 entries");
+        Assert.IsTrue(moreThan > lines.FindLastIndex(line => line.StartsWith('{')), string.Join(" | ", lines));
+        Assert.AreEqual(1, lines.Count(line => line.StartsWith("There are more than", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    [DataRow(LdapDialect.WinLdap)]
+    [DataRow(LdapDialect.OpenLdap)]
+    public async Task ExecuteAsync_SizeLimitExceededWithNoEntries_ReportsMoreThanZeroEntries(LdapDialect dialect)
+    {
+        List<string> lines = await VerboseLinesAsync(dialect, Url, BindSuccess1, SearchSizeLimitExceeded2);
+
+        CollectionAssert.Contains(lines, "There are more than 0 entries");
+    }
+
+    [TestMethod]
+    [DataRow(LdapDialect.WinLdap)]
+    [DataRow(LdapDialect.OpenLdap)]
+    public async Task ExecuteAsync_SearchDoneWithSuccess_ReportsNoMoreThanLine(LdapDialect dialect)
+    {
+        List<string> lines = await VerboseLinesAsync(dialect, Url, BindSuccess1, EntryOuX2, SearchDone2);
+
+        Assert.IsFalse(lines.Any(line => line.StartsWith("There are more than", StringComparison.Ordinal)), string.Join(" | ", lines));
     }
 
     [TestMethod]

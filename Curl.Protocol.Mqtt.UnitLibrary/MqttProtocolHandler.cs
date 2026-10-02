@@ -31,7 +31,10 @@ namespace Curl.Protocol.Mqtt;
 /// curl writes it: two bytes of topic length, the topic, then the payload. The transfer runs
 /// until the broker ends it: a DISCONNECT is a success, and a closed connection is exit 56
 /// (<see cref="CurlExitCode.RecvError" />, <c>Connection disconnected</c>), which is how a
-/// subscribe usually ends.
+/// subscribe usually ends. A PUBLISH whose remaining length is over
+/// <see cref="ITransferContext.MaxFileSize" /> is exit 63
+/// (<see cref="CurlExitCode.FilesizeExceeded" />) with none of it written; the limit applies
+/// to each PUBLISH on its own.
 /// </para>
 /// <para>
 /// Either way, a refused CONNACK, any packet curl does not expect and a user name or
@@ -153,7 +156,7 @@ public sealed class MqttProtocolHandler : IProtocolHandler
         TransferResult result;
         await using (connection.ConfigureAwait(false))
         {
-            MqttSession session = new(connection, context.Output, context.Progress, context.Events, log, context.CancellationToken);
+            MqttSession session = new(connection, context.Output, context.Progress, context.Events, log, context.MaxFileSize, context.TimeProvider, context.CancellationToken);
             try
             {
                 await session

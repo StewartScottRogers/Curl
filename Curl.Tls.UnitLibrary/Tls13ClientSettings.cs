@@ -33,11 +33,23 @@ public sealed record Tls13ClientSettings
     public IReadOnlyList<ushort> CipherSuites { get; init; } =
         [Tls13CipherSuite.Aes256GcmSha384.Code, Tls13CipherSuite.ChaCha20Poly1305Sha256.Code, Tls13CipherSuite.Aes128GcmSha256.Code];
 
-    /// <summary>Gets the groups offered in <c>supported_groups</c>, in preference order; each must be one <see cref="TlsNamedGroup.CanShare" /> accepts.</summary>
+    /// <summary>
+    /// Gets a value indicating whether the ClientHello also offers <c>TLS_EMPTY_RENEGOTIATION_INFO_SCSV</c>
+    /// (<c>00ff</c>, RFC 5746 section 3.3) after the TLS 1.3 suites and any <see cref="LowerVersions" /> ones,
+    /// as LibreSSL does. It is a signalling value, not a suite: it never joins <see cref="CipherSuites" />, and a
+    /// ServerHello that selects it is refused with <c>illegal_parameter</c>.
+    /// </summary>
+    public bool OfferEmptyRenegotiationInfoScsv { get; init; }
+
+    /// <summary>
+    /// Gets the groups offered in <c>supported_groups</c>, in preference order; each must be one
+    /// <see cref="TlsNamedGroup.CanShare" /> or <see cref="TlsNamedGroup.IsTls12EcdheGroup" /> accepts. A
+    /// TLS 1.2-only group is offered for a TLS 1.2 continuation, as OpenSSL does, and is never retried on.
+    /// </summary>
     public IReadOnlyList<ushort> SupportedGroups { get; init; } =
         [TlsNamedGroup.X25519, TlsNamedGroup.Secp256r1, TlsNamedGroup.Secp384r1, TlsNamedGroup.Secp521r1];
 
-    /// <summary>Gets the groups the first ClientHello sends a key share for, each one of <see cref="SupportedGroups" />.</summary>
+    /// <summary>Gets the groups the first ClientHello sends a key share for, each one of <see cref="SupportedGroups" /> that <see cref="TlsNamedGroup.CanShare" /> accepts.</summary>
     public IReadOnlyList<ushort> KeyShareGroups { get; init; } = [TlsNamedGroup.X25519];
 
     /// <summary>Gets the signature schemes offered in <c>signature_algorithms</c>; the server's CertificateVerify must use one of them.</summary>
@@ -208,7 +220,7 @@ public sealed record Tls13ClientSettings
     {
         Require(CertificateCompressionAlgorithms.All(CertificateCompressionAlgorithm.CanDecompress), "Offer only certificate compression algorithms the client can decompress.", nameof(CertificateCompressionAlgorithms));
         Require(CipherSuites.Count > 0 && CipherSuites.All(code => Tls13CipherSuite.Find(code) is not null), "Offer at least one cipher suite, and only TLS 1.3 suites.", nameof(CipherSuites));
-        Require(SupportedGroups.All(TlsNamedGroup.CanShare), "Every supported group must be one the client can make a key share for.", nameof(SupportedGroups));
-        Require(KeyShareGroups.All(SupportedGroups.Contains), "Every key share group must be one of the supported groups.", nameof(KeyShareGroups));
+        Require(SupportedGroups.All(group => TlsNamedGroup.CanShare(group) || TlsNamedGroup.IsTls12EcdheGroup(group)), "Every supported group must be one the client can make a key share for or agree ECDHE on in TLS 1.2.", nameof(SupportedGroups));
+        Require(KeyShareGroups.All(group => SupportedGroups.Contains(group) && TlsNamedGroup.CanShare(group)), "Every key share group must be one of the supported groups the client can make a key share for.", nameof(KeyShareGroups));
     }
 }

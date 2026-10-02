@@ -48,9 +48,6 @@ public sealed class SshPacketReaderTests
     }
 
     [TestMethod]
-    [DataRow(0x00100000u, (byte)4, DisplayName = "1 MiB, measured: curl fails the key exchange")]
-    [DataRow((uint)(SshPacketReader.MaximumPacketSize + 4), (byte)4, DisplayName = "one block over the maximum")]
-    [DataRow(0u, (byte)0, DisplayName = "zero length")]
     [DataRow(13u, (byte)4, DisplayName = "not a multiple of the block size")]
     [DataRow(12u, (byte)2, DisplayName = "padding under four, measured: curl fails the key exchange")]
     [DataRow(12u, (byte)11, DisplayName = "no payload")]
@@ -61,6 +58,58 @@ public sealed class SshPacketReaderTests
         SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
 
         await Assert.ThrowsExactlyAsync<InvalidDataException>(async () => await reader.ReadAsync(CancellationToken.None));
+    }
+
+    [TestMethod]
+    [DataRow(0x00100000u, -41, DisplayName = "1 MiB, measured: curl fails the key exchange")]
+    [DataRow((uint)(SshPacketReader.MaximumPacketSize - 4 + 8), -41, DisplayName = "one block over the maximum")]
+    [DataRow(uint.MaxValue, -41, DisplayName = "the largest length")]
+    [DataRow(0u, -12, DisplayName = "zero length")]
+    public async Task ReadAsync_UnprotectedLengthZeroOrOverTheMaximum_ThrowsWithLibssh2sCode(uint packetLength, int expectedCode)
+    {
+        byte[] bytes = new SshServerScript().RawPacket(packetLength, 4, new byte[64]).Bytes;
+        SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
+
+        SshPacketLengthException failure = await Assert.ThrowsExactlyAsync<SshPacketLengthException>(
+            async () => await reader.ReadAsync(CancellationToken.None));
+
+        Assert.AreEqual(expectedCode, failure.Libssh2ErrorCode);
+    }
+
+    // Measured 2026-10-01 (BL-1081) under aes128-ctr with hmac-sha2-256: libssh2 counts the
+    // MAC or tag in its 40000-byte maximum, reading a packet_length of 39964 and refusing
+    // 39980 with -41.
+    [TestMethod]
+    [DataRow(39968u, false, DisplayName = "4 + 39968 + a 16-byte tag, under the maximum: read on")]
+    [DataRow(39984u, true, DisplayName = "4 + 39984 + a 16-byte tag, over the maximum: -41")]
+    public async Task ReadAsync_LengthNearTheMaximum_CountsTheTag(uint packetLength, bool refused)
+    {
+        byte[] bytes = [.. SshTestEncoding.UInt32(packetLength), .. new byte[128]];
+        SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
+        reader.ChangeProtection(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With("aes128-gcm@openssh.com", null), ReaderKeys));
+
+        Exception failure = await Assert.ThrowsAsync<Exception>(async () => await reader.ReadAsync(CancellationToken.None));
+
+        Assert.AreEqual(refused ? typeof(SshPacketLengthException) : typeof(EndOfStreamException), failure.GetType());
+    }
+
+    [TestMethod]
+    [DataRow("aes128-ctr", "hmac-sha2-256", DisplayName = "aes128-ctr, as measured")]
+    [DataRow("aes128-gcm@openssh.com", null, DisplayName = "AES-GCM, as measured")]
+    [DataRow("chacha20-poly1305@openssh.com", null, DisplayName = "ChaCha20-Poly1305, as measured")]
+    public async Task ReadAsync_ProtectedLengthOverTheMaximum_ThrowsWithMinus41(string cipher, string? mac)
+    {
+        byte[] bytes = new SshServerScript()
+            .Protect(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With(cipher, mac), ReaderKeys), resetSequenceNumber: true)
+            .Packet([6, 1, 2, 3], sealedPacket => sealedPacket[0] ^= 0x80)
+            .Bytes;
+        SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
+        reader.ChangeProtection(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With(cipher, mac), ReaderKeys));
+
+        SshPacketLengthException failure = await Assert.ThrowsExactlyAsync<SshPacketLengthException>(
+            async () => await reader.ReadAsync(CancellationToken.None));
+
+        Assert.AreEqual(-41, failure.Libssh2ErrorCode);
     }
 
     [TestMethod]
@@ -90,7 +139,6 @@ public sealed class SshPacketReaderTests
     }
 
     [TestMethod]
-    [DataRow(0u, DisplayName = "zero length")]
     [DataRow(20u, DisplayName = "not a multiple of 16 without the length field")]
     [DataRow(28u, DisplayName = "a multiple of 16 only with the length field")]
     public async Task ReadAsync_EncryptThenMacFraming_RefusesLengthsOffTheBlockSize(uint packetLength)

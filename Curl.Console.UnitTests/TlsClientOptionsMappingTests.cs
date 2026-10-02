@@ -157,6 +157,22 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
+    public void FromCommandLine_NoSessionIdAndSslAllowBeast_SetNoSessionIdAndAllowBeast()
+    {
+        Assert.AreEqual(new TlsClientOptions(NoSessionId: true), Map("--no-sessionid", Url));
+        Assert.AreEqual(new TlsClientOptions(AllowBeast: true), Map("--ssl-allow-beast", Url));
+        Assert.AreEqual(new TlsClientOptions(), Map("--proxy-ssl-allow-beast", Url));
+    }
+
+    [TestMethod]
+    public void ProxyFromCommandLine_NoSessionIdAndProxySslAllowBeast_SetNoSessionIdAndAllowBeast()
+    {
+        Assert.AreEqual(new TlsClientOptions(NoSessionId: true), MapProxy("--no-sessionid", Url));
+        Assert.AreEqual(new TlsClientOptions(AllowBeast: true), MapProxy("--proxy-ssl-allow-beast", Url));
+        Assert.AreEqual(new TlsClientOptions(), MapProxy("--ssl-allow-beast", Url));
+    }
+
+    [TestMethod]
     public void ProxyFromCommandLine_ProxyTlsv1_SetsTheProxysMinimumVersionTls10()
     {
         Assert.AreEqual(new TlsClientOptions(MinimumVersion: TlsVersion.Tls10), MapProxy("--proxy-tlsv1", Url));
@@ -383,9 +399,9 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
-    public void ProxyFromCommandLine_ProxyCaNativeAndProxySslAllowBeast_ChangeNothing()
+    public void ProxyFromCommandLine_ProxyCaNativeChangesNothingAndProxySslAllowBeastOnlyTheProxysSplit()
     {
-        Assert.AreEqual(new TlsClientOptions(), MapProxy("--proxy-ca-native", "--proxy-ssl-allow-beast", Url));
+        Assert.AreEqual(new TlsClientOptions(AllowBeast: true), MapProxy("--proxy-ca-native", "--proxy-ssl-allow-beast", Url));
         Assert.AreEqual(new TlsClientOptions(), Map("--proxy-ca-native", "--proxy-ssl-allow-beast", Url));
     }
 

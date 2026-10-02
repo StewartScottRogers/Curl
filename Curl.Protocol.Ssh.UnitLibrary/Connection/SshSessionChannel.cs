@@ -65,6 +65,11 @@ internal sealed class SshSessionChannel(SshTransport transport)
     internal uint OpenFailureReasonCode { get; private set; }
 
     /// <summary>
+    /// Gets where the sessions steps are logged: the transports log.
+    /// </summary>
+    internal SshDiagnosticLog DiagnosticLog => transport.DiagnosticLog;
+
+    /// <summary>
     /// Sends <c>SSH_MSG_CHANNEL_OPEN</c> for a <c>session</c> channel and waits for the
     /// server's answer.
     /// </summary>
@@ -87,12 +92,14 @@ internal sealed class SshSessionChannel(SshTransport transport)
         if (answer[0] == SshConnectionMessageNumber.ChannelOpenFailure)
         {
             OpenFailureReasonCode = confirmation.ReadUInt32();
+            transport.DiagnosticLog.ChannelOpened(false);
             return false;
         }
 
         remoteChannelNumber = confirmation.ReadUInt32();
         remoteWindow = confirmation.ReadUInt32();
         remoteMaximumPacketSize = Math.Max(confirmation.ReadUInt32(), 1);
+        transport.DiagnosticLog.ChannelOpened(true);
         return true;
     }
 
@@ -132,7 +139,9 @@ internal sealed class SshSessionChannel(SshTransport transport)
         request.WriteString(value);
         await transport.PacketWriter.WriteAsync(request.ToArray(), cancellationToken).ConfigureAwait(false);
         byte[] answer = await WaitForAsync(SshConnectionMessageNumber.ChannelSuccess, SshConnectionMessageNumber.ChannelFailure, cancellationToken).ConfigureAwait(false);
-        return answer[0] == SshConnectionMessageNumber.ChannelSuccess;
+        bool started = answer[0] == SshConnectionMessageNumber.ChannelSuccess;
+        transport.DiagnosticLog.ChannelRequested(requestType, value, started);
+        return started;
     }
 
     /// <summary>

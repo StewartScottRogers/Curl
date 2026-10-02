@@ -5,10 +5,36 @@ namespace Curl.Tls;
 /// carries <c>renegotiation_info</c> (empty: Curl never renegotiates), <c>server_name</c>,
 /// <c>srp</c> with <see cref="SrpCredentials" />, <c>ec_point_formats</c>, <c>supported_groups</c>, <c>session_ticket</c>,
 /// <c>status_request</c>, ALPN, <c>encrypt_then_mac</c>, <c>extended_master_secret</c> and,
-/// when TLS 1.2 is offered, <c>signature_algorithms</c>, in OpenSSL's order.
+/// when TLS 1.2 is offered, <c>signature_algorithms</c>, in <see cref="ExtensionOrder" />
+/// (OpenSSL's by default), with any of <see cref="FixedExtensions" /> sent verbatim in their place.
 /// </summary>
 public sealed record Tls12ClientSettings
 {
+    /// <summary>Gets the order OpenSSL sends the ClientHello's extensions in, the default <see cref="ExtensionOrder" />.</summary>
+    public static IReadOnlyList<TlsExtensionType> DefaultExtensionOrder { get; } =
+    [
+        TlsExtensionType.RenegotiationInfo, TlsExtensionType.ServerName, TlsExtensionType.Srp, TlsExtensionType.EcPointFormats,
+        TlsExtensionType.SupportedGroups, TlsExtensionType.SessionTicket, TlsExtensionType.StatusRequest,
+        TlsExtensionType.ApplicationLayerProtocolNegotiation, TlsExtensionType.EncryptThenMac, TlsExtensionType.ExtendedMasterSecret,
+        TlsExtensionType.SignatureAlgorithms,
+    ];
+
+    /// <summary>
+    /// Gets the order the ClientHello's extensions are sent in. An extension the settings
+    /// call for whose type is not listed goes after the listed ones; a listed type the
+    /// settings do not call for is skipped.
+    /// </summary>
+    public IReadOnlyList<TlsExtensionType> ExtensionOrder { get; init; } = DefaultExtensionOrder;
+
+    /// <summary>
+    /// Gets extensions sent verbatim: each replaces the one of its type the settings would
+    /// build, or is added when they build none, and goes at its type's place in
+    /// <see cref="ExtensionOrder" />. A platform profile sends its own <c>ec_point_formats</c>
+    /// and <c>status_request</c> this way. A fixed <c>status_request</c> asks for a staple
+    /// without <see cref="RequestOcspStatus" />'s check of it.
+    /// </summary>
+    public IReadOnlyList<TlsExtension> FixedExtensions { get; init; } = [];
+
     /// <summary>Gets the host name sent in <c>server_name</c> and handed to the verifier, or <see langword="null" /> to send none (an IP address).</summary>
     public string? ServerName { get; init; }
 

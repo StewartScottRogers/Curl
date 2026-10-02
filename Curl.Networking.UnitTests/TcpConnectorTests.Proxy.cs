@@ -179,6 +179,21 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ThroughATunnel_ReportsNoMappedDestinationSoTheOriginIsNamedLeftIntact()
+    {
+        // curl -v -p -x http://127.0.0.1:18536 http://example.invalid:8080/ ->
+        // * Connection #0 to host example.invalid:8080 left intact (the origin, not the proxy; BL-1074)
+        var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 200 Connection established\r\n\r\n"));
+        var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
+
+        var result = await connector.ConnectAsync(PlainTarget, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNull(result.MappedHost);
+        Assert.AreEqual(0, result.MappedPort);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WithTunnelOptions_SendsTheirUserAgent()
     {
         var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n\r\n"));

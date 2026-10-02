@@ -108,11 +108,11 @@ public sealed class VerboseTransferEventWriterQuicTlsTests
     }
 
     [TestMethod]
-    public void TlsTrust_TcpOnWindows_WritesNothing()
+    public void TlsTrust_TcpOnWindows_WritesTheSchannelLinesNotTheTrustAnchors()
     {
         Writer(TlsBackend.Schannel).ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = true, UsesWindowsSystemStores = true });
 
-        Assert.AreEqual(string.Empty, Written());
+        Assert.AreEqual("* schannel: disabled automatic use of client certificate\n", Written());
     }
 
     private static TlsHandshakeEvent QuicHandshake(params X509Certificate2[] chain)

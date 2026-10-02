@@ -328,7 +328,7 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual(IPAddress.Loopback, dialer.BoundDials.Single().LocalEndPoint.Address);
     }
 
-    private static TcpConnector LocalBindingConnector(FakeTcpDialer dialer, LocalBinding binding, INetworkInterfaceLookup? interfaces = null) =>
+    private static TcpConnector LocalBindingConnector(ITcpDialer dialer, LocalBinding binding, INetworkInterfaceLookup? interfaces = null) =>
         new(
             new HostMapDnsResolver([]),
             dialer,

@@ -1,3 +1,4 @@
+using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;
@@ -48,5 +49,36 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.AreEqual(CurlExitCode.SslPinnedPubKeyNotMatch, result.ExitCode);
         Assert.AreEqual("SSL: public key does not match pinned public key", result.ErrorMessage);
         Assert.IsTrue(plaintextDisposed);
+    }
+
+    [TestMethod]
+    [DataRow(SchannelBuild)]
+    [DataRow(OpenSslBuild)]
+    public async Task AuthenticateAsClientAsync_WithTheServerKeysHashPinned_ReportsTheHashInTheHandshakeEvent(bool matchesSchannelBuild)
+    {
+        var events = new RecordingTransferEvents();
+
+        var (result, _) = await HandshakeAsync(
+            Provider(Tls12Only(new TlsClientOptions(Insecure: true, PinnedPublicKey: ServerKeyPin)), matchesSchannelBuild), CertificateHost, events);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(ServerKeyPin, Assert.ContainsSingle(events.Handshakes).PinnedPublicKeyHash);
+        await result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    [DataRow(SchannelBuild, 2)]
+    [DataRow(OpenSslBuild, 1)]
+    public async Task AuthenticateAsClientAsync_WithAnotherKeysHashPinned_ReportsTheHashAndEachBuildsMismatchLines(bool matchesSchannelBuild, int mismatchLines)
+    {
+        var events = new RecordingTransferEvents();
+
+        var (result, _) = await HandshakeAsync(
+            Provider(Tls12Only(new TlsClientOptions(Insecure: true, PinnedPublicKey: "sha256//AAAA")), matchesSchannelBuild), CertificateHost, events);
+
+        Assert.AreEqual(CurlExitCode.SslPinnedPubKeyNotMatch, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { " public key hash: " + ServerKeyPin }.Concat(Enumerable.Repeat("SSL: public key does not match pinned public key", mismatchLines)).ToArray(),
+            events.Info.Where(line => line.Contains("public key", StringComparison.Ordinal)).ToArray());
     }
 }

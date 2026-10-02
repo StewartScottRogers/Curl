@@ -34,6 +34,13 @@ public interface IMultiplexedConnection : IAsyncDisposable
     string ApplicationProtocol { get; }
 
     /// <summary>
+    /// Gets how many client-initiated bidirectional streams the peer allows: its latest
+    /// <c>MAX_STREAMS</c>, or <see langword="null" />, the default, when the implementation does
+    /// not know it. A pool shares the connection between at most this many transfers (BL-735).
+    /// </summary>
+    long? BidirectionalStreamLimit => null;
+
+    /// <summary>
     /// Opens a client-initiated bidirectional stream, which HTTP/3 carries one request and
     /// its response on.
     /// </summary>

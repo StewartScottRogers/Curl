@@ -451,6 +451,31 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    public void TryGetVariableText_TlsEarlyDataNotGiven_PrintsZeroAsTheSchannelBuild()
+    {
+        // curl 8.21.0 (Schannel) -sk --tls-earlydata -w "%{tls_earlydata}|" twice over TLS printed "0|0|" (BL-906 Notes).
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), "https://127.0.0.1/", 0, "https://127.0.0.1/", "https", Clock);
+
+        Assert.AreEqual("0", Get(variables, "tls_earlydata"));
+        Assert.Contains("\"tls_earlydata\":0,", Get(variables, "json"));
+    }
+
+    [TestMethod]
+    [DataRow(36L, "36")]
+    [DataRow(-36L, "-36")]
+    public void TryGetVariableText_TlsEarlyDataSentGiven_PrintsTheReportedByteCount(long sent, string expected)
+    {
+        // CURLINFO_EARLYDATA_SENT_T: the bytes sent as early data, negative when the server rejected them.
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), "https://localhost/", 0, "https://localhost/", "https", Clock)
+        {
+            TlsEarlyDataSent = sent,
+        };
+
+        Assert.AreEqual(expected, Get(variables, "tls_earlydata"));
+        Assert.Contains($"\"tls_earlydata\":{expected},", Get(variables, "json"));
+    }
+
+    [TestMethod]
     public void TryGetVariableText_TimeQueueWithTimings_PrintsOneMicrosecond()
     {
         // curl printed 0.000083 and 0.000038: the queue is left as the transfer starts, which is the handler's start here.

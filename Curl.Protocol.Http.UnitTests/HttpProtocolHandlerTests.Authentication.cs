@@ -316,6 +316,49 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(downloadSize, report.DownloadSize);
     }
 
+    /// <summary>
+    /// An <c>https</c> transfer asks the authenticator to answer a challenge with the DER of
+    /// the connection's TLS server certificate, the first of its peer certificates, so
+    /// hand-built Negotiate sends <c>tls-server-end-point</c> channel bindings (BL-966).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_HttpsChallenge_AsksWithTheServerCertificateDer()
+    {
+        byte[] serverCertificate = [0x30, 0x03, 0x02, 0x01, 0x07];
+        ReadOnlyMemory<byte>[] chain = [serverCertificate, new byte[] { 0x30, 0x01 }];
+        QueueConnector connector = new(
+            ConnectResult.Connected(new TurnTakingConnection(65536, ClosingChallengeHead + "nope"), null, peerCertificates: chain),
+            ConnectResult.Connected(new TurnTakingConnection(65536, OkHead + "ok"), null, peerCertificates: chain));
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        TransferContext context = new() { Url = CurlUrl.Parse("https://127.0.0.1:18183/a"), Output = new MemoryStream() };
+
+        TransferResult result = await new HttpProtocolHandler(connector, authenticator).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(2, authenticator.Calls.Count);
+        CollectionAssert.AreEqual(serverCertificate, authenticator.Calls[1].Request.ServerCertificate.ToArray());
+    }
+
+    /// <summary>
+    /// A plain <c>http</c> transfer asks the authenticator with no server certificate, even
+    /// when the connection reports one, as an HTTPS proxy's own does (BL-966, ADR-0341).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_HttpChallenge_AsksWithNoServerCertificate()
+    {
+        ReadOnlyMemory<byte>[] chain = [new byte[] { 0x30, 0x01 }];
+        QueueConnector connector = new(
+            ConnectResult.Connected(new TurnTakingConnection(65536, ClosingChallengeHead + "nope"), null, peerCertificates: chain),
+            ConnectResult.Connected(new TurnTakingConnection(65536, OkHead + "ok"), null, peerCertificates: chain));
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+
+        TransferResult result = await new HttpProtocolHandler(connector, authenticator).ExecuteAsync(AuthContext(new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(2, authenticator.Calls.Count);
+        Assert.IsTrue(authenticator.Calls[1].Request.ServerCertificate.IsEmpty);
+    }
+
     private static TransferContext AuthContext(Stream output, Stream? headerOutput = null, HttpRequestOptions? options = null) =>
         new() { Url = CurlUrl.Parse(AuthUrl), Output = output, HeaderOutput = headerOutput, Http = options };
 }

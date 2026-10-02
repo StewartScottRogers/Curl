@@ -147,6 +147,32 @@ public sealed class CurlCommandRunnerRemoveOnErrorTests
             StandardErrorText);
     }
 
+    // Measured on the OpenSSL curl 8.21.0 for Linux, 2026-10-01 (BL-752 Notes).
+    [TestMethod]
+    public async Task RunAsync_RemoveOnErrorOutputNotARegularFile_WarnsSkippingRemoval()
+    {
+        outputFiles.NonRegularPaths.Add("/dev/null");
+
+        int exitCode = await RunAsync([CutShort], "--no-progress-meter", "--remove-on-error", "-o", "/dev/null", Url);
+
+        Assert.AreEqual(18, exitCode);
+        Assert.AreEqual(
+            "curl: (18) end of response with 5 bytes missing" + NewLine
+            + "Warning: Skipping removal; not a regular file: /dev/null" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoveOnErrorOutputNotARegularFileSilent_PrintsNoWarning()
+    {
+        outputFiles.NonRegularPaths.Add("/dev/null");
+
+        int exitCode = await RunAsync([CutShort], "-s", "-S", "--remove-on-error", "-o", "/dev/null", Url);
+
+        Assert.AreEqual(18, exitCode);
+        Assert.AreEqual("curl: (18) end of response with 5 bytes missing" + NewLine, StandardErrorText);
+    }
+
     [TestMethod]
     public async Task RunAsync_RemoveOnErrorFileCannotBeDeletedSilent_PrintsNoWarning()
     {

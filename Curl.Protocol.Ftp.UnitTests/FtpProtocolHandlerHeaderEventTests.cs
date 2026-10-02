@@ -159,6 +159,30 @@ public sealed class FtpProtocolHandlerHeaderEventTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_AuthAccepted_ReportsTheHandshakeAndTheConnectionOpenedAgainBeforeUser()
+    {
+        // curl 8.21.0 -k -v --ssl-reqd: between "< 234 AUTH accepted" and USER it writes the TLS
+        // lines and the connect's "Established connection" line again (measured, BL-1084).
+        var events = new RecordingTransferEvents();
+        var securedControl = new ScriptedConnection(Encoding.Latin1.GetBytes("331 Password required\r\n230 Logged in\r\n"));
+        var connector = new OpenedReportingConnector(ConnectResult.Connected(new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + "234 AUTH accepted\r\n"))));
+        var tls = new QueuedTlsProvider(ConnectResult.Connected(securedControl));
+        TransferContext context = MutableContext.Build(
+            new TransferContext { Url = CurlUrl.Parse(Url), Output = new MemoryStream() },
+            m =>
+            {
+                m.SslLevel = TransportSecurityLevel.Required;
+                m.Events = events;
+            });
+
+        await new FtpProtocolHandler(connector, new QueuedListener(), tls).ExecuteAsync(context);
+
+        Assert.AreSame(events, tls.HandshakeEvents.Single());
+        Assert.HasCount(2, events.ConnectionsOpened);
+        Assert.AreSame(events.ConnectionsOpened[0], events.ConnectionsOpened[1]);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_RangeEndsWithAbor_ReportsAborAndItsReplyButNotQuit()
     {
         // curl -v -r 0-2 ftp://127.0.0.1:18990/f.txt: ABOR is reported, read 226; QUIT is not.

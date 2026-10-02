@@ -115,7 +115,8 @@ internal sealed class HttpTransferDeadline : IDisposable
 
     /// <summary>
     /// Connects over QUIC through <paramref name="connector" />
-    /// (<see cref="IConnector.ConnectMultiplexedAsync" />), under the same limits as
+    /// as the session <c>openSession</c> builds over it, which the connector may share with other
+    /// transfers (<see cref="IConnector.ConnectMultiplexedSessionAsync" />, BL-735), under the same limits as
     /// <see cref="ConnectAsync" /> and with the same exit 28 failure (ADR-0144 section 7).
     /// </summary>
     /// <param name="connector">The connector to open the connection with.</param>
@@ -124,12 +125,17 @@ internal sealed class HttpTransferDeadline : IDisposable
     /// Cancels this connect alone, when a racing connect has won (ADR-0144 section 4); the
     /// connect then ends as the exit 28 failure, which the race discards.
     /// </param>
+    /// <param name="openSession">Builds the session over a new QUIC connection.</param>
     /// <returns>The connector's result, or the exit 28 failure.</returns>
     /// <exception cref="OperationCanceledException">The transfer was cancelled.</exception>
-    internal ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(IConnector connector, ConnectTarget target, CancellationToken abandoned = default) =>
+    internal ValueTask<ConnectResult> ConnectMultiplexedSessionAsync(
+        IConnector connector,
+        ConnectTarget target,
+        Func<IMultiplexedConnection, IConnection> openSession,
+        CancellationToken abandoned = default) =>
         WithinConnectTimeoutAsync(
-            token => connector.ConnectMultiplexedAsync(target, token),
-            message => MultiplexedConnectResult.Failed(CurlExitCode.OperationTimedOut, message),
+            token => connector.ConnectMultiplexedSessionAsync(target, openSession, token),
+            message => ConnectResult.Failed(CurlExitCode.OperationTimedOut, message),
             abandoned);
 
     private async ValueTask<TResult> WithinConnectTimeoutAsync<TResult>(

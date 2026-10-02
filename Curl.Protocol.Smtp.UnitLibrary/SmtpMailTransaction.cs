@@ -25,8 +25,8 @@ namespace Curl.Protocol.Smtp;
 /// <item><c>MAIL</c> or any <c>RCPT</c> answered other than 2xx, or <c>DATA</c> answered
 /// other than 354, is exit 55, <c>MAIL failed: 550</c>; the reply to the end of the message
 /// other than 250 is exit 8, <c>Weird server reply</c>. Each still sends <c>QUIT</c>.</item>
-/// <item>The server closing before a reply is complete is exit 56 and a reply line of 65536
-/// bytes exit 100, neither with <c>QUIT</c>.</item>
+/// <item>The server closing before a reply is complete is exit 56, a reply line of 65536
+/// bytes exit 100 and a reply line holding a NUL byte exit 8, none with <c>QUIT</c>.</item>
 /// <item>Every result carries <see cref="TransferReport.UploadSize" />, the bytes sent after
 /// <c>DATA</c> with the stuffed dots and the end-of-data mark, and
 /// <see cref="TransferReport.ResponseCode" />, the last reply's code, which is 0 once the
@@ -67,6 +67,10 @@ internal sealed class SmtpMailTransaction(
         catch (SmtpReplyMissingException)
         {
             result = TransferResult.Failure(CurlExitCode.RecvError, SmtpSessionMessages.ResponseReadingFailed);
+        }
+        catch (SmtpNulByteInReplyException)
+        {
+            result = TransferResult.Failure(CurlExitCode.WeirdServerReply, SmtpSessionMessages.NulByteInResponseLine);
         }
         catch (InvalidDataException)
         {

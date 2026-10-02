@@ -169,6 +169,19 @@ public sealed class CurlCommandRunnerTests
         Assert.IsEmpty(http.Contexts);
     }
 
+    // FR-064: curl 8.21.0 refuses a --url-query name holding a space before connecting.
+    [TestMethod]
+    public async Task RunAsync_UrlQueryNameHoldingASpace_PrintsMalformedInputAndReturns3WithoutConnecting()
+    {
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
+
+        int exitCode = await RunAsync(["-sS", "--url-query", "a b=c", "http://h/p"], http);
+
+        Assert.AreEqual(3, exitCode);
+        Assert.AreEqual("curl: (3) URL rejected: Malformed input to a URL function" + NewLine, StandardErrorText);
+        Assert.IsEmpty(http.Contexts);
+    }
+
     // curl 8.21.0 (Schannel) exits 3 with this line for a 65536-byte host, and tries to
     // resolve a 65535-byte one; the length is the percent-decoded host's (measured
     // 2026-09-27, BL-327; upstream test399).

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 using Curl.Networking.Fakes;
@@ -144,6 +145,47 @@ public sealed class DohDnsResolverTests
         var addresses = await new DohDnsResolver(connector, MeasuredDohUrl).ResolveAsync("example.test", CancellationToken.None);
 
         CollectionAssert.AreEqual(new[] { IPAddress.Loopback }, addresses.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(AddressFamily.InterNetwork, (byte)0x01)]
+    [DataRow(AddressFamily.InterNetworkV6, (byte)0x1C)]
+    public async Task ResolveAsync_WithOneAddressFamily_PostsOnlyThatFamilysQuery(AddressFamily family, byte queryType)
+    {
+        // BL-642: curl 8.21.0 -4 sent one POST with QTYPE 00 01, and -6 one with QTYPE 00 1C.
+        var connector = new FakeConnector();
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl) { AddressFamily = family };
+
+        await resolver.ResolveAsync("example.test", CancellationToken.None);
+
+        Assert.HasCount(1, connector.Opened);
+        byte[] written = [.. connector.Opened[0].Written];
+        CollectionAssert.AreEqual(new byte[] { 0x00, queryType, 0x00, 0x01 }, written[^4..]);
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_WithIpv6Only_ReturnsTheAaaaAnswersAddresses()
+    {
+        var connector = Answering(Ok(AnswerTo(DnsRecordType.Aaaa, IPv6Address)));
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl) { AddressFamily = AddressFamily.InterNetworkV6 };
+
+        var addresses = await resolver.ResolveAsync("example.test", CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { IPv6Address }, addresses.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_WithUnspecifiedAddressFamily_PostsBothQueriesAFirst()
+    {
+        var connector = new FakeConnector();
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl) { AddressFamily = AddressFamily.Unspecified };
+
+        await resolver.ResolveAsync("example.test", CancellationToken.None);
+
+        Assert.AreEqual(AddressFamily.Unspecified, new DohDnsResolver(connector, MeasuredDohUrl).AddressFamily);
+        Assert.HasCount(2, connector.Opened);
+        Assert.AreEqual((byte)0x01, connector.Opened[0].Written[^3]);
+        Assert.AreEqual((byte)0x1C, connector.Opened[1].Written[^3]);
     }
 
     [TestMethod]
@@ -304,6 +346,113 @@ public sealed class DohDnsResolverTests
 
         Assert.IsNotNull(result.Connection);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Loopback, 48637) }, dialer.DialedEndPoints);
+    }
+
+    [TestMethod]
+    [DataRow(null)]
+    [DataRow("")]
+    [DataRow(" ")]
+    public async Task ResolveHttpsRecordAsync_WithNoHost_Throws(string? host)
+    {
+        var resolver = new DohDnsResolver(new FakeConnector(), MeasuredDohUrl);
+
+        await Assert.ThrowsAsync<ArgumentException>(async () => await resolver.ResolveHttpsRecordAsync(host!, 443, CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task ResolveHttpsRecordAsync_OnPort443_PostsTheHttpsQueryAndReturnsTheEchConfigList()
+    {
+        const string RecordData = "000100" + "00010003026832" + "00050006AABBCCDDEEFF";
+        var question = "076578616D706C650474657374000041" + "0001";
+        var answer = Convert.FromHexString("000081800001000100000000" + question + "C00C004100010000003C0014" + RecordData);
+        var connector = Answering(Ok(answer));
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl);
+
+        var record = await resolver.ResolveHttpsRecordAsync("example.test", 443, CancellationToken.None);
+
+        var head = "POST /dns-query HTTP/1.1\r\n"
+            + $"Host: 127.0.0.1:{DohPort}\r\n"
+            + "Accept: */*\r\n"
+            + "Content-Type: application/dns-message\r\n"
+            + "Content-Length: 30\r\n"
+            + "\r\n";
+        var query = Convert.FromHexString("000001000001000000000000" + question);
+        Assert.HasCount(1, connector.Opened);
+        CollectionAssert.AreEqual(Encoding.Latin1.GetBytes(head).Concat(query).ToArray(), connector.Opened[0].Written);
+        Assert.IsNotNull(record);
+        CollectionAssert.AreEqual(new[] { "h2" }, record.ApplicationProtocols.ToArray());
+        Assert.AreEqual("AABBCCDDEEFF", Convert.ToHexString(record.EchConfigList.Span));
+    }
+
+    [TestMethod]
+    [DataRow("00010003026832" + "00050006AABBCCDDEEFF", "AABBCCDDEEFF")]
+    [DataRow("00010003026832", null)]
+    public async Task FindEchConfigListAsync_IsTheHttpsRecordsEchParameter(string parameters, string? expected)
+    {
+        var question = "076578616D706C650474657374000041" + "0001";
+        var recordData = "000100" + parameters;
+        var answer = Convert.FromHexString("000081800001000100000000" + question + "C00C004100010000003C" + (recordData.Length / 2).ToString("X4") + recordData);
+        var resolver = new DohDnsResolver(Answering(Ok(answer)), MeasuredDohUrl);
+
+        var list = await resolver.FindEchConfigListAsync("example.test", 443, CancellationToken.None);
+
+        Assert.AreEqual(expected, list is null ? null : Convert.ToHexString(list));
+    }
+
+    [TestMethod]
+    public async Task FindEchConfigListAsync_WithNoRecord_IsNull() =>
+        Assert.IsNull(await new DohDnsResolver(new FakeConnector(), MeasuredDohUrl).FindEchConfigListAsync("example.test", 443, CancellationToken.None));
+
+    [TestMethod]
+    public async Task ResolveHttpsRecordAsync_OnAnotherPort_AsksForThePortPrefixedName()
+    {
+        var connector = new FakeConnector();
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl);
+
+        var record = await resolver.ResolveHttpsRecordAsync("example.test", 8443, CancellationToken.None);
+
+        Assert.IsNull(record);
+        var expected = DnsQueryEncoder.Encode("_8443._https.example.test", DnsRecordType.Https).Bytes;
+        CollectionAssert.AreEqual(expected, connector.Opened[0].Written.TakeLast(expected.Length).ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("127.0.0.1")]
+    [DataRow("[::1]")]
+    [DataRow("localhost")]
+    public async Task ResolveHttpsRecordAsync_ForALiteralOrLocalhost_AsksNothing(string host)
+    {
+        var connector = new FakeConnector();
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl);
+
+        Assert.IsNull(await resolver.ResolveHttpsRecordAsync(host, 443, CancellationToken.None));
+        Assert.IsEmpty(connector.Targets);
+    }
+
+    [TestMethod]
+    public async Task ResolveHttpsRecordAsync_ForANameWithAnEmptyLabel_AsksNothing()
+    {
+        var connector = new FakeConnector();
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl);
+
+        Assert.IsNull(await resolver.ResolveHttpsRecordAsync("a..test", 443, CancellationToken.None));
+        Assert.IsEmpty(connector.Targets);
+    }
+
+    [TestMethod]
+    public async Task ResolveHttpsRecordAsync_WhenTheAnswerHoldsNoHttpsRecord_ReturnsNull()
+    {
+        var connector = Answering(Ok(AnswerTo(DnsRecordType.A, IPAddress.Loopback)));
+        var resolver = new DohDnsResolver(connector, MeasuredDohUrl);
+
+        Assert.IsNull(await resolver.ResolveHttpsRecordAsync("example.test", 443, CancellationToken.None));
+    }
+
+    [TestMethod]
+    public void HttpsQueryName_FollowsRfc9460Section9_1()
+    {
+        Assert.AreEqual("example.test", DohDnsResolver.HttpsQueryName("example.test", 443));
+        Assert.AreEqual("_80._https.example.test", DohDnsResolver.HttpsQueryName("example.test", 80));
     }
 
     private static async Task AssertCouldNotResolveAsync(IConnector dohConnector)

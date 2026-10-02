@@ -136,7 +136,8 @@ internal static class TlsFailureMessages
         "schannel: next InitializeSecurityContext failed: SEC_E_ILLEGAL_MESSAGE (0x80090326) - This error usually occurs when a fatal SSL/TLS alert is received (e.g. handshake failed). More detail may be available in the Windows System event log.";
 
     // OpenSSL 3's reason strings for an alert, each its reason code 1000 plus the alert
-    // (ssl/ssl_err.c): handshake_failure (ADR-0140) and protocol_version (BL-502) measured.
+    // (ssl/ssl_err.c): handshake_failure (ADR-0140), protocol_version (BL-502) and
+    // unknown_psk_identity (BL-712, an SRP server that does not know the user) measured.
     private static readonly FrozenDictionary<TlsAlertDescription, string> OpenSslAlertReasons = new Dictionary<TlsAlertDescription, string>
     {
         [TlsAlertDescription.UnexpectedMessage] = "sslv3 alert unexpected message",
@@ -161,6 +162,7 @@ internal static class TlsFailureMessages
         [TlsAlertDescription.MissingExtension] = "tlsv13 alert missing extension",
         [TlsAlertDescription.UnsupportedExtension] = "tlsv1 unsupported extension",
         [TlsAlertDescription.UnrecognizedName] = "tlsv1 unrecognized name",
+        [TlsAlertDescription.UnknownPskIdentity] = "tlsv1 alert unknown psk identity",
         [TlsAlertDescription.BadCertificateStatusResponse] = "tlsv1 bad certificate status response",
         [TlsAlertDescription.CertificateRequired] = "tlsv13 alert certificate required",
         [TlsAlertDescription.NoApplicationProtocol] = "tlsv1 alert no application protocol",
@@ -180,6 +182,13 @@ internal static class TlsFailureMessages
         failure.Origin == TlsHandshakeFailureOrigin.TransportClosed || offersOnlyVersionsBelowTls12
             ? SchannelHandshakeNotReceived
             : SchannelFatalAlertReceived;
+
+    /// <summary>
+    /// The message for exit 101 when the server did not accept the hand-built client's ECH
+    /// offer: libcurl's text for <c>CURLE_ECH_REQUIRED</c>, since no curl build measured has ECH
+    /// to show OpenSSL's error string (ADR-0327).
+    /// </summary>
+    public const string EchRequired = "ECH attempted but failed";
 
     /// <summary>
     /// The OpenSSL build's message for exit 35 when the hand-built client's handshake fails
@@ -457,11 +466,25 @@ internal static class TlsFailureMessages
     public const string OpenSslNoSuitableGroups = "TLS connect error: error:0A000127:SSL routines::no suitable groups";
 
     /// <summary>
+    /// Every build's message for exit 35 when a <c>--curves</c> list stars only groups
+    /// TLS 1.3 cannot share a key for, such as <c>*brainpoolP256r1:P-384</c>, and TLS 1.3 is
+    /// offered: measured with curl 8.18.0's OpenSSL 3.5.5 build, 2026-10-01 (BL-1082).
+    /// </summary>
+    public const string OpenSslNoSuitableKeyShare = "TLS connect error: error:0A000065:SSL routines::no suitable key share";
+
+    /// <summary>
     /// Every build's message for exit 35 when a <c>--sigalgs</c> list names only schemes the
     /// client cannot offer, such as <c>RSA+SHA1</c>: measured with curl 8.18.0's OpenSSL 3.5.5
     /// build, 2026-09-30 (BL-709, ADR-0284).
     /// </summary>
     public const string OpenSslNoSuitableSignatureAlgorithm = "TLS connect error: error:0A000076:SSL routines::no suitable signature algorithm";
+
+    /// <summary>
+    /// Every build's message for exit 35 when a <c>--sigalgs</c> list names no scheme TLS 1.2
+    /// can check, such as <c>RSA+SHA1</c> or <c>mldsa65</c>, under a TLS 1.2 ceiling: measured
+    /// with curl 8.18.0's OpenSSL 3.5.5 build, 2026-10-01 (BL-1094).
+    /// </summary>
+    public const string OpenSslNoCiphersAvailable = "TLS connect error: error:0A0000B5:SSL routines::no ciphers available";
 
     /// <summary>
     /// The Windows message for exit 35 when the server answers a <c>--curves</c> ClientHello

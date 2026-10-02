@@ -11,7 +11,7 @@ namespace Curl.Networking;
 /// Pins what the Schannel build reports for a chain from a private root, measured by
 /// BL-150 against curl 8.21.0's Schannel build with <c>--cacert root.pem</c> (BL-368): a
 /// leaf out of its validity period, an intermediate not sent, and a CA with no revocation
-/// endpoint, which ADR-0086 fails unless <c>--ssl-no-revoke</c> is given; and, against the
+/// endpoint, which ADR-0321 fails unless <c>--ssl-no-revoke</c> is given; and, against the
 /// system store, the exit 35 Schannel gives a certificate that is only out of date.
 /// </summary>
 public sealed partial class SslStreamTlsProviderTests

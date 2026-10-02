@@ -185,7 +185,8 @@ internal sealed class CookieEngine
     /// <param name="cookieStrings">The group's <c>-b name=value</c> strings.</param>
     private sealed class GroupCookies(CookieStore store, IReadOnlyList<string> cookieStrings) : ICookieStore
     {
-        public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now) => store.GetCookieHeader(url, secure, now, cookieStrings);
+        public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, ITransferEvents events) =>
+            store.GetCookieHeader(url, secure, now, cookieStrings, events);
 
         public int StoreFromResponse(CurlUrl url, string setCookieHeader, int storedFromResponse, DateTimeOffset now, ITransferEvents events) =>
             store.StoreFromResponse(url, setCookieHeader, storedFromResponse, now, events);
@@ -198,7 +199,7 @@ internal sealed class CookieEngine
     /// <param name="cookieStrings">The group's <c>-b name=value</c> strings.</param>
     private sealed class CookieStringSender(IReadOnlyList<string> cookieStrings) : ICookieStore
     {
-        public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now) =>
+        public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, ITransferEvents events) =>
             cookieStrings.Count == 0 ? null : string.Join("; ", cookieStrings);
 
         public int StoreFromResponse(CurlUrl url, string setCookieHeader, int storedFromResponse, DateTimeOffset now, ITransferEvents events) =>

@@ -20,6 +20,7 @@ using Curl.Protocol.Ldap;
 using Curl.Protocol.Mqtt;
 using Curl.Protocol.Pop3;
 using Curl.Protocol.Rtsp;
+using Curl.Protocol.Smb;
 using Curl.Protocol.Smtp;
 using Curl.Protocol.Ssh;
 using Curl.Protocol.Ssh.Negotiation;
@@ -51,7 +52,8 @@ internal static class CurlComposition
     /// <c>Sec-WebSocket-Key</c> and frame mask from <see cref="SystemWebSocketRandomSource" />
     /// (ADR-0128); <c>rtsp</c> over <paramref name="connector" />, sending one <c>OPTIONS *</c>
     /// request per transfer with a pre-emptive <c>Authorization</c> from the same authenticator
-    /// (ADR-0169); <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
+    /// (ADR-0169); <c>smb</c> and <c>smbs</c> over <paramref name="connector" />, speaking curl's SMBv1 on every
+    /// platform (ADR-0200); <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
     /// and key files from the disk and offering the Windows curl's libssh2 algorithms on Windows and the
     /// OpenSSL build's elsewhere (ADR-0122); and <c>tftp</c> over
     /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS
@@ -59,14 +61,14 @@ internal static class CurlComposition
     /// encoding (ADR-0056, rule 4); and <c>ftp</c> and <c>ftps</c>, which
     /// <see cref="RoutingFtpProtocolHandler" /> hands to the HTTP handler when an <c>ftp</c>
     /// transfer is forwarded through an HTTP proxy without <c>-p</c> (ADR-0056, rule 3) and
-    /// otherwise to <see cref="CreateFtpProtocolHandler" />'s handler (ADR-0093, ADR-0102).
+    /// otherwise to <see cref="CreateFtpProtocolHandler" />'s handler (ADR-0323, ADR-0102).
     /// Each scheme is claimed by exactly one handler. Every handler connects through an
     /// <see cref="EndPointRecordingConnector" /> and an <see cref="EndPointRecordingDatagramConnector" />
     /// sharing one <see cref="ConnectionEndPointRecorder" />, and is wrapped in an
     /// <see cref="EndPointReportingProtocolHandler" />, so every scheme's report carries the end
     /// points of the first connection its transfer opened (ADR-0119).
     /// </summary>
-    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>imaps</c>, <c>mqtts</c>, <c>pop3s</c>, <c>smtps</c>, <c>ldaps</c>, <c>wss</c> and <c>ftps</c>.</param>
+    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>imaps</c>, <c>mqtts</c>, <c>pop3s</c>, <c>smtps</c>, <c>ldaps</c>, <c>smbs</c>, <c>wss</c> and <c>ftps</c>.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
     /// <param name="tlsProvider">
     /// Upgrades an FTP connection after an accepted <c>AUTH</c> or <c>PROT P</c>, an IMAP connection after an accepted <c>STARTTLS</c>, a POP3 connection
@@ -103,6 +105,7 @@ internal static class CurlComposition
     /// <c>--connect-timeout</c> (BL-797); <paramref name="connector" /> when not given.
     /// </param>
     /// <returns>Every registered handler.</returns>
+    /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -113,31 +116,33 @@ internal static class CurlComposition
         HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic,
         NegotiateOptions? negotiateOptions = null,
         TimeProvider? signingClock = null,
-        IConnector? ftpDataConnector = null)
+        IConnector? ftpDataConnector = null,
+        IDiagnosticLog? diagnosticLog = null)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
-        EndPointRecordingDatagramConnector recordingDatagramConnector = new(datagramConnector, recorder);
-        ISecurityContextFactory contexts = securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector);
-        RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(contexts, negotiateOptions);
+        EndPointRecordingDatagramConnector recordingDatagramConnector = new(NumberedDatagramsOf(connector, datagramConnector), recorder);
+        ISecurityContextFactory contexts = securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog);
+        RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(contexts, negotiateOptions, diagnosticLog);
         SecurityDelegation saslDelegation = (negotiateOptions ?? NegotiateOptions.Default).Delegation;
         AwsSigV4Signer signer = new(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
         HttpProtocolHandler http = new(recordingConnector, new AwsSigV4HttpAuthenticator(httpAuthenticator, signer), cookieStore, proxyAuthSchemes);
 
         IProtocolHandler[] handlers =
         [
-            new FileProtocolHandler(new PhysicalFileSystem()),
+            new FileProtocolHandler(new PhysicalFileSystem(), ConnectionNumbersOf(connector)),
             new DictProtocolHandler(recordingConnector),
             new GopherProtocolHandler(recordingConnector),
             new TelnetProtocolHandler(recordingConnector),
             new TftpProtocolHandler(recordingDatagramConnector, recordingConnector, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
             new MqttProtocolHandler(recordingConnector),
-            new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation)),
-            new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation)),
-            new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation)),
+            new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
+            new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
+            new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
             new LdapProtocolHandler(recordingConnector, OperatingSystem.IsWindows() ? LdapDialect.WinLdap : LdapDialect.OpenLdap),
             new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()),
             new RtspProtocolHandler(recordingConnector, httpAuthenticator),
+            new SmbProtocolHandler(recordingConnector),
             new SshProtocolHandler(
                 recordingConnector,
                 new PhysicalFileSystem(),
@@ -196,15 +201,17 @@ internal static class CurlComposition
     /// <param name="securityContexts">Makes Negotiate's and NTLM's contexts: <see cref="CreateSecurityContextFactory" />'s in production.</param>
     /// <param name="negotiateOptions">The service names and delegation level; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
     /// <returns>The authenticator.</returns>
-    internal static RankedHttpAuthenticator CreateHttpAuthenticator(ISecurityContextFactory securityContexts, NegotiateOptions? negotiateOptions = null)
+    /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
+    internal static RankedHttpAuthenticator CreateHttpAuthenticator(ISecurityContextFactory securityContexts, NegotiateOptions? negotiateOptions = null, IDiagnosticLog? diagnosticLog = null)
     {
         Encoding credentialEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows());
 
         return new RankedHttpAuthenticator(
             new BasicAndBearerAuthenticator(credentialEncoding),
-            new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom),
+            new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom, diagnosticLog),
             new NegotiateHttpAuthenticator(securityContexts, negotiateOptions),
-            new NtlmHttpAuthenticator(securityContexts, refusedChallengeFailsTransfer: OperatingSystem.IsWindows()));
+            new NtlmHttpAuthenticator(securityContexts, matchesSspiBuild: OperatingSystem.IsWindows(), diagnosticLog),
+            diagnosticLog);
     }
 
     /// <summary>
@@ -219,7 +226,8 @@ internal static class CurlComposition
     /// <param name="connector">Opens TCP connections to a KDC.</param>
     /// <param name="datagramConnector">Opens UDP channels to a KDC.</param>
     /// <returns>The router.</returns>
-    internal static RoutingSecurityContextFactory CreateSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector)
+    /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
+    internal static RoutingSecurityContextFactory CreateSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector, IDiagnosticLog? diagnosticLog = null)
     {
         KerberosKdcSocketTransport kdcTransport = new(datagramConnector, connector, KdcReplyTimeout, TimeProvider.System);
         DnsServerResolver srvResolver = new(new DnsServerResolverOptions(null, null, null, null), TimeProvider.System);
@@ -235,7 +243,8 @@ internal static class CurlComposition
         return new RoutingSecurityContextFactory(
             OperatingSystem.IsWindows(),
             new SystemSecurityContextFactory(),
-            new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), TimeProvider.System, new SystemKerberosRandomSource(), new SystemNtlmRandomSource()));
+            new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), TimeProvider.System, new SystemKerberosRandomSource(), new SystemNtlmRandomSource()),
+            diagnosticLog);
     }
 
     /// <summary>
@@ -261,8 +270,9 @@ internal static class CurlComposition
     /// <param name="securityContexts">Makes GSSAPI's and NTLM's contexts: <see cref="CreateSecurityContextFactory" />'s in production.</param>
     /// <param name="gssapiDelegation">The <c>--delegation</c> level; <see cref="SecurityDelegation.None" /> when not given.</param>
     /// <returns>The authenticator.</returns>
-    internal static ISaslAuthenticator CreateSaslAuthenticator(ISecurityContextFactory securityContexts, SecurityDelegation gssapiDelegation = SecurityDelegation.None) =>
-        new SaslAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), securityContexts) { GssapiDelegation = gssapiDelegation };
+    /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
+    internal static ISaslAuthenticator CreateSaslAuthenticator(ISecurityContextFactory securityContexts, SecurityDelegation gssapiDelegation = SecurityDelegation.None, IDiagnosticLog? diagnosticLog = null) =>
+        new SaslAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), securityContexts, diagnosticLog) { GssapiDelegation = gssapiDelegation };
 
     /// <summary>
     /// Creates the network transports for one run: a <see cref="TcpConnector" /> over the
@@ -304,7 +314,7 @@ internal static class CurlComposition
     {
         if (options.DohUrl is { } dohUrl)
         {
-            return CreateDohResolver(dohUrl, CreateDohConnector(options, tcpDialer, timeProvider));
+            return CreateDohResolver(dohUrl, CreateDohConnector(options, tcpDialer, timeProvider), AddressFamilyOf(options));
         }
 
 
@@ -327,9 +337,14 @@ internal static class CurlComposition
     /// </summary>
     /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
     /// <param name="connector">Opens each DoH connection: <see cref="CreateDohConnector" />'s in production.</param>
+    /// <param name="addressFamily">
+    /// The <c>-4</c> or <c>-6</c> family (<see cref="AddressFamilyOf" />), whose query alone is sent (BL-939).
+    /// </param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector) =>
-        DohUrlOf(dohUrl) is { } url ? new DohDnsResolver(connector, url) : new UnusableDohUrlResolver();
+    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily) =>
+        DohUrlOf(dohUrl) is { } url
+            ? new DohDnsResolver(connector, url) { AddressFamily = addressFamily }
+            : new UnusableDohUrlResolver();
 
     /// <summary>
     /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
@@ -376,10 +391,19 @@ internal static class CurlComposition
     /// <param name="options">The origin's or the HTTPS proxy's TLS options.</param>
     /// <param name="timeProvider">The clock the provider times its handshakes on.</param>
     /// <returns>The provider.</returns>
-    internal static ITlsProviderWithWarnings CreateTlsProvider(TlsClientOptions options, TimeProvider timeProvider) =>
-        TlsClientRouting.Choose(options) == TlsClientRoute.HandBuilt
-            ? new HandBuiltTlsProvider(options, timeProvider)
-            : new SslStreamTlsProvider(options, timeProvider);
+    /// <param name="sessions">
+    /// The run's TLS session cache, which the hand-built provider offers and keeps sessions in,
+    /// so a later connection resumes as curl's does, unless <see cref="TlsClientOptions.NoSessionId" />
+    /// (BL-713); <c>--ssl-sessions</c> loads and saves it (ADR-0319);
+    /// <see langword="null" /> for none.
+    /// </param>
+    /// <param name="echConfigs">
+    /// Finds a host's ECHConfigList for <c>--ech true</c> or <c>hard</c> without <c>ecl:</c>: the run's
+    /// <see cref="DohDnsResolver" /> under <c>--doh-url</c> (ADR-0327); <see langword="null" /> for none.
+    /// </param>
+    internal static ITlsProviderWithWarnings CreateTlsProvider(TlsClientOptions options, TimeProvider timeProvider, TlsSessionCache? sessions = null, IEchConfigListLookup? echConfigs = null) =>
+        TlsClientRouting.Choose(options) != TlsClientRoute.HandBuilt ? new SslStreamTlsProvider(options, timeProvider)
+            : new HandBuiltTlsProvider(options, timeProvider, sessions, echConfigs);
 
     /// <summary>
     /// Creates the network transports as <see cref="CreateTransports(CommandLineOptions)" /> does,
@@ -395,24 +419,34 @@ internal static class CurlComposition
     /// The run's connection cache, which every option group's pooling connector shares
     /// (<see cref="CreatePoolingConnector" />); <see langword="null" /> for a pool of the group's own.
     /// </param>
-    internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider, ConnectionCache? runConnections = null)
+    /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache, which the origin's TLS provider uses (ADR-0319); <see langword="null" /> for none.</param>
+    /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
+    /// <param name="runDnsCache">The run's DNS cache, which every option group's TCP connector answers from and adds to as curl 8.21.0 shares its cache (BL-1053); <see langword="null" /> for a cache of the group's own.</param>
+    internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null)
     {
-        TcpDialer tcpDialer = new(TcpSocketOptions.FromCommandLine(options.TcpNoDelay, options.TcpKeepAlive, options.TcpKeepAliveSeconds, options.TcpKeepAliveProbeCount));
+        TcpDialer tcpDialer = new(TcpSocketOptions.FromCommandLine(options.TcpNoDelay, options.TcpKeepAlive, options.TcpKeepAliveSeconds, options.TcpKeepAliveProbeCount)
+            with
+        {
+            TypeOfService = options.IpTypeOfService,
+            VlanPriority = options.VlanPriority,
+            FastOpen = options.TcpFastOpen,
+            MultipathTcp = options.MultipathTcp,
+        });
         IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
-        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider);
+        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(proxyTlsClientOptions, timeProvider);
         LateBoundSecurityContextFactory proxyContexts = new();
-        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts);
+        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider);
-        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts);
-        UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider);
+        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache);
+        UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider, diagnosticLog);
         PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, timeProvider, runConnections);
 
         // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
         // contexts come from, which can only be made once the connectors exist (BL-604).
-        proxyContexts.Bind(CreateSecurityContextFactory(poolingConnector, udpDatagramConnector));
+        proxyContexts.Bind(CreateSecurityContextFactory(poolingConnector, udpDatagramConnector, diagnosticLog));
         return new CurlTransports(
             dnsResolver,
             timeProvider,
@@ -425,7 +459,8 @@ internal static class CurlComposition
             quicDialer,
             tcpConnector,
             udpDatagramConnector,
-            poolingConnector);
+            poolingConnector,
+            diagnosticLog);
     }
 
     /// <summary>
@@ -491,6 +526,10 @@ internal static class CurlComposition
     /// Makes the Kerberos contexts SOCKS5 GSS-API runs on, with the <c>--socks5-*</c> options of
     /// <see cref="Socks5AuthenticationMapping.FromCommandLine" /> (BL-615); <see langword="null" /> for none.
     /// </param>
+    /// <param name="runDnsCache">
+    /// The run's DNS cache, shared by every option group's connector (BL-1053); <see langword="null" /> for
+    /// a cache of the connector's own.
+    /// </param>
     /// <returns>The connector.</returns>
     internal static TcpConnector CreateTcpConnector(
         CommandLineOptions options,
@@ -501,7 +540,8 @@ internal static class CurlComposition
         HttpProxyTunnelOptions proxyTunnelOptions,
         ITlsProvider? proxyTlsProvider = null,
         QuicDialer? quicDialer = null,
-        ISecurityContextFactory? socks5SecurityContexts = null) =>
+        ISecurityContextFactory? socks5SecurityContexts = null,
+        DnsCache? runDnsCache = null) =>
         new(
             dnsResolver,
             tcpDialer,
@@ -520,7 +560,8 @@ internal static class CurlComposition
             localBinding: LocalBindingOf(options),
             preProxy: PreProxyOf(options),
             socks5Authentication: Socks5AuthenticationMapping.FromCommandLine(options, socks5SecurityContexts, OperatingSystem.IsWindows()),
-            haproxyProtocol: HaproxyProtocolOf(options));
+            haproxyProtocol: HaproxyProtocolOf(options),
+            dnsCache: runDnsCache);
 
     /// <summary>
     /// The SOCKS proxy the connector reaches an HTTP or HTTPS proxy through: the <c>--preproxy</c>
@@ -644,17 +685,20 @@ internal static class CurlComposition
     /// <param name="options">The parsed command line.</param>
     /// <param name="dnsResolver">Resolves a host no <c>--resolve</c> entry answers for.</param>
     /// <param name="timeProvider">The clock the connector times on.</param>
+    /// <param name="diagnosticLog">Where the resolve and the channel are logged (<c>--log-level</c>, BL-968); <see langword="null" /> logs nothing.</param>
     /// <returns>The connector.</returns>
     internal static UdpDatagramConnector CreateUdpDatagramConnector(
         CommandLineOptions options,
         IDnsResolver dnsResolver,
-        TimeProvider timeProvider) =>
+        TimeProvider timeProvider,
+        IDiagnosticLog? diagnosticLog = null) =>
         new(
             dnsResolver,
             timeProvider,
             ResolveOverrides.Parse(options.ResolveEntries),
             new ConnectToMappings(options.ConnectToEntries),
-            AddressFamilyOf(options));
+            AddressFamilyOf(options),
+            diagnosticLog);
 
     /// <summary>
     /// Maps the command line to what the CONNECT request through an HTTP proxy carries: the
@@ -674,7 +718,8 @@ internal static class CurlComposition
     /// <param name="options">The parsed command line.</param>
     /// <param name="securityContexts">Makes the proxy's NTLM and Negotiate contexts: <see cref="CreateSecurityContextFactory" />'s router in production.</param>
     /// <returns>The tunnel's options.</returns>
-    internal static HttpProxyTunnelOptions CreateProxyTunnelOptions(CommandLineOptions options, ISecurityContextFactory securityContexts) =>
+    /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
+    internal static HttpProxyTunnelOptions CreateProxyTunnelOptions(CommandLineOptions options, ISecurityContextFactory securityContexts, IDiagnosticLog? diagnosticLog = null) =>
         new(
             options.UserAgent switch
             {
@@ -687,7 +732,7 @@ internal static class CurlComposition
             ProxyHeaders = options.ProxyHeaders,
             CommandLineTextEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()),
             ProxyAuthSchemes = options.ProxyAuthSchemes,
-            ProxyAuthenticator = CreateHttpAuthenticator(securityContexts, NegotiateOptionsMapping.FromCommandLine(options)),
+            ProxyAuthenticator = CreateHttpAuthenticator(securityContexts, NegotiateOptionsMapping.FromCommandLine(options), diagnosticLog),
         };
 
     /// <summary>
@@ -695,7 +740,7 @@ internal static class CurlComposition
     /// the real disk, the real network and the given standard streams, wrapping warnings at
     /// the width <see cref="TerminalColumns.Resolve()" /> gives. The network
     /// transports are built for each option group by
-    /// <see cref="CreateTransports(CommandLineOptions, TimeProvider, ConnectionCache?)" /> once the
+    /// <see cref="CreateTransports(CommandLineOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?)" /> once the
     /// command line is parsed, because their TLS settings come from it, over one
     /// <see cref="ConnectionCache" /> the runner closes when the run ends, so a later group reuses
     /// an earlier group's connection when their settings match (ADR-0285, BL-754).
@@ -720,8 +765,11 @@ internal static class CurlComposition
         bool terminalRendersStyles = false)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
+        TlsSessionCache tlsSessions = new(TimeProvider.System);
+        DnsCache runDnsCache = new();
+        LateBoundDiagnosticLog runLog = new();
         return new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, TimeProvider.System, runConnections), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -738,7 +786,10 @@ internal static class CurlComposition
             readEnvironmentVariable: name => Environment.GetEnvironmentVariable(name),
             terminalRendersStyles: terminalRendersStyles,
             accountHomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            runConnectionCache: runConnections);
+            runConnectionCache: runConnections,
+            tlsSessions: tlsSessions,
+            extendedAttributeWriter: NativeExtendedAttributeWriter.ForCurrentPlatform(),
+            lateBoundDiagnosticLog: runLog);
     }
 
     /// <summary>
@@ -774,9 +825,11 @@ internal static class CurlComposition
         ProxySelector? proxySelector = null,
         ISecurityContextFactory? securityContexts = null,
         TimeProvider? signingClock = null,
-        ConnectionCache? runConnections = null) =>
-        new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(GroupConnectorOf(options, connector, runConnections), datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts, options, signingClock)),
+        ConnectionCache? runConnections = null)
+    {
+        LateBoundDiagnosticLog runLog = new();
+        return new(
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(GroupConnectorOf(options, connector, runConnections), datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts, options, signingClock, runLog)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -785,7 +838,32 @@ internal static class CurlComposition
             OperatingSystem.IsWindows(),
             writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths(),
-            runConnectionCache: runConnections);
+            runConnectionCache: runConnections,
+            lateBoundDiagnosticLog: runLog);
+    }
+
+    /// <summary>
+    /// The datagram connector TFTP opens its channel through: over a
+    /// <see cref="PoolingConnector" />, one that numbers each open in that pool's sequence, as
+    /// curl 8.21.0 numbers a TFTP transfer's connection with the connections before it
+    /// (BL-969); over any other connector, <paramref name="datagramConnector" /> itself.
+    /// </summary>
+    /// <param name="connector">The connector the TCP protocols connect through.</param>
+    /// <param name="datagramConnector">Opens the channels.</param>
+    /// <returns>The datagram connector.</returns>
+    internal static IDatagramConnector NumberedDatagramsOf(IConnector connector, IDatagramConnector datagramConnector) =>
+        connector is PoolingConnector pool ? pool.NumberingDatagrams(datagramConnector) : datagramConnector;
+
+    /// <summary>
+    /// The count the <c>file://</c> handler numbers its transfers in: over a
+    /// <see cref="PoolingConnector" />, that pool's, as curl 8.21.0 numbers a <c>file://</c>
+    /// transfer with every connection the run opens (BL-977); over any other connector, a count
+    /// of its own from <c>0</c>.
+    /// </summary>
+    /// <param name="connector">The connector the TCP protocols connect through.</param>
+    /// <returns>The count.</returns>
+    internal static IConnectionNumbers ConnectionNumbersOf(IConnector connector) =>
+        connector is PoolingConnector pool ? pool.ConnectionNumbers : new ConnectionNumberSequence();
 
     /// <summary>
     /// The connector an option group of a runner over fake connectors connects through:
@@ -831,17 +909,14 @@ internal static class CurlComposition
     /// <param name="transports">The run's connectors.</param>
     /// <returns>The dispatcher.</returns>
     internal static ProtocolDispatcher CreateDispatcher(CurlTransports transports) =>
-        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, ftpDataConnector: FtpDataConnectorOf(transports)));
+        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog));
 
     /// <summary>
     /// Creates what one run transfers through: the production handler set, every TCP handler
     /// connecting through <paramref name="transports" />' one
     /// <see cref="CurlTransports.PoolingConnector" />, its HTTP handler keeping cookies in
-    /// <paramref name="cookies" />; the proxy TLS provider's <see cref="ITlsProviderWithWarnings.Warnings" />
-    /// as the lines printed before each transfer, as curl 8.21.0 prints its one Schannel warning,
-    /// about the proxy's CA path, once per URL for <c>--capath</c>, <c>--proxy-capath</c> or both
-    /// (measured, proxy or not), and the proxy's CA path is <c>--proxy-capath</c> or else
-    /// <c>--capath</c>; <paramref name="cookies" /> for the runner to load and save; a
+    /// <paramref name="cookies" />; <see cref="WarningLinesBeforeEachTransfer" /> on this platform's
+    /// curl build as the lines printed before each transfer; <paramref name="cookies" /> for the runner to load and save; a
     /// <see cref="ProxySelector" /> reading the process's proxy environment variables; the
     /// pooling connector as the connection pool the runner disposes when the run ends (ADR-0050);
     /// and the TCP connector's <see cref="TcpConnector.LoadResolveEntries" />, which the runner
@@ -852,9 +927,57 @@ internal static class CurlComposition
     /// <param name="negotiateOptions">The service names and delegation the HTTP handler's Negotiate answers with; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
+        CreateTransferDispatch(transports, OperatingSystem.IsWindows(), cookies, negotiateOptions);
+
+    /// <summary>
+    /// Returns the lines curl 8.21.0 prints to standard error before each URL's transfer, unless
+    /// <c>-s</c> is given, for TLS options its build ignores (measured, BL-1034): the proxy TLS
+    /// provider's <see cref="ITlsProviderWithWarnings.Warnings" />, the one Schannel warning about
+    /// the proxy's CA path for <c>--capath</c>, <c>--proxy-capath</c> or both (the proxy's CA path
+    /// is <c>--proxy-capath</c> or else <c>--capath</c>); then, in the Schannel build only, one
+    /// line for <c>--tls13-ciphers</c> and then one for <c>--proxy-tls13-ciphers</c>, each when
+    /// given, whatever the URL's scheme and whether or not a proxy is used (ADR-0349).
+    /// </summary>
+    /// <param name="transports">The run's connectors and the TLS options they were built from.</param>
+    /// <param name="matchesSchannelBuild">Whether the run behaves like curl's Schannel build.</param>
+    /// <returns>The warning lines, each unwrapped and without its line ending.</returns>
+    internal static IReadOnlyList<string> WarningLinesBeforeEachTransfer(CurlTransports transports, bool matchesSchannelBuild)
+    {
+        if (!matchesSchannelBuild)
+        {
+            return transports.ProxyTlsProvider.Warnings;
+        }
+
+        List<string> lines = [.. transports.ProxyTlsProvider.Warnings];
+        if (transports.TlsClientOptions.Tls13Ciphers is not null)
+        {
+            lines.Add(SchannelIgnoredOptionWarning("--tls13-ciphers"));
+        }
+
+        if (transports.ProxyTlsClientOptions.Tls13Ciphers is not null)
+        {
+            lines.Add(SchannelIgnoredOptionWarning("--proxy-tls13-ciphers"));
+        }
+
+        return lines;
+    }
+
+    private static string SchannelIgnoredOptionWarning(string option) =>
+        $"Warning: ignoring {option}, not supported by libcurl with Schannel";
+
+    /// <summary>
+    /// Creates what one run transfers through as <see cref="CreateTransferDispatch(CurlTransports, CookieEngine?, NegotiateOptions?)" />
+    /// does, warning as the named curl build does.
+    /// </summary>
+    /// <param name="transports">The run's connectors.</param>
+    /// <param name="matchesSchannelBuild">Whether the run warns as curl's Schannel build does.</param>
+    /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
+    /// <param name="negotiateOptions">The service names and delegation the HTTP handler's Negotiate answers with; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
+    /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
+    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports))),
-            transports.ProxyTlsProvider.Warnings,
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog)),
+            WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild),
             cookies,
             new ProxySelector(Environment.GetEnvironmentVariable),
             transports.PoolingConnector,
@@ -878,6 +1001,7 @@ internal static class CurlComposition
     /// </param>
     /// <param name="signingClock">The clock <c>--aws-sigv4</c> signs with; <see cref="TimeProvider.System" /> when <see langword="null" />.</param>
     /// <returns>The dispatcher, no warning lines, the cookies and the proxy selector.</returns>
+    /// <param name="diagnosticLog">The run's diagnostic log, bound by the runner once the command line is read (BL-923).</param>
     private static TransferDispatch CreateTransferDispatch(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -886,9 +1010,10 @@ internal static class CurlComposition
         ProxySelector? proxySelector,
         ISecurityContextFactory? securityContexts,
         CommandLineOptions options,
-        TimeProvider? signingClock) =>
+        TimeProvider? signingClock,
+        IDiagnosticLog diagnosticLog) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, options.ProxyAuthSchemes, NegotiateOptionsMapping.FromCommandLine(options), signingClock)),
+            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, options.ProxyAuthSchemes, NegotiateOptionsMapping.FromCommandLine(options), signingClock, diagnosticLog: diagnosticLog)),
             [],
             cookies,
             proxySelector);

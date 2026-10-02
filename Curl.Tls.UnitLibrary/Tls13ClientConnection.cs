@@ -78,18 +78,17 @@ public sealed class Tls13ClientConnection
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(transport);
-        Tls13ClientConnection connection = Create(transport, settings, random, verifier);
-        connection.earlyData = earlyData;
-        return await connection.CompleteAsync(transport, cancellationToken).ConfigureAwait(false);
+        return await Create(transport, settings, random, verifier, earlyData).CompleteAsync(transport, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Creates a connection that has sent nothing yet, for <see cref="TlsClientConnection" />
     /// to send its ClientHello, read the server's answer, and complete it or hand the hello
-    /// to the TLS 1.2 client.
+    /// to the TLS 1.2 client; <paramref name="earlyData" /> is the first application data,
+    /// sent as 0-RTT early data when the hello offers it and otherwise once the handshake completes.
     /// </summary>
     /// <exception cref="ArgumentException">The settings offer a suite whose records cannot be protected yet, or cannot drive a handshake.</exception>
-    internal static Tls13ClientConnection Create(Stream transport, Tls13ClientSettings settings, ITlsRandomSource random, IServerCertificateVerifier verifier)
+    internal static Tls13ClientConnection Create(Stream transport, Tls13ClientSettings settings, ITlsRandomSource random, IServerCertificateVerifier verifier, ReadOnlyMemory<byte> earlyData = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (!settings.CipherSuites.All(Tls13RecordProtection.CanProtect))
@@ -97,7 +96,7 @@ public sealed class Tls13ClientConnection
             throw new ArgumentException("A TLS 1.3 connection over a byte stream offers only the GCM and ChaCha20-Poly1305 suites until AES-CCM is built.", nameof(settings));
         }
 
-        return new(settings, new Tls13ClientHandshake(settings, random, verifier), transport);
+        return new(settings, new Tls13ClientHandshake(settings, random, verifier), transport) { earlyData = earlyData };
     }
 
     /// <summary>Gets the ClientHello <see cref="SendClientHelloAsync" /> sent.</summary>

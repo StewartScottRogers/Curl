@@ -17,9 +17,9 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     [DataRow(false, DisplayName = "curl's own NTLM")]
     [DataRow(true, DisplayName = "SSPI")]
-    public async Task CreateAuthorizationAsync_BareNtlmAfterType3_ReportsHandshakeRejectedThenProblem(bool refusedChallengeFailsTransfer)
+    public async Task CreateAuthorizationAsync_BareNtlmAfterType3_ReportsHandshakeRejectedThenProblem(bool matchesSspiBuild)
     {
-        List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), refusedChallengeFailsTransfer, SentType3, sentBeforeAnyChallenge: false, "NTLM");
+        List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), matchesSspiBuild, SentType3, sentBeforeAnyChallenge: false, "NTLM");
 
         CollectionAssert.AreEqual(new[] { "NTLM handshake rejected", "NTLM authentication problem, ignoring." }, lines);
     }
@@ -27,7 +27,7 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     public async Task CreateAuthorizationAsync_BareNtlmAfterType1AnsweringAChallenge_ReportsInternalErrorThenProblem()
     {
-        List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), refusedChallengeFailsTransfer: true, SentType1, sentBeforeAnyChallenge: false, "NTLM");
+        List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), matchesSspiBuild: true, SentType1, sentBeforeAnyChallenge: false, "NTLM");
 
         CollectionAssert.AreEqual(new[] { "NTLM handshake failure (internal error)", "NTLM authentication problem, ignoring." }, lines);
     }
@@ -37,7 +37,7 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow("Basic realm=\"r\"", DisplayName = "No NTLM challenge after Type 3")]
     public async Task CreateAuthorizationAsync_NonBareChallengeAfterType3_ReportsNothing(string challenge)
     {
-        List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), refusedChallengeFailsTransfer: false, SentType3, sentBeforeAnyChallenge: false, challenge);
+        List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), matchesSspiBuild: false, SentType3, sentBeforeAnyChallenge: false, challenge);
 
         Assert.IsEmpty(lines);
     }
@@ -45,7 +45,7 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     public async Task CreateAuthorizationAsync_NoNtlmChallengeAfterType1AnsweringAChallenge_ReportsNothing()
     {
-        List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), refusedChallengeFailsTransfer: false, SentType1, sentBeforeAnyChallenge: false, "Basic realm=\"r\"");
+        List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), matchesSspiBuild: false, SentType1, sentBeforeAnyChallenge: false, "Basic realm=\"r\"");
 
         Assert.IsEmpty(lines);
     }
@@ -55,7 +55,7 @@ public sealed partial class NtlmHttpAuthenticatorTests
     {
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1)));
 
-        List<string> lines = await LinesAsync(contexts, refusedChallengeFailsTransfer: false, SentType1, sentBeforeAnyChallenge: true, "NTLM");
+        List<string> lines = await LinesAsync(contexts, matchesSspiBuild: false, SentType1, sentBeforeAnyChallenge: true, "NTLM");
 
         Assert.IsEmpty(lines);
     }
@@ -63,9 +63,9 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     [DataRow(false, DisplayName = "curl's own NTLM")]
     [DataRow(true, DisplayName = "SSPI")]
-    public async Task CreateAuthorizationAsync_ChallengeNotBase64_ReportsProblemAlone(bool refusedChallengeFailsTransfer)
+    public async Task CreateAuthorizationAsync_ChallengeNotBase64_ReportsProblemAlone(bool matchesSspiBuild)
     {
-        List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), refusedChallengeFailsTransfer, SentType1, sentBeforeAnyChallenge: true, "NTLM @@@notbase64");
+        List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), matchesSspiBuild, SentType1, sentBeforeAnyChallenge: true, "NTLM @@@notbase64");
 
         CollectionAssert.AreEqual(new[] { "NTLM authentication problem, ignoring." }, lines);
     }
@@ -77,7 +77,7 @@ public sealed partial class NtlmHttpAuthenticatorTests
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.MalformedToken, [])));
 
-        List<string> lines = await LinesAsync(contexts, refusedChallengeFailsTransfer: false, SentType1, sentBeforeAnyChallenge: true, Type2Challenge);
+        List<string> lines = await LinesAsync(contexts, matchesSspiBuild: false, SentType1, sentBeforeAnyChallenge: true, Type2Challenge);
 
         CollectionAssert.AreEqual(new[] { "NTLM handshake failure (bad type-2 message)", "NTLM authentication problem, ignoring." }, lines);
     }
@@ -89,7 +89,7 @@ public sealed partial class NtlmHttpAuthenticatorTests
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.Completed, [1, 2, 3])));
 
-        List<string> lines = await LinesAsync(contexts, refusedChallengeFailsTransfer: true, SentType1, sentBeforeAnyChallenge: true, Type2Challenge);
+        List<string> lines = await LinesAsync(contexts, matchesSspiBuild: true, SentType1, sentBeforeAnyChallenge: true, Type2Challenge);
 
         Assert.IsEmpty(lines);
     }
@@ -111,7 +111,7 @@ public sealed partial class NtlmHttpAuthenticatorTests
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(status, [])));
         RecordingInfoEvents events = new();
-        NtlmHttpAuthenticator authenticator = new(contexts, refusedChallengeFailsTransfer: true);
+        NtlmHttpAuthenticator authenticator = new(contexts, matchesSspiBuild: true);
 
         HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => authenticator.CreateAuthorizationAsync(Request(events), SentType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
@@ -127,7 +127,7 @@ public sealed partial class NtlmHttpAuthenticatorTests
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.Refused, [])));
         RecordingInfoEvents events = new();
-        NtlmHttpAuthenticator authenticator = new(contexts, refusedChallengeFailsTransfer: false);
+        NtlmHttpAuthenticator authenticator = new(contexts, matchesSspiBuild: false);
 
         await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => authenticator.CreateAuthorizationAsync(Request(events), SentType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
@@ -135,10 +135,10 @@ public sealed partial class NtlmHttpAuthenticatorTests
         Assert.IsEmpty(events.Info);
     }
 
-    private static async Task<List<string>> LinesAsync(ISecurityContextFactory contexts, bool refusedChallengeFailsTransfer, string sent, bool sentBeforeAnyChallenge, string challenge)
+    private static async Task<List<string>> LinesAsync(ISecurityContextFactory contexts, bool matchesSspiBuild, string sent, bool sentBeforeAnyChallenge, string challenge)
     {
         RecordingInfoEvents events = new();
-        await new NtlmHttpAuthenticator(contexts, refusedChallengeFailsTransfer).CreateAuthorizationAsync(Request(events), sent, sentBeforeAnyChallenge, [challenge], CancellationToken.None);
+        await new NtlmHttpAuthenticator(contexts, matchesSspiBuild).CreateAuthorizationAsync(Request(events), sent, sentBeforeAnyChallenge, [challenge], CancellationToken.None);
         return events.Info;
     }
 

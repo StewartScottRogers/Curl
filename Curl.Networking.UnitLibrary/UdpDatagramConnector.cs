@@ -20,6 +20,7 @@ public sealed class UdpDatagramConnector : IDatagramConnector
     private readonly ResolveOverrides _resolveOverrides;
     private readonly ConnectToMappings _connectToMappings;
     private readonly AddressFamily _addressFamily;
+    private readonly NetworkDiagnosticLog _log;
 
     /// <summary>
     /// Initializes a connector that opens <see cref="UdpDatagramChannel" /> sockets.
@@ -36,13 +37,18 @@ public sealed class UdpDatagramConnector : IDatagramConnector
     /// The family <c>-4</c> or <c>-6</c> chose, or <see cref="AddressFamily.Unspecified" /> for
     /// either: a host name is opened at that family's addresses only (BL-500).
     /// </param>
+    /// <param name="diagnosticLog">
+    /// Where the resolve and the channel are logged (<c>--log-level</c>, BL-968);
+    /// <see langword="null" /> for <see cref="NoDiagnosticLog.Instance" />.
+    /// </param>
     public UdpDatagramConnector(
         IDnsResolver dnsResolver,
         TimeProvider timeProvider,
         ResolveOverrides? resolveOverrides = null,
         ConnectToMappings? connectToMappings = null,
-        AddressFamily addressFamily = AddressFamily.Unspecified)
-        : this(dnsResolver, timeProvider, serverEndPoint => new UdpDatagramChannel(serverEndPoint), resolveOverrides, connectToMappings, addressFamily)
+        AddressFamily addressFamily = AddressFamily.Unspecified,
+        IDiagnosticLog? diagnosticLog = null)
+        : this(dnsResolver, timeProvider, serverEndPoint => new UdpDatagramChannel(serverEndPoint), resolveOverrides, connectToMappings, addressFamily, diagnosticLog)
     {
     }
 
@@ -62,14 +68,19 @@ public sealed class UdpDatagramConnector : IDatagramConnector
     /// <param name="addressFamily">
     /// The family <c>-4</c> or <c>-6</c> chose, or <see cref="AddressFamily.Unspecified" /> for either.
     /// </param>
+    /// <param name="diagnosticLog">
+    /// Where the resolve and the channel are logged; <see langword="null" /> for <see cref="NoDiagnosticLog.Instance" />.
+    /// </param>
     internal UdpDatagramConnector(
         IDnsResolver dnsResolver,
         TimeProvider timeProvider,
         Func<IPEndPoint, IDatagramChannel> openChannel,
         ResolveOverrides? resolveOverrides = null,
         ConnectToMappings? connectToMappings = null,
-        AddressFamily addressFamily = AddressFamily.Unspecified)
+        AddressFamily addressFamily = AddressFamily.Unspecified,
+        IDiagnosticLog? diagnosticLog = null)
     {
+        _log = new NetworkDiagnosticLog(diagnosticLog ?? NoDiagnosticLog.Instance);
         _dnsResolver = dnsResolver;
         _timeProvider = timeProvider;
         _openChannel = openChannel;
@@ -109,18 +120,30 @@ public sealed class UdpDatagramConnector : IDatagramConnector
             return DatagramOpenResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
         }
 
+        var resolveStarted = _timeProvider.GetTimestamp();
         var (addresses, failure) = await ResolveAsync(destination, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
             var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
+            _log.Failed(DiagnosticLogComponents.Dns, exitCode, message);
             return DatagramOpenResult.Failed(exitCode, message);
         }
 
+        _log.Resolved(destination.Host, destination.Port, addresses, IsOverridden(destination), _timeProvider.GetElapsedTime(resolveStarted));
         var openStarted = _timeProvider.GetTimestamp();
         var channel = OpenFirstAvailable(addresses, destination.Port);
         return channel is null
             ? OpenFailure(host, port, destination, openStarted)
-            : DatagramOpenResult.Opened(channel);
+            : Opened(channel);
+    }
+
+    private bool IsOverridden(ConnectDestination destination) =>
+        _resolveOverrides.Find(destination.Host, destination.Port) is not null;
+
+    private DatagramOpenResult Opened(IDatagramChannel channel)
+    {
+        _log.DatagramChannelOpened(channel.ServerEndPoint);
+        return DatagramOpenResult.Opened(channel);
     }
 
     private async ValueTask<DnsResolution> ResolveAsync(ConnectDestination destination, CancellationToken cancellationToken)
@@ -141,9 +164,9 @@ public sealed class UdpDatagramConnector : IDatagramConnector
     {
         var elapsedMilliseconds = (long)_timeProvider.GetElapsedTime(openStarted).TotalMilliseconds;
         var via = destination.IsMapped ? $" via {destination.Host}:{destination.Port}" : string.Empty;
-        return DatagramOpenResult.Failed(
-            CurlExitCode.CouldntConnect,
-            $"Failed to connect to {host}:{port}{via} after {elapsedMilliseconds} ms: Could not connect to server");
+        var message = $"Failed to connect to {host}:{port}{via} after {elapsedMilliseconds} ms: Could not connect to server";
+        _log.Failed(DiagnosticLogComponents.Connect, CurlExitCode.CouldntConnect, message);
+        return DatagramOpenResult.Failed(CurlExitCode.CouldntConnect, message);
     }
 
     private IDatagramChannel? OpenFirstAvailable(IReadOnlyList<IPAddress> addresses, int port)

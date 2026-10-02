@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -7,7 +9,7 @@ namespace Curl.Networking;
 /// <c>-:</c>/<c>--next</c> option group of a command line (ADR-0285, BL-754).
 /// </summary>
 /// <param name="timeProvider">Measures how long each connection has been idle.</param>
-public sealed class ConnectionCache(TimeProvider timeProvider) : IAsyncDisposable
+public sealed class ConnectionCache(TimeProvider timeProvider) : IAsyncDisposable, IConnectionNumbers
 {
     private long _nextConnectionNumber;
 
@@ -51,9 +53,12 @@ public sealed class ConnectionCache(TimeProvider timeProvider) : IAsyncDisposabl
         await CloseAllAsync(closing);
     }
 
-    /// <summary>Takes the next connection number, from <c>0</c> across the whole run (ADR-0109).</summary>
+    /// <summary>
+    /// Takes the next connection number, from <c>0</c> across the whole run, whether a TCP
+    /// connection, a TFTP channel or a <c>file://</c> transfer takes it (ADR-0109, BL-977).
+    /// </summary>
     /// <returns>The number.</returns>
-    internal long NumberNextConnection() => Interlocked.Increment(ref _nextConnectionNumber) - 1;
+    public long NumberNextConnection() => Interlocked.Increment(ref _nextConnectionNumber) - 1;
 
     /// <summary>Closes each of <paramref name="entries" /> in turn.</summary>
     /// <param name="entries">The connections to close.</param>

@@ -447,6 +447,23 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.IsTrue(plaintextStream.IsDisposed);
     }
 
+    // BL-1088: the Schannel build's client-certificate line comes before the failure; no SNI line.
+    [TestMethod]
+    [DataRow(SchannelBuild, 1)]
+    [DataRow(OpenSslBuild, 0)]
+    public async Task AuthenticateAsClientAsync_WithAClientCertificateThatDoesNotLoadToAnIpAddress_ReportsTheTrustWithoutTheIpAddressOnlyInTheSchannelBuild(bool matchesSchannelBuild, int expectedTrustEvents)
+    {
+        var (plaintext, _) = Unanswered();
+        var events = new RecordingTransferEvents();
+        var options = new TlsClientOptions(ClientCertificate: Path.Combine(_directory, "nosuch.pem"));
+
+        var result = await Provider(options, matchesSchannelBuild).AuthenticateAsClientAsync(plaintext, "127.0.0.1", events, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SslCertProblem, result.ExitCode);
+        Assert.HasCount(expectedTrustEvents, events.TlsEvents);
+        Assert.IsTrue(events.TlsEvents.Cast<TlsTrustEvent>().All(trust => !trust.TargetsIpAddress && !trust.UsesAutomaticClientCertificate));
+    }
+
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WhenTheServerAsksForAClientCertificate_PresentsTheCertCertificate()
     {
@@ -586,6 +603,20 @@ public sealed partial class HandBuiltTlsProviderTests
     }
 
     [TestMethod]
+    public void ToTlsClientCertificate_OfALoadedPkcs12RsaKey_CanSignTheLegacyRsaRule()
+    {
+        var path = ClientCertificateLoaderTests.WriteRsaPkcs12File(_directory);
+        var (loaded, failure) = ClientCertificateLoader.LoadAsSchannelBuild(path, "secret", null, new FakeClientCertificateStore());
+        Assert.IsNull(failure);
+        using (loaded)
+        {
+            var signingKey = HandBuiltTlsProvider.ToTlsClientCertificate(loaded)!.SigningKey;
+
+            Assert.IsTrue(CanSignLegacyRsaRule(signingKey));
+        }
+    }
+
+    [TestMethod]
     [DataRow("localhost", "localhost")]
     [DataRow("127.0.0.1", null)]
     [DataRow("[::1]", null)]
@@ -596,10 +627,22 @@ public sealed partial class HandBuiltTlsProviderTests
     public void ServerCertificateOf_WithNoCertificate_IsNull() =>
         Assert.IsNull(HandBuiltTlsProvider.ServerCertificateOf([]));
 
+    // TLS 1.0 and 1.1's RSA rule and TlsSigningKey.CanSign(rule) are internal to Curl.Tls, so
+    // the test reaches them by reflection.
+    private static bool CanSignLegacyRsaRule(TlsSigningKey signingKey)
+    {
+        var legacyRules = (System.Collections.IList)typeof(TlsSignatureScheme)
+            .GetProperty("LegacyRules", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .GetValue(null)!;
+        var canSign = typeof(TlsSigningKey).GetMethods(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            .Single(method => method.Name == nameof(TlsSigningKey.CanSign));
+        return (bool)canSign.Invoke(signingKey, [legacyRules[0]])!;
+    }
+
     private static TlsClientOptions Tls12Only(TlsClientOptions options) => options with { MaximumVersion = TlsVersion.Tls12 };
 
-    private static HandBuiltTlsProvider Provider(TlsClientOptions options, bool matchesSchannelBuild) =>
-        new(options, matchesSchannelBuild, TimeProvider.System, new FakeClientCertificateStore(), SystemTlsRandomSource.Instance);
+    private static HandBuiltTlsProvider Provider(TlsClientOptions options, bool matchesSchannelBuild, IEchConfigListLookup? echConfigs = null) =>
+        new(options, matchesSchannelBuild, TimeProvider.System, new FakeClientCertificateStore(), SystemTlsRandomSource.Instance, echConfigs: echConfigs);
 
     // A plaintext connection the test watches for disposal; nothing answers on it.
     private static (StreamConnection Plaintext, InMemoryDuplexStream Stream) Unanswered()

@@ -16,7 +16,8 @@ public sealed class CommandLineProtocolSetOptionTests
     private static readonly string[] EveryKnownScheme =
     [
         "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap", "imaps", "ldap", "ldaps",
-        "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smtp", "smtps", "telnet", "tftp", "ws", "wss",
+        "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smb", "smbs", "smtp", "smtps", "telnet", "tftp", "ws",
+        "wss",
     ];
 
     [TestMethod]
@@ -64,6 +65,33 @@ public sealed class CommandLineProtocolSetOptionTests
     }
 
     [TestMethod]
+    public void Parse_ProtoRemovingFtp_StillAllowsSmbAndSmbs()
+    {
+        // Linux curl 8.18.0 (OpenSSL), measured 2026-10-01 (BL-1099 Notes): curl -sS --proto -ftp
+        // smb://127.0.0.1:1/s/f -> exit 7, a connect failure, so smb stays allowed.
+        CommandLineParseResult result = CommandLineParser.Parse(["--proto", "-ftp", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.AllowedProtocols!.Contains("smb"));
+        Assert.IsTrue(result.Options.AllowedProtocols.Contains("smbs"));
+        Assert.IsFalse(result.Options.AllowedProtocols.Contains("ftp"));
+    }
+
+    [TestMethod]
+    [DataRow("smb")]
+    [DataRow("smbs")]
+    [DataRow("=SMB")]
+    public void Parse_ProtoNamingSmb_TakesItWithoutAWarning(string value)
+    {
+        // Linux curl 8.18.0 (OpenSSL), measured 2026-10-01 (BL-1099 Notes): --proto smb,bogus warns
+        // only about 'bogus'.
+        CommandLineParseResult result = CommandLineParser.Parse(["--proto", value, Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
     public void Parse_ProtoGivenTwice_StartsAgainFromEverySchemeEachTime()
     {
         CommandLineParseResult result = CommandLineParser.Parse(["--proto", "-http", "--proto", "+ftp", Url]);
@@ -80,7 +108,6 @@ public sealed class CommandLineProtocolSetOptionTests
     [DataRow("*", new[] { "Warning: unrecognized protocol '*'" }, DisplayName = "star")]
     [DataRow(" http , bogus", new[] { "Warning: unrecognized protocol ' http '", "Warning: unrecognized protocol ' bogus'" }, DisplayName = "spaces kept")]
     [DataRow("ipfs,ws,wss,rtmp,scp", new[] { "Warning: unrecognized protocol 'ipfs'", "Warning: unrecognized protocol 'rtmp'" }, DisplayName = "ipfs and rtmp unknown")]
-    [DataRow("smb", new[] { "Warning: unrecognized protocol 'smb'" }, DisplayName = "smb unknown")]
     [DataRow("-bogus", new[] { "Warning: unrecognized protocol 'bogus'" }, DisplayName = "removing unknown")]
     [DataRow("http,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", new[] { "Warning: unrecognized protocol 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'" }, DisplayName = "name cut to 31 characters")]
     [DataRow("+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", new[] { "Warning: unrecognized protocol 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'" }, DisplayName = "cut after the modifier")]
@@ -145,6 +172,7 @@ public sealed class CommandLineProtocolSetOptionTests
     [DataRow("ldap", "ldap")]
     [DataRow("HTTPS", "https")]
     [DataRow("ftp", "ftp")]
+    [DataRow("SMBS", "smbs")]
     public void Parse_ProtoDefaultNamingKnownScheme_RecordsItLowercase(string value, string expected)
     {
         CommandLineParseResult result = CommandLineParser.Parse(["--proto-default", value, Url]);
@@ -156,7 +184,6 @@ public sealed class CommandLineProtocolSetOptionTests
     [TestMethod]
     [DataRow("bogus")]
     [DataRow("all")]
-    [DataRow("smb")]
     [DataRow("ipfs")]
     public void Parse_ProtoDefaultNamingUnknownScheme_RefusesAsUnsupportedWithExitOne(string value)
     {

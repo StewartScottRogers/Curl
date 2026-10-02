@@ -6,7 +6,7 @@ namespace Curl.Networking.Fakes;
 
 /// <summary>
 /// A <see cref="FakeTcpDialer" /> whose device bind answers <see cref="DeviceBinds" />, as
-/// <see cref="TcpDialer.DialFromDeviceAsync" /> does: a device bound with no address after it dials
+/// <see cref="TcpDialer.DialFromDeviceAsync" /> does, through its <see cref="TcpDialer.BindDeviceOrLocalEndAsync" />: a device bound with no address after it dials
 /// unbound, anything else binds the local end chosen through <see cref="FakeTcpDialer.DialFromAsync(IPEndPoint, IPEndPoint, int, ITransferEvents, CancellationToken)" />.
 /// </summary>
 /// <param name="inner">Records the dials and answers them.</param>
@@ -38,13 +38,19 @@ public sealed class FakeDeviceBindingTcpDialer(FakeTcpDialer inner, bool deviceB
         CancellationToken cancellationToken)
     {
         DeviceDials.Add((deviceName, bindsAddressAfterDevice));
-        if (DeviceBinds && !bindsAddressAfterDevice)
-        {
-            return await inner.DialAsync(endPoint, cancellationToken);
-        }
+        IPEndPoint? localEndPoint = null;
+        await TcpDialer.BindDeviceOrLocalEndAsync(
+            deviceName,
+            bindsAddressAfterDevice,
+            _ => DeviceBinds,
+            chooseLocalEndAsync,
+            chosen => localEndPoint = chosen,
+            events,
+            cancellationToken);
 
-        var localEndPoint = await chooseLocalEndAsync(cancellationToken);
-        return await inner.DialFromAsync(endPoint, localEndPoint, localPortCount, events, cancellationToken);
+        return localEndPoint is null
+            ? await inner.DialAsync(endPoint, cancellationToken)
+            : await inner.DialFromAsync(endPoint, localEndPoint, localPortCount, events, cancellationToken);
     }
 
     /// <inheritdoc />

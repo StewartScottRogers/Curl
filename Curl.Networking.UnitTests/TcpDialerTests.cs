@@ -367,6 +367,39 @@ public sealed class TcpDialerTests
         CollectionAssert.AreEqual(new[] { expected }, events.Info);
     }
 
+    // curl 8.18.0 on Linux (BL-1026, BL-1076 Notes): --interface lo and if!lo -> the line and no address;
+    // ifhost!lo!127.0.0.1 binds the device silently, then its host; a refused device bind binds the address.
+    [TestMethod]
+    [DataRow(true, false, "socket successfully bound to interface 'lo'", false, DisplayName = "plain or if!, device bound")]
+    [DataRow(false, false, null, true, DisplayName = "plain or if!, device refused")]
+    [DataRow(true, true, null, true, DisplayName = "ifhost!, device bound")]
+    [DataRow(false, true, null, true, DisplayName = "ifhost!, device refused")]
+    public async Task BindDeviceOrLocalEndAsync_ForEachDeviceBindOutcome_ReportsCurlsLineOrBindsTheAddress(
+        bool deviceBinds, bool bindsAddressAfterDevice, string? expectedLine, bool bindsAddress)
+    {
+        var events = new RecordingTransferEvents();
+        var devicesTried = new List<string>();
+        var bound = new List<IPEndPoint>();
+        var chosen = new IPEndPoint(IPAddress.Loopback, 40000);
+
+        await TcpDialer.BindDeviceOrLocalEndAsync(
+            "lo",
+            bindsAddressAfterDevice,
+            name =>
+            {
+                devicesTried.Add(name);
+                return deviceBinds;
+            },
+            _ => ValueTask.FromResult(chosen),
+            bound.Add,
+            events,
+            CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "lo" }, devicesTried);
+        CollectionAssert.AreEqual(expectedLine is null ? Array.Empty<string>() : new[] { expectedLine }, events.Info);
+        CollectionAssert.AreEqual(bindsAddress ? new[] { chosen } : Array.Empty<IPEndPoint>(), bound);
+    }
+
     private static string LastLineOfABusyPortBind()
     {
         var events = new RecordingTransferEvents();

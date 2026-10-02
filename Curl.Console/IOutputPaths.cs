@@ -27,13 +27,15 @@ internal interface IOutputPaths
     bool Exists(string path);
 
     /// <summary>
-    /// Deletes the file at <paramref name="path" />, as curl's <c>unlink</c> of a
-    /// <c>--remove-on-error</c> output file does.
+    /// Deletes the <c>--remove-on-error</c> output file at <paramref name="path" /> when it is a
+    /// regular file, as curl 8.21.0's <c>stat</c>, <c>S_ISREG</c> and <c>unlink</c> do.
     /// </summary>
     /// <param name="path">The file.</param>
     /// <returns>
-    /// <see langword="true" /> when a file was there and is gone; <see langword="false" /> when no
-    /// file was there (a device such as <c>NUL</c>, a directory, nothing) or it could not be deleted.
+    /// <see cref="OutputFileRemoval.Removed" /> when the file is gone;
+    /// <see cref="OutputFileRemoval.NotRegularFile" /> off Windows when no regular file was there
+    /// (<c>/dev/null</c>, a directory, nothing); <see cref="OutputFileRemoval.Failed" /> when it
+    /// could not be deleted, and on Windows when no file was there (<c>NUL</c>, a directory, nothing).
     /// </returns>
-    bool TryDeleteFile(string path);
+    OutputFileRemoval RemoveFile(string path);
 }

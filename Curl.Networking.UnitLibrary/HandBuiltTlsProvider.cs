@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Net;
 using System.Net.Security;
 using System.Runtime.ExceptionServices;
@@ -46,6 +48,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <inheritdoc />
     TlsClientRoute IHandshakeReportingTlsProvider.Route => TlsClientRoute.HandBuilt;
 
+    /// <inheritdoc />
+    string? IHandshakeReportingTlsProvider.RouteReason => TlsClientRouting.Reason(_options);
+
     private readonly TlsClientOptions _options;
 
     private readonly bool _matchesSchannelBuild;
@@ -58,6 +63,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     private readonly ServerCertificateVerification _verification;
 
+    private readonly TlsSessionCache? _sessions;
+
+    private readonly IEchConfigListLookup? _echConfigs;
+
     /// <summary>
     /// Creates the provider for the curl build this platform usually runs: Schannel on
     /// Windows, OpenSSL elsewhere.
@@ -66,6 +75,23 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
     public HandBuiltTlsProvider(TlsClientOptions options, TimeProvider timeProvider)
         : this(options, OperatingSystem.IsWindows(), timeProvider, new SystemClientCertificateStore(), SystemTlsRandomSource.Instance)
+    {
+    }
+
+    /// <summary>
+    /// Creates the provider for the curl build this platform usually runs, offering each TLS
+    /// 1.3 handshake a session from <paramref name="sessions" /> and keeping the session
+    /// tickets it receives there (the run's cache, which <c>--ssl-sessions</c> also loads and saves,
+    /// ADR-0319; none under <c>--no-sessionid</c>, BL-713), and finding a
+    /// host's ECHConfigList for <c>--ech true</c> or <c>hard</c> without <c>ecl:</c> through
+    /// <paramref name="echConfigs" /> (ADR-0327).
+    /// </summary>
+    /// <param name="options">The settings applied to every handshake.</param>
+    /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
+    /// <param name="sessions">The run's session cache, or <see langword="null" /> to neither offer nor keep sessions.</param>
+    /// <param name="echConfigs">Finds a host's ECHConfigList through DoH, or <see langword="null" /> when no DoH server is used.</param>
+    public HandBuiltTlsProvider(TlsClientOptions options, TimeProvider timeProvider, TlsSessionCache? sessions, IEchConfigListLookup? echConfigs)
+        : this(options, OperatingSystem.IsWindows(), timeProvider, new SystemClientCertificateStore(), SystemTlsRandomSource.Instance, sessions, echConfigs)
     {
     }
 
@@ -81,6 +107,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
     /// <param name="certificateStore">Opens the store a Schannel <c>--cert</c> store path names.</param>
     /// <param name="random">The source of the client's randoms and key shares.</param>
+    /// <param name="sessions">The run's session cache, or <see langword="null" /> to neither offer nor keep sessions.</param>
+    /// <param name="echConfigs">Finds a host's ECHConfigList for <c>--ech</c>, or <see langword="null" /> when no DoH server is used.</param>
     /// <exception cref="ArgumentException">
     /// <see cref="TlsClientOptions.MinimumVersion" /> is above <see cref="TlsClientOptions.MaximumVersion" />.
     /// </exception>
@@ -89,8 +117,12 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         bool matchesSchannelBuild,
         TimeProvider timeProvider,
         IClientCertificateStore certificateStore,
-        ITlsRandomSource random)
+        ITlsRandomSource random,
+        TlsSessionCache? sessions = null,
+        IEchConfigListLookup? echConfigs = null)
     {
+        _sessions = sessions;
+        _echConfigs = echConfigs;
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _ = TlsVersionRange.ToSslProtocols(options.MinimumVersion, options.MaximumVersion);
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
@@ -169,32 +201,159 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ArgumentException.ThrowIfNullOrWhiteSpace(targetHost);
         ArgumentNullException.ThrowIfNull(applicationProtocols);
 
-        var offeredApplicationProtocols = _options.UseAlpn ? applicationProtocols : [];
-        var (prepared, preparationFailure) = Prepare(events, targetHost, offeredApplicationProtocols);
+        var offeredApplicationProtocols = OfferedApplicationProtocols(applicationProtocols);
+        var (prepared, preparationFailure, sendsInternalErrorAlert) = await PrepareWithEchAsync(events, targetHost, offeredApplicationProtocols, plaintext.RemoteEndPoint, cancellationToken).ConfigureAwait(false);
         if (prepared is null)
         {
-            await plaintext.DisposeAsync().ConfigureAwait(false);
-            return preparationFailure!;
+            return await FailBeforeHandshakeAsync(plaintext, preparationFailure!, sendsInternalErrorAlert, cancellationToken).ConfigureAwait(false);
         }
 
+        var peerKey = SessionPeerKey(targetHost, plaintext.RemoteEndPoint);
+        var session = OfferedSession(peerKey);
+        prepared = prepared with { Settings = prepared.Settings with { ResumptionSession = session } };
         var handshakeStarted = _timeProvider.GetTimestamp();
-        var (handshake, thrown) = await TryHandshakeAsync(plaintext, prepared, cancellationToken).ConfigureAwait(false);
-        prepared.Verifier.Observed.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
-        if (handshake is not { Failure: null })
+        var handshakeRun = new HandshakeRun(plaintext, targetHost, events, isProxy, prepared, offeredApplicationProtocols, peerKey);
+        if (EarlyDataApplicationProtocol(session, offeredApplicationProtocols) is { } earlyDataProtocol)
         {
-            return await FailAsync(plaintext, prepared, handshake?.Failure, thrown).ConfigureAwait(false);
+            return DeferHandshake(handshakeRun, session!, earlyDataProtocol, handshakeStarted);
         }
 
-        events.ReportTlsHandshake(DescribeHandshake(handshake, prepared.Verifier, offeredApplicationProtocols) with
-        {
-            IsProxy = isProxy,
-            VerifiedHostName = SslStreamTlsProvider.VerifiedHostName(targetHost, _options.Insecure),
-        });
-        return ConnectResult.Connected(
-            new HandBuiltTlsConnection(handshake.Stream!, plaintext, prepared.ClientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild)),
+        var (handshake, failure) = await CompleteHandshakeAsync(handshakeRun, ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
+        return failure ?? ConnectResult.Connected(
+            ConnectionOver(handshake!, handshakeRun),
             new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
             peerCertificates: prepared.Verifier.PeerCertificates,
-            applicationProtocol: handshake.ApplicationProtocol);
+            applicationProtocol: handshake!.ApplicationProtocol);
+    }
+
+    // Runs the prepared handshake, sending earlyData first (as 0-RTT early data when the hello
+    // offers it), and reports it as a connect does: the verify result, then on success the
+    // handshake and the stapled status; a failure disposes the plaintext and is the result.
+    private async ValueTask<(HandBuiltHandshake? Handshake, ConnectResult? Failure)> CompleteHandshakeAsync(
+        HandshakeRun run,
+        ReadOnlyMemory<byte> earlyData,
+        CancellationToken cancellationToken)
+    {
+        var (handshake, thrown) = await TryHandshakeAsync(run.Plaintext, run.Prepared, earlyData, cancellationToken).ConfigureAwait(false);
+        run.Prepared.Verifier.Observed.ReportVerifyResult(run.Events, run.IsProxy, _matchesSchannelBuild);
+        run.Prepared.Verifier.Observed.ReportPinnedPublicKeyRefusal(run.Events, _matchesSchannelBuild);
+        if (!Completed(handshake))
+        {
+            return (null, await FailAsync(run.Plaintext, run.Events, run.Prepared, handshake?.Failure, thrown).ConfigureAwait(false));
+        }
+
+        KeepReceivedSessions(run.PeerKey, handshake.Stream!);
+        run.Events.ReportTlsHandshake(DescribeHandshake(handshake, run.Prepared.Verifier, run.OfferedApplicationProtocols) with
+        {
+            IsProxy = run.IsProxy,
+            VerifiedHostName = SslStreamTlsProvider.VerifiedHostName(run.TargetHost, _options.Insecure),
+        });
+        CertificateStatusText.Report(run.Events, handshake.CertificateStatus);
+        return (handshake, null);
+    }
+
+    private HandBuiltTlsConnection ConnectionOver(HandBuiltHandshake handshake, HandshakeRun run) =>
+        new(handshake.Stream!, run.Plaintext, run.Prepared.ClientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), !_matchesSchannelBuild);
+
+    // --tls-earlydata (BL-1105): the ALPN protocol of a resumed TLS 1.3 session that allows
+    // early data, when the connection offers it, as curl's Curl_on_session_reuse decides; else null.
+    private string? EarlyDataApplicationProtocol(TlsSessionRecord? session, IReadOnlyList<string> offeredApplicationProtocols) =>
+        _options.AllowEarlyData && OffersTls13 && EarlyDataProtocolOf(session) is { } protocol && offeredApplicationProtocols.Contains(protocol)
+            ? protocol
+            : null;
+
+    // The ALPN protocol of a session that allows early data, or null; the cache holds only TLS 1.3 sessions.
+    private static string? EarlyDataProtocolOf(TlsSessionRecord? session) =>
+        session is { MaxEarlyDataSize: > 0 } ? session.ApplicationProtocol : null;
+
+    // curl's deferred connect (vtls.c, ssl_connection_deferred): the connection is up at once
+    // with the session's ALPN protocol, the only one the hello then offers, and the handshake
+    // runs on the first write, carrying it as 0-RTT early data.
+    private ConnectResult DeferHandshake(HandshakeRun run, TlsSessionRecord session, string protocol, long handshakeStarted)
+    {
+        run.Events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"SSL session allows {session.MaxEarlyDataSize} bytes of early data, reusing ALPN '{protocol}'"));
+        var deferred = run with
+        {
+            Prepared = run.Prepared with { Settings = run.Prepared.Settings with { ApplicationProtocols = [protocol], OfferEarlyData = true } },
+        };
+        return ConnectResult.Connected(
+            new EarlyDataTlsConnection(run.Plaintext, (earlyData, cancellationToken) => HandshakeWithEarlyDataAsync(deferred, session.MaxEarlyDataSize, earlyData, cancellationToken)),
+            new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
+            applicationProtocol: protocol);
+    }
+
+    // The deferred handshake, with curl's early data lines (openssl.c's ossl_send_earlydata,
+    // vtls.c's ssl_cf_connect_deferred); a failure is the connect's exit code and message.
+    private async ValueTask<IConnection> HandshakeWithEarlyDataAsync(HandshakeRun run, uint maxEarlyDataSize, ReadOnlyMemory<byte> earlyData, CancellationToken cancellationToken)
+    {
+        var sent = (int)Math.Min((uint)earlyData.Length, maxEarlyDataSize);
+        run.Events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"SSL sending {sent} bytes of early data"));
+        var (handshake, failure) = await CompleteHandshakeAsync(run, earlyData, cancellationToken).ConfigureAwait(false);
+        if (failure is not null)
+        {
+            throw new DeferredTlsHandshakeFailedException(failure.ExitCode, failure.ErrorMessage!);
+        }
+
+        var accepted = EarlyDataAccepted(handshake!.Stream!);
+        ReportEarlyDataSent(run, accepted ? sent : -sent);
+        run.Events.ReportInfo(accepted
+            ? string.Create(CultureInfo.InvariantCulture, $"Server accepted {sent} bytes of TLS early data.")
+            : "Server rejected TLS early data.");
+        return ConnectionOver(handshake, run);
+    }
+
+    // %{tls_earlydata} (BL-906): openssl.c's Curl_pgrsEarlyData call, the bytes sent and
+    // negative when rejected, made only for the origin's connection, never a proxy's.
+    private static void ReportEarlyDataSent(HandshakeRun run, long bytes)
+    {
+        if (!run.IsProxy)
+        {
+            run.Events.ReportTlsEarlyData(bytes);
+        }
+    }
+
+    // Whether the server accepted the early data; a TLS 1.2 connection accepts none.
+    internal static bool EarlyDataAccepted(Stream stream) =>
+        stream is Tls13ClientStream { Handshake.EarlyDataAccepted: true };
+
+    // One connection's handshake: what it runs over, for whom, and what it reports.
+    private sealed record HandshakeRun(
+        IConnection Plaintext,
+        string TargetHost,
+        ITransferEvents Events,
+        bool IsProxy,
+        PreparedHandshake Prepared,
+        IReadOnlyList<string> OfferedApplicationProtocols,
+        string? PeerKey);
+
+    private IReadOnlyList<string> OfferedApplicationProtocols(IReadOnlyList<string> applicationProtocols) =>
+        _options.UseAlpn ? applicationProtocols : [];
+
+    private static bool Completed([NotNullWhen(true)] HandBuiltHandshake? handshake) => handshake is { Failure: null };
+
+    // Prepare, then the --ech offer (ADR-0327): --ech hard with no usable configuration fails
+    // here, before a byte is sent, and the --cert certificate is disposed.
+    private async ValueTask<(PreparedHandshake? Prepared, ConnectResult? Failure, bool SendsInternalErrorAlert)> PrepareWithEchAsync(
+        ITransferEvents events,
+        string targetHost,
+        IReadOnlyList<string> offeredApplicationProtocols,
+        EndPoint? remoteEndPoint,
+        CancellationToken cancellationToken)
+    {
+        var preparation = Prepare(events, targetHost, offeredApplicationProtocols);
+        if (preparation.Prepared is not { } prepared)
+        {
+            return preparation;
+        }
+
+        var echOffer = await EchOffer.DecideAsync(_options, OffersTls13, _echConfigs, targetHost, PortOf(remoteEndPoint), cancellationToken).ConfigureAwait(false);
+        if (echOffer.Failure is not null)
+        {
+            prepared.ClientCertificate?.Dispose();
+            return (null, echOffer.Failure, false);
+        }
+
+        return (prepared with { Settings = prepared.Settings with { EchConfigs = echOffer.Configs, SendEchGrease = echOffer.SendGrease } }, null, false);
     }
 
     /// <summary>
@@ -214,6 +373,35 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             : certificate.GetRSAPrivateKey() is { } rsa ? new RsaTlsSigningKey(rsa)
             : certificate.GetECDsaPrivateKey() is { } ecdsa ? new EcdsaTlsSigningKey(ecdsa)
             : null;
+
+    // The connection's peer key in the run's session cache, or null when there is no cache or,
+    // under --no-sessionid, sessions are neither offered nor kept (BL-713).
+    private string? SessionPeerKey(string targetHost, EndPoint? remoteEndPoint) =>
+        _sessions is null || _options.NoSessionId ? null : TlsSessionCache.PeerKey(targetHost, PortOf(remoteEndPoint), _options);
+
+    // The session the ClientHello offers to resume: taken out of the cache, as curl takes a TLS 1.3 one.
+    private TlsSessionRecord? OfferedSession(string? peerKey) => peerKey is null ? null : _sessions!.Take(peerKey);
+
+    // Keeps the session tickets the connection receives, read when the cache is saved.
+    private void KeepReceivedSessions(string? peerKey, Stream stream)
+    {
+        if (peerKey is not null)
+        {
+            _sessions!.Track(peerKey, () => ReceivedSessionsOf(stream));
+        }
+    }
+
+    // Whether a TLS 1.0 CBC write is preceded by OpenSSL's empty application data record (ADR-0150):
+    // always, unless --ssl-allow-beast or --proxy-ssl-allow-beast turns the split off (BL-713).
+    internal static bool InsertsEmptyFragment(TlsClientOptions options) => !options.AllowBeast;
+
+    // The port the session cache's peer key names: the connection's, or https's when the
+    // connection does not know its address.
+    internal static int PortOf(EndPoint? remoteEndPoint) => remoteEndPoint is IPEndPoint address ? address.Port : 443;
+
+    // The session tickets a TLS 1.3 connection has received; the TLS 1.2 client keeps none.
+    internal static IReadOnlyList<TlsSessionRecord> ReceivedSessionsOf(Stream stream) =>
+        stream is Tls13ClientStream tls13 ? tls13.Handshake.ReceivedSessions : [];
 
     /// <summary>
     /// Returns the name the ClientHello carries in <c>server_name</c>: the target host, or
@@ -243,7 +431,40 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             CertificateVerified = verifier.Observed.Verified,
             CertificateVerifyResult = verifier.Observed.VerifyResult,
             PeerCertificateChain = [.. verifier.Observed.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
+            PinnedPublicKeyHash = verifier.Observed.PinnedPublicKeyHash,
         };
+
+    /// <summary>
+    /// The fatal <c>internal_error</c> alert OpenSSL writes when <c>--curves</c> or
+    /// <c>--sigalgs</c> leaves nothing to offer, in a record with the ClientHello's legacy
+    /// version 3.1 (measured 2026-10-01 with curl 8.18.0 and OpenSSL 3.5.5, BL-1087).
+    /// </summary>
+    internal static ReadOnlySpan<byte> InternalErrorAlertRecord => [0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x50];
+
+    // A failure found before the handshake: the alert when it calls for one, then the
+    // plaintext is disposed whatever the write did, and cancellation escapes as in FailAsync.
+    private static async ValueTask<ConnectResult> FailBeforeHandshakeAsync(IConnection plaintext, ConnectResult failure, bool sendsInternalErrorAlert, CancellationToken cancellationToken)
+    {
+        var thrown = sendsInternalErrorAlert ? await TrySendInternalErrorAlertAsync(plaintext, cancellationToken).ConfigureAwait(false) : null;
+        await plaintext.DisposeAsync().ConfigureAwait(false);
+        RethrowIfCancellation(thrown);
+        return failure;
+    }
+
+    // The alert is a courtesy: a peer that is already gone leaves the failure as it was.
+    private static async ValueTask<Exception?> TrySendInternalErrorAlertAsync(IConnection plaintext, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await plaintext.WriteAsync(InternalErrorAlertRecord.ToArray(), cancellationToken).ConfigureAwait(false);
+            await plaintext.FlushAsync(cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+        catch (Exception exception)
+        {
+            return exception;
+        }
+    }
 
     // Cancellation is the one exception ITlsProvider lets escape; its stack trace is kept.
     private static void RethrowIfCancellation(Exception? thrown)
@@ -260,6 +481,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // disposed, cancellation escapes, and anything else is the build's failure.
     private async ValueTask<ConnectResult> FailAsync(
         IConnection plaintext,
+        ITransferEvents events,
         PreparedHandshake prepared,
         TlsHandshakeFailure? failure,
         Exception? thrown)
@@ -267,6 +489,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         prepared.ClientCertificate?.Dispose();
         await plaintext.DisposeAsync().ConfigureAwait(false);
         RethrowIfCancellation(thrown);
+        CertificateStatusText.Report(events, failure?.CertificateStatusRejection);
         return thrown is null
             ? FailedHandshake(failure!)
             : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(thrown));
@@ -274,7 +497,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     // Everything the handshake needs before a byte is sent, in the order the SslStream
     // provider does it: the suites, the --cert certificate, the trust event, the anchors.
-    private (PreparedHandshake? Prepared, ConnectResult? Failure) Prepare(
+    // --curves or --sigalgs leaving nothing to offer (exit 35, not a refused list's 59) is
+    // the one failure OpenSSL announces with an internal_error alert (BL-1087).
+    private (PreparedHandshake? Prepared, ConnectResult? Failure, bool SendsInternalErrorAlert) Prepare(
         ITransferEvents events,
         string targetHost,
         IReadOnlyList<string> offeredApplicationProtocols)
@@ -282,22 +507,31 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var (suites, cipherFailure) = SelectCipherSuites();
         if (cipherFailure is not null)
         {
-            return (null, ConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure));
+            return (null, ConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure), false);
         }
+
+        (suites, var srpFailure) = WithSrpSuites(events, suites);
+        if (srpFailure is not null)
+        {
+            return (null, srpFailure, false);
+        }
+
+        var srpCredentials = TlsSrp.CredentialsOf(_options);
 
         var (profile, listFailure) = CurvesAndSignatureAlgorithms.Apply(Profile, _options);
         if (listFailure is not null)
         {
-            return (null, listFailure);
+            return (null, listFailure, listFailure.ExitCode == CurlExitCode.SslConnectError);
         }
 
         var (clientCertificate, clientCertificateFailure) = ClientCertificateLoader.Load(_options, _matchesSchannelBuild, _certificateStore, _timeProvider.GetUtcNow());
         if (clientCertificateFailure is not null)
         {
-            return (null, clientCertificateFailure);
+            SslStreamTlsProvider.ReportTrustBeforeClientCertificateFailure(events, _options, targetHost, _matchesSchannelBuild);
+            return (null, clientCertificateFailure, false);
         }
 
-        events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options));
+        events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options, targetHost));
         try
         {
             var (chainPolicy, anchorsBesideSystemStore, revocationLists) = _verification.ReadTrustAnchors();
@@ -306,27 +540,48 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 {
                     RequestOcspStatus = _options.RequireCertificateStatus,
                     TimeProvider = _timeProvider,
+                    SrpCredentials = srpCredentials,
                 },
                 clientCertificate,
-                new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost)), null);
+                new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost)), null, false);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
         {
             clientCertificate?.Dispose();
             var (exitCode, message) = _verification.TrustAnchorsUnusable(exception);
-            return (null, ConnectResult.Failed(exitCode, message));
+            return (null, ConnectResult.Failed(exitCode, message), false);
         }
+    }
+
+    // --tlsuser: announce the login and offer OpenSSL's SRP cipher list, or fail with exit 43
+    // when no --tlspassword came with it, as curl's OpenSSL build does (ADR-0328).
+    private (IReadOnlyList<ushort>? Suites, ConnectResult? Failure) WithSrpSuites(ITransferEvents events, IReadOnlyList<ushort>? suites)
+    {
+        if (_options.TlsUser is null)
+        {
+            return (suites, null);
+        }
+
+        TlsSrp.ReportUser(events, _options);
+        if (_options.TlsPassword is null)
+        {
+            return (null, ConnectResult.Failed(CurlExitCode.BadFunctionArgument, TlsSrp.PasswordMissing));
+        }
+
+        TlsSrp.ReportCipherList(events, _options);
+        return (TlsSrp.OfferedSuites(_options, suites ?? Profile.CipherSuites), null);
     }
 
     // The handshake's outcome, or what it threw: the transport's failures and cancellation.
     private async Task<(HandBuiltHandshake? Handshake, Exception? Thrown)> TryHandshakeAsync(
         IConnection plaintext,
         PreparedHandshake prepared,
+        ReadOnlyMemory<byte> earlyData,
         CancellationToken cancellationToken)
     {
         try
         {
-            return (await HandshakeAsync(new ConnectionStream(plaintext), prepared.Settings, prepared.Verifier, cancellationToken).ConfigureAwait(false), null);
+            return (await HandshakeAsync(new ConnectionStream(plaintext), prepared.Settings, prepared.Verifier, earlyData, cancellationToken).ConfigureAwait(false), null);
         }
         catch (Exception exception)
         {
@@ -335,10 +590,12 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     }
 
     // A certificate the verifier rejected fails as the SslStream provider fails it, a stapled
-    // OCSP response --cert-status rejected is exit 91 (ADR-0191), and any other handshake
-    // failure is exit 35.
+    // OCSP response --cert-status rejected is exit 91 (ADR-0191), a server that did not accept
+    // the ECH offer is exit 101 (ADR-0327), and any other handshake failure is exit 35.
     private ConnectResult FailedHandshake(TlsHandshakeFailure failure) =>
-        failure.CertificateRejection is ValueTuple<CurlExitCode, string> rejected
+        failure.Alert == TlsAlertDescription.EchRequired
+            ? ConnectResult.Failed(CurlExitCode.EchRequired, TlsFailureMessages.EchRequired)
+            : failure.CertificateRejection is ValueTuple<CurlExitCode, string> rejected
             ? ConnectResult.Failed(rejected.Item1, rejected.Item2)
             : failure.CertificateStatusRejection is { } statusRejection
             ? ConnectResult.Failed(CurlExitCode.SslInvalidCertStatus, CertificateStatusFailureMessages.For(statusRejection))
@@ -348,14 +605,15 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         Stream transport,
         ClientSettings settings,
         IServerCertificateVerifier verifier,
+        ReadOnlyMemory<byte> earlyData,
         CancellationToken cancellationToken)
     {
         // Every TLS 1.3 suite is runnable (BL-811), and a --tls13-ciphers list naming none
         // is exit 59 before this, so a range reaching TLS 1.3 always offers it.
         var runsTls13 = OffersTls13;
         var runsTls12 = OffersBelowTls13 && settings.OffersSuiteFor(IsTls12Suite);
-        return runsTls13 && runsTls12 ? await HandshakeTls13OrTls12Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false)
-            : runsTls13 ? await HandshakeTls13Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false)
+        return runsTls13 && runsTls12 ? await HandshakeTls13OrTls12Async(transport, settings, verifier, earlyData, cancellationToken).ConfigureAwait(false)
+            : runsTls13 ? await HandshakeTls13Async(transport, settings, verifier, earlyData, cancellationToken).ConfigureAwait(false)
             : await HandshakeTls12Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false);
     }
 
@@ -371,19 +629,21 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         Stream transport,
         ClientSettings settings,
         IServerCertificateVerifier verifier,
+        ReadOnlyMemory<byte> earlyData,
         CancellationToken cancellationToken)
     {
-        var offer = new TlsClientSettings(settings.ToTls13(), settings.ToTls12(_options));
-        return Describe(await TlsClientConnection.ConnectAsync(transport, offer, _random, verifier, cancellationToken).ConfigureAwait(false));
+        var offer = new TlsClientSettings(settings.ToTls13(alongsideTls12: true), settings.ToTls12(_options));
+        return Describe(await TlsClientConnection.ConnectWithEarlyDataAsync(transport, offer, _random, verifier, earlyData, cancellationToken).ConfigureAwait(false));
     }
 
     private async Task<HandBuiltHandshake> HandshakeTls13Async(
         Stream transport,
         ClientSettings settings,
         IServerCertificateVerifier verifier,
+        ReadOnlyMemory<byte> earlyData,
         CancellationToken cancellationToken)
     {
-        var tls13 = await Tls13ClientConnection.ConnectAsync(transport, settings.ToTls13(), _random, verifier, cancellationToken).ConfigureAwait(false);
+        var tls13 = await Tls13ClientConnection.ConnectWithEarlyDataAsync(transport, settings.ToTls13(alongsideTls12: false), _random, verifier, earlyData, cancellationToken).ConfigureAwait(false);
         return tls13.Stream is { } tls13Stream ? HandBuiltHandshake.Completed(tls13Stream) : HandBuiltHandshake.Failed(tls13.Failure!);
     }
 
@@ -429,10 +689,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     // The Schannel build ignores --sigalgs and --curves, so on Windows a handshake that fails
     // with either in force prints what the build that applies it prints (ADR-0151): OpenSSL's
-    // text for --sigalgs, and for --curves the handshake_failure alert as curl.se's LibreSSL
-    // build prints it (ADR-0284).
+    // text for --sigalgs and --tlsuser (TLS-SRP, ADR-0328), and for --curves the
+    // handshake_failure alert as curl.se's LibreSSL build prints it (ADR-0284).
     private string HandshakeFailureMessage(TlsHandshakeFailure failure) =>
-        !_matchesSchannelBuild || _options.SignatureAlgorithms is not null ? TlsFailureMessages.OpenSslHandBuiltHandshakeFailure(failure)
+        !_matchesSchannelBuild || _options.SignatureAlgorithms is not null || _options.TlsUser is not null ? TlsFailureMessages.OpenSslHandBuiltHandshakeFailure(failure)
         : _options.Curves is not null && IsHandshakeFailureAlertReceived(failure) ? TlsFailureMessages.LibreSslHandshakeFailureAlert
         : TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, OffersOnlyVersionsBelowTls12);
 
@@ -458,6 +718,21 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         // --cert-status: ask for a stapled OCSP response and judge it on this clock.
         internal bool RequestOcspStatus { get; init; }
 
+        // --ssl-sessions: the session the TLS 1.3 ClientHello offers to resume, if any.
+        internal TlsSessionRecord? ResumptionSession { get; init; }
+
+        // --ech: the configurations the TLS 1.3 ClientHello seals its inner hello for, if any.
+        internal EchConfigList? EchConfigs { get; init; }
+
+        // --ech grease: a GREASE encrypted_client_hello in the TLS 1.3 ClientHello.
+        internal bool SendEchGrease { get; init; }
+
+        // --tls-earlydata: offer early_data on the resumed session (BL-1105).
+        internal bool OfferEarlyData { get; init; }
+
+        // --tlsuser and --tlspassword: the TLS-SRP login the TLS 1.2 ClientHello offers (ADR-0229).
+        internal TlsSrpCredentials? SrpCredentials { get; init; }
+
         internal TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
         private IReadOnlyList<ushort> OfferedSuites => CipherSuites ?? Profile.CipherSuites;
@@ -470,23 +745,41 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             ClientHelloProfile profile) =>
             new(ServerNameFor(targetHost), applicationProtocols, cipherSuites, clientCertificate, profile);
 
-        // Both builds send a 32-byte legacy session ID (middlebox compatibility mode).
-        internal Tls13ClientSettings ToTls13() => new()
+        // Both builds send a 32-byte legacy session ID (middlebox compatibility mode). Beside
+        // TLS 1.2, OpenSSL keeps the TLS 1.2-only groups in supported_groups (measured, BL-1086);
+        // with TLS 1.3 alone, a group TLS 1.3 cannot use is not offered.
+        internal Tls13ClientSettings ToTls13(bool alongsideTls12) => new()
         {
             ServerName = ServerName,
             ApplicationProtocols = ApplicationProtocols,
             ClientCertificate = ClientCertificate,
             RequestOcspStatus = RequestOcspStatus,
             TimeProvider = TimeProvider,
+            ResumptionSession = ResumptionSession,
+            OfferEarlyData = OfferEarlyData,
             CipherSuites = [.. OfferedSuites.Where(Tls13RecordProtection.CanProtect)],
-            SupportedGroups = [.. Profile.SupportedGroups.Where(TlsNamedGroup.CanShare)],
+            SupportedGroups = alongsideTls12 ? Profile.SupportedGroups : [.. Profile.SupportedGroups.Where(TlsNamedGroup.CanShare)],
             KeyShareGroups = Profile.KeyShareGroups,
             SignatureAlgorithms = ClientHelloProfileMapping.CheckableSignatureAlgorithms(Profile),
             CertificateCompressionAlgorithms = Profile.CertificateCompressionAlgorithms,
-            ExtensionOrder = ClientHelloProfileMapping.ExtensionOrder(Profile, RequestOcspStatus),
+            ExtensionOrder = WithEncryptedClientHello(WithPadding(WithEarlyData(ClientHelloProfileMapping.ExtensionOrder(Profile, RequestOcspStatus)))),
             FixedExtensions = ClientHelloProfileMapping.FixedExtensions(Profile),
             SendLegacySessionId = true,
+            EncryptedClientHelloConfigs = EchConfigs,
+            SendEncryptedClientHelloGrease = SendEchGrease,
         };
+
+        // padding follows the measured extensions and early_data, where OpenSSL sends it (BL-1048).
+        private IReadOnlyList<TlsExtensionType> WithPadding(IReadOnlyList<TlsExtensionType> order) =>
+            Profile.PadsTcpHello ? [.. order, TlsExtensionType.Padding] : order;
+
+        // early_data follows the profile's measured extensions, where OpenSSL sends it (BL-1105).
+        private IReadOnlyList<TlsExtensionType> WithEarlyData(IReadOnlyList<TlsExtensionType> order) =>
+            OfferEarlyData ? [.. order, TlsExtensionType.EarlyData] : order;
+
+        // encrypted_client_hello goes last, after the profile's measured extensions (ADR-0327).
+        private IReadOnlyList<TlsExtensionType> WithEncryptedClientHello(IReadOnlyList<TlsExtensionType> order) =>
+            EchConfigs is null && !SendEchGrease ? order : [.. order, TlsExtensionType.EncryptedClientHello];
 
         // Whether the suites to offer include one the predicate accepts; the profiles always do.
         internal bool OffersSuiteFor(Func<ushort, bool> canProtect) => CipherSuites?.Any(canProtect) ?? true;
@@ -508,6 +801,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             OfferSessionTicket = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.SessionTicket),
             OfferExtendedMasterSecret = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.ExtendedMasterSecret),
             OfferEncryptThenMac = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.EncryptThenMac),
+            ExtensionOrder = ClientHelloProfileMapping.Tls12ExtensionOrder(Profile, RequestOcspStatus),
+            FixedExtensions = ClientHelloProfileMapping.Tls12FixedExtensions(Profile),
+            SrpCredentials = SrpCredentials,
+            InsertEmptyFragment = InsertsEmptyFragment(options),
         };
 
         private static bool ReachesTls13(TlsClientOptions options) => options.MaximumVersion is TlsVersion.SystemDefault or TlsVersion.Tls13;

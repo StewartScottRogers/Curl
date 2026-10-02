@@ -24,6 +24,9 @@ public sealed record SshAlgorithmPreferences(
     /// <summary>The <see cref="CryptographyBackend" /> of <see cref="OpenSslReference" />.</summary>
     internal const string OpenSslBackend = "OpenSSL";
 
+    /// <summary>The <see cref="CryptographyBackend" /> of <see cref="WindowsReference" />.</summary>
+    internal const string WinCngBackend = "WinCNG";
+
     private const string SignalNames = ",ext-info-c,kex-strict-c-v00@openssh.com";
 
     private const string FiniteFieldKeyExchanges =
@@ -103,7 +106,7 @@ public sealed record SshAlgorithmPreferences(
         Split(WindowsMacs),
         [SshAlgorithmCatalogue.NoCompression])
     {
-        CryptographyBackend = "WinCNG",
+        CryptographyBackend = WinCngBackend,
         HostKeysNeverAgreed = Split(RsaCertificateHostKeys),
         GroupExchangeSizes = SshGroupExchangeSizes.WindowsReference,
     };

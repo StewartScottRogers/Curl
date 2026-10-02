@@ -67,6 +67,9 @@ public sealed class QuicConnection : IMultiplexedConnection
     public string ApplicationProtocol => state.Tls.ApplicationProtocol!;
 
     /// <inheritdoc />
+    public long? BidirectionalStreamLimit => (long)state.Streams.ClientBidirectionalStreamLimit;
+
+    /// <inheritdoc />
     public ValueTask<IMultiplexedStream> OpenBidirectionalStreamAsync(CancellationToken cancellationToken) =>
         WaitForStreamAsync(streams => streams.OpenBidirectional(), cancellationToken);
 

@@ -57,20 +57,59 @@ internal static class TransferEventInfoText
             return OpenSslHandshakeText.Lines(handshake, alpnLines);
         }
 
-        return handshake.IsQuic ? OpenSslHandshakeText.LibreSslLines(handshake, alpnLines) : alpnLines;
+        return handshake.IsQuic ? OpenSslHandshakeText.LibreSslLines(handshake, alpnLines) : SchannelLines(handshake, alpnLines);
     }
 
     /// <summary>
     /// Returns the <c>SSL Trust</c> lines a curl build prints before a handshake: the OpenSSL
     /// build's (<see cref="OpenSslTrustText"/>), which curl.se's LibreSSL build also prints for
-    /// a QUIC connect on Windows (ADR-0144); the Schannel build prints none.
+    /// a QUIC connect on Windows (ADR-0144); the Schannel build's <c>schannel:</c> lines
+    /// (<see cref="SchannelTrustText"/>) instead.
     /// </summary>
     /// <param name="trust">The trust the connection is set up with.</param>
     /// <param name="tlsBackend">The curl build whose wording to use.</param>
     /// <returns>The lines, in the order curl prints them.</returns>
     public static IReadOnlyList<string> TlsTrust(TlsTrustEvent trust, TlsBackend tlsBackend)
     {
-        return tlsBackend == TlsBackend.OpenSsl || trust.IsQuic ? OpenSslTrustText.Lines(trust) : [];
+        return tlsBackend == TlsBackend.OpenSsl || trust.IsQuic ? OpenSslTrustText.Lines(trust) : SchannelTrustText.Lines(trust);
+    }
+
+    /// <summary>
+    /// Returns the info lines a curl build prints for one TLS message: the OpenSSL build's
+    /// <c>TLSv1.3 (IN), ...</c> line (<see cref="OpenSslMessageText"/>), when it has one; the
+    /// Schannel build's three renegotiation lines for a received session ticket
+    /// (<see cref="SchannelRenegotiationText"/>, BL-1089), and none for any other message.
+    /// </summary>
+    /// <param name="message">The message.</param>
+    /// <param name="tlsBackend">The curl build whose wording to use.</param>
+    /// <returns>The lines, without the <c>* </c> prefix, in the order curl prints them.</returns>
+    public static IReadOnlyList<string> TlsMessage(TlsMessageEvent message, TlsBackend tlsBackend)
+    {
+        if (tlsBackend == TlsBackend.Schannel)
+        {
+            return SchannelRenegotiationText.Lines(message);
+        }
+
+        return OpenSslMessageText.Line(message) is { } line ? [line] : [];
+    }
+
+    /// <summary>
+    /// Returns curl's <c> public key hash: sha256//...</c> line, leading space and all, when a
+    /// <c>sha256//</c> <c>--pinnedpubkey</c> was checked, and none otherwise (ADR-0336, BL-877).
+    /// The Schannel build prints it between the two ALPN lines, the OpenSSL build after the
+    /// verify result.
+    /// </summary>
+    /// <param name="handshake">The facts the handshake negotiated.</param>
+    /// <returns>The line, or none.</returns>
+    internal static IReadOnlyList<string> PinnedPublicKeyHashLines(TlsHandshakeEvent handshake)
+    {
+        return handshake.PinnedPublicKeyHash is { } hash ? [" public key hash: " + hash] : [];
+    }
+
+    private static IReadOnlyList<string> SchannelLines(TlsHandshakeEvent handshake, IReadOnlyList<string> alpnLines)
+    {
+        var hashLines = PinnedPublicKeyHashLines(handshake);
+        return [.. alpnLines.Take(1), .. hashLines, .. alpnLines.Skip(1)];
     }
 
     private static IReadOnlyList<string> AlpnLines(TlsHandshakeEvent handshake)

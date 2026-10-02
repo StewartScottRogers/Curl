@@ -14,6 +14,9 @@ internal static class SmtpSessionMessages
     /// <summary>A reply line reached 65536 bytes (exit 100).</summary>
     internal const string ReplyLineTooLarge = "A value or data field grew larger than allowed";
 
+    /// <summary>A reply line held a NUL byte (exit 8, BL-1121).</summary>
+    internal const string NulByteInResponseLine = "Nul byte in server response line";
+
     /// <summary>The URL's path decoded to a control character (exit 3).</summary>
     internal const string MalformedUrl = "URL using bad/illegal format or missing URL";
 

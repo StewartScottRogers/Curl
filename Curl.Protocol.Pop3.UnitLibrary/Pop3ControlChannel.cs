@@ -16,6 +16,11 @@ namespace Curl.Protocol.Pop3;
 /// Where each command sent and each status read are logged at <c>verbose</c> (ADR-0222), a
 /// command as its sender says it may be logged; <see langword="null" /> logs nothing.
 /// </param>
+/// <param name="dumpHeaderOutput">
+/// The <c>-D</c> stream, which gets every line read, byte for byte with its line end, until
+/// <see cref="StopReporting" />, as curl 8.21.0 writes each response line there (BL-1133);
+/// <see langword="null" /> writes nothing.
+/// </param>
 /// <remarks>
 /// Commands and responses are Latin-1. As measured on curl 8.21.0 (BL-547): a line ends at
 /// LF, with a CR before it dropped; a status line starts with <c>+</c> or <c>-ERR</c> and any
@@ -25,7 +30,7 @@ namespace Curl.Protocol.Pop3;
 /// <see cref="StopReporting" />; a body's bytes are not reported here (BL-552).
 /// </remarks>
 internal sealed class Pop3ControlChannel(
-    IConnection connection, ITransferEvents events, CancellationToken cancellationToken, IDiagnosticLog? diagnosticLog = null)
+    IConnection connection, ITransferEvents events, CancellationToken cancellationToken, IDiagnosticLog? diagnosticLog = null, Stream? dumpHeaderOutput = null)
 {
     private const int ReadBufferSize = 4096;
 
@@ -50,6 +55,9 @@ internal sealed class Pop3ControlChannel(
     /// <summary>Where lines are reported: <c>events</c> until <see cref="StopReporting" />, nowhere after.</summary>
     private ITransferEvents reporting = events;
 
+    /// <summary>Where lines are written for <c>-D</c>: <c>dumpHeaderOutput</c> until <see cref="StopReporting" />, nowhere after.</summary>
+    private Stream? dumping = dumpHeaderOutput;
+
     /// <summary>
     /// Gets the connection commands are sent on and responses read from: the one the
     /// channel was built with until <see cref="SwitchTo(IConnection)" />.
@@ -65,9 +73,13 @@ internal sealed class Pop3ControlChannel(
 
     /// <summary>
     /// Reports nothing more: curl sends <c>QUIT</c> once the transfer is over, where <c>-v</c>
-    /// does not see it or its answer.
+    /// does not see it or its answer, and its answer is not written to <c>-D</c> either.
     /// </summary>
-    public void StopReporting() => reporting = NoTransferEvents.Instance;
+    public void StopReporting()
+    {
+        reporting = NoTransferEvents.Instance;
+        dumping = null;
+    }
 
     /// <summary>
     /// Sends <paramref name="command" /> followed by CRLF, reported as a request header once
@@ -103,6 +115,7 @@ internal sealed class Pop3ControlChannel(
     /// <returns>The status line.</returns>
     /// <exception cref="Pop3ReplyMissingException">The server closed the connection first.</exception>
     /// <exception cref="InvalidDataException">A line reached 65536 bytes, its CR and LF included.</exception>
+    /// <exception cref="Pop3NulByteInLineException">A line held a NUL byte.</exception>
     public async ValueTask<Pop3Response> ReadResponseAsync()
     {
         while (true)
@@ -126,6 +139,7 @@ internal sealed class Pop3ControlChannel(
     /// </returns>
     /// <exception cref="Pop3ReplyMissingException">The server closed the connection first.</exception>
     /// <exception cref="InvalidDataException">A line reached 65536 bytes, its CR and LF included.</exception>
+    /// <exception cref="Pop3NulByteInLineException">A line held a NUL byte.</exception>
     public async ValueTask<Pop3Capabilities?> ReadCapabilitiesAsync()
     {
         var lines = new List<string>();
@@ -169,7 +183,9 @@ internal sealed class Pop3ControlChannel(
 
     /// <summary>
     /// Reads one line up to its LF, without the LF or a CR before it. The line is reported
-    /// with its line end as a response header.
+    /// with its line end as a response header, unless it holds a NUL byte: then it is not
+    /// reported and <see cref="Pop3NulByteInLineException" /> is thrown, as curl 8.21.0
+    /// checks every response line before <c>-v</c> shows it (BL-1120).
     /// </summary>
     private async ValueTask<string> ReadLineAsync()
     {
@@ -182,19 +198,37 @@ internal sealed class Pop3ControlChannel(
             }
 
             byte next = buffer[bufferStart++];
+            line.Add(next);
             if (next == (byte)'\n')
             {
-                int length = line.Count > 0 && line[^1] == (byte)'\r' ? line.Count - 1 : line.Count;
-                line.Add(next);
-                byte[] bytes = [.. line];
-                reporting.ReportResponseHeader(bytes);
-                return Encoding.Latin1.GetString(bytes, 0, length);
+                return await EndLineAsync(line).ConfigureAwait(false);
             }
-
-            line.Add(next);
         }
 
         throw new Pop3ReplyMissingException();
+    }
+
+    /// <summary>
+    /// Ends <paramref name="line" />, which holds its LF: refuses it when it holds a NUL byte,
+    /// else reports it as a response header, writes it to the <c>-D</c> stream when there is
+    /// one, and returns it without its LF or a CR before it.
+    /// </summary>
+    private async ValueTask<string> EndLineAsync(List<byte> line)
+    {
+        if (line.Contains(0))
+        {
+            throw new Pop3NulByteInLineException();
+        }
+
+        int length = line.Count > 1 && line[^2] == (byte)'\r' ? line.Count - 2 : line.Count - 1;
+        byte[] bytes = [.. line];
+        reporting.ReportResponseHeader(bytes);
+        if (dumping is not null)
+        {
+            await dumping.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+        }
+
+        return Encoding.Latin1.GetString(bytes, 0, length);
     }
 
     private async ValueTask<bool> TryFillAsync()

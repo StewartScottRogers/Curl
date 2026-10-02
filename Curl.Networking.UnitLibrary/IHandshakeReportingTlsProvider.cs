@@ -18,6 +18,13 @@ internal interface IHandshakeReportingTlsProvider : ITlsProvider
     TlsClientRoute Route { get; }
 
     /// <summary>
+    /// Gets why the connection's options chose this provider, as
+    /// <see cref="TlsClientRouting.Reason" /> words it, for the diagnostic log's handshake line
+    /// (BL-968); <see langword="null" /> when no option chose it.
+    /// </summary>
+    string? RouteReason { get; }
+
+    /// <summary>
     /// Performs the client handshake as
     /// <see cref="ITlsProvider.AuthenticateAsClientAsync(IConnection, string, CancellationToken)" />
     /// does, reporting the trust it is set up with to <paramref name="events" /> and, when it

@@ -44,7 +44,10 @@ internal sealed class InMemorySshAgent : ISshAgentConnector
         return ValueTask.FromResult<Stream?>(new AgentConnectionStream(Answer));
     }
 
-    private byte[] Answer(byte[] request)
+    /// <summary>Answers one request body with one answer body, as a connection does.</summary>
+    /// <param name="request">The request body.</param>
+    /// <returns>The answer body.</returns>
+    internal byte[] Answer(byte[] request)
     {
         requests.Add(request);
         return request[0] switch

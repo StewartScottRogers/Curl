@@ -5,7 +5,7 @@
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-821.
 Builds on ADR-0140 ("Class structure" names `TlsClientConnection`), ADR-0157 (TLS 1.3 over a
-byte stream), ADR-0254 (TLS 1.2 and below over a byte stream) and ADR-0162 (which client
+byte stream), ADR-0249 (TLS 1.2 and below over a byte stream) and ADR-0162 (which client
 `HandBuiltTlsProvider` runs for a version range).
 
 ## Context

@@ -170,7 +170,8 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            var channel = new SmtpControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog);
+            var channel = new SmtpControlChannel(
+                connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput);
 
             // curl decodes the path once connected, so a malformed one still costs a connect.
             TransferResult result = SmtpEhloDomain.Read(url, localHostName) is { } domain

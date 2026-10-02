@@ -20,8 +20,15 @@ namespace Curl.Core.Hsts;
 /// case and one trailing dot.
 /// </remarks>
 /// <param name="timeProvider">The clock expiries are counted on.</param>
-public sealed class HstsCache(TimeProvider timeProvider)
+/// <param name="diagnosticLog">
+/// Where the cache writes its entries' lives, component <see cref="DiagnosticLogComponents.Hsts" />
+/// (BL-1072): each entry stored from a header and each expired entry a lookup removes, as
+/// <c>verbose</c>, by host name only; <see langword="null" /> for none.
+/// </param>
+public sealed class HstsCache(TimeProvider timeProvider, IDiagnosticLog? diagnosticLog = null)
 {
+    private readonly IDiagnosticLog log = diagnosticLog ?? NoDiagnosticLog.Instance;
+
     /// <summary>The two comment lines curl writes at the top of the file, without line endings.</summary>
     public static readonly IReadOnlyList<string> FileHeaderLines =
     [
@@ -124,10 +131,13 @@ public sealed class HstsCache(TimeProvider timeProvider)
         if (index < 0)
         {
             Add(host, header.IncludeSubDomains, expires);
-            return;
+        }
+        else
+        {
+            entries[index] = entries[index] with { IncludeSubDomains = header.IncludeSubDomains, ExpiresUnixSeconds = expires };
         }
 
-        entries[index] = entries[index] with { IncludeSubDomains = header.IncludeSubDomains, ExpiresUnixSeconds = expires };
+        LogVerbose("stored entry for ", host, string.Empty);
     }
 
     /// <summary>
@@ -268,6 +278,7 @@ public sealed class HstsCache(TimeProvider timeProvider)
             if (entry.ExpiresUnixSeconds <= now)
             {
                 entries.RemoveAt(index);
+                LogVerbose("entry for ", entry.Host, " expired");
                 continue;
             }
 
@@ -323,4 +334,16 @@ public sealed class HstsCache(TimeProvider timeProvider)
     }
 
     private long NowSeconds() => timeProvider.GetUtcNow().ToUnixTimeSeconds();
+
+    /// <summary>
+    /// Writes the <c>verbose</c> line <paramref name="before" />, <paramref name="host" /> without its
+    /// trailing dot, then <paramref name="after" />, joining them only when the level is enabled.
+    /// </summary>
+    private void LogVerbose(string before, string host, string after)
+    {
+        if (log.IsEnabled(DiagnosticLogLevel.Verbose))
+        {
+            log.Write(DiagnosticLogLevel.Verbose, DiagnosticLogComponents.Hsts, before + WithoutTrailingDot(host) + after);
+        }
+    }
 }

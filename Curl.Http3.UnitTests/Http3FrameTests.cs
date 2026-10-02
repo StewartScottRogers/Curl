@@ -109,7 +109,7 @@ public sealed class Http3FrameTests
     [TestMethod]
     public async Task Settings_GreaseIdentifiers_AreLeftOut()
     {
-        // 0x21 and 0x1f * 2 + 0x21 = 0x5f are reserved (RFC 9114 section 7.2.4.1); 0x33 is unknown and kept.
+        // 0x21 and 0x1f * 2 + 0x21 = 0x5f are reserved (RFC 9114 section 7.2.4.1); 0x33 is SETTINGS_H3_DATAGRAM and kept.
         var frame = (Http3SettingsFrame)await ReadOnlyFrameAsync(FromHex("04 09 21 05 06 10 405f 00 33 01"));
 
         CollectionAssert.AreEqual(new Http3Setting[] { new(0x06, 16), new(0x33, 1) }, frame.Settings.ToArray());
@@ -119,8 +119,32 @@ public sealed class Http3FrameTests
     [DataRow("04 04 01 00 01 05", DisplayName = "an identifier twice")]
     [DataRow("04 02 02 00", DisplayName = "HTTP/2 SETTINGS_ENABLE_PUSH")]
     [DataRow("04 02 05 00", DisplayName = "HTTP/2 SETTINGS_MAX_FRAME_SIZE")]
+    [DataRow("04 02 08 02", DisplayName = "SETTINGS_ENABLE_CONNECT_PROTOCOL 2")]
+    [DataRow("04 03 08 40 40", DisplayName = "SETTINGS_ENABLE_CONNECT_PROTOCOL 64")]
+    [DataRow("04 02 33 02", DisplayName = "SETTINGS_H3_DATAGRAM 2")]
+    [DataRow("04 09 33 c0 00 00 00 00 00 01 00", DisplayName = "SETTINGS_H3_DATAGRAM 256 in an eight-byte integer")]
     public async Task Settings_ForbiddenIdentifier_IsSettingsError(string hex) =>
         Assert.AreEqual(Http3ErrorCode.SettingsError, await ErrorOfAsync(() => ReadAllFramesAsync(StreamOf(hex))));
+
+    [TestMethod]
+    public async Task Settings_ZeroOrOneSettingsOfZeroAndOne_AreKept()
+    {
+        var frame = (Http3SettingsFrame)await ReadOnlyFrameAsync(FromHex("04 04 08 01 33 00"));
+
+        CollectionAssert.AreEqual(
+            new Http3Setting[] { new(Http3SettingIdentifier.EnableConnectProtocol, 1), new(Http3SettingIdentifier.H3Datagram, 0) },
+            frame.Settings.ToArray());
+    }
+
+    [TestMethod]
+    public async Task Settings_ZeroOrOneSettingsOfOneAndZero_AreKept()
+    {
+        var frame = (Http3SettingsFrame)await ReadOnlyFrameAsync(FromHex("04 04 08 00 33 01"));
+
+        CollectionAssert.AreEqual(
+            new Http3Setting[] { new(Http3SettingIdentifier.EnableConnectProtocol, 0), new(Http3SettingIdentifier.H3Datagram, 1) },
+            frame.Settings.ToArray());
+    }
 
     [TestMethod]
     [DataRow("04 01 06", DisplayName = "SETTINGS identifier without a value")]

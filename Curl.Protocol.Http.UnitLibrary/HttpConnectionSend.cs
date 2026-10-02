@@ -74,6 +74,10 @@ internal static class HttpConnectionSend
         }
     }
 
+    // A TLS handshake deferred to the first write (--tls-earlydata, BL-1105) fails as the
+    // connect would have; any other failed write is exit 55.
     private static HttpTransferException SendFailed(IOException exception) =>
-        new(CurlExitCode.SendError, HttpTransferMessages.SendFailure(exception));
+        exception is DeferredTlsHandshakeFailedException handshake
+            ? new(handshake.ExitCode, handshake.Message)
+            : new(CurlExitCode.SendError, HttpTransferMessages.SendFailure(exception));
 }

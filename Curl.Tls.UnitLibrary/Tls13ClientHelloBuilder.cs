@@ -87,7 +87,11 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
     }
 
     private ClientHello Create(List<TlsExtension> extensions) =>
-        new(LegacyVersion, random, legacySessionId, [.. settings.CipherSuites, .. settings.LowerVersions?.OfferedCipherSuites ?? []], [0], [.. extensions]);
+        new(LegacyVersion, random, legacySessionId, OfferedCipherSuites(), [0], [.. extensions]);
+
+    /// <summary>The TLS 1.3 suites, then any <see cref="Tls13ClientSettings.LowerVersions" /> suites, then with <see cref="Tls13ClientSettings.OfferEmptyRenegotiationInfoScsv" /> <c>00ff</c>, each code once.</summary>
+    private ushort[] OfferedCipherSuites() =>
+        [.. settings.CipherSuites.Concat(settings.LowerVersions?.OfferedCipherSuites ?? []).Concat(settings.OfferEmptyRenegotiationInfoScsv ? [Tls12CipherSuite.EmptyRenegotiationInfoScsv] : []).Distinct()];
 
     /// <summary>TLS 1.3, then with <see cref="Tls13ClientSettings.LowerVersions" /> every version from its ceiling down to its minimum.</summary>
     private ushort[] OfferedVersions()

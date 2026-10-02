@@ -21,11 +21,16 @@ public interface ICookieStore
     /// withhold <c>Secure</c> cookies otherwise.
     /// </param>
     /// <param name="now">The time that decides which cookies have expired.</param>
+    /// <param name="events">
+    /// Where the store reports, as curl's <c>-v</c> lines, a limit that cut the header short,
+    /// before the request's header lines; <see cref="NoTransferEvents.Instance" /> when nobody
+    /// is listening.
+    /// </param>
     /// <returns>
     /// The header value without the header name, or <see langword="null" /> when no stored
     /// cookie matches.
     /// </returns>
-    string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now);
+    string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, ITransferEvents events);
 
     /// <summary>
     /// Stores the cookie from one <c>Set-Cookie</c> header of a response to a request for

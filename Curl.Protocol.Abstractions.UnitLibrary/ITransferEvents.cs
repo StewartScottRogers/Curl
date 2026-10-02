@@ -87,6 +87,19 @@ public interface ITransferEvents
     }
 
     /// <summary>
+    /// Reports the bytes an origin connection sent as TLS 1.3 0-RTT early data under
+    /// <c>--tls-earlydata</c>, the source of <c>%{tls_earlydata}</c>
+    /// (<c>CURLINFO_EARLYDATA_SENT_T</c>, BL-906): the count when the server accepted them, and
+    /// its negation when it rejected them. Never reported for an HTTPS proxy, nor by the
+    /// Schannel build, which sends no early data, so the value stays <c>0</c>.
+    /// </summary>
+    /// <param name="bytes">The early data bytes sent, negative when the server rejected them.</param>
+    /// <remarks>Does nothing by default.</remarks>
+    void ReportTlsEarlyData(long bytes)
+    {
+    }
+
+    /// <summary>
     /// Reports request head bytes exactly as written (<c>CURLINFO_HEADER_OUT</c>), CRLFs
     /// included, one call per write of a head.
     /// </summary>

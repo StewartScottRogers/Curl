@@ -216,7 +216,7 @@ internal static class HttpTransferMessages
     /// Gives an HTTP/2 error code's name as nghttp2's <c>nghttp2_http2_strerror</c> gives it,
     /// <c>unknown</c> for a code RFC 9113 does not list.
     /// </summary>
-    private static string Http2ErrorName(Curl.Http2.Http2ErrorCode errorCode) =>
+    internal static string Http2ErrorName(Curl.Http2.Http2ErrorCode errorCode) =>
         (uint)errorCode < Http2ErrorNames.Length ? Http2ErrorNames[(uint)errorCode] : "unknown";
 
     private static readonly string[] Http2ErrorNames =

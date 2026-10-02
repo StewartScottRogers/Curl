@@ -109,21 +109,18 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         ITransferEvents events,
         CancellationToken cancellationToken)
     {
-        var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, SocketOptions.SocketProtocol);
         try
         {
             ApplySocketOptions(socket);
-            var deviceBound = TryBindToDevice(socket, deviceName);
-            if (deviceBound && !bindsAddressAfterDevice)
-            {
-                // libcurl says so only for a name bound as a device alone, never for ifhost!.
-                events.ReportInfo(LocalBindLines.DeviceBound(deviceName));
-            }
-            else
-            {
-                var localEndPoint = await chooseLocalEndAsync(cancellationToken).ConfigureAwait(false);
-                BindLocalEnd(socket, localEndPoint, localPortCount, events);
-            }
+            await BindDeviceOrLocalEndAsync(
+                deviceName,
+                bindsAddressAfterDevice,
+                [ExcludeFromCodeCoverage(Justification = "ADR-0083: binds the real socket, as its method does.")] (string name) => TryBindToDevice(socket, name),
+                chooseLocalEndAsync,
+                [ExcludeFromCodeCoverage(Justification = "ADR-0083: binds the real socket, as its method does.")] (IPEndPoint localEndPoint) => BindLocalEnd(socket, localEndPoint, localPortCount, events),
+                events,
+                cancellationToken).ConfigureAwait(false);
 
             await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
         }
@@ -136,10 +133,51 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         return Connected(socket, endPoint);
     }
 
+    /// <summary>
+    /// Binds a socket to the device <paramref name="deviceName" /> through <paramref name="tryBindToDevice" />,
+    /// as libcurl's <c>bindlocal</c> tries <c>SO_BINDTODEVICE</c>, writing curl's <c>-v</c> line
+    /// <c>socket successfully bound to interface '&lt;name&gt;'</c> when that bind is the whole binding
+    /// (BL-1076); otherwise binds the local end <paramref name="chooseLocalEndAsync" /> chooses through
+    /// <paramref name="bindLocalEnd" />.
+    /// </summary>
+    /// <remarks>
+    /// curl 8.18.0 on Linux writes the line for a plain or <c>if!</c> name whose device bind succeeds, before
+    /// the connect, so it stands even when the connect is then refused; <c>ifhost!</c> binds the device
+    /// silently and goes on to its host's address, and a refused device bind falls back to the interface's
+    /// address (BL-1076 Notes).
+    /// </remarks>
+    /// <param name="deviceName">The interface to bind the socket to.</param>
+    /// <param name="bindsAddressAfterDevice"><see langword="true" /> for <c>ifhost!</c>.</param>
+    /// <param name="tryBindToDevice">Binds the socket to the named device, answering whether it did.</param>
+    /// <param name="chooseLocalEndAsync">Chooses the local address and first port, only when one is to be bound.</param>
+    /// <param name="bindLocalEnd">Binds the socket's local end to the end point chosen.</param>
+    /// <param name="events">Where the <c>-v</c> line goes.</param>
+    /// <param name="cancellationToken">Cancels the choice of local end.</param>
+    /// <returns>A task that completes once the socket is bound.</returns>
+    internal static async ValueTask BindDeviceOrLocalEndAsync(
+        string deviceName,
+        bool bindsAddressAfterDevice,
+        Func<string, bool> tryBindToDevice,
+        Func<CancellationToken, ValueTask<IPEndPoint>> chooseLocalEndAsync,
+        Action<IPEndPoint> bindLocalEnd,
+        ITransferEvents events,
+        CancellationToken cancellationToken)
+    {
+        if (tryBindToDevice(deviceName) && !bindsAddressAfterDevice)
+        {
+            // libcurl says so only for a name bound as a device alone, never for ifhost!.
+            events.ReportInfo(LocalBindLines.DeviceBound(deviceName));
+            return;
+        }
+
+        var localEndPoint = await chooseLocalEndAsync(cancellationToken).ConfigureAwait(false);
+        bindLocalEnd(localEndPoint);
+    }
+
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
     private async ValueTask<DialedTcpConnection> DialBoundAsync(IPEndPoint endPoint, IPEndPoint? bindTo, int localPortCount, ITransferEvents events, CancellationToken cancellationToken)
     {
-        var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, SocketOptions.SocketProtocol);
         try
         {
             ApplySocketOptions(socket);
@@ -167,6 +205,40 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         return new DialedTcpConnection(
             new StreamConnection(new NetworkStream(socket, ownsSocket: true), endPoint, localEndPoint),
             localEndPoint);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Only <c>--mptcp</c> can fail here: a plain TCP socket opens wherever .NET runs, so no socket is
+    /// opened to find out.
+    /// </remarks>
+    public SocketException? FailureToOpenSocket(AddressFamily family) =>
+        SocketOptions.MultipathTcp ? TryOpenSocket(family, SocketOptions.SocketProtocol) : null;
+
+    /// <summary>
+    /// Opens and closes a stream socket of <paramref name="family" /> with <paramref name="protocol" />,
+    /// giving the <see cref="SocketException" /> the operating system refuses it with, or
+    /// <see langword="null" /> when it opens.
+    /// </summary>
+    /// <remarks>
+    /// Excluded from coverage per ADR-0083: which branch runs is the platform's, so the Windows coverage
+    /// run, where Multipath TCP is refused, reaches only one.
+    /// </remarks>
+    /// <param name="family">The address family of the socket.</param>
+    /// <param name="protocol">The protocol to open it with.</param>
+    /// <returns>The refusal, or <see langword="null" />.</returns>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: the platform picks the branch.")]
+    internal static SocketException? TryOpenSocket(AddressFamily family, ProtocolType protocol)
+    {
+        try
+        {
+            using var socket = new Socket(family, SocketType.Stream, protocol);
+            return null;
+        }
+        catch (SocketException exception)
+        {
+            return exception;
+        }
     }
 
     /// <inheritdoc />
@@ -275,7 +347,9 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
 
     /// <summary>
     /// Sets <see cref="SocketOptions" /> on <paramref name="socket" />:<see cref="Socket.NoDelay" />
-    /// from <see cref="TcpSocketOptions.NoDelay" />, and <c>SO_KEEPALIVE</c> from
+    /// from <see cref="TcpSocketOptions.NoDelay" />, the Type of Service or Traffic Class and priority
+    /// <see cref="QualityOfServiceSocketOptions.For" /> lists, TCP Fast Open as <see cref="FastOpenSocketOption.For" />
+    /// names it when <see cref="TcpSocketOptions.FastOpen" /> is set, and <c>SO_KEEPALIVE</c> from
     /// <see cref="TcpSocketOptions.KeepAlive" />, with the probe time and interval
     /// <see cref="TcpSocketOptions.KeepAliveSeconds" /> and the probe count
     /// <see cref="TcpSocketOptions.KeepAliveProbeCount" /> when it is on.
@@ -289,6 +363,12 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     internal void ApplySocketOptions(Socket socket)
     {
         socket.NoDelay = SocketOptions.NoDelay;
+        var platform = QualityOfServiceSocketOptions.CurrentPlatform;
+        foreach (RawSocketOption option in QualityOfServiceSocketOptions.For(SocketOptions, socket.AddressFamily, platform).Concat(FastOpenSocketOption.For(SocketOptions, platform)))
+        {
+            QualityOfServiceSocketOptions.TrySet(socket, option);
+        }
+
         socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, SocketOptions.KeepAlive);
         if (!SocketOptions.KeepAlive)
         {

@@ -56,4 +56,12 @@ public sealed record HttpProxyTunnelOptions(string? UserAgent, Encoding Credenti
     /// <see cref="CredentialEncoding" /> (<see cref="PreemptiveBasicProxyAuthenticator" />).
     /// </summary>
     public IHttpAuthenticator? ProxyAuthenticator { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the tunnel's <c>-v</c> lines are curl's Schannel build's,
+    /// which print no <c>allocate connect buffer</c> before a proxy connection's first CONNECT,
+    /// rather than its OpenSSL build's, which do (BL-964 Notes, ADR-0342). The platform's build
+    /// by default: Schannel on Windows, OpenSSL elsewhere.
+    /// </summary>
+    public bool MatchesSchannelBuild { get; init; } = OperatingSystem.IsWindows();
 }

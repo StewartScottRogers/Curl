@@ -284,10 +284,23 @@ public sealed class HttpProtocolHandler(
             ProxyAuthorizationInfoLines = proxyAuthorizationLines.Lines,
             RedirectsFollowed = options.RedirectsFollowed,
         };
-        return Http3RefusalOf(plan) is { } refusal
+        TransferResult result = Http3RefusalOf(plan) is { } refusal
             ? await ExchangeWithoutHttp3Async(plan, refusal).ConfigureAwait(false)
             : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
+        return WithFirstAuthorizationFailure(result, authorizationLines.Lines);
     }
+
+    /// <summary>
+    /// Gives a failed transfer the message of the first line the authenticator reported while
+    /// it made the first request's <c>Authorization</c> value, a Negotiate context's failure, as
+    /// curl 8.21.0 does: its <c>failf</c> for the context fills the error buffer before any later
+    /// one, so <c>curl: (22)</c> after <c>-f</c> meets the 401 carries it rather than
+    /// <c>The requested URL returned error: 401</c> (measured, BL-955 Notes; ADR-0344).
+    /// </summary>
+    private static TransferResult WithFirstAuthorizationFailure(TransferResult result, IReadOnlyList<string> authorizationLines) =>
+        result.ExitCode != CurlExitCode.Ok && authorizationLines.Count > 0
+            ? result with { ErrorMessage = authorizationLines[0] }
+            : result;
 
     /// <summary>
     /// Gives why HTTP/3 is refused for <paramref name="plan" />, in the order curl 8.21.0's
@@ -493,6 +506,7 @@ public sealed class HttpProtocolHandler(
             };
         }
 
+        plan.TakeServerCertificateFrom(connect);
         plan.Progress.ReportTransferStarted();
 
         HttpAttemptOutcome outcome;
@@ -573,11 +587,15 @@ public sealed class HttpProtocolHandler(
                 : await RaceQuicAgainstTcpAsync(plan, target).ConfigureAwait(false);
         }
 
-        MultiplexedConnectResult quic = await plan.Deadline.ConnectMultiplexedAsync(connector, target).ConfigureAwait(false);
-        return quic.Connection is { } quicConnection
-            ? Http3Connected(quicConnection, quic)
-            : ConnectResult.Failed(quic.ExitCode, quic.ErrorMessage!);
+        return await ConnectOverQuicAsync(plan, target).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Connects over QUIC as an <see cref="Http3Session" />, which a pooling connector shares
+    /// between the transfers to the origin, each on a request stream of its own (BL-735).
+    /// </summary>
+    private ValueTask<ConnectResult> ConnectOverQuicAsync(HttpRequestPlan plan, ConnectTarget target, CancellationToken abandoned = default) =>
+        plan.Deadline.ConnectMultiplexedSessionAsync(connector, target, quic => new Http3Session(quic), abandoned);
 
     /// <summary>
     /// Races QUIC against TCP for <c>--http3</c> as curl's ngtcp2 build does
@@ -593,27 +611,27 @@ public sealed class HttpProtocolHandler(
     {
         using CancellationTokenSource quicAbandoned = new();
         using CancellationTokenSource tcpAbandoned = new();
-        Task<MultiplexedConnectResult> quic = plan.Deadline.ConnectMultiplexedAsync(connector, target, quicAbandoned.Token).AsTask();
+        Task<ConnectResult> quic = ConnectOverQuicAsync(plan, target, quicAbandoned.Token).AsTask();
         await FirstAttemptOrHappyEyeballsTimeoutAsync(plan, quic).ConfigureAwait(false);
-        if (quic.IsCompleted && (await quic.ConfigureAwait(false)).Connection is { } early)
+        if (quic.IsCompleted && (await quic.ConfigureAwait(false)).Connection is not null)
         {
-            return Http3Connected(early, quic.Result);
+            return quic.Result;
         }
 
         Task<ConnectResult> tcp = plan.Deadline.ConnectAsync(connector, target, tcpAbandoned.Token).AsTask();
         if (await Task.WhenAny(quic, tcp).ConfigureAwait(false) == tcp && (await tcp.ConfigureAwait(false)).Connection is not null)
         {
             await quicAbandoned.CancelAsync().ConfigureAwait(false);
-            _ = DisposeLosingQuicAsync(quic);
+            _ = DisposeLosingAttemptAsync(quic);
             return tcp.Result;
         }
 
-        MultiplexedConnectResult quicResult = await quic.ConfigureAwait(false);
-        if (quicResult.Connection is { } quicConnection)
+        ConnectResult quicResult = await quic.ConfigureAwait(false);
+        if (quicResult.Connection is not null)
         {
             await tcpAbandoned.CancelAsync().ConfigureAwait(false);
-            _ = DisposeLosingTcpAsync(tcp);
-            return Http3Connected(quicConnection, quicResult);
+            _ = DisposeLosingAttemptAsync(tcp);
+            return quicResult;
         }
 
         ConnectResult tcpResult = await tcp.ConfigureAwait(false);
@@ -641,24 +659,24 @@ public sealed class HttpProtocolHandler(
             return tcp.Result;
         }
 
-        Task<MultiplexedConnectResult> quic = plan.Deadline.ConnectMultiplexedAsync(connector, target, quicAbandoned.Token).AsTask();
-        if (await Task.WhenAny(tcp, quic).ConfigureAwait(false) == quic && (await quic.ConfigureAwait(false)).Connection is { } early)
+        Task<ConnectResult> quic = ConnectOverQuicAsync(plan, target, quicAbandoned.Token).AsTask();
+        if (await Task.WhenAny(tcp, quic).ConfigureAwait(false) == quic && (await quic.ConfigureAwait(false)).Connection is not null)
         {
             await tcpAbandoned.CancelAsync().ConfigureAwait(false);
-            _ = DisposeLosingTcpAsync(tcp);
-            return Http3Connected(early, quic.Result);
+            _ = DisposeLosingAttemptAsync(tcp);
+            return quic.Result;
         }
 
         ConnectResult tcpResult = await tcp.ConfigureAwait(false);
         if (tcpResult.Connection is not null)
         {
             await quicAbandoned.CancelAsync().ConfigureAwait(false);
-            _ = DisposeLosingQuicAsync(quic);
+            _ = DisposeLosingAttemptAsync(quic);
             return tcpResult;
         }
 
-        MultiplexedConnectResult quicResult = await quic.ConfigureAwait(false);
-        return quicResult.Connection is { } quicConnection ? Http3Connected(quicConnection, quicResult) : tcpResult;
+        ConnectResult quicResult = await quic.ConfigureAwait(false);
+        return quicResult.Connection is not null ? quicResult : tcpResult;
     }
 
     /// <summary>
@@ -673,33 +691,15 @@ public sealed class HttpProtocolHandler(
         await firstCompleted.CancelAsync().ConfigureAwait(false);
     }
 
-    /// <summary>Disposes the connection a TCP connect that lost the race opens anyway.</summary>
-    private static async Task DisposeLosingTcpAsync(Task<ConnectResult> tcp)
+    /// <summary>Disposes the connection a connect that lost the race opens anyway.</summary>
+    private static async Task DisposeLosingAttemptAsync(Task<ConnectResult> attempt)
     {
-        await ((Task)tcp).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        if (tcp.IsCompletedSuccessfully && tcp.Result.Connection is { } connection)
+        await ((Task)attempt).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        if (attempt.IsCompletedSuccessfully && attempt.Result.Connection is { } connection)
         {
             await connection.DisposeAsync().ConfigureAwait(false);
         }
     }
-
-    /// <summary>Disposes the connection a QUIC connect that lost the race opens anyway.</summary>
-    private static async Task DisposeLosingQuicAsync(Task<MultiplexedConnectResult> quic)
-    {
-        await ((Task)quic).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        if (quic.IsCompletedSuccessfully && quic.Result.Connection is { } connection)
-        {
-            await connection.DisposeAsync().ConfigureAwait(false);
-        }
-    }
-
-    /// <summary>Hands on a QUIC connection as an <see cref="Http3Session" />.</summary>
-    private static ConnectResult Http3Connected(IMultiplexedConnection connection, MultiplexedConnectResult quic) =>
-        ConnectResult.Connected(
-            new Http3Session(connection),
-            quic.Timings,
-            connection.LocalEndPoint as IPEndPoint,
-            applicationProtocol: connection.ApplicationProtocol);
 
     /// <summary>
     /// Decides whether the transfer tries QUIC: <c>--http3</c> or <c>--http3-only</c> with an
@@ -739,8 +739,8 @@ public sealed class HttpProtocolHandler(
     /// (<see cref="StreamSessionOf" />) carries each request on a stream of its own; its
     /// <see cref="Http2Session" /> is handed to the connection, which keeps it for the next
     /// transfer when pooled and sends its closing GOAWAY when it closes, or, on a connection
-    /// that holds no session, the GOAWAY is sent here (BL-817). An HTTP/3 connection is never
-    /// marked reusable.
+    /// that holds no session, the GOAWAY is sent here (BL-817). An HTTP/3 connection is marked
+    /// reusable while its session takes new requests (BL-735).
     /// </summary>
     private async ValueTask<HttpAttemptOutcome> ExchangeOnConnectionAsync(
         HttpRequestPlan plan,
@@ -777,11 +777,11 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Marks the connection reusable when the last response is reported left intact over
-    /// HTTP/1.x or HTTP/2, or reports that a pooled connection that died is being given up.
+    /// HTTP/1.x or HTTP/2, or over HTTP/3 while the session takes new requests, so a pool keeps it (BL-735), or reports that a pooled connection that died is being given up.
     /// </summary>
     private static void SettleConnection(HttpRequestPlan plan, IConnection connection, IHttpStreamSession? streams, HttpAttemptOutcome outcome)
     {
-        if (outcome.ReportsLeftIntact && streams is null or Http2Session)
+        if (outcome.ReportsLeftIntact && streams is null or Http2Session or Http3Session { AcceptsNewStreams: true })
         {
             connection.MarkReusable();
         }
@@ -851,13 +851,13 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Gives the session that carries each request on a stream of its own over the connection:
-    /// the HTTP/3 session a QUIC connect made, the HTTP/2 session an earlier transfer left with
+    /// the HTTP/3 session a QUIC connect made, which a pooled connection holds (BL-735), the HTTP/2 session an earlier transfer left with
     /// a pooled connection (BL-817), a new HTTP/2 session for a connection that speaks HTTP/2
     /// (<see cref="SpeaksHttp2" />), or <see langword="null" /> for HTTP/1.x.
     /// </summary>
     private static IHttpStreamSession? StreamSessionOf(HttpRequestPlan plan, ConnectResult connect, IConnection connection) =>
         (IHttpStreamSession?)(connection as Http3Session)
-            ?? (connection.Session as Http2Session)
+            ?? (connection.Session as IHttpStreamSession)
             ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection) : null);
 
     /// <summary>
@@ -917,7 +917,8 @@ public sealed class HttpProtocolHandler(
     /// Names a connection left intact by its Unix domain socket, else by the <c>--connect-to</c>
     /// destination the connector reports it dialled, else by the alt-svc alternative it was
     /// dialled to, else by the target's host and port: curl 8.21.0 names the host it connected
-    /// to, not the origin (BL-623 case 1, BL-900, BL-975).
+    /// to, not the origin (BL-623 case 1, BL-900, BL-975), except through a CONNECT tunnel or a
+    /// SOCKS proxy, where it names the origin, not the proxy (BL-1074).
     /// </summary>
     private static string LeftIntactLine(ConnectTarget target, ConnectResult connect) =>
         (connect.UnixSocketPath, connect.MappedHost, target.AltSvcRoute) switch
@@ -948,6 +949,10 @@ public sealed class HttpProtocolHandler(
         HttpRequestOptions options = plan.Options;
         HttpRequestFraming framing = plan.Framing;
         CancellationToken cancellationToken = plan.Deadline.Token;
+
+        // curl 8.21.0 says which version it uses before it builds the request, so the cookie
+        // store's limit lines come after it (measured, BL-1136 Notes).
+        ReportProtocolChosen(context.Events, newConnection, streams);
         IHttpStreamConnection? requestStream = CreateRequestStream(plan, streams);
         IConnection connection = ExchangeConnectionOf(plan, requestStream, transport);
         byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection);
@@ -998,7 +1003,6 @@ public sealed class HttpProtocolHandler(
         HttpRequestPlan? retry = null;
         HttpResponseHead? actedOn = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
-        ReportProtocolChosen(context.Events, newConnection, streams);
         LogVersionChosen(exchangeLog, plan, transport, newConnection, streams);
         ReportAuthorizationLines(plan);
         try
@@ -1096,7 +1100,8 @@ public sealed class HttpProtocolHandler(
             plan.Context.Url.Scheme,
             plan.Framing.Body is null ? 0 : plan.Framing.KnownLength,
             plan.Context.NoBody,
-            new HttpStreamOpenedLines(plan.Context.Events, HttpUrlText.Effective(plan.Context.Url)));
+            new HttpStreamOpenedLines(plan.Context.Events, HttpUrlText.Effective(plan.Context.Url)),
+            plan.Context.DiagnosticLog);
 
     /// <summary>
     /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one;
@@ -1424,7 +1429,7 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Decides whether the connection is reported left intact although the server closed it
     /// to end the body, as curl 8.21.0 does for an HTTP/1.0 keep-alive response with no length
-    /// (measured, BL-471 Notes; ADR-0109). It is marked reusable, as curl pools it, and the pool
+    /// (measured, BL-471 Notes; ADR-0324). It is marked reusable, as curl pools it, and the pool
     /// reports it dead before any reuse (ADR-0112).
     /// </summary>
     private static bool LeftIntactAfterServerClosed(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
@@ -1561,7 +1566,9 @@ public sealed class HttpProtocolHandler(
     /// Reads the body into the transfer's output, or into nothing when it is discarded, as
     /// <see cref="SetBodyLimitAndSinks" /> sets it up, then writes a chunked body's trailers; or reads
     /// nothing when <paramref name="delivery" /> says there is no body to deliver. Over HTTP/2 and HTTP/3
-    /// the trailers are the stream's trailing field section, read once the stream has ended.
+    /// the trailers are the stream's trailing field section, read once the stream has ended. An
+    /// HTTP/2 stream's discarded body is not read at all: the stream is given up
+    /// (<see cref="Http2StreamConnection.AbandonResponseAsync" />), as curl resets it (BL-970).
     /// </summary>
     private static async ValueTask ReadBodyAsync(
         HttpRequestPlan plan,
@@ -1574,6 +1581,12 @@ public sealed class HttpProtocolHandler(
     {
         if (delivery != HttpBodyDelivery.Deliver)
         {
+            return;
+        }
+
+        if (discardsBody && requestStream is Http2StreamConnection http2Stream)
+        {
+            await http2Stream.AbandonResponseAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -1628,10 +1641,11 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Asks the cookie store for the <c>Cookie</c> value to send to the transfer's URL, or
-    /// gives <see langword="null" /> when cookies are off.
+    /// gives <see langword="null" /> when cookies are off. The store reports a limit that cut
+    /// the value short to the transfer's events, before the request's header lines, as curl does.
     /// </summary>
     private string? CookieHeaderFor(ITransferContext context) =>
-        CookieStore?.GetCookieHeader(context.Url, TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow());
+        CookieStore?.GetCookieHeader(context.Url, TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow(), context.Events);
 
     /// <summary>
     /// Hands <paramref name="header" />, when it is a <c>Set-Cookie</c> header and cookies are
@@ -2170,8 +2184,11 @@ public sealed class HttpProtocolHandler(
         /// <summary>Gets the request's method and body framing.</summary>
         public HttpRequestFraming Framing { get; } = Framing;
 
-        /// <summary>Gets the request as the authenticator is asked about it.</summary>
-        public HttpAuthRequest AuthRequest { get; } = AuthRequest;
+        /// <summary>
+        /// Gets the request as the authenticator is asked about it, carrying the connection's
+        /// TLS server certificate once <see cref="TakeServerCertificateFrom" /> has run.
+        /// </summary>
+        public HttpAuthRequest AuthRequest { get; private set; } = AuthRequest;
 
         /// <summary>
         /// Gets the <c>Authorization</c> value to send, or <see langword="null" /> to send none.
@@ -2353,6 +2370,22 @@ public sealed class HttpProtocolHandler(
             return retry;
         }
 
+        /// <summary>
+        /// Sets <see cref="HttpAuthRequest.ServerCertificate" /> on <see cref="AuthRequest" /> to
+        /// the DER of <paramref name="connect" />'s TLS server certificate, the first of its
+        /// <see cref="ConnectResult.PeerCertificates" />, for an <c>https</c> URL, so hand-built
+        /// Negotiate sends <c>tls-server-end-point</c> channel bindings as curl 8.18.0 with MIT
+        /// does; empty for an <c>http</c> URL, even through an HTTPS proxy, and the proxy's
+        /// request never carries one, as curl takes the bindings only from the origin's TLS
+        /// (ADR-0341).
+        /// </summary>
+        /// <param name="connect">The connection the request goes over.</param>
+        public void TakeServerCertificateFrom(ConnectResult connect) =>
+            AuthRequest = AuthRequest with
+            {
+                ServerCertificate = Context.Url.Scheme == "https" && connect.PeerCertificates is [var certificate, ..] ? certificate : default,
+            };
+
         private HttpRequestPlan With(HttpRequestFraming framing, string? authorization) =>
             With(framing, authorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge);
 
@@ -2415,7 +2448,7 @@ public sealed class HttpProtocolHandler(
 
         /// <summary>
         /// Gets a value indicating whether the connection is reported left intact although the
-        /// server closed it to end the body (ADR-0109); it is marked reusable all the same, and
+        /// server closed it to end the body (ADR-0324); it is marked reusable all the same, and
         /// the pool finds it dead (ADR-0112).
         /// </summary>
         public bool LeftIntactAfterServerClosed { get; init; }

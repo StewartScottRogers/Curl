@@ -115,7 +115,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <see cref="TransferContext.ResumeUploadFromUnknownOffset" /> is <c>-C -</c> with a
     /// <c>-T</c> <paramref name="upload" />, and its
     /// <see cref="TransferContext.HeaderOutput" /> is <see cref="HeaderOutputOf" />'s, wrapped by
-    /// <paramref name="watchHeaderOutput" /> when given.
+    /// <paramref name="watchHeaderOutput" /> when given; its <see cref="TransferContext.DumpHeaderOutput" /> is
+    /// <paramref name="headerOutput" />, the <c>-D</c> stream alone, whatever <c>-i</c> says.
     /// </returns>
     internal TransferContext Create(
         CommandLineOptions options,
@@ -147,6 +148,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Url = url,
             Output = WatchedOutput(output, lowSpeedWatchdog),
             HeaderOutput = transferHeaderOutput,
+            DumpHeaderOutput = headerOutput,
             NoBody = options.NoBody,
             Range = range,
             RangeText = options.Range,

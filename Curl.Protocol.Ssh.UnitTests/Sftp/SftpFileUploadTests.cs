@@ -211,6 +211,16 @@ public sealed class SftpFileUploadTests
     }
 
     [TestMethod]
+    public async Task UploadAsync_CreateFileModeZero_SendsCurlsDefault0644AsTheOpensPermissionsAsMeasured()
+    {
+        SftpServerScript script = SftpServerScript.Started().HomeDirectory().Handle().Status(2, SftpStatusCode.Ok).Status(3, SftpStatusCode.Ok);
+
+        Outcome outcome = await UploadAsync(script, "/n.txt", Plain with { CreateFileMode = 0 }, new MemoryStream(Content));
+
+        CollectionAssert.AreEqual(SftpServerScript.OpenRequest("/n.txt", NewFile, 1, 0x1A4), Requests(outcome)[2]);
+    }
+
+    [TestMethod]
     [DataRow("/~/up/x.txt", "/home/fake/up/x.txt", DisplayName = "home path, as measured")]
     [DataRow("/a%20b.txt", "/a b.txt", DisplayName = "escaped space")]
     public async Task UploadAsync_UrlPath_OpensThePathCurlSends(string urlPath, string expected)
@@ -395,6 +405,35 @@ public sealed class SftpFileUploadTests
 
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
         Assert.AreEqual("Error in the SSH layer", failure.Message);
+    }
+
+    [TestMethod]
+    public async Task UploadAsync_CreateDirectories_ReportsEachDirectoryBeforeItsMakeDirectoryIsSent()
+    {
+        SftpServerScript script = SftpServerScript.Started()
+            .HomeDirectory()
+            .Status(1, 2)
+            .Status(2, SftpStatusCode.Ok)
+            .Status(3, SftpStatusCode.Ok)
+            .Handle(4)
+            .Status(5, SftpStatusCode.Ok)
+            .Status(6, SftpStatusCode.Ok);
+        ScriptedConnection connection = new(script.Bytes);
+        RequestCountingTransferEvents events = new(connection);
+        SftpUploadOptions options = new(0, false, false, true, 0);
+
+        TransferResult result = await new SftpFileUpload(SftpSessionTests.Transport(connection), events)
+            .UploadAsync("/a/b/c.txt", options, new MemoryStream("x"u8.ToArray()), NoTransferProgress.Instance, CancellationToken.None);
+
+        Assert.IsTrue(result.IsSuccess, result.ErrorMessage);
+
+        // INIT, REALPATH and the failed OPEN come before the first line; its MKDIR before the second.
+        CollectionAssert.AreEqual(
+            new[] { "3: SFTP: creating directory '/a'", "4: SFTP: creating directory '/a/b'", "7: upload completely sent off: 1 bytes" },
+            events.Lines);
+        List<byte[]> requests = SftpServerScript.SftpRequests(connection.Written);
+        CollectionAssert.AreEqual(SftpServerScript.MakeDirectoryRequest("/a", 2), requests[3]);
+        CollectionAssert.AreEqual(SftpServerScript.MakeDirectoryRequest("/a/b", 3), requests[4]);
     }
 
     private static ValueTask<TransferResult> Upload(ScriptedConnection connection, string urlPath, SftpUploadOptions options) =>

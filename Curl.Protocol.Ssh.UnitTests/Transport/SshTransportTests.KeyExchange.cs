@@ -561,6 +561,8 @@ public sealed partial class SshTransportTests
     [DataRow("aes256-gcm@openssh.com", null, -1, "Failure establishing ssh session: -12, Unable to exchange encryption keys", DisplayName = "AES-GCM")]
     [DataRow("chacha20-poly1305@openssh.com", null, -1, "Failure establishing ssh session: -12, Unable to exchange encryption keys", DisplayName = "ChaCha20-Poly1305 tag")]
     [DataRow("chacha20-poly1305@openssh.com", null, 3, KeyExchangeMethodFailed, DisplayName = "ChaCha20-Poly1305 length, off the block size")]
+    [DataRow("chacha20-poly1305@openssh.com", null, 0, "Failure establishing ssh session: -41, Unable to exchange encryption keys", DisplayName = "ChaCha20-Poly1305 length, over the maximum")]
+    [DataRow("aes128-ctr", "hmac-sha2-256", 0, "Failure establishing ssh session: -41, Unable to exchange encryption keys", DisplayName = "aes128-ctr length, over the maximum")]
     public async Task ReExchangeKeysAsync_ServerPacketFailsItsCheck_EndsTheSessionWithLibssh2sCode(string cipher, string? mac, int alteredByte, string expectedMessage)
     {
         TestHostKey hostKey = TestHostKey.Dsa();

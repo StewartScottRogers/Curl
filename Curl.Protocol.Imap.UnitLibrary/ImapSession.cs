@@ -62,7 +62,8 @@ internal sealed class ImapSession(
     ITlsProvider tlsProvider,
     ISaslAuthenticator? saslAuthenticator,
     ITransferContext context,
-    bool implicitTls) : IAsyncDisposable
+    bool implicitTls,
+    ConnectionOpenedEvent? opened) : IAsyncDisposable
 {
     private const string CapabilityCommand = "CAPABILITY";
 
@@ -123,6 +124,11 @@ internal sealed class ImapSession(
         catch (ImapWeirdResponseException weird)
         {
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, weird.Message);
+        }
+        catch (ImapHeaderWriteFailedException failed)
+        {
+            // Nothing more is sent, not even LOGOUT, as curl 8.21.0 does (BL-1138).
+            return TransferResult.Failure(CurlExitCode.WriteError, failed.Message);
         }
         catch (SaslAuthenticationFailedException failure)
         {
@@ -353,18 +359,26 @@ internal sealed class ImapSession(
     }
 
     /// <summary>
-    /// Runs the TLS handshake over the connection and asks for the capabilities again over
-    /// the secured one; a failed handshake ends the session with its exit code and no
-    /// <c>LOGOUT</c>.
+    /// Runs the TLS handshake over the connection, reporting it to the transfer's events, and
+    /// asks for the capabilities again over the secured one; a failed handshake ends the
+    /// session with its exit code and no <c>LOGOUT</c>. A completed one reports the connect's
+    /// <c>Established connection</c> line again, as curl 8.21.0 writes it a second time
+    /// between <c>OK Begin TLS negotiation now</c> and the second <c>CAPABILITY</c>
+    /// (measured, BL-1084).
     /// </summary>
     private async ValueTask<TransferResult?> UpgradeAsync()
     {
         ConnectResult secured = await tlsProvider
-            .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.CancellationToken)
+            .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.Events, context.CancellationToken)
             .ConfigureAwait(false);
         if (secured.Connection is not { } connection)
         {
             return TransferResult.Failure(secured.ExitCode, secured.ErrorMessage!);
+        }
+
+        if (opened is not null)
+        {
+            context.Events.ReportConnectionOpened(opened);
         }
 
         securedConnection = connection;

@@ -299,6 +299,19 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DeferredTlsHandshakeFailsOnTheFirstWrite_FailsWithTheHandshakesExitCode()
+    {
+        // --tls-earlydata defers the handshake to the request's write (BL-1105); its failure is the connect's.
+        FailingSendConnection connection = new(new DeferredTlsHandshakeFailedException(CurlExitCode.SslConnectError, "TLS connect error"), 0);
+
+        TransferResult result = await Handler(QueueConnector.For(connection))
+            .ExecuteAsync(BodyContext("https://127.0.0.1:18174/", new HttpRequestOptions()));
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual("TLS connect error", result.ErrorMessage);
+    }
+
+    [TestMethod]
     [DataRow(true, "Recv failure: Connection was reset")]
     [DataRow(false, "Failure when receiving data from the peer")]
     public async Task ExecuteAsync_ConnectionFailsAReceive_FailsWithExit56AndTheMeasuredMessage(bool reset, string message)

@@ -23,7 +23,8 @@ namespace Curl.Cli;
 /// <c>http,bogus</c> warns once; <c>++http</c> warns about <c>+http</c>; <c>=,http</c> and <c>+</c> warn about
 /// <c>''</c>; <c>' http , bogus'</c> warns about <c>' http '</c> and <c>' bogus'</c>; <c>-all</c>,
 /// <c>=http,-http</c>, <c>=bogus</c> and <c>=</c> are refused, the last two after their warning; <c>ipfs</c>,
-/// <c>rtmp</c> and <c>smb</c> are unknown to that build.
+/// <c>rtmp</c> and <c>smb</c> are unknown to that build. <c>smb</c> and <c>smbs</c> are known all the same,
+/// as the Linux (OpenSSL) curl 8.18.0 knows them, since Curl serves both (BL-598, BL-1099).
 /// </para>
 /// </remarks>
 internal static class CommandLineProtocolSet
@@ -34,13 +35,15 @@ internal static class CommandLineProtocolSet
     /// <summary>
     /// The schemes curl 8.21.0 knows for these options: the <c>Protocols:</c> line of the Windows (Schannel)
     /// build's <c>curl -V</c>, less <c>ipfs</c> and <c>ipns</c>, which that build's curl tool handles itself and
-    /// its libcurl does not know. The same set on every platform, so a command line reads the same everywhere
+    /// its libcurl does not know, plus <c>smb</c> and <c>smbs</c>, which Curl serves and the Linux (OpenSSL) build
+    /// knows. The same set on every platform, so a command line reads the same everywhere
     /// (ADR-0189).
     /// </summary>
     internal static FrozenSet<string> KnownSchemes { get; } = FrozenSet.Create(
         StringComparer.OrdinalIgnoreCase,
         "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap", "imaps", "ldap", "ldaps",
-        "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smtp", "smtps", "telnet", "tftp", "ws", "wss");
+        "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smb", "smbs", "smtp", "smtps", "telnet", "tftp", "ws",
+        "wss");
 
     /// <summary>
     /// Reads a <c>--proto</c> or <c>--proto-redir</c> value into the schemes it allows.

@@ -103,6 +103,7 @@ public sealed class TransferContextTests
         Assert.IsNull(context.TimeCondition);
         Assert.IsFalse(context.RemoteTime);
         Assert.IsNull(context.HeaderOutput);
+        Assert.IsNull(context.DumpHeaderOutput);
         Assert.IsNull(context.PostData);
         Assert.IsNull(context.Credentials);
         Assert.IsEmpty(context.TelnetOptions);
@@ -141,6 +142,7 @@ public sealed class TransferContextTests
         using var output = new MemoryStream();
         using var upload = new MemoryStream();
         using var headerOutput = new MemoryStream();
+        using var dumpHeaderOutput = new MemoryStream();
         using var cancellation = new CancellationTokenSource();
         var range = ByteRange.Bounded(1, 9);
         var timeCondition = new TimeCondition(
@@ -171,6 +173,7 @@ public sealed class TransferContextTests
             NoBody = true,
             TimeCondition = timeCondition,
             HeaderOutput = headerOutput,
+            DumpHeaderOutput = dumpHeaderOutput,
             PostData = postData,
             Credentials = credentials,
             TelnetOptions = telnetOptions,
@@ -214,6 +217,7 @@ public sealed class TransferContextTests
         Assert.IsTrue(context.NoBody);
         Assert.AreEqual(timeCondition, context.TimeCondition);
         Assert.AreSame(headerOutput, context.HeaderOutput);
+        Assert.AreSame(dumpHeaderOutput, context.DumpHeaderOutput);
         Assert.IsTrue(context.PostData.HasValue);
         Assert.IsTrue(postData.Span.SequenceEqual(context.PostData.Value.Span));
         Assert.AreSame(credentials, context.Credentials);

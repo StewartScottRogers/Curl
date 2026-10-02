@@ -4,11 +4,11 @@
 - **Date:** 2026-09-27
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-477.
-Amends ADR-0109.
+Amends ADR-0324.
 
 ## Context
 
-ADR-0109 has `HttpProtocolHandler` report `left intact` for an HTTP/1.0 keep-alive response
+ADR-0324 has `HttpProtocolHandler` report `left intact` for an HTTP/1.0 keep-alive response
 whose body ran to the server's close, but not mark the connection reusable, because
 `PoolingConnector` had no way to tell the connection was closed. curl 8.21.0 pools it and,
 when a second URL would reuse it, prints `Connection 0 seems to be dead` and
@@ -53,4 +53,4 @@ read, is reused and dies on the request, which the handler already matches (BL-3
 - **Probe the socket before reuse.** Needs a new member on `IConnection` in
   `Curl.Protocol.Abstractions.UnitLibrary`, and reports connections dead that curl reuses,
   as measured above.
-- **Keep the connection out of the pool (ADR-0109).** Loses curl's two lines.
+- **Keep the connection out of the pool (ADR-0324).** Loses curl's two lines.

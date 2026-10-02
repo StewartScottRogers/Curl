@@ -52,7 +52,22 @@ public sealed record NtlmAuthenticateMessage(
     /// <see cref="NtlmNegotiateFlags.NegotiateUnicode" /> each byte widened to a 16-bit
     /// little-endian unit, which is UTF-16LE for ASCII.
     /// </remarks>
-    public bool TryEncode([NotNullWhen(true)] out byte[]? message)
+    public bool TryEncode([NotNullWhen(true)] out byte[]? message) => TryEncode(out message, out _);
+
+    /// <summary>
+    /// Writes the message, or returns <see langword="false" /> where curl fails with
+    /// <c>CURLE_TOO_LARGE</c> and says which of curl's two checks refused it, so the caller
+    /// can print the message curl prints.
+    /// </summary>
+    /// <param name="message">The message, or <see langword="null" /> when it is refused.</param>
+    /// <param name="failure">
+    /// <see cref="NtlmMessageFailure.None" /> when the message was written;
+    /// <see cref="NtlmMessageFailure.ResponsesTooLarge" /> when the responses end past
+    /// <see cref="CurlBufferSize" />; <see cref="NtlmMessageFailure.NamesTooLarge" /> when
+    /// the domain, user and workstation take the message to <see cref="CurlBufferSize" /> or more.
+    /// </param>
+    /// <remarks>Strings are written as <see cref="TryEncode(out byte[])" /> writes them.</remarks>
+    public bool TryEncode([NotNullWhen(true)] out byte[]? message, out NtlmMessageFailure failure)
     {
         message = null;
         bool unicode = Flags.HasFlag(NtlmNegotiateFlags.NegotiateUnicode);
@@ -62,10 +77,19 @@ public sealed record NtlmAuthenticateMessage(
 
         int responsesEnd = HeaderLength + LmChallengeResponse.Length + NtChallengeResponse.Length;
         int messageLength = responsesEnd + domain.Length + user.Length + workstation.Length;
-        if (responsesEnd > CurlBufferSize || messageLength >= CurlBufferSize)
+        if (responsesEnd > CurlBufferSize)
         {
+            failure = NtlmMessageFailure.ResponsesTooLarge;
             return false;
         }
+
+        if (messageLength >= CurlBufferSize)
+        {
+            failure = NtlmMessageFailure.NamesTooLarge;
+            return false;
+        }
+
+        failure = NtlmMessageFailure.None;
 
         byte[] written = new byte[messageLength];
         NtlmMessageLayout.WriteSignatureAndType(written, 3);

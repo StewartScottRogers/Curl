@@ -24,15 +24,36 @@ internal static class Socks5GssapiNegotiation
     /// <param name="connection">The connection to the proxy.</param>
     /// <param name="proxyHost">The proxy's host, which names the acceptor.</param>
     /// <param name="options">The service name, NEC mode, delegation, contexts and texts.</param>
+    /// <param name="events">Receives curl's <c>-v</c> lines when the exchange fails (BL-1039).</param>
     /// <param name="cancellationToken">Cancels the exchange.</param>
     /// <returns><see langword="null" /> when authenticated without protection, else the exit 97 failure.</returns>
     public static async ValueTask<ConnectResult?> RunAsync(
         IConnection connection,
         string proxyHost,
         Socks5AuthenticationOptions options,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         var texts = new Socks5GssapiFailureText(options.UsesSspiTexts, options.CredentialCacheName);
+        var failure = await NegotiateAsync(connection, proxyHost, options, texts, cancellationToken).ConfigureAwait(false);
+        if (failure is not null)
+        {
+            foreach (var line in texts.VerboseLines(failure.ErrorMessage!))
+            {
+                events.ReportInfo(line);
+            }
+        }
+
+        return failure;
+    }
+
+    private static async ValueTask<ConnectResult?> NegotiateAsync(
+        IConnection connection,
+        string proxyHost,
+        Socks5AuthenticationOptions options,
+        Socks5GssapiFailureText texts,
+        CancellationToken cancellationToken)
+    {
         if (options.SecurityContexts is not { } factory)
         {
             return SocksProxyTunnel.Failed(texts.ContextFailed(SecurityContextStatus.NoCredentials));

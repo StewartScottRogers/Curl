@@ -485,7 +485,7 @@ public sealed class Tls13ClientHandshake : IDisposable
         }
 
         group = decoded.Value;
-        bool offeredWithoutShare = settings.SupportedGroups.Contains(decoded.Value) && shares.TrueForAll(share => share.Group != decoded.Value);
+        bool offeredWithoutShare = settings.SupportedGroups.Contains(decoded.Value) && TlsNamedGroup.CanShare(decoded.Value) && shares.TrueForAll(share => share.Group != decoded.Value);
         return offeredWithoutShare ? null : TlsAlertDescription.IllegalParameter;
     }
 

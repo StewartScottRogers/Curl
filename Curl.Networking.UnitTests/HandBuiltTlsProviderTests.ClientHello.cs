@@ -145,6 +145,60 @@ public sealed partial class HandBuiltTlsProviderTests
             offeredSchemes);
     }
 
+    // Measured with Record-CurlExchange.ps1 -Script against https://localhost (BL-941): the
+    // Windows reference build with --tls-max 1.2 and --tls-max 1.0, and Ubuntu's OpenSSL build
+    // with --tls-max 1.2 (its --tls-max 1.0 sends a protocol_version alert, not a hello).
+    // Each extension is its type and its data, in the order sent.
+    private static readonly (TlsExtensionType Type, string Data)[] MeasuredSchannelTls12Extensions =
+    [
+        (TlsExtensionType.ServerName, "000c0000096c6f63616c686f7374"),
+        (TlsExtensionType.StatusRequest, "0100000000"),
+        (TlsExtensionType.SupportedGroups, "0006001d00170018"),
+        (TlsExtensionType.EcPointFormats, "0100"),
+        (TlsExtensionType.SignatureAlgorithms, "0018080408050806040105010201040305030203020206010603"),
+        (TlsExtensionType.SessionTicket, string.Empty),
+        (TlsExtensionType.ApplicationLayerProtocolNegotiation, "000908687474702f312e31"),
+        (TlsExtensionType.ExtendedMasterSecret, string.Empty),
+        (TlsExtensionType.RenegotiationInfo, "00"),
+    ];
+
+    private static readonly (TlsExtensionType Type, string Data)[] MeasuredOpenSslTls12Extensions =
+    [
+        (TlsExtensionType.RenegotiationInfo, "00"),
+        (TlsExtensionType.ServerName, "000c0000096c6f63616c686f7374"),
+        (TlsExtensionType.EcPointFormats, "03000102"),
+        (TlsExtensionType.SupportedGroups, "000a001d0017001e00180019"),
+        (TlsExtensionType.ApplicationLayerProtocolNegotiation, "000c02683208687474702f312e31"),
+        (TlsExtensionType.EncryptThenMac, string.Empty),
+        (TlsExtensionType.ExtendedMasterSecret, string.Empty),
+        (TlsExtensionType.SignatureAlgorithms, "0028040305030603080708080809080a080b080408050806040105010601030303010302040205020602"),
+    ];
+
+    [TestMethod]
+    [DataRow(SchannelBuild, TlsVersion.Tls12)]
+    [DataRow(SchannelBuild, TlsVersion.Tls10)]
+    [DataRow(OpenSslBuild, TlsVersion.Tls12)]
+    public async Task AuthenticateAsClientAsync_BelowATls13Ceiling_SendsTheMeasuredExtensionsInTheMeasuredOrder(bool matchesSchannelBuild, TlsVersion ceiling)
+    {
+        var profile = ProfileOf(matchesSchannelBuild);
+        var measured = (matchesSchannelBuild ? MeasuredSchannelTls12Extensions : MeasuredOpenSslTls12Extensions)
+            .Where(extension => ceiling == TlsVersion.Tls12 || extension.Type != TlsExtensionType.SignatureAlgorithms)
+            .ToArray();
+
+        var hello = DecodeClientHello(await CaptureClientHelloAsync(
+            new TlsClientOptions { MaximumVersion = ceiling }, matchesSchannelBuild, "localhost", profile.ApplicationProtocols));
+
+        CollectionAssert.AreEqual(measured.Select(extension => extension.Type).ToArray(), ExtensionTypes(hello));
+        foreach (var (type, data) in measured)
+        {
+            // ADR-0235 decision 1: the signature schemes the client cannot check are left out.
+            var expected = type == TlsExtensionType.SignatureAlgorithms
+                ? SignatureAlgorithmsExtension.Encode([.. SignatureAlgorithmsExtension.Decode(Convert.FromHexString(data)).Value.Where(TlsSignatureScheme.IsTls12Scheme)]).Data
+                : Convert.FromHexString(data);
+            CollectionAssert.AreEqual(expected, ExtensionData(hello, type), $"{type}");
+        }
+    }
+
     private static ClientHelloProfile ProfileOf(bool matchesSchannelBuild) =>
         matchesSchannelBuild ? ClientHelloProfile.Schannel : ClientHelloProfile.OpenSsl;
 
@@ -153,7 +207,8 @@ public sealed partial class HandBuiltTlsProviderTests
         TlsClientOptions options,
         bool matchesSchannelBuild,
         string targetHost,
-        IReadOnlyList<string> applicationProtocols)
+        IReadOnlyList<string> applicationProtocols,
+        IEchConfigListLookup? echConfigs = null)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = Task.Run(async () =>
@@ -166,7 +221,7 @@ public sealed partial class HandBuiltTlsProviderTests
             return (byte[])[.. header, .. body];
         });
 
-        var result = await Provider(options with { Insecure = true }, matchesSchannelBuild).AuthenticateAsClientAsync(
+        var result = await Provider(options with { Insecure = true }, matchesSchannelBuild, echConfigs).AuthenticateAsClientAsync(
             new StreamConnection(client, ServerEndPoint), targetHost, new RecordingTransferEvents(), false, applicationProtocols, CancellationToken.None);
 
         Assert.AreNotEqual(Protocol.Abstractions.CurlExitCode.Ok, result.ExitCode);

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 using Curl.Protocol.Abstractions;
@@ -8,7 +9,8 @@ namespace Curl.Networking;
 /// <summary>
 /// Resolves a host name through an RFC 8484 DNS-over-HTTPS server, as curl 8.21.0 does for
 /// <c>--doh-url</c> (ADR-0152, BL-641): it POSTs an A query and an AAAA query in parallel, each on
-/// a connection of its own, and returns the AAAA answer's addresses and then the A answer's.
+/// a connection of its own, and returns the AAAA answer's addresses and then the A answer's. Under
+/// <c>-4</c> or <c>-6</c> (<see cref="AddressFamily" />) it sends only that family's query (BL-939).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -32,7 +34,7 @@ namespace Curl.Networking;
 /// only for that option.
 /// </para>
 /// </remarks>
-public sealed class DohDnsResolver : IDnsResolver
+public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
 {
     private readonly IConnector _connector;
     private readonly Uri _dohUrl;
@@ -88,6 +90,14 @@ public sealed class DohDnsResolver : IDnsResolver
         _dohServer = new ConnectTarget(dohUrl.IdnHost, dohUrl.Port, isHttps) { PoolScheme = dohUrl.Scheme };
     }
 
+    /// <summary>
+    /// Gets the address family <c>-4</c> or <c>-6</c> limits the transfer to:
+    /// <see cref="AddressFamily.InterNetwork" /> sends only the A query and
+    /// <see cref="AddressFamily.InterNetworkV6" /> only the AAAA query, as curl 8.21.0 was measured to
+    /// (BL-939); any other value, the default, sends both.
+    /// </summary>
+    public AddressFamily AddressFamily { get; init; } = AddressFamily.Unspecified;
+
     /// <inheritdoc />
     public async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
     {
@@ -109,12 +119,96 @@ public sealed class DohDnsResolver : IDnsResolver
             return [];
         }
 
-        var ipv4 = QueryAsync(queryA.Bytes, DnsRecordType.A, cancellationToken);
-        var ipv6 = QueryAsync(DnsQueryEncoder.Encode(host, DnsRecordType.Aaaa).Bytes, DnsRecordType.Aaaa, cancellationToken);
-        DohQueryResult[] results = await Task.WhenAll(ipv4, ipv6).ConfigureAwait(false);
+        var results = DohQueryResult.AsOneEntry(await Task.WhenAll(StartAddressQueries(host, queryA.Bytes, cancellationToken)).ConfigureAwait(false));
         DohTraceLines.Report(_dohTrace, _describeExitCode, host, results);
-        return [.. results[1].Addresses, .. results[0].Addresses];
+        return ResolvedAddresses(results);
     }
+
+    // curl resolves from its one entry only when a query counts as answered, and then every
+    // address in it counts, a failed decode's too (measured, BL-958); IPv6 first.
+    private static IPAddress[] ResolvedAddresses(DohQueryResult[] results) =>
+        results.Any(result => result.CountsAsAnswered)
+            ? [.. Enumerable.Reverse(results).SelectMany(result => result.Addresses)]
+            : [];
+
+    // Starts the A query and the AAAA query, A first, leaving out the one -4 or -6 rules out.
+    private List<Task<DohQueryResult>> StartAddressQueries(string host, byte[] queryA, CancellationToken cancellationToken)
+    {
+        List<Task<DohQueryResult>> queries = [];
+        if (AddressFamily != AddressFamily.InterNetworkV6)
+        {
+            queries.Add(QueryAsync(queryA, DnsRecordType.A, cancellationToken));
+        }
+
+        if (AddressFamily != AddressFamily.InterNetwork)
+        {
+            queries.Add(QueryAsync(DnsQueryEncoder.Encode(host, DnsRecordType.Aaaa).Bytes, DnsRecordType.Aaaa, cancellationToken));
+        }
+
+        return queries;
+    }
+
+    /// <summary>
+    /// Fetches <paramref name="host" />'s HTTPS record (RFC 9460) through the DoH server, the
+    /// query curl 8.21.0 adds to the A and AAAA ones under <c>--ech true</c> or <c>hard</c> to find
+    /// the host's ECHConfigList (ADR-0312, BL-707). The name asked for is the host itself on port
+    /// 443 and <c>_&lt;port&gt;._https.&lt;host&gt;</c> on any other port (RFC 9460 section 9.1), and
+    /// the first HTTPS record of the answer is decoded, as curl decodes only the first.
+    /// </summary>
+    /// <param name="host">The host name, already converted to its ASCII form.</param>
+    /// <param name="port">The port the transfer connects to.</param>
+    /// <param name="cancellationToken">Cancels the query.</param>
+    /// <returns>
+    /// The record, its <see cref="ServiceBindingRecord.EchConfigList" /> among its parameters; or
+    /// <see langword="null" /> for an IP address literal or <c>localhost</c>, which are never asked
+    /// for, and when the query fails, the answer holds no HTTPS record or its first one does not decode.
+    /// </returns>
+    public async ValueTask<ServiceBindingRecord?> ResolveHttpsRecordAsync(string host, int port, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(host);
+
+        if (HttpsQueryFor(host, port) is not { } query)
+        {
+            return null;
+        }
+
+        var result = await QueryAsync(query, DnsRecordType.Https, cancellationToken).ConfigureAwait(false);
+        return result.Answer is { Failure: DnsMessageFailure.None, HttpsRecordData: [var first, ..] }
+            ? ServiceBindingRecordDecoder.Decode(first).Record
+            : null;
+    }
+
+    /// <summary>
+    /// Finds <paramref name="host" />'s ECHConfigList for <c>--ech true</c> or <c>hard</c>: the
+    /// <c>ech</c> parameter of the HTTPS record <see cref="ResolveHttpsRecordAsync" /> fetches (ADR-0327).
+    /// </summary>
+    /// <param name="host">The host the transfer connects to.</param>
+    /// <param name="port">The port it connects to.</param>
+    /// <param name="cancellationToken">Cancels the query.</param>
+    /// <returns>The list's bytes, or <see langword="null" /> when there is no record or it has no <c>ech</c>.</returns>
+    public async ValueTask<byte[]?> FindEchConfigListAsync(string host, int port, CancellationToken cancellationToken) =>
+        await ResolveHttpsRecordAsync(host, port, cancellationToken).ConfigureAwait(false) is { EchConfigList.IsEmpty: false } record
+            ? record.EchConfigList.ToArray()
+            : null;
+
+    /// <summary>The HTTPS query for <paramref name="host" />, or <see langword="null" /> for a literal, <c>localhost</c> or a name that does not encode.</summary>
+    private static byte[]? HttpsQueryFor(string host, int port)
+    {
+        if (IPAddress.TryParse(host.Trim('[', ']'), out _) || TcpConnector.IsLocalhost(host))
+        {
+            return null;
+        }
+
+        var query = DnsQueryEncoder.Encode(HttpsQueryName(host, port), DnsRecordType.Https);
+        return query.Failure == DnsMessageFailure.None ? query.Bytes : null;
+    }
+
+    /// <summary>The name curl asks the HTTPS record of: the host on port 443, <c>_&lt;port&gt;._https.&lt;host&gt;</c> on any other.</summary>
+    /// <param name="host">The host name.</param>
+    /// <param name="port">The port the transfer connects to.</param>
+    /// <returns>The query name.</returns>
+    internal static string HttpsQueryName(string host, int port) =>
+        port == 443 ? host : $"_{port}._https.{host}";
 
     /// <summary>Builds the POST curl sends for one DNS query.</summary>
     /// <param name="query">The DNS query message.</param>

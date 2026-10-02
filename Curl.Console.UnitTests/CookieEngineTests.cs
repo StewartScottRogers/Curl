@@ -26,7 +26,7 @@ public sealed class CookieEngineTests
     {
         CookieEngine cookies = CookieEngine.FromCommandLine(Parse("-b", "a=b", "-H", header, Url))!;
 
-        Assert.IsNull(cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now));
+        Assert.IsNull(cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance));
     }
 
     [TestMethod]
@@ -37,7 +37,7 @@ public sealed class CookieEngineTests
     {
         CookieEngine cookies = CookieEngine.FromCommandLine(Parse(["-b", "a=b", .. headerArguments, Url]))!;
 
-        Assert.AreEqual("a=b", cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now));
+        Assert.AreEqual("a=b", cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance));
     }
 
     [TestMethod]
@@ -51,7 +51,7 @@ public sealed class CookieEngineTests
 
         await cookies.LoadCookieFilesAsync(fileSystem, Stream.Null, Now, NoTransferEvents.Instance);
 
-        Assert.AreEqual("sess=s1", cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now));
+        Assert.AreEqual("sess=s1", cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance));
     }
 
     private static CommandLineOptions Parse(params string[] arguments)

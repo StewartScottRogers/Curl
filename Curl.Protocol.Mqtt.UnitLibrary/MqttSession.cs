@@ -23,8 +23,24 @@ namespace Curl.Protocol.Mqtt;
 /// slice as data, and each <c>mqtt_doing: state [N]</c> line curl's state machine writes.
 /// </param>
 /// <param name="log">Where each packet sent and received and each step is logged (ADR-0222, BL-928).</param>
+/// <param name="maxFileSize">
+/// The most bytes one PUBLISH body may hold (<c>--max-filesize</c>), or <see langword="null" />
+/// or 0 for no limit. A PUBLISH whose remaining length is larger fails the transfer with exit 63
+/// before any of its body is read, as curl 8.21.0's <c>mqtt_doing</c> does (BL-1115).
+/// </param>
+/// <param name="timeProvider">
+/// The clock the idle time before a PINGREQ is measured on and waited out with.
+/// </param>
 /// <param name="cancellationToken">Cancels every read and write.</param>
 /// <remarks>
+/// <para>
+/// While a packet's first byte is awaited, the session sends a PINGREQ (<c>C0 00</c>) and
+/// reports <c>mqtt_ping: sent ping request.</c> once more than 60 seconds have passed since
+/// it last sent or received anything, as curl 8.21.0's <c>mqtt_ping</c> does with the
+/// default <c>CURLOPT_UPKEEP_INTERVAL_MS</c> of 60000 (BL-1116). No second PINGREQ is sent
+/// until a PINGRESP arrives. The <c>mqtt_doing: state [0]</c> line curl writes for each idle
+/// poll in between is not reproduced; only the one after the PINGREQ is.
+/// </para>
 /// <para>
 /// A received PUBLISH is written as curl writes it: its whole body after the fixed header -
 /// the two-byte topic length, the topic, then the payload - with nothing parsed out. Each
@@ -52,6 +68,8 @@ internal sealed class MqttSession(
     ITransferProgress progress,
     ITransferEvents events,
     MqttDiagnosticLog log,
+    long? maxFileSize,
+    TimeProvider timeProvider,
     CancellationToken cancellationToken)
 {
     /// <summary><c>MQTT_FIRST</c>: awaiting a packet's first byte.</summary>
@@ -66,7 +84,17 @@ internal sealed class MqttSession(
     /// </summary>
     private const int OutputWriteSize = 4096;
 
+    /// <summary>
+    /// How long the connection must sit idle before a PINGREQ: curl's
+    /// <c>CURL_UPKEEP_INTERVAL_DEFAULT</c> of 60000 ms, which <c>mqtt_ping</c> must exceed,
+    /// so the first whole millisecond past it.
+    /// </summary>
+    private static readonly TimeSpan PingAfterIdle = TimeSpan.FromMilliseconds(60001);
+
     private readonly MqttPacketReader reader = new(connection, events, log, cancellationToken);
+
+    /// <summary>Whether a PINGREQ is sent and its PINGRESP not yet received.</summary>
+    private bool pingSent;
 
     /// <summary>The body length of the PUBLISH being written, reported as the expected download size.</summary>
     private long publishLength;
@@ -108,11 +136,54 @@ internal sealed class MqttSession(
         while (state != SessionState.Done)
         {
             ReportDoingState(FirstState);
-            MqttFixedHeader header = await reader.ReadFixedHeaderAsync().ConfigureAwait(false);
+            MqttFixedHeader header = await ReadFixedHeaderPingingWhenIdleAsync().ConfigureAwait(false);
             state = header.RemainingLength == 0
                 ? StateAfterEmptyPacket(header)
                 : await ReadPacketAsync(state, header, url, postData).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Reads the next fixed header, sending a PINGREQ if the connection sits idle past
+    /// <see cref="PingAfterIdle" /> while its first byte is awaited and no PINGREQ is
+    /// outstanding.
+    /// </summary>
+    /// <remarks>
+    /// The idle time is counted from when the wait begins, which is straight after the
+    /// session last sent or received anything: the CONNECT, a packet handled whole, or the
+    /// PINGREQ itself, the moments curl sets <c>lastTime</c>. The clock is read only when a
+    /// wait begins, so a peer that has its next packet ready never costs a timer.
+    /// </remarks>
+    private async ValueTask<MqttFixedHeader> ReadFixedHeaderPingingWhenIdleAsync()
+    {
+        Task firstByte = reader.WhenFirstByteReadyAsync();
+        if (!pingSent && !firstByte.IsCompleted)
+        {
+            await PingIfIdleBeforeAsync(firstByte).ConfigureAwait(false);
+        }
+
+        return await reader.ReadFixedHeaderAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits until <paramref name="firstByte" /> completes or <see cref="PingAfterIdle" />
+    /// passes, and in the second case sends a PINGREQ.
+    /// </summary>
+    private async ValueTask PingIfIdleBeforeAsync(Task firstByte)
+    {
+        using CancellationTokenSource stopTimer = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Task timer = Task.Delay(PingAfterIdle, timeProvider, stopTimer.Token);
+        if (await Task.WhenAny(firstByte, timer).ConfigureAwait(false) == firstByte)
+        {
+            await stopTimer.CancelAsync().ConfigureAwait(false);
+            return;
+        }
+
+        await timer.ConfigureAwait(false);
+        await SendAsync(MqttPackets.BuildPingRequest()).ConfigureAwait(false);
+        pingSent = true;
+        events.ReportInfo(MqttTransferMessages.SentPingRequest);
+        ReportDoingState(FirstState);
     }
 
     /// <summary>
@@ -129,6 +200,7 @@ internal sealed class MqttSession(
                 return SessionState.Done;
             case MqttPackets.PingResponseType:
                 events.ReportInfo(MqttTransferMessages.ReceivedPingResponse);
+                pingSent = false;
                 return SessionState.AwaitingPublish;
             default:
                 log.EmptyPacketIgnored(header);
@@ -305,6 +377,11 @@ internal sealed class MqttSession(
     {
         publishLength = header.RemainingLength;
         events.ReportInfo(MqttTransferMessages.RemainingLength(header.RemainingLength));
+        if (maxFileSize is > 0 and long limit && header.RemainingLength > limit)
+        {
+            throw new MqttTransferException(CurlExitCode.FilesizeExceeded, MqttTransferMessages.MaximumFileSizeExceeded);
+        }
+
         using MemoryStream body = new();
         while (body.Length < header.RemainingLength)
         {

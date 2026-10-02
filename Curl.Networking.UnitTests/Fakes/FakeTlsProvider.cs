@@ -24,6 +24,15 @@ public sealed class FakeTlsProvider : IHandshakeReportingTlsProvider
     /// <summary>Gets the route this provider says it is; <see cref="TlsClientRoute.SslStream" /> unless set.</summary>
     public TlsClientRoute Route { get; init; } = TlsClientRoute.SslStream;
 
+    /// <summary>Gets why this provider says it was chosen; <see langword="null" /> unless set.</summary>
+    public string? RouteReason { get; init; }
+
+    /// <summary>
+    /// Gets whether a successful four-argument handshake says its revocation check could not
+    /// complete, as <see cref="SslStreamTlsProvider" /> does under <c>--ssl-revoke-best-effort</c>.
+    /// </summary>
+    public bool RevocationCheckIncomplete { get; init; }
+
     /// <summary>
     /// Gets the handshake a successful four-argument handshake reports on its events, as the real
     /// providers do; <see langword="null" /> reports none.
@@ -79,6 +88,11 @@ public sealed class FakeTlsProvider : IHandshakeReportingTlsProvider
         if (HandshakeToReport is { } handshake && FailureToReturn is null)
         {
             events.ReportTlsHandshake(handshake);
+        }
+
+        if (RevocationCheckIncomplete)
+        {
+            (events as HandshakeCapturingTransferEvents)?.ReportRevocationCheckIncomplete();
         }
 
         ReceivedIsProxy.Add(isProxy);

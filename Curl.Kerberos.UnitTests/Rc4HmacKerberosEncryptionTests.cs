@@ -105,6 +105,51 @@ public sealed class Rc4HmacKerberosEncryptionTests
         CollectionAssert.AreEqual(HMACSHA1.HashData(FooKey, "test"u8), Rc4Hmac().ComputePseudoRandom(FooKey, "test"u8));
     }
 
+    // MIT Kerberos t_cksums.c at commit 50588db5d26e81f3d564d1f69435af34ae80d9b2: its
+    // CKSUMTYPE_HMAC_MD5_ARCFOUR case, key usage 6.
+    [TestMethod]
+    public void ComputeChecksum_MitTCksumsCase_MatchesVectorAndVerifies()
+    {
+        byte[] key = Hex.Bytes("F7D3A155AF5E238A0B7A871A96BA2AB2");
+        byte[] data = Encoding.ASCII.GetBytes("seventeen eighteen nineteen twenty");
+        byte[] published = Hex.Bytes("EB38CC97E2230F59DA4117DC5859D7EC");
+        byte[] flipped = Hex.Bytes("EB38CC97E2230F59DA4117DC5859D7EC");
+        flipped[^1] ^= 0x01;
+
+        byte[] checksum = Rc4Hmac().ComputeChecksum(key, 6, data);
+
+        CollectionAssert.AreEqual(published, checksum);
+        Assert.IsTrue(Rc4Hmac().VerifyChecksum(key, 6, data, published));
+        Assert.IsFalse(Rc4Hmac().VerifyChecksum(key, 6, data, flipped));
+    }
+
+    // MIT Kerberos t_decrypt.c at commit 50588db5d26e81f3d564d1f69435af34ae80d9b2: its five
+    // rc4-hmac (ENCTYPE_ARCFOUR_HMAC) cases, key usages 0 to 4.
+    [TestMethod]
+    [DataRow("", 0, "F81FEC39255F5784E850C4377C88BD85", "02C1EB15586144122EC717763DD348BF00434DDC6585954C")]
+    [DataRow("1", 1, "67D1300D281223867F9647FF48721273", "6156E0CC04E0A0874F9FDA008F498A7ADBBC80B70B14DDDBC0")]
+    [DataRow("9 bytesss", 2, "3E40AB6093695281B3AC1A9304224D98", "0F9AD121D99D4A09448E4F1F718C4F5CBE6096262C66F29DF232A87C9F98755D55")]
+    [DataRow("13 bytes byte", 3, "4BA2FBF0379FAED87A254D3B353D5A7E", "612C57568B17A70352BAE8CF26FB9459A6F3353CD35FD439DB3107CBEC765D326DFC04C1DD")]
+    [DataRow("30 bytes bytes bytes bytes byt", 4, "68F263DB3FCE15D031C9EAB02D67107A", "95F9047C3AD75891C2E9B04B16566DC8B6EB9CE4231AFB2542EF87A7B5A0F260A99F0460508DE0CECC632D07C354124E46C5D2234EB8")]
+    public void Decrypt_MitTDecryptCase_GivesThePlaintext(string plaintext, int usage, string key, string ciphertext)
+    {
+        byte[] decrypted = Rc4Hmac().Decrypt(Hex.Bytes(key), usage, Hex.Bytes(ciphertext));
+
+        CollectionAssert.AreEqual(Encoding.ASCII.GetBytes(plaintext), decrypted);
+    }
+
+    // The "9 bytesss" case above with one bit of its encrypted plaintext flipped.
+    [TestMethod]
+    public void Decrypt_MitTDecryptCaseWithOneBitFlipped_ThrowsIntegrityCheckFailed()
+    {
+        byte[] ciphertext = Hex.Bytes("0F9AD121D99D4A09448E4F1F718C4F5CBE6096262C66F29DF232A87C9F98755D55");
+        ciphertext[^1] ^= 0x01;
+
+        KerberosCryptographyException exception = Assert.ThrowsExactly<KerberosCryptographyException>(() => Rc4Hmac().Decrypt(Hex.Bytes("3E40AB6093695281B3AC1A9304224D98"), 2, ciphertext));
+
+        Assert.AreEqual(KerberosCryptographyError.IntegrityCheckFailed, exception.Error);
+    }
+
     private static KerberosEncryption Rc4Hmac() =>
         KerberosEncryption.Create(KerberosEncryptionType.Rc4Hmac, new FixedKerberosRandomSource(Confounder));
 }

@@ -96,6 +96,26 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         new(innerConnector, _cache, _configuration) { WaitsForMultiplexing = WaitsForMultiplexing };
 
     /// <summary>
+    /// Gives a datagram connector that opens channels through <paramref name="datagramConnector" />
+    /// and numbers each open in this pool's sequence, as curl 8.21.0 numbers a TFTP transfer's
+    /// connection with the TCP connections before it (BL-969).
+    /// </summary>
+    /// <param name="datagramConnector">Opens the channels.</param>
+    /// <returns>The numbering connector.</returns>
+    public IDatagramConnector NumberingDatagrams(IDatagramConnector datagramConnector)
+    {
+        ArgumentNullException.ThrowIfNull(datagramConnector);
+        return new ConnectionNumberingDatagramConnector(datagramConnector, _cache);
+    }
+
+    /// <summary>
+    /// Gets the count this pool numbers its connections in, for a handler that numbers a
+    /// transfer as a connection without connecting: curl 8.21.0 numbers a <c>file://</c>
+    /// transfer with the connections before it (BL-977).
+    /// </summary>
+    public IConnectionNumbers ConnectionNumbers => _cache;
+
+    /// <summary>
     /// Gets the longest a connection may sit idle and still be reused: 118 seconds, curl's
     /// <c>CURLOPT_MAXAGE_CONN</c> default.
     /// </summary>
@@ -133,30 +153,49 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(target);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var key = ConnectionPoolKey.Of(target, _configuration);
-        var shared = await ShareAsync(key, target.Events, cancellationToken);
-        if (shared is not null)
-        {
-            new NetworkDiagnosticLog(target.DiagnosticLog).PoolShare(target, shared.ConnectionNumber);
-            target.Events.ReportInfo("Multiplexed connection found");
-            return Reuse(target, shared);
-        }
-
-        var idle = await TakeIdleAsync(key, target.Events);
-        new NetworkDiagnosticLog(target.DiagnosticLog).PoolDecision(target, idle?.ConnectionNumber);
-
-        return idle is null
-            ? await OpenAsync(target, key, cancellationToken)
-            : Reuse(target, Lease(idle));
+        return await ConnectThroughPoolAsync(
+            target,
+            ConnectionPoolKey.Of(target, _configuration),
+            token => _innerConnector.ConnectAsync(target, token),
+            isQuic: false,
+            cancellationToken);
     }
 
     /// <inheritdoc />
     /// <remarks>
-    /// Asks the inner connector for a new QUIC connection every time; keeping one per origin
-    /// for later transfers and <c>-Z</c> streams is BL-735's.
+    /// Asks the inner connector for a new QUIC connection every time, unpooled; HTTP/3 transfers
+    /// are pooled through <see cref="ConnectMultiplexedSessionAsync" />.
     /// </remarks>
     public ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken) =>
         _innerConnector.ConnectMultiplexedAsync(target, cancellationToken);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Pools the session as <see cref="ConnectAsync" /> pools a connection, under a key of its own
+    /// that no TCP connection shares (BL-735): a session in use with a stream to spare
+    /// (<see cref="IConnectionSession.ConcurrentTransferLimit" />) is shared with curl's
+    /// <c>Multiplexed connection found</c>, an idle one is reused, and otherwise the inner
+    /// connector opens a new one, numbered next. The session is known as soon as it is open,
+    /// so transfers waiting for multiplexing (<see cref="WaitsForMultiplexing" />) wait only
+    /// for the QUIC handshake. A failed QUIC connect is not numbered: <c>--http3</c> races it
+    /// against a TCP connect, which curl numbers as the same connection (ADR-0338).
+    /// </remarks>
+    public async ValueTask<ConnectResult> ConnectMultiplexedSessionAsync(
+        ConnectTarget target,
+        Func<IMultiplexedConnection, IConnection> openSession,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(openSession);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return await ConnectThroughPoolAsync(
+            target,
+            ConnectionPoolKey.Of(target, _configuration) is { } key ? key with { IsQuic = true } : null,
+            token => _innerConnector.ConnectMultiplexedSessionAsync(target, openSession, token),
+            isQuic: true,
+            cancellationToken);
+    }
 
     /// <summary>
     /// Closes the pool when this connector made it (<see cref="ConnectionCache.DisposeAsync" />);
@@ -435,16 +474,41 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         return match;
     }
 
+    private async ValueTask<ConnectResult> ConnectThroughPoolAsync(
+        ConnectTarget target,
+        ConnectionPoolKey? key,
+        Func<CancellationToken, ValueTask<ConnectResult>> openAsync,
+        bool isQuic,
+        CancellationToken cancellationToken)
+    {
+        var shared = await ShareAsync(key, target.Events, cancellationToken);
+        if (shared is not null)
+        {
+            new NetworkDiagnosticLog(target.DiagnosticLog).PoolShare(target, shared.ConnectionNumber);
+            target.Events.ReportInfo("Multiplexed connection found");
+            return Reuse(target, shared);
+        }
+
+        var idle = await TakeIdleAsync(key, target.Events);
+        new NetworkDiagnosticLog(target.DiagnosticLog).PoolDecision(target, idle?.ConnectionNumber);
+
+        return idle is null
+            ? await OpenAsync(target, key, openAsync, isQuic, cancellationToken)
+            : Reuse(target, Lease(idle));
+    }
+
     private async ValueTask<ConnectResult> OpenAsync(
         ConnectTarget target,
         ConnectionPoolKey? key,
+        Func<CancellationToken, ValueTask<ConnectResult>> openAsync,
+        bool isQuic,
         CancellationToken cancellationToken)
     {
         var negotiation = StartNegotiation(key);
         ConnectResult connect;
         try
         {
-            connect = await _innerConnector.ConnectAsync(target, cancellationToken);
+            connect = await openAsync(cancellationToken);
         }
         catch
         {
@@ -452,23 +516,25 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
             throw;
         }
 
-        var connectionNumber = _cache.NumberNextConnection();
         if (connect.Connection is null)
         {
             Decide(negotiation);
-            return NumberedConnectFailure.Of(connect, connectionNumber);
+            return isQuic ? connect : NumberedConnectFailure.Of(connect, _cache.NumberNextConnection());
         }
 
         var entry = Lease(new PoolEntry(
             key,
             connect.Connection,
-            connectionNumber,
+            _cache.NumberNextConnection(),
             connect.LocalEndPoint,
             connect.PeerCertificates,
             connect.UnixSocketPath,
             connect.MappedHost,
-            connect.MappedPort));
-        if (MayMultiplex(target, connect))
+            connect.MappedPort)
+        {
+            Session = isQuic ? connect.Connection as IConnectionSession : null,
+        });
+        if (!isQuic && MayMultiplex(target, connect))
         {
             KeepNegotiating(entry, negotiation);
         }

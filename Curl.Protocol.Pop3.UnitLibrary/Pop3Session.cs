@@ -35,7 +35,8 @@ namespace Curl.Protocol.Pop3;
 /// TLS handshake through the injected <see cref="ITlsProvider" />, whose failure is returned
 /// as it reported it, then <c>CAPA</c> again.</item>
 /// <item>The server closing before a response is complete is exit 56; a line of 65536 bytes
-/// is exit 100.</item>
+/// is exit 100; a line holding a NUL byte is exit 8 <c>Nul byte in server response line</c>,
+/// the line itself not reported (BL-1120).</item>
 /// <item>No failure above sends <c>QUIT</c>. Once the session is open, the response to
 /// <c>QUIT</c> is read and whatever it says is ignored, as curl ignores it.</item>
 /// </list>
@@ -45,7 +46,8 @@ internal sealed class Pop3Session(
     ITlsProvider tlsProvider,
     ITransferContext context,
     bool implicitTls,
-    ISaslAuthenticator? saslAuthenticator = null) : IAsyncDisposable
+    ISaslAuthenticator? saslAuthenticator = null,
+    ConnectionOpenedEvent? opened = null) : IAsyncDisposable
 {
     private bool secure = implicitTls;
 
@@ -107,6 +109,10 @@ internal sealed class Pop3Session(
         catch (InvalidDataException)
         {
             return TransferResult.Failure(CurlExitCode.TooLarge, Pop3SessionMessages.ResponseLineTooLarge);
+        }
+        catch (Pop3NulByteInLineException)
+        {
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, Pop3SessionMessages.NulByteInLine);
         }
         catch (SaslAuthenticationFailedException failure)
         {
@@ -194,18 +200,25 @@ internal sealed class Pop3Session(
     }
 
     /// <summary>
-    /// Runs the TLS handshake over the connection and asks for the capabilities again over
-    /// the secured one; a failed handshake ends the session with its exit code and no
-    /// <c>QUIT</c>.
+    /// Runs the TLS handshake over the connection, reporting it to the transfer's events, and
+    /// asks for the capabilities again over the secured one; a failed handshake ends the
+    /// session with its exit code and no <c>QUIT</c>. A completed one reports the connect's
+    /// <c>Established connection</c> line again, as curl 8.21.0 writes it a second time
+    /// between <c>+OK Begin TLS negotiation</c> and the second <c>CAPA</c> (measured, BL-1084).
     /// </summary>
     private async ValueTask<TransferResult?> UpgradeAsync()
     {
         ConnectResult secured = await tlsProvider
-            .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.CancellationToken)
+            .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.Events, context.CancellationToken)
             .ConfigureAwait(false);
         if (secured.Connection is not { } connection)
         {
             return TransferResult.Failure(secured.ExitCode, secured.ErrorMessage!);
+        }
+
+        if (opened is not null)
+        {
+            context.Events.ReportConnectionOpened(opened);
         }
 
         securedConnection = connection;
@@ -292,6 +305,9 @@ internal sealed class Pop3Session(
         {
         }
         catch (InvalidDataException)
+        {
+        }
+        catch (Pop3NulByteInLineException)
         {
         }
     }

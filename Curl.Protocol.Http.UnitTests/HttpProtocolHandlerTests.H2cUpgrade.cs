@@ -27,6 +27,15 @@ public sealed partial class HttpProtocolHandlerTests
     /// <summary>The acknowledgement of the server's SETTINGS curl sent after its preface.</summary>
     private const string SettingsAcknowledgement = "000000040100000000";
 
+    /// <summary>The SETTINGS INITIAL_WINDOW_SIZE 65536 curl sends before the first stream it opens after the upgrade (BL-970 Notes).</summary>
+    private const string UpgradedStreamSettings = "000006040000000000000400010000";
+
+    /// <summary>curl's WINDOW_UPDATE growing stream 3 to 10 MiB from the default 65535, sent twice (BL-970 Notes).</summary>
+    private const string Stream3WindowUpdate = "000004080000000003009F0001";
+
+    /// <summary>The RST_STREAM with STREAM_CLOSED curl sends on stream 1 when it ignores that stream's body (BL-970 Notes).</summary>
+    private const string Stream1ClosedReset = "00000403000000000100000005";
+
     [TestMethod]
     public async Task ExecuteAsync_Http2UpgradeAnswered101_SendsThePrefaceAndReadsTheResponseFromStream1()
     {
@@ -46,10 +55,10 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual("hi\n", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(200, result.Report!.ResponseCode);
             Assert.AreEqual(new Version(2, 0), result.Report.HttpVersion);
-            StringAssert.StartsWith(
+            Assert.AreEqual(
+                Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest)) + Http2Preface.ToUpperInvariant() + SettingsAcknowledgement + ClosingGoAway,
                 Convert.ToHexString(connection.Written),
-                Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest)) + Http2Preface.ToUpperInvariant() + SettingsAcknowledgement,
-                $"Chunk size {chunkSize}");
+                $"Chunk size {chunkSize}: curl 8.18.0 sends no post-upgrade SETTINGS when no other stream opens (BL-970 Notes)");
             Assert.IsTrue(connection.IsMarkedReusable, $"Chunk size {chunkSize}: the upgraded connection keeps its HTTP/2 session for later requests");
             CollectionAssert.Contains(events.Info, HttpConnectionInfoLines.SwitchingToHttp2);
             Assert.AreEqual("Connection #0 to host 127.0.0.1:48717 left intact", events.Info[^1], $"Chunk size {chunkSize}");
@@ -126,14 +135,14 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_Http2Upgrade401OnStream1_RetriesAsHeadersOnStream3OfTheSameConnection()
     {
-        // curl --http2 -v --anyauth -u a:b http://127.0.0.1:48867/a (BL-866 Notes): the 401 read
+        // curl --http2 -v --anyauth -u a:b http://127.0.0.1:48973/a (BL-866, BL-970 Notes): the 401 read
         // from stream 1 leaves the connection intact and the retry goes out as HEADERS on stream 3.
         // The server allows one stream at a time, so stream 1 must be closed once its response ends.
         HpackEncoder server = new();
         byte[] response =
         [
             .. Encoding.Latin1.GetBytes(SwitchingProtocolsHead),
-            .. Http2Response(
+            .. RecordedUpgradeFrames(
                 Http2FrameFactory.CreateSettings([new(Http2SettingIdentifier.MaxConcurrentStreams, 1)]),
                 Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "401"), new("www-authenticate", "Basic realm=\"x\"")]), isEndStream: false, isEndHeaders: true),
                 Http2FrameFactory.CreateData(1, "no\n"u8.ToArray(), isEndStream: true),
@@ -145,7 +154,7 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferEvents events = new();
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, "Basic YTpi"))
-            .ExecuteAsync(UpgradeContext("http://127.0.0.1:48867/a", output, null, events));
+            .ExecuteAsync(UpgradeContext("http://127.0.0.1:48973/a", output, null, events));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("ok", Latin1(output.ToArray()));
@@ -153,7 +162,15 @@ public sealed partial class HttpProtocolHandlerTests
         Http2Frame retry = (await FramesAfterUpgradeRequest(connection.Written)).Single(frame => frame.Type == Http2FrameType.Headers);
         Assert.AreEqual(3, retry.StreamId);
         Assert.AreEqual("Basic YTpi", new HpackDecoder().Decode(retry.Payload.Span).Single(field => field.Name == "authorization").Value);
-        Assert.AreEqual("Connection #0 to host 127.0.0.1:48867 left intact", events.Info[^1]);
+        Assert.AreEqual("Connection #0 to host 127.0.0.1:48973 left intact", events.Info[^1]);
+        Assert.AreEqual(
+            Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest.Replace("48717", "48973", StringComparison.Ordinal).Replace("GET / ", "GET /a ", StringComparison.Ordinal)))
+                + Http2Preface.ToUpperInvariant() + SettingsAcknowledgement + Stream1ClosedReset + UpgradedStreamSettings
+                + "00002D0105000000038286418B089D5C0B8170DC69E7DD6704022F611F0888BA34188A73DF59BF7A8825B650C3CB85E5C153032A2F2A"
+                + Stream3WindowUpdate + Stream3WindowUpdate
+                + ClosingGoAway,
+            Convert.ToHexString(connection.Written),
+            "curl 8.18.0 (BL-970 Notes): stream 1's ignored body is reset with STREAM_CLOSED before the SETTINGS and the retry's HEADERS");
     }
 
     [TestMethod]
@@ -165,7 +182,8 @@ public sealed partial class HttpProtocolHandlerTests
         byte[] response =
         [
             .. Encoding.Latin1.GetBytes(SwitchingProtocolsHead),
-            .. Http2Response(
+            .. RecordedUpgradeFrames(
+                Http2FrameFactory.CreateSettings([]),
                 Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200")]), isEndStream: false, isEndHeaders: true),
                 Http2FrameFactory.CreateData(1, "hi\n"u8.ToArray(), isEndStream: true),
                 Http2FrameFactory.CreateHeaders(3, server.Encode([new(":status", "200")]), isEndStream: false, isEndHeaders: true),
@@ -192,6 +210,14 @@ public sealed partial class HttpProtocolHandlerTests
         Http2Frame next = (await FramesAfterUpgradeRequest(wire.Written)).Single(frame => frame.Type == Http2FrameType.Headers);
         Assert.AreEqual(3, next.StreamId);
         Assert.AreEqual(Http2FrameFlags.EndStream | Http2FrameFlags.EndHeaders, next.Flags);
+        Assert.AreEqual(
+            Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest.Replace("48717", "48866", StringComparison.Ordinal).Replace("GET / ", "GET /a ", StringComparison.Ordinal)))
+                + Http2Preface.ToUpperInvariant() + SettingsAcknowledgement + UpgradedStreamSettings
+                + "0000220105000000038286418B089D5C0B8170DC69E79C7304022F627A8825B650C3CB85E5C153032A2F2A"
+                + Stream3WindowUpdate + Stream3WindowUpdate
+                + ClosingGoAway,
+            Convert.ToHexString(wire.Written),
+            "curl 8.18.0 (BL-970 Notes): the SETTINGS INITIAL_WINDOW_SIZE 65536 goes out once, before stream 3's HEADERS");
     }
 
     [TestMethod]
@@ -216,6 +242,13 @@ public sealed partial class HttpProtocolHandlerTests
         StringAssert.EndsWith(Latin1(headerOutput.ToArray()), "HTTP/2 200 \r\ncontent-length: 2\r\n\r\nx-checksum: 1\r\n");
         Assert.IsTrue(connection.IsMarkedReusable);
     }
+
+    /// <summary>
+    /// Serializes the server's frames after the <c>101</c> as the BL-866 and BL-970 recordings
+    /// sent them: its own SETTINGS first and no acknowledgement of the client's, so the client's
+    /// stream windows grow from the default 65535.
+    /// </summary>
+    private static byte[] RecordedUpgradeFrames(params Http2Frame[] frames) => [.. frames.SelectMany(Http2FrameCodec.Serialize)];
 
     /// <summary>Reads the frames the client wrote after its HTTP/1.1 upgrade request and its preface.</summary>
     private static Task<List<Http2Frame>> FramesAfterUpgradeRequest(byte[] written)

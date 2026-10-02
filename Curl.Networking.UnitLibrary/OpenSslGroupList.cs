@@ -11,7 +11,8 @@ namespace Curl.Networking;
 /// prefix drops an unknown name instead of failing, <c>*</c> asks for a key share, <c>-</c>
 /// removes a group named earlier, and <c>DEFAULT</c> stands for the platform curl's own
 /// groups and key shares. A repeated group is offered once. Without a <c>*</c>, the first
-/// group the client can make a key share for gets the one key share.
+/// group the client can make a key share for gets the one key share; with one, only the
+/// starred TLS 1.3 groups get key shares, so stars on TLS 1.2 groups alone leave none.
 /// </summary>
 internal static class OpenSslGroupList
 {
@@ -76,9 +77,9 @@ internal static class OpenSslGroupList
 
         ushort[] usable = [.. groups.Where(IsUsable)];
         // Every starred group was offered too (a removal takes it out of both lists), but only
-        // a TLS 1.3 group gets a key share.
-        ushort[] shared = [.. keyShares.Where(TlsNamedGroup.CanShare)];
-        return new OfferedGroups(usable, shared.Length > 0 ? shared : FirstWithKeyShare(usable));
+        // a TLS 1.3 group gets a key share: stars on TLS 1.2 groups alone leave none, which
+        // OpenSSL refuses as "no suitable key share" when it offers TLS 1.3 (BL-1082).
+        return new OfferedGroups(usable, keyShares.Count > 0 ? [.. keyShares.Where(TlsNamedGroup.CanShare)] : FirstWithKeyShare(usable));
     }
 
     // The first group a TLS 1.3 key share can be made for, or none.

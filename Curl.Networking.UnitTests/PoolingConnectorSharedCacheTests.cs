@@ -127,6 +127,60 @@ public sealed class PoolingConnectorSharedCacheTests
         Assert.IsFalse(inner.Opened[0].IsDisposed);
     }
 
+    [TestMethod]
+    public async Task NumberingDatagrams_WithNullConnector_ThrowsArgumentNullException()
+    {
+        await using var pool = new PoolingConnector(new FakeConnector(), _time);
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => pool.NumberingDatagrams(null!));
+
+        Assert.AreEqual("datagramConnector", exception.ParamName);
+    }
+
+    [TestMethod]
+    public async Task NumberingDatagrams_AfterATcpConnection_NumbersEachOpenNextInThePool()
+    {
+        await using var pool = new PoolingConnector(new FakeConnector(), _time);
+        var channel = new UnusedChannel();
+        var datagrams = pool.NumberingDatagrams(new FixedDatagramConnector(DatagramOpenResult.Opened(channel)));
+        await ReturnToCacheAsync(pool);
+
+        var first = await datagrams.OpenAsync("tftp.example", 69, CancellationToken.None);
+        var second = await datagrams.OpenAsync("tftp.example", 69, CancellationToken.None);
+
+        Assert.AreSame(channel, first.Channel);
+        Assert.AreEqual(1L, first.ConnectionNumber);
+        Assert.AreEqual(2L, second.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public async Task NumberingDatagrams_WhenTheOpenFails_NumbersTheFailureAndTheNextTcpConnectionAfterIt()
+    {
+        await using var pool = new PoolingConnector(new FakeConnector(), _time);
+        var datagrams = pool.NumberingDatagrams(new FixedDatagramConnector(DatagramOpenResult.Failed(CurlExitCode.CouldntResolveHost, "Could not resolve host: tftp.example")));
+
+        var failed = await datagrams.OpenAsync("tftp.example", 69, CancellationToken.None);
+        var connected = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, failed.ExitCode);
+        Assert.AreEqual("Could not resolve host: tftp.example", failed.ErrorMessage);
+        Assert.AreEqual(0L, failed.ConnectionNumber);
+        Assert.AreEqual(1L, connected.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public async Task ConnectionNumbers_AfterATcpConnection_GivesTheNextNumberAndTheNextConnectionTheOneAfter()
+    {
+        await using var pool = new PoolingConnector(new FakeConnector(), _time);
+        await ReturnToCacheAsync(pool);
+
+        long fileTransferNumber = pool.ConnectionNumbers.NumberNextConnection();
+        var connected = await pool.ConnectAsync(new ConnectTarget("other.example", 80, false) { PoolScheme = "http" }, CancellationToken.None);
+
+        Assert.AreEqual(1L, fileTransferNumber);
+        Assert.AreEqual(2L, connected.ConnectionNumber);
+    }
+
     private static async Task ReturnToCacheAsync(PoolingConnector connector)
     {
         var result = await connector.ConnectAsync(Target(), CancellationToken.None);
@@ -136,4 +190,23 @@ public sealed class PoolingConnectorSharedCacheTests
 
     private static ConnectTarget Target() =>
         new("origin.example", 80, false) { PoolScheme = "http" };
+
+    private sealed class FixedDatagramConnector(DatagramOpenResult result) : IDatagramConnector
+    {
+        public ValueTask<DatagramOpenResult> OpenAsync(string host, int port, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(result);
+    }
+
+    private sealed class UnusedChannel : IDatagramChannel
+    {
+        public System.Net.EndPoint ServerEndPoint { get; } = new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 69);
+
+        public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, System.Net.EndPoint destination, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 }

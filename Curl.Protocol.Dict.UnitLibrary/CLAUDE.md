@@ -34,6 +34,10 @@ handler holds no proxy code.
   whole request to `ITransferContext.Events` as one block of data sent, each read as
   data received, the server's close as a zero-byte block, and then
   `shutting down connection #N`, which a refused path reports too.
+- `DictIoFailures` turns a failed send, receive or output write into curl's exit
+  55, 56 or 23 and its message (BL-1125); the handler returns it rather than
+  throwing, and `-v` then shows the message (unless it is curl's fallback text),
+  `Failed sending DICT request` after a failed send, and `closing connection #N`.
 
 Every byte these classes send was measured against curl 8.21.0; the captures are
 in BL-041's Notes and pinned by `DictProtocolHandlerTests`. Change behaviour only

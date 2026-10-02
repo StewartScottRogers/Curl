@@ -61,6 +61,26 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    [DataRow(ProxyKind.Http)]
+    [DataRow(null)]
+    public async Task ConnectAsync_ThroughAPreProxy_ReportsTheOpenedSocksConnectionToTheHttpProxy(ProxyKind? tunnelKind)
+    {
+        // curl -sS -v --preproxy socks5://127.0.0.1:41080 -x http://10.0.0.1:3128 http://h/ ->
+        // * Opened SOCKS connection from 127.0.0.1 port 60395 to 10.0.0.1 port 3128 (via 127.0.0.1 port 41080) (BL-1038)
+        var socksConnection = new ScriptedConnection([.. Socks5NoAuthentication, .. Socks5Succeeded, .. Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n\r\n")]);
+        var (connector, _) = CreatePreProxyConnector(socksConnection);
+        var events = new RecordingTransferEvents();
+        var target = tunnelKind is { } kind
+            ? new ConnectTarget("h", 443, UseTls: false) { Proxy = new ProxyEndpoint(kind, "10.0.0.1", 3128, null), Events = events }
+            : ForwardProxyTarget with { Events = events };
+
+        var result = await connector.ConnectAsync(target, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.Contains(events.Info, "Opened SOCKS connection from 127.0.0.1 port 50000 to 10.0.0.1 port 3128 (via 192.0.2.20 port 1080)");
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ThroughAnHttpsProxyBehindAPreProxy_RunsTheProxyHandshakeInsideTheSocksTunnel()
     {
         var socksConnection = new ScriptedConnection([.. Socks5NoAuthentication, .. Socks5Succeeded]);

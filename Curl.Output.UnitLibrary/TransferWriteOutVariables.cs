@@ -76,8 +76,9 @@ namespace Curl.Output;
 /// <c>proxy_ssl_verify_result</c> are <see cref="SslVerifyResult"/> and
 /// <see cref="ProxySslVerifyResult"/>, set by the caller: <c>0</c> in the Schannel build,
 /// which reports it even for a failed verification (ADR-0043), and OpenSSL's verify code in
-/// the OpenSSL build (BL-661). <c>tls_earlydata</c> prints the <c>0</c> early-data bytes
-/// Schannel never sends. <c>num_retries</c>
+/// the OpenSSL build (BL-661). <c>tls_earlydata</c> is <see cref="TlsEarlyDataSent"/>, set by
+/// the caller: <c>0</c> without early data, as the Schannel build, which sends none, always
+/// prints (BL-906). <c>num_retries</c>
 /// is <see cref="RetryCount"/>, set by the caller (BL-513). <c>ftp_entry_path</c> is
 /// <see cref="TransferReport.FtpEntryPath"/>: nothing, and <c>null</c> in <c>json</c>,
 /// for a transfer that is not FTP or whose <c>PWD</c> reply named no directory (BL-514).
@@ -178,7 +179,7 @@ public sealed class TransferWriteOutVariables(
         ["speed_upload"] = variables => WriteOutValue.FromNumber(ComputeBytesPerSecond(variables.report.UploadSize, variables.TotalMicroseconds)),
         ["ssl_verify_result"] = variables => WriteOutValue.FromNumber(variables.SslVerifyResult),
         ["proxy_ssl_verify_result"] = variables => WriteOutValue.FromNumber(variables.ProxySslVerifyResult),
-        ["tls_earlydata"] = _ => WriteOutValue.FromNumber(0),
+        ["tls_earlydata"] = variables => WriteOutValue.FromNumber(variables.TlsEarlyDataSent),
         ["num_retries"] = variables => WriteOutValue.FromNumber(variables.RetryCount),
         ["ftp_entry_path"] = variables => WriteOutValue.FromText(variables.report.FtpEntryPath),
         ["num_certs"] = variables => WriteOutValue.FromNumber(variables.report.PeerCertificates.Count),
@@ -250,6 +251,15 @@ public sealed class TransferWriteOutVariables(
     /// proxy and in the Schannel build (BL-661).
     /// </summary>
     public long ProxySslVerifyResult { get; init; }
+
+    /// <summary>
+    /// Gets the bytes the origin's connection sent as TLS 1.3 0-RTT early data, printed by
+    /// <c>%{tls_earlydata}</c> (<c>CURLINFO_EARLYDATA_SENT_T</c>): negative when the server
+    /// rejected them, and <c>0</c>, the default, without early data. curl 8.21.0's Schannel
+    /// build sends none and printed <c>0</c> under <c>--tls-earlydata</c> (measured
+    /// 2026-10-01, BL-906).
+    /// </summary>
+    public long TlsEarlyDataSent { get; init; }
 
     /// <summary>
     /// Gets the library version <c>%{json}</c> prints last, as <c>curl_version</c>; by

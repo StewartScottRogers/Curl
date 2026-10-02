@@ -21,7 +21,11 @@ ending with a slash - into the output, and ends the session with
 `DISCONNECT` 11 `Shutdown`; every `SshTransferException` becomes a failed
 `TransferResult`. On the way it reports curl's `-v` lines, worded in `SshInfoLines`, through
 `ITransferEvents`, and each block written to the output through
-`ReceivedDataReportingStream` (ADR-0262). The console passes the platform's preset and ADR-0022's credential
+`ReceivedDataReportingStream` (ADR-0262). Curl's own diagnostic log (component `ssh`,
+ADR-0222, BL-925) is worded in `SshDiagnosticLog`, which the handler builds from
+`ITransferContext.DiagnosticLog` and hangs on `SshTransport.DiagnosticLog`, so the packet
+reader and writer, the authentication, the channel and the SFTP session all write to it;
+a new SSH step logs through it, never a password, pass phrase or key byte. The console passes the platform's preset and ADR-0022's credential
 encoding. `Curl.Protocol.Ssh.UnitTests` drives it end to end against the public
 `Fakes.InMemorySshServer`, an `IConnector` answering each connection with a real
 server-side session over `Fakes.InMemoryDuplexConnection`.
@@ -44,9 +48,10 @@ session, which the writer and reader start at the first `NEWKEYS` for `zlib` and
 `zlib@openssh.com` (ADR-0264); `Authentication` holds
 `SshUserAuthentication`, which requests the `ssh-userauth` service and authenticates the
 user with `none`, `publickey`, `password`, the ssh-agent's identities and
-`keyboard-interactive` in curl's order (ADR-0215, ADR-0230, ADR-0271) - the agent through
-`ISshAgentConnector` (`SystemSshAgentConnector`: the Windows pipe or the Unix socket
-`SSH_AUTH_SOCK` names) and `SshAgentClient`, which speaks the agent protocol; `Keys` holds `SshUserKeySource`, which finds `--key` (or curl's
+`keyboard-interactive` in curl's order (ADR-0215, ADR-0230, ADR-0271), upgrading an `ssh-rsa` key, and on OpenSSL an RSA certificate, from `server-sig-algs` (ADR-0311) - the agent through
+`ISshAgentConnector` (`PlatformSshAgentConnector`: on Windows PuTTY's Pageant through
+`PageantSshAgentConnector`, then `SystemSshAgentConnector`'s pipe; elsewhere the Unix socket
+`SSH_AUTH_SOCK` names - ADR-0304) and `SshAgentClient`, which speaks the agent protocol; `Keys` holds `SshUserKeySource`, which finds `--key` (or curl's
 default files through an injected `HOME` reader), `--pubkey` and `--pass`,
 `SshPrivateKeyReader`, which reads every PEM, PKCS #8 and `openssh-key-v1` key file
 ADR-0122 lists, Ed25519 and bcrypt-encrypted `openssh-key-v1` included
@@ -83,4 +88,6 @@ Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network. The one exception is the local ssh-agent:
 `SystemSshAgentConnector` opens its named pipe or Unix domain socket, behind
-`ISshAgentConnector`, in two methods excluded from coverage under ADR-0083 (ADR-0271).
+`ISshAgentConnector`, in two methods excluded from coverage under ADR-0083 (ADR-0271),
+and `WindowsPageantWindow` makes Pageant's Win32 calls behind `IPageantWindow`, excluded
+the same way (ADR-0304).

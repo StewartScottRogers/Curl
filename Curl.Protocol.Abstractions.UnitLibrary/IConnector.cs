@@ -62,4 +62,31 @@ public interface IConnector
     /// </exception>
     ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken) =>
         ValueTask.FromResult(MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC is not available on this connector"));
+
+    /// <summary>
+    /// Gives a connection over QUIC to <paramref name="target" /> as the session
+    /// <paramref name="openSession" /> builds over it, such as the HTTP handler's HTTP/3 session,
+    /// so a pooling connector can hand that one session to every transfer to the origin, each on
+    /// a stream of its own, as curl multiplexes <c>-Z</c> transfers over HTTP/3 (BL-735).
+    /// </summary>
+    /// <param name="target">The host and port to connect to.</param>
+    /// <param name="openSession">
+    /// Builds the session over a new QUIC connection, which it then owns. A session that is also
+    /// an <see cref="IConnectionSession" /> tells a pool how many transfers it carries at once.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the resolve and handshake.</param>
+    /// <returns>
+    /// The session as the connect result's connection, or the failure of
+    /// <see cref="ConnectMultiplexedAsync" />. The default opens a new QUIC connection every time
+    /// (<see cref="MultiplexedConnectResult.ToConnectResult" />).
+    /// </returns>
+    /// <exception cref="OperationCanceledException">
+    /// <paramref name="cancellationToken" /> was cancelled. This is the only exception an
+    /// implementation may let escape.
+    /// </exception>
+    async ValueTask<ConnectResult> ConnectMultiplexedSessionAsync(
+        ConnectTarget target,
+        Func<IMultiplexedConnection, IConnection> openSession,
+        CancellationToken cancellationToken) =>
+        (await ConnectMultiplexedAsync(target, cancellationToken).ConfigureAwait(false)).ToConnectResult(openSession);
 }

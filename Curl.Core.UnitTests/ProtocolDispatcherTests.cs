@@ -1,3 +1,4 @@
+using Curl.Core.Fakes;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Core;
@@ -97,6 +98,24 @@ public sealed class ProtocolDispatcherTests
 
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
         Assert.AreEqual("Protocol \"bogus\" not supported", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow("bogus://127.0.0.1:48806/", "Protocol \"bogus\" not supported")]
+    [DataRow("dict://127.0.0.1:48805/", "Protocol \"dict\" is disabled")]
+    public async Task DispatchAsync_RefusedScheme_ReportsTheRefusalAsAnInfoLine(string url, string message)
+    {
+        // Measured against curl 8.21.0 on 2026-10-01 (BL-805 Notes): curl -v --proto -http
+        // http://127.0.0.1:48805/ writes "* Protocol "http" is disabled" before its curl: (1) line, and
+        // curl -v --proto =http bogus://... writes "* Protocol "bogus" not supported".
+        RecordingTransferEvents events = new();
+        ProtocolDispatcher dispatcher = new([new RecordingHandler(TransferResult.Success(0), "http", "dict")]);
+        TransferContext context = new() { Url = CurlUrl.Parse(url), Output = Stream.Null, Events = events };
+
+        TransferResult result = await dispatcher.DispatchAsync(context, new HashSet<string>(["http"]));
+
+        Assert.AreEqual(message, result.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { message }, events.Infos);
     }
 
     [TestMethod]

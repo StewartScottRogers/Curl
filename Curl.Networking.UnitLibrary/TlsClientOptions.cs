@@ -74,7 +74,7 @@ namespace Curl.Networking;
 /// check whether a certificate in a <paramref name="CaCertificateFile" /> chain is revoked.
 /// Without it the Schannel build checks, and a chain whose revocation status is unknown,
 /// such as one from a private CA with no revocation endpoint, fails with exit 60, as
-/// ADR-0086 decides. The OpenSSL build never checks, so ignores it.
+/// ADR-0321 decides. The OpenSSL build never checks, so ignores it.
 /// </param>
 /// <param name="RevocationCheckBestEffort">
 /// <see langword="true" /> for curl's <c>--ssl-revoke-best-effort</c>: the Schannel build
@@ -114,7 +114,7 @@ namespace Curl.Networking;
 /// <param name="Ech">
 /// curl's <c>--ech</c> mode, verbatim (<c>false</c>, <c>grease</c>, <c>true</c> or <c>hard</c>);
 /// <see langword="null" /> when not given. ADR-0151 gives every mode but <c>false</c> to the
-/// hand-built client (BL-711); neither provider applies it yet.
+/// hand-built client, which offers GREASE or ECH as <see cref="EchModes.Of" /> reads it (ADR-0327, BL-711).
 /// </param>
 /// <param name="EchPublicName">
 /// The public name of curl's <c>--ech pn:&lt;name&gt;</c>, without the prefix; <see langword="null" />
@@ -126,8 +126,9 @@ namespace Curl.Networking;
 /// </param>
 /// <param name="SslSessionsFile">
 /// curl's <c>--ssl-sessions</c> file, which session tickets are loaded from and saved to;
-/// <see langword="null" /> when not given. ADR-0151 gives it to the hand-built client (BL-710);
-/// neither provider applies it yet.
+/// <see langword="null" /> when not given. It routes the connection to the hand-built client
+/// (ADR-0151), which offers and keeps sessions in the run's <see cref="TlsSessionCache" />
+/// (ADR-0319, BL-710).
 /// </param>
 /// <param name="Engine">
 /// curl's <c>--engine</c> name, verbatim; <see langword="null" /> when not given. No provider loads
@@ -136,7 +137,8 @@ namespace Curl.Networking;
 /// </param>
 /// <param name="TlsUser">
 /// curl's <c>--tlsuser</c>: the TLS-SRP user name; <see langword="null" /> when not given. ADR-0151
-/// gives TLS-SRP to the hand-built client (BL-712); neither provider applies it yet.
+/// gives TLS-SRP to the hand-built client: <see cref="TlsClientRouting" /> sends it there and
+/// <see cref="TlsSrp" /> builds the login (ADR-0328).
 /// </param>
 /// <param name="TlsPassword">
 /// curl's <c>--tlspassword</c>: the TLS-SRP password, empty included; <see langword="null" /> when not
@@ -172,6 +174,18 @@ namespace Curl.Networking;
 /// <see cref="Networking.CertificateRevocationListFile" />, ADR-0197). The Schannel build ignores it,
 /// as curl 8.21.0's does (measured, BL-609).
 /// </param>
+/// <param name="NoSessionId">
+/// <see langword="true" /> for curl's <c>--no-sessionid</c>: no TLS session is offered or kept, so every
+/// connection of the run makes a full handshake. <c>SslStream</c> cannot stop the operating system's
+/// process-wide session cache, so <see cref="TlsClientRouting" /> sends such a connection to
+/// <see cref="HandBuiltTlsProvider" />, which then neither offers nor keeps a session (ADR-0151, BL-713).
+/// </param>
+/// <param name="AllowBeast">
+/// <see langword="true" /> for curl's <c>--ssl-allow-beast</c> (<c>--proxy-ssl-allow-beast</c> for an HTTPS
+/// proxy): a TLS 1.0 CBC write goes out whole, without the empty application data record OpenSSL sends
+/// before it (ADR-0150). <see cref="TlsClientRouting" /> sends a connection with it whose range reaches
+/// TLS 1.0 to <see cref="HandBuiltTlsProvider" />, since <c>SslStream</c> has no control for the split.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsVersion MinimumVersion = TlsVersion.SystemDefault,
@@ -202,4 +216,6 @@ public sealed record TlsClientOptions(
     bool RequireCertificateStatus = false,
     bool AutoClientCertificate = false,
     string? PinnedPublicKey = null,
-    string? CertificateRevocationListFile = null);
+    string? CertificateRevocationListFile = null,
+    bool NoSessionId = false,
+    bool AllowBeast = false);

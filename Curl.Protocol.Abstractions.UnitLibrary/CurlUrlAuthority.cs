@@ -36,11 +36,22 @@ internal sealed record CurlUrlAuthority(
     /// </summary>
     /// <param name="text">The authority: everything between the slashes after the scheme and the first <c>/</c>, <c>?</c> or <c>#</c>.</param>
     /// <param name="scheme">The scheme written, or <see langword="null" /> when the URL has none yet.</param>
+    /// <param name="disallowUser">
+    /// <see langword="true" /> to reject user information, even an empty user, before the host
+    /// and port are checked, as curl's <c>CURLU_DISALLOW_USER</c> does.
+    /// </param>
     /// <param name="rejection">Why curl rejects the authority, or <see cref="CurlUrlRejection.None" />.</param>
     /// <returns>The authority, or <see langword="null" /> when curl rejects it.</returns>
-    public static CurlUrlAuthority? Parse(string text, string? scheme, out CurlUrlRejection rejection)
+    public static CurlUrlAuthority? Parse(string text, string? scheme, bool disallowUser, out CurlUrlRejection rejection)
     {
         int at = text.IndexOf('@');
+        if (disallowUser && at >= 0)
+        {
+            rejection = CurlUrlRejection.UserNotAllowed;
+
+            return null;
+        }
+
         CurlUrlAuthority login = at < 0
             ? None
             : SplitLogin(text[..at], CurlUrlScheme.HasLoginOptions(scheme));

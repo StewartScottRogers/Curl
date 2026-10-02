@@ -50,19 +50,32 @@ public static class NoProxyMatcher
     /// <param name="noProxy">The <c>--noproxy</c> or <c>NO_PROXY</c> list; <see langword="null" /> exempts nothing.</param>
     /// <returns><see langword="true" /> when the host must be reached without the proxy.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="hostName" /> is <see langword="null" />.</exception>
-    public static bool Matches(string hostName, string? noProxy)
+    public static bool Matches(string hostName, string? noProxy) => MatchingEntry(hostName, noProxy) is not null;
+
+    /// <summary>
+    /// Finds the entry of <paramref name="noProxy" /> that exempts <paramref name="hostName" />,
+    /// which Curl's diagnostic log names (BL-1072).
+    /// </summary>
+    /// <param name="hostName">The URL's host, as <see cref="Matches" /> takes it.</param>
+    /// <param name="noProxy">The <c>--noproxy</c> or <c>NO_PROXY</c> list; <see langword="null" /> exempts nothing.</param>
+    /// <returns>
+    /// The first entry that exempts the host, as written in the list (<c>*</c> for the whole
+    /// list <c>*</c>), or <see langword="null" /> when none does.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="hostName" /> is <see langword="null" />.</exception>
+    public static string? MatchingEntry(string hostName, string? noProxy)
     {
         ArgumentNullException.ThrowIfNull(hostName);
 
         if (hostName.Length == 0 || string.IsNullOrEmpty(noProxy))
         {
-            return false;
+            return null;
         }
 
-        return noProxy == "*" || AnyEntryMatches(hostName, noProxy);
+        return noProxy == "*" ? noProxy : FirstMatchingEntry(hostName, noProxy);
     }
 
-    private static bool AnyEntryMatches(string hostName, ReadOnlySpan<char> rest)
+    private static string? FirstMatchingEntry(string hostName, ReadOnlySpan<char> rest)
     {
         HostType type = ClassifyHost(hostName);
         ReadOnlySpan<char> name = type == HostType.Name ? WithoutTrailingDot(hostName) : hostName;
@@ -71,7 +84,7 @@ public static class NoProxyMatcher
             ReadOnlySpan<char> token = ReadEntry(ref rest);
             if (!token.IsEmpty && EntryMatches(token, name, type))
             {
-                return true;
+                return token.ToString();
             }
 
             if (!rest.StartsWith(','))
@@ -82,7 +95,7 @@ public static class NoProxyMatcher
             rest = rest.TrimStart(',');
         }
 
-        return false;
+        return null;
     }
 
     /// <summary>

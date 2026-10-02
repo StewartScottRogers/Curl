@@ -9,7 +9,7 @@ namespace Curl.Protocol.Ftp;
 /// <c>--ftp-create-dirs</c> over <c>ftp://</c> against curl 8.21.0: the commands sent on the
 /// control connection, the data connection's target, the output and the exit code. Every
 /// case was recorded from real curl on 2026-09-27 with <c>Record-CurlExchange.ps1 -Ftp</c>
-/// serving the three bytes <c>abc</c> and uploading <c>hello</c> (BL-436, ADR-0093's BL-436
+/// serving the three bytes <c>abc</c> and uploading <c>hello</c> (BL-436, ADR-0323's BL-436
 /// addendum), and is replayed here with the recorder's replies.
 /// </summary>
 [TestClass]

@@ -56,6 +56,12 @@ internal static class LdapVerboseLines
         }
     }
 
+    /// <summary>Formats the line both builds write after a search the server ended with <c>sizeLimitExceeded</c>.</summary>
+    /// <param name="entryCount">The number of entries written.</param>
+    /// <returns>The line, such as <c>There are more than 2 entries</c>.</returns>
+    internal static string MoreThan(int entryCount) =>
+        string.Create(CultureInfo.InvariantCulture, $"There are more than {entryCount} entries");
+
     /// <summary>Formats the line for a connection curl keeps once the transfer is done.</summary>
     /// <param name="connectionNumber">curl's number for the connection.</param>
     /// <param name="host">The host the connection was opened to.</param>

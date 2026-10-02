@@ -31,7 +31,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// the <c>--capath</c> roots trusted beside it when there is no <c>--cacert</c>. With
     /// <c>--cacert</c> the Schannel build checks revocation below the root unless
     /// <see cref="TlsClientOptions.SkipRevocationCheck" /> is set, so a private CA with no
-    /// revocation endpoint fails with exit 60 as in curl (ADR-0086); the OpenSSL build never
+    /// revocation endpoint fails with exit 60 as in curl (ADR-0321); the OpenSSL build never
     /// checks it. The OpenSSL build then loads the <c>--crlfile</c> lists, as curl loads them
     /// after the <c>--cacert</c> file (BL-609); the Schannel build ignores <c>--crlfile</c>.
     /// Under <c>-k</c> nothing is read.
@@ -124,11 +124,29 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     {
         var anchoredErrors = WithTheNameCheckCurlRuns(
             WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
+        var observed = ObservePeerVerification(anchoredErrors, chain, peerCertificates) with
+        {
+            RevocationCheckIncomplete = !options.Insecure && RevocationBestEffortTolerates(chain),
+        };
+        var refusal = VerifyPeer(anchoredErrors, chain, targetHost, [])
+            ?? RevocationListRefusal(revocationLists, chain);
+        return refusal is null ? JudgePinnedPublicKey(observed, peerCertificates) : (observed, refusal);
+    }
+
+    // The pin is checked only once the certificate is accepted, and only then does curl print
+    // the " public key hash:" line (ADR-0336, BL-877).
+    private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) JudgePinnedPublicKey(
+        PeerVerification observed,
+        ReadOnlyMemory<byte>[] peerCertificates)
+    {
+        var refusal = PinnedPublicKey.Refusal(options.PinnedPublicKey, peerCertificates);
         return (
-            ObservePeerVerification(anchoredErrors, chain, peerCertificates),
-            VerifyPeer(anchoredErrors, chain, targetHost, [])
-                ?? RevocationListRefusal(revocationLists, chain)
-                ?? PinnedPublicKey.Refusal(options.PinnedPublicKey, peerCertificates));
+            observed with
+            {
+                PinnedPublicKeyHash = PinnedPublicKey.ReportedHash(options.PinnedPublicKey, peerCertificates),
+                PinnedPublicKeyRefused = refusal is not null,
+            },
+            refusal);
     }
 
     // Reached only for a chain VerifyPeer accepted without -k, so a chain was built.

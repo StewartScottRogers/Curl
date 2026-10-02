@@ -13,6 +13,18 @@ internal sealed class HandshakeCapturingTransferEvents(ITransferEvents inner) : 
     /// <summary>Gets the last handshake reported, or <see langword="null" /> when none was.</summary>
     public TlsHandshakeEvent? Handshake { get; private set; }
 
+    /// <summary>
+    /// Gets whether the provider accepted a certificate whose revocation check could not
+    /// complete, as <c>--ssl-revoke-best-effort</c> lets it (BL-968).
+    /// </summary>
+    public bool RevocationCheckIncomplete { get; private set; }
+
+    /// <summary>
+    /// Records that the certificate was accepted although its revocation status was offline or
+    /// unknown; nothing is passed on, as curl prints nothing for it.
+    /// </summary>
+    public void ReportRevocationCheckIncomplete() => RevocationCheckIncomplete = true;
+
     /// <inheritdoc />
     public void ReportInfo(string text) => inner.ReportInfo(text);
 
@@ -41,6 +53,9 @@ internal sealed class HandshakeCapturingTransferEvents(ITransferEvents inner) : 
     /// <inheritdoc />
     public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) =>
         inner.ReportCertificateVerifyResult(verifyResult, isProxy);
+
+    /// <inheritdoc />
+    public void ReportTlsEarlyData(long bytes) => inner.ReportTlsEarlyData(bytes);
 
     /// <inheritdoc />
     public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => inner.ReportRequestHeader(bytes);

@@ -94,4 +94,25 @@ public sealed class MultiplexedConnectResult
 
         return new MultiplexedConnectResult(null, exitCode, errorMessage, null);
     }
+
+    /// <summary>
+    /// Gives this result as a <see cref="ConnectResult" />: a success carries the session
+    /// <paramref name="openSession" /> builds over <see cref="Connection" />, with
+    /// <see cref="Timings" />, the connection's local endpoint and its ALPN protocol; a failure
+    /// carries <see cref="ExitCode" /> and <see cref="ErrorMessage" />.
+    /// </summary>
+    /// <param name="openSession">Builds the session over the connection, which it then owns.</param>
+    /// <returns>The connect result.</returns>
+    public ConnectResult ToConnectResult(Func<IMultiplexedConnection, IConnection> openSession)
+    {
+        ArgumentNullException.ThrowIfNull(openSession);
+
+        return Connection is { } connection
+            ? ConnectResult.Connected(
+                openSession(connection),
+                Timings,
+                connection.LocalEndPoint as System.Net.IPEndPoint,
+                applicationProtocol: connection.ApplicationProtocol)
+            : ConnectResult.Failed(ExitCode, ErrorMessage!);
+    }
 }

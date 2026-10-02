@@ -183,7 +183,7 @@ public sealed class TraceTransferEventWriterTests
     }
 
     [TestMethod]
-    public void TlsDataMessagesAndTrust_Schannel_WriteNothing()
+    public void TlsDataMessagesAndTrust_Schannel_WriteOnlyTheSchannelTrustLine()
     {
         TraceTransferEventWriter writer = new(output, TraceDumpFormat.HexAndText, writesTimestamps: false, TimeProvider.System, TlsBackend.Schannel);
 
@@ -198,7 +198,7 @@ public sealed class TraceTransferEventWriterTests
         });
         writer.ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = false });
 
-        Assert.AreEqual(string.Empty, Written());
+        Assert.AreEqual("* schannel: disabled automatic use of client certificate\n", Written());
     }
 
     private static void WriteHttpExchange(TraceTransferEventWriter writer, int port, int localPort)

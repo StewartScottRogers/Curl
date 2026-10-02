@@ -36,13 +36,14 @@ public sealed class HandshakeCapturingTransferEventsTests
         capturing.ReportTlsMessage(new TlsMessageEvent { ProtocolVersion = 0x0303, ContentType = default, Bytes = new byte[] { 2 }, Sent = false });
         capturing.ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = true });
         capturing.ReportCertificateVerifyResult(18, isProxy: true);
+        capturing.ReportTlsEarlyData(-36);
         capturing.ReportRequestHeader([3]);
         capturing.ReportResponseHeader([4]);
         capturing.ReportDataSent([5]);
         capturing.ReportDataReceived([6]);
 
         CollectionAssert.AreEqual(
-            new[] { "info", "opened", "reused", "handshake", "tls-data", "tls-message", "trust", "verify 18 True", "request", "response", "sent", "received" },
+            new[] { "info", "opened", "reused", "handshake", "tls-data", "tls-message", "trust", "verify 18 True", "early-data -36", "request", "response", "sent", "received" },
             inner.Calls);
         Assert.AreSame(handshake, capturing.Handshake);
     }
@@ -65,7 +66,30 @@ public sealed class HandshakeCapturingTransferEventsTests
         Assert.AreEqual(TlsClientRoute.HandBuilt, handBuilt.Route);
     }
 
-    private sealed class CountingTransferEvents : ITransferEvents
+    [TestMethod]
+    public void RouteReason_OfEachProvider_IsTheOneTlsClientRoutingGives()
+    {
+        IHandshakeReportingTlsProvider sslStream = new SslStreamTlsProvider(new TlsClientOptions());
+        IHandshakeReportingTlsProvider handBuilt = new HandBuiltTlsProvider(new TlsClientOptions(MaximumVersion: TlsVersion.Tls11), TimeProvider.System);
+
+        Assert.IsNull(sslStream.RouteReason);
+        Assert.AreEqual("--tls-max caps the versions below TLS 1.2", handBuilt.RouteReason);
+    }
+
+    [TestMethod]
+    public void RevocationCheckIncomplete_IsFalseUntilReportedAndPassesNothingOn()
+    {
+        var inner = new CountingTransferEvents();
+        var capturing = new HandshakeCapturingTransferEvents(inner);
+
+        Assert.IsFalse(capturing.RevocationCheckIncomplete);
+        capturing.ReportRevocationCheckIncomplete();
+
+        Assert.IsTrue(capturing.RevocationCheckIncomplete);
+        Assert.IsEmpty(inner.Calls);
+    }
+
+    internal sealed class CountingTransferEvents : ITransferEvents
     {
         public List<string> Calls { get; } = [];
 
@@ -84,6 +108,8 @@ public sealed class HandshakeCapturingTransferEventsTests
         public void ReportTlsTrust(TlsTrustEvent trust) => Calls.Add("trust");
 
         public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) => Calls.Add($"verify {verifyResult} {isProxy}");
+
+        public void ReportTlsEarlyData(long bytes) => Calls.Add($"early-data {bytes}");
 
         public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => Calls.Add("request");
 

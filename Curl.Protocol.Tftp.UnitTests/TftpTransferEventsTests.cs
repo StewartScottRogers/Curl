@@ -328,6 +328,20 @@ public sealed class TftpTransferEventsTests
         Assert.IsEmpty(events.Steps);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_OnAChannelOpenedAsConnection2_ShutsDownConnection2()
+    {
+        var events = new RecordingTransferEvents();
+        var clock = new ManualTimeProvider();
+        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Data(1, "hello\n"));
+        var handler = new TftpProtocolHandler(new RecordingDatagramConnector(DatagramOpenResult.Opened(channel).WithConnectionNumber(2)));
+
+        await handler.ExecuteAsync(Context(events, clock, noOptions: true));
+
+        Assert.AreEqual("shutting down connection #2", events.Steps[^1]);
+        CollectionAssert.DoesNotContain(events.Steps, ShuttingDown);
+    }
+
     private static TftpProtocolHandler Handler(IDatagramChannel channel) =>
         new(new RecordingDatagramConnector(DatagramOpenResult.Opened(channel)));
 

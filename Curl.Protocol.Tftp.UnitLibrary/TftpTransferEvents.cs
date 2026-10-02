@@ -114,8 +114,9 @@ internal sealed class TftpTransferEvents(ITransferEvents events)
         }
     }
 
-    /// <summary>Reports <c>shutting down connection #0</c>.</summary>
-    public void ShuttingDown() => events.ReportInfo("shutting down connection #0");
+    /// <summary>Reports <c>shutting down connection #N</c>, N the number the channel was opened with (BL-969).</summary>
+    /// <param name="connectionNumber">curl's number for the transfer's connection.</param>
+    public void ShuttingDown(long connectionNumber) => events.ReportInfo($"shutting down connection #{connectionNumber}");
 
     private void ReportParsedBlockSize(string name, string value, int requestedBlockSize)
     {

@@ -197,16 +197,30 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
-    public async Task ConnectAsync_ThroughAProxy_ReportsTryingTheProxyAndTheConnectionOpenedToIt()
+    [DataRow(true, new string[0], DisplayName = "Schannel build")]
+    [DataRow(false, new[] { "allocate connect buffer" }, DisplayName = "OpenSSL build")]
+    public async Task ConnectAsync_ThroughAProxy_ReportsTryingTheProxyAndTheConnectionOpenedToIt(bool matchesSchannelBuild, string[] beforeEstablishing)
     {
         var events = new RecordingTransferEvents();
         var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 200 Connection established\r\n\r\n"));
         var dialer = new FakeTcpDialer { DialOutcome = _ => proxyConnection };
-        var connector = CreateConnector(new FakeDnsResolver(ProxyAddress), dialer, new FakeTlsProvider());
+        var connector = new TcpConnector(
+            new FakeDnsResolver(ProxyAddress),
+            dialer,
+            new FakeTlsProvider(),
+            new ManualTimeProvider(),
+            HttpProxyTunnelOptions.Default with { MatchesSchannelBuild = matchesSchannelBuild });
 
         await connector.ConnectAsync(PlainTarget with { Events = events }, CancellationToken.None);
 
-        CollectionAssert.AreEqual(new[] { "Host proxy.example:3128 was resolved.", "IPv6: (none)", "IPv4: 192.0.2.10", "  Trying 192.0.2.10:3128..." }, events.Info);
+        // curl -v -p -x http://127.0.0.1:18964 http://example.test/ (8.21.0 Schannel; 8.18.0 OpenSSL
+        // and 8.21.0's source for the OpenSSL build, BL-964 Notes).
+        CollectionAssert.AreEqual(
+            new[] { "Host proxy.example:3128 was resolved.", "IPv6: (none)", "IPv4: 192.0.2.10", "  Trying 192.0.2.10:3128..." }
+                .Concat(beforeEstablishing)
+                .Concat(["Establishing HTTP proxy tunnel to example.com:80", "CONNECT phase completed for HTTP proxy", "CONNECT tunnel established, response 200"])
+                .ToArray(),
+            events.Info);
         Assert.AreEqual("proxy.example", events.Opened[0].HostName);
         Assert.AreEqual(new IPEndPoint(ProxyAddress, 3128), events.Opened[0].RemoteEndPoint);
     }

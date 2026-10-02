@@ -52,6 +52,54 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
         Assert.AreEqual(0, standardOutput.Length);
     }
 
+    // curl 8.21.0 checks CURLU_DISALLOW_USER while parsing the login, so a bad host or port, or an
+    // unsupported scheme, after it is never reached (measured 2026-10-01, BL-910 Notes).
+    [TestMethod]
+    [DataRow("http://u@127.0.0.1:99999/", DisplayName = "user and bad port")]
+    [DataRow("http://u:p@127.0.0.1:abc/", DisplayName = "user, password and bad port")]
+    [DataRow("http://u@exa%20mple.com/", DisplayName = "user and bad host")]
+    [DataRow("http://u@[::1]x/", DisplayName = "user and text after an IPv6 host")]
+    [DataRow("http://u@:80/", DisplayName = "user and no host")]
+    [DataRow("foo://u@127.0.0.1/", DisplayName = "user and unsupported scheme")]
+    public async Task RunAsync_UrlWithUserInformationAndALaterBadPart_Exits67(string url)
+    {
+        int exitCode = await RunAsync([Ok], "-sS", "--disallow-username-in-url", url);
+
+        Assert.AreEqual(67, exitCode);
+        Assert.AreEqual(Refused + NewLine, StandardErrorText);
+        Assert.IsEmpty(server.Targets);
+    }
+
+    [TestMethod]
+    [DataRow("http://u@127.0.0.1:99999/", 3, "curl: (3) URL rejected: Port number was not a decimal number between 0 and 65535", DisplayName = "user and bad port")]
+    [DataRow("http://u:p@127.0.0.1:abc/", 3, "curl: (3) URL rejected: Port number was not a decimal number between 0 and 65535", DisplayName = "user, password and bad port")]
+    [DataRow("http://u@exa%20mple.com/", 3, "curl: (3) URL rejected: Bad hostname", DisplayName = "user and bad host")]
+    [DataRow("http://u@[::1]x/", 3, "curl: (3) URL rejected: Port number was not a decimal number between 0 and 65535", DisplayName = "user and text after an IPv6 host")]
+    [DataRow("http://u@:80/", 3, "curl: (3) URL rejected: No host part in the URL", DisplayName = "user and no host")]
+    [DataRow("foo://u@127.0.0.1/", 1, "curl: (1) Protocol \"foo\" not supported", DisplayName = "user and unsupported scheme")]
+    public async Task RunAsync_UrlWithUserInformationAndALaterBadPartWithoutTheOption_KeepsItsOwnFailure(
+        string url,
+        int expectedExitCode,
+        string expectedError)
+    {
+        int exitCode = await RunAsync([Ok], "-sS", url);
+
+        Assert.AreEqual(expectedExitCode, exitCode);
+        Assert.AreEqual(expectedError + NewLine, StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow("http://u@ex ample/", "curl: (3) URL rejected: Malformed input to a URL function", DisplayName = "space in the URL")]
+    [DataRow("http:////u@127.0.0.1/", "curl: (3) URL rejected: Unsupported number of slashes following scheme", DisplayName = "four slashes")]
+    [DataRow("http://u@[::1/", "curl: (3) bad range specification in position 11:", DisplayName = "unclosed bracket, a glob error")]
+    public async Task RunAsync_UrlRejectedBeforeItsLoginIsParsed_KeepsExit3(string url, string expectedFirstLine)
+    {
+        int exitCode = await RunAsync([Ok], "-sS", "--disallow-username-in-url", url);
+
+        Assert.AreEqual(3, exitCode);
+        Assert.StartsWith(expectedFirstLine + NewLine, StandardErrorText);
+    }
+
     [TestMethod]
     public async Task RunAsync_UrlWithUserInformationAndSilent_Exits67Quietly()
     {

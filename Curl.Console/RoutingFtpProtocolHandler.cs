@@ -7,7 +7,7 @@ namespace Curl.Console;
 /// the handler curl 8.21.0 performs it with: an <c>ftp</c> one forwarded through an HTTP proxy
 /// goes to the HTTP handler, as curl forwards <c>curl -x http://p ftp://h/f</c> as
 /// <c>GET ftp://h/f HTTP/1.1</c> (ADR-0056, rule 3; measured in BL-330's Notes), and every
-/// other goes to the FTP handler (ADR-0093).
+/// other goes to the FTP handler (ADR-0323).
 /// </summary>
 /// <remarks>
 /// Only an <c>ftp</c> transfer through an <see cref="ProxyKind.Http" /> or

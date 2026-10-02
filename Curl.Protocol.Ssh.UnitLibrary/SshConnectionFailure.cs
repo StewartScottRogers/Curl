@@ -1,4 +1,5 @@
 using Curl.Protocol.Ssh.PacketProtection;
+using Curl.Protocol.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh;
 
@@ -15,7 +16,7 @@ internal static class SshConnectionFailure
     /// <param name="exception">The exception.</param>
     /// <returns><see langword="true" /> for an <see cref="EndOfStreamException" />, an <see cref="SshConnectionLostException" />, an <see cref="InvalidDataException" /> or an <see cref="SshPacketAuthenticationException" />.</returns>
     internal static bool Is(Exception exception) =>
-        exception is EndOfStreamException or SshConnectionLostException or InvalidDataException or SshPacketAuthenticationException;
+        exception is EndOfStreamException or SshConnectionLostException or InvalidDataException or SshPacketAuthenticationException or SshPacketLengthException;
 
     /// <summary>
     /// Runs <paramref name="step" />, reporting a broken connection as curl does when an SFTP

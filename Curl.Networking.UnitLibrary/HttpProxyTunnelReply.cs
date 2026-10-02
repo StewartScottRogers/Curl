@@ -50,9 +50,16 @@ internal readonly record struct HttpProxyTunnelReply(int StatusCode, string? Rec
     public ReadOnlyMemory<byte> Head { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the body is <c>Transfer-Encoding: chunked</c>, so it ends
+    /// with its last chunk and trailer rather than after <see cref="ContentLength" /> bytes.
+    /// </summary>
+    public bool IsChunked { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether another CONNECT can follow on the same connection once
-    /// <see cref="ContentLength" /> body bytes are read: no <c>Connection: close</c> or
-    /// <c>Proxy-Connection: close</c>, as curl 8.21.0 closes on either, and no chunked body.
+    /// the body is read - <see cref="ContentLength" /> bytes, or the chunked body when
+    /// <see cref="IsChunked" />: no <c>Connection: close</c> or <c>Proxy-Connection: close</c>,
+    /// as curl 8.21.0 closes on either and keeps the connection otherwise, chunked or not (BL-862 Notes).
     /// </summary>
     public bool LeavesConnectionReusable { get; init; }
 

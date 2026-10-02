@@ -308,6 +308,19 @@ public sealed class Tls12ClientHandshakeTests
             hello.Extensions.Select(extension => extension.Type).ToArray());
     }
 
+    // OpenSSL leaves out both group extensions when there is no group (measured, BL-1094).
+    [TestMethod]
+    public void AClientHelloWithNoGroupLeavesOutThePointFormatsAndTheGroups()
+    {
+        Tls12ClientHandshake client = Client(DefaultSettings with { SupportedGroups = [], OfferSessionTicket = false });
+
+        ClientHello hello = ClientHello.Decode(Body(client.Start().MessagesToSend[0])).Value;
+
+        CollectionAssert.AreEqual(
+            new[] { TlsExtensionType.RenegotiationInfo, TlsExtensionType.ServerName, TlsExtensionType.EncryptThenMac, TlsExtensionType.ExtendedMasterSecret, TlsExtensionType.SignatureAlgorithms },
+            hello.Extensions.Select(extension => extension.Type).ToArray());
+    }
+
     [TestMethod]
     public void TheRenegotiationSignalingSuiteMayBeOffered()
     {

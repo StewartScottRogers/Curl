@@ -686,6 +686,7 @@ internal sealed class SftpSession
         request.WriteUInt32(id);
         writeFields(request);
         await SendPacketAsync(request.ToArray(), cancellationToken).ConfigureAwait(false);
+        channel.DiagnosticLog.SftpRequestSent(type, id);
         return id;
     }
 
@@ -711,6 +712,7 @@ internal sealed class SftpSession
             byte[] packet = await ReadPacketAsync(cancellationToken).ConfigureAwait(false);
             if (packet.Length >= 5 && BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(1)) == id)
             {
+                channel.DiagnosticLog.SftpAnswerRead(packet);
                 return (packet[0], new SshWireReader(packet.AsMemory(5)));
             }
         }

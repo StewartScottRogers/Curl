@@ -35,6 +35,11 @@ internal sealed class SshPacketWriter(IConnection connection, ISshRandomSource r
     internal uint SequenceNumber { get; private set; }
 
     /// <summary>
+    /// Gets or sets where each message's number is logged at <c>verbose</c>.
+    /// </summary>
+    internal SshDiagnosticLog DiagnosticLog { get; set; } = SshDiagnosticLog.None;
+
+    /// <summary>
     /// Starts counting again from 0, as strict key exchange requires after each
     /// <c>NEWKEYS</c> (OpenSSH's <c>PROTOCOL</c>, section 1.10).
     /// </summary>
@@ -112,5 +117,6 @@ internal sealed class SshPacketWriter(IConnection connection, ISshRandomSource r
         }
 
         SequenceNumber = unchecked(SequenceNumber + 1);
+        DiagnosticLog.MessageSent(message.Span[0]);
     }
 }

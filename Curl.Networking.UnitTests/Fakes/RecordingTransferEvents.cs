@@ -1,3 +1,5 @@
+using System.Text;
+
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking.Fakes;
@@ -8,6 +10,12 @@ namespace Curl.Networking.Fakes;
 /// </summary>
 public sealed class RecordingTransferEvents : ITransferEvents
 {
+    /// <summary>
+    /// Gets every <see cref="ReportInfo" /> text as <c>* text</c>, every request head line as
+    /// <c>&gt; line</c> and every response header line as <c>&lt; line</c>, in order, as <c>-v</c> shows them.
+    /// </summary>
+    public List<string> Transcript { get; } = [];
+
     /// <summary>Gets every <see cref="ReportInfo" /> text, in order.</summary>
     public List<string> Info { get; } = [];
 
@@ -27,6 +35,7 @@ public sealed class RecordingTransferEvents : ITransferEvents
     public void ReportInfo(string text)
     {
         Info.Add(text);
+        Transcript.Add("* " + text);
         OnInfo?.Invoke(text);
     }
 
@@ -61,6 +70,18 @@ public sealed class RecordingTransferEvents : ITransferEvents
     /// <inheritdoc />
     public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) => VerifyResults.Add((verifyResult, isProxy));
 
+    /// <summary>Gets every <see cref="ReportTlsEarlyData" /> byte count, in order.</summary>
+    public List<long> EarlyDataSent { get; } = [];
+
+    /// <inheritdoc />
+    public void ReportTlsEarlyData(long bytes) => EarlyDataSent.Add(bytes);
+
+    /// <summary>Gets every <see cref="ReportTlsMessage" /> message, in the order reported.</summary>
+    public List<TlsMessageEvent> TlsMessages { get; } = [];
+
+    /// <inheritdoc />
+    public void ReportTlsMessage(TlsMessageEvent message) => TlsMessages.Add(message);
+
     /// <inheritdoc />
     public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)
     {
@@ -69,12 +90,13 @@ public sealed class RecordingTransferEvents : ITransferEvents
     /// <inheritdoc />
     public void ReportRequestHeader(ReadOnlySpan<byte> bytes)
     {
+        var head = Encoding.Latin1.GetString(bytes);
+        Transcript.AddRange(head[..^2].Split("\r\n").Select(line => "> " + line));
     }
 
     /// <inheritdoc />
-    public void ReportResponseHeader(ReadOnlySpan<byte> bytes)
-    {
-    }
+    public void ReportResponseHeader(ReadOnlySpan<byte> bytes) =>
+        Transcript.Add("< " + Encoding.Latin1.GetString(bytes).TrimEnd('\r', '\n'));
 
     /// <inheritdoc />
     public void ReportDataSent(ReadOnlySpan<byte> bytes)

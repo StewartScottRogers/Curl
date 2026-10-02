@@ -1,12 +1,14 @@
 namespace Curl.Protocol.Imap.Fakes;
 
 /// <summary>
-/// An output that refuses every write with <paramref name="failure" />, so the exit 23 path
-/// runs with no disk involved.
+/// An output that refuses every write after the first <see cref="WritesBeforeFailure" /> with
+/// <paramref name="failure" />, so the exit 23 path runs with no disk involved.
 /// </summary>
-/// <param name="failure">What each write throws.</param>
+/// <param name="failure">What each refused write throws.</param>
 public sealed class FailingOutputStream(IOException failure) : Stream
 {
+    private int writesAccepted;
+
     public override bool CanRead => false;
 
     public override bool CanSeek => false;
@@ -21,6 +23,9 @@ public sealed class FailingOutputStream(IOException failure) : Stream
         set => throw new NotSupportedException();
     }
 
+    /// <summary>Gets or sets how many asynchronous writes succeed before the first is refused; 0 by default.</summary>
+    public int WritesBeforeFailure { get; set; }
+
     public override void Flush()
     {
     }
@@ -33,6 +38,14 @@ public sealed class FailingOutputStream(IOException failure) : Stream
 
     public override void Write(byte[] buffer, int offset, int count) => throw failure;
 
-    public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
-        ValueTask.FromException(failure);
+    public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        if (writesAccepted < WritesBeforeFailure)
+        {
+            writesAccepted++;
+            return ValueTask.CompletedTask;
+        }
+
+        return ValueTask.FromException(failure);
+    }
 }

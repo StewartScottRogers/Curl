@@ -25,6 +25,12 @@ internal sealed class MqttPacketReader(IConnection connection, ITransferEvents e
     private int end;
 
     /// <summary>
+    /// The read <see cref="WhenFirstByteReadyAsync" /> started and no fill has taken yet,
+    /// or <see langword="null" />.
+    /// </summary>
+    private Task<int>? pendingRead;
+
+    /// <summary>
     /// Reads the next packet's fixed header, decoding its remaining length as MQTT 3.1.1
     /// section 2.2.3 specifies.
     /// </summary>
@@ -144,18 +150,49 @@ internal sealed class MqttPacketReader(IConnection connection, ITransferEvents e
         return buffer[start++];
     }
 
+    /// <summary>
+    /// Waits until the next fixed header's first byte, or the peer's close or failure, can
+    /// be read without waiting, starting a read from the connection if nothing is buffered.
+    /// The read started here is the one the next <see cref="ReadFixedHeaderAsync" /> takes,
+    /// so a caller that stops waiting neither loses nor repeats it.
+    /// </summary>
+    /// <returns>
+    /// A task that completes, never faulted, when the first byte is ready; a failed read
+    /// throws from <see cref="ReadFixedHeaderAsync" /> instead.
+    /// </returns>
+    internal Task WhenFirstByteReadyAsync()
+    {
+        if (start < end)
+        {
+            return Task.CompletedTask;
+        }
+
+        pendingRead ??= ReadConnectionAsync();
+        return pendingRead.ContinueWith(
+            static _ => { },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
     private async ValueTask<bool> FillAsync()
+    {
+        Task<int> read = pendingRead ?? ReadConnectionAsync();
+        pendingRead = null;
+        end = await read.ConfigureAwait(false);
+        start = 0;
+        return end > 0;
+    }
+
+    private async Task<int> ReadConnectionAsync()
     {
         try
         {
-            end = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            return await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         }
         catch (IOException)
         {
             throw new MqttTransferException(CurlExitCode.RecvError, MqttTransferMessages.ReceiveFailed);
         }
-
-        start = 0;
-        return end > 0;
     }
 }

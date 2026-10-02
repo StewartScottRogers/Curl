@@ -34,6 +34,40 @@ public sealed class DictProtocolHandlerTransferEventsTests
     }
 
     [TestMethod]
+    [DataRow("dict://h/d:", "DEFINE ! default")]
+    [DataRow("dict://h/d::db", "DEFINE db default")]
+    [DataRow("dict://h/m:", "MATCH ! . default")]
+    [DataRow("dict://h/m::db:strat", "MATCH db strat default")]
+    [DataRow("dict://h/find:", "MATCH ! . default")]
+    [DataRow("dict://h/lookup:", "DEFINE ! default")]
+    public async Task ExecuteAsync_LookupWithoutAWord_ReportsLookupWordIsMissingBeforeTheRequest(string url, string command)
+    {
+        // Measured (BL-1126): -v dict://127.0.0.1:<port>/d::db wrote "* lookup word is missing"
+        // right before "} [48 bytes data]" and sent "DEFINE db default".
+        TranscriptTransferEvents events = new();
+
+        await new DictProtocolHandler(Connector(new ScriptedConnection(), 0)).ExecuteAsync(Context(url, events));
+
+        CollectionAssert.AreEqual(
+            new[] { "* lookup word is missing", "=> CLIENT libcurl 8.21.0\r\n" + command + "\r\nQUIT\r\n", "<= ", "* shutting down connection #0" },
+            events.Transcript);
+    }
+
+    [TestMethod]
+    [DataRow("dict://h/d:word")]
+    [DataRow("dict://h/m:word")]
+    [DataRow("dict://h/help")]
+    public async Task ExecuteAsync_LookupWithAWordOrPlainCommand_ReportsNoLookupWordIsMissing(string url)
+    {
+        TranscriptTransferEvents events = new();
+
+        await new DictProtocolHandler(Connector(new ScriptedConnection(), 0)).ExecuteAsync(Context(url, events));
+
+        CollectionAssert.DoesNotContain(events.Transcript, "* lookup word is missing");
+        StringAssert.StartsWith(events.Transcript.First(), "=> ");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ReplyInTwoReads_ReportsEachReadAsItsOwnBlockAndTheConnectionsNumber()
     {
         TranscriptTransferEvents events = new();
