@@ -209,10 +209,40 @@ public sealed class FtpProtocolHandlerRangeTests
     public async Task ExecuteAsync_ResumeAtTheEnd_QuitsWithoutRetrieving()
     {
         // curl -C 10 on the ten-byte file: "File already completely downloaded", exit 0.
-        FtpRun run = await RunAsync(Sized + Bye, "", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 10 });
+        var events = new RecordingTransferEvents();
+        FtpRun run = await RunAsync(Sized + Bye, "", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 10, Events = events });
 
         Assert.AreEqual(SizeSent + "QUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.Contains("File already completely downloaded", events.Info);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ResumeWithSizeRefused_ReportsSizeUnsupportedAndRestarts()
+    {
+        // curl -C 5 with SIZE answered 502: "ftp server does not support SIZE", then REST 5 (550 is exit 78).
+        var events = new RecordingTransferEvents();
+        FtpRun run = await RunAsync(
+            InDirectory + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n502 No\r\n" + Restarting + Opened + Bye,
+            "56789",
+            c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 5, Events = events });
+
+        Assert.AreEqual(SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Success(5), run.Result);
+        int unsupported = events.Info.IndexOf("ftp server does not support SIZE");
+        Assert.IsGreaterThanOrEqualTo(0, unsupported);
+        Assert.AreEqual("Instructs server to resume from offset 5", events.Info[unsupported + 1]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ResumeWithSize_DoesNotReportSizeUnsupported()
+    {
+        var events = new RecordingTransferEvents();
+        FtpRun run = await RunAsync(Sized + Restarting + Opened + Bye, "56789", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 5, Events = events });
+
+        Assert.AreEqual(TransferResult.Success(5), run.Result);
+        Assert.DoesNotContain("ftp server does not support SIZE", events.Info);
+        Assert.DoesNotContain("File already completely downloaded", events.Info);
     }
 
     [TestMethod]

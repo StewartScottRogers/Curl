@@ -348,6 +348,18 @@ internal static class FtpTransferMessages
     /// </summary>
     internal const string SamePathAsPreviousTransfer = "Request has same path as previous transfer";
 
+    /// <summary>The exit 70 message for an end-of-transfer reply of <c>552</c> (BL-1118).</summary>
+    internal const string StorageAllocationExceeded = "Exceeded storage allocation";
+
+    /// <summary>The <c>-v</c> line for a <c>-C</c> download whose offset leaves nothing to fetch (BL-1118).</summary>
+    internal const string AlreadyCompletelyDownloaded = "File already completely downloaded";
+
+    /// <summary>The <c>-v</c> line for a <c>-C</c> upload whose offset covers the whole source (BL-1118).</summary>
+    internal const string AlreadyCompletelyUploaded = "File already completely uploaded";
+
+    /// <summary>The <c>-v</c> line for a <c>-C</c> download whose <c>SIZE</c> gave no count (BL-1118).</summary>
+    internal const string SizeNotSupported = "ftp server does not support SIZE";
+
     /// <summary>
     /// The <c>-v</c> line curl 8.21.0 writes for a reply to <c>PWD</c> (BL-945): the
     /// directory it named, <see cref="FailedToFigureOutPath" /> for a <c>257</c> that names

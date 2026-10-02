@@ -669,9 +669,13 @@ internal sealed class FtpSession(
             return await SendUploadAsync((context.Append ? "APPE " : "STOR ") + fileName, upload).ConfigureAwait(false);
         }
 
-        return FtpUploadOffset.TrySkip(upload, offset)
-            ? await SendUploadAsync("APPE " + fileName, upload).ConfigureAwait(false)
-            : await QuitAndSucceedAsync().ConfigureAwait(false);
+        if (FtpUploadOffset.TrySkip(upload, offset))
+        {
+            return await SendUploadAsync("APPE " + fileName, upload).ConfigureAwait(false);
+        }
+
+        context.Events.ReportInfo(FtpTransferMessages.AlreadyCompletelyUploaded);
+        return await QuitAndSucceedAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1385,7 +1389,13 @@ internal sealed class FtpSession(
             return null;
         }
 
-        return await (fileSize is { } size ? PositionWithinSizeAsync(size) : RestartAtAsync(window.Offset)).ConfigureAwait(false);
+        if (fileSize is { } size)
+        {
+            return await PositionWithinSizeAsync(size).ConfigureAwait(false);
+        }
+
+        context.Events.ReportInfo(FtpTransferMessages.SizeNotSupported);
+        return await RestartAtAsync(window.Offset).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1402,6 +1412,7 @@ internal sealed class FtpSession(
 
         if (remaining == 0)
         {
+            context.Events.ReportInfo(FtpTransferMessages.AlreadyCompletelyDownloaded);
             return await EndAndSucceedAsync().ConfigureAwait(false);
         }
 
@@ -1571,7 +1582,8 @@ internal sealed class FtpSession(
 
     /// <summary>
     /// Reads the end-of-transfer reply, after curl 8.21.0's <c>-v</c> line naming the directory
-    /// it remembers, and ends the transfer: exit 18 for missing bytes or a reply other than
+    /// it remembers, and ends the transfer: exit 18 for missing bytes, exit 70 after
+    /// <c>QUIT</c> for <c>552</c>, exit 18 after <c>QUIT</c> for any other reply but
     /// <c>226</c> or <c>250</c>; otherwise the post-transfer quotes, <c>QUIT</c> and, for a
     /// success, the <c>-v</c> line saying the control connection is left intact.
     /// </summary>
@@ -1586,11 +1598,21 @@ internal sealed class FtpSession(
 
         if (complete.Code is not (226 or 250))
         {
-            return await QuitAndFailAsync(CurlExitCode.PartialFile, FtpTransferMessages.TransferNotOk(complete.Code)).ConfigureAwait(false);
+            (CurlExitCode exitCode, string message) = DescribeTransferNotOk(complete.Code);
+            return await QuitAndFailAsync(exitCode, message).ConfigureAwait(false);
         }
 
         return await QuitAndKeepConnectionAsync().ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// The exit code and message of curl 8.21.0's <c>ftp_done</c> for an end-of-transfer
+    /// reply other than <c>226</c> or <c>250</c>: exit 70 for <c>552</c>, otherwise exit 18.
+    /// </summary>
+    private static (CurlExitCode ExitCode, string Message) DescribeTransferNotOk(int code) =>
+        code == 552
+            ? (CurlExitCode.RemoteDiskFull, FtpTransferMessages.StorageAllocationExceeded)
+            : (CurlExitCode.PartialFile, FtpTransferMessages.TransferNotOk(code));
 
     /// <summary>
     /// Ends a transfer the server reported complete as <see cref="QuitAndSucceedAsync" /> does,
