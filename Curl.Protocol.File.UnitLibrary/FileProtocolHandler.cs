@@ -11,6 +11,11 @@ namespace Curl.Protocol.File;
 /// The file system to open local paths through. No <see cref="FileStream" /> is ever
 /// constructed here, so the handler's tests run entirely in memory.
 /// </param>
+/// <param name="connectionNumbers">
+/// The count each transfer past its open takes its connection number from: the run's shared
+/// count, as curl 8.21.0 numbers a <c>file://</c> transfer with every connection the run
+/// opens (BL-977).
+/// </param>
 /// <remarks>
 /// <para>
 /// The order of work matches curl 8.21.0's <c>lib/file.c</c>: open, apply
@@ -68,7 +73,7 @@ namespace Curl.Protocol.File;
 /// with the method that reads it.
 /// </para>
 /// </remarks>
-public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandler
+public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbers connectionNumbers) : IProtocolHandler
 {
     /// <summary>
     /// The write size for a <c>file://</c> download body, which is curl's
@@ -113,13 +118,25 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
     /// <summary>
-    /// The connection number the last transfer past its open was given, so the next is one
-    /// more: curl 8.21.0 numbers <c>file://</c> transfers as connections, <c>#0</c>, <c>#1</c>
-    /// and on, and a transfer whose open failed takes no number (measured in BL-936). The
-    /// count is this handler's own, so a run that mixes <c>file://</c> with a networked
-    /// scheme numbers them apart where curl shares one count.
+    /// The count each transfer past its open takes its connection number from: curl 8.21.0
+    /// numbers <c>file://</c> transfers as connections, <c>#0</c>, <c>#1</c> and on, a
+    /// transfer whose open failed taking no number (measured in BL-936), in the one count
+    /// shared with every connection the run opens, so <c>curl -v http://h/ file:///a</c>
+    /// shuts down <c>#1</c> for the file (measured in BL-977).
     /// </summary>
-    private long lastConnectionNumber = -1;
+    private readonly IConnectionNumbers connectionNumbers =
+        connectionNumbers ?? throw new ArgumentNullException(nameof(connectionNumbers));
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FileProtocolHandler" /> class that numbers
+    /// its transfers in a count of its own, from <c>0</c>, for a run with no networked
+    /// connections to share one with.
+    /// </summary>
+    /// <param name="fileSystem">The file system to open local paths through.</param>
+    public FileProtocolHandler(IFileSystem fileSystem)
+        : this(fileSystem, new ConnectionNumberSequence())
+    {
+    }
 
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => Schemes;
@@ -232,12 +249,6 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     }
 
     /// <summary>
-    /// Gives a transfer that got past its open the next connection number.
-    /// </summary>
-    /// <returns>The number, counting from 0.</returns>
-    private long TakeConnectionNumber() => Interlocked.Increment(ref lastConnectionNumber);
-
-    /// <summary>
     /// Opens the source and, whatever happens next, disposes it.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
@@ -261,7 +272,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         }
 
         transferLog.OpenedForReading(path.OsPath, opened.Length);
-        long connectionNumber = TakeConnectionNumber();
+        long connectionNumber = connectionNumbers.NumberNextConnection();
 
         // curl 8.21.0 draws its meter for a download that got past the open and failed
         // later (exit 63, exit 36) and never for one whose open failed (exit 37), measured
@@ -463,7 +474,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         FileUrlPath path,
         Stream upload)
     {
-        long connectionNumber = TakeConnectionNumber();
+        long connectionNumber = connectionNumbers.NumberNextConnection();
         TransferResult result = await UploadIntoDestinationAsync(context, path, upload).ConfigureAwait(false);
 
         return ReportConnectionEnd(context, result, connectionNumber);

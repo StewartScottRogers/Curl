@@ -181,6 +181,37 @@ public sealed class FileProtocolHandlerTransferEventTests
             events.Info);
     }
 
+    // curl -v http://127.0.0.1:<port>/ file:///C:/Windows/win.ini: the HTTP connection is #0,
+    // so the file transfer shuts down #1 (measured, BL-977).
+    [TestMethod]
+    public async Task ExecuteAsync_DownloadAfterANetworkedConnection_ShutsDownTheSharedNextNumber()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content);
+        var connectionNumbers = new ConnectionNumberSequence();
+        connectionNumbers.NumberNextConnection();
+        var handler = new FileProtocolHandler(fileSystem, connectionNumbers);
+        var events = new RecordingTransferEvents();
+
+        await handler.ExecuteAsync(new TransferContext { Url = FileUrl, Output = new MemoryStream(), Events = events });
+
+        CollectionAssert.AreEqual(new[] { "shutting down connection #1" }, events.Info);
+        Assert.AreEqual(2L, connectionNumbers.NumberNextConnection());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadAfterANetworkedConnection_ShutsDownTheSharedNextNumber()
+    {
+        var connectionNumbers = new ConnectionNumberSequence();
+        connectionNumbers.NumberNextConnection();
+        var handler = new FileProtocolHandler(new FakeFileSystem(), connectionNumbers);
+        var events = new RecordingTransferEvents();
+
+        await handler.ExecuteAsync(new TransferContext { Url = FileUrl, Output = new MemoryStream(), Upload = new MemoryStream(Content), Events = events });
+
+        CollectionAssert.AreEqual(new[] { "shutting down connection #1" }, events.Info);
+    }
+
     // curl --trace-ascii - --max-filesize 3: all six bytes traced, three written.
     [TestMethod]
     public async Task ExecuteAsync_MaxFileSizeCutsTheBody_ReportsTheWholeChunkReadThenTheFailure()

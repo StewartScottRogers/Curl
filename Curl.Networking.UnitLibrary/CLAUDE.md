@@ -289,6 +289,9 @@ one, closed by its `DisposeAsync`; `new PoolingConnector(inner, cache, configura
 given cache, which only its owner closes, and puts `configuration` into `ConnectionPoolKey`
 (`Configuration`, compared with `Equals`), so connectors over one cache - the `--next` option groups
 of one run - reuse each other's connections only when their configurations are equal.
+The cache is also the run's `IConnectionNumbers`, which `PoolingConnector.ConnectionNumbers`
+hands to `FileProtocolHandler`, so a `file://` transfer takes the next number in the same count
+(ADR-0347, BL-977), as `NumberingDatagrams` does for a TFTP channel (ADR-0346).
 
 Per BL-717 a pooled connection whose `IConnectionSession` multiplexes (HTTP/2) is shared, not
 checked out: while its session's `ConcurrentTransferLimit` has streams to spare, a transfer with the

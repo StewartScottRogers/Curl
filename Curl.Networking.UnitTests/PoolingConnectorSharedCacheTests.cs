@@ -168,6 +168,19 @@ public sealed class PoolingConnectorSharedCacheTests
         Assert.AreEqual(1L, connected.ConnectionNumber);
     }
 
+    [TestMethod]
+    public async Task ConnectionNumbers_AfterATcpConnection_GivesTheNextNumberAndTheNextConnectionTheOneAfter()
+    {
+        await using var pool = new PoolingConnector(new FakeConnector(), _time);
+        await ReturnToCacheAsync(pool);
+
+        long fileTransferNumber = pool.ConnectionNumbers.NumberNextConnection();
+        var connected = await pool.ConnectAsync(new ConnectTarget("other.example", 80, false) { PoolScheme = "http" }, CancellationToken.None);
+
+        Assert.AreEqual(1L, fileTransferNumber);
+        Assert.AreEqual(2L, connected.ConnectionNumber);
+    }
+
     private static async Task ReturnToCacheAsync(PoolingConnector connector)
     {
         var result = await connector.ConnectAsync(Target(), CancellationToken.None);

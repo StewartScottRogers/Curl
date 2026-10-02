@@ -109,6 +109,13 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     }
 
     /// <summary>
+    /// Gets the count this pool numbers its connections in, for a handler that numbers a
+    /// transfer as a connection without connecting: curl 8.21.0 numbers a <c>file://</c>
+    /// transfer with the connections before it (BL-977).
+    /// </summary>
+    public IConnectionNumbers ConnectionNumbers => _cache;
+
+    /// <summary>
     /// Gets the longest a connection may sit idle and still be reused: 118 seconds, curl's
     /// <c>CURLOPT_MAXAGE_CONN</c> default.
     /// </summary>

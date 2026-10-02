@@ -79,6 +79,14 @@ public sealed class FileProtocolHandlerTests
     }
 
     [TestMethod]
+    public void Constructor_NullConnectionNumbers_ThrowsArgumentNullException()
+    {
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => new FileProtocolHandler(new FakeFileSystem(), null!));
+
+        Assert.AreEqual("connectionNumbers", exception.ParamName);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NullContext_ThrowsArgumentNullException()
     {
         var handler = new FileProtocolHandler(new FakeFileSystem());
