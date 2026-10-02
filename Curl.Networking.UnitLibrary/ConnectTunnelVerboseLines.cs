@@ -13,6 +13,9 @@ namespace Curl.Networking;
 /// scheme. After a <c>2xx</c> come <c>CONNECT phase completed for HTTP proxy</c> and
 /// <c>CONNECT tunnel established, response &lt;code&gt;</c>, and the OpenSSL build writes
 /// <c>allocate connect buffer</c> before a proxy connection's first CONNECT (BL-964, ADR-0342).
+/// A non-<c>2xx</c> chunked reply adds <c>CONNECT responded chunked</c> after its
+/// <c>Transfer-Encoding</c> line, and a discarded chunked body <c>Ignore chunked response-body</c>
+/// and how it ended (BL-1144).
 /// </summary>
 internal static class ConnectTunnelVerboseLines
 {
@@ -24,6 +27,34 @@ internal static class ConnectTunnelVerboseLines
     /// lines; the Schannel build writes none (measured, BL-964 Notes).
     /// </summary>
     internal const string AllocateConnectBuffer = "allocate connect buffer";
+
+    /// <summary>
+    /// The line curl writes after a non-<c>2xx</c> reply's <c>Transfer-Encoding</c> line that
+    /// names <c>chunked</c> (measured, BL-1144 Notes).
+    /// </summary>
+    internal const string RespondedChunked = "CONNECT responded chunked";
+
+    /// <summary>The line curl writes after a <c>407</c>'s head, before it discards the chunked body (BL-1144 Notes).</summary>
+    internal const string IgnoreChunkedBody = "Ignore chunked response-body";
+
+    /// <summary>The line curl writes once a discarded chunked body has ended (BL-1144 Notes).</summary>
+    internal const string ChunkReadingDone = "chunk reading DONE";
+
+    /// <summary>
+    /// Reports the line curl writes when it stops reading a discarded chunked body:
+    /// <see cref="ChunkReadingDone" /> once it ended, else the failure's own message, which curl
+    /// writes as a <c>-v</c> line too - except <see cref="HttpProxyTunnelChunkedBody.ReceiveFailureMessage" />,
+    /// curl's text for an exit 56 nothing words, which it does not (measured, BL-1144 Notes).
+    /// </summary>
+    /// <param name="events">Where the line goes.</param>
+    /// <param name="failure">The exit 56 message, or <see langword="null" /> when the body ended.</param>
+    internal static void ReportChunkedBodyEnd(ITransferEvents events, string? failure)
+    {
+        if (failure != HttpProxyTunnelChunkedBody.ReceiveFailureMessage)
+        {
+            events.ReportInfo(failure ?? ChunkReadingDone);
+        }
+    }
 
     /// <summary>
     /// Reports the line curl writes once a proxy connection is ready for its first CONNECT:
@@ -92,6 +123,11 @@ internal static class ConnectTunnelVerboseLines
             var end = lineFeed < 0 ? head.Length : lineFeed + 1;
             var line = head[..end];
             events.ReportResponseHeader(line);
+            if (statusCode / 100 != 2 && IsChunkedTransferEncoding(line))
+            {
+                events.ReportInfo(RespondedChunked);
+            }
+
             if (refusedScheme is not null)
             {
                 ReportProblemLines(events, Encoding.Latin1.GetString(line), refusedScheme);
@@ -99,6 +135,15 @@ internal static class ConnectTunnelVerboseLines
 
             head = head[end..];
         }
+    }
+
+    // A "Transfer-Encoding:" line, the name compared without regard to case, whose value names chunked.
+    private static bool IsChunkedTransferEncoding(ReadOnlySpan<byte> line)
+    {
+        var text = Encoding.Latin1.GetString(line);
+        const string name = "Transfer-Encoding:";
+        return text.StartsWith(name, StringComparison.OrdinalIgnoreCase)
+            && HttpProxyTunnel.HasToken(text[name.Length..].TrimEnd('\r', '\n'), "chunked");
     }
 
     private static void ReportProblemLines(ITransferEvents events, string line, string scheme)

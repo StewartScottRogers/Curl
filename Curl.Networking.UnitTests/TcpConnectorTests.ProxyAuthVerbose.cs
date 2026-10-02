@@ -30,6 +30,18 @@ public sealed partial class TcpConnectorTests
     private static readonly string[] DigestChallengeLines =
         ["< HTTP/1.1 407 Proxy Authentication Required", "< Proxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"", "< Content-Length: 0", "< Connection: close", "< "];
 
+    private const string ChunkedDigestChallenge =
+        "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"\r\nTransfer-Encoding: chunked\r\n\r\n";
+
+    private static readonly string[] ChunkedDigestChallengeLines =
+    [
+        "< HTTP/1.1 407 Proxy Authentication Required",
+        "< Proxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"",
+        "< Transfer-Encoding: chunked",
+        "* CONNECT responded chunked",
+        "< ",
+    ];
+
     [TestMethod]
     public async Task ConnectAsync_WithProxyBasic_ReportsTheBasicLinesAndTheProblemAfterTheChallenge()
     {
@@ -90,6 +102,53 @@ public sealed partial class TcpConnectorTests
                 ["* Proxy auth using Digest with user 'u'", Establishing],
                 RequestLines(DigestConnect),
                 EstablishedLines),
+            events.Transcript);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithProxyDigestAfterAChunked407_ReportsRespondedChunkedIgnoreAndChunkReadingDone()
+    {
+        // Measured (BL-1144): curl 8.21.0 -v -p -x ... -U u:p --proxy-digest against a chunked 407 then a 200.
+        var events = new RecordingTransferEvents();
+        var (connector, _) = CreateAuthenticatingConnector(
+            HttpAuthSchemes.Digest,
+            new ScriptedConnection(Encoding.Latin1.GetBytes(
+                ChunkedDigestChallenge + "5;ext=1\r\nhello\r\n3\r\nabc\r\n0\r\nX-Trailer: t\r\n\r\n" + EstablishedReply)));
+
+        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+
+        AssertTranscript(
+            Lines(
+                [Trying, "* Proxy auth using Digest with user 'u'", Establishing],
+                RequestLines(UnauthenticatedConnect),
+                ChunkedDigestChallengeLines,
+                ["* Ignore chunked response-body", "* chunk reading DONE", "* Proxy auth using Digest with user 'u'", Establishing],
+                RequestLines(DigestConnect),
+                EstablishedLines),
+            events.Transcript);
+    }
+
+    [TestMethod]
+    [DataRow("zz\r\nhello\r\n0\r\n\r\n", new[] { "* chunk hex-length char not a hex digit: 0x7a" }, DisplayName = "malformed")]
+    [DataRow("5\r\nhel", new[] { "* Proxy CONNECT aborted" }, DisplayName = "cut short")]
+    [DataRow("5\r\nhelloX", new string[0], DisplayName = "no CRLF after the data")]
+    public async Task ConnectAsync_WithProxyDigestAfterABadChunked407_ReportsTheFailureLineCurlWrites(string body, string[] expectedEnd)
+    {
+        // Measured (BL-1144): the line before curl's "* closing connection #0", which the HTTP handler writes.
+        var events = new RecordingTransferEvents();
+        var (connector, _) = CreateAuthenticatingConnector(
+            HttpAuthSchemes.Digest,
+            new ScriptedConnection(Encoding.Latin1.GetBytes(ChunkedDigestChallenge + body)));
+
+        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+
+        AssertTranscript(
+            Lines(
+                [Trying, "* Proxy auth using Digest with user 'u'", Establishing],
+                RequestLines(UnauthenticatedConnect),
+                ChunkedDigestChallengeLines,
+                ["* Ignore chunked response-body"],
+                expectedEnd),
             events.Transcript);
     }
 

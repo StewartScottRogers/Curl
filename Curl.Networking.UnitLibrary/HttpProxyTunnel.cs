@@ -234,7 +234,7 @@ internal static class HttpProxyTunnel
             .Select(field => (field.Line[..field.Colon], field.Line[(field.Colon + 1)..].Trim(' ', '\t', '\r')));
 
     // The comma-separated value names the token, compared without regard to case.
-    private static bool HasToken(string value, string token) =>
+    internal static bool HasToken(string value, string token) =>
         value.Split(',').Any(item => item.Trim(' ', '\t').Equals(token, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
