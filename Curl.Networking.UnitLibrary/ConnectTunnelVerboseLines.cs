@@ -5,7 +5,8 @@ namespace Curl.Networking;
 
 /// <summary>
 /// The <c>-v</c> lines curl 8.21.0 (Schannel) writes around each CONNECT to an HTTP proxy, as
-/// measured with <c>Record-CurlExchange.ps1</c> as the proxy (BL-863 Notes): <c>Proxy auth using
+/// measured with <c>Record-CurlExchange.ps1</c> as the proxy (BL-863 Notes): <c>CONNECT: no ALPN
+/// negotiated</c> once the proxy is dialled (BL-1145), <c>Proxy auth using
 /// &lt;scheme&gt; with user '&lt;user&gt;'</c> and <c>Establishing HTTP proxy tunnel to
 /// &lt;host&gt;:&lt;port&gt;</c> before it, the request head, each reply header line, and after a
 /// <c>407</c>'s <c>Proxy-Authenticate</c> line, when the CONNECT sent a Basic or Digest value,
@@ -21,6 +22,12 @@ internal static class ConnectTunnelVerboseLines
 {
     /// <summary>The line curl writes before dialling the proxy again after a <c>407</c> that closed the connection.</summary>
     internal const string ConnectAgain = "Connect me again please";
+
+    /// <summary>
+    /// The line curl writes before a proxy connection's CONNECTs when ALPN agreed nothing: always
+    /// through a plain HTTP proxy, and through an HTTPS proxy that selected no protocol (BL-872, BL-1145).
+    /// </summary>
+    internal const string NoAlpnNegotiated = "CONNECT: no ALPN negotiated";
 
     /// <summary>
     /// The line curl's OpenSSL build writes once per proxy connection, before its first CONNECT's

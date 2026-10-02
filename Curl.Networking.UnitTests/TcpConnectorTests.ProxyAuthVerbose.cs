@@ -12,12 +12,14 @@ namespace Curl.Networking;
 /// CONNECT head, the reply's header lines, <c>Connect me again please</c> and
 /// <c>&lt;scheme&gt; authentication problem, ignoring.</c>, and after a <c>2xx</c> the
 /// <c>CONNECT phase completed</c> and <c>CONNECT tunnel established</c> lines (BL-964), in the
-/// Schannel build unless a test says otherwise. The <c>CONNECT: no ALPN negotiated</c> line
-/// before a plain proxy's CONNECT is not reported yet.
+/// Schannel build unless a test says otherwise, each dial's <c>Trying</c> followed by <c>CONNECT: no ALPN
+/// negotiated</c> (BL-1145).
 /// </summary>
 public sealed partial class TcpConnectorTests
 {
     private const string Trying = "*   Trying 192.0.2.10:18602...";
+
+    private const string NoAlpnNegotiated = "* CONNECT: no ALPN negotiated";
 
     private const string Establishing = "* Establishing HTTP proxy tunnel to example.test:80";
 
@@ -52,7 +54,7 @@ public sealed partial class TcpConnectorTests
 
         AssertTranscript(
             Lines(
-                [Trying, "* Proxy auth using Basic with user 'u'", Establishing],
+                [Trying, NoAlpnNegotiated, "* Proxy auth using Basic with user 'u'", Establishing],
                 RequestLines(BasicConnect),
                 BasicChallengeLines[..2],
                 ["* Basic authentication problem, ignoring."],
@@ -73,10 +75,10 @@ public sealed partial class TcpConnectorTests
 
         AssertTranscript(
             Lines(
-                [Trying, "* Proxy auth using Digest with user 'u'", Establishing],
+                [Trying, NoAlpnNegotiated, "* Proxy auth using Digest with user 'u'", Establishing],
                 RequestLines(UnauthenticatedConnect),
                 DigestChallengeLines,
-                ["* Connect me again please", Trying, "* Proxy auth using Digest with user 'u'", Establishing],
+                ["* Connect me again please", Trying, NoAlpnNegotiated, "* Proxy auth using Digest with user 'u'", Establishing],
                 RequestLines(DigestConnect),
                 EstablishedLines),
             events.Transcript);
@@ -96,7 +98,7 @@ public sealed partial class TcpConnectorTests
 
         AssertTranscript(
             Lines(
-                [Trying, "* Proxy auth using Digest with user 'u'", Establishing],
+                [Trying, NoAlpnNegotiated, "* Proxy auth using Digest with user 'u'", Establishing],
                 RequestLines(UnauthenticatedConnect),
                 ["< HTTP/1.1 407 Proxy Authentication Required", "< Proxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"", "< Content-Length: 6", "< "],
                 ["* Proxy auth using Digest with user 'u'", Establishing],
@@ -119,7 +121,7 @@ public sealed partial class TcpConnectorTests
 
         AssertTranscript(
             Lines(
-                [Trying, "* Proxy auth using Digest with user 'u'", Establishing],
+                [Trying, NoAlpnNegotiated, "* Proxy auth using Digest with user 'u'", Establishing],
                 RequestLines(UnauthenticatedConnect),
                 ChunkedDigestChallengeLines,
                 ["* Ignore chunked response-body", "* chunk reading DONE", "* Proxy auth using Digest with user 'u'", Establishing],
@@ -144,7 +146,7 @@ public sealed partial class TcpConnectorTests
 
         AssertTranscript(
             Lines(
-                [Trying, "* Proxy auth using Digest with user 'u'", Establishing],
+                [Trying, NoAlpnNegotiated, "* Proxy auth using Digest with user 'u'", Establishing],
                 RequestLines(UnauthenticatedConnect),
                 ChunkedDigestChallengeLines,
                 ["* Ignore chunked response-body"],
@@ -168,10 +170,10 @@ public sealed partial class TcpConnectorTests
 
         AssertTranscript(
             Lines(
-                [Trying, Establishing],
+                [Trying, NoAlpnNegotiated, Establishing],
                 RequestLines(UnauthenticatedConnect),
                 isBasic ? BasicChallengeLines : DigestChallengeLines,
-                ["* Connect me again please", Trying, $"* Proxy auth using {scheme} with user 'u'", Establishing],
+                ["* Connect me again please", Trying, NoAlpnNegotiated, $"* Proxy auth using {scheme} with user 'u'", Establishing],
                 RequestLines(isBasic ? BasicConnect : DigestConnect),
                 EstablishedLines),
             events.Transcript);
@@ -195,10 +197,10 @@ public sealed partial class TcpConnectorTests
 
         AssertTranscript(
             Lines(
-                isBasic ? [Trying, Establishing] : [Trying, "* Proxy auth using Digest with user 'u'", Establishing],
+                isBasic ? [Trying, NoAlpnNegotiated, Establishing] : [Trying, NoAlpnNegotiated, "* Proxy auth using Digest with user 'u'", Establishing],
                 RequestLines(UnauthenticatedConnect),
                 challengeLines,
-                ["* Connect me again please", Trying, $"* Proxy auth using {scheme} with user 'u'", Establishing],
+                ["* Connect me again please", Trying, NoAlpnNegotiated, $"* Proxy auth using {scheme} with user 'u'", Establishing],
                 RequestLines(isBasic ? BasicConnect : DigestConnect),
                 challengeLines[..2],
                 [$"* {scheme} authentication problem, ignoring."],
@@ -228,10 +230,10 @@ public sealed partial class TcpConnectorTests
 
         AssertTranscript(
             Lines(
-                [Trying, "* allocate connect buffer", "* Proxy auth using Digest with user 'u'", Establishing],
+                [Trying, NoAlpnNegotiated, "* allocate connect buffer", "* Proxy auth using Digest with user 'u'", Establishing],
                 RequestLines(UnauthenticatedConnect),
                 DigestChallengeLines,
-                ["* Connect me again please", Trying, "* allocate connect buffer", "* Proxy auth using Digest with user 'u'", Establishing],
+                ["* Connect me again please", Trying, NoAlpnNegotiated, "* allocate connect buffer", "* Proxy auth using Digest with user 'u'", Establishing],
                 RequestLines(DigestConnect),
                 EstablishedLines),
             events.Transcript);
@@ -256,7 +258,7 @@ public sealed partial class TcpConnectorTests
         await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
 
         Assert.AreEqual(1, events.Transcript.Count(line => line == "* allocate connect buffer"));
-        Assert.AreEqual("* allocate connect buffer", events.Transcript[1]);
+        Assert.AreEqual("* allocate connect buffer", events.Transcript[2]);
         CollectionAssert.AreEqual(EstablishedLines, events.Transcript.TakeLast(4).ToArray());
     }
 

@@ -939,7 +939,7 @@ public sealed partial class TcpConnector(
 
         return proxy.Kind switch
         {
-            ProxyKind.Http or ProxyKind.Http10 => await OpenTunnelAsync(dialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false),
+            ProxyKind.Http or ProxyKind.Http10 => await OpenPlainTunnelAsync(dialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false),
             ProxyKind.Https => await OpenTunnelOverTlsAsync(dialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false),
             _ => (await OpenSocksTunnelAsync(dialed, target, destination, proxy, new ConnectTimings(started, nameResolved, 0, null), cancellationToken).ConfigureAwait(false), null),
         };
@@ -985,6 +985,20 @@ public sealed partial class TcpConnector(
             IsProxy: true);
     }
 
+    /// <summary>
+    /// Opens the tunnel through a plain HTTP proxy after saying no ALPN was negotiated, as both
+    /// builds of curl 8.21.0 do on every dial, before the CONNECT's lines (measured, BL-863, BL-1145).
+    /// </summary>
+    private ValueTask<(ConnectResult? Result, string? RedialAuthorization)> OpenPlainTunnelAsync(
+        DialedSocket dialed,
+        TunnelRequest tunnel,
+        string? proxyAuthorization,
+        CancellationToken cancellationToken)
+    {
+        tunnel.Target.Events.ReportInfo(ConnectTunnelVerboseLines.NoAlpnNegotiated);
+        return OpenTunnelAsync(dialed, tunnel, proxyAuthorization, cancellationToken);
+    }
+
     private async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> OpenTunnelOverTlsAsync(
         DialedSocket dialed,
         TunnelRequest tunnel,
@@ -1006,7 +1020,7 @@ public sealed partial class TcpConnector(
         // --no-alpn (measured, BL-872).
         tunnel.Target.Events.ReportInfo(securedProxy.ApplicationProtocol is { } agreed
             ? $"CONNECT: '{agreed}' negotiated"
-            : "CONNECT: no ALPN negotiated");
+            : ConnectTunnelVerboseLines.NoAlpnNegotiated);
 
         // CONNECT and the target's TLS run over the proxy's TLS; the socket's local end point stays.
         var securedDialed = dialed with { Connection = proxyConnection };
