@@ -34,6 +34,7 @@ internal sealed class LocalBindingAddressChooser(
     /// </summary>
     /// <remarks>
     /// The <c>-v</c> lines libcurl writes as it chooses go to <paramref name="events" /> (BL-1027): the
+    /// <c>Local Interface ... is ip ...</c> line for an interface found (BL-1079), the
     /// <c>Name ... resolved to</c> line for a host resolved, and the <c>Could not ...</c> lines for a host
     /// or an <c>if!</c> interface that gives no address. A family mismatch writes nothing more, as in curl.
     /// </remarks>
@@ -51,6 +52,7 @@ internal sealed class LocalBindingAddressChooser(
 
         if (InterfaceAddress(family) is { } interfaceAddress)
         {
+            ReportInterfaceFound(interfaceAddress, events);
             return interfaceAddress;
         }
 
@@ -82,6 +84,22 @@ internal sealed class LocalBindingAddressChooser(
 
         return addresses.FirstOrDefault(address => address.AddressFamily == family)
             ?? throw new LocalBindException(LocalBindFailure.AddressFamilyMismatch);
+    }
+
+    /// <summary>
+    /// Writes libcurl's <c>Local Interface ... is ip ...</c> line for the interface address found and, for a
+    /// plain name (a host name too), the <c>Name ... resolved to</c> line of that address resolved as the
+    /// host; an <c>if!</c> name writes the first line alone (measured, BL-1079 Notes).
+    /// </summary>
+    private void ReportInterfaceFound(IPAddress interfaceAddress, ITransferEvents events)
+    {
+        var onWindows = OperatingSystem.IsWindows();
+        var onLinux = OperatingSystem.IsLinux();
+        events.ReportInfo(LocalBindLines.LocalInterface(binding.InterfaceName!, interfaceAddress, onWindows, onLinux));
+        if (binding.HostName is not null)
+        {
+            events.ReportInfo(LocalBindLines.NameResolved(interfaceAddress.ToString(), interfaceAddress.AddressFamily, interfaceAddress, onWindows, onLinux));
+        }
     }
 
     private static IPAddress UnspecifiedAddress(AddressFamily family) =>

@@ -34,6 +34,15 @@ public sealed class LocalBindLinesTests
     }
 
     [TestMethod]
+    public void LocalInterface_NamesTheInterfaceItsAddressAndThePlatformsFamilyNumber()
+    {
+        // curl 8.22.0 Linux, --interface lo http://[::1]:1/ with SO_BINDTODEVICE refused (BL-1079).
+        var line = LocalBindLines.LocalInterface("lo", IPAddress.IPv6Loopback, onWindows: false, onLinux: true);
+
+        Assert.AreEqual("Local Interface lo is ip ::1 using address family 10", line);
+    }
+
+    [TestMethod]
     public void CouldNotResolveHost_NamesTheHost()
     {
         Assert.AreEqual("Could not resolve host: bogus0", LocalBindLines.CouldNotResolveHost("bogus0"));
