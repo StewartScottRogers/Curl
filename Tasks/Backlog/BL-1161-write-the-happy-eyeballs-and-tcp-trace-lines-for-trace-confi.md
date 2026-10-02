@@ -1,5 +1,5 @@
 ---
-id: BL-1158
+id: BL-1161
 title: Write the [HAPPY-EYEBALLS] and [TCP] trace lines for --trace-config happy-eyeballs, tcp, network, all and -vvvv
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1158 — Write the [HAPPY-EYEBALLS] and [TCP] trace lines for --trace-config happy-eyeballs, tcp, network, all and -vvvv
+# BL-1161 — Write the [HAPPY-EYEBALLS] and [TCP] trace lines for --trace-config happy-eyeballs, tcp, network, all and -vvvv
 
 ## Goal
 

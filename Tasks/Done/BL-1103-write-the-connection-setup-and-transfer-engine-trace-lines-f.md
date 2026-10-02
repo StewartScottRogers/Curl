@@ -24,7 +24,7 @@ Curl writes curl 8.21.0's `[SETUP]`, `[HAPPY-EYEBALLS]`, `[TCP]`, `[UDP]`, `[MUL
 ## Acceptance criteria
 
 - [x] Measured first with `Record-CurlExchange.ps1` for each component name, `network`, `-vv`, `-vvv` and `-vvvv`; stderr in Notes.
-- [x] Tests pin each component's lines for a plain HTTP transfer, and that no line appears without its component. (This run: `[SETUP]`; the rest split into BL-1158, BL-1159, BL-1160 as Context allows.)
+- [x] Tests pin each component's lines for a plain HTTP transfer, and that no line appears without its component. (This run: `[SETUP]`; the rest split into BL-1161, BL-1159, BL-1160 as Context allows.)
 - [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage for each library changed.
 
 ## Notes
@@ -41,7 +41,7 @@ Curl writes curl 8.21.0's `[SETUP]`, `[HAPPY-EYEBALLS]`, `[TCP]`, `[UDP]`, `[MUL
   - `--trace-config network -v`: `[DNS]`, `[HAPPY-EYEBALLS]`, `[TCP]`, `[MULTI]`, `[TIMER]`; no `[SETUP]`, `[READ]` or `[WRITE]`. `-vvvv`: every component (as `all`) plus ids and times.
   - Order (curl -s ... http://127.0.0.1:1/, grepping `[SETUP]`): `--trace-config -setup -vv` on; `-vv --trace-config -setup` off; `-vv --trace-config -all` off; `-vv --trace-config -network` on; `-vv -v` off; `-vv --no-verbose -v` off; `--trace-config setup -v --no-verbose -v` off; `--trace-config dns -v --no-verbose -v` no `[DNS]`; `--trace-config dns -v -v` `[DNS]` on; `-vv --trace-config setup -v` on; `-vvv --trace-config -read` keeps `[SETUP]` and `[WRITE]`. A failed connect (refused, or `--connect-timeout`) writes only `added` and `happy eyeballing`.
   - Aside, not pinned: `-vv --trace-config setup -v` still showed ids and times.
-- Split (the task's Context allows it): this run delivers `[SETUP]` and the verbosity components; `[HAPPY-EYEBALLS]`/`[TCP]` → BL-1158, `[MULTI]`/`[TIMER]`/`[READ]`/`[WRITE]` → BL-1159, proxies and `[HTTPS-CONNECT]` → BL-1160. Decision recorded in ADR-0357.
+- Split (the task's Context allows it): this run delivers `[SETUP]` and the verbosity components; `[HAPPY-EYEBALLS]`/`[TCP]` → BL-1161, `[MULTI]`/`[TIMER]`/`[READ]`/`[WRITE]` → BL-1159, proxies and `[HTTPS-CONNECT]` → BL-1160. Decision recorded in ADR-0357.
 - Touches: added `Curl.Cli.UnitLibrary` and `Curl.Cli.UnitTests` - which components `-vv` turns on depends on the order of options (`--trace-config -setup -vv` against `-vv --trace-config -setup`), which only the parser sees. No other task in Doing on `origin/work/dark-factory` named them.
 - Delivered: `CommandLineOptions` adds `setup` at `-vv`, `read`/`write` at `-vvv`, `all` at `-vvvv` to `TraceComponents`, a first `-v` takes them out again, `--no-verbose` and `--trace-config -all` empty the set. `SetupFilterTraceEvents` (Networking) writes the `[SETUP]` lines, layered over `DnsFilterTraceEvents` by `TcpConnector.TracingConnectionFilters` under `TracesSetupFilter`; `CurlComposition.TracesSetup` sets it, and `TracesDns` now includes `network`.
 - Tests: `CommandLineTraceConfigTests.Parse_VerbosityAndTraceConfig_TurnOnTheComponentsCurlTurnsOn`, `SetupFilterTraceEventsTests`, `TcpConnectorTests.SetupFilterTrace`, and `CurlCompositionDnsTraceTests`' `[SETUP]` cases (alone, with `[DNS]` in curl's order, and absent). `Measure-CodeQuality.ps1`: Curl.Cli, Curl.Networking and Curl.Console at 100% line and branch, no failing member.
@@ -50,4 +50,4 @@ Curl writes curl 8.21.0's `[SETUP]`, `[HAPPY-EYEBALLS]`, `[TCP]`, `[UDP]`, `[MUL
 
 - 2026-10-01: Created.
 - 2026-10-02: Backlog -> Doing.
-- 2026-10-02: Doing -> Done. -vv and --trace-config setup write curl's [SETUP] lines; -vv..-vvvv turn on their trace components; the rest split into BL-1158..BL-1160
+- 2026-10-02: Doing -> Done. -vv and --trace-config setup write curl's [SETUP] lines; -vv..-vvvv turn on their trace components; the rest split into BL-1161..BL-1160
