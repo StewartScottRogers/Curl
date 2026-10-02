@@ -161,9 +161,11 @@ catch rate is measured. An auditor that misses a defect planted for it, returns 
 block, or changes the audited tree is **unreliable** on that audit's scorecard: its
 re-audits close nothing and its numbers are marked.
 
-Audit paths are `Audit/` and `.claude/agents/audit-*`. Four guards keep the factory out:
-tasks that touch them are interactive only, and `task-board.ps1` refuses a lane filing or
-claiming one; every factory process carries `CURL_DARK_FACTORY_LANE`, and the PreToolUse
+Audit paths are `Audit/` and `.claude/agents/audit-*`; the guard files that protect them -
+`.claude/hooks/guard-audit-paths.ps1`, `.claude/settings.json`, `.github/workflows/ci.yml`
+and `.claude/skills/task-board/task-board.ps1` - change only through the `audit` branch
+too. Four guards keep the factory out: tasks that touch an audit path or a guard file are
+interactive only, and `task-board.ps1` refuses a lane filing or claiming one (BL-1209); every factory process carries `CURL_DARK_FACTORY_LANE`, and the PreToolUse
 hook `.claude/hooks/guard-audit-paths.ps1` refuses it any read or change of an audit path;
 the CI job `audit-guard` (`Audit/Guard/Test-AuditPathsUntouched.ps1`, required on `master`)
 fails when `work/dark-factory` changes one; and audit work is done on the `audit` branch,
