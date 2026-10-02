@@ -71,6 +71,7 @@ public sealed class CurlCompositionDohSubTransferTraceTests
             "* [DNS] hostname: example.test",
             "* [DoH] TTL: 60 seconds",
             "* [DoH] A: 127.0.0.1",
+            "* [DNS] resolve complete for example.test:47113",
             "* Host example.test:47113 was resolved.",
         ];
         Assert.IsNotNull(result.Connection);

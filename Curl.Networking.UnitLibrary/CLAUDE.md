@@ -401,7 +401,12 @@ each look-up; and `TcpConnector.TracesDnsFilter` wraps a direct connect's events
 resolver answered nothing writes `Could not resolve host:` (twice, once under DoH) and
 `Could not resolve: H:P`, which `DnsFilterTraceEvents` brackets with the negative cache entry and the
 exit 6 lines up to `[DNS] [1] shutdown async`; `AsyncResolveTeardownTraceEvents`, wrapped around each
-transfer's events by the console, writes `[DNS] [1] destroy async` after `closing connection #N`. Per ADR-0357 (BL-1103)
+transfer's events by the console, writes `[DNS] [1] destroy async` after `closing connection #N`. Per ADR-0381
+(BL-1181) a tunnelling proxy's connect is traced for its first hop, a Unix socket's through
+`DnsFilterTraceEvents.StartOverUnixSocket` (`transport=6`), a negative DNS cache entry writes
+`Could not resolve host:`, `Could not resolve: H:P` and `Could not resolve: H` (the filter adds its type line
+and exit 6), and a looked-up name writes `[DNS] resolve complete for H:P` and, after a refused dial,
+`[DNS] [1] shutdown async`. Per ADR-0357 (BL-1103)
 `TcpConnector.TracesSetupFilter` writes `[SETUP] added` and wraps those events in turn in
 `SetupFilterTraceEvents`, which writes the setup filter's `happy eyeballing to origin` line before
 the first `Trying` and its removal after `Established connection`, so `-vv` prints curl's order.

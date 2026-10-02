@@ -103,6 +103,96 @@ public sealed class DnsFilterTraceEventsTests
     }
 
     [TestMethod]
+    public void StartOverUnixSocket_WritesTheUnixSocketFiltersCreation_AndNoProgressAfterTrying()
+    {
+        var inner = new CountingTransferEvents();
+
+        var events = DnsFilterTraceEvents.StartOverUnixSocket(inner, "/run/app.sock");
+        events.ReportInfo("  Trying /run/app.sock:0...");
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[DNS] created DNS filter for /run/app.sock:0, transport=6, queries=3",
+                "[DNS] added",
+                "[DNS] cf_dns_start unix-domain-socket /run/app.sock:0",
+                "  Trying /run/app.sock:0...",
+            },
+            inner.Calls);
+    }
+
+    [TestMethod]
+    public void ReportInfo_ANegativeCacheEntry_WritesItsTypeAndEndsWithExit6AfterTheHostAlone()
+    {
+        var inner = new CountingTransferEvents();
+        var events = new DnsFilterTraceEvents(inner, "AAAA", "foo", 47500);
+
+        events.ReportInfo("Negative DNS entry");
+        events.ReportInfo("Could not resolve host: foo");
+        events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine("foo", 47500));
+        events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine("foo"));
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[DNS] cache entry does not have type=AAAA addresses",
+                "Negative DNS entry",
+                "Could not resolve host: foo",
+                "Could not resolve: foo:47500",
+                "Could not resolve: foo",
+                "[DNS] error resolving: 6",
+                "[DNS] Curl_conn_connect(block=0) -> 6, done=0",
+                "[DNS] Curl_conn_connect(), filter returned 6",
+            },
+            inner.Calls);
+    }
+
+    [TestMethod]
+    public void ReportInfo_ALookedUpNameThenARefusedDial_CompletesTheResolveAndShutsItDown()
+    {
+        var inner = new CountingTransferEvents();
+        var events = new DnsFilterTraceEvents(inner, host: "example.test", port: 47113);
+
+        events.ReportInfo("Host example.test:47113 was resolved.");
+        events.ReportInfo("Failed to connect to example.test:47113 after 0 ms: Could not connect to server");
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[DNS] resolve complete for example.test:47113",
+                "Host example.test:47113 was resolved.",
+                "Failed to connect to example.test:47113 after 0 ms: Could not connect to server",
+                "[DNS] Curl_conn_connect(block=0) -> 7, done=0",
+                "[DNS] Curl_conn_connect(), filter returned 7",
+                "[DNS] [1] shutdown async",
+            },
+            inner.Calls);
+    }
+
+    [TestMethod]
+    public void ReportInfo_ANameFoundInTheDnsCache_WritesNoResolveCompletion()
+    {
+        var inner = new CountingTransferEvents();
+        var events = new DnsFilterTraceEvents(inner, host: "foo", port: 80);
+
+        events.ReportInfo("Hostname foo was found in DNS cache");
+        events.ReportInfo("Host foo:80 was resolved.");
+
+        CollectionAssert.AreEqual(new[] { "Hostname foo was found in DNS cache", "Host foo:80 was resolved." }, inner.Calls);
+    }
+
+    [TestMethod]
+    public void ReportInfo_LocalhostResolved_WritesNoResolveCompletion()
+    {
+        // curl answers localhost itself (measured, BL-1181 Notes).
+        var inner = new CountingTransferEvents();
+
+        new DnsFilterTraceEvents(inner, host: "localhost", port: 80).ReportInfo("Host localhost:80 was resolved.");
+
+        CollectionAssert.AreEqual(new[] { "Host localhost:80 was resolved." }, inner.Calls);
+    }
+
+    [TestMethod]
     public void ReportInfo_AnyOtherLine_IsPassedOnAlone()
     {
         var inner = new CountingTransferEvents();

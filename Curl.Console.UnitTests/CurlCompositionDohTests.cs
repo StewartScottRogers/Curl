@@ -115,6 +115,7 @@ public sealed class CurlCompositionDohTests
                 "[DNS] hostname: example.test",
                 "[DoH] TTL: 60 seconds",
                 "[DoH] A: 127.0.0.1",
+                "[DNS] resolve complete for example.test:48712",
                 "Host example.test:48712 was resolved.",
                 "IPv6: (none)",
                 "IPv4: 127.0.0.1",

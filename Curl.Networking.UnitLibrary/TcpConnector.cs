@@ -704,6 +704,11 @@ public sealed partial class TcpConnector(
                 CurlErrorBuffer.Truncate($"Unix socket path too long: '{unixSocket.Path}'"));
         }
 
+        if (TracesDnsFilter)
+        {
+            target = target with { Events = DnsFilterTraceEvents.StartOverUnixSocket(target.Events, unixSocket.Path) };
+        }
+
         var name = unixSocket.RemoteIpText;
         target.Events.ReportInfo($"  Trying {name}:0...");
         var nameResolved = timeProvider.GetTimestamp();
@@ -811,17 +816,30 @@ public sealed partial class TcpConnector(
     /// (measured, BL-1157 Notes): <c>Could not resolve host: &lt;host&gt;</c>, twice from the
     /// system's threaded resolver and so from every resolver but DoH, which writes it once (ADR-0366), then
     /// <c>Could not resolve: &lt;host&gt;:&lt;port&gt;</c>, around which a
-    /// <see cref="DnsFilterTraceEvents" /> writes its own.
+    /// <see cref="DnsFilterTraceEvents" /> writes its own. A negative DNS cache entry writes
+    /// <c>Could not resolve host: &lt;host&gt;</c> once, <c>Could not resolve: &lt;host&gt;:&lt;port&gt;</c>
+    /// and <c>Could not resolve: &lt;host&gt;</c> (measured, BL-1181 Notes).
     /// </summary>
     private ConnectResult HostNotResolved(ITransferEvents events, ConnectDestination destination, DnsLookupFailure failure, bool fromCache)
     {
         var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
-        if (!fromCache && exitCode == CurlExitCode.CouldntResolveHost)
+        if (fromCache)
+        {
+            ReportNegativeEntryFailed(events, destination, message);
+        }
+        else if (exitCode == CurlExitCode.CouldntResolveHost)
         {
             ReportLookUpFailed(events, destination, message);
         }
 
         return ConnectResult.Failed(exitCode, message);
+    }
+
+    private static void ReportNegativeEntryFailed(ITransferEvents events, ConnectDestination destination, string message)
+    {
+        events.ReportInfo(message);
+        events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine(destination.Host, destination.Port));
+        events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine(destination.Host));
     }
 
     private void ReportLookUpFailed(ITransferEvents events, ConnectDestination destination, string message)
@@ -945,6 +963,13 @@ public sealed partial class TcpConnector(
         CancellationToken cancellationToken)
     {
         var firstHop = FirstHopTo(proxy);
+
+        // curl 8.21.0's DNS filter resolves the proxy it dials first (measured, BL-1181 Notes).
+        if (TracesDnsFilter)
+        {
+            target = target with { Events = DnsFilterTraceEvents.Start(target.Events, firstHop.Host, firstHop.Port, addressFamily) };
+        }
+
         var (addresses, failure) = await ResolveWithFailureReasonAsync(firstHop.Host, firstHop.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
