@@ -34,3 +34,4 @@ An `imap://` or `imaps://` transfer with `-D` writes every response line it read
 ## Log
 
 - 2026-10-01: Created.
+- 2026-10-01: Backlog -> Doing.
