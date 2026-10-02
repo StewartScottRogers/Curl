@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <!-- LibraryImport generates unsafe marshalling for DarwinFastOpenConnect's connectx (BL-1101). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Curl.Kerberos.UnitLibrary\Curl.Kerberos.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />

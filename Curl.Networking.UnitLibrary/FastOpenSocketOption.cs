@@ -30,4 +30,15 @@ internal static class FastOpenSocketOption
             (true, SocketPlatform.Darwin) => [new RawSocketOption(IpProtocolTcp, DarwinTcpFastOpen, 1)],
             _ => [],
         };
+
+    /// <summary>
+    /// Answers whether the connect itself goes through <c>connectx</c> with <c>CONNECT_DATA_IDEMPOTENT</c>,
+    /// as libcurl 8.21.0 connects on Darwin for <c>--tcp-fastopen</c> (BL-1101, ADR-0355): only when
+    /// <see cref="TcpSocketOptions.FastOpen" /> is set on <see cref="SocketPlatform.Darwin" />.
+    /// </summary>
+    /// <param name="options">The options the dialer was created with.</param>
+    /// <param name="platform">The operating system the socket is on.</param>
+    /// <returns><see langword="true" /> to connect through <see cref="DarwinFastOpenConnect" />.</returns>
+    internal static bool ConnectsThroughConnectx(TcpSocketOptions options, SocketPlatform platform) =>
+        options.FastOpen && platform == SocketPlatform.Darwin;
 }

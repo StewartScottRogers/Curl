@@ -122,7 +122,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
                 events,
                 cancellationToken).ConfigureAwait(false);
 
-            await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
+            socket = await ConnectAsync(socket, endPoint, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -186,7 +186,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
                 BindLocalEnd(socket, bindTo, localPortCount, events);
             }
 
-            await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
+            socket = await ConnectAsync(socket, endPoint, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -195,6 +195,25 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         }
 
         return Connected(socket, endPoint);
+    }
+
+    /// <summary>
+    /// Connects <paramref name="socket" /> to <paramref name="endPoint" />: through <c>connectx</c> on macOS
+    /// when <see cref="FastOpenSocketOption.ConnectsThroughConnectx" /> says so (BL-1101), otherwise, or when
+    /// <c>connectx</c> refuses, with <see cref="Socket.ConnectAsync(EndPoint, CancellationToken)" />.
+    /// </summary>
+    /// <returns>The connected socket, which replaces <paramref name="socket" /> after a <c>connectx</c>.</returns>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    private async ValueTask<Socket> ConnectAsync(Socket socket, IPEndPoint endPoint, CancellationToken cancellationToken)
+    {
+        if (FastOpenSocketOption.ConnectsThroughConnectx(SocketOptions, QualityOfServiceSocketOptions.CurrentPlatform)
+            && DarwinFastOpenConnect.TryConnect(socket, endPoint) is { } connected)
+        {
+            return connected;
+        }
+
+        await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
+        return socket;
     }
 
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]

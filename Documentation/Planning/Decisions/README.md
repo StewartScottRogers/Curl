@@ -364,6 +364,7 @@ choices do not need one.
 | [0352](ADR-0352-quic-s-udp-socket-bind-writes-the-tcp-path-s-v-bind-lines.md) | QUIC's UDP socket bind writes the TCP path's `-v` bind lines, as curl.se's ngtcp2 build does (amends ADR-0295 Decision 4) | Accepted | 2026-10-02 |
 | [0353](ADR-0353-an-interface-found-after-a-refused-device-bind-writes-curl-s-local-interface-line.md) | An interface found after a refused device bind writes curl's `Local Interface ... is ip ...` line, and a plain name then the `Name` line of its address (completes ADR-0295 Decision 4) | Accepted | 2026-10-02 |
 | [0354](ADR-0354-encrypted-pkcs8-keys-for-hand-built-client-certificates-are-decrypted-by-hand.md) | An `ENCRYPTED PRIVATE KEY` for an Ed25519, Ed448 or ML-DSA client certificate is decrypted by hand: PBES2 with PBKDF2 and AES or DES-EDE3 CBC (amends ADR-0301) | Accepted | 2026-10-02 |
+| [0355](ADR-0355-tcp-fastopen-on-macos-connects-through-connectx.md) | `--tcp-fastopen` on macOS connects through `connectx` with `CONNECT_DATA_IDEMPOTENT`, as libcurl does, falling back to a plain connect when it refuses (BL-1101; amends ADR-0317) | Accepted | 2026-10-02 |
 
 ## Template
 
