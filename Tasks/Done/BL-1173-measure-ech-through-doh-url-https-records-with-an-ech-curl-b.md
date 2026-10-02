@@ -71,12 +71,12 @@ from source, so no production behaviour changed. `EchOffer`'s doc comments now s
 
 ### Decisions and pins
 
-- ADR-0368: the `Some HTTPS RR to process` and `HTTPS-RR:` lines, and the HTTPS query sent on every resolve, come from
+- ADR-0369: the `Some HTTPS RR to process` and `HTTPS-RR:` lines, and the HTTPS query sent on every resolve, come from
   `--enable-httpsrr`. The platform builds lack that feature, so Curl writes neither line and asks only under `--ech true`/`hard`.
 - `HandBuiltTlsProviderTests.MeasuredEchLines` gained six rows that pin the measured list, the bad list, `hard` with no record, and `grease`.
 - `DohDnsResolverTests.ResolveHttpsRecordAsync_WritesTheMeasuredQueryBytes` pins the two measured HTTPS query messages.
 - Coverage: only doc comments changed in `Curl.Networking.UnitLibrary`, so its 100/100 from BL-1107 stands.
-- `Documentation/Planning/Decisions` (ADR-0368 and its README row) is outside `touches`; rule 3 allows a new ADR.
+- `Documentation/Planning/Decisions` (ADR-0369 and its README row) is outside `touches`; rule 3 allows a new ADR.
 
 ## Log
 
