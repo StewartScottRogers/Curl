@@ -86,6 +86,21 @@ public sealed class CurlCommandRunnerUrlCredentialsTests
     }
 
     [TestMethod]
+    public async Task RunAsync_MqttUrlWithUserInformation_HandsItsUserNameAndPasswordToTheMqttTransfer()
+    {
+        // FR-042: mqtt://al:pw@host/t sends CONNECT with the user name and password, as -u al:pw does.
+        RecordingProtocolHandler mqtt = RecordingProtocolHandler.WritingPath("mqtt");
+
+        int exitCode = await RunAsync(["-s", "-S", "mqtt://al:pw@127.0.0.1:1883/t"], mqtt);
+
+        Assert.AreEqual(0, exitCode);
+        NetworkCredential? credentials = Assert.ContainsSingle(mqtt.Contexts).Credentials;
+        Assert.IsNotNull(credentials);
+        Assert.AreEqual("al", credentials.UserName);
+        Assert.AreEqual("pw", credentials.Password);
+    }
+
+    [TestMethod]
     public async Task RunAsync_FtpUrlWithoutUserInformation_CarriesNoCredentials()
     {
         // curl logs in as anonymous; FtpSession supplies that when the context carries no credentials.
