@@ -127,6 +127,32 @@ public sealed class CurlCommandRunnerTransferWarningTests
     }
 
     [TestMethod]
+    public async Task RunAsync_Tls13CipherWarningsAt79ColumnsAndTwoUrls_PrintsBothUnwrappedBeforeEachUrl()
+    {
+        // Measured, curl 8.21.0 Schannel (BL-1034): each line is 72 or 79 bytes, so neither wraps.
+        string[] lines =
+        [
+            "Warning: ignoring --tls13-ciphers, not supported by libcurl with Schannel",
+            "Warning: ignoring --proxy-tls13-ciphers, not supported by libcurl with Schannel",
+        ];
+        string warnings = lines[0] + Environment.NewLine + lines[1] + Environment.NewLine;
+
+        int exitCode = await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([RecordingProtocolHandler.WritingPath("file")]), lines),
+                fileSystem,
+                fileSystem,
+                standardOutput,
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: false,
+                79)
+            .RunAsync(["-o", "a", "-o", "b", "file:///Windows/win.ini", "file:///Windows/win.ini"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(warnings + warnings, StandardErrorText);
+    }
+
+    [TestMethod]
     [DataRow("-s")]
     [DataRow("-sS")]
     public async Task RunAsync_SilentAnywhereWithCaPathWarnings_PrintsNoWarning(string silent)

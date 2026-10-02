@@ -907,11 +907,8 @@ internal static class CurlComposition
     /// Creates what one run transfers through: the production handler set, every TCP handler
     /// connecting through <paramref name="transports" />' one
     /// <see cref="CurlTransports.PoolingConnector" />, its HTTP handler keeping cookies in
-    /// <paramref name="cookies" />; the proxy TLS provider's <see cref="ITlsProviderWithWarnings.Warnings" />
-    /// as the lines printed before each transfer, as curl 8.21.0 prints its one Schannel warning,
-    /// about the proxy's CA path, once per URL for <c>--capath</c>, <c>--proxy-capath</c> or both
-    /// (measured, proxy or not), and the proxy's CA path is <c>--proxy-capath</c> or else
-    /// <c>--capath</c>; <paramref name="cookies" /> for the runner to load and save; a
+    /// <paramref name="cookies" />; <see cref="WarningLinesBeforeEachTransfer" /> on this platform's
+    /// curl build as the lines printed before each transfer; <paramref name="cookies" /> for the runner to load and save; a
     /// <see cref="ProxySelector" /> reading the process's proxy environment variables; the
     /// pooling connector as the connection pool the runner disposes when the run ends (ADR-0050);
     /// and the TCP connector's <see cref="TcpConnector.LoadResolveEntries" />, which the runner
@@ -922,9 +919,57 @@ internal static class CurlComposition
     /// <param name="negotiateOptions">The service names and delegation the HTTP handler's Negotiate answers with; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
+        CreateTransferDispatch(transports, OperatingSystem.IsWindows(), cookies, negotiateOptions);
+
+    /// <summary>
+    /// Returns the lines curl 8.21.0 prints to standard error before each URL's transfer, unless
+    /// <c>-s</c> is given, for TLS options its build ignores (measured, BL-1034): the proxy TLS
+    /// provider's <see cref="ITlsProviderWithWarnings.Warnings" />, the one Schannel warning about
+    /// the proxy's CA path for <c>--capath</c>, <c>--proxy-capath</c> or both (the proxy's CA path
+    /// is <c>--proxy-capath</c> or else <c>--capath</c>); then, in the Schannel build only, one
+    /// line for <c>--tls13-ciphers</c> and then one for <c>--proxy-tls13-ciphers</c>, each when
+    /// given, whatever the URL's scheme and whether or not a proxy is used (ADR-0349).
+    /// </summary>
+    /// <param name="transports">The run's connectors and the TLS options they were built from.</param>
+    /// <param name="matchesSchannelBuild">Whether the run behaves like curl's Schannel build.</param>
+    /// <returns>The warning lines, each unwrapped and without its line ending.</returns>
+    internal static IReadOnlyList<string> WarningLinesBeforeEachTransfer(CurlTransports transports, bool matchesSchannelBuild)
+    {
+        if (!matchesSchannelBuild)
+        {
+            return transports.ProxyTlsProvider.Warnings;
+        }
+
+        List<string> lines = [.. transports.ProxyTlsProvider.Warnings];
+        if (transports.TlsClientOptions.Tls13Ciphers is not null)
+        {
+            lines.Add(SchannelIgnoredOptionWarning("--tls13-ciphers"));
+        }
+
+        if (transports.ProxyTlsClientOptions.Tls13Ciphers is not null)
+        {
+            lines.Add(SchannelIgnoredOptionWarning("--proxy-tls13-ciphers"));
+        }
+
+        return lines;
+    }
+
+    private static string SchannelIgnoredOptionWarning(string option) =>
+        $"Warning: ignoring {option}, not supported by libcurl with Schannel";
+
+    /// <summary>
+    /// Creates what one run transfers through as <see cref="CreateTransferDispatch(CurlTransports, CookieEngine?, NegotiateOptions?)" />
+    /// does, warning as the named curl build does.
+    /// </summary>
+    /// <param name="transports">The run's connectors.</param>
+    /// <param name="matchesSchannelBuild">Whether the run warns as curl's Schannel build does.</param>
+    /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
+    /// <param name="negotiateOptions">The service names and delegation the HTTP handler's Negotiate answers with; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
+    /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
+    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
         new(
             new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog)),
-            transports.ProxyTlsProvider.Warnings,
+            WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild),
             cookies,
             new ProxySelector(Environment.GetEnvironmentVariable),
             transports.PoolingConnector,

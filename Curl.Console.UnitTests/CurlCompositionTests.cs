@@ -425,7 +425,7 @@ public sealed partial class CurlCompositionTests
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
         Assert.IsNotNull(dispatch.Dispatcher);
-        Assert.AreSame(transports.ProxyTlsProvider.Warnings, dispatch.WarningLinesBeforeEachTransfer);
+        CollectionAssert.AreEqual(transports.ProxyTlsProvider.Warnings.ToArray(), dispatch.WarningLinesBeforeEachTransfer.ToArray());
     }
 
     [TestMethod]
@@ -593,6 +593,89 @@ public sealed partial class CurlCompositionTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void CreateTransferDispatch_Tls13CiphersOnWindows_WarnsAsTheSchannelBuildDoes()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(
+            Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/"));
+
+        TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
+
+        // Measured, curl 8.21.0 Schannel (BL-1034): one line each, --tls13-ciphers first.
+        string[] expected =
+        [
+            "Warning: ignoring --tls13-ciphers, not supported by libcurl with Schannel",
+            "Warning: ignoring --proxy-tls13-ciphers, not supported by libcurl with Schannel",
+        ];
+        CollectionAssert.AreEqual(expected, dispatch.WarningLinesBeforeEachTransfer.ToArray());
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void CreateTransferDispatch_Tls13CiphersOffWindows_PrintsNoWarning()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(
+            Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/"));
+
+        TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
+
+        Assert.IsEmpty(dispatch.WarningLinesBeforeEachTransfer);
+    }
+
+    [TestMethod]
+    public void WarningLinesBeforeEachTransfer_SchannelBuildWithCaPathAndBothTls13CipherLists_ListsCaPathThenTls13ThenProxyTls13()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(
+            Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/"));
+
+        IReadOnlyList<string> lines = CurlComposition.WarningLinesBeforeEachTransfer(
+            transports with { ProxyTlsProvider = new WarningTlsProvider("Warning: ignoring setting the CA path for the proxy, not supported by libcurl with Schannel") },
+            matchesSchannelBuild: true);
+
+        // Measured, curl 8.21.0 Schannel (BL-1034): this order whatever the command line's.
+        string[] expected =
+        [
+            "Warning: ignoring setting the CA path for the proxy, not supported by libcurl with Schannel",
+            "Warning: ignoring --tls13-ciphers, not supported by libcurl with Schannel",
+            "Warning: ignoring --proxy-tls13-ciphers, not supported by libcurl with Schannel",
+        ];
+        CollectionAssert.AreEqual(expected, lines.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("--tls13-ciphers", "Warning: ignoring --tls13-ciphers, not supported by libcurl with Schannel")]
+    [DataRow("--proxy-tls13-ciphers", "Warning: ignoring --proxy-tls13-ciphers, not supported by libcurl with Schannel")]
+    public void WarningLinesBeforeEachTransfer_SchannelBuildWithOneTls13CipherList_ListsOnlyItsWarning(string option, string expected)
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(Parse(option, "BOGUS", "http://example.com/"));
+
+        IReadOnlyList<string> lines = CurlComposition.WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild: true);
+
+        CollectionAssert.AreEqual(new[] { expected }, lines.ToArray());
+    }
+
+    [TestMethod]
+    public void WarningLinesBeforeEachTransfer_SchannelBuildWithNoIgnoredOption_ListsNothing()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(Parse("https://example.com/"));
+
+        Assert.IsEmpty(CurlComposition.WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild: true));
+    }
+
+    [TestMethod]
+    public void WarningLinesBeforeEachTransfer_OpenSslBuildWithBothTls13CipherLists_ListsNothing()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(
+            Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/"));
+
+        IReadOnlyList<string> lines = CurlComposition.WarningLinesBeforeEachTransfer(
+            transports with { ProxyTlsProvider = new WarningTlsProvider() },
+            matchesSchannelBuild: false);
+
+        Assert.IsEmpty(lines);
+    }
+
+    [TestMethod]
     public void CreateTransports_CaPathCertKeyAndCiphers_SslStreamTlsProviderReceivesMappedOptions()
     {
         CommandLineOptions options = Parse(
@@ -712,4 +795,13 @@ public sealed partial class CurlCompositionTests
     }
 
     private sealed class ReplacementTimeProvider : TimeProvider;
+
+    // A proxy TLS provider that only reports the warnings it is given; it never connects.
+    private sealed class WarningTlsProvider(params string[] warnings) : ITlsProviderWithWarnings
+    {
+        public IReadOnlyList<string> Warnings { get; } = warnings;
+
+        public ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+    }
 }
