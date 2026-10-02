@@ -32,3 +32,4 @@ Under `-v` without `--trace-config smtp`, an SMTP upload read from standard inpu
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
