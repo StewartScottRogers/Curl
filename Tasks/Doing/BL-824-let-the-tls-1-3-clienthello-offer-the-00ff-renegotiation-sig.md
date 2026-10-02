@@ -37,3 +37,4 @@ completed:
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Networking.UnitTests (a pinned LibreSSL QUIC cipher-suite assertion), which BL-872 in Doing also touches
+- 2026-10-01: Backlog -> Doing.
