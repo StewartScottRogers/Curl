@@ -416,6 +416,19 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task UdpChannelOpener_OpenFrom_WithPortZero_BindsTheLocalAddressOnAnEphemeralPort()
+    {
+        // The one OpenFrom call that returns on every run: the range tests above go inconclusive
+        // when another process holds the port after the taken one, leaving OpenFrom's return
+        // unreached (BL-1154).
+        await using var channel = new UdpChannelOpener().OpenFrom(new IPEndPoint(IPAddress.Loopback, 9), new IPEndPoint(IPAddress.Loopback, 0), 1, NoTransferEvents.Instance);
+
+        var localEndPoint = (IPEndPoint)channel.LocalEndPoint!;
+        Assert.AreEqual(IPAddress.Loopback, localEndPoint.Address);
+        Assert.AreNotEqual(0, localEndPoint.Port);
+    }
+
+    [TestMethod]
     public void UdpChannelOpener_OpenFrom_WhenEveryPortIsTaken_ThrowsInterfaceFailed()
     {
         using var taken = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
