@@ -380,6 +380,7 @@ choices do not need one.
 | [0368](ADR-0368-trace-config-smtp-writes-curls-smtp-state-machine-lines.md) | `--trace-config smtp` (and `protocol`, `all`) writes curl 8.21.0's `[SMTP]` state machine lines from the SMTP handler; under the trace the body and its end-of-data mark are separate data events, as measured (BL-1163) | Accepted | 2026-10-02 |
 | [0369](ADR-0369-curl-does-not-write-the-httpsrr-builds-https-rr-lines.md) | Curl does not write the `--enable-httpsrr` build's `Some HTTPS RR to process` and `HTTPS-RR:` lines, and asks the HTTPS query only under `--ech true` or `hard` (BL-1173) | Accepted | 2026-10-02 |
 | [0370](ADR-0370-trace-config-ws-writes-curls-websocket-frame-lines.md) | `--trace-config ws` (and `protocol`, `all`) writes curl 8.21.0's `[WS]` frame decode, pong, upload and established lines from the WebSocket handler (BL-1164) | Accepted | 2026-10-02 |
+| [0371](ADR-0371-the-openssl-build-reports-a-failed-handshake-before-every-tls-failure.md) | The OpenSSL build reports a failed `TlsHandshakeEvent` before every TLS failure: the certificate lines before an exit 60, the ALPN offer before an exit 35, and the hand-built client's lines before a pin refusal (BL-1178) | Accepted | 2026-10-02 |
 
 ## Template
 

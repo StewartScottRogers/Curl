@@ -59,7 +59,7 @@ reports through `ReportPinnedPublicKeyRefusal`: the mismatch line, twice in the 
 once in the OpenSSL build, after the failed handshake event carrying the hash line. Per ADR-0363 (BL-1149) a failed handshake is
 reported as a `TlsHandshakeEvent` with `Failed` set (`ReportFailedHandshake` in each provider), which
 then carries the hash line: always in the Schannel build, whose `-v` prints its ALPN offer before
-any failure, and in the OpenSSL build (ADR-0370, BL-1178) in `SslStreamTlsProvider` before every
+any failure, and in the OpenSSL build (ADR-0371, BL-1178) in `SslStreamTlsProvider` before every
 failure, with the version, suite and ALPN answer kept from the certificate callback when the
 certificate or pin was refused (`-v` prints the certificate details first) and nothing negotiated
 otherwise (only the ALPN offer, exit 35), and in `HandBuiltTlsProvider` on a pin refusal, from the
