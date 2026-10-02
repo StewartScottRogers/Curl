@@ -31,3 +31,4 @@ With `--curves`, the hand-built client's ClientHello matches OpenSSL 3.5's curl 
 ## Log
 
 - 2026-09-30: Created.
+- 2026-10-02: Backlog -> Doing.
