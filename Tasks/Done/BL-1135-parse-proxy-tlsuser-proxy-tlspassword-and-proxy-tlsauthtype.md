@@ -8,7 +8,7 @@ depends-on: [BL-712]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-01
-completed:
+completed: 2026-10-02
 ---
 # BL-1135 — Parse --proxy-tlsuser, --proxy-tlspassword and --proxy-tlsauthtype and list TLS-SRP in curl -V
 
@@ -25,15 +25,23 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] The three proxy options parse with curl's refusals, with tests in `Curl.Cli.UnitTests`.
-- [ ] `ProxyFromCommandLine` maps them, and `FromCommandLine` does not, with tests in `Curl.Console.UnitTests`.
-- [ ] `curl -V` lists `TLS-SRP` in curl's position, with a test.
-- [ ] `--ai-help` describes the three proxy options correctly.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage for each library changed.
+- [x] The three proxy options parse with curl's refusals, with tests in `Curl.Cli.UnitTests`.
+- [x] `ProxyFromCommandLine` maps them, and `FromCommandLine` does not, with tests in `Curl.Console.UnitTests`.
+- [x] `curl -V` lists `TLS-SRP` in curl's position, with a test.
+- [x] `--ai-help` describes the three proxy options correctly.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage for each library changed.
 
 ## Notes
+
+- Measured with WSL curl 8.18.0 (OpenSSL) on 2026-10-02: `--proxy-tlsuser ""` is accepted and `--proxy-tlspassword ""` is refused as blank (the reverse of `--tlsuser` and `--tlspassword`); `--proxy-tlsauthtype` refuses blank and `srp` as `--tlsauthtype` does; none of the three takes `--no-`. Pinned in `CommandLineProxyTlsSrpOptionTests`.
+- `curl -V` lists `TLS-SRP` right after `SSL`: curl sorts case-insensitively, and Curl lists neither `threadsafe` nor `UnixSockets`.
+- With these three rows every curl option that takes no `--no-` prefix has a row, so the "cannot be reversed" branch of `CommandLineParser.RefuseUnlistedNegation` became unreachable and broke 100% branch coverage. It now delegates to `RefuseUnlistedName`; `CommandLineUnimplementedOptionTests` still fails should such a row be removed.
+- The three options wait for BL-1170 in `LibcurlSourceCodeOptionCoverageTests` (their `--libcurl` lines).
+- `--ai-help` no longer says "Not supported by this build yet" for them, with a test.
+- Coverage: `Curl.Cli.UnitLibrary` and `Curl.Console` 100% line and branch, 0 failing members.
 
 ## Log
 
 - 2026-10-01: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. proxy TLS-SRP options parse with curl refusals and reach the proxy handshake; curl -V lists TLS-SRP
