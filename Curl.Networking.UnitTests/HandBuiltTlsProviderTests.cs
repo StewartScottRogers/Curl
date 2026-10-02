@@ -557,8 +557,8 @@ public sealed partial class HandBuiltTlsProviderTests
 
     [TestMethod]
     [DataRow(SchannelBuild, TlsVersion.SystemDefault, TlsVersion.Tls10, "Recv failure: Connection was reset")]
-    [DataRow(OpenSslBuild, TlsVersion.SystemDefault, TlsVersion.Tls10, "Recv failure: Connection reset by peer")]
-    [DataRow(OpenSslBuild, TlsVersion.Tls11, TlsVersion.Tls11, "Recv failure: Connection reset by peer")]
+    [DataRow(OpenSslBuild, TlsVersion.SystemDefault, TlsVersion.Tls12, "Recv failure: Connection reset by peer")]
+    [DataRow(OpenSslBuild, TlsVersion.Tls12, TlsVersion.Tls12, "Recv failure: Connection reset by peer")]
     [DataRow(OpenSslBuild, TlsVersion.SystemDefault, TlsVersion.SystemDefault, "Recv failure: Connection reset by peer")]
     public async Task AuthenticateAsClientAsync_WhenTheServerResetsMidHandshake_ReportsTheMeasuredLine(
         bool matchesSchannelBuild,

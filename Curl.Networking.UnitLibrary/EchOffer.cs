@@ -26,7 +26,7 @@ internal sealed record EchOffer(EchConfigList? Configs, bool SendGrease, Connect
     /// The message a usable list fails with on a range below TLS 1.3: OpenSSL's error string for
     /// a handshake with no version left (measured 2026-10-02, curl 8.21.0 and OpenSSL 4.0.0).
     /// </summary>
-    internal const string NoProtocolsAvailableMessage = "TLS connect error: error:0A0000BF:SSL routines::no protocols available";
+    internal const string NoProtocolsAvailableMessage = TlsFailureMessages.OpenSslNoProtocolsAvailable;
 
     /// <summary>The line <c>grease</c> writes.</summary>
     internal const string GreaseLine = "ECH: will GREASE ClientHello";

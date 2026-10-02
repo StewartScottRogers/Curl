@@ -494,6 +494,13 @@ internal static class TlsFailureMessages
     public const string OpenSslNoCiphersAvailable = "TLS connect error: error:0A0000B5:SSL routines::no ciphers available";
 
     /// <summary>
+    /// The OpenSSL build's message for exit 35 when no TLS version is left to offer, as under
+    /// <c>--tls-max 1.0</c> or <c>--tls-max 1.1</c>, which OpenSSL 3's security level forbids:
+    /// measured with curl 8.18.0's OpenSSL 3.5.5 build, 2026-10-02 (BL-1152, ADR-0364).
+    /// </summary>
+    public const string OpenSslNoProtocolsAvailable = "TLS connect error: error:0A0000BF:SSL routines::no protocols available";
+
+    /// <summary>
     /// The Windows message for exit 35 when the server answers a <c>--curves</c> ClientHello
     /// with a <c>handshake_failure</c> alert, as the one Windows build that applies
     /// <c>--curves</c>, curl.se's curl 8.18.0 with LibreSSL 4.2.1, prints it (measured
