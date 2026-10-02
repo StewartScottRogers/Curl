@@ -206,7 +206,7 @@ public sealed partial class TcpConnectorTests
 
         await connector.ConnectAsync(PlainTarget with { Events = events }, CancellationToken.None);
 
-        CollectionAssert.AreEqual(new[] { "Host proxy.example:3128 was resolved.", "IPv6: (none)", "IPv4: 192.0.2.10", "  Trying 192.0.2.10:3128..." }, events.Info);
+        CollectionAssert.AreEqual(new[] { "Host proxy.example:3128 was resolved.", "IPv6: (none)", "IPv4: 192.0.2.10", "  Trying 192.0.2.10:3128...", "Establishing HTTP proxy tunnel to example.com:80" }, events.Info);
         Assert.AreEqual("proxy.example", events.Opened[0].HostName);
         Assert.AreEqual(new IPEndPoint(ProxyAddress, 3128), events.Opened[0].RemoteEndPoint);
     }

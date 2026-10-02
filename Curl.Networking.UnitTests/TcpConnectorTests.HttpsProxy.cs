@@ -243,7 +243,7 @@ public sealed partial class TcpConnectorTests
             CancellationToken.None);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        CollectionAssert.AreEqual(ProxyResolvedAndTriedLines.Append(expectedLine).ToArray(), events.Info);
+        CollectionAssert.AreEqual(ProxyResolvedAndTriedLines.Append(expectedLine).Append("Establishing HTTP proxy tunnel to example.test:80").ToArray(), events.Info);
         Assert.AreEqual(0, writtenWhenReported);
         Assert.IsNotEmpty(proxyTls.Written);
     }

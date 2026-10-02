@@ -824,6 +824,7 @@ public sealed partial class TcpConnector(
                 return result;
             }
 
+            target.Events.ReportInfo(ConnectTunnelVerboseLines.ConnectAgain);
             proxyAuthorization = redialAuthorization;
             answersChallenge = true;
         }
@@ -1015,7 +1016,7 @@ public sealed partial class TcpConnector(
         while (true)
         {
             log.TunnelRequested(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port);
-            var (reply, exception) = await RequestTunnelAsync(connection, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false);
+            var (reply, exception) = await RequestTunnelAsync(connection, tunnel, proxyAuthorization, answersChallenge, cancellationToken).ConfigureAwait(false);
             if (exception is null && reply.OpensTunnel)
             {
                 EndProxyAuthorization(proxyAuthorization);
@@ -1146,19 +1147,27 @@ public sealed partial class TcpConnector(
     /// Sends one CONNECT and reads the proxy's reply, whose complete head goes to the
     /// transfer's header output when its events take it (<see cref="IConnectReplyHeadWritingEvents" />),
     /// whatever the status, as curl 8.21.0 writes a <c>407</c>'s and a <c>403</c>'s too (BL-613 Notes).
+    /// The CONNECT's <c>-v</c> lines, its request head and the reply's header lines go to the
+    /// target's events as <see cref="ConnectTunnelVerboseLines" /> words them (BL-863).
     /// </summary>
     private async ValueTask<(HttpProxyTunnelReply Reply, ExceptionDispatchInfo? Exception)> RequestTunnelAsync(
         IConnection connection,
         TunnelRequest tunnel,
         string? proxyAuthorization,
+        bool answersChallenge,
         CancellationToken cancellationToken)
     {
         try
         {
             var destination = tunnel.Destination;
-            await connection.WriteAsync(HttpProxyTunnel.BuildConnectRequest(destination.Host, destination.Port, tunnel.Proxy, _proxyTunnelOptions, proxyAuthorization), cancellationToken).ConfigureAwait(false);
+            var events = tunnel.Target.Events;
+            ConnectTunnelVerboseLines.ReportBeforeConnect(events, ProxyAuthRequestOf(destination, tunnel.Proxy), proxyAuthorization, answersChallenge);
+            var request = HttpProxyTunnel.BuildConnectRequest(destination.Host, destination.Port, tunnel.Proxy, _proxyTunnelOptions, proxyAuthorization);
+            events.ReportRequestHeader(request);
+            await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
             var reply = await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false);
+            ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization);
             if (tunnel.Target.Events is IConnectReplyHeadWritingEvents headOutput && !reply.Head.IsEmpty)
             {
                 await headOutput.WriteConnectReplyHeadAsync(reply.Head, cancellationToken).ConfigureAwait(false);
