@@ -22,6 +22,8 @@ public sealed class FtpProtocolHandlerStateTraceTests
 
     private const string Epsv = "229 Entering Extended Passive Mode (|||53990|)\r\n";
 
+    private const string Pasv = "227 Entering Passive Mode (127,0,0,1,210,230)\r\n";
+
     private const string Opened = "150 Opening BINARY mode data connection\r\n";
 
     private const string Complete = "226 Transfer complete\r\n";
@@ -194,16 +196,32 @@ public sealed class FtpProtocolHandlerStateTraceTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_TracedCwd_WritesNoStateChangeForIt()
+    public async Task ExecuteAsync_TracedCwd_EntersTheCwdStateOnceAndAwaitsTheDataAfterTheFirst()
     {
+        // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/d/e/a.txt (BL-1197)
         TraceRecordingEvents events = await RunAsync(
-            "/dir/a.txt",
-            LoggedIn + "250 OK\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            "/d/e/a.txt",
+            LoggedIn + "250 OK\r\n250 OK\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             _ => { });
 
-        int cwd = events.Transcript.IndexOf("> CWD dir");
-        Assert.AreEqual("< 250 OK", events.Transcript[cwd + 1]);
-        Assert.AreEqual("* [FTP] [STOP] -> [PASV]", events.Transcript[cwd + 3]);
+        string[] expected =
+        [
+            "* [FTP] [STOP] DO phase starts",
+            "> CWD d",
+            "* [FTP] [STOP] -> [CWD]",
+            "* [FTP] [CWD] perform, awaiting DATA connect",
+            "< 250 OK",
+            "> CWD e",
+            "< 250 OK",
+            "> EPSV",
+            "* [FTP] [CWD] -> [PASV]",
+            "* Connect data stream passively",
+            "< 229 Entering Extended Passive Mode (|||53990|)",
+            "* Connecting to 127.0.0.1 port 53990",
+            "* [FTP] [PASV] -> [STOP]",
+            "* [FTP] [STOP] DO phase is complete2",
+        ];
+        CollectionAssert.AreEqual(expected, Slice(events, "* [FTP] [STOP] DO phase starts", expected.Length));
     }
 
     [TestMethod]
@@ -220,6 +238,7 @@ public sealed class FtpProtocolHandlerStateTraceTests
     [TestMethod]
     public async Task ExecuteAsync_RefusedGreeting_EndsTheTraceBeforeTheConnectPhaseIsDone()
     {
+        // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, GREETING=500 go away: exit 8 (BL-1197)
         TraceRecordingEvents events = await RunAsync("/a.txt", "500 Go away\r\n", _ => { });
 
         string[] expected =
@@ -227,6 +246,7 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [STOP] setup connection -> 0",
             "* [FTP] [STOP] -> [WAIT220]",
             "< 500 Go away",
+            "* [FTP] [WAIT220] done, result=8",
         ];
         CollectionAssert.AreEqual(expected, events.Transcript);
     }
@@ -340,6 +360,357 @@ public sealed class FtpProtocolHandlerStateTraceTests
         "* [FTP] [STOP] DO phase is complete2",
     ];
 
+    [TestMethod]
+    public async Task ExecuteAsync_TracedRefusedRetr_ClosesTheDataConnectionAndKeepsResultZero()
+    {
+        // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, RETR=550 No such file: exit 78 (BL-1197)
+        TraceRecordingEvents events = await RunAsync("/a.txt", LoggedIn + Epsv + "200 Type set\r\n213 6\r\n550 No such file\r\n" + Bye, _ => { });
+
+        string[] expected =
+        [
+            "> RETR a.txt",
+            "* [FTP] [RETR_SIZE] -> [RETR]",
+            "* [FTP] [RETR] ftp_domore_pollset()",
+            "< 550 No such file",
+            "* [FTP] [RETR] closing DATA connection",
+            "* [FTP] [RETR] done, result=0",
+        ];
+        CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "> RETR a.txt"));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedRemoteTime_EntersTheMdtmStateFirstInTheDoPhase()
+    {
+        // curl -sS --trace-config ftp -v -R ftp://127.0.0.1:P/a.txt (BL-1197)
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            LoggedIn + "213 20260927123456\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            context => context.RemoteTime = true);
+
+        string[] expected =
+        [
+            "* [FTP] [STOP] DO phase starts",
+            "> MDTM a.txt",
+            "* [FTP] [STOP] -> [MDTM]",
+            "* [FTP] [MDTM] perform, awaiting DATA connect",
+            "< 213 20260927123456",
+            "> EPSV",
+            "* [FTP] [MDTM] -> [PASV]",
+            "< 229 Entering Extended Passive Mode (|||53990|)",
+            "* [FTP] [PASV] -> [STOP]",
+        ];
+        CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "* [FTP] [STOP] DO phase starts").Take(expected.Length).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedResumedDownload_EntersTheRetrRestStateAfterFtpStateRetr()
+    {
+        // curl -sS --trace-config ftp -v -C 2 ftp://127.0.0.1:P/a.txt (BL-1197)
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            LoggedIn + Epsv + "200 Type set\r\n213 6\r\n350 Restarting at 2\r\n" + Opened + Complete + Bye,
+            context => context.ResumeFrom = 2);
+
+        string[] expected =
+        [
+            "< 213 6",
+            "* [FTP] [RETR_SIZE] ftp_state_retr()",
+            "* Instructs server to resume from offset 2",
+            "> REST 2",
+            "* [FTP] [RETR_SIZE] -> [RETR_REST]",
+            "* [FTP] [RETR_REST] ftp_domore_pollset()",
+            "< 350 Restarting at 2",
+            "> RETR a.txt",
+            "* [FTP] [RETR_REST] -> [RETR]",
+            "* [FTP] [RETR] ftp_domore_pollset()",
+        ];
+        CollectionAssert.AreEqual(expected, Slice(events, "< 213 6", expected.Length));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedDisableEpsv_EntersThePasvStateOnPasv()
+    {
+        // curl -sS --trace-config ftp -v --disable-epsv ftp://127.0.0.1:P/a.txt (BL-1197)
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            LoggedIn + Pasv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            context => context.FtpDisableEpsv = true);
+
+        string[] expected =
+        [
+            "* [FTP] [STOP] DO phase starts",
+            "> PASV",
+            "* [FTP] [STOP] -> [PASV]",
+            "* Connect data stream passively",
+            "* [FTP] [PASV] perform, awaiting DATA connect",
+            "< 227 Entering Passive Mode (127,0,0,1,210,230)",
+        ];
+        CollectionAssert.AreEqual(expected, Slice(events, "* [FTP] [STOP] DO phase starts", expected.Length));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedRefusedEpsv_ClosesTheDataConnectionAndStaysInPasvForPasv()
+    {
+        // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, EPSV=500 no (BL-1197)
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            LoggedIn + "500 no\r\n" + Pasv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            _ => { });
+
+        string[] expected =
+        [
+            "> EPSV",
+            "* [FTP] [STOP] -> [PASV]",
+            "* Connect data stream passively",
+            "* [FTP] [PASV] perform, awaiting DATA connect",
+            "< 500 no",
+            "* Failed EPSV attempt. Disabling EPSV",
+            "* [FTP] [PASV] closing DATA connection",
+            "> PASV",
+            "< 227 Entering Passive Mode (127,0,0,1,210,230)",
+        ];
+        CollectionAssert.AreEqual(expected, Slice(events, "> EPSV", expected.Length));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedSsl_WritesTheAuthPbszAndProtStates()
+    {
+        // curl -sS --trace-config ftp -v --ssl -k ftp://127.0.0.1:P/a.txt (BL-1197)
+        var securedControl = new ScriptedConnection(Encoding.Latin1.GetBytes(
+            "331 Password required\r\n230 Logged in\r\n200 PBSZ=0\r\n200 Protection level set to P\r\n257 \"/\" is current directory\r\n"
+            + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye))
+        {
+            RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, ControlPort),
+        };
+        var tls = new QueuedTlsProvider(ConnectResult.Connected(securedControl), ConnectResult.Connected(new ScriptedConnection("hello\n"u8.ToArray())));
+
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            "220 Recorder ready\r\n234 AUTH accepted\r\n",
+            context => context.SslLevel = TransportSecurityLevel.Try,
+            tls: tls);
+
+        string[] expected =
+        [
+            "* [FTP] [STOP] -> [WAIT220]",
+            "< 220 Recorder ready",
+            "> AUTH SSL",
+            "* [FTP] [WAIT220] -> [AUTH]",
+            "< 234 AUTH accepted",
+            "> USER anonymous",
+            "* [FTP] [AUTH] -> [USER]",
+            "< 331 Password required",
+            "> PASS ftp@example.com",
+            "* [FTP] [USER] -> [PASS]",
+            "< 230 Logged in",
+            "> PBSZ 0",
+            "* [FTP] [PASS] -> [PBSZ]",
+            "< 200 PBSZ=0",
+            "> PROT P",
+            "* [FTP] [PBSZ] -> [PROT]",
+            "< 200 Protection level set to P",
+            "> PWD",
+            "* [FTP] [PROT] -> [PWD]",
+            "< 257 \"/\" is current directory",
+            "* [FTP] [PWD] -> [STOP]",
+            "* [FTP] [STOP] protocol connect phase DONE",
+        ];
+        CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "* [FTP] [STOP] -> [WAIT220]").Take(expected.Length).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedQuotes_WritesTheQuoteAndPrequoteStatesAndThePostQuoteReply()
+    {
+        // curl -sS --trace-config ftp -v -Q NOOP -Q '-SITE x' -Q +HELP ftp://127.0.0.1:P/a.txt (BL-1197)
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            LoggedIn + "200 ok\r\n" + Epsv + "200 Type set\r\n214 ok\r\n213 6\r\n" + Opened + Complete + "200 ok\r\n" + Bye,
+            context => context.QuoteCommands.AddRange(["NOOP", "-SITE x", "+HELP"]));
+
+        string[] expected =
+        [
+            "* [FTP] [STOP] DO phase starts",
+            "> NOOP",
+            "* [FTP] [STOP] -> [QUOTE]",
+            "* [FTP] [QUOTE] perform, awaiting DATA connect",
+            "< 200 ok",
+            "> EPSV",
+            "* [FTP] [QUOTE] -> [PASV]",
+            "< 229 Entering Extended Passive Mode (|||53990|)",
+            "* [FTP] [PASV] -> [STOP]",
+            "* [FTP] [STOP] DO phase is complete2",
+            "* [FTP] [STOP] ftp_domore_pollset()",
+            "> TYPE I",
+            "* [FTP] [STOP] -> [RETR_TYPE]",
+            "* [FTP] [RETR_TYPE] ftp_domore_pollset()",
+            "< 200 Type set",
+            "> HELP",
+            "* [FTP] [RETR_TYPE] -> [RETR_PREQUOTE]",
+            "* [FTP] [RETR_PREQUOTE] ftp_domore_pollset()",
+            "< 214 ok",
+            "> SIZE a.txt",
+            "* [FTP] [RETR_PREQUOTE] -> [RETR_SIZE]",
+            "* [FTP] [RETR_SIZE] ftp_domore_pollset()",
+            "< 213 6",
+            "* [FTP] [RETR_SIZE] ftp_state_retr()",
+            "> RETR a.txt",
+            "* [FTP] [RETR_SIZE] -> [RETR]",
+            "* [FTP] [RETR] ftp_domore_pollset()",
+            "< 150 Opening BINARY mode data connection",
+            "* [FTP] ftp_initiate_transfer()",
+            "* [FTP] [RETR] -> [STOP]",
+            "* [FTP] [STOP] closing DATA connection",
+            "* [FTP] getftpresponse start",
+            "< 226 Transfer complete",
+            "* [FTP] getftpresponse -> result=0, nread=23, ftpcode=226",
+            "> SITE x",
+            "* [FTP] getftpresponse start",
+            "< 200 ok",
+            "* [FTP] getftpresponse -> result=0, nread=8, ftpcode=200",
+            "* [FTP] [STOP] done, result=0",
+        ];
+        CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "* [FTP] [STOP] DO phase starts"));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedRelativeEntryPath_EntersTheSystState()
+    {
+        // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, PWD=257 "x" is cwd (BL-1197)
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n257 \"x\" is cwd\r\n502 Command not implemented\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            _ => { });
+
+        string[] expected =
+        [
+            "> PWD",
+            "* [FTP] [PASS] -> [PWD]",
+            "< 257 \"x\" is cwd",
+            "> SYST",
+            "* [FTP] [PWD] -> [SYST]",
+            "< 502 Command not implemented",
+            "* [FTP] [SYST] -> [STOP]",
+            "* [FTP] [STOP] protocol connect phase DONE",
+        ];
+        CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "> PWD").Take(expected.Length).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedAccount_EntersTheAcctState()
+    {
+        // curl -sS --trace-config ftp -v --ftp-account bob ftp://127.0.0.1:P/a.txt, PASS=332 (BL-1197)
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            "220 Recorder ready\r\n331 Password required\r\n332 need acct\r\n230 ok\r\n257 \"/\" is current directory\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            context => context.FtpAccount = "bob");
+
+        string[] expected =
+        [
+            "> PASS ftp@example.com",
+            "* [FTP] [USER] -> [PASS]",
+            "< 332 need acct",
+            "> ACCT bob",
+            "* [FTP] [PASS] -> [ACCT]",
+            "< 230 ok",
+            "> PWD",
+            "* [FTP] [ACCT] -> [PWD]",
+        ];
+        CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "> PASS ftp@example.com").Take(expected.Length).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedRefusedPass_WritesDoneWithTheExitCode()
+    {
+        // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, PASS=530 no: exit 67 (BL-1197)
+        TraceRecordingEvents events = await RunAsync("/a.txt", "220 Recorder ready\r\n331 Password required\r\n530 no\r\n", _ => { });
+
+        CollectionAssert.AreEqual(new[] { "< 530 no", "* [FTP] [PASS] done, result=67" }, FtpLinesFrom(events, "< 530 no"));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedRefusedCwd_WritesTheDoPhaseFailedAndResultZero()
+    {
+        // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/d/a.txt, CWD=550 no: exit 9 (BL-1197)
+        TraceRecordingEvents events = await RunAsync("/d/a.txt", LoggedIn + "550 no\r\n" + Bye, _ => { });
+
+        string[] expected = ["< 550 no", "* [FTP] [CWD] DO phase failed", "* [FTP] [CWD] done, result=0"];
+        CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "< 550 no"));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedRefusedQuote_WritesTheDoPhaseFailedAndExit21()
+    {
+        // curl -sS --trace-config ftp -v -Q NOOP ftp://127.0.0.1:P/a.txt, NOOP=502 (BL-1197)
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            LoggedIn + "502 Command not implemented\r\n",
+            context => context.QuoteCommands.Add("NOOP"));
+
+        string[] expected = ["< 502 Command not implemented", "* [FTP] [QUOTE] DO phase failed", "* [FTP] [QUOTE] done, result=21"];
+        CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "< 502 Command not implemented"));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedRange_ReadsAborsReplyAfterClosingTheDataConnection()
+    {
+        // curl -sS --trace-config ftp -v -r 0-1 ftp://127.0.0.1:P/a.txt (BL-1197)
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            LoggedIn + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            context => context.Range = ByteRange.Bounded(0, 1));
+
+        string[] expected =
+        [
+            "* Remembering we are in directory \"\"",
+            "> ABOR",
+            "* [FTP] [STOP] closing DATA connection",
+            "* [FTP] getftpresponse start",
+            "< 226 Transfer complete",
+            "* [FTP] getftpresponse -> result=0, nread=23, ftpcode=226",
+            "* partial download completed, closing connection",
+            "* [FTP] [STOP] done, result=0",
+            "* shutting down connection #0",
+        ];
+        CollectionAssert.AreEqual(expected, Slice(events, "* Remembering we are in directory \"\"", expected.Length));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TracedUploadResumedFromTheRemoteSize_EntersTheStorSizeState()
+    {
+        // curl -sS --trace-config ftp -v -T up.txt -C - ftp://127.0.0.1:P/a.txt (BL-1197)
+        TraceRecordingEvents events = await RunAsync(
+            "/a.txt",
+            LoggedIn + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
+            context =>
+            {
+                context.Upload = new MemoryStream("0123456789"u8.ToArray());
+                context.ResumeUploadFromUnknownOffset = true;
+            });
+
+        string[] expected =
+        [
+            "> SIZE a.txt",
+            "* [FTP] [STOR_TYPE] -> [STOR_SIZE]",
+            "* [FTP] [STOR_SIZE] ftp_domore_pollset()",
+            "< 213 6",
+            "> APPE a.txt",
+            "* [FTP] [STOR_SIZE] -> [STOR]",
+        ];
+        CollectionAssert.AreEqual(expected, Slice(events, "> SIZE a.txt", expected.Length));
+    }
+
+    /// <summary>The lines from <paramref name="first" /> on, <paramref name="count" /> of them.</summary>
+    private static string[] Slice(TraceRecordingEvents events, string first, int count) =>
+        [.. events.Transcript.Skip(events.Transcript.IndexOf(first)).Take(count)];
+
+    /// <summary>The <c>[FTP]</c>, command and reply lines from <paramref name="first" /> on, the other <c>-v</c> lines left out.</summary>
+    private static string[] FtpLinesFrom(TraceRecordingEvents events, string first) =>
+    [
+        .. events.Transcript
+            .Skip(events.Transcript.IndexOf(first))
+            .Where(line => line.StartsWith("* [FTP]", StringComparison.Ordinal) || line.StartsWith("> ", StringComparison.Ordinal) || line.StartsWith("< ", StringComparison.Ordinal)),
+    ];
+
     private static async Task<TraceRecordingEvents> RunActiveAsync(string path, string replies, Action<MutableContext> adjust)
     {
         var events = new TraceRecordingEvents();
@@ -364,7 +735,7 @@ public sealed class FtpProtocolHandlerStateTraceTests
         return events;
     }
 
-    private static async Task<TraceRecordingEvents> RunAsync(string path, string replies, Action<MutableContext> adjust, bool traced = true)
+    private static async Task<TraceRecordingEvents> RunAsync(string path, string replies, Action<MutableContext> adjust, bool traced = true, QueuedTlsProvider? tls = null)
     {
         var events = new TraceRecordingEvents();
         var control = new ScriptedConnection(Encoding.Latin1.GetBytes(replies))
@@ -396,7 +767,7 @@ public sealed class FtpProtocolHandlerStateTraceTests
                 adjust(mutable);
             });
 
-        var handler = new FtpProtocolHandler(connector, new QueuedListener(), new QueuedTlsProvider()) { TracesStateMachine = traced };
+        var handler = new FtpProtocolHandler(connector, new QueuedListener(), tls ?? new QueuedTlsProvider()) { TracesStateMachine = traced };
         await handler.ExecuteAsync(context);
         return events;
     }

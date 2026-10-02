@@ -31,6 +31,10 @@ public sealed class MutableContext
 
     public bool NoBody { get; set; }
 
+    public bool RemoteTime { get; set; }
+
+    public string? FtpAccount { get; set; }
+
     public string? FtpPort { get; set; }
 
     public bool FtpUseEprt { get; set; } = true;
@@ -73,6 +77,8 @@ public sealed class MutableContext
             ResumeUploadFromUnknownOffset = mutable.ResumeUploadFromUnknownOffset,
             Range = mutable.Range,
             NoBody = mutable.NoBody,
+            RemoteTime = mutable.RemoteTime,
+            FtpAccount = mutable.FtpAccount,
             HeaderOutput = mutable.HeaderOutput,
             FtpPort = mutable.FtpPort,
             FtpUseEprt = mutable.FtpUseEprt,

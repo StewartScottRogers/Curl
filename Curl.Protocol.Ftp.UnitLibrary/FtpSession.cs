@@ -260,6 +260,7 @@ internal sealed class FtpSession(
             result = lost.Result;
         }
 
+        trace.Ended(result.ExitCode);
         log.SessionEnded(result, context.TimeProvider.GetElapsedTime(started));
         return result with
         {
@@ -585,7 +586,7 @@ internal sealed class FtpSession(
     {
         ReportWhetherInEntryDirectory(path);
         trace.DoPhaseStarts(IsListing(path) ? "LIST" : "RETR");
-        return await SendQuotesAsync(quotes.AfterLogin).ConfigureAwait(false)
+        return await SendQuotesAsync(quotes.AfterLogin, FtpQuoteStage.AfterLogin).ConfigureAwait(false)
             ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
             ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
             ?? (context.NoBody
@@ -607,11 +608,27 @@ internal sealed class FtpSession(
         window = DownloadWindowOf(listing);
         return await OpenDataConnectionAsync(DownloadPretArgument(path, listing)).ConfigureAwait(false)
             ?? await SetTypeAsync(ascii).ConfigureAwait(false)
-            ?? await SendQuotesAsync(quotes.BeforeTransfer).ConfigureAwait(false)
+            ?? await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
             ?? await ReadSizeAsync(path.FileName, ascii).ConfigureAwait(false)
+            ?? TraceRetrieveNext(listing)
             ?? await RefuseOversizedFileAsync().ConfigureAwait(false)
             ?? await PositionAsync().ConfigureAwait(false)
             ?? await RetrieveAsync(listing ? ListCommand(path) : "RETR " + path.FileName, listing).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes curl's <c>ftp_state_retr()</c> note for a file, once its size is known and
+    /// before <c>--max-filesize</c> is checked or <c>REST</c> sent; never for a listing.
+    /// </summary>
+    /// <returns>Always <see langword="null" />: the download goes on.</returns>
+    private TransferResult? TraceRetrieveNext(bool listing)
+    {
+        if (!listing)
+        {
+            trace.RetrieveNext();
+        }
+
+        return null;
     }
 
     /// <summary>Whether a download is a listing: the path names a directory, or <c>-l</c> or <c>;type=d</c> asks for one.</summary>
@@ -659,12 +676,12 @@ internal sealed class FtpSession(
 
         ReportWhetherInEntryDirectory(path);
         trace.DoPhaseStarts("STOR");
-        return await SendQuotesAsync(quotes.AfterLogin).ConfigureAwait(false)
+        return await SendQuotesAsync(quotes.AfterLogin, FtpQuoteStage.AfterLogin).ConfigureAwait(false)
             ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
             ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
             ?? await OpenDataConnectionAsync("STOR " + path.FileName).ConfigureAwait(false)
             ?? await SetTypeAsync(typeCode.UseAscii).ConfigureAwait(false)
-            ?? await SendQuotesAsync(quotes.BeforeTransfer).ConfigureAwait(false)
+            ?? await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
             ?? await StoreAsync(path.FileName, upload).ConfigureAwait(false);
     }
 
@@ -854,7 +871,7 @@ internal sealed class FtpSession(
     {
         if (fileName.Length == 0)
         {
-            return await SendQuotesAsync(quotes.BeforeTransfer).ConfigureAwait(false)
+            return await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
                 ?? await QuitAndSucceedAsync().ConfigureAwait(false);
         }
 
@@ -868,7 +885,7 @@ internal sealed class FtpSession(
     {
         FtpReply rest = await ExchangeAsync("REST 0").ConfigureAwait(false);
         return await WriteHeaderAsync(rest.Code == 350 ? FtpHeadHeaderLines.AcceptRanges : null).ConfigureAwait(false)
-            ?? await SendQuotesAsync(quotes.BeforeTransfer).ConfigureAwait(false)
+            ?? await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
             ?? await QuitAndSucceedAsync().ConfigureAwait(false);
     }
 
@@ -1288,6 +1305,7 @@ internal sealed class FtpSession(
         }
 
         context.Events.ReportInfo(FtpTransferMessages.EpsvFailed);
+        trace.EpsvRefused();
         log.EpsvRefused(code);
         return await EnterPassiveModeAsync(afterSent: null).ConfigureAwait(false);
     }
@@ -1469,11 +1487,6 @@ internal sealed class FtpSession(
 
     private async ValueTask<TransferResult> RetrieveAsync(string command, bool listing)
     {
-        if (!listing)
-        {
-            trace.RetrieveNext();
-        }
-
         FtpReply opened = await ExchangeAsync(command).ConfigureAwait(false);
         if (opened.Code is 125 or 150)
         {
@@ -1608,6 +1621,7 @@ internal sealed class FtpSession(
         context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
         await AbortRangeAsync().ConfigureAwait(false);
         context.Events.ReportInfo(FtpTransferMessages.PartialDownloadClosing);
+        trace.Ended(CurlExitCode.Ok);
         context.Events.ReportInfo(FtpTransferMessages.ShuttingDownConnection(controlName.Number));
         return await QuitAndSucceedAsync().ConfigureAwait(false);
     }
@@ -1636,7 +1650,6 @@ internal sealed class FtpSession(
             return await QuitAndFailAsync(exitCode, message).ConfigureAwait(false);
         }
 
-        trace.Done();
         return await QuitAndKeepConnectionAsync().ConfigureAwait(false);
     }
 
@@ -1677,7 +1690,8 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult> QuitAndSucceedAsync()
     {
-        (FtpQuoteCommand Command, int Code)? refused = await FindRefusedQuoteAsync(quotes.AfterTransfer).ConfigureAwait(false);
+        (FtpQuoteCommand Command, int Code)? refused = await FindRefusedQuoteAsync(quotes.AfterTransfer, FtpQuoteStage.AfterTransfer).ConfigureAwait(false);
+        trace.Ended(refused is null ? CurlExitCode.Ok : CurlExitCode.QuoteError);
         await QuitAsync().ConfigureAwait(false);
         return refused is { } quote
             ? TransferResult.Failure(CurlExitCode.QuoteError, FtpTransferMessages.QuoteNotAccepted(quote.Command.Command), bytesTransferred)
@@ -1690,8 +1704,9 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask AbortRangeAsync()
     {
-        if (window.MaxDownload is not null && await SendIgnoringReplyAsync("ABOR").ConfigureAwait(false) is { } aborted)
+        if (window.MaxDownload is not null && await SendIgnoringReplyAsync("ABOR", trace.ClosingDataConnection).ConfigureAwait(false) is { } aborted)
         {
+            trace.TransferReplyRead(aborted);
             lastReplyCode = aborted.Code;
         }
     }
@@ -1712,8 +1727,8 @@ internal sealed class FtpSession(
     /// Sends the quotes due before the transfer: the first answered with 400 or more whose
     /// failure is not ignored ends the transfer with exit 21 and no <c>QUIT</c>.
     /// </summary>
-    private async ValueTask<TransferResult?> SendQuotesAsync(IReadOnlyList<FtpQuoteCommand> commands) =>
-        await FindRefusedQuoteAsync(commands).ConfigureAwait(false) is { } refused
+    private async ValueTask<TransferResult?> SendQuotesAsync(IReadOnlyList<FtpQuoteCommand> commands, FtpQuoteStage stage) =>
+        await FindRefusedQuoteAsync(commands, stage).ConfigureAwait(false) is { } refused
             ? TransferResult.Failure(CurlExitCode.QuoteError, FtpTransferMessages.QuoteCommandFailed(refused.Code), bytesTransferred)
             : null;
 
@@ -1722,11 +1737,14 @@ internal sealed class FtpSession(
     /// with 400 or more whose failure is not ignored.
     /// </summary>
     /// <returns>That command and its reply's code, or <see langword="null" /> when none was refused.</returns>
-    private async ValueTask<(FtpQuoteCommand Command, int Code)?> FindRefusedQuoteAsync(IReadOnlyList<FtpQuoteCommand> commands)
+    private async ValueTask<(FtpQuoteCommand Command, int Code)?> FindRefusedQuoteAsync(IReadOnlyList<FtpQuoteCommand> commands, FtpQuoteStage stage)
     {
         foreach (FtpQuoteCommand quote in commands)
         {
-            FtpReply reply = await ExchangeAsync(quote.Command).ConfigureAwait(false);
+            await SendAsync(quote.Command).ConfigureAwait(false);
+            trace.QuoteSent(stage);
+            FtpReply reply = await ReadReplyAsync().ConfigureAwait(false);
+            trace.QuoteReplyRead(stage, reply);
             if (reply.Code >= 400)
             {
                 if (!quote.IgnoreFailure)
@@ -1759,12 +1777,14 @@ internal sealed class FtpSession(
     /// The reply, or <see langword="null" /> when the command could not be sent or no
     /// complete reply of a readable size arrived.
     /// </returns>
-    private async ValueTask<FtpReply?> SendIgnoringReplyAsync(string command)
+    private async ValueTask<FtpReply?> SendIgnoringReplyAsync(string command, Action? afterSent = null)
     {
         if (!await control.TrySendAsync(command).ConfigureAwait(false))
         {
             return null;
         }
+
+        afterSent?.Invoke();
 
         try
         {
@@ -1795,15 +1815,20 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<FtpReply> ExchangeAsync(string command, string? afterSent)
     {
-        if (!await control.TrySendAsync(command).ConfigureAwait(false))
-        {
-            throw Failed(CurlExitCode.SendError, FtpTransferMessages.SendFailed);
-        }
-
+        await SendAsync(command).ConfigureAwait(false);
         trace.Sent(command);
         ReportInfo(afterSent);
         trace.AwaitingReply();
         return await ReadReplyAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>Sends <paramref name="command" />, ending the conversation with exit 55 when it cannot be sent.</summary>
+    private async ValueTask SendAsync(string command)
+    {
+        if (!await control.TrySendAsync(command).ConfigureAwait(false))
+        {
+            throw Failed(CurlExitCode.SendError, FtpTransferMessages.SendFailed);
+        }
     }
 
     /// <summary>
