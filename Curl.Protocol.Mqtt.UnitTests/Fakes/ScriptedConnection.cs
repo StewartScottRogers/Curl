@@ -17,10 +17,23 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
 
     private readonly MemoryStream written = new();
 
+    private int writeCount;
+
     /// <summary>
     /// Gets or sets a value indicating whether every write throws an <see cref="IOException" />.
     /// </summary>
     public bool FailWrites { get; set; }
+
+    /// <summary>
+    /// Gets or sets the exception every write from <see cref="WritesBeforeFailure" /> on
+    /// throws, or <see langword="null" /> for none.
+    /// </summary>
+    public IOException? WriteFailure { get; set; }
+
+    /// <summary>
+    /// Gets or sets how many writes succeed before <see cref="WriteFailure" /> is thrown.
+    /// </summary>
+    public int WritesBeforeFailure { get; set; }
 
     /// <summary>
     /// Gets a value indicating whether the handler disposed the connection.
@@ -62,6 +75,11 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
         if (FailWrites)
         {
             throw new IOException("The scripted peer refused the write.");
+        }
+
+        if (WriteFailure is not null && writeCount++ >= WritesBeforeFailure)
+        {
+            throw WriteFailure;
         }
 
         written.Write(buffer.Span);

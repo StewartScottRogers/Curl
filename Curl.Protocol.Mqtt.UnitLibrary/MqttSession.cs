@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Mqtt;
@@ -127,7 +128,8 @@ internal sealed class MqttSession(
         ReadOnlyMemory<byte>? postData)
     {
         events.ReportInfo(MqttTransferMessages.UsingClientId(clientIdentifier));
-        await SendAsync(MqttPackets.BuildConnect(clientIdentifier, credentials)).ConfigureAwait(false);
+        await SendAsync(MqttPackets.BuildConnect(clientIdentifier, credentials), MqttTransferMessages.ConnectNotSent)
+            .ConfigureAwait(false);
 
         // curl runs mqtt_doing once straight after the CONNECT, before any reply can have
         // arrived, and finds nothing to read (measured every time on loopback, BL-935).
@@ -462,7 +464,17 @@ internal sealed class MqttSession(
         events.ReportInfo(MqttTransferMessages.ServerDisconnected);
     }
 
-    private async ValueTask SendAsync(byte[] packet)
+    /// <summary>
+    /// Sends one packet; a send that fails ends the session with exit 55 and curl's text,
+    /// <see cref="MqttTransferMessages.SendConnectionReset" /> for a reset and
+    /// <see cref="MqttTransferMessages.SendFailed" /> otherwise.
+    /// </summary>
+    /// <param name="packet">The packet to send.</param>
+    /// <param name="failureLine">
+    /// The <c>-v</c> line <c>lib/mqtt.c</c> writes when this packet cannot be sent, or
+    /// <see langword="null" /> for none.
+    /// </param>
+    private async ValueTask SendAsync(byte[] packet, string? failureLine = null)
     {
         log.PacketSent(packet);
         events.ReportRequestHeader(packet);
@@ -471,11 +483,19 @@ internal sealed class MqttSession(
             await connection.WriteAsync(packet, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (IOException)
+        catch (IOException failure)
         {
-            throw new MqttTransferException(CurlExitCode.SendError, MqttTransferMessages.SendFailed);
+            throw new MqttTransferException(
+                CurlExitCode.SendError,
+                IsReset(failure) ? MqttTransferMessages.SendConnectionReset : MqttTransferMessages.SendFailed)
+            {
+                FollowingLine = failureLine,
+            };
         }
     }
+
+    private static bool IsReset(IOException failure) =>
+        failure.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset };
 
     /// <summary>
     /// Where the session stands between packets, after curl 8.21.0's <c>mqttstate</c> and

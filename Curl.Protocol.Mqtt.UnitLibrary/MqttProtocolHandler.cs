@@ -154,6 +154,7 @@ public sealed class MqttProtocolHandler : IProtocolHandler
 
         context.Progress.ReportTransferStarted();
         TransferResult result;
+        string? followingLine = null;
         await using (connection.ConfigureAwait(false))
         {
             MqttSession session = new(connection, context.Output, context.Progress, context.Events, log, context.MaxFileSize, context.TimeProvider, context.CancellationToken);
@@ -171,24 +172,30 @@ public sealed class MqttProtocolHandler : IProtocolHandler
             catch (MqttTransferException failure)
             {
                 result = new TransferResult(failure.ExitCode, session.BytesWritten, failure.Message);
+                followingLine = failure.FollowingLine;
             }
         }
 
-        ReportConnectionEnd(context.Events, result, connected.ConnectionNumber);
+        ReportConnectionEnd(context.Events, result, followingLine, connected.ConnectionNumber);
         return result;
     }
 
     /// <summary>
     /// Reports how the transfer ended, as curl 8.21.0's <c>-v</c> does (measured, BL-935):
-    /// the failure's message unless curl prints it without <c>failf</c>, then
-    /// <c>closing connection #N</c> after an output write failure and
-    /// <c>shutting down connection #N</c> after anything else.
+    /// the failure's message unless curl prints it without <c>failf</c>, then the line
+    /// <c>lib/mqtt.c</c> adds after it (BL-1229), then <c>closing connection #N</c> after an
+    /// output write failure and <c>shutting down connection #N</c> after anything else.
     /// </summary>
-    private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, long connectionNumber)
+    private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, string? followingLine, long connectionNumber)
     {
         if (result.ErrorMessage is { } message && !MqttTransferMessages.IsStrerrorText(message))
         {
             events.ReportInfo(message);
+        }
+
+        if (followingLine is not null)
+        {
+            events.ReportInfo(followingLine);
         }
 
         events.ReportInfo(result.ExitCode == CurlExitCode.WriteError
