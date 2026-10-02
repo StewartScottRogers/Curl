@@ -70,3 +70,23 @@ handler's client writer stack and a transfer engine Curl does not have as such.
 - The `[READ]` lines carry no volatile value. The upload readers' lines (`add buf reader`,
   `cr_buf_read(len=65388)`, `client_read(...)`) of a `-d` body, and the lines of each followed
   redirect's hop, were not delivered here and are a follow-up task.
+
+## Amendment, 2026-10-02 (BL-1160): the `[HAPROXY]` lines
+
+Decided by Claude under Stewart's delegation.
+
+BL-1160 split again: this run delivers the `[HAPROXY]` lines and pins `[SETUP]` through a plain
+HTTP proxy; `[HTTP-PROXY]` and `[H1-PROXY]` (a CONNECT tunnel), `[SOCKS]` and `[HTTPS-CONNECT]` each
+go to a follow-up task (BL-1190, BL-1191, BL-1192), each a filter of its own with lines to measure.
+
+- Measured (BL-1160 Notes): a plain `-x http://` proxy adds no proxy filter at all; its `[SETUP]`
+  lines are a direct connect's, naming the proxy as the origin, which Curl already wrote, since a
+  forward-proxy target is a direct connect.
+- With `--haproxy-protocol` the setup filter writes `[SETUP] added HAPROXY filter` once the socket
+  connected, before `Established connection`, and the `[HAPROXY]` component writes `removing
+  connected setup filter` and `destroy` after the `[SETUP]` removal. `haproxy`, `proxy` and `all`
+  turn `[HAPROXY]` on (`CurlComposition.TracesHaproxy`, `TcpConnector.TracesHaproxyFilter`);
+  `network` does not. A refused connect writes no `[HAPROXY]` line.
+- `TcpConnector` writes the added line beside the PROXY line it sends and the removal lines after it
+  reports the connection opened, over TLS too, where their place is unmeasured (BL-1192 measures it).
+- The `[SETUP]` and `[HAPROXY]` lines carry no volatile value: no descriptor, stamp or repetition.
