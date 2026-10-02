@@ -36,3 +36,4 @@ BL-602 left the retry's verbose lines unreported. curl 8.21.0 `-v` prints `Proxy
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
