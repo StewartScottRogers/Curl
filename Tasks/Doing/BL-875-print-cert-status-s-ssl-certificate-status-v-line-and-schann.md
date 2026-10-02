@@ -33,3 +33,4 @@ With `-v`, a `--cert-status` transfer prints curl's `* SSL certificate status: g
 ## Log
 
 - 2026-09-29: Created.
+- 2026-10-01: Backlog -> Doing.
