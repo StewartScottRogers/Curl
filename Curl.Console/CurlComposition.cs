@@ -309,14 +309,17 @@ internal static class CurlComposition
     /// <param name="options">The parsed command line.</param>
     /// <param name="timeProvider">The clock the hand-built resolver and the DoH connections time on.</param>
     /// <param name="tcpDialer">Opens the plaintext TCP connections to the DoH server.</param>
+    /// <param name="dohTrace">
+    /// Receives the DoH resolver's <c>--trace-config doh</c> lines (BL-1102); <see langword="null" />
+    /// for none.
+    /// </param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDnsResolver(CommandLineOptions options, TimeProvider timeProvider, ITcpDialer tcpDialer)
+    internal static IDnsResolver CreateDnsResolver(CommandLineOptions options, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null)
     {
         if (options.DohUrl is { } dohUrl)
         {
-            return CreateDohResolver(dohUrl, CreateDohConnector(options, tcpDialer, timeProvider), AddressFamilyOf(options));
+            return CreateDohResolver(dohUrl, CreateDohConnector(options, tcpDialer, timeProvider), AddressFamilyOf(options), dohTrace);
         }
-
 
         DnsServerResolverOptions resolverOptions = new(
             options.DnsServers,
@@ -340,11 +343,25 @@ internal static class CurlComposition
     /// <param name="addressFamily">
     /// The <c>-4</c> or <c>-6</c> family (<see cref="AddressFamilyOf" />), whose query alone is sent (BL-939).
     /// </param>
+    /// <param name="dohTrace">
+    /// Receives the <c>--trace-config doh</c> lines, with <see cref="CurlEasyErrorText" />'s texts
+    /// (BL-1102); <see langword="null" /> for none.
+    /// </param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily) =>
+    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily, ITransferEvents? dohTrace = null) =>
         DohUrlOf(dohUrl) is { } url
-            ? new DohDnsResolver(connector, url) { AddressFamily = addressFamily }
+            ? new DohDnsResolver(connector, url, dohTrace ?? NoTransferEvents.Instance, CurlEasyErrorText.Of) { AddressFamily = addressFamily }
             : new UnusableDohUrlResolver();
+
+    /// <summary>
+    /// Whether <c>--trace-config</c> turned on curl 8.21.0's <c>[DNS]</c> lines: <c>dns</c>, <c>doh</c>
+    /// and <c>all</c> each turn on the DNS filter's lines and the DoH resolver's alike (measured,
+    /// BL-1102 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesDns(CommandLineOptions options) =>
+        options.TraceComponents.Contains("dns") || options.TraceComponents.Contains("doh") || options.TraceComponents.Contains("all");
 
     /// <summary>
     /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
@@ -432,7 +449,8 @@ internal static class CurlComposition
             FastOpen = options.TcpFastOpen,
             MultipathTcp = options.MultipathTcp,
         });
-        IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer);
+        FlowScopedTransferEvents? resolverEvents = TracesDns(options) ? new() : null;
+        IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer, resolverEvents);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);
@@ -440,7 +458,7 @@ internal static class CurlComposition
         LateBoundSecurityContextFactory proxyContexts = new();
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider);
-        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache);
+        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
         UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider, diagnosticLog);
         PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, timeProvider, runConnections);
 
@@ -530,7 +548,13 @@ internal static class CurlComposition
     /// The run's DNS cache, shared by every option group's connector (BL-1053); <see langword="null" /> for
     /// a cache of the connector's own.
     /// </param>
-    /// <returns>The connector.</returns>
+    /// <param name="resolverEvents">
+    /// The events <paramref name="dnsResolver" /> reports its <c>--trace-config doh</c> lines to, which
+    /// the connector points at each resolving transfer's events (BL-1102); <see langword="null" /> for none.
+    /// </param>
+    /// <returns>
+    /// The connector, writing curl's <c>[DNS]</c> filter lines when <see cref="TracesDns" /> says so.
+    /// </returns>
     internal static TcpConnector CreateTcpConnector(
         CommandLineOptions options,
         IDnsResolver dnsResolver,
@@ -541,7 +565,8 @@ internal static class CurlComposition
         ITlsProvider? proxyTlsProvider = null,
         QuicDialer? quicDialer = null,
         ISecurityContextFactory? socks5SecurityContexts = null,
-        DnsCache? runDnsCache = null) =>
+        DnsCache? runDnsCache = null,
+        FlowScopedTransferEvents? resolverEvents = null) =>
         new(
             dnsResolver,
             tcpDialer,
@@ -561,7 +586,11 @@ internal static class CurlComposition
             preProxy: PreProxyOf(options),
             socks5Authentication: Socks5AuthenticationMapping.FromCommandLine(options, socks5SecurityContexts, OperatingSystem.IsWindows()),
             haproxyProtocol: HaproxyProtocolOf(options),
-            dnsCache: runDnsCache);
+            dnsCache: runDnsCache)
+        {
+            TracesDnsFilter = TracesDns(options),
+            ResolverEvents = resolverEvents,
+        };
 
     /// <summary>
     /// The SOCKS proxy the connector reaches an HTTP or HTTPS proxy through: the <c>--preproxy</c>
