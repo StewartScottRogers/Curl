@@ -29,6 +29,8 @@ public sealed partial class HandBuiltTlsProviderTests
 
     private const bool OpenSslBuild = false;
 
+    private const string FailedToReceiveHandshakeLine = "schannel: failed to receive handshake, SSL/TLS connection failed";
+
     private const string UntrustedRootLine =
         "schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted.";
 
@@ -586,6 +588,51 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.IsTrue(result.PlaintextDisposed);
     }
 
+    // curl 8.21.0 Schannel -v, --tlsv1.3 against a TLS 1.2-only server, exit 35: the failf text
+    // as an info line after the ALPN offer, before "closing connection #0" (measured 2026-10-03, BL-1324).
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WhenTheServerClosesMidHandshakeInTheSchannelBuild_ReportsFailedToReceiveHandshakeOnceAsTheLastLine()
+    {
+        var handshakesAtEcho = -1;
+        RecordingTransferEvents? events = null;
+        events = new RecordingTransferEvents { OnInfo = _ => handshakesAtEcho = events!.Handshakes.Count };
+
+        var (result, _) = await HandshakeWithServerAnsweringAsync(SchannelBuild, answer: null, events: events);
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual(FailedToReceiveHandshakeLine, result.ErrorMessage);
+        Assert.AreEqual(FailedToReceiveHandshakeLine, events.Info[^1]);
+        Assert.AreEqual(1, events.Info.Count(line => line == FailedToReceiveHandshakeLine));
+        Assert.AreEqual(events.Handshakes.Count, handshakesAtEcho);
+    }
+
+    // Every Schannel exit 35 is a failf, so a named security status is echoed too (BL-1324).
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WhenTheServerSendsAHandshakeFailureAlertInTheSchannelBuild_ReportsTheSecurityStatusOnceAsTheLastLine()
+    {
+        var events = new RecordingTransferEvents();
+
+        var (result, _) = await HandshakeWithServerAnsweringAsync(SchannelBuild, answer: [0x15, 0x03, 0x03, 0x00, 0x02, 0x02, 0x28], events: events);
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        StringAssert.StartsWith(result.ErrorMessage, "schannel: next InitializeSecurityContext failed: SEC_E_ILLEGAL_MESSAGE (0x80090326)");
+        Assert.AreEqual(result.ErrorMessage, events.Info[^1]);
+        Assert.AreEqual(1, events.Info.Count(line => line == result.ErrorMessage));
+    }
+
+    // The OpenSSL build's exit 35 lines are BL-1178's; this echo adds none of them.
+    [TestMethod]
+    [DataRow(null)]
+    [DataRow(new byte[] { 0x15, 0x03, 0x03, 0x00, 0x02, 0x02, 0x28 })]
+    public async Task AuthenticateAsClientAsync_WhenTheHandshakeFailsInTheOpenSslBuild_ReportsNoFailureLine(byte[]? answer)
+    {
+        var events = new RecordingTransferEvents();
+
+        var (result, _) = await HandshakeWithServerAnsweringAsync(OpenSslBuild, answer, events: events);
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        CollectionAssert.DoesNotContain(events.Info, result.ErrorMessage);
+    }
     [TestMethod]
     [DataRow(SchannelBuild, "schannel: next InitializeSecurityContext failed: SEC_E_ILLEGAL_MESSAGE (0x80090326) - This error usually occurs when a fatal SSL/TLS alert is received (e.g. handshake failed). More detail may be available in the Windows System event log.")]
     [DataRow(OpenSslBuild, "TLS connect error: error:0A000410:SSL routines::ssl/tls alert handshake failure")]
@@ -764,7 +811,7 @@ public sealed partial class HandBuiltTlsProviderTests
     }
 
     // A server that reads the ClientHello and then sends the answer and closes, or just closes.
-    private static async Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeWithServerAnsweringAsync(bool matchesSchannelBuild, byte[]? answer, TlsClientOptions? options = null)
+    private static async Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeWithServerAnsweringAsync(bool matchesSchannelBuild, byte[]? answer, TlsClientOptions? options = null, RecordingTransferEvents? events = null)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = Task.Run(async () =>
@@ -781,7 +828,7 @@ public sealed partial class HandBuiltTlsProviderTests
         });
 
         var result = await Provider(options ?? Tls12Only(new TlsClientOptions(Insecure: true)), matchesSchannelBuild)
-            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events ?? new RecordingTransferEvents(), false, Http11, CancellationToken.None);
 
         await serverTask;
         return (result, client.IsDisposed);

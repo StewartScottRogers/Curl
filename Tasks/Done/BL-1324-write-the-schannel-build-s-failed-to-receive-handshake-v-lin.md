@@ -8,7 +8,7 @@ depends-on: [BL-1323]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1324 — Write the Schannel build's 'failed to receive handshake' -v line before a refused TLS version range's exit 35
 
@@ -35,15 +35,20 @@ When the Schannel build's handshake fails with `schannel: failed to receive hand
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Networking.UnitTests` drives `SslStreamTlsProvider` as the Schannel build into the `failed to receive handshake` failure (as the existing exit 35 tests do, e.g. a transport that closes during the handshake) and asserts the info line `schannel: failed to receive handshake, SSL/TLS connection failed` is reported once, after the failed handshake event, with the result unchanged (exit 35, same message).
-- [ ] A test pins the same for `HandBuiltTlsProvider` as the Schannel build when the server closes during the handshake (`TlsHandshakeFailureOrigin.TransportClosed`).
-- [ ] A test pins that a Schannel exit 35 with a named security status reports that message as its info line too.
-- [ ] A test pins that the OpenSSL build reports no new line for the same failures.
-- [ ] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean; `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Networking.UnitTests` drives `SslStreamTlsProvider` as the Schannel build into the `failed to receive handshake` failure (as the existing exit 35 tests do, e.g. a transport that closes during the handshake) and asserts the info line `schannel: failed to receive handshake, SSL/TLS connection failed` is reported once, after the failed handshake event, with the result unchanged (exit 35, same message).
+- [x] A test pins the same for `HandBuiltTlsProvider` as the Schannel build when the server closes during the handshake (`TlsHandshakeFailureOrigin.TransportClosed`).
+- [x] A test pins that a Schannel exit 35 with a named security status reports that message as its info line too.
+- [x] A test pins that the OpenSSL build reports no new line for the same failures.
+- [x] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean; `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Reused BL-1323's `SchannelFailureEcho`: in the Schannel build it now echoes every exit 35 result (any `SchannelSslConnectError` or hand-built handshake failure text, named security statuses and `Recv failure: ...` included) as well as exit 60's `SEC_E_UNTRUSTED_ROOT`, since every Schannel exit 35 is a `failf` in curl 8.21.0. Both providers already route their failures through it, so only its condition changed.
+- The named-status test uses the hand-built provider's handshake_failure alert, so it runs on every platform, rather than SslStream's Windows-only `SEC_E_ILLEGAL_MESSAGE`.
+- Gates: Networking build clean with -warnaserror; full fast suite green (Networking 2959 passed, 28 skipped); `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. The Schannel build echoes every exit 35 handshake failure, e.g. 'failed to receive handshake', as a -v line before closing
