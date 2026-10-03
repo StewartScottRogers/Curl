@@ -3187,7 +3187,7 @@ internal sealed class CurlCommandRunner(
     /// </param>
     /// <param name="transfer">
     /// The transfer, which names its output; the file is resolved by
-    /// <see cref="ResolveOutputFileAsync" />.
+    /// <see cref="ResolveOutputFile" />.
     /// </param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <returns>
@@ -3213,6 +3213,11 @@ internal sealed class CurlCommandRunner(
         standardOutputSwitchedToBinary |= !options.UseAscii && !transfer.WritesToFile;
         if (!options.Silent)
         {
+            if (FallsBackToDefaultRemoteName(options, url, transfer))
+            {
+                await WriteErrorLineAsync(RemoteFileName.NoRemoteNameWarning).ConfigureAwait(false);
+            }
+
             await WriteErrorLinesAsync(dispatch.WarningLinesBeforeEachTransfer).ConfigureAwait(false);
         }
 
@@ -3473,7 +3478,7 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Performs one checked transfer, sending <paramref name="formBody" /> when given, to the file
-    /// <see cref="ResolveOutputFileAsync" /> names when it names one, nowhere under <c>--out-null</c>
+    /// <see cref="ResolveOutputFile" /> names when it names one, nowhere under <c>--out-null</c>
     /// (<see cref="Stream.Null" />, with the progress meter drawn as for a file) and to standard
     /// output otherwise, and writes the progress meter after it. The transfer goes through the proxy
     /// <see cref="TransferProxySelection" /> chooses, with the credentials
@@ -3507,7 +3512,7 @@ internal sealed class CurlCommandRunner(
         Stream? upload)
     {
         Running.UploadResumesFromUnknownOffset = options.ResumeFromOutputSize && upload is not null;
-        string? outputFile = await ResolveOutputFileAsync(options, transfer, url).ConfigureAwait(false);
+        string? outputFile = ResolveOutputFile(options, transfer, url);
         if (outputFile is not null
             && await CreateOutputDirectoriesOrSkipAsync(options, outputFile).ConfigureAwait(false) is { } unstarted)
         {
@@ -3623,9 +3628,9 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Works out the file a transfer saves its body to: the <c>-o</c> name, or the remote name
-    /// <see cref="RemoteFileName" /> takes from the URL's path (printing
-    /// <see cref="RemoteFileName.NoRemoteNameWarning" />, unless <c>-s</c> was given, when there is
-    /// none), rewritten on Windows and put under <c>--output-dir</c>.
+    /// <see cref="RemoteFileName" /> takes from the URL's path (<see cref="RemoteFileName.Fallback" />
+    /// when there is none, the warning for which <see cref="TransferAsync" /> has already printed),
+    /// rewritten on Windows and put under <c>--output-dir</c>.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="transfer">The transfer, which names its output.</param>
@@ -3638,7 +3643,7 @@ internal sealed class CurlCommandRunner(
     /// the <c>--output-dir</c> text is kept as typed and joined with <c>/</c>, as curl 8.21.0 does
     /// (<c>--output-dir "o?d" -o x</c> fails on <c>o?d/x</c>, measured 2026-09-27, BL-239 Notes).
     /// </remarks>
-    private async Task<string?> ResolveOutputFileAsync(CommandLineOptions options, UrlTransfer transfer, CurlUrl url)
+    private string? ResolveOutputFile(CommandLineOptions options, UrlTransfer transfer, CurlUrl url)
     {
         if (transfer.OutputFileName is { } fileName)
         {
@@ -3650,14 +3655,26 @@ internal sealed class CurlCommandRunner(
             return null;
         }
 
-        string? remoteName = RemoteFileName.FromUrlPath(url.AbsolutePath);
-        if (remoteName is null && !options.Silent)
-        {
-            await WriteErrorLineAsync(RemoteFileName.NoRemoteNameWarning).ConfigureAwait(false);
-        }
-
-        return RemoteNamePath(options, remoteName ?? RemoteFileName.Fallback);
+        return RemoteNamePath(options, RemoteFileName.FromUrlPath(url.AbsolutePath) ?? RemoteFileName.Fallback);
     }
+
+    /// <summary>
+    /// Whether <see cref="ResolveOutputFile" /> will fall back to <see cref="RemoteFileName.Fallback" />
+    /// for this transfer: it takes the remote name (<c>-O</c>, no <c>-o</c>) and its URL, which
+    /// parses, has no file name in its path. <see cref="TransferAsync" /> then prints
+    /// <see cref="RemoteFileName.NoRemoteNameWarning" /> before the
+    /// <see cref="TransferDispatch.WarningLinesBeforeEachTransfer" />, as curl 8.21.0 names the output
+    /// file before it sets the transfer's options (measured 2026-10-03, BL-1362).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="url">The URL, without the <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
+    /// <returns><see langword="true" /> when the transfer saves to <see cref="RemoteFileName.Fallback" />.</returns>
+    private static bool FallsBackToDefaultRemoteName(CommandLineOptions options, string url, UrlTransfer transfer) =>
+        transfer.OutputFileName is null
+        && transfer.UsesRemoteName
+        && TryParseTransferUrl(QueryUrl.Append(url, options), options, out CurlUrl? parsed, out _)
+        && RemoteFileName.FromUrlPath(parsed.AbsolutePath) is null;
 
     /// <summary>
     /// Turns a remote file name, from the URL or a <c>Content-Disposition</c> header, into the
@@ -3996,7 +4013,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">The URL.</param>
-    /// <param name="target">The file, as <see cref="ResolveOutputFileAsync" /> resolved it.</param>
+    /// <param name="target">The file, as <see cref="ResolveOutputFile" /> resolved it.</param>
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>

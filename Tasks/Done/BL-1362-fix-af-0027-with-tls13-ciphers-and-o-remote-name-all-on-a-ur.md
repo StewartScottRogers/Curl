@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console]
+touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1362 — Fix AF-0027: With --tls13-ciphers and -O/--remote-name-all on a URL without a file name, Curl prints the Schannel 'ignoring --tls13-ciphers' warning before 'No remote filename', curl prints them the other way round
 
@@ -41,12 +41,26 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix: `CurlCommandRunner.TransferAsync` now prints `Warning: No remote filename` before
+  `WarningLinesBeforeEachTransfer` (new `FallsBackToDefaultRemoteName`), and
+  `ResolveOutputFile` (was `ResolveOutputFileAsync`) no longer prints it. curl 8.21.0 names the
+  output file in `single_transfer` before it sets the transfer's options, where the Schannel
+  `ignoring --tls13-ciphers` warning comes from. The warning is printed only when the URL parses,
+  as before (a URL curl rejects still gets no such line).
+- `touches` widened to `Curl.Console.UnitTests` for the regression tests; no other task in
+  Doing on `origin/work/dark-factory` named it (only BL-1361, `Curl.Networking.UnitTests`).
+- Tests: `CurlCommandRunnerTransferWarningTests.RunAsync_Tls13CipherWarningAndRemoteNameWithoutFileName_PrintsNoRemoteFilenameFirst`
+  (`-O` and `--remote-name-all`) and `RunAsync_RemoteNameOnAUrlThatDoesNotParse_PrintsNoRemoteFilenameWarning`.
+- The finding's reproduction (port 48302) now gives both: exit 0,
+  [Warning: No remote filename, uses "curl_response" | Warning: ignoring --tls13-ciphers, not supported by libcurl with Schannel].
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. -O/--remote-name-all's 'No remote filename' warning now prints before the per-transfer Schannel warnings, as curl 8.21.0 orders them
