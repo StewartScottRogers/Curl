@@ -89,3 +89,7 @@ Follow the key rule in [Report-Format.md](Report-Format.md). Use these kinds:
 
 Use Critical only for a test that passes while the behaviour it names is visibly broken in the
 product today.
+
+## Method counts
+
+Run every step above on every audit; re-audits come on top, never instead. Report ``method.librariesMutated`` and ``method.testsRead`` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).

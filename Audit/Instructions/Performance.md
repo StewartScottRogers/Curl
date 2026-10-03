@@ -73,3 +73,7 @@ show the trend. Copy them from `performance.json`.
 Follow the key rule in [Report-Format.md](Report-Format.md). Kinds: `slow`, `memory`,
 `slow-startup`, `publish-failed`, `aot-warning`. For `slow` and `memory`, `<what>` is the
 scenario name.
+
+## Method counts
+
+Run every step above on every audit; re-audits come on top, never instead. Report ``method.scenariosRun`` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).

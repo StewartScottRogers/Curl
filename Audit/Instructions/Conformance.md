@@ -77,3 +77,7 @@ evidence: a conformance claim means nothing without the curl it was measured aga
 Follow the key rule in [Report-Format.md](Report-Format.md). `<where>` is the option or area
 (`--libcurl`, `exit-codes`, `write-out`), and kinds are `exit-code`, `stdout`, `stderr`,
 `request` and `refused-option`.
+
+## Method counts
+
+Run every step above on every audit; re-audits come on top, never instead. Report ``method.casesRun`` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).
