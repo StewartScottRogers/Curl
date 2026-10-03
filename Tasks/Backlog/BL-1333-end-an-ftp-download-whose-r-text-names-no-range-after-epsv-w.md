@@ -1,5 +1,5 @@
 ---
-id: BL-1320
+id: BL-1333
 title: End an FTP download whose -r text names no range after EPSV with exit 0, as curl 8.21.0 does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-03
 completed:
 ---
-# BL-1320 — End an FTP download whose -r text names no range after EPSV with exit 0, as curl 8.21.0 does
+# BL-1333 — End an FTP download whose -r text names no range after EPSV with exit 0, as curl 8.21.0 does
 
 ## Goal
 

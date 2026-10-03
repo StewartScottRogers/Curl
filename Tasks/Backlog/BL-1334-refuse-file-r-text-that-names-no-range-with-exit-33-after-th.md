@@ -1,5 +1,5 @@
 ---
-id: BL-1321
+id: BL-1334
 title: Refuse file:// -r text that names no range with exit 33 after the open and the -i headers, as curl's file_do does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-007
 created: 2026-10-03
 completed:
 ---
-# BL-1321 — Refuse file:// -r text that names no range with exit 33 after the open and the -i headers, as curl's file_do does
+# BL-1334 — Refuse file:// -r text that names no range with exit 33 after the open and the -i headers, as curl's file_do does
 
 ## Goal
 

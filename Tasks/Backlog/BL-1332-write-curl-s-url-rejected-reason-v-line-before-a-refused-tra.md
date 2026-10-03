@@ -1,5 +1,5 @@
 ---
-id: BL-1319
+id: BL-1332
 title: Write curl's '* URL rejected: <reason>' -v line before a refused transfer URL's exit 3
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-03
 completed:
 ---
-# BL-1319 — Write curl's '* URL rejected: <reason>' -v line before a refused transfer URL's exit 3
+# BL-1332 — Write curl's '* URL rejected: <reason>' -v line before a refused transfer URL's exit 3
 
 ## Goal
 
