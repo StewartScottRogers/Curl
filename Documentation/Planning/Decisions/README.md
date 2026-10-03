@@ -396,6 +396,7 @@ choices do not need one.
 | [0384](ADR-0384-an-smtp-send-failure-ends-the-transfer-with-exit-55.md) | An SMTP command or message that cannot be written ends the transfer with exit 55, `Send failure: Connection was reset` or `Failed sending data to the peer`, sending and reading nothing more (BL-1243) | Accepted | 2026-10-02 |
 | [0385](ADR-0385-approved-findings-are-released-by-a-dispatched-workflow.md) | The board page's Release buttons dispatch `release-approved-findings.yml`, which runs `New-TasksFromAcceptedFindings.ps1` (with `-Id` only when the script has it), lands the tasks on `work/dark-factory` with dedupe and the findings on `audit`, and opens but never merges the audit pull request (BL-1249) | Accepted | 2026-10-02 |
 | [0386](ADR-0386-trace-config-http2-traces-the-h2c-upgrade-and-echoes-the-head.md) | Under `-v --trace-config http/2` an h2c upgrade writes curl's `added`, `upgrading`, `created session via Upgrade` and `(via h1 upgrade)` lines and stream 1's frame lines, and every HTTP/2 head line is echoed as `status:` or `header:` right after its `<` line; I/O-loop lines stay out (BL-1205) | Accepted | 2026-10-02 |
+| [0387](ADR-0387-the-hand-built-openssl-build-reports-a-failed-handshake-before-every-handshake-failure.md) | `HandBuiltTlsProvider`'s OpenSSL build reports a failed `TlsHandshakeEvent` before every handshake failure: the certificate lines before an exit 60, the ALPN offer before an exit 35 (BL-1202) | Accepted | 2026-10-02 |
 
 ## Template
 
