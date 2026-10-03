@@ -3,10 +3,10 @@ id: AF-0009
 title: Two Curl.Cli tests hardcode an option count of 280 and fail against the 281 options in the table; the red baseline blocks mutation testing of Curl.Cli
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Cli.UnitTests/CommandLineNextGroupTests.cs:OptionTable_EveryRow_IsClassifiedAsGlobalOrPerGroupExactlyOnce:name-lies
-task: none
+task: BL-1265
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
@@ -41,3 +41,4 @@ dotnet test Curl.Cli.UnitTests -c Release --filter "Name=OptionTable_EveryRow_Is
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.

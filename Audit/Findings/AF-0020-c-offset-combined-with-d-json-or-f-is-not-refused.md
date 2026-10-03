@@ -3,10 +3,10 @@ id: AF-0020
 title: -C <offset> combined with -d, --json or -F is not refused: curl exits 2 'cannot mix --continue-at with --data/--form', Curl sends the request
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:--continue-at:exit-code
-task: none
+task: BL-1276
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
@@ -41,3 +41,4 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.
