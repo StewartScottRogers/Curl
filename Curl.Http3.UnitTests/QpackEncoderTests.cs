@@ -194,4 +194,58 @@ public sealed class QpackEncoderTests
 
         Assert.AreEqual(1, encoder.KnownReceivedCount);
     }
+
+    [TestMethod]
+    [DataRow(0L, "authorization", "Basic dTpw", "0000 7f45 0a 42617369632064547077")]
+    [DataRow(4096L, "authorization", "Basic dTpw", "0000 7f45 0a 42617369632064547077")]
+    [DataRow(0L, "cookie", "a=b", "0000 75 03 613d62")]
+    [DataRow(4096L, "cookie", "a=b", "0000 75 03 613d62")]
+    public void EncodeFieldSection_AuthorizationOrShortCookie_IsANeverIndexedLiteralNamingTheStaticEntry(
+        long capacity, string name, string value, string expectedSection)
+    {
+        var encoder = new QpackEncoder(capacity, 16, huffmanCodeLiterals: false);
+        encoder.TrySetDynamicTableCapacity(capacity);
+        var decoder = new QpackDecoder(capacity, 16);
+        decoder.ReadEncoderStream(encoder.TakeEncoderStreamBytes());
+
+        var section = encoder.EncodeFieldSection(0, Fields((name, value)));
+
+        CollectionAssert.AreEqual(FromHex(expectedSection), section);
+        Assert.IsEmpty(encoder.TakeEncoderStreamBytes());
+        Assert.AreEqual(0, encoder.InsertCount);
+        CollectionAssert.AreEqual(new HeaderField[] { new(name, value, IsNeverIndexed: true) }, Decode(decoder, 0, section));
+    }
+
+    [TestMethod]
+    [DataRow("authorization", "Basic dTpw", "0000 7f45 0a 42617369632064547077")]
+    [DataRow("cookie", "a=b", "0000 75 03 613d62")]
+    public void EncodeFieldSection_AuthorizationOrShortCookieAlreadyInTheDynamicTable_IsNeverReferencedFromIt(
+        string name, string value, string expectedSection)
+    {
+        var encoder = new QpackEncoder(4096, 16, huffmanCodeLiterals: false);
+        encoder.TrySetDynamicTableCapacity(4096);
+        encoder.TryInsert(new HeaderField(name, value));
+        encoder.TakeEncoderStreamBytes();
+
+        var section = encoder.EncodeFieldSection(0, Fields((name, value)));
+
+        CollectionAssert.AreEqual(FromHex(expectedSection), section);
+        Assert.IsEmpty(encoder.TakeEncoderStreamBytes());
+    }
+
+    [TestMethod]
+    public void EncodeFieldSection_CookieOfTwentyBytes_StaysIndexable()
+    {
+        const string Value = "a=0123456789abcdefgh";
+        var withoutTable = new QpackEncoder(0, 0, huffmanCodeLiterals: false);
+        var withTable = new QpackEncoder(4096, 16, huffmanCodeLiterals: false);
+        withTable.TrySetDynamicTableCapacity(4096);
+        withTable.TakeEncoderStreamBytes();
+
+        CollectionAssert.AreEqual(
+            FromHex("0000 55 14 613d3031323334353637383961626364656667 68"),
+            withoutTable.EncodeFieldSection(0, Fields(("cookie", Value))));
+        CollectionAssert.AreEqual(FromHex("0280 10"), withTable.EncodeFieldSection(0, Fields(("cookie", Value))));
+        CollectionAssert.AreEqual(FromHex("c5 14 613d3031323334353637383961626364656667 68"), withTable.TakeEncoderStreamBytes());
+    }
 }

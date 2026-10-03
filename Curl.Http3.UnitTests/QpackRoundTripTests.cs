@@ -37,7 +37,7 @@ public sealed class QpackRoundTripTests
             new(":authority", "example.com"),
             new(":path", "/index.html"),
             new("user-agent", "curl/8.21.0"),
-            new("cookie", "a=1; b=2"),
+            new("cookie", "a=1; b=2", IsNeverIndexed: true),
             new("x-latin1", "café"),
         ],
     ];

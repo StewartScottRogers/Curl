@@ -18,7 +18,9 @@ namespace Curl.Http3;
 /// name and value; the newest dynamic entry matching both; a new dynamic entry inserted
 /// for it; a literal naming a static entry; a literal naming the newest dynamic entry with
 /// the name; a literal with a literal name. A never-indexed field skips every dynamic step
-/// and every indexed form. A dynamic entry the decoder has not acknowledged is referenced,
+/// and every indexed form; as in nghttp3, which curl's HTTP/3 build uses, that is a field
+/// marked <see cref="HeaderField.IsNeverIndexed" />, every <c>authorization</c>, and a
+/// <c>cookie</c> shorter than 20 bytes. A dynamic entry the decoder has not acknowledged is referenced,
 /// and inserted, only while the stream may block (SETTINGS_QPACK_BLOCKED_STREAMS). Base is
 /// the Insert Count before the section, so entries inserted for it are post-Base, or 0 when
 /// the section references no dynamic entry.
@@ -27,6 +29,9 @@ namespace Curl.Http3;
 public sealed class QpackEncoder
 {
     private const QpackErrorCode DecoderStreamError = QpackErrorCode.DecoderStreamError;
+
+    /// <summary>A <c>cookie</c> shorter than this is never indexed, as nghttp3 decides.</summary>
+    private const int ShortestIndexedCookieLength = 20;
 
     private readonly QpackDynamicTable table = new();
     private readonly long maximumTableCapacity;
@@ -209,9 +214,9 @@ public sealed class QpackEncoder
     private void EncodeFieldLine(HeaderField field, SectionInProgress section)
     {
         var (staticIndex, isStaticExact) = QpackStaticTable.Find(field.Name, field.Value);
-        if (field.IsNeverIndexed)
+        if (IsNeverIndexed(field))
         {
-            WriteLiteralWithoutDynamicReference(field, staticIndex, section);
+            WriteLiteralWithoutDynamicReference(field, staticIndex, true, section);
             return;
         }
 
@@ -226,6 +231,11 @@ public sealed class QpackEncoder
             WriteLiteral(field, staticIndex, section);
         }
     }
+
+    private static bool IsNeverIndexed(HeaderField field) =>
+        field.IsNeverIndexed
+        || field.Name == "authorization"
+        || (field.Name == "cookie" && field.Value.Length < ShortestIndexedCookieLength);
 
     private bool TryWriteDynamicIndexed(HeaderField field, SectionInProgress section)
     {
@@ -258,7 +268,7 @@ public sealed class QpackEncoder
             : -1;
         if (nameIndex < 0)
         {
-            WriteLiteralWithoutDynamicReference(field, staticIndex, section);
+            WriteLiteralWithoutDynamicReference(field, staticIndex, false, section);
             return;
         }
 
@@ -275,15 +285,15 @@ public sealed class QpackEncoder
         QpackPrimitives.WriteString(section.Lines, field.Value, 7, 0x00, huffmanCodeLiterals);
     }
 
-    private void WriteLiteralWithoutDynamicReference(HeaderField field, int staticIndex, SectionInProgress section)
+    private void WriteLiteralWithoutDynamicReference(HeaderField field, int staticIndex, bool isNeverIndexed, SectionInProgress section)
     {
         if (staticIndex >= 0)
         {
-            QpackPrimitives.WriteInteger(section.Lines, staticIndex, 4, (byte)(field.IsNeverIndexed ? 0x70 : 0x50));
+            QpackPrimitives.WriteInteger(section.Lines, staticIndex, 4, (byte)(isNeverIndexed ? 0x70 : 0x50));
         }
         else
         {
-            QpackPrimitives.WriteString(section.Lines, field.Name, 3, (byte)(field.IsNeverIndexed ? 0x30 : 0x20), huffmanCodeLiterals);
+            QpackPrimitives.WriteString(section.Lines, field.Name, 3, (byte)(isNeverIndexed ? 0x30 : 0x20), huffmanCodeLiterals);
         }
 
         QpackPrimitives.WriteString(section.Lines, field.Value, 7, 0x00, huffmanCodeLiterals);
