@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Roadmap.md]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1330 — Correct Roadmap.md's Milestone 2 and Milestone 5 status lines: SMB, SCP and SFTP are registered
 
@@ -24,14 +24,18 @@ The **Status** lines of Milestone 2 and Milestone 5 in `Documentation/Planning/R
 
 ## Acceptance criteria
 
-- [ ] Milestone 5's **Status** line says LDAP, RTSP and SMB (`smb`, `smbs`) are built and registered in `Curl.Console`, and no longer says SMB is not registered.
-- [ ] Milestone 2's **Status** line says FTP, SCP and SFTP are built and registered, and no longer says SCP and SFTP are being built.
-- [ ] Each status line still says "In progress" or "Done" according to its milestone's "Delivers" tasks (checked with `task-board.ps1 status` and the `Tasks/Done` archives), and the Notes record which.
-- [ ] No file other than `Documentation/Planning/Roadmap.md` changes.
+- [x] Milestone 5's **Status** line says LDAP, RTSP and SMB (`smb`, `smbs`) are built and registered in `Curl.Console`, and no longer says SMB is not registered.
+- [x] Milestone 2's **Status** line says FTP, SCP and SFTP are built and registered, and no longer says SCP and SFTP are being built.
+- [x] Each status line still says "In progress" or "Done" according to its milestone's "Delivers" tasks (checked with `task-board.ps1 status` and the `Tasks/Done` archives), and the Notes record which.
+- [x] No file other than `Documentation/Planning/Roadmap.md` changes.
 
 ## Notes
+
+- Every task listed under "Delivers" for Milestone 2 (BL-343 to BL-904 as listed, BL-669 to BL-681, BL-748 to BL-750) and Milestone 5 (BL-585 to BL-598, BL-830, BL-840, BL-845, BL-853) is in a `Tasks/Done` archive, checked by listing `Tasks/Done` recursively; so both status lines now say "Done". BL-693 (`--krb` for FTP) is in Deferred and was already named as deferred under Outstanding, not under Delivers.
+- `Curl.Console/CurlComposition.cs` registers `SmbProtocolHandler` (line 159) and `SshProtocolHandler` (line 160) for smb/smbs and scp/sftp.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. Roadmap Milestones 2 and 5 status lines say SCP, SFTP and SMB are registered, and Done
