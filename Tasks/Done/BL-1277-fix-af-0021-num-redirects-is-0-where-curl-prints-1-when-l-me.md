@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Core.UnitLibrary]
+touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1277 — Fix AF-0021: %{num_redirects} is 0 where curl prints 1 when -L meets a Location it cannot parse
 
@@ -41,12 +41,23 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Touches widened to `Curl.Core.UnitTests`: three existing `RedirectFollowerTests` pinned the wrong count (0). No task in Doing on `origin/work/dark-factory` names it.
+- Measured curl 8.21.0 (Schannel, Git for Windows) 2026-10-02 with `Record-CurlExchange.ps1`, `-sL -w '%{num_redirects}|%{url_effective}|%{redirect_url}'` against a 301:
+  - `Location: http://127.0.0.1:x/z` -> exit 3, `1|<first URL>|`
+  - `Location: foo://h/z` -> exit 1, `1|<first URL>|`
+  - `Location: ftp://127.0.0.1/z` with `--proto-redir =http` -> exit 1, `1|ftp://127.0.0.1/z|`
+  - `--max-redirs 0` -> exit 47, `0|<first URL>|<target>` (unchanged, already right)
+- Fix: `RedirectFollower.Refusal` now says whether a refusal reaches the target; `StopBeforeHop` counts every refusal but the limit (`RedirectChain.CountRefused`), and the protocol-disabled refusal also moves `%{url_effective}` to the target, which Curl also had wrong. Measured behaviour, no design choice, so no ADR.
+- The hop proxy selector's failure still counts nothing; it was not measured here and is outside the finding.
+- After the fix the finding's reproduction gives `candidate Location http://127.0.0.1:x/z: exit 3, num_redirects 1` and `Location /z: exit 0, num_redirects 1`, as curl.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. -L counts a redirect whose target curl refuses (unparsable, unsupported scheme, --proto-redir) in %{num_redirects}, as curl does

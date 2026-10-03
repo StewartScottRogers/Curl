@@ -787,7 +787,10 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
         Assert.AreEqual($"Protocol \"{scheme}\" is disabled (in redirect)", result.ErrorMessage);
         Assert.HasCount(1, handler.Contexts);
-        Assert.AreEqual(0, result.Report!.RedirectCount);
+        // Measured against curl 8.21.0 on 2026-10-02 (BL-1277 Notes): --proto-redir =http with
+        // Location: ftp://127.0.0.1/z -> -w '%{num_redirects}|%{url_effective}' writes 1|ftp://127.0.0.1/z.
+        Assert.AreEqual(1, result.Report!.RedirectCount);
+        Assert.AreEqual(target, result.Report.EffectiveUrl);
         // Measured against curl 8.21.0 on 2026-09-27 (BL-289): -w '[%{redirect_url}]' writes [].
         Assert.IsNull(result.Report.RedirectUrl);
     }
@@ -924,6 +927,10 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual("The redirect target URL could not be parsed: Unsupported URL scheme", result.ErrorMessage);
         // Measured against curl 8.21.0 (BL-289): -w '[%{redirect_url}]' writes [].
         Assert.IsNull(result.Report!.RedirectUrl);
+        // Measured against curl 8.21.0 on 2026-10-02 (BL-1277 Notes): Location: foo://h/z ->
+        // -w '%{num_redirects}|%{url_effective}' writes 1 and the first URL.
+        Assert.AreEqual(1, result.Report.RedirectCount);
+        Assert.IsNull(result.Report.EffectiveUrl);
     }
 
     [TestMethod]
@@ -944,7 +951,10 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual($"The redirect target URL could not be parsed: {reason}", result.ErrorMessage);
         Assert.HasCount(1, handler.Contexts);
-        Assert.AreEqual(0, result.Report!.RedirectCount);
+        // Measured against curl 8.21.0 on 2026-10-02 (AF-0021, BL-1277 Notes): Location:
+        // http://127.0.0.1:x/z -> -w '%{num_redirects}|%{url_effective}' writes 1 and the first URL.
+        Assert.AreEqual(1, result.Report!.RedirectCount);
+        Assert.IsNull(result.Report.EffectiveUrl);
         // Measured against curl 8.21.0 (BL-289): -w '[%{redirect_url}]' writes [].
         Assert.IsNull(result.Report.RedirectUrl);
     }

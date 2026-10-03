@@ -241,6 +241,11 @@ public sealed class RedirectFollower(
         hopProxy = default;
         if (Refusal(ref target, first, chain.RedirectCount, policy, out next) is { } refusal)
         {
+            if (!refusal.KeepsRedirectUrl)
+            {
+                chain.CountRefused(refusal.ReachesTarget ? target : null);
+            }
+
             chain.Refused(refusal.KeepsRedirectUrl);
             return TransferResult.Failure(refusal.ExitCode, refusal.Message, result.BytesTransferred);
         }
@@ -341,11 +346,13 @@ public sealed class RedirectFollower(
     /// Why <paramref name="target" /> is not followed, or <see langword="null" /> when it is.
     /// Only the limit refusal keeps <see cref="TransferReport.RedirectUrl" />: curl 8.21.0 writes
     /// an empty <c>%{redirect_url}</c> after refusing a target that does not parse or whose
-    /// scheme it refuses (measured, BL-289). A target that parses is switched to <c>https</c>
+    /// scheme it refuses (measured, BL-289). Every other refusal counts the redirect in
+    /// <c>%{num_redirects}</c>, and only the <c>--proto-redir</c> or <c>--proto</c> refusal
+    /// (<c>ReachesTarget</c>) moves <c>%{url_effective}</c> to the target (measured, BL-1277). A target that parses is switched to <c>https</c>
     /// (<see cref="SwitchedToHttps" />) before its scheme is checked, as curl switches it before
     /// looking the scheme up.
     /// </summary>
-    private (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? Refusal(
+    private (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl, bool ReachesTarget)? Refusal(
         ref string target,
         ITransferContext first,
         int followed,
@@ -355,17 +362,17 @@ public sealed class RedirectFollower(
         next = null;
         if (policy.MaxRedirects >= 0 && followed >= policy.MaxRedirects)
         {
-            return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed", true);
+            return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed", true, false);
         }
 
         if (!CurlUrl.TryParse(target, first.PathAsIs, out next))
         {
-            return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false);
+            return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false, false);
         }
 
         if (!SchemesCurlParses.Contains(next.Scheme))
         {
-            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false);
+            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false, false);
         }
 
         first.Events.ReportInfo(IssueAnotherRequestMessagePrefix + target + "'");
@@ -395,7 +402,7 @@ public sealed class RedirectFollower(
     /// reported to the hop's events, as curl 8.21.0's <c>-v</c> writes it before its
     /// <c>curl: (1)</c> line (measured, BL-805 Notes).
     /// </summary>
-    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? ProtocolDisabledRefusal(
+    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl, bool ReachesTarget)? ProtocolDisabledRefusal(
         string scheme,
         RedirectPolicy policy,
         ITransferContext first)
@@ -407,7 +414,7 @@ public sealed class RedirectFollower(
 
         string message = $"Protocol \"{scheme}\" is disabled (in redirect)";
         first.Events.ReportInfo(message);
-        return (CurlExitCode.UnsupportedProtocol, message, false);
+        return (CurlExitCode.UnsupportedProtocol, message, false, true);
     }
 
     private static string UnparsableUrlReason(string target)
@@ -652,6 +659,17 @@ public sealed class RedirectFollower(
         /// <see cref="TransferReport.RedirectUrl" /> unless <paramref name="keepsRedirectUrl" />.
         /// </summary>
         public void Refused(bool keepsRedirectUrl) => redirectUrlCleared = !keepsRedirectUrl;
+
+        /// <summary>
+        /// Counts a redirect whose target was refused, as curl does for every refusal but the
+        /// <c>--max-redirs</c> limit, moving the effective URL to <paramref name="reachedUrl" />
+        /// unless it is <see langword="null" />.
+        /// </summary>
+        public void CountRefused(string? reachedUrl)
+        {
+            effectiveUrl = reachedUrl ?? effectiveUrl;
+            RedirectCount++;
+        }
 
         public TransferResult Merge(TransferResult outcome)
         {
