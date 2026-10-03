@@ -19,6 +19,7 @@ namespace Curl.Networking;
 public sealed class CertificateRevocationListFileTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
+    private static readonly DateTimeOffset ExpiryMoment = new(2030, 6, 1, 12, 0, 0, TimeSpan.Zero);
 
     private static X509Certificate2 s_root = null!;
 
@@ -204,6 +205,16 @@ public sealed class CertificateRevocationListFileTests
             Load(TestRevocationList.Pem(EmptyListFromRoot())).Refusal(s_leaf, s_root, Now.AddDays(2)));
 
     [TestMethod]
+    public void Refusal_AtTheListsExpiryMoment_HasExpired() =>
+        Assert.AreEqual(
+            OpenSslVerifyResult.CertificateRevocationListHasExpired,
+            Load(TestRevocationList.Pem(ListExpiringAt(ExpiryMoment))).Refusal(s_leaf, s_root, ExpiryMoment));
+
+    [TestMethod]
+    public void Refusal_OneSecondBeforeTheListsExpiry_Accepts() =>
+        Assert.IsNull(Load(TestRevocationList.Pem(ListExpiringAt(ExpiryMoment))).Refusal(s_leaf, s_root, ExpiryMoment.AddSeconds(-1)));
+
+    [TestMethod]
     public void Refusal_WithAnExpiredListBeforeACurrentOne_UsesTheCurrentOne()
     {
         var expired = TestRevocationList.Write(s_root, thisUpdate: Now.AddDays(-3), nextUpdate: Now.AddDays(-2));
@@ -215,6 +226,9 @@ public sealed class CertificateRevocationListFileTests
     [TestMethod]
     public void Refusal_WithOnlyAListWithoutNextUpdate_AcceptsAnyLaterMoment() =>
         Assert.IsNull(Load(TestRevocationList.Pem(TestRevocationList.Write(s_root))).Refusal(s_leaf, s_root, Now.AddYears(5)));
+
+    private static byte[] ListExpiringAt(DateTimeOffset nextUpdate) =>
+        TestRevocationList.Write(s_root, thisUpdate: nextUpdate.AddDays(-1), nextUpdate: nextUpdate);
 
     private static byte[] EmptyListFromRoot() =>
         new CertificateRevocationListBuilder().Build(s_root, BigInteger.One, Now.AddDays(1), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1, Now.AddDays(-1));

@@ -414,6 +414,7 @@ choices do not need one.
 | [0402](ADR-0402-native-curl-exe-links-com-through-api-sets-and-skips-the-account-home-on-windows.md) | The native `curl.exe` links the runtime's COM calls through `mincore.lib` (the `api-ms-win-core-com` API sets) instead of `ole32.lib`, and skips the account home lookup on Windows, so a plain GET loads no `ole32`, `user32`, `gdi32` or `imm32` (BL-1290) | Accepted | 2026-10-02 |
 | [0403](ADR-0403-a-failed-telnet-window-size-write-reports-curls-send-failure-line.md) | A telnet NAWS window size write that fails reports curl's socket filter line `Send failure: <text>` (the Schannel build's Winsock words on Windows, `strerror` elsewhere) between the suboption's `Sending data failed (N)` lines, from curl's source, since loopback never loses the race to measure it (BL-1312) | Accepted | 2026-10-03 |
 | [0404](ADR-0404-the-conformance-server-skips-its-waits-unless-a-curl-timer-races-them.md) | The upstream conformance runner gives the `sws` emulation a wait-skipping clock unless the command names a curl timer that races it (`-m`, `-y`, `-Y`, `--connect-timeout`, `--expect100-timeout`), so `writedelay` and `<postcmd>` `wait` take no real time and no case's server timing depends on machine load (BL-1355) | Accepted | 2026-10-03 |
+| [0405](ADR-0405-a-crl-is-expired-from-its-nextupdate-moment-on.md) | A `--crlfile` list whose `nextUpdate` equals the moment checked has expired, as OpenSSL's `X509_cmp_time` counts an equal time as past (AF-0029, BL-1371) | Accepted | 2026-10-03 |
 
 ## Template
 
