@@ -44,3 +44,4 @@ An `imap://` transfer honours `ITransferContext.NoBody` (`-I`) and `ITransferCon
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-03: Backlog -> Doing.
