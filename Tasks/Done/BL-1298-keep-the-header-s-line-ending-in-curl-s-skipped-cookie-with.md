@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cookies.UnitLibrary, Curl.Cookies.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1298 — Keep the header's line ending in curl's skipped cookie with bad tailmatch domain line
 
@@ -29,17 +29,20 @@ The `-v` refusal Curl writes for a `Set-Cookie` whose `Domain` the host may not 
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Cookies.UnitTests` assert the refusal text for each of the three measured headers is `skipped cookie with bad tailmatch domain: ` followed by the measured rest of the line and `\r\n` (e.g. `...: example.com; Path=/\r\n`), from `SetCookieParser.Parse(..., out refusal)` and from the `CookieStore` path that reports it as an info line.
-- [ ] Existing tests that pinned the refusal without the line ending are updated, and their comments cite `lib/cookie.c` lines 518-525 and the 2026-10-02 measurement.
-- [ ] No other refusal text changes: a test pins `invalid cookie, dropped` and `skipped cookie because not 'secure'` unchanged.
-- [ ] `ParseFromCookieFile` (a `Set-Cookie:` line read from a `-b` file) keeps its current text: a test pins it, since that path does not come from a received header.
-- [ ] `dotnet build Curl.Cookies.UnitTests -warnaserror` is clean; `dotnet test Curl.Cookies.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cookies.UnitLibrary` reports no failing member.
+- [x] Tests in `Curl.Cookies.UnitTests` assert the refusal text for each of the three measured headers is `skipped cookie with bad tailmatch domain: ` followed by the measured rest of the line and `\r\n` (e.g. `...: example.com; Path=/\r\n`), from `SetCookieParser.Parse(..., out refusal)` and from the `CookieStore` path that reports it as an info line.
+- [x] Existing tests that pinned the refusal without the line ending are updated, and their comments cite `lib/cookie.c` lines 518-525 and the 2026-10-02 measurement.
+- [x] No other refusal text changes: a test pins `invalid cookie, dropped` and `skipped cookie because not 'secure'` unchanged.
+- [x] `ParseFromCookieFile` (a `Set-Cookie:` line read from a `-b` file) keeps its current text: a test pins it, since that path does not come from a received header.
+- [x] `dotnet build Curl.Cookies.UnitTests -warnaserror` is clean; `dotnet test Curl.Cookies.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cookies.UnitLibrary` reports no failing member.
 
 ## Notes
 
 - The `-b` file case was not measured; if a measurement shows curl prints the file line's own ending there too, file a follow-up rather than widening this task.
+- Delivered directly (a one-line change): `TrySetDomain` appends `\r\n` to the refusal; doc comments on it and on `Parse(..., out refusal)` cite `lib/cookie.c` 518-525 and the bare-LF case. `ParseFromCookieFile` never reaches the tailmatch refusal (no host), so its text is unchanged by construction; `ParseFromCookieFile_DomainLine_KeepsItsRefusalText` pins it.
+- Quality was measured from a Cookies-only coverage run (`dotnet test Curl.Cookies.UnitTests --collect "Code Coverage;Format=cobertura"`, then `Measure-CodeQuality.ps1 -Library Curl.Cookies.UnitLibrary -SkipTestRun -ResultsDirectory ...`): 100% line, 100% branch, 0 failing members. The script's default whole-solution run exceeds 30 minutes in a lane. 363 tests pass.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. Curl's -v bad tailmatch domain refusal ends with the header line's CR LF, as curl 8.21.0's does

@@ -47,22 +47,41 @@ public sealed partial class CookieStoreTests
     [DataRow("n4=v; Path=/; Secure", NotSecure)]
     [DataRow("n=v; Secure\t; Path=/", NotSecure, DisplayName = "Secure ended by a tab")]
     [DataRow("n=v; Secure; Path=/a\u0001b", NotSecure, DisplayName = "Before a later control character")]
-    [DataRow("n3=v; Path=/; Domain=other.test", BadTailmatch + "other.test")]
-    [DataRow("n=v; Path=/; Domain=.other.test", BadTailmatch + "other.test", DisplayName = "Without its leading dot")]
-    [DataRow("n=v; Path=/; Domain=OTHER.Test", BadTailmatch + "OTHER.Test", DisplayName = "In the case sent")]
-    [DataRow("n=v; Domain=\".other.test\"", BadTailmatch + "\".other.test\"", DisplayName = "Quotes kept")]
-    [DataRow("n=v; Domain=other.test ; Path=/", BadTailmatch + "other.test ; Path=/", DisplayName = "The rest of the header")]
-    [DataRow("n=v; Domain=  .other.test;Path=/", BadTailmatch + "other.test;Path=/", DisplayName = "Leading blanks and dot left out")]
-    [DataRow("n=v; Domain=other.test   ", BadTailmatch + "other.test   ", DisplayName = "Trailing blanks kept")]
-    [DataRow("n=v; Domain=other.test\t; Path=/", BadTailmatch + "other.test\t; Path=/", DisplayName = "A trailing tab kept")]
-    [DataRow("n=v; Domain=other.test; X=a\u0001", BadTailmatch + "other.test; X=a\u0001", DisplayName = "Before a later control character, which is printed")]
-    [DataRow("n=v; Domain=www.example.co.uk; Domain=x.test; Path=/", BadTailmatch + "x.test; Path=/", DisplayName = "The Domain that failed")]
+    [DataRow("n3=v; Path=/; Domain=other.test", BadTailmatch + "other.test\r\n")]
+    [DataRow("n=v; Path=/; Domain=.other.test", BadTailmatch + "other.test\r\n", DisplayName = "Without its leading dot")]
+    [DataRow("n=v; Path=/; Domain=OTHER.Test", BadTailmatch + "OTHER.Test\r\n", DisplayName = "In the case sent")]
+    [DataRow("n=v; Domain=\".other.test\"", BadTailmatch + "\".other.test\"\r\n", DisplayName = "Quotes kept")]
+    [DataRow("n=v; Domain=other.test ; Path=/", BadTailmatch + "other.test ; Path=/\r\n", DisplayName = "The rest of the header")]
+    [DataRow("n=v; Domain=  .other.test;Path=/", BadTailmatch + "other.test;Path=/\r\n", DisplayName = "Leading blanks and dot left out")]
+    [DataRow("n=v; Domain=other.test   ", BadTailmatch + "other.test   \r\n", DisplayName = "Trailing blanks kept")]
+    [DataRow("n=v; Domain=other.test\t; Path=/", BadTailmatch + "other.test\t; Path=/\r\n", DisplayName = "A trailing tab kept")]
+    [DataRow("n=v; Domain=other.test; X=a\u0001", BadTailmatch + "other.test; X=a\u0001\r\n", DisplayName = "Before a later control character, which is printed")]
+    [DataRow("n=v; Domain=www.example.co.uk; Domain=x.test; Path=/", BadTailmatch + "x.test; Path=/\r\n", DisplayName = "The Domain that failed")]
     public void StoreFromResponse_ParserRefusesTheHeader_ReportsCurlsLine(string header, string expectedLine) =>
         AssertReportsOnly(CoUk, header, expectedLine);
 
+    /// <summary>
+    /// curl 8.21.0 <c>lib/cookie.c</c> lines 518-525 print the <c>Domain</c> value with <c>%s</c> of a pointer into
+    /// the header line, so the rest of the line, its CR LF included, comes before <c>infof</c>'s own newline.
+    /// Measured on 2026-10-02 (curl 8.21.0, Schannel) with <c>Record-CurlExchange.ps1</c> serving these three
+    /// headers to <c>curl -sv -b '' http://127.0.0.1:&lt;port&gt;/</c> (BL-1298).
+    /// </summary>
+    [TestMethod]
+    [DataRow("g=1; Domain=.example.com; Path=/", BadTailmatch + "example.com; Path=/\r\n")]
+    [DataRow("h=1; Domain=example.com", BadTailmatch + "example.com\r\n")]
+    [DataRow("i=1; Domain=example.com  ", BadTailmatch + "example.com  \r\n")]
+    public void StoreFromResponse_MeasuredBadTailmatchHeaders_ReportTheLineWithItsCrLf(string header, string expectedLine) =>
+        AssertReportsOnly(Loopback, header, expectedLine);
+
     [TestMethod]
     public void StoreFromResponse_DomainIsAnotherIpAddress_ReportsBadTailmatch() =>
-        AssertReportsOnly(Loopback, "i=1; Domain=127.0.0.2", BadTailmatch + "127.0.0.2");
+        AssertReportsOnly(Loopback, "i=1; Domain=127.0.0.2", BadTailmatch + "127.0.0.2\r\n");
+
+    [TestMethod]
+    [DataRow("noequals", InvalidCookie)]
+    [DataRow("n4=v; Path=/; Secure", NotSecure)]
+    public void StoreFromResponse_OtherRefusals_HaveNoLineEnding(string header, string expectedLine) =>
+        AssertReportsOnly(CoUk, header, expectedLine);
 
     [TestMethod]
     public void StoreFromResponse_LongNameAndValueWithAControlCharacter_ReportsInvalidOctetsInValue() =>
