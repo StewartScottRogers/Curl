@@ -133,6 +133,62 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     }
 
     [TestMethod]
+    [DataRow("setup")]
+    [DataRow("all")]
+    public async Task RunAsync_HttpsGetThroughAnHttpsProxyUnderTraceConfigSetup_WritesTheSetupLinesAroundTheTunnel(string components)
+    {
+        // curl -s -k --proxy-insecure -v --trace-config https-connect,setup -x https://127.0.0.1:18458
+        // https://example.test/ (BL-1283 Context): the origin's ALPN connect filter adds the setup filter,
+        // so no [SETUP] added line, and its SSL filter is added once the tunnel is open.
+        int exitCode = await RunAsync([Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection established\r\n\r\n"), Response], "-k", "--proxy-insecure", "-v", "--trace-config", components, "-x", "https://127.0.0.1:18458", "https://example.test/");
+
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[SETUP] happy eyeballing to proxy 127.0.0.1:18458",
+                "[SETUP] added SSL filter for HTTP proxy",
+                "[SETUP] added HTTP proxy tunnel filter",
+                "[SETUP] added SSL filter for origin",
+                "[SETUP] removing connected setup filter",
+                "[SETUP] destroy",
+            },
+            SetupLines());
+    }
+
+    [TestMethod]
+    [DataRow("setup")]
+    [DataRow("all")]
+    public async Task RunAsync_HttpGetThroughAnHttpsProxyUnderTraceConfigSetup_WritesTheSetupLinesAroundTheTunnel(string components)
+    {
+        // curl -s --proxy-insecure -v --trace-config proxy,setup -p -x https://127.0.0.1:18955
+        // http://example.test/x (BL-1255 Notes): the setup filter is added first, and no origin SSL filter.
+        int exitCode = await RunAsync([Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection established\r\n\r\n"), Response], "--proxy-insecure", "-v", "--trace-config", components, "-p", "-x", "https://127.0.0.1:18955", "http://example.test/x");
+
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[SETUP] added",
+                "[SETUP] happy eyeballing to proxy 127.0.0.1:18955",
+                "[SETUP] added SSL filter for HTTP proxy",
+                "[SETUP] added HTTP proxy tunnel filter",
+                "[SETUP] removing connected setup filter",
+                "[SETUP] destroy",
+            },
+            SetupLines());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpsGetThroughAnHttpsProxyWithoutTheSetupComponent_WritesNoSetupLine()
+    {
+        int exitCode = await RunAsync([Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection established\r\n\r\n"), Response], "-k", "--proxy-insecure", "-v", "--trace-config", "proxy", "-x", "https://127.0.0.1:18458", "https://example.test/");
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(0, SetupLines().Length);
+    }
+
+    [TestMethod]
     public async Task RunAsync_HttpsGetOverAUnixSocketUnderTraceConfigHttpsConnectAndSetup_EyeballsToThePathAtPort0()
     {
         // curl -s -k -v --trace-config https-connect,setup --unix-socket <path> https://example.test/ (BL-1254 Notes).
@@ -160,6 +216,11 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
 
     private string[] FilterLines() =>
         [.. StandardErrorLines().Where(line => line.StartsWith("* [HTTPS-CONNECT] ", StringComparison.Ordinal) || line.StartsWith("* [SETUP] ", StringComparison.Ordinal))];
+
+    // Under all every line carries its time and transfer first, so each [SETUP] line is cut from its tag.
+    private string[] SetupLines() =>
+        [.. StandardErrorLines().Where(line => line.Contains("* [SETUP] ", StringComparison.Ordinal))
+            .Select(line => line[line.IndexOf("[SETUP]", StringComparison.Ordinal)..])];
 
     private List<string> StandardErrorLines() =>
         [.. Encoding.ASCII.GetString(standardError.ToArray())

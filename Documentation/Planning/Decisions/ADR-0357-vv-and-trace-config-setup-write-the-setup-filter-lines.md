@@ -387,3 +387,17 @@ http/1.1`, `send(len=429)`, `recv(len=4096) -> 81, 0`, `recv(len=4096) -> 0, 117
   Schannel build's receive lengths on every platform until they are measured.
 - Through a proxy or a tunnel the TCP filter sits below the proxy's filter and the target's records
   ride inside it; those connections keep writing no record lines.
+
+## Amendment, 2026-10-03 (BL-1283): the `[SETUP]` lines through an HTTPS proxy, end to end
+
+Decided by Claude under Stewart's delegation. BL-1255 already writes the setup filter's lines
+through `-x https://` in `TcpConnector`; BL-1283 pins them from the command line in
+`CurlCommandRunnerHttpsConnectTraceTests`, under `--trace-config setup` and `all`, against the
+measured order (BL-1283 Context, BL-1255 Notes):
+
+- `https://` origin: `happy eyeballing to proxy <host>:<port>`, `added SSL filter for HTTP proxy`,
+  `added HTTP proxy tunnel filter`, `added SSL filter for origin` once the tunnel is open, then the
+  removal. No bare `[SETUP] added`: the origin's ALPN connect filter adds the setup filter.
+- `http://` origin: `[SETUP] added` first, then the same lines without the origin's SSL filter.
+
+No behaviour changed; nothing volatile is pinned.
