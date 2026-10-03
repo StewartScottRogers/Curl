@@ -24,8 +24,9 @@ public sealed partial class TcpConnector
     // Under TracesSetupFilter or TracesHttpsConnectFilter a direct QUIC connect reports through the
     // [SETUP] and [HTTPS-CONNECT] filters as a TCP one does; no [DNS] filter goes between them, since
     // curl's QUIC filter lines were not measured with it. With a second attempt to come, the filter's
-    // state is kept on the target for the TCP attempt the race starts on the same target.
-    private (ConnectTarget Target, HttpsConnectFilterTraceEvents? HttpsConnect, QuicHttpsConnectAttempt? Attempt) QuicConnectionFilters(ConnectTarget target)
+    // state is kept on the target for the TCP attempt the race starts on the same target. Through a
+    // CONNECT-UDP proxy the setup filter eyeballs to the proxy, as curl 8.22.0 does (BL-1320 Notes).
+    private (ConnectTarget Target, HttpsConnectFilterTraceEvents? HttpsConnect, QuicHttpsConnectAttempt? Attempt) QuicConnectionFilters(ConnectTarget target, ProxyEndpoint? udpTunnelProxy = null)
     {
         var httpsOrigin = IsHttpsOrigin(target);
         if (!TracesSetupFilter && !TracesHttpsConnectFor(httpsOrigin))
@@ -33,13 +34,12 @@ public sealed partial class TcpConnector
             return (target, null, null);
         }
 
-        var destination = DestinationOf(target);
         var (events, httpsConnect) = SetupAndDnsFilterEvents(
             target.Events,
             httpsOrigin,
             TracesSetupFilter,
             static below => below,
-            below => new SetupFilterTraceEvents(below, destination.Host, destination.Port),
+            QuicSetupFilterStarter(DestinationOf(target), udpTunnelProxy),
             secondAttemptVersion: HttpsConnectSecondAttemptVersion);
         var traced = target with { Events = events };
 
@@ -54,6 +54,12 @@ public sealed partial class TcpConnector
         _quicHttpsConnectAttempts.AddOrUpdate(target, attempt);
         return (traced, httpsConnect, attempt);
     }
+
+    // The setup filter of a QUIC connect: eyeballing to the origin, or to the CONNECT-UDP proxy.
+    private static Func<ITransferEvents, ITransferEvents> QuicSetupFilterStarter(ConnectDestination destination, ProxyEndpoint? udpTunnelProxy) =>
+        udpTunnelProxy is null
+            ? below => new SetupFilterTraceEvents(below, destination.Host, destination.Port)
+            : below => new SetupFilterTraceEvents(below, udpTunnelProxy.Host, udpTunnelProxy.Port, SetupFilterTraceEvents.ToProxy);
 
     // The [HTTPS-CONNECT] filter over the given events, going on from the QUIC attempt's when there is one.
     private HttpsConnectFilterTraceEvents HttpsConnectFilterOver(ITransferEvents events, bool tracesSetup, string? secondAttemptVersion, QuicHttpsConnectAttempt? quicAttempt)

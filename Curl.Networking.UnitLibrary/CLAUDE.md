@@ -489,7 +489,10 @@ Per ADR-0250 (BL-942) a target whose `Proxy` is an HTTP, HTTP/1.0 or HTTPS proxy
 resolved: `TcpConnector.UdpTunnel.cs` dials the proxy, sends curl 8.22.0's CONNECT-UDP request
 (`HttpProxyTunnel.BuildConnectUdpRequest`), takes a `101` or `2xx` (`OpensUdpTunnel`), and hands
 `QuicDialer.DialThroughTunnelAsync` a `CapsuleDatagramChannel`, which carries each datagram as an
-RFC 9297 `DATAGRAM` capsule over the proxy connection. Tests run the handshake through
+RFC 9297 `DATAGRAM` capsule over the proxy connection. Per ADR-0357's BL-1320 amendment it writes
+curl's `Establishing HTTP proxy UDP tunnel to`, request head and reply lines, and goes through the
+`[SETUP]` (to proxy) and `[HTTPS-CONNECT]` filters as a direct QUIC connect does, the CONNECT
+tunnel `--http3` tries next going on from its state. Tests run the handshake through
 `Fakes/CapsuleQuicProxyConnection`, which feeds the capsules to a `QuicTestServer`.
 
 Per ADR-0222 (BL-920) `TcpConnector` and `PoolingConnector` write the connect steps to

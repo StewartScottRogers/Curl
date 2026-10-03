@@ -422,6 +422,25 @@ the QUIC attempt's `[SETUP] destroy` after the filter's own once connected, and 
 exit code if TCP fails too. Not written, as for TCP: `[SETUP] query ALPN`. Through a proxy
 (CONNECT-UDP), and for an Alt-Svc race that tries TCP first, QUIC writes no filter lines yet.
 
+## Amendment, 2026-10-03 (BL-1320): `[HTTPS-CONNECT]` and `[SETUP]` through a CONNECT-UDP proxy
+
+Decided by Claude under Stewart's delegation. Measured with curl.se's curl 8.22.0 ngtcp2 build,
+`-v --trace-config https-connect,setup`, `Record-CurlExchange.ps1` as an HTTP proxy answering 403
+(BL-1320 Notes). A QUIC connect through an HTTP or HTTPS proxy now goes through the same filters as
+a direct one (`TcpConnector.ConnectMultiplexedThroughProxyAsync`): `added`, `connect, init`, the
+attempt lines, `[SETUP] happy eyeballing to proxy <proxy>:<port>`, the proxy's `Trying` and one poll
+round, `[SETUP] added HTTP proxy tunnel filter`, `CONNECT-UDP: no ALPN negotiated` (now written for
+an HTTP proxy too), `Establishing HTTP proxy UDP tunnel to <host>:<port>`, the request head (now
+reported) and one poll round, the reply's header lines (now reported) and `CONNECT-UDP tunnel
+failed, response <n>`; under `--http3-only` then `all attempts failed` and its code. Under `--http3`
+the CONNECT tunnel that follows on the same target goes on from the kept state, as after a direct
+QUIC attempt: `h3 baller failed, starting h2`, then the CONNECT path's own lines. An opened tunnel
+writes `CONNECT-UDP phase completed for HTTP proxy` before `established` (measured, BL-942), and the
+QUIC handshake's one round, `done=1` and the removals follow as for a direct QUIC connect (not
+measured: no CONNECT-UDP proxy was at hand). An HTTPS proxy writes `[SETUP] added SSL filter for
+HTTP proxy` and the tunnel filter line before its handshake, as its CONNECT tunnel does (not
+measured). The Alt-Svc race that tries TCP first is BL-1360: the connector cannot yet tell it apart.
+
 ## Amendment, 2026-10-03 (BL-1287): the `[SSL]` and `[SSL-PROXY]` lines of a TLS handshake
 
 Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and

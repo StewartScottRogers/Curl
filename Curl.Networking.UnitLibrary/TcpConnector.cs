@@ -1248,7 +1248,8 @@ public sealed partial class TcpConnector(
             IsHttpsOrigin(target),
             TracesSetupFilter,
             below => DnsFilterTraceEvents.Start(below, firstHop.Host, firstHop.Port, addressFamily),
-            below => new SetupFilterTraceEvents(below, firstHop.Host, firstHop.Port, peer));
+            below => new SetupFilterTraceEvents(below, firstHop.Host, firstHop.Port, peer),
+            quicAttempt: TakeQuicHttpsConnectAttempt(target));
         return (target with { Events = events }, httpsConnect);
     }
 
