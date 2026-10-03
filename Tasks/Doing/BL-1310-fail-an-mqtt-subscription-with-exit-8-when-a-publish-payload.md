@@ -35,3 +35,4 @@ An `mqtt://` subscription run with `-I` (`ITransferContext.NoBody`) ends with ex
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-03: Backlog -> Doing.
