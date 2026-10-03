@@ -36,3 +36,4 @@ A `pop3://` transfer whose body (a RETR message, a LIST or UIDL listing, a custo
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
