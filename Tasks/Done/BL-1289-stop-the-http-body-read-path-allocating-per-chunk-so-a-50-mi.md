@@ -8,7 +8,7 @@ depends-on: [BL-1290]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1289 — Stop the HTTP body read path allocating per chunk so a 50 MiB GET's heap stays flat
 
@@ -42,9 +42,9 @@ after exit); a temporary `System.Console.Error.WriteLine(GC.GetTotalAllocatedByt
 
 ## Acceptance criteria
 
-- [ ] Measured with a temporary line at the end of `Program.Main`, a 50 MiB `-s -o <file>` GET from a loopback server allocates at most 256 KiB more than `curl --version` does, with the numbers recorded under Notes.
-- [ ] The same for `-s` to a piped standard output.
-- [ ] No output byte, exit code or `-v` line changes: `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Measured with a temporary line at the end of `Program.Main`, a 50 MiB `-s -o <file>` GET from a loopback server allocates at most 256 KiB more than `curl --version` does, with the numbers recorded under Notes.
+- [x] The same for `-s` to a piped standard output.
+- [x] No output byte, exit code or `-v` line changes: `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -86,9 +86,46 @@ outside the repository (loopback `TcpListener`, one `200` with `Content-Length: 
      `AsyncLocal` set per write). BL-1288's uncommitted `SynchronousWriteStream` (its Notes) removes the
      thread-pool part of the stdout write on top of this. Without `-Z` the gate is not needed per chunk.
 
+### Run of 2026-10-03 (lane 5): done
+
+Lane 1's stash was not in this worktree, so its four attributes were redone. Changes:
+
+- `HttpResponseBodyReader`: `PoolingAsyncValueTaskMethodBuilder` on `ReadAsync`, `WriteAsync`,
+  `WriteWithinLimitAsync` and `WriteChunkDataAsync` (lane 1's item 1).
+- `HttpFirstByteTimingConnection.ReadAsync` and `PooledConnection.ReadAsync`: the same attribute.
+  With the `Curl.Console` boxes gone their boxes did show in the dump (41 to 83 each, 144 bytes),
+  so lane 1's "changed nothing" no longer held.
+- `DeferredOutputFileStream.WriteAsync` returns the open file's own `ValueTask`; only the first
+  write, which opens the file, is an async method (`OpenAndWriteAsync`).
+- `StandardOutputFailureDeferringStream.WriteAsync`: pooled builder.
+- `WriteGateStream.WriteAsync` calls the new `WriteGate.WriteExclusiveAsync`: no closure, no
+  `Func<Task>`, and no `AsyncLocal` set (the source of the two `ExecutionContext`s per write). A flow
+  that holds the gate still writes straight through; any other takes the permit without marking
+  itself as holder, which is safe because the wrapped stream never writes back through the gate.
+  New tests: `WriteGateStreamTests.WriteAsync_InsideTheGate_WritesAtOnce` and
+  `WriteAsync_InnerWriteThrows_LetsTheGateGo`.
+
+Measured with a temporary `ALLOC` line at the end of `Program.Main` (reverted), a C# file-based
+loopback server outside the repository (`Content-Length` body, 64 KiB writes), three runs each.
+Native AOT (`dotnet publish Curl.Console -c Release`), `GC.GetTotalAllocatedBytes(true)`:
+
+| Run | `--version` | `-s -o file` | `-s` to a pipe |
+| --- | --- | --- | --- |
+| 1 MiB body | 382,944 | 557,232 | 555,560 to 560,816 |
+| 50 MiB body | 382,944 | 559,800 to 564,296 (+176,856 to +181,352) | 572,104 to 573,088 (+189,160 to +190,144) |
+
+Both runs stay under the 262,144-byte limit, and 1 MiB against 50 MiB differs by 2.5 KB (`-o`) and
+about 12 KB (pipe): allocation no longer grows with the body. What is left is the transfer's fixed
+setup. The JIT build (`dotnet curl.dll`) allocates more fixed overhead (`--version` 282,024 to
+289,392; 50 MiB `-o` 537,568 to 563,568; pipe 512,192 to 522,864), so on the JIT build `-o` sits
+right at the limit (+255,880 to +274,176) because of JIT-only types (`RuntimeType`, `GenericCache`),
+not because of per-chunk work: no type in its heap dump has a count anywhere near the 3,200 chunks.
+The native figures are the ones the Goal is about (the native `curl.exe`'s working set).
+
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-02: Doing -> Backlog. Needs Curl.Console (its DeferredOutputFileStream, WriteGate and StandardOutputFailureDeferringStream allocate per chunk), which BL-1290 in Doing touches; waits on BL-1290
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. A 50 MiB HTTP GET allocates flat: +177-181 KB (-o) and +189-190 KB (pipe) over --version natively, no per-chunk allocation
