@@ -46,7 +46,7 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 ## Notes
 
-- `Aria.Substitute` now scans each of the four S-boxes whole with `Aria.SubstituteBytes` (the masked scan BL-1268 gave Camellia) over both 64-bit halves of the state, and keeps each box's bytes with a fixed lane mask that depends only on SL1/SL2. Recorded as ADR-0394 (supersedes ADR-0147's S-box choice). The XML remarks and the library's CLAUDE.md now say ARIA (and Camellia, missed by BL-1268) are constant-time. ADR-0147 itself is left as written, as BL-1268 left ADR-0145.
+- `Aria.Substitute` now scans each of the four S-boxes whole with `Aria.SubstituteBytes` (the masked scan BL-1268 gave Camellia) over both 64-bit halves of the state, and keeps each box's bytes with a fixed lane mask that depends only on SL1/SL2. Recorded as ADR-0395 (supersedes ADR-0147's S-box choice). The XML remarks and the library's CLAUDE.md now say ARIA (and Camellia, missed by BL-1268) are constant-time. ADR-0147 itself is left as written, as BL-1268 left ADR-0145.
 - Reproduction: `Select-String ... SubstitutionBoxes[(` now prints nothing. Build clean; fast tests green (Cryptography 1330 passed, RFC 5794 vectors included).
 
 ## Log
