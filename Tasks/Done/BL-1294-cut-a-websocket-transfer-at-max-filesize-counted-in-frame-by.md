@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ws.UnitLibrary, Curl.Protocol.Ws.UnitTests]
 requirement: FR-084
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1294 — Cut a WebSocket transfer at --max-filesize counted in frame bytes, with exit 63
 
@@ -25,15 +25,22 @@ A `ws://` or `wss://` transfer honours `ITransferContext.MaxFileSize` as curl 8.
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Ws.UnitTests` drives the measured exchange with `MaxFileSize = 3` and asserts exit 63 (`CurlExitCode.FilesizeExceeded`), message `Exceeded the maximum allowed file size (3) with 3 bytes`, output `h`, a 9-byte received-data event, nothing sent after the upgrade request, and the connection ending `closing connection #0`.
-- [ ] A test with `MaxFileSize = 7` (exactly the text frame) asserts output `hello`, then the CLOSE frame's first byte over the limit ends the transfer with `... (7) with 7 bytes`.
-- [ ] A test where the frame bytes arrive together with the 101 head (the reader's already-received bytes) pins that those count against the limit too.
-- [ ] Tests pin that `MaxFileSize` of 0, `null` and exactly 9 end as today with output `hello`.
-- [ ] `dotnet build Curl.Protocol.Ws.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Ws.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ws.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Ws.UnitTests` drives the measured exchange with `MaxFileSize = 3` and asserts exit 63 (`CurlExitCode.FilesizeExceeded`), message `Exceeded the maximum allowed file size (3) with 3 bytes`, output `h`, a 9-byte received-data event, nothing sent after the upgrade request, and the connection ending `closing connection #0`.
+- [x] A test with `MaxFileSize = 7` (exactly the text frame) asserts output `hello`, then the CLOSE frame's first byte over the limit ends the transfer with `... (7) with 7 bytes`.
+- [x] A test where the frame bytes arrive together with the 101 head (the reader's already-received bytes) pins that those count against the limit too.
+- [x] Tests pin that `MaxFileSize` of 0, `null` and exactly 9 end as today with output `hello`.
+- [x] `dotnet build Curl.Protocol.Ws.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Ws.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ws.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- `WsFrameReceiver` takes `maxFileSize` (from `context.MaxFileSize`): each read is cut to the bytes left under the limit, as curl's `cw_download_write` does before the WebSocket decoder; the prefix is decoded and its payload written, then exit 63 is thrown. A decoder failure inside the prefix wins over the cut (curl's decoder returns its error first); no pong is sent for a cut read.
+- Default taken: `%{size_download}` counts only the bytes under the limit, as curl's `req.bytecount` adds only the bytes it passes on; the received-data event still carries the whole read.
+- `UpgradeAsync` measured at complexity 12 before this change, so the post-101 part moved into `SwitchToWebSocketAsync`; the library now reports 0 failing members (100% line, 100% branch, worst CRAP 10).
+- Quality measured from the Ws tests' own coverage (`-SkipTestRun -ResultsDirectory`), since the full-solution run passed 30 minutes.
+- Tests: `WsProtocolHandlerMaxFileSizeTests`, 7 cases; Ws tests 299 passed, 1 skipped.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. A ws:// or wss:// transfer stops at --max-filesize counted in frame bytes with exit 63, as curl 8.21.0 does
