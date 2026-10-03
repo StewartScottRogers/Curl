@@ -46,7 +46,7 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
-- Decision: ADR-0395 (decided by Claude under Stewart's delegation). On Windows the parser reads as the
+- Decision: ADR-0397 (decided by Claude under Stewart's delegation). On Windows the parser reads as the
   Schannel build and refuses `--http2`, `--http2-prior-knowledge`, `--http3`, `--http3-only`, `--tlsuser`,
   `--tlspassword`, `--tlsauthtype`, `--proxy-tlsuser`, `--proxy-tlspassword`, `--proxy-tlsauthtype` and
   `--ssl-sessions` with `the installed libcurl version does not support this`, exit 2; off Windows nothing
@@ -75,4 +75,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
-- 2026-10-02: Doing -> Done. On Windows the eleven options curl's Schannel build lacks are refused with exit 2 as it refuses them (AF-0022, ADR-0395)
+- 2026-10-02: Doing -> Done. On Windows the eleven options curl's Schannel build lacks are refused with exit 2 as it refuses them (AF-0022, ADR-0397)
