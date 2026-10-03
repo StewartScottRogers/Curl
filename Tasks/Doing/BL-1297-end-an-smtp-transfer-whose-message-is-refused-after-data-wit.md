@@ -46,3 +46,4 @@ When the server answers the end of an SMTP message with anything but 250, Curl's
 - 2026-10-03: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1297-20261002-211047-L1.jsonl
 - 2026-10-03: Blocked -> Backlog. Requeued: the timeout was Measure-CodeQuality running the whole solution (fixed in BL-1318); Notes say how to restore the stashed work
+- 2026-10-03: Backlog -> Doing.
