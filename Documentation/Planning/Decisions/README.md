@@ -416,6 +416,7 @@ choices do not need one.
 | [0404](ADR-0404-the-conformance-server-skips-its-waits-unless-a-curl-timer-races-them.md) | The upstream conformance runner gives the `sws` emulation a wait-skipping clock unless the command names a curl timer that races it (`-m`, `-y`, `-Y`, `--connect-timeout`, `--expect100-timeout`), so `writedelay` and `<postcmd>` `wait` take no real time and no case's server timing depends on machine load (BL-1355) | Accepted | 2026-10-03 |
 | [0405](ADR-0405-a-crl-is-expired-from-its-nextupdate-moment-on.md) | A `--crlfile` list whose `nextUpdate` equals the moment checked has expired, as OpenSSL's `X509_cmp_time` counts an equal time as past (AF-0029, BL-1371) | Accepted | 2026-10-03 |
 | [0406](ADR-0406-a-fixed-lane-shift-retires-idle-lanes-down-to-the-boards-capacity.md) | A fixed `-Lanes N` shift retires idle lanes down to the board's capacity every 5 minutes and adds them back one a step up to N, and every retire goes to an idle lane first, so lanes stop polling overlapping touches (BL-1374, AF-0032) | Accepted | 2026-10-03 |
+| [0407](ADR-0407-the-run-cost-cap-follows-the-median-run.md) | `RunDarkFactory.ps1` caps each headless run at 2.7 times the median of the newest 40 task runs' costs, between $2 and `-TaskBudgetUsd`, so runs stay under three times the median as it moves (BL-1377, AF-0033) | Accepted | 2026-10-03 |
 
 ## Template
 
