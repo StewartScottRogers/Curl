@@ -52,3 +52,4 @@ needs Windows 10 or later, where the API sets exist.
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
