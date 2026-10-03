@@ -332,3 +332,28 @@ tunnel's bytes), `--trace-config proxy,setup`, `http-proxy`, `ssl` and `all` (BL
 - Not written: curl's `[SSL-PROXY]` lines (`cf_connect()`, `adjust_pollset, POLLIN fd=N`, `query
   ALPN`), which `--trace-config proxy` and `ssl` both turn on. No `[SSL]` filter line is written
   anywhere yet; they wait for that filter's own task.
+
+## Amendment, 2026-10-03 (BL-1259): `[TCP]` and `[TCP-1]` I/O of an FTP transfer
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and
+`Record-CurlExchange.ps1` under `-s -v --trace-config tcp` for a download, an upload (`-T`) and a
+listing (BL-1259 Notes).
+
+- `ConnectTarget.TcpIoTrace` (a `TcpIoTraceLines`: filter name, receive length, whether a read that
+  cannot complete at once is first written as `recv(len=<n>) -> 81, 0`) lets a handler say how its
+  connection's I/O is traced. `TcpConnector` wraps the connection in `TcpIoTraceConnection` with
+  those lines when the dial traces the TCP filter; a target without them keeps the BL-1195 rule
+  (`PoolScheme` `http` gets the HTTP lines and the `query ALPN` line, anything else none).
+- The control connection, when it stays plain: `[TCP] send(len=<n>) -> 0, <n>` before each `>`
+  command and `[TCP] recv(len=900) -> 0, <n>` before each `<` reply. No would-block line: curl's
+  `recv(len=900) -> 81, 0` before the final `226` is a race with the server (absent after a
+  listing), so it is not written. `QUIT` is sent as curl closes the connection and writes no
+  `[TCP]` line; the handler stops the control connection's info lines before it
+  (`InfoLineStoppingTransferEvents`).
+- The data connection, curl's second filter chain: `[TCP-1] recv(len=<bytes still expected>)`,
+  preceded by the would-block line for a read the server has not answered yet. With a known size
+  curl reads no end of file and stops at `SIZE`, so the session sizes its reads to the bytes still
+  expected and stops there; a listing reads `recv(len=102400)` to `-> 0, 0`; an upload writes
+  `[TCP-1] send(len=<n>) -> 0, <n>`.
+- `ftps://` and `--ssl`/`--ssl-reqd` transfers write none of these lines, as the reads below TLS
+  are records, not FTP's reads; they wait for the TLS record layer's task, like `https://`.
