@@ -26,6 +26,8 @@ internal sealed class HttpResponseHeadBuilder
 
     private string pendingTerminator = string.Empty;
 
+    private string? location;
+
     /// <summary>
     /// Gets the header added last to the current head, its continuation lines folded in; valid
     /// once <see cref="AddLine" />, <see cref="EndHead" /> or <see cref="EndHeadAtClose" /> has
@@ -60,12 +62,19 @@ internal sealed class HttpResponseHeadBuilder
     /// </summary>
     /// <param name="line">A non-empty line after the status line.</param>
     /// <exception cref="HttpTransferException">
-    /// The line has no colon, or continues a header that is not there (exit 8,
-    /// <c>Header without colon</c>); or the heads grew past <see cref="MaximumHeadSize" />
+    /// The line holds a NUL byte (exit 8, <c>Nul byte in header</c>); or has no colon, or
+    /// continues a header that is not there (exit 8, <c>Header without colon</c>); or is a
+    /// second <c>Location</c> header that differs from the first (exit 8,
+    /// <c>Multiple Location headers</c>); or the heads grew past <see cref="MaximumHeadSize" />
     /// (exit 56); or a folded line reached <see cref="HttpLineReader.MaximumLineLength" /> (exit 100).
     /// </exception>
     internal void AddLine(HttpLine line)
     {
+        if (line.Content.Contains('\0', StringComparison.Ordinal))
+        {
+            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.NulByteInHeader);
+        }
+
         if (line.IsContinuation)
         {
             Fold(line);
@@ -78,6 +87,7 @@ internal sealed class HttpResponseHeadBuilder
             throw HeaderWithoutColon();
         }
 
+        KeepLocation(ToHeader(line.Content));
         pendingHeader.Clear().Append(line.Content);
         pendingTerminator = line.Terminator;
         hasPendingHeader = true;
@@ -127,6 +137,26 @@ internal sealed class HttpResponseHeadBuilder
         {
             throw new HttpTransferException(CurlExitCode.TooLarge, HttpTransferMessages.LineTooLarge);
         }
+    }
+
+    /// <summary>
+    /// Keeps the first non-empty <c>Location</c> value of the exchange and refuses a later one
+    /// that differs from it, as curl 8.21.0's <c>http_header_l</c> does for every status code;
+    /// an empty value, or an exact repeat, is ignored.
+    /// </summary>
+    private void KeepLocation(HttpResponseHeader header)
+    {
+        if (!header.Name.Equals("Location", StringComparison.OrdinalIgnoreCase) || header.Value.Length == 0)
+        {
+            return;
+        }
+
+        if (location is not null && !location.Equals(header.Value, StringComparison.Ordinal))
+        {
+            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.MultipleLocationHeaders);
+        }
+
+        location = header.Value;
     }
 
     private void CommitPendingHeader()

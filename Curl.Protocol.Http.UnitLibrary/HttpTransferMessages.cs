@@ -43,6 +43,17 @@ internal static class HttpTransferMessages
     internal const string HeaderWithoutColon = "Header without colon";
 
     /// <summary>
+    /// The exit 8 message for a head line holding a NUL byte (curl 8.21.0, <c>lib/http.c</c>).
+    /// </summary>
+    internal const string NulByteInHeader = "Nul byte in header";
+
+    /// <summary>
+    /// The exit 8 message for a second non-empty <c>Location</c> header whose value differs
+    /// from the first (curl 8.21.0, <c>http_header_l</c>).
+    /// </summary>
+    internal const string MultipleLocationHeaders = "Multiple Location headers";
+
+    /// <summary>
     /// The exit 8 message for a carriage return inside a head line rather than before its
     /// line feed.
     /// </summary>
