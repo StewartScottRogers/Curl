@@ -226,6 +226,15 @@ public sealed class CommandLineOptions
         CaEmbedDumpRequested = false;
     }
 
+    /// <summary>
+    /// <see langword="true"/> when the command line is read as curl's Linux and macOS builds read it, as
+    /// UTF-8, so an option value starting with a character in U+2000-U+203F is warned about
+    /// (<see cref="CommandLineWarning.ArgumentStartsWithUnicode(string)"/>); <see langword="false"/> as
+    /// curl's Windows Schannel build reads it, in the ANSI code page, where it never is. Set by
+    /// <see cref="CommandLineParser"/> for the platform it is asked to behave as.
+    /// </summary>
+    public bool ReadsArgumentsAsUtf8 { get => globals.ReadsArgumentsAsUtf8; internal set => globals.ReadsArgumentsAsUtf8 = value; }
+
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
     public bool Silent { get => globals.Silent; internal set => globals.Silent = value; }
 

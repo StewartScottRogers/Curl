@@ -267,6 +267,19 @@ public static class CommandLineWarning
     ];
 
     /// <summary>
+    /// The lines curl's OpenSSL build prints for an option value that starts with a character in
+    /// U+2000-U+203F, such as a dash or a smart quote pasted from a document, before it uses the value
+    /// as given: <c>Warning: The argument '&lt;value&gt;' starts with a Unicode character. Maybe ASCII was
+    /// intended?</c>, wrapped at 79 columns as curl wraps its warnings. From <c>has_leading_unicode</c>
+    /// and <c>getparameter</c> in curl 8.21.0's <c>src/tool_getparam.c</c>; the Windows Schannel build
+    /// reads its arguments in the ANSI code page and never prints it (measured 2026-10-02, BL-1224).
+    /// </summary>
+    /// <param name="value">The value exactly as given.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> ArgumentStartsWithUnicode(string value) =>
+        WrappedMessage.Lines("Warning: ", $"The argument '{value}' starts with a Unicode character. Maybe ASCII was intended?");
+
+    /// <summary>
     /// The line curl prints for an option it still accepts but that no longer does anything
     /// (<c>--sslv2</c>, <c>--metalink</c>, <c>--krb4</c> and the rest of its no-function options):
     /// <c>Warning: --&lt;name&gt; is deprecated and has no function anymore</c>, naming the long option
