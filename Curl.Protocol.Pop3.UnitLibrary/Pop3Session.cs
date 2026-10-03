@@ -21,7 +21,8 @@ namespace Curl.Protocol.Pop3;
 /// <c>QUIT</c> is still sent. An answer other than <c>+OK</c> is exit 8,
 /// <c>Weird server reply</c>, and <c>QUIT</c> is still sent. A body is written as
 /// <see cref="Pop3BodyDecoder" /> decodes it; the server closing before its terminator is a
-/// success with no <c>QUIT</c>.</item>
+/// success with no <c>QUIT</c>. A body that runs past <c>--max-filesize</c> is written up to
+/// the limit and is exit 63, and <c>QUIT</c> is still sent (BL-1291).</item>
 /// <item>A greeting that does not start <c>+OK</c> is exit 8,
 /// <c>Got unexpected pop3-server response</c>. The greeting's APOP timestamp is kept in
 /// <see cref="ApopTimestamp" />.</item>
@@ -60,6 +61,12 @@ internal sealed class Pop3Session(
     /// curl sends no <c>QUIT</c>.
     /// </summary>
     private bool bodyCutOff;
+
+    /// <summary>The <c>--max-filesize</c> limit, or <see langword="null" /> for none (0 is none).</summary>
+    private readonly long? maxFileSize = context.MaxFileSize > 0 ? context.MaxFileSize : null;
+
+    /// <summary>How many body bytes have been written.</summary>
+    private long written;
 
     /// <summary>
     /// Gets the APOP timestamp the greeting carried, or <see langword="null" /> when it
@@ -253,7 +260,7 @@ internal sealed class Pop3Session(
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, Pop3SessionMessages.WeirdServerReply);
         }
 
-        return TransferResult.Success(command.WritesBody ? await ReceiveBodyAsync().ConfigureAwait(false) : 0);
+        return command.WritesBody ? await ReceiveBodyAsync().ConfigureAwait(false) : TransferResult.Success(0);
     }
 
     /// <summary>
@@ -261,15 +268,15 @@ internal sealed class Pop3Session(
     /// ends with the terminator, or the server closes the connection, which curl also counts
     /// as success, writing what it had and sending no <c>QUIT</c>. Each piece the decoder lets
     /// go of is reported as data received just before it is written, as curl's
-    /// <c>--trace</c> shows it (BL-552).
+    /// <c>--trace</c> shows it (BL-552). A piece that runs past <c>--max-filesize</c> ends the
+    /// body with exit 63 (<see cref="WritePiecesAsync" />).
     /// </summary>
-    /// <returns>How many body bytes were written.</returns>
-    private async ValueTask<long> ReceiveBodyAsync()
+    /// <returns>A success carrying how many body bytes were written, or exit 63.</returns>
+    private async ValueTask<TransferResult> ReceiveBodyAsync()
     {
         context.Progress.ReportTransferStarted();
         var decoder = new Pop3BodyDecoder();
         var pieces = new Pop3BodyPieces();
-        long written = 0;
         bool ended = false;
         while (!ended)
         {
@@ -277,27 +284,45 @@ internal sealed class Pop3Session(
             if (chunk.IsEmpty)
             {
                 bodyCutOff = true;
-                return written;
+                break;
             }
 
             ended = decoder.Decode(chunk.Span, pieces);
-            await WritePiecesAsync(pieces).ConfigureAwait(false);
-            written += pieces.Length;
+            bool withinLimit = await WritePiecesAsync(pieces).ConfigureAwait(false);
             pieces.Clear();
             context.Progress.ReportDownloaded(written, null);
+            if (!withinLimit)
+            {
+                return TransferResult.Failure(CurlExitCode.FilesizeExceeded, Pop3SessionMessages.MaxFileSizeExceeded(maxFileSize!.Value, written), written);
+            }
         }
 
-        return written;
+        return TransferResult.Success(written);
     }
 
-    private async ValueTask WritePiecesAsync(Pop3BodyPieces pieces)
+    /// <summary>
+    /// Reports and writes each piece, cutting the one that runs past <c>--max-filesize</c> to
+    /// the bytes left under it and stopping there, as curl 8.21.0's <c>cw_download_write</c>
+    /// does: the whole piece is still reported as received, and a body exactly at the limit
+    /// is not cut (BL-1291).
+    /// </summary>
+    /// <returns><see langword="false" /> when a piece was cut.</returns>
+    private async ValueTask<bool> WritePiecesAsync(Pop3BodyPieces pieces)
     {
         for (int index = 0; index < pieces.Count; index++)
         {
             ReadOnlyMemory<byte> piece = pieces[index];
             context.Events.ReportDataReceived(piece.Span);
-            await context.Output.WriteAsync(piece, context.CancellationToken).ConfigureAwait(false);
+            int allowed = maxFileSize is { } max ? (int)Math.Min(piece.Length, max - written) : piece.Length;
+            await context.Output.WriteAsync(piece[..allowed], context.CancellationToken).ConfigureAwait(false);
+            written += allowed;
+            if (allowed < piece.Length)
+            {
+                return false;
+            }
         }
+
+        return true;
     }
 
     private async ValueTask QuitAsync()

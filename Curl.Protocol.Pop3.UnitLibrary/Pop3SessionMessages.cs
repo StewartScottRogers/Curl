@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Curl.Protocol.Pop3;
 
 /// <summary>
@@ -35,6 +37,17 @@ internal static class Pop3SessionMessages
 
     /// <summary><c>LIST</c> or <c>RETR</c> was answered with something other than <c>+OK</c> (exit 8, BL-549).</summary>
     internal const string WeirdServerReply = "Weird server reply";
+
+    /// <summary>
+    /// The exit 63 message for a body that ran past <c>--max-filesize</c>, as curl 8.21.0's
+    /// <c>cw_download_write</c> formats it: <c>Exceeded the maximum allowed file size (3) with 3 bytes</c>
+    /// (BL-1291).
+    /// </summary>
+    /// <param name="maxFileSize">The limit.</param>
+    /// <param name="written">The body bytes written before the transfer stopped.</param>
+    /// <returns>The message to report.</returns>
+    internal static string MaxFileSizeExceeded(long maxFileSize, long written) =>
+        string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({maxFileSize}) with {written} bytes");
 
     /// <summary>The URL's message id decodes to a byte below 0x20 (exit 3, BL-549).</summary>
     internal const string UrlMalformed = "URL using bad/illegal format or missing URL";
