@@ -13,10 +13,11 @@ namespace Curl.Cryptography;
 /// big-endian, as RFC 3713 specifies.
 /// </summary>
 /// <remarks>
-/// Not constant-time: the F-function indexes Camellia's fixed S-boxes with key-mixed data
-/// bytes, as OpenSSL's and LibreSSL's own Camellia do (ADR-0145); it exists because curl's
-/// LibreSSL and OpenSSL builds offer the Camellia suites (ADR-0140). The key schedule is
-/// held in the instance and zeroed by <see cref="Dispose" />.
+/// Constant-time in the key and the data: the F-function reads every entry of Camellia's
+/// fixed S-box in order and keeps the ones it needs by mask, so no memory address depends
+/// on a key-mixed byte (ADR-0393, superseding ADR-0145). It exists because curl's LibreSSL
+/// and OpenSSL builds offer the Camellia suites (ADR-0140). The key schedule is held in the
+/// instance and zeroed by <see cref="Dispose" />.
 /// </remarks>
 public sealed class Camellia : IDisposable
 {
@@ -300,15 +301,20 @@ public sealed class Camellia : IDisposable
     internal static ulong Function(ulong input, ulong subkey)
     {
         ulong x = input ^ subkey;
-        ReadOnlySpan<byte> box = SubstitutionBox1;
-        uint t1 = box[(int)(x >> 56)];
-        uint t2 = RotateByteLeft(box[(int)(x >> 48) & 0xFF], 1);
-        uint t3 = RotateByteLeft(box[(int)(x >> 40) & 0xFF], 7);
-        uint t4 = box[(int)RotateByteLeft((uint)(x >> 32) & 0xFF, 1)];
-        uint t5 = RotateByteLeft(box[(int)(x >> 24) & 0xFF], 1);
-        uint t6 = RotateByteLeft(box[(int)(x >> 16) & 0xFF], 7);
-        uint t7 = box[(int)RotateByteLeft((uint)(x >> 8) & 0xFF, 1)];
-        uint t8 = box[(int)(x & 0xFF)];
+        // SBOX4 is SBOX1 of the input rotated left by one bit: rotate the fourth and
+        // seventh bytes before the look-up; SBOX2 and SBOX3 rotate the output after it.
+        ulong indices = (x & 0xFFFFFF00FFFF00FFUL)
+            | ((ulong)RotateByteLeft((uint)(x >> 32) & 0xFF, 1) << 32)
+            | ((ulong)RotateByteLeft((uint)(x >> 8) & 0xFF, 1) << 8);
+        ulong substituted = SubstituteBytes(indices);
+        uint t1 = (uint)(substituted >> 56);
+        uint t2 = RotateByteLeft((uint)(substituted >> 48) & 0xFF, 1);
+        uint t3 = RotateByteLeft((uint)(substituted >> 40) & 0xFF, 7);
+        uint t4 = (uint)(substituted >> 32) & 0xFF;
+        uint t5 = RotateByteLeft((uint)(substituted >> 24) & 0xFF, 1);
+        uint t6 = RotateByteLeft((uint)(substituted >> 16) & 0xFF, 7);
+        uint t7 = (uint)(substituted >> 8) & 0xFF;
+        uint t8 = (uint)substituted & 0xFF;
         ulong y1 = t1 ^ t3 ^ t4 ^ t6 ^ t7 ^ t8;
         ulong y2 = t1 ^ t2 ^ t4 ^ t5 ^ t7 ^ t8;
         ulong y3 = t1 ^ t2 ^ t3 ^ t5 ^ t6 ^ t8;
@@ -318,6 +324,30 @@ public sealed class Camellia : IDisposable
         ulong y7 = t3 ^ t4 ^ t5 ^ t6 ^ t8;
         ulong y8 = t1 ^ t4 ^ t5 ^ t6 ^ t7;
         return (y1 << 56) | (y2 << 48) | (y3 << 40) | (y4 << 32) | (y5 << 24) | (y6 << 16) | (y7 << 8) | y8;
+    }
+
+    /// <summary>
+    /// Each of the eight bytes of <paramref name="indices" /> through SBOX1, without a
+    /// secret-dependent address (ADR-0393): every entry of the table is read, in order,
+    /// once, and kept in each byte whose index equals its position, chosen by a mask
+    /// computed without a branch.
+    /// </summary>
+    internal static ulong SubstituteBytes(ulong indices)
+    {
+        const ulong Ones = 0x0101010101010101UL;
+        const ulong LowSevenBits = 0x7F7F7F7F7F7F7F7FUL;
+        ReadOnlySpan<byte> box = SubstitutionBox1;
+        ulong result = 0;
+        for (int position = 0; position < box.Length; position++)
+        {
+            ulong difference = indices ^ ((ulong)position * Ones);
+            // The high bit of each byte is set exactly where that byte of difference is zero.
+            ulong zeroBytes = ~(((difference & LowSevenBits) + LowSevenBits) | difference | LowSevenBits);
+            ulong mask = (zeroBytes >> 7) * 0xFF;
+            result |= mask & (box[position] * Ones);
+        }
+
+        return result;
     }
 
     /// <summary>RFC 3713 section 2.4.2, the FL-function.</summary>
