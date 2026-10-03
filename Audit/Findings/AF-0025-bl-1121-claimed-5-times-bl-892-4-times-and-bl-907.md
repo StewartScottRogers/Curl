@@ -3,8 +3,8 @@ id: AF-0025
 title: BL-1121 claimed 5 times, BL-892 4 times and BL-907 3 times
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-1121:redone-work
 task: none
 found: 2026-10-02
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.
