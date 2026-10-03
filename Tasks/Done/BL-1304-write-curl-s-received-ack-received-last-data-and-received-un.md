@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1304 — Write curl's Received ACK, Received last DATA and Received unexpected DATA -v lines for TFTP
 
@@ -31,15 +31,16 @@ Under `-v`, a `tftp://` transfer that receives an out-of-order packet writes the
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Tftp.UnitTests` drives an upload through the fake datagram channel whose server answers DATA 1 with ACK 0 and asserts the info line `Received ACK for block 0, expecting 1`, followed by the re-sent DATA 1, then completes the upload normally.
-- [ ] A test drives a download whose server sends DATA 1 twice and asserts `Received last DATA packet block 1 again.` once, that the block's bytes reach the output once, and that ACK 1 is sent twice.
-- [ ] A test drives a download whose server sends DATA 3 after DATA 1 and asserts `Received unexpected DATA packet block 3, expecting block 2`, that nothing is acknowledged for it, and that the transfer completes when DATA 2 arrives.
-- [ ] A test pins the wrapped case: a download whose last block received was 65535 and that then receives block 1 writes `Received unexpected DATA packet block 1, expecting block 0`.
-- [ ] `dotnet build Curl.Protocol.Tftp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Tftp.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Tftp.UnitTests` drives an upload through the fake datagram channel whose server answers DATA 1 with ACK 0 and asserts the info line `Received ACK for block 0, expecting 1`, followed by the re-sent DATA 1, then completes the upload normally.
+- [x] A test drives a download whose server sends DATA 1 twice and asserts `Received last DATA packet block 1 again.` once, that the block's bytes reach the output once, and that ACK 1 is sent twice.
+- [x] A test drives a download whose server sends DATA 3 after DATA 1 and asserts `Received unexpected DATA packet block 3, expecting block 2`, that nothing is acknowledged for it, and that the transfer completes when DATA 2 arrives.
+- [x] A test pins the wrapped case: a download whose last block received was 65535 and that then receives block 1 writes `Received unexpected DATA packet block 1, expecting block 0`.
+- [x] `dotnet build Curl.Protocol.Tftp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Tftp.UnitLibrary` reports no failing member.
 
 ## Notes
 
 - Out of scope, a known gap for a later task: `tftp_tx` also accepts ACK 65535 when it expects block 0 (the tftpd-hpa wrap bug, lines 377-383); `TftpUpload.AcceptAcknowledgementAsync` does not.
+- 2026-10-03, lane 9: restored the stashed work with `git restore --source`; build clean, 199 TFTP tests pass, Measure-CodeQuality -Library reports 0 failing members.
 - 2026-10-03, interactive session: timed out after 120 min because `Measure-CodeQuality.ps1 -Library` ran the whole solution's ~25k tests with coverage (40-58 min a run on nine lanes) and other lanes killed runs machine-wide; both fixed (BL-1318). Essentially done: every criterion was ticked with 100% line and branch coverage (it also covered the older DefaultPort fallback gap in TftpProtocolHandler.ExecuteAsync). Only the final build, commit and Done move were cut off. Restore, verify, commit. The stash also holds an old copy of this task file under Tasks/Doing: restore only the Curl.* files and tick the boxes in this file again. The work is in the shared stash `b4f4bc3da43655ed9059c4a47dac733e8d08e77e` (never pop a stash; lanes share them). Restore it with `git checkout b4f4bc3da43655ed9059c4a47dac733e8d08e77e -- Curl.Protocol.Tftp.UnitLibrary/CLAUDE.md Curl.Protocol.Tftp.UnitLibrary/TftpDownload.cs Curl.Protocol.Tftp.UnitLibrary/TftpTransferEvents.cs Curl.Protocol.Tftp.UnitLibrary/TftpUpload.cs Curl.Protocol.Tftp.UnitTests/TftpProtocolHandlerTests.cs Curl.Protocol.Tftp.UnitTests/TftpTransferEventsTests.cs` and continue from there.
 
 ## Log
@@ -49,3 +50,4 @@ Under `-v`, a `tftp://` transfer that receives an out-of-order packet writes the
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1304-20261002-211047-L6.jsonl
 - 2026-10-03: Blocked -> Backlog. Requeued: the timeout was Measure-CodeQuality running the whole solution (fixed in BL-1318); Notes say how to restore the stashed work
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. TFTP -v writes curl's Received ACK, Received last DATA and Received unexpected DATA lines
