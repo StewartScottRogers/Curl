@@ -38,3 +38,4 @@ When the GSSAPI exchange's security-layer step cannot answer the server's offer,
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
