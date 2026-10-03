@@ -310,6 +310,6 @@ an HTTPS proxy) under `-s -k -v --trace-config https-connect,setup` (BL-1254 Not
   eyeballs to `origin <path>:0`, the whole path though `Trying` cuts it to 45 characters, and adds the
   SSL filter for an `https://` origin before the handshake.
 - Left to their own tasks: an HTTPS proxy's own `[SETUP]` lines (`added SSL filter for HTTP proxy`,
-  `added HTTP proxy tunnel filter`, measured; BL-1261), so through it only the `[HTTPS-CONNECT]`
+  `added HTTP proxy tunnel filter`, measured; BL-1283), so through it only the `[HTTPS-CONNECT]`
   lines are written; and `--http3`, which the reference build cannot do, so it could not be measured
-  (BL-1262).
+  (BL-1284).

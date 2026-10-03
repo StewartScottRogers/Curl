@@ -1,5 +1,5 @@
 ---
-id: BL-1261
+id: BL-1283
 title: Write the [SETUP] lines of a connect through an HTTPS proxy
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1261 — Write the [SETUP] lines of a connect through an HTTPS proxy
+# BL-1283 — Write the [SETUP] lines of a connect through an HTTPS proxy
 
 ## Goal
 

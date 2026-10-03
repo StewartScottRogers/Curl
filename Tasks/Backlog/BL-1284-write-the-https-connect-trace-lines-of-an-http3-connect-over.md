@@ -1,5 +1,5 @@
 ---
-id: BL-1262
+id: BL-1284
 title: Write the [HTTPS-CONNECT] trace lines of an --http3 connect over QUIC
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1262 — Write the [HTTPS-CONNECT] trace lines of an --http3 connect over QUIC
+# BL-1284 — Write the [HTTPS-CONNECT] trace lines of an --http3 connect over QUIC
 
 ## Goal
 
