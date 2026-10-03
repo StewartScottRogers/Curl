@@ -103,11 +103,21 @@ public sealed class WsUpgradeResponseReaderTests
     }
 
     [TestMethod]
-    public async Task ReadAsync_ReadResetByThePeer_FailsWithRecvFailure()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ReadAsync_ReadResetByThePeer_FailsWithTheWinsockWords()
     {
         var reset = new IOException("reset", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset));
 
         await AssertFailsOn(new FailingConnection(readFailure: reset), CurlExitCode.RecvError, "Recv failure: Connection was reset");
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ReadAsync_ReadResetByThePeer_FailsWithTheSocketErrorsOwnMessage()
+    {
+        var reset = new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset);
+
+        await AssertFailsOn(new FailingConnection(readFailure: new IOException("reset", reset)), CurlExitCode.RecvError, "Recv failure: " + reset.Message);
     }
 
     [TestMethod]

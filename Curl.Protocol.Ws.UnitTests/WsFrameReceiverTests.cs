@@ -131,6 +131,30 @@ public sealed class WsFrameReceiverTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ReceiveAsync_ReadAborted_FailsWith56AndTheWinsockWords()
+    {
+        var aborted = new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionAborted);
+
+        WsTransferException failure = await ReceiveFailingWith(new IOException("aborted", aborted));
+
+        Assert.AreEqual(CurlExitCode.RecvError, failure.ExitCode);
+        Assert.AreEqual("Recv failure: Connection was aborted", failure.Message);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ReceiveAsync_ReadAborted_FailsWith56AndTheSocketErrorsOwnMessage()
+    {
+        var aborted = new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionAborted);
+
+        WsTransferException failure = await ReceiveFailingWith(new IOException("aborted", aborted));
+
+        Assert.AreEqual(CurlExitCode.RecvError, failure.ExitCode);
+        Assert.AreEqual("Recv failure: " + aborted.Message, failure.Message);
+    }
+
+    [TestMethod]
     public async Task ReceiveAsync_PongCannotBeSent_FailsWith55()
     {
         var connection = new FailingConnection(writeFailure: new IOException("broken"));
@@ -148,6 +172,10 @@ public sealed class WsFrameReceiverTests
             output.AddRange(payload.Span);
             return ValueTask.CompletedTask;
         };
+
+    private static Task<WsTransferException> ReceiveFailingWith(IOException readFailure) =>
+        Assert.ThrowsExactlyAsync<WsTransferException>(
+            async () => await new WsFrameReceiver(new FailingConnection(readFailure: readFailure), MeasuredMask, NoTransferProgress.Instance, NoTransferEvents.Instance).ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect([]), CancellationToken.None));
 
     private static byte[] Hex(string pairs) => Convert.FromHexString(pairs.Replace(" ", string.Empty, StringComparison.Ordinal));
 }
