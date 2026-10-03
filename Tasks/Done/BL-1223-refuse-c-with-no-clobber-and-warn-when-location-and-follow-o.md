@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1223 — Refuse -C with --no-clobber and warn when --location and --follow override each other, as curl does
 
@@ -30,10 +30,10 @@ completed:
 ## Acceptance criteria
 
 - [x] Before the code change, `Notes` records curl 8.21.0's stderr and exit code for `-s -C 5 --no-clobber`, `-s -L --follow`, `--follow --location-trusted`, `-L --no-follow` and `--follow --no-location`.
-- [ ] Tests in `Curl.Cli.UnitTests` pin every case above, measured and newly measured, line for line: the refusal's lines and exit 2, and each warning's text and place among the parser's warnings.
-- [ ] No other refusal or warning changes; every existing Cli test passes unchanged.
+- [x] Tests in `Curl.Cli.UnitTests` pin every case above, measured and newly measured, line for line: the refusal's lines and exit 2, and each warning's text and place among the parser's warnings.
+- [x] No other refusal or warning changes; every existing Cli test passes unchanged.
 - [x] `curl --ai-help` needs no change (no option is added or changed); say so in `Notes`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
 
@@ -47,8 +47,10 @@ completed:
   - `--no-follow -L`, `--no-location --follow`: no warning (the other was not in force). `-L --follow --follow`: one warning. `-L -L --follow -L`: follow-overrides then location-overrides.
   - `-L -r 5 --follow`: the range warning, then `Warning: --follow overrides --location`.
 - `--ai-help` needs no change: no option is added or changed, only a refusal and two warnings.
-- Implemented in this checkout (left uncommitted for the shift to stash): `SetClobber` (a `NegatableFlagThatCanRefuse`), the `--no-clobber` check in `SetResumeFrom`, `CommandLineRefusal.ContinueAtExclusiveWithNoClobber`, `CommandLineWarning.LocationOverridesFollow`/`FollowOverridesLocation` raised from `SetLocation`/`SetFollow`, and the tests `CommandLineContinueAtNoClobberTests` and `CommandLineLocationFollowOverrideTests`. Build clean, all Cli tests pass.
-- The refusal breaks `Curl.Console.UnitTests/CurlCommandRunnerNoClobberTests.cs` `RunAsync_NoClobberWithResume_AppendsToTheTarget`, which runs `-C 3 -o out.txt --no-clobber` - a combination real curl refuses. That test must be removed (or turned into an exit-2 check) in the same change, so `Curl.Console.UnitTests` joins `touches`. BL-1191 (in Doing) touches `Curl.Console.UnitTests`, so the task goes back to Backlog until it is done.
+- First run's code was left uncommitted for the shift to stash; this lane could not reach the stash, so the second run rewrote it: `SetClobber` (a `NegatableFlagThatCanRefuse`), the `--no-clobber` check in `SetResumeFrom` (after `--range` and `--remove-on-error`, curl's order), `CommandLineRefusal.ContinueAtExclusiveWithNoClobber`, `CommandLineWarning.LocationOverridesFollow`/`FollowOverridesLocation` raised from `SetLocation`/`SetFollow` through `AddWarningLinesUnlessSilent` (which already drops a warning raised under `-s`, with or without `-S`, as measured). Tests: `CommandLineContinueAtNoClobberTests` and `CommandLineLocationFollowOverrideTests`.
+- "In force" mirrors curl's single `followlocation` state: `--follow` is in force when `FollowRedirectsPerSpec`; `-L` when `FollowRedirects` without it.
+- The refusal broke `Curl.Console.UnitTests/CurlCommandRunnerNoClobberTests.cs` `RunAsync_NoClobberWithResume_AppendsToTheTarget` (`-C 3 -o out.txt --no-clobber`, which real curl refuses); it is now `RunAsync_NoClobberWithResume_IsRefusedWithoutWriting`, pinning exit 2, the three lines and no file write. `Curl.Console.UnitTests` is in `touches` for that (BL-1191 is done).
+- Verified 2026-10-02: `dotnet build Curl.slnx -warnaserror` clean; every fast test project passes (Cli 3682, Console 2364); `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`: 100% line, 100% branch, 0 failing members.
 
 ## Log
 
@@ -56,3 +58,4 @@ completed:
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-02: Doing -> Backlog. Needs Curl.Console.UnitTests (a test runs -C with --no-clobber, which curl refuses), held by BL-1191 in Doing; code is ready in Notes
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. curl -C with --no-clobber is refused (exit 2, curl's three lines) and -L/--follow overriding each other warns, as curl 8.21.0 does
