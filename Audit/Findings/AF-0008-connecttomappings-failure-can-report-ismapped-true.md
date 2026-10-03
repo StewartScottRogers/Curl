@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: yes | Same red baseline, no mutants run. ConnectToMappings (ConnectDestination.cs) still creates IsMapped: false at lines 66 and 135. A fix is not shown.
+
 ## Log
 
 - 2026-10-02: filed proposed.

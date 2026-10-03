@@ -38,6 +38,8 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction against curl 8.21.0 Schannel: --http2, --tlsuser 1 and --ssl-sessions f.txt exit 2 from both binaries. Also checked --http2-prior-knowledge, --http3, --http3-only, --tlspassword x and --tlsauthtype SRP with -sS: both binaries exit 2 with the identical 'option --X: the installed libcurl version does not support this' text.
+
 ## Log
 
 - 2026-10-02: filed proposed.
