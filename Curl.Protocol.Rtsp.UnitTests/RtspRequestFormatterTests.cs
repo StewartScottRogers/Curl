@@ -95,11 +95,56 @@ public sealed class RtspRequestFormatterTests
     [TestMethod]
     public void Format_Session_WritesItAfterCSeq()
     {
-        byte[] head = RtspRequestFormatter.Format(RtspMethod.Options, "*", 2, "1234", new HttpRequestOptions(), null);
+        byte[] head = RtspRequestFormatter.Format(RtspMethod.Options, "*", 2, "1234", null, new HttpRequestOptions(), null);
 
         Assert.AreEqual(
             "OPTIONS * RTSP/1.0\r\nCSeq: 2\r\nSession: 1234\r\nUser-Agent: curl/8.21.0\r\n\r\n",
             Encoding.Latin1.GetString(head));
+    }
+
+    [TestMethod]
+    public void Format_RangeAndReferer_WritesRangeBeforeReferer()
+    {
+        var options = new HttpRequestOptions { Referer = "http://r/" };
+
+        Assert.AreEqual(
+            "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nReferer: http://r/\r\nUser-Agent: curl/8.21.0\r\n\r\n",
+            Format(options, range: "1-2"));
+    }
+
+    [TestMethod]
+    public void Format_SessionAndRange_WritesSessionBeforeRange()
+    {
+        byte[] head = RtspRequestFormatter.Format(RtspMethod.Options, "*", 2, "1234", "5-", new HttpRequestOptions(), null);
+
+        Assert.AreEqual(
+            "OPTIONS * RTSP/1.0\r\nCSeq: 2\r\nSession: 1234\r\nRange: 5-\r\nUser-Agent: curl/8.21.0\r\n\r\n",
+            Encoding.Latin1.GetString(head));
+    }
+
+    [TestMethod]
+    [DataRow("Range: npt=0-")]
+    [DataRow("range: npt=0-")]
+    [DataRow("RANGE: npt=0-")]
+    public void Format_RangeHeaderOfAnyCase_SuppressesCurlsRange(string header)
+    {
+        var options = new HttpRequestOptions { Headers = [header] };
+
+        Assert.AreEqual(
+            "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\n" + header + "\r\n\r\n",
+            Format(options, range: "1-2"));
+    }
+
+    [TestMethod]
+    [DataRow(null, null, null)]
+    [DataRow(0L, null, null)]
+    [DataRow(0L, "1-2", "1-2")]
+    [DataRow(null, "1-2", "1-2")]
+    [DataRow(5L, null, "5-")]
+    [DataRow(5L, "1-2", "5-")]
+    public void RangeValue_ResumeAndRange_GivesCurlsRangeValue(long? resumeFrom, string? rangeText, string? expected)
+    {
+        Assert.AreEqual(expected, RtspRequestFormatter.RangeValue(resumeFrom, rangeText));
     }
 
     [TestMethod]
@@ -113,7 +158,7 @@ public sealed class RtspRequestFormatterTests
             CommandLineTextEncoding = Encoding.UTF8,
         };
 
-        byte[] head = RtspRequestFormatter.Format(RtspMethod.Options, "*", 1, null, options, null);
+        byte[] head = RtspRequestFormatter.Format(RtspMethod.Options, "*", 1, null, null, options, null);
 
         CollectionAssert.AreEqual(
             Encoding.UTF8.GetBytes("OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nReferer: http://r/é\r\nUser-Agent: é\r\nX: é\r\n\r\n"),
@@ -144,6 +189,6 @@ public sealed class RtspRequestFormatterTests
         Assert.AreEqual("OPTIONS", RtspMethod.Options.Name);
     }
 
-    private static string Format(HttpRequestOptions options, string? authorization = null) =>
-        Encoding.Latin1.GetString(RtspRequestFormatter.Format(RtspMethod.Options, "*", 1, null, options, authorization));
+    private static string Format(HttpRequestOptions options, string? authorization = null, string? range = null) =>
+        Encoding.Latin1.GetString(RtspRequestFormatter.Format(RtspMethod.Options, "*", 1, null, range, options, authorization));
 }

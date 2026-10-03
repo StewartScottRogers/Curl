@@ -242,6 +242,7 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
             OptionsTarget,
             sequenceNumber,
             session.SessionId,
+            RtspRequestFormatter.RangeValue(context.ResumeFrom, context.RangeText),
             options,
             Authorization(context, options));
         events.ReportRequestHeader(request);

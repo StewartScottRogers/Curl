@@ -8,7 +8,7 @@ depends-on: [BL-1292]
 touches: [Curl.Protocol.Rtsp.UnitLibrary, Curl.Protocol.Rtsp.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1293 — Send curl's Range header on an RTSP request for -r and -C
 
@@ -32,15 +32,17 @@ An `rtsp://` request carries `Range: <text>` for `-r <text>`, and `Range: <offse
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.Rtsp.UnitTests` (`RtspRequestFormatterTests` or the handler tests) assert the exact request bytes of the three measured runs, including `-e http://r/` with `-r 1-2` placing `Range: 1-2` before `Referer: http://r/`.
-- [ ] Tests pin that `-C 0` alone sends no `Range`, that `-C 5 -r 1-2` sends `Range: 5-`, and that a held session ID's `Session` line comes before `Range`.
-- [ ] A test pins that a `-H Range` header of any letter case suppresses curl's `Range` line.
-- [ ] `dotnet build Curl.Protocol.Rtsp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Rtsp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Rtsp.UnitLibrary` reports no failing member.
+- [x] Tests in `Curl.Protocol.Rtsp.UnitTests` (`RtspRequestFormatterTests` or the handler tests) assert the exact request bytes of the three measured runs, including `-e http://r/` with `-r 1-2` placing `Range: 1-2` before `Referer: http://r/`.
+- [x] Tests pin that `-C 0` alone sends no `Range`, that `-C 5 -r 1-2` sends `Range: 5-`, and that a held session ID's `Session` line comes before `Range`.
+- [x] A test pins that a `-H Range` header of any letter case suppresses curl's `Range` line.
+- [x] `dotnet build Curl.Protocol.Rtsp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Rtsp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Rtsp.UnitLibrary` reports no failing member.
 
 ## Notes
 
 - `-C -` (resume from the output's size) needs an output to measure; pin only the numeric forms here.
 - 2026-10-03, interactive session: timed out after 120 min because `Measure-CodeQuality.ps1 -Library` ran the whole solution's ~25k tests with coverage (40-58 min a run on nine lanes) and other lanes killed runs machine-wide; both fixed (BL-1318). Code and tests were written and green (196/196) before the timeout; only the Measure-CodeQuality check was never completed. Restore the work, rebuild, run the RTSP tests, then `Measure-CodeQuality.ps1 -Library Curl.Protocol.Rtsp.UnitLibrary`, which now takes minutes (BL-1318). The work is in the shared stash `011be235c828c5355b3745fa019d6c7cc6ec5dfc` (never pop a stash; lanes share them). Restore it with `git checkout 011be235c828c5355b3745fa019d6c7cc6ec5dfc -- Curl.Protocol.Rtsp.UnitLibrary/RtspProtocolHandler.cs Curl.Protocol.Rtsp.UnitLibrary/RtspRequestFormatter.cs Curl.Protocol.Rtsp.UnitTests/RtspProtocolHandlerTests.cs Curl.Protocol.Rtsp.UnitTests/RtspRequestFormatterTests.cs` and continue from there.
+
+- 2026-10-03, lane 7: restored the stash by applying its diff against its parent (git apply), rebuilt clean, 196/196 RTSP tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Protocol.Rtsp.UnitLibrary` reports 0 failing members.
 
 ## Log
 
@@ -49,3 +51,4 @@ An `rtsp://` request carries `Range: <text>` for `-r <text>`, and `Range: <offse
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1293-20261002-211047-L2.jsonl
 - 2026-10-03: Blocked -> Backlog. Requeued: the timeout was Measure-CodeQuality running the whole solution (fixed in BL-1318); Notes say how to restore the stashed work
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. RTSP requests send curl's Range line for -r and -C, before Referer, unless -H names Range

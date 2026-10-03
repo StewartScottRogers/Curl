@@ -94,6 +94,48 @@ public sealed class RtspProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(null, "1-2", null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nUser-Agent: curl/8.21.0\r\n\r\n")]
+    [DataRow(5L, null, null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 5-\r\nUser-Agent: curl/8.21.0\r\n\r\n")]
+    [DataRow(null, "1-2", "Range: npt=0-", "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nRange: npt=0-\r\n\r\n")]
+    [DataRow(0L, null, null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\n\r\n")]
+    [DataRow(5L, "1-2", null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 5-\r\nUser-Agent: curl/8.21.0\r\n\r\n")]
+    public async Task ExecuteAsync_ResumeAndRange_SendsCurlsRangeLine(long? resumeFrom, string? rangeText, string? header, string expected)
+    {
+        ScriptedConnection server = Server(Ok);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("rtsp://127.0.0.1:47950/media"),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { Headers = header is null ? [] : [header] },
+            ResumeFrom = resumeFrom,
+            RangeText = rangeText,
+        };
+
+        await Handler(server).ExecuteAsync(context);
+
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(server.Sent));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RangeAndReferer_SendsRangeBeforeReferer()
+    {
+        ScriptedConnection server = Server(Ok);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("rtsp://127.0.0.1:47950/media"),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { Referer = "http://r/" },
+            RangeText = "1-2",
+        };
+
+        await Handler(server).ExecuteAsync(context);
+
+        Assert.AreEqual(
+            "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nReferer: http://r/\r\nUser-Agent: curl/8.21.0\r\n\r\n",
+            Encoding.Latin1.GetString(server.Sent));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_CustomMethodTargetAndBody_StillSendsOptionsStar()
     {
         ScriptedConnection server = Server(Ok);
