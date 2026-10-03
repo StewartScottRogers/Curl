@@ -37,3 +37,4 @@ An `sftp://` file download honours `ITransferContext.MaxFileSize` as curl 8.21.0
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
