@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cryptography.UnitLibrary]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1268 — Fix AF-0012: Camellia's F-function indexes the S-boxes with key-mixed data (TLS Camellia suites)
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- `Camellia.Function` now gathers its eight S-box indices into one word and `Camellia.SubstituteBytes` reads every SBOX1 entry in order, keeping each by a branch-free per-byte mask (SWAR zero test); SBOX4's input and SBOX2/SBOX3's output rotations are applied around it. Decision recorded in ADR-0393, superseding ADR-0145.
+- No new test: `Curl.Cryptography.UnitTests` is held by BL-1266 (outside this task's touches), and the existing RFC 3713 vectors and CBC tests exercise every line of the new code (it has no branches beyond the loop). All 1330 cryptography tests pass.
+- Reproduction now prints no match.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. Camellia's F-function reads its S-box by a constant-time masked scan; AF-0012's reproduction no longer matches
