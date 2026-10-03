@@ -35,3 +35,4 @@ An `smb://` message send or read that fails with any socket error ends with curl
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
