@@ -61,6 +61,18 @@ public sealed class TcpPendingConnectionTests
         Assert.ThrowsExactly<ObjectDisposedException>(() => socket.Listen(1));
     }
 
+    [TestMethod]
+    public void TurnOffNagle_SetsNoDelayOnTheAcceptedSocket()
+    {
+        // AF-0030: the accept step sets TCP_NODELAY, as curl does on every connection.
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        socket.NoDelay = false;
+
+        TcpPendingConnection.TurnOffNagle(socket);
+
+        Assert.IsTrue(socket.NoDelay);
+    }
+
     private static Socket BoundSocket()
     {
         var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);

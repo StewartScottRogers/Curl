@@ -70,6 +70,13 @@ internal sealed class TcpPendingConnection : IPendingConnection
     }
 
     /// <summary>
+    /// Sets TCP_NODELAY on an accepted socket, as curl sets it on every connection it makes
+    /// (<c>tcp_nodelay</c> defaults on), so small writes leave without Nagle's delay.
+    /// </summary>
+    /// <param name="accepted">The socket the listening socket accepted.</param>
+    internal static void TurnOffNagle(Socket accepted) => accepted.NoDelay = true;
+
+    /// <summary>
     /// Accepts one socket and returns it as a <see cref="StreamConnection" /> that owns it, with
     /// its local and remote end points; a socket that fails before it is handed over is closed.
     /// </summary>
@@ -83,7 +90,7 @@ internal sealed class TcpPendingConnection : IPendingConnection
         var accepted = await listeningSocket.AcceptAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            accepted.NoDelay = true;
+            TurnOffNagle(accepted);
             return new StreamConnection(
                 new NetworkStream(accepted, ownsSocket: true),
                 accepted.RemoteEndPoint,
