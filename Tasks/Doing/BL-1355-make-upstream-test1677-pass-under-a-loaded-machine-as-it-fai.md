@@ -32,3 +32,4 @@ Upstream case `test1677` in `Curl.Conformance.UnitTests` passes reliably while u
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
