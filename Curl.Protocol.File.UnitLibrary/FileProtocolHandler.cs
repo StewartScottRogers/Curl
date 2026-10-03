@@ -60,7 +60,7 @@ namespace Curl.Protocol.File;
 /// Of the options on <see cref="ITransferContext" />, the download path ignores
 /// <see cref="ITransferContext.ConvertLineEndings" /> and
 /// <see cref="ITransferContext.CreateFileMode" />, and the upload path ignores
-/// <see cref="ITransferContext.Range" />, <see cref="ITransferContext.NoBody" />,
+/// <see cref="ITransferContext.Range" />, <see cref="ITransferContext.RangeText" />, <see cref="ITransferContext.NoBody" />,
 /// <see cref="ITransferContext.TimeCondition" />, <see cref="ITransferContext.HeaderOutput" />
 /// and <see cref="ITransferContext.MaxFileSize" />. Both read
 /// <see cref="ITransferContext.TimeProvider" /> only to time the diagnostic log's
@@ -376,6 +376,15 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         Stream source,
         long length)
     {
+        // curl 8.21.0's file_do calls Curl_range only after the open and the -i header
+        // block, and never under -I, so text that names no range fails here and no
+        // earlier: a range only RangeText carries is one no parser could read.
+        if (context.Range is null && context.RangeText is not null)
+        {
+            return ValueTask.FromResult(
+                TransferResult.Failure(CurlExitCode.RangeError, FileTransferMessages.RangeNotDelivered));
+        }
+
         if (!TryResolveWindow(
             context,
             length,
@@ -545,8 +554,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         // curl knows the length of a -T file and not of standard input, and only a known
         // length turns a failed read into exit 26; the curl tool reports a failed read as the
         // end of the file, so with no length to fall short of, the upload simply ends there.
-        long? needed = upload.CanSeek ? upload.Length - upload.Position : null;
-        long skip = context.ResumeFrom ?? 0;
+        long? needed = RemainingLength(upload);
+        long skip = context.ResumeFrom.GetValueOrDefault();
 
         bool skipped = await TrySkipAsync(upload, skip, context.CancellationToken)
             .ConfigureAwait(false);
@@ -563,11 +572,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         // only 131072/200000, with size_upload 131062, 61072 and 0.
         int firstChunkSize = UploadChunkSize - (int)(skip % UploadChunkSize);
 
-        // A fresh converter per upload, so the carriage return it remembers never leaks
-        // from one transfer into the next. Bytes skipped by -C are not seen by it.
-        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = context.ConvertLineEndings
-            ? new CrlfUploadConverter(UploadChunkSize).Convert
-            : static chunk => chunk;
+        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = CreateUploadChunkConverter(context);
 
         return await CopyAsync(
                 upload,
@@ -594,6 +599,32 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
                 context.CancellationToken)
             .ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Measures how many bytes an upload source has left to give.
+    /// </summary>
+    /// <param name="upload">The stream to upload from.</param>
+    /// <returns>
+    /// The bytes from its position to its end, or <see langword="null" /> when it cannot
+    /// seek, as standard input cannot, so its length is unknown.
+    /// </returns>
+    private static long? RemainingLength(Stream upload) =>
+        upload.CanSeek ? upload.Length - upload.Position : null;
+
+    /// <summary>
+    /// Picks what each upload chunk goes through on its way to the destination.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <returns>
+    /// A fresh <c>--crlf</c> converter when <see cref="ITransferContext.ConvertLineEndings" />
+    /// is set, fresh per upload so the carriage return it remembers never leaks from one
+    /// transfer into the next (bytes skipped by <c>-C</c> are not seen by it); otherwise
+    /// a pass-through.
+    /// </returns>
+    private static Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> CreateUploadChunkConverter(ITransferContext context) =>
+        context.ConvertLineEndings
+            ? new CrlfUploadConverter(UploadChunkSize).Convert
+            : static chunk => chunk;
 
     /// <summary>
     /// Moves up to <paramref name="count" /> bytes in <paramref name="chunkSize" /> chunks,
@@ -1076,27 +1107,69 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         out string errorMessage)
     {
         errorMessage = FileTransferMessages.ResumeFailed;
-        start = 0;
-        count = 0;
 
         if (range.Kind == ByteRangeKind.Suffix)
         {
-            long suffixLength = range.SuffixLength ?? 0;
-
-            if (suffixLength > length + 1)
-            {
-                errorMessage = FileTransferMessages.CouldNotResumeDownload;
-
-                return false;
-            }
-
-            start = Math.Max(0, length - suffixLength);
-            count = length - start;
-
-            return true;
+            return TryResolveSuffix(range.SuffixLength.GetValueOrDefault(), length, out start, out count, out errorMessage);
         }
 
-        start = range.FirstBytePosition ?? 0;
+        return TryResolveFromStart(range, length, out start, out count);
+    }
+
+    /// <summary>
+    /// Turns a suffix range - <c>-r -N</c> - into a window: the last
+    /// <paramref name="suffixLength" /> bytes, or the whole file when it holds fewer.
+    /// </summary>
+    /// <param name="suffixLength">How many trailing bytes were asked for.</param>
+    /// <param name="length">The length of the opened file.</param>
+    /// <param name="start">On success, the first byte position to send.</param>
+    /// <param name="count">On success, how many bytes to send from there.</param>
+    /// <param name="errorMessage">On failure, the exit 36 message to report.</param>
+    /// <returns>
+    /// <see langword="false" /> when more than one byte more than the file holds was asked for.
+    /// </returns>
+    private static bool TryResolveSuffix(
+        long suffixLength,
+        long length,
+        out long start,
+        out long count,
+        out string errorMessage)
+    {
+        errorMessage = FileTransferMessages.ResumeFailed;
+        start = 0;
+        count = 0;
+
+        if (suffixLength > length + 1)
+        {
+            errorMessage = FileTransferMessages.CouldNotResumeDownload;
+
+            return false;
+        }
+
+        start = Math.Max(0, length - suffixLength);
+        count = length - start;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Turns a <c>first-last</c> or <c>first-</c> range into a window, clamped to the file.
+    /// </summary>
+    /// <param name="range">The requested range, not a suffix.</param>
+    /// <param name="length">The length of the opened file.</param>
+    /// <param name="start">On success, the first byte position to send.</param>
+    /// <param name="count">On success, how many bytes to send from there.</param>
+    /// <returns>
+    /// <see langword="false" /> when the first byte position is strictly past the end of the file.
+    /// </returns>
+    private static bool TryResolveFromStart(
+        ByteRange range,
+        long length,
+        out long start,
+        out long count)
+    {
+        count = 0;
+        start = range.FirstBytePosition.GetValueOrDefault();
 
         if (start > length)
         {
@@ -1110,17 +1183,14 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         // to long.MinValue, so the copy loop's "transferred < count" was false on the
         // first test and the handler reported success having written nothing. A range
         // asking for the whole file returned an empty one, with exit 0.
-        count = range.LastBytePosition is { } lastBytePosition
-            ? (Math.Min(lastBytePosition, length - 1) - start) + 1
-            : length - start;
-
-        // An empty file has no last byte to clamp to, so the line above computes 1 for
-        // a zero-length source. Nothing is transferred either way, but the reported
-        // count has to be zero.
-        if (count < 0 || length == 0)
-        {
-            count = 0;
-        }
+        // On an empty file the clamp lands on -1 and the count on 0. ByteRange keeps the end
+        // at or past the start, and the start is at most the length here, so the count is
+        // never negative; Math.Max states that floor without a branch no input can reach.
+        count = Math.Max(
+            0,
+            range.LastBytePosition is { } lastBytePosition
+                ? (Math.Min(lastBytePosition, length - 1) - start) + 1
+                : length - start);
 
         return true;
     }
