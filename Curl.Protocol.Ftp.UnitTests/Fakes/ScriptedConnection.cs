@@ -37,6 +37,12 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     /// </summary>
     public bool FailReadsWhenExhausted { get; set; }
 
+    /// <summary>
+    /// Gets or sets the exception a read past the script throws when
+    /// <see cref="FailReadsWhenExhausted" /> is set; an <see cref="IOException" />, the default.
+    /// </summary>
+    public Exception ReadFailure { get; set; } = new IOException("The connection was reset.");
+
     /// <inheritdoc />
     public bool IsSecure => false;
 
@@ -68,7 +74,7 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
         if (nextRead == reads.Length)
         {
             return FailReadsWhenExhausted
-                ? ValueTask.FromException<int>(new IOException("The connection was reset."))
+                ? ValueTask.FromException<int>(ReadFailure)
                 : ValueTask.FromResult(0);
         }
 

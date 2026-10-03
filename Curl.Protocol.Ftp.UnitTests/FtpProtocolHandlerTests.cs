@@ -717,18 +717,103 @@ public sealed class FtpProtocolHandlerTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_CommandSendReset_FailsWithExit55SendFailureConnectionWasReset()
+    {
+        FtpRun run = await RunWithCommandSendFailingAsync(System.Net.Sockets.SocketError.ConnectionReset);
+
+        Assert.AreEqual("USER anonymous\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), run.Result);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_CommandSendResetOffWindows_FailsWithExit55SendFailureAndTheErrorsOwnMessage()
+    {
+        FtpRun run = await RunWithCommandSendFailingAsync(System.Net.Sockets.SocketError.ConnectionReset);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + SocketMessage(System.Net.Sockets.SocketError.ConnectionReset)), run.Result);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_CommandSendAborted_FailsWithExit55SendFailureConnectionWasAborted()
+    {
+        FtpRun run = await RunWithCommandSendFailingAsync(System.Net.Sockets.SocketError.ConnectionAborted);
+
+        Assert.AreEqual("USER anonymous\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was aborted"), run.Result);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_CommandSendAbortedOffWindows_FailsWithExit55SendFailureAndTheErrorsOwnMessage()
+    {
+        FtpRun run = await RunWithCommandSendFailingAsync(System.Net.Sockets.SocketError.ConnectionAborted);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + SocketMessage(System.Net.Sockets.SocketError.ConnectionAborted)), run.Result);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_DataReadAborted_FailsWithExit56RecvFailureConnectionWasAbortedCountingTheBytesReceived()
+    {
+        FtpRun run = await RunWithDataReadFailingAsync(System.Net.Sockets.SocketError.ConnectionAborted);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "Recv failure: Connection was aborted", 2), run.Result);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_DataReadAbortedOffWindows_FailsWithExit56RecvFailureAndTheErrorsOwnMessage()
+    {
+        FtpRun run = await RunWithDataReadFailingAsync(System.Net.Sockets.SocketError.ConnectionAborted);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "Recv failure: " + SocketMessage(System.Net.Sockets.SocketError.ConnectionAborted), 2), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DataReadFailsWithTheSocketErrorDeeperDown_KeepsTheFallbackText()
+    {
+        var data = new ScriptedConnection("ab"u8.ToArray())
+        {
+            FailReadsWhenExhausted = true,
+            ReadFailure = new IOException("tls", new IOException("inner", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionAborted))),
+        };
+
+        FtpRun run = await FtpRun.ExecuteAsync(
+            Url,
+            new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn + Epsv + TypeSet + "213 3\r\n" + Opening)),
+            data);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "Failure when receiving data from the peer", 2), run.Result);
+    }
+
+    private static string SocketMessage(System.Net.Sockets.SocketError error) => new System.Net.Sockets.SocketException((int)error).Message;
+
+    private static Task<FtpRun> RunWithCommandSendFailingAsync(System.Net.Sockets.SocketError error)
     {
         var control = new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn))
         {
             WritesBeforeFailure = 1,
-            WriteFailure = new IOException("reset", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset)),
+            WriteFailure = new IOException("failed", new System.Net.Sockets.SocketException((int)error)),
         };
 
-        FtpRun run = await FtpRun.ExecuteAsync(Url, control, new ScriptedConnection());
+        return FtpRun.ExecuteAsync(Url, control, new ScriptedConnection());
+    }
 
-        Assert.AreEqual("USER anonymous\r\n", run.Sent);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), run.Result);
+    private static Task<FtpRun> RunWithDataReadFailingAsync(System.Net.Sockets.SocketError error)
+    {
+        var data = new ScriptedConnection("ab"u8.ToArray())
+        {
+            FailReadsWhenExhausted = true,
+            ReadFailure = new IOException("failed", new System.Net.Sockets.SocketException((int)error)),
+        };
+
+        return FtpRun.ExecuteAsync(
+            Url,
+            new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn + Epsv + TypeSet + "213 3\r\n" + Opening)),
+            data);
     }
 
     [TestMethod]

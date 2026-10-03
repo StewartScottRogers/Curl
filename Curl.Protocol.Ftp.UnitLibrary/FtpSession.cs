@@ -1615,9 +1615,9 @@ internal sealed class FtpSession(
             {
                 read = await data.ReadAsync(buffer.AsMemory(0, NextDataReadLength()), context.CancellationToken).ConfigureAwait(false);
             }
-            catch (IOException)
+            catch (IOException failure)
             {
-                return TransferResult.Failure(CurlExitCode.RecvError, FtpTransferMessages.ReceiveFailed, bytesTransferred);
+                return TransferResult.Failure(CurlExitCode.RecvError, FtpTransferMessages.ReceiveFailed(failure), bytesTransferred);
             }
 
             int wanted = CountWithinWindow(read);
