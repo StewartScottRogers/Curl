@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using Curl.Protocol.Abstractions;
 
@@ -40,6 +41,13 @@ namespace Curl.Protocol.Tftp;
 /// exit 28 (<see cref="CurlExitCode.OperationTimedOut" />) <c>Timeout was reached</c>;
 /// <see cref="ITransferContext.MaxTime" /> passing ends it with exit 28 and the elapsed
 /// milliseconds and bytes received.
+/// </para>
+/// <para>
+/// Each block goes through curl's download writer: <see cref="ITransferContext.NoBody" />
+/// (<c>-I</c>) ends the download at the first DATA block with exit 8 and writes nothing,
+/// and <see cref="ITransferContext.MaxFileSize" /> ends it with exit 63 once a block passes
+/// the limit, after writing the bytes under it; either way the server is sent a bare ERROR
+/// packet. An upload ignores both.
 /// </para>
 /// </remarks>
 internal sealed class TftpDownload(ITransferContext context, IDatagramChannel channel, long startTimestamp)
@@ -214,12 +222,14 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     /// <summary>
     /// Writes the expected DATA block to the output and acknowledges it to the endpoint it
     /// came from, which is the server's transfer identifier (RFC 1350 section 4), or
-    /// acknowledges a repeat of the last block again without writing it.
+    /// acknowledges a repeat of the last block again without writing it. When the download
+    /// writer stops the download (<see cref="WriteBlockAsync" />), it sends that endpoint a
+    /// bare ERROR packet carrying the last block acknowledged instead, as curl does.
     /// </summary>
     /// <param name="received">The DATA datagram's length and source.</param>
     /// <returns>
-    /// A success when the block is shorter than the block size and so the last, otherwise
-    /// <see langword="null" />.
+    /// A success when the block is shorter than the block size and so the last, the
+    /// writer's failure when it stopped the download, otherwise <see langword="null" />.
     /// </returns>
     private async ValueTask<TransferResult?> AcceptDataAsync(DatagramReceived received)
     {
@@ -227,11 +237,15 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         var payloadLength = received.Length - TftpPackets.DataHeaderLength;
         if (block == expectedBlock)
         {
-            await context.Output
-                .WriteAsync(buffer.AsMemory(TftpPackets.DataHeaderLength, payloadLength), context.CancellationToken)
-                .ConfigureAwait(false);
-            events.DataReceived(buffer.AsSpan(TftpPackets.DataHeaderLength, payloadLength));
-            bytesTransferred += payloadLength;
+            if (await WriteBlockAsync(payloadLength).ConfigureAwait(false) is { } stopped)
+            {
+                var lastAcknowledged = unchecked((ushort)(expectedBlock - 1));
+                await channel
+                    .SendAsync(TftpPackets.BuildAbandonment(lastAcknowledged), received.RemoteEndPoint, context.CancellationToken)
+                    .ConfigureAwait(false);
+                return stopped;
+            }
+
             expectedBlock = unchecked((ushort)(block + 1));
             await AcknowledgeNewAsync(block, received.RemoteEndPoint).ConfigureAwait(false);
         }
@@ -247,6 +261,42 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         }
 
         return payloadLength < blockSize ? TransferResult.Success(bytesTransferred) : null;
+    }
+
+    /// <summary>
+    /// Hands the expected block's payload to the output as curl 8.21.0's download writer
+    /// (<c>cw_download_write</c>) does: under <see cref="ITransferContext.NoBody" /> it writes
+    /// nothing and stops with exit 8 <c>Weird server reply</c>; with a
+    /// <see cref="ITransferContext.MaxFileSize" /> above 0 it writes only the bytes left under
+    /// the limit and stops with exit 63 when it cut any. The payload is reported as data
+    /// received either way.
+    /// </summary>
+    /// <param name="payloadLength">The block's payload length, after the DATA header.</param>
+    /// <returns>The failure when the writer stopped the download, otherwise <see langword="null" />.</returns>
+    private async ValueTask<TransferResult?> WriteBlockAsync(int payloadLength)
+    {
+        var payload = buffer.AsMemory(TftpPackets.DataHeaderLength, payloadLength);
+        if (context.NoBody)
+        {
+            events.DataReceived(payload.Span);
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply", bytesTransferred);
+        }
+
+        var limit = context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue;
+        var allowed = (int)Math.Min(payloadLength, limit - bytesTransferred);
+        await context.Output.WriteAsync(payload[..allowed], context.CancellationToken).ConfigureAwait(false);
+        events.DataReceived(payload.Span);
+        bytesTransferred += allowed;
+        if (allowed == payloadLength)
+        {
+            return null;
+        }
+
+        var message = string.Create(
+            CultureInfo.InvariantCulture,
+            $"Exceeded the maximum allowed file size ({limit}) with {bytesTransferred} bytes");
+        events.MaxFileSizeExceeded(message);
+        return TransferResult.Failure(CurlExitCode.FilesizeExceeded, message, bytesTransferred);
     }
 
     /// <summary>
