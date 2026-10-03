@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cryptography.UnitLibrary]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1269 — Fix AF-0013: ARIA's substitution layer indexes the S-boxes with key-mixed state bytes (TLS ARIA-GCM suites)
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- `Aria.Substitute` now scans each of the four S-boxes whole with `Aria.SubstituteBytes` (the masked scan BL-1268 gave Camellia) over both 64-bit halves of the state, and keeps each box's bytes with a fixed lane mask that depends only on SL1/SL2. Recorded as ADR-0394 (supersedes ADR-0147's S-box choice). The XML remarks and the library's CLAUDE.md now say ARIA (and Camellia, missed by BL-1268) are constant-time. ADR-0147 itself is left as written, as BL-1268 left ADR-0145.
+- Reproduction: `Select-String ... SubstitutionBoxes[(` now prints nothing. Build clean; fast tests green (Cryptography 1330 passed, RFC 5794 vectors included).
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. ARIA's substitution layers read their S-boxes by constant-time masked scan; AF-0013's reproduction no longer matches
