@@ -40,3 +40,4 @@ Every auditor runs every step of its method on every audit; re-audits are added 
 - 2026-10-03: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Built on the audit branch (PR #56); waits for a 3-auditor check run after BL-1365, then the merge. An interactive session completes it.
 - 2026-10-03: Blocked -> Doing.
+- 2026-10-03: Doing -> Blocked. Opus switch on the audit branch (PR #57); waits for a 3-auditor check run, then the merge. An interactive session completes it.
