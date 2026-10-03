@@ -35,3 +35,4 @@ A `gopher://` selector send or reply read that fails with any socket error ends 
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
