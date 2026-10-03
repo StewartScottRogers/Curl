@@ -23,7 +23,7 @@ Interactive only (`lane: no`): the change is to the audit office's fuzzer, which
 factory may not read or change (ADR-0267). Its `touches` should be set to the fuzzer's
 folder by the interactive session; a lane cannot name an audit path.
 
-BL-1267 (ADR-0393) gave `Curl.Protocol.Ssh.UnitLibrary` a public static class
+BL-1267 (ADR-0394) gave `Curl.Protocol.Ssh.UnitLibrary` a public static class
 `SshWireDecoders`. Each method returns its refusal of malformed bytes as a value and lets
 any other exception escape, which is the crash the fuzzer looks for:
 

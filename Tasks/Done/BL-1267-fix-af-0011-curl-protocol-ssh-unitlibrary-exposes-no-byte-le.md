@@ -52,7 +52,7 @@ The finding closes only when a later re-audit by the security auditor confirms t
   `TryDecodeKexInit`, `TryDecodeSftpAttributes`, `TryDecodeHostKeySignature` (name, key
   blob, signature blob, exchange hash, through the named `ISshSignatureVerifier`). The
   refusals the transport already treats as a malformed server become the return value;
-  anything else escapes so the fuzzer sees it as a crash. ADR-0393 records it.
+  anything else escapes so the fuzzer sees it as a crash. ADR-0394 records it.
 - The reproduction could not be run here: the fuzzer lives under the audit folder, which
   the audit guard refuses a dark factory lane to read, run or change (ADR-0267). Whether
   it finds the readers by reflection or needs its `ssh` target rewritten is unknown from
