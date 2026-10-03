@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1278 — Fix AF-0022: Options the Windows Schannel curl refuses with exit 2 (--http2, --http2-prior-knowledge, --http3, --http3-only, --tlsuser, --tlspassword, --tlsauthtype, --ssl-sessions) are accepted by Curl
 
@@ -41,12 +41,38 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Decision: ADR-0395 (decided by Claude under Stewart's delegation). On Windows the parser reads as the
+  Schannel build and refuses `--http2`, `--http2-prior-knowledge`, `--http3`, `--http3-only`, `--tlsuser`,
+  `--tlspassword`, `--tlsauthtype`, `--proxy-tlsuser`, `--proxy-tlspassword`, `--proxy-tlsauthtype` and
+  `--ssl-sessions` with `the installed libcurl version does not support this`, exit 2; off Windows nothing
+  changes. The three `--proxy-` TLS-SRP options were not in the finding but the same curl refuses them the
+  same way, so they are included.
+- Measured with `C:\Program Files\Git\mingw64\bin\curl.exe` (8.21.0 Schannel) on 2026-10-02: each option
+  (also `--http2=x`, and each value option with an empty value) refused as above, even under `-s`; a value
+  option as the last argument is `requires parameter` first; `--no-http2` etc. stay "cannot be reversed";
+  in a `-K` file the line is `k.txt:1 config file option 'tlsuser' the installed libcurl version does not
+  support this`, wrapped, then `option -K: ...`.
+- Implementation: `CommandLineOption.RefusedBySchannelBuild()` wraps a row's applier; it checks
+  `CommandLineOptions.ActsAsWindowsSchannelBuild`, set from the parser's `isWindows`. New overload
+  `CommandLineParser.Parse(..., DefaultConfigFileSearch, bool isWindows)`; `CurlCommandRunner` and
+  `CurlComposition.CreateRunner` take an optional `parsesAsWindowsBuild` (default: this process's platform).
+  `--ai-help` gives each of the eleven sections a line saying Windows refuses it.
+- touches widened (rule 3): the change made 37 Cli and 53 Console tests fail on Windows because they
+  parsed `--http2`/`--http3`/TLS-SRP/`--ssl-sessions` as this platform. Those tests now parse as the OpenSSL
+  build (`OpenSslBuildParser` helpers, `parsesAsWindowsBuild: false`), which needed `Curl.Cli.UnitTests`,
+  `Curl.Console` and `Curl.Console.UnitTests`. No task in Doing on `origin/work/dark-factory` touched them.
+- Reproduction after the fix: curl and candidate both exit 2 with the same two stderr lines for
+  `--http2`, `--tlsuser 1` and `--ssl-sessions f.txt`.
+- Tests: Curl.Cli.UnitTests 3752 passed (new `CommandLineSchannelBuildRefusalTests`), Curl.Console.UnitTests
+  2437 passed (new `CurlCommandRunnerSchannelBuildRefusalTests`); all 33 test projects green.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. On Windows the eleven options curl's Schannel build lacks are refused with exit 2 as it refuses them (AF-0022, ADR-0395)
