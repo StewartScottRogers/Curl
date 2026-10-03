@@ -3,8 +3,8 @@ id: AF-0006
 title: DNS label length bound `position + length > message.Length` can become >= with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs:DecodeName-gt-boundary:surviving-mutant
 task: none
 found: 2026-10-02
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.
