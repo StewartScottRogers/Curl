@@ -363,7 +363,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     private static async ValueTask<TransferResult> TransferOverScpAsync(ITransferContext context, SshTransport transport, Stream output, SshStateTrace trace) =>
         context.Upload is { } upload
             ? await new ScpFileUpload(transport, context.Events) { Trace = trace }.UploadAsync(context.Url.AbsolutePath, context.CreateFileMode, upload, context.Progress, context.CancellationToken).ConfigureAwait(false)
-            : await new ScpFileDownload(transport) { Trace = trace }.DownloadAsync(context.Url.AbsolutePath, output, context.Progress, context.CancellationToken).ConfigureAwait(false);
+            : await new ScpFileDownload(transport) { Trace = trace }.DownloadAsync(context.Url.AbsolutePath, output, context.Progress, context.CancellationToken, context.MaxFileSize).ConfigureAwait(false);
 
     // An upload is sent (ADR-0244); otherwise a path ending with a slash is listed and any
     // other is downloaded (ADR-0241). Each runs the -Q commands around it (ADR-0247), with

@@ -36,12 +36,15 @@ internal sealed class ScpFileDownload(SshTransport transport)
     /// <param name="output">Where the file's bytes go.</param>
     /// <param name="progress">Told the bytes downloaded so far, and the size when known.</param>
     /// <param name="cancellationToken">Cancels the download.</param>
+    /// <param name="maxFileSize">The <c>--max-filesize</c> limit; no limit when not given or 0 (BL-1328).</param>
     /// <returns>
     /// Success with the bytes downloaded; exit 18, <c>end of response with N bytes
     /// missing</c>, when the channel ends before the header's size; exit 18, <c>transfer
     /// closed with N bytes remaining to read</c>, for a negative size other than -1; exit
-    /// 79, <c>Error in the SSH layer</c>, when the connection breaks during the copy - each
-    /// with the bytes written so far.
+    /// 79, <c>Error in the SSH layer</c>, when the connection breaks during the copy; exit
+    /// 63, <c>Exceeded the maximum allowed file size (N) with N bytes</c>, when a read would
+    /// pass <paramref name="maxFileSize" />, after writing the bytes under it - each with
+    /// the bytes written so far.
     /// </returns>
     /// <exception cref="SshTransferException">
     /// The server refused the channel or the <c>exec</c> request, or the connection broke
@@ -51,7 +54,8 @@ internal sealed class ScpFileDownload(SshTransport transport)
         string urlPath,
         Stream output,
         ITransferProgress progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long? maxFileSize = null)
     {
         Trace.Write("DO phase starts");
         Trace.Enter("SSH_SCP_TRANS_INIT");
@@ -61,7 +65,7 @@ internal sealed class ScpFileDownload(SshTransport transport)
         long size = await new ScpFileHeaderReader(channel).ReadFileSizeAsync(cancellationToken).ConfigureAwait(false);
         Trace.Rest();
         Trace.Write("DO phase is complete");
-        TransferResult result = await new Copy(channel, size, output, progress).RunAsync(cancellationToken).ConfigureAwait(false);
+        TransferResult result = await new Copy(channel, size, new DownloadSizeLimit(maxFileSize), output, progress).RunAsync(cancellationToken).ConfigureAwait(false);
         Trace.Enter("SSH_SCP_DONE");
         Trace.Enter("SSH_SCP_CHANNEL_FREE");
         await CloseIgnoringFailureAsync(channel, cancellationToken).ConfigureAwait(false);
@@ -110,8 +114,10 @@ internal sealed class ScpFileDownload(SshTransport transport)
         }
     }
 
-    // One copy of the file's bytes to the output, counting them as they go.
-    private sealed class Copy(SshSessionChannel channel, long size, Stream output, ITransferProgress progress)
+    // One copy of the file's bytes to the output, counting them as they go; a read that
+    // would pass the --max-filesize limit is cut at it and the copy fails with exit 63
+    // (BL-1328).
+    private sealed class Copy(SshSessionChannel channel, long size, DownloadSizeLimit maxFileSize, Stream output, ITransferProgress progress)
     {
         private readonly long? expectedSize = size == UnknownSize ? null : size;
 
@@ -151,9 +157,14 @@ internal sealed class ScpFileDownload(SshTransport transport)
                     return EndOfChannel();
                 }
 
-                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-                received += read;
+                int allowed = maxFileSize.AllowedOf(received, read);
+                await output.WriteAsync(buffer.AsMemory(0, allowed), cancellationToken).ConfigureAwait(false);
+                received += allowed;
                 progress.ReportDownloaded(received, expectedSize);
+                if (allowed < read)
+                {
+                    return maxFileSize.Exceeded(received);
+                }
             }
 
             return TransferResult.Success(received);

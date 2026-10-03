@@ -1,4 +1,3 @@
-using System.Globalization;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Transport;
 
@@ -158,7 +157,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
             return TransferResult.Failure(failure.ExitCode, failure.Message);
         }
 
-        Copy copy = new(new SftpReadAhead(session, handle, part), part.Length, maxFileSize is > 0 and long limit ? limit : long.MaxValue, output, progress);
+        Copy copy = new(new SftpReadAhead(session, handle, part), part.Length, new DownloadSizeLimit(maxFileSize), output, progress);
         return await copy.RunAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -166,7 +165,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
     // returns beyond the part is dropped, as curl stops at the size it expects; a read
     // that would pass the --max-filesize limit is cut at it, as curl 8.21.0's
     // cw_download_write cuts it, and the copy fails with exit 63 (BL-1327).
-    private sealed class Copy(SftpReadAhead reads, long? size, long maxFileSize, Stream output, ITransferProgress progress)
+    private sealed class Copy(SftpReadAhead reads, long? size, DownloadSizeLimit maxFileSize, Stream output, ITransferProgress progress)
     {
         private long received;
 
@@ -194,26 +193,18 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 }
 
                 data = data[..(int)Math.Min(data.Length, (size ?? long.MaxValue) - received)];
-                int allowed = (int)Math.Min(data.Length, maxFileSize - received);
+                int allowed = maxFileSize.AllowedOf(received, data.Length);
                 await output.WriteAsync(data[..allowed], cancellationToken).ConfigureAwait(false);
                 received += allowed;
                 progress.ReportDownloaded(received, size);
                 if (allowed < data.Length)
                 {
-                    return MaxFileSizeExceeded();
+                    return maxFileSize.Exceeded(received);
                 }
             }
 
             return TransferResult.Success(received);
         }
-
-        // From curl 8.21.0's cw_download_write (lib/sendf.c): a body exactly at the limit
-        // succeeds; one cut at it fails after the bytes under it are written.
-        private TransferResult MaxFileSizeExceeded() =>
-            TransferResult.Failure(
-                CurlExitCode.FilesizeExceeded,
-                string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({maxFileSize}) with {received} bytes"),
-                received);
 
         // Measured: a file that ends 5 bytes short of its STAT size is exit 18.
         private TransferResult EndOfFile() =>
