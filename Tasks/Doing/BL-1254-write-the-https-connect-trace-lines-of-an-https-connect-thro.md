@@ -32,3 +32,4 @@ Curl writes curl 8.21.0's `[HTTPS-CONNECT]` lines (and the https:// origin's `[S
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
