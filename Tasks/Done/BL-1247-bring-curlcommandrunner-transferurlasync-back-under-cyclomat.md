@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1247 — Bring CurlCommandRunner.TransferUrlAsync back under cyclomatic complexity 10
 
@@ -23,13 +23,16 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Console` reports 0 failing members.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass unchanged.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Console` reports 0 failing members.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass unchanged.
 
 ## Notes
+
+- 2026-10-02: Extracted `TryResolveTransferUrl` (scheme guess plus `-T` URL resolution) and `RefuseMalformedSetopt` (`--interface` then `--ech` refusal) out of `TransferUrlAsync`; same calls in the same order, so behaviour is unchanged. `Measure-CodeQuality.ps1 -Library Curl.Console`: 0 failing members. Build clean with -warnaserror; fast tests green.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Renumbered from BL-1218, which the archived Done/2026-10-02_1625 task already holds.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. TransferUrlAsync is back under complexity 10; Curl.Console has 0 failing members

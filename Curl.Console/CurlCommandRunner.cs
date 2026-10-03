@@ -1982,8 +1982,7 @@ internal sealed class CurlCommandRunner(
 
         string? uploadFile = transfer.UploadFile;
         RecordLibcurlTransfer(options, givenUrl, uploadFile);
-        string transferUrl = UrlSchemeGuesser.AddScheme(givenUrl, options.DefaultProtocol);
-        if (uploadFile is not null && !UploadTransferUrl.TryResolve(transferUrl, uploadFile, out transferUrl))
+        if (!TryResolveTransferUrl(options, givenUrl, uploadFile, out string transferUrl))
         {
             return (UploadUrlMalformedFailure, givenUrl, transferUrl);
         }
@@ -1994,7 +1993,7 @@ internal sealed class CurlCommandRunner(
         }
 
         ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(options, transfer);
-        if ((RefuseMalformedInterface(options, eventsBeforeConnecting) ?? RefuseMalformedEchMode(options, eventsBeforeConnecting)) is { } setoptFailure)
+        if (RefuseMalformedSetopt(options, eventsBeforeConnecting) is { } setoptFailure)
         {
             return (setoptFailure, givenUrl, transferUrl);
         }
@@ -2008,6 +2007,31 @@ internal sealed class CurlCommandRunner(
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
     }
+
+    /// <summary>
+    /// Gives a URL typed without a scheme the <c>--proto-default</c> scheme or the one
+    /// <see cref="UrlSchemeGuesser" /> guesses and, for a <c>-T</c> upload, resolves it with
+    /// <see cref="UploadTransferUrl" />.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="givenUrl">The URL as the glob expanded it, after any IPFS rewrite.</param>
+    /// <param name="uploadFile">The transfer's <c>-T</c> file, or <see langword="null" /> when it uploads nothing.</param>
+    /// <param name="transferUrl">The URL to transfer; for a <c>-T</c> URL that cannot be parsed, the empty string.</param>
+    /// <returns><see langword="false" /> when a <c>-T</c> URL cannot be parsed.</returns>
+    private static bool TryResolveTransferUrl(CommandLineOptions options, string givenUrl, string? uploadFile, out string transferUrl)
+    {
+        transferUrl = UrlSchemeGuesser.AddScheme(givenUrl, options.DefaultProtocol);
+        return uploadFile is null || UploadTransferUrl.TryResolve(transferUrl, uploadFile, out transferUrl);
+    }
+
+    /// <summary>
+    /// Refuses an <c>--interface</c> and then an <c>--ech</c> value curl's setopt refuses, before the transfer connects.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="events">The transfer's events before connecting.</param>
+    /// <returns>The first refusal, or <see langword="null" /> when both are accepted.</returns>
+    private static TransferResult? RefuseMalformedSetopt(CommandLineOptions options, ITransferEvents events) =>
+        RefuseMalformedInterface(options, events) ?? RefuseMalformedEchMode(options, events);
 
     /// <summary>
     /// Sets the transfer up for <c>--etag-compare</c> and <c>--etag-save</c>, in that order, as curl 8.21.0
