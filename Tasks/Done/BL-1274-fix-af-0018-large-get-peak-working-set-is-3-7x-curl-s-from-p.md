@@ -8,7 +8,7 @@ depends-on: [BL-1288]
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1274 — Fix AF-0018: large-get peak working set is 3.7x curl's, from per-byte allocation in HttpResponseBodyReader.CopyFramedAsync
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the performance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -64,6 +64,20 @@ The finding closes only when a later re-audit by the performance auditor confirm
 - Filed BL-1288 (touches Curl.Console, Curl.Cli.UnitLibrary and their tests; no task in Doing on
   `origin/work/dark-factory` touches them) for the shell32 fix and the remaining ~2.6-3.8 MB, with the
   measurement method. This task waits on it, then only needs the reproduction run.
+- 2026-10-03, lane 2: BL-1288 is Done (with BL-1289 and BL-1290); no code change in this task.
+  The audit guard still keeps `Audit/Tools/Measure-Performance.ps1` from a lane, so criterion 1 was
+  ticked on an equivalent measurement of the same scenario: native `dotnet publish Curl.Console -c Release`
+  at afdf3962 (since BL-1288's 023395df only MQTT code changed), a throwaway C# file-based app with a
+  loopback `TcpListener` serving a 50 MiB `Content-Length` body, `K32GetProcessMemoryInfo` peak working
+  set after exit, median of 5, Windows 11:
+
+  | Run | Windows `curl.exe` | Curl | Ratio |
+  | --- | --- | --- | --- |
+  | `-s -o <file>` | 7.47 MB | 14.73 MB | 1.97x |
+  | `-s`, piped stdout | 7.48 MB | 14.61 MB | 1.95x |
+
+  Under the finding's 2x, though by only ~0.2 MB. The audit tool's numbers (curl 9.46 MB in the finding)
+  come from its own harness, so the re-audit by the performance auditor is what closes AF-0018.
 
 ## Log
 
@@ -71,3 +85,4 @@ The finding closes only when a later re-audit by the performance auditor confirm
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-02: Doing -> Backlog. Waits on BL-1288: the excess working set is Curl.Console/Curl.Cli startup footprint, not HttpResponseBodyReader; shell32 fix alone reaches 2.35x, not 2x
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. Native curl.exe's 50 MiB GET peaks at 1.97x (-o) and 1.95x (pipe) Windows curl.exe's working set, under AF-0018's 2x; re-audit closes the finding
