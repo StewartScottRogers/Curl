@@ -34,3 +34,4 @@ An `sftp://` download, or an upload with `-C -` that asks the server for the rem
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
