@@ -1,5 +1,5 @@
 ---
-id: BL-1312
+id: BL-1313
 title: Write curl's SPNEGO empty challenge line when --anyauth picks Negotiate on a challenge that starts with =
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-03
 completed:
 ---
-# BL-1312 — Write curl's SPNEGO empty challenge line when --anyauth picks Negotiate on a challenge that starts with =
+# BL-1313 — Write curl's SPNEGO empty challenge line when --anyauth picks Negotiate on a challenge that starts with =
 
 ## Goal
 

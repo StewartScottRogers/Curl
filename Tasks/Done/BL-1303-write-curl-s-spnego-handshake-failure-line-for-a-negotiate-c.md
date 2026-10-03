@@ -48,7 +48,7 @@ When a 401 answers `--negotiate` with a `Negotiate` challenge whose token starts
 - Path found: with `--negotiate -u :` the first request's context fails (no credentials), nothing is sent, and the 401 reaches `RankedHttpAuthenticator.ContinueAuthorizationAsync` with an empty sent value, which calls `NegotiateHttpAuthenticator.StepWithoutAnsweringAsync`. That method now takes the challenges and, as curl's `Curl_auth_decode_spnego_message` does, reports `EmptyChallengeMessageLine` and steps no context when the Negotiate token starts with `=`. `ContinueAuthorizationAsync` (first leg succeeded) reports the same line and disposes the awaiting context unstepped. Bare `Negotiate` and an undecodable token not starting with `=` behave as before (pinned in `NegotiateEmptyChallengeMessageTests`).
 - The line is the same on both builds, so no diagnostic-log entry and no platform split; tests run with `wordsFailuresAsSspi` true and false.
 - Quality: measured with coverage from `Curl.Authentication.UnitTests` only (`Measure-CodeQuality.ps1 -SkipTestRun -ResultsDirectory`), because the whole-solution test run the script starts by default hung past an hour in this lane. `NegotiateHttpAuthenticator` has no failing member; the two failing members it lists (`NtlmHttpAuthenticator.ContextRequestFor` 80% branch, `SystemSecurityContext.Step` 87.5% branch) are in files this task did not change, with branches taken by the off-Windows tests skipped here.
-- Follow-up filed: BL-1312, the `--anyauth` path where Negotiate is picked after the challenge, which steps a context without seeing the challenge.
+- Follow-up filed: BL-1313, the `--anyauth` path where Negotiate is picked after the challenge, which steps a context without seeing the challenge.
 
 ## Log
 
