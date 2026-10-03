@@ -66,3 +66,4 @@ first when only MSBuild properties changed, or ILC does not relink.
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
