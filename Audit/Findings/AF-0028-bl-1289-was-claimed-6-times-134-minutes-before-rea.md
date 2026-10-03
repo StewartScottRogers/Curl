@@ -3,15 +3,15 @@ id: AF-0028
 title: BL-1289 was claimed 6 times (134 minutes) before reaching Done
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-03_1459.md: the reproduction no longer reproduces.
 key: process:BL-1289:BL-1289:redone-work
 task: BL-1363
 found: 2026-10-03
 found-at: 454d1d2abbb96213c945e91f0dc3d241bd40cc2d
 scorecard: 2026-10-03_0623.md
-closed:
-closed-by:
+closed: 2026-10-03
+closed-by: 2026-10-03_1459.md
 ---
 # AF-0028 - BL-1289 was claimed 6 times (134 minutes) before reaching Done
 
@@ -39,8 +39,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 ## Re-audits
 
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | BL-1289 is absent from the tool output; only BL-1322 has 3 or more claims.
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: no | BL-1289 is not in the tasks output. The related task BL-1363 is Blocked, and its log says BL-1289 was claimed 2 times, not 6.
 
 ## Log
 
 - 2026-10-03: filed proposed.
 - 2026-10-03: proposed -> accepted.
+- 2026-10-03: accepted -> closed. Re-audit 2026-10-03_1459.md: the reproduction no longer reproduces.

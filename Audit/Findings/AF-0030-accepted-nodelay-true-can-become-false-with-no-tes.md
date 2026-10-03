@@ -3,10 +3,10 @@ id: AF-0030
 title: `accepted.NoDelay = true` can become false with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpPendingConnection.cs:AcceptedSocketNoDelay:surviving-mutant
-task: none
+task: BL-1372
 found: 2026-10-03
 found-at: d1db9881553d55cd92c0e74bb41561c3dea9ea84
 scorecard: 2026-10-03_1233.md
@@ -38,6 +38,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: yes | Seed-0 mutation run: TcpPendingConnection.cs:86 `NoDelay = true` to false survived.
+
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.

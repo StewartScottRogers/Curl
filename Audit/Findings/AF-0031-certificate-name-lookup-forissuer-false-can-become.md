@@ -3,10 +3,10 @@ id: AF-0031
 title: Certificate name lookup `forIssuer: false` can become true with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/TlsFailureMessages.cs:CertificateSubjectName:surviving-mutant
-task: none
+task: BL-1373
 found: 2026-10-03
 found-at: d1db9881553d55cd92c0e74bb41561c3dea9ea84
 scorecard: 2026-10-03_1233.md
@@ -38,6 +38,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: yes | Seed-0 mutation run: TlsFailureMessages.cs:320 `forIssuer: false` to true survived.
+
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.

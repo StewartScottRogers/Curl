@@ -41,6 +41,7 @@ Run from the repository root:
 - 2026-10-02 | 2026-10-02_1400.md | reproduces: no | CLAUDE.md now reads '66 projects, one flat alphabetical run'; Get-ChildItem -Directory -Filter 'Curl.*' counts 66. Statement matches.
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | CLAUDE.md:202 reads '66 projects, one flat alphabetical run'. Counting directories matching 'Curl.*' gives 66. The statement matches the repository.
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | CLAUDE.md:202 now says '66 projects, one flat alphabetical run'; the repository has 66 Curl.* directories.
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: no | CLAUDE.md:202 now reads '66 projects, one flat alphabetical run'; counting 'Curl.*' directories gives 66.
 
 ## Log
 
