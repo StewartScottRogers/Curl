@@ -40,7 +40,7 @@ Curl writes curl 8.21.0's `[TIMER] [TIMEOUT]` lines of `-m` under `--trace-confi
   - `localhost -m 5`: after the IPv4 attempt `[TIMEOUT] gives ... 4791ms`.
   - The response-wait lines came in all seven loopback runs.
 - Delivered: `ConnectAttemptTraceEvents` takes `transferTimeout`, writes both `set` lines (TIMEOUT first), orders `expires in` nearest first and subtracts a second family's delay from every given timer; `TcpConnector.TracedTransferTimeout` (from a positive `-m` in `CurlComposition`). Console: `TransferTimers` (count, `tinternal`, wait lines), `MultiStateTraceEvents` takes it for its poll lines and the response-wait lines, `ResponseWaitTimerTraceEvents` writes them after `Request completely sent off` when `timer` is traced without `multi`.
-- Decisions (ADR-0400): the response-wait lines are always written (every run measured wrote them); values from the configured delays (`4800ms` where curl's clock gave `4791ms`); ties name `-m`'s timer first.
+- Decisions (ADR-0401): the response-wait lines are always written (every run measured wrote them); values from the configured delays (`4800ms` where curl's clock gave `4791ms`); ties name `-m`'s timer first.
 - Tests: `ConnectAttemptTraceEventsTests.MaxTimeOnAPlainConnect_*`, `MaxTimeAndAConnectTimeout_*`, `MaxTimeAcrossTwoFamilies_*`; `CurlCompositionDnsTraceTests.Connect_UnderTraceConfigTimerWithMaxTime_*`, `Connect_UnderTraceConfigTimerWithMaxTimeAndAConnectTimeout_*`, `Connect_UnderTraceConfigTimerWithMaxTimeZero_*`; `CurlCommandRunnerTransferEventTests.RunAsync_TraceConfigTimerWithTimeouts_*`, `RunAsync_TraceConfigNetworkWithMaxTimeAndAConnectTimeout_*`, `RunAsync_TraceConfigMultiWithMaxTimeButNotTimer_*`, `RunAsync_TraceConfigTimerWithoutMaxTimeOrConnectTimeout_*`; `TransferTimersTests`, `ResponseWaitTimerTraceEventsTests`.
 - `Measure-CodeQuality.ps1`: Curl.Networking.UnitLibrary and Curl.Console 100% line and branch, 0 failing members. No option changed, so `--ai-help` is untouched.
 
@@ -48,4 +48,4 @@ Curl writes curl 8.21.0's `[TIMER] [TIMEOUT]` lines of `-m` under `--trace-confi
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
-- 2026-10-02: Doing -> Done. --trace-config timer writes -m's [TIMER] [TIMEOUT] lines beside the connect timeout's, the nearest named in gives, and the response wait's timer lines (ADR-0400)
+- 2026-10-02: Doing -> Done. --trace-config timer writes -m's [TIMER] [TIMEOUT] lines beside the connect timeout's, the nearest named in gives, and the response wait's timer lines (ADR-0401)
