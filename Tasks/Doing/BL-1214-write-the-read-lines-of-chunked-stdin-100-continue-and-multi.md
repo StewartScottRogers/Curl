@@ -32,3 +32,4 @@ Under `--trace-config read` chunked, stdin (`-T -`), `100-continue` and `-F` mul
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
