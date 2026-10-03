@@ -35,3 +35,4 @@ A `pop3://` command send that fails with any socket error ends with curl 8.21.0'
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
