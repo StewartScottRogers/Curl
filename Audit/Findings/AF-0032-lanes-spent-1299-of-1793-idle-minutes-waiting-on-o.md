@@ -6,7 +6,7 @@ severity: Medium
 status: accepted
 reason: 
 key: process:logs:overlap-waits:overlap-wait
-task: none
+task: BL-1374
 found: 2026-10-03
 found-at: d1db9881553d55cd92c0e74bb41561c3dea9ea84
 scorecard: 2026-10-03_1233.md

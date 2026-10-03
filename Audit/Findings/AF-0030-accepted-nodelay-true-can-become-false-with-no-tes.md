@@ -6,7 +6,7 @@ severity: Medium
 status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpPendingConnection.cs:AcceptedSocketNoDelay:surviving-mutant
-task: none
+task: BL-1372
 found: 2026-10-03
 found-at: d1db9881553d55cd92c0e74bb41561c3dea9ea84
 scorecard: 2026-10-03_1233.md
