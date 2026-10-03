@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: FR-085
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1325 — Add one shared table that words a socket error as curl's 'Recv failure:' and 'Send failure:' lines on each platform
 
@@ -26,13 +26,14 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Protocol.Abstractions.UnitLibrary/CurlSocketErrorText.cs` exists with the members above and XML doc comments that cite `lib/cf-socket.c` lines 1562 and 1618 and `lib/curlx/strerr.c` `get_winsock_error`.
-- [ ] A data-driven test in `Curl.Protocol.Abstractions.UnitTests` pins `Words(new SocketException((int)error), isWindows: true)` for each of the twelve errors listed in Context, and that an unlisted error (e.g. `SocketError.AccessDenied`) gives the exception's own message.
-- [ ] A test pins that `isWindows: false` gives `SocketException.Message` for `ConnectionReset` and `ConnectionAborted`.
-- [ ] Tests pin `ReceiveFailure(new IOException("x", new SocketException((int)SocketError.ConnectionAborted)))` is `Recv failure: Connection was aborted` on Windows (via the overload taking the platform), `SendFailure` likewise with `Send failure: `, and that an `IOException` with no socket error inside returns `null`.
-- [ ] `dotnet build Curl.Protocol.Abstractions.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Abstractions.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` reports no failing member.
+- [x] `Curl.Protocol.Abstractions.UnitLibrary/CurlSocketErrorText.cs` exists with the members above and XML doc comments that cite `lib/cf-socket.c` lines 1562 and 1618 and `lib/curlx/strerr.c` `get_winsock_error`.
+- [x] A data-driven test in `Curl.Protocol.Abstractions.UnitTests` pins `Words(new SocketException((int)error), isWindows: true)` for each of the twelve errors listed in Context, and that an unlisted error (e.g. `SocketError.AccessDenied`) gives the exception's own message.
+- [x] A test pins that `isWindows: false` gives `SocketException.Message` for `ConnectionReset` and `ConnectionAborted`.
+- [x] Tests pin `ReceiveFailure(new IOException("x", new SocketException((int)SocketError.ConnectionAborted)))` is `Recv failure: Connection was aborted` on Windows (via the overload taking the platform), `SendFailure` likewise with `Send failure: `, and that an `IOException` with no socket error inside returns `null`.
+- [x] `dotnet build Curl.Protocol.Abstractions.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Abstractions.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` reports no failing member.
 
 ## Notes
+- 2026-10-03, interactive session: restored from lane 2's stash (c0e65b81^3: CurlSocketErrorText.cs and CurlSocketErrorTextTests.cs). Build clean with -warnaserror; Curl.Protocol.Abstractions.UnitTests 703/703. Measure-CodeQuality -Library Curl.Protocol.Abstractions.UnitLibrary (26 test projects, 27 min on an idle machine): 100% line and branch; CurlSocketErrorText has no failing member. It reports two older members over complexity 10 that this task did not touch (CurlUrlAuthority.Parse 14, CurlUrlHost.TryNormalize 12), filed as BL-1376.
 
 ## Log
 
@@ -41,3 +42,5 @@ completed:
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1325-20261003-061205-L2.jsonl
 - 2026-10-03: Blocked -> Doing.
 - 2026-10-03: Doing -> Blocked. Code and its 22 tests are committed and green (restored from stash c0e65b81^3); the Measure-CodeQuality -Library check runs in an interactive session, which completes the task.
+- 2026-10-03: Blocked -> Doing.
+- 2026-10-03: Doing -> Done. CurlSocketErrorText words socket errors as curl does; the library's two older complexity failures are BL-1376
