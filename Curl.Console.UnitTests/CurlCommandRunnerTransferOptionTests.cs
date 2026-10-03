@@ -16,6 +16,8 @@ public sealed class CurlCommandRunnerTransferOptionTests
 {
     private const string SourceUrl = "file:///source.txt";
 
+    private const string SshUrl = "sftp://127.0.0.1/source.txt";
+
     private static readonly string NewLine = Environment.NewLine;
 
     private static readonly string NotDeliveredLine = "curl: (33) " + ByteRangeParser.NotDeliveredMessage + NewLine;
@@ -43,15 +45,15 @@ public sealed class CurlCommandRunnerTransferOptionTests
     [TestMethod]
     [DataRow("3-1")]
     [DataRow("-0")]
-    public async Task RunAsync_RangeThatNamesNoRange_ReturnsExit33WithoutDispatching(string rangeText)
+    public async Task RunAsync_SshRangeThatNamesNoRange_ReturnsExit33WithoutDispatching(string rangeText)
     {
-        RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
+        RecordingProtocolHandler sftp = RecordingProtocolHandler.WritingPath("sftp");
 
-        int exitCode = await RunAsync(["-r", rangeText, SourceUrl], file);
+        int exitCode = await RunAsync(["-r", rangeText, SshUrl], sftp);
 
         Assert.AreEqual(33, exitCode);
         Assert.AreEqual(NotDeliveredLine, StandardErrorText);
-        Assert.IsEmpty(file.Contexts);
+        Assert.IsEmpty(sftp.Contexts);
         Assert.AreEqual(0, standardOutput.Length);
     }
 
@@ -86,11 +88,11 @@ public sealed class CurlCommandRunnerTransferOptionTests
     }
 
     [TestMethod]
-    public async Task RunAsync_RangeWithInvalidCharacter_PrintsTheWarningThenExit33()
+    public async Task RunAsync_SshRangeWithInvalidCharacter_PrintsTheWarningThenExit33()
     {
-        RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
+        RecordingProtocolHandler sftp = RecordingProtocolHandler.WritingPath("sftp");
 
-        int exitCode = await RunAsync(["-r", "abc", SourceUrl], file);
+        int exitCode = await RunAsync(["-r", "abc", SshUrl], sftp);
 
         Assert.AreEqual(33, exitCode);
         Assert.AreEqual(
@@ -100,7 +102,7 @@ public sealed class CurlCommandRunnerTransferOptionTests
                 "Warning: request is uncertain.")
             + NotDeliveredLine,
             StandardErrorText);
-        Assert.IsEmpty(file.Contexts);
+        Assert.IsEmpty(sftp.Contexts);
     }
 
     [TestMethod]

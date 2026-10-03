@@ -3139,7 +3139,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>
     /// The transfer's result; <see cref="NoCryptoEngines.LoadFailure" />'s failure, before any upload
     /// file is opened or the URL parsed, for an <c>--engine</c> off Windows; <see cref="ByteRangeParser.NotDeliveredFailure" />, with nothing
-    /// transferred, when the <c>-r</c> text names no range, as curl 8.21.0 reports it; the
+    /// transferred, when the <c>-r</c> text names no range on an <c>sftp</c> or <c>scp</c> URL, as curl 8.21.0 reports it; the
     /// <c>-F</c> body's build failure, with nothing transferred, when a form file cannot be opened;
     /// <see cref="CannotOpenUploadFileResult" />, with nothing transferred, when the <c>-T</c> file
     /// cannot be opened, after curl's <c>curl: cannot open</c> and try-help lines, which curl 8.21.0
@@ -3872,12 +3872,14 @@ internal sealed class CurlCommandRunner(
     /// <param name="url">The transfer's URL.</param>
     /// <param name="range">
     /// The range; <see langword="null" /> for the whole resource, and for text that names no
-    /// range on an <c>http</c> or <c>https</c> URL.
+    /// range on any URL but an <c>sftp</c> or <c>scp</c> one.
     /// </param>
     /// <returns>
-    /// <see langword="false" /> when the text names no range and the URL is not HTTP, so the
-    /// transfer must end with <see cref="ByteRangeParser.NotDeliveredFailure" />. curl 8.21.0
-    /// sends HTTP's range text verbatim and never refuses it (BL-386 Notes).
+    /// <see langword="false" /> when the text names no range and the URL is SSH's, so the
+    /// transfer must end with <see cref="ByteRangeParser.NotDeliveredFailure" />. Every other
+    /// handler gets the text as <see cref="ITransferContext.RangeText" />, as curl 8.21.0 hands
+    /// it on: HTTP, RTSP and WebSocket send it verbatim, FTP and file parse it themselves
+    /// (<c>Curl_range</c>), and the rest ignore it (BL-386, BL-1322 Notes).
     /// </returns>
     private static bool TryParseRange(string? rangeText, CurlUrl url, out ByteRange? range)
     {
@@ -3885,7 +3887,7 @@ internal sealed class CurlCommandRunner(
 
         return rangeText is null
             || ByteRangeParser.TryParse(rangeText, out range)
-            || url.Scheme is "http" or "https";
+            || url.Scheme is not ("sftp" or "scp");
     }
 
     /// <summary>
