@@ -77,6 +77,13 @@ internal sealed class HttpResponseHeadReader
     internal Action<byte[]> LineReporting { get; init; } = static _ => { };
 
     /// <summary>
+    /// Gets what is told of each head's status line, 1xx heads' included, right after the line
+    /// is reported to <see cref="Events" />, so a redirect's <c>Need to rewind upload for next
+    /// request</c> follows it (BL-1213). By default nothing is.
+    /// </summary>
+    internal Action<HttpStatusLine>? StatusLineReported { get; init; }
+
+    /// <summary>
     /// Gets what is told of each header of every head, 1xx heads' included, once it is whole -
     /// its continuation lines folded in - just before its lines are reported to
     /// <see cref="Events" />; a header whose head fails before it is whole is never told, nor
@@ -327,6 +334,7 @@ internal sealed class HttpResponseHeadReader
         }
 
         ReportLine(bytes);
+        StatusLineReported?.Invoke(statusLine);
         return statusLine;
     }
 

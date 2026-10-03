@@ -401,6 +401,7 @@ choices do not need one.
 | [0389](ADR-0389-chunked-stdin-continue-and-multipart-bodies-write-their-read-trace-lines.md) | Under `--trace-config read` chunked, stdin (`-T -`), `100 Continue` and multipart (`-F`) HTTP/1.x bodies write curl's `[READ]` lines: `len=-1` and `total=-1` for stdin, `cr_mime_read` for `-F`, `http_chunk` for chunks, and two held-back `client_read` lines around a head that waits (BL-1214) | Accepted | 2026-10-02 |
 | [0390](ADR-0390-connect-timeout-timer-lines-are-written-for-the-connect-phase-from-the-configured-delays.md) | `--trace-config timer` writes a given `--connect-timeout`'s `[TIMER] [CONNECTTIMEOUT]` lines around a direct connect, and `multi` adds each timer's `expires in` line, written from the configured delays; the response wait and `-m`'s `[TIMEOUT]` lines are a follow-up (BL-1210) | Accepted | 2026-10-02 |
 | [0391](ADR-0391-a-refused-connect-and-a-reused-connection-write-their-own-multi-lines.md) | Under `--trace-config multi` a refused connect writes curl's close, `connect failed -> 7`, `multi_done` and `[COMPLETED]` lines, polling once, and a reused connection writes its own lines up to `xfer_setup` (BL-1212) | Accepted | 2026-10-02 |
+| [0392](ADR-0392-a-redirect-after-a-request-body-writes-curls-rewind-lines.md) | A `3xx` under `-L` after a request body writes `Need to rewind upload for next request` from the HTTP handler, and `--trace-config read` adds curl's three rewind `[READ]` lines around the hop (BL-1213) | Accepted | 2026-10-02 |
 
 ## Template
 

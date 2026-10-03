@@ -225,6 +225,38 @@ public sealed class CurlCommandRunnerTransferEventTests
     private const string ReadResetLine = "* [READ] client_reset, clear readers" + InfoEnd;
 
     [TestMethod]
+    public async Task RunAsync_VerboseRewindWithoutTraceConfigRead_WritesThePlainLineAndNoReadLine()
+    {
+        // curl -v -d ab -L on a 302: "Need to rewind upload for next request" and no [READ] line (BL-1213 Notes).
+        await RunAsync(["-s", "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], RewindingExchange());
+
+        StringAssert.Contains(StandardErrorText, "* Need to rewind upload for next request" + InfoEnd);
+        Assert.IsFalse(StandardErrorText.Contains("[READ]", StringComparison.Ordinal), StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigReadRewind_WritesTheRewindLinesAroundTheHopsEnd()
+    {
+        // curl -v --trace-config read -d ab -L on a 302 kept alive (BL-1213 Notes).
+        await RunAsync(["-s", "-v", "--trace-config", "read", "http://127.0.0.1:18441/f.txt", "-o", "o"], RewindingExchange());
+
+        StringAssert.Contains(
+            StandardErrorText,
+            "* [READ] client reader needs rewind before next request" + InfoEnd
+            + "* Need to rewind upload for next request" + InfoEnd
+            + "* [READ] client_reset, will rewind reader" + InfoEnd
+            + "* Connection #0 to host 127.0.0.1:18441 left intact" + InfoEnd);
+    }
+
+    private static RecordingProtocolHandler RewindingExchange() =>
+        new("http", context =>
+        {
+            context.Events.ReportInfo("Need to rewind upload for next request");
+            context.Events.ReportInfo("Connection #0 to host 127.0.0.1:18441 left intact");
+            return ValueTask.FromResult(TransferResult.Success(0));
+        });
+
+    [TestMethod]
     public async Task RunAsync_TraceConfigWrite_WritesTheClientWriterLinesAfterEachHeaderAndTheBody()
     {
         // The lines curl 8.21.0 wrote under -s -v --trace-config write (measured 2026-10-02, BL-1187 Notes).

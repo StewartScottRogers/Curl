@@ -36,6 +36,36 @@ public sealed class ClientReaderResetTraceEventsTests
     }
 
     [TestMethod]
+    [DataRow("shutting down connection #0")]
+    [DataRow("Connection #0 to host 127.0.0.1:47811 left intact")]
+    public void ReportInfo_ARedirectHopThatNeedsItsBodyRewound_WritesCurlsRewindLines(string connectionsLastLine)
+    {
+        // curl -v --trace-config read -d ab -L on a 302 or 307 to /b, closing or kept alive (BL-1213 Notes).
+        CallRecordingEvents inner = new();
+        ClientReaderResetTraceEvents events = new(inner);
+
+        events.ReportInfo("Need to rewind upload for next request");
+        events.ReportInfo(connectionsLastLine);
+        events.ReportInfo("Issue another request to this URL: 'http://127.0.0.1:47811/b'");
+        events.ReportInfo("Connection #1 to host 127.0.0.1:47811 left intact");
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Info [READ] client reader needs rewind before next request",
+                "Info Need to rewind upload for next request",
+                "Info [READ] client_reset, will rewind reader",
+                $"Info {connectionsLastLine}",
+                "Info [READ] client start, rewind readers",
+                "Info Issue another request to this URL: 'http://127.0.0.1:47811/b'",
+                "Info [READ] client_reset, clear readers",
+                "Info [READ] client_reset, clear readers",
+                "Info Connection #1 to host 127.0.0.1:47811 left intact",
+            },
+            inner.Calls);
+    }
+
+    [TestMethod]
     [DataRow("closing connection #0")]
     [DataRow("Connection #0 to host 127.0.0.1:47811 was reset")]
     [DataRow("Request completely sent off")]

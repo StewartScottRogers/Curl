@@ -1016,6 +1016,7 @@ public sealed class HttpProtocolHandler(
             Events = context.Events,
             LineReporting = line => (requestStream as Http3StreamConnection)?.EchoResponseLineBefore(line),
             LineReported = line => EchoResponseLineAfter(requestStream, connection, line),
+            StatusLineReported = statusLine => ReportUploadRewind(plan, statusLine),
             HeaderReceived = (statusLine, header) =>
             {
                 ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
@@ -1162,6 +1163,23 @@ public sealed class HttpProtocolHandler(
     /// connection switched to HTTP/2 after an h2c upgrade's <c>101</c>; or, over HTTP/3, the status line
     /// as the request stream's <c>--trace-config http/3</c> <c>status:</c> line (BL-1208); nothing over HTTP/1.x.
     /// </summary>
+    /// <summary>
+    /// Reports <c>Need to rewind upload for next request</c> after a <c>3xx</c> status line under
+    /// <c>-L</c> when the request sent a body that is not empty, as curl 8.21.0 does whatever the
+    /// redirect then does with the body: a <c>307</c> sends it again, a <c>302</c> drops it
+    /// (measured, BL-1213 Notes).
+    /// </summary>
+    private static void ReportUploadRewind(HttpRequestPlan plan, HttpStatusLine statusLine)
+    {
+        if (plan.Options.FollowRedirects
+            && statusLine.StatusCode is >= 300 and < 400
+            && plan.Framing.Body is not null
+            && plan.Framing.KnownLength != 0)
+        {
+            plan.Context.Events.ReportInfo(HttpConnectionInfoLines.NeedToRewindUpload);
+        }
+    }
+
     private static void EchoResponseLineAfter(IHttpStreamConnection? requestStream, IConnection connection, byte[] line)
     {
         IHttpStreamConnection? stream = TrailerStreamOf(requestStream, connection);

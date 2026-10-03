@@ -102,6 +102,12 @@ internal static class HttpConnectionInfoLines
     internal const string SettingSizeWhileIgnoring = "setting size while ignoring";
 
     /// <summary>
+    /// The line written after the status line of a <c>3xx</c> that <c>-L</c> may follow when the
+    /// request sent a body, which the next request would have to send again (measured, BL-1213 Notes).
+    /// </summary>
+    internal const string NeedToRewindUpload = "Need to rewind upload for next request";
+
+    /// <summary>
     /// Formats the line written once a request's whole body has been sent.
     /// </summary>
     /// <param name="bytesSent">The body bytes sent, chunk framing included.</param>
