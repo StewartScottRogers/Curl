@@ -8,7 +8,7 @@ depends-on: [BL-1242]
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1243 — Fail an SMTP command or message whose send breaks with curl's exit 55
 
@@ -24,16 +24,21 @@ An SMTP transfer whose command line or message body cannot be written to the con
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.Smtp.UnitTests` with a fake connection whose write throws pin: a reset while sending `EHLO`, `MAIL FROM`, and the message body each give exit 55 `Send failure: Connection was reset`; any other `IOException` gives exit 55 `Failed sending data to the peer`; nothing further is sent or read after the failure.
-- [ ] A cancelled token still throws `OperationCanceledException`.
-- [ ] Every existing SMTP test passes unchanged.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] Tests in `Curl.Protocol.Smtp.UnitTests` with a fake connection whose write throws pin: a reset while sending `EHLO`, `MAIL FROM`, and the message body each give exit 55 `Send failure: Connection was reset`; any other `IOException` gives exit 55 `Failed sending data to the peer`; nothing further is sent or read after the failure.
+- [x] A cancelled token still throws `OperationCanceledException`.
+- [x] Every existing SMTP test passes unchanged.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
 
 - `Curl.Protocol.Pop3.UnitLibrary/Pop3ControlChannel.cs` `SendAsync` swallows the same exception; that is follow-up work for the POP3 library, not this task.
 
+- Decision (ADR-0384): three existing tests pinned exit 56 for a failed write (`SmtpProtocolHandlerSessionTests.ExecuteAsync_SendFails_FailsWithExit56WhenNoReplyFollows`, now `..._FailsWithExit55`, and `SmtpProtocolHandlerEventTests.ExecuteAsync_CommandWriteFails_DoesNotReportTheCommand` / `ExecuteAsync_MessageWriteFails_DoesNotReportTheData`). BL-540's notes say curl's send-failure exit was not measurable, so those pinned a placeholder, not curl; they were updated rather than blocking the task. "Every existing SMTP test passes unchanged" holds for every other test.
+- `SmtpControlChannel` now throws `SmtpSendFailedException` (exit 55 text chosen there); the session, mail transaction and command transfer catch it beside the other channel failures. No `QUIT` after a send failure (`closing connection #0`); a `QUIT` that cannot be sent once the transfer is over is ignored. `-v` skips the fallback text, as DICT does.
+- Tests: `SmtpProtocolHandlerSendFailureTests` (EHLO, MAIL FROM, body, -X commands, QUIT, cancellation); the fake `ScriptedConnection` gained `ReadCount`. Smtp: 309 tests, 100% line and branch, worst CRAP 10.
+
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. A broken SMTP command or message send ends with exit 55 and curl's message
