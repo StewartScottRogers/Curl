@@ -3,8 +3,8 @@ id: AF-0008
 title: ConnectToMappings.Failure can report IsMapped: true instead of false with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/ConnectToMappings.cs:Failure-IsMapped:surviving-mutant
 task: none
 found: 2026-10-02
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.
