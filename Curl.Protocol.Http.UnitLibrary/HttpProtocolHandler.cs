@@ -254,8 +254,9 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Gets or sets whether an HTTP/1.x request body's reads write curl 8.21.0's <c>--trace-config read</c>
-    /// lines (<see cref="HttpClientReaderTraceLines" />, BL-1189): the reader added for a <c>-d</c> body or a
-    /// <c>-T</c> upload of known length, and each read into the upload buffer. Off by default.
+    /// lines (<see cref="HttpClientReaderTraceLines" />, BL-1189, BL-1214): the reader added for a <c>-d</c>
+    /// body or a <c>-T</c> upload, and each read into the upload buffer, chunked or not, held back for
+    /// <c>100 Continue</c> or not, a <c>-F</c> body's included. Off by default.
     /// </summary>
     public bool TracesClientReaders { get; init; }
 
@@ -2023,7 +2024,7 @@ public sealed class HttpProtocolHandler(
 
         if (responseConnection is HttpContinueWaitConnection waiting)
         {
-            await upload.WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
+            await upload.WriteHeadBeforeContinueAsync(requestBody, cancellationToken).ConfigureAwait(false);
             if (!await waiting.WaitForContinueAsync(context.TimeProvider, cancellationToken).ConfigureAwait(false))
             {
                 return true;

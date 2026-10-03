@@ -1,3 +1,4 @@
+using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http.Fakes;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -75,6 +76,102 @@ public sealed partial class HttpProtocolHandlerTests
             },
             events.Events.Take(7).ToArray(),
             string.Join('\n', events.Events));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_StdinUploadTracingReaders_WritesTheHeldBackReadsAroundTheHeadAndTheChunkedReadsAfterTheWait()
+    {
+        // printf abc | curl -sv --trace-config read -T - http://127.0.0.1:47811/up (BL-1214 Notes).
+        const string head = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:47811\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Transfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n";
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        GatedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi"), 65536, head.Length + 13);
+        RecordingTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:47811/up"),
+            Output = new MemoryStream(),
+            Upload = StandardInput("abc"u8.ToArray()),
+            TimeProvider = time,
+            Events = events,
+        };
+
+        Task<TransferResult> transfer = new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator()) { TracesClientReaders = true }
+            .ExecuteAsync(context).AsTask();
+        await time.TimerCreatedAsync(HttpRequestOptions.DefaultContinueWait);
+        time.Advance(HttpRequestOptions.DefaultContinueWait);
+        TransferResult result = await transfer;
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "* using HTTP/1.x",
+                "* [READ] add fread reader, len=-1 -> 0",
+                "* [READ] client_read(len=65405) -> 0, nread=0, eos=0",
+                "> " + head,
+                "* [READ] client_read(len=65536) -> 0, nread=0, eos=0",
+                "* Done waiting for 100-continue",
+                "* [READ] cr_in_read(len=65524, total=-1, read=3) -> 0, nread=3, eos=0",
+                "* [READ] http_chunk, made chunk of 3 bytes -> 0",
+                "* [READ] client_read(len=65536) -> 0, nread=8, eos=0",
+                "} 3\r\nabc\r\n",
+                "* [READ] cr_in_read(len=65524, total=-1, read=3) -> 0, nread=0, eos=1",
+                "* [READ] http_chunk, added last, empty chunk",
+                "* [READ] client_read(len=65536) -> 0, nread=5, eos=1",
+                "} 0\r\n\r\n",
+                "* upload completely sent off: 13 bytes",
+            },
+            events.Events.Take(15).ToArray(),
+            string.Join('\n', events.Events));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MultipartPostTracingReaders_WritesTheMimeReadersLinesBeforeTheHead()
+    {
+        // curl -sv --trace-config read -F a=b http://127.0.0.1:47811/ (BL-1214 Notes).
+        const string contentType = "multipart/form-data; boundary=------------------------Q8BOgKaJAf5dPmHW2bVJZk";
+        const string head = "POST / HTTP/1.1\r\nHost: 127.0.0.1:47811\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Content-Length: 149\r\nContent-Type: " + contentType + "\r\n\r\n";
+        byte[] form = new byte[149];
+        ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi", 65536);
+        RecordingTransferEvents events = new();
+        HttpRequestOptions options = new() { Body = new StreamBody(new MemoryStream(form), form.Length, contentType) };
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator()) { TracesClientReaders = true }
+            .ExecuteAsync(EventsContext("http://127.0.0.1:47811/", events, options));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "* using HTTP/1.x",
+                "* [READ] cr_mime_read(len=149), mime_read() -> 149",
+                "* [READ] cr_mime_read(len=149, total=149, read=149) -> 0, 149, 1",
+                "* [READ] client_read(len=65343) -> 0, nread=149, eos=1",
+                "> " + head,
+            },
+            events.Events.Take(5).ToArray(),
+            string.Join('\n', events.Events));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_StdinUploadNotTracingReaders_WritesNoReadLine()
+    {
+        RecordingTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:47811/up"),
+            Output = new MemoryStream(),
+            Upload = StandardInput("abc"u8.ToArray()),
+            Http = new HttpRequestOptions { Headers = ["Expect:"] },
+            Events = events,
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n", 65536))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsFalse(events.Info.Any(line => line.StartsWith("[READ]", StringComparison.Ordinal)), string.Join('\n', events.Events));
     }
 
     [TestMethod]

@@ -337,20 +337,146 @@ public sealed class HttpRequestBodyWriterTests
     }
 
     [TestMethod]
-    [DataRow(true, false, false)]
-    [DataRow(false, true, false)]
-    [DataRow(false, false, true)]
-    public async Task WriteAsync_TracingBodiesWithoutMeasuredLines_ReportsNoReadLine(bool isChunked, bool emptyBody, bool unknownLengthUpload)
+    public async Task WriteAsync_TracedEmptyBytesBody_ReportsNoReadLine()
     {
         RecordingTransferEvents events = new();
-        HttpRequestBodyWriter writer = new(new ScriptedConnection([], 1)) { Events = events, TracesReaders = true, IsUpload = unknownLengthUpload };
-        HttpRequestBody body = unknownLengthUpload
-            ? new StreamBody(new MemoryStream("ab"u8.ToArray()), null, "a/b")
-            : new BytesBody(emptyBody ? ReadOnlyMemory<byte>.Empty : "ab"u8.ToArray(), "a/b");
+        HttpRequestBodyWriter writer = new(new ScriptedConnection([], 1)) { Events = events, TracesReaders = true };
 
-        await writer.WriteAsync(body, isChunked, CancellationToken.None);
+        await writer.WriteAsync(new BytesBody(ReadOnlyMemory<byte>.Empty, "a/b"), false, CancellationToken.None);
 
         Assert.IsEmpty(events.Info);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_TracedChunkedBytesBody_ReportsTheChunkAndTheLastChunkInItsOneRead()
+    {
+        // curl -sv --trace-config read -H 'Transfer-Encoding: chunked' -d ab after a 157-byte head (BL-1214 Notes).
+        RecordingTransferEvents events = await TracedWriteAsync(new BytesBody("ab"u8.ToArray(), "a/b"), isUpload: false, sharedHeadLength: 157, isChunked: true);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[READ] add buf reader, len=2 -> 0",
+                "[READ] cr_buf_read(len=65367) -> 0, nread=2, eos=1",
+                "[READ] http_chunk, made chunk of 2 bytes -> 0",
+                "[READ] http_chunk, added last, empty chunk",
+                "[READ] client_read(len=65379) -> 0, nread=12, eos=1",
+            },
+            events.Info);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_TracedStdinUploadSentAtOnce_ReportsAnUnknownLengthAndTheEmptyReadThatEndsIt()
+    {
+        // printf abc | curl -sv --trace-config read -H Expect: -T - after a 109-byte head (BL-1214 Notes).
+        RecordingTransferEvents events = await TracedWriteAsync(new StreamBody(new MemoryStream("abc"u8.ToArray()), null, "a/b"), isUpload: true, sharedHeadLength: 109, isChunked: true);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[READ] add fread reader, len=-1 -> 0",
+                "[READ] cr_in_read(len=65415, total=-1, read=3) -> 0, nread=3, eos=0",
+                "[READ] http_chunk, made chunk of 3 bytes -> 0",
+                "[READ] client_read(len=65427) -> 0, nread=8, eos=0",
+                "[READ] cr_in_read(len=65524, total=-1, read=3) -> 0, nread=0, eos=1",
+                "[READ] http_chunk, added last, empty chunk",
+                "[READ] client_read(len=65536) -> 0, nread=5, eos=1",
+            },
+            events.Info);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_TracedChunkedUploadOfKnownLength_AddsTheLastChunkToTheReadThatReachesItsEnd()
+    {
+        RecordingTransferEvents events = await TracedWriteAsync(new StreamBody(new MemoryStream("abc"u8.ToArray()), 3, "a/b"), isUpload: true, sharedHeadLength: 0, isChunked: true);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[READ] add fread reader, len=3 -> 0",
+                "[READ] cr_in_read(len=3, total=3, read=3) -> 0, nread=3, eos=1",
+                "[READ] http_chunk, made chunk of 3 bytes -> 0",
+                "[READ] http_chunk, added last, empty chunk",
+                "[READ] client_read(len=65536) -> 0, nread=13, eos=1",
+            },
+            events.Info);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_TracedMultipartBodyLongerThanTheBuffer_ReportsTheMimeReadersLinesForEachRead()
+    {
+        // curl -sv --trace-config read -F f=@mid.bin (70000 bytes) after a 195-byte head (BL-1214 Notes).
+        RecordingTransferEvents events = await TracedWriteAsync(new StreamBody(new MemoryStream(new byte[70208]), 70208, "a/b"), isUpload: false, sharedHeadLength: 195);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[READ] cr_mime_read(len=65341), mime_read() -> 65341",
+                "[READ] cr_mime_read(len=65341, total=70208, read=65341) -> 0, 65341, 0",
+                "[READ] client_read(len=65341) -> 0, nread=65341, eos=0",
+                "[READ] cr_mime_read(len=4867), mime_read() -> 4867",
+                "[READ] cr_mime_read(len=4867, total=70208, read=70208) -> 0, 4867, 1",
+                "[READ] client_read(len=65536) -> 0, nread=4867, eos=1",
+            },
+            events.Info);
+    }
+
+    [TestMethod]
+    public async Task WriteHeadBeforeContinueAsync_TracingReaders_ReportsTheReaderAndAHeldBackReadEitherSideOfTheHead()
+    {
+        // curl -sv --trace-config read -T big (1100000 bytes) with a 128-byte head (BL-1214 Notes).
+        RecordingTransferEvents events = new();
+        ScriptedConnection connection = new([], 1);
+        HttpRequestBodyWriter writer = new(connection) { Events = events, TracesReaders = true, IsUpload = true, HeldHead = new byte[128] };
+        StreamBody body = new(new MemoryStream(new byte[70000]), 1100000, "a/b");
+
+        await writer.WriteHeadBeforeContinueAsync(body, CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "* [READ] add fread reader, len=1100000 -> 0",
+                "* [READ] client_read(len=65408) -> 0, nread=0, eos=0",
+                "> " + new string('\0', 128),
+                "* [READ] client_read(len=65536) -> 0, nread=0, eos=0",
+            },
+            events.Events);
+        Assert.HasCount(128, connection.Written);
+    }
+
+    [TestMethod]
+    public async Task WriteHeadBeforeContinueAsync_ThenWriteAsync_ReportsTheReaderOnceAndReadsTheWholeBuffer()
+    {
+        RecordingTransferEvents events = new();
+        HttpRequestBodyWriter writer = new(new ScriptedConnection([], 1)) { Events = events, TracesReaders = true, IsUpload = true, HeldHead = new byte[128] };
+        StreamBody body = new(new MemoryStream("abc"u8.ToArray()), 3, "a/b");
+
+        await writer.WriteHeadBeforeContinueAsync(body, CancellationToken.None);
+        await writer.WriteAsync(body, false, CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[READ] add fread reader, len=3 -> 0",
+                "[READ] client_read(len=65408) -> 0, nread=0, eos=0",
+                "[READ] client_read(len=65536) -> 0, nread=0, eos=0",
+                "[READ] cr_in_read(len=3, total=3, read=3) -> 0, nread=3, eos=1",
+                "[READ] client_read(len=65536) -> 0, nread=3, eos=1",
+            },
+            events.Info);
+    }
+
+    [TestMethod]
+    public async Task WriteHeadBeforeContinueAsync_NotTracingReaders_SendsTheHeadAndReportsNoReadLine()
+    {
+        RecordingTransferEvents events = new();
+        ScriptedConnection connection = new([], 1);
+        HttpRequestBodyWriter writer = new(connection) { Events = events, HeldHead = "H"u8.ToArray() };
+
+        await writer.WriteHeadBeforeContinueAsync(new BytesBody("ab"u8.ToArray(), "a/b"), CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "> H" }, events.Events);
+        CollectionAssert.AreEqual("H"u8.ToArray(), connection.Written);
     }
 
     [TestMethod]
@@ -365,17 +491,25 @@ public sealed class HttpRequestBodyWriterTests
     }
 
     [TestMethod]
-    public async Task WriteAsync_StreamBodyThatIsNotAnUpload_ReportsNoReadLine()
+    public async Task WriteAsync_TracedMultipartBodyEndingEarly_ReportsNoReadForTheEmptyRead()
     {
         RecordingTransferEvents events = new();
         HttpRequestBodyWriter writer = new(new ScriptedConnection([], 1)) { Events = events, TracesReaders = true };
 
-        await writer.WriteAsync(new StreamBody(new MemoryStream("ab"u8.ToArray()), 2, "a/b"), false, CancellationToken.None);
+        await Assert.ThrowsExactlyAsync<HttpTransferException>(
+            async () => await writer.WriteAsync(new StreamBody(new MemoryStream("ab"u8.ToArray()), 3, "a/b"), false, CancellationToken.None));
 
-        Assert.IsEmpty(events.Info);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[READ] cr_mime_read(len=3), mime_read() -> 2",
+                "[READ] cr_mime_read(len=3, total=3, read=2) -> 0, 2, 0",
+                "[READ] client_read(len=65536) -> 0, nread=2, eos=0",
+            },
+            events.Info);
     }
 
-    private static async Task<RecordingTransferEvents> TracedWriteAsync(HttpRequestBody body, bool isUpload, int sharedHeadLength)
+    private static async Task<RecordingTransferEvents> TracedWriteAsync(HttpRequestBody body, bool isUpload, int sharedHeadLength, bool isChunked = false)
     {
         RecordingTransferEvents events = new();
         HttpRequestBodyWriter writer = new(new ScriptedConnection([], 1))
@@ -386,7 +520,7 @@ public sealed class HttpRequestBodyWriterTests
             SharedHeadLength = sharedHeadLength,
         };
 
-        await writer.WriteAsync(body, false, CancellationToken.None);
+        await writer.WriteAsync(body, isChunked, CancellationToken.None);
 
         return events;
     }
