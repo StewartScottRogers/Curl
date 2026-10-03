@@ -99,4 +99,46 @@ public sealed class Http2FrameTraceTests
 
         CollectionAssert.AreEqual(new[] { "[HTTP/2] [0] created h2 session", "[HTTP/2] [3] CLOSED" }, events.Info);
     }
+
+    [TestMethod]
+    public void UpgradeStartedAndSessionCreatedByUpgrade_ReportCurlsH2cLines()
+    {
+        RecordingTransferEvents events = new();
+        Http2FrameTrace trace = new(events);
+
+        trace.UpgradeStarted();
+        trace.SessionCreatedByUpgrade();
+
+        string[] expected =
+        [
+            "[HTTP/2] added",
+            "[HTTP/2] upgrading connection to HTTP/2",
+            "[HTTP/2] created session via Upgrade",
+            "[HTTP/2] [0] created h2 session (via h1 upgrade)",
+        ];
+        CollectionAssert.AreEqual(expected, events.Info);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/2 200 \r\n", "[HTTP/2] [1] status: HTTP/2 200", DisplayName = "status line")]
+    [DataRow("content-length: 2\r\n", "[HTTP/2] [1] header: content-length: 2", DisplayName = "header")]
+    [DataRow("x-a: b c\n", "[HTTP/2] [1] header: x-a: b c", DisplayName = "header ended by a line feed")]
+    public void ResponseLineReported_EchoesTheLineAsCurlDoes(string line, string expected)
+    {
+        RecordingTransferEvents events = new();
+
+        new Http2FrameTrace(events).ResponseLineReported(1, Encoding.Latin1.GetBytes(line));
+
+        CollectionAssert.AreEqual(new[] { expected }, events.Info);
+    }
+
+    [TestMethod]
+    public void ResponseLineReported_EmptyLine_ReportsNothing()
+    {
+        RecordingTransferEvents events = new();
+
+        new Http2FrameTrace(events).ResponseLineReported(1, "\r\n"u8);
+
+        Assert.IsEmpty(events.Info);
+    }
 }

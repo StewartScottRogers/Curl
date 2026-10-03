@@ -1013,6 +1013,7 @@ public sealed class HttpProtocolHandler(
         HttpResponseHeadReader headReader = new(responseConnection)
         {
             Events = context.Events,
+            LineReported = line => EchoHttp2ResponseLine(requestStream, connection, line),
             HeaderReceived = (statusLine, header) =>
             {
                 ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
@@ -1145,9 +1146,20 @@ public sealed class HttpProtocolHandler(
     /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one;
     /// else, for <see cref="HttpVersionPreference.Http2" /> over cleartext, the transport watched for an
     /// h2c upgrade's <c>101</c> (<see cref="HttpH2cUpgradeConnection" />, BL-716); and else the transport itself.
+    /// The upgrade's HTTP/2 lines are traced as <see cref="TracesHttp2Frames" /> says (BL-1205).
     /// </summary>
-    private static IConnection ExchangeConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection transport) =>
-        (IConnection?)requestStream ?? (UpgradesToH2c(plan, transport) ? new HttpH2cUpgradeConnection(transport, plan.Context.Events, plan.Context.Url.Scheme) : transport);
+    private IConnection ExchangeConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection transport) =>
+        (IConnection?)requestStream ?? (UpgradesToH2c(plan, transport)
+            ? new HttpH2cUpgradeConnection(transport, plan.Context.Events, plan.Context.Url.Scheme, TracesHttp2Frames ? plan.Context.Events : null)
+            : transport);
+
+    /// <summary>
+    /// Echoes a response head line as the exchange's HTTP/2 stream's <c>--trace-config http/2</c>
+    /// <c>status:</c> or <c>header:</c> line (BL-1205): the request stream's, else stream 1 of a
+    /// connection switched to HTTP/2 after an h2c upgrade's <c>101</c>; nothing over HTTP/1.x or HTTP/3.
+    /// </summary>
+    private static void EchoHttp2ResponseLine(IHttpStreamConnection? requestStream, IConnection connection, byte[] line) =>
+        (TrailerStreamOf(requestStream, connection) as Http2StreamConnection)?.EchoResponseLine(line);
 
     /// <summary>
     /// Decides whether an HTTP/1.x exchange asks to upgrade to h2c: for <c>--http2</c>

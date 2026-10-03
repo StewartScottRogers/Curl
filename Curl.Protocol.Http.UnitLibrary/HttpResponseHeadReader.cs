@@ -63,6 +63,13 @@ internal sealed class HttpResponseHeadReader
     internal ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
 
     /// <summary>
+    /// Gets what is told of each head line right after it is reported to <see cref="Events" />,
+    /// so an HTTP/2 stream's <c>--trace-config http/2</c> echo follows its <c>&lt;</c> line
+    /// (<see cref="Http2FrameTrace.ResponseLineReported" />, BL-1205). By default nothing is.
+    /// </summary>
+    internal Action<byte[]> LineReported { get; init; } = static _ => { };
+
+    /// <summary>
     /// Gets what is told of each header of every head, 1xx heads' included, once it is whole -
     /// its continuation lines folded in - just before its lines are reported to
     /// <see cref="Events" />; a header whose head fails before it is whole is never told, nor
@@ -147,7 +154,7 @@ internal sealed class HttpResponseHeadReader
         if (heldEmptyLine is { } bytes)
         {
             heldEmptyLine = null;
-            Events.ReportResponseHeader(bytes);
+            ReportLine(bytes);
         }
     }
 
@@ -289,6 +296,13 @@ internal sealed class HttpResponseHeadReader
     private bool ShowsPendingHeaderWhole(ReadOnlySpan<byte> unfinishedLine) =>
         heldHeaderLines.Count > 0 && unfinishedLine.Length > 0 && !HttpLine.IsBlank((char)unfinishedLine[0]);
 
+    /// <summary>Reports one head line to <see cref="Events" />, then tells <see cref="LineReported" /> of it.</summary>
+    private void ReportLine(byte[] bytes)
+    {
+        Events.ReportResponseHeader(bytes);
+        LineReported(bytes);
+    }
+
     private static HttpTransferException EmptyReply() =>
         new(CurlExitCode.GotNothing, HttpTransferMessages.EmptyReply);
 
@@ -304,7 +318,7 @@ internal sealed class HttpResponseHeadReader
             Events.ReportInfo(HttpConnectionInfoLines.AssumeCloseAfterBody);
         }
 
-        Events.ReportResponseHeader(bytes);
+        ReportLine(bytes);
         return statusLine;
     }
 
@@ -478,7 +492,7 @@ internal sealed class HttpResponseHeadReader
 
         foreach (byte[] held in headerLines)
         {
-            Events.ReportResponseHeader(held);
+            ReportLine(held);
         }
     }
 

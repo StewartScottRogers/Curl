@@ -49,8 +49,11 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// opens on the connection, <c>000006 04 00 00000000 0004 00010000</c>: INITIAL_WINDOW_SIZE
     /// 65536 again (measured, BL-970 Notes).
     /// </summary>
-    private static readonly byte[] UpgradedStreamSettingsFrame = Http2FrameCodec.Serialize(
-        Http2FrameFactory.CreateSettings([new(Http2SettingIdentifier.InitialWindowSize, Http2Connection.ClientInitialWindowSize)]));
+    private static readonly Http2Frame UpgradedStreamSettings =
+        Http2FrameFactory.CreateSettings([new(Http2SettingIdentifier.InitialWindowSize, Http2Connection.ClientInitialWindowSize)]);
+
+    /// <summary>The bytes of <see cref="UpgradedStreamSettings" />, written as one.</summary>
+    private static readonly byte[] UpgradedStreamSettingsFrame = Http2FrameCodec.Serialize(UpgradedStreamSettings);
 
     private readonly HpackEncoder encoder = new();
 
@@ -225,6 +228,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         await frameLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            TraceFramesFor(receiver);
             await Frames.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
             isPrefaceSent = true;
             isUpgradeSettingsDue = true;
@@ -349,6 +353,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         if (isUpgradeSettingsDue)
         {
             await Connection.WriteAsync(UpgradedStreamSettingsFrame, cancellationToken).ConfigureAwait(false);
+            receiver.FrameTrace?.FrameSent(UpgradedStreamSettings);
             isUpgradeSettingsDue = false;
         }
 

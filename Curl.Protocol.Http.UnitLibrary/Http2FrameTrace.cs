@@ -35,6 +35,46 @@ internal sealed class Http2FrameTrace(ITransferEvents events) : IHttp2FrameObser
     /// <summary>Reports <c>[HTTP/2] [0] created h2 session</c>, before the preface's frames.</summary>
     internal void SessionCreated() => Report(0, "created h2 session");
 
+    /// <summary>
+    /// Reports <c>[HTTP/2] added</c> and <c>[HTTP/2] upgrading connection to HTTP/2</c>, which an
+    /// h2c upgrade writes right after <c>Received 101</c> (measured, BL-1205 Notes).
+    /// </summary>
+    internal void UpgradeStarted()
+    {
+        events.ReportInfo("[HTTP/2] added");
+        events.ReportInfo("[HTTP/2] upgrading connection to HTTP/2");
+    }
+
+    /// <summary>
+    /// Reports <c>[HTTP/2] created session via Upgrade</c> and
+    /// <c>[HTTP/2] [0] created h2 session (via h1 upgrade)</c>, which an h2c upgrade writes before
+    /// the preface's frames, after any <c>Copied HTTP/2 data</c> line (measured, BL-1205 Notes).
+    /// </summary>
+    internal void SessionCreatedByUpgrade()
+    {
+        events.ReportInfo("[HTTP/2] created session via Upgrade");
+        Report(0, "created h2 session (via h1 upgrade)");
+    }
+
+    /// <summary>
+    /// Echoes a response head line just reported as a <c>&lt;</c> line, as curl's nghttp2 layer
+    /// does after writing it (measured, BL-1205 Notes): <c>[HTTP/2] [1] status: HTTP/2 200</c> for
+    /// the status line, <c>[HTTP/2] [1] header: name: value</c> for a header, and nothing for the
+    /// head's empty line.
+    /// </summary>
+    /// <param name="streamId">The stream the head arrived on.</param>
+    /// <param name="line">The line as reported, its line end included.</param>
+    internal void ResponseLineReported(int streamId, ReadOnlySpan<byte> line)
+    {
+        string text = Encoding.Latin1.GetString(line).TrimEnd('\r', '\n');
+        if (text.Length == 0)
+        {
+            return;
+        }
+
+        Report(streamId, text.StartsWith("HTTP/2 ", StringComparison.Ordinal) ? "status: " + text.TrimEnd(' ') : "header: " + text);
+    }
+
     /// <summary>Reports <c>[HTTP/2] [&lt;stream&gt;] CLOSED</c> once the response on a stream has ended.</summary>
     /// <param name="streamId">The stream.</param>
     internal void StreamClosed(int streamId) => Report(streamId, "CLOSED");

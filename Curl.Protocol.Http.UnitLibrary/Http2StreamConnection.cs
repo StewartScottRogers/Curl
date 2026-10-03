@@ -83,6 +83,14 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     internal Http2FrameTrace? FrameTrace => frameTrace;
 
     /// <summary>
+    /// Echoes a line of this stream's response head, just reported as a <c>&lt;</c> line, as a
+    /// <c>--trace-config http/2</c> <c>status:</c> or <c>header:</c> line (BL-1205); nothing when the
+    /// transfer traces nothing.
+    /// </summary>
+    /// <param name="line">The line as reported, its line end included.</param>
+    internal void EchoResponseLine(byte[] line) => frameTrace?.ResponseLineReported(streamId, line);
+
+    /// <summary>
     /// Reports curl's <c>OPENED stream</c> lines for this stream, once it has its identifier and
     /// before its HEADERS go out, as curl writes them before nghttp2 submits the frame.
     /// </summary>
