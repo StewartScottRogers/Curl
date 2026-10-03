@@ -44,3 +44,4 @@ Under `-v`, a `tftp://` transfer that receives an out-of-order packet writes the
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
