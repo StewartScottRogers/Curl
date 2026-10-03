@@ -25,6 +25,13 @@ namespace Curl.Protocol.Pop3;
 /// later continuation is answered by the exchange; a continuation it cannot answer, a
 /// <c>-ERR</c>, or <c>+OK</c> before the initial response was sent is exit 67
 /// <c>Login denied</c> with nothing more sent. No fallback follows a failed exchange.</item>
+/// <item>A continuation whose text is not base64 (empty text or text starting <c>=</c> is an
+/// empty challenge) is handed over empty to a mechanism that ignores it. A mechanism that
+/// reads it - every GSSAPI challenge, the first one a CRAM-MD5, DIGEST-MD5 or NTLM exchange
+/// answers - is cancelled with <c>*</c>: the response is read whatever it is, the mechanism
+/// is dropped and the authenticator chooses again. None left: <c>APOP</c> or
+/// <c>USER</c>/<c>PASS</c> as below when possible, else exit 67 <c>Authentication
+/// cancelled</c> (BL-1222).</item>
 /// <item>No SASL mechanism chosen: <c>APOP &lt;user&gt; &lt;digest&gt;</c>
 /// (<see cref="Pop3ApopDigest" />) when the greeting carried a timestamp, whatever
 /// <c>CAPA</c> said; refused, exit 67 <c>Authentication failed: &lt;n&gt;</c>, n being 45
@@ -78,7 +85,13 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// <summary>The mechanisms that need <c>--oauth2-bearer</c>.</summary>
     private static readonly string[] BearerMechanisms = ["OAUTHBEARER", "XOAUTH2"];
 
+    /// <summary>What curl sends to cancel a SASL exchange (RFC 5034 section 4).</summary>
+    private const string CancelLine = "*";
+
     private readonly MailRequestOptions mail = context.Mail ?? new MailRequestOptions();
+
+    /// <summary>How many challenges the current exchange has been handed.</summary>
+    private int challengesHanded;
 
     /// <summary>
     /// Logs in.
@@ -96,13 +109,19 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
             return null;
         }
 
-        return options.Method != Pop3LoginMethod.Apop && ChooseSaslExchange(options, capabilities) is { } exchange
-            ? await AuthenticateAsync(exchange).ConfigureAwait(false)
-            : await LogInWithoutSaslAsync(options, capabilities, apopTimestamp).ConfigureAwait(false);
+        (SaslOutcome outcome, TransferResult? result) = options.Method == Pop3LoginMethod.Apop
+            ? (SaslOutcome.NoneChosen, null)
+            : await TrySaslAsync(options, capabilities).ConfigureAwait(false);
+        return outcome == SaslOutcome.Finished
+            ? result
+            : await LogInWithoutSaslAsync(options, capabilities, apopTimestamp, outcome == SaslOutcome.Cancelled).ConfigureAwait(false);
     }
 
     private static TransferResult LoginDenied() =>
         TransferResult.Failure(CurlExitCode.LoginDenied, Pop3SessionMessages.LoginDenied);
+
+    private static TransferResult AuthenticationCancelled() =>
+        TransferResult.Failure(CurlExitCode.LoginDenied, Pop3SessionMessages.AuthenticationCancelled);
 
     /// <summary>
     /// The character curl 8.21.0 reports a refusal by: <c>-</c> for <c>-ERR</c>, <c>*</c> for
@@ -115,24 +134,94 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
 
     /// <summary>
     /// The challenge a continuation carries: its text after the <c>+</c> and any spaces,
-    /// decoded from base64. Text that is not base64 is an empty challenge, so LOGIN, which
-    /// ignores its challenges, answers <c>+ !!!</c> as measured.
+    /// decoded from base64. Text that is not base64 is an empty challenge when it starts with
+    /// <c>=</c> or <paramref name="mechanism" /> ignores it, so LOGIN answers <c>+ !!!</c> as
+    /// measured, and cancels the exchange otherwise (BL-1222).
     /// </summary>
-    private static byte[] DecodeChallenge(Pop3Response continuation)
+    /// <param name="continuation">The <c>+</c> line.</param>
+    /// <param name="mechanism">The exchange's mechanism.</param>
+    /// <param name="index">How many challenges the exchange has been handed before this one.</param>
+    /// <returns>The challenge, or <see langword="null" /> to cancel with <c>*</c>.</returns>
+    private static byte[]? DecodeChallenge(Pop3Response continuation, string mechanism, int index)
     {
         string text = continuation.Line[1..].TrimStart(' ');
         var challenge = new byte[text.Length];
-        return Convert.TryFromBase64String(text, challenge, out int length) ? challenge[..length] : [];
+        if (Convert.TryFromBase64String(text, challenge, out int length))
+        {
+            return challenge[..length];
+        }
+
+        return text.StartsWith('=') || !ReadsChallenge(mechanism, index) ? [] : null;
     }
 
-    private ISaslExchange? ChooseSaslExchange(Pop3LoginOptions options, Pop3Capabilities? capabilities)
+    /// <summary>
+    /// Whether curl 8.21.0 decodes challenge <paramref name="index" /> of
+    /// <paramref name="mechanism" /> (<c>get_server_message</c> in <c>lib/curl_sasl.c</c>):
+    /// every GSSAPI challenge, and the first one a CRAM-MD5, DIGEST-MD5 or NTLM exchange
+    /// answers (NTLM's Type 2).
+    /// </summary>
+    private static bool ReadsChallenge(string mechanism, int index) =>
+        mechanism.ToUpperInvariant() switch
+        {
+            "GSSAPI" => true,
+            "CRAM-MD5" or "DIGEST-MD5" or "NTLM" => index == 0,
+            _ => false,
+        };
+
+    /// <summary>
+    /// Tries the SASL mechanism the authenticator chooses among those <c>CAPA</c> listed, and
+    /// after each one cancelled with <c>*</c> the next, as curl 8.21.0 removes a cancelled
+    /// mechanism and starts again (BL-1222). A chosen mechanism that was never offered cannot
+    /// be removed, so the loop stops rather than choosing it forever.
+    /// </summary>
+    /// <returns>How SASL ended, and the exchange's result when one was accepted or refused.</returns>
+    private async ValueTask<(SaslOutcome Outcome, TransferResult? Result)> TrySaslAsync(Pop3LoginOptions options, Pop3Capabilities? capabilities)
     {
         if (saslAuthenticator is null || capabilities is null)
         {
-            return null;
+            return (SaslOutcome.NoneChosen, null);
         }
 
-        var request = new SaslRequest(
+        List<string> offered = [.. capabilities.SaslMechanisms];
+        (SaslOutcome outcome, TransferResult? result) = await TryMechanismsAsync(saslAuthenticator, CreateSaslRequest(options), offered).ConfigureAwait(false);
+        if (outcome == SaslOutcome.NoneChosen && offered.Count > 0)
+        {
+            Pop3DiagnosticLogLines.NoUsableMechanism(context.DiagnosticLog, offered);
+        }
+
+        return (outcome, result);
+    }
+
+    /// <summary>
+    /// Runs the exchange of each mechanism <paramref name="authenticator" /> chooses among
+    /// <paramref name="offered" />, removing each one cancelled, until one is accepted or
+    /// refused, none is chosen, or a cancelled one was not among <paramref name="offered" />.
+    /// </summary>
+    private async ValueTask<(SaslOutcome Outcome, TransferResult? Result)> TryMechanismsAsync(
+        ISaslAuthenticator authenticator, SaslRequest request, List<string> offered)
+    {
+        SaslOutcome outcome = SaslOutcome.NoneChosen;
+        while (authenticator.ChooseMechanism(request, offered) is { } mechanism)
+        {
+            (bool cancelled, TransferResult? result) = await AuthenticateAsync(authenticator.Begin(mechanism, request)).ConfigureAwait(false);
+            if (!cancelled)
+            {
+                return (SaslOutcome.Finished, result);
+            }
+
+            Pop3DiagnosticLogLines.MechanismCancelled(context.DiagnosticLog, mechanism);
+            outcome = SaslOutcome.Cancelled;
+            if (offered.RemoveAll(offer => offer.Equals(mechanism, StringComparison.OrdinalIgnoreCase)) == 0)
+            {
+                break;
+            }
+        }
+
+        return (outcome, null);
+    }
+
+    private SaslRequest CreateSaslRequest(Pop3LoginOptions options) =>
+        new(
             context.Credentials,
             mail.SaslAuthorizationIdentity,
             mail.BearerToken,
@@ -140,18 +229,6 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
             mail.ServiceName ?? DefaultServiceName,
             context.Url.IdnHost,
             context.Url.Port);
-        if (saslAuthenticator.ChooseMechanism(request, capabilities.SaslMechanisms) is { } mechanism)
-        {
-            return saslAuthenticator.Begin(mechanism, request);
-        }
-
-        if (capabilities.SaslMechanisms.Count > 0)
-        {
-            Pop3DiagnosticLogLines.NoUsableMechanism(context.DiagnosticLog, capabilities.SaslMechanisms);
-        }
-
-        return null;
-    }
 
     /// <summary>Logs the login that succeeded by <paramref name="method" />.</summary>
     /// <returns><see langword="null" />, to carry on.</returns>
@@ -172,37 +249,67 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// <c>AUTH</c> only under <c>--sasl-ir</c> (BL-856). <c>+OK</c> before the initial response
     /// was made or sent is <c>Login denied</c>, as it is anywhere before curl's final state.
     /// </remarks>
-    private async ValueTask<TransferResult?> AuthenticateAsync(ISaslExchange exchange)
+    /// <returns>
+    /// Whether the exchange was cancelled with <c>*</c> over a challenge that was not base64,
+    /// and otherwise <see langword="null" /> once logged in or the failure.
+    /// </returns>
+    private async ValueTask<(bool Cancelled, TransferResult? Result)> AuthenticateAsync(ISaslExchange exchange)
     {
-        byte[]? unsent = mail.SaslInitialResponse ? await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false) : null;
+        challengesHanded = 0;
         bool initialResponseDue = !mail.SaslInitialResponse;
-        string command = "AUTH " + exchange.Mechanism;
-        string? logged = null;
-        if (SendsInitialResponseInline(exchange, unsent))
-        {
-            logged = command + " " + Pop3DiagnosticLogLines.SaslResponseNotLogged;
-            command += " " + Encode(unsent!);
-            unsent = null;
-        }
-
-        await channel.SendAsync(command, logged).ConfigureAwait(false);
+        byte[]? unsent = await SendAuthAsync(exchange).ConfigureAwait(false);
         while (true)
         {
             Pop3Response response = await channel.ReadResponseAsync().ConfigureAwait(false);
             if (response.IsOk)
             {
-                return unsent is null && !initialResponseDue ? LoggedIn("SASL " + exchange.Mechanism) : LoginDenied();
+                return (false, unsent is null && !initialResponseDue ? LoggedIn("SASL " + exchange.Mechanism) : LoginDenied());
             }
 
             if (await AnswerToAsync(response, unsent, initialResponseDue, exchange).ConfigureAwait(false) is not { } answer)
             {
-                return LoginDenied();
+                return (false, LoginDenied());
+            }
+
+            if (answer == CancelLine)
+            {
+                await CancelAsync().ConfigureAwait(false);
+                return (true, null);
             }
 
             unsent = null;
             initialResponseDue = false;
-            await channel.SendAsync(Encode(answer), Pop3DiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
+            await channel.SendAsync(answer, Pop3DiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Sends <c>AUTH &lt;mechanism&gt;</c>, with the initial response on the line when it goes
+    /// there; under <c>--sasl-ir</c> it is made now.
+    /// </summary>
+    /// <returns>The initial response made now and still to send at the first continuation, if any.</returns>
+    private async ValueTask<byte[]?> SendAuthAsync(ISaslExchange exchange)
+    {
+        byte[]? initialResponse = mail.SaslInitialResponse ? await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false) : null;
+        string command = "AUTH " + exchange.Mechanism;
+        if (!SendsInitialResponseInline(exchange, initialResponse))
+        {
+            await channel.SendAsync(command).ConfigureAwait(false);
+            return initialResponse;
+        }
+
+        await channel.SendAsync(command + " " + Encode(initialResponse!), command + " " + Pop3DiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
+        return null;
+    }
+
+    /// <summary>
+    /// Cancels the exchange with <c>*</c> and reads the server's response, whatever it is, as
+    /// curl's <c>SASL_CANCEL</c> state does.
+    /// </summary>
+    private async ValueTask CancelAsync()
+    {
+        await channel.SendAsync(CancelLine).ConfigureAwait(false);
+        await channel.ReadResponseAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -214,11 +321,13 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
         && exchange.Mechanism.Length + Encode(initialResponse).Length <= MaxInitialResponseLength;
 
     /// <summary>
-    /// The answer to a response other than <c>+OK</c>: the unsent initial response, the one
-    /// made now when it is due, or the exchange's answer to the challenge, for a continuation;
-    /// <see langword="null" /> for <c>-ERR</c> or a challenge the exchange cannot answer.
+    /// The line that answers a response other than <c>+OK</c>, for a continuation: the unsent
+    /// initial response, the one made now when it is due, or the exchange's answer to the
+    /// challenge, each encoded; <see cref="CancelLine" /> for a challenge that is not base64
+    /// and that the mechanism reads; <see langword="null" /> for <c>-ERR</c> or a challenge the
+    /// exchange cannot answer.
     /// </summary>
-    private async ValueTask<byte[]?> AnswerToAsync(Pop3Response response, byte[]? unsentInitialResponse, bool initialResponseDue, ISaslExchange exchange)
+    private async ValueTask<string?> AnswerToAsync(Pop3Response response, byte[]? unsentInitialResponse, bool initialResponseDue, ISaslExchange exchange)
     {
         if (response.Line[0] != '+')
         {
@@ -228,19 +337,31 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
         byte[]? initialResponse = initialResponseDue
             ? await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false)
             : unsentInitialResponse;
-        return initialResponse ?? await exchange.RespondAsync(DecodeChallenge(response), context.CancellationToken).ConfigureAwait(false);
+        if (initialResponse is not null)
+        {
+            return Encode(initialResponse);
+        }
+
+        if (DecodeChallenge(response, exchange.Mechanism, challengesHanded++) is not { } challenge)
+        {
+            return CancelLine;
+        }
+
+        return await exchange.RespondAsync(challenge, context.CancellationToken).ConfigureAwait(false) is { } answer ? Encode(answer) : null;
     }
 
     /// <summary>
     /// Logs in with <c>APOP</c> or <c>USER</c>/<c>PASS</c>, which need credentials and a login
-    /// option that does not name a SASL mechanism.
+    /// option that does not name a SASL mechanism. With neither possible, a SASL exchange
+    /// cancelled before is <c>Authentication cancelled</c>, as curl's <c>SASL_IDLE</c> answer
+    /// in <c>lib/pop3.c</c> is, with no <c>SASL:</c> line (BL-1222).
     /// </summary>
     private ValueTask<TransferResult?> LogInWithoutSaslAsync(
-        Pop3LoginOptions options, Pop3Capabilities? capabilities, string? apopTimestamp)
+        Pop3LoginOptions options, Pop3Capabilities? capabilities, string? apopTimestamp, bool saslCancelled)
     {
         if (options.Method == Pop3LoginMethod.Sasl || context.Credentials is not { } credential)
         {
-            return ValueTask.FromResult<TransferResult?>(NoWayToLogIn(options, capabilities));
+            return ValueTask.FromResult<TransferResult?>(NoWayToLogIn(options, capabilities, saslCancelled));
         }
 
         if (apopTimestamp is not null)
@@ -250,8 +371,11 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
 
         return AllowsUserAndPass(options, capabilities)
             ? SendUserAndPassAsync(credential.UserName, credential.Password)
-            : ValueTask.FromResult<TransferResult?>(NoWayToLogIn(options, capabilities));
+            : ValueTask.FromResult<TransferResult?>(NoWayToLogIn(options, capabilities, saslCancelled));
     }
+
+    private TransferResult NoWayToLogIn(Pop3LoginOptions options, Pop3Capabilities? capabilities, bool saslCancelled) =>
+        saslCancelled ? AuthenticationCancelled() : NoWayToLogIn(options, capabilities);
 
     /// <summary>
     /// Writes the <c>-v</c> lines curl 8.21.0's <c>Curl_sasl_is_blocked</c> writes when no way
@@ -377,5 +501,18 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
             : TransferResult.Failure(
                 CurlExitCode.LoginDenied,
                 string.Format(CultureInfo.InvariantCulture, Pop3SessionMessages.AccessDenied, RefusalCode(response)));
+    }
+
+    /// <summary>How the SASL step of a login ended.</summary>
+    private enum SaslOutcome
+    {
+        /// <summary>No mechanism was chosen, so the login goes on without SASL.</summary>
+        NoneChosen,
+
+        /// <summary>Every mechanism chosen was cancelled with <c>*</c>; the login goes on without SASL.</summary>
+        Cancelled,
+
+        /// <summary>An exchange was accepted or refused.</summary>
+        Finished,
     }
 }

@@ -91,6 +91,13 @@ internal static class Pop3SessionMessages
     internal const string AuthenticationFailed = "Authentication failed: {0}";
 
     /// <summary>
+    /// Every SASL mechanism tried was cancelled with <c>*</c> over a challenge that was not
+    /// base64, and neither <c>APOP</c> nor <c>USER</c>/<c>PASS</c> was possible (exit 67,
+    /// BL-1222).
+    /// </summary>
+    internal const string AuthenticationCancelled = "Authentication cancelled";
+
+    /// <summary>
     /// Tells whether curl 8.21.0's <c>-v</c> writes <paramref name="message" /> as a <c>*</c>
     /// line when the transfer fails with it (BL-552). It does for every message it formats
     /// itself, a TLS failure's included, and not for <see cref="WeirdServerReply" />,
