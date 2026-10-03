@@ -1,5 +1,5 @@
 ---
-id: BL-1335
+id: BL-1353
 title: Correct ITransferContext.MaxFileSize's remark on which handlers read it
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-084
 created: 2026-10-03
 completed:
 ---
-# BL-1335 — Correct ITransferContext.MaxFileSize's remark on which handlers read it
+# BL-1353 — Correct ITransferContext.MaxFileSize's remark on which handlers read it
 
 ## Goal
 

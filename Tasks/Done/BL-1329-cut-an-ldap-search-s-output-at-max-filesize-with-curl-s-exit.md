@@ -35,7 +35,7 @@ An `ldap://` / `ldaps://` search honours `ITransferContext.MaxFileSize` as curl 
 
 - Delivered directly (one method, the TFTP precedent's shape) rather than the full `/protocol` stages: `LdapEntryWriter.WriteAsync` now cuts the crossing piece to the bytes left under `MaxFileSize`, reports the exit 63 text as an info line and sets `WriteFailure`, which `LdapSearch` already handles by abandoning (OpenLDAP) and unbinding - the same "nothing more is written" path as exit 23. Exactly at the limit is no failure; 0 and `null` mean no limit.
 - The `{ [N bytes data]` line still reports the whole piece, as TFTP's `WriteBlockAsync` does.
-- The `ITransferContext.MaxFileSize` remark still lists `ldap` as not reading it; `Curl.Protocol.Abstractions.UnitLibrary` was held by BL-1325, so BL-1335 was filed to correct it.
+- The `ITransferContext.MaxFileSize` remark still lists `ldap` as not reading it; `Curl.Protocol.Abstractions.UnitLibrary` was held by BL-1325, so BL-1353 was filed to correct it.
 - Tests: `LdapProtocolHandlerTests.MaxFileSize.cs` (10 cases). Ldap tests 538 passed; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ldap.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10. The first measure run stopped on a failing test elsewhere in its test set that did not reproduce on the rerun.
 
 ## Log
