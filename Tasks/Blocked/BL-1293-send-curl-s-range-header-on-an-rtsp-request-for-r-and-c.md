@@ -45,3 +45,4 @@ An `rtsp://` request carries `Range: <text>` for `-r <text>`, and `Range: <offse
 
 - 2026-10-02: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1293-20261002-211047-L2.jsonl
