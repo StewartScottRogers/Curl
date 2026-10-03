@@ -3,8 +3,8 @@ id: AF-0026
 title: Five ECH tests in Curl.Networking.UnitTests fail on the unmutated tree, which blocks mutation testing of Curl.Networking.UnitLibrary
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitTests/EchTlsClientTests.cs:AuthenticateAsClientAsync_WithEch:failing-baseline
 task: none
 found: 2026-10-03
@@ -41,3 +41,4 @@ dotnet test Curl.Networking.UnitTests -c Release -nologo
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.
