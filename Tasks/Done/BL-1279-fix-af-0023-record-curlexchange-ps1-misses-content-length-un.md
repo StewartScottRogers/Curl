@@ -8,7 +8,7 @@ depends-on: []
 touches: [Record-CurlExchange.ps1]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1279 — Fix AF-0023: Record-CurlExchange.ps1 misses Content-Length unless it is the last request header, so it drops a body sent in a later TCP write and resets the connection
 
@@ -41,12 +41,23 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The defect was already fixed before this run: commit 574c0684 (BL-1217, 2026-10-02) changed line 714's
+  pattern to `'(?im)^Content-Length:[ \t]*(\d+)[ \t]*\r?$'`, so a CRLF-terminated Content-Length line
+  matches wherever it sits. No code change was needed here.
+- The reproduction as written in the finding cannot run in PowerShell: its `-Pattern` is double-quoted,
+  so `$headers` interpolates to empty, Select-String finds nothing and the command throws "Cannot index
+  into a null array" (both pwsh 7 and Windows PowerShell 5.1). With the pattern single-quoted
+  (`-Pattern 'Match\(\$headers, ''(.+)''\)'`), the same check prints `True`, the expected result.
+- End to end: `.\Record-CurlExchange.ps1 -Port 18279 -CurlArgs '-sS','-d','a=1&b=2','http://127.0.0.1:18279/'`
+  records the request with `Content-Length: 7` before `Content-Type` and the body `a=1&b=2`, curl exit 0.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. Record-CurlExchange.ps1 finds a CRLF-terminated Content-Length anywhere in the header block (fixed by BL-1217, verified)
