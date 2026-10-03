@@ -25,6 +25,8 @@ public sealed class ImapProtocolHandlerSaslCancelTests
 
     private const string AuthenticationCancelled = "Authentication cancelled";
 
+    private const string SecurityLayerFailure = "GSSAPI handshake failure (invalid security layer)";
+
     private static readonly byte[] PlainMessage = Latin1("\0user\0secret");
 
     [TestMethod]
@@ -196,6 +198,62 @@ public sealed class ImapProtocolHandlerSaslCancelTests
         Assert.AreEqual(Capability + "A002 AUTHENTICATE " + mechanism + "\r\neA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
         Assert.IsEmpty(sasl.Challenges.Single());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ExchangeGivesCancelReasonAndLoginDisabled_WritesTheReasonThenCancelsWithAuthenticationCancelled()
+    {
+        // curl 8.21.0, lib/curl_sasl.c lines 789-793: the GSSAPI step writes its infof line,
+        // returns CURLE_BAD_CONTENT_ENCODING, and curl sends * and moves to SASL_CANCEL (BL-1348).
+        var sasl = new RankedSaslAuthenticator(("GSSAPI", Latin1("G"), []));
+        sasl.CancelReasons["GSSAPI"] = SecurityLayerFailure;
+        var events = new RecordingTransferEvents();
+
+        ImapRun run = await RunAsync(
+            Caps("IMAP4rev1 AUTH=GSSAPI LOGINDISABLED") + "+ \r\n+ AAAA\r\nA002 BAD cancelled\r\n* BAD Command not recognized\r\n",
+            sasl,
+            events);
+
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE GSSAPI\r\nRw==\r\n*\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), run.Result);
+        Assert.HasCount(1, sasl.Challenges);
+        int reasonAt = events.Transcript.IndexOf("* " + SecurityLayerFailure);
+        int cancelAt = events.Transcript.FindIndex(line => line.StartsWith("> *", StringComparison.Ordinal));
+        Assert.IsGreaterThanOrEqualTo(0, reasonAt);
+        Assert.IsGreaterThan(reasonAt, cancelAt, "The reason is written before * is sent.");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ExchangeGivesCancelReasonAndAnotherMechanismOffered_StartsItAfterTheCancel()
+    {
+        var sasl = new RankedSaslAuthenticator(("GSSAPI", Latin1("G"), []), ("PLAIN", PlainMessage, []));
+        sasl.CancelReasons["GSSAPI"] = SecurityLayerFailure;
+        var events = new RecordingTransferEvents();
+
+        ImapRun run = await RunAsync(
+            Caps("AUTH=GSSAPI AUTH=PLAIN") + "+ \r\n+ AAAA\r\nA002 BAD cancelled\r\n+ \r\nA003 OK done\r\n" + ListAndLogout("A004", "A005"),
+            sasl,
+            events);
+
+        Assert.AreEqual(
+            Capability + "A002 AUTHENTICATE GSSAPI\r\nRw==\r\n*\r\nA003 AUTHENTICATE PLAIN\r\nAHVzZXIAc2VjcmV0\r\nA004 LIST \"\" *\r\nA005 LOGOUT\r\n",
+            run.Sent);
+        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        CollectionAssert.Contains(events.Info, SecurityLayerFailure);
+        CollectionAssert.AreEqual(new[] { "PLAIN" }, sasl.Offers[1]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ExchangeCannotAnswerWithNoCancelReason_FailsWithLoginDeniedSendingNoCancel()
+    {
+        var sasl = new RankedSaslAuthenticator(("GSSAPI", Latin1("G"), []), ("PLAIN", PlainMessage, []));
+        var events = new RecordingTransferEvents();
+
+        ImapRun run = await RunAsync(Caps("AUTH=GSSAPI AUTH=PLAIN") + "+ \r\n+ AAAA\r\n", sasl, events);
+
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE GSSAPI\r\nRw==\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
+        CollectionAssert.DoesNotContain(events.Info, SecurityLayerFailure);
     }
 
     private static Task<ImapRun> RunAsync(string script, ISaslAuthenticator sasl, RecordingTransferEvents? events = null, RecordingDiagnosticLog? log = null)

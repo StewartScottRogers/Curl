@@ -17,7 +17,8 @@ namespace Curl.Protocol.Imap;
 /// with the initial response in base64 after it (<c>=</c> when empty) when the server
 /// advertised <c>SASL-IR</c> or <c>--sasl-ir</c> was given, else in answer to the first
 /// <c>+</c>. Each <c>+</c> is answered in base64; the tagged <c>OK</c> once a message has been
-/// sent is success. Anything else, or a challenge the exchange cannot answer, is exit 67
+/// sent is success. Anything else, or a challenge the exchange cannot answer and gives no
+/// cancel reason for, is exit 67
 /// <c>Login denied</c> with nothing more sent.</item>
 /// <item>A <c>+</c> whose text is not base64 (empty text or text starting <c>=</c> is an
 /// empty challenge) is handed over empty to a mechanism that ignores it. A mechanism that
@@ -25,7 +26,9 @@ namespace Curl.Protocol.Imap;
 /// answers - is cancelled with <c>*</c>: the reply is read whatever it is, the mechanism is
 /// dropped from the offered ones and the authenticator chooses again. None left is
 /// <c>LOGIN</c> when it may be sent, and otherwise exit 67 <c>Authentication cancelled</c>
-/// (BL-1220).</item>
+/// (BL-1220). An exchange that cannot answer a challenge and gives a
+/// <see cref="ISaslExchange.CancelReason" /> is cancelled the same way, after that reason
+/// is written as a <c>-v</c> info line (BL-1348).</item>
 /// <item>No choice: with a user, <c>LOGINDISABLED</c> not advertised and the options
 /// allowing it, <c>LOGIN user password</c>, each as <see cref="ImapQuoting" /> writes it;
 /// answered other than <c>OK</c> it is exit 67 <c>Access denied. </c> and the byte curl
@@ -68,7 +71,10 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
         /// <summary>The server refused, or the exchange could not answer a challenge.</summary>
         Refused,
 
-        /// <summary>The exchange was cancelled with <c>*</c> over a challenge that was not base64.</summary>
+        /// <summary>
+        /// The exchange was cancelled with <c>*</c> over a challenge that was not base64, or one
+        /// it could not answer with a cancel reason.
+        /// </summary>
         Cancelled,
     }
 
@@ -368,7 +374,8 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     /// <summary>
     /// Answers a <c>+</c> with the initial response when it is due and the mechanism has one,
     /// and otherwise with the exchange's answer to the decoded challenge, or cancels the
-    /// exchange over a challenge it reads that is not base64.
+    /// exchange over a challenge it reads that is not base64 or that it cannot answer with a
+    /// cancel reason.
     /// </summary>
     /// <returns><see langword="null" /> once the answer is sent, or how the exchange ended.</returns>
     private async ValueTask<ExchangeOutcome?> AnswerAsync(ISaslExchange exchange, ImapResponse continuation, bool initialResponseDue)
@@ -386,11 +393,29 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
 
         if (answer is null)
         {
-            return ExchangeOutcome.Refused;
+            return await RefuseOrCancelAsync(exchange).ConfigureAwait(false);
         }
 
         await channel.SendLineAsync(Encode(answer), ImapDiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
         return null;
+    }
+
+    /// <summary>
+    /// Ends an exchange that could not answer: one that gives a
+    /// <see cref="ISaslExchange.CancelReason" /> has it written as a <c>-v</c> info line and is
+    /// cancelled with <c>*</c>, as curl 8.21.0 does for a step returning
+    /// <c>CURLE_BAD_CONTENT_ENCODING</c> (<c>lib/curl_sasl.c</c> lines 789-793); any other is
+    /// refused (BL-1348).
+    /// </summary>
+    private async ValueTask<ExchangeOutcome> RefuseOrCancelAsync(ISaslExchange exchange)
+    {
+        if (exchange.CancelReason is not { } reason)
+        {
+            return ExchangeOutcome.Refused;
+        }
+
+        context.Events.ReportInfo(reason);
+        return await CancelAsync().ConfigureAwait(false);
     }
 
     /// <summary>Logs an accepted exchange in, and fails a refused one with exit 67 <c>Login denied</c>.</summary>
