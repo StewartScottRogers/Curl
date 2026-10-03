@@ -37,3 +37,4 @@ An HTTP/1.x request send or response read that fails with any socket error ends 
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
