@@ -24,14 +24,15 @@ Every auditor runs every step of its method on every audit; re-audits are added 
 
 ## Acceptance criteria
 
-- [ ] RunAudit.ps1's auditor prompt says: do every step of your method in full; the re-audits come on top of it, never instead.
-- [ ] Auditor-Rules.md rule 5 adds that re-audits never replace the method; Truthfulness.md, and any other method that lets the prompt limit its steps, says only an explicit list of steps does, and a re-audit list is not one.
-- [ ] Report-Format.md defines per-step counts in the report's `metrics` for each auditor (for example truthfulness `sampled.names`, `sampled.docComments`, `sampled.adrs`, `sampled.scriptHelp`; process `rulesChecked`; quality `mutants`, `testsRead`; conformance `cases`; security and performance theirs), and each method says to report them.
-- [ ] Write-AuditScorecard.ps1 marks an auditor unreliable when its report lacks a required count, and its -SelfTest covers it.
+- [x] RunAudit.ps1's auditor prompt says: do every step of your method in full; the re-audits come on top of it, never instead.
+- [x] Auditor-Rules.md rule 5 adds that re-audits never replace the method; Truthfulness.md, and any other method that lets the prompt limit its steps, says only an explicit list of steps does, and a re-audit list is not one.
+- [x] Report-Format.md defines per-step counts in the report's `metrics` for each auditor (for example truthfulness `sampled.names`, `sampled.docComments`, `sampled.adrs`, `sampled.scriptHelp`; process `rulesChecked`; quality `mutants`, `testsRead`; conformance `cases`; security and performance theirs), and each method says to report them.
+- [x] Write-AuditScorecard.ps1 marks an auditor unreliable when its report lacks a required count, and its -SelfTest covers it.
 - [ ] A rerun of truthfulness, process and quality on the run 2 planted tree reports the counts, runs over 20 turns each, and truthfulness catches PD-402 and PD-403 (Notes record it).
 - [ ] `dotnet build` is clean and the fast tests are green.
 
 ## Notes
+- 2026-10-03: Merged in PR #56. The 12:33 check run (20261003-123313, $1.28): all three reported method counts, but ran 16 (quality), 8 (truthfulness) and 10 (process) turns, not over 20. Truthfulness reported names=0, docComments=0 and said "I did not run the names and doc-comment steps (1 and 2) or the ADR step (4)"; the scorecard marked it unreliable for that, as designed. Catches: quality 0/2, truthfulness 1/3, process 2/3. The last criterion is not met: the instructions alone do not make the Sonnet auditors run their whole method.
 
 ## Log
 

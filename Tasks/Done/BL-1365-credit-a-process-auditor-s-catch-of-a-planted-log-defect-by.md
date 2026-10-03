@@ -9,7 +9,7 @@ touches: [Audit/Tools/Write-AuditFindings.ps1, Audit/Tools/Write-AuditScorecard.
 lane: no
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1365 — Credit a process auditor's catch of a planted log defect by its catch text, not its log file name
 
@@ -24,15 +24,18 @@ A process finding that names a planted log defect's catch text is a catch, whate
 
 ## Acceptance criteria
 
-- [ ] Test-Catch (Write-AuditFindings.ps1) and Test-Caught (Write-AuditScorecard.ps1): when the planted defect's auditor is `process` and its file is in the log copy (no project folder: a .log, .jsonl or ci-runs.json), the same-file test is skipped and only the catch text in key, title or evidence is required.
-- [ ] Both self-tests gain the two reports above as cases that count as catches, and a process report without the catch text that does not.
-- [ ] Replaying run 1's and run 2's reports through both tools turns both PD-501s into catches (Notes record it).
-- [ ] `dotnet build` is clean and the fast tests are green.
+- [x] Test-Catch (Write-AuditFindings.ps1) and Test-Caught (Write-AuditScorecard.ps1): when the planted defect's auditor is `process` and its file is in the log copy (no project folder: a .log, .jsonl or ci-runs.json), the same-file test is skipped and only the catch text in key, title or evidence is required.
+- [x] Both self-tests gain the two reports above as cases that count as catches, and a process report without the catch text that does not.
+- [x] Replaying run 1's and run 2's reports through both tools turns both PD-501s into catches (Notes record it).
+- [x] `dotnet build` is clean and the fast tests are green.
 
 ## Notes
+- 2026-10-03: Replaying the 2026-10-02 and 2026-10-03 06:23 process reports through Test-Caught: both PD-501s are catches; PD-503 and PD-502 stay missed (BL-1366, BL-1367). The 12:33 check run: process caught 2 of 3. Merged in PR #56 (579e6554).
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Built on the audit branch (PR #56, 579e6554); waits for the 3-auditor check run and the merge. An interactive session completes it.
+- 2026-10-03: Blocked -> Doing.
+- 2026-10-03: Doing -> Done. Process catches of planted log defects count by catch text; merged in PR #56
