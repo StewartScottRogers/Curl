@@ -32,3 +32,4 @@ Split from BL-1320, which wrote them for QUIC through a CONNECT-UDP proxy and me
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1360-20261003-061205-L7.jsonl
