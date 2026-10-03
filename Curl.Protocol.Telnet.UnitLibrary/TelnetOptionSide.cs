@@ -24,13 +24,13 @@ internal sealed class TelnetOptionSide(
     /// Answers the peer's request or offer to enable <paramref name="option" />.
     /// </summary>
     /// <param name="option">The option named.</param>
-    /// <param name="replies">Receives any reply to send.</param>
+    /// <param name="replies">Receives any reply to send, as its own write.</param>
     /// <returns>
     /// <see langword="true" /> when this enabled the option, whether answering an offer or
     /// confirming this side's own request; <see langword="false" /> when it was already
     /// enabled or is refused.
     /// </returns>
-    public bool ReceiveEnable(byte option, List<byte> replies)
+    public bool ReceiveEnable(byte option, TelnetOutbox replies)
     {
         TelnetOptionState previous = states[option];
         if (previous != TelnetOptionState.No)
@@ -55,8 +55,8 @@ internal sealed class TelnetOptionSide(
     /// Answers the peer's request or refusal to disable <paramref name="option" />.
     /// </summary>
     /// <param name="option">The option named.</param>
-    /// <param name="replies">Receives any reply to send.</param>
-    public void ReceiveDisable(byte option, List<byte> replies)
+    /// <param name="replies">Receives any reply to send, as its own write.</param>
+    public void ReceiveDisable(byte option, TelnetOutbox replies)
     {
         if (states[option] == TelnetOptionState.Yes)
         {
@@ -71,8 +71,8 @@ internal sealed class TelnetOptionSide(
     /// asked for.
     /// </summary>
     /// <param name="option">The option to ask for.</param>
-    /// <param name="replies">Receives the request.</param>
-    public void RequestEnable(byte option, List<byte> replies)
+    /// <param name="replies">Receives the request, as its own write.</param>
+    public void RequestEnable(byte option, TelnetOutbox replies)
     {
         if (states[option] == TelnetOptionState.No)
         {
@@ -81,12 +81,10 @@ internal sealed class TelnetOptionSide(
         }
     }
 
-    private void AppendCommand(List<byte> replies, byte command, byte option)
+    private void AppendCommand(TelnetOutbox replies, byte command, byte option)
     {
         log.OptionSent(command, option);
+        replies.Send([TelnetByte.InterpretAsCommand, command, option]);
         trace.OptionSent(command, option);
-        replies.Add(TelnetByte.InterpretAsCommand);
-        replies.Add(command);
-        replies.Add(option);
     }
 }

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Telnet;
@@ -32,10 +33,12 @@ namespace Curl.Protocol.Telnet;
 /// </para>
 /// <para>
 /// A connection failure is met as curl 8.21.0 on Windows meets it. A read the connection
-/// fails, as a reset does, ends the session like a close, with exit 0. A send it fails,
-/// of the upload or of a negotiation reply, ends it with exit 55
-/// (<see cref="CurlExitCode.SendError" />), and an output that refuses a write with
-/// exit 23 (<see cref="CurlExitCode.WriteError" />).
+/// fails, as a reset does, ends the session like a close, with exit 0. A send of the
+/// upload it fails ends it with exit 55 (<see cref="CurlExitCode.SendError" />), and an
+/// output that refuses a write with exit 23 (<see cref="CurlExitCode.WriteError" />). Each
+/// negotiation reply is its own write, as curl sends it; one the connection fails with a
+/// socket error is reported as curl's <c>Sending data failed (N)</c> line and the session
+/// goes on, as curl's does (BL-1307), while any other failure of one ends it with exit 55.
 /// </para>
 /// <para>
 /// Received data meets <see cref="ITransferContext.NoBody" /> and
@@ -136,7 +139,8 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
         log.SessionStarted(target.Host, target.Port);
         context.Progress.ReportTransferStarted();
-        var trace = new TelnetTraceReporter(context.Events);
+        var outbox = new TelnetOutbox(context.Events);
+        var trace = new TelnetTraceReporter(outbox);
         await using (connection.ConfigureAwait(false))
         {
             var optionValues = new TelnetOptionValues();
@@ -144,9 +148,10 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
                 context.Credentials?.UserName,
                 context.TelnetOptions,
                 optionValues)
-                ?? await RunSessionAsync(connection, context, new TelnetReceiver(optionValues, log, trace), startedAt).ConfigureAwait(false);
+                ?? await RunSessionAsync(connection, context, new TelnetReceiver(optionValues, log, trace), outbox, startedAt).ConfigureAwait(false);
             log.SessionEnded(result, context.TimeProvider.GetElapsedTime(sessionStarted));
             trace.ConnectionEnded(result, connect.ConnectionNumber);
+            outbox.ReportPending();
             return result;
         }
     }
@@ -155,6 +160,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         IConnection connection,
         ITransferContext context,
         TelnetReceiver receiver,
+        TelnetOutbox outbox,
         long startedAt)
     {
         var sendLock = new SemaphoreSlim(1, 1);
@@ -166,7 +172,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
         try
         {
-            return await ReceiveUntilClosedAsync(connection, context, receiver, sendLock, uploadSendFailed.Task, startedAt)
+            return await ReceiveUntilClosedAsync(connection, context, receiver, outbox, sendLock, uploadSendFailed.Task, startedAt)
                 .ConfigureAwait(false);
         }
         finally
@@ -191,6 +197,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         IConnection connection,
         ITransferContext context,
         TelnetReceiver receiver,
+        TelnetOutbox outbox,
         SemaphoreSlim sendLock,
         Task uploadSendFailed,
         long startedAt)
@@ -198,7 +205,6 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         CancellationToken cancellationToken = context.CancellationToken;
         var buffer = new byte[ReceiveBufferSize];
         var data = new List<byte>();
-        var replies = new List<byte>();
         long bytesWritten = 0;
 
         while (true)
@@ -226,8 +232,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
             }
 
             data.Clear();
-            replies.Clear();
-            TelnetReceiveError error = receiver.Receive(buffer.AsSpan(0, count), data, replies);
+            TelnetReceiveError error = receiver.Receive(buffer.AsSpan(0, count), data, outbox);
             if (await WriteReceivedDataAsync(context, data, bytesWritten).ConfigureAwait(false) is { } writeFailure)
             {
                 return writeFailure;
@@ -235,7 +240,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
             bytesWritten += data.Count;
             context.Progress.ReportDownloaded(bytesWritten, null);
-            if (!await TrySendAsync(connection, sendLock, replies.ToArray(), cancellationToken).ConfigureAwait(false))
+            if (!await TrySendRepliesAsync(outbox, connection, sendLock, cancellationToken).ConfigureAwait(false))
             {
                 return SendFailure(bytesWritten);
             }
@@ -296,7 +301,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         }
 
         long? limit = context.MaxFileSize is > 0 ? context.MaxFileSize : null;
-        int allowed = limit is { } max ? (int)Math.Clamp(max - bytesWritten, 0, data.Count) : data.Count;
+        int allowed = AllowedBytes(limit, bytesWritten, data.Count);
         bool cut = allowed < data.Count;
         data.RemoveRange(allowed, data.Count - allowed);
         if (await WriteOutputAsync(context.Output, data, context.CancellationToken).ConfigureAwait(false) is { } accepted)
@@ -306,6 +311,14 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
         return cut ? FileSizeExceeded(limit!.Value, bytesWritten + allowed) : null;
     }
+
+    /// <summary>
+    /// How many of a read's <paramref name="count" /> bytes fit under <c>--max-filesize</c>
+    /// <paramref name="limit" /> (<see langword="null" /> for none) after
+    /// <paramref name="bytesWritten" />.
+    /// </summary>
+    private static int AllowedBytes(long? limit, long bytesWritten, int count) =>
+        limit is { } max ? (int)Math.Clamp(max - bytesWritten, 0, count) : count;
 
     private static TransferResult FileSizeExceeded(long limit, long bytesWritten) =>
         new(
@@ -400,6 +413,59 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         return [.. escaped];
     }
 
+    /// <summary>
+    /// Sends the replies a read called for, one write each, as curl 8.21.0's
+    /// <c>send_negotiation</c> and <c>sendsuboption</c> do: a write the connection fails with
+    /// a socket error is reported as <c>Sending data failed (N)</c> and the session goes on,
+    /// as curl's do (BL-1307). Returns <see langword="false" /> for a write that fails
+    /// otherwise, which still ends the session with exit 55.
+    /// </summary>
+    private static async Task<bool> TrySendRepliesAsync(
+        TelnetOutbox outbox,
+        IConnection connection,
+        SemaphoreSlim sendLock,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await outbox.SendPendingAsync(reply => SendReplyAsync(connection, sendLock, reply, cancellationToken)).ConfigureAwait(false);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Sends one reply, returning <see langword="null" /> when the connection took it, or
+    /// the socket error number - the WSA code on Windows, the errno elsewhere, as curl's
+    /// <c>SOCKERRNO</c> is - when it failed with a <see cref="SocketException" /> inside its
+    /// <see cref="IOException" />. Any other <see cref="IOException" /> is thrown.
+    /// </summary>
+    private static async Task<int?> SendReplyAsync(
+        IConnection connection,
+        SemaphoreSlim sendLock,
+        byte[] reply,
+        CancellationToken cancellationToken)
+    {
+        await sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await connection.WriteAsync(reply, cancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+        catch (IOException failure) when (failure.InnerException is SocketException socketError)
+        {
+            return socketError.NativeErrorCode;
+        }
+        finally
+        {
+            sendLock.Release();
+        }
+    }
+
     /// <summary>Sends bytes to the server, reporting whether the connection took them.</summary>
     private static async Task<bool> TrySendAsync(
         IConnection connection,
@@ -407,11 +473,6 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         byte[] bytes,
         CancellationToken cancellationToken)
     {
-        if (bytes.Length == 0)
-        {
-            return true;
-        }
-
         await sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
