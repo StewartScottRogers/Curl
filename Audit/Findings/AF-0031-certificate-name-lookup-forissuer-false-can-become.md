@@ -3,8 +3,8 @@ id: AF-0031
 title: Certificate name lookup `forIssuer: false` can become true with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/TlsFailureMessages.cs:CertificateSubjectName:surviving-mutant
 task: none
 found: 2026-10-03
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.
