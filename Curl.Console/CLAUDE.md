@@ -268,8 +268,9 @@ Under `-n`, `--netrc-file` or `--netrc-optional` the netrc file has its say too,
 `-u`'s. A `-u` with a user name wins and no file is read. The file is the `--netrc-file` one, else
 `.netrc` in `HOME` (on Windows `_netrc` after it, and `USERPROFILE` when `HOME` is not set), read
 through the runner's `IDataFileReader` and environment. The URL's percent-decoded user name picks
-the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; with no entry the
-URL's user and password are sent. A required file that is missing or malformed fails each URL with
+the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; an entry with no
+login takes the URL's user name, and one with no password sends an empty one, never the URL's
+(BL-1356); with no entry the URL's user and password are sent. A required file that is missing or malformed fails each URL with
 `curl: (26) .netrc error: no such file` or `syntax error` before anything is sent;
 `--netrc-optional` ignores both. When the file is in use, `TransferCredentialLookup.ForRedirectHops`
 gives `RedirectFollower` the same lookup for each redirect hop's URL, so every hop sends its own

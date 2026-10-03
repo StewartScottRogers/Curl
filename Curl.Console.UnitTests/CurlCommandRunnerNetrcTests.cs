@@ -256,6 +256,30 @@ public sealed class CurlCommandRunnerNetrcTests
     }
 
     [TestMethod]
+    [DataRow(Url, "", "np")]
+    [DataRow("http://uu@127.0.0.1:18505/", "uu", "np")]
+    public async Task RunAsync_EntryWithOnlyAPassword_SendsItWithTheUrlsUserOrNone(string url, string user, string password)
+    {
+        // machine 127.0.0.1 password np: Basic Om5w (:np) bare, Basic dXU6bnA= (uu:np) under uu@ (BL-1356 Notes).
+        dataFiles.Files["home/.netrc"] = Encoding.UTF8.GetBytes("machine 127.0.0.1 password np\n");
+
+        await RunAsync(["-s", "-S", "-n", url]);
+
+        AssertSent(user, password);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EntryWithOnlyALoginAndAUrlPassword_SendsAnEmptyPassword()
+    {
+        // machine 127.0.0.1 login lo, http://:up@host/: Basic bG86 (lo:), the URL's password dropped (BL-1356 Notes).
+        dataFiles.Files["home/.netrc"] = Encoding.UTF8.GetBytes("machine 127.0.0.1 login lo\n");
+
+        await RunAsync(["-s", "-S", "-n", "http://:up@127.0.0.1:18505/"]);
+
+        AssertSent("lo", string.Empty);
+    }
+
+    [TestMethod]
     [DataRow(Url)]
     [DataRow("http://b:x@127.0.0.1:18505/")]
     public async Task RunAsync_RequiredNetrcMalformed_Exits26WithSyntaxError(string url)
