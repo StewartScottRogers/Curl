@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Zstandard.UnitLibrary, Curl.Zstandard.UnitTests]
 requirement: FR-073
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1299 — Refuse zstd bytes that cannot begin a frame magic as soon as they arrive, as libzstd does
 
@@ -28,15 +28,21 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Zstandard.UnitTests` (`ZstandardDecoderTests`) assert that after the measured frame, `Decompress` given `78` returns `InvalidData` with `LastError == PrefixUnknown`, and the same for `28 00`, `28 B5 00`, `28 B5 2F 00`, `40`, `50 00`, `5F 2A 4D 00`.
-- [ ] Tests assert that `28`, `28 B5`, `28 B5 2F`, `50`, `5A 2A`, `53 2A 4D` return `NeedMoreData` and consume their bytes, and that feeding the rest of a valid magic afterwards still decodes the next frame.
-- [ ] A test pins the same early refusal at the very start of the stream (first byte `78`), and one feeds a valid frame a byte at a time to show nothing else changes.
-- [ ] `ZstandardDecoder.TryDecompress` keeps its current results for complete inputs (its existing tests pass unchanged).
-- [ ] `dotnet build Curl.Zstandard.UnitTests -warnaserror` is clean; `dotnet test Curl.Zstandard.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Zstandard.UnitLibrary` reports no failing member.
+- [x] Tests in `Curl.Zstandard.UnitTests` (`ZstandardDecoderTests`) assert that after the measured frame, `Decompress` given `78` returns `InvalidData` with `LastError == PrefixUnknown`, and the same for `28 00`, `28 B5 00`, `28 B5 2F 00`, `40`, `50 00`, `5F 2A 4D 00`.
+- [x] Tests assert that `28`, `28 B5`, `28 B5 2F`, `50`, `5A 2A`, `53 2A 4D` return `NeedMoreData` and consume their bytes, and that feeding the rest of a valid magic afterwards still decodes the next frame.
+- [x] A test pins the same early refusal at the very start of the stream (first byte `78`), and one feeds a valid frame a byte at a time to show nothing else changes.
+- [x] `ZstandardDecoder.TryDecompress` keeps its current results for complete inputs (its existing tests pass unchanged).
+- [x] `dotnet build Curl.Zstandard.UnitTests -warnaserror` is clean; `dotnet test Curl.Zstandard.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Zstandard.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Delivered directly rather than through every `/feature` stage: the change is one guard in one method, and the task's Context already pins libzstd's behaviour and the measured curl results.
+- `ZstandardDecoder.GatherField` now asks `CanBeginMagic` whenever it holds 1 to 3 bytes of a magic: they must be a prefix of `28 B5 2F FD`, or a byte `0x50`-`0x5F` followed by a prefix of `2A 4D 18`. If neither, it fails with `PrefixUnknown` at once; the bytes it took stay consumed, as when a whole 4-byte bad magic fails.
+- Measurement: `Measure-CodeQuality.ps1 -Library` still runs the whole solution's tests (over 30 minutes), so coverage came from `dotnet test Curl.Zstandard.UnitTests --collect:"Code Coverage;Format=cobertura"` and then `Measure-CodeQuality.ps1 -Library Curl.Zstandard.UnitLibrary -SkipTestRun -ResultsDirectory <that dir>`: 100% line, 100% branch, max complexity 10, 0 failing members.
+- Tests: Curl.Zstandard.UnitTests 272 passed; Curl.Protocol.Http.UnitTests and Curl.Tls.UnitTests (the two libraries that reference Zstandard) and Curl.Console.UnitTests also green; `dotnet build Curl.slnx` clean.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. zstd bytes that cannot begin a frame magic now fail with PrefixUnknown as they arrive, as libzstd does (exit 61 in curl)
