@@ -32,3 +32,4 @@ Curl writes curl 8.21.0's `[HTTP-PROXY]` and `[H1-PROXY]` lines around a CONNECT
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
