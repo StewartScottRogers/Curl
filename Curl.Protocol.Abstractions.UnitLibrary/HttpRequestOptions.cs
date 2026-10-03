@@ -148,6 +148,13 @@ public sealed record HttpRequestOptions
     public bool IgnoreContentLength { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>--http0.9</c> was given: accept an HTTP/0.9
+    /// response, one with no status line or headers, as a body read to close instead of
+    /// failing with exit 1.
+    /// </summary>
+    public bool AllowHttp09Reply { get; init; }
+
+    /// <summary>
     /// Gets the request line's target from <c>--request-target</c>, verbatim, or
     /// <see langword="null" /> to derive it from <see cref="ITransferContext.Url" />.
     /// </summary>

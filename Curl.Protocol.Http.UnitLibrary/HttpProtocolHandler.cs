@@ -1025,6 +1025,7 @@ public sealed class HttpProtocolHandler(
             },
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
             IsHttp2OrHttp3 = requestStream is not null,
+            AcceptsHttp09 = options.AllowHttp09Reply,
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
             DefersFrom = (statusLine, header) => framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };

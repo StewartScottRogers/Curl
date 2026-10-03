@@ -86,6 +86,31 @@ internal sealed class HttpLineReader(IConnection connection)
     }
 
     /// <summary>
+    /// Reads until the bytes after the last line returned either cannot begin <c>HTTP/</c>, in
+    /// any letter case, or are long enough to begin it, or until the peer closes; curl 8.21.0
+    /// tells an HTTP/0.9 response from the first bytes that cannot begin a status line.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels every read.</param>
+    /// <returns><see langword="true" /> when the bytes cannot begin <c>HTTP/</c>.</returns>
+    /// <exception cref="HttpTransferException">A read failed (exit 56).</exception>
+    internal async ValueTask<bool> BeginsOtherThanHttpAsync(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            int received = end - start;
+            if (!HttpStatusLine.CanBeginHttp(buffer.AsSpan(start, received)))
+            {
+                return true;
+            }
+
+            if (received >= "HTTP/".Length || !await FillAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
     /// Takes every byte read past the last line returned.
     /// </summary>
     /// <returns>The bytes, possibly none.</returns>

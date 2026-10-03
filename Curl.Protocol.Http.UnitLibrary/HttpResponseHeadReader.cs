@@ -114,6 +114,16 @@ internal sealed class HttpResponseHeadReader
     internal bool IsHttp2OrHttp3 { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>--http0.9</c> accepts an HTTP/0.9 response: when the
+    /// first bytes cannot begin <c>HTTP/</c>, <see cref="ReadAsync" /> gives a head with
+    /// <see cref="HttpStatusLine.Http09" />, no headers and no head bytes, and every byte read
+    /// is the body, which runs to close; nothing is reported to <see cref="Events" />, as
+    /// curl 8.21.0 writes no header and no <c>-v</c> line for it (measured, BL-1275 Notes).
+    /// Otherwise such bytes fail with exit 1.
+    /// </summary>
+    internal bool AcceptsHttp09 { get; init; }
+
+    /// <summary>
     /// Gets what tells, before each status line is parsed, whether the connection has switched
     /// to HTTP/2 after an h2c upgrade's <c>101</c> (<see cref="HttpH2cUpgradeConnection.IsUpgraded" />),
     /// so the line is an HTTP/2 stream's as for <see cref="IsHttp2OrHttp3" />. By default it never has.
@@ -199,6 +209,11 @@ internal sealed class HttpResponseHeadReader
     /// </exception>
     internal async ValueTask<HttpResponseHead> ReadAsync(CancellationToken cancellationToken)
     {
+        if (await ReadHttp09HeadAsync(cancellationToken).ConfigureAwait(false) is { } http09)
+        {
+            return http09;
+        }
+
         while (true)
         {
             HttpStatusLine statusLine = await ReadStatusLineAsync(cancellationToken).ConfigureAwait(false);
@@ -320,6 +335,22 @@ internal sealed class HttpResponseHeadReader
 
     private static HttpTransferException EmptyReply() =>
         new(CurlExitCode.GotNothing, HttpTransferMessages.EmptyReply);
+
+    /// <summary>
+    /// Gives the head of an HTTP/0.9 response <see cref="AcceptsHttp09" /> accepts, its bytes
+    /// so far the start of the body, or <see langword="null" /> when HTTP/0.9 is not accepted
+    /// or the response can still begin <c>HTTP/</c>.
+    /// </summary>
+    private async ValueTask<HttpResponseHead?> ReadHttp09HeadAsync(CancellationToken cancellationToken)
+    {
+        if (!AcceptsHttp09 || IsHttp2OrHttp3 || !await lines.BeginsOtherThanHttpAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        EndedAtEmptyLine = true;
+        return new HttpResponseHead(HttpStatusLine.Http09(), [], ReadOnlyMemory<byte>.Empty, lines.TakeRemaining());
+    }
 
     private async ValueTask<HttpStatusLine> ReadStatusLineAsync(CancellationToken cancellationToken)
     {
