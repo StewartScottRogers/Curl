@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1276 — Fix AF-0020: -C <offset> combined with -d, --json or -F is not refused: curl exits 2 'cannot mix --continue-at with --data/--form', Curl sends the request
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Measured curl 8.21.0 (Schannel) on 2026-10-02: a `-C` offset above 0 beside `-d`, `--data-binary`, `--data-urlencode` or `--json` (sent as POST) prints `curl: cannot mix --continue-at with --data` and `curl: (2) Failed initialization`, exit 2, no request; beside `-F`/`--form-string` it names `--form`. Either order, per `--next` group, any scheme (file:// too). `-s` without `-S` hides both lines. Accepted: `-C 0`, `-C -`, `-G -d`. `-F` with `-d` keeps its own form-and-data warning refusal first.
+- Fix: `CommandLineParser.TransferSetupRefusal` now refuses with the new `CommandLineRefusal.ContinueAtWithBody` (found at transfer setup, so it sits beside `NoUrlSpecified` and `FormAndDataBoth`). Tests: `CommandLineContinueAtWithBodyTests`. No ADR: Curl now matches curl, nothing diverges.
+- The reproduction now gives exit 2 and the two lines for both `-d x` and `-F a=b`, byte for byte as curl.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. -C <offset> with -d/--json/-F is refused at transfer setup as curl 8.21.0 does (exit 2, cannot mix --continue-at with --data/--form)
