@@ -67,6 +67,22 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_TracingTheProxyFiltersThroughATunnelAsTheOpenSslBuild_AllocatesTheConnectBufferAfterConnectStart()
+    {
+        // curl's OpenSSL build writes allocate connect buffer before Establishing (ADR-0342).
+        var (events, _) = await TraceThroughTunnelAsync(TunnelEstablishedReply, matchesSchannelBuild: false);
+
+        AssertTunnelLines(
+            new[]
+            {
+                "* [H1-PROXY] CONNECT start",
+                "* allocate connect buffer",
+                "* Establishing HTTP proxy tunnel to example.test:80",
+            },
+            events.Transcript.Skip(5).Take(3).ToArray());
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_TracingTheProxyFiltersThroughATunnel_RemovesTheHttpProxyFilterAfterEstablishedConnection()
     {
         var openedBeforeRemoval = -1;
@@ -233,8 +249,15 @@ public sealed partial class TcpConnectorTests
 
     private static ConnectTarget TunnelTarget => new("example.test", 80, UseTls: false) { Proxy = TunnelProxy, PoolScheme = "http" };
 
-    private static TcpConnector TunnelConnector(ScriptedConnection proxyConnection, bool tracesHttpProxy = true, bool tracesH1Proxy = true, bool tracesSetup = false) =>
-        new(new FakeDnsResolver(ProxyAddress), new FakeTcpDialer { DialOutcome = _ => proxyConnection }, new FakeTlsProvider(), new ManualTimeProvider())
+    // Pins curl's Schannel build, the one these lines were measured from (BL-1193 Notes), so the
+    // tests pass on every platform; the OpenSSL build's extra line is pinned by its own test (BL-1256).
+    private static TcpConnector TunnelConnector(ScriptedConnection proxyConnection, bool tracesHttpProxy = true, bool tracesH1Proxy = true, bool tracesSetup = false, bool matchesSchannelBuild = true) =>
+        new(
+            new FakeDnsResolver(ProxyAddress),
+            new FakeTcpDialer { DialOutcome = _ => proxyConnection },
+            new FakeTlsProvider(),
+            new ManualTimeProvider(),
+            HttpProxyTunnelOptions.Default with { MatchesSchannelBuild = matchesSchannelBuild })
         {
             TracesHttpProxyFilter = tracesHttpProxy,
             TracesH1ProxyFilter = tracesH1Proxy,
@@ -250,11 +273,12 @@ public sealed partial class TcpConnectorTests
         bool tracesSetup = false,
         ConnectTarget? target = null,
         RecordingTransferEvents? events = null,
-        string connectHead = TunnelConnectHead)
+        string connectHead = TunnelConnectHead,
+        bool matchesSchannelBuild = true)
     {
         events ??= new RecordingTransferEvents();
         var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes(proxyReply));
-        var connector = TunnelConnector(proxyConnection, tracesHttpProxy, tracesH1Proxy, tracesSetup);
+        var connector = TunnelConnector(proxyConnection, tracesHttpProxy, tracesH1Proxy, tracesSetup, matchesSchannelBuild);
         var result = await connector.ConnectAsync((target ?? TunnelTarget) with { Events = events }, CancellationToken.None);
         Assert.AreEqual(connectHead.Replace("example.test:80", $"example.test:{(target ?? TunnelTarget).Port}", StringComparison.Ordinal), Encoding.Latin1.GetString(proxyConnection.Written.ToArray()));
         return (events, result);
