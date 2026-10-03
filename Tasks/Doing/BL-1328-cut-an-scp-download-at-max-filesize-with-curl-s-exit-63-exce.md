@@ -35,3 +35,4 @@ An `scp://` download honours `ITransferContext.MaxFileSize` exactly as BL-1327 m
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
