@@ -3,8 +3,8 @@ id: AF-0024
 title: The differential tool does not normalise elapsed milliseconds in error text or the -v source port, so identical behaviour is counted as a difference
 auditor: conformance
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Audit/Tools/Invoke-DifferentialConformance.ps1:Get-Normalised:stderr
 task: none
 found: 2026-10-02
@@ -41,3 +41,4 @@ Select-String -Path Audit/Tools/Invoke-DifferentialConformance.ps1 -Pattern 'aft
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.
