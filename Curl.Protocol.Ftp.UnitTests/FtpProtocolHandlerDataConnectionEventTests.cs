@@ -466,6 +466,28 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         Assert.AreEqual(CurlExitCode.QuoteError, run.Result.ExitCode);
     }
 
+    [TestMethod]
+    [DataRow("229 Entering Extended Passive Mode (|||99999|)\r\n")]
+    [DataRow("229 Entering Extended Passive Mode (|||123x)\r\n")]
+    public async Task ExecuteAsync_EpsvReplyWithAnIllegalPort_ReportsCurlsLinesAndFailsWithExit13(string reply)
+    {
+        // curl -v ftp://127.0.0.1:<port>/f.txt, measured 2026-10-02 (BL-1240).
+        DataRun run = await RunAsync("/f.txt", LoggedIn + reply + Bye, _ => { });
+
+        string[] expected =
+        [
+            .. LoggedInTranscript,
+            SamePath,
+            "> EPSV\r\n",
+            "* Connect data stream passively",
+            "< " + reply,
+            "* Remembering we are in directory \"\"",
+            "* Connection #0 to host 127.0.0.1:47931 left intact",
+        ];
+        CollectionAssert.AreEqual(expected, run.Events.Transcript);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpWeirdPasvReply, "Illegal port number in EPSV reply"), run.Result);
+    }
+
     private static async Task<DataRun> RunAsync(
         string path,
         string replies,

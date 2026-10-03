@@ -1293,9 +1293,9 @@ internal sealed class FtpSession(
             return await AnswerRefusedEpsvAsync(epsv.Code).ConfigureAwait(false);
         }
 
-        return FtpPassiveReply.TryParseEpsvPort(epsv.LastLine, out int epsvPort)
+        return FtpPassiveReply.TryParseEpsvPort(epsv.LastLine, out int epsvPort, out string unreadable)
             ? await ConnectDataAsync(context.Url.IdnHost, controlPeerAddress, epsvPort).ConfigureAwait(false)
-            : await QuitAndFailAsync(CurlExitCode.FtpWeirdPasvReply, FtpTransferMessages.WeirdEpsvReply).ConfigureAwait(false);
+            : await QuitAndFailKeepingConnectionAsync(CurlExitCode.FtpWeirdPasvReply, unreadable).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1363,6 +1363,13 @@ internal sealed class FtpSession(
         context.Events.ReportInfo(FtpTransferMessages.ConnectingTo(shownHost, port));
         trace.DoPhaseComplete();
         var failure = new FtpDataConnectFailure(host, shownHost, port, controlName);
+        if (port == 0)
+        {
+            // A ConnectTarget carries ports 1 to 65535; curl 8.21.0 dials a 229's port 0 and
+            // the dial fails at once (measured, BL-1240).
+            return TransferResult.Failure(CurlExitCode.CouldntConnect, failure.Rewrite($"Failed to connect to {host}:0 after 0 ms: Could not connect to server"));
+        }
+
         var target = new ConnectTarget(host, port, false)
         {
             Proxy = context.Proxy,
@@ -1683,6 +1690,19 @@ internal sealed class FtpSession(
         }
 
         return ended;
+    }
+
+    /// <summary>
+    /// Ends the transfer as <see cref="QuitAndFailAsync" /> does, after curl 8.21.0's <c>-v</c>
+    /// lines naming the directory it remembers and saying the control connection is left
+    /// intact, which its <c>ftp_done</c> writes for a failure that leaves the control
+    /// connection usable, such as an unreadable <c>229</c> (measured, BL-1240).
+    /// </summary>
+    private async ValueTask<TransferResult> QuitAndFailKeepingConnectionAsync(CurlExitCode exitCode, string message)
+    {
+        context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
+        context.Events.ReportInfo(FtpTransferMessages.ConnectionLeftIntact(controlName.Number, controlName.Host, controlName.Port));
+        return await QuitAndFailAsync(exitCode, message).ConfigureAwait(false);
     }
 
     private async ValueTask<TransferResult> QuitAndFailAsync(CurlExitCode exitCode, string message)

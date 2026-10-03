@@ -454,22 +454,64 @@ public sealed class FtpProtocolHandlerTests
 
     [TestMethod]
     [DataRow("229 garbage")]
-    [DataRow("229 Entering Extended Passive Mode (|||0|)")]
-    [DataRow("229 Entering Extended Passive Mode (|||70000|)")]
+    [DataRow("229 Entering Extended Passive Mode |||40000|")]
     [DataRow("229 Entering Extended Passive Mode (|!|40000|)")]
     [DataRow("229 Entering Extended Passive Mode (||!40000|)")]
+    [DataRow("229 Entering Extended Passive Mode (||x|)")]
     [DataRow("229 Entering Extended Passive Mode (||")]
-    [DataRow("229 Entering Extended Passive Mode (|||40000")]
-    [DataRow("229 Entering Extended Passive Mode (|||40000|")]
-    [DataRow("229 Entering Extended Passive Mode (|||40000|x")]
+    [DataRow("229 Entering Extended Passive Mode (|||")]
     [DataRow("229 Entering Extended Passive Mode (||||)")]
-    [DataRow("229 Entering Extended Passive Mode (|||4a000|)")]
-    public async Task ExecuteAsync_UnreadableEpsvReply_QuitsAndFailsWithExit13(string reply)
+    public async Task ExecuteAsync_EpsvReplyWithoutThreeDelimitersAndADigit_QuitsAndFailsWithExit13WeirdlyFormatted(string reply)
     {
         FtpRun run = await FtpRun.ExecuteAsync(Url, LoggedIn + reply + "\r\n" + Bye);
 
         Assert.AreEqual(LoginSent + "EPSV\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpWeirdPasvReply, "Weirdly formatted EPSV reply"), run.Result);
+    }
+
+    [TestMethod]
+    [DataRow("229 Entering Extended Passive Mode (|||99999|)")]
+    [DataRow("229 Entering Extended Passive Mode (|||65536|)")]
+    [DataRow("229 Entering Extended Passive Mode (|||99999999999|)")]
+    [DataRow("229 Entering Extended Passive Mode (|||123x)")]
+    [DataRow("229 Entering Extended Passive Mode (|||4a000|)")]
+    [DataRow("229 Entering Extended Passive Mode (|||40000")]
+    [DataRow("229 Entering Extended Passive Mode (1112|)")]
+    public async Task ExecuteAsync_EpsvReplyWithAnUnreadablePort_QuitsAndFailsWithExit13IllegalPort(string reply)
+    {
+        // curl 8.21.0 -v, measured 2026-10-02 for (|||99999|) and (|||123x) (BL-1240).
+        FtpRun run = await FtpRun.ExecuteAsync(Url, LoggedIn + reply + "\r\n" + Bye);
+
+        Assert.AreEqual(LoginSent + "EPSV\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpWeirdPasvReply, "Illegal port number in EPSV reply"), run.Result);
+    }
+
+    [TestMethod]
+    [DataRow("229 Entering Extended Passive Mode (|||65535|)", 65535)]
+    [DataRow("229 Entering Extended Passive Mode (|||40000|", 40000)]
+    [DataRow("229 Entering Extended Passive Mode (|||40000|x", 40000)]
+    [DataRow("229 Entering Extended Passive Mode (!!!40000!)", 40000)]
+    public async Task ExecuteAsync_EpsvPortClosedByTheDelimiter_DialsThatPortWhateverFollows(string reply, int port)
+    {
+        // curl 8.21.0 dials port 0 and (|||40000| with no ')' alike, measured 2026-10-02 (BL-1240).
+        FtpRun run = await FtpRun.ExecuteAsync(Url, LoggedIn + reply + "\r\n" + TypeSet + "213 1\r\n" + Opening + Complete + Bye, "x");
+
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", port, false), run.Connector.Targets[1]);
+        Assert.AreEqual(TransferResult.Success(1), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EpsvPortZero_FailsTheDialWithExit7WithoutConnecting()
+    {
+        // curl 8.21.0 dials port 0 and fails at once, measured 2026-10-02 (BL-1240); its
+        // fallback to PASV after a failed EPSV dial is BL-1248's.
+        FtpRun run = await FtpRun.ExecuteAsync(Url, LoggedIn + "229 Entering Extended Passive Mode (|||0|)\r\n" + Bye);
+
+        Assert.HasCount(1, run.Connector.Targets);
+        Assert.AreEqual(LoginSent + "EPSV\r\n", run.Sent);
+        Assert.AreEqual(
+            TransferResult.Failure(CurlExitCode.CouldntConnect, "Failed to connect to 127.0.0.1:18321 via 127.0.0.1:0 after 0 ms: Could not connect to server"),
+            run.Result);
     }
 
     [TestMethod]

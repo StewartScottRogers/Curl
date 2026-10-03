@@ -20,14 +20,25 @@ internal static class FtpPassiveReply
     /// <summary>
     /// Reads the port from an <c>EPSV</c> reply such as
     /// <c>229 Entering Extended Passive Mode (|||40000|)</c>: after the first <c>(</c>,
-    /// three repeats of one delimiter, the port, the delimiter again and <c>)</c>.
+    /// three repeats of one delimiter, the port and the delimiter again. What follows the
+    /// closing delimiter, <c>)</c> or anything else, is not read, as curl 8.21.0 does not.
     /// </summary>
     /// <param name="lastLine">The reply's last line.</param>
-    /// <param name="port">The port, from 1 to 65535, when this returns <see langword="true" />.</param>
+    /// <param name="port">
+    /// The port, from 0 to 65535, when this returns <see langword="true" />; curl 8.21.0
+    /// accepts 0 and dials it (measured, BL-1240).
+    /// </param>
+    /// <param name="failureMessage">
+    /// When this returns <see langword="false" />, curl 8.21.0's exit 13 message:
+    /// <see cref="FtpTransferMessages.IllegalEpsvPort" /> when the three delimiters are
+    /// followed by a digit but the port is above 65535 or not closed by the delimiter,
+    /// otherwise <see cref="FtpTransferMessages.WeirdEpsvReply" />.
+    /// </param>
     /// <returns><see langword="true" /> when the line holds such a port.</returns>
-    public static bool TryParseEpsvPort(string lastLine, out int port)
+    public static bool TryParseEpsvPort(string lastLine, out int port, out string failureMessage)
     {
         port = 0;
+        failureMessage = FtpTransferMessages.WeirdEpsvReply;
         int open = lastLine.IndexOf('(', StringComparison.Ordinal);
         if (open < 0)
         {
@@ -35,8 +46,13 @@ internal static class FtpPassiveReply
         }
 
         ReadOnlySpan<char> inside = lastLine.AsSpan(open + 1);
-        return StartsWithThreeDelimiters(inside)
-            && TryReadDelimitedPort(inside[3..], inside[0], out port);
+        if (!StartsWithThreeDelimitersAndDigit(inside))
+        {
+            return false;
+        }
+
+        failureMessage = FtpTransferMessages.IllegalEpsvPort;
+        return TryReadDelimitedPort(inside[3..], inside[0], out port);
     }
 
     /// <summary>
@@ -73,17 +89,21 @@ internal static class FtpPassiveReply
         return false;
     }
 
-    private static bool StartsWithThreeDelimiters(ReadOnlySpan<char> text) =>
-        text.Length >= 3 && text[1] == text[0] && text[2] == text[0];
+    private static bool StartsWithThreeDelimitersAndDigit(ReadOnlySpan<char> text) =>
+        text.Length >= 4 && text[1] == text[0] && text[2] == text[0] && char.IsAsciiDigit(text[3]);
 
+    /// <summary>
+    /// Reads the digits <paramref name="text" /> starts with as the port, which must be at
+    /// most 65535 and be followed by <paramref name="delimiter" />.
+    /// </summary>
     private static bool TryReadDelimitedPort(ReadOnlySpan<char> text, char delimiter, out int port)
     {
         port = 0;
-        int end = text.IndexOf(delimiter);
-        return end >= 0
-            && text[(end + 1)..].StartsWith(')')
-            && int.TryParse(text[..end], NumberStyles.None, CultureInfo.InvariantCulture, out port)
-            && port is >= 1 and <= 65535;
+        int digits = CountLeadingDigits(text);
+        return digits < text.Length
+            && text[digits] == delimiter
+            && int.TryParse(text[..digits], NumberStyles.None, CultureInfo.InvariantCulture, out port)
+            && port <= 65535;
     }
 
     private static bool TryReadPasvNumbers(ReadOnlySpan<char> text, Span<int> numbers)

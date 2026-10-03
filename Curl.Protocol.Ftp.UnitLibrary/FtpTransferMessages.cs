@@ -157,8 +157,17 @@ internal static class FtpTransferMessages
     /// <summary>The exit 9 message for a <c>CWD</c> the server refused.</summary>
     internal const string ChangeDirectoryDenied = "Server denied you to change to the given directory";
 
-    /// <summary>The exit 13 message for a <c>229</c> reply with no port curl can read.</summary>
+    /// <summary>
+    /// The exit 13 message for a <c>229</c> reply with no <c>(</c>, or whose <c>(</c> is not
+    /// followed by three repeats of one delimiter and a digit.
+    /// </summary>
     internal const string WeirdEpsvReply = "Weirdly formatted EPSV reply";
+
+    /// <summary>
+    /// The exit 13 message for a <c>229</c> reply whose port, after <c>(</c> and three
+    /// delimiters, is above 65535 or is not followed by the delimiter (BL-1240).
+    /// </summary>
+    internal const string IllegalEpsvPort = "Illegal port number in EPSV reply";
 
     /// <summary>The exit 14 message for a <c>227</c> reply with no port curl can read.</summary>
     internal const string Weird227Reply = "Could not interpret the 227-response";
