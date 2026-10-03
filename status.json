@@ -1,0 +1,91 @@
+{
+    "schema":  1,
+    "shift":  "20261003-061205",
+    "branch":  "work/dark-factory",
+    "state":  "running",
+    "publishedAt":  "2026-10-03T20:09:29Z",
+    "autoLanes":  null,
+    "lanes":  [
+                  {
+                      "lane":  1,
+                      "task":  null,
+                      "title":  null,
+                      "phase":  "wait",
+                      "step":  "No task is ready.",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-10-03T20:09:15Z"
+                  },
+                  {
+                      "lane":  2,
+                      "task":  "BL-1362",
+                      "title":  "Fix AF-0027: With --tls13-ciphers and -O/--remote-name-all on a URL without a file name, Curl prints the Schannel \u0027ignoring --tls13-ciphers\u0027 warning before \u0027No remote filename\u0027, curl prints them the other way round",
+                      "phase":  "run",
+                      "step":  "build",
+                      "taskStartedAt":  "2026-10-03T20:05:53Z",
+                      "heartbeatAt":  "2026-10-03T20:09:28Z"
+                  },
+                  {
+                      "lane":  3,
+                      "task":  null,
+                      "title":  null,
+                      "phase":  "wait",
+                      "step":  "No task is ready.",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-10-03T20:09:06Z"
+                  },
+                  {
+                      "lane":  4,
+                      "task":  null,
+                      "title":  null,
+                      "phase":  "wait",
+                      "step":  "No task is ready.",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-10-03T20:09:25Z"
+                  },
+                  {
+                      "lane":  5,
+                      "task":  null,
+                      "title":  null,
+                      "phase":  "wait",
+                      "step":  "No task is ready.",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-10-03T20:08:30Z"
+                  },
+                  {
+                      "lane":  6,
+                      "task":  null,
+                      "title":  null,
+                      "phase":  "wait",
+                      "step":  "No task is ready.",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-10-03T20:08:58Z"
+                  },
+                  {
+                      "lane":  7,
+                      "task":  "BL-1361",
+                      "title":  "Fix AF-0026: Five ECH tests in Curl.Networking.UnitTests fail on the unmutated tree, which blocks mutation testing of Curl.Networking.UnitLibrary",
+                      "phase":  "run",
+                      "step":  "test",
+                      "taskStartedAt":  "2026-10-03T20:05:42Z",
+                      "heartbeatAt":  "2026-10-03T20:09:16Z"
+                  },
+                  {
+                      "lane":  8,
+                      "task":  null,
+                      "title":  null,
+                      "phase":  "wait",
+                      "step":  "No task is ready.",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-10-03T20:08:52Z"
+                  },
+                  {
+                      "lane":  9,
+                      "task":  null,
+                      "title":  null,
+                      "phase":  "wait",
+                      "step":  "No task is ready.",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-10-03T20:08:41Z"
+                  }
+              ]
+}
