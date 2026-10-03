@@ -407,6 +407,7 @@ choices do not need one.
 | [0395](ADR-0395-aria-reads-its-s-boxes-by-masked-scan-and-is-constant-time.md) | `Aria`'s substitution layers read each of its four S-boxes by one masked scan of all 256 entries, so no address depends on the key or data, and it is constant-time; supersedes ADR-0147's S-box choice (BL-1269, AF-0013) | Accepted | 2026-10-02 |
 | [0396](ADR-0396-des-reads-its-s-boxes-by-masked-scan-and-is-constant-time.md) | `Des`'s round function reads each of its eight S-boxes by one masked scan of all 64 entries, so no address depends on the key or data, and it is constant-time; supersedes ADR-0156's table look-up (BL-1270, AF-0014) | Accepted | 2026-10-02 |
 | [0397](ADR-0397-the-windows-build-refuses-the-options-curls-schannel-build-lacks.md) | On Windows `--http2`, `--http2-prior-knowledge`, `--http3`, `--http3-only`, the six TLS-SRP options and `--ssl-sessions` are refused with exit 2 as curl's Schannel build refuses them; accepted elsewhere (BL-1278, AF-0022) | Accepted | 2026-10-02 |
+| [0398](ADR-0398-cast-128-reads-its-s-boxes-by-masked-scan-and-is-constant-time.md) | `Cast128`'s round function and key schedule read each 256-entry S-box by one masked scan, so no address depends on the key or data, and it is constant-time (BL-1271, AF-0015) | Accepted | 2026-10-02 |
 
 ## Template
 
