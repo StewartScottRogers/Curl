@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cryptography.UnitLibrary]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1270 — Fix AF-0014: DES round function indexes the S-boxes with key-dependent values (NTLM LMOWFv1 and DESL)
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Plan: replace the secret-indexed S-box read in `Des.Round` with `Des.SubstituteSix`, a masked scan of all 64 entries of the box (mask `((six ^ position) - 1) >> 31`), the pattern BL-1269 used for ARIA. Recorded as ADR-0396, superseding ADR-0156s table look-up.
+- `SubstituteSix` has no branches; existing FIPS and NTLM known-answer tests in Curl.Cryptography.UnitTests and Curl.Ntlm.UnitTests cover it, so no new test was needed (the test project is outside `touches`).
+- Reproduction now gives no match. Build clean; fast tests green (Curl.Cryptography.UnitTests 1330 passed).
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. DES reads its S-boxes by constant-time masked scan; AF-0014's reproduction no longer matches
