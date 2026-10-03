@@ -35,3 +35,4 @@ Under `-v --trace-config http/3` an HTTP/3 transfer also writes curl's QUIC conn
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
