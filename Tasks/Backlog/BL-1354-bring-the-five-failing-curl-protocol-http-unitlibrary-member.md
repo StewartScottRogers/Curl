@@ -1,5 +1,5 @@
 ---
-id: BL-1335
+id: BL-1354
 title: Bring the five failing Curl.Protocol.Http.UnitLibrary members back under the quality gates
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-03
 completed:
 ---
-# BL-1335 — Bring the five failing Curl.Protocol.Http.UnitLibrary members back under the quality gates
+# BL-1354 — Bring the five failing Curl.Protocol.Http.UnitLibrary members back under the quality gates
 
 ## Goal
 

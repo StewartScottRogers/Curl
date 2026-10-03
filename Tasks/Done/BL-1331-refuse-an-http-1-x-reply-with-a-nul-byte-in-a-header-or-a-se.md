@@ -41,7 +41,7 @@ An HTTP/1.x response header line holding a NUL byte fails the transfer with exit
 - Choice: the Location check uses the line's own value, not a folded one, so a `Location` folded over several lines is compared by its first line only. This edge case was not measured.
 - Choice: no test pins a NUL in a continuation line, because which earlier lines curl echoes there was not measured. The refusal itself covers that case.
 - Tests: `HttpProtocolHandlerTests.WeirdHeaderLine.cs` (6 cases). Http tests: 1765 passed, 4 skipped (platform).
-- Quality: `HttpResponseHeadBuilder` and `HttpTransferMessages` are clean. `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` still reports 5 failing members, all already failing before this task and in code it did not touch (`SettleConnection`, `ExchangeAsync`, `HttpResponseHeadReader..ctor`, `HttpRequestBodyWriter.ReportStreamRead`, `Http3StreamConnection..ctor`). They are filed as BL-1335 instead of widening this task, so the last criterion is ticked for this task's own members only.
+- Quality: `HttpResponseHeadBuilder` and `HttpTransferMessages` are clean. `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` still reports 5 failing members, all already failing before this task and in code it did not touch (`SettleConnection`, `ExchangeAsync`, `HttpResponseHeadReader..ctor`, `HttpRequestBodyWriter.ReportStreamRead`, `Http3StreamConnection..ctor`). They are filed as BL-1354 instead of widening this task, so the last criterion is ticked for this task's own members only.
 
 ## Log
 
