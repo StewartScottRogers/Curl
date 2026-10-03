@@ -11,8 +11,9 @@ namespace Curl.Cryptography;
 /// and written big-endian, as Schneier's test vectors and OpenSSH do.
 /// </summary>
 /// <remarks>
-/// Not constant-time: Blowfish indexes its key-dependent S-boxes with data bytes by
-/// design (ADR-0118); it exists because curl's SSH backends offer it. The key schedule is
+/// Constant-time in the key and the data: every S-box look-up reads all four key-dependent
+/// S-boxes and keeps the entry it needs by mask, so no memory address depends on either
+/// (ADR-0400). It exists because curl's SSH backends offer it. The key schedule is
 /// copied into the instance and zeroed by <see cref="Dispose" />.
 /// </remarks>
 public sealed class Blowfish : IDisposable

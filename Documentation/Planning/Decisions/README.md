@@ -409,6 +409,7 @@ choices do not need one.
 | [0397](ADR-0397-the-windows-build-refuses-the-options-curls-schannel-build-lacks.md) | On Windows `--http2`, `--http2-prior-knowledge`, `--http3`, `--http3-only`, the six TLS-SRP options and `--ssl-sessions` are refused with exit 2 as curl's Schannel build refuses them; accepted elsewhere (BL-1278, AF-0022) | Accepted | 2026-10-02 |
 | [0398](ADR-0398-cast-128-reads-its-s-boxes-by-masked-scan-and-is-constant-time.md) | `Cast128`'s round function and key schedule read each 256-entry S-box by one masked scan, so no address depends on the key or data, and it is constant-time (BL-1271, AF-0015) | Accepted | 2026-10-02 |
 | [0399](ADR-0399-rc4-swaps-and-reads-its-permutation-by-masked-scan-and-is-constant-time.md) | `Rc4` swaps and reads its permutation at the key-dependent index by one masked scan of all 256 entries, so no address depends on the key, and it is constant-time (BL-1272, AF-0016) | Accepted | 2026-10-02 |
+| [0400](ADR-0400-blowfish-reads-its-s-boxes-by-masked-scan-and-is-constant-time.md) | `Blowfish`'s F function reads all four S-boxes by one vectorised masked scan, so no address depends on the key, passphrase or data, and `Blowfish` and `BcryptPbkdf` are constant-time (BL-1273, AF-0017) | Accepted | 2026-10-02 |
 
 ## Template
 

@@ -53,10 +53,10 @@ Namespace `Curl.Cryptography`. It holds:
   bcrypt's salted one); `BcryptPbkdf` reuses it.
 - `Blowfish` (public, `IDisposable`): the block cipher, keys of 1 to 56 bytes -
   `EncryptBlock`, `DecryptBlock`, and the CBC mode of SSH's `blowfish-cbc`, `EncryptCbc`
-  and `DecryptCbc`. Not constant-time.
+  and `DecryptCbc`. Constant-time (ADR-0400).
 - `BcryptPbkdf` (public): OpenBSD's `bcrypt_pbkdf`, the KDF of encrypted
-  `openssh-key-v1` keys - `DeriveKey`, plus the internal bcrypt `ComputeHash`. Not
-  constant-time.
+  `openssh-key-v1` keys - `DeriveKey`, plus the internal bcrypt `ComputeHash`.
+  Constant-time (ADR-0400).
 - `Camellia` (public, `IDisposable`): RFC 3713, keys of 16, 24 or 32 bytes - `EncryptBlock`,
   `DecryptBlock`, and the CBC mode of TLS's Camellia suites (RFC 5932), `EncryptCbc` and
   `DecryptCbc`, plus the internal F, FL and FLINV functions. Not constant-time (ADR-0145).
@@ -270,9 +270,9 @@ Namespace `Curl.Cryptography`. It holds:
   secret: select and swap with masks (`ConstantTime`), fixed-width limbs, never `/`, `%`
   or `BigInteger` on a secret. Compare tags and MACs with
   `CryptographicOperations.FixedTimeEquals`. Each public type says in its XML docs
-  whether it is constant-time; Blowfish is not,
-  by design, and says so. Camellia (ADR-0393), ARIA (ADR-0395), DES (ADR-0396), CAST-128
-  (ADR-0398) and RC4 (ADR-0399) read their tables by masked scan and are.
+  whether it is constant-time. Camellia (ADR-0393), ARIA (ADR-0395), DES (ADR-0396),
+  CAST-128 (ADR-0398), RC4 (ADR-0399) and Blowfish (ADR-0400) read their tables by masked
+  scan and are.
 - **Zeroing.** Every secret, `stackalloc` temporaries and intermediate key material
   included, is cleared with `CryptographicOperations.ZeroMemory` in a `finally` block or
   in `Dispose`. Keyed types copy the key in their constructor, implement `IDisposable`,
