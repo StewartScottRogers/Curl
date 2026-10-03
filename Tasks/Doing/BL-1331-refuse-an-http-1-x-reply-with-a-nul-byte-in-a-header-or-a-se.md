@@ -40,3 +40,4 @@ An HTTP/1.x response header line holding a NUL byte fails the transfer with exit
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
