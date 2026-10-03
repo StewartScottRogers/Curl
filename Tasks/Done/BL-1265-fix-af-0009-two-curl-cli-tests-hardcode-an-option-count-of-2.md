@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1265 — Fix AF-0009: Two Curl.Cli tests hardcode an option count of 280 and fail against the 281 options in the table; the red baseline blocks mutation testing of Curl.Cli
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-02: No code change was needed. In this tree neither test holds a literal 280: `OptionTable_EveryRow_IsClassifiedAsGlobalOrPerGroupExactlyOnce` asserts `HasCount(CommandLineOptionTable.Rows.Count, ...)` and `EveryListedOption_IsParsedAndListedOnce` asserts `HasCount(parsed.Count, listed)`, both counting against the option table rather than a magic number, and each row check names the offending option. `git log -S "HasCount(280"` finds no commit that ever held the literal, so the audited tree most likely carried a planted defect or a local edit. The finding's reproduction gives Passed: 2; the full fast suite is green (Curl.Cli.UnitTests 3701 passed). The quality auditor's re-audit closes AF-0009.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. AF-0009 reproduction passes: both option-count tests count against the option table, no hardcoded 280
