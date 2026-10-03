@@ -43,3 +43,4 @@ Under `-v`, a transfer URL curl's parser rejects writes curl 8.21.0's info line 
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
