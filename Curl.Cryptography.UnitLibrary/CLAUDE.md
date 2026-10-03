@@ -128,7 +128,7 @@ Namespace `Curl.Cryptography`. It holds:
 - `Rc4` (public, `IDisposable`): the RC4 stream cipher, keys of 1 to 256 bytes -
   `ApplyKeyStream`, which keeps its place in the keystream between calls, and
   `DiscardKeyStream`, with `Rfc4345DiscardLength` (1536) for SSH's `arcfour128` and
-  `arcfour256`. Not constant-time.
+  `arcfour256`. Constant-time (ADR-0399).
 - `Des` (public, `IDisposable`): FIPS 46-3 DES, an 8-byte key whose parity bits are
   ignored and every weak key accepted (the BCL's `DES` refuses them; ADR-0156) -
   `EncryptBlock` and `DecryptBlock`, plus the internal round function `Round`. NTLM's
@@ -270,9 +270,9 @@ Namespace `Curl.Cryptography`. It holds:
   secret: select and swap with masks (`ConstantTime`), fixed-width limbs, never `/`, `%`
   or `BigInteger` on a secret. Compare tags and MACs with
   `CryptographicOperations.FixedTimeEquals`. Each public type says in its XML docs
-  whether it is constant-time; Blowfish and RC4 are not,
-  by design, and say so. Camellia (ADR-0393), ARIA (ADR-0395), DES (ADR-0396) and CAST-128
-  (ADR-0398) read their S-boxes by masked scan and are.
+  whether it is constant-time; Blowfish is not,
+  by design, and says so. Camellia (ADR-0393), ARIA (ADR-0395), DES (ADR-0396), CAST-128
+  (ADR-0398) and RC4 (ADR-0399) read their tables by masked scan and are.
 - **Zeroing.** Every secret, `stackalloc` temporaries and intermediate key material
   included, is cleared with `CryptographicOperations.ZeroMemory` in a `finally` block or
   in `Dispose`. Keyed types copy the key in their constructor, implement `IDisposable`,
