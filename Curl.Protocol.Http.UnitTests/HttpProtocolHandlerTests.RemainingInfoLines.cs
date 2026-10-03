@@ -138,12 +138,58 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ReusedConnectionResetByThePeer_ReportsTheReceiveFailureBeforeTheRetry()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_ReusedConnectionResetByThePeer_ReportsTheWinsockReceiveFailureBeforeTheRetry()
     {
         // curl -v on two URLs, the server closing after the first: "Recv failure: Connection
         // was reset" before "Connection died, retrying a fresh connect (retry count: 1)".
-        IOException reset = new("Connection reset.", new SocketException((int)SocketError.ConnectionReset));
-        ScriptedConnection dead = new([], 65536, failureAfterResponse: reset);
+        await AssertReusedConnectionResetReportsAsync(new SocketException((int)SocketError.ConnectionReset), "Recv failure: Connection was reset");
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_ReusedConnectionResetByThePeer_ReportsTheSocketErrorsOwnWordsBeforeTheRetry()
+    {
+        SocketException socketError = new((int)SocketError.ConnectionReset);
+
+        await AssertReusedConnectionResetReportsAsync(socketError, "Recv failure: " + socketError.Message);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_FreshConnectionResetByThePeer_ReportsTheWinsockReceiveFailureBeforeClosing()
+    {
+        await AssertFreshConnectionFailureReportsAsync(new SocketException((int)SocketError.ConnectionReset), "Recv failure: Connection was reset");
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_FreshConnectionResetByThePeer_ReportsTheSocketErrorsOwnWordsBeforeClosing()
+    {
+        SocketException socketError = new((int)SocketError.ConnectionReset);
+
+        await AssertFreshConnectionFailureReportsAsync(socketError, "Recv failure: " + socketError.Message);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_FreshConnectionAbortedUnderTheRead_ReportsTheWinsockReceiveFailureBeforeClosing()
+    {
+        await AssertFreshConnectionFailureReportsAsync(new SocketException((int)SocketError.ConnectionAborted), "Recv failure: Connection was aborted");
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_FreshConnectionAbortedUnderTheRead_ReportsTheSocketErrorsOwnWordsBeforeClosing()
+    {
+        SocketException socketError = new((int)SocketError.ConnectionAborted);
+
+        await AssertFreshConnectionFailureReportsAsync(socketError, "Recv failure: " + socketError.Message);
+    }
+
+    private static async Task AssertReusedConnectionResetReportsAsync(SocketException socketError, string expectedLine)
+    {
+        ScriptedConnection dead = new([], 65536, failureAfterResponse: new IOException("Connection reset.", socketError));
         RecordingTransferEvents events = new();
         QueueConnector connector = new(
             ConnectResult.Connected(dead, null, isReused: true),
@@ -153,22 +199,22 @@ public sealed partial class HttpProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
-            new[] { RequestSent, "Recv failure: Connection was reset", DiedRetrying, "shutting down connection #0", IssueAnother },
+            new[] { RequestSent, expectedLine, DiedRetrying, "shutting down connection #0", IssueAnother },
             events.Info.Take(5).ToArray());
     }
 
-    [TestMethod]
-    public async Task ExecuteAsync_FreshConnectionResetByThePeer_ReportsTheReceiveFailureBeforeClosing()
+    private static async Task AssertFreshConnectionFailureReportsAsync(SocketException socketError, string expectedLine)
     {
-        IOException reset = new("Connection reset.", new SocketException((int)SocketError.ConnectionReset));
+        IOException failure = new("Connection failed.", socketError);
         RecordingTransferEvents events = new();
 
-        TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection([], 65536, failureAfterResponse: reset)))
+        TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection([], 65536, failureAfterResponse: failure)))
             .ExecuteAsync(ReuseContext(events));
 
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual(expectedLine, result.ErrorMessage);
         CollectionAssert.AreEqual(
-            new[] { UsingHttp1, RequestSent, "Recv failure: Connection was reset", "closing connection #0" },
+            new[] { UsingHttp1, RequestSent, expectedLine, "closing connection #0" },
             events.Info.ToArray());
     }
 

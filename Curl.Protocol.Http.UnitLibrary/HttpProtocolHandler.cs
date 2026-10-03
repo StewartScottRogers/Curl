@@ -1427,14 +1427,14 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Reports a read the peer reset as the <c>-v</c> line curl 8.21.0 prints for it,
-    /// <c>Recv failure: Connection was reset</c>, before the connection's end is reported
-    /// (measured, BL-449 Notes), and an HTTP/3 stream the server refused as the line curl 8.21.0's
+    /// Reports a read a socket error failed as the <c>-v</c> line curl 8.21.0's <c>failf</c> prints
+    /// for it, such as <c>Recv failure: Connection was reset</c>, before the connection's end is
+    /// reported (measured, BL-449 Notes), and an HTTP/3 stream the server refused as the line curl 8.21.0's
     /// <c>cf-ngtcp2.c</c> prints for it (ADR-0187). Any other failure is left to the transfer's result.
     /// </summary>
     private static void ReportReceiveFailure(ITransferEvents events, HttpTransferException failure)
     {
-        if (failure.IsStreamRefused || failure.Message == HttpTransferMessages.ConnectionReset)
+        if (failure.IsStreamRefused || failure.Message.StartsWith(HttpTransferMessages.ReceiveFailurePrefix, StringComparison.Ordinal))
         {
             events.ReportInfo(failure.Message);
         }

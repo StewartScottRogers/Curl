@@ -114,11 +114,23 @@ public sealed class HttpResponseBodyReaderTests
     [TestMethod]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nhello", DisplayName = "Content-Length body")]
     [DataRow("HTTP/1.1 200 OK\r\n\r\nhello", DisplayName = "Read-to-close body")]
-    public async Task CopyAsync_PeerResetsMidBody_ThrowsExit56AfterWritingWhatArrived(string response)
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task CopyAsync_PeerResetsMidBody_ThrowsExit56WithTheWinsockWordsAfterWritingWhatArrived(string response)
     {
         IOException reset = new("Reset.", new SocketException((int)SocketError.ConnectionReset));
 
         await AssertReadFailsAsync(response, reset, "Recv failure: Connection was reset");
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nhello", DisplayName = "Content-Length body")]
+    [DataRow("HTTP/1.1 200 OK\r\n\r\nhello", DisplayName = "Read-to-close body")]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task CopyAsync_PeerResetsMidBody_ThrowsExit56WithTheSocketErrorsOwnWordsAfterWritingWhatArrived(string response)
+    {
+        SocketException socketError = new((int)SocketError.ConnectionReset);
+
+        await AssertReadFailsAsync(response, new IOException("Reset.", socketError), "Recv failure: " + socketError.Message);
     }
 
     [TestMethod]

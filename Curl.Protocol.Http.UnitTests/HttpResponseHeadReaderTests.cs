@@ -341,7 +341,8 @@ public sealed class HttpResponseHeadReaderTests
     [TestMethod]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Type: te", DisplayName = "Inside the headers")]
     [DataRow("", DisplayName = "Before the status line")]
-    public async Task ReadAsync_ConnectionResetWhileReadingTheHead_ReturnsRecvError(string response)
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ReadAsync_ConnectionResetWhileReadingTheHead_ReturnsRecvErrorWithTheWinsockWords(string response)
     {
         // Measured inside the headers: curl: (56) Recv failure: Connection was reset.
         await AssertFailsEveryWayAsync(
@@ -349,6 +350,21 @@ public sealed class HttpResponseHeadReaderTests
             CurlExitCode.RecvError,
             "Recv failure: Connection was reset",
             new IOException("reset", new SocketException((int)SocketError.ConnectionReset)));
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Type: te", DisplayName = "Inside the headers")]
+    [DataRow("", DisplayName = "Before the status line")]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ReadAsync_ConnectionResetWhileReadingTheHead_ReturnsRecvErrorWithTheSocketErrorsOwnWords(string response)
+    {
+        SocketException socketError = new((int)SocketError.ConnectionReset);
+
+        await AssertFailsEveryWayAsync(
+            response,
+            CurlExitCode.RecvError,
+            "Recv failure: " + socketError.Message,
+            new IOException("reset", socketError));
     }
 
     [TestMethod]
