@@ -29,6 +29,12 @@ namespace Curl.Protocol.Mqtt;
 /// or 0 for no limit. A PUBLISH whose remaining length is larger fails the transfer with exit 63
 /// before any of its body is read, as curl 8.21.0's <c>mqtt_doing</c> does (BL-1115).
 /// </param>
+/// <param name="noBody">
+/// Whether the transfer asked for no body (<c>-I</c>). The first PUBLISH body slice is then
+/// reported as data and, before anything is written, fails the transfer with exit 8
+/// <c>Weird server reply</c>, as curl 8.21.0's <c>cw_download_write</c> does (BL-1310). The
+/// <paramref name="maxFileSize" /> check still comes first; a publish is unaffected.
+/// </param>
 /// <param name="timeProvider">
 /// The clock the idle time before a PINGREQ is measured on and waited out with.
 /// </param>
@@ -70,6 +76,7 @@ internal sealed class MqttSession(
     ITransferEvents events,
     MqttDiagnosticLog log,
     long? maxFileSize,
+    bool noBody,
     TimeProvider timeProvider,
     CancellationToken cancellationToken)
 {
@@ -429,6 +436,11 @@ internal sealed class MqttSession(
     private async ValueTask WriteOutputSliceAsync(ReadOnlyMemory<byte> slice)
     {
         events.ReportDataReceived(slice.Span);
+        if (noBody)
+        {
+            throw new MqttTransferException(CurlExitCode.WeirdServerReply, MqttTransferMessages.WeirdServerReply);
+        }
+
         try
         {
             await output.WriteAsync(slice, cancellationToken).ConfigureAwait(false);

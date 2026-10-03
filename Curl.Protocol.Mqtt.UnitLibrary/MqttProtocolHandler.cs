@@ -34,7 +34,9 @@ namespace Curl.Protocol.Mqtt;
 /// subscribe usually ends. A PUBLISH whose remaining length is over
 /// <see cref="ITransferContext.MaxFileSize" /> is exit 63
 /// (<see cref="CurlExitCode.FilesizeExceeded" />) with none of it written; the limit applies
-/// to each PUBLISH on its own.
+/// to each PUBLISH on its own. Under <see cref="ITransferContext.NoBody" /> (<c>-I</c>) the
+/// first PUBLISH body is exit 8 (<see cref="CurlExitCode.WeirdServerReply" />) with nothing
+/// written, as curl 8.21.0 does (BL-1310).
 /// </para>
 /// <para>
 /// Either way, a refused CONNACK, any packet curl does not expect and a user name or
@@ -157,7 +159,7 @@ public sealed class MqttProtocolHandler : IProtocolHandler
         string? followingLine = null;
         await using (connection.ConfigureAwait(false))
         {
-            MqttSession session = new(connection, context.Output, context.Progress, context.Events, log, context.MaxFileSize, context.TimeProvider, context.CancellationToken);
+            MqttSession session = new(connection, context.Output, context.Progress, context.Events, log, context.MaxFileSize, context.NoBody, context.TimeProvider, context.CancellationToken);
             try
             {
                 await session
