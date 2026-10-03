@@ -32,3 +32,4 @@ Under `--trace-config tcp`, `network`, `all` and `-vvvv`, an `https://` transfer
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-03: Backlog -> Doing.
