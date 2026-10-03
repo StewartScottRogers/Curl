@@ -36,7 +36,9 @@ namespace Curl.Protocol.Rtsp;
 /// <c>CSeq</c> other than the one sent, or none, fails with 85,
 /// <c>The CSeq of this request 1 did not match the response &lt;received&gt;</c>, also when the
 /// server closed before the head ended. A connect failure is returned as the connector
-/// reported it.
+/// reported it. Under <c>--max-filesize</c> above 0, a <c>Content-Length</c> over the limit
+/// fails with 63, <c>Maximum file size exceeded</c>, after any <c>-f</c> refusal and before the
+/// head's blank line is reported or any body byte read, and the connection is closed (BL-1292).
 /// For <c>-v</c> and <c>--trace</c> (BL-593) the request is reported as one header event and
 /// <c>Request completely sent off</c>, the reply head one line at a time, the body as received
 /// data, each failure's message, and then what became of the connection. The connection is
@@ -251,7 +253,7 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
         events.ReportInfo(RtspVerboseLines.RequestSent);
         var log = new RtspTransferLog(context.DiagnosticLog);
         log.RequestSent(RtspMethod.Options.Name, sequenceNumber);
-        RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, events, context.CancellationToken, log).ConfigureAwait(false);
+        RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, events, context.CancellationToken, log, context.MaxFileSize).ConfigureAwait(false);
         log.ReplyRead(head, session.SessionId);
         TransferReport report = new()
         {
@@ -260,7 +262,7 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
             HeaderSize = head.Length,
             RequestSize = request.Length,
         };
-        if (StatusFailure(head, options, events) is { } statusFailure)
+        if (StatusFailure(head, options, context.MaxFileSize, events) is { } statusFailure)
         {
             return statusFailure with { Report = report };
         }
@@ -274,12 +276,13 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
     }
 
     /// <summary>
-    /// Fails a completed head whose status curl refuses: 400 or more under <c>-f</c> with 22,
-    /// below 100 with 1. Reports the head's blank line to <c>-v</c> as curl 8.21.0 does: after
-    /// the <c>-f</c> message, before the other one.
+    /// Fails a completed head curl refuses: a status of 400 or more under <c>-f</c> with 22, else
+    /// a <c>Content-Length</c> over a <c>--max-filesize</c> limit above 0 with 63 before any of the
+    /// body is read (BL-1292), else a status below 100 with 1. Reports the head's blank line to
+    /// <c>-v</c> as curl 8.21.0 does: after the first two messages, before the last.
     /// </summary>
-    /// <returns>The failure, or <see langword="null" /> when the status is accepted.</returns>
-    private static TransferResult? StatusFailure(RtspReplyHead head, HttpRequestOptions options, ITransferEvents events)
+    /// <returns>The failure, or <see langword="null" /> when the head is accepted.</returns>
+    private static TransferResult? StatusFailure(RtspReplyHead head, HttpRequestOptions options, long? maxFileSize, ITransferEvents events)
     {
         if (head.EndLine is not { } endLine)
         {
@@ -291,7 +294,7 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
                 events,
                 CurlExitCode.HttpReturnedError,
                 string.Create(CultureInfo.InvariantCulture, $"The requested URL returned error: {head.StatusCode}"))
-            : null;
+            : SizeFailure(head.ContentLength, maxFileSize, events);
         events.ReportResponseHeader(endLine);
         if (refused is not null)
         {
@@ -302,6 +305,13 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
             ? Fail(events, CurlExitCode.UnsupportedProtocol, UnsupportedResponseCode)
             : null;
     }
+
+    /// <summary>Fails a known <c>Content-Length</c> over a <c>--max-filesize</c> limit above 0 with 63.</summary>
+    /// <returns>The failure, or <see langword="null" /> when the length is within the limit or there is none.</returns>
+    private static TransferResult? SizeFailure(long contentLength, long? maxFileSize, ITransferEvents events) =>
+        maxFileSize > 0 && contentLength > maxFileSize
+            ? Fail(events, CurlExitCode.FilesizeExceeded, RtspReplyHeadParser.MaxFileSizeExceeded)
+            : null;
 
     private string? Authorization(ITransferContext context, HttpRequestOptions options) =>
         authenticator.CreateAuthorization(
