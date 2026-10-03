@@ -108,6 +108,16 @@ internal static class ImapSessionMessages
     internal static string OutputWriteFailed(int passed, int returned) =>
         string.Create(CultureInfo.InvariantCulture, $"Failure writing output to destination, passed {passed} returned {returned}");
 
+    /// <summary>
+    /// The body ran past <c>--max-filesize</c> (exit 63), as curl 8.21.0's
+    /// <c>cw_download_write</c> formats it (BL-1311).
+    /// </summary>
+    /// <param name="maxFileSize">The limit.</param>
+    /// <param name="written">The body bytes written before the transfer stopped.</param>
+    /// <returns>The message, such as <c>Exceeded the maximum allowed file size (3) with 3 bytes</c>.</returns>
+    internal static string MaxFileSizeExceeded(long maxFileSize, long written) =>
+        string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({maxFileSize}) with {written} bytes");
+
     /// <summary>The <c>-D</c> stream refused a response line (exit 23, BL-1138).</summary>
     /// <param name="passed">The length of the refused line, its line end included.</param>
     /// <returns>The message to report.</returns>

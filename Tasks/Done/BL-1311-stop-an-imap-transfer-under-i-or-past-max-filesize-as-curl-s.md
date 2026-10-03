@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests]
 requirement: FR-084
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1311 — Stop an IMAP transfer under -I or past --max-filesize as curl's download writer does
 
@@ -33,15 +33,36 @@ An `imap://` transfer honours `ITransferContext.NoBody` (`-I`) and `ITransferCon
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.Imap.UnitTests` drive each of the three `-I` cases above through the fake connection with `NoBody = true` and assert exit 8 (`CurlExitCode.WeirdServerReply`), message `Weird server reply`, nothing written to the output, the received-data event of the measured size still reported, no info line for the failure, the connection ending with `shutting down connection #0`, and the commands sent matching the measured transcript.
-- [ ] A test of the UID FETCH with `MaxFileSize = 3` asserts exit 63 (`CurlExitCode.FilesizeExceeded`), message `Exceeded the maximum allowed file size (3) with 3 bytes`, output `Fro`, the message as an info line before `shutting down connection #0`, and no `LOGOUT` sent.
-- [ ] A test of a LIST with a limit that falls inside the second LIST line asserts the first line written whole and the second cut.
-- [ ] Tests pin that `MaxFileSize` of 0, `null` and exactly the 100-byte message end with exit 0 and the whole body; an APPEND upload (`-T`) ignores both settings.
-- [ ] `dotnet build Curl.Protocol.Imap.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Imap.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Imap.UnitLibrary` reports no failing member.
+- [x] Tests in `Curl.Protocol.Imap.UnitTests` drive each of the three `-I` cases above through the fake connection with `NoBody = true` and assert exit 8 (`CurlExitCode.WeirdServerReply`), message `Weird server reply`, nothing written to the output, the received-data event of the measured size still reported, no info line for the failure, the connection ending with `shutting down connection #0`, and the commands sent matching the measured transcript.
+- [x] A test of the UID FETCH with `MaxFileSize = 3` asserts exit 63 (`CurlExitCode.FilesizeExceeded`), message `Exceeded the maximum allowed file size (3) with 3 bytes`, output `Fro`, the message as an info line before `shutting down connection #0`, and no `LOGOUT` sent.
+- [x] A test of a LIST with a limit that falls inside the second LIST line asserts the first line written whole and the second cut.
+- [x] Tests pin that `MaxFileSize` of 0, `null` and exactly the 100-byte message end with exit 0 and the whole body; an APPEND upload (`-T`) ignores both settings.
+- [x] `dotnet build Curl.Protocol.Imap.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Imap.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Imap.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Re-measured 2026-10-03 with `Record-CurlExchange.ps1 -Imap` (curl 8.21.0, Schannel):
+  the `-I` UID FETCH sends **no** `LOGOUT` (the transcript ends at `A004 UID FETCH`);
+  the `-I` LIST and SEARCH send `LOGOUT` after stopping, unseen under `-v`. A
+  `--max-filesize 40` LIST writes `* LIST (\HasNoChildren) "/" INBOX\r\n* LIS`, exit 63,
+  `LOGOUT` sent. So a listing's refused body logs out and a FETCH's does not.
+- Plan (pipeline `feature`, delivered directly - one class and its tests): `ImapSession`
+  routes every body write through a new `WriteBodyAsync`, which refuses under `NoBody`
+  (exit 8, nothing written) and cuts at `MaxFileSize` (exit 63, the allowed part
+  written, the count running across the listing's lines and literal, 0 meaning no
+  limit), setting the phase to `Performing` so the handler ends with `shutting down
+  connection #0`. `LogoutIfBodyRefusedAsync` sends `LOGOUT` for those two failures on
+  the listing path only. `ImapSessionMessages.MaxFileSizeExceeded` formats the message,
+  which `-v` writes; `Weird server reply` is already not written.
+- Choice: a listed literal (e.g. `-X "FETCH 1 BODY[]"`) cut at the limit follows the
+  listing (sends `LOGOUT`), as curl writes it from the same `listsearch` state; not
+  measured separately.
+- The tests run with no credentials, so `CAPABILITY` is followed directly by the command
+  curl sent after its `AUTHENTICATE PLAIN`; the commands are otherwise the measured ones.
+- Tests: `ImapProtocolHandlerBodyLimitTests` (10 cases).
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. IMAP stops under -I (exit 8, nothing written) and past --max-filesize (exit 63, allowed bytes written) as curl 8.21.0 does

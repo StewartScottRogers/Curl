@@ -55,6 +55,12 @@ namespace Curl.Protocol.Imap;
 /// <item>A <c>-T</c> upload, whatever the path's parameters or <c>-X</c> say, is appended to
 /// the mailbox as <see cref="ImapAppend" /> describes, then <c>LOGOUT</c> is sent whatever
 /// became of it (BL-557).</item>
+/// <item>The <c>FETCH</c> literal and the listed responses are body bytes, which meet
+/// <c>-I</c> and <c>--max-filesize</c> as curl 8.21.0's <c>cw_download_write</c> does
+/// (BL-1311): under <c>-I</c> the first of them is exit 8 <c>Weird server reply</c> with
+/// nothing written; past the limit the bytes left under it are written and the transfer is
+/// exit 63. Either ends with <c>shutting down connection</c>; a listing sends <c>LOGOUT</c>
+/// first and a <c>FETCH</c> does not (measured 2026-10-03).</item>
 /// </list>
 /// </remarks>
 internal sealed class ImapSession(
@@ -83,6 +89,9 @@ internal sealed class ImapSession(
     private bool preauthenticated;
 
     private IConnection? securedConnection;
+
+    /// <summary>The <c>--max-filesize</c> limit, or <see langword="null" /> for none (0 is none).</summary>
+    private readonly long? maxFileSize = context.MaxFileSize > 0 ? context.MaxFileSize : null;
 
     /// <summary>
     /// Gets how far the session got, which decides the line <c>-v</c> ends a failed transfer
@@ -555,9 +564,9 @@ internal sealed class ImapSession(
             long? literalSize = ReportedLiteralSizeOf(read.Untagged[0]);
             byte[] line = Encoding.Latin1.GetBytes(read.Untagged[0] + "\n");
             context.Events.ReportDataReceived(line);
-            if (await WriteOutputAsync(line, written).ConfigureAwait(false) is { } failure)
+            if (await WriteBodyAsync(line, written).ConfigureAwait(false) is { } failure)
             {
-                return failure;
+                return await LogoutIfBodyRefusedAsync(failure).ConfigureAwait(false);
             }
 
             written += line.Length;
@@ -590,8 +599,24 @@ internal sealed class ImapSession(
     private async ValueTask<TransferResult> CopyListedLiteralAsync(long size, long written)
     {
         Phase = ImapSessionPhase.Transferring;
-        return await CopyLiteralAsync(size, written, reportsProgress: false).ConfigureAwait(false)
-            ?? await LogoutAndSucceedAsync(written + size).ConfigureAwait(false);
+        return await CopyLiteralAsync(size, written, reportsProgress: false).ConfigureAwait(false) is { } failure
+            ? await LogoutIfBodyRefusedAsync(failure).ConfigureAwait(false)
+            : await LogoutAndSucceedAsync(written + size).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>LOGOUT</c> before returning <paramref name="failure" /> when it is a listing's
+    /// body refused under <c>-I</c> or cut at <c>--max-filesize</c>, as curl 8.21.0 does
+    /// (measured 2026-10-03); any other failure is returned as it is.
+    /// </summary>
+    private async ValueTask<TransferResult> LogoutIfBodyRefusedAsync(TransferResult failure)
+    {
+        if (failure.ExitCode is CurlExitCode.WeirdServerReply or CurlExitCode.FilesizeExceeded)
+        {
+            await LogoutAsync().ConfigureAwait(false);
+        }
+
+        return failure;
     }
 
     /// <summary>
@@ -672,7 +697,7 @@ internal sealed class ImapSession(
                 return TransferResult.Failure(CurlExitCode.PartialFile, ImapSessionMessages.LiteralCutShort(size - copied), writtenBefore + copied);
             }
 
-            if (await WriteOutputAsync(piece, writtenBefore + copied).ConfigureAwait(false) is { } failure)
+            if (await WriteBodyAsync(piece, writtenBefore + copied).ConfigureAwait(false) is { } failure)
             {
                 return failure;
             }
@@ -705,6 +730,37 @@ internal sealed class ImapSession(
     {
         await LogoutAsync().ConfigureAwait(false);
         return TransferResult.Success(bytesTransferred);
+    }
+
+    /// <summary>
+    /// Writes the body bytes <paramref name="piece" /> to the output, <paramref name="written" />
+    /// bytes already written, as curl 8.21.0's <c>cw_download_write</c> lets them through: under
+    /// <c>-I</c> nothing is written and the transfer is exit 8; past <c>--max-filesize</c> the
+    /// bytes left under it are written and the transfer is exit 63, a body exactly at the
+    /// limit passing. Either failure is reported as one while logged in (BL-1311).
+    /// </summary>
+    private async ValueTask<TransferResult?> WriteBodyAsync(ReadOnlyMemory<byte> piece, long written)
+    {
+        if (context.NoBody)
+        {
+            Phase = ImapSessionPhase.Performing;
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, ImapSessionMessages.WeirdServerReply, written);
+        }
+
+        int allowed = maxFileSize is { } max ? (int)Math.Min(piece.Length, max - written) : piece.Length;
+        if (await WriteOutputAsync(piece[..allowed], written).ConfigureAwait(false) is { } failure)
+        {
+            return failure;
+        }
+
+        if (allowed == piece.Length)
+        {
+            return null;
+        }
+
+        Phase = ImapSessionPhase.Performing;
+        return TransferResult.Failure(
+            CurlExitCode.FilesizeExceeded, ImapSessionMessages.MaxFileSizeExceeded(maxFileSize!.Value, written + allowed), written + allowed);
     }
 
     /// <summary>Writes <paramref name="piece" /> to the output; exit 23 when the output fails.</summary>
