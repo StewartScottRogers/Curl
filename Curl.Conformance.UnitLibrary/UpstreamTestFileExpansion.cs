@@ -36,8 +36,8 @@ public sealed class UpstreamTestFileExpansion
 
     /// <summary>
     /// Each instruction the harness does not carry out that a kept line uses, left as written:
-    /// <c>%days</c>, <c>%sha256b64file</c> or <c>%strippemfile</c>, and <c>%include</c> or
-    /// <c>%includetext</c> when the expansion was given no way to read files.
+    /// <c>%days</c>, and <c>%include</c>, <c>%includetext</c>, <c>%sha256b64file</c> or
+    /// <c>%strippemfile</c> when the expansion was given no way to read files.
     /// </summary>
     public IReadOnlyList<string> UnsupportedInstructions { get; }
 

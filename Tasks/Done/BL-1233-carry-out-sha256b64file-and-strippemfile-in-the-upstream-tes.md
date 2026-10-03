@@ -8,7 +8,7 @@ depends-on: [BL-1232]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1233 — Carry out %sha256b64file and %strippemfile in the upstream test-file expander
 
@@ -27,13 +27,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Neither marker is in `UnsupportedMarkers`; a case using them is no longer skipped for it.
-- [ ] Tests in `Curl.Conformance.UnitTests` with the in-memory file seam pin: `%sha256b64file[%LOGDIR/k.pub]sha256b64file%` (and the upper-case spelling) gives the base64 SHA-256 of the file's bytes; a `%2F` in the path is decoded before the read; `%strippemfile[...]strippemfile%` over a file with text before, between and after two PEM blocks gives exactly what `get_file_content`'s three steps give, worked out by hand in the test's comment, once with LF and once with CRLF line ends (note that `[\r\n]?` keeps only the `\r` of a CRLF after an END line, and the later CRLF-to-LF step leaves that lone `\r`); two markers on one line are both replaced.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] Neither marker is in `UnsupportedMarkers`; a case using them is no longer skipped for it.
+- [x] Tests in `Curl.Conformance.UnitTests` with the in-memory file seam pin: `%sha256b64file[%LOGDIR/k.pub]sha256b64file%` (and the upper-case spelling) gives the base64 SHA-256 of the file's bytes; a `%2F` in the path is decoded before the read; `%strippemfile[...]strippemfile%` over a file with text before, between and after two PEM blocks gives exactly what `get_file_content`'s three steps give, worked out by hand in the test's comment, once with LF and once with CRLF line ends (note that `[\r\n]?` keeps only the `\r` of a CRLF after an END line, and the later CRLF-to-LF step leaves that lone `\r`); two markers on one line are both replaced.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- New `UpstreamTestFileContentInstructions` carries out both markers after `%include`, through the same `readFile` delegate BL-1232 added; `UpstreamTestInstructions.ReplaceEach` and `DecodePercentPairs` became internal-public so it reuses them. `get_file_content`'s substitution runs as an interpreted `Regex` (Singleline; .NET's `$` matches before a final LF as Perl's does), the way `UpstreamRegex` already uses one.
+- Default taken: a file that cannot be read counts as empty (SHA-256 of no bytes; strippem gives nothing), matching how includes treat a missing file. Without a reader both markers are still listed as unsupported, like the includes.
+- Coverage: Curl.Conformance.UnitLibrary 100% line, 100% branch, worst CRAP 10.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. The upstream test-file expander carries out %sha256b64file and %strippemfile through its file reader

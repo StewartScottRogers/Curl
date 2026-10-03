@@ -22,11 +22,13 @@ parsing, the way `runtests.pl`'s `prepro` does: `UpstreamTestConditionalLines` r
 `UpstreamTestVariableSubstitution` replaces `%NAME` variables with the run's values, then
 `UpstreamTestFileInclusions` replaces `%includetext` (then the variables again),
 `UpstreamTestInstructions` replaces `%SP`-style character macros and `%b64[]b64%`,
-`%hex[]hex%` and `%repeat[]%`, and `UpstreamTestFileInclusions` replaces `%include`; both
-includes read files through the delegate the caller passes (`UpstreamCaseRunner` reads the
-disk). The resulting `UpstreamTestFileExpansion` lists upstream variables with no value and
-instructions it does not carry out (`%days`, `%sha256b64file`, `%strippemfile`, and the
-includes when given no reader), left as written so the case can be skipped with a reason;
+`%hex[]hex%` and `%repeat[]%`, `UpstreamTestFileInclusions` replaces `%include`, and
+`UpstreamTestFileContentInstructions` replaces `%sha256b64file[]sha256b64file%` (the base64
+SHA-256 of a file) and `%strippemfile[]strippemfile%` (a file's PEM blocks); all four read files
+through the delegate the caller passes (`UpstreamCaseRunner` reads the disk). The resulting
+`UpstreamTestFileExpansion` lists upstream variables with no value and instructions it does not
+carry out (`%days`, and the four file instructions when given no reader), left as written so the
+case can be skipped with a reason;
 `Parse()` hands it to the parser.
 It works on bytes, not on a parsed case, because a `%if` block can wrap whole parts.
 

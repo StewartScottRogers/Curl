@@ -9,7 +9,8 @@ namespace Curl.Conformance;
 /// its variables (<c>%HOSTIP</c>, <c>%TESTNUMBER</c>, …), its <c>%includetext</c> files (then its
 /// variables again, when it had one), its character macros (<c>%SP</c>, <c>%TAB</c>, <c>%CR</c>,
 /// <c>%LT</c>, <c>%GT</c>, <c>%AMP</c>), its <c>%b64[…]b64%</c>, <c>%hex[…]hex%</c> and
-/// <c>%repeat[…]%</c> instructions and its <c>%include</c> files replaced, in that order.
+/// <c>%repeat[…]%</c> instructions, its <c>%include</c> files, and its <c>%sha256b64file[…]sha256b64file%</c>
+/// and <c>%strippemfile[…]strippemfile%</c> instructions replaced, in that order.
 /// </summary>
 /// <remarks>
 /// It works on the file's bytes rather than on a parsed <see cref="UpstreamTestCase"/> because a
@@ -26,8 +27,9 @@ namespace Curl.Conformance;
 public static class UpstreamTestFileExpander
 {
     /// <summary>
-    /// Expands the bytes of one test file, leaving <c>%include</c> and <c>%includetext</c> as
-    /// written and listing them as unsupported, since it has no way to read the files they name.
+    /// Expands the bytes of one test file, leaving <c>%include</c>, <c>%includetext</c>,
+    /// <c>%sha256b64file</c> and <c>%strippemfile</c> as written and listing them as unsupported,
+    /// since it has no way to read the files they name.
     /// </summary>
     /// <param name="file">The whole test file, as written.</param>
     /// <param name="variables">
@@ -39,7 +41,10 @@ public static class UpstreamTestFileExpander
     public static UpstreamTestFileExpansion Expand(ReadOnlySpan<byte> file, IReadOnlyDictionary<string, string> variables, IReadOnlySet<string> features) =>
         Expand(file, variables, features, null);
 
-    /// <summary>Expands the bytes of one test file, reading the files <c>%include</c> and <c>%includetext</c> name.</summary>
+    /// <summary>
+    /// Expands the bytes of one test file, reading the files <c>%include</c>, <c>%includetext</c>,
+    /// <c>%sha256b64file</c> and <c>%strippemfile</c> name.
+    /// </summary>
     /// <param name="file">The whole test file, as written.</param>
     /// <param name="variables">
     /// The run's variable values, keyed by name without the <c>%</c>, such as <c>HOSTIP</c>
@@ -47,9 +52,9 @@ public static class UpstreamTestFileExpander
     /// </param>
     /// <param name="features">The features the run reports, such as <c>brotli</c> or <c>IPv6</c>; case-sensitive.</param>
     /// <param name="readFile">
-    /// Reads the file an include names, by its path after variable substitution, or returns
-    /// <see langword="null"/> when it cannot, so the include becomes nothing; <see langword="null"/>
-    /// leaves includes as written and lists them as unsupported.
+    /// Reads the file an instruction names, by its path after variable substitution, or returns
+    /// <see langword="null"/> when it cannot, so it counts as empty; <see langword="null"/>
+    /// leaves those instructions as written and lists them as unsupported.
     /// </param>
     /// <returns>The expanded file with the variables and instructions it could not resolve.</returns>
     public static UpstreamTestFileExpansion Expand(ReadOnlySpan<byte> file, IReadOnlyDictionary<string, string> variables, IReadOnlySet<string> features, Func<string, byte[]?>? readFile)
@@ -98,10 +103,11 @@ public static class UpstreamTestFileExpander
         if (readFile is null)
         {
             UpstreamTestFileInclusions.AddUnread(expanded, unsupportedInstructions);
+            UpstreamTestFileContentInstructions.AddUnread(expanded, unsupportedInstructions);
         }
         else
         {
-            expanded = UpstreamTestFileInclusions.ReplaceRawIncludes(expanded, readFile);
+            expanded = UpstreamTestFileContentInstructions.Replace(UpstreamTestFileInclusions.ReplaceRawIncludes(expanded, readFile), readFile);
         }
 
         UpstreamTestInstructions.AddUnsupported(expanded, unsupportedInstructions);
