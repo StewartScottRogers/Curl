@@ -62,7 +62,7 @@ Curl writes curl 8.21.0's `[SSL]` lines around an origin's TLS handshake and `[S
 - `--ai-help all` shows curl's general `--trace-config` text ("Details to log in trace/verbose output"), still true; no change.
 - ADR-0357 amended in place, as the criterion asks.
 - Tests: `TcpConnectorTests.SslFilterTrace` (8), `CurlCompositionSslTraceTests` (13 rows), `CurlCommandRunnerHttpsConnectTraceTests` (+4 rows); `CurlCommandRunnerTcpIoTraceTests` now sets the new `[SSL] query ALPN` lines aside. Networking 2947 passed, Console 2486 passed, solution build clean, all fast tests green.
-- `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 100% line, 100% branch, 0 failing, worst CRAP 10 (after moving `WriteSslQueryAlpnLines` out of `SecureWhenAskedAsync`). `-Library Curl.Console`: 100% line, 99.06% branch, 11 failing members, none of them changed here (`TracesSsl` and `TracesSslProxy` pass); they were already below the gates, so they are filed as BL-1322 rather than widening this task.
+- `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 100% line, 100% branch, 0 failing, worst CRAP 10 (after moving `WriteSslQueryAlpnLines` out of `SecureWhenAskedAsync`). `-Library Curl.Console`: 100% line, 99.06% branch, 11 failing members, none of them changed here (`TracesSsl` and `TracesSslProxy` pass); they were already below the gates, so they are filed as BL-1356 rather than widening this task.
 
 ## Log
 

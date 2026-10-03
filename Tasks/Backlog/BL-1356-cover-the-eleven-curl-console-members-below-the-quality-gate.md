@@ -1,5 +1,5 @@
 ---
-id: BL-1322
+id: BL-1356
 title: Cover the eleven Curl.Console members below the quality gates
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-03
 completed:
 ---
-# BL-1322 — Cover the eleven Curl.Console members below the quality gates
+# BL-1356 — Cover the eleven Curl.Console members below the quality gates
 
 ## Goal
 
