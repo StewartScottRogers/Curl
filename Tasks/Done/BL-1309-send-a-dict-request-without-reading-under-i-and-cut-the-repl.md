@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Dict.UnitLibrary, Curl.Protocol.Dict.UnitTests]
 requirement: FR-084
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1309 — Send a dict request without reading under -I, and cut the reply at --max-filesize with exit 63
 
@@ -29,15 +29,21 @@ A `dict://` transfer honours `ITransferContext.NoBody` (`-I`) and `ITransferCont
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Dict.UnitTests` runs a `d:hello` transfer with `NoBody = true` and asserts exit 0, the full request written, no read made afterwards (the fake connection records reads), nothing written to the output, and the info lines ending `shutting down connection #0`.
-- [ ] A test with `MaxFileSize = 3` and the measured reply asserts exit 63 (`CurlExitCode.FilesizeExceeded`), message `Exceeded the maximum allowed file size (3) with 3 bytes`, output `220`, and the info lines ending with that message then `closing connection #0`.
-- [ ] A test delivering the reply in two reads with a limit that falls inside the second asserts the first read written whole and the second cut, with the message's two numbers both the limit.
-- [ ] Tests pin that `MaxFileSize` of 0, `null` and exactly the reply's length end with exit 0 and the whole reply.
-- [ ] `dotnet build Curl.Protocol.Dict.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Dict.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Dict.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Dict.UnitTests` runs a `d:hello` transfer with `NoBody = true` and asserts exit 0, the full request written, no read made afterwards (the fake connection records reads), nothing written to the output, and the info lines ending `shutting down connection #0`.
+- [x] A test with `MaxFileSize = 3` and the measured reply asserts exit 63 (`CurlExitCode.FilesizeExceeded`), message `Exceeded the maximum allowed file size (3) with 3 bytes`, output `220`, and the info lines ending with that message then `closing connection #0`.
+- [x] A test delivering the reply in two reads with a limit that falls inside the second asserts the first read written whole and the second cut, with the message's two numbers both the limit.
+- [x] Tests pin that `MaxFileSize` of 0, `null` and exactly the reply's length end with exit 0 and the whole reply.
+- [x] `dotnet build Curl.Protocol.Dict.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Dict.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Dict.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Done directly rather than through the full /feature fan-out: a two-branch change in one handler, modelled on the Telnet handler's AllowedBytes/FileSizeExceeded (BL-1309).
+- `-I` returns exit 0 right after the request is sent and logged, so no zero-byte receive is reported, matching the measured -v lines (no `{ [0 bytes data]`).
+- The limit counts across reads; a read arriving with the limit already reached writes nothing and fails with exit 63, the message's count being the limit, as `cw_download_write` does.
+- New tests: `DictProtocolHandlerBodyLimitTests`; `ScriptedConnection` gained `ReadCount`. Dict tests 83 passed; Measure-CodeQuality reports 0 failing members.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. dict:// sends without reading under -I and cuts the reply at --max-filesize with exit 63

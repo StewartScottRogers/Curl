@@ -32,7 +32,12 @@ namespace Curl.Protocol.Dict;
 /// all returned rather than thrown, with the texts of <see cref="DictIoFailures" />; such a
 /// transfer reports its message (unless it is curl's fallback text), <c>Failed sending DICT
 /// request</c> after a failed send, and <c>closing connection #N</c> (BL-1125). Cancellation
-/// still leaves as an exception.
+/// still leaves as an exception. Under <see cref="ITransferContext.NoBody" /> (<c>-I</c>) the
+/// request is sent and the transfer ends with exit 0 without reading the reply; past
+/// <see cref="ITransferContext.MaxFileSize" /> the read is cut to the bytes left under the
+/// limit, they are written, and the transfer ends with exit 63
+/// (<see cref="CurlExitCode.FilesizeExceeded" />) and <c>Exceeded the maximum allowed file
+/// size (N) with N bytes</c>, as curl 8.21.0's <c>cw_download_write</c> does (BL-1309).
 /// </remarks>
 public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
 {
@@ -154,12 +159,18 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
 
         context.Events.ReportDataSent(request);
         log.CommandSent(request);
+        if (context.NoBody)
+        {
+            return TransferResult.Success(0);
+        }
+
         return await CopyReplyAsync(connection, context).ConfigureAwait(false);
     }
 
     private static async Task<TransferResult> CopyReplyAsync(IConnection connection, ITransferContext context)
     {
         var buffer = new byte[BufferSize];
+        long? limit = context.MaxFileSize is > 0 ? context.MaxFileSize : null;
         long bytesWritten = 0;
         while (true)
         {
@@ -179,17 +190,40 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
                 return TransferResult.Success(bytesWritten);
             }
 
+            int allowed = AllowedBytes(limit, bytesWritten, read);
             try
             {
-                await context.Output.WriteAsync(buffer.AsMemory(0, read), context.CancellationToken).ConfigureAwait(false);
+                await context.Output.WriteAsync(buffer.AsMemory(0, allowed), context.CancellationToken).ConfigureAwait(false);
             }
             catch (IOException exception)
             {
-                return DictIoFailures.WriteFailed(bytesWritten, read, exception);
+                return DictIoFailures.WriteFailed(bytesWritten, allowed, exception);
             }
 
-            bytesWritten += read;
+            bytesWritten += allowed;
             context.Progress.ReportDownloaded(bytesWritten, null);
+            if (allowed < read)
+            {
+                return FileSizeExceeded(limit!.Value, bytesWritten);
+            }
         }
     }
+
+    /// <summary>
+    /// How many of a read's <paramref name="count" /> bytes fit under <c>--max-filesize</c>
+    /// <paramref name="limit" /> (<see langword="null" /> for none) after
+    /// <paramref name="bytesWritten" />, as curl 8.21.0's <c>cw_download_write</c> cuts a write.
+    /// </summary>
+    private static int AllowedBytes(long? limit, long bytesWritten, int count) =>
+        limit is { } max ? (int)Math.Clamp(max - bytesWritten, 0, count) : count;
+
+    /// <summary>
+    /// Makes the exit 63 result curl 8.21.0's <c>cw_download_write</c> fails with once a
+    /// write was cut at <c>--max-filesize</c> <paramref name="limit" />.
+    /// </summary>
+    private static TransferResult FileSizeExceeded(long limit, long bytesWritten) =>
+        new(
+            CurlExitCode.FilesizeExceeded,
+            bytesWritten,
+            string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({limit}) with {bytesWritten} bytes"));
 }
