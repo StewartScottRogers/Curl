@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Cr
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Mutation run on Curl.Cryptography.UnitLibrary with seed 0 and 40 mutants: 34 killed, 2 timed out, 4 survived, score 0.9. No mutant was sampled at BrainpoolPoint.cs:161 (the || check is still in the source). The only Brainpool mutants sampled (BrainpoolPoint.cs:163 and others) were killed. Survivors were in SortingNetwork.cs, MlDsaPolynomial.cs, MontgomeryModulus.cs and AeadAesCcm.cs. The site was not sampled, so the finding is neither confirmed nor shown fixed.
+
 ## Log
 
 - 2026-10-02: filed proposed.

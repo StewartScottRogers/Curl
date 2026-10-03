@@ -3,15 +3,15 @@ id: AF-0012
 title: Camellia's F-function indexes the S-boxes with key-mixed data (TLS Camellia suites)
 auditor: security
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-03_0623.md: the reproduction no longer reproduces.
 key: security:Curl.Cryptography.UnitLibrary/Camellia.cs:F:secret-dependent-lookup
 task: BL-1268
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
-closed:
-closed-by:
+closed: 2026-10-03
+closed-by: 2026-10-03_0623.md
 ---
 # AF-0012 - Camellia's F-function indexes the S-boxes with key-mixed data (TLS Camellia suites)
 
@@ -38,7 +38,10 @@ Select-String -Path Curl.Cryptography.UnitLibrary/Camellia.cs -Pattern 'box\[\(i
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Select-String -Path Curl.Cryptography.UnitLibrary/Camellia.cs -Pattern 'box\[\(int\)\(x >> 56\)\]' found no match. Camellia.SubstituteBytes (Camellia.cs:335-350) now reads all 256 SBOX1 entries in order and keeps each by a branch-free per-byte equality mask; no address depends on the key-mixed bytes.
+
 ## Log
 
 - 2026-10-02: filed proposed.
 - 2026-10-02: proposed -> accepted.
+- 2026-10-03: accepted -> closed. Re-audit 2026-10-03_0623.md: the reproduction no longer reproduces.

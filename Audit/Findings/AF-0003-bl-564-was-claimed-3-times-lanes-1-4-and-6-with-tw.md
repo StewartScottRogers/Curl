@@ -39,6 +39,7 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 ## Re-audits
 
 - 2026-10-02 | 2026-10-02_1400.md | reproduces: no | Ran the measure tool and the Select-String. BL-564 is not among the 244 tasks and ..\logs has no BL-564-* files, so Select-String finds nothing.
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction. The log folder holds 271 files, all from 2026-10-02 onward, and none are BL-564 logs. Select-String over BL-564-*.jsonl matched nothing. This is missing log data, not proof of a fix. The tool now reports tasksClaimedMoreThanOnce=5 (BL-1223, BL-1274, BL-1289, BL-1288, BL-1259), none of them BL-564.
 
 ## Log
 

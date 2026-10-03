@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: yes | The Networking mutation run stopped on a red baseline (5 failing ECH tests) and ran no mutants, so killing the mutant is not shown. DnsAnswerDecoder.cs:319 still reads 'if (position + length > message.Length)'.
+
 ## Log
 
 - 2026-10-02: filed proposed.

@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: yes | Same red baseline, no mutants run. HttpProxyTunnel.cs:170 still reads 'if (header.Count > MaximumHeaderBytes)'. A fix is not shown.
+
 ## Log
 
 - 2026-10-02: filed proposed.

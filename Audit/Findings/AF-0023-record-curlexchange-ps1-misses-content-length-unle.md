@@ -38,6 +38,8 @@ $h = "POST / HTTP/1.1`r`nContent-Length: 3`r`nContent-Type: x"; [regex]::Match($
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: no | The reproduction as written errors with 'Cannot index into a null array', because its -Pattern is double-quoted and PowerShell expands $headers to an empty string, so it can be run but cannot give either result. Rerun with the same pattern single-quoted ('Match\(\$headers, ''(.+)''\)'), it returns True. Record-CurlExchange.ps1:714 now uses '(?im)^Content-Length:[ \t]*(\d+)[ \t]*\r?$', which matches a Content-Length header that is not the last header.
+
 ## Log
 
 - 2026-10-02: filed proposed.
