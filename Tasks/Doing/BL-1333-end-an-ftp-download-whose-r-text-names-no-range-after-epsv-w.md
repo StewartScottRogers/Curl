@@ -36,3 +36,4 @@ When an `ftp://` download is handed `-r` text that names no range (`ITransferCon
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
