@@ -46,6 +46,20 @@ public sealed class AwsSigV4HttpAuthenticatorTests
     }
 
     [TestMethod]
+    public void CreateAuthorization_ServiceAndRegionFromTheHost_ReportsThePickedLinesBeforeTheStringToSign()
+    {
+        RecordingEvents events = new();
+        HttpAuthRequest request = SignedRequest() with { Url = CurlUrl.Parse("http://s3.eu-west-1.localhost:18644/"), Events = events };
+        request = request with { AwsSigV4 = request.AwsSigV4! with { Parameter = "aws:amz" } };
+
+        Authenticator().CreateAuthorization(request, []);
+
+        Assert.AreEqual("aws_sigv4: picked service s3 from host", events.Lines[0]);
+        Assert.AreEqual("aws_sigv4: picked region eu-west-1 from host", events.Lines[1]);
+        StringAssert.StartsWith(events.Lines[2], "aws_sigv4: String to sign (enclosed in []) - [", StringComparison.Ordinal);
+    }
+
+    [TestMethod]
     public void CreateAuthorization_AwsSigV4_SignsAsTheAsynchronousCallDoes()
     {
         string? value = Authenticator().CreateAuthorization(SignedRequest(), []);

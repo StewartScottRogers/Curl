@@ -8,7 +8,7 @@ depends-on: [BL-1227]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1244 — Print curl's 'aws_sigv4: picked service/region from host' -v lines before the String to sign line
 
@@ -25,14 +25,19 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Console.UnitTests` pins the two picked lines, in order, before the `String to sign` line for `aws:amz` and host `s3.eu-west-1.localhost`.
-- [ ] A test pins that `aws:amz:us-east-1:s3` writes no picked line.
-- [ ] Without `-v` no picked line is written.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member.
+- [x] A test in `Curl.Console.UnitTests` pins the two picked lines, in order, before the `String to sign` line for `aws:amz` and host `s3.eu-west-1.localhost`.
+- [x] A test pins that `aws:amz:us-east-1:s3` writes no picked line.
+- [x] Without `-v` no picked line is written.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member.
 
 ## Notes
+
+- `AwsSigV4HttpAuthenticator.Sign` reports each `PickedFromHostLines` entry as an informational line before the string to sign. A custom `Authorization` header or a failed signing carries no picked lines, so nothing extra is printed there, as in curl, which returns before parsing the host.
+- Tests: `AwsSigV4HttpAuthenticatorTests.CreateAuthorization_ServiceAndRegionFromTheHost_ReportsThePickedLinesBeforeTheStringToSign` and three end-to-end `CurlCompositionAwsSigV4Tests` (`-v aws:amz`, `-v aws:amz:us-east-1:s3`, and `aws:amz` without `-v`).
+- `Measure-CodeQuality.ps1 -Library Curl.Console`: 100% line and branch coverage; the one failing member, `CurlCommandRunner.TransferUrlAsync` (complexity 12), was already failing before this task, is in a file it does not touch, and is filed as BL-1247.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. curl -v --aws-sigv4 prints the 'aws_sigv4: picked service/region from host' lines before the String to sign line

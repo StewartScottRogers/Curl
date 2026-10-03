@@ -158,6 +158,51 @@ public sealed class CurlCompositionAwsSigV4Tests
     }
 
     /// <summary>
+    /// Measured 2026-10-02 (BL-1244): <c>-v --aws-sigv4 aws:amz</c> against
+    /// <c>s3.eu-west-1.localhost</c> prints the service and region it picked from the host
+    /// after <c>using HTTP/1.x</c> and before the string to sign.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_AwsSigV4VerboseRegionAndServiceFromHost_PrintsThePickedLinesBeforeTheStringToSign()
+    {
+        ScriptedConnector server = new([Latin1(Ok)]);
+
+        (int exitCode, string standardError) = await RunAsync(server, MeasuredForBl629, "-v", "--aws-sigv4", "aws:amz", "http://s3.eu-west-1.localhost:18644/");
+
+        Assert.AreEqual(0, exitCode, standardError);
+        StringAssert.Contains(
+            standardError.Replace("\r\n", "\n", StringComparison.Ordinal),
+            "* using HTTP/1.x\n"
+            + "* aws_sigv4: picked service s3 from host\n"
+            + "* aws_sigv4: picked region eu-west-1 from host\n"
+            + "* aws_sigv4: String to sign (enclosed in []) - [AWS4-HMAC-SHA256\n",
+            StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_AwsSigV4VerboseRegionAndServiceInTheParameter_PrintsNoPickedLine()
+    {
+        ScriptedConnector server = new([Latin1(Ok)]);
+
+        (int exitCode, string standardError) = await RunAsync(server, MeasuredForBl629, "-v", "--aws-sigv4", "aws:amz:us-east-1:s3", "http://s3.eu-west-1.localhost:18644/");
+
+        Assert.AreEqual(0, exitCode, standardError);
+        Assert.DoesNotContain("picked", standardError, StringComparison.Ordinal);
+        StringAssert.Contains(standardError, "* aws_sigv4: String to sign", StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_AwsSigV4RegionAndServiceFromHostWithoutVerbose_PrintsNoPickedLine()
+    {
+        ScriptedConnector server = new([Latin1(Ok)]);
+
+        (int exitCode, string standardError) = await RunAsync(server, MeasuredForBl629, "--aws-sigv4", "aws:amz", "http://s3.eu-west-1.localhost:18644/");
+
+        Assert.AreEqual(0, exitCode, standardError);
+        Assert.AreEqual(string.Empty, standardError);
+    }
+
+    /// <summary>
     /// <c>--aws-sigv4 aws</c> against <c>localhost</c> names no service: curl 8.21.0 connects,
     /// sends nothing and fails with exit 3 (measured, BL-629 Notes).
     /// </summary>
