@@ -3,8 +3,8 @@ id: AF-0035
 title: AES-CCM length-field check `lengthFieldSize < sizeof(int)` can become `<=` with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Cryptography.UnitLibrary/AeadAesCcm.cs:RequireMessageLength:surviving-mutant
 task: none
 found: 2026-10-03
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Cr
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.
