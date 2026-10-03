@@ -42,3 +42,4 @@ An `smb://`/`smbs://` download honours `ITransferContext.NoBody` (`-I`) and `ITr
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1296-20261002-211047-L4.jsonl
 - 2026-10-03: Blocked -> Backlog. Requeued: the timeout was Measure-CodeQuality running the whole solution (fixed in BL-1318); Notes say how to restore the stashed work
+- 2026-10-03: Backlog -> Doing.
