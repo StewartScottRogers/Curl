@@ -46,3 +46,4 @@ When the Schannel build's handshake fails with `schannel: failed to receive hand
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
