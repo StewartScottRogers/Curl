@@ -31,3 +31,4 @@ Every member of `Curl.Console` meets the quality gates: `Measure-CodeQuality.ps1
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
