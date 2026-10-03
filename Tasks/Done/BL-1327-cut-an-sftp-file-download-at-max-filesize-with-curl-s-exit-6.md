@@ -38,8 +38,8 @@ An `sftp://` file download honours `ITransferContext.MaxFileSize` as curl 8.21.0
 - `SftpFileDownload.DownloadAsync` takes an optional `maxFileSize`; `Copy` writes `min(read, limit - received)` bytes, reports progress for what it wrote, and on a cut returns exit 63 with the `failf` text. The handler's existing `ReportReturnedFailure` turns that into the `-v` info line, so no new event wiring was needed.
 - Teardown on the cut, pinned in `SshProtocolHandlerTests.MaxFileSize.cs`: `sftp 16 .`, `OPEN`, `STAT`, `READ`, `CLOSE`, then channel EOF, CLOSE and DISCONNECT 11, the same as any other failed copy.
 - With unknown size and a cut in the second 30000-byte read, the read-ahead had topped up one more read, so `CLOSE` goes out with request id 18.
-- Tests: 1633 passed in `Curl.Protocol.Ssh.UnitTests` (8 new cases). Measure-CodeQuality, 2026-10-03 09:32: every member this task changed passes. It reported 2 failing members this task did not touch and added no branch to: `SshProtocolHandler..ctor` (line 81, branch 75%) and `HandshakeAndTransferAsync` (line 255, branch 66.67%). Filed as BL-1335 rather than widening this task.
-- The remark on `ITransferContext.MaxFileSize` still lists `sftp` as not reading it; the file is outside this task's `touches`, so the fix is filed as BL-1336.
+- Tests: 1633 passed in `Curl.Protocol.Ssh.UnitTests` (8 new cases). Measure-CodeQuality, 2026-10-03 09:32: every member this task changed passes. It reported 2 failing members this task did not touch and added no branch to: `SshProtocolHandler..ctor` (line 81, branch 75%) and `HandshakeAndTransferAsync` (line 255, branch 66.67%). Filed as BL-1357 rather than widening this task.
+- The remark on `ITransferContext.MaxFileSize` still lists `sftp` as not reading it; the file is outside this task's `touches`, so the fix is filed as BL-1358.
 
 ## Log
 

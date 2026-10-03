@@ -1,5 +1,5 @@
 ---
-id: BL-1336
+id: BL-1358
 title: Drop sftp from ITransferContext.MaxFileSize's list of handlers that do not read it yet
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-03
 completed:
 ---
-# BL-1336 — Drop sftp from ITransferContext.MaxFileSize's list of handlers that do not read it yet
+# BL-1358 — Drop sftp from ITransferContext.MaxFileSize's list of handlers that do not read it yet
 
 ## Goal
 

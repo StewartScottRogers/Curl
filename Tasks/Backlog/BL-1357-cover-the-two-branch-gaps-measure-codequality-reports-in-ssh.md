@@ -1,5 +1,5 @@
 ---
-id: BL-1335
+id: BL-1357
 title: Cover the two branch gaps Measure-CodeQuality reports in SshProtocolHandler's constructor and HandshakeAndTransferAsync
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-03
 completed:
 ---
-# BL-1335 — Cover the two branch gaps Measure-CodeQuality reports in SshProtocolHandler's constructor and HandshakeAndTransferAsync
+# BL-1357 — Cover the two branch gaps Measure-CodeQuality reports in SshProtocolHandler's constructor and HandshakeAndTransferAsync
 
 ## Goal
 
