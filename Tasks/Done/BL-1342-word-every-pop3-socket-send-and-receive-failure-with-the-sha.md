@@ -8,7 +8,7 @@ depends-on: [BL-1325]
 touches: [Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests]
 requirement: FR-085
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1342 — Word every pop3 socket send failure with the shared CurlSocketErrorText table
 
@@ -25,14 +25,17 @@ A `pop3://` command send that fails with any socket error ends with curl 8.21.0'
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Pop3.UnitTests` makes a command send throw `IOException` wrapping `SocketException(SocketError.ConnectionAborted)` and asserts exit 55 (`CurlExitCode.SendError`) with `Send failure: Connection was aborted` (Windows-only), plus a non-Windows twin with `Send failure: ` + the exception's own message.
-- [ ] Every existing reset test is split by platform; an `IOException` with no socket error still gives `Failed sending data to the peer`.
-- [ ] `Pop3SessionMessages` no longer declares its own `Connection was reset` constant.
-- [ ] `dotnet build Curl.Protocol.Pop3.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Pop3.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Pop3.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Pop3.UnitTests` makes a command send throw `IOException` wrapping `SocketException(SocketError.ConnectionAborted)` and asserts exit 55 (`CurlExitCode.SendError`) with `Send failure: Connection was aborted` (Windows-only), plus a non-Windows twin with `Send failure: ` + the exception's own message.
+- [x] Every existing reset test is split by platform; an `IOException` with no socket error still gives `Failed sending data to the peer`.
+- [x] `Pop3SessionMessages` no longer declares its own `Connection was reset` constant.
+- [x] `dotnet build Curl.Protocol.Pop3.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Pop3.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Pop3.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Done directly rather than through the full /feature stages: a one-line production change (`CurlSocketErrorText.SendFailure(failure) ?? SendFailed`) whose shape the task pinned. `SendConnectionReset` removed from `Pop3SessionMessages`. Reset tests split into Windows (`Connection was reset`) and non-Windows (`Send failure: ` + `SocketException.Message`) twins; aborted tests added for both. Pop3 tests: 310 passed, 5 skipped (non-Windows twins) on Windows; Measure-CodeQuality reports 0 failing members.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. pop3 command send failures now say Send failure: <CurlSocketErrorText words> (exit 55) for every socket error
