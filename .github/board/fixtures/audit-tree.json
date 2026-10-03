@@ -12,7 +12,9 @@
     { "path": "Audit/Findings/AF-0005-retry-delay-ignores-retry-after.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee15", "size": 900 },
     { "path": "Audit/Findings/AF-0006-ftp-list-line-differs.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee16", "size": 900 },
     { "path": "Audit/Findings/AF-0007-lane-idle-on-empty-queue.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee17", "size": 900 },
-    { "path": "Audit/Findings/AF-0008-missing-text.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee18", "size": 900 }
+    { "path": "Audit/Findings/AF-0008-missing-text.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee18", "size": 900 },
+    { "path": "Audit/Findings/AF-0009-released-finding.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee19", "size": 500 },
+    { "path": "Audit/Findings/AF-0010-approved-waiting-for-release.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1a", "size": 500 }
   ],
   "truncated": false
 }

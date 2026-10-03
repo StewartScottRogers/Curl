@@ -56,6 +56,16 @@
   shows the steps at any time. Saving a token, and each page load with one saved, costs
   one GET of the repository (the URL above ?contents= in a local preview) to learn this.
 
+  Releasing findings (BL-1249): with a token that also has Actions: read and write, the tab
+  shows "Release approved findings (N)", N being the approved findings whose task: is none,
+  and each such Approved card a "Release" button. Either sends one POST to
+  /repos/<repo>/actions/workflows/release-approved-findings.yml/dispatches (ref master,
+  input findings: the card's ID, or empty for all), which runs
+  Audit/Tools/New-TasksFromAcceptedFindings.ps1 in GitHub Actions. The page then says
+  "Releasing… (run)", and "Released as BL-####" once a refresh reads the finding's task:
+  line naming its task. A 404 means the workflow is not on master yet; a 401 or 403 means
+  the token lacks Actions: read and write, and the steps to add it are shown.
+
   Adding a data source: append one { name, url, fetch, render } object to `sources`
   below. `fetch(source)` returns the parsed data (use fetchJson, which records the
   rate-limit headers and throws on 403 and 429); `render(data)` draws it. The refresh
@@ -129,6 +139,11 @@
   #token-help ol { margin: 4px 0; padding-left: 24px; }
   #token-help li { margin: 2px 0; overflow-wrap: anywhere; }
   #token-help a { color: inherit; }
+  #audit-release { margin-top: 10px; }
+  #audit-release:empty { display: none; }
+  .release-message a { color: inherit; }
+  .release-message ol { margin: 4px 0; padding-left: 24px; }
+  .release-message li { overflow-wrap: anywhere; }
   @media (max-width: 700px) {
     #board, #audit-board { grid-template-columns: minmax(0, 1fr); }
   }
@@ -169,6 +184,7 @@
     <ol id="token-steps"></ol>
   </details>
 </section>
+<section id="audit-release"></section>
 <main id="audit-board"></main>
 <section id="audit-folded"></section>
 </div>
@@ -212,10 +228,22 @@ const tokenSteps = [
   [['Expiration: 30 days', '']],
   [['Resource owner: StewartScottRogers', '']],
   [['Repository access: Only select repositories, then Curl', '']],
-  [['Permissions, Repository permissions, Contents: Read and write (Metadata read-only is added by itself; everything else No access)', '']],
+  [['Permissions, Repository permissions, Actions: Read and write, and Contents: Read and write (Metadata read-only is added by itself; everything else No access)', '']],
   [['Generate token and copy it', '']],
   [['Here: press Forget token, paste the new token, save', '']],
   [['Optional: delete the expired token at ', ''], ['https://github.com/settings/personal-access-tokens', 'https://github.com/settings/personal-access-tokens']],
+];
+// Releasing approved findings (BL-1249): one workflow dispatch per press. The URL sits
+// beside the token check's, so a local preview's ?contents= override covers it too.
+const releaseWorkflow = 'release-approved-findings.yml';
+const dispatchUrl = new URL(`actions/workflows/${releaseWorkflow}/dispatches`, tokenCheckUrl).href;
+const releaseRunsUrl = `https://github.com/${repo}/actions/workflows/${releaseWorkflow}`;
+// How to give the saved token the Actions permission; editing keeps the token's value.
+const tokenEditSteps = [
+  'Open https://github.com/settings/personal-access-tokens',
+  'Choose Curl board audit tab, then Edit',
+  'Repository permissions: Actions: Read and write, and Contents: Read and write',
+  'Update; the token itself does not change, so there is nothing to save here again',
 ];
 // What the last request made with the token said about it: refused (401, or a 403 naming
 // the token) and the expiry GitHub sent, when the browser lets the page read it.
@@ -545,6 +573,7 @@ async function readFindings(auditTree) {
       finding.auditor = fields.auditor || '';
       finding.severity = fields.severity || '';
       finding.reason = fields.reason || '';
+      finding.task = fields.task || '';
       finding.log = log;
     } catch (error) {
       finding.error = error.message;
@@ -575,6 +604,7 @@ function findingElement(finding) {
   link.href = `https://github.com/${repo}/blob/${encodePath(finding.ref)}/${encodePath(finding.path)}`;
   body.append(link);
   if (!finding.error && findingMoves[finding.status] && savedToken() && !tokenRefused) body.append(movesElement(finding));
+  if (!finding.error && finding.status === 'accepted') body.append(...releaseElements(finding));
   const message = moveMessages.get(finding.id);
   if (message) body.append(element('p', `move-message ${message.kind}`, message.text));
   if (finding.error) {
@@ -631,6 +661,7 @@ function renderAudit() {
   for (const [status, label] of findingFolds) folded.append(foldedList(`fold:${status}`, label, withStatus(status)));
   const others = findings.filter(finding => finding.error || !known.includes(finding.status));
   if (others.length > 0) folded.append(foldedList('fold:other', 'Unreadable or unknown status', others));
+  renderReleaseAll();
   const field = typing && [...document.querySelectorAll('input[data-reason-for]')]
     .find(input => input.dataset.reasonFor === typing.id);
   if (field) {
@@ -651,8 +682,8 @@ function renderTokenControls() {
   document.getElementById('token-saved').hidden = !saved;
   document.getElementById('token-note').textContent =
     `Read-only. To approve, defer, block or reject findings here, paste a fine-grained GitHub personal ` +
-    `access token for ${repo} only, with Contents: read and write. It is kept in this browser's local ` +
-    `storage and sent only to the GitHub contents API.`;
+    `access token for ${repo} only, with Contents: read and write, and Actions: read and write to release ` +
+    `approved findings as tasks. It is kept in this browser's local storage and sent only to the GitHub API.`;
   document.getElementById('token-saved-text').textContent = tokenRefused
     ? 'The saved token was refused; moves are off.'
     : `Moves commit to the ${auditBranch} branch with the token saved in this browser.`;
@@ -888,7 +919,7 @@ function adoptFindingText(id, path, sha, text) {
   const { fields, log } = parseFinding(text);
   Object.assign(finding, {
     path, sha, text, log, ref: auditBranch, error: undefined,
-    status: (fields.status || '').toLowerCase(), reason: fields.reason || '',
+    status: (fields.status || '').toLowerCase(), reason: fields.reason || '', task: fields.task || '',
   });
 }
 
@@ -925,8 +956,7 @@ async function moveFinding(id, label, to, reasonRequired) {
     const commit = written.commit && written.commit.sha ? ` in ${written.commit.sha.slice(0, 7)}` : '';
     movesInFlight.delete(id);
     setMoveMessage(id, 'info', to === 'accepted'
-      ? `Approved${commit}. Its tasks are filed by an interactive session running ` +
-        `Audit\\Tools\\New-TasksFromAcceptedFindings.ps1 (Audit/Triage.md, step 3).`
+      ? `Approved${commit}. Release it as a Curl task with its Release button.`
       : `Moved ${from} -> ${to}${commit}.`);
   } catch (error) {
     let text = `${label} failed: ${error.message}.`;
@@ -943,6 +973,128 @@ async function moveFinding(id, label, to, reasonRequired) {
     movesInFlight.delete(id);
     setMoveMessage(id, 'error', text);
   }
+}
+
+// The BL ID a finding's task: line names, or null while it is none.
+function releasedTask(finding) {
+  const match = /^BL-\d+$/i.exec((finding.task || '').trim());
+  return match ? match[0].toUpperCase() : null;
+}
+
+function awaitingRelease(finding) {
+  return !finding.error && finding.status === 'accepted' && (finding.task || 'none').trim().toLowerCase() === 'none';
+}
+
+// Per finding ID, or '*' for the release-all button: the last dispatch's message and the
+// findings it covered. Kept outside the cards so a refresh's redraw loses none of them.
+const releaseMessages = new Map();
+// Findings a dispatch has started a run for, waiting for their task: line to change.
+const releasing = new Set();
+let releaseInFlight = false;
+
+// "Released as BL-####" once every finding the message covered names its task.
+function releaseMessageElement(message) {
+  const findings = message.ids.map(currentFinding).filter(Boolean);
+  const tasks = findings.map(releasedTask);
+  if (findings.length > 0 && tasks.every(Boolean)) {
+    return element('p', 'move-message release-message', `Released as ${tasks.join(', ')}`);
+  }
+  const box = element('p', `move-message release-message ${message.kind}`, message.text);
+  if (message.run) {
+    const link = element('a', null, 'run');
+    link.href = message.run;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    box.append(' (', link, ')');
+  }
+  if (message.steps) {
+    const list = element('ol');
+    for (const step of message.steps) list.append(element('li', null, step));
+    box.append(list);
+  }
+  return box;
+}
+
+function releaseButton(label, ids, all) {
+  const button = element('button', null, label);
+  button.type = 'button';
+  button.disabled = releaseInFlight || ids.every(id => releasing.has(id));
+  button.addEventListener('click', () => releaseFindings(ids, all));
+  return button;
+}
+
+// An approved card's Release button (while its task: is none) and its release message.
+function releaseElements(finding) {
+  const task = releasedTask(finding);
+  const message = releaseMessages.get(finding.id);
+  if (task) return [element('p', 'move-message release-message', `Released as ${task}`)];
+  const parts = [];
+  if (awaitingRelease(finding) && savedToken() && !tokenRefused) {
+    const box = element('div', 'moves');
+    box.append(releaseButton('Release', [finding.id], false));
+    parts.push(box);
+  }
+  if (message) parts.push(releaseMessageElement(message));
+  return parts;
+}
+
+function renderReleaseAll() {
+  const section = document.getElementById('audit-release');
+  section.replaceChildren();
+  const waiting = ((latestAudit && latestAudit.findings) || []).filter(awaitingRelease).map(finding => finding.id);
+  if (waiting.length > 0 && savedToken() && !tokenRefused) {
+    section.append(releaseButton(`Release approved findings (${waiting.length})`, waiting, true));
+  }
+  const message = releaseMessages.get('*');
+  if (message) section.append(releaseMessageElement(message));
+}
+
+function setReleaseMessage(ids, all, message) {
+  const entry = { ...message, ids };
+  if (all) releaseMessages.set('*', entry);
+  for (const id of ids) releaseMessages.set(id, entry);
+  renderAudit();
+}
+
+// One workflow dispatch: the card's finding, or empty for every approved finding without
+// a task. The token goes only into the Authorization header.
+async function releaseFindings(ids, all) {
+  const token = savedToken();
+  if (!token || releaseInFlight || ids.length === 0) return;
+  releaseInFlight = true;
+  setReleaseMessage(ids, all, { kind: 'info', text: 'Sending the release…' });
+  let message;
+  try {
+    const response = await fetch(dispatchUrl, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: 'master', inputs: { findings: all ? '' : ids.join(',') }, return_run_details: true }),
+    });
+    const answer = await response.json().catch(() => ({}));
+    if (response.ok) {
+      for (const id of ids) releasing.add(id);
+      message = { kind: 'info', text: 'Releasing…', run: answer.html_url || releaseRunsUrl };
+    } else if (response.status === 404) {
+      message = { kind: 'error', text: 'Available after the next merge to master.' };
+    } else if (response.status === 401 || response.status === 403) {
+      // A 401 is the token itself refused; a 403 here is a token without the Actions
+      // permission, which still moves findings, so only a 401 turns the moves off.
+      if (response.status === 401) noteTokenAnswer(response, answer.message);
+      message = {
+        kind: 'error',
+        text: `GitHub refused the release (${response.status}). The token needs Actions: Read and write as well as ` +
+          'Contents: Read and write. To edit it:',
+        steps: tokenEditSteps,
+      };
+    } else {
+      message = { kind: 'error', text: `Release failed: GitHub answered ${response.status}${answer.message ? `: ${answer.message}` : ''}.` };
+    }
+  } catch (error) {
+    message = { kind: 'error', text: `Release failed: ${error.message}.` };
+  }
+  releaseInFlight = false;
+  setReleaseMessage(ids, all, message);
 }
 
 function showTab() {

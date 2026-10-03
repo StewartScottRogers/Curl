@@ -1,0 +1,213 @@
+# Release approved findings (BL-1249): turns the audit office's accepted findings whose
+# task is none into Curl tasks, the button on the board page's Audit tab made real.
+#
+# The filing itself stays in Audit/Tools/New-TasksFromAcceptedFindings.ps1, run from the
+# audit branch's checkout with CLAUDE_PROJECT_DIR set to the work/dark-factory checkout,
+# exactly as an interactive session runs it (Audit/Triage.md, step 3). This workflow only
+# previews it (-WhatIf, into the job summary), runs it, and lands its two halves:
+#   - the new task files on work/dark-factory, rebased onto the branch as it is and run
+#     through task-board.ps1 dedupe against that upstream commit, retried 3 times;
+#   - the findings' task: lines on audit, with any ID dedupe renumbered rewritten first,
+#     then the audit pull request opened if none is open. It is never merged here: an
+#     interactive session merges audit pull requests once CI is green.
+#
+# GitHub dispatches only a workflow that is on the default branch, so the board page's
+# buttons answer 404 until this file reaches master.
+name: Release approved findings
+
+on:
+  workflow_dispatch:
+    inputs:
+      findings:
+        description: Comma-separated finding IDs (AF-####) to release; empty releases every approved finding without a task
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-findings
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      FINDINGS_INPUT: ${{ inputs.findings }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out work/dark-factory
+        uses: actions/checkout@v4
+        with:
+          ref: work/dark-factory
+          path: factory
+          fetch-depth: 0
+
+      - name: Check out audit
+        uses: actions/checkout@v4
+        with:
+          ref: audit
+          path: office
+          fetch-depth: 0
+
+      - name: Read the input and set up git
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ids = @($env:FINDINGS_INPUT -split ',' | ForEach-Object { $_.Trim().ToUpperInvariant() } | Where-Object { $_ })
+          foreach ($id in $ids) {
+            if ($id -notmatch '^AF-\d{4,}$') { throw "'$id' is not a finding ID (AF-####); nothing was released." }
+          }
+          # Windows PowerShell's Out-File -Encoding utf8 writes a BOM, which GitHub would read as part of the name.
+          $utf8 = New-Object Text.UTF8Encoding($false)
+          [IO.File]::AppendAllText($env:GITHUB_ENV, "FINDING_IDS=$($ids -join ',')`nCLAUDE_PROJECT_DIR=$(Join-Path $env:GITHUB_WORKSPACE 'factory')`n", $utf8)
+          foreach ($checkout in 'factory', 'office') {
+            git -C $checkout config user.name 'github-actions[bot]'
+            git -C $checkout config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          }
+
+      - name: Preview what the script will file (-WhatIf)
+        shell: powershell
+        working-directory: office
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $script = Join-Path (Get-Location) 'Audit\Tools\New-TasksFromAcceptedFindings.ps1'
+          $parameters = (Get-Command $script).Parameters
+          if (-not $parameters.ContainsKey('WhatIf')) { throw 'New-TasksFromAcceptedFindings.ps1 has no -WhatIf, so a run cannot show what it will file first; nothing was released.' }
+          $arguments = @{ WhatIf = $true }
+          $ids = @($env:FINDING_IDS -split ',' | Where-Object { $_ })
+          $summary = @('## What the script will file', '')
+          if ($ids.Count -gt 0 -and $parameters.ContainsKey('Id')) {
+            $arguments.Id = $ids
+            $summary += "Only the findings named: $($ids -join ', ')."
+          } elseif ($ids.Count -gt 0) {
+            Write-Output "::warning::New-TasksFromAcceptedFindings.ps1 has no -Id filter, so every approved finding without a task is released, not only $($ids -join ', ')."
+            $summary += "The script has no -Id filter, so every approved finding without a task is released, not only $($ids -join ', ')."
+          } else {
+            $summary += 'Every approved finding without a task.'
+          }
+          $preview = & $script @arguments *>&1 | Out-String
+          Write-Output $preview
+          $summary += '', '```', $preview.TrimEnd(), '```', ''
+          [IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, ($summary -join "`n") + "`n", (New-Object Text.UTF8Encoding($false)))
+
+      - name: File the tasks and land them on work/dark-factory and audit
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Invoke-Git([string] $Checkout) {
+            git -C $Checkout @args
+            if ($LASTEXITCODE -ne 0) { throw "git -C $Checkout $args failed with exit code $LASTEXITCODE." }
+          }
+          # Task files added since a commit, as ID -> path and slug -> ID.
+          function Get-AddedTasks([string] $Since) {
+            $byId = @{}; $bySlug = @{}
+            foreach ($path in @(git -C factory diff --cached --name-only --diff-filter=A $Since -- Tasks)) {
+              if ((Split-Path $path -Leaf) -match '^(BL-\d+)-(.+)\.md$') { $byId[$Matches[1]] = $path; $bySlug[$Matches[2]] = $Matches[1] }
+            }
+            @{ ById = $byId; BySlug = $bySlug }
+          }
+          $factoryStart = (git -C factory rev-parse HEAD)
+          $officeStart = (git -C office rev-parse HEAD)
+
+          # 1. Run the script, as the preview step did but for real.
+          Push-Location office
+          try {
+            $script = Join-Path (Get-Location) 'Audit\Tools\New-TasksFromAcceptedFindings.ps1'
+            $arguments = @{}
+            $ids = @($env:FINDING_IDS -split ',' | Where-Object { $_ })
+            if ($ids.Count -gt 0 -and (Get-Command $script).Parameters.ContainsKey('Id')) { $arguments.Id = $ids }
+            & $script @arguments
+          } finally { Pop-Location }
+
+          # 2. Pair each finding the script changed with the task its task: line names.
+          $pairs = [ordered]@{}
+          foreach ($path in @(git -C office diff --name-only $officeStart -- Audit/Findings)) {
+            if ((Split-Path $path -Leaf) -notmatch '^(AF-\d+)') { continue }
+            $finding = $Matches[1]
+            $file = Join-Path 'office' $path
+            if (-not (Test-Path $file)) { continue }
+            $taskLine = Select-String -Path $file -Pattern '^task:\s*(BL-\d+)\s*$' | Select-Object -First 1
+            if ($taskLine) { $pairs[$finding] = $taskLine.Matches[0].Groups[1].Value }
+          }
+          Invoke-Git factory add -A -- Tasks
+          $added = Get-AddedTasks $factoryStart
+          if ($pairs.Count -eq 0 -and $added.ById.Count -eq 0) {
+            [IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, "## Released`n`nNothing: no approved finding was without a task.`n", (New-Object Text.UTF8Encoding($false)))
+            exit 0
+          }
+          $slugById = @{}
+          foreach ($slug in $added.BySlug.Keys) { $slugById[$added.BySlug[$slug]] = $slug }
+          $findingList = ($pairs.Keys -join ', ')
+
+          # 3. Commit the tasks, rebase onto work/dark-factory, dedupe against the commit
+          #    rebased onto, and push; three tries.
+          if (git -C factory diff --cached --name-only) {
+            Invoke-Git factory commit -m "chore(tasks): release audit findings $findingList as $(@($pairs.Values) -join ', ')"
+          }
+          $finalIds = @{}
+          $pushed = $false
+          foreach ($attempt in 1..3) {
+            Invoke-Git factory fetch origin work/dark-factory
+            $upstream = (git -C factory rev-parse origin/work/dark-factory)
+            git -C factory rebase $upstream
+            if ($LASTEXITCODE -ne 0) { git -C factory rebase --abort; throw "Rebasing the released tasks onto $upstream conflicted; nothing was pushed." }
+            Push-Location factory
+            try {
+              & powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-board.ps1 dedupe -Since $upstream
+              if ($LASTEXITCODE -ne 0) { throw "task-board.ps1 dedupe failed with exit code $LASTEXITCODE." }
+            } finally { Pop-Location }
+            Invoke-Git factory add -A -- Tasks
+            $current = Get-AddedTasks $upstream
+            foreach ($finding in $pairs.Keys) {
+              $slug = $slugById[$pairs[$finding]]
+              $finalIds[$finding] = if ($slug -and $current.BySlug[$slug]) { $current.BySlug[$slug] } else { $pairs[$finding] }
+            }
+            if ((git -C factory rev-parse HEAD) -eq $upstream) { $pushed = $true; break }
+            Invoke-Git factory commit --amend --allow-empty -m "chore(tasks): release audit findings $findingList as $(@($pairs.Keys | ForEach-Object { $finalIds[$_] }) -join ', ')"
+            git -C factory push origin HEAD:work/dark-factory
+            if ($LASTEXITCODE -eq 0) { $pushed = $true; break }
+            Write-Output "::warning::Push to work/dark-factory refused on try $attempt; rebasing again."
+          }
+          if (-not $pushed) { throw 'work/dark-factory moved under all three tries; the tasks were not pushed and no finding was changed on audit.' }
+
+          # 4. Rewrite any renumbered ID in its finding, then commit and push the findings.
+          foreach ($finding in $pairs.Keys) {
+            if ($finalIds[$finding] -eq $pairs[$finding]) { continue }
+            $file = Get-ChildItem (Join-Path 'office' 'Audit\Findings') -Filter "$finding-*.md" | Select-Object -First 1
+            $bytes = [IO.File]::ReadAllBytes($file.FullName)
+            $bom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+            $text = [IO.File]::ReadAllText($file.FullName)
+            $text = [regex]::Replace($text, "\b$([regex]::Escape($pairs[$finding]))\b", $finalIds[$finding])
+            [IO.File]::WriteAllText($file.FullName, $text, (New-Object Text.UTF8Encoding($bom)))
+          }
+          $taskList = @($pairs.Keys | ForEach-Object { $finalIds[$_] }) -join ', '
+          Invoke-Git office add -A -- Audit/Findings
+          if (git -C office diff --cached --name-only) {
+            Invoke-Git office commit -m "audit: findings $findingList become $taskList"
+          }
+          $pushed = $false
+          foreach ($attempt in 1..3) {
+            git -C office pull --rebase origin audit
+            if ($LASTEXITCODE -ne 0) { git -C office rebase --abort; throw 'Rebasing the findings onto audit conflicted; the tasks are on work/dark-factory, the findings were not pushed.' }
+            git -C office push origin HEAD:audit
+            if ($LASTEXITCODE -eq 0) { $pushed = $true; break }
+          }
+          if (-not $pushed) { throw 'The audit branch moved under all three tries; the tasks are on work/dark-factory, the findings were not pushed.' }
+
+          # 5. Open the audit pull request if none is open. Never merge it.
+          $rows = @($pairs.Keys | ForEach-Object { "| $_ | $($finalIds[$_]) |" })
+          $released = @('| Finding | Task |', '| --- | --- |') + $rows
+          $open = gh pr list --repo $env:GITHUB_REPOSITORY --head audit --base master --state open --json number --jq 'length'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not list the audit pull requests.' }
+          if ([int]$open -eq 0) {
+            $body = (@("Released by the Release approved findings workflow ($env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID):", '') + $released +
+              @('', 'An interactive session merges this once CI is green; this workflow never merges it.')) -join "`n"
+            gh pr create --repo $env:GITHUB_REPOSITORY --head audit --base master --title "audit: findings $findingList become $taskList" --body $body
+            if ($LASTEXITCODE -ne 0) { throw 'Could not open the audit pull request.' }
+          }
+
+          # 6. The released pairs, in the job summary.
+          [IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, ((@('## Released', '') + $released) -join "`n") + "`n", (New-Object Text.UTF8Encoding($false)))

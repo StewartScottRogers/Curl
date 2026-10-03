@@ -4,6 +4,7 @@ title: README says 48 projects
 auditor: truthfulness
 severity: Low
 status: accepted
+task: none
 reason: Stewart accepted it on 2026-09-30.
 ---
 # AF-0002 — README says 48 projects

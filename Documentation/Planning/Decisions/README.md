@@ -394,6 +394,7 @@ choices do not need one.
 | [0382](ADR-0382-the-multi-trace-lines-are-tied-to-the-transfers-own-lines.md) | Under `--trace-config multi`, `network`, `all` and `-vvvv` the `[MULTI]` lines of a plain HTTP transfer are written by `MultiStateTraceEvents`, each group tied to the transfer line curl writes it beside; `[PGRS-*]` stamps are microseconds on the runner's clock, the poll descriptor the `[TCP]` one or 3 (BL-1188) | Accepted | 2026-10-02 |
 | [0383](ADR-0383-the-http-handler-writes-the-upload-readers-read-trace-lines.md) | Under `--trace-config read` the HTTP handler writes an HTTP/1.x `-d` or `-T` body's upload reader lines, and `ClientReaderResetTraceEvents` a reset line as each redirect hop starts; rewound, chunked, `100 Continue`, multipart and HTTP/2-3 bodies write none yet (BL-1189) | Accepted | 2026-10-02 |
 | [0384](ADR-0384-an-smtp-send-failure-ends-the-transfer-with-exit-55.md) | An SMTP command or message that cannot be written ends the transfer with exit 55, `Send failure: Connection was reset` or `Failed sending data to the peer`, sending and reading nothing more (BL-1243) | Accepted | 2026-10-02 |
+| [0385](ADR-0385-approved-findings-are-released-by-a-dispatched-workflow.md) | The board page's Release buttons dispatch `release-approved-findings.yml`, which runs `New-TasksFromAcceptedFindings.ps1` (with `-Id` only when the script has it), lands the tasks on `work/dark-factory` with dedupe and the findings on `audit`, and opens but never merges the audit pull request (BL-1249) | Accepted | 2026-10-02 |
 
 ## Template
 
