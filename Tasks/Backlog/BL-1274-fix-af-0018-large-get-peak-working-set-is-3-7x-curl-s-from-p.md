@@ -4,7 +4,7 @@ title: Fix AF-0018: large-get peak working set is 3.7x curl's, from per-byte all
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1287]
+depends-on: [BL-1288]
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-03
@@ -61,7 +61,7 @@ The finding closes only when a later re-audit by the performance auditor confirm
   ILC and lazy P/Invokes gave nothing.
 - The reproduction script is under `Audit/`, which the audit guard refuses to a lane, so a lane
   cannot tick the first criterion itself; an interactive session (or the re-audit) runs it.
-- Filed BL-1287 (touches Curl.Console, Curl.Cli.UnitLibrary and their tests; no task in Doing on
+- Filed BL-1288 (touches Curl.Console, Curl.Cli.UnitLibrary and their tests; no task in Doing on
   `origin/work/dark-factory` touches them) for the shell32 fix and the remaining ~2.6-3.8 MB, with the
   measurement method. This task waits on it, then only needs the reproduction run.
 
@@ -69,4 +69,4 @@ The finding closes only when a later re-audit by the performance auditor confirm
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
-- 2026-10-02: Doing -> Backlog. Waits on BL-1287: the excess working set is Curl.Console/Curl.Cli startup footprint, not HttpResponseBodyReader; shell32 fix alone reaches 2.35x, not 2x
+- 2026-10-02: Doing -> Backlog. Waits on BL-1288: the excess working set is Curl.Console/Curl.Cli startup footprint, not HttpResponseBodyReader; shell32 fix alone reaches 2.35x, not 2x

@@ -1,5 +1,5 @@
 ---
-id: BL-1287
+id: BL-1288
 title: Cut the native build's startup working set so a 50 MiB GET peaks at most 2x curl's
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1287 — Cut the native build's startup working set so a 50 MiB GET peaks at most 2x curl's
+# BL-1288 — Cut the native build's startup working set so a 50 MiB GET peaks at most 2x curl's
 
 ## Goal
 
