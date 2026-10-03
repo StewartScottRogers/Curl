@@ -3,8 +3,8 @@ id: AF-0016
 title: RC4 reads its key-dependent permutation at key-dependent indexes (SSH arcfour, NTLM)
 auditor: security
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: security:Curl.Cryptography.UnitLibrary/Rc4.cs:ApplyKeyStream:secret-dependent-lookup
 task: none
 found: 2026-10-02
@@ -41,3 +41,4 @@ Select-String -Path Curl.Cryptography.UnitLibrary/Rc4.cs -Pattern 'permutation\[
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.
