@@ -1,5 +1,5 @@
 ---
-id: BL-1249
+id: BL-1251
 title: Write curl's Remembering and left-intact -v lines for every FTP failure that keeps the control connection
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1249 — Write curl's Remembering and left-intact -v lines for every FTP failure that keeps the control connection
+# BL-1251 — Write curl's Remembering and left-intact -v lines for every FTP failure that keeps the control connection
 
 ## Goal
 
