@@ -335,7 +335,9 @@ as a glob and closes after the last transfer (ADR-0046): `-v` is `Curl.Output`'s
 output is a terminal; a trace is its `TraceTransferEventWriter`, stamped under `--trace-time`, into
 the named file (opened once per run, truncated), standard output for `-`, standard error for `%`,
 and standard error, with no warning, for a file that cannot be opened. On Windows each is text
-mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). Under `--trace-ids` (or `-vv`) each transfer
+mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). A transfer URL curl's parser rejects is
+reported to the transfer's events before connecting as the info line `URL rejected: <reason>`,
+ahead of its `curl: (3)` (or `(67)`) line, as curl 8.21.0's `failf` does (BL-1332). Under `--trace-ids` (or `-vv`) each transfer
 reports through a `TraceIdsTransferEvents` view, so its lines carry `[<xfer>-<conn>] ` after the
 stamp, `[<xfer>-x] ` for the `--resolve` and `-b` lines before it connects (ADR-0202, BL-648).
 Under `--trace-config read` (or `all`, `-vvv`, `-vvvv`) the runner writes curl's

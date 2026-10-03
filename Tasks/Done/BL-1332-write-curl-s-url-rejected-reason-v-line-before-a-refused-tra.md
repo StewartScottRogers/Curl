@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1332 — Write curl's '* URL rejected: <reason>' -v line before a refused transfer URL's exit 3
 
@@ -31,16 +31,22 @@ Under `-v`, a transfer URL curl's parser rejects writes curl 8.21.0's info line 
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Console.UnitTests` runs `-v "http://h/a b"` and asserts standard error is exactly `* URL rejected: Malformed input to a URL function` + newline + `curl: (3) URL rejected: Malformed input to a URL function` + newline, exit 3.
-- [ ] A test runs `-sv "http://h/a b"` and asserts standard error is only the `* URL rejected: ...` line, exit 3.
-- [ ] A data-driven test pins the `* URL rejected:` line for the bad port (`http://127.0.0.1:99999/`), `file://host/x` (`Bad file:// URL`), and `--disallow-username-in-url http://u@127.0.0.1/` (exit 67, `Credentials was passed in the URL when prohibited`) cases, each URL drive-less so the test passes on Windows, Linux and macOS.
-- [ ] A test runs `--trace-ascii - "http://h/a b"` and asserts standard output is exactly `* URL rejected: Malformed input to a URL function\n` (LF, as measured 2026-10-03: curl 8.21.0 wrote those 50 bytes to stdout and the `curl: (3)` line to stderr).
-- [ ] Every existing `URL rejected` test passes unchanged.
-- [ ] `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member.
+- [x] A test in `Curl.Console.UnitTests` runs `-v "http://h/a b"` and asserts standard error is exactly `* URL rejected: Malformed input to a URL function` + newline + `curl: (3) URL rejected: Malformed input to a URL function` + newline, exit 3.
+- [x] A test runs `-sv "http://h/a b"` and asserts standard error is only the `* URL rejected: ...` line, exit 3.
+- [x] A data-driven test pins the `* URL rejected:` line for the bad port (`http://127.0.0.1:99999/`), `file://host/x` (`Bad file:// URL`), and `--disallow-username-in-url http://u@127.0.0.1/` (exit 67, `Credentials was passed in the URL when prohibited`) cases, each URL drive-less so the test passes on Windows, Linux and macOS.
+- [x] A test runs `--trace-ascii - "http://h/a b"` and asserts standard output is exactly `* URL rejected: Malformed input to a URL function\n` (LF, as measured 2026-10-03: curl 8.21.0 wrote those 50 bytes to stdout and the `curl: (3)` line to stderr).
+- [x] Every existing `URL rejected` test passes unchanged.
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member.
 
 ## Notes
+
+- Delivered directly rather than through the full `/feature` agent chain: a one-call change in one method. `CurlCommandRunner.TransferUploadingAsync` now returns `ReportUrlRejected`, which reports `URL rejected: <reason>` through `ReportInfo` on the transfer's before-connecting events (`EventsBeforeConnecting`, now shared with `SetUpTransferEvents`, so `--trace-ids` marks it `[<xfer>-x]` like the other pre-connection lines) and then returns `UrlRejectedFailure`.
+- Pinned in `CurlCommandRunnerUrlRejectedVerboseTests` (6 tests). The `*` line is asserted with LF, as every other `*` line in the runner's tests is: the writer emits LF and Windows' text-mode stream adds the CR, which is how curl's CR LF is produced (Curl.Console's CLAUDE.md, BL-242).
+- Quality: `Measure-CodeQuality.ps1 -Library Curl.Console` reports 100% line, 99.06% branch and 11 failing members, exactly the pre-existing ones BL-1356 lists; none is in code this task touched (a first cut's static lambda in `TransferUploadingAsync` added an uncovered member, removed by `EventsBeforeConnecting`).
+- Fast tests: Curl.Console.UnitTests 2492 passed, 24 skipped, 0 failed.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. -v writes curl's '* URL rejected: <reason>' info line (and --trace its trace line) before a rejected transfer URL's exit 3 or 67

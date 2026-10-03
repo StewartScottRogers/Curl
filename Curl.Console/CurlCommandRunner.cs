@@ -2732,8 +2732,17 @@ internal sealed class CurlCommandRunner(
         state.Events = options.WriteOut is null && !options.TraceIds
             ? recorded
             : new ConnectionIdRecordingTransferEvents(recorded, state, connectionIdsByPoolNumber, takeConnectionId);
-        return transferEventOutput.EventsFor(transfer.TransferId, () => null);
+        return EventsBeforeConnecting(transfer);
     }
+
+    /// <summary>
+    /// The sink for what <paramref name="transfer" /> reports before it connects, whose lines under
+    /// <c>--trace-ids</c> carry <c>[&lt;xfer&gt;-x] </c>.
+    /// </summary>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns>The transfer's events before connecting.</returns>
+    private ITransferEvents EventsBeforeConnecting(UrlTransfer transfer) =>
+        transferEventOutput.EventsFor(transfer.TransferId, () => null);
 
     /// <summary>
     /// Wraps <paramref name="output" /> in the events that add the trace lines the transfer writes
@@ -3235,7 +3244,7 @@ internal sealed class CurlCommandRunner(
 
         if (!TryParseTransferUrl(QueryUrl.Append(url, options), options, out CurlUrl? transferUrl, out CurlUrlRejection rejection))
         {
-            return UrlRejectedFailure(rejection);
+            return ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
         }
 
         if (ParsedUrlRefusal(transferUrl) is { } refusal)
@@ -3298,6 +3307,20 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(
             rejection == CurlUrlRejection.UserNotAllowed ? CurlExitCode.LoginDenied : CurlExitCode.UrlMalformat,
             UrlRejectedPrefix + rejection.ToCurlMessage());
+
+    /// <summary>
+    /// Reports a transfer URL curl's parser rejects as the <c>-v</c> info line
+    /// <c>URL rejected: &lt;reason&gt;</c>, as curl 8.21.0's <c>failf</c> in <c>lib/url.c</c> does
+    /// (measured 2026-10-03, BL-1332), and returns <see cref="UrlRejectedFailure" />.
+    /// </summary>
+    /// <param name="rejection">Why the URL was rejected.</param>
+    /// <param name="events">The transfer's events before connecting.</param>
+    /// <returns>The failure carrying the same text.</returns>
+    private static TransferResult ReportUrlRejected(CurlUrlRejection rejection, ITransferEvents events)
+    {
+        events.ReportInfo(UrlRejectedPrefix + rejection.ToCurlMessage());
+        return UrlRejectedFailure(rejection);
+    }
 
     /// <summary>
     /// Why the parsed URL is refused before any connection, or <see langword="null" /> when it is not:
