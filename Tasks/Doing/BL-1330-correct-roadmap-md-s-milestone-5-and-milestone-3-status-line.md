@@ -34,3 +34,4 @@ The **Status** lines of Milestone 2 and Milestone 5 in `Documentation/Planning/R
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
