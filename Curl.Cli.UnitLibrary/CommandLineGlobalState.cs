@@ -45,6 +45,8 @@ internal sealed class CommandLineGlobalState
 
     public bool ReadsArgumentsAsUtf8 { get; set; }
 
+    public bool ActsAsWindowsSchannelBuild { get; set; }
+
     public bool Silent { get; set; }
 
     public bool ShowError { get; set; }

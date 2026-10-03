@@ -240,6 +240,7 @@ namespace Curl.Console;
 /// </para>
 /// </remarks>
 /// <param name="lateBoundDiagnosticLog">The log the authenticators were composed with, bound to the run's diagnostic log once it is open (BL-923); <see langword="null" /> when none was composed.</param>
+/// <param name="parsesAsWindowsBuild">Whether the command line is read as curl's Windows Schannel build reads it (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild" />); <see langword="null" />, the default, reads it as this process's platform's build does. Tests pass <see langword="false" /> to reach the HTTP/2, HTTP/3 and TLS-SRP options on any platform.</param>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
     IFileSystem fileSystem,
@@ -264,7 +265,8 @@ internal sealed class CurlCommandRunner(
     IAsyncDisposable? runConnectionCache = null,
     TlsSessionCache? tlsSessions = null,
     IExtendedAttributeWriter? extendedAttributeWriter = null,
-    LateBoundDiagnosticLog? lateBoundDiagnosticLog = null)
+    LateBoundDiagnosticLog? lateBoundDiagnosticLog = null,
+    bool? parsesAsWindowsBuild = null)
 {
     /// <summary>
     /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
@@ -1264,7 +1266,8 @@ internal sealed class CurlCommandRunner(
             Path.Exists,
             ConsolePasswordPrompt.ForProcessConsole,
             fileReader,
-            defaultConfigFileSearch ?? NoDefaultConfigFile);
+            defaultConfigFileSearch ?? NoDefaultConfigFile,
+            parsesAsWindowsBuild ?? OperatingSystem.IsWindows());
 
     /// <summary>
     /// Transfers every URL of one option group in order, each command-line URL once for every URL

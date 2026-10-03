@@ -1080,6 +1080,11 @@ internal static class CurlComposition
     /// through (<see cref="CreatePoolingConnector" />) and the runner closes when the run ends; or
     /// <see langword="null" /> to connect through <paramref name="connector" /> itself.
     /// </param>
+    /// <param name="parsesAsWindowsBuild">
+    /// Whether the runner reads the command line as curl's Windows Schannel build does; <see langword="null" />
+    /// for this process's platform. Tests pass <see langword="false" /> to reach <c>--http2</c>, <c>--http3</c> and
+    /// the TLS-SRP options on every platform (ADR-0395).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -1090,7 +1095,8 @@ internal static class CurlComposition
         ProxySelector? proxySelector = null,
         ISecurityContextFactory? securityContexts = null,
         TimeProvider? signingClock = null,
-        ConnectionCache? runConnections = null)
+        ConnectionCache? runConnections = null,
+        bool? parsesAsWindowsBuild = null)
     {
         LateBoundDiagnosticLog runLog = new();
         return new(
@@ -1104,7 +1110,8 @@ internal static class CurlComposition
             writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths(),
             runConnectionCache: runConnections,
-            lateBoundDiagnosticLog: runLog);
+            lateBoundDiagnosticLog: runLog,
+            parsesAsWindowsBuild: parsesAsWindowsBuild);
     }
 
     /// <summary>

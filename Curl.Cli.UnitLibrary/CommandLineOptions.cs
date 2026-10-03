@@ -235,6 +235,16 @@ public sealed class CommandLineOptions
     /// </summary>
     public bool ReadsArgumentsAsUtf8 { get => globals.ReadsArgumentsAsUtf8; internal set => globals.ReadsArgumentsAsUtf8 = value; }
 
+    /// <summary>
+    /// <see langword="true"/> when the command line is read as curl's Windows Schannel build reads it: that
+    /// build's libcurl has no HTTP/2, HTTP/3, TLS-SRP or SSL session export, so <c>--http2</c>,
+    /// <c>--http2-prior-knowledge</c>, <c>--http3</c>, <c>--http3-only</c>, <c>--tlsuser</c>, <c>--tlspassword</c>,
+    /// <c>--tlsauthtype</c>, their three <c>--proxy-</c> forms and <c>--ssl-sessions</c> are refused with
+    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedBySchannelBuild"/>,
+    /// ADR-0395). Set by <see cref="CommandLineParser"/> for the platform it is asked to behave as.
+    /// </summary>
+    public bool ActsAsWindowsSchannelBuild { get => globals.ActsAsWindowsSchannelBuild; internal set => globals.ActsAsWindowsSchannelBuild = value; }
+
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
     public bool Silent { get => globals.Silent; internal set => globals.Silent = value; }
 

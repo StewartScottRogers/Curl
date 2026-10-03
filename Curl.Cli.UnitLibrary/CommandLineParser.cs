@@ -108,7 +108,8 @@ public static class CommandLineParser
     /// Parses <paramref name="arguments"/> as the four-argument overload does, but as curl's build for
     /// the platform <paramref name="isWindows"/> names reads them rather than as this process's
     /// platform: off Windows an option value starting with a character in U+2000-U+203F is warned
-    /// about (<see cref="CommandLineOptions.ReadsArgumentsAsUtf8"/>), on Windows it is not.
+    /// about (<see cref="CommandLineOptions.ReadsArgumentsAsUtf8"/>), on Windows it is not, and on Windows the
+    /// options its libcurl was built without are refused (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild"/>).
     /// </summary>
     /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
     /// <param name="pathExists">Reports whether a file or directory exists at a path.</param>
@@ -137,11 +138,27 @@ public static class CommandLineParser
     /// line is accepted when the file names a URL.
     /// </returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
-    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch)
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch) =>
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch, OperatingSystem.IsWindows());
+
+    /// <summary>
+    /// Parses <paramref name="arguments"/> after curl's default config file, as the overload without
+    /// <paramref name="isWindows"/> does, but as curl's build for the platform <paramref name="isWindows"/>
+    /// names reads them, as the five-argument overload taking <paramref name="isWindows"/> does.
+    /// </summary>
+    /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
+    /// <param name="pathExists">Reports whether a file or directory exists at a path.</param>
+    /// <param name="passwordPrompt">Asks for the password of a <c>-u</c> user given without one; called at most once.</param>
+    /// <param name="dataFileReader">Reads the default config file, and every file an option names.</param>
+    /// <param name="defaultConfigFileSearch">Lists where to look for the default config file; <see cref="DefaultConfigFileSearch.ForProcess"/> for this process.</param>
+    /// <param name="isWindows">Whether to read the arguments as curl's Windows Schannel build does.</param>
+    /// <returns>As the overload without <paramref name="isWindows"/> returns.</returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows)
     {
         ArgumentNullException.ThrowIfNull(defaultConfigFileSearch);
 
-        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), OperatingSystem.IsWindows());
+        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows);
     }
 
     private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows)
@@ -151,7 +168,7 @@ public static class CommandLineParser
         ArgumentNullException.ThrowIfNull(passwordPrompt);
         ArgumentNullException.ThrowIfNull(dataFileReader);
 
-        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows };
+        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows };
         if (!SkipsDefaultConfigFile(arguments))
         {
             ConfigFileApplier.ApplyDefaultFile(options, defaultConfigFileCandidates, pathExists, dataFileReader);
