@@ -156,7 +156,7 @@ public sealed class CurlCommandRunnerNoClobberTests
     }
 
     [TestMethod]
-    public async Task RunAsync_NoClobberWithResume_AppendsToTheTarget()
+    public async Task RunAsync_NoClobberWithResume_IsRefusedWithoutWriting()
     {
         outputFiles.ExistingPaths.Add("out.txt");
         outputFiles.ExistingContent["out.txt"] = Encoding.ASCII.GetBytes("abc");
@@ -165,9 +165,14 @@ public sealed class CurlCommandRunnerNoClobberTests
             "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 3-7/8\r\nContent-Length: 5\r\n\r\nhello",
             "-sS", "-C", "3", "-o", "out.txt", "--no-clobber", Url);
 
-        Assert.AreEqual(0, exitCode);
-        CollectionAssert.AreEqual(new[] { FileWriteMode.Append }, outputFiles.WriteModes);
-        Assert.AreEqual("abchello", WrittenText("out.txt"));
+        // curl 8.21.0 refuses -C with --no-clobber before any transfer (BL-1223).
+        Assert.AreEqual(2, exitCode);
+        Assert.IsEmpty(outputFiles.WriteModes);
+        Assert.AreEqual(
+            "curl: --continue-at is mutually exclusive with --no-clobber" + NewLine
+            + "curl: option --no-clobber: is badly used here" + NewLine
+            + "curl: try 'curl --help' or 'curl --manual' for more information" + NewLine,
+            StandardErrorText);
     }
 
     [TestMethod]

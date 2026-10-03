@@ -87,7 +87,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("remote-header-name", 'J', (options, on) => options.RemoteHeaderName = on),
         CommandLineOption.Text("output-dir", null, (options, directory) => options.OutputDirectory = directory),
         CommandLineOption.NegatableFlag("create-dirs", null, (options, on) => options.CreateDirectories = on),
-        CommandLineOption.NegatableFlag("clobber", null, (options, on) => options.Clobber = on),
+        CommandLineOption.NegatableFlagThatCanRefuse("clobber", null, SetClobber),
         CommandLineOption.NegatableFlag("skip-existing", null, (options, on) => options.SkipExisting = on),
         CommandLineOption.NegatableFlagThatCanRefuse("remove-on-error", null, SetRemoveOnError),
         CommandLineOption.Value("write-out", 'w', SetWriteOut),
@@ -1282,7 +1282,7 @@ public static class CommandLineOptionTable
     /// <summary>
     /// Records a <c>-C</c>/<c>--continue-at</c> value: <c>-</c> for "from the output file's size",
     /// or a byte offset read by <see cref="CommandLineNumber.ParseOffset"/>. It is refused when
-    /// <c>-r</c>/<c>--range</c> or <c>--remove-on-error</c> came first, before the value is looked at, as curl 8.21.0 does.
+    /// <c>-r</c>/<c>--range</c>, <c>--remove-on-error</c> or <c>--no-clobber</c> came first, before the value is looked at, as curl 8.21.0 does.
     /// </summary>
     private static CommandLineRefusal? SetResumeFrom(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
@@ -1294,6 +1294,11 @@ public static class CommandLineOptionTable
         if (options.RemoveOnError)
         {
             return CommandLineRefusal.ContinueAtExclusiveWithRemoveOnError(spelledOption, options.ErrorsHidden);
+        }
+
+        if (options.Clobber == false)
+        {
+            return CommandLineRefusal.ContinueAtExclusiveWithNoClobber(spelledOption, options.ErrorsHidden);
         }
 
         if (value == "-")
@@ -1326,6 +1331,22 @@ public static class CommandLineOptionTable
         }
 
         options.RemoveOnError = on;
+        return null;
+    }
+
+    /// <summary>
+    /// Records <c>--clobber</c> or <c>--no-clobber</c>. Turning clobbering off is refused when
+    /// <c>-C</c>/<c>--continue-at</c> came first, in any form, as curl 8.21.0 refuses it (measured
+    /// 2026-10-02, BL-1223 Notes); <c>--clobber</c> never is.
+    /// </summary>
+    private static CommandLineRefusal? SetClobber(CommandLineOptions options, bool on, string spelledOption)
+    {
+        if (!on && (options.ResumeFrom is not null || options.ResumeFromOutputSize))
+        {
+            return CommandLineRefusal.ContinueAtExclusiveWithNoClobber(spelledOption, options.ErrorsHidden);
+        }
+
+        options.Clobber = on;
         return null;
     }
 
@@ -1684,6 +1705,11 @@ public static class CommandLineOptionTable
     /// </summary>
     private static void SetLocation(CommandLineOptions options, bool on)
     {
+        if (options.FollowRedirectsPerSpec)
+        {
+            options.AddWarningLinesUnlessSilent(CommandLineWarning.LocationOverridesFollow);
+        }
+
         options.FollowRedirects = on;
         options.FollowRedirectsPerSpec = false;
     }
@@ -1695,6 +1721,11 @@ public static class CommandLineOptionTable
     /// </summary>
     private static void SetFollow(CommandLineOptions options, bool on)
     {
+        if (options.FollowRedirects && !options.FollowRedirectsPerSpec)
+        {
+            options.AddWarningLinesUnlessSilent(CommandLineWarning.FollowOverridesLocation);
+        }
+
         options.FollowRedirects = on;
         options.FollowRedirectsPerSpec = on;
     }

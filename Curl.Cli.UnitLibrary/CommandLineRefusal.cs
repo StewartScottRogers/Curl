@@ -226,6 +226,25 @@ public sealed class CommandLineRefusal
         ContinueAtExclusiveWith("--remove-on-error", spelledOption, errorsHidden);
 
     /// <summary>
+    /// Refuses <c>-C</c>/<c>--continue-at</c> and <c>--no-clobber</c> on one command line,
+    /// naming whichever came second: <c>curl: --continue-at is mutually exclusive with --no-clobber</c>,
+    /// <c>curl: option &lt;spelled&gt;: is badly used here</c> and the try-help line.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-10-02 (BL-1223 Notes): <c>-C -</c> counts as much
+    /// as <c>-C 5</c>, a <c>--clobber</c> after <c>--no-clobber</c> clears it, and the first line is
+    /// hidden by <c>-s</c> without <c>-S</c> as <see cref="ContinueAtExclusiveWithRange"/>'s is.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed, for whichever option came second.</param>
+    /// <param name="errorsHidden">
+    /// <see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option.
+    /// </param>
+    /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal ContinueAtExclusiveWithNoClobber(string spelledOption, bool errorsHidden) =>
+        ContinueAtExclusiveWith("--no-clobber", spelledOption, errorsHidden);
+
+    /// <summary>
     /// Refuses <c>-C</c>/<c>--continue-at</c> beside <paramref name="otherOption"/>, as
     /// <see cref="ContinueAtExclusiveWithRange"/> describes.
     /// </summary>
