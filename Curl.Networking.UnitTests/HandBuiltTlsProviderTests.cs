@@ -29,6 +29,9 @@ public sealed partial class HandBuiltTlsProviderTests
 
     private const bool OpenSslBuild = false;
 
+    private const string UntrustedRootLine =
+        "schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted.";
+
     private static readonly IPEndPoint ServerEndPoint = new(IPAddress.Loopback, 443);
 
     private static readonly string[] Http11 = ["http/1.1"];
@@ -329,6 +332,41 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.AreEqual(sslStream.Result.ExitCode, handBuilt.Result.ExitCode);
         Assert.AreEqual(sslStream.Result.ErrorMessage, handBuilt.Result.ErrorMessage);
         Assert.IsTrue(handBuilt.PlaintextDisposed);
+    }
+
+    // curl 8.21.0 Schannel -v, untrusted self-signed root, exit 60: the failf text as an info
+    // line after the ALPN offer, before "closing connection #0" (measured 2026-10-03, BL-1323).
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithAnUntrustedSelfSignedChainInTheSchannelBuild_ReportsSecEUntrustedRootOnceAfterTheFailedHandshake()
+    {
+        var handshakesBeforeEcho = -1;
+        RecordingTransferEvents? events = null;
+        events = new RecordingTransferEvents { OnInfo = _ => handshakesBeforeEcho = events!.Handshakes.Count };
+
+        var (result, _) = await HandshakeAsync(Provider(Tls12Only(new TlsClientOptions()), SchannelBuild), CertificateHost, events, Http11);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+        Assert.AreEqual(UntrustedRootLine, result.ErrorMessage);
+        Assert.AreEqual(UntrustedRootLine, Assert.ContainsSingle(events.Info));
+        Assert.AreEqual(1, handshakesBeforeEcho);
+        Assert.IsTrue(Assert.ContainsSingle(events.Handshakes).Failed);
+    }
+
+    // Neither -k in the Schannel build nor the OpenSSL build refusing the same chain prints it.
+    [TestMethod]
+    [DataRow(SchannelBuild, true)]
+    [DataRow(OpenSslBuild, false)]
+    public async Task AuthenticateAsClientAsync_WithAnUntrustedSelfSignedChainInsecureOrInTheOpenSslBuild_ReportsNoSecEUntrustedRootLine(bool matchesSchannelBuild, bool insecure)
+    {
+        var events = new RecordingTransferEvents();
+
+        var (result, _) = await HandshakeAsync(Provider(Tls12Only(new TlsClientOptions(Insecure: insecure)), matchesSchannelBuild), CertificateHost, events, Http11);
+
+        CollectionAssert.DoesNotContain(events.Info, UntrustedRootLine);
+        if (result.Connection is { } connection)
+        {
+            await connection.DisposeAsync();
+        }
     }
 
     // curl 8.18.0 OpenSSL -v, untrusted self-signed root, exit 60: "SSL connection using", the

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1323 — Write the Schannel build's SEC_E_UNTRUSTED_ROOT -v line before an untrusted certificate's exit 60
 
@@ -37,14 +37,21 @@ When the Schannel build refuses a server certificate whose chain ends in an untr
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Networking.UnitTests` (beside the existing `SEC_E_UNTRUSTED_ROOT` cases in `SslStreamTlsProviderTests.cs`, which run as the Schannel build on every platform) asserts the events receive the info line `schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted.` exactly once, after the failed handshake event, and that the result is still exit 60 with the same message.
-- [ ] The same is pinned for `HandBuiltTlsProvider` answering as the Schannel build, if it can reach `SchannelUntrustedRoot`; if it cannot, the Notes say why.
-- [ ] Tests pin that `-k` (verification off), and the OpenSSL build refusing the same certificate, report no such line.
-- [ ] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean; `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Networking.UnitTests` (beside the existing `SEC_E_UNTRUSTED_ROOT` cases in `SslStreamTlsProviderTests.cs`, which run as the Schannel build on every platform) asserts the events receive the info line `schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted.` exactly once, after the failed handshake event, and that the result is still exit 60 with the same message.
+- [x] The same is pinned for `HandBuiltTlsProvider` answering as the Schannel build, if it can reach `SchannelUntrustedRoot`; if it cannot, the Notes say why.
+- [x] Tests pin that `-k` (verification off), and the OpenSSL build refusing the same certificate, report no such line.
+- [x] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean; `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Plan: one small shared seam, `SchannelFailureEcho.Report(events, matchesSchannelBuild, failure)` in `Curl.Networking.UnitLibrary`, called on the failed-handshake return of both `SslStreamTlsProvider` and `HandBuiltTlsProvider` (`FailAsync`). It reports the failure's text as an info line when the provider is the Schannel build and the text is `TlsFailureMessages.SchannelUntrustedRoot` (now `internal const`), and returns the failure unchanged. BL-1324 widens the set it echoes with exit 35's `failed to receive handshake`.
+- Placement: last, after the failed handshake event, the pinned-key refusal lines and (hand-built) the certificate-status and ECH lines, so `-v` shows it after `ALPN: curl offers` and before `closing connection #0`, as measured. It also echoes the same text when `--cacert` names an untrusted chain, since curl's `failf` echoes every failure under `-v`.
+- `HandBuiltTlsProvider` reaches `SchannelUntrustedRoot` (its verifier's rejection is the SslStream provider's verdict, BL-708), so it is pinned too.
+- No ADR: the behaviour is measured curl output, not a design choice.
+- Tests: `SslStreamTlsProviderTests` and `HandBuiltTlsProviderTests` each gain the Schannel echo test (once, after the failed handshake event, exit 60 with the same message) and a `-k` / OpenSSL-build test that reports no such line. Networking fast tests 2953 passed; full solution fast tests green; `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members. The first measurement run failed in one of the test projects it reached (output lost); the rerun was green, so it is recorded here as a flaky failure that did not reproduce.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. Schannel build's -v prints SEC_E_UNTRUSTED_ROOT before exit 60, in both TLS providers

@@ -29,6 +29,9 @@ public sealed partial class SslStreamTlsProviderTests
 
     private const bool OpenSslBuild = false;
 
+    private const string UntrustedRootLine =
+        "schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted.";
+
     private const string CorruptCertificatePem = "-----BEGIN CERTIFICATE-----\nnot base64 !!!\n-----END CERTIFICATE-----\n";
 
     // Base64, so ImportFromPem decodes it, but not a certificate, so it throws.
@@ -189,6 +192,42 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.AreEqual(
             "schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted.",
             result.Result.ErrorMessage);
+    }
+
+    // curl 8.21.0 Schannel -v, untrusted self-signed certificate: failf writes the exit 60 text
+    // as an info line after "ALPN: curl offers http/1.1", before "closing connection #0"
+    // (measured 2026-10-03, BL-1323).
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithUntrustedSelfSignedCertificateInTheSchannelBuild_ReportsSecEUntrustedRootOnceAfterTheFailedHandshake()
+    {
+        var handshakesBeforeEcho = -1;
+        RecordingTransferEvents? events = null;
+        events = new RecordingTransferEvents { OnInfo = _ => handshakesBeforeEcho = events!.Handshakes.Count };
+
+        var result = await PinReportingHandshakeAsync(new TlsClientOptions(), events, SchannelBuild, ["http/1.1"]);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+        Assert.AreEqual(UntrustedRootLine, result.ErrorMessage);
+        Assert.AreEqual(UntrustedRootLine, Assert.ContainsSingle(events.Info));
+        Assert.AreEqual(1, handshakesBeforeEcho);
+        Assert.IsTrue(Assert.ContainsSingle(events.Handshakes).Failed);
+    }
+
+    // Neither -k in the Schannel build nor the OpenSSL build refusing the same certificate prints it.
+    [TestMethod]
+    [DataRow(SchannelBuild, true)]
+    [DataRow(OpenSslBuild, false)]
+    public async Task AuthenticateAsClientAsync_WithUntrustedSelfSignedCertificateInsecureOrInTheOpenSslBuild_ReportsNoSecEUntrustedRootLine(bool matchesSchannelBuild, bool insecure)
+    {
+        var events = new RecordingTransferEvents();
+
+        var result = await PinReportingHandshakeAsync(new TlsClientOptions(Insecure: insecure), events, matchesSchannelBuild, ["http/1.1"]);
+
+        CollectionAssert.DoesNotContain(events.Info, UntrustedRootLine);
+        if (result.Connection is { } connection)
+        {
+            await connection.DisposeAsync();
+        }
     }
 
     [TestMethod]
