@@ -193,3 +193,29 @@ before the response's `<` lines (BL-1195 Notes).
   `query ALPN` comes from it), on other protocols (FTP's reads are `len=900`), through a proxy, and the
   `[HAPROXY]` line's `send(len=44)`. The wrapper keeps the events of the transfer that dialled it, so
   a reused connection writes its lines through those events.
+
+## BL-1192 amendment: the [HTTPS-CONNECT] lines of a direct https:// connect
+
+Decided by Claude under Stewart's delegation, 2026-10-02. Measured with curl 8.21.0 (mingw,
+Schannel) and `Record-CurlExchange.ps1 -Tls` (BL-1192 Notes).
+
+- `--trace-config https-connect` and `all` (so `-vvvv`) write them; `network` and `proxy` do not.
+  `TcpConnector.TracesHttpsConnectFilter` turns them on for a direct connect to an `https://` origin
+  (`PoolScheme` `https`, TLS, not a forward proxy), through `HttpsConnectFilterTraceEvents`, which sits
+  between the `[SETUP]` and `[DNS]` events: `added` before `[DNS] created`; `connect, init` and
+  `1st attempt uses <v> from wanted versions` before `[SETUP] happy eyeballing`; `connect -> 0, done=1`
+  before `Established connection`; its removal after `[DNS]`'s and before `[SETUP]`'s. `<v>` is `h1`
+  under `--http1.0`/`--http1.1`, `h3` under `--http3`/`--http3-only` (unmeasured: this curl build has
+  neither HTTP/2 nor HTTP/3), else `h2`, even where the Schannel build's ALPN offers only `http/1.1`.
+- Volatile: curl writes one `connect -> 0, done=0` / `adjust_pollset -> 0, 1 socks` pair per poll
+  round. Curl writes one after the `Trying` line, two before a finished handshake's lines and one
+  before a failed one's - the loopback TLS 1.2 counts. curl writes the handshake's pairs between
+  `ALPN: curl offers` and `ALPN: server ...`; one `TlsHandshakeEvent` carries both lines, so Curl
+  writes the pairs before them. Under `dns` too, `[DNS] Curl_conn_connect(...) done=0` comes before
+  the first pair, where curl puts it between the pair's two lines.
+- A failed dial or handshake writes `connect, all attempts failed` and `connect -> <exit>, done=0`
+  (measured 7 and 60) after the failure's own lines; a name that does not resolve writes only `added`.
+- An `https://` origin's setup filter is added by the ALPN connect filter, so `[SETUP] added` is not
+  written for it, and `[SETUP] added SSL filter for origin` is, before the handshake's lines (after
+  any `[SETUP] added HAPROXY filter`, by curl's setup-filter order; unmeasured over HAPROXY).
+- Not written: through a tunnelling proxy, over a Unix socket, and over QUIC (BL-1254).

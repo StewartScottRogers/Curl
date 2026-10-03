@@ -443,6 +443,31 @@ internal static class CurlComposition
         options.TraceComponents.Contains("timer") || options.TraceComponents.Contains("network") || options.TraceComponents.Contains("all");
 
     /// <summary>
+    /// Whether curl 8.21.0's <c>[HTTPS-CONNECT]</c> lines are written: <c>https-connect</c> or <c>all</c>
+    /// is among the trace components, which <c>-vvvv</c> puts there too; neither <c>network</c> nor
+    /// <c>proxy</c> turns them on (measured, BL-1192 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesHttpsConnect(CommandLineOptions options) =>
+        options.TraceComponents.Contains("https-connect") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// The HTTP version curl 8.21.0's <c>[HTTPS-CONNECT]</c> filter names for its first attempt:
+    /// <c>h1</c> under <c>--http1.0</c> and <c>--http1.1</c>, <c>h3</c> under <c>--http3</c> and
+    /// <c>--http3-only</c>, else <c>h2</c> (measured for none and <c>--http1.1</c>, BL-1192 Notes).
+    /// </summary>
+    /// <param name="version">The HTTP version option given, if any.</param>
+    /// <returns>The version's name.</returns>
+    internal static string HttpsConnectFirstAttemptVersionOf(RequestedHttpVersion? version) =>
+        version switch
+        {
+            RequestedHttpVersion.Http10 or RequestedHttpVersion.Http11 => "h1",
+            RequestedHttpVersion.Http3 or RequestedHttpVersion.Http3Only => "h3",
+            _ => "h2",
+        };
+
+    /// <summary>
     /// Whether curl 8.21.0's <c>[READ]</c> lines are written: <c>read</c> or <c>all</c> is among the
     /// trace components, which <c>-vvv</c> and up put there too; <c>network</c> does not turn them on
     /// (measured, BL-1103 and BL-1159 Notes).
@@ -771,6 +796,8 @@ internal static class CurlComposition
             TracesHappyEyeballsFilter = TracesHappyEyeballs(options),
             TracesTcpFilter = TracesTcp(options),
             TracesHappyEyeballsTimer = TracesTimer(options),
+            TracesHttpsConnectFilter = TracesHttpsConnect(options),
+            HttpsConnectFirstAttemptVersion = HttpsConnectFirstAttemptVersionOf(options.HttpVersion),
             ResolverEvents = resolverEvents,
         };
 

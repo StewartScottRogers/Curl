@@ -424,6 +424,12 @@ Per ADR-0357's BL-1195 amendment a plain HTTP connection (`PoolScheme` `http`) d
 `TracesTcpFilter` is wrapped in `TcpIoTraceConnection`, which writes `[TCP] send(len=N) -> 0, N` after
 each write and `[TCP] recv(len=102400) -> 0, N` after each read, `-> 81, 0` first when the read does
 not complete at once, and `TcpConnector` writes `QueryAlpnLine` after the setup filters' removal.
+Per ADR-0357's BL-1192 amendment `TcpConnector.TracesHttpsConnectFilter` puts
+`HttpsConnectFilterTraceEvents` between the `[SETUP]` and `[DNS]` events of a direct connect to an
+`https://` origin, writing curl's `[HTTPS-CONNECT]` lines (`added`, `connect, init`, the
+`HttpsConnectFirstAttemptVersion` line, poll-round pairs fixed to the loopback counts, `done=1`, the
+removal, and `all attempts failed` with the exit code); for such an origin the setup filter writes no
+`[SETUP] added` but `SslFilterAddedLine` before the handshake.
 
 Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
 `--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr`, measured against curl 8.22.0's c-ares

@@ -263,6 +263,27 @@ public sealed partial class TcpConnector(
     public bool TracesHappyEyeballsTimer { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a direct connect to an <c>https://</c> origin writes the
+    /// <c>[HTTPS-CONNECT]</c> lines curl 8.21.0 writes for its ALPN connect filter under
+    /// <c>--trace-config https-connect</c> or <c>all</c> (<see cref="HttpsConnectFilterTraceEvents" />,
+    /// measured, BL-1192 Notes).
+    /// </summary>
+    public bool TracesHttpsConnectFilter { get; init; }
+
+    /// <summary>
+    /// Gets the HTTP version the <c>[HTTPS-CONNECT] 1st attempt uses &lt;version&gt; from wanted
+    /// versions</c> line names under <see cref="TracesHttpsConnectFilter" />: <c>h2</c> (the default,
+    /// even where the handshake offers only <c>http/1.1</c>), <c>h1</c> or <c>h3</c>.
+    /// </summary>
+    public string HttpsConnectFirstAttemptVersion { get; init; } = "h2";
+
+    /// <summary>
+    /// The line curl 8.21.0's setup filter writes, under <see cref="TracesSetupFilter" />, as it adds
+    /// the SSL filter for a direct <c>https://</c> origin once the socket connected (BL-1192 Notes).
+    /// </summary>
+    public const string SslFilterAddedLine = "[SETUP] added SSL filter for origin";
+
+    /// <summary>
     /// The line curl 8.21.0's setup filter writes, under <see cref="TracesSetupFilter" />, as it adds
     /// the PROXY protocol filter once the socket connected, before <c>Established connection</c>.
     /// </summary>
@@ -627,17 +648,34 @@ public sealed partial class TcpConnector(
     // DnsFilterTraceEvents over ConnectAttemptTraceEvents, which write curl's [SETUP], [DNS],
     // [HAPPY-EYEBALLS], [TCP] and [TIMER] lines in curl's order around its own (BL-1102, BL-1103,
     // BL-1161, BL-1186), the last also given back for the
-    // race to tell; otherwise the target is as given.
-    private (ConnectTarget Target, ConnectAttemptTraceEvents? Trace) TracingConnectionFilters(ConnectTarget target, ConnectDestination destination)
+    // race to tell; otherwise the target is as given. Under TracesHttpsConnectFilter an https://
+    // origin's [HTTPS-CONNECT] events sit between the [SETUP] and [DNS] ones, given back for a failed
+    // connect to report on (BL-1192).
+    private (ConnectTarget Target, ConnectAttemptTraceEvents? Trace, HttpsConnectFilterTraceEvents? HttpsConnect) TracingConnectionFilters(ConnectTarget target, ConnectDestination destination)
     {
         var trace = ConnectAttemptTraceOf(target.Events, destination.Host);
-        if (!TracesSetupFilter && !TracesDnsFilter && trace is null)
+        var httpsOrigin = IsHttpsOrigin(target);
+        if (!TracesAnyFilterAbove(trace, httpsOrigin))
         {
-            return (target, null);
+            return (target, null, null);
         }
 
-        return (target with { Events = SetupAndDnsFilterEvents(trace ?? target.Events, destination) }, trace);
+        var (events, httpsConnect) = SetupAndDnsFilterEvents(trace ?? target.Events, destination, httpsOrigin);
+        return (target with { Events = events }, trace, httpsConnect);
     }
+
+    private bool TracesAnyFilterAbove(ConnectAttemptTraceEvents? trace, bool httpsOrigin) =>
+        TracesSetupFilter || TracesDnsFilter || trace is not null || TracesHttpsConnectFor(httpsOrigin);
+
+    private bool TracesHttpsConnectFor(bool httpsOrigin) => TracesHttpsConnectFilter && httpsOrigin;
+
+    private bool WritesSslFilterAddedFor(ConnectTarget target) => TracesSetupFilter && IsHttpsOrigin(target);
+
+    // An https:// origin, not a forward proxy: curl 8.21.0 connects it through its ALPN connect
+    // filter, which adds the setup filter itself, so no "[SETUP] added" line is written for it, and
+    // the setup filter reports adding the SSL filter once the socket connected (measured, BL-1192 Notes).
+    private static bool IsHttpsOrigin(ConnectTarget target) =>
+        target.UseTls && !target.IsForwardProxy && string.Equals(target.PoolScheme, "https", StringComparison.OrdinalIgnoreCase);
 
     private ConnectAttemptTraceEvents? ConnectAttemptTraceOf(ITransferEvents events, string host) =>
         TracesHappyEyeballsFilter || TracesTcpFilter || TracesHappyEyeballsTimer
@@ -645,16 +683,31 @@ public sealed partial class TcpConnector(
             : null;
 
     // The [SETUP] filter's events over the [DNS] filter's over the given ones, each when traced; the
-    // setup filter's first line is written before the DNS filter's.
-    private ITransferEvents SetupAndDnsFilterEvents(ITransferEvents events, ConnectDestination destination)
+    // setup filter's first line (the ALPN connect filter's for an https:// origin) is written before
+    // the DNS filter's, and the ALPN connect filter's events sit between the two.
+    private (ITransferEvents Events, HttpsConnectFilterTraceEvents? HttpsConnect) SetupAndDnsFilterEvents(
+        ITransferEvents events,
+        ConnectDestination destination,
+        bool httpsOrigin)
     {
-        if (TracesSetupFilter)
+        var tracesHttpsConnect = TracesHttpsConnectFor(httpsOrigin);
+        WriteFirstFilterAddedLine(events, httpsOrigin, tracesHttpsConnect);
+        events = TracesDnsFilter ? DnsFilterTraceEvents.Start(events, destination.Host, destination.Port, addressFamily) : events;
+        var httpsConnect = tracesHttpsConnect ? new HttpsConnectFilterTraceEvents(events, HttpsConnectFirstAttemptVersion) : null;
+        events = httpsConnect ?? events;
+        return (TracesSetupFilter ? new SetupFilterTraceEvents(events, destination.Host, destination.Port) : events, httpsConnect);
+    }
+
+    private void WriteFirstFilterAddedLine(ITransferEvents events, bool httpsOrigin, bool tracesHttpsConnect)
+    {
+        if (tracesHttpsConnect)
+        {
+            events.ReportInfo(HttpsConnectFilterTraceEvents.AddedLine);
+        }
+        else if (TracesSetupFilter && !httpsOrigin)
         {
             events.ReportInfo(SetupFilterTraceEvents.AddedLine);
         }
-
-        events = TracesDnsFilter ? DnsFilterTraceEvents.Start(events, destination.Host, destination.Port, addressFamily) : events;
-        return TracesSetupFilter ? new SetupFilterTraceEvents(events, destination.Host, destination.Port) : events;
     }
 
     private static TimeSpan ConnectTimeoutOrDefault(TimeSpan? connectTimeout) =>
@@ -677,7 +730,23 @@ public sealed partial class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        (target, var trace) = TracingConnectionFilters(target, destination);
+        (target, var trace, var httpsConnect) = TracingConnectionFilters(target, destination);
+        var result = await ConnectDirectlyTracedAsync(target, destination, started, trace, cancellationToken).ConfigureAwait(false);
+        if (result.ExitCode != CurlExitCode.Ok)
+        {
+            httpsConnect?.ReportConnectFailed(result.ExitCode);
+        }
+
+        return result;
+    }
+
+    private async ValueTask<ConnectResult> ConnectDirectlyTracedAsync(
+        ConnectTarget target,
+        ConnectDestination destination,
+        long started,
+        ConnectAttemptTraceEvents? trace,
+        CancellationToken cancellationToken)
+    {
         var ((addresses, failure), fromCache) = await ResolveNotingCacheAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
@@ -701,7 +770,7 @@ public sealed partial class TcpConnector(
 
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
         var named = destination.IsMapped ? dialed with { MappedDestination = destination } : dialed;
-        return await SecureWhenAskedAsync(named, target, timings, 0, cancellationToken).ConfigureAwait(false);
+        return await SecureWhenAskedAsync(named, target, timings, 0, cancellationToken, WritesSslFilterAddedFor(target)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1481,7 +1550,8 @@ public sealed partial class TcpConnector(
         ConnectTarget target,
         ConnectTimings timings,
         int proxyConnectResponseCode,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool writesSslFilterAdded = false)
     {
         if (haproxyProtocol is { } header)
         {
@@ -1493,7 +1563,7 @@ public sealed partial class TcpConnector(
             return OpenedInPlaintext(dialed, target, timings, proxyConnectResponseCode);
         }
 
-        var secured = await AuthenticateTargetAsync(dialed.Connection, target, cancellationToken).ConfigureAwait(false);
+        var secured = await AuthenticateTargetAsync(dialed.Connection, target, writesSslFilterAdded, cancellationToken).ConfigureAwait(false);
         if (secured.Connection is not { } securedConnection)
         {
             return secured;
@@ -1607,6 +1677,23 @@ public sealed partial class TcpConnector(
     // provider, as curl 8.21.0 verifies it with --proxy-insecure and not -k (measured, BL-441),
     // and is reported as a proxy's, as curl's OpenSSL build says Proxy certificate: for it
     // (measured, BL-405).
+    // Under writesSslFilterAdded the setup filter first reports adding the SSL filter, after any
+    // HAPROXY filter and before the handshake's own lines (measured for a direct https:// connect,
+    // BL-1192 Notes).
+    private ValueTask<ConnectResult> AuthenticateTargetAsync(
+        IConnection plaintext,
+        ConnectTarget target,
+        bool writesSslFilterAdded,
+        CancellationToken cancellationToken)
+    {
+        if (writesSslFilterAdded)
+        {
+            target.Events.ReportInfo(SslFilterAddedLine);
+        }
+
+        return AuthenticateTargetAsync(plaintext, target, cancellationToken);
+    }
+
     private ValueTask<ConnectResult> AuthenticateTargetAsync(
         IConnection plaintext,
         ConnectTarget target,
