@@ -5,7 +5,7 @@ namespace Curl.Console;
 /// <summary>
 /// Parses a command line as curl's Linux and macOS OpenSSL build reads it, on every platform, so tests of
 /// the options curl's Windows Schannel build refuses (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild"/>,
-/// ADR-0395) - <c>--http2</c>, <c>--http3</c>, the TLS-SRP options and <c>--ssl-sessions</c> - run on Windows too.
+/// ADR-0397) - <c>--http2</c>, <c>--http3</c>, the TLS-SRP options and <c>--ssl-sessions</c> - run on Windows too.
 /// </summary>
 internal static class OpenSslBuildParser
 {

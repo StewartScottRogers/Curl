@@ -241,7 +241,7 @@ public sealed class CommandLineOptions
     /// <c>--http2-prior-knowledge</c>, <c>--http3</c>, <c>--http3-only</c>, <c>--tlsuser</c>, <c>--tlspassword</c>,
     /// <c>--tlsauthtype</c>, their three <c>--proxy-</c> forms and <c>--ssl-sessions</c> are refused with
     /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedBySchannelBuild"/>,
-    /// ADR-0395). Set by <see cref="CommandLineParser"/> for the platform it is asked to behave as.
+    /// ADR-0397). Set by <see cref="CommandLineParser"/> for the platform it is asked to behave as.
     /// </summary>
     public bool ActsAsWindowsSchannelBuild { get => globals.ActsAsWindowsSchannelBuild; internal set => globals.ActsAsWindowsSchannelBuild = value; }
 

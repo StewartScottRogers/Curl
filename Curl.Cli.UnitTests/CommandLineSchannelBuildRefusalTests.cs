@@ -4,7 +4,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Pins the options curl's Windows Schannel build refuses because its libcurl was built without the
-/// feature (ADR-0395, audit finding AF-0022): <c>--http2</c>, <c>--http2-prior-knowledge</c>, <c>--http3</c>,
+/// feature (ADR-0397, audit finding AF-0022): <c>--http2</c>, <c>--http2-prior-knowledge</c>, <c>--http3</c>,
 /// <c>--http3-only</c>, <c>--tlsuser</c>, <c>--tlspassword</c>, <c>--tlsauthtype</c>, their <c>--proxy-</c> forms
 /// and <c>--ssl-sessions</c>. Every line was measured with curl 8.21.0 (x86_64-w64-mingw32) Schannel against
 /// <c>http://127.0.0.1:1/</c> on 2026-10-02 (BL-1278). Each test parses as the Windows build explicitly,

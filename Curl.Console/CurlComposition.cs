@@ -1083,7 +1083,7 @@ internal static class CurlComposition
     /// <param name="parsesAsWindowsBuild">
     /// Whether the runner reads the command line as curl's Windows Schannel build does; <see langword="null" />
     /// for this process's platform. Tests pass <see langword="false" /> to reach <c>--http2</c>, <c>--http3</c> and
-    /// the TLS-SRP options on every platform (ADR-0395).
+    /// the TLS-SRP options on every platform (ADR-0397).
     /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(

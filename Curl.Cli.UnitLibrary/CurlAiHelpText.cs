@@ -16,7 +16,7 @@ public static class CurlAiHelpText
 {
     private const string AllSubject = "all";
 
-    /// <summary>The line an option's section carries when curl's Windows Schannel build refuses it (ADR-0395).</summary>
+    /// <summary>The line an option's section carries when curl's Windows Schannel build refuses it (ADR-0397).</summary>
     private const string SchannelBuildRefusalLine =
         "- On Windows: refused with exit 2 (`the installed libcurl version does not support this`), as curl's Schannel build refuses it; accepted on Linux and macOS.";
 
