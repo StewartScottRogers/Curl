@@ -1728,7 +1728,15 @@ public sealed partial class TcpConnector(
             events.ReportInfo(HaproxyFilterAddedLine);
         }
 
-        await dialed.Connection.WriteAsync(header.Build(dialed.LocalEndPoint, dialed.RemoteEndPoint), cancellationToken).ConfigureAwait(false);
+        var line = header.Build(dialed.LocalEndPoint, dialed.RemoteEndPoint);
+        await dialed.Connection.WriteAsync(line, cancellationToken).ConfigureAwait(false);
+
+        // The TCP filter sits below the HAPROXY filter, so it traces the line's send like any other,
+        // before Established connection, over TLS too (measured, BL-1253 Notes).
+        if (dialed.TracesTcpFilter)
+        {
+            events.ReportInfo($"[TCP] send(len={line.Length}) -> 0, {line.Length}");
+        }
     }
 
     // Under TracesHaproxyFilter a connection that wrote the PROXY line reports curl 8.21.0's

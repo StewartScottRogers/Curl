@@ -261,3 +261,27 @@ Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, 
   answers. The scripted proxy cannot finish a TLS handshake, so this follows from the filter order
   and from the `network` measurement (only the topmost filter writes the line), not from a recording.
   Through a CONNECT tunnel behind a pre-proxy the `[H1-PROXY]` filter answers, as before.
+
+## Amendment, 2026-10-02 (BL-1253): `[TCP]` I/O through a proxy, for the PROXY line, and what is left
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and
+`Record-CurlExchange.ps1` under `-s -v --trace-config tcp` (BL-1253 Notes).
+
+- `--haproxy-protocol`: the TCP filter sits below the HAPROXY filter, so the PROXY line's write is
+  traced like any other send, `[TCP] send(len=44) -> 0, 44` for a TCP4 line, after the dial's
+  `[TCP]` lines and before `Established connection`. `TcpConnector` writes it after writing the
+  line whenever the dial traces the TCP filter, over TLS too, since the line goes out before the
+  handshake.
+- A forward HTTP proxy (`-x http://...` to an `http://` URL) writes exactly what a direct plain
+  connection does (`query ALPN`, `send(len=131)` for the absolute-form request, `recv(len=102400)`);
+  its target already carries `PoolScheme` `http`, so the BL-1195 wrapper covered it and only a test
+  was added.
+- Left to their own tasks, because neither can be written from `Curl.Networking` alone:
+  - `https://`: curl's Schannel build traces the TLS records below the TLS filter, the handshake's
+    reads as `recv(len=4096)` and the application data's as `recv(len=103424)`, with record sizes
+    (`send(len=429)` for the ClientHello) that depend on the TLS stack's own messages and buffer
+    sizes; no `query ALPN` line. Matching that needs the record layer's read sizes, not a wrapper.
+  - FTP: the control connection reads as `recv(len=900)` and the data connection writes
+    `[TCP-1]` lines whose `len=` is the bytes still expected. The FTP control and data targets
+    look alike to `TcpConnector` (no `PoolScheme`), so the FTP handler has to say which is which
+    and what length to report, a change to `Curl.Protocol.Ftp.UnitLibrary` and `ConnectTarget`.

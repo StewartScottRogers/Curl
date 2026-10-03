@@ -53,6 +53,49 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ThroughAForwardProxyUnderTraceConfigTcp_WritesQueryAlpnSendAndRecvBesideTheHeaders()
+    {
+        // curl -s -v --trace-config tcp -x http://127.0.0.1:18533 http://example.invalid/ (BL-1253 Notes).
+        int exitCode = await RunAsync("-v", "--trace-config", "tcp", "-x", "http://127.0.0.1:47195", "http://example.invalid/");
+
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "* Established connection to 127.0.0.1 (127.0.0.1 port 47195) from 127.0.0.1 port 50000 ",
+                "* [TCP] query ALPN",
+                "* using HTTP/1.x",
+                "* [TCP] send(len=131) -> 0, 131",
+                "> GET http://example.invalid/ HTTP/1.1",
+                "> Host: example.invalid",
+                "> User-Agent: curl/8.21.0",
+                "> Accept: */*",
+                "> Proxy-Connection: Keep-Alive",
+                "> ",
+                "* Request completely sent off",
+                "* [TCP] recv(len=102400) -> 0, 40",
+                "< HTTP/1.1 200 OK",
+                "< Content-Length: 2",
+                "< ",
+            },
+            TransferLines());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_WithHaproxyProtocolUnderTraceConfigTcp_WritesTheProxyLinesSendBeforeEstablishedConnection()
+    {
+        // curl -s -v --trace-config tcp --haproxy-protocol http://127.0.0.1:18531/ (BL-1253 Notes).
+        int exitCode = await RunAsync("-v", "--trace-config", "tcp", "--haproxy-protocol", "http://127.0.0.1:47195/");
+
+        Assert.AreEqual(0, exitCode);
+        List<string> lines = StandardErrorLines();
+        int established = lines.FindIndex(line => line.StartsWith("* Established connection", StringComparison.Ordinal));
+        CollectionAssert.AreEqual(
+            new[] { "* [TCP] send(len=44) -> 0, 44", lines[established], "* [TCP] query ALPN", "* using HTTP/1.x", "* [TCP] send(len=79) -> 0, 79" },
+            lines.Skip(established - 1).Take(5).ToArray());
+    }
+
+    [TestMethod]
     [DataRow("-v", "--trace-config", "all")]
     [DataRow("-vvvv")]
     public async Task RunAsync_PlainGetUnderAllOrVvvv_WritesQueryAlpnSendAndRecv(params string[] arguments)
