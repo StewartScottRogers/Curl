@@ -172,7 +172,15 @@
     lane-<n>.retire beside the lane's state. A lane asked to retire is never stopped
     mid-task: it finishes and integrates the task it holds, and stops with "retired"
     before its next claim. Restarts cover the active lanes, and the end-of-shift report
-    covers every lane started, retired ones included.
+    covers every lane started, retired ones included. A retire goes to the highest-numbered
+    lane that holds no task, when there is one.
+
+    A fixed lane count (-Lanes N, N > 1) is capped by the board's capacity too (BL-1374,
+    AF-0032): every 5 minutes, except while waiting for tokens, the coordinator reads
+    task-board.ps1 capacity as -Lanes Auto does and retires idle lanes down to it, so no
+    lane polls "every ready task overlaps one in Doing" for hours; when the capacity rises
+    again it adds one lane per step, never above N. Each change traces
+    "lanes a -> b (reason)", e.g. "lanes 9 -> 4 (4 ready tasks can run at once)".
 
     AUTO LANES (-Lanes Auto)
 
@@ -1202,10 +1210,32 @@ function Get-LaneToAdd {
 
 function Get-LaneToRetire {
     # The highest-numbered active lane not already retiring, or $null when there is none.
-    param([int[]]$Active, [int[]]$Retiring)
+    # One among -Idle (lanes holding no task) is preferred, so it stops within a minute
+    # instead of after a task (BL-1374).
+    param([int[]]$Active, [int[]]$Retiring, [int[]]$Idle = @())
     $candidates = @($Active | Where-Object { $Retiring -notcontains $_ } | Sort-Object -Descending)
+    $idleCandidates = @($candidates | Where-Object { $Idle -contains $_ })
+    if ($idleCandidates.Count) { return $idleCandidates[0] }
     if ($candidates.Count) { return $candidates[0] }
     return $null
+}
+
+function Get-CapacityLaneCount {
+    # One capacity step of a fixed -Lanes N shift (BL-1374): straight down to the board's
+    # -Capacity (at least 1) when more lanes run, but by no more than the -Idle lanes; up
+    # one lane when the capacity allows it, never above -Requested. Reason is the log line,
+    # e.g. "lanes 9 -> 4 (4 ready tasks can run at once)".
+    param([int]$Current, [int]$Capacity, [int]$Requested, [int]$Idle)
+    $ceiling = [math]::Max(1, [math]::Min($Capacity, $Requested))
+    $lanes = $Current
+    if ($Current -gt $ceiling) { $lanes = [math]::Max($ceiling, $Current - $Idle) }
+    elseif ($Current -lt $ceiling) { $lanes = $Current + 1 }
+    $limit = if ($Capacity -ge $Requested) { "-Lanes $Requested" }
+        elseif ($Capacity -eq 1) { '1 ready task can run at once' }
+        elseif ($Capacity -le 0) { 'no ready task can run' }
+        else { "$Capacity ready tasks can run at once" }
+    $step = if ($lanes -eq $Current) { "lanes $Current held" } else { "lanes $Current -> $lanes" }
+    return [pscustomobject]@{ Lanes = $lanes; Changed = ($lanes -ne $Current); Reason = "$step ($limit)" }
 }
 
 function Test-LanesFinished {
@@ -1284,6 +1314,15 @@ if ($TestAutoLanes) {
         ,@('lane-to-add 1..16', 'null', "$(if ($null -eq (Get-LaneToAdd -Active (1..16) -Max 16)) { 'null' } else { 'a lane' })")
         ,@('lane-to-retire 1,2,3 retiring 3', '2', "$(Get-LaneToRetire -Active 1, 2, 3 -Retiring 3)")
         ,@('lane-to-retire 1,2,3 retiring 1,2,3', 'null', "$(if ($null -eq (Get-LaneToRetire -Active 1, 2, 3 -Retiring 1, 2, 3)) { 'null' } else { 'a lane' })")
+        ,@('lane-to-retire 1,2,3,4 idle 1,2', '2', "$(Get-LaneToRetire -Active 1, 2, 3, 4 -Retiring @() -Idle 1, 2)")
+        ,@('lane-to-retire 1,2,3 retiring 2 idle 2', '3', "$(Get-LaneToRetire -Active 1, 2, 3 -Retiring 2 -Idle 2)")
+        ,@('capacity 9 lanes capacity 4 idle 6', 'lanes 9 -> 4 (4 ready tasks can run at once)', (Get-CapacityLaneCount -Current 9 -Capacity 4 -Requested 9 -Idle 6).Reason)
+        ,@('capacity 9 lanes capacity 4 idle 2', 'lanes 9 -> 7 (4 ready tasks can run at once)', (Get-CapacityLaneCount -Current 9 -Capacity 4 -Requested 9 -Idle 2).Reason)
+        ,@('capacity 3 lanes capacity 0', 'lanes 3 -> 1 (no ready task can run)', (Get-CapacityLaneCount -Current 3 -Capacity 0 -Requested 9 -Idle 3).Reason)
+        ,@('capacity 1 lane capacity 1', 'lanes 1 held (1 ready task can run at once)', (Get-CapacityLaneCount -Current 1 -Capacity 1 -Requested 9 -Idle 1).Reason)
+        ,@('capacity 4 lanes capacity 6', 'lanes 4 -> 5 (6 ready tasks can run at once)', (Get-CapacityLaneCount -Current 4 -Capacity 6 -Requested 9 -Idle 0).Reason)
+        ,@('capacity 9 lanes capacity 12', 'lanes 9 held (-Lanes 9)', (Get-CapacityLaneCount -Current 9 -Capacity 12 -Requested 9 -Idle 0).Reason)
+        ,@('capacity 8 lanes capacity 12', 'lanes 8 -> 9 (-Lanes 9)', (Get-CapacityLaneCount -Current 8 -Capacity 12 -Requested 9 -Idle 0).Reason)
         ,@('lanes-finished 1,3 of 1,2', 'False', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 2)")
         ,@('lanes-finished 1,3 of 1,3', 'True', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 3)")
         ,@('start saved 2', '3 (last shift saved 2, raised to 3 by -MinStartLanes)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 2 }) 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
@@ -3789,10 +3828,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     }
 
     function Request-LaneRetire {
-        # Asks the highest-numbered active lane not already retiring to stop after its
-        # current task, and returns it; $null when every active lane is already retiring.
+        # Asks the highest-numbered active lane not already retiring, an idle one first, to
+        # stop after its current task, and returns it; $null when every active lane is
+        # already retiring.
         $retiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
-        $n = Get-LaneToRetire -Active @($activeLanes) -Retiring $retiring
+        $n = Get-LaneToRetire -Active @($activeLanes) -Retiring $retiring -Idle @(Get-IdleLanes)
         if ($null -eq $n) { return $null }
         Set-Content -Path (Get-LaneStatePath $n 'retire') -Value (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') -Encoding ASCII
         Write-Trace '-' 'lane' "lane $n asked to retire after its current task"
@@ -3868,6 +3908,31 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         Save-AutoLanes $script:LaneCount
     }
 
+    function Get-IdleLanes {
+        # The active lanes holding no task: claiming, waiting on overlapping touches, or starting.
+        return @($activeLanes | Where-Object { -not (Get-LaneState $_ 'task') })
+    }
+
+    function Invoke-CapacityLaneStep {
+        # One capacity step of a fixed -Lanes N shift (BL-1374, AF-0032): idle lanes beyond
+        # the board's capacity retire, and lanes come back one a step, up to N, as it rises.
+        $retiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
+        $current = @($activeLanes | Where-Object { $retiring -notcontains $_ }).Count
+        if ((Get-UsageStop) -or (Get-Date) -gt $shiftEnd) { return }
+        $capacity = Get-ShiftCapacity -Fallback $current
+        $idle = @(Get-IdleLanes | Where-Object { $retiring -notcontains $_ })
+        $step = Get-CapacityLaneCount -Current $current -Capacity $capacity -Requested $requestedLanes -Idle $idle.Count
+        if (-not $step.Changed) { return }
+        Write-Trace '-' 'lanes' $step.Reason 'Cyan'
+        if ($step.Lanes -gt $current) {
+            if ($null -eq (Add-Lane)) { Write-Trace '-' 'lanes' 'no lane to add' 'Yellow' }
+            return
+        }
+        foreach ($i in 1..($current - $step.Lanes)) { if ($null -eq (Request-LaneRetire)) { break } }
+    }
+
+    # The lane count a fixed shift asked for; capacity steps never go above it.
+    $requestedLanes = $LaneCount
     foreach ($n in 1..$LaneCount) {
         $where = Start-Lane -N $n
         $activeLanes.Add($n)
@@ -3881,6 +3946,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $giveUp = $shiftEnd.AddMinutes($TaskMinutes + 30)
     $tick = Get-Date
     $nextAutoStep = (Get-Date).AddMinutes(15)
+    $nextCapacityStep = (Get-Date).AddMinutes(5)
     while ((Get-Date) -lt $giveUp) {
         # The coordinator announces the usage limit for every lane, and lanes waiting for a
         # new session add that wait to their shift, so the coordinator waits longer too.
@@ -3920,6 +3986,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if ($AutoLanes -and (Get-Date) -ge $nextAutoStep -and -not (Test-WaitingForSession)) {
             Invoke-AutoLaneStep
             $nextAutoStep = (Get-Date).AddMinutes(15)
+        }
+        # A fixed count of lanes steps to the board's capacity every 5 minutes (BL-1374).
+        if (-not $AutoLanes -and $requestedLanes -gt 1 -and (Get-Date) -ge $nextCapacityStep -and -not (Test-WaitingForSession)) {
+            Invoke-CapacityLaneStep
+            $nextCapacityStep = (Get-Date).AddMinutes(5)
         }
         # The coordinator is the board branch's one writer for a lane shift.
         Publish-BoardStatusIfDue -Branch $branch
