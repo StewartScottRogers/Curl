@@ -918,7 +918,7 @@ internal sealed class FtpSession(
         {
             if (!await TryChangeDirectoryAsync(directory).ConfigureAwait(false))
             {
-                return await QuitAndFailAsync(CurlExitCode.RemoteAccessDenied, FtpTransferMessages.ChangeDirectoryDenied).ConfigureAwait(false);
+                return await QuitAndFailLeavingConnectionIntactAsync(CurlExitCode.RemoteAccessDenied, FtpTransferMessages.ChangeDirectoryDenied).ConfigureAwait(false);
             }
         }
 
@@ -1167,7 +1167,7 @@ internal sealed class FtpSession(
         pendingConnection = listening.PendingConnection;
         if (pendingConnection is null)
         {
-            return await QuitAndFailAsync(listening.ExitCode, FtpTransferMessages.BindFailed(listening.ErrorMessage!)).ConfigureAwait(false);
+            return await QuitAndFailLeavingConnectionIntactAsync(listening.ExitCode, FtpTransferMessages.BindFailed(listening.ErrorMessage!)).ConfigureAwait(false);
         }
 
         trace.ActivePortListening();
@@ -1295,7 +1295,7 @@ internal sealed class FtpSession(
 
         if (!FtpPassiveReply.TryParseEpsvPort(epsv.LastLine, out int epsvPort, out string unreadable))
         {
-            return await QuitAndFailKeepingConnectionAsync(CurlExitCode.FtpWeirdPasvReply, unreadable).ConfigureAwait(false);
+            return await QuitAndFailAsync(CurlExitCode.FtpWeirdPasvReply, unreadable).ConfigureAwait(false);
         }
 
         TransferResult? dialFailure = await DialDataAsync(context.Url.IdnHost, controlPeerAddress, epsvPort).ConfigureAwait(false);
@@ -1676,10 +1676,10 @@ internal sealed class FtpSession(
 
     /// <summary>
     /// Reads the end-of-transfer reply, after curl 8.21.0's <c>-v</c> line naming the directory
-    /// it remembers, and ends the transfer: exit 18 for missing bytes, exit 70 after
-    /// <c>QUIT</c> for <c>552</c>, exit 18 after <c>QUIT</c> for any other reply but
-    /// <c>226</c> or <c>250</c>; otherwise the post-transfer quotes, <c>QUIT</c> and, for a
-    /// success, the <c>-v</c> line saying the control connection is left intact.
+    /// it remembers, and ends the transfer: exit 18 for missing bytes; exit 70 for <c>552</c>
+    /// and exit 18 for any other reply but <c>226</c> or <c>250</c>, each after the <c>-v</c>
+    /// line saying the control connection is left intact and <c>QUIT</c>; otherwise the
+    /// post-transfer quotes, <c>QUIT</c> and, for a success, that left-intact line.
     /// </summary>
     private async ValueTask<TransferResult> ReadTransferCompleteAsync()
     {
@@ -1695,7 +1695,7 @@ internal sealed class FtpSession(
         if (complete.Code is not (226 or 250))
         {
             (CurlExitCode exitCode, string message) = DescribeTransferNotOk(complete.Code);
-            return await QuitAndFailAsync(exitCode, message).ConfigureAwait(false);
+            return await QuitAndFailLeavingConnectionIntactAsync(exitCode, message).ConfigureAwait(false);
         }
 
         return await QuitAndKeepConnectionAsync().ConfigureAwait(false);
@@ -1727,20 +1727,29 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
-    /// Ends the transfer as <see cref="QuitAndFailAsync" /> does, after curl 8.21.0's <c>-v</c>
-    /// lines naming the directory it remembers and saying the control connection is left
-    /// intact, which its <c>ftp_done</c> writes for a failure that leaves the control
-    /// connection usable, such as an unreadable <c>229</c> (measured, BL-1240).
+    /// Sends <c>QUIT</c> and fails the transfer after curl 8.21.0's <c>-v</c> lines naming the
+    /// directory it remembers and saying the control connection is left intact, as measured
+    /// for exits 13, 17, 30, 36, 63 and 78 (BL-1240, BL-1251). Every caller passes a failure
+    /// curl's <c>ftp_done</c> says leaves the control connection "alive fine": exits 9, 10,
+    /// 12, 13, 17, 18, 19, 23, 25, 30, 36, 63 and 78; any other failure marks it invalid,
+    /// and its <c>-v</c> lines are not these.
     /// </summary>
-    private async ValueTask<TransferResult> QuitAndFailKeepingConnectionAsync(CurlExitCode exitCode, string message)
-    {
-        context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
-        context.Events.ReportInfo(FtpTransferMessages.ConnectionLeftIntact(controlName.Number, controlName.Host, controlName.Port));
-        return await QuitAndFailAsync(exitCode, message).ConfigureAwait(false);
-    }
-
     private async ValueTask<TransferResult> QuitAndFailAsync(CurlExitCode exitCode, string message)
     {
+        context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
+        return await QuitAndFailLeavingConnectionIntactAsync(exitCode, message).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>QUIT</c> and fails the transfer after curl 8.21.0's <c>-v</c> line saying the
+    /// control connection is left intact, with no line naming the directory: after a refused
+    /// <c>CWD</c> and after an active-mode port that cannot be bound, for which curl names no
+    /// directory, and after an end-of-transfer reply other than <c>226</c> or <c>250</c>,
+    /// whose directory line came before the reply (measured for exits 9, 18, 30 and 70, BL-1251).
+    /// </summary>
+    private async ValueTask<TransferResult> QuitAndFailLeavingConnectionIntactAsync(CurlExitCode exitCode, string message)
+    {
+        context.Events.ReportInfo(FtpTransferMessages.ConnectionLeftIntact(controlName.Number, controlName.Host, controlName.Port));
         await QuitAsync().ConfigureAwait(false);
         return TransferResult.Failure(exitCode, message, bytesTransferred);
     }
@@ -1795,10 +1804,25 @@ internal sealed class FtpSession(
         return await QuitAndSucceedAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Fails a download refused once its size is known (exit 36 or 63). Without a byte limit
+    /// it ends as <see cref="QuitAndFailAsync" /> does; with one, as curl 8.21.0 was measured to
+    /// (BL-1251): the <c>-v</c> line naming the directory it remembers, <c>ABOR</c>, the lines
+    /// saying the partial download closes and shuts down the connection, then <c>QUIT</c>.
+    /// </summary>
     private async ValueTask<TransferResult> EndAndFailAsync(CurlExitCode exitCode, string message)
     {
+        if (window.MaxDownload is null)
+        {
+            return await QuitAndFailAsync(exitCode, message).ConfigureAwait(false);
+        }
+
+        context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
         await AbortRangeAsync().ConfigureAwait(false);
-        return await QuitAndFailAsync(exitCode, message).ConfigureAwait(false);
+        context.Events.ReportInfo(FtpTransferMessages.PartialDownloadClosing);
+        context.Events.ReportInfo(FtpTransferMessages.ShuttingDownConnection(controlName.Number));
+        await QuitAsync().ConfigureAwait(false);
+        return TransferResult.Failure(exitCode, message, bytesTransferred);
     }
 
     /// <summary>

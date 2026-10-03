@@ -488,6 +488,160 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpWeirdPasvReply, "Illegal port number in EPSV reply"), run.Result);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_PasvRefusedAfterARefusedEpsv_ReportsTheDirectoryAndLeftIntactLinesAndFailsWithExit13()
+    {
+        // curl -v ftp://127.0.0.1:<port>/f.txt, EPSV and PASV answered 500 no, measured 2026-10-02 (BL-1251).
+        DataRun run = await RunAsync("/f.txt", LoggedIn + "500 no\r\n500 no\r\n" + Bye, _ => { });
+
+        string[] expected =
+        [
+            "> EPSV\r\n",
+            "* Connect data stream passively",
+            "< 500 no\r\n",
+            "* Failed EPSV attempt. Disabling EPSV",
+            "> PASV\r\n",
+            "< 500 no\r\n",
+            "* Remembering we are in directory \"\"",
+            "* Connection #0 to host 127.0.0.1:47931 left intact",
+        ];
+        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpWeirdPasvReply, "Bad PASV/EPSV response: 500"), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TypeRefused_ReportsTheDirectoryAndLeftIntactLinesAndFailsWithExit17()
+    {
+        // curl -v ftp://127.0.0.1:<port>/f.txt, TYPE answered 500 no, measured 2026-10-02 (BL-1251).
+        DataRun run = await RunAsync("/f.txt", LoggedIn + Epsv + "500 no\r\n" + Bye, _ => { });
+
+        string[] expected =
+        [
+            "> TYPE I\r\n",
+            "< 500 no\r\n",
+            "* Remembering we are in directory \"\"",
+            "* Connection #0 to host 127.0.0.1:47931 left intact",
+        ];
+        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        Assert.AreEqual(CurlExitCode.FtpCouldntSetType, run.Result.ExitCode);
+    }
+
+    [TestMethod]
+    [DataRow("", "> SIZE f.txt\r\n", DisplayName = "SIZE 550")]
+    [DataRow("213 11\r\n", "> RETR f.txt\r\n", DisplayName = "RETR 550")]
+    public async Task ExecuteAsync_FileNotFound_ReportsTheDirectoryAndLeftIntactLinesAndFailsWithExit78(string sizeReply, string refusedCommand)
+    {
+        // curl -v ftp://127.0.0.1:<port>/f.txt, SIZE or RETR answered 550 no, measured 2026-10-02 (BL-1251).
+        DataRun run = await RunAsync("/f.txt", LoggedIn + Epsv + "200 Type set\r\n" + sizeReply + "550 no\r\n" + Bye, _ => { });
+
+        string[] expected =
+        [
+            refusedCommand,
+            "< 550 no\r\n",
+            "* Remembering we are in directory \"\"",
+            "* Connection #0 to host 127.0.0.1:47931 left intact",
+        ];
+        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        Assert.AreEqual(CurlExitCode.RemoteFileNotFound, run.Result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ChangeDirectoryRefused_ReportsOnlyTheLeftIntactLineAndFailsWithExit9()
+    {
+        // curl -v ftp://127.0.0.1:<port>/d/f.txt, CWD answered 550 no, measured 2026-10-02 (BL-1251):
+        // no directory is remembered after a refused CWD.
+        DataRun run = await RunAsync("/d/f.txt", LoggedIn + "550 no\r\n" + Bye, _ => { });
+
+        string[] expected =
+        [
+            .. LoggedInTranscript,
+            "> CWD d\r\n",
+            "< 550 no\r\n",
+            "* Connection #0 to host 127.0.0.1:47931 left intact",
+        ];
+        CollectionAssert.AreEqual(expected, run.Events.Transcript);
+        Assert.AreEqual(CurlExitCode.RemoteAccessDenied, run.Result.ExitCode);
+    }
+
+    [TestMethod]
+    [DataRow("451 no\r\n", CurlExitCode.PartialFile)]
+    [DataRow("552 full\r\n", CurlExitCode.RemoteDiskFull)]
+    public async Task ExecuteAsync_TransferEndedWithoutOk_ReportsTheLeftIntactLineAfterTheReply(string reply, CurlExitCode exitCode)
+    {
+        // curl -v ftp://127.0.0.1:<port>/f.txt, the reply after RETR's data 451 or 552, measured 2026-10-02 (BL-1251).
+        DataRun run = await RunAsync("/f.txt", LoggedIn + Epsv + "200 Type set\r\n213 11\r\n" + Opened + reply + Bye, _ => { });
+
+        string[] expected =
+        [
+            "* Remembering we are in directory \"\"",
+            "< " + reply,
+            "* Connection #0 to host 127.0.0.1:47931 left intact",
+        ];
+        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        Assert.AreEqual(exitCode, run.Result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ResumeBeyondTheFileSize_ReportsTheDirectoryAndLeftIntactLinesAndFailsWithExit36()
+    {
+        // curl -v -C 200 ftp://127.0.0.1:<port>/f.txt, SIZE answered 213 5, measured 2026-10-02 (BL-1251).
+        DataRun run = await RunAsync("/f.txt", LoggedIn + Epsv + "200 Type set\r\n213 5\r\n" + Bye, context => context.ResumeFrom = 200);
+
+        string[] expected =
+        [
+            "> SIZE f.txt\r\n",
+            "< 213 5\r\n",
+            "* Remembering we are in directory \"\"",
+            "* Connection #0 to host 127.0.0.1:47931 left intact",
+        ];
+        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadDownloadResume, "Offset (200) was beyond file size (5)"), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MaxFileSizeExceeded_ReportsTheDirectoryAndLeftIntactLinesAndFailsWithExit63()
+    {
+        // curl -v --max-filesize 50 ftp://127.0.0.1:<port>/f.txt, SIZE answered 213 100, measured 2026-10-02 (BL-1251).
+        DataRun run = await RunAsync("/f.txt", LoggedIn + Epsv + "200 Type set\r\n213 100\r\n" + Bye, context => context.MaxFileSize = 50);
+
+        string[] expected =
+        [
+            "> SIZE f.txt\r\n",
+            "< 213 100\r\n",
+            "* Remembering we are in directory \"\"",
+            "* Connection #0 to host 127.0.0.1:47931 left intact",
+        ];
+        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        Assert.AreEqual(CurlExitCode.FilesizeExceeded, run.Result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MaxFileSizeExceededWithARange_AbortsAndShutsTheConnectionDown()
+    {
+        // curl -v -r 0-2 --max-filesize 50 ftp://127.0.0.1:<port>/f.txt, SIZE answered 213 100,
+        // measured 2026-10-02 (BL-1251): ABOR, and the connection is not left intact.
+        DataRun run = await RunAsync(
+            "/f.txt",
+            LoggedIn + Epsv + "200 Type set\r\n213 100\r\n502 Command not implemented\r\n" + Bye,
+            context =>
+            {
+                context.Range = ByteRange.Bounded(0, 2);
+                context.MaxFileSize = 50;
+            });
+
+        string[] expected =
+        [
+            "< 213 100\r\n",
+            "* Remembering we are in directory \"\"",
+            "> ABOR\r\n",
+            "< 502 Command not implemented\r\n",
+            "* partial download completed, closing connection",
+            "* shutting down connection #0",
+        ];
+        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        Assert.AreEqual(CurlExitCode.FilesizeExceeded, run.Result.ExitCode);
+    }
+
     private static async Task<DataRun> RunAsync(
         string path,
         string replies,

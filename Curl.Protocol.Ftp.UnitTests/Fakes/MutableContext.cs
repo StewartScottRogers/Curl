@@ -31,6 +31,8 @@ public sealed class MutableContext
 
     public ByteRange? Range { get; set; }
 
+    public long? MaxFileSize { get; set; }
+
     public bool NoBody { get; set; }
 
     public bool RemoteTime { get; set; }
@@ -81,6 +83,7 @@ public sealed class MutableContext
             ResumeFrom = mutable.ResumeFrom,
             ResumeUploadFromUnknownOffset = mutable.ResumeUploadFromUnknownOffset,
             Range = mutable.Range,
+            MaxFileSize = mutable.MaxFileSize,
             NoBody = mutable.NoBody,
             RemoteTime = mutable.RemoteTime,
             FtpAccount = mutable.FtpAccount,
