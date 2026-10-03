@@ -1,3 +1,4 @@
+using System.Globalization;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Transport;
 
@@ -35,12 +36,15 @@ internal sealed class SftpFileDownload(SshTransport transport)
     /// <param name="quotes">The <c>-Q</c> commands, run after <c>REALPATH</c> and after the handle's close; none when not given.</param>
     /// <param name="range">The <c>-r</c> range, read as <see cref="SftpDownloadPart.Choose" /> reads it; the whole file when not given.</param>
     /// <param name="resumeFrom">The <c>-C</c> offset; no resume when not given or 0.</param>
+    /// <param name="maxFileSize">The <c>--max-filesize</c> limit; no limit when not given or 0 (BL-1327).</param>
     /// <returns>
     /// Success with the bytes downloaded; exit 33 or 36, with nothing read, for a range or
     /// <c>-C</c> offset the file cannot serve (<see cref="SftpDownloadPart.Choose" />); exit 18, <c>end of response with N bytes
     /// missing</c>, when the file ends before the size <c>STAT</c> gave; exit 79,
     /// <c>Error in the SSH layer</c>, when a read fails or the connection breaks during
-    /// the copy - each with the bytes written so far; success with nothing written when
+    /// the copy; exit 63, <c>Exceeded the maximum allowed file size (N) with N bytes</c>, when
+    /// a read would pass <paramref name="maxFileSize" />, after writing the bytes under it -
+    /// each with the bytes written so far; success with nothing written when
     /// the connection is closed or reset at <c>OPEN</c>, as measured (BL-1046).
     /// </returns>
     /// <exception cref="SshTransferException">
@@ -56,7 +60,8 @@ internal sealed class SftpFileDownload(SshTransport transport)
         CancellationToken cancellationToken,
         SftpQuoteCommands? quotes = null,
         ByteRange? range = null,
-        long? resumeFrom = null)
+        long? resumeFrom = null,
+        long? maxFileSize = null)
     {
         quotes ??= SftpQuoteCommands.None;
         Trace.Enter("SSH_SFTP_INIT");
@@ -82,7 +87,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 Trace.Enter("SSH_SFTP_DOWNLOAD_STAT");
                 long? size = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.StatSizeAsync(path, cancellationToken)).ConfigureAwait(false);
-                TransferResult result = await CopyPartOfKnownSizeAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
+                TransferResult result = await CopyPartOfKnownSizeAsync(session, handle, size, range, resumeFrom, maxFileSize, output, progress, cancellationToken).ConfigureAwait(false);
                 Trace.Enter("SSH_SFTP_CLOSE");
                 result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
                 Trace.EndSftpDonePhase();
@@ -114,6 +119,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
         long? size,
         ByteRange? range,
         long? resumeFrom,
+        long? maxFileSize,
         Stream output,
         ITransferProgress progress,
         CancellationToken cancellationToken)
@@ -126,7 +132,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
 
         Trace.Rest();
         Trace.Write("DO phase is complete");
-        return await CopyPartAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
+        return await CopyPartAsync(session, handle, size, range, resumeFrom, maxFileSize, output, progress, cancellationToken).ConfigureAwait(false);
     }
 
     // Measured: a range or -C offset the file cannot serve reads nothing, and the handle
@@ -137,6 +143,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
         long? size,
         ByteRange? range,
         long? resumeFrom,
+        long? maxFileSize,
         Stream output,
         ITransferProgress progress,
         CancellationToken cancellationToken)
@@ -151,13 +158,15 @@ internal sealed class SftpFileDownload(SshTransport transport)
             return TransferResult.Failure(failure.ExitCode, failure.Message);
         }
 
-        Copy copy = new(new SftpReadAhead(session, handle, part), part.Length, output, progress);
+        Copy copy = new(new SftpReadAhead(session, handle, part), part.Length, maxFileSize is > 0 and long limit ? limit : long.MaxValue, output, progress);
         return await copy.RunAsync(cancellationToken).ConfigureAwait(false);
     }
 
     // One copy of the part's bytes to the output, counting them as they go; what a read
-    // returns beyond the part is dropped, as curl stops at the size it expects.
-    private sealed class Copy(SftpReadAhead reads, long? size, Stream output, ITransferProgress progress)
+    // returns beyond the part is dropped, as curl stops at the size it expects; a read
+    // that would pass the --max-filesize limit is cut at it, as curl 8.21.0's
+    // cw_download_write cuts it, and the copy fails with exit 63 (BL-1327).
+    private sealed class Copy(SftpReadAhead reads, long? size, long maxFileSize, Stream output, ITransferProgress progress)
     {
         private long received;
 
@@ -185,13 +194,26 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 }
 
                 data = data[..(int)Math.Min(data.Length, (size ?? long.MaxValue) - received)];
-                await output.WriteAsync(data, cancellationToken).ConfigureAwait(false);
-                received += data.Length;
+                int allowed = (int)Math.Min(data.Length, maxFileSize - received);
+                await output.WriteAsync(data[..allowed], cancellationToken).ConfigureAwait(false);
+                received += allowed;
                 progress.ReportDownloaded(received, size);
+                if (allowed < data.Length)
+                {
+                    return MaxFileSizeExceeded();
+                }
             }
 
             return TransferResult.Success(received);
         }
+
+        // From curl 8.21.0's cw_download_write (lib/sendf.c): a body exactly at the limit
+        // succeeds; one cut at it fails after the bytes under it are written.
+        private TransferResult MaxFileSizeExceeded() =>
+            TransferResult.Failure(
+                CurlExitCode.FilesizeExceeded,
+                string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({maxFileSize}) with {received} bytes"),
+                received);
 
         // Measured: a file that ends 5 bytes short of its STAT size is exit 18.
         private TransferResult EndOfFile() =>
