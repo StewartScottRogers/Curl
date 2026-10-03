@@ -28,7 +28,10 @@ reader and writer, the authentication, the channel and the SFTP session all writ
 a new SSH step logs through it, never a password, pass phrase or key byte. The console passes the platform's preset and ADR-0022's credential
 encoding. `Curl.Protocol.Ssh.UnitTests` drives it end to end against the public
 `Fakes.InMemorySshServer`, an `IConnector` answering each connection with a real
-server-side session over `Fakes.InMemoryDuplexConnection`.
+server-side session over `Fakes.InMemoryDuplexConnection`. `SshWireDecoders`, also at
+the root, runs the readers of server bytes - packets, zlib, `KEXINIT`, SFTP attributes,
+host-key signatures - over raw bytes for the audit fuzzer (ADR-0394); a new reader of
+what a server sends gets a method there.
 
 Folders follow ADR-0122's structure. `Transport` frames packets and runs the
 handshake (`SshTransport`: identification, `KEXINIT`, key exchange, `NEWKEYS`, a

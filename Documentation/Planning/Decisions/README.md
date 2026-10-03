@@ -403,6 +403,7 @@ choices do not need one.
 | [0391](ADR-0391-a-refused-connect-and-a-reused-connection-write-their-own-multi-lines.md) | Under `--trace-config multi` a refused connect writes curl's close, `connect failed -> 7`, `multi_done` and `[COMPLETED]` lines, polling once, and a reused connection writes its own lines up to `xfer_setup` (BL-1212) | Accepted | 2026-10-02 |
 | [0392](ADR-0392-a-redirect-after-a-request-body-writes-curls-rewind-lines.md) | A `3xx` under `-L` after a request body writes `Need to rewind upload for next request` from the HTTP handler, and `--trace-config read` adds curl's three rewind `[READ]` lines around the hop (BL-1213) | Accepted | 2026-10-02 |
 | [0393](ADR-0393-camellia-reads-its-s-box-by-masked-scan-and-is-constant-time.md) | `Camellia`'s F-function reads SBOX1 by one masked scan of all 256 entries per round, so no address depends on the key or data, and it is constant-time; supersedes ADR-0145 (BL-1268, AF-0012) | Accepted | 2026-10-02 |
+| [0394](ADR-0394-the-ssh-library-exposes-its-server-byte-readers-for-fuzzing.md) | `Curl.Protocol.Ssh.UnitLibrary` exposes its packet, zlib, `KEXINIT`, SFTP attribute and host-key signature readers over raw bytes through the public `SshWireDecoders`, so the audit fuzzer can reach them (AF-0011, BL-1267) | Accepted | 2026-10-02 |
 
 ## Template
 
