@@ -39,6 +39,7 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 ## Re-audits
 
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction with -Since 2026-09-30. Only BL-1289 has claims>=3 (6). BL-1121, BL-892 and BL-907 are absent: the log folder holds no logs for them. Absence of logs, not a fix.
+- 2026-10-03 | 2026-10-03_1233.md | reproduces: no | With -Since 2026-09-30 the only task with claims of 3 or more is BL-1322 (5). BL-1121, BL-892 and BL-907 are absent from the logs.
 
 ## Log
 
