@@ -29,6 +29,12 @@ When Negotiate is picked only after the challenge (`--anyauth`, or `--negotiate 
 
 ## Notes
 
+- Measured 2026-10-03, curl 8.21.0 (x86_64-w64-mingw32, Schannel), `Record-CurlExchange.ps1 -Response <401 Negotiate => x3 -CurlArgs -sv --max-time 8 --anyauth -u : URL` (and the same with `--negotiate --basic`). stderr after the 401:
+  `* Issue another request to this URL: 'http://127.0.0.1:47314/'`, `* Reusing existing http: connection with host 127.0.0.1`, `* InitializeSecurityContext failed: SEC_E_NO_CREDENTIALS (0x8009030e) - No credentials are available in the security package`, `* Server auth using Negotiate with user ''`, then a second `GET /` with no `Authorization` header. **No `SPNEGO handshake failure (empty challenge message)` line.** Exit code: the recorder serves one response per connection, so curl's retry on a fresh connection timed out (28, from `--max-time`); without `--max-time` it hung for 30 minutes. The exit code that matters here is "a further request is sent", which it is.
+- Why: `Curl_auth_decode_spnego_message` decodes the challenge (and writes the line for a token starting with `=`) only when a context already exists - the second leg BL-1303 pinned. On the first leg (`--anyauth`, Negotiate picked from the 401) there is no context, so the token is ignored and a fresh context steps.
+- Decision (measured, no ADR needed - it is ADR-0232's existing behaviour): the task's premise was wrong. Curl already matches: `RankedHttpAuthenticator.CreateAuthorizationAsync` steps one context, reports its failure only, and answers `string.Empty` (ask again without a header). No production change; pinned with `NegotiateEmptyChallengeMessageTests.CreateAuthorizationAsync_NegotiatePickedAfterA401WithEquals_StepsAContextWithoutTheLineAndAsksAgain` (`--anyauth` SSPI and GSS-API wording, `--negotiate --basic`). Acceptance criterion 2 reworded from "asserts the info line ... no context created" to what curl was measured to do.
+- Build `dotnet build Curl.Authentication.UnitTests -warnaserror`: 0 errors. Tests: 800 passed, 4 skipped (platform-conditional), 0 failed. `dotnet format --verify-no-changes` clean.
+
 ## Log
 
 - 2026-10-03: Created.
