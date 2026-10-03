@@ -71,7 +71,7 @@ public sealed class QpackRoundTripTests
     }
 
     [TestMethod]
-    public void DynamicTable_OnceWarm_EncodesARepeatedRequestAsIndexesBelowBase()
+    public void DynamicTable_OnceWarm_EncodesARepeatedRequestAsIndexesBelowBaseAndThePathAsALiteral()
     {
         var encoder = new QpackEncoder(4096, 16);
         var decoder = new QpackDecoder(4096, 16);
@@ -83,8 +83,8 @@ public sealed class QpackRoundTripTests
 
         var repeat = encoder.EncodeFieldSection(4, Requests[0]);
 
-        CollectionAssert.AreEqual(FromHex("0482 d1 d7 10 11 12 dd"), first);
-        CollectionAssert.AreEqual(FromHex("0400 d1 d7 82 81 80 dd"), repeat);
+        CollectionAssert.AreEqual(FromHex("0381 d1 d7 10 51 88 60d5485f2bce9a68 11 dd"), first);
+        CollectionAssert.AreEqual(FromHex("0300 d1 d7 81 51 88 60d5485f2bce9a68 80 dd"), repeat);
         Assert.IsEmpty(encoder.TakeEncoderStreamBytes());
         CollectionAssert.AreEqual(Requests[0], Decode(decoder, 4, repeat));
     }

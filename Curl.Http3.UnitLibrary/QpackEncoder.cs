@@ -16,7 +16,10 @@ namespace Curl.Http3;
 /// <para>
 /// A field line is encoded as the first of these that applies: a static entry matching
 /// name and value; the newest dynamic entry matching both; a new dynamic entry inserted
-/// for it; a literal naming a static entry; a literal naming the newest dynamic entry with
+/// for it, unless nghttp3 keeps the field literal (<c>:path</c>, <c>age</c>,
+/// <c>content-length</c>, <c>etag</c>, <c>if-modified-since</c>, <c>if-none-match</c>,
+/// <c>location</c>, <c>set-cookie</c>, a name it has no token for, or a field over three
+/// quarters of the table's capacity); a literal naming a static entry; a literal naming the newest dynamic entry with
 /// the name; a literal with a literal name. A never-indexed field skips every dynamic step
 /// and every indexed form; as in nghttp3, which curl's HTTP/3 build uses, that is a field
 /// marked <see cref="HeaderField.IsNeverIndexed" />, every <c>authorization</c>, and a
@@ -33,10 +36,18 @@ public sealed class QpackEncoder
     /// <summary>A <c>cookie</c> shorter than this is never indexed, as nghttp3 decides.</summary>
     private const int ShortestIndexedCookieLength = 20;
 
+    /// <summary>Names nghttp3 always encodes as literals, never inserting them into the dynamic table.</summary>
+    private static readonly HashSet<string> LiteralOnlyNames =
+        [":path", "age", "content-length", "etag", "if-modified-since", "if-none-match", "location", "set-cookie"];
+
+    /// <summary>The names outside the static table that nghttp3 has a token for and inserts into the dynamic table.</summary>
+    private static readonly HashSet<string> StoredNamesOutsideStaticTable = ["host", "te", ":protocol", "priority"];
+
     private readonly QpackDynamicTable table = new();
     private readonly long maximumTableCapacity;
     private readonly long maximumBlockedStreams;
     private readonly bool huffmanCodeLiterals;
+    private readonly bool tryIndexEveryName;
     private readonly List<byte> encoderStreamBytes = [];
     private readonly List<byte> unreadDecoderStreamBytes = [];
     private readonly List<UnacknowledgedSection> unacknowledgedSections = [];
@@ -50,13 +61,20 @@ public sealed class QpackEncoder
     /// <param name="huffmanCodeLiterals">
     /// Whether string literals are Huffman-coded when that makes them strictly shorter.
     /// </param>
-    public QpackEncoder(long maximumTableCapacity, long maximumBlockedStreams, bool huffmanCodeLiterals = true)
+    /// <param name="tryIndexEveryName">
+    /// Whether a field of any name is inserted into the dynamic table when it fits, as
+    /// nghttp3 does for a field flagged <c>NGHTTP3_NV_FLAG_TRY_INDEX</c> and as RFC 9204
+    /// appendix B's encoder does; a field over three quarters of the capacity still stays
+    /// literal. Off by default, as in curl, which flags no field.
+    /// </param>
+    public QpackEncoder(long maximumTableCapacity, long maximumBlockedStreams, bool huffmanCodeLiterals = true, bool tryIndexEveryName = false)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maximumTableCapacity);
         ArgumentOutOfRangeException.ThrowIfNegative(maximumBlockedStreams);
         this.maximumTableCapacity = maximumTableCapacity;
         this.maximumBlockedStreams = maximumBlockedStreams;
         this.huffmanCodeLiterals = huffmanCodeLiterals;
+        this.tryIndexEveryName = tryIndexEveryName;
     }
 
     /// <summary>Gets how many entries this encoder has inserted into the dynamic table.</summary>
@@ -226,7 +244,7 @@ public sealed class QpackEncoder
             return;
         }
 
-        if (!TryWriteDynamicIndexed(field, section))
+        if (!TryWriteDynamicIndexed(field, IsStored(field, staticIndex), section))
         {
             WriteLiteral(field, staticIndex, section);
         }
@@ -237,10 +255,26 @@ public sealed class QpackEncoder
         || field.Name == "authorization"
         || (field.Name == "cookie" && field.Value.Length < ShortestIndexedCookieLength);
 
-    private bool TryWriteDynamicIndexed(HeaderField field, SectionInProgress section)
+    /// <summary>
+    /// Gets whether a field may be inserted into the dynamic table to encode it, as
+    /// nghttp3's <c>qpack_encoder_decide_indexing_mode</c> decides: not one of
+    /// <see cref="LiteralOnlyNames" />, not a name nghttp3 has no token for (outside the
+    /// static table and <see cref="StoredNamesOutsideStaticTable" />), and taking no more
+    /// than three quarters of the table's capacity. With <see cref="tryIndexEveryName" />
+    /// only the size counts.
+    /// </summary>
+    private bool IsStored(HeaderField field, int staticIndex) =>
+        (tryIndexEveryName || IsStoredName(field.Name, staticIndex))
+        && field.Size <= table.Capacity * 3 / 4;
+
+    private static bool IsStoredName(string name, int staticIndex) =>
+        !LiteralOnlyNames.Contains(name)
+        && (staticIndex >= 0 || StoredNamesOutsideStaticTable.Contains(name));
+
+    private bool TryWriteDynamicIndexed(HeaderField field, bool mayInsert, SectionInProgress section)
     {
         var absoluteIndex = table.FindNewest(field.Name, field.Value, true, section.LargestUsableIndex(knownReceivedCount));
-        if (absoluteIndex < 0 && section.CanBlock && TryInsert(field, section.SmallestReference))
+        if (absoluteIndex < 0 && mayInsert && section.CanBlock && TryInsert(field, section.SmallestReference))
         {
             absoluteIndex = table.InsertCount - 1;
         }

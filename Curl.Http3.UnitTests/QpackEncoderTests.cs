@@ -65,7 +65,7 @@ public sealed class QpackEncoderTests
     [TestMethod]
     public void EncodeFieldSection_EntryTooLargeToInsert_NamesTheEntryInsertedForThisSectionPostBase()
     {
-        var encoder = new QpackEncoder(100, 1, huffmanCodeLiterals: false);
+        var encoder = new QpackEncoder(100, 1, huffmanCodeLiterals: false, tryIndexEveryName: true);
         encoder.TrySetDynamicTableCapacity(100);
         var longValue = new string('v', 70);
 
@@ -78,7 +78,7 @@ public sealed class QpackEncoderTests
     [TestMethod]
     public void EncodeFieldSection_BlockedStreamLimit_LetsABlockedStreamGoOnBlockingButNoOther()
     {
-        var encoder = new QpackEncoder(220, 1, huffmanCodeLiterals: false);
+        var encoder = new QpackEncoder(220, 1, huffmanCodeLiterals: false, tryIndexEveryName: true);
         encoder.TrySetDynamicTableCapacity(220);
 
         CollectionAssert.AreEqual(FromHex("0280 10"), encoder.EncodeFieldSection(4, Fields(("x", "1"))));
@@ -94,7 +94,7 @@ public sealed class QpackEncoderTests
     [TestMethod]
     public void TryInsert_WouldEvictAnEntryAnUnacknowledgedSectionReferences_IsRefusedUntilAcknowledged()
     {
-        var encoder = new QpackEncoder(100, 2, huffmanCodeLiterals: false);
+        var encoder = new QpackEncoder(100, 2, huffmanCodeLiterals: false, tryIndexEveryName: true);
         encoder.TrySetDynamicTableCapacity(100);
         encoder.EncodeFieldSection(4, Fields(("x-a", "1")));
         encoder.ReadDecoderStream(FromHex("01"));
@@ -110,7 +110,7 @@ public sealed class QpackEncoderTests
     [TestMethod]
     public void TryInsert_StreamCancelled_ReleasesItsReferences()
     {
-        var encoder = new QpackEncoder(100, 2, huffmanCodeLiterals: false);
+        var encoder = new QpackEncoder(100, 2, huffmanCodeLiterals: false, tryIndexEveryName: true);
         encoder.TrySetDynamicTableCapacity(100);
         encoder.EncodeFieldSection(4, Fields(("x-a", "1")));
         encoder.ReadDecoderStream(FromHex("01"));
@@ -184,7 +184,7 @@ public sealed class QpackEncoderTests
     [TestMethod]
     public void ReadDecoderStream_InstructionSplitAcrossReads_TakesEffectOnceComplete()
     {
-        var encoder = new QpackEncoder(220, 1, huffmanCodeLiterals: false);
+        var encoder = new QpackEncoder(220, 1, huffmanCodeLiterals: false, tryIndexEveryName: true);
         encoder.TrySetDynamicTableCapacity(220);
         encoder.EncodeFieldSection(200, Fields(("x", "1")));
 
@@ -230,6 +230,66 @@ public sealed class QpackEncoderTests
         var section = encoder.EncodeFieldSection(0, Fields((name, value)));
 
         CollectionAssert.AreEqual(FromHex(expectedSection), section);
+        Assert.IsEmpty(encoder.TakeEncoderStreamBytes());
+    }
+
+    [TestMethod]
+    [DataRow(":path", "/x", "0000 51 022f78")]
+    [DataRow("etag", "\"a\"", "0000 57 03226122")]
+    [DataRow("x-custom", "1", "0000 2701 782d637573746f6d 0131")]
+    public void EncodeFieldSection_NameNghttp3KeepsLiteral_IsNeverInserted(string name, string value, string expectedSection)
+    {
+        var encoder = new QpackEncoder(4096, 16, huffmanCodeLiterals: false);
+        encoder.TrySetDynamicTableCapacity(4096);
+        encoder.TakeEncoderStreamBytes();
+
+        var section = encoder.EncodeFieldSection(0, Fields((name, value)));
+
+        CollectionAssert.AreEqual(FromHex(expectedSection), section);
+        Assert.IsEmpty(encoder.TakeEncoderStreamBytes());
+        Assert.AreEqual(0, encoder.InsertCount);
+    }
+
+    [TestMethod]
+    public void EncodeFieldSection_FieldOverThreeQuartersOfTheCapacity_IsNeverInserted()
+    {
+        var encoder = new QpackEncoder(100, 16, huffmanCodeLiterals: false, tryIndexEveryName: true);
+        encoder.TrySetDynamicTableCapacity(100);
+        encoder.TakeEncoderStreamBytes();
+        var value = new string('v', 34);
+
+        var section = encoder.EncodeFieldSection(0, Fields(("user-agent", value)));
+
+        CollectionAssert.AreEqual(FromHex("0000 5f50 22").Concat(Enumerable.Repeat((byte)'v', 34)).ToArray(), section);
+        Assert.IsEmpty(encoder.TakeEncoderStreamBytes());
+    }
+
+    [TestMethod]
+    [DataRow("user-agent", "curl/8.21.0", "ff20 0b 6375726c2f382e32312e30")]
+    [DataRow("host", "a", "44 686f7374 01 61")]
+    public void EncodeFieldSection_NameNghttp3Stores_IsInserted(string name, string value, string expectedEncoderStream)
+    {
+        var encoder = new QpackEncoder(4096, 16, huffmanCodeLiterals: false);
+        encoder.TrySetDynamicTableCapacity(4096);
+        encoder.TakeEncoderStreamBytes();
+
+        var section = encoder.EncodeFieldSection(0, Fields((name, value)));
+
+        CollectionAssert.AreEqual(FromHex("0280 10"), section);
+        CollectionAssert.AreEqual(FromHex(expectedEncoderStream), encoder.TakeEncoderStreamBytes());
+    }
+
+    [TestMethod]
+    public void EncodeFieldSection_LiteralOnlyFieldAlreadyInTheDynamicTable_IsReferencedFromIt()
+    {
+        var encoder = new QpackEncoder(4096, 16, huffmanCodeLiterals: false);
+        encoder.TrySetDynamicTableCapacity(4096);
+        encoder.TryInsert(new HeaderField(":path", "/x"));
+        encoder.TakeEncoderStreamBytes();
+
+        var section = encoder.EncodeFieldSection(0, Fields((":path", "/x")));
+
+        CollectionAssert.AreEqual(FromHex("0200 80"), section);
         Assert.IsEmpty(encoder.TakeEncoderStreamBytes());
     }
 

@@ -6,7 +6,8 @@ namespace Curl.Http3;
 /// <summary>
 /// Replays RFC 9204 appendix B byte for byte: the encoder produces every published field
 /// section and encoder stream instruction, and the decoder reads them back, producing
-/// every published decoder stream instruction and table state. The examples run in order
+/// every published decoder stream instruction and table state. The encoder inserts every
+/// name, as the appendix does, where curl's nghttp3 keeps :path literal. The examples run in order
 /// on one connection whose decoder advertised a 220-byte table (MaxEntries 6).
 /// </summary>
 [TestClass]
@@ -140,7 +141,7 @@ public sealed class QpackAppendixBTests
         CollectionAssert.AreEqual(FromHex("88"), decoder.TakeDecoderStreamBytes());
     }
 
-    private static QpackEncoder NewEncoder() => new(MaximumTableCapacity, 100, huffmanCodeLiterals: false);
+    private static QpackEncoder NewEncoder() => new(MaximumTableCapacity, 100, huffmanCodeLiterals: false, tryIndexEveryName: true);
 
     private static QpackDecoder NewDecoder() => new(MaximumTableCapacity, 100);
 }
