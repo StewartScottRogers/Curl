@@ -36,3 +36,4 @@ The telnet handler words every failed socket send with `CurlSocketErrorText` (BL
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
