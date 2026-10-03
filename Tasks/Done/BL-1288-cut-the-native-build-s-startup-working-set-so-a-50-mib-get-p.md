@@ -8,7 +8,7 @@ depends-on: [BL-1289, BL-1290]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1288 — Cut the native build's startup working set so a 50 MiB GET peaks at most 2x curl's
 
@@ -57,9 +57,9 @@ first when only MSBuild properties changed, or ILC does not relink.
 
 ## Acceptance criteria
 
-- [ ] On Windows, `AccountHomeDirectory.ForPlatform(true)` returns `null` and neither `CurlComposition` nor `DefaultConfigFileSearch.ForProcess` calls `Environment.GetFolderPath` on Windows; off Windows the `.curlrc` and `known_hosts` searches still end with the account's home directory, pinned by unit tests in `Curl.Cli.UnitTests`.
-- [ ] Measured as in Context, the published `curl.exe`'s median peak working set over 5 runs is at most 2x Windows `curl.exe`'s for both the `-o` run and the piped-stdout run, with the numbers recorded under Notes.
-- [ ] No output byte, exit code or `-v` line changes: `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] On Windows, `AccountHomeDirectory.ForPlatform(true)` returns `null` and neither `CurlComposition` nor `DefaultConfigFileSearch.ForProcess` calls `Environment.GetFolderPath` on Windows; off Windows the `.curlrc` and `known_hosts` searches still end with the account's home directory, pinned by unit tests in `Curl.Cli.UnitTests`.
+- [x] Measured as in Context, the published `curl.exe`'s median peak working set over 5 runs is at most 2x Windows `curl.exe`'s for both the `-o` run and the piped-stdout run, with the numbers recorded under Notes.
+- [x] No output byte, exit code or `-v` line changes: `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -100,9 +100,33 @@ What the rest of the excess is (all measured in this run):
   private memory 1.4 MB. So even with BL-1289 and BL-1290 the `-o` run lands near 15 MB; if it is still
   over 14.86 MB once they are Done, the startup code paged in (`.text`) is the next lead.
 
+### Run of 2026-10-03 (lane 7): Done, no code change needed
+
+BL-1290 (commit 46eb46b1) landed step 1 as `AccountHomeDirectory.ReadOffWindows(bool isWindows, Func<string>)`
+and `AccountHomeDirectory.ForProcess` rather than the `ForPlatform(bool)` this task named: same behaviour,
+`null` on Windows without calling `Environment.GetFolderPath`, which neither `CurlComposition` nor
+`DefaultConfigFileSearch.ForProcess` calls any more. Pinned by `AccountHomeDirectoryTests` and, off
+Windows, by `DefaultConfigFileSearchTests` (lists end with `/account/.curlrc`) and `SshKnownHostsFileSearchTests`.
+Kept that name rather than renaming it to match this task's wording. BL-1289 (commit 66f76c67) took the
+per-chunk allocations out of the read and output paths, which covers the synchronous stdout write the
+previous run stashed.
+
+Measured as in Context on Windows 11, 2026-10-03, at commit 023395df (`dotnet publish Curl.Console -c Release`,
+native folder deleted first), a C# file-based app with a loopback `TcpListener`, `K32GetProcessMemoryInfo`
+after exit, median of 5:
+
+| Run | Windows `curl.exe` | Curl | Ratio |
+| --- | --- | --- | --- |
+| `-s -o <file>` | 7.43 MB | 14.61 MB | 1.97x |
+| `-s`, piped stdout | 7.45 MB | 14.55 MB | 1.95x |
+
+Both are under 2x, though only about 0.25 MB under. If later work grows the startup footprint, the next
+lead is still the 4.9 MB of `curl.exe`'s own image pages (`.text` 2.7 MB) that the previous run found paged in.
+
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-02: Doing -> Backlog. Waits on BL-1289 (read-path allocations) and BL-1290 (ole32/user32 imports); after this run's changes the 50 MiB GET peaks at 2.35x (-o) and 2.25x (pipe)
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. Native curl.exe's 50 MiB GET peaks at 1.97x (-o) and 1.95x (pipe) Windows curl.exe's working set, after BL-1289 and BL-1290
