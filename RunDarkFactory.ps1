@@ -147,7 +147,12 @@
       claim      A lane takes the next task the board offers - one whose `touches` do
                  not overlap any task in Doing - moves it to Doing, commits and pushes
                  that move. The push is the lock: if another lane got there first, the
-                 push is refused and the lane picks again.
+                 push is refused, traced as "race", and the lane picks again. Only
+                 a pushed claim is traced as "claim".
+      offline    Before a claim or an integration attempt the lane checks that
+                 origin answers, and waits up to an hour for it when it does not, so
+                 a GitHub outage never parks finished work or counts as a lost race
+                 (AF-0025, BL-1281).
       run        /task-run in the lane's worktree. The run commits but never pushes.
       integrate  The lane rebases its commits onto the shared branch, rebuilds, runs
                  the fast tests and pushes. Red fast tests are run once more, with the
@@ -2932,6 +2937,31 @@ function Enter-Lock {
     }
 }
 
+function Test-RemoteReachable {
+    # Whether origin answers at all, so a failed fetch or push can be told apart: refused by
+    # a remote that answers (another lane pushed first) or never heard (GitHub out of reach).
+    & git -C $Root ls-remote -q origin "refs/heads/$Branch" 2>&1 | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Wait-RemoteReachable {
+    # Waits for origin to answer, up to -Minutes, polling every -PollSeconds. An outage at
+    # GitHub is no reason to park finished work, or to trace a claim that was never refused
+    # as a lost race: on 2026-09-30 a few minutes of "unable to access" parked BL-892, which
+    # was finished, and another lane did it again (AF-0025, BL-1281). Returns $true once
+    # origin answers, $false when it never did.
+    param([string]$Id = '-', [int]$Minutes = 60, [int]$PollSeconds = 30)
+    if (Test-RemoteReachable) { return $true }
+    Write-Trace $Id 'offline' "origin out of reach; waiting up to $Minutes min for it" 'DarkYellow'
+    $deadline = (Get-Date).AddMinutes($Minutes)
+    while ((Get-Date) -lt $deadline) {
+        Write-HeartbeatIfDue
+        Start-Sleep -Seconds $PollSeconds
+        if (Test-RemoteReachable) { Write-Trace $Id 'online' 'origin answers again'; return $true }
+    }
+    return $false
+}
+
 function Sync-Lane {
     # Puts this lane's checkout exactly on the shared branch as it is on the remote.
     Save-StrayChanges 'sync'
@@ -2959,6 +2989,7 @@ function Invoke-Claim {
     $lock = Enter-Lock
     try {
         foreach ($attempt in 1..5) {
+            if (-not (Wait-RemoteReachable)) { return @{ Wait = $true; Why = 'origin out of reach' } }
             if (-not (Sync-Lane)) { Start-Sleep -Seconds 10; continue }
             $requeued = @(Invoke-Requeue)
             if ($requeued.Count) {
@@ -2979,7 +3010,9 @@ function Invoke-Claim {
             Invoke-Git @('add', '-A', 'Tasks') | Out-Null
             Invoke-Git @('commit', '-q', '-m', "chore(tasks): claim $id on dark factory lane $Lane") | Out-Null
             if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return @{ Id = $id } }
-            Write-Trace $id 'claim' 'lost the race; picking again' 'DarkYellow'
+            # Only a claim that was pushed is traced as 'claim', so the log counts claims
+            # truly; a refused push is 'race', and an unheard one is no race at all.
+            if (Test-RemoteReachable) { Write-Trace $id 'race' 'another lane pushed first; picking again' 'DarkYellow' }
         }
         return @{ Wait = $true; Why = 'claim kept losing races' }
     } finally { $lock.Dispose() }
@@ -3022,6 +3055,9 @@ function Invoke-Integrate {
     Write-Heartbeat 'integrate'
     try {
         foreach ($attempt in 1..3) {
+            # Finished work is parked only for what origin refused, never because origin was
+            # out of reach (AF-0025): each attempt starts once origin answers.
+            if (-not (Wait-RemoteReachable -Id $Id)) { return 'origin stayed out of reach for an hour' }
             if (-not (Invoke-Git @('fetch', '-q', 'origin', $Branch))) { Start-Sleep -Seconds 10; continue }
             if (-not (Invoke-Git @('rebase', '-q', "origin/$Branch"))) {
                 if (Test-Rebasing) {
@@ -3154,6 +3190,7 @@ if ($TestPark) {
     $quiet = { param([string[]]$Reasons) $script:Alarmed = $Reasons }
     $failed = 0
     $cases = @(
+        ,@('an origin that answers is reachable at once', 'True', { "$(Wait-RemoteReachable -Minutes 0 -PollSeconds 0)" })
         ,@('a park pushes its move to Backlog, naming the branch', "'' Backlog factory/BL-001-lane-9-test", {
             Set-Content -Path (Join-Path $repo 'work.txt') -Value 'work'
             git -C $repo add -A 2>&1 | Out-Null; git -C $repo commit -q -m work 2>&1 | Out-Null
@@ -3166,6 +3203,12 @@ if ($TestPark) {
             # The git failures it traces are expected here, so they are not printed.
             $r = Invoke-Park -Id 'BL-002' -Why 'push kept being refused' -RetrySeconds @(0) 6>$null
             "$(if ($r -match '^BL-002 PARK NOT PUSHED ') { 'BL-002 PARK NOT PUSHED' } else { "'$r'" }), $(if ($r -match 'still in Doing') { 'still in Doing' } else { 'state not said' }), $(if ((Get-ParkedBranches 'BL-002' $repo) -contains 'factory/BL-002-lane-9-test') { 'branch kept' } else { 'no branch' })" })
+        ,@('an origin out of reach is waited for, then reported unreachable', 'False offline', {
+            New-Item -ItemType Directory -Force -Path $script:LogDir | Out-Null
+            $script:TraceFile = Join-Path $script:LogDir 'trace.log'
+            $r = Wait-RemoteReachable -Minutes 0 -PollSeconds 0 6>$null
+            $traced = (Get-Content -Path $TraceFile -ErrorAction SilentlyContinue) -join ' '
+            "$r $(if ($traced -match 'offline +origin out of reach') { 'offline' } else { 'not traced' })" })
         ,@('an orphan with a parked branch and clean lanes goes to Backlog', 'backlog factory/BL-002-lane-9-test', {
             $a = Get-OrphanAction -Id 'BL-002' -ParkedBranches (Get-ParkedBranches 'BL-002' $repo) -DirtyLanes @(@(9) | Where-Object { Test-WorktreeDirty $repo })
             "$($a.Action) $($a.Branch)" })
