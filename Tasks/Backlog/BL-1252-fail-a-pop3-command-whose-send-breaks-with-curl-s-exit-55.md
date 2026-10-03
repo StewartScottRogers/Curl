@@ -1,5 +1,5 @@
 ---
-id: BL-1248
+id: BL-1252
 title: Fail a POP3 command whose send breaks with curl's exit 55
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1248 — Fail a POP3 command whose send breaks with curl's exit 55
+# BL-1252 — Fail a POP3 command whose send breaks with curl's exit 55
 
 ## Goal
 
