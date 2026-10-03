@@ -33,3 +33,4 @@ When the 4-byte window size write inside a telnet NAWS subnegotiation fails, Cur
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
