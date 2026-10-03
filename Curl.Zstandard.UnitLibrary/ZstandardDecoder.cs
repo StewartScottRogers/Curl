@@ -203,7 +203,9 @@ public sealed class ZstandardDecoder
         fieldLength += count;
         if (fieldLength < fieldNeeded)
         {
-            return OperationStatus.NeedMoreData;
+            return stage == Stage.Magic && !CanBeginMagic(field.AsSpan(0, fieldLength))
+                ? Fail(ZstandardDecodeError.PrefixUnknown)
+                : OperationStatus.NeedMoreData;
         }
 
         fieldLength = 0;
@@ -220,6 +222,21 @@ public sealed class ZstandardDecoder
         Stage.RleBlockValue => ReadRleValue(value[0]),
         _ => ReadChecksum(BinaryPrimitives.ReadUInt32LittleEndian(value)),
     };
+
+    /// <summary>
+    /// Whether the 0 to 3 bytes gathered so far can still begin the Zstandard magic or a
+    /// skippable-frame magic, as libzstd's <c>ZSTD_getFrameHeader_advanced</c> judges a partial
+    /// magic on every call, so bytes that cannot fail at once rather than at the fourth byte.
+    /// </summary>
+    private static bool CanBeginMagic(ReadOnlySpan<byte> prefix)
+    {
+        if (((ReadOnlySpan<byte>)[0x28, 0xB5, 0x2F, 0xFD]).StartsWith(prefix))
+        {
+            return true;
+        }
+
+        return (prefix[0] & 0xF0) == 0x50 && ((ReadOnlySpan<byte>)[0x2A, 0x4D, 0x18]).StartsWith(prefix[1..]);
+    }
 
     private OperationStatus? ReadMagic(uint magic)
     {

@@ -20,6 +20,13 @@ public sealed class ZstandardDecoderTests
     /// </summary>
     private const string MeasuredHelloWorldFrame = "28B52FFD240C61000048656C6C6F2C20776F726C64D7B42074";
 
+    /// <summary>
+    /// "ok" in a single-segment frame with one 2-byte raw block. curl 8.21.0 with libzstd
+    /// 1.5.7 writes "ok" and exits 61 when one byte 0x78 follows it, and exits 0 when
+    /// <c>28 B5 2F FD</c> follows it (measured with Record-CurlExchange.ps1, BL-1299).
+    /// </summary>
+    private const string MeasuredOkFrame = "28B52FFD20021100006F6B";
+
     private static readonly byte[] HelloWorld = Encoding.ASCII.GetBytes("Hello, world");
 
     public static IEnumerable<object[]> ValidInputs =>
@@ -119,6 +126,78 @@ public sealed class ZstandardDecoderTests
         Assert.AreEqual(0, consumed);
         Assert.AreEqual(0, written);
         Assert.AreEqual(ZstandardDecodeError.PrefixUnknown, decoder.LastError);
+    }
+
+    [TestMethod]
+    [DataRow("78")]
+    [DataRow("2800")]
+    [DataRow("28B500")]
+    [DataRow("28B52F00")]
+    [DataRow("40")]
+    [DataRow("5000")]
+    [DataRow("5F2A4D00")]
+    public void Decompress_BytesThatCannotBeginAMagicAfterAFrame_FailAtOnceWithPrefixUnknown(string trailingHex)
+    {
+        var decoder = new ZstandardDecoder();
+        Assert.AreEqual(OperationStatus.Done, decoder.Decompress(Convert.FromHexString(MeasuredOkFrame), new byte[16], out _, out _));
+
+        var status = decoder.Decompress(Convert.FromHexString(trailingHex), new byte[16], out _, out var written);
+
+        Assert.AreEqual(OperationStatus.InvalidData, status);
+        Assert.AreEqual(ZstandardDecodeError.PrefixUnknown, decoder.LastError);
+        Assert.AreEqual(0, written);
+    }
+
+    [TestMethod]
+    [DataRow("28", "B52FFD")]
+    [DataRow("28B5", "2FFD")]
+    [DataRow("28B52F", "FD")]
+    [DataRow("50", "2A4D18")]
+    [DataRow("5A2A", "4D18")]
+    [DataRow("532A4D", "18")]
+    public void Decompress_PartialMagicAfterAFrame_NeedsMoreDataAndDecodesTheNextFrameOnceComplete(string prefixHex, string restHex)
+    {
+        var decoder = new ZstandardDecoder();
+        decoder.Decompress(Convert.FromHexString(MeasuredOkFrame), new byte[16], out _, out _);
+        var prefix = Convert.FromHexString(prefixHex);
+
+        var status = decoder.Decompress(prefix, new byte[16], out var consumed, out _);
+
+        Assert.AreEqual(OperationStatus.NeedMoreData, status);
+        Assert.AreEqual(prefix.Length, consumed);
+        Assert.AreEqual(ZstandardDecodeError.None, decoder.LastError);
+        var restOfFrame = prefix[0] == 0x28 ? MeasuredOkFrame[8..] : "00000000" + MeasuredOkFrame;
+        ReadOnlySpan<byte> rest = Convert.FromHexString(restHex + restOfFrame);
+        var destination = new byte[16];
+        var written = 0;
+        var nextStatus = OperationStatus.Done;
+        while (!rest.IsEmpty && nextStatus == OperationStatus.Done)
+        {
+            nextStatus = decoder.Decompress(rest, destination.AsSpan(written), out var restConsumed, out var restWritten);
+            rest = rest[restConsumed..];
+            written += restWritten;
+        }
+
+        Assert.AreEqual(OperationStatus.Done, nextStatus);
+        CollectionAssert.AreEqual(Ascii("ok"), destination[..written]);
+    }
+
+    [TestMethod]
+    public void Decompress_FirstByteCannotBeginAMagic_FailsAtOnceWithPrefixUnknown()
+    {
+        var decoder = new ZstandardDecoder();
+
+        var status = decoder.Decompress([0x78], new byte[16], out var consumed, out _);
+
+        Assert.AreEqual(OperationStatus.InvalidData, status);
+        Assert.AreEqual(1, consumed);
+        Assert.AreEqual(ZstandardDecodeError.PrefixUnknown, decoder.LastError);
+    }
+
+    [TestMethod]
+    public void Decompress_MeasuredFrameOneByteAtATime_WritesItsContent()
+    {
+        AssertDecodesInPieces("measured ok frame", Convert.FromHexString(MeasuredOkFrame), Ascii("ok"), 1, 1, 16);
     }
 
     [TestMethod]
