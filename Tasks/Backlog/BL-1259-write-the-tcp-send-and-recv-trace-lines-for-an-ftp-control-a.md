@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-1253]
-touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Console.UnitTests]
+touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-02
 completed:
@@ -29,7 +29,12 @@ Under `--trace-config tcp`, `network`, `all` and `-vvvv`, an `ftp://` transfer w
 
 ## Notes
 
+- 2026-10-03 (lane 1): measured with Record-CurlExchange.ps1 (curl 8.21.0 Schannel): control `[TCP] send(len=n)` before each `>`, `[TCP] recv(len=900) -> 0, n` before each `<`, no lines for QUIT; data `[TCP-1] recv(len=<remaining>)` for a known size (no EOF read; curl cuts off at SIZE: `SIZE=213 3` with "hello" writes "hel", exit 0), `[TCP-1] recv(len=102400)` to `-> 0, 0` for LIST; upload `[TCP-1] send(len=5) -> 0, 5`. Would-block `[TCP] recv(len=900) -> 81, 0` before 226 is a race (absent after LIST), so control writes none.
+- Implemented in the working tree (stashed by the shift): `TcpIoTraceLines` + `ConnectTarget.TcpIoTrace`, `InfoLineStoppingTransferEvents` (Abstractions; Abstractions.UnitTests added to touches, no other Doing task names it); `TcpIoTraceConnection` takes the lines; FTP sets them on plain control/data targets, sizes data reads to the bytes still expected, stops at SIZE, silences QUIT. Build clean, fast tests green, new tests in Networking, Ftp, Abstractions and Console.UnitTests.
+- Left: Measure-CodeQuality.ps1 for the three libraries (run exceeded the 1-hour limit), ADR-0357 BL-1259 amendment. Run ran out of budget.
+
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-03: Doing -> Backlog. Code done in the stashed working tree; coverage measurement and the ADR-0357 amendment remain (run out of budget)
