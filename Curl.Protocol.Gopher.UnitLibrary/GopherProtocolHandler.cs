@@ -1,4 +1,3 @@
-using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Gopher;
@@ -228,12 +227,11 @@ public sealed class GopherProtocolHandler : IProtocolHandler
 
     /// <summary>
     /// The exit 55 message for a failed send: the socket filter's <c>Send failure:</c> text
-    /// for a reset, and curl's fallback text for anything else.
+    /// (<see cref="CurlSocketErrorText" />) for a socket error, and curl's fallback text for
+    /// anything else.
     /// </summary>
     private static string SendFailure(IOException exception) =>
-        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
-            ? GopherTransferMessages.SendConnectionReset
-            : GopherTransferMessages.SendFailed;
+        CurlSocketErrorText.SendFailure(exception) ?? GopherTransferMessages.SendFailed;
 
     /// <summary>
     /// Writes a piece of the request just sent to the <c>-D</c> stream, as curl 8.21.0's
@@ -320,11 +318,14 @@ public sealed class GopherProtocolHandler : IProtocolHandler
 
     /// <summary>
     /// The exit 56 message for a failed read: the TLS build's own text when a
-    /// <c>gophers</c> connection ended without <c>close_notify</c> (ADR-0221), and curl's
-    /// fallback text for anything else.
+    /// <c>gophers</c> connection ended without <c>close_notify</c> (ADR-0221), the socket
+    /// filter's <c>Recv failure:</c> text (<see cref="CurlSocketErrorText" />) for a socket
+    /// error, and curl's fallback text for anything else.
     /// </summary>
     private static string ReceiveFailure(IOException exception) =>
-        exception is MissingCloseNotifyException ? exception.Message : GopherTransferMessages.ReceiveFailed;
+        exception is MissingCloseNotifyException
+            ? exception.Message
+            : CurlSocketErrorText.ReceiveFailure(exception) ?? GopherTransferMessages.ReceiveFailed;
 
     /// <summary>
     /// How many bytes of a failed write the output accepted: the count an
