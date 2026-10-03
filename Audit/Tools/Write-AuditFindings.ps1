@@ -143,16 +143,29 @@ function Test-SamePath([string]$Location, [string]$Planted) {
     return ($Location -ieq $Planted) -or $Location.EndsWith('/' + $Planted, [StringComparison]::OrdinalIgnoreCase)
 }
 
+function Test-AtPlantedLine([string]$Location, $Planted) {
+    # The finding's location (file:line or file:first-last) reaches within 2 lines of the
+    # planted line. A defect reported twice for two symptoms - slow and memory-hungry, say -
+    # names its catch text in one report only; the other still points at the planted line
+    # (BL-1316). 2 lines, not more, so a real finding beside a planted one stays a finding.
+    if (-not "$($Planted.line)" -or "$Location" -notmatch ':(\d+)(?:-(\d+))?$') { return $false }
+    $first = [int]$Matches[1]
+    $last = if ($Matches[2]) { [int]$Matches[2] } else { $first }
+    $line = [int]$Planted.line
+    return ($line -ge $first - 2) -and ($line -le $last + 2)
+}
+
 function Test-Catch($Finding, [string]$Auditor, [object[]]$Planted) {
     # A catch: the planted defect's own auditor, in the defect's file, with the manifest's catch
-    # fragment in the finding's title, key or evidence. The same rule as Write-AuditScorecard.ps1.
+    # fragment in the finding's title, key or evidence, or with a location at the planted line.
+    # The same rule as Write-AuditScorecard.ps1.
     foreach ($p in $Planted) {
         if ($p.auditor -ne $Auditor) { continue }
         $sameFile = Test-SamePath (ConvertTo-Normalised $Finding.location) (ConvertTo-Normalised $p.file)
         $haystack = "$($Finding.title) $($Finding.key) $($Finding.evidence)"
         $catchText = "$($p.catch)".Trim()
         $named = $catchText -and $haystack.IndexOf($catchText, [StringComparison]::OrdinalIgnoreCase) -ge 0
-        if ($sameFile -and $named) { return $p }
+        if ($sameFile -and ($named -or (Test-AtPlantedLine "$($Finding.location)" $p))) { return $p }
     }
     return $null
 }
@@ -263,12 +276,13 @@ if ($SelfTest) {
         }
         function Text([string]$Prefix) { $f = Get-ChildItem -LiteralPath $FindingsDirectory -Filter "$Prefix-*.md" | Select-Object -First 1; if ($f) { [IO.File]::ReadAllText($f.FullName) } else { '' } }
         $af7 = Text 'AF-0007'
-        Check 'new finding filed as proposed with the next ID' ($af7 -match '(?m)^status: proposed$' -and $af7 -match '(?m)^key: quality:Curl.Cli.UnitTests/ParserTests.cs:Parse_Empty_Throws:weak-assertion$') 'AF-0007'
+        Check 'new finding filed as proposed with the next ID' ($af7 -match '(?m)^status: proposed\r?$' -and $af7 -match '(?m)^key: quality:Curl.Cli.UnitTests/ParserTests.cs:Parse_Empty_Throws:weak-assertion\r?$') 'AF-0007'
         $af1 = Text 'AF-0001'
         Check 'a repeated key on a deferred finding keeps it deferred, its line inside Re-audits, before Log' ($af1 -match '(?m)^status: deferred\r?$' -and $af1 -match '(?s)## Re-audits\r?\n\r?\n- 2026-10-14 \| 2026-10-14_0930.md \| reproduces: yes \| still reported\r?\n\r?\n## Log\r?\n\r?\n- 2026-10-01: filed proposed\.\r?\n- 2026-10-02: proposed -> deferred\.[^\r\n]*\r?\n?$') 'AF-0001'
         Check 'a repeated key adds a re-audit line and files nothing' ((Text 'AF-0001') -match 'reproduces: yes \| still reported' -and -not ((Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -match 'key: quality:Curl.Core.UnitTests/UrlTests.cs:Parse_Port_Rejects:name-lies' | Measure-Object).Count -ne 1) 'AF-0001'
-        $catchesJson = @(Get-Content -LiteralPath (Join-Path $ReportDirectory 'catches.json') -Raw | ConvertFrom-Json)
-        Check 'a planted-defect match is skipped and in catches.json' ($catchesJson.Count -eq 1 -and $catchesJson[0].planted -eq 'PD-101' -and -not ((Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -match 'FixedTimeEquals replaced')) "catches $($catchesJson.Count)"
+        # Windows PowerShell 5.1's ConvertFrom-Json emits a JSON array as one object; unroll it.
+        $catchesJson = @((Get-Content -LiteralPath (Join-Path $ReportDirectory 'catches.json') -Raw | ConvertFrom-Json) | ForEach-Object { $_ })
+        Check 'a planted-defect match is skipped and in catches.json' ($catchesJson.Count -eq 2 -and @($catchesJson | Where-Object { $_.planted -eq 'PD-101' }).Count -eq 2 -and -not ((Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -match 'FixedTimeEquals replaced')) "catches $($catchesJson.Count)"
         $af6 = Text 'AF-0006'
         Check 'reproduces false from a reliable auditor closes it, blocked or not' ($af6 -match '(?m)^status: closed$' -and $af6 -match '(?m)^closed: 2026-10-14$' -and $af6 -match '(?m)^closed-by: 2026-10-14_0930.md$') 'AF-0006'
         Check 'closing writes the reason and a last Log line' ($af6 -match '(?m)^reason: Re-audit 2026-10-14_0930.md: the reproduction no longer reproduces\.$' -and $af6 -match '(?s)reproduces: no \|[^\n]*\n\n## Log\n\n- 2026-10-01: filed proposed\.\n- 2026-10-02: proposed -> blocked\.[^\n]*\n- 2026-10-14: blocked -> closed\. Re-audit 2026-10-14_0930.md: the reproduction no longer reproduces\.\n$') 'AF-0006'
@@ -286,9 +300,12 @@ if ($SelfTest) {
         $templateFields = @([regex]::Matches([IO.File]::ReadAllText((Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md')), '(?m)^([a-z-]+):') | ForEach-Object { $_.Groups[1].Value }) -join ','
         $newFields = @([regex]::Matches(($af7 -split '\r?\n---')[0], '(?m)^([a-z-]+):') | ForEach-Object { $_.Groups[1].Value }) -join ','
         $sections = @([regex]::Matches($af7, '(?m)^## (.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() }) -join ','
-        Check 'front matter and sections match the template' ($newFields -eq $templateFields -and $sections -eq 'Summary,Evidence,Reproduction,Re-audits,Log' -and $af7 -match '(?m)^- 2026-10-14: filed proposed\.$' -and $af7 -notmatch '\{\{') "$newFields | $sections"
+        Check 'front matter and sections match the template' ($newFields -eq $templateFields -and $sections -eq 'Summary,Evidence,Reproduction,Re-audits,Log' -and $af7 -match '(?m)^- 2026-10-14: filed proposed\.\r?$' -and $af7 -notmatch '\{\{') "$newFields | $sections"
         Check 'a process defect cited under logs/ is the same file' ((Test-SamePath 'logs/ci-runs.json' 'ci-runs.json') -and -not (Test-SamePath 'logs/other-ci-runs.json' 'ci-runs.json') -and (Test-SamePath 'Curl.Tls.UnitLibrary/TlsMac.cs' 'Curl.Tls.UnitLibrary/TlsMac.cs')) 'logs/ci-runs.json'
-        Check 'summary line' ($line -eq 'findings: new 3, still open 1, closed 1, catches 1') $line
+        Check 'a differently worded report at the planted line is a catch, not a finding' (-not ((Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -match 'returns at the first differing byte')) 'TlsMac.cs:41'
+        $plantedAt40 = [pscustomobject]@{ line = 40 }
+        Check 'the planted-line window is 2 lines' ((Test-AtPlantedLine 'x.cs:42' $plantedAt40) -and -not (Test-AtPlantedLine 'x.cs:43' $plantedAt40) -and (Test-AtPlantedLine 'x.cs:30-38' $plantedAt40) -and -not (Test-AtPlantedLine 'x.cs:30-37' $plantedAt40) -and -not (Test-AtPlantedLine 'x.cs' $plantedAt40) -and -not (Test-AtPlantedLine 'x.cs:40' ([pscustomobject]@{ line = $null }))) '42 yes, 43 no, 30-38 yes, 30-37 no, no line no'
+        Check 'summary line' ($line -eq 'findings: new 3, still open 1, closed 1, catches 2') $line
         exit $(if ($failed) { 1 } else { 0 })
     }
     finally { Remove-Item -Recurse -Force -LiteralPath $work -ErrorAction SilentlyContinue }

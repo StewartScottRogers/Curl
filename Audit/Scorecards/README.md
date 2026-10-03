@@ -45,7 +45,7 @@ than leaving its row out.
 | Closed | Of those, the findings this audit closed under the [closure rule](../Findings/README.md#rules). |
 | Still open | That auditor's findings in `Audit/Findings/` that are open (`proposed`, `accepted`, `deferred` or `blocked`) after this audit, new ones included. |
 | Planted assigned | Planted defects the manifest assigns to that auditor. |
-| Planted caught | Of those, the ones it caught: its report has a finding in the defect's file whose title, key or evidence contains the manifest's catch text. A catch by a different auditor does not count for either. |
+| Planted caught | Of those, the ones it caught: its report has a finding in the defect's file whose title, key or evidence contains the manifest's catch text, or whose location is within 2 lines of the defect's line (a defect reported for two symptoms names its catch text once; BL-1316). Every such finding is a catch, and none is filed. A catch by a different auditor does not count for either. |
 | Catch rate | Planted caught divided by planted assigned, as a whole percent. |
 | Reliable | `yes` or `no`, see [Reliability](#reliability). |
 
