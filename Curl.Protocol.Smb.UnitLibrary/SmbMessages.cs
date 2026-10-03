@@ -45,7 +45,7 @@ internal static class SmbMessages
     /// <summary>Exit 67, no user given, or a session setup response with an error status.</summary>
     public const string LoginDenied = "Login denied";
 
-    /// <summary>Exit 8, an open response giving the file a negative size.</summary>
+    /// <summary>Exit 8, an open response giving the file a negative size, or file data arriving under <c>-I</c>.</summary>
     public const string WeirdServerReply = "Weird server reply";
 
     /// <summary>Exit 9, a tree connect or open refused with the DOS error <c>ERRnoaccess</c>.</summary>
@@ -60,6 +60,16 @@ internal static class SmbMessages
     /// <returns>curl's message.</returns>
     public static string OutputWriteFailed(int passed, int returned) =>
         string.Create(CultureInfo.InvariantCulture, $"Failure writing output to destination, passed {passed} returned {returned}");
+
+    /// <summary>
+    /// Exit 63, a download that delivered all the bytes <c>--max-filesize</c> allows with more
+    /// still arriving: <c>lib/sendf.c</c>'s <c>cw_download_write</c> at <c>curl-8_21_0</c>.
+    /// </summary>
+    /// <param name="maxFileSize">The limit.</param>
+    /// <param name="written">The bytes written before the download stopped.</param>
+    /// <returns>curl's message.</returns>
+    public static string MaxFileSizeExceeded(long maxFileSize, long written) =>
+        string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({maxFileSize}) with {written} bytes");
 
     /// <summary>
     /// The texts above that are <c>curl_easy_strerror</c>'s for their exit code, which curl
