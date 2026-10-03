@@ -35,3 +35,4 @@ An `smtp://` command or message send that fails with any socket error ends with 
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
