@@ -140,12 +140,22 @@ function Test-SamePath([string]$Location, [string]$Planted) {
     return ($Location -ieq $Planted) -or $Location.EndsWith('/' + $Planted, [StringComparison]::OrdinalIgnoreCase)
 }
 
+function Test-AtPlantedLine([string]$Location, $Planted) {
+    # Within 2 lines of the planted line; the same rule as Write-AuditFindings.ps1 (BL-1316).
+    if (-not "$($Planted.line)" -or "$Location" -notmatch ':(\d+)(?:-(\d+))?$') { return $false }
+    $first = [int]$Matches[1]
+    $last = if ($Matches[2]) { [int]$Matches[2] } else { $first }
+    $line = [int]$Planted.line
+    return ($line -ge $first - 2) -and ($line -le $last + 2)
+}
+
 function Test-Caught($Planted, $Report) {
     foreach ($f in @($Report.findings | Where-Object { $_ })) {
         $sameFile = Test-SamePath (ConvertTo-Normalised $f.location) (ConvertTo-Normalised $Planted.file)
         $text = "$($f.title) $($f.key) $($f.evidence)"
         $fragment = "$($Planted.catch)".Trim()
-        if ($sameFile -and $fragment -and $text.IndexOf($fragment, [StringComparison]::OrdinalIgnoreCase) -ge 0) { return $true }
+        $named = $fragment -and $text.IndexOf($fragment, [StringComparison]::OrdinalIgnoreCase) -ge 0
+        if ($sameFile -and ($named -or (Test-AtPlantedLine "$($f.location)" $Planted))) { return $true }
     }
     return $false
 }
