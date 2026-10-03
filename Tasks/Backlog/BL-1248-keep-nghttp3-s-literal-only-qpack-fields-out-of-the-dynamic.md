@@ -1,5 +1,5 @@
 ---
-id: BL-1244
+id: BL-1248
 title: Keep nghttp3's literal-only QPACK fields out of the dynamic table
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1244 — Keep nghttp3's literal-only QPACK fields out of the dynamic table
+# BL-1248 — Keep nghttp3's literal-only QPACK fields out of the dynamic table
 
 ## Goal
 

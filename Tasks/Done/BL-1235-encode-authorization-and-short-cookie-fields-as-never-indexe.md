@@ -35,7 +35,7 @@ completed: 2026-10-02
 - `QpackEncoder.IsNeverIndexed` now applies nghttp3's rule (the flag, `authorization`, a `cookie` under 20 characters), mirroring `HpackEncoder.IsNeverIndexed`; such a field takes the existing never-indexed path (static name reference or literal name, `N` set, no dynamic step). nghttp3 does not include `proxy-authorization` (nghttp2 does), so neither does the QPACK rule.
 - The cookie length is measured as `Value.Length`, as `HpackEncoder` does; header values here are Latin-1, one byte per character.
 - `QpackRoundTripTests`' `cookie: a=1; b=2` now expects `IsNeverIndexed: true` on decode: the decoder reports the `N` bit, and that row asserted the old encoding.
-- The rest of nghttp3's rule differs: `QpackEncoder` inserts `:path`, `age`, `content-length`, `etag`, `if-modified-since`, `if-none-match`, `location`, `set-cookie`, names without an nghttp3 token, and entries over three quarters of the capacity, where nghttp3 keeps them literal. Filed as BL-1244.
+- The rest of nghttp3's rule differs: `QpackEncoder` inserts `:path`, `age`, `content-length`, `etag`, `if-modified-since`, `if-none-match`, `location`, `set-cookie`, names without an nghttp3 token, and entries over three quarters of the capacity, where nghttp3 keeps them literal. Filed as BL-1248.
 
 ## Log
 
