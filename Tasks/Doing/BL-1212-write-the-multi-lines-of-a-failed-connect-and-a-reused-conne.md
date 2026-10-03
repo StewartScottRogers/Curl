@@ -32,3 +32,4 @@ A refused connect and a transfer on a reused connection write curl 8.21.0's `[MU
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
