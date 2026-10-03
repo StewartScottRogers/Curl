@@ -42,3 +42,4 @@ When the server answers the end of an SMTP message with anything but 250, Curl's
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-03: Backlog -> Doing.
