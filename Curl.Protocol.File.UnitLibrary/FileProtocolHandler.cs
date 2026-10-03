@@ -203,15 +203,18 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// Reports a failed transfer's message as an information line, as libcurl's
     /// <c>failf</c> does under <c>-v</c> and <c>--trace</c>: curl 8.21.0 prints
     /// <c>* Could not open file ...</c> before <c>curl: (37)</c>, measured in BL-936. Exit 55
-    /// is the exception: its message is only <c>curl_easy_strerror</c>'s text, which no
-    /// <c>failf</c> wrote, so curl prints no line for it.
+    /// and the exit 33 of <c>-r</c> text that names no range are the exceptions: each message
+    /// is only <c>curl_easy_strerror</c>'s text, which no <c>failf</c> wrote, so curl prints no
+    /// line for it (<c>curl -sv -r 5-2 file://...</c> writes only <c>* shutting down
+    /// connection #0</c>, measured in BL-1322).
     /// </summary>
     /// <param name="events">Where the line goes.</param>
     /// <param name="result">The outcome of the transfer.</param>
     /// <returns><paramref name="result" />, unchanged.</returns>
     private static TransferResult ReportFailure(ITransferEvents events, TransferResult result)
     {
-        if (result.ErrorMessage is { } message && message != FileTransferMessages.DestinationWriteFailed)
+        if (result.ErrorMessage is { } message
+            && message is not (FileTransferMessages.DestinationWriteFailed or FileTransferMessages.RangeNotDelivered))
         {
             events.ReportInfo(message);
         }

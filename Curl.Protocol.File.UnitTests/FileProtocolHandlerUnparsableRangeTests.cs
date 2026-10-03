@@ -37,6 +37,19 @@ public sealed class FileProtocolHandlerUnparsableRangeTests
         Assert.IsEmpty(output.ToArray());
     }
 
+    // curl -sv -r 5-2 file:///.../f.txt: stderr is only "* shutting down connection #0" (BL-1322):
+    // the message is curl_easy_strerror's, which no failf wrote.
+    [TestMethod]
+    public async Task ExecuteAsync_RangeTextNamingNoRange_ReportsOnlyTheShutdownLine()
+    {
+        var events = new RecordingTransferEvents();
+
+        await DownloadAsync(
+            new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream(), RangeText = "5-2", Events = events });
+
+        CollectionAssert.AreEqual(new[] { "* shutting down connection #0" }, events.Transcript);
+    }
+
     // curl -s -i -r 5-2: the three header lines and the empty line, then exit 33.
     [TestMethod]
     public async Task ExecuteAsync_RangeTextNamingNoRangeWithHeaderOutput_WritesTheHeaderBlockThenFails()
