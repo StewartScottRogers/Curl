@@ -50,7 +50,7 @@ The finding closes only when a later re-audit by the process auditor confirms th
   `DarkFactory-20261003-061205.log`). Only `-Lanes Auto` capped lanes at
   `task-board.ps1 capacity`, so all nine lanes ran whatever the board could run at once,
   and lanes without a task polled "every ready task overlaps one in Doing" once a minute.
-- Fix (ADR-0405): a fixed shift of more than one lane takes a capacity step every 5 minutes
+- Fix (ADR-0406): a fixed shift of more than one lane takes a capacity step every 5 minutes
   (`Invoke-CapacityLaneStep`, pure rule `Get-CapacityLaneCount`): idle lanes beyond the
   capacity retire, and lanes come back one per step up to N. Every retire, Auto's included,
   goes to an idle lane first (`Get-LaneToRetire -Idle`). 9 new `-TestAutoLanes` cases; all 53 pass.
@@ -65,4 +65,4 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
-- 2026-10-03: Doing -> Done. Fixed-lane shifts retire idle lanes down to the board's capacity every 5 minutes (ADR-0405); AF-0032 awaits its re-audit.
+- 2026-10-03: Doing -> Done. Fixed-lane shifts retire idle lanes down to the board's capacity every 5 minutes (ADR-0406); AF-0032 awaits its re-audit.
