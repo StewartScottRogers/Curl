@@ -32,3 +32,4 @@ The remark on `ITransferContext.MaxFileSize` lists `sftp` among the handlers tha
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
