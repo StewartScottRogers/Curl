@@ -19,8 +19,12 @@ namespace Curl.Console;
 /// numbers are the microseconds since the transfer's events were set up, which is what curl's are despite
 /// their <c>ns</c>; the poll lines' descriptor is the one the <c>[TCP] connected on fd=</c> line names, or
 /// <see cref="DefaultSocketDescriptor" /> when that line is not traced (ADR-0382, BL-1188). A reused
-/// connection writes none of the connect groups. A failed connect writes no closing lines; that and a
-/// reused connection's own lines are BL-1188's follow-up.
+/// connection writes none of the connect groups but its own lines around the <c>Reusing existing</c>
+/// line, up to <c>xfer_setup</c>. A refused connect writes the poll lines once, a
+/// <c>Curl_multi_will_close</c> line before each <c>connect to ... failed</c> line, and after the
+/// <c>Failed to connect to</c> line turns to its own groups: the <c>connect failed -&gt; 7</c> and
+/// <c>multi_done</c> lines after it, the <c>[COMPLETED]</c> lines after <c>closing connection</c>
+/// (ADR-0391, BL-1212).
 /// </remarks>
 internal sealed class MultiStateTraceEvents : ITransferEvents
 {
@@ -54,18 +58,42 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
     /// <summary>Stands for the connection's <c>left intact</c> or <c>shutting down connection</c> line.</summary>
     private const string TransferEndAnchor = "\0transfer end";
 
-    /// <summary>The index of the first group a reused connection still writes: the protocol's, after the connect groups.</summary>
-    private const int ProtocolMilestone = 7;
+    private const string ConnectToPrefix = "connect to ";
+    private const string ConnectToFailedInfix = " failed: ";
+    private const string FailedToConnectPrefix = "Failed to connect to ";
+
+    /// <summary>The index of the group whose poll lines a failed connect writes before it fails.</summary>
+    private const int ConnectPolledMilestone = 5;
+
+    /// <summary>The index of the first group a reused connection writes after its own lines: the request's.</summary>
+    private const int RequestSentMilestone = 9;
 
     /// <summary>The lines of a group that writes none on one side of its line.</summary>
     private static readonly Func<string[]> None = Fixed();
+
+    /// <summary>The lines curl writes before a reused connection's <c>Reusing existing</c> line.</summary>
+    private static readonly string[] ReusedBeforeLines = ["[MULTI] [CONNECT] transfer credentials: -"];
+
+    /// <summary>The lines curl writes after a reused connection's <c>Reusing existing</c> line, up to the request.</summary>
+    private static readonly string[] ReusedAfterLines =
+    [
+        "[MULTI] [CONNECT] [PGRS-POSTQUEUE] set",
+        "[MULTI] [CONNECT] -> [CONNECTING]",
+        "[MULTI] [CONNECTING] -> [PROTOCONNECT]",
+        "[MULTI] [PROTOCONNECT] -> [DO]",
+        "[MULTI] [DO] xfer_setup: recv_idx=0, send_idx=0",
+    ];
 
     private readonly ITransferEvents inner;
     private readonly TimeProvider timeProvider;
     private readonly Func<long> takeConnectionId;
     private readonly long startTimestamp;
-    private readonly Milestone[] milestones;
+    private readonly Milestone[] failedConnectMilestones;
+    private Milestone[] milestones;
     private int next;
+    private bool connectFailed;
+    private long connectionId;
+    private string failedHostAndPort = string.Empty;
     private string socketDescriptor = DefaultSocketDescriptor;
 
     /// <summary>Creates the events, taking the transfer's start time from <paramref name="timeProvider" />.</summary>
@@ -94,6 +122,11 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
             new([ClientWriterTraceEvents.DoneLine, ClientReaderResetTraceEvents.ResetLine, TransferEndAnchor], Fixed("[MULTI] [PERFORMING] -> [DONE]", "[MULTI] [DONE] multi_done: status: 0 prem: 0 done: 0")),
             new([TransferEndAnchor], Fixed("[MULTI] [DONE] multi_done_locked, in use=0"), Fixed("[MULTI] [DONE] -> [COMPLETED]", "[MULTI] [COMPLETED] -> [MSGSENT]", "[MULTI] [COMPLETED] removed from multi, mid=1, running=0, total=1")),
         ];
+        failedConnectMilestones =
+        [
+            new([FailedToConnectPrefix], None, FailedConnectLines),
+            new(["closing connection #"], None, FailedConnectCompletedLines),
+        ];
     }
 
     /// <inheritdoc />
@@ -104,9 +137,37 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
             socketDescriptor = text[TcpConnectedPrefix.Length..];
         }
 
+        if (!connectFailed)
+        {
+            FollowConnectFailure(text);
+        }
+
         List<string> after = Advance(EndsTheTransfer(text) ? TransferEndAnchor : text);
         inner.ReportInfo(text);
         Write(after);
+    }
+
+    /// <summary>
+    /// Writes curl's close line before each address's <c>connect to ... failed</c> line, and on the
+    /// <c>Failed to connect to</c> line that ends the connect, turns to the failed connect's groups.
+    /// </summary>
+    /// <param name="text">The line about to be written.</param>
+    private void FollowConnectFailure(string text)
+    {
+        if (StartsWith(text, ConnectToPrefix) && text.Contains(ConnectToFailedInfix, StringComparison.Ordinal))
+        {
+            PassThrough(ConnectPolledMilestone);
+            Write([Invariant($"[MULTI] [CONNECTING] Curl_multi_will_close fd={socketDescriptor}")]);
+        }
+
+        if (StartsWith(text, FailedToConnectPrefix))
+        {
+            PassThrough(ConnectPolledMilestone);
+            connectFailed = true;
+            failedHostAndPort = text[FailedToConnectPrefix.Length..].Split(" after ", 2)[0];
+            milestones = failedConnectMilestones;
+            next = 0;
+        }
     }
 
     /// <inheritdoc />
@@ -120,8 +181,10 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
     /// <inheritdoc />
     public void ReportConnectionReused(ConnectionReusedEvent reused)
     {
-        next = Math.Max(next, ProtocolMilestone);
+        Write(ReusedBeforeLines);
         inner.ReportConnectionReused(reused);
+        Write(ReusedAfterLines);
+        next = Math.Max(next, RequestSentMilestone);
     }
 
     /// <inheritdoc />
@@ -173,12 +236,7 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
         {
             if (milestones[index].IsAnchoredBy(text))
             {
-                for (; next < index; next++)
-                {
-                    Write(milestones[next].Before());
-                    Write(milestones[next].After());
-                }
-
+                PassThrough(index - 1);
                 Write(milestones[index].Before());
                 after.AddRange(milestones[index].After());
                 next = index + 1;
@@ -186,6 +244,17 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
         }
 
         return after;
+    }
+
+    /// <summary>Writes the whole of every group not yet written up to and including <paramref name="last" />.</summary>
+    /// <param name="last">The index of the last group to write.</param>
+    private void PassThrough(int last)
+    {
+        for (; next <= last; next++)
+        {
+            Write(milestones[next].Before());
+            Write(milestones[next].After());
+        }
     }
 
     private void Write(IEnumerable<string> lines)
@@ -196,11 +265,34 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
         }
     }
 
-    private string[] ConnectionCreatedLines() =>
+    private string[] ConnectionCreatedLines()
+    {
+        connectionId = takeConnectionId();
+        return
+        [
+            "[MULTI] [CONNECT] transfer credentials: -",
+            Invariant($"[MULTI] [CONNECT] [CPOOL] added connection {connectionId}. The cache now contains 1 members"),
+            "[MULTI] [CONNECT] [PGRS-POSTQUEUE] set",
+        ];
+    }
+
+    private string[] FailedConnectLines() =>
     [
-        "[MULTI] [CONNECT] transfer credentials: -",
-        Invariant($"[MULTI] [CONNECT] [CPOOL] added connection {takeConnectionId()}. The cache now contains 1 members"),
-        "[MULTI] [CONNECT] [PGRS-POSTQUEUE] set",
+        "[MULTI] [CONNECTING] failed to connect [0][!DNS][!SETUP][!HAPPY-EYEBALLS]",
+        "[MULTI] [CONNECTING] connect failed -> 7",
+        "[MULTI] [CONNECTING] multi_done: status: 7 prem: 1 done: 0",
+        "[MULTI] [CONNECTING] multi_done_locked, in use=0",
+        Invariant($"[MULTI] [CONNECTING] multi_done, terminating conn #{connectionId} to {failedHostAndPort}, forbid=0, close=0, premature=1, conn_multiplex=0"),
+    ];
+
+    private string[] FailedConnectCompletedLines() =>
+    [
+        "[MULTI] [CONNECTING] -> [COMPLETED]",
+        Added("COMPLETED", "PRETRANSFER"),
+        Added("COMPLETED", "POSTRANSFER"),
+        Added("COMPLETED", "STARTTRANSFER"),
+        "[MULTI] [COMPLETED] -> [MSGSENT]",
+        "[MULTI] [COMPLETED] removed from multi, mid=1, running=0, total=1",
     ];
 
     private string[] NameLookedUpLines() =>

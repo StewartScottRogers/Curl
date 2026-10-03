@@ -399,6 +399,8 @@ choices do not need one.
 | [0387](ADR-0387-the-hand-built-openssl-build-reports-a-failed-handshake-before-every-handshake-failure.md) | `HandBuiltTlsProvider`'s OpenSSL build reports a failed `TlsHandshakeEvent` before every handshake failure: the certificate lines before an exit 60, the ALPN offer before an exit 35 (BL-1202) | Accepted | 2026-10-02 |
 | [0388](ADR-0388-trace-config-http3-writes-the-connection-lines-and-echoes-the-head.md) | Under `-v --trace-config http/3` a QUIC connect writes curl's `handshake complete`, `max bidi streams`, `peer verified` and `connect` lines, the first stream the peer's idle timeout, each head line its `status:` / `header:` echo, and a finished transfer `easy handle is done`, `no active streams` and `MAX_CONCURRENT` (BL-1208) | Accepted | 2026-10-02 |
 | [0389](ADR-0389-chunked-stdin-continue-and-multipart-bodies-write-their-read-trace-lines.md) | Under `--trace-config read` chunked, stdin (`-T -`), `100 Continue` and multipart (`-F`) HTTP/1.x bodies write curl's `[READ]` lines: `len=-1` and `total=-1` for stdin, `cr_mime_read` for `-F`, `http_chunk` for chunks, and two held-back `client_read` lines around a head that waits (BL-1214) | Accepted | 2026-10-02 |
+| [0390](ADR-0390-connect-timeout-timer-lines-are-written-for-the-connect-phase-from-the-configured-delays.md) | `--trace-config timer` writes a given `--connect-timeout`'s `[TIMER] [CONNECTTIMEOUT]` lines around a direct connect, and `multi` adds each timer's `expires in` line, written from the configured delays; the response wait and `-m`'s `[TIMEOUT]` lines are a follow-up (BL-1210) | Accepted | 2026-10-02 |
+| [0391](ADR-0391-a-refused-connect-and-a-reused-connection-write-their-own-multi-lines.md) | Under `--trace-config multi` a refused connect writes curl's close, `connect failed -> 7`, `multi_done` and `[COMPLETED]` lines, polling once, and a reused connection writes its own lines up to `xfer_setup` (BL-1212) | Accepted | 2026-10-02 |
 
 ## Template
 
@@ -420,4 +422,3 @@ What this makes easy, and what it makes hard. Both, honestly.
 ## Alternatives considered
 Each option and the specific reason it lost.
 ```
-| [0390](ADR-0390-connect-timeout-timer-lines-are-written-for-the-connect-phase-from-the-configured-delays.md) | `--trace-config timer` writes a given `--connect-timeout`'s `[TIMER] [CONNECTTIMEOUT]` lines around a direct connect, and `multi` adds each timer's `expires in` line, written from the configured delays; the response wait and `-m`'s `[TIMEOUT]` lines are a follow-up (BL-1210) | Accepted | 2026-10-02 |
