@@ -35,3 +35,4 @@ The process auditor sees every rule's measure and files a finding for each rule 
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Blocked. Paused for BL-1360, which an interactive session is finishing; resumes after.
