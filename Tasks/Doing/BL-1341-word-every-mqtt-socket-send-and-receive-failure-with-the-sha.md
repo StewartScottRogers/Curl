@@ -36,3 +36,4 @@ An `mqtt://` packet send or read that fails with a socket error ends with curl 8
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
