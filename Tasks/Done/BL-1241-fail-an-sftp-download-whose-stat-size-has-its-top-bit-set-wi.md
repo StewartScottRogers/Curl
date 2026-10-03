@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1241 — Fail an SFTP download whose STAT size has its top bit set with curl's exit 36 'Bad file size'
 
@@ -24,14 +24,20 @@ An `sftp://` download, or an upload with `-C -` that asks the server for the rem
 
 ## Acceptance criteria
 
-- [ ] A test drives a download whose STAT answer carries the size `0x8000000000000000` and asserts exit 36 `Bad file size (-9223372036854775808)`, nothing written, no READ sent and the handle closed; a second row with `0xFFFFFFFFFFFFFFFF` asserts `Bad file size (-1)`.
-- [ ] A test drives an upload with `-C -` (`ResumeFrom` negative) whose STAT answer carries `0x8000000000000000` and asserts exit 36 with the same message and no data written to the server.
-- [ ] Sizes of 0 and answers without the size flag keep today's behaviour; the existing tests for them pass unchanged.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] A test drives a download whose STAT answer carries the size `0x8000000000000000` and asserts exit 36 `Bad file size (-9223372036854775808)`, nothing written, no READ sent and the handle closed; a second row with `0xFFFFFFFFFFFFFFFF` asserts `Bad file size (-1)`.
+- [x] A test drives an upload with `-C -` (`ResumeFrom` negative) whose STAT answer carries `0x8000000000000000` and asserts exit 36 with the same message and no data written to the server.
+- [x] Sizes of 0 and answers without the size flag keep today's behaviour; the existing tests for them pass unchanged.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- `SftpSession.StatSizeAsync` now returns a size with its top bit set as the negative number curl's signed `curl_off_t` reads; 0 and a missing size flag stay `null` (unknown). `SftpFileDownload.CopyPartOfKnownSizeAsync` turns a negative size into `SshTransferException.SftpBadFileSize` (exit 36, `Bad file size (N)`) before the DO phase completes and still sends CLOSE; `SftpFileUpload.RemoteSizeAsync` throws it before the OPEN for `-C -`.
+- Pinned from curl 8.21.0's source, not measured: OpenSSH's `sftp-server` never reports such a size. The tests say so.
+- Removed the `size beyond a long` row (`FFFFFFFFFFFFFFFF`) of `DownloadAsync_StatGivesNoUsableSize_ReadsUntilTheEnd`: it pinned the old "unknown size" behaviour this task replaces, and `DownloadAsync_SizeWithItsTopBitSet_EndsWithExit36BadFileSizeAndClosesTheHandle` now covers that input.
+- `Measure-CodeQuality.ps1` flagged `SftpQuoteCommands.StateOf` (complexity 13, branch 92%). That failure was already there before this task, and the file is in this task's `touches`. Replaced its switch with the `QuoteStates` lookup, the same shape as `PathRequests`, so the library now reports 0 failing members.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. An SFTP download or -C - upload whose STAT size has its top bit set fails with exit 36 'Bad file size (N)'
