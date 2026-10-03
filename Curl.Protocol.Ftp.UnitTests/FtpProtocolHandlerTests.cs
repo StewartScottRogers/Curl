@@ -80,8 +80,8 @@ public sealed class FtpProtocolHandlerTests
         FtpRun run = await FtpRun.ExecuteAsync(Url, LoggedIn + Epsv + TypeSet + "213 1\r\n" + Opening + Complete + Bye, "x");
 
         Assert.HasCount(2, run.Connector.Targets);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18321, false), run.Connector.Targets[0]);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 61744, false), run.Connector.Targets[1]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18321, false) { TcpIoTrace = new TcpIoTraceLines("TCP", 900, false) }, run.Connector.Targets[0]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 61744, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
         Assert.IsTrue(run.Control.IsDisposed);
         Assert.IsTrue(run.Data.IsDisposed);
     }
@@ -91,8 +91,8 @@ public sealed class FtpProtocolHandlerTests
     {
         FtpRun run = await FtpRun.ExecuteAsync("ftp://h/file.txt", LoggedIn + Epsv + TypeSet + "213 1\r\n" + Opening + Complete + Bye, "x");
 
-        Assert.AreEqual(new ConnectTarget("h", 21, false), run.Connector.Targets[0]);
-        Assert.AreEqual(new ConnectTarget("h", 61744, false), run.Connector.Targets[1]);
+        Assert.AreEqual(new ConnectTarget("h", 21, false) { TcpIoTrace = new TcpIoTraceLines("TCP", 900, false) }, run.Connector.Targets[0]);
+        Assert.AreEqual(new ConnectTarget("h", 61744, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
     }
 
     [TestMethod]
@@ -393,7 +393,7 @@ public sealed class FtpProtocolHandlerTests
             "abc");
 
         Assert.AreEqual(LoginSent + "EPSV\r\nPASV\r\nTYPE I\r\nSIZE file.txt\r\nRETR file.txt\r\nQUIT\r\n", run.Sent);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 62942, false), run.Connector.Targets[1]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 62942, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
         Assert.AreEqual(TransferResult.Success(3), run.Result);
     }
 
@@ -405,7 +405,7 @@ public sealed class FtpProtocolHandlerTests
             LoggedIn + "500 no\r\n227 127,0,0,1,1,2\r\n" + TypeSet + "213 1\r\n" + Opening + Complete + Bye,
             "x");
 
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 258, false), run.Connector.Targets[1]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 258, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
         Assert.IsTrue(run.Result.IsSuccess);
     }
 
@@ -449,7 +449,7 @@ public sealed class FtpProtocolHandlerTests
             LoggedIn + "500 no\r\n227 Entering Passive Mode (10,1,2,3,0,21)\r\n" + TypeSet + "213 1\r\n" + Opening + Complete + Bye,
             "x");
 
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 21, false), run.Connector.Targets[1]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 21, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
     }
 
     [TestMethod]
@@ -496,7 +496,7 @@ public sealed class FtpProtocolHandlerTests
         // curl 8.21.0 dials port 0 and (|||40000| with no ')' alike, measured 2026-10-02 (BL-1240).
         FtpRun run = await FtpRun.ExecuteAsync(Url, LoggedIn + reply + "\r\n" + TypeSet + "213 1\r\n" + Opening + Complete + Bye, "x");
 
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", port, false), run.Connector.Targets[1]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", port, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
         Assert.AreEqual(TransferResult.Success(1), run.Result);
     }
 

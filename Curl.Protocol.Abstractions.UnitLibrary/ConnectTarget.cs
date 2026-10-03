@@ -92,6 +92,18 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     public string? PoolScheme { get; init; }
 
     /// <summary>
+    /// Gets how a plain connection's I/O is written as curl's TCP filter lines when the connector
+    /// traces that filter, or <see langword="null" />, the default, to leave it to
+    /// <see cref="PoolScheme" />: an <c>http</c> connection is written as <c>[TCP]</c> with curl's
+    /// 102400-byte receive buffer, any other connection not at all (ADR-0357).
+    /// </summary>
+    /// <remarks>
+    /// The FTP handler sets it for its control and data connections, which curl reads with other
+    /// lengths and names <c>[TCP]</c> and <c>[TCP-1]</c> (measured, BL-1259 Notes).
+    /// </remarks>
+    public TcpIoTraceLines? TcpIoTrace { get; init; }
+
+    /// <summary>
     /// Gets the alternative service to dial in place of <see cref="Host" /> and
     /// <see cref="Port" /> (<c>--alt-svc</c>), or <see langword="null" />, the default, to dial
     /// them.

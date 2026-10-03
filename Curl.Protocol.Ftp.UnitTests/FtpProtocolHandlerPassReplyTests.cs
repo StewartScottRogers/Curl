@@ -75,7 +75,7 @@ public sealed class FtpProtocolHandlerPassReplyTests
             ConnectResult.Failed(CurlExitCode.OperationTimedOut, message),
             out QueuedConnector connector);
 
-        Assert.AreEqual(new ConnectTarget("10.255.255.1", 56902, false), connector.Targets[1]);
+        Assert.AreEqual(new ConnectTarget("10.255.255.1", 56902, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, connector.Targets[1]);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.OperationTimedOut, "Failed to connect to 127.0.0.1:47663 via 10.255.255.1:56902 after 21066 ms: Could not connect to server"),
             result with { Report = null });
@@ -92,7 +92,7 @@ public sealed class FtpProtocolHandlerPassReplyTests
             ConnectResult.Failed(CurlExitCode.CouldntConnect, "unused"),
             out QueuedConnector connector);
 
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 56902, false), connector.Targets[1]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 56902, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, connector.Targets[1]);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
     }
 
@@ -111,7 +111,7 @@ public sealed class FtpProtocolHandlerPassReplyTests
         TransferResult result = await new FtpProtocolHandler(connector).ExecuteAsync(
             new TransferContext { Url = CurlUrl.Parse("ftp://ftp.invalid/f.txt"), Output = new MemoryStream(), FtpDisableEpsv = true });
 
-        Assert.AreEqual(new ConnectTarget("ftp.invalid", 61744, false), connector.Targets[1]);
+        Assert.AreEqual(new ConnectTarget("ftp.invalid", 61744, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, connector.Targets[1]);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.CouldntResolveHost, message), result with { Report = null });
     }
 

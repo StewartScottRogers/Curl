@@ -239,6 +239,39 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_TracingTheTcpFilterForATargetNamingItsOwnLines_TracesItsIoAsNamedWithoutQueryingAlpn()
+    {
+        // curl -s -v --trace-config tcp ftp://127.0.0.1:18601/a.txt, its data connection (BL-1259 Notes).
+        var events = new CountingTransferEvents();
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), new FakeTcpDialer { DialOutcome = _ => new ScriptedConnection("hello"u8.ToArray()) }, new FakeTlsProvider(), new ManualTimeProvider())
+        {
+            TracesTcpFilter = true,
+        };
+        var lines = new TcpIoTraceLines("TCP-1", ReceiveLength: null, WritesWouldBlockReads: true);
+
+        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 59271, UseTls: false) { Events = events, TcpIoTrace = lines }, CancellationToken.None);
+        await result.Connection!.ReadAsync(new byte[5], CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[] { "[TCP] connected on fd=3", "opened", "[TCP-1] recv(len=5) -> 0, 5" },
+            events.Calls.Skip(5).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_NotTracingTheTcpFilterForATargetNamingItsOwnLines_LeavesTheConnectionUntraced()
+    {
+        var events = new CountingTransferEvents();
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), new FakeTcpDialer { DialOutcome = _ => new ScriptedConnection([]) }, new FakeTlsProvider(), new ManualTimeProvider());
+
+        var result = await connector.ConnectAsync(
+            new ConnectTarget("127.0.0.1", 59271, UseTls: false) { Events = events, TcpIoTrace = new TcpIoTraceLines("TCP", 900, WritesWouldBlockReads: false) },
+            CancellationToken.None);
+        await result.Connection!.WriteAsync(new byte[16], CancellationToken.None);
+
+        Assert.AreEqual("opened", events.Calls[^1]);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_TracingOnlyTheTcpFilter_WritesNoHappyEyeballsLine()
     {
         // curl -s -v --trace-config tcp http://127.0.0.1:48761/ (BL-1161 Notes).

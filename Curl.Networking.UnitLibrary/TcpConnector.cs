@@ -1745,15 +1745,17 @@ public sealed partial class TcpConnector(
 
     // A plain HTTP connection dialled under TracesTcpFilter writes curl 8.21.0's [TCP] send and recv
     // lines for its I/O, and [TCP] query ALPN after the setup filters' removal, before the handler's
-    // "using HTTP/1.x" (measured, BL-1195 Notes).
+    // "using HTTP/1.x" (measured, BL-1195 Notes). A target that names its own TcpIoTrace, as FTP's
+    // control and data connections do, is written as it says, with no query ALPN line (BL-1259 Notes).
     private ConnectResult OpenedInPlaintext(DialedSocket dialed, ConnectTarget target, ConnectTimings timings, int proxyConnectResponseCode)
     {
-        var tracesIo = dialed.TracesTcpFilter && target.PoolScheme == "http";
-        var connection = tracesIo ? new TcpIoTraceConnection(dialed.Connection, target.Events) : dialed.Connection;
+        var lines = !dialed.TracesTcpFilter ? null : target.TcpIoTrace ?? (target.PoolScheme == "http" ? TcpIoTraceConnection.HttpLines : null);
+        var tracesHttpIo = ReferenceEquals(lines, TcpIoTraceConnection.HttpLines);
+        var connection = lines is null ? dialed.Connection : new TcpIoTraceConnection(dialed.Connection, target.Events, lines);
         var opened = WithSetupFiltersRemoved(
             Opened(dialed, target.Events, connection, timings, proxyConnectResponseCode, peerCertificates: null, applicationProtocol: null),
             dialed, target.Events);
-        WriteQueryAlpnLine(dialed, target, tracesIo);
+        WriteQueryAlpnLine(dialed, target, tracesHttpIo);
         return opened;
     }
 

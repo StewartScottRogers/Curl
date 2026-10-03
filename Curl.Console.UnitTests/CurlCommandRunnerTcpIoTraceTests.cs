@@ -22,6 +22,8 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
 
     private readonly MemoryStream standardError = new();
 
+    private byte[][] serverReads = [FortyByteResponse];
+
     [TestMethod]
     [DataRow("tcp")]
     [DataRow("network")]
@@ -122,6 +124,51 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
         Assert.IsFalse(StandardErrorLines().Any(line => line.Contains("[TCP]", StringComparison.Ordinal)));
     }
 
+    [TestMethod]
+    [DataRow("tcp")]
+    [DataRow("network")]
+    public async Task RunAsync_FtpRetrUnderTraceConfigTcp_WritesSendAndRecvBesideEachCommandAndReplyAndTcp1ForTheData(string components)
+    {
+        // curl -s -v --trace-config tcp ftp://127.0.0.1:18601/a.txt, a 5-byte file (BL-1259 Notes); the
+        // scripted server answers at once, so no would-block recv line is written, and QUIT writes none.
+        serverReads =
+        [
+            .. new[]
+            {
+                "220 Recorder ready\r\n", "331 Password required\r\n", "230 Logged in\r\n", "257 \"/\" is current directory\r\n",
+                "229 Entering Extended Passive Mode (|||59271|)\r\n", "200 Type set\r\n", "213 5\r\n",
+                "150 Opening BINARY mode data connection\r\n", "hello", "226 Transfer complete\r\n", "221 Bye\r\n",
+            }.Select(Encoding.ASCII.GetBytes),
+        ];
+
+        int exitCode = await RunAsync("-v", "--trace-config", components, "ftp://127.0.0.1:18601/a.txt");
+
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "* [TCP] recv(len=900) -> 0, 20", "< 220 Recorder ready",
+                "* [TCP] send(len=16) -> 0, 16", "> USER anonymous",
+                "* [TCP] recv(len=900) -> 0, 23", "< 331 Password required",
+                "* [TCP] send(len=22) -> 0, 22", "> PASS ftp@example.com",
+                "* [TCP] recv(len=900) -> 0, 15", "< 230 Logged in",
+                "* [TCP] send(len=5) -> 0, 5", "> PWD",
+                "* [TCP] recv(len=900) -> 0, 30", "< 257 \"/\" is current directory",
+                "* [TCP] send(len=6) -> 0, 6", "> EPSV",
+                "* [TCP] recv(len=900) -> 0, 48", "< 229 Entering Extended Passive Mode (|||59271|)",
+                "* [TCP] send(len=8) -> 0, 8", "> TYPE I",
+                "* [TCP] recv(len=900) -> 0, 14", "< 200 Type set",
+                "* [TCP] send(len=12) -> 0, 12", "> SIZE a.txt",
+                "* [TCP] recv(len=900) -> 0, 7", "< 213 5",
+                "* [TCP] send(len=12) -> 0, 12", "> RETR a.txt",
+                "* [TCP] recv(len=900) -> 0, 41", "< 150 Opening BINARY mode data connection",
+                "* [TCP-1] recv(len=5) -> 0, 5",
+                "* [TCP] recv(len=900) -> 0, 23", "< 226 Transfer complete",
+            },
+            StandardErrorLines().Where(line => line.StartsWith("> ", StringComparison.Ordinal) || line.StartsWith("< ", StringComparison.Ordinal)
+                || line.Contains("] send(len=", StringComparison.Ordinal) || line.Contains("] recv(len=", StringComparison.Ordinal)).ToArray());
+    }
+
     // The lines from Established connection to the response's blank line, every other component's
     // trace lines set aside.
     private string[] TransferLines()
@@ -148,7 +195,7 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
         TcpConnector connector = CurlComposition.CreateTcpConnector(
             parsed.Options,
             new LoopbackDnsResolver(),
-            new ScriptedTcpDialer(new ScriptedConnector([FortyByteResponse])),
+            new ScriptedTcpDialer(new ScriptedConnector(serverReads)),
             new PassThroughTlsProvider(),
             TimeProvider.System,
             HttpProxyTunnelOptions.Default);

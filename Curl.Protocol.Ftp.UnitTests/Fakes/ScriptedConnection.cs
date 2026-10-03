@@ -58,9 +58,13 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     /// <summary>Gets every byte written so far, in order.</summary>
     public byte[] Sent => [.. sent];
 
+    /// <summary>Gets the length of each read's buffer, in order (BL-1259).</summary>
+    public List<int> ReadLengths { get; } = [];
+
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
+        ReadLengths.Add(buffer.Length);
         if (nextRead == reads.Length)
         {
             return FailReadsWhenExhausted

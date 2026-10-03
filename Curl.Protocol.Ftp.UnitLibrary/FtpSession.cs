@@ -140,6 +140,9 @@ internal sealed class FtpSession(
 
     private const int ReadBufferSize = 16384;
 
+    /// <summary>The most a data read asks for: curl 8.21.0's receive buffer (measured, BL-1259 Notes).</summary>
+    private const int DataReadBufferSize = 102400;
+
     /// <summary>
     /// How long curl 8.21.0 waits for the server to open an active-mode data connection,
     /// measured with <c>-P -</c> whatever <c>--connect-timeout</c> says.
@@ -1409,6 +1412,7 @@ internal sealed class FtpSession(
             Proxy = context.Proxy,
             Events = new FtpDataConnectEvents(context.Events, failure, controlName.Host, trace),
             DiagnosticLog = context.DiagnosticLog,
+            TcpIoTrace = protectData ? null : FtpTcpIoTraces.Data,
         };
         ConnectResult connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         dataConnection = connected.Connection;
@@ -1575,13 +1579,13 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult?> CopyDataAsync()
     {
         IConnection data = dataConnection!;
-        byte[] buffer = new byte[ReadBufferSize];
-        while (!IsWindowRead())
+        byte[] buffer = new byte[DataReadBufferSize];
+        while (!IsWindowRead() && !IsExpectedSizeRead())
         {
             int read;
             try
             {
-                read = await data.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false);
+                read = await data.ReadAsync(buffer.AsMemory(0, NextDataReadLength()), context.CancellationToken).ConfigureAwait(false);
             }
             catch (IOException)
             {
@@ -1607,6 +1611,13 @@ internal sealed class FtpSession(
             {
                 return TransferResult.Failure(CurlExitCode.FilesizeExceeded, FtpTransferMessages.MaxFileSizeExceededWhileReading(maxFileSize!.Value, bytesTransferred), bytesTransferred);
             }
+        }
+
+        // Read to the announced size, curl shuts the data connection down and writes the empty
+        // block, { [0 bytes data], an end of data would have written (measured, BL-1259 Notes).
+        if (!IsWindowRead())
+        {
+            context.Events.ReportDataReceived([]);
         }
 
         return null;
@@ -1647,6 +1658,20 @@ internal sealed class FtpSession(
     /// data connection.
     /// </summary>
     private bool IsWindowRead() => window.MaxDownload is { } max && bytesTransferred >= max;
+
+    /// <summary>
+    /// Whether the size <c>SIZE</c> announced has been read: curl 8.21.0 reads no further, and a
+    /// server that sends more is cut off there (measured, BL-1259 Notes).
+    /// </summary>
+    private bool IsExpectedSizeRead() => expectedSize is { } expected && bytesTransferred >= expected;
+
+    /// <summary>
+    /// The length of the next data read: the bytes still expected, at most curl's 102400-byte
+    /// buffer, or the whole buffer when the size is unknown, as curl 8.21.0 sizes its reads and
+    /// writes them under <c>--trace-config tcp</c> (measured, BL-1259 Notes).
+    /// </summary>
+    private int NextDataReadLength() =>
+        expectedSize is { } expected ? (int)Math.Min(DataReadBufferSize, expected - bytesTransferred) : DataReadBufferSize;
 
     /// <summary>The bytes of a read of <paramref name="read" /> bytes that lie within the window.</summary>
     private int CountWithinWindow(int read) =>

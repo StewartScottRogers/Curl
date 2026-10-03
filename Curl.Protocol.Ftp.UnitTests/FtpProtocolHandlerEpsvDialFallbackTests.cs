@@ -36,8 +36,8 @@ public sealed class FtpProtocolHandlerEpsvDialFallbackTests
         Run run = await RunAsync("229 Entering Extended Passive Mode (|||40000|)\r\n" + Pasv + Retrieved);
 
         Assert.AreEqual(TransferResult.Success(5), run.Result);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 40000, false), run.Connector.Targets[1]);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 40001, false), run.Connector.Targets[2]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 40000, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 40001, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[2]);
         string[] expected =
         [
             "* Connecting to 127.0.0.1 port 40000",
@@ -59,7 +59,7 @@ public sealed class FtpProtocolHandlerEpsvDialFallbackTests
 
         Assert.AreEqual(TransferResult.Success(5), run.Result);
         Assert.HasCount(2, run.Connector.Targets);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 40001, false), run.Connector.Targets[1]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 40001, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
         string[] expected =
         [
             "* Connecting to 127.0.0.1 port 0",

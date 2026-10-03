@@ -5,27 +5,28 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking;
 
 /// <summary>
-/// Passes every call on to <paramref name="inner" /> and writes the <c>[TCP]</c> lines curl 8.21.0
-/// writes for a plain HTTP connection's I/O under <c>--trace-config tcp</c>, <c>network</c> or
-/// <c>all</c> (measured, BL-1195 Notes): <c>[TCP] send(len=&lt;n&gt;) -&gt; 0, &lt;n&gt;</c> after
-/// each write, which comes before the request's <c>&gt;</c> lines, as the HTTP handler reports its
-/// head once it is written, and <c>[TCP] recv(len=102400) -&gt; 0, &lt;n&gt;</c> after each read.
+/// Passes every call on to <paramref name="inner" /> and writes the TCP filter lines curl 8.21.0
+/// writes for a plain connection's I/O under <c>--trace-config tcp</c>, <c>network</c> or
+/// <c>all</c>, shaped by <paramref name="lines" />: <c>[TCP] send(len=&lt;n&gt;) -&gt; 0, &lt;n&gt;</c>
+/// after each write, which comes before the request's <c>&gt;</c> lines, as a handler reports what
+/// it sent once it is written, and <c>[TCP] recv(len=&lt;length&gt;) -&gt; 0, &lt;n&gt;</c> after each
+/// read (measured, BL-1195 and BL-1259 Notes).
 /// </summary>
 /// <remarks>
-/// A read that cannot complete at once is first written as curl's would-block result,
-/// <c>[TCP] recv(len=102400) -&gt; 81, 0</c> (<c>CURLE_AGAIN</c>), as curl writes one when it
-/// polls before the server has answered. The length is always curl's receive buffer, 102400,
-/// whatever the reader's own buffer (ADR-0357's BL-1195 amendment).
+/// Under <see cref="TcpIoTraceLines.WritesWouldBlockReads" />, a read that cannot complete at once is
+/// first written as curl's would-block result, <c>recv(len=&lt;length&gt;) -&gt; 81, 0</c>
+/// (<c>CURLE_AGAIN</c>), as curl writes one when it polls before the server has answered. The length
+/// is <see cref="TcpIoTraceLines.ReceiveLength" />, such as HTTP's 102400 whatever the reader's own
+/// buffer, or the read's buffer length when that is <see langword="null" /> (ADR-0357's BL-1195 and
+/// BL-1259 amendments).
 /// </remarks>
 /// <param name="inner">The dialled connection.</param>
 /// <param name="events">The events the lines are written to.</param>
-internal sealed class TcpIoTraceConnection(IConnection inner, ITransferEvents events) : IConnection
+/// <param name="lines">The filter name, receive length and would-block choice the lines carry.</param>
+internal sealed class TcpIoTraceConnection(IConnection inner, ITransferEvents events, TcpIoTraceLines lines) : IConnection
 {
-    /// <summary>The length curl's lines give every read: its receive buffer's size.</summary>
-    public const int ReceiveBufferLength = 102400;
-
-    /// <summary>The line written for a read that cannot complete at once.</summary>
-    public const string WouldBlockLine = "[TCP] recv(len=102400) -> 81, 0";
+    /// <summary>How a plain HTTP connection's I/O is written: <c>[TCP]</c>, curl's 102400-byte receive buffer as every read's length, would-block reads written.</summary>
+    public static readonly TcpIoTraceLines HttpLines = new("TCP", 102400, WritesWouldBlockReads: true);
 
     /// <inheritdoc />
     public bool IsSecure => inner.IsSecure;
@@ -45,14 +46,15 @@ internal sealed class TcpIoTraceConnection(IConnection inner, ITransferEvents ev
     /// <inheritdoc />
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
+        var length = lines.ReceiveLength ?? buffer.Length;
         var reading = inner.ReadAsync(buffer, cancellationToken);
-        if (!reading.IsCompleted)
+        if (lines.WritesWouldBlockReads && !reading.IsCompleted)
         {
-            events.ReportInfo(WouldBlockLine);
+            events.ReportInfo($"[{lines.FilterName}] recv(len={length}) -> 81, 0");
         }
 
         var read = await reading.ConfigureAwait(false);
-        events.ReportInfo($"[TCP] recv(len={ReceiveBufferLength}) -> 0, {read}");
+        events.ReportInfo($"[{lines.FilterName}] recv(len={length}) -> 0, {read}");
         return read;
     }
 
@@ -60,7 +62,7 @@ internal sealed class TcpIoTraceConnection(IConnection inner, ITransferEvents ev
     public async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
         await inner.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
-        events.ReportInfo($"[TCP] send(len={buffer.Length}) -> 0, {buffer.Length}");
+        events.ReportInfo($"[{lines.FilterName}] send(len={buffer.Length}) -> 0, {buffer.Length}");
     }
 
     /// <inheritdoc />
