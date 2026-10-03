@@ -823,6 +823,7 @@ internal static class CurlComposition
             TracesTimers = TracesTimer(options),
             TracesTimerExpiry = TracesMulti(options),
             TracedConnectTimeout = options.ConnectTimeout > TimeSpan.Zero ? options.ConnectTimeout : null,
+            TracedTransferTimeout = options.MaxTime > TimeSpan.Zero ? options.MaxTime : null,
             TracesHttpsConnectFilter = TracesHttpsConnect(options),
             HttpsConnectFirstAttemptVersion = HttpsConnectFirstAttemptVersionOf(options.HttpVersion),
             ResolverEvents = resolverEvents,

@@ -2743,6 +2743,9 @@ internal sealed class CurlCommandRunner(
     /// <see cref="CurlComposition.TracesRead" /> and, outermost so its <c>[WRITE] [OUT] done</c> comes before
     /// the <c>[READ]</c> line, <see cref="ClientWriterTraceEvents" /> under <see cref="CurlComposition.TracesWrite" />.
     /// The <c>[MULTI]</c> lines sit inside the other two, which is what lets them find their place among those lines.
+    /// Under <see cref="CurlComposition.TracesTimer" /> the response wait's <c>[TIMER]</c> lines
+    /// (<see cref="TransferTimers.WaitLines" />) go among the <c>[MULTI]</c> lines, or, with the multi not
+    /// traced, through <see cref="ResponseWaitTimerTraceEvents" /> in their place (BL-1258).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="output">The transfer's own events.</param>
@@ -2751,9 +2754,22 @@ internal sealed class CurlCommandRunner(
     private ITransferEvents WithTraceLineEvents(CommandLineOptions options, ITransferEvents output, Func<long> takeConnectionId)
     {
         ITransferEvents teardown = CurlComposition.TracesDns(options) ? new AsyncResolveTeardownTraceEvents(output) : output;
-        ITransferEvents multi = CurlComposition.TracesMulti(options) ? new MultiStateTraceEvents(teardown, timeProvider, takeConnectionId) : teardown;
+        ITransferEvents multi = WithMultiOrTimerEvents(options, teardown, takeConnectionId);
         ITransferEvents readers = CurlComposition.TracesRead(options) ? new ClientReaderResetTraceEvents(multi) : multi;
         return CurlComposition.TracesWrite(options) ? new ClientWriterTraceEvents(readers) : readers;
+    }
+
+    private ITransferEvents WithMultiOrTimerEvents(CommandLineOptions options, ITransferEvents inner, Func<long> takeConnectionId)
+    {
+        TransferTimers timers = TransferTimers.Of(options);
+        bool tracesMulti = CurlComposition.TracesMulti(options);
+        IReadOnlyList<string> waitLines = CurlComposition.TracesTimer(options) ? timers.WaitLines(tracesMulti) : [];
+        if (tracesMulti)
+        {
+            return new MultiStateTraceEvents(inner, timeProvider, takeConnectionId, timers, waitLines);
+        }
+
+        return waitLines.Count > 0 ? new ResponseWaitTimerTraceEvents(inner, waitLines) : inner;
     }
 
     /// <summary>

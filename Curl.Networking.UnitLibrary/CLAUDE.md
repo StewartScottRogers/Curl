@@ -420,7 +420,7 @@ writes `[SETUP] added SOCKS filter to H:P` first. Per BL-1186
 `TcpConnector.TracesHappyEyeballsTimer` (`--trace-config timer`, `network`, `all`) has
 `ConnectAttemptTraceEvents` write `[TIMER] [HAPPY_EYEBALLS] set for <us>ns` and `gives multi timeout in
 <ms>ms` as a second family's delay starts, and `cleared` once an attempt connects, before `Connected to`.
-Per ADR-0390 and ADR-0400 (BL-1210, BL-1258) it also writes the `[TIMER] [TIMEOUT]` lines of
+Per ADR-0390 and ADR-0401 (BL-1210, BL-1258) it also writes the `[TIMER] [TIMEOUT]` lines of
 `TracedTransferTimeout` (`-m`) and the `[TIMER] [CONNECTTIMEOUT]` lines of `TracedConnectTimeout`: both
 `set` lines first, then after the first attempt every pending timer's `expires in` (under
 `TracesTimerExpiry`, nearest first) and the nearest's `gives multi timeout`, from the configured delays.

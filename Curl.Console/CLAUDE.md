@@ -347,7 +347,10 @@ HTTP/1.x `-d` or `-T` body's upload reader lines (ADR-0383, BL-1189).
 Under `--trace-config multi` (or `network`, `all`, `-vvvv`) the runner writes curl's `[MULTI] [INIT]`
 lines up to `[SETUP] -> [CONNECT]` before that, and `MultiStateTraceEvents`, inside the `[READ]` and
 `[WRITE]` events, writes each later group of `[MULTI]` lines beside the transfer line curl writes it
-next to (ADR-0382, BL-1188).
+next to (ADR-0382, BL-1188). Its poll lines give `timeouts=` and `tinternal=` from `TransferTimers`
+(a positive `-m` and `--connect-timeout`), and under `--trace-config timer` the response wait's
+`[TIMER]` lines (`TransferTimers.WaitLines`) go between its `PERFORMING` poll lines; with the multi
+not traced, `ResponseWaitTimerTraceEvents` writes them after `Request completely sent off` (ADR-0401, BL-1258).
 The lines are only as complete as what the
 handler and connector report (BL-242 Notes name the follow-ups).
 
