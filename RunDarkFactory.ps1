@@ -2695,6 +2695,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
    dotnet build and dotnet test in the foreground with the Bash tool and a timeout of up
    to 3600000 ms, and never end your reply to wait for a notification.
+8. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
+   killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
+   take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
+   read the report rather than running it again. If the task cannot be finished before
+   the deadline, move it to Backlog before then with a -Reason saying what is left.
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -2760,6 +2765,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
    dotnet build and dotnet test in the foreground with the Bash tool and a timeout of up
    to 3600000 ms, and never end your reply to wait for a notification.
+9. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
+   killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
+   take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
+   read the report rather than running it again. If the task cannot be finished before
+   the deadline, move it to Backlog before then with a -Reason saying what is left.
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -2910,7 +2920,10 @@ function Invoke-TaskRun {
     if ($Resume) { $Text = $ResumeNote + $Text; $Suffix += '-resumed' }
     if ($null -eq $Deny) { $Deny = if ($Lane) { $LaneForbidden } else { $Forbidden } }
     if ($Minutes -le 0) { $Minutes = $TaskMinutes }
+    # The run is told when it will be killed, so it can hand the task back before then (AF-0034).
+    $deadline = (Get-Date).AddMinutes($Minutes)
     $Text = $Text.Replace('{ID}', $Id).Replace('{LANE}', "$Lane").Replace('{BRANCH}', $Branch)
+    $Text = $Text.Replace('{DEADLINE}', $deadline.ToString('HH:mm')).Replace('{MINUTES}', "$Minutes")
     $raw = Join-Path $LogDir "$Id-$Stamp$LaneTag$Suffix.jsonl"
     $err = Join-Path $LogDir "$Id-$Stamp$LaneTag$Suffix.err.txt"
     $script:RunResult = $null
@@ -2929,7 +2942,6 @@ function Invoke-TaskRun {
     $p.StandardInput.Write($Text)
     $p.StandardInput.Close()
 
-    $deadline = (Get-Date).AddMinutes($Minutes)
     $timedOut = $false
     $pending = $p.StandardOutput.ReadLineAsync()
     while ($true) {
@@ -2944,6 +2956,9 @@ function Invoke-TaskRun {
         } elseif ((Get-Date) -gt $deadline) {
             & taskkill /T /F /PID $p.Id 2>&1 | Out-Null
             $timedOut = $true
+            # A killed run sends no result event, so its end is traced here: without it the
+            # lane log's last line for the run is whatever step it was in (AF-0034).
+            Write-Trace $Id 'end' "killed: timed out after $Minutes min" 'Red'
             break
         }
     }
