@@ -3,8 +3,8 @@ id: AF-0023
 title: Record-CurlExchange.ps1 misses Content-Length unless it is the last request header, so it drops a body sent in a later TCP write and resets the connection
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Record-CurlExchange.ps1:Test-RequestComplete:request
 task: none
 found: 2026-10-02
@@ -41,3 +41,4 @@ $h = "POST / HTTP/1.1`r`nContent-Length: 3`r`nContent-Type: x"; [regex]::Match($
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.
