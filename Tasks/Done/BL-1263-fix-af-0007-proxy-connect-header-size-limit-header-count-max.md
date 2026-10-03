@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1263 — Fix AF-0007: Proxy CONNECT header size limit `header.Count > MaximumHeaderBytes` can become >= with no test failing
 
@@ -41,12 +41,24 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix is test-only: `ReadReplyAsync_WhenALineEndsTheHeaderBlockAt307200Bytes_KeepsReading` in
+  `Curl.Networking.UnitTests/HttpProxyTunnelTests.cs`. A header block whose line ends at exactly
+  307200 bytes is still read (the proxy then closes: `Proxy CONNECT aborted`); one byte more gives
+  `Too large response headers: 307201 > 307200`. The production code was already right.
+- Added `Curl.Networking.UnitTests` to `touches`: the pinning test lives there, and no task in
+  Doing on `origin/work/dark-factory` names it.
+- Mutant checked by hand rather than with the 40-mutant tool run: with line 170 changed to `>=`,
+  the 438-byte row fails; with `>` restored, all 94 HttpProxyTunnel tests pass.
+- Boundary not re-measured against real curl: curl's own message `<n> > 307200` states the
+  comparison is strict, and the over-limit case was already measured (307762).
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. A CONNECT header block of exactly 307200 bytes is pinned as within the limit, killing the > to >= mutant (AF-0007)
