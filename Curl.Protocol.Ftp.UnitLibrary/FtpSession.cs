@@ -609,7 +609,7 @@ internal sealed class FtpSession(
         bool listing = IsListing(path);
         bool ascii = listing || typeCode.UseAscii;
         window = DownloadWindowOf(listing);
-        return await OpenDataConnectionAsync(DownloadPretArgument(path, listing)).ConfigureAwait(false)
+        return await OpenDownloadDataConnectionAsync(DownloadPretArgument(path, listing)).ConfigureAwait(false)
             ?? await SetTypeAsync(ascii).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
             ?? await ReadSizeAsync(path.FileName, ascii).ConfigureAwait(false)
@@ -632,6 +632,34 @@ internal sealed class FtpSession(
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Opens a download's data connection, then ends the download there when its <c>-r</c>
+    /// text names no range (<see cref="EndWhenRangeTextNamesNoRangeAsync" />).
+    /// </summary>
+    private async ValueTask<TransferResult?> OpenDownloadDataConnectionAsync(string pretArgument) =>
+        await OpenDataConnectionAsync(pretArgument).ConfigureAwait(false)
+            ?? await EndWhenRangeTextNamesNoRangeAsync().ConfigureAwait(false);
+
+    /// <summary>
+    /// Ends a download, a listing included, whose <c>-r</c> text names no range (<c>abc</c>, <c>-0</c>,
+    /// <c>5-2</c>: <see cref="ITransferContext.RangeText" /> set, <see cref="ITransferContext.Range" />
+    /// <see langword="null" />) once its data connection is open, with no <c>TYPE</c>,
+    /// <c>SIZE</c> or <c>RETR</c>, and exit 0: curl 8.21.0's <c>ftp_do_more</c> parses the
+    /// range only then, and the range error it gets does not reach the exit code (measured,
+    /// BL-1333).
+    /// </summary>
+    /// <returns><see langword="null" /> when the download goes on.</returns>
+    private async ValueTask<TransferResult?> EndWhenRangeTextNamesNoRangeAsync()
+    {
+        if (context.Range is not null || context.RangeText is null)
+        {
+            return null;
+        }
+
+        context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
+        return await QuitAndKeepConnectionAsync().ConfigureAwait(false);
     }
 
     /// <summary>Whether a download is a listing: the path names a directory, or <c>-l</c> or <c>;type=d</c> asks for one.</summary>
