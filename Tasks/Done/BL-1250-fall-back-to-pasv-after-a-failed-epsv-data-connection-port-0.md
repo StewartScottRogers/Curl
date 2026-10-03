@@ -31,6 +31,12 @@ When the data connection to the port a `229` reply names cannot be made (port 0 
 
 ## Notes
 
+- `FtpSession` splits the passive dial (`DialDataAsync`) from the TLS handshake; a failed EPSV dial over IPv4 writes `Failed EPSV attempt. Disabling EPSV` and sends `PASV`. The connector's own `-v` failure line (rewritten with `via`) comes first, as before. Only a failed dial falls back; a failed TLS handshake on an open data connection still ends the transfer (not measured).
+- Port 0 stays undialled, so `ConnectTarget` is unchanged: the session writes the `via` failure line itself and falls back the same way. curl's `Trying 127.0.0.1:0...`, `Immediate connect fail` and `connect to ... failed` lines before it are not reproduced.
+- IPv6, measured 2026-10-02 (`Record-CurlExchange.ps1 -Ftp -ListenAddress ::1`, `-g -v ftp://[::1]:18932/f.txt`, 229 naming 40000): exit 8, `-v` `Failed to connect to ::1:18932 via ::1:40000 after 2768 ms: Could not connect to server` then `Failed EPSV attempt, exiting`, no `PASV` or `QUIT`, and the error line keeps the dial's message (curl's error buffer holds the first failf). Implemented that way.
+- Two older tests that pinned exit 7 for a failed EPSV dial now use `--disable-epsv` and a `227`, keeping their intent (the connector's failure passes through).
+- `--log-level warning` writes `EPSV data connection failed; falling back to PASV`.
+
 ## Log
 
 - 2026-10-02: Created.
