@@ -8,7 +8,7 @@ depends-on: [BL-1304]
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
 requirement: FR-084
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1305 — Stop a TFTP download under -I or past --max-filesize as curl's download writer does
 
@@ -31,14 +31,18 @@ A `tftp://` download honours `ITransferContext.NoBody` (`-I`) and `ITransferCont
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Tftp.UnitTests` runs a download with `NoBody = true` through the fake datagram channel and asserts exit 8 (`CurlExitCode.WeirdServerReply`) with message `Weird server reply`, nothing written to the output, the block's 6 payload bytes still reported as received data (curl's `{ [6 bytes data]`), no info line for the failure, and that the last datagram sent is exactly `00 05 00 00`.
-- [ ] A test runs a download of `hello\n` with `MaxFileSize = 3` and asserts exit 63 (`CurlExitCode.FilesizeExceeded`) with message `Exceeded the maximum allowed file size (3) with 3 bytes`, output `hel`, all 6 payload bytes reported as received data, that message reported as an info line, and the ERROR packet `00 05 00 00` as the last datagram sent.
-- [ ] A test with a 512-byte block size and a 700-byte file and `MaxFileSize = 600` asserts the first block is written whole, 88 bytes of the second, the message `... (600) with 600 bytes`, and an ERROR packet whose code field is 1 (the last block acknowledged).
-- [ ] Tests pin that `MaxFileSize` of 0, `null`, and exactly the file's length all complete with exit 0 and the whole file.
-- [ ] An upload (`-T`) ignores both settings: a test asserts an upload with `NoBody = true` and `MaxFileSize = 1` completes as today.
-- [ ] `dotnet build Curl.Protocol.Tftp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Tftp.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Tftp.UnitTests` runs a download with `NoBody = true` through the fake datagram channel and asserts exit 8 (`CurlExitCode.WeirdServerReply`) with message `Weird server reply`, nothing written to the output, the block's 6 payload bytes still reported as received data (curl's `{ [6 bytes data]`), no info line for the failure, and that the last datagram sent is exactly `00 05 00 00`.
+- [x] A test runs a download of `hello\n` with `MaxFileSize = 3` and asserts exit 63 (`CurlExitCode.FilesizeExceeded`) with message `Exceeded the maximum allowed file size (3) with 3 bytes`, output `hel`, all 6 payload bytes reported as received data, that message reported as an info line, and the ERROR packet `00 05 00 00` as the last datagram sent.
+- [x] A test with a 512-byte block size and a 700-byte file and `MaxFileSize = 600` asserts the first block is written whole, 88 bytes of the second, the message `... (600) with 600 bytes`, and an ERROR packet whose code field is 1 (the last block acknowledged).
+- [x] Tests pin that `MaxFileSize` of 0, `null`, and exactly the file's length all complete with exit 0 and the whole file.
+- [x] An upload (`-T`) ignores both settings: a test asserts an upload with `NoBody = true` and `MaxFileSize = 1` completes as today.
+- [x] `dotnet build Curl.Protocol.Tftp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Tftp.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Delivered directly (the Context already held the full curl measurement and source reading): `TftpDownload.WriteBlockAsync` plays curl's `cw_download_write`; `AcceptDataAsync` sends `TftpPackets.BuildAbandonment(expectedBlock - 1)` to the server's transfer endpoint when the writer stops; `TftpTransferEvents.MaxFileSizeExceeded` reports the exit-63 message as an info line. Tests in `TftpDownloadWriterTests`.
+- Choice: on a stop, `BytesTransferred` is the bytes written (0 under `-I`), matching curl's `bytecount`, which the exit-63 message also prints.
+- Quality: `Measure-CodeQuality.ps1 -Library Curl.Protocol.Tftp.UnitLibrary` reported 0 failing members; Tftp tests 206 passed; Console tests 2461 passed.
 
 - The `ITransferContext.MaxFileSize` doc comment in `Curl.Protocol.Abstractions.UnitLibrary` still says only `file://` and HTTP enforce it; that file is outside this task's `touches`, so leave it for the documentation pass.
 
@@ -46,3 +50,4 @@ A `tftp://` download honours `ITransferContext.NoBody` (`-I`) and `ITransferCont
 
 - 2026-10-02: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. a TFTP download stops under -I (exit 8) and past --max-filesize (exit 63) and sends curl's bare ERROR packet
