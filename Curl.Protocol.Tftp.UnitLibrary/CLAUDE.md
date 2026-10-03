@@ -97,6 +97,9 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   `got option=(n) value=(v)` with `blksize parsed from OACK (A) requested (R)` and, for a
   download only, `tsize parsed from OACK (N)`, `Connected for receive|transmit`, `Timeout
   waiting for block N ACK. Retries = R` for a re-send once the server has answered,
-  `TFTP error: <text>` for an ERROR packet whose text ends in a NUL, and `shutting down
+  `Received ACK for block N, expecting M` for an upload's ACK of the wrong block,
+  `Received last DATA packet block N again.` and `Received unexpected DATA packet block
+  N, expecting block M` (M wraps from 65535 to 0) for a download's repeated or
+  out-of-order block (BL-1304), `TFTP error: <text>` for an ERROR packet whose text ends in a NUL, and `shutting down
   connection #0` - and each downloaded block's bytes as data received. An upload reports
   no data sent, as curl reports none.

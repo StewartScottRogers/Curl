@@ -237,10 +237,12 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         }
         else if (block == unchecked((ushort)(expectedBlock - 1)))
         {
+            events.RepeatedData(block);
             await SendAsync(TftpPackets.BuildAcknowledgement(block), received.RemoteEndPoint).ConfigureAwait(false);
         }
         else
         {
+            events.UnexpectedData(block, expectedBlock);
             return null;
         }
 

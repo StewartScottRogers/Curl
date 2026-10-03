@@ -227,6 +227,7 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
 
         if (block != lastSentBlock)
         {
+            events.UnexpectedAcknowledgement(block, lastSentBlock);
             return await ResendAsync().ConfigureAwait(false)
                 ? null
                 : TransferResult.Failure(

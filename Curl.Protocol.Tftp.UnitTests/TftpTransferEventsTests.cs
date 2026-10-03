@@ -247,6 +247,111 @@ public sealed class TftpTransferEventsTests
             events.Steps);
     }
 
+    /// <summary>
+    /// Pinned from curl 8.21.0's <c>tftp_tx</c> (lib/tftp.c lines 371-393): an ACK for a
+    /// block other than the one last sent is reported, and the last DATA packet is re-sent.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWhoseDataOneIsAnsweredWithAckZero_ReportsTheUnexpectedAckAndResendsDataOne()
+    {
+        var events = new RecordingTransferEvents();
+        var clock = new ManualTimeProvider();
+        var channel = new PausingDatagramChannel(
+            ServerEndPoint,
+            clock,
+            Acknowledgement(0),
+            Acknowledgement(0),
+            Acknowledgement(1));
+
+        var result = await Handler(channel).ExecuteAsync(UploadContext(events, clock, noOptions: true));
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual(9, result.BytesTransferred);
+        CollectionAssert.AreEqual(
+            new[] { "Connected for transmit", "set timeouts for state 2; Total 0, retry 5 maxtry 3", "Received ACK for block 0, expecting 1", ShuttingDown },
+            events.Steps.Skip(3).ToArray());
+        byte[] dataOne = [0, 3, 0, 1, .. "upload me"u8.ToArray()];
+        Assert.HasCount(3, channel.Sent);
+        CollectionAssert.AreEqual(dataOne, channel.Sent[1]);
+        CollectionAssert.AreEqual(dataOne, channel.Sent[2]);
+    }
+
+    /// <summary>
+    /// Pinned from curl 8.21.0's <c>tftp_rx</c> (lib/tftp.c lines 532-549): a repeat of the
+    /// last block received is reported, with its full stop, and acknowledged again.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DownloadWhoseDataOneArrivesTwice_ReportsTheRepeatOnceAndAcksItTwice()
+    {
+        var events = new RecordingTransferEvents();
+        var clock = new ManualTimeProvider();
+        var first = new string('a', 512);
+        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Data(1, first), Data(1, first), Data(2, "end"));
+        var context = Context(events, clock, noOptions: true);
+
+        var result = await Handler(channel).ExecuteAsync(context);
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual(first + "end", Encoding.ASCII.GetString(((MemoryStream)context.Output).ToArray()));
+        Assert.AreEqual(1, events.Steps.Count(step => step == "Received last DATA packet block 1 again."));
+        CollectionAssert.AreEqual(
+            new[] { "Received last DATA packet block 1 again.", "<= end", ShuttingDown },
+            events.Steps.TakeLast(3).ToArray());
+        Assert.AreEqual(2, channel.Sent.Count(sent => sent.SequenceEqual(new byte[] { 0, 4, 0, 1 })));
+    }
+
+    /// <summary>
+    /// Pinned from curl 8.21.0's <c>tftp_rx</c> (lib/tftp.c lines 532-549): a block that is
+    /// neither the next nor the last is reported and otherwise ignored.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DownloadWhoseDataThreeArrivesAfterDataOne_ReportsItAcksNothingForItAndCompletesOnDataTwo()
+    {
+        var events = new RecordingTransferEvents();
+        var clock = new ManualTimeProvider();
+        var first = new string('a', 512);
+        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Data(1, first), Data(3, "x"), Data(2, "end"));
+        var context = Context(events, clock, noOptions: true);
+
+        var result = await Handler(channel).ExecuteAsync(context);
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual(first + "end", Encoding.ASCII.GetString(((MemoryStream)context.Output).ToArray()));
+        CollectionAssert.AreEqual(
+            new[] { "Received unexpected DATA packet block 3, expecting block 2", "<= end", ShuttingDown },
+            events.Steps.TakeLast(3).ToArray());
+        Assert.HasCount(3, channel.Sent);
+        CollectionAssert.AreEqual(new byte[] { 0, 4, 0, 1 }, channel.Sent[1]);
+        CollectionAssert.AreEqual(new byte[] { 0, 4, 0, 2 }, channel.Sent[2]);
+    }
+
+    /// <summary>
+    /// Block numbers print as curl's unsigned 16-bit values: after block 65535 the next
+    /// block expected is 0.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DownloadWhoseBlockOneArrivesAfterBlock65535_ReportsExpectingBlockZero()
+    {
+        var events = new RecordingTransferEvents();
+        var clock = new ManualTimeProvider();
+        var script = new List<(byte[]? Datagram, EndPoint Source)> { OptionAcknowledgement("blksize\08\0") };
+        for (var block = 1; block <= ushort.MaxValue; block++)
+        {
+            script.Add(Data((ushort)block, "abcdefgh"));
+        }
+
+        script.Add(Data(1, "abcdefgh"));
+        script.Add(Data(0, "end"));
+        var channel = new PausingDatagramChannel(ServerEndPoint, clock, [.. script]);
+
+        var result = await Handler(channel).ExecuteAsync(Context(events, clock, blockSize: 8));
+
+        Assert.IsTrue(result.IsSuccess);
+        CollectionAssert.AreEqual(
+            new[] { "<= abcdefgh", "Received unexpected DATA packet block 1, expecting block 0", "<= end", ShuttingDown },
+            events.Steps.TakeLast(4).ToArray());
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_MaxTime_ReportsTheMillisecondsLeftAsTotal()
     {

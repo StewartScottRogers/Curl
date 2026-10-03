@@ -101,6 +101,16 @@ public sealed class TftpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_UrlWithNoPort_OpensPort69()
+    {
+        var connector = Connector(Channel(Data(1, "hello")));
+
+        await new TftpProtocolHandler(connector).ExecuteAsync(Context("unknown://h/file.txt", new MemoryStream()));
+
+        CollectionAssert.AreEqual(new[] { ("h", 69) }, connector.Opens);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ThreeBlocks_AcksEachAndWritesAllBytesInOrder()
     {
         var first = Payload(512, 'a');
