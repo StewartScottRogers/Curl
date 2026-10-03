@@ -147,7 +147,7 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
     private async ValueTask<(byte[] Handle, long Offset)> OpenAsync(SftpSession session, byte[] path, SftpUploadOptions options, CancellationToken cancellationToken)
     {
         long offset = options.ResumeFromRemoteSize
-            ? await session.StatSizeAsync(path, cancellationToken).ConfigureAwait(false) ?? 0
+            ? await RemoteSizeAsync(session, path, cancellationToken).ConfigureAwait(false)
             : options.ResumeFrom;
         uint flags = OpenFlagsFor(options.Append, offset);
 
@@ -159,6 +159,15 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
             ? await CreateDirectoriesAndOpenAsync(session, path, flags, createFileMode, cancellationToken).ConfigureAwait(false)
             : throw SshTransferException.SftpUploadFailed(status);
         return (handle, offset);
+    }
+
+    // Measured: no size, or 0, resumes at 0. From curl 8.21.0's sftp_upload_init
+    // (BL-1241): a size with its top bit set reads as negative and fails with exit 36
+    // before the open.
+    private static async ValueTask<long> RemoteSizeAsync(SftpSession session, byte[] path, CancellationToken cancellationToken)
+    {
+        long size = await session.StatSizeAsync(path, cancellationToken).ConfigureAwait(false) ?? 0;
+        return size >= 0 ? size : throw SshTransferException.SftpBadFileSize(size);
     }
 
     // Measured: one MKDIR for every slash after the first, from the root down, each after

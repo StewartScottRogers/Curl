@@ -148,7 +148,6 @@ public sealed partial class SftpFileDownloadTests
     [TestMethod]
     [DataRow("0000000000", DisplayName = "no size flag")]
     [DataRow("00000001000000", DisplayName = "size cut short")]
-    [DataRow("00000001FFFFFFFFFFFFFFFF", DisplayName = "size beyond a long")]
     public async Task DownloadAsync_StatGivesNoUsableSize_ReadsUntilTheEnd(string attributesHex)
     {
         SftpServerScript script = SftpServerScript.Started()

@@ -82,9 +82,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 Trace.Enter("SSH_SFTP_DOWNLOAD_STAT");
                 long? size = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.StatSizeAsync(path, cancellationToken)).ConfigureAwait(false);
-                Trace.Rest();
-                Trace.Write("DO phase is complete");
-                TransferResult result = await CopyPartAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
+                TransferResult result = await CopyPartOfKnownSizeAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
                 Trace.Enter("SSH_SFTP_CLOSE");
                 result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
                 Trace.EndSftpDonePhase();
@@ -105,6 +103,30 @@ internal sealed class SftpFileDownload(SshTransport transport)
         {
             return null;
         }
+    }
+
+    // From curl 8.21.0's sftp_download_stat (BL-1241): a size with its top bit set reads
+    // as negative and fails with exit 36 before the DO phase completes; the handle is
+    // still closed.
+    private async ValueTask<TransferResult> CopyPartOfKnownSizeAsync(
+        SftpSession session,
+        byte[] handle,
+        long? size,
+        ByteRange? range,
+        long? resumeFrom,
+        Stream output,
+        ITransferProgress progress,
+        CancellationToken cancellationToken)
+    {
+        if (size < 0)
+        {
+            SshTransferException failure = SshTransferException.SftpBadFileSize(size.Value);
+            return TransferResult.Failure(failure.ExitCode, failure.Message);
+        }
+
+        Trace.Rest();
+        Trace.Write("DO phase is complete");
+        return await CopyPartAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
     }
 
     // Measured: a range or -C offset the file cannot serve reads nothing, and the handle

@@ -227,6 +227,18 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
         new(CurlExitCode.BadDownloadResume, $"Offset ({offset}) was beyond file size ({size})");
 
     /// <summary>
+    /// Creates the failure curl 8.21.0 reports when an SFTP <c>STAT</c> answer's 64-bit size
+    /// has its top bit set, so curl's signed <c>curl_off_t</c> reads it as negative: exit 36
+    /// and <c>Bad file size (N)</c>, with N the size as a signed number. Pinned from
+    /// <c>lib/vssh/libssh2.c</c> at <c>curl-8_21_0</c> (<c>sftp_download_stat</c> and
+    /// <c>sftp_upload_init</c>), since no real server reports such a size (BL-1241).
+    /// </summary>
+    /// <param name="size">The size read as a signed 64-bit number.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpBadFileSize(long size) =>
+        new(CurlExitCode.BadDownloadResume, $"Bad file size ({size})");
+
+    /// <summary>
     /// Creates the failure curl 8.21.0 reports when the server refuses the <c>session</c>
     /// channel an SCP transfer opens: exit 79 and libssh2's text for the reason code,
     /// measured 2026-09-29 as <c>Channel open failure (connect failed)</c> for OpenSSH's

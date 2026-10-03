@@ -397,11 +397,12 @@ internal sealed class SftpSession
 
     /// <summary>
     /// Sends <c>SSH_FXP_STAT</c> for <paramref name="path" /> and reads the size from the
-    /// answer. A size of 0, as measured, counts as unknown.
+    /// answer. A size of 0, as measured, counts as unknown; a size with its top bit set is
+    /// returned negative, as curl's signed <c>curl_off_t</c> reads it, for the caller to fail.
     /// </summary>
     /// <param name="path">The path.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
-    /// <returns>The size, or <see langword="null" /> when the server gave none, gave 0, answered with a status or sent attributes cut short.</returns>
+    /// <returns>The size as a signed number, or <see langword="null" /> when the server gave none, gave 0, answered with a status or sent attributes cut short.</returns>
     /// <exception cref="InvalidDataException">The answer is malformed.</exception>
     internal async ValueTask<long?> StatSizeAsync(byte[] path, CancellationToken cancellationToken)
     {
@@ -622,7 +623,7 @@ internal sealed class SftpSession
         {
             bool hasSize = (attributes.ReadUInt32() & AttributeSize) != 0;
             long size = hasSize ? (long)(((ulong)attributes.ReadUInt32() << 32) | attributes.ReadUInt32()) : 0;
-            return size > 0 ? size : null;
+            return size != 0 ? size : null;
         }
         catch (InvalidDataException)
         {
