@@ -35,3 +35,4 @@ A `ws://` upgrade send, frame send or frame read that fails with any socket erro
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
