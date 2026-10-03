@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1264 — Fix AF-0008: ConnectToMappings.Failure can report IsMapped: true instead of false with no test failing
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The fix is test-only: `Map_WhenTheMatchingDestinationDoesNotParse_ReportsCurlsExit49Message` now asserts the whole failure `ConnectDestination` (empty host, port 0, `IsMapped: false`, the message) rather than only `ParseError`. The production code was already right.
+- Added `Curl.Networking.UnitTests` to `touches`: the tests live there. No other task in Doing on `origin/work/dark-factory` names it.
+- The audit guard refuses lanes access to `Audit/Tools/Invoke-MutationTest.ps1`, so the reproduction was run by hand: the mutant (`IsMapped: true` at `ConnectToMappings.cs:135`) applied with the Edit tool failed 9 of 42 `ConnectToMappings` tests, then the code was reverted. The quality auditor's re-audit still has to confirm it with the tool itself.
+- `dotnet build`: 0 warnings, 0 errors. Fast tests: all 33 test projects passed.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. Tests now pin IsMapped: false on every --connect-to parse failure; the AF-0008 mutant is killed
