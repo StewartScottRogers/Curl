@@ -105,3 +105,4 @@ What the rest of the excess is (all measured in this run):
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-02: Doing -> Backlog. Waits on BL-1289 (read-path allocations) and BL-1290 (ole32/user32 imports); after this run's changes the 50 MiB GET peaks at 2.35x (-o) and 2.25x (pipe)
+- 2026-10-03: Backlog -> Doing.
