@@ -3,10 +3,10 @@ id: AF-0005
 title: Brainpool point decoding: changing || to && in the below-modulus check is not caught by any test
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Cryptography.UnitLibrary/BrainpoolPoint.cs:Decode-or-to-and:surviving-mutant
-task: none
+task: BL-1261
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Cr
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.

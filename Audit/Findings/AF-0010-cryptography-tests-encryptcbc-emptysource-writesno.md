@@ -3,10 +3,10 @@ id: AF-0010
 title: Cryptography tests EncryptCbc_EmptySource_WritesNothing and Constructor_56ByteKey_IsAccepted (Blowfish, Cast128, Camellia, ChaCha20, Rc4) have no assertion
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Cryptography.UnitTests/BlowfishTests.cs:EncryptCbc_EmptySource_WritesNothing:no-assertion
-task: none
+task: BL-1266
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
@@ -41,3 +41,4 @@ Select-String -Path Curl.Cryptography.UnitTests/BlowfishTests.cs -Pattern 'Encry
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.

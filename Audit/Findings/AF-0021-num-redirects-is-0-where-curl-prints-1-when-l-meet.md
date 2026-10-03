@@ -3,10 +3,10 @@ id: AF-0021
 title: %{num_redirects} is 0 where curl prints 1 when -L meets a Location it cannot parse
 auditor: conformance
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Core.UnitLibrary/RedirectFollower.cs:num_redirects:stdout
-task: none
+task: BL-1277
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
@@ -41,3 +41,4 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.

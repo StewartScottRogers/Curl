@@ -3,10 +3,10 @@ id: AF-0011
 title: Curl.Protocol.Ssh.UnitLibrary exposes no byte-level parser entry point, so its packet and message readers cannot be fuzzed
 auditor: security
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: security:Curl.Protocol.Ssh.UnitLibrary:ssh-parsers:unfuzzable
-task: none
+task: BL-1267
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
@@ -41,3 +41,4 @@ dotnet run Audit/Tools/Fuzz/Fuzz.cs -- --target ssh --iterations 1000 --seed 1 -
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.

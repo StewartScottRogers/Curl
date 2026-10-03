@@ -3,10 +3,10 @@ id: AF-0007
 title: Proxy CONNECT header size limit `header.Count > MaximumHeaderBytes` can become >= with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:ReadReply-header-limit-gt:surviving-mutant
-task: none
+task: BL-1263
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.

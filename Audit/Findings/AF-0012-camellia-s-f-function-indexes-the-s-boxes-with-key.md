@@ -3,10 +3,10 @@ id: AF-0012
 title: Camellia's F-function indexes the S-boxes with key-mixed data (TLS Camellia suites)
 auditor: security
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: security:Curl.Cryptography.UnitLibrary/Camellia.cs:F:secret-dependent-lookup
-task: none
+task: BL-1268
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
@@ -41,3 +41,4 @@ Select-String -Path Curl.Cryptography.UnitLibrary/Camellia.cs -Pattern 'box\[\(i
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.

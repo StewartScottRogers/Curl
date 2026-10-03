@@ -3,10 +3,10 @@ id: AF-0017
 title: Blowfish's F-function reads key-dependent S-boxes at data-dependent indexes (SSH blowfish-cbc, bcrypt_pbkdf)
 auditor: security
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: security:Curl.Cryptography.UnitLibrary/BlowfishState.cs:F:secret-dependent-lookup
-task: none
+task: BL-1273
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
@@ -41,3 +41,4 @@ Select-String -Path Curl.Cryptography.UnitLibrary/BlowfishState.cs -Pattern 'box
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.
