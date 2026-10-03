@@ -420,3 +420,4 @@ What this makes easy, and what it makes hard. Both, honestly.
 ## Alternatives considered
 Each option and the specific reason it lost.
 ```
+| [0390](ADR-0390-connect-timeout-timer-lines-are-written-for-the-connect-phase-from-the-configured-delays.md) | `--trace-config timer` writes a given `--connect-timeout`'s `[TIMER] [CONNECTTIMEOUT]` lines around a direct connect, and `multi` adds each timer's `expires in` line, written from the configured delays; the response wait and `-m`'s `[TIMEOUT]` lines are a follow-up (BL-1210) | Accepted | 2026-10-02 |

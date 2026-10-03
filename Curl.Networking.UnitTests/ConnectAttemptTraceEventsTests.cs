@@ -206,6 +206,105 @@ public sealed class ConnectAttemptTraceEventsTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ConnectTimeoutOnAPlainConnect_WritesItsSetAndGivesLinesAndExpiresInOnlyUnderTheMulti(bool tracesTimerExpiry)
+    {
+        // curl -s -v --trace-config timer (and network) --connect-timeout 1 http://127.0.0.1:P/ (BL-1210 Notes).
+        var inner = new CountingTransferEvents();
+        var events = new ConnectAttemptTraceEvents(inner, "127.0.0.1", false, false, tracesTimer: true, tracesTimerExpiry, TimeSpan.FromSeconds(1));
+
+        events.ConnectStarting();
+        events.ReportInfo("  Trying 127.0.0.1:48763...");
+        events.AttemptConnected(IPv4);
+
+        string[] expiry = tracesTimerExpiry ? ["[TIMER] [CONNECTTIMEOUT] expires in 1000000ns"] : [];
+        CollectionAssert.AreEqual(
+            new[] { "[TIMER] [CONNECTTIMEOUT] set for 1000000ns", "  Trying 127.0.0.1:48763..." }
+                .Concat(expiry)
+                .Concat(["[TIMER] [CONNECTTIMEOUT] gives multi timeout in 1000ms", "[TIMER] [HAPPY_EYEBALLS] cleared"])
+                .ToArray(),
+            inner.Calls);
+    }
+
+    [TestMethod]
+    public void TwoFamiliesWithAConnectTimeoutUnderTheMulti_WriteEveryTimersExpiresInAndTheNearestGivesTheTimeout()
+    {
+        // curl -s -v --trace-config timer,multi --connect-timeout 1 http://localhost:P/, IPv4 winning
+        // (BL-1210 Notes); the elapsed time comes off the configured delays exactly (ADR-0357).
+        var inner = new CountingTransferEvents();
+        var events = new ConnectAttemptTraceEvents(inner, "localhost", false, false, tracesTimer: true, tracesTimerExpiry: true, TimeSpan.FromSeconds(1));
+
+        events.ConnectStarting();
+        events.RaceStarting(TimeSpan.FromMilliseconds(200));
+        events.ReportInfo("  Trying [::1]:48763...");
+        events.SecondFamilyDue();
+        events.ReportInfo("  Trying 127.0.0.1:48763...");
+        events.AttemptConnected(IPv4);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[TIMER] [CONNECTTIMEOUT] set for 1000000ns",
+                "  Trying [::1]:48763...",
+                "[TIMER] [HAPPY_EYEBALLS] set for 200000ns",
+                "[TIMER] [HAPPY_EYEBALLS] expires in 200000ns",
+                "[TIMER] [CONNECTTIMEOUT] expires in 1000000ns",
+                "[TIMER] [HAPPY_EYEBALLS] gives multi timeout in 200ms",
+                "  Trying 127.0.0.1:48763...",
+                "[TIMER] [CONNECTTIMEOUT] expires in 800000ns",
+                "[TIMER] [CONNECTTIMEOUT] gives multi timeout in 800ms",
+                "[TIMER] [HAPPY_EYEBALLS] cleared",
+            },
+            inner.Calls);
+    }
+
+    [TestMethod]
+    public void AConnectTimeoutShorterThanTheSecondFamilysDelay_GivesTheMultiTimeoutRoundedUp()
+    {
+        var inner = new CountingTransferEvents();
+        var events = new ConnectAttemptTraceEvents(inner, "localhost", false, false, tracesTimer: true, tracesTimerExpiry: false, TimeSpan.FromMicroseconds(100500));
+
+        events.RaceStarting(TimeSpan.FromMilliseconds(200));
+        events.ReportInfo("  Trying [::1]:48763...");
+
+        Assert.AreEqual("[TIMER] [CONNECTTIMEOUT] gives multi timeout in 101ms", inner.Calls[^1]);
+    }
+
+    [TestMethod]
+    public void ASecondFamilyStartedAfterTheFirstFailed_WritesNoFurtherConnectTimeoutLine()
+    {
+        var inner = new CountingTransferEvents();
+        var events = new ConnectAttemptTraceEvents(inner, "localhost", false, false, tracesTimer: true, tracesTimerExpiry: true, TimeSpan.FromSeconds(1));
+
+        events.RaceStarting(TimeSpan.FromMilliseconds(200));
+        events.ReportInfo("  Trying [::1]:48763...");
+        events.AttemptFailing(IPv6);
+        events.AttemptFailed(IPv6);
+        var linesBefore = inner.Calls.Count;
+        events.ReportInfo("  Trying 127.0.0.1:48763...");
+
+        CollectionAssert.AreEqual(new[] { "  Trying 127.0.0.1:48763..." }, inner.Calls.Skip(linesBefore).ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(false, null)]
+    [DataRow(true, null)]
+    [DataRow(false, 1000)]
+    public void WithoutAConnectTimeoutOrTheTimer_ConnectStartingWritesNothing(bool tracesTimer, int? connectTimeoutMilliseconds)
+    {
+        // curl -s -v --trace-config timer http://127.0.0.1:P/ writes no CONNECTTIMEOUT line (BL-1210 Notes).
+        var inner = new CountingTransferEvents();
+        TimeSpan? connectTimeout = connectTimeoutMilliseconds is { } milliseconds ? TimeSpan.FromMilliseconds(milliseconds) : null;
+        var events = new ConnectAttemptTraceEvents(inner, "127.0.0.1", false, false, tracesTimer, tracesTimerExpiry: true, connectTimeout);
+
+        events.ConnectStarting();
+        events.ReportInfo("  Trying 127.0.0.1:48763...");
+
+        CollectionAssert.AreEqual(new[] { "  Trying 127.0.0.1:48763..." }, inner.Calls);
+    }
+
+    [TestMethod]
     public void EveryOtherReport_IsPassedOnUnchanged()
     {
         var inner = new CountingTransferEvents();

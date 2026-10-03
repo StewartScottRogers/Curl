@@ -278,10 +278,26 @@ public sealed partial class TcpConnector(
 
     /// <summary>
     /// Gets a value indicating whether a direct connect writes the <c>[TIMER] [HAPPY_EYEBALLS]</c>
-    /// lines curl 8.21.0 writes as it sets and clears its second-family timer under
-    /// <c>--trace-config timer</c>, <c>network</c> or <c>all</c> (<see cref="ConnectAttemptTraceEvents" />, BL-1186).
+    /// lines curl 8.21.0 writes as it sets and clears its second-family timer, and the
+    /// <c>[TIMER] [CONNECTTIMEOUT]</c> lines of a given <c>--connect-timeout</c>, under
+    /// <c>--trace-config timer</c>, <c>network</c> or <c>all</c> (<see cref="ConnectAttemptTraceEvents" />,
+    /// BL-1186, BL-1210).
     /// </summary>
-    public bool TracesHappyEyeballsTimer { get; init; }
+    public bool TracesTimers { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether, under <see cref="TracesTimers" />, a direct connect also writes
+    /// the <c>[TIMER] ... expires in</c> lines curl 8.21.0 writes only when its multi is traced too:
+    /// <c>timer</c> with <c>multi</c>, <c>network</c> or <c>all</c> (measured, BL-1210 Notes).
+    /// </summary>
+    public bool TracesTimerExpiry { get; init; }
+
+    /// <summary>
+    /// Gets the <c>--connect-timeout</c> whose <c>[TIMER] [CONNECTTIMEOUT]</c> lines a direct connect
+    /// writes under <see cref="TracesTimers" />, or <see langword="null" /> when none, or 0, was given:
+    /// curl's default connect timeout and a shorter <c>-m</c> write no such line (measured, BL-1210 Notes).
+    /// </summary>
+    public TimeSpan? TracedConnectTimeout { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether a direct connect to an <c>https://</c> origin writes the
@@ -665,7 +681,7 @@ public sealed partial class TcpConnector(
     }
 
     // Under TracesSetupFilter, TracesDnsFilter, TracesHappyEyeballsFilter, TracesTcpFilter and
-    // TracesHappyEyeballsTimer a direct connect reports through SetupFilterTraceEvents over
+    // TracesTimers a direct connect reports through SetupFilterTraceEvents over
     // DnsFilterTraceEvents over ConnectAttemptTraceEvents, which write curl's [SETUP], [DNS],
     // [HAPPY-EYEBALLS], [TCP] and [TIMER] lines in curl's order around its own (BL-1102, BL-1103,
     // BL-1161, BL-1186), the last also given back for the
@@ -681,6 +697,7 @@ public sealed partial class TcpConnector(
             return (target, null, null);
         }
 
+        trace?.ConnectStarting();
         var (events, httpsConnect) = SetupAndDnsFilterEvents(trace ?? target.Events, destination, httpsOrigin);
         return (target with { Events = events }, trace, httpsConnect);
     }
@@ -699,8 +716,8 @@ public sealed partial class TcpConnector(
         target.UseTls && !target.IsForwardProxy && string.Equals(target.PoolScheme, "https", StringComparison.OrdinalIgnoreCase);
 
     private ConnectAttemptTraceEvents? ConnectAttemptTraceOf(ITransferEvents events, string host) =>
-        TracesHappyEyeballsFilter || TracesTcpFilter || TracesHappyEyeballsTimer
-            ? new ConnectAttemptTraceEvents(events, host, TracesHappyEyeballsFilter, TracesTcpFilter, TracesHappyEyeballsTimer)
+        TracesHappyEyeballsFilter || TracesTcpFilter || TracesTimers
+            ? new ConnectAttemptTraceEvents(events, host, TracesHappyEyeballsFilter, TracesTcpFilter, TracesTimers, TracesTimerExpiry, TracedConnectTimeout)
             : null;
 
     // The [SETUP] filter's events over the [DNS] filter's over the given ones, each when traced; the

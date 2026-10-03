@@ -237,6 +237,57 @@ public sealed class CurlCompositionDnsTraceTests
     }
 
     [TestMethod]
+    public async Task Connect_UnderTraceConfigTimerWithAConnectTimeout_WritesTheConnectTimeoutSetAndGivesLinesButNoExpiresIn()
+    {
+        // curl -s -v --trace-config timer --connect-timeout 1 http://127.0.0.1:P/ (BL-1210 Notes).
+        List<string> lines = await ConnectAsync("-v", "--trace-config", "timer", "--connect-timeout", "1");
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[TIMER] [CONNECTTIMEOUT] set for 1000000ns",
+                "  Trying 127.0.0.1:47110...",
+                "[TIMER] [CONNECTTIMEOUT] gives multi timeout in 1000ms",
+                "[TIMER] [HAPPY_EYEBALLS] cleared",
+                "Established connection",
+            },
+            lines);
+    }
+
+    [TestMethod]
+    [DataRow("-v", "--trace-config", "network", "--connect-timeout", "1")]
+    [DataRow("-v", "--trace-config", "timer,multi", "--connect-timeout", "1")]
+    [DataRow("-v", "--trace-config", "all", "--connect-timeout", "1")]
+    [DataRow("-vvvv", "--connect-timeout", "1")]
+    public async Task Connect_WithTheTimerAndMultiComponentsAndAConnectTimeout_WritesTheExpiresInLine(params string[] arguments)
+    {
+        // curl -s -v --trace-config network --connect-timeout 1 http://127.0.0.1:P/ (BL-1210 Notes).
+        List<string> lines = await ConnectAsync(arguments);
+
+        string[] timerLines = [.. lines.Where(line => line.StartsWith("[TIMER] [CONNECTTIMEOUT]", StringComparison.Ordinal))];
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[TIMER] [CONNECTTIMEOUT] set for 1000000ns",
+                "[TIMER] [CONNECTTIMEOUT] expires in 1000000ns",
+                "[TIMER] [CONNECTTIMEOUT] gives multi timeout in 1000ms",
+            },
+            timerLines);
+    }
+
+    [TestMethod]
+    [DataRow("-v", "--trace-config", "timer")]
+    [DataRow("-v", "--trace-config", "network")]
+    [DataRow("-v", "--trace-config", "timer", "--connect-timeout", "0")]
+    public async Task Connect_WithoutAConnectTimeout_WritesNoConnectTimeoutLine(params string[] arguments)
+    {
+        // curl's default 300-second connect timeout writes no [TIMER] line (BL-1210 Notes).
+        List<string> lines = await ConnectAsync(arguments);
+
+        Assert.IsFalse(lines.Any(line => line.Contains("CONNECTTIMEOUT", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     [DataRow("-v")]
     [DataRow("-vvv")]
     [DataRow("-v", "--trace-config", "happy-eyeballs,tcp,dns,setup")]

@@ -126,7 +126,7 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = new TcpConnector(new FakeDnsResolver(System.Net.IPAddress.IPv6Loopback, Loopback), dialer, new FakeTlsProvider(), time, happyEyeballsTimeout: TimeSpan.FromMilliseconds(200))
         {
-            TracesHappyEyeballsTimer = true,
+            TracesTimers = true,
         };
 
         var connecting = connector.ConnectAsync(DualTarget(events), CancellationToken.None).AsTask();
@@ -149,12 +149,53 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_TracingTimersWithAConnectTimeoutAcrossTwoFamilies_WritesTheConnectTimeoutLinesFirstAndBetweenTheAttempts()
+    {
+        // curl -s -v --trace-config network --connect-timeout 1 http://localhost:P/, IPv4 winning (BL-1210 Notes):
+        // the connect timeout is set before the [DNS] filter's first line.
+        var time = new ManualTimeProvider();
+        var dialer = new GatedTcpDialer(time);
+        var events = new RecordingTransferEvents();
+        var connector = new TcpConnector(new FakeDnsResolver(System.Net.IPAddress.IPv6Loopback, Loopback), dialer, new FakeTlsProvider(), time, happyEyeballsTimeout: TimeSpan.FromMilliseconds(200))
+        {
+            TracesTimers = true,
+            TracesTimerExpiry = true,
+            TracedConnectTimeout = TimeSpan.FromSeconds(1),
+            TracesDnsFilter = true,
+        };
+
+        var connecting = connector.ConnectAsync(DualTarget(events), CancellationToken.None).AsTask();
+        time.Advance(200);
+        await dialer.WaitForDialsAsync(2);
+        dialer.Connect(IPv4Attempt, new StallingConnection());
+        await connecting;
+
+        Assert.StartsWith("[DNS] ", events.Info[1]);
+        var lines = events.Info.Where(line => line.StartsWith("  Trying ", StringComparison.Ordinal) || line.StartsWith("[TIMER]", StringComparison.Ordinal)).ToList();
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[TIMER] [CONNECTTIMEOUT] set for 1000000ns",
+                "  Trying [::1]:18644...",
+                "[TIMER] [HAPPY_EYEBALLS] set for 200000ns",
+                "[TIMER] [HAPPY_EYEBALLS] expires in 200000ns",
+                "[TIMER] [CONNECTTIMEOUT] expires in 1000000ns",
+                "[TIMER] [HAPPY_EYEBALLS] gives multi timeout in 200ms",
+                "  Trying 127.0.0.1:18644...",
+                "[TIMER] [CONNECTTIMEOUT] expires in 800000ns",
+                "[TIMER] [CONNECTTIMEOUT] gives multi timeout in 800ms",
+                "[TIMER] [HAPPY_EYEBALLS] cleared",
+            },
+            lines);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_TracingTheHappyEyeballsTimerWhenTheDialIsRefused_WritesNoTimerLine()
     {
         // curl -s -v --trace-config timer http://127.0.0.1:1/ (BL-1159 and BL-1186 Notes).
         var events = new CountingTransferEvents();
         var dialer = new FakeTcpDialer { DialOutcome = _ => throw new SocketException((int)SocketError.ConnectionRefused) };
-        var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider()) { TracesHappyEyeballsTimer = true };
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider()) { TracesTimers = true };
 
         var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = events }, CancellationToken.None);
 

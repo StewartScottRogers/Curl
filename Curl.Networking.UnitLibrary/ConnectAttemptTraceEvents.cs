@@ -10,7 +10,9 @@ namespace Curl.Networking;
 /// <c>[TCP]</c> lines curl 8.21.0 writes around its connect attempts under <c>--trace-config
 /// happy-eyeballs</c>, <c>tcp</c>, <c>network</c> or <c>all</c> (measured, BL-1161 Notes), and the
 /// <c>[TIMER] [HAPPY_EYEBALLS]</c> lines of its second-family timer under <c>timer</c>, <c>network</c> or
-/// <c>all</c> (measured, BL-1186 Notes). It sits below
+/// <c>all</c> (measured, BL-1186 Notes), with a given <c>--connect-timeout</c>'s <c>[TIMER] [CONNECTTIMEOUT]</c>
+/// lines and, when the multi is traced too, each timer's <c>expires in</c> line (measured, BL-1210 Notes;
+/// <see cref="ConnectStarting" />). It sits below
 /// the <c>[DNS]</c> and <c>[SETUP]</c> filters' events, so the lines it writes as a <c>Trying</c> line
 /// passes through come before theirs; the <see cref="AddressFamilyRace" /> tells it the rest
 /// (<see cref="RaceStarting" />, <see cref="SecondFamilyDue" />, <see cref="AttemptFailing" />,
@@ -27,9 +29,27 @@ namespace Curl.Networking;
 /// <param name="host">The host the connection dials, after any <c>--connect-to</c> mapping.</param>
 /// <param name="tracesHappyEyeballs">Whether the <c>[HAPPY-EYEBALLS]</c> lines are written.</param>
 /// <param name="tracesTcp">Whether the <c>[TCP]</c> lines are written.</param>
-/// <param name="tracesTimer">Whether the <c>[TIMER] [HAPPY_EYEBALLS]</c> lines are written.</param>
-internal sealed class ConnectAttemptTraceEvents(ITransferEvents inner, string host, bool tracesHappyEyeballs, bool tracesTcp, bool tracesTimer = false) : ITransferEvents
+/// <param name="tracesTimer">Whether the <c>[TIMER]</c> lines are written.</param>
+/// <param name="tracesTimerExpiry">
+/// Whether the <c>[TIMER] ... expires in</c> lines are written too, which curl writes only when its
+/// multi is traced as well (measured, BL-1210 Notes).
+/// </param>
+/// <param name="connectTimeout">
+/// The <c>--connect-timeout</c> given, whose <c>[TIMER] [CONNECTTIMEOUT]</c> lines are written, or
+/// <see langword="null" /> when none was: curl's default connect timeout writes none (measured, BL-1210 Notes).
+/// </param>
+internal sealed class ConnectAttemptTraceEvents(
+    ITransferEvents inner,
+    string host,
+    bool tracesHappyEyeballs,
+    bool tracesTcp,
+    bool tracesTimer = false,
+    bool tracesTimerExpiry = false,
+    TimeSpan? connectTimeout = null) : ITransferEvents
 {
+    private const string HappyEyeballsTimer = "HAPPY_EYEBALLS";
+    private const string ConnectTimeoutTimer = "CONNECTTIMEOUT";
+
     /// <summary>The descriptor the first socket of a connect is written with.</summary>
     public const int FirstSocketDescriptor = 3;
 
@@ -45,6 +65,7 @@ internal sealed class ConnectAttemptTraceEvents(ITransferEvents inner, string ho
     private readonly List<(IPEndPoint RemoteEndPoint, int Descriptor, int Number)> _ongoing = [];
     private int _attempts;
     private TimeSpan? _secondFamilyTimeout;
+    private bool _secondFamilyStartedOnTime;
 
     /// <summary>Gets a value indicating whether the <c>[HAPPY-EYEBALLS]</c> lines are written.</summary>
     public bool TracesHappyEyeballs => tracesHappyEyeballs;
@@ -59,9 +80,22 @@ internal sealed class ConnectAttemptTraceEvents(ITransferEvents inner, string ho
     /// <param name="timeout">The <c>--happy-eyeballs-timeout-ms</c> delay.</param>
     public void RaceStarting(TimeSpan timeout) => _secondFamilyTimeout = timeout;
 
+    /// <summary>
+    /// Writes the <c>[TIMER] [CONNECTTIMEOUT] set for</c> line curl writes as the transfer sets up,
+    /// before any connection filter's line, when a <c>--connect-timeout</c> was given.
+    /// </summary>
+    public void ConnectStarting()
+    {
+        if (connectTimeout is { } timeout)
+        {
+            WriteTimer(ConnectTimeoutTimer, $"set for {Microseconds(timeout)}ns");
+        }
+    }
+
     /// <summary>Writes the poll round in which the second family's delay ran out.</summary>
     public void SecondFamilyDue()
     {
+        _secondFamilyStartedOnTime = true;
         WritePollRound();
         foreach (var attempt in _ongoing)
         {
@@ -110,7 +144,7 @@ internal sealed class ConnectAttemptTraceEvents(ITransferEvents inner, string ho
 
         WriteHappyEyeballs($"connect attempt #{winner.Number} successful");
         CloseLosers(winner);
-        WriteTimer("cleared");
+        WriteTimer(HappyEyeballsTimer, "cleared");
         WriteHappyEyeballs($"Connected to {host} ({remoteEndPoint.Address}) port {remoteEndPoint.Port}");
     }
 
@@ -186,15 +220,69 @@ internal sealed class ConnectAttemptTraceEvents(ITransferEvents inner, string ho
         WriteTcp($"cf_socket_open() -> 0, fd={descriptor}");
         WriteTcp($"local address {unspecified} port 0...");
         WriteChecked();
-        if (_attempts == 0 && _secondFamilyTimeout is { } timeout)
-        {
-            WriteHappyEyeballs($"next HAPPY_EYEBALLS timeout in {(long)timeout.TotalMilliseconds}ms");
-            WriteTimer($"set for {(long)timeout.TotalMicroseconds}ns");
-            WriteTimer($"gives multi timeout in {(long)timeout.TotalMilliseconds}ms");
-        }
-
+        WriteFirstWait();
+        WriteWaitAfterSecondFamilyDue();
         _attempts++;
     }
+
+    // After the first attempt the multi waits on its nearest timer: the second family's delay, set
+    // here, or the connect timeout. Volatile values are written from the configured delays (ADR-0357).
+    private void WriteFirstWait()
+    {
+        if (_attempts != 0)
+        {
+            return;
+        }
+
+        var pending = new List<(string Name, TimeSpan Remaining)>();
+        if (_secondFamilyTimeout is { } secondFamily)
+        {
+            WriteHappyEyeballs($"next HAPPY_EYEBALLS timeout in {(long)secondFamily.TotalMilliseconds}ms");
+            WriteTimer(HappyEyeballsTimer, $"set for {Microseconds(secondFamily)}ns");
+            pending.Add((HappyEyeballsTimer, secondFamily));
+        }
+
+        if (connectTimeout is { } timeout)
+        {
+            pending.Add((ConnectTimeoutTimer, timeout));
+        }
+
+        WriteWait(pending);
+    }
+
+    // Once the second family started on time, the connect timeout is the only timer left, with the
+    // second family's delay gone from it.
+    private void WriteWaitAfterSecondFamilyDue()
+    {
+        if (_attempts == 1 && _secondFamilyStartedOnTime && connectTimeout is { } timeout)
+        {
+            WriteWait([(ConnectTimeoutTimer, timeout - _secondFamilyTimeout!.Value)]);
+        }
+    }
+
+    // curl's multi writes each pending timer's "expires in" line when it is traced, then names the
+    // nearest as the one that "gives multi timeout", in milliseconds rounded up (measured, BL-1210 Notes).
+    private void WriteWait(List<(string Name, TimeSpan Remaining)> pending)
+    {
+        if (pending.Count == 0)
+        {
+            return;
+        }
+
+        if (tracesTimerExpiry)
+        {
+            foreach (var (name, remaining) in pending)
+            {
+                WriteTimer(name, $"expires in {Microseconds(remaining)}ns");
+            }
+        }
+
+        var nearest = pending.MinBy(timer => timer.Remaining);
+        WriteTimer(nearest.Name, $"gives multi timeout in {(long)Math.Ceiling(nearest.Remaining.TotalMilliseconds)}ms");
+    }
+
+    // curl names its timers in microseconds followed by "ns" (measured, BL-1186 Notes).
+    private static long Microseconds(TimeSpan timeout) => (long)timeout.TotalMicroseconds;
 
     private void WritePollRound()
     {
@@ -219,12 +307,11 @@ internal sealed class ConnectAttemptTraceEvents(ITransferEvents inner, string ho
         }
     }
 
-    // curl names its timers in microseconds followed by "ns" (measured, BL-1186 Notes).
-    private void WriteTimer(string text)
+    private void WriteTimer(string name, string text)
     {
         if (tracesTimer)
         {
-            inner.ReportInfo($"[TIMER] [HAPPY_EYEBALLS] {text}");
+            inner.ReportInfo($"[TIMER] [{name}] {text}");
         }
     }
 
