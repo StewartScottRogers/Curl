@@ -32,3 +32,4 @@ Curl writes curl 8.21.0's `[TCP]` lines for the connection's I/O - `[TCP] query 
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
