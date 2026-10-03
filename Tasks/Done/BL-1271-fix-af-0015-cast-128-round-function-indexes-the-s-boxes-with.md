@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cryptography.UnitLibrary]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1271 — Fix AF-0015: CAST-128 round function indexes the S-boxes with key- and data-dependent bytes (SSH cast128-cbc)
 
@@ -41,12 +41,25 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Every S-box read in `Cast128` - the four in `Round` and the five per key-schedule row,
+  since the key schedule also indexed S5 to S8 with key bytes - now goes through the new
+  internal `Cast128.ReadBox`: a masked scan of all 256 entries with
+  `ConstantTime.EqualMask`, as BL-1270 did for DES. Output unchanged; RFC 2144's
+  known-answer tests pass.
+- Decision recorded in ADR-0397 (decided by Claude under Stewart's delegation); the
+  library's `CLAUDE.md` and `Cast128`'s XML docs now say constant-time.
+- No new test: `Curl.Cryptography.UnitTests` is outside `touches`, and `ReadBox` has no
+  branch, so the existing known-answer tests cover every line of it.
+- Reproduction gives no match; `dotnet build` clean, fast tests green (Cryptography 1330
+  passed).
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. CAST-128 reads its S-boxes by constant-time masked scan in the round function and key schedule (AF-0015)
