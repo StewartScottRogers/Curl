@@ -16,6 +16,18 @@ namespace Curl.Protocol.Http;
 /// </remarks>
 internal sealed class HttpResponseHeadReader
 {
+    // The defaults are made once here, in the static constructor, which the compiler does not
+    // cache delegates in, so they add no branch to the instance constructor (BL-1354).
+    private static readonly Action<byte[]> IgnoreLine = static _ => { };
+
+    private static readonly Action<HttpStatusLine, HttpResponseHeader> IgnoreHeader = static (_, _) => { };
+
+    private static readonly Func<HttpResponseHead, HttpHeadRefusal?> FindNoRefusal = static _ => null;
+
+    private static readonly Func<bool> NeverSwitched = static () => false;
+
+    private static readonly Func<HttpStatusLine, HttpResponseHeader, bool> DefersNoHeader = static (_, _) => false;
+
     private readonly HttpLineReader lines;
 
     /// <summary>
@@ -67,14 +79,14 @@ internal sealed class HttpResponseHeadReader
     /// so an HTTP/2 stream's <c>--trace-config http/2</c> echo follows its <c>&lt;</c> line
     /// (<see cref="Http2FrameTrace.ResponseLineReported" />, BL-1205). By default nothing is.
     /// </summary>
-    internal Action<byte[]> LineReported { get; init; } = static _ => { };
+    internal Action<byte[]> LineReported { get; init; } = IgnoreLine;
 
     /// <summary>
     /// Gets what is told of each head line right before it is reported to <see cref="Events" />,
     /// so an HTTP/3 stream's <c>--trace-config http/3</c> <c>header:</c> echo precedes its <c>&lt;</c>
     /// line (<see cref="Http3StreamTrace.ResponseLineReporting" />, BL-1208). By default nothing is.
     /// </summary>
-    internal Action<byte[]> LineReporting { get; init; } = static _ => { };
+    internal Action<byte[]> LineReporting { get; init; } = IgnoreLine;
 
     /// <summary>
     /// Gets what is told of each head's status line, 1xx heads' included, right after the line
@@ -90,7 +102,7 @@ internal sealed class HttpResponseHeadReader
     /// the last header of a final head the peer closed among its headers (<see cref="HeadActedOn" />).
     /// It is told with the status line of the head the header belongs to.
     /// </summary>
-    internal Action<HttpStatusLine, HttpResponseHeader> HeaderReceived { get; init; } = static (_, _) => { };
+    internal Action<HttpStatusLine, HttpResponseHeader> HeaderReceived { get; init; } = IgnoreHeader;
 
     /// <summary>
     /// Gets what finds the header of a final head that curl 8.21.0 refuses while it reads the
@@ -104,7 +116,7 @@ internal sealed class HttpResponseHeadReader
     /// to <see cref="Events" />, the head's empty line included, since curl 8.21.0 stops reading
     /// the head at the refused header (measured, BL-475 Notes).
     /// </summary>
-    internal Func<HttpResponseHead, HttpHeadRefusal?> FindRefusal { get; init; } = static _ => null;
+    internal Func<HttpResponseHead, HttpHeadRefusal?> FindRefusal { get; init; } = FindNoRefusal;
 
     /// <summary>
     /// Gets a value indicating whether the heads are an HTTP/2 or HTTP/3 stream's, as
@@ -128,7 +140,7 @@ internal sealed class HttpResponseHeadReader
     /// to HTTP/2 after an h2c upgrade's <c>101</c> (<see cref="HttpH2cUpgradeConnection.IsUpgraded" />),
     /// so the line is an HTTP/2 stream's as for <see cref="IsHttp2OrHttp3" />. By default it never has.
     /// </summary>
-    internal Func<bool> IsSwitchedToHttp2 { get; init; } = static () => false;
+    internal Func<bool> IsSwitchedToHttp2 { get; init; } = NeverSwitched;
 
     /// <summary>
     /// Gets what decides, for each whole header of a final head that curl acts on, whether it
@@ -138,7 +150,7 @@ internal sealed class HttpResponseHeadReader
     /// before the header that caused them, as curl 8.21.0 writes a Negotiate context's failure
     /// (measured, BL-843 Notes). By default no header is deferred.
     /// </summary>
-    internal Func<HttpStatusLine, HttpResponseHeader, bool> DefersFrom { get; init; } = static (_, _) => false;
+    internal Func<HttpStatusLine, HttpResponseHeader, bool> DefersFrom { get; init; } = DefersNoHeader;
 
     /// <summary>
     /// Gets the refused header of the final head <see cref="ReadAsync" /> read, as

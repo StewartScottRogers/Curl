@@ -803,7 +803,7 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static void SettleConnection(HttpRequestPlan plan, IConnection connection, IHttpStreamSession? streams, HttpAttemptOutcome outcome)
     {
-        if (outcome.ReportsLeftIntact && streams is null or Http2Session or Http3Session { AcceptsNewStreams: true })
+        if (outcome.ReportsLeftIntact && TakesNewRequests(streams))
         {
             connection.MarkReusable();
         }
@@ -813,6 +813,13 @@ public sealed class HttpProtocolHandler(
             HttpExchangeLog.For(plan.Context.DiagnosticLog, streams).RetryingOnFreshConnection(outcome.RetryCount);
         }
     }
+
+    /// <summary>
+    /// Tells whether a connection can carry another request once its response is left intact:
+    /// always over HTTP/1.x and HTTP/2, and over HTTP/3 while the session takes new streams.
+    /// </summary>
+    private static bool TakesNewRequests(IHttpStreamSession? streams) =>
+        streams is not Http3Session { AcceptsNewStreams: false };
 
     /// <summary>
     /// Sends <paramref name="plan" />, framed for HTTP/2 or HTTP/3 when <paramref name="streams" /> is set,
@@ -1056,9 +1063,9 @@ public sealed class HttpProtocolHandler(
             ReportNoEndOfMessageIndicator(plan, actedOn, headReader);
             retry = await RetryOfAsync(plan, actedOn, bodyLeftUnsent, upload, cancellationToken).ConfigureAwait(false);
             headReader.ReleaseDeferredHeaders();
-            HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
+            HttpFailMode fail = FailModeOf(options, retry);
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
-            bool discardsBody = retry is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
+            bool discardsBody = DiscardsBody(options, retry, exchange.RedirectUrl);
             ReportIgnoredBody(plan, actedOn, discardsBody);
             headReader.ReportHeldLines();
             delivery = DeliveryOf(plan, actedOn, discardsBody);
@@ -1086,7 +1093,7 @@ public sealed class HttpProtocolHandler(
             return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
         }
 
-        (requestStream as Http3StreamConnection)?.ReportTransferDone(connect.ConnectionNumber);
+        ReportTransferDone(requestStream, connect);
         TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
         LogExchanged(exchangeLog, context.TimeProvider, exchange.RequestReady, actedOn!, body);
         return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection)))
@@ -1095,6 +1102,27 @@ public sealed class HttpProtocolHandler(
             UpgradedSession = UpgradedSessionOf(connection),
         };
     }
+
+    /// <summary>
+    /// Gives how <c>-f</c> or <c>--fail-with-body</c> applies to a response: as asked, unless
+    /// the handler answers it with <paramref name="retry" />, which no failing mode stops.
+    /// </summary>
+    private static HttpFailMode FailModeOf(HttpRequestOptions options, HttpRequestPlan? retry) =>
+        retry is null ? options.Fail : HttpFailMode.None;
+
+    /// <summary>
+    /// Tells whether the response's body is read and discarded rather than delivered: when the
+    /// handler answers it with <paramref name="retry" />, or follows its redirect.
+    /// </summary>
+    private static bool DiscardsBody(HttpRequestOptions options, HttpRequestPlan? retry, string? redirectUrl) =>
+        retry is not null || (options.FollowRedirects && redirectUrl is not null);
+
+    /// <summary>
+    /// Marks an HTTP/3 request stream's transfer done with its session and writes its
+    /// <c>--trace-config http/3</c> lines (<see cref="Http3StreamConnection.ReportTransferDone" />); other streams need neither.
+    /// </summary>
+    private static void ReportTransferDone(IHttpStreamConnection? requestStream, ConnectResult connect) =>
+        (requestStream as Http3StreamConnection)?.ReportTransferDone(connect.ConnectionNumber);
 
     /// <summary>
     /// Gives the session the exchange ran on: <paramref name="streams" /> when it began on one,
