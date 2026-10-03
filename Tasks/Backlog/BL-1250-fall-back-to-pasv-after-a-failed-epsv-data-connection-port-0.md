@@ -1,5 +1,5 @@
 ---
-id: BL-1248
+id: BL-1250
 title: Fall back to PASV after a failed EPSV data connection, port 0 included, as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1248 — Fall back to PASV after a failed EPSV data connection, port 0 included, as curl does
+# BL-1250 — Fall back to PASV after a failed EPSV data connection, port 0 included, as curl does
 
 ## Goal
 
