@@ -33,7 +33,7 @@ Upstream case `test1677` in `Curl.Conformance.UnitTests` passes reliably while u
 - Fix (ADR-0404): `CurlTimerOptions.AnyIn` looks for a curl timer that races the server (`-m`, `-y`, `-Y`, `--max-time`, `--connect-timeout`, `--speed-time`, `--speed-limit`, `--expect100-timeout`); without one the runner gives the emulation a `WaitSkippingTimeProvider`, which moves on by each wait at once. Writes keep their order and their separate reads; test1677 now runs in 0.24 s. No sleep or timeout was changed.
 - Touches widened to `Curl.Conformance.UnitLibrary`: the runner builds the server, so the fix is there. No task in Doing on origin/work/dark-factory named it (checked 2026-10-03).
 - Conformance run: 684 passed, 0 failed; `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`: 0 failing members.
-- Seen while measuring: test3035 (unlisted; curl's real `--retry-delay` waits) once outlasted the 30 s hang limit under coverage; filed as BL-1356.
+- Seen while measuring: test3035 (unlisted; curl's real `--retry-delay` waits) once outlasted the 30 s hang limit under coverage; filed as BL-1359.
 
 ## Log
 

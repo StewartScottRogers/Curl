@@ -1,5 +1,5 @@
 ---
-id: BL-1356
+id: BL-1359
 title: Keep upstream test3035's real retry delays from tripping the conformance row's hang limit under coverage
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-03
 completed:
 ---
-# BL-1356 — Keep upstream test3035's real retry delays from tripping the conformance row's hang limit under coverage
+# BL-1359 — Keep upstream test3035's real retry delays from tripping the conformance row's hang limit under coverage
 
 ## Goal
 
