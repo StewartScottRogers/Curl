@@ -3,8 +3,8 @@ id: AF-0038
 title: VerifyPeer_..._StillRefuses asserts only Assert.IsNotNull(failure), not which refusal
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitTests/SslStreamTlsProviderTests.RevocationBestEffort.cs:VerifyPeer_WithNoChainAndRevocationCheckBestEffortInTheSchannelBuild_StillRefuses:weak-assertion
 task: none
 found: 2026-10-03
@@ -41,3 +41,4 @@ Select-String -Path Curl.Networking.UnitTests/SslStreamTlsProviderTests.Revocati
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.
