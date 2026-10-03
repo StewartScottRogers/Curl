@@ -48,3 +48,4 @@ When a 401 answers `--negotiate` with a `Negotiate` challenge whose token starts
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-03: Backlog -> Doing.
