@@ -1,5 +1,5 @@
 ---
-id: BL-1314
+id: BL-1315
 title: Close the MQTT session's two async branch-coverage gaps in ReadPacketAsync and ReadFixedHeaderPingingWhenIdleAsync
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-03
 completed:
 ---
-# BL-1314 — Close the MQTT session's two async branch-coverage gaps in ReadPacketAsync and ReadFixedHeaderPingingWhenIdleAsync
+# BL-1315 — Close the MQTT session's two async branch-coverage gaps in ReadPacketAsync and ReadFixedHeaderPingingWhenIdleAsync
 
 ## Goal
 
