@@ -42,3 +42,4 @@ A `-w` template whose `%{...}` holds a name of 24 or more bytes stops writing th
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1301-20261002-211047-L8.jsonl
 - 2026-10-03: Blocked -> Backlog. Requeued: the timeout was Measure-CodeQuality running the whole solution (fixed in BL-1318); Notes say how to restore the stashed work
+- 2026-10-03: Backlog -> Doing.
