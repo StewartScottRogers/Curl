@@ -47,3 +47,4 @@ When the Schannel build refuses a server certificate whose chain ends in an untr
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
