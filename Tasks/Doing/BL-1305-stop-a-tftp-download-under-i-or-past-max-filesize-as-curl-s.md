@@ -45,3 +45,4 @@ A `tftp://` download honours `ITransferContext.NoBody` (`-I`) and `ITransferCont
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-03: Backlog -> Doing.
