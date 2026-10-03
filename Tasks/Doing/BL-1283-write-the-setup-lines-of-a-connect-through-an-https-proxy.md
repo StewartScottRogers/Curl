@@ -31,3 +31,4 @@ Curl writes curl 8.21.0's `[SETUP]` lines under `--trace-config setup`, `all` an
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-03: Backlog -> Doing.
