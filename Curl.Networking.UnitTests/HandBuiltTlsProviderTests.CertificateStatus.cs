@@ -1,3 +1,4 @@
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 
 using Curl.Networking.Fakes;
@@ -74,7 +75,9 @@ public sealed partial class HandBuiltTlsProviderTests
 
         Assert.AreEqual(expectedExitCode, result.ExitCode, result.ErrorMessage);
         Assert.AreEqual(expectedLine, events.Info.Single());
-        Assert.HasCount(status == OcspStapleStatus.Good ? 1 : 0, events.Handshakes);
+        var handshake = Assert.ContainsSingle(events.Handshakes);
+        Assert.AreEqual(status != OcspStapleStatus.Good, handshake.Failed);
+        Assert.AreEqual(SslProtocols.Tls13, handshake.ProtocolVersion);
         if (result.Connection is { } connection)
         {
             await connection.DisposeAsync();

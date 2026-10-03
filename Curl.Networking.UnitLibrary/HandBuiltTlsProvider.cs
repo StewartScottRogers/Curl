@@ -262,17 +262,12 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     }
 
     // The Schannel build prints its ALPN offer, and a refused pin's hash, before a failed
-    // handshake (ADR-0363, BL-1149). The OpenSSL build finishes the handshake before curl checks
-    // the pin, so before a pin refusal it prints every line of it, from what had been negotiated
-    // when the verifier was presented the chain (BL-1178).
+    // handshake (ADR-0363, BL-1149). The OpenSSL build prints every line of what had been
+    // negotiated when the verifier was presented the chain before a refused certificate or pin,
+    // and only its ALPN offer when nothing was (ADR-0371, BL-1178, BL-1202).
     private void ReportFailedHandshake(HandshakeRun run)
     {
         var verifier = run.Prepared.Verifier;
-        if (!_matchesSchannelBuild && !verifier.Observed.PinnedPublicKeyRefused)
-        {
-            return;
-        }
-
         run.Events.ReportTlsHandshake(DescribeHandshake(HandBuiltHandshake.NegotiatedBy(verifier.Presented), verifier, run.OfferedApplicationProtocols) with
         {
             IsProxy = run.IsProxy,

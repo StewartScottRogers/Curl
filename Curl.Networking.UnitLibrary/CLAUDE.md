@@ -62,8 +62,8 @@ then carries the hash line: always in the Schannel build, whose `-v` prints its 
 any failure, and in the OpenSSL build (ADR-0371, BL-1178) in `SslStreamTlsProvider` before every
 failure, with the version, suite and ALPN answer kept from the certificate callback when the
 certificate or pin was refused (`-v` prints the certificate details first) and nothing negotiated
-otherwise (only the ALPN offer, exit 35), and in `HandBuiltTlsProvider` on a pin refusal, from the
-version, suite and ALPN protocol `Curl.Tls` hands the verifier in `ServerCertificateChain`
+otherwise (only the ALPN offer, exit 35), and in `HandBuiltTlsProvider` before every handshake
+failure too (ADR-0387, BL-1202), from the version, suite and ALPN protocol `Curl.Tls` hands the verifier in `ServerCertificateChain`
 (`HandBuiltHandshake.NegotiatedBy`). Per ADR-0197 the OpenSSL build, unless `-k`,
 reads `--crlfile` (`TlsClientOptions.CertificateRevocationListFile`) in `ReadTrustAnchors` through
 `CertificateRevocationListFile` (exit 82 through `CertificateRevocationListFileException` and
