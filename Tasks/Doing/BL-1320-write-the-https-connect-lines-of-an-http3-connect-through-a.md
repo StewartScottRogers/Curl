@@ -31,3 +31,4 @@ Split from BL-1284, which wrote them for a direct QUIC connect (ADR-0357's BL-12
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
