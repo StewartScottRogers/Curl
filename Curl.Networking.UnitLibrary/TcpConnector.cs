@@ -256,6 +256,26 @@ public sealed partial class TcpConnector(
     public bool TracesH1ProxyFilter { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether an origin's TLS handshake writes curl 8.21.0's <c>[SSL]</c> lines
+    /// under <c>--trace-config ssl</c>, <c>network</c> or <c>all</c> (<see cref="SslFilterTrace" />,
+    /// measured, BL-1287 Notes).
+    /// </summary>
+    public bool TracesSslFilter { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether an HTTPS proxy's TLS handshake writes curl 8.21.0's
+    /// <c>[SSL-PROXY]</c> lines under <c>--trace-config proxy</c> or a named <c>all</c>, but not
+    /// <c>ssl</c> or <c>network</c> (<see cref="SslFilterTrace" />, measured, BL-1287 Notes).
+    /// </summary>
+    public bool TracesSslProxyFilter { get; init; }
+
+    /// <summary>The name an origin's SSL filter writes its lines under.</summary>
+    internal const string SslFilterName = "SSL";
+
+    /// <summary>The name an HTTPS proxy's SSL filter writes its lines under.</summary>
+    internal const string SslProxyFilterName = "SSL-PROXY";
+
+    /// <summary>
     /// The line curl 8.21.0's setup filter writes, under <see cref="TracesSetupFilter" />, as it adds
     /// the tunnel filter once a plain HTTP proxy's socket connected, before <c>CONNECT: no ALPN
     /// negotiated</c> (measured, BL-1193 Notes).
@@ -1390,6 +1410,8 @@ public sealed partial class TcpConnector(
         }
 
         trace.ReportConnecting(events);
+        var sslTrace = new SslFilterTrace(SslProxyFilterName, TracesSslProxyFilter, trace);
+        sslTrace.ReportConnecting(events);
 
         // curl 8.21.0 verifies the proxy against its own host name and reports a failed
         // handshake to it with the same exit code and message as one to a target (measured).
@@ -1397,14 +1419,16 @@ public sealed partial class TcpConnector(
         // provider runs this handshake (ADR-0061). It offers http/1.1 through ALPN whatever the
         // HTTP version options say, and none under --no-alpn (measured on both builds, ADR-0190).
         var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, tunnel.Proxy.Host, tunnel.Target, isProxy: true, applicationProtocols: HttpApplicationProtocols.Http11Only, cancellationToken).ConfigureAwait(false);
+        sslTrace.ReportFinished(events, securedProxy);
         if (securedProxy.Connection is not { } proxyConnection)
         {
             return (securedProxy, null);
         }
 
         // Both builds say what the proxy's ALPN agreed before the CONNECT, with and without
-        // --no-alpn (measured, BL-872).
-        trace.ReportProxyHandshakePolled(events);
+        // --no-alpn (measured, BL-872); the proxy's SSL filter answers the tunnel's ALPN query first
+        // (measured, BL-1287 Notes).
+        sslTrace.ReportAlpnQueried(events, securedProxy.ApplicationProtocol);
         events.ReportInfo(securedProxy.ApplicationProtocol is { } agreed
             ? $"CONNECT: '{agreed}' negotiated"
             : ConnectTunnelVerboseLines.NoAlpnNegotiated);
@@ -1779,7 +1803,7 @@ public sealed partial class TcpConnector(
         // A provider that measured its handshake is trusted for the moment it completed; for
         // one that did not, the moment it returned is that moment.
         var handshakeCompleted = secured.Timings?.TlsHandshakeCompleted ?? timeProvider.GetTimestamp();
-        return WithSetupFiltersRemoved(
+        var opened = WithSetupFiltersRemoved(
             Opened(
                 dialed,
                 target.Events,
@@ -1790,6 +1814,18 @@ public sealed partial class TcpConnector(
                 secured.ApplicationProtocol),
             dialed,
             target.Events);
+        WriteSslQueryAlpnLines(target, secured.ApplicationProtocol);
+        return opened;
+    }
+
+    // The HTTP handler asks the topmost filter, the origin's SSL filter, which protocol ALPN
+    // agreed, before using HTTP/1.x (measured, BL-1287 Notes).
+    private void WriteSslQueryAlpnLines(ConnectTarget target, string? applicationProtocol)
+    {
+        if (target.PoolScheme == "https" && !target.IsForwardProxy)
+        {
+            SslTraceFor(target).ReportAlpnQueried(target.Events, applicationProtocol);
+        }
     }
 
     // Runs the target's handshake over the dialled connection, traced as TLS records when
@@ -1952,8 +1988,8 @@ public sealed partial class TcpConnector(
     // (measured, BL-405).
     // Under writesSslFilterAdded the setup filter first reports adding the SSL filter, after any
     // HAPROXY filter and before the handshake's own lines (measured for a direct https:// connect,
-    // BL-1192 Notes).
-    private ValueTask<ConnectResult> AuthenticateTargetAsync(
+    // BL-1192 Notes). The SSL filter's own lines go around the handshake (measured, BL-1287 Notes).
+    private async ValueTask<ConnectResult> AuthenticateTargetAsync(
         IConnection plaintext,
         ConnectTarget target,
         bool writesSslFilterAdded,
@@ -1964,8 +2000,18 @@ public sealed partial class TcpConnector(
             target.Events.ReportInfo(SslFilterAddedLine);
         }
 
-        return AuthenticateTargetAsync(plaintext, target, cancellationToken);
+        var sslTrace = SslTraceFor(target);
+        sslTrace.ReportConnecting(target.Events);
+        var secured = await AuthenticateTargetAsync(plaintext, target, cancellationToken).ConfigureAwait(false);
+        sslTrace.ReportFinished(target.Events, secured);
+        return secured;
     }
+
+    // A forward proxy is the target itself, so its handshake is the proxy's SSL filter's.
+    private SslFilterTrace SslTraceFor(ConnectTarget target) =>
+        target.IsForwardProxy
+            ? new SslFilterTrace(SslProxyFilterName, TracesSslProxyFilter)
+            : new SslFilterTrace(SslFilterName, TracesSslFilter);
 
     private ValueTask<ConnectResult> AuthenticateTargetAsync(
         IConnection plaintext,

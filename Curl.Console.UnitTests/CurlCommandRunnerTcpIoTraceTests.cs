@@ -181,7 +181,8 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
     {
         // curl -s -v -k --trace-config tcp https://127.0.0.1:P/ (BL-1253 Notes): the handshake's records
         // with Schannel's 4096-byte reads, the request's and response's with its 103424-byte reads, and
-        // no [TCP] query ALPN. The scripted server answers at once, so no would-block recv line is written.
+        // no [TCP] query ALPN, the [SSL] filter answering it (BL-1287). The scripted server answers at once,
+        // so no would-block recv line is written.
         serverReads = [new byte[81], new byte[1175], new byte[51], FortyByteResponse];
         tlsProvider = new RecordExchangingTlsProvider();
 
@@ -205,7 +206,7 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
             },
             StandardErrorLines()
                 .Select(line => line.Contains("[TCP] ", StringComparison.Ordinal) ? line[line.IndexOf("[TCP] ", StringComparison.Ordinal)..] : Regex.Replace(line, @"^.*] (?=[<>] )", ""))
-                .Where(line => (line.StartsWith("[TCP] ", StringComparison.Ordinal) && line.Contains("(len=", StringComparison.Ordinal)) || line.Contains("ALPN", StringComparison.Ordinal)
+                .Where(line => (line.StartsWith("[TCP] ", StringComparison.Ordinal) && line.Contains("(len=", StringComparison.Ordinal)) || (line.Contains("ALPN", StringComparison.Ordinal) && !line.Contains("[SSL] ", StringComparison.Ordinal))
                     || line is "> GET / HTTP/1.1" or "> Accept: */*" or "< HTTP/1.1 200 OK" or "< ")
                 .ToArray());
     }

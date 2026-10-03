@@ -113,8 +113,9 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
-    public async Task ConnectAsync_TracingTheProxyFiltersWhenTheHttpsProxysHandshakeFails_StopsAfterTheFirstPoll()
+    public async Task ConnectAsync_TracingTheProxyFiltersWhenTheHttpsProxysHandshakeFails_StopsAfterOnePollRound()
     {
+        // A failed handshake waits one poll round, as a failed origin handshake measured (BL-1287 Notes).
         var events = new RecordingTransferEvents();
         var connector = HttpsProxyTunnelConnector(
             new SequencedTlsProvider(ConnectResult.Failed(CurlExitCode.SslConnectError, "handshake failed")),
@@ -124,8 +125,8 @@ public sealed partial class TcpConnectorTests
 
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         AssertTunnelLines(
-            new[] { TcpConnector.HttpsProxySslFilterAddedLine, TcpConnector.HttpProxyTunnelFilterAddedLine, "[HTTP-PROXY] CONNECT" },
-            events.Info.Where(line => line.StartsWith('[')).TakeLast(3).ToArray());
+            new[] { TcpConnector.HttpsProxySslFilterAddedLine, TcpConnector.HttpProxyTunnelFilterAddedLine, "[HTTP-PROXY] CONNECT", "[HTTP-PROXY] CONNECT" },
+            events.Info.Where(line => line.StartsWith('[')).TakeLast(4).ToArray());
     }
 
     [TestMethod]
@@ -155,7 +156,7 @@ public sealed partial class TcpConnectorTests
 
     private static ConnectTarget HttpsProxyTunnelTarget => TunnelTarget with { Proxy = TunnelHttpsProxy };
 
-    private static TcpConnector HttpsProxyTunnelConnector(ITlsProvider proxyTlsProvider, bool tracesHttpProxy = true, bool tracesH1Proxy = true, bool tracesSetup = false) =>
+    private static TcpConnector HttpsProxyTunnelConnector(ITlsProvider proxyTlsProvider, bool tracesHttpProxy = true, bool tracesH1Proxy = true, bool tracesSetup = false, bool tracesSslProxy = false) =>
         new(
             new FakeDnsResolver(ProxyAddress),
             new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
@@ -167,6 +168,7 @@ public sealed partial class TcpConnectorTests
             TracesHttpProxyFilter = tracesHttpProxy,
             TracesH1ProxyFilter = tracesH1Proxy,
             TracesSetupFilter = tracesSetup,
+            TracesSslProxyFilter = tracesSslProxy,
         };
 
     // Connects to example.test:80 through an HTTPS proxy whose handshake agrees on the ALPN protocol

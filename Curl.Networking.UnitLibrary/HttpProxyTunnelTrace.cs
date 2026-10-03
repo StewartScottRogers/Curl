@@ -14,22 +14,12 @@ namespace Curl.Networking;
 /// <param name="tracesH1Proxy">Whether the <c>[H1-PROXY]</c> lines are written.</param>
 internal sealed class HttpProxyTunnelTrace(bool tracesHttpProxy, bool tracesH1Proxy)
 {
-    /// <summary>Writes the lines before <c>CONNECT: no ALPN negotiated</c>.</summary>
-    /// <param name="events">The target's events.</param>
-    public void ReportConnecting(ITransferEvents events) => WriteHttpProxy(events, "CONNECT");
-
     /// <summary>
-    /// Writes the lines an HTTPS proxy's handshake adds between <see cref="ReportConnecting" /> and
-    /// <c>CONNECT: ... negotiated</c>: one per poll round curl waits on the handshake, fixed to the two
-    /// a loopback proxy measured and written once the handshake is done (BL-1255 Notes, ADR-0357's
-    /// BL-1255 amendment).
+    /// Writes the lines before <c>CONNECT: no ALPN negotiated</c>; through an HTTPS proxy, before its
+    /// handshake and again in each of the handshake's poll rounds (<see cref="SslFilterTrace" />).
     /// </summary>
     /// <param name="events">The target's events.</param>
-    public void ReportProxyHandshakePolled(ITransferEvents events)
-    {
-        WriteHttpProxy(events, "CONNECT");
-        WriteHttpProxy(events, "CONNECT");
-    }
+    public void ReportConnecting(ITransferEvents events) => WriteHttpProxy(events, "CONNECT");
 
     /// <summary>
     /// Writes the lines between <c>CONNECT: no ALPN negotiated</c> and the CONNECT's own lines

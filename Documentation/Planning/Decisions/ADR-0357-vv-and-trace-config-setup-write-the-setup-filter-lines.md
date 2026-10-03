@@ -421,3 +421,32 @@ target for the TCP attempt the race starts on the same target, which adds no fil
 the QUIC attempt's `[SETUP] destroy` after the filter's own once connected, and the QUIC attempt's
 exit code if TCP fails too. Not written, as for TCP: `[SETUP] query ALPN`. Through a proxy
 (CONNECT-UDP), and for an Alt-Svc race that tries TCP first, QUIC writes no filter lines yet.
+
+## Amendment, 2026-10-03 (BL-1287): the `[SSL]` and `[SSL-PROXY]` lines of a TLS handshake
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and
+`Record-CurlExchange.ps1 -Tls` for a direct `https://` transfer and, with `-Script`, through an
+HTTPS proxy, under `--trace-config ssl`, `proxy`, `network`, `tls`, `all` and `-vvvv` (BL-1287 Notes).
+
+- Which components: `[SSL]` (the origin's SSL filter) under `ssl`, `network` and `all`, `-vvvv`'s
+  included; `[SSL-PROXY]` (an HTTPS proxy's) only under `proxy` and a named `all`, not under `ssl`,
+  `network` or `-vvvv`. `tls` turns on neither. This corrects the BL-1255 amendment, which said
+  `ssl` turns on `[SSL-PROXY]` too: measured, it does not.
+- `SslFilterTrace` writes them from `TcpConnector`: `cf_connect()` before the handshake's trust
+  lines; once the handshake returns, its poll rounds (`cf_connect() -> 0, done=0`,
+  `adjust_pollset, POLLIN fd=N`, and `cf_connect()` again, each round of an HTTPS proxy's handshake
+  writing `[HTTP-PROXY] CONNECT` before its `cf_connect()`), then `cf_connect() -> 0, done=1`
+  before `Established connection`. The ALPN query, `query ALPN` and `query ALPN: returning '<p>'`
+  (`(nil)` when ALPN agreed nothing), is answered by the topmost filter: the origin's SSL filter for
+  an `https` transfer after `Established connection` and the setup filters' removal, before
+  `using HTTP/1.x`; the proxy's SSL filter before `CONNECT: ... negotiated`. A forward HTTPS proxy's
+  handshake writes `[SSL-PROXY]` lines and no ALPN query (unmeasured; follows from the filter names).
+- Volatile, fixed: the poll rounds, two on loopback, are written as two for a handshake that
+  succeeded and one for one that failed (measured once each); the descriptor `fd=N` is written as
+  the first socket's, `fd=3`, as the `[TCP]` lines do. The rounds are written once the handshake is
+  done, so they follow its `-v` lines (`ALPN: server ...`) rather than sitting between its `ALPN:
+  curl offers` and `ALPN: server ...` lines: the handshake's lines are rendered from one event in
+  `Curl.Output`, outside this task. This replaces `HttpProxyTunnelTrace.ReportProxyHandshakePolled`.
+- A failed handshake ends with `cf_connect() -> <exit code>, done=0` (measured `60` for an untrusted
+  certificate); through an HTTPS proxy its one round writes a second `[HTTP-PROXY] CONNECT`.
+- Not written: curl's `[SSLS]` session-cache lines under `all`.

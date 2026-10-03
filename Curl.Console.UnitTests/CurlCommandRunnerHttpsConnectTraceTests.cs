@@ -237,6 +237,46 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
             FilterLines());
     }
 
+    [TestMethod]
+    public async Task RunAsync_HttpsGetUnderTraceConfigSsl_WritesTheSslFiltersLinesAroundTheHandshakeAndTheAlpnQuery()
+    {
+        // curl -s -v -k --trace-config ssl https://127.0.0.1:18961/x (BL-1287 Notes); the pass-through
+        // provider reports no handshake, so its schannel and ALPN lines are not among them.
+        int exitCode = await RunAsync("-k", "-v", "--trace-config", "ssl", "--http1.1", "https://127.0.0.1:18443/");
+
+        Assert.AreEqual(0, exitCode);
+        List<string> lines = StandardErrorLines();
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "*   Trying 127.0.0.1:18443...",
+                "* [SSL] cf_connect()",
+                "* [SSL] cf_connect() -> 0, done=0",
+                "* [SSL] adjust_pollset, POLLIN fd=3",
+                "* [SSL] cf_connect()",
+                "* [SSL] cf_connect() -> 0, done=0",
+                "* [SSL] adjust_pollset, POLLIN fd=3",
+                "* [SSL] cf_connect()",
+                "* [SSL] cf_connect() -> 0, done=1",
+                "* Established connection to 127.0.0.1 (127.0.0.1 port 18443) from 127.0.0.1 port 50000 ",
+                "* [SSL] query ALPN",
+                "* [SSL] query ALPN: returning '(nil)'",
+                "* using HTTP/1.x",
+            },
+            lines.Take(lines.IndexOf("* using HTTP/1.x") + 1).ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("-v")]
+    [DataRow("-v", "--trace-config", "proxy")]
+    [DataRow("-v", "--trace-config", "tls")]
+    public async Task RunAsync_HttpsGetWithoutTheSslComponent_WritesNoSslLine(params string[] arguments)
+    {
+        await RunAsync(["-k", .. arguments, "https://127.0.0.1:18443/"]);
+
+        Assert.IsFalse(StandardErrorLines().Any(line => line.Contains("[SSL", StringComparison.Ordinal)));
+    }
+
     private string[] FilterLines() =>
         [.. StandardErrorLines().Where(line => line.StartsWith("* [HTTPS-CONNECT] ", StringComparison.Ordinal) || line.StartsWith("* [SETUP] ", StringComparison.Ordinal))];
 
