@@ -70,3 +70,4 @@ The finding closes only when a later re-audit by the performance auditor confirm
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-02: Doing -> Backlog. Waits on BL-1288: the excess working set is Curl.Console/Curl.Cli startup footprint, not HttpResponseBodyReader; shell32 fix alone reaches 2.35x, not 2x
+- 2026-10-03: Backlog -> Doing.
