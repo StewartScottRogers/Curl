@@ -33,11 +33,6 @@ internal static class MqttTransferMessages
     internal const string ReceiveFailed = "Failure when receiving data from the peer";
 
     /// <summary>
-    /// The exit 55 message curl's socket filter reports for a send the peer reset.
-    /// </summary>
-    internal const string SendConnectionReset = "Send failure: Connection was reset";
-
-    /// <summary>
     /// The exit 55 message curl falls back to for any other failed send,
     /// <c>curl_easy_strerror(CURLE_SEND_ERROR)</c>.
     /// </summary>

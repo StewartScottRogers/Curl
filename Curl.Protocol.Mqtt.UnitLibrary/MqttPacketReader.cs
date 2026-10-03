@@ -190,9 +190,11 @@ internal sealed class MqttPacketReader(IConnection connection, ITransferEvents e
         {
             return await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         }
-        catch (IOException)
+        catch (IOException failure)
         {
-            throw new MqttTransferException(CurlExitCode.RecvError, MqttTransferMessages.ReceiveFailed);
+            throw new MqttTransferException(
+                CurlExitCode.RecvError,
+                CurlSocketErrorText.ReceiveFailure(failure) ?? MqttTransferMessages.ReceiveFailed);
         }
     }
 }

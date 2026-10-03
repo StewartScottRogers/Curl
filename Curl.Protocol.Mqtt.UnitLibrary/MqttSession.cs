@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Mqtt;
@@ -478,8 +477,8 @@ internal sealed class MqttSession(
 
     /// <summary>
     /// Sends one packet; a send that fails ends the session with exit 55 and curl's text,
-    /// <see cref="MqttTransferMessages.SendConnectionReset" /> for a reset and
-    /// <see cref="MqttTransferMessages.SendFailed" /> otherwise.
+    /// <see cref="CurlSocketErrorText.SendFailure(IOException)" />'s <c>Send failure: &lt;words&gt;</c>
+    /// for a socket error and <see cref="MqttTransferMessages.SendFailed" /> otherwise.
     /// </summary>
     /// <param name="packet">The packet to send.</param>
     /// <param name="failureLine">
@@ -499,15 +498,12 @@ internal sealed class MqttSession(
         {
             throw new MqttTransferException(
                 CurlExitCode.SendError,
-                IsReset(failure) ? MqttTransferMessages.SendConnectionReset : MqttTransferMessages.SendFailed)
+                CurlSocketErrorText.SendFailure(failure) ?? MqttTransferMessages.SendFailed)
             {
                 FollowingLine = failureLine,
             };
         }
     }
-
-    private static bool IsReset(IOException failure) =>
-        failure.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset };
 
     /// <summary>
     /// Where the session stands between packets, after curl 8.21.0's <c>mqttstate</c> and

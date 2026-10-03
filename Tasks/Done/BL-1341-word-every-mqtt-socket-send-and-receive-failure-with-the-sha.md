@@ -8,7 +8,7 @@ depends-on: [BL-1325]
 touches: [Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests]
 requirement: FR-085
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1341 — Word every mqtt socket send and receive failure with the shared CurlSocketErrorText table
 
@@ -25,15 +25,21 @@ An `mqtt://` packet send or read that fails with a socket error ends with curl 8
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Mqtt.UnitTests` makes the CONNACK read throw `IOException` wrapping `SocketException(SocketError.ConnectionAborted)` and asserts exit 56 with `Recv failure: Connection was aborted` (Windows-only), plus a non-Windows twin with `Recv failure: ` + the exception's own message.
-- [ ] A test makes the CONNECT send fail the same way and asserts exit 55 with `Send failure: Connection was aborted` (Windows) and its twin.
-- [ ] A test pins that a connection closed mid-packet still gives `Failure when receiving data from the peer`.
-- [ ] Every existing reset test is split by platform; `MqttTransferMessages` no longer declares its own `Connection was reset` constant.
-- [ ] `dotnet build Curl.Protocol.Mqtt.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Mqtt.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Mqtt.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Mqtt.UnitTests` makes the CONNACK read throw `IOException` wrapping `SocketException(SocketError.ConnectionAborted)` and asserts exit 56 with `Recv failure: Connection was aborted` (Windows-only), plus a non-Windows twin with `Recv failure: ` + the exception's own message.
+- [x] A test makes the CONNECT send fail the same way and asserts exit 55 with `Send failure: Connection was aborted` (Windows) and its twin.
+- [x] A test pins that a connection closed mid-packet still gives `Failure when receiving data from the peer`.
+- [x] Every existing reset test is split by platform; `MqttTransferMessages` no longer declares its own `Connection was reset` constant.
+- [x] `dotnet build Curl.Protocol.Mqtt.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Mqtt.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Mqtt.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Delivered directly rather than through the full `/feature` stages: two call sites. `MqttPacketReader.ReadConnectionAsync` and `MqttSession.SendAsync` now word socket errors with `CurlSocketErrorText.ReceiveFailure` / `SendFailure`, falling back to `ReceiveFailed` / `SendFailed` for an `IOException` with no `SocketException`. `IsReset` and `SendConnectionReset` are gone.
+- Default taken: `ScriptedConnection` gained `ReadFailure`, so a null chunk can throw a chosen `IOException`. The receive tests live in a new `MqttProtocolHandlerReceiveFailureTests`, beside the existing send-failure class.
+- The old "fails" send tests used `NetworkDown`, which is a socket error. They now use a plain `IOException` so they still pin the fallback text.
+- On Windows: 123 passed, 5 skipped (the non-Windows twins). `Measure-CodeQuality` reports 0 failing members.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. mqtt socket send and receive failures say Send failure / Recv failure with the platform's CurlSocketErrorText words
