@@ -166,6 +166,25 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         unread = ReadOnlyMemory<byte>.Empty;
     }
 
+    /// <summary>Echoes a response head line as its <c>header:</c> trace line, before it is reported (BL-1208).</summary>
+    /// <param name="line">The line about to be reported, its line end included.</param>
+    internal void EchoResponseLineBefore(byte[] line) => trace.ResponseLineReporting(stream!.StreamId, line);
+
+    /// <summary>Echoes the response's status line as its <c>status:</c> trace line, after it is reported (BL-1208).</summary>
+    /// <param name="line">The line just reported, its line end included.</param>
+    internal void EchoResponseLineAfter(byte[] line) => trace.ResponseLineReported(stream!.StreamId, line);
+
+    /// <summary>
+    /// Marks the transfer on this stream done with the session and writes curl's
+    /// <c>--trace-config http/3</c> lines for it (<see cref="Http3StreamTrace.TransferDone" />, BL-1208).
+    /// </summary>
+    /// <param name="connectionNumber">The connection's number, as in <c>Connection #&lt;n&gt;</c>.</param>
+    internal void ReportTransferDone(long connectionNumber)
+    {
+        (long? streamsLeft, int streamsInUse) = session.EndRequestStream();
+        trace.TransferDone(stream!.StreamId, connectionNumber, streamsLeft, streamsInUse);
+    }
+
     /// <summary>
     /// Does nothing: the session disposes every stream it opened when it is disposed.
     /// </summary>
@@ -199,7 +218,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         isRequestEnded = bodyLength == 0;
         try
         {
-            stream = await session.OpenRequestStreamAsync(frameLog, cancellationToken).ConfigureAwait(false);
+            stream = await session.OpenRequestStreamAsync(frameLog, cancellationToken, trace).ConfigureAwait(false);
         }
         catch (MultiplexedConnectionFailedException lost)
         {

@@ -26,10 +26,14 @@ public sealed partial class HttpProtocolHandlerTests
             new[]
             {
                 "< HTTP/3 103 \r\n",
+                "* [HTTP/3] [0] status: HTTP/3 103 \r\n",
+                "* [HTTP/3] [0] header: link: </a>",
                 "< link: </a>\r\n",
                 "< \r\n",
                 "* [HTTP/3] [0] end_headers, status=103",
                 "< HTTP/3 200 \r\n",
+                "* [HTTP/3] [0] status: HTTP/3 200 \r\n",
+                "* [HTTP/3] [0] header: content-length: 5",
                 "< content-length: 5\r\n",
                 "< \r\n",
                 "* [HTTP/3] [0] end_headers, status=200",
@@ -42,8 +46,51 @@ public sealed partial class HttpProtocolHandlerTests
                 "* [HTTP/3] [0] CLOSED",
                 "* [HTTP/3] [0] quic close(app_error=256) -> 0",
             },
-            events.Events.Skip(interim).Take(16).ToArray(),
+            events.Events.Skip(interim).Take(20).ToArray(),
             string.Join('\n', events.Events));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http3GetTracingStreams_WritesTheIdleTimeoutBeforeOpenedAndTheEndLinesBeforeLeftIntact()
+    {
+        // curl 8.18.0's ngtcp2 build against cloudflare-quic.com (BL-1208 Notes).
+        FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200", ("content-length", "1")), Http3Data("x")), 65536);
+        FakeMultiplexedConnection quic = new(stream) { PeerIdleTimeout = TimeSpan.FromMilliseconds(180000), BidirectionalStreamLimit = 100 };
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await new HttpProtocolHandler(QuicConnector(quic), new SilentAuthenticator()) { TracesHttp3Streams = true }
+            .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), new MemoryStream(), events: events));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        int idle = events.Info.IndexOf("[HTTP/3] peer idle timeout is 180000ms, set keep-alive to 90000 ms.");
+        Assert.IsGreaterThan(events.Info.IndexOf("using HTTP/3"), idle, string.Join('\n', events.Info));
+        StringAssert.StartsWith(events.Info[idle + 1], "[HTTP/3] [0] OPENED stream for ");
+        int done = events.Info.IndexOf("[HTTP/3] [0] easy handle is done");
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[HTTP/3] [0] quic close(app_error=256) -> 0",
+                "[HTTP/3] [0] easy handle is done",
+                "[HTTP/3] no active streams, unset keep-alive",
+                "[HTTP/3] query conn[0]: MAX_CONCURRENT -> 99 (0 in use)",
+            },
+            events.Info.Skip(done - 1).Take(4).ToArray(),
+            string.Join('\n', events.Info));
+        StringAssert.StartsWith(events.Info[done + 3], "Connection #0 to host ");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http3GetTracingStreamsWithoutPeerIdleTimeoutOrStreamLimit_WritesNeitherLine()
+    {
+        FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200"), Http3Data("x")), 65536);
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await new HttpProtocolHandler(QuicConnector(new FakeMultiplexedConnection(stream)), new SilentAuthenticator()) { TracesHttp3Streams = true }
+            .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), new MemoryStream(), events: events));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsFalse(events.Info.Any(line => line.Contains("peer idle timeout", StringComparison.Ordinal) || line.Contains("MAX_CONCURRENT", StringComparison.Ordinal)), string.Join('\n', events.Info));
+        CollectionAssert.Contains(events.Info, "[HTTP/3] [0] easy handle is done");
     }
 
     [TestMethod]
@@ -57,7 +104,7 @@ public sealed partial class HttpProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
-            new[] { "[HTTP/3] [0] end_headers, status=200", "[HTTP/3] [0] CLOSED", "[HTTP/3] [0] quic close(app_error=256) -> 0" },
+            new[] { "[HTTP/3] [0] status: HTTP/3 200 \r\n", "[HTTP/3] [0] header: content-length: 5", "[HTTP/3] [0] end_headers, status=200", "[HTTP/3] [0] CLOSED", "[HTTP/3] [0] quic close(app_error=256) -> 0", "[HTTP/3] [0] easy handle is done" },
             events.Info.Where(line => line.StartsWith("[HTTP/3] [0] ", StringComparison.Ordinal) && !line.StartsWith("[HTTP/3] [0] [", StringComparison.Ordinal) && !line.Contains("OPENED", StringComparison.Ordinal)).ToArray(),
             string.Join('\n', events.Events));
     }

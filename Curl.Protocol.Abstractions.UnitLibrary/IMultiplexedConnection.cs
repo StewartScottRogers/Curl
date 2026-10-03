@@ -41,6 +41,14 @@ public interface IMultiplexedConnection : IAsyncDisposable
     long? BidirectionalStreamLimit => null;
 
     /// <summary>
+    /// Gets the idle timeout the peer declared in its <c>max_idle_timeout</c> transport
+    /// parameter, which curl's <c>--trace-config http/3</c> line <c>peer idle timeout is &lt;n&gt;ms</c>
+    /// names (BL-1208), or <see langword="null" />, the default, when it declared none or the
+    /// implementation does not know it.
+    /// </summary>
+    TimeSpan? PeerIdleTimeout => null;
+
+    /// <summary>
     /// Opens a client-initiated bidirectional stream, which HTTP/3 carries one request and
     /// its response on.
     /// </summary>

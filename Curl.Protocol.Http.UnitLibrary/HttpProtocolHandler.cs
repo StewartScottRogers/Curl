@@ -1013,7 +1013,8 @@ public sealed class HttpProtocolHandler(
         HttpResponseHeadReader headReader = new(responseConnection)
         {
             Events = context.Events,
-            LineReported = line => EchoHttp2ResponseLine(requestStream, connection, line),
+            LineReporting = line => (requestStream as Http3StreamConnection)?.EchoResponseLineBefore(line),
+            LineReported = line => EchoResponseLineAfter(requestStream, connection, line),
             HeaderReceived = (statusLine, header) =>
             {
                 ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
@@ -1082,6 +1083,7 @@ public sealed class HttpProtocolHandler(
             return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
         }
 
+        (requestStream as Http3StreamConnection)?.ReportTransferDone(connect.ConnectionNumber);
         TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
         LogExchanged(exchangeLog, context.TimeProvider, exchange.RequestReady, actedOn!, body);
         return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection)))
@@ -1156,10 +1158,15 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Echoes a response head line as the exchange's HTTP/2 stream's <c>--trace-config http/2</c>
     /// <c>status:</c> or <c>header:</c> line (BL-1205): the request stream's, else stream 1 of a
-    /// connection switched to HTTP/2 after an h2c upgrade's <c>101</c>; nothing over HTTP/1.x or HTTP/3.
+    /// connection switched to HTTP/2 after an h2c upgrade's <c>101</c>; or, over HTTP/3, the status line
+    /// as the request stream's <c>--trace-config http/3</c> <c>status:</c> line (BL-1208); nothing over HTTP/1.x.
     /// </summary>
-    private static void EchoHttp2ResponseLine(IHttpStreamConnection? requestStream, IConnection connection, byte[] line) =>
-        (TrailerStreamOf(requestStream, connection) as Http2StreamConnection)?.EchoResponseLine(line);
+    private static void EchoResponseLineAfter(IHttpStreamConnection? requestStream, IConnection connection, byte[] line)
+    {
+        IHttpStreamConnection? stream = TrailerStreamOf(requestStream, connection);
+        (stream as Http2StreamConnection)?.EchoResponseLine(line);
+        (stream as Http3StreamConnection)?.EchoResponseLineAfter(line);
+    }
 
     /// <summary>
     /// Decides whether an HTTP/1.x exchange asks to upgrade to h2c: for <c>--http2</c>

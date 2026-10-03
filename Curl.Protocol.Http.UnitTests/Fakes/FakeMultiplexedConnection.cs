@@ -31,6 +31,9 @@ public sealed class FakeMultiplexedConnection(params FakeMultiplexedStream[] req
     /// <inheritdoc />
     public long? BidirectionalStreamLimit { get; init; }
 
+    /// <inheritdoc />
+    public TimeSpan? PeerIdleTimeout { get; init; }
+
     /// <summary>
     /// Gets the exception opening a stream throws, or <see langword="null" /> to open streams.
     /// </summary>

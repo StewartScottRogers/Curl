@@ -59,6 +59,12 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
 
     private volatile bool isStoppedByRefusedStream;
 
+    /// <summary>How many request streams the session has opened, for curl's <c>MAX_CONCURRENT</c> line (BL-1208).</summary>
+    private long requestStreamsOpened;
+
+    /// <summary>How many opened request streams have not yet been marked done (<see cref="EndRequestStream" />).</summary>
+    private int requestStreamsInUse;
+
     /// <summary>
     /// The frame log of the transfer that last opened a stream, which the server's SETTINGS and
     /// GOAWAY go to (ADR-0345 point 3), or <see langword="null" /> until one has.
@@ -166,13 +172,14 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
     /// <param name="transferLog">The frame log of the transfer opening the stream.</param>
     /// <param name="cancellationToken">Cancels the opens and writes.</param>
     /// <returns>The request stream.</returns>
-    internal async ValueTask<IMultiplexedStream> OpenRequestStreamAsync(HttpFrameLog transferLog, CancellationToken cancellationToken)
+    /// <param name="trace">The transfer's <c>--trace-config http/3</c> lines, told of the peer's idle timeout when this is the connection's first request stream (BL-1208), or <see langword="null" />.</param>
+    internal async ValueTask<IMultiplexedStream> OpenRequestStreamAsync(HttpFrameLog transferLog, CancellationToken cancellationToken, Http3StreamTrace? trace = null)
     {
         await openingStreams.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             UseConnectionLog(transferLog);
-            return await OpenRequestStreamOneAtATimeAsync(cancellationToken).ConfigureAwait(false);
+            return await OpenRequestStreamOneAtATimeAsync(trace, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -180,10 +187,26 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
         }
     }
 
-    private async ValueTask<IMultiplexedStream> OpenRequestStreamOneAtATimeAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Marks one transfer's request stream done and says what curl's <c>query conn[&lt;n&gt;]: MAX_CONCURRENT</c>
+    /// line reports (BL-1208): how many more request streams the peer allows, or <see langword="null" />
+    /// when the connection does not know, and how many request streams are still in use.
+    /// </summary>
+    /// <returns>The streams left and the streams still in use.</returns>
+    internal (long? StreamsLeft, int StreamsInUse) EndRequestStream()
+    {
+        lock (gate)
+        {
+            requestStreamsInUse--;
+            return (Connection.BidirectionalStreamLimit - requestStreamsOpened, requestStreamsInUse);
+        }
+    }
+
+    private async ValueTask<IMultiplexedStream> OpenRequestStreamOneAtATimeAsync(Http3StreamTrace? trace, CancellationToken cancellationToken)
     {
         if (openedStreams.Count == 0) // the first request: the three unidirectional streams go first
         {
+            trace?.ConnectionReady(Connection.PeerIdleTimeout);
             await Http3LocalUnidirectionalStreams.OpenControlStreamAsync(await OpenLocalStreamAsync(cancellationToken).ConfigureAwait(false), Http3LocalUnidirectionalStreams.CurlSettings, cancellationToken).ConfigureAwait(false);
             await Http3LocalUnidirectionalStreams.OpenQpackEncoderStreamAsync(await OpenLocalStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
             await Http3LocalUnidirectionalStreams.OpenQpackDecoderStreamAsync(await OpenLocalStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
@@ -191,6 +214,12 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
 
         IMultiplexedStream requestStream = await OpenBidirectionalStreamAsync(cancellationToken).ConfigureAwait(false);
         openedStreams.Add(requestStream);
+        lock (gate)
+        {
+            requestStreamsOpened++;
+            requestStreamsInUse++;
+        }
+
         return requestStream;
     }
 

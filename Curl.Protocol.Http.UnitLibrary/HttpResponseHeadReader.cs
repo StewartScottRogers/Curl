@@ -70,6 +70,13 @@ internal sealed class HttpResponseHeadReader
     internal Action<byte[]> LineReported { get; init; } = static _ => { };
 
     /// <summary>
+    /// Gets what is told of each head line right before it is reported to <see cref="Events" />,
+    /// so an HTTP/3 stream's <c>--trace-config http/3</c> <c>header:</c> echo precedes its <c>&lt;</c>
+    /// line (<see cref="Http3StreamTrace.ResponseLineReporting" />, BL-1208). By default nothing is.
+    /// </summary>
+    internal Action<byte[]> LineReporting { get; init; } = static _ => { };
+
+    /// <summary>
     /// Gets what is told of each header of every head, 1xx heads' included, once it is whole -
     /// its continuation lines folded in - just before its lines are reported to
     /// <see cref="Events" />; a header whose head fails before it is whole is never told, nor
@@ -296,9 +303,10 @@ internal sealed class HttpResponseHeadReader
     private bool ShowsPendingHeaderWhole(ReadOnlySpan<byte> unfinishedLine) =>
         heldHeaderLines.Count > 0 && unfinishedLine.Length > 0 && !HttpLine.IsBlank((char)unfinishedLine[0]);
 
-    /// <summary>Reports one head line to <see cref="Events" />, then tells <see cref="LineReported" /> of it.</summary>
+    /// <summary>Tells <see cref="LineReporting" /> of one head line, reports it to <see cref="Events" />, then tells <see cref="LineReported" /> of it.</summary>
     private void ReportLine(byte[] bytes)
     {
+        LineReporting(bytes);
         Events.ReportResponseHeader(bytes);
         LineReported(bytes);
     }

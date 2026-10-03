@@ -37,6 +37,28 @@ public sealed class QuicConnectionTests
 
     [TestMethod]
     [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    public async Task PeerIdleTimeout_ServerDeclaresOne_IsItsMaxIdleTimeout()
+    {
+        (QuicConnection connection, _, _) = await ConnectAsync(parameters => GenerousServerLimits(parameters) with { MaxIdleTimeout = 180000 });
+        await using (connection)
+        {
+            Assert.AreEqual(TimeSpan.FromMilliseconds(180000), connection.PeerIdleTimeout);
+        }
+    }
+
+    [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    public async Task PeerIdleTimeout_ServerDeclaresNone_IsNull()
+    {
+        (QuicConnection connection, _, _) = await ConnectAsync(parameters => GenerousServerLimits(parameters) with { MaxIdleTimeout = 0 });
+        await using (connection)
+        {
+            Assert.IsNull(connection.PeerIdleTimeout);
+        }
+    }
+
+    [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task AcceptUnidirectionalStreamAsync_ServerStream_IsAcceptedAndRead()
     {
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
