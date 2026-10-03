@@ -91,3 +91,4 @@ outside the repository (loopback `TcpListener`, one `200` with `Content-Length: 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-02: Doing -> Backlog. Needs Curl.Console (its DeferredOutputFileStream, WriteGate and StandardOutputFailureDeferringStream allocate per chunk), which BL-1290 in Doing touches; waits on BL-1290
+- 2026-10-03: Backlog -> Doing.
