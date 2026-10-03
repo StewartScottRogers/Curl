@@ -15,6 +15,9 @@ namespace Curl.Networking;
 /// after it. curl writes one pair per poll round, so the count is fixed to what a loopback TLS 1.2
 /// handshake measured, and the handshake's pairs come before its <c>ALPN:</c> lines, which one
 /// event carries, where curl writes them between those lines (ADR-0357's BL-1192 amendment).
+/// Through a proxy or over a Unix socket the same lines go around the proxy's own (measured, BL-1254
+/// Notes): one more pair after each CONNECT request head, and two before <c>Opened SOCKS
+/// connection</c>, the rounds a loopback SOCKS5 handshake measured (ADR-0357's BL-1254 amendment).
 /// </summary>
 /// <param name="inner">The events below the ALPN connect filter: the DNS filter's, or the transfer's own.</param>
 /// <param name="firstAttemptVersion">The HTTP version curl's first attempt uses: <c>h1</c>, <c>h2</c> or <c>h3</c>.</param>
@@ -24,6 +27,7 @@ internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, strin
     public const string AddedLine = "[HTTPS-CONNECT] added";
 
     private const string TryingPrefix = "  Trying ";
+    private const string SocksOpenedPrefix = "Opened SOCKS connection ";
     private const string HappyEyeballingPrefix = "[SETUP] happy eyeballing";
     private const string ConnectingLine = "[HTTPS-CONNECT] connect -> 0, done=0";
     private const string PollsetLine = "[HTTPS-CONNECT] adjust_pollset -> 0, 1 socks";
@@ -39,6 +43,12 @@ internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, strin
             _connecting = true;
             inner.ReportInfo("[HTTPS-CONNECT] connect, init");
             inner.ReportInfo($"[HTTPS-CONNECT] 1st attempt uses {firstAttemptVersion} from wanted versions");
+        }
+
+        if (text.StartsWith(SocksOpenedPrefix, StringComparison.Ordinal))
+        {
+            WritePollRound();
+            WritePollRound();
         }
 
         inner.ReportInfo(text);
@@ -103,7 +113,11 @@ internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, strin
     public void ReportTlsEarlyData(long bytes) => inner.ReportTlsEarlyData(bytes);
 
     /// <inheritdoc />
-    public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => inner.ReportRequestHeader(bytes);
+    public void ReportRequestHeader(ReadOnlySpan<byte> bytes)
+    {
+        inner.ReportRequestHeader(bytes);
+        WritePollRound();
+    }
 
     /// <inheritdoc />
     public void ReportResponseHeader(ReadOnlySpan<byte> bytes) => inner.ReportResponseHeader(bytes);

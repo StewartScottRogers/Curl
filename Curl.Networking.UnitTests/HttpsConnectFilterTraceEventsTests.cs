@@ -121,6 +121,27 @@ public sealed class HttpsConnectFilterTraceEventsTests
     }
 
     [TestMethod]
+    public void ReportRequestHeader_AProxysConnectRequest_IsFollowedByAPollRound()
+    {
+        var inner = new CountingTransferEvents();
+
+        new HttpsConnectFilterTraceEvents(inner, "h2").ReportRequestHeader("CONNECT h:443 HTTP/1.1\r\n\r\n"u8);
+
+        CollectionAssert.AreEqual(new[] { "request", Connecting, Pollset }, inner.Calls);
+    }
+
+    [TestMethod]
+    public void ReportInfo_TheOpenedSocksConnectionLine_IsPrecededByTwoPollRounds()
+    {
+        var inner = new CountingTransferEvents();
+        const string Opened = "Opened SOCKS connection from 127.0.0.1 port 5 to h port 443 (via 127.0.0.1 port 1080)";
+
+        new HttpsConnectFilterTraceEvents(inner, "h2").ReportInfo(Opened);
+
+        CollectionAssert.AreEqual(new[] { Connecting, Pollset, Connecting, Pollset, Opened }, inner.Calls);
+    }
+
+    [TestMethod]
     public void EveryOtherReport_IsPassedOnUnchanged()
     {
         var inner = new CountingTransferEvents();
@@ -139,7 +160,7 @@ public sealed class HttpsConnectFilterTraceEventsTests
         events.ReportDataReceived([6]);
 
         CollectionAssert.AreEqual(
-            new[] { "Host h:443 was resolved.", "reused", "tls-data", "tls-message", "trust", "verify 18 True", "early-data -36", "request", "response", "sent", "received" },
+            new[] { "Host h:443 was resolved.", "reused", "tls-data", "tls-message", "trust", "verify 18 True", "early-data -36", "request", Connecting, Pollset, "response", "sent", "received" },
             inner.Calls);
     }
 

@@ -285,3 +285,31 @@ Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, 
     `[TCP-1]` lines whose `len=` is the bytes still expected. The FTP control and data targets
     look alike to `TcpConnector` (no `PoolScheme`), so the FTP handler has to say which is which
     and what length to report, a change to `Curl.Protocol.Ftp.UnitLibrary` and `ConnectTarget`.
+
+## Amendment, 2026-10-02 (BL-1254): `[HTTPS-CONNECT]` through a proxy and over a Unix socket
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and
+`Record-CurlExchange.ps1` (`-Script` playing an HTTP or SOCKS5 proxy, `-UnixSocket`, `-Tls` playing
+an HTTPS proxy) under `-s -k -v --trace-config https-connect,setup` (BL-1254 Notes).
+
+- An `https://` origin reached through an HTTP, HTTPS or SOCKS proxy, or over `--unix-socket`, writes
+  the same `[HTTPS-CONNECT]` lines as a direct connect: `added` first, `connect, init` and the
+  `1st attempt` line before the setup filter's `happy eyeballing` line (or `Trying`), a poll-round
+  pair after `Trying`, the handshake's pairs, and `done=1` and the removal, or `all attempts failed`
+  and the exit code. `TcpConnector` builds the filter for each route through one helper
+  (`SetupAndDnsFilterEvents`), each route giving its own DNS and setup filters.
+- Through a proxy the filter also polls while the proxy works: one pair after the CONNECT request
+  head (before the reply's lines), and two before `Opened SOCKS connection`. As in the BL-1192
+  amendment the counts follow curl's poll timing; they are fixed to the loopback measurement. A
+  SOCKS handshake that fails writes none of its pairs (curl wrote four for a SOCKS5 whose local
+  resolve failed); the failure lines still end it.
+- The setup filter through a SOCKS proxy (not only its `added SOCKS filter` line) is now traced, for
+  every origin: `[SETUP] added` (none for an `https://` origin), `happy eyeballing to origin
+  <proxy>:<port>` (the SOCKS proxy is its origin, unlike an HTTP proxy's `to proxy`), and for an
+  `https://` origin `added SSL filter for origin` once the tunnel is open. Over a Unix socket it
+  eyeballs to `origin <path>:0`, the whole path though `Trying` cuts it to 45 characters, and adds the
+  SSL filter for an `https://` origin before the handshake.
+- Left to their own tasks: an HTTPS proxy's own `[SETUP]` lines (`added SSL filter for HTTP proxy`,
+  `added HTTP proxy tunnel filter`, measured; BL-1261), so through it only the `[HTTPS-CONNECT]`
+  lines are written; and `--http3`, which the reference build cannot do, so it could not be measured
+  (BL-1262).

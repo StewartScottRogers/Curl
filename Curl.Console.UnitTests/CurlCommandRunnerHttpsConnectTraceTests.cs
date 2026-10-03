@@ -101,6 +101,66 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         Assert.AreEqual(expected, CurlComposition.HttpsConnectFirstAttemptVersionOf(version));
     }
 
+    [TestMethod]
+    [DataRow("-x", "http://127.0.0.1:18454", "HTTP/1.1 200 Connection established\r\n\r\n", "[SETUP] happy eyeballing to proxy 127.0.0.1:18454", "[SETUP] added HTTP proxy tunnel filter", 1)]
+    [DataRow("-x", "socks5h://127.0.0.1:18455", "\u0005\0\u0005\0\0\u0001\u007f\0\0\u0001\u0001\u00bb", "[SETUP] happy eyeballing to origin 127.0.0.1:18455", "[SETUP] added SOCKS filter to example.test:443", 2)]
+    public async Task RunAsync_HttpsGetThroughAProxyUnderTraceConfigHttpsConnectAndSetup_WritesTheFiltersLinesAroundTheTunnel(
+        string option, string proxy, string proxyReply, string eyeballing, string tunnelFilterAdded, int tunnelPollRounds)
+    {
+        // curl -s -k -v --trace-config https-connect,setup -x <proxy> https://example.test/ (BL-1254 Notes).
+        int exitCode = await RunAsync([Encoding.Latin1.GetBytes(proxyReply), Response], "-k", "-v", "--trace-config", "https-connect,setup", option, proxy, "https://example.test/");
+
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(
+            (string[])
+            [
+                "* [HTTPS-CONNECT] added",
+                "* [HTTPS-CONNECT] connect, init",
+                "* [HTTPS-CONNECT] 1st attempt uses h2 from wanted versions",
+                $"* {eyeballing}",
+                "* [HTTPS-CONNECT] connect -> 0, done=0",
+                "* [HTTPS-CONNECT] adjust_pollset -> 0, 1 socks",
+                $"* {tunnelFilterAdded}",
+                .. Enumerable.Repeat(new[] { "* [HTTPS-CONNECT] connect -> 0, done=0", "* [HTTPS-CONNECT] adjust_pollset -> 0, 1 socks" }, tunnelPollRounds).SelectMany(pair => pair),
+                "* [SETUP] added SSL filter for origin",
+                "* [HTTPS-CONNECT] connect -> 0, done=1",
+                "* [HTTPS-CONNECT] removing connected setup filter",
+                "* [HTTPS-CONNECT] destroy",
+                "* [SETUP] removing connected setup filter",
+                "* [SETUP] destroy",
+            ],
+            FilterLines());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpsGetOverAUnixSocketUnderTraceConfigHttpsConnectAndSetup_EyeballsToThePathAtPort0()
+    {
+        // curl -s -k -v --trace-config https-connect,setup --unix-socket <path> https://example.test/ (BL-1254 Notes).
+        int exitCode = await RunAsync([Response], "-k", "-v", "--trace-config", "https-connect,setup", "--unix-socket", "/tmp/bl1254.sock", "https://example.test/");
+
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "* [HTTPS-CONNECT] added",
+                "* [HTTPS-CONNECT] connect, init",
+                "* [HTTPS-CONNECT] 1st attempt uses h2 from wanted versions",
+                "* [SETUP] happy eyeballing to origin /tmp/bl1254.sock:0",
+                "* [HTTPS-CONNECT] connect -> 0, done=0",
+                "* [HTTPS-CONNECT] adjust_pollset -> 0, 1 socks",
+                "* [SETUP] added SSL filter for origin",
+                "* [HTTPS-CONNECT] connect -> 0, done=1",
+                "* [HTTPS-CONNECT] removing connected setup filter",
+                "* [HTTPS-CONNECT] destroy",
+                "* [SETUP] removing connected setup filter",
+                "* [SETUP] destroy",
+            },
+            FilterLines());
+    }
+
+    private string[] FilterLines() =>
+        [.. StandardErrorLines().Where(line => line.StartsWith("* [HTTPS-CONNECT] ", StringComparison.Ordinal) || line.StartsWith("* [SETUP] ", StringComparison.Ordinal))];
+
     private List<string> StandardErrorLines() =>
         [.. Encoding.ASCII.GetString(standardError.ToArray())
             .Split('\n', StringSplitOptions.RemoveEmptyEntries)
@@ -110,14 +170,17 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     /// Runs <c>-s</c> and <paramref name="arguments" /> through the production handler set over the
     /// connector the composition builds from them, whose connection replays the response.
     /// </summary>
-    private async Task<int> RunAsync(params string[] arguments)
+    private Task<int> RunAsync(params string[] arguments) => RunAsync([Response], arguments);
+
+    /// <summary>Runs <paramref name="arguments" /> as above over connections that replay <paramref name="reads" />.</summary>
+    private async Task<int> RunAsync(byte[][] reads, params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse(["-s", .. arguments], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = CurlComposition.CreateTcpConnector(
             parsed.Options,
             new LoopbackDnsResolver(),
-            new ScriptedTcpDialer(new ScriptedConnector([Response])),
+            new ScriptedTcpDialer(new ScriptedConnector(reads)),
             new PassThroughTlsProvider(),
             TimeProvider.System,
             HttpProxyTunnelOptions.Default);

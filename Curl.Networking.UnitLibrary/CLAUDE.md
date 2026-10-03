@@ -438,6 +438,11 @@ ALPN` in place of `[TCP] query ALPN`; under `TracesSetupFilter` that path also w
 `happy eyeballing to proxy H:P` (`SetupFilterTraceEvents.ToProxy`), `HttpProxyTunnelFilterAddedLine` and,
 for an `https://` origin, `SslFilterAddedLine` after the tunnel. CONNECT reply heads go to the
 `IConnectReplyHeadWritingEvents` the target's events were before any trace filter wrapped them.
+Per ADR-0357's BL-1254 amendment the `[HTTPS-CONNECT]` filter goes around a connect through any
+proxy and over a Unix socket too (`SetupAndDnsFilterEvents` builds it for every route), with a
+poll-round pair after each CONNECT request head and two before `Opened SOCKS connection`; the setup
+filter is traced through a SOCKS proxy (`happy eyeballing to origin <proxy>`) and over a Unix socket
+(`happy eyeballing to origin <path>:0`), adding an `https://` origin's SSL filter there as well.
 
 Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
 `--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr`, measured against curl 8.22.0's c-ares

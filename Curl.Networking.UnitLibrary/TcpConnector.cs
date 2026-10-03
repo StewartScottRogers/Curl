@@ -705,7 +705,12 @@ public sealed partial class TcpConnector(
         }
 
         trace?.ConnectStarting();
-        var (events, httpsConnect) = SetupAndDnsFilterEvents(trace ?? target.Events, destination, httpsOrigin);
+        var (events, httpsConnect) = SetupAndDnsFilterEvents(
+            trace ?? target.Events,
+            httpsOrigin,
+            TracesSetupFilter,
+            below => DnsFilterTraceEvents.Start(below, destination.Host, destination.Port, addressFamily),
+            below => new SetupFilterTraceEvents(below, destination.Host, destination.Port));
         return (target with { Events = events }, trace, httpsConnect);
     }
 
@@ -729,27 +734,30 @@ public sealed partial class TcpConnector(
 
     // The [SETUP] filter's events over the [DNS] filter's over the given ones, each when traced; the
     // setup filter's first line (the ALPN connect filter's for an https:// origin) is written before
-    // the DNS filter's, and the ALPN connect filter's events sit between the two.
+    // the DNS filter's, and the ALPN connect filter's events sit between the two. A direct connect, a
+    // proxy's and a Unix socket's each start their own DNS and setup filters (measured, BL-1254 Notes).
     private (ITransferEvents Events, HttpsConnectFilterTraceEvents? HttpsConnect) SetupAndDnsFilterEvents(
         ITransferEvents events,
-        ConnectDestination destination,
-        bool httpsOrigin)
+        bool httpsOrigin,
+        bool tracesSetup,
+        Func<ITransferEvents, ITransferEvents> startDnsFilter,
+        Func<ITransferEvents, ITransferEvents> startSetupFilter)
     {
         var tracesHttpsConnect = TracesHttpsConnectFor(httpsOrigin);
-        WriteFirstFilterAddedLine(events, httpsOrigin, tracesHttpsConnect);
-        events = TracesDnsFilter ? DnsFilterTraceEvents.Start(events, destination.Host, destination.Port, addressFamily) : events;
+        WriteFirstFilterAddedLine(events, httpsOrigin, tracesHttpsConnect, tracesSetup);
+        events = TracesDnsFilter ? startDnsFilter(events) : events;
         var httpsConnect = tracesHttpsConnect ? new HttpsConnectFilterTraceEvents(events, HttpsConnectFirstAttemptVersion) : null;
         events = httpsConnect ?? events;
-        return (TracesSetupFilter ? new SetupFilterTraceEvents(events, destination.Host, destination.Port) : events, httpsConnect);
+        return (tracesSetup ? startSetupFilter(events) : events, httpsConnect);
     }
 
-    private void WriteFirstFilterAddedLine(ITransferEvents events, bool httpsOrigin, bool tracesHttpsConnect)
+    private static void WriteFirstFilterAddedLine(ITransferEvents events, bool httpsOrigin, bool tracesHttpsConnect, bool tracesSetup)
     {
         if (tracesHttpsConnect)
         {
             events.ReportInfo(HttpsConnectFilterTraceEvents.AddedLine);
         }
-        else if (TracesSetupFilter && !httpsOrigin)
+        else if (tracesSetup && !httpsOrigin)
         {
             events.ReportInfo(SetupFilterTraceEvents.AddedLine);
         }
@@ -777,12 +785,16 @@ public sealed partial class TcpConnector(
     {
         (target, var trace, var httpsConnect) = TracingConnectionFilters(target, destination);
         var result = await ConnectDirectlyTracedAsync(target, destination, started, trace, cancellationToken).ConfigureAwait(false);
+        ReportHttpsConnectFailure(httpsConnect, result);
+        return result;
+    }
+
+    private static void ReportHttpsConnectFailure(HttpsConnectFilterTraceEvents? httpsConnect, ConnectResult result)
+    {
         if (result.ExitCode != CurlExitCode.Ok)
         {
             httpsConnect?.ReportConnectFailed(result.ExitCode);
         }
-
-        return result;
     }
 
     private async ValueTask<ConnectResult> ConnectDirectlyTracedAsync(
@@ -841,11 +853,26 @@ public sealed partial class TcpConnector(
                 CurlErrorBuffer.Truncate($"Unix socket path too long: '{unixSocket.Path}'"));
         }
 
-        if (TracesDnsFilter)
-        {
-            target = target with { Events = DnsFilterTraceEvents.StartOverUnixSocket(target.Events, unixSocket.Path) };
-        }
+        // Over a Unix socket the setup filter eyeballs to the socket's path, port 0, and an https://
+        // origin's ALPN connect filter goes around it as for a direct connect (measured, BL-1254 Notes).
+        var httpsOrigin = IsHttpsOrigin(target);
+        var (events, httpsConnect) = SetupAndDnsFilterEvents(
+            target.Events,
+            httpsOrigin,
+            TracesSetupFilter,
+            below => DnsFilterTraceEvents.StartOverUnixSocket(below, unixSocket.Path),
+            below => new SetupFilterTraceEvents(below, unixSocket.Path, 0));
+        var result = await ConnectOverUnixSocketTracedAsync(target with { Events = events }, unixSocket, started, cancellationToken).ConfigureAwait(false);
+        ReportHttpsConnectFailure(httpsConnect, result);
+        return result;
+    }
 
+    private async ValueTask<ConnectResult> ConnectOverUnixSocketTracedAsync(
+        ConnectTarget target,
+        UnixSocketAddress unixSocket,
+        long started,
+        CancellationToken cancellationToken)
+    {
         var name = unixSocket.RemoteIpText;
         target.Events.ReportInfo($"  Trying {name}:0...");
         var nameResolved = timeProvider.GetTimestamp();
@@ -872,7 +899,7 @@ public sealed partial class TcpConnector(
         new NetworkDiagnosticLog(target.DiagnosticLog).UnixSocketConnected(unixSocket.Path);
         var dialed = new DialedSocket(connection, null, unixSocket.Path, null, name, unixSocket.Path);
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
-        return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken).ConfigureAwait(false);
+        return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken, WritesSslFilterAddedFor(target)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1101,7 +1128,22 @@ public sealed partial class TcpConnector(
     {
         var firstHop = FirstHopTo(proxy);
         var headOutput = target.Events as IConnectReplyHeadWritingEvents;
-        target = TracingTunnelFilters(target, proxy, firstHop);
+        (target, var httpsConnect) = TracingTunnelFilters(target, proxy, firstHop);
+        var result = await ConnectThroughProxyTracedAsync(target, destination, proxy, new ProxyRoute(firstHop, headOutput, started), cancellationToken).ConfigureAwait(false);
+        ReportHttpsConnectFailure(httpsConnect, result);
+        return result;
+    }
+
+    private readonly record struct ProxyRoute(ProxyEndpoint FirstHop, IConnectReplyHeadWritingEvents? HeadOutput, long Started);
+
+    private async ValueTask<ConnectResult> ConnectThroughProxyTracedAsync(
+        ConnectTarget target,
+        ConnectDestination destination,
+        ProxyEndpoint proxy,
+        ProxyRoute route,
+        CancellationToken cancellationToken)
+    {
+        var (firstHop, headOutput, started) = route;
         var (addresses, failure) = await ResolveWithFailureReasonAsync(firstHop.Host, firstHop.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
@@ -1142,25 +1184,27 @@ public sealed partial class TcpConnector(
     // curl 8.21.0's DNS filter resolves the proxy it dials first (measured, BL-1181 Notes). Through
     // a plain HTTP proxy its setup filter writes [SETUP] added (not for an https:// origin, whose
     // ALPN connect filter adds it) before the DNS filter's lines, and happy eyeballing to proxy
-    // before the first Trying (measured, BL-1193 Notes).
-    private ConnectTarget TracingTunnelFilters(ConnectTarget target, ProxyEndpoint proxy, ProxyEndpoint firstHop)
+    // before the first Trying (measured, BL-1193 Notes). Through a SOCKS proxy it eyeballs to origin,
+    // the SOCKS proxy it dials (measured, BL-1254 Notes). An https:// origin's ALPN connect filter
+    // goes around them as for a direct connect, its added line first (measured, BL-1254 Notes).
+    private (ConnectTarget Target, HttpsConnectFilterTraceEvents? HttpsConnect) TracingTunnelFilters(ConnectTarget target, ProxyEndpoint proxy, ProxyEndpoint firstHop)
     {
-        var tracesSetup = TracesSetupFilterThrough(proxy);
-        WriteTunnelSetupAddedLine(target, tracesSetup);
-        var events = TracesDnsFilter ? DnsFilterTraceEvents.Start(target.Events, firstHop.Host, firstHop.Port, addressFamily) : target.Events;
-        return target with { Events = tracesSetup ? new SetupFilterTraceEvents(events, firstHop.Host, firstHop.Port, SetupFilterTraceEvents.ToProxy) : events };
+        var peer = IsSocks(proxy) ? SetupFilterTraceEvents.ToOrigin : SetupFilterTraceEvents.ToProxy;
+        var (events, httpsConnect) = SetupAndDnsFilterEvents(
+            target.Events,
+            IsHttpsOrigin(target),
+            TracesSetupFilterThrough(proxy),
+            below => DnsFilterTraceEvents.Start(below, firstHop.Host, firstHop.Port, addressFamily),
+            below => new SetupFilterTraceEvents(below, firstHop.Host, firstHop.Port, peer));
+        return (target with { Events = events }, httpsConnect);
     }
 
+    // An HTTPS proxy's own [SETUP] lines are not written yet (BL-1254 Notes).
     private bool TracesSetupFilterThrough(ProxyEndpoint proxy) =>
-        TracesSetupFilter && proxy.Kind is ProxyKind.Http or ProxyKind.Http10;
+        TracesSetupFilter && proxy.Kind is not ProxyKind.Https;
 
-    private static void WriteTunnelSetupAddedLine(ConnectTarget target, bool tracesSetup)
-    {
-        if (tracesSetup && !IsHttpsOrigin(target))
-        {
-            target.Events.ReportInfo(SetupFilterTraceEvents.AddedLine);
-        }
-    }
+    private static bool IsSocks(ProxyEndpoint proxy) =>
+        proxy.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a or ProxyKind.Socks5 or ProxyKind.Socks5Hostname;
 
     /// <summary>
     /// Dials the proxy and opens the tunnel through it, sending
@@ -1312,8 +1356,9 @@ public sealed partial class TcpConnector(
             return failure;
         }
 
-        // As through an HTTP proxy, %{time_connect} is when the tunnel is open.
-        return await SecureWhenAskedAsync(dialed, target, timings with { Connected = timeProvider.GetTimestamp() }, 0, cancellationToken).ConfigureAwait(false);
+        // As through an HTTP proxy, %{time_connect} is when the tunnel is open, and the setup filter
+        // adds an https:// origin's SSL filter then (measured, BL-1254 Notes).
+        return await SecureWhenAskedAsync(dialed, target, timings with { Connected = timeProvider.GetTimestamp() }, 0, cancellationToken, WritesSslFilterAddedFor(target)).ConfigureAwait(false);
     }
 
     /// <summary>
