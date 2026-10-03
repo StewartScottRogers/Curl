@@ -49,6 +49,9 @@ internal sealed class ConnectAttemptTraceEvents(ITransferEvents inner, string ho
     /// <summary>Gets a value indicating whether the <c>[HAPPY-EYEBALLS]</c> lines are written.</summary>
     public bool TracesHappyEyeballs => tracesHappyEyeballs;
 
+    /// <summary>Gets a value indicating whether the <c>[TCP]</c> lines are written.</summary>
+    public bool TracesTcp => tracesTcp;
+
     /// <summary>
     /// Notes that the race has a second family, started after <paramref name="timeout" />, which
     /// curl names after the first attempt's <c>checked connect attempts</c> line.

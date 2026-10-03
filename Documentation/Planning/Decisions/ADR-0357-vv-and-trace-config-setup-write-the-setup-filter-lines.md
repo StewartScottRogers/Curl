@@ -164,3 +164,32 @@ Decided by Claude under Stewart's delegation.
 - Not written: `[SOCKS] query ALPN`, which curl writes after `Established connection` when the HTTP
   layer asks the filter chain for ALPN, as `[TCP] query ALPN` (BL-1195) is; it follows in its own task.
   The lines of a SOCKS5 user name and password or GSS-API negotiation are unmeasured.
+
+## Amendment, 2026-10-02 (BL-1195): the `[TCP]` I/O lines
+
+Decided by Claude under Stewart's delegation.
+
+curl 8.21.0 (mingw, Schannel) under `--trace-config tcp`, `network`, `all` and `-vvvv` writes, for a
+plain `http://` transfer, `[TCP] query ALPN` after the setup filters' removal and before
+`using HTTP/1.x`, `[TCP] send(len=<n>) -> 0, <n>` before the request's `>` lines (one send for the
+head and a small `-d` body together, `len=160`), and `[TCP] recv(len=102400) -> <result>, <bytes>`
+before the response's `<` lines (BL-1195 Notes).
+
+- `TcpConnector` wraps a plain HTTP connection (`ConnectTarget.PoolScheme` `http`) dialled under
+  `TracesTcpFilter` in `TcpIoTraceConnection` and writes `TcpConnector.QueryAlpnLine` after the setup
+  filters' removal. The wrapper writes the `send` line after each write and the `recv` line after
+  each read; the HTTP handler reports its head after writing it, so the order matches curl's.
+- **Would-block results.** curl writes `recv(len=102400) -> 81, 0` (`CURLE_AGAIN`) when it reads
+  before the server has answered, which depends on timing: measured once for a plain GET, not for a
+  150000-byte body nor a `-d` upload. The wrapper writes it when the inner read does not complete at
+  once (its `ValueTask` is not completed when returned), the same condition in .NET terms, so it
+  follows the same timing rather than being pinned on or off. A live run of Curl against the
+  recorder writes it exactly as curl did.
+- **Length.** `len=` is always 102400, curl's receive buffer, whatever the reader asked for; curl
+  asks for less only for a body's known remainder (`recv(len=47643)` for the tail of a 150000-byte
+  body), which Curl's 16384-byte reads do not mirror, so a body over 16384 bytes writes more `recv`
+  lines than curl. Not pinned.
+- Not written: the lines over TLS (`https://`, where the TCP filter sits below the TLS filter and
+  `query ALPN` comes from it), on other protocols (FTP's reads are `len=900`), through a proxy, and the
+  `[HAPROXY]` line's `send(len=44)`. The wrapper keeps the events of the transfer that dialled it, so
+  a reused connection writes its lines through those events.

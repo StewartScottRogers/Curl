@@ -269,6 +269,12 @@ public sealed partial class TcpConnector(
     public const string HaproxyFilterAddedLine = "[SETUP] added HAPROXY filter";
 
     /// <summary>
+    /// The line curl 8.21.0's TCP filter writes, under <see cref="TracesTcpFilter" />, as a plain HTTP
+    /// connection is asked its ALPN protocol, after the setup filters' removal (BL-1195 Notes).
+    /// </summary>
+    public const string QueryAlpnLine = "[TCP] query ALPN";
+
+    /// <summary>
     /// Gets the events a resolver built once per run reports to, such as the
     /// <see cref="DohDnsResolver" />'s <c>--trace-config doh</c> lines: before each look-up the
     /// connector points them at the resolving transfer's events (BL-1102); <see langword="null" />
@@ -1484,9 +1490,7 @@ public sealed partial class TcpConnector(
 
         if (!target.UseTls)
         {
-            return WithSetupFiltersRemoved(
-                Opened(dialed, target.Events, dialed.Connection, timings, proxyConnectResponseCode, peerCertificates: null, applicationProtocol: null),
-                dialed, target.Events);
+            return OpenedInPlaintext(dialed, target, timings, proxyConnectResponseCode);
         }
 
         var secured = await AuthenticateTargetAsync(dialed.Connection, target, cancellationToken).ConfigureAwait(false);
@@ -1511,6 +1515,23 @@ public sealed partial class TcpConnector(
             target.Events);
     }
 
+    // A plain HTTP connection dialled under TracesTcpFilter writes curl 8.21.0's [TCP] send and recv
+    // lines for its I/O, and [TCP] query ALPN after the setup filters' removal, before the handler's
+    // "using HTTP/1.x" (measured, BL-1195 Notes).
+    private ConnectResult OpenedInPlaintext(DialedSocket dialed, ConnectTarget target, ConnectTimings timings, int proxyConnectResponseCode)
+    {
+        var tracesIo = dialed.TracesTcpFilter && target.PoolScheme == "http";
+        var connection = tracesIo ? new TcpIoTraceConnection(dialed.Connection, target.Events) : dialed.Connection;
+        var opened = WithSetupFiltersRemoved(
+            Opened(dialed, target.Events, connection, timings, proxyConnectResponseCode, peerCertificates: null, applicationProtocol: null),
+            dialed, target.Events);
+        if (tracesIo)
+        {
+            target.Events.ReportInfo(QueryAlpnLine);
+        }
+
+        return opened;
+    }
     // curl 8.21.0 writes the PROXY line after any tunnel and before TLS, from the socket's own ends
     // (BL-616), its setup filter first reporting that it added the HAPROXY filter (BL-1160 Notes).
     private async ValueTask WriteHaproxyLineAsync(HaproxyProtocolHeader header, DialedSocket dialed, ITransferEvents events, CancellationToken cancellationToken)
@@ -1696,7 +1717,7 @@ public sealed partial class TcpConnector(
         var (dialed, remoteEndPoint, lastError, lastBindFailure) = await race.DialAsync(addresses, port, cancellationToken).ConfigureAwait(false);
         return dialed is null
             ? (null, lastError, lastBindFailure)
-            : (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint) { TracesHappyEyeballsFilter = trace?.TracesHappyEyeballs == true }, SocketError.Success, null);
+            : (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint) { TracesHappyEyeballsFilter = trace?.TracesHappyEyeballs == true, TracesTcpFilter = trace?.TracesTcp == true }, SocketError.Success, null);
     }
 
     /// <summary>
@@ -1775,6 +1796,12 @@ public sealed partial class TcpConnector(
         /// lines written, so its filter's removal is written once the connection is established (BL-1161).
         /// </summary>
         public bool TracesHappyEyeballsFilter { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether the socket was dialled with the <c>[TCP]</c> lines written,
+        /// so a plain HTTP connection over it writes its I/O's too (BL-1195).
+        /// </summary>
+        public bool TracesTcpFilter { get; init; }
     }
 
     /// <summary>

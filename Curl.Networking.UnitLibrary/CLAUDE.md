@@ -420,6 +420,10 @@ writes `[SETUP] added SOCKS filter to H:P` first. Per BL-1186
 `TcpConnector.TracesHappyEyeballsTimer` (`--trace-config timer`, `network`, `all`) has
 `ConnectAttemptTraceEvents` write `[TIMER] [HAPPY_EYEBALLS] set for <us>ns` and `gives multi timeout in
 <ms>ms` as a second family's delay starts, and `cleared` once an attempt connects, before `Connected to`.
+Per ADR-0357's BL-1195 amendment a plain HTTP connection (`PoolScheme` `http`) dialled under
+`TracesTcpFilter` is wrapped in `TcpIoTraceConnection`, which writes `[TCP] send(len=N) -> 0, N` after
+each write and `[TCP] recv(len=102400) -> 0, N` after each read, `-> 81, 0` first when the read does
+not complete at once, and `TcpConnector` writes `QueryAlpnLine` after the setup filters' removal.
 
 Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
 `--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr`, measured against curl 8.22.0's c-ares

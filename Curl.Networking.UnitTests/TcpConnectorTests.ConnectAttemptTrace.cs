@@ -163,6 +163,41 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_TracingTheTcpFilterForPlainHttp_QueriesAlpnAndTracesTheConnectionsIo()
+    {
+        // curl -s -v --trace-config tcp http://127.0.0.1:47195/ (BL-1195 Notes).
+        var events = new CountingTransferEvents();
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), new FakeTcpDialer { DialOutcome = _ => new ScriptedConnection([]) }, new FakeTlsProvider(), new ManualTimeProvider())
+        {
+            TracesTcpFilter = true,
+        };
+
+        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47195, UseTls: false) { Events = events, PoolScheme = "http" }, CancellationToken.None);
+        await result.Connection!.WriteAsync(new byte[79], CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[] { "[TCP] connected on fd=3", "opened", TcpConnector.QueryAlpnLine, "[TCP] send(len=79) -> 0, 79" },
+            events.Calls.Skip(5).ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(null)]
+    [DataRow("ftp")]
+    public async Task ConnectAsync_TracingTheTcpFilterForAnotherScheme_LeavesTheConnectionUntraced(string? poolScheme)
+    {
+        var events = new CountingTransferEvents();
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), new FakeTcpDialer { DialOutcome = _ => new ScriptedConnection([]) }, new FakeTlsProvider(), new ManualTimeProvider())
+        {
+            TracesTcpFilter = true,
+        };
+
+        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47195, UseTls: false) { Events = events, PoolScheme = poolScheme }, CancellationToken.None);
+        await result.Connection!.WriteAsync(new byte[79], CancellationToken.None);
+
+        Assert.AreEqual("opened", events.Calls[^1]);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_TracingOnlyTheTcpFilter_WritesNoHappyEyeballsLine()
     {
         // curl -s -v --trace-config tcp http://127.0.0.1:48761/ (BL-1161 Notes).
