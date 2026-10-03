@@ -79,6 +79,10 @@ internal sealed class SmtpMailTransaction(
         {
             result = TransferResult.Failure(CurlExitCode.TooLarge, SmtpSessionMessages.ReplyLineTooLarge);
         }
+        catch (SmtpSendFailedException failure)
+        {
+            result = TransferResult.Failure(CurlExitCode.SendError, failure.Message);
+        }
 
         return result with
         {

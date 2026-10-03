@@ -89,40 +89,34 @@ internal sealed class SmtpControlChannel(
     public void SwitchTo(IConnection secured) => connection = secured;
 
     /// <summary>
-    /// Sends <paramref name="command" /> followed by CRLF. A connection that fails with an
-    /// <see cref="IOException" /> is left for the next <see cref="ReadReplyAsync()" /> to find
-    /// closed.
+    /// Sends <paramref name="command" /> followed by CRLF.
     /// </summary>
     /// <param name="command">The command line without its line end, such as <c>EHLO x</c>.</param>
     /// <param name="logged">
     /// What the diagnostic log says was sent when <paramref name="command" /> carries a
     /// credential, or <see langword="null" /> to log <paramref name="command" /> itself.
     /// </param>
-    /// <returns>A task that completes once the command is sent or the send has failed.</returns>
+    /// <returns>A task that completes once the command is sent.</returns>
+    /// <exception cref="SmtpSendFailedException">The write failed with an <see cref="IOException" /> (exit 55).</exception>
     public async ValueTask SendAsync(string command, string? logged = null)
     {
         SmtpDiagnosticLogLines.CommandSent(diagnosticLog, logged ?? command);
         byte[] bytes = Encoding.Latin1.GetBytes(command + "\r\n");
-        if (await TryWriteAsync(bytes).ConfigureAwait(false))
-        {
-            reporting.ReportRequestHeader(bytes);
-        }
+        await WriteAsync(bytes).ConfigureAwait(false);
+        reporting.ReportRequestHeader(bytes);
     }
 
     /// <summary>
     /// Sends <paramref name="bytes" /> as they are, such as a piece of the message after
-    /// <c>DATA</c>, reported as data sent. A connection that fails with an
-    /// <see cref="IOException" /> is left for the next <see cref="ReadReplyAsync()" /> to find
-    /// closed.
+    /// <c>DATA</c>, reported as data sent.
     /// </summary>
     /// <param name="bytes">The bytes to send.</param>
-    /// <returns>A task that completes once the bytes are sent or the send has failed.</returns>
+    /// <returns>A task that completes once the bytes are sent.</returns>
+    /// <exception cref="SmtpSendFailedException">The write failed with an <see cref="IOException" /> (exit 55).</exception>
     public async ValueTask SendBytesAsync(ReadOnlyMemory<byte> bytes)
     {
-        if (await TryWriteAsync(bytes).ConfigureAwait(false))
-        {
-            reporting.ReportDataSent(bytes.Span);
-        }
+        await WriteAsync(bytes).ConfigureAwait(false);
+        reporting.ReportDataSent(bytes.Span);
     }
 
     /// <summary>
@@ -185,7 +179,8 @@ internal sealed class SmtpControlChannel(
 
     /// <summary>
     /// Sends <c>QUIT</c> and reads its reply, ignoring whatever it says and a reply line that
-    /// is too long or holds a NUL byte, as curl does once the session is open. Neither is reported, and nothing
+    /// is too long or holds a NUL byte, and a <c>QUIT</c> that cannot be sent, as curl does once
+    /// the session is open. Neither is reported, and nothing
     /// is after them: curl sends <c>QUIT</c> once the transfer is over, where <c>-v</c> does
     /// not see it.
     /// </summary>
@@ -195,10 +190,13 @@ internal sealed class SmtpControlChannel(
         reporting = NoTransferEvents.Instance;
         dumping = null;
         QuitSent = true;
-        await SendAsync("QUIT").ConfigureAwait(false);
         try
         {
+            await SendAsync("QUIT").ConfigureAwait(false);
             await ReadReplyAsync().ConfigureAwait(false);
+        }
+        catch (SmtpSendFailedException)
+        {
         }
         catch (InvalidDataException)
         {
@@ -208,18 +206,17 @@ internal sealed class SmtpControlChannel(
         }
     }
 
-    /// <summary>Writes and flushes <paramref name="bytes" />; <see langword="false" /> when an <see cref="IOException" /> stopped it.</summary>
-    private async ValueTask<bool> TryWriteAsync(ReadOnlyMemory<byte> bytes)
+    /// <summary>Writes and flushes <paramref name="bytes" />, turning an <see cref="IOException" /> into an <see cref="SmtpSendFailedException" />.</summary>
+    private async ValueTask WriteAsync(ReadOnlyMemory<byte> bytes)
     {
         try
         {
             await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-            return true;
         }
-        catch (IOException)
+        catch (IOException failure)
         {
-            return false;
+            throw new SmtpSendFailedException(failure);
         }
     }
 

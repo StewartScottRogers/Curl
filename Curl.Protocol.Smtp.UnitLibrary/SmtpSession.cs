@@ -24,7 +24,8 @@ namespace Curl.Protocol.Smtp;
 /// <c>EHLO</c> again.</item>
 /// <item>The server closing before a reply is complete is exit 56; a reply line of 65536
 /// bytes is exit 100; a reply line holding a NUL byte is exit 8
-/// <c>Nul byte in server response line</c>, the line unreported (BL-1121).</item>
+/// <c>Nul byte in server response line</c>, the line unreported (BL-1121); a command that
+/// cannot be written is exit 55 (<see cref="SmtpSendFailedException" />, BL-1243).</item>
 /// <item>No failure above sends <c>QUIT</c>. Once the session is open, <c>QUIT</c>'s reply is
 /// read and whatever it says is ignored, as curl ignores it.</item>
 /// <item>Given an <see cref="ISaslAuthenticator" />, a session opened with <c>EHLO</c>
@@ -89,6 +90,10 @@ internal sealed class SmtpSession(
         catch (InvalidDataException)
         {
             return TransferResult.Failure(CurlExitCode.TooLarge, SmtpSessionMessages.ReplyLineTooLarge);
+        }
+        catch (SmtpSendFailedException failure)
+        {
+            return TransferResult.Failure(CurlExitCode.SendError, failure.Message);
         }
         catch (SaslAuthenticationFailedException failure)
         {

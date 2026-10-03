@@ -196,6 +196,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     /// <summary>
     /// Writes the lines curl 8.21.0's <c>-v</c> ends an SMTP transfer with (BL-546): a failure's
     /// message, but for <c>Login denied</c>, which curl only makes <c>curl: (67)</c> of (BL-1061),
+    /// and <c>Failed sending data to the peer</c>, which no <c>failf</c> writes (BL-1243),
     /// then <c>shutting down connection #N</c> when <c>QUIT</c> was sent and
     /// <c>closing connection #N</c> when it was not; a success ends with
     /// <c>Connection #N to host H:P left intact</c>. The <c>--trace-config smtp</c> end lines come
@@ -210,13 +211,13 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
             return;
         }
 
-        if (result.ErrorMessage != SmtpSessionMessages.LoginDenied)
+        if (result.ErrorMessage is not (SmtpSessionMessages.LoginDenied or SmtpSessionMessages.SendFailed))
         {
             events.ReportInfo(result.ErrorMessage!);
         }
 
         channel.Trace.Ended(result.ExitCode);
-        events.ReportInfo(channel.QuitSent ?SmtpConnectionInfoLines.ShuttingDown(connectionNumber) : SmtpConnectionInfoLines.Closing(connectionNumber));
+        events.ReportInfo(channel.QuitSent ? SmtpConnectionInfoLines.ShuttingDown(connectionNumber) : SmtpConnectionInfoLines.Closing(connectionNumber));
     }
 
     private async ValueTask<TransferResult> RunSessionAsync(

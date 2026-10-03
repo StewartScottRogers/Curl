@@ -133,7 +133,7 @@ public sealed class SmtpProtocolHandlerEventTests
         await SmtpRun.ExecuteAsync(context, connection);
 
         CollectionAssert.AreEqual(
-            (string[])["< 220 localhost ESMTP\r\n", "* response reading failed (errno: 0)", "* closing connection #0"],
+            (string[])["< 220 localhost ESMTP\r\n", "* closing connection #0"],
             events.Transcript);
     }
 
@@ -154,7 +154,7 @@ public sealed class SmtpProtocolHandlerEventTests
         await SmtpRun.ExecuteAsync(context, connection);
 
         CollectionAssert.AreEqual(
-            (string[])["> DATA\r\n", "< 354 End data with <CR><LF>.<CR><LF>\r\n", "* upload completely sent off: 8 bytes"],
+            (string[])["> DATA\r\n", "< 354 End data with <CR><LF>.<CR><LF>\r\n", "* closing connection #0"],
             events.Transcript.Skip(OpenedSession.Length + 4).Take(3).ToArray());
     }
 

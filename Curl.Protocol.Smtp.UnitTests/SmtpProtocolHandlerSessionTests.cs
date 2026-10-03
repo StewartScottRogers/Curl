@@ -291,14 +291,14 @@ public sealed class SmtpProtocolHandlerSessionTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SendFails_FailsWithExit56WhenNoReplyFollows()
+    public async Task ExecuteAsync_SendFails_FailsWithExit55()
     {
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting)) { WritesBeforeFailure = 0 };
 
         SmtpRun run = await RunAsync(Url, connection);
 
         Assert.AreEqual(string.Empty, run.Sent);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), run.Result);
     }
 
     [TestMethod]
