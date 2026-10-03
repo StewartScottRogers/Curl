@@ -6,7 +6,7 @@ severity: Medium
 status: accepted
 reason: 
 key: performance:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:large-get:high-memory
-task: none
+task: BL-1274
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md

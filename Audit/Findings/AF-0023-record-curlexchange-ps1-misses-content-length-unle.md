@@ -6,7 +6,7 @@ severity: Medium
 status: accepted
 reason: 
 key: conformance:Record-CurlExchange.ps1:Test-RequestComplete:request
-task: none
+task: BL-1279
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md

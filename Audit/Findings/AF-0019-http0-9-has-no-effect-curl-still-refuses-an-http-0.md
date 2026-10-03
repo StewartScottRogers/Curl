@@ -6,7 +6,7 @@ severity: High
 status: accepted
 reason: 
 key: conformance:Curl.Protocol.Http.UnitLibrary/HttpStatusLine.cs:--http0.9:exit-code
-task: none
+task: BL-1275
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md

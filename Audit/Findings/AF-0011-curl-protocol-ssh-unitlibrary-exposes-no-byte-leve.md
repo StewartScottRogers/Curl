@@ -6,7 +6,7 @@ severity: Low
 status: accepted
 reason: 
 key: security:Curl.Protocol.Ssh.UnitLibrary:ssh-parsers:unfuzzable
-task: none
+task: BL-1267
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
