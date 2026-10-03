@@ -3,8 +3,8 @@ id: AF-0018
 title: large-get peak working set is 3.7x curl's, from per-byte allocation in HttpResponseBodyReader.CopyFramedAsync
 auditor: performance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: performance:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:large-get:high-memory
 task: none
 found: 2026-10-02
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Measure-Performance.ps1 -Iterations 20 -
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.
