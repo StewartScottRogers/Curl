@@ -33,3 +33,4 @@ Under `-v --trace-config http/2` an h2c-upgraded transfer writes the `[HTTP/2]` 
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
