@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1315 — Close the MQTT session's two async branch-coverage gaps in ReadPacketAsync and ReadFixedHeaderPingingWhenIdleAsync
 
@@ -25,12 +25,17 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Mqtt.UnitLibrary` (on the MQTT tests' coverage as above) reports 0 failing members.
-- [ ] `dotnet test Curl.Protocol.Mqtt.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Mqtt.UnitLibrary` (on the MQTT tests' coverage as above) reports 0 failing members.
+- [x] `dotnet test Curl.Protocol.Mqtt.UnitTests --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- The `!pingSent && !firstByte.IsCompleted` gap was the `pingSent` true side: no test re-entered the read with a PINGREQ outstanding. `ExecuteAsync_PublishWhilePingRequestOutstanding_SendsNoSecondPingRequest` sends a PUBLISH before the PINGRESP and pins that no second PINGREQ follows.
+- The `state switch` gap was the CONNACK arm's await completing asynchronously: every test had the CONNACK body ready with its header. `ExecuteAsync_ConnackBodyArrivingAfterItsHeader_SubscribesAndWritesPublish` (GatedConnection) delivers the body 50 ms later.
+- No production code changed; measured 0 failing members, MQTT 100% line and branch.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. MQTT session's ping-outstanding and late-CONNACK branches are covered; the library measures 0 failing members

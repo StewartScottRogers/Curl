@@ -225,6 +225,27 @@ public sealed class MqttProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ConnackBodyArrivingAfterItsHeader_SubscribesAndWritesPublish()
+    {
+        GatedConnection connection = new();
+        RecordingStream output = new();
+        connection.Send(Bytes("20 02"));
+        Task<TransferResult> transfer = new MqttProtocolHandler(FakeConnector.For(connection), () => FixedSuffix)
+            .ExecuteAsync(Context("mqtt://h/t", output)).AsTask();
+
+        await Task.Delay(50);
+        connection.Send(Bytes("00 00"));
+        connection.Send(Suback);
+        connection.Send(Publish("t", "HELLO"));
+        connection.Send(Disconnect);
+        TransferResult result = await transfer;
+
+        Assert.AreEqual(TransferResult.Success(8), result);
+        CollectionAssert.AreEqual(Concat(MeasuredConnect, Bytes("82 06 00 01 00 01 74 00")), connection.Written);
+        CollectionAssert.AreEqual(Publish("t", "HELLO")[2..], output.ToArray());
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TopicAndPayloadOver127Bytes_UseTwoByteRemainingLength()
     {
         string topic = new('t', 200);
