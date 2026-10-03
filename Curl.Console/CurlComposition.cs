@@ -1051,7 +1051,7 @@ internal static class CurlComposition
             defaultConfigFileSearch: DefaultConfigFileSearch.ForProcess,
             readEnvironmentVariable: name => Environment.GetEnvironmentVariable(name),
             terminalRendersStyles: terminalRendersStyles,
-            accountHomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            accountHomeDirectory: AccountHomeDirectory.ForProcess,
             runConnectionCache: runConnections,
             tlsSessions: tlsSessions,
             extendedAttributeWriter: NativeExtendedAttributeWriter.ForCurrentPlatform(),

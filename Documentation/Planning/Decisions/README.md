@@ -411,6 +411,7 @@ choices do not need one.
 | [0399](ADR-0399-rc4-swaps-and-reads-its-permutation-by-masked-scan-and-is-constant-time.md) | `Rc4` swaps and reads its permutation at the key-dependent index by one masked scan of all 256 entries, so no address depends on the key, and it is constant-time (BL-1272, AF-0016) | Accepted | 2026-10-02 |
 | [0400](ADR-0400-blowfish-reads-its-s-boxes-by-masked-scan-and-is-constant-time.md) | `Blowfish`'s F function reads all four S-boxes by one vectorised masked scan, so no address depends on the key, passphrase or data, and `Blowfish` and `BcryptPbkdf` are constant-time (BL-1273, AF-0017) | Accepted | 2026-10-02 |
 | [0401](ADR-0401-max-time-timer-lines-and-the-response-wait-timer-lines-are-written.md) | `--trace-config timer` writes `-m`'s `[TIMER] [TIMEOUT]` lines beside the connect timeout's, the nearest named in `gives`, and the response wait's timer lines after `Request completely sent off` (among the `[MULTI]` poll lines under `multi`), from the configured delays (BL-1258) | Accepted | 2026-10-02 |
+| [0402](ADR-0402-native-curl-exe-links-com-through-api-sets-and-skips-the-account-home-on-windows.md) | The native `curl.exe` links the runtime's COM calls through `mincore.lib` (the `api-ms-win-core-com` API sets) instead of `ole32.lib`, and skips the account home lookup on Windows, so a plain GET loads no `ole32`, `user32`, `gdi32` or `imm32` (BL-1290) | Accepted | 2026-10-02 |
 
 ## Template
 
