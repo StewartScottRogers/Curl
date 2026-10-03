@@ -50,7 +50,9 @@ such an early end start the next request; `upgrade` ends a request with `Upgrade
 headers too. `SwsHttpServerConnection` carries out the rest (ADR-0042): each reply goes out in
 writes of up to 20 bytes (`SwsServerSend`), each readable when sws would write it, with
 `writedelay: N` ms after each and `<postcmd>` `wait N` seconds (`SwsPostReplyCommands`) after
-the last, timed on the `TimeProvider` given to the connector; `idle` answers nothing, and a read
+the last, timed on the `TimeProvider` given to the connector (a wait that wakes more than a
+second late, as after a stall on a busy runner, waits 250 ms more so curl's own overdue timers,
+such as `-m`, fire first; BL-1321); `idle` answers nothing, and a read
 then waits until cancelled; `stream` answers with `a string to stream 01234567890\n` without end
 and reads nothing more; `connection-monitor` records `[DISCONNECT]\n` in `ReceivedBytes`
 (`SwsServerRecording`, one flag for the server as in sws) when a connection that carried a
