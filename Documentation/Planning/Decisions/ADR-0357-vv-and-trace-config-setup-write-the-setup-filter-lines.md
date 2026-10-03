@@ -357,3 +357,33 @@ listing (BL-1259 Notes).
   `[TCP-1] send(len=<n>) -> 0, <n>`.
 - `ftps://` and `--ssl`/`--ssl-reqd` transfers write none of these lines, as the reads below TLS
   are records, not FTP's reads; they wait for the TLS record layer's task, like `https://`.
+
+## Amendment, 2026-10-03 (BL-1260): `[TCP]` I/O of an `https://` connection's TLS records
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) under
+`-s -v -k --trace-config tcp https://127.0.0.1:P/` (BL-1253 Notes): after `ALPN: curl offers
+http/1.1`, `send(len=429)`, `recv(len=4096) -> 81, 0`, `recv(len=4096) -> 0, 1175`, `send(len=158)`,
+`recv(len=4096) -> 0, 51`; then `send(len=108)` before the `>` lines and `recv(len=103424) -> 81, 0`,
+`recv(len=103424) -> 0, 72` before the `<` lines; no `[TCP] query ALPN`.
+
+- `TcpConnector.TlsRecordTraceFor` wraps a direct connection to an `https` origin (`PoolScheme`
+  `https`, no `Proxy`, not a forward proxy) dialled under `TracesTcpFilter` in `TcpIoTraceConnection`
+  before the TLS handshake, so the provider's record reads and writes are written. Its lines start as
+  `HttpsHandshakeLines` (`recv(len=4096)`) and change to `HttpsApplicationDataLines`
+  (`recv(len=103424)`) once the handshake succeeds; a read that cannot complete at once is first
+  written as `-> 81, 0`, as for plain HTTP. No `[TCP] query ALPN` is written: TLS answers that query.
+- What matches curl exactly: the order of the lines beside the TLS info lines and the `>`/`<` lines,
+  the `send` lines' form, the receive lengths, and the would-block lines when the server has not
+  answered yet. The receive lengths 4096 and 103424 are Schannel's buffers, pinned as constants
+  whatever buffer `SslStream` or the hand-built TLS client passes, since they say how curl reads, not
+  how many bytes arrive.
+- What cannot match byte for byte: the record sizes (`send(len=429)`, `1175`, `158`, `108`, ...) are
+  whatever the TLS stack in use writes and the server sends - `SslStream` (Schannel or OpenSSL
+  underneath) or `Curl.Tls` - so a different ClientHello, key share or session ticket gives other
+  numbers, and a stack that reads a record in two reads writes two `recv` lines. The handshake's
+  `adjust_pollset, !active, POLLIN fd=N` lines are poll rounds of curl's event loop with a socket
+  number Curl does not have; they are not written.
+- The OpenSSL build's lines on Linux and macOS were not reachable from the lane; Curl writes the
+  Schannel build's receive lengths on every platform until they are measured.
+- Through a proxy or a tunnel the TCP filter sits below the proxy's filter and the target's records
+  ride inside it; those connections keep writing no record lines.
