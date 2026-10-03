@@ -31,3 +31,4 @@ completed:
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Blocked. Waiting on PR #53 (audit branch) CI; an interactive session merges it and completes this task. Parked so the next shift can start.
