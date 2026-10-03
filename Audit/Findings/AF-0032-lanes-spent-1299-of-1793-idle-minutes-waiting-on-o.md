@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: yes | The tool gives laneIdleMinutes=2110 and waitOverlapMinutes=1544, not 1793 and 1299. The defect (overlap waits at about 40% of lane time) persists with different numbers.
+
 ## Log
 
 - 2026-10-03: filed proposed.

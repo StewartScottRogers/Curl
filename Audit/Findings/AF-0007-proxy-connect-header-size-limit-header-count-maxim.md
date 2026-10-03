@@ -40,6 +40,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: yes | Same red baseline, no mutants run. HttpProxyTunnel.cs:170 still reads 'if (header.Count > MaximumHeaderBytes)'. A fix is not shown.
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | Networking run, seed 0: no mutant sampled at HttpProxyTunnel.cs:170 (code unchanged); not shown surviving by the reproduction, unverified.
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: no | Seed-0 run did not sample the site. Hand-mutated HttpProxyTunnel.cs:170 to >= in a scratch copy: ReadReplyAsync_WhenALineEndsTheHeaderBlockAt307200Bytes_KeepsReading failed, so the mutant is killed.
 
 ## Log
 

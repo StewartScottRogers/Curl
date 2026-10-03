@@ -3,15 +3,15 @@ id: AF-0003
 title: BL-564 was claimed 3 times: lanes 1, 4 and 6, with two conflict-resolve runs
 auditor: process
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-09-30.
+status: closed
+reason: Re-audit 2026-10-03_1459.md: the reproduction no longer reproduces.
 key: process:BL-564:BL-564:redone-work
 task: BL-1069
 found: 2026-09-30
 found-at: d065d6d3507e2ed87905d40a24233af193913378
 scorecard: 2026-09-30_1754.md
-closed:
-closed-by:
+closed: 2026-10-03
+closed-by: 2026-10-03_1459.md
 ---
 # AF-0003 - BL-564 was claimed 3 times: lanes 1, 4 and 6, with two conflict-resolve runs
 
@@ -41,8 +41,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 - 2026-10-02 | 2026-10-02_1400.md | reproduces: no | Ran the measure tool and the Select-String. BL-564 is not among the 244 tasks and ..\logs has no BL-564-* files, so Select-String finds nothing.
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction. The log folder holds 271 files, all from 2026-10-02 onward, and none are BL-564 logs. Select-String over BL-564-*.jsonl matched nothing. This is missing log data, not proof of a fix. The tool now reports tasksClaimedMoreThanOnce=5 (BL-1223, BL-1274, BL-1289, BL-1288, BL-1259), none of them BL-564.
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | The log folder holds only the 2026-10-03 shift. The tool output has no BL-564 task and the Select-String over ..\logs\BL-564-*.jsonl matched no files. Not reproducible on this log set.
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: no | The tool ran. BL-564 is not in the log folder; its tasks list holds only 2026-10-03 tasks and Select-String finds no BL-564 files.
 
 ## Log
 
 - 2026-09-30: filed proposed.
 - 2026-09-30: proposed -> accepted. Stewart accepted it on 2026-09-30 (log written 2026-10-02, BL-1183).
+- 2026-10-03: accepted -> closed. Re-audit 2026-10-03_1459.md: the reproduction no longer reproduces.

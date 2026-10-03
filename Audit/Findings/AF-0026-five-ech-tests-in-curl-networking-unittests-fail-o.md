@@ -39,6 +39,7 @@ dotnet test Curl.Networking.UnitTests -c Release -nologo
 ## Re-audits
 
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | dotnet test Curl.Networking.UnitTests -c Release: Passed 2973, Failed 0, Skipped 31.
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: no | dotnet test Curl.Networking.UnitTests -c Release: Failed 0, Passed 2974, Skipped 30.
 
 ## Log
 

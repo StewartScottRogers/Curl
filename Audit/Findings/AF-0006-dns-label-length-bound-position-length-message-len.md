@@ -40,6 +40,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: yes | The Networking mutation run stopped on a red baseline (5 failing ECH tests) and ran no mutants, so killing the mutant is not shown. DnsAnswerDecoder.cs:319 still reads 'if (position + length > message.Length)'.
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | Networking run, seed 0: no mutant sampled at DnsAnswerDecoder.cs:319 (code unchanged there); the only survivors are CertificateRevocationListFile.cs:116, TcpPendingConnection.cs:86, TlsFailureMessages.cs:320. Not shown surviving by the reproduction; the site was not sampled so this is unverified.
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: no | Seed-0 run did not sample the site. Hand-mutated DnsAnswerDecoder.cs:319 to >= in a scratch copy: Decode_ACnameLabelEndingExactlyAtTheMessageEnd_IsReadAndThenFailsWithOutOfRange failed, so the mutant is killed.
 
 ## Log
 

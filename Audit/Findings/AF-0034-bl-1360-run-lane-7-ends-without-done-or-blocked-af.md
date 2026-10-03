@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: yes | Partly. BL-1325 is blocked at 120.57 min, as the finding says. BL-1360 is now reported as blocked at 120.25 min (timeout), not as ending without DONE or BLOCKED after 87 min. BL-1374 and BL-1335 show outcome open (50.78 and 49.43 min) in the later shift's still-running logs.
+
 ## Log
 
 - 2026-10-03: filed proposed.
