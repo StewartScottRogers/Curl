@@ -98,7 +98,7 @@ internal sealed class TelnetOutbox(ITransferEvents events)
 
     /// <summary>curl's socket filter's <c>Send failure: &lt;text&gt;</c>.</summary>
     private static string DescribeSendFailure(SocketException failure) =>
-        "Send failure: " + TelnetSocketErrorText.Current(failure);
+        "Send failure: " + CurlSocketErrorText.Words(failure, OperatingSystem.IsWindows());
 
     /// <summary>
     /// One queued step: exactly one of a line, a run of data or a write, a write with the

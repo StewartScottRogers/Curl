@@ -25,8 +25,8 @@ public sealed class SocketFailingConnection(params byte[][] reads) : IConnection
     /// <summary>Gets a value indicating whether the read after the scripted ones never completes.</summary>
     public bool StaysOpen { get; init; }
 
-    /// <summary>Gets the socket error inside every failed write's <see cref="IOException" />.</summary>
-    public SocketException Failure { get; } = new((int)SocketError.ConnectionAborted);
+    /// <summary>Gets the socket error inside every failed write's <see cref="IOException" />; <see cref="SocketError.ConnectionAborted" /> unless set.</summary>
+    public SocketException Failure { get; init; } = new((int)SocketError.ConnectionAborted);
 
     /// <summary>Gets every write attempted, in order, the failed ones included.</summary>
     public List<byte[]> Writes { get; } = [];

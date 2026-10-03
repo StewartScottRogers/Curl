@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Telnet.Fakes;
@@ -80,7 +81,7 @@ public sealed class TelnetProtocolHandlerSendFailureTests
     {
         var connection = new SocketFailingConnection(Hex("FF FD 1F"), Latin1("hi")) { SuccessfulWrites = 1 };
         string failed = $"* Sending data failed ({connection.Failure.NativeErrorCode})";
-        string sendFailure = "* Send failure: " + TelnetSocketErrorText.Current(connection.Failure);
+        string sendFailure = "* Send failure: " + CurlSocketErrorText.Words(connection.Failure, OperatingSystem.IsWindows());
 
         Session session = await RunAsync(connection, ["WS=80x24"]);
 
@@ -106,23 +107,64 @@ public sealed class TelnetProtocolHandlerSendFailureTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_UploadWriteFailsWithSocketError_StillExitsWith55SendFailure()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_UploadWriteIsAbortedOnWindows_ExitsWith55WithTheSchannelBuildsSendFailure()
     {
         var connection = new SocketFailingConnection { SuccessfulWrites = 0, StaysOpen = true };
 
         Session session = await RunAsync(connection, [], "a\n"u8.ToArray());
 
-        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Send failure: Connection was reset"), session.Result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Send failure: Connection was aborted"), session.Result);
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ReplyWriteFailsWithoutSocketError_StillExitsWith55SendFailure()
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_UploadWriteIsAbortedOffWindows_ExitsWith55WithStrerrorsSendFailure()
+    {
+        var connection = new SocketFailingConnection { SuccessfulWrites = 0, StaysOpen = true };
+
+        Session session = await RunAsync(connection, [], "a\n"u8.ToArray());
+
+        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Send failure: " + connection.Failure.Message), session.Result);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_WindowSizeWriteIsNetworkResetOnWindows_ReportsNetworkHasBeenResetBesideTheSendingDataFailedLine()
+    {
+        var connection = new SocketFailingConnection(Hex("FF FD 1F"), Latin1("hi"))
+        {
+            SuccessfulWrites = 1,
+            Failure = new SocketException((int)SocketError.NetworkReset),
+        };
+
+        Session session = await RunAsync(connection, ["WS=80x24"]);
+
+        Assert.AreEqual("* Sending data failed (10052)", session.Transcript[5]);
+        Assert.AreEqual("* Send failure: Network has been reset", session.Transcript[6]);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_WindowSizeWriteIsNetworkResetOffWindows_ReportsStrerrorsWordsBesideTheSendingDataFailedLine()
+    {
+        var failure = new SocketException((int)SocketError.NetworkReset);
+        var connection = new SocketFailingConnection(Hex("FF FD 1F"), Latin1("hi")) { SuccessfulWrites = 1, Failure = failure };
+
+        Session session = await RunAsync(connection, ["WS=80x24"]);
+
+        Assert.AreEqual($"* Sending data failed ({failure.NativeErrorCode})", session.Transcript[5]);
+        Assert.AreEqual("* Send failure: " + failure.Message, session.Transcript[6]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReplyWriteFailsWithoutSocketError_ExitsWith55FailedSendingDataToThePeer()
     {
         var connection = new FaultingConnection(Greeting) { WritesFail = true };
 
         Session session = await RunAsync(connection, []);
 
-        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 5, "Send failure: Connection was reset"), session.Result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 5, "Failed sending data to the peer"), session.Result);
         Assert.AreEqual("* SENT WONT TERM TYPE", session.Transcript[1]);
     }
 
