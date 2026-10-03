@@ -78,3 +78,4 @@ correct count of 2.
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Stewart: BL-1289 was claimed 2 times, not 6 (lane logs, git, task log); the miscount is in the audit office's Measure-FactoryProcess.ps1, which only an interactive session may fix - have one count claims from lane-log claim lines and re-read AF-0028?
+- 2026-10-03: Blocked -> Deferred. Its finding AF-0028 was closed by the reliable process re-audit of 2026-10-03 14:59 (it no longer reproduces), and the miscount it found in Measure-FactoryProcess.ps1 is covered by BL-1366; nothing left to do here. Look again only if AF-0028 reappears.
