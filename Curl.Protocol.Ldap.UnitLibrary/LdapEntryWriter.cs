@@ -16,7 +16,11 @@ namespace Curl.Protocol.Ldap;
 /// exit 23 <c>Failure writing output to destination, passed N returned M</c>: <c>N</c> the
 /// size of the piece it failed on, <c>M</c> the bytes of it the output accepted, as
 /// <see cref="OutputWriteFailedException.BytesAccepted" /> says, and 0 for any other
-/// <see cref="IOException" /> (measured by BL-845).
+/// <see cref="IOException" /> (measured by BL-845). A <see cref="ITransferContext.MaxFileSize" />
+/// above 0 ends it too, as curl 8.21.0's download writer (<c>cw_download_write</c> in
+/// <c>lib/sendf.c</c>) does: the piece that crosses the limit is written cut to the bytes left,
+/// and the writing fails with exit 63 <c>Exceeded the maximum allowed file size (N) with N bytes</c>,
+/// also reported as an info line; output exactly at the limit is no failure (BL-1329).
 /// </remarks>
 /// <param name="dialect">The build to answer as.</param>
 /// <param name="context">The transfer, whose output and progress are written to.</param>
@@ -31,12 +35,12 @@ internal sealed class LdapEntryWriter(LdapDialect dialect, ITransferContext cont
     /// <summary>Gets how many entries have been added, written or held.</summary>
     public int EntryCount { get; private set; }
 
-    /// <summary>Gets the exit 23 failure the output ended the writing with; <see langword="null" /> while it accepts every byte.</summary>
+    /// <summary>Gets the failure that ended the writing - exit 23 from the output or exit 63 from the size limit; <see langword="null" /> while every byte is written.</summary>
     public TransferResult? WriteFailure { get; private set; }
 
     /// <summary>Writes <paramref name="entry" />, or holds it for the Windows build.</summary>
     /// <param name="entry">The entry that arrived.</param>
-    /// <returns><see langword="false" /> when the output failed and <see cref="WriteFailure" /> says how.</returns>
+    /// <returns><see langword="false" /> when the writing failed and <see cref="WriteFailure" /> says how.</returns>
     public ValueTask<bool> AddAsync(LdapSearchEntry entry)
     {
         IReadOnlyList<byte[]> pieces = LdapEntryFormatter.FormatPieces(dialect, entry);
@@ -51,30 +55,43 @@ internal sealed class LdapEntryWriter(LdapDialect dialect, ITransferContext cont
     }
 
     /// <summary>Writes the entries the Windows build held, once its search has succeeded.</summary>
-    /// <returns><see langword="false" /> when the output failed and <see cref="WriteFailure" /> says how.</returns>
+    /// <returns><see langword="false" /> when the writing failed and <see cref="WriteFailure" /> says how.</returns>
     public ValueTask<bool> WriteHeldAsync() => WriteAsync(held);
 
     private async ValueTask<bool> WriteAsync(IReadOnlyList<byte[]> pieces)
     {
+        long limit = context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue;
         foreach (byte[] piece in pieces.Where(piece => piece.Length > 0))
         {
             context.Events.ReportDataReceived(piece);
+            int allowed = (int)Math.Min(piece.Length, limit - BytesWritten);
             try
             {
-                await context.Output.WriteAsync(piece, context.CancellationToken).ConfigureAwait(false);
+                await context.Output.WriteAsync(piece.AsMemory(0, allowed), context.CancellationToken).ConfigureAwait(false);
             }
             catch (IOException exception)
             {
-                WriteFailure = TransferResult.Failure(CurlExitCode.WriteError, OutputWriteFailed(piece.Length, BytesAcceptedBy(exception)));
+                WriteFailure = TransferResult.Failure(CurlExitCode.WriteError, OutputWriteFailed(allowed, BytesAcceptedBy(exception)));
                 return false;
             }
 
-            BytesWritten += piece.Length;
+            BytesWritten += allowed;
             context.Progress.ReportDownloaded(BytesWritten, null);
+            if (allowed < piece.Length)
+            {
+                string message = MaxFileSizeExceeded(limit, BytesWritten);
+                context.Events.ReportInfo(message);
+                WriteFailure = TransferResult.Failure(CurlExitCode.FilesizeExceeded, message);
+                return false;
+            }
         }
 
         return true;
     }
+
+    /// <summary>curl's exit 63 message for a download cut at <paramref name="limit" /> after <paramref name="written" /> bytes.</summary>
+    private static string MaxFileSizeExceeded(long limit, long written) =>
+        string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({limit}) with {written} bytes");
 
     /// <summary>curl's exit 23 message for a write of <paramref name="passed" /> bytes of which the output took <paramref name="returned" />.</summary>
     private static string OutputWriteFailed(int passed, int returned) =>

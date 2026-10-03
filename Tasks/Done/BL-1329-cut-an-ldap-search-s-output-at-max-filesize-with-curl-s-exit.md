@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ldap.UnitLibrary, Curl.Protocol.Ldap.UnitTests]
 requirement: FR-084
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1329 — Cut an LDAP search's output at --max-filesize with curl's exit 63 'Exceeded the maximum allowed file size' text
 
@@ -25,15 +25,21 @@ An `ldap://` / `ldaps://` search honours `ITransferContext.MaxFileSize` as curl 
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Ldap.UnitTests` runs a search returning one entry whose formatted output is longer than 10 bytes, with `MaxFileSize = 10`, and asserts exit 63 (`CurlExitCode.FilesizeExceeded`), message `Exceeded the maximum allowed file size (10) with 10 bytes`, exactly the first 10 bytes of the unlimited output written, and that message reported as an info line.
-- [ ] The test runs for both `LdapDialect` values (the Windows build and the OpenLDAP build), since they write at different times.
-- [ ] A test with two entries and a limit inside the second asserts the first entry is written whole.
-- [ ] Tests pin that `MaxFileSize` of 0, `null`, and exactly the output's length complete with exit 0 and the whole output.
-- [ ] `dotnet build Curl.Protocol.Ldap.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Ldap.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ldap.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Ldap.UnitTests` runs a search returning one entry whose formatted output is longer than 10 bytes, with `MaxFileSize = 10`, and asserts exit 63 (`CurlExitCode.FilesizeExceeded`), message `Exceeded the maximum allowed file size (10) with 10 bytes`, exactly the first 10 bytes of the unlimited output written, and that message reported as an info line.
+- [x] The test runs for both `LdapDialect` values (the Windows build and the OpenLDAP build), since they write at different times.
+- [x] A test with two entries and a limit inside the second asserts the first entry is written whole.
+- [x] Tests pin that `MaxFileSize` of 0, `null`, and exactly the output's length complete with exit 0 and the whole output.
+- [x] `dotnet build Curl.Protocol.Ldap.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Ldap.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ldap.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Delivered directly (one method, the TFTP precedent's shape) rather than the full `/protocol` stages: `LdapEntryWriter.WriteAsync` now cuts the crossing piece to the bytes left under `MaxFileSize`, reports the exit 63 text as an info line and sets `WriteFailure`, which `LdapSearch` already handles by abandoning (OpenLDAP) and unbinding - the same "nothing more is written" path as exit 23. Exactly at the limit is no failure; 0 and `null` mean no limit.
+- The `{ [N bytes data]` line still reports the whole piece, as TFTP's `WriteBlockAsync` does.
+- The `ITransferContext.MaxFileSize` remark still lists `ldap` as not reading it; `Curl.Protocol.Abstractions.UnitLibrary` was held by BL-1325, so BL-1335 was filed to correct it.
+- Tests: `LdapProtocolHandlerTests.MaxFileSize.cs` (10 cases). Ldap tests 538 passed; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ldap.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10. The first measure run stopped on a failing test elsewhere in its test set that did not reproduce on the rerun.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. An LDAP search cuts its output at --max-filesize and fails with exit 63 on both builds
