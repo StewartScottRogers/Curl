@@ -8,7 +8,7 @@ depends-on: [BL-1336, BL-1345]
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1350 — Cancel an SMTP SASL exchange whose mechanism gives a CancelReason, writing it as a -v line first
 
@@ -24,13 +24,17 @@ When `ISaslExchange.RespondAsync` returns `null` with `ISaslExchange.CancelReaso
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Smtp.UnitTests` uses a fake exchange whose `RespondAsync` returns `null` with `CancelReason` `GSSAPI handshake failure (empty security message)` and asserts the reason is reported as an info line, then `*` is sent, and authentication goes on as after an undecodable challenge.
-- [ ] A test pins that a `null` response with no `CancelReason` still ends with exit 67 and no `*`.
-- [ ] `dotnet build Curl.Protocol.Smtp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Smtp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Smtp.UnitTests` uses a fake exchange whose `RespondAsync` returns `null` with `CancelReason` `GSSAPI handshake failure (empty security message)` and asserts the reason is reported as an info line, then `*` is sent, and authentication goes on as after an undecodable challenge.
+- [x] A test pins that a `null` response with no `CancelReason` still ends with exit 67 and no `*`.
+- [x] `dotnet build Curl.Protocol.Smtp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Smtp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- `SmtpSaslAuthentication.AnswerAsync` now hands a `null` answer to `CancelOrRefuseAsync`: with a `CancelReason` it reports the reason via `ITransferEvents.ReportInfo` and goes to the existing `CancelAsync` (`*`, read any reply, next mechanism); without one it stays `Refused` (exit 67). No new decision beyond the contract BL-1335 already set, so no ADR.
+- Tests in `SmtpProtocolHandlerSaslCancelTests`; `RankedSaslAuthenticator` gained an init-only `CancelReason`. Smtp tests: 316 passed, 7 skipped (off-Windows only); Measure-CodeQuality: 0 failing members.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. SMTP writes an exchange's CancelReason as a -v line, cancels with * and tries the next mechanism; no reason still exits 67

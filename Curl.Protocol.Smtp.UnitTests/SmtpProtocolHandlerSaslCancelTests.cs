@@ -192,11 +192,42 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
         Assert.HasCount(1, sasl.Choices);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_ExchangeGivesACancelReason_WritesItThenCancelsAndTriesTheNextMechanism()
+    {
+        // curl 8.21.0 lib/curl_sasl.c 789-793: CURLE_BAD_CONTENT_ENCODING from a step means infof, cancelauth, next mechanism.
+        const string Reason = "GSSAPI handshake failure (empty security message)";
+        var sasl = new RankedSaslAuthenticator(("GSSAPI", "token"u8.ToArray(), []), Plain) { CancelReason = Reason };
+        var events = new RecordingTransferEvents();
+
+        SmtpRun run = await RunAsync(Offering("GSSAPI PLAIN") + "334 \r\n334 \r\n" + Cancelled + "334 \r\n235 ok\r\n" + HelpReplyAndBye, sasl, events);
+
+        Assert.AreEqual(Ehlo + "AUTH GSSAPI\r\ndG9rZW4=\r\n*\r\nAUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
+        CollectionAssert.AreEqual(new[] { "PLAIN" }, sasl.Offers[1]);
+        int reasonAt = events.Transcript.IndexOf("* " + Reason);
+        Assert.IsGreaterThanOrEqualTo(0, reasonAt);
+        Assert.StartsWith("> *", events.Transcript[reasonAt + 1]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ExchangeCannotAnswerWithoutACancelReason_FailsWithLoginDeniedAndSendsNoCancel()
+    {
+        var sasl = new RankedSaslAuthenticator(("GSSAPI", "token"u8.ToArray(), []), Plain);
+        var events = new RecordingTransferEvents();
+
+        SmtpRun run = await RunAsync(Offering("GSSAPI PLAIN") + "334 \r\n334 \r\n" + Cancelled + HelpReplyAndBye, sasl, events);
+
+        Assert.AreEqual(Ehlo + "AUTH GSSAPI\r\ndG9rZW4=\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
+        Assert.IsFalse(events.Info.Any(line => line.StartsWith("GSSAPI", StringComparison.Ordinal)));
+    }
+
     private static string Offering(string mechanisms) => Greeting + "250-localhost\r\n250 AUTH " + mechanisms + "\r\n";
 
-    private static Task<SmtpRun> RunAsync(string replies, ISaslAuthenticator sasl) =>
+    private static Task<SmtpRun> RunAsync(string replies, ISaslAuthenticator sasl, ITransferEvents? events = null) =>
         SmtpRun.ExecuteAsync(
-            new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Credentials = new NetworkCredential("u", "p") },
+            new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Credentials = new NetworkCredential("u", "p"), Events = events ?? NoTransferEvents.Instance },
             new ScriptedConnection(Encoding.Latin1.GetBytes(replies)),
             sasl);
 }

@@ -21,13 +21,16 @@ namespace Curl.Protocol.Smtp;
 /// <c>334</c>. An empty message is sent as <c>=</c>.</item>
 /// <item>Each <c>334</c> is answered; <c>235</c> once a message has been sent is success.
 /// Anything else, <c>235</c> before any message, or a challenge the exchange cannot answer
-/// is exit 67 <c>Login denied</c> with nothing more sent.</item>
+/// and gives no cancel reason for is exit 67 <c>Login denied</c> with nothing more sent.</item>
 /// <item>A <c>334</c> whose text is not base64 (empty text or text starting <c>=</c> is an
 /// empty challenge) is handed over empty to a mechanism that ignores it. A mechanism that
 /// reads it - every GSSAPI challenge, the first one a CRAM-MD5, DIGEST-MD5 or NTLM exchange
 /// answers - is cancelled with <c>*</c>: the reply is read whatever it is, the mechanism is
 /// dropped from the offered ones and the authenticator chooses again. None left is exit 67
 /// <c>Authentication cancelled</c> (BL-774).</item>
+/// <item>An exchange that cannot answer a challenge but gives a
+/// <see cref="ISaslExchange.CancelReason" /> has the reason written as a <c>-v</c> info line
+/// and is cancelled with <c>*</c> the same way (BL-1350).</item>
 /// </list>
 /// </remarks>
 internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAuthenticator authenticator, ITransferContext context)
@@ -381,7 +384,7 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
 
         if (response is null)
         {
-            return ExchangeOutcome.Refused;
+            return await CancelOrRefuseAsync(exchange).ConfigureAwait(false);
         }
 
         await channel.SendAsync(Encode(response), SmtpDiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
@@ -399,6 +402,24 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
 
         initialResponseAsked = true;
         return await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ends an exchange that could not answer a challenge: with a
+    /// <see cref="ISaslExchange.CancelReason" />, writes it as a <c>-v</c> info line and cancels
+    /// with <c>*</c>, as curl 8.21.0 does for a mechanism step returning
+    /// <c>CURLE_BAD_CONTENT_ENCODING</c> (<c>lib/curl_sasl.c</c> lines 789-793, BL-1350);
+    /// without one, refuses it with nothing more sent.
+    /// </summary>
+    private async ValueTask<ExchangeOutcome> CancelOrRefuseAsync(ISaslExchange exchange)
+    {
+        if (exchange.CancelReason is not { } reason)
+        {
+            return ExchangeOutcome.Refused;
+        }
+
+        context.Events.ReportInfo(reason);
+        return await CancelAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -424,7 +445,7 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
         /// <summary>The server refused, or the exchange could not answer a challenge.</summary>
         Refused,
 
-        /// <summary>The exchange was cancelled with <c>*</c> over a challenge that was not base64.</summary>
+        /// <summary>The exchange was cancelled with <c>*</c> over a challenge that was not base64, or one it gave a cancel reason for.</summary>
         Cancelled,
     }
 }
