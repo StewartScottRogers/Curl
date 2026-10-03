@@ -244,3 +244,20 @@ Schannel) and `Record-CurlExchange.ps1 -Script` playing a plain HTTP proxy (BL-1
   wrapped them, so tracing never loses them.
 - Not written: through an HTTPS proxy (its TLS filter's lines are unmeasured, BL-1255), and the
   sequence of a second CONNECT after a `407` is unmeasured: each CONNECT writes the same lines.
+
+## Amendment, 2026-10-02 (BL-1246): `[SOCKS] query ALPN`
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and
+`Record-CurlExchange.ps1 -Script` playing a SOCKS5h proxy (BL-1246 Notes).
+
+- The ALPN query is answered by the connection's topmost filter, and only that filter writes the
+  line. Through a SOCKS proxy (or a `--preproxy` in front of a forward HTTP proxy) to a plain
+  `http://` target that is the SOCKS filter: `TcpConnector.SocksQueryAlpnLine`, `[SOCKS] query ALPN`,
+  after `Established connection` and before `using HTTP/1.x`, under `TracesSocksFilter` (`socks`,
+  `proxy`, a named `all`). It replaces `[TCP] query ALPN`: under `socks` and `tcp` together only the
+  `[SOCKS]` line is written, and under `network`, `-vvvv` or plain `-v` no `query ALPN` line at all.
+- Written once per new connection; a reused connection writes no second line (measured).
+- Not written over TLS: for an `https://` target the TLS filter sits above the SOCKS filter and
+  answers. The scripted proxy cannot finish a TLS handshake, so this follows from the filter order
+  and from the `network` measurement (only the topmost filter writes the line), not from a recording.
+  Through a CONNECT tunnel behind a pre-proxy the `[H1-PROXY]` filter answers, as before.

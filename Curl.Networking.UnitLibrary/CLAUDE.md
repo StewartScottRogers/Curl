@@ -423,7 +423,7 @@ writes `[SETUP] added SOCKS filter to H:P` first. Per BL-1186
 Per ADR-0357's BL-1195 amendment a plain HTTP connection (`PoolScheme` `http`) dialled under
 `TracesTcpFilter` is wrapped in `TcpIoTraceConnection`, which writes `[TCP] send(len=N) -> 0, N` after
 each write and `[TCP] recv(len=102400) -> 0, N` after each read, `-> 81, 0` first when the read does
-not complete at once, and `TcpConnector` writes `QueryAlpnLine` after the setup filters' removal.
+not complete at once, and `TcpConnector` writes `QueryAlpnLine` after the setup filters' removal. Per its BL-1246 amendment a plain HTTP connection whose topmost filter is SOCKS (a SOCKS `Proxy`, or the pre-proxy of a forward proxy) writes `SocksQueryAlpnLine` there instead, under `TracesSocksFilter` only, and no `[TCP]` one.
 Per ADR-0357's BL-1192 amendment `TcpConnector.TracesHttpsConnectFilter` puts
 `HttpsConnectFilterTraceEvents` between the `[SETUP]` and `[DNS]` events of a direct connect to an
 `https://` origin, writing curl's `[HTTPS-CONNECT]` lines (`added`, `connect, init`, the

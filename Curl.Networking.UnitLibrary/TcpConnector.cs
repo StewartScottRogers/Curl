@@ -333,6 +333,13 @@ public sealed partial class TcpConnector(
     public const string QueryAlpnLine = "[TCP] query ALPN";
 
     /// <summary>
+    /// The line curl 8.21.0's SOCKS filter writes, under <see cref="TracesSocksFilter" />, as a new
+    /// plain HTTP connection through a SOCKS proxy or pre-proxy is asked its ALPN protocol, after
+    /// <c>Established connection</c> and before <c>using HTTP/1.x</c> (BL-1246 Notes).
+    /// </summary>
+    public const string SocksQueryAlpnLine = "[SOCKS] query ALPN";
+
+    /// <summary>
     /// Gets the events a resolver built once per run reports to, such as the
     /// <see cref="DohDnsResolver" />'s <c>--trace-config doh</c> lines: before each look-up the
     /// connector points them at the resolving transfer's events (BL-1102); <see langword="null" />
@@ -1675,23 +1682,43 @@ public sealed partial class TcpConnector(
         var opened = WithSetupFiltersRemoved(
             Opened(dialed, target.Events, connection, timings, proxyConnectResponseCode, peerCertificates: null, applicationProtocol: null),
             dialed, target.Events);
-        WriteQueryAlpnLine(dialed, target.Events, tracesIo);
+        WriteQueryAlpnLine(dialed, target, tracesIo);
         return opened;
     }
 
-    // Through a plain HTTP proxy's tunnel the ALPN query is the [H1-PROXY] filter's, never [TCP]'s
-    // (measured, BL-1193 Notes).
-    private static void WriteQueryAlpnLine(DialedSocket dialed, ITransferEvents events, bool tracesIo)
+    // The topmost filter answers the ALPN query: through a plain HTTP proxy's tunnel the [H1-PROXY]
+    // filter, through a SOCKS proxy or pre-proxy the [SOCKS] filter, never [TCP], so under network
+    // alone a SOCKS connection writes none (measured, BL-1193 and BL-1246 Notes).
+    private void WriteQueryAlpnLine(DialedSocket dialed, ConnectTarget target, bool tracesIo)
     {
         if (dialed.TunnelTrace is { } tunnelTrace)
         {
-            tunnelTrace.ReportAlpnQueried(events);
+            tunnelTrace.ReportAlpnQueried(target.Events);
+        }
+        else if (IsThroughSocks(target))
+        {
+            WriteSocksQueryAlpnLine(target);
         }
         else if (tracesIo)
         {
-            events.ReportInfo(QueryAlpnLine);
+            target.Events.ReportInfo(QueryAlpnLine);
         }
     }
+
+    // Only a new plain HTTP connection is asked; a reused one writes no second line (measured,
+    // BL-1246 Notes).
+    private void WriteSocksQueryAlpnLine(ConnectTarget target)
+    {
+        if (TracesSocksFilter && target.PoolScheme == "http")
+        {
+            target.Events.ReportInfo(SocksQueryAlpnLine);
+        }
+    }
+
+    // Whether the SOCKS filter is the connection's topmost: the target's own SOCKS proxy, or the
+    // pre-proxy in front of a forward HTTP proxy. Through a CONNECT tunnel the proxy's filter is above it.
+    private bool IsThroughSocks(ConnectTarget target) =>
+        TunnelProxyOf(target)?.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a or ProxyKind.Socks5 or ProxyKind.Socks5Hostname;
     // curl 8.21.0 writes the PROXY line after any tunnel and before TLS, from the socket's own ends
     // (BL-616), its setup filter first reporting that it added the HAPROXY filter (BL-1160 Notes).
     private async ValueTask WriteHaproxyLineAsync(HaproxyProtocolHeader header, DialedSocket dialed, ITransferEvents events, CancellationToken cancellationToken)
