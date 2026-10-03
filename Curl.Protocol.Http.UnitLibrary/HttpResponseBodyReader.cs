@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Http;
@@ -355,6 +356,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// with exit 23 and the chunked message, as curl 8.21.0 reports them inside chunks
     /// (measured, BL-365 Notes); every other failure keeps its own message.
     /// </summary>
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
     private async ValueTask WriteChunkDataAsync(Stream output, ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
     {
         try
@@ -382,6 +384,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     private static HttpTransferException WriteFailed(int passed, int returned) =>
         new(CurlExitCode.WriteError, HttpTransferMessages.OutputWriteFailed(passed, returned));
 
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     private async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         try
@@ -408,6 +411,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// Writes <paramref name="bytes" />, or as many as <see cref="MaximumBodySize" /> allows and
     /// then fails with exit 63.
     /// </summary>
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     private async ValueTask<int> WriteAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
     {
         if (bytes.Length > RoomLeft)
@@ -421,6 +425,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         return await WriteWithinLimitAsync(output, bytes, cancellationToken).ConfigureAwait(false);
     }
 
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     private async ValueTask<int> WriteWithinLimitAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
     {
         if (bytes.IsEmpty)

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -147,6 +148,7 @@ internal sealed class StandardOutputFailureDeferringStream(Stream inner) : Strea
     /// since; its <see cref="OutputWriteFailedException.BytesAccepted" /> is the room the
     /// stdio buffer had left for this write.
     /// </exception>
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
         if (!HasWriteFailed)
