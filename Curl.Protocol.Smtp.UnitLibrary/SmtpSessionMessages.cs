@@ -44,7 +44,10 @@ internal static class SmtpSessionMessages
     /// </summary>
     internal const string AuthenticationCancelled = "Authentication cancelled";
 
-    /// <summary>The reply to the end of the message was not 250 (exit 8, BL-542).</summary>
+    /// <summary>
+    /// The reply to the end of the message was not 250 (exit 8, BL-542); <c>-v</c> writes no
+    /// line for it and leaves the connection intact (BL-1297).
+    /// </summary>
     internal const string WeirdServerReply = "Weird server reply";
 
     /// <summary>

@@ -199,19 +199,21 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     /// and <c>Failed sending data to the peer</c>, which no <c>failf</c> writes (BL-1243),
     /// then <c>shutting down connection #N</c> when <c>QUIT</c> was sent and
     /// <c>closing connection #N</c> when it was not; a success ends with
-    /// <c>Connection #N to host H:P left intact</c>. The <c>--trace-config smtp</c> end lines come
+    /// <c>Connection #N to host H:P left intact</c>, and so does a message refused after
+    /// <c>DATA</c> (<c>Weird server reply</c>), which curl fails with no <c>failf</c> and whose
+    /// connection it keeps (measured, BL-1297). The <c>--trace-config smtp</c> end lines come
     /// just before the connection's line, after the failure's message (measured, BL-1163).
     /// </summary>
     private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, SmtpControlChannel channel, ConnectTarget target, long connectionNumber)
     {
-        if (result.ExitCode == CurlExitCode.Ok)
+        if (LeavesConnectionIntact(result))
         {
             channel.Trace.Ended(result.ExitCode);
             events.ReportInfo(SmtpConnectionInfoLines.LeftIntact(connectionNumber, target.Host, target.Port));
             return;
         }
 
-        if (result.ErrorMessage is not (SmtpSessionMessages.LoginDenied or SmtpSessionMessages.SendFailed))
+        if (WritesFailureLine(result))
         {
             events.ReportInfo(result.ErrorMessage!);
         }
@@ -219,6 +221,20 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
         channel.Trace.Ended(result.ExitCode);
         events.ReportInfo(channel.QuitSent ? SmtpConnectionInfoLines.ShuttingDown(connectionNumber) : SmtpConnectionInfoLines.Closing(connectionNumber));
     }
+
+    /// <summary>
+    /// True for a success and for a message refused after <c>DATA</c>, whose connection curl
+    /// 8.21.0 keeps (BL-1297).
+    /// </summary>
+    private static bool LeavesConnectionIntact(TransferResult result)
+        => result.ExitCode == CurlExitCode.Ok || result.ErrorMessage == SmtpSessionMessages.WeirdServerReply;
+
+    /// <summary>
+    /// False for <c>Login denied</c> and <c>Failed sending data to the peer</c>, which curl
+    /// writes no <c>-v</c> line for (BL-1061, BL-1243).
+    /// </summary>
+    private static bool WritesFailureLine(TransferResult result)
+        => result.ErrorMessage is not (SmtpSessionMessages.LoginDenied or SmtpSessionMessages.SendFailed);
 
     private async ValueTask<TransferResult> RunSessionAsync(
         SmtpControlChannel channel, ITransferContext context, string domain, bool implicitTls, ConnectionOpenedEvent? opened)

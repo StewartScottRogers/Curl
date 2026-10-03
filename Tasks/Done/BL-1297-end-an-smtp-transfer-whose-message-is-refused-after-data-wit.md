@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1297 — End an SMTP transfer whose message is refused after DATA with curl's -v lines
 
@@ -32,13 +32,14 @@ When the server answers the end of an SMTP message with anything but 250, Curl's
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Smtp.UnitTests` drives the measured exchange through the fake connection and asserts exit 8 (`CurlExitCode.WeirdServerReply`), message `Weird server reply`, info lines ending `upload completely sent off: 7 bytes` then `Connection #0 to host 127.0.0.1:<port> left intact` with no `Weird server reply` line, and `QUIT` sent.
-- [ ] A test pins that a 552 to `MAIL FROM` still ends with exit 55, the `MAIL failed: 552` line and the connection line it ends with today (measured identical to curl on 2026-10-02), so only the end-of-data reply changes.
-- [ ] A test pins that a reply with a NUL byte after the message still ends with its own message line, as today.
-- [ ] `dotnet build Curl.Protocol.Smtp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Smtp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Smtp.UnitTests` drives the measured exchange through the fake connection and asserts exit 8 (`CurlExitCode.WeirdServerReply`), message `Weird server reply`, info lines ending `upload completely sent off: 7 bytes` then `Connection #0 to host 127.0.0.1:<port> left intact` with no `Weird server reply` line, and `QUIT` sent.
+- [x] A test pins that a 552 to `MAIL FROM` still ends with exit 55, the `MAIL failed: 552` line and the connection line it ends with today (measured identical to curl on 2026-10-02), so only the end-of-data reply changes.
+- [x] A test pins that a reply with a NUL byte after the message still ends with its own message line, as today.
+- [x] `dotnet build Curl.Protocol.Smtp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Smtp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` reports no failing member.
 
 ## Notes
 - 2026-10-03, interactive session: timed out after 120 min because `Measure-CodeQuality.ps1 -Library` ran the whole solution's ~25k tests with coverage (40-58 min a run on nine lanes) and other lanes killed runs machine-wide; both fixed (BL-1318). Criteria 1-3 were written and green (312/312), but Measure reported 1 failing member in Curl.Protocol.Smtp.UnitLibrary that was never identified. Restore, run `Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary`, read the failing-member table, and cover that member. The work is in the shared stash `41dabaabc70e62a26754d4afd66a1961be406cca` (never pop a stash; lanes share them). Restore it with `git checkout 41dabaabc70e62a26754d4afd66a1961be406cca -- Curl.Protocol.Smtp.UnitLibrary/SmtpProtocolHandler.cs Curl.Protocol.Smtp.UnitLibrary/SmtpSessionMessages.cs Curl.Protocol.Smtp.UnitTests/SmtpProtocolHandlerEventTests.cs Curl.Protocol.Smtp.UnitTests/SmtpProtocolHandlerStateTraceTests.cs` and continue from there.
+- 2026-10-03, lane 5: restored the stashed work; the failing member was `SmtpProtocolHandler.ReportConnectionEnd` at complexity 12 (Measure's limit 10). Extracted `LeavesConnectionIntact` and `WritesFailureLine`; Measure now reports 0 failing members, 100% line and branch, worst CRAP 10. SMTP tests 312/312.
 
 ## Log
 
@@ -47,3 +48,4 @@ When the server answers the end of an SMTP message with anything but 250, Curl's
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1297-20261002-211047-L1.jsonl
 - 2026-10-03: Blocked -> Backlog. Requeued: the timeout was Measure-CodeQuality running the whole solution (fixed in BL-1318); Notes say how to restore the stashed work
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. An SMTP message refused after DATA ends -v with curl's 'Connection #0 ... left intact' and no Weird server reply line, exit 8

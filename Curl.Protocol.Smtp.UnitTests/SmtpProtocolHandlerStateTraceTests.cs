@@ -196,11 +196,10 @@ public sealed class SmtpProtocolHandlerStateTraceTests
             (string[])[
                 "* [SMTP] state change from STOP to POSTDATA",
                 "< 554 no\r\n",
-                "* Weird server reply",
                 "* [SMTP] smtp_done(status=0, premature=0) -> 8",
-                "* shutting down connection #0",
+                "* Connection #0 to host 127.0.0.1:18025 left intact",
             ],
-            events.Transcript.TakeLast(5).ToArray());
+            events.Transcript.TakeLast(4).ToArray());
     }
 
     [TestMethod]
