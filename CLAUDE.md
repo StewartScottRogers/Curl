@@ -142,7 +142,7 @@ Every session, lanes included, whispers milestones to Stewart through the PostTo
 `.claude/hooks/whisper-milestone.ps1`: a task moved to Done, a CI failure filed, a commit
 made, a branch deleted - quietly, in Windows' Zira voice, one phrase at a time. The same
 script, run by `task-board.ps1`, whispers the Backlog's depth ("Backlog depth, 63.") a minute
-after a move takes a task out of `Backlog`, once per burst of moves (BL-1182).
+after a move takes a task out of `Backlog`, once per burst of moves (BL-1182). All of it is silent while `%LOCALAPPDATA%\Curl\audio-off` exists (BL-1317); while it does, Claude also starts shifts with `-QuietAlarm`, so alarms and notices stay on screen.
 ## Audit office
 An independent team of AI auditors audits the dark factory and the code it produced, from
 outside the factory's reach (ADR-0267; `Audit/README.md` maps the folder). Six read-only
