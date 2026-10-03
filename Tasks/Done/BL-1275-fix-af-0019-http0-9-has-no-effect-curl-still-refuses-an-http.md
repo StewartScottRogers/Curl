@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Console]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1275 — Fix AF-0019: --http0.9 has no effect: Curl still refuses an HTTP/0.9 reply with exit 1 where curl prints it and exits 0
 
@@ -41,12 +41,34 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Touches widened (2026-10-02): the flag had to travel from the command line to the
+  handler, so `Curl.Protocol.Abstractions.UnitLibrary` (`HttpRequestOptions.AllowHttp09Reply`),
+  `Curl.Console` (`HttpRequestOptionsMapping` copies it) and `Curl.Protocol.Http.UnitTests`
+  were added. No task in Doing on `origin/work/dark-factory` named any of them.
+  `Curl.Console.UnitTests` (held by BL-1254) was deliberately left alone.
+- Measured curl 8.21.0 (mingw, Schannel) with `Record-CurlExchange.ps1`:
+  `--http0.9 -sS -v -i -w "[%{http_code} %{http_version} %{size_header} %{size_download} %{num_headers}]"`
+  against `just text` wrote `just text[000 0 0 9 0]`, exit 0; `-v` showed no `<` line and
+  no "Received HTTP/0.9" info line. A multi-line reply with a later `HTTP/1.1 200 OK`
+  line was written whole as body.
+- Design: `HttpResponseHeadReader.AcceptsHttp09` (HTTP/1.x only) reads until the first
+  bytes cannot begin `HTTP/` (`HttpLineReader.BeginsOtherThanHttpAsync`, so a long line-less
+  body never meets the 100 KiB line limit), then gives a head with
+  `HttpStatusLine.Http09()` - version 0.9, status 0 - no headers, no head bytes, and every
+  byte read as the body prefix. Version 0.9 is never persistent, so the body runs to close
+  and the connection is not reused. `%{http_version}` already writes `0` for it.
+- Candidate after the fix: the finding's reproduction gives `exit 0, stdout [just text],
+  stderr []`, and the `-i -w` case above gives the same `just text[000 0 0 9 0]` as curl.
+- `dotnet format --verify-no-changes` still reports one whitespace issue in
+  `Curl.Protocol.Ldap.UnitLibrary/LdapSearch.cs:53`; it predates this task and is outside it.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. --http0.9 accepts an HTTP/0.9 reply: body written whole, exit 0, http_code 000, as curl 8.21.0
