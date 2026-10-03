@@ -38,3 +38,4 @@ Split methods to at most 10 and cover the missing branches with tests; never rai
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
