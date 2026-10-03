@@ -81,7 +81,7 @@ public sealed class CommandLineRefusal
     /// <see langword="true"/> for the refusals curl 8.21.0 meets while setting up the transfers,
     /// after it has read the whole command line and printed
     /// <see cref="CommandLineParseResult.NotedDefaultConfigFile"/>'s note:
-    /// <see cref="NoUrlSpecified"/> and <see cref="FormAndDataBoth"/>. <see langword="false"/> for
+    /// <see cref="NoUrlSpecified"/>, <see cref="FormAndDataBoth"/> and <see cref="ContinueAtWithBody"/>. <see langword="false"/> for
     /// every other refusal, which curl meets while reading the command line and prints before the
     /// note (measured 2026-09-27, BL-352).
     /// </summary>
@@ -297,6 +297,31 @@ public sealed class CommandLineRefusal
         ArgumentNullException.ThrowIfNull(warningLines);
 
         return new(CurlExitCode.FailedInit, [], warningLines, foundAtTransferSetup: true);
+    }
+
+    /// <summary>
+    /// Refuses a byte offset from <c>-C</c>/<c>--continue-at</c> beside a request body, found at transfer
+    /// setup (<see cref="FoundAtTransferSetup"/>): <c>curl: cannot mix --continue-at with &lt;bodyOption&gt;</c>
+    /// and <c>curl: (2) Failed initialization</c>, with no <see cref="TryHelpLine"/>; it exits 2.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-10-02 (BL-1276, audit finding AF-0020):
+    /// <c>-C 10 -d x URL</c>, <c>--data-binary</c>, <c>--data-urlencode</c> and <c>--json</c> name
+    /// <c>--data</c>, <c>-C 10 -F a=b URL</c> names <c>--form</c>, in either order and without connecting;
+    /// <c>-s</c> without <c>-S</c> hides both lines; <c>-C 0</c>, <c>-C -</c> and <c>-G</c> are accepted.
+    /// </remarks>
+    /// <param name="bodyOption">The long option of the body, <c>--data</c> or <c>--form</c>, dashes included.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> was read.</param>
+    /// <returns>A refusal of two lines, or none when <paramref name="errorsHidden"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="bodyOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal ContinueAtWithBody(string bodyOption, bool errorsHidden)
+    {
+        ArgumentNullException.ThrowIfNull(bodyOption);
+
+        IReadOnlyList<string> lines = errorsHidden
+            ? []
+            : ["curl: cannot mix --continue-at with " + bodyOption, "curl: (2) Failed initialization"];
+        return new(CurlExitCode.FailedInit, [], lines, foundAtTransferSetup: true);
     }
 
     /// <summary>Refuses a command line that has arguments but names no URL.</summary>

@@ -24,7 +24,8 @@ namespace Curl.Cli;
 /// injected <see cref="IDataFileReader"/>: the file it names, or standard input for <c>@-</c>.
 /// A <c>-F</c> / <c>--form</c> value is read into form parts by <see cref="MultipartFormField"/>,
 /// and a command line that asks for a form and a <c>-d</c> body both is refused once read, with
-/// <see cref="CommandLineRefusal.FormAndDataBoth"/>.
+/// <see cref="CommandLineRefusal.FormAndDataBoth"/>, as is a <c>-C</c> byte offset beside either, with
+/// <see cref="CommandLineRefusal.ContinueAtWithBody"/>.
 /// A <c>-K</c> / <c>--config</c> file is read through the same reader and its lines applied in
 /// place of the option (see <see cref="ConfigFileApplier"/>). Only the overload taking a
 /// <see cref="DefaultConfigFileSearch"/> reads the default config file (<c>.curlrc</c>) first; the others
@@ -204,8 +205,9 @@ public static class CommandLineParser
 
     /// <summary>
     /// Checks each option group once the command line is all read, as curl 8.21.0 does while setting
-    /// up that group's transfers: a group is refused when it names no URL, or when it asks for a
-    /// multipart form post and a <c>-d</c> body both. A refused first group refuses the command line;
+    /// up that group's transfers: a group is refused when it names no URL, when it asks for a
+    /// multipart form post and a <c>-d</c> body both, or when it pairs a <c>-C</c> byte offset with either.
+    /// A refused first group refuses the command line;
     /// a later one is accepted with the groups before it and <see cref="CommandLineParseResult.RefusalAfterGroups"/>,
     /// as curl runs those groups first (measured 2026-09-28, BL-508 Notes).
     /// </summary>
@@ -237,8 +239,28 @@ public static class CommandLineParser
             return CommandLineRefusal.NoUrlSpecified();
         }
 
-        return group.HttpMethodSelected == SelectedHttpMethod.MultipartFormPost && group.PostData is not null
-            ? RefuseFormAndDataBoth(group)
+        bool formPost = group.HttpMethodSelected == SelectedHttpMethod.MultipartFormPost;
+        if (formPost && group.PostData is not null)
+        {
+            return RefuseFormAndDataBoth(group);
+        }
+
+        return group.ResumeFrom > 0 ? ContinueAtWithBodyRefusal(group, formPost) : null;
+    }
+
+    /// <summary>
+    /// Refuses a <c>-C</c> byte offset beside a <c>-F</c> form or a <c>-d</c> body sent as a POST, as
+    /// curl 8.21.0 does; <see langword="null"/> when there is neither, or <c>-G</c> sends the body as the query.
+    /// </summary>
+    private static CommandLineRefusal? ContinueAtWithBodyRefusal(CommandLineOptions group, bool formPost)
+    {
+        if (formPost)
+        {
+            return CommandLineRefusal.ContinueAtWithBody("--form", group.ErrorsHidden);
+        }
+
+        return group.PostData is not null && !group.DataInQuery
+            ? CommandLineRefusal.ContinueAtWithBody("--data", group.ErrorsHidden)
             : null;
     }
 
