@@ -32,3 +32,4 @@ Under `--trace-config read` a `-L` hop after a request with a body writes curl 8
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
