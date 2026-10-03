@@ -44,3 +44,4 @@ An `rtsp://` request carries `Range: <text>` for `-r <text>`, and `Range: <offse
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-03: Backlog -> Doing.
