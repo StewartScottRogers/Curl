@@ -8,7 +8,7 @@ depends-on: [BL-1299]
 touches: [Curl.Zstandard.UnitLibrary, Curl.Zstandard.UnitTests]
 requirement: FR-073
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1300 — Give no output from a zstd Decompress call that fails, as libzstd's ZSTD_decompressStream does
 
@@ -28,15 +28,20 @@ A `ZstandardDecoder.Decompress` call that returns `OperationStatus.InvalidData` 
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Zstandard.UnitTests` feed each measured frame to `Decompress` in one call with a 16384-byte destination and assert `InvalidData`, `bytesWritten == 0`, `bytesConsumed == 0`, and `LastError` `ChecksumWrong` and `CorruptionDetected` respectively.
-- [ ] A test feeds a two-block frame whose checksum is wrong with the first block in one call and the rest in a second: the first call reports its block's bytes and `NeedMoreData`, the second reports 0 written and `InvalidData`, pinning that only the failing call's output is withheld.
-- [ ] A test with a destination smaller than the frame pins that calls returning `DestinationTooSmall` before the failing call keep their counts.
-- [ ] The `ZstandardDecoder.Decompress` doc comment states the rule and cites `ZSTD_decompressStream`.
-- [ ] `dotnet build Curl.Zstandard.UnitTests -warnaserror` is clean; `dotnet test Curl.Zstandard.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Zstandard.UnitLibrary` reports no failing member.
+- [x] Tests in `Curl.Zstandard.UnitTests` feed each measured frame to `Decompress` in one call with a 16384-byte destination and assert `InvalidData`, `bytesWritten == 0`, `bytesConsumed == 0`, and `LastError` `ChecksumWrong` and `CorruptionDetected` respectively.
+- [x] A test feeds a two-block frame whose checksum is wrong with the first block in one call and the rest in a second: the first call reports its block's bytes and `NeedMoreData`, the second reports 0 written and `InvalidData`, pinning that only the failing call's output is withheld.
+- [x] A test with a destination smaller than the frame pins that calls returning `DestinationTooSmall` before the failing call keep their counts.
+- [x] The `ZstandardDecoder.Decompress` doc comment states the rule and cites `ZSTD_decompressStream`.
+- [x] `dotnet build Curl.Zstandard.UnitTests -warnaserror` is clean; `dotnet test Curl.Zstandard.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Zstandard.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Plan: `Decompress` reports `bytesConsumed` and `bytesWritten` of 0 whenever it returns `InvalidData`; every earlier call keeps its counts. No caller change: `HttpContentCodingDecoder.DecodeZstandard` writes only what the call reports, and `TryDecompress` accumulates only reported bytes.
+- The existing test `Decompress_FirstByteCannotBeginAMagic_FailsAtOnceWithPrefixUnknown` expected 1 consumed; it now pins 0, as `ZSTD_decompressStream` leaves `input->pos` unmoved on an error.
+- Verified: Curl.Zstandard.UnitTests 276 passed; Curl.Protocol.Http.UnitTests 1759 passed (the only production caller); `dotnet build` clean; Measure-CodeQuality on Curl.Zstandard.UnitLibrary 100% line, 100% branch, 0 failing members (coverage from the Zstandard tests alone, `-SkipTestRun`: the whole-solution run exceeded 50 minutes in Curl.Protocol.Ssh.UnitTests and its MSBuild nodes then died, with no test failing up to that point).
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. A failing zstd Decompress call reports nothing consumed or written, so curl writes none of its output, as libzstd does

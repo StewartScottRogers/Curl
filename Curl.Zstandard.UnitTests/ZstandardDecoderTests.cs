@@ -190,8 +190,61 @@ public sealed class ZstandardDecoderTests
         var status = decoder.Decompress([0x78], new byte[16], out var consumed, out _);
 
         Assert.AreEqual(OperationStatus.InvalidData, status);
-        Assert.AreEqual(1, consumed);
+        Assert.AreEqual(0, consumed);
         Assert.AreEqual(ZstandardDecodeError.PrefixUnknown, decoder.LastError);
+    }
+
+    [TestMethod]
+    [DataRow("28B52FFD24021100006F6B00000000", ZstandardDecodeError.ChecksumWrong)]
+    [DataRow("28B52FFD20031100006F6B", ZstandardDecodeError.CorruptionDetected)]
+    public void Decompress_MeasuredFrameThatFailsInOneCall_ReportsNothingConsumedOrWritten(string frameHex, ZstandardDecodeError expected)
+    {
+        var decoder = new ZstandardDecoder();
+
+        var status = decoder.Decompress(Convert.FromHexString(frameHex), new byte[16384], out var consumed, out var written);
+
+        Assert.AreEqual(OperationStatus.InvalidData, status);
+        Assert.AreEqual(0, written);
+        Assert.AreEqual(0, consumed);
+        Assert.AreEqual(expected, decoder.LastError);
+    }
+
+    [TestMethod]
+    public void Decompress_WrongChecksumAfterAnEarlierCall_WithholdsOnlyTheFailingCallsOutput()
+    {
+        var firstCall = Concatenate(FrameHeader(0x04, OneKibibyteWindow), RawBlock(false, Ascii("Hello, ")));
+        var secondCall = Concatenate(RawBlock(true, Ascii("world")), [0, 0, 0, 0]);
+        var decoder = new ZstandardDecoder();
+        var destination = new byte[16384];
+
+        var firstStatus = decoder.Decompress(firstCall, destination, out var firstConsumed, out var firstWritten);
+        var secondStatus = decoder.Decompress(secondCall, destination.AsSpan(firstWritten), out var secondConsumed, out var secondWritten);
+
+        Assert.AreEqual(OperationStatus.NeedMoreData, firstStatus);
+        Assert.AreEqual(firstCall.Length, firstConsumed);
+        CollectionAssert.AreEqual(Ascii("Hello, "), destination[..firstWritten]);
+        Assert.AreEqual(OperationStatus.InvalidData, secondStatus);
+        Assert.AreEqual(0, secondConsumed);
+        Assert.AreEqual(0, secondWritten);
+        Assert.AreEqual(ZstandardDecodeError.ChecksumWrong, decoder.LastError);
+    }
+
+    [TestMethod]
+    public void Decompress_DestinationSmallerThanAFrameWithAWrongChecksum_KeepsTheCountsOfCallsBeforeTheFailure()
+    {
+        var decoder = new ZstandardDecoder();
+        ReadOnlySpan<byte> source = Convert.FromHexString("28B52FFD24021100006F6B00000000");
+
+        var firstStatus = decoder.Decompress(source, new byte[1], out var firstConsumed, out var firstWritten);
+        var secondStatus = decoder.Decompress(source[firstConsumed..], new byte[1], out var secondConsumed, out var secondWritten);
+
+        Assert.AreEqual(OperationStatus.DestinationTooSmall, firstStatus);
+        Assert.AreEqual(10, firstConsumed);
+        Assert.AreEqual(1, firstWritten);
+        Assert.AreEqual(OperationStatus.InvalidData, secondStatus);
+        Assert.AreEqual(0, secondConsumed);
+        Assert.AreEqual(0, secondWritten);
+        Assert.AreEqual(ZstandardDecodeError.ChecksumWrong, decoder.LastError);
     }
 
     [TestMethod]

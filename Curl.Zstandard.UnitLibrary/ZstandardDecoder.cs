@@ -168,6 +168,14 @@ public sealed class ZstandardDecoder
     /// with <see cref="LastError" /> saying why, for anything RFC 8878 forbids, after which
     /// every call fails the same way.
     /// </returns>
+    /// <remarks>
+    /// A call that returns <see cref="OperationStatus.InvalidData" /> reports
+    /// <paramref name="bytesConsumed" /> and <paramref name="bytesWritten" /> of 0, whatever it
+    /// decoded into <paramref name="destination" /> before it found the error, as libzstd's
+    /// <c>ZSTD_decompressStream</c> leaves <c>input-&gt;pos</c> and <c>output-&gt;pos</c>
+    /// unmoved on an error; so curl writes none of a failing call's output. Earlier calls keep
+    /// the counts they reported.
+    /// </remarks>
     public OperationStatus Decompress(ReadOnlySpan<byte> source, Span<byte> destination, out int bytesConsumed, out int bytesWritten)
     {
         var buffers = new DecodeBuffers(source, destination);
@@ -178,8 +186,9 @@ public sealed class ZstandardDecoder
         }
         while (status is null);
 
-        bytesConsumed = buffers.Consumed;
-        bytesWritten = buffers.Written;
+        var failed = status == OperationStatus.InvalidData;
+        bytesConsumed = failed ? 0 : buffers.Consumed;
+        bytesWritten = failed ? 0 : buffers.Written;
         return status.Value;
     }
 
