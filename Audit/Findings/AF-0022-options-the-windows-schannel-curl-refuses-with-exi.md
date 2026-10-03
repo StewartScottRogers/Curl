@@ -3,8 +3,8 @@ id: AF-0022
 title: Options the Windows Schannel curl refuses with exit 2 (--http2, --http2-prior-knowledge, --http3, --http3-only, --tlsuser, --tlspassword, --tlsauthtype, --ssl-sessions) are accepted by Curl
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:build-feature-options:refused-option
 task: none
 found: 2026-10-02
@@ -41,3 +41,4 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.
