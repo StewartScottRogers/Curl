@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1262 — Fix AF-0006: DNS label length bound `position + length > message.Length` can become >= with no test failing
 
@@ -41,12 +41,23 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The production check was right; only a test was missing. Added
+  `DnsAnswerDecoderTests.Decode_ACnameLabelEndingExactlyAtTheMessageEnd_IsReadAndThenFailsWithOutOfRange`:
+  a CNAME whose one-byte label `a` ends on the message's last byte. With `>` the label is read and
+  the next length byte is past the end (`OutOfRange`); with the mutant `>=` it is `BadLabel`.
+- `touches` widened to `Curl.Networking.UnitTests`, where the test lives; no task in Doing on
+  `origin/work/dark-factory` names it.
+- The reproduction script lives under `Audit/`, which a factory lane may not read, so the mutant
+  was applied by hand instead: with `>=` at `DnsAnswerDecoder.cs:319` the new test fails (1 of 40),
+  with `>` all 40 pass. The re-audit by the quality auditor confirms it with the script itself.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. A test pins the DNS label bound at the message end; the >= mutant at DnsAnswerDecoder.cs:319 is killed
