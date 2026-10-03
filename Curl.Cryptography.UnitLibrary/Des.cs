@@ -13,8 +13,9 @@ namespace Curl.Cryptography;
 /// <c>0101010101010101</c>) could not be computed with it (ADR-0156).
 /// </summary>
 /// <remarks>
-/// Not constant-time: the S-boxes are indexed by key-dependent values, as in every table
-/// implementation of DES. The 16 round keys live in the instance and are zeroed by
+/// Constant-time in the key and the data: the round function reads every entry of each
+/// S-box in order and keeps the one it needs by mask, so no memory address depends on a
+/// key-mixed value (ADR-0396, superseding ADR-0156's table look-up). The 16 round keys live in the instance and are zeroed by
 /// <see cref="Dispose" />.
 /// </remarks>
 public sealed class Des : IDisposable
@@ -165,12 +166,32 @@ public sealed class Des : IDisposable
         for (int box = 0; box < 8; box++)
         {
             int six = (int)(mixed >> (42 - (6 * box))) & 0x3F;
-            int row = ((six >> 4) & 0x2) | (six & 0x1);
-            int column = (six >> 1) & 0xF;
-            substituted = (substituted << 4) | SubstitutionBoxes[(box * 64) + (row * 16) + column];
+            substituted = (substituted << 4) | SubstituteSix(six, SubstitutionBoxes.AsSpan(box * 64, 64));
         }
 
         return (uint)Permute(substituted, 32, RoundPermutation);
+    }
+
+    /// <summary>
+    /// The six bits <paramref name="six" /> through one 64-entry S-box, without a
+    /// secret-dependent address (ADR-0396): every entry is read, in order, once, and kept
+    /// only where the six bits that select it equal <paramref name="six" />, chosen by a mask
+    /// computed without a branch.
+    /// </summary>
+    internal static uint SubstituteSix(int six, ReadOnlySpan<byte> box)
+    {
+        uint result = 0;
+        for (int position = 0; position < 64; position++)
+        {
+            // The row is the outer two bits of the six, the column the inner four.
+            int row = ((position >> 4) & 0x2) | (position & 0x1);
+            int column = (position >> 1) & 0xF;
+            // (six ^ position) - 1 is negative exactly when the two are equal; the shift spreads its sign.
+            uint mask = (uint)(((six ^ position) - 1) >> 31);
+            result |= mask & box[(row * 16) + column];
+        }
+
+        return result;
     }
 
     private void TransformBlock(ReadOnlySpan<byte> source, Span<byte> destination, bool decrypt)

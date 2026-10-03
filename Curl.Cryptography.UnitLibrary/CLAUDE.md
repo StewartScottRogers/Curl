@@ -132,7 +132,7 @@ Namespace `Curl.Cryptography`. It holds:
 - `Des` (public, `IDisposable`): FIPS 46-3 DES, an 8-byte key whose parity bits are
   ignored and every weak key accepted (the BCL's `DES` refuses them; ADR-0156) -
   `EncryptBlock` and `DecryptBlock`, plus the internal round function `Round`. NTLM's
-  `LMOWFv1` and `DESL` use it. Not constant-time.
+  `LMOWFv1` and `DESL` use it. Constant-time (ADR-0396).
 - `Cast128SubstitutionBoxes` (internal): RFC 2144 Appendix A's S1 to S4 (`RoundBoxes`)
   and S5 to S8 (`KeyScheduleBoxes`).
 - `Cast128` (public, `IDisposable`): RFC 2144, keys of 5 to 16 bytes (12 rounds up to 10
@@ -270,8 +270,8 @@ Namespace `Curl.Cryptography`. It holds:
   secret: select and swap with masks (`ConstantTime`), fixed-width limbs, never `/`, `%`
   or `BigInteger` on a secret. Compare tags and MACs with
   `CryptographicOperations.FixedTimeEquals`. Each public type says in its XML docs
-  whether it is constant-time; Blowfish, CAST-128, RC4 and DES (ADR-0156) are not,
-  by design, and say so. Camellia (ADR-0393) and ARIA (ADR-0395) read their S-boxes by
+  whether it is constant-time; Blowfish, CAST-128 and RC4 are not,
+  by design, and say so. Camellia (ADR-0393), ARIA (ADR-0395) and DES (ADR-0396) read their S-boxes by
   masked scan and are.
 - **Zeroing.** Every secret, `stackalloc` temporaries and intermediate key material
   included, is cleared with `CryptographicOperations.ZeroMemory` in a `finally` block or
