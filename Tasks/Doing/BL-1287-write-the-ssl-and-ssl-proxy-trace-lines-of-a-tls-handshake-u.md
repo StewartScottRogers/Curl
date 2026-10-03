@@ -35,3 +35,4 @@ Curl writes curl 8.21.0's `[SSL]` lines around an origin's TLS handshake and `[S
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-03: Backlog -> Doing.
