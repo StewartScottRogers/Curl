@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1303 — Write curl's SPNEGO handshake failure line for a Negotiate challenge that starts with =
 
@@ -37,15 +37,21 @@ When a 401 answers `--negotiate` with a `Negotiate` challenge whose token starts
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Authentication.UnitTests` replays the measured exchange (first leg failing for want of credentials, then a 401 with `Negotiate =`) through a fake `ISecurityContextFactory` and asserts the info line `SPNEGO handshake failure (empty challenge message)` reported once for the challenge, no context step made for it, and no Authorization header for a further request.
-- [ ] A test where the first leg succeeded and the server answers `Negotiate =abc` asserts the same line and that the awaiting context is disposed without a step.
-- [ ] Tests run with `wordsFailuresAsSspi` both `true` and `false` and assert the same line.
-- [ ] A test pins that an empty `Negotiate` challenge (no token) and an undecodable token not starting with `=` keep today's behaviour.
-- [ ] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean; `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Authentication.UnitTests` replays the measured exchange (first leg failing for want of credentials, then a 401 with `Negotiate =`) through a fake `ISecurityContextFactory` and asserts the info line `SPNEGO handshake failure (empty challenge message)` reported once for the challenge, no context step made for it, and no Authorization header for a further request.
+- [x] A test where the first leg succeeded and the server answers `Negotiate =abc` asserts the same line and that the awaiting context is disposed without a step.
+- [x] Tests run with `wordsFailuresAsSspi` both `true` and `false` and assert the same line.
+- [x] A test pins that an empty `Negotiate` challenge (no token) and an undecodable token not starting with `=` keep today's behaviour.
+- [x] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean; `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Path found: with `--negotiate -u :` the first request's context fails (no credentials), nothing is sent, and the 401 reaches `RankedHttpAuthenticator.ContinueAuthorizationAsync` with an empty sent value, which calls `NegotiateHttpAuthenticator.StepWithoutAnsweringAsync`. That method now takes the challenges and, as curl's `Curl_auth_decode_spnego_message` does, reports `EmptyChallengeMessageLine` and steps no context when the Negotiate token starts with `=`. `ContinueAuthorizationAsync` (first leg succeeded) reports the same line and disposes the awaiting context unstepped. Bare `Negotiate` and an undecodable token not starting with `=` behave as before (pinned in `NegotiateEmptyChallengeMessageTests`).
+- The line is the same on both builds, so no diagnostic-log entry and no platform split; tests run with `wordsFailuresAsSspi` true and false.
+- Quality: measured with coverage from `Curl.Authentication.UnitTests` only (`Measure-CodeQuality.ps1 -SkipTestRun -ResultsDirectory`), because the whole-solution test run the script starts by default hung past an hour in this lane. `NegotiateHttpAuthenticator` has no failing member; the two failing members it lists (`NtlmHttpAuthenticator.ContextRequestFor` 80% branch, `SystemSecurityContext.Step` 87.5% branch) are in files this task did not change, with branches taken by the off-Windows tests skipped here.
+- Follow-up filed: BL-1312, the `--anyauth` path where Negotiate is picked after the challenge, which steps a context without seeing the challenge.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. A Negotiate challenge whose token starts with = writes curl's SPNEGO handshake failure (empty challenge message) line and steps no context
