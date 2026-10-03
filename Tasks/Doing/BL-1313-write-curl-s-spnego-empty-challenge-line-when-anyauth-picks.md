@@ -32,3 +32,4 @@ When Negotiate is picked only after the challenge (`--anyauth`, or `--negotiate 
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
