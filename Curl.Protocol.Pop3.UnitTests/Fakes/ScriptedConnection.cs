@@ -46,12 +46,16 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     /// <summary>Gets a value indicating whether the connection has been disposed.</summary>
     public bool IsDisposed { get; private set; }
 
+    /// <summary>Gets how many reads have been asked for so far, the ones past the script included.</summary>
+    public int ReadCount { get; private set; }
+
     /// <summary>Gets every byte written so far, in order.</summary>
     public byte[] Sent => [.. sent];
 
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
+        ReadCount++;
         if (nextRead == reads.Length)
         {
             return FailReadsWhenExhausted

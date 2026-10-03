@@ -9,6 +9,15 @@ internal static class Pop3SessionMessages
     /// <summary>The server closed the connection before a response was complete (exit 56).</summary>
     internal const string ResponseReadingFailed = "response reading failed (errno: 0)";
 
+    /// <summary>A write to the connection was reset by the peer (exit 55, BL-1252).</summary>
+    internal const string SendConnectionReset = "Send failure: Connection was reset";
+
+    /// <summary>
+    /// A write to the connection failed other than by a reset (exit 55, BL-1252); curl prints
+    /// it without a <c>-v</c> line of its own.
+    /// </summary>
+    internal const string SendFailed = "Failed sending data to the peer";
+
     /// <summary>A response line reached 65536 bytes (exit 100).</summary>
     internal const string ResponseLineTooLarge = "A value or data field grew larger than allowed";
 
@@ -101,11 +110,11 @@ internal static class Pop3SessionMessages
     /// Tells whether curl 8.21.0's <c>-v</c> writes <paramref name="message" /> as a <c>*</c>
     /// line when the transfer fails with it (BL-552). It does for every message it formats
     /// itself, a TLS failure's included, and not for <see cref="WeirdServerReply" />,
-    /// <see cref="UrlMalformed" />, <see cref="LoginDenied" /> and
-    /// <see cref="ResponseLineTooLarge" />, which are only the exit code's own text.
+    /// <see cref="UrlMalformed" />, <see cref="LoginDenied" />, <see cref="ResponseLineTooLarge" />
+    /// and <see cref="SendFailed" />, which are only the exit code's own text.
     /// </summary>
     /// <param name="message">The failure's message.</param>
     /// <returns><see langword="true" /> when the message is written.</returns>
     internal static bool IsWrittenByVerbose(string message) =>
-        message is not (WeirdServerReply or UrlMalformed or LoginDenied or ResponseLineTooLarge);
+        message is not (WeirdServerReply or UrlMalformed or LoginDenied or ResponseLineTooLarge or SendFailed);
 }

@@ -120,10 +120,12 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
     /// ends with <c>Connection #N to host H:P left intact</c>; a failure with its message, when
     /// curl reports it (<see cref="Pop3SessionMessages.IsWrittenByVerbose" />), then
     /// <c>shutting down connection #N</c> once the session was logged in and
-    /// <c>closing connection #N</c> before.
+    /// <c>closing connection #N</c> before or after a send failure, which sends no <c>QUIT</c>
+    /// (BL-1252).
     /// </summary>
     private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, bool sessionOpen, ConnectTarget target, long connectionNumber)
     {
+        sessionOpen &= result.ExitCode != CurlExitCode.SendError;
         if (result.ExitCode == CurlExitCode.Ok)
         {
             events.ReportInfo(Pop3ConnectionInfoLines.LeftIntact(connectionNumber, target.Host, target.Port));
