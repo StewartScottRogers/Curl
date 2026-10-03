@@ -40,3 +40,4 @@ completed:
 - 2026-10-03: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1325-20261003-061205-L2.jsonl
 - 2026-10-03: Blocked -> Doing.
+- 2026-10-03: Doing -> Blocked. Code and its 22 tests are committed and green (restored from stash c0e65b81^3); the Measure-CodeQuality -Library check runs in an interactive session, which completes the task.
