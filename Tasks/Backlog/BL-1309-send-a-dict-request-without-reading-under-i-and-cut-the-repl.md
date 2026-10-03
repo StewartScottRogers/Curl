@@ -1,5 +1,5 @@
 ---
-id: BL-1288
+id: BL-1309
 title: Send a dict request without reading under -I, and cut the reply at --max-filesize with exit 63
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-084
 created: 2026-10-02
 completed:
 ---
-# BL-1288 — Send a dict request without reading under -I, and cut the reply at --max-filesize with exit 63
+# BL-1309 — Send a dict request without reading under -I, and cut the reply at --max-filesize with exit 63
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-1285
+id: BL-1306
 title: Stop a telnet session under -I or past --max-filesize as curl's download writer does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-084
 created: 2026-10-02
 completed:
 ---
-# BL-1285 — Stop a telnet session under -I or past --max-filesize as curl's download writer does
+# BL-1306 — Stop a telnet session under -I or past --max-filesize as curl's download writer does
 
 ## Goal
 

@@ -1,16 +1,16 @@
 ---
-id: BL-1286
+id: BL-1307
 title: Write curl's Sending data failed (N) line and carry on when a telnet negotiation reply cannot be sent
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1285]
+depends-on: [BL-1306]
 touches: [Curl.Protocol.Telnet.UnitLibrary, Curl.Protocol.Telnet.UnitTests]
 requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1286 — Write curl's Sending data failed (N) line and carry on when a telnet negotiation reply cannot be sent
+# BL-1307 — Write curl's Sending data failed (N) line and carry on when a telnet negotiation reply cannot be sent
 
 ## Goal
 

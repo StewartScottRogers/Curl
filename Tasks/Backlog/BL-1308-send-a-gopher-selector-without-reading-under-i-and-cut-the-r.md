@@ -1,5 +1,5 @@
 ---
-id: BL-1287
+id: BL-1308
 title: Send a gopher selector without reading under -I, and cut the reply at --max-filesize with exit 63
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-084
 created: 2026-10-02
 completed:
 ---
-# BL-1287 — Send a gopher selector without reading under -I, and cut the reply at --max-filesize with exit 63
+# BL-1308 — Send a gopher selector without reading under -I, and cut the reply at --max-filesize with exit 63
 
 ## Goal
 

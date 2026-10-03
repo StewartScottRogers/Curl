@@ -1,5 +1,5 @@
 ---
-id: BL-1290
+id: BL-1311
 title: Stop an IMAP transfer under -I or past --max-filesize as curl's download writer does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-084
 created: 2026-10-02
 completed:
 ---
-# BL-1290 — Stop an IMAP transfer under -I or past --max-filesize as curl's download writer does
+# BL-1311 — Stop an IMAP transfer under -I or past --max-filesize as curl's download writer does
 
 ## Goal
 

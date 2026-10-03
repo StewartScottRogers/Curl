@@ -1,5 +1,5 @@
 ---
-id: BL-1289
+id: BL-1310
 title: Fail an MQTT subscription with exit 8 when a PUBLISH payload arrives under -I
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1289 — Fail an MQTT subscription with exit 8 when a PUBLISH payload arrives under -I
+# BL-1310 — Fail an MQTT subscription with exit 8 when a PUBLISH payload arrives under -I
 
 ## Goal
 

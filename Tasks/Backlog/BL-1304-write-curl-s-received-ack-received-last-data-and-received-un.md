@@ -1,5 +1,5 @@
 ---
-id: BL-1283
+id: BL-1304
 title: Write curl's Received ACK, Received last DATA and Received unexpected DATA -v lines for TFTP
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1283 — Write curl's Received ACK, Received last DATA and Received unexpected DATA -v lines for TFTP
+# BL-1304 — Write curl's Received ACK, Received last DATA and Received unexpected DATA -v lines for TFTP
 
 ## Goal
 

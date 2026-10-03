@@ -1,16 +1,16 @@
 ---
-id: BL-1284
+id: BL-1305
 title: Stop a TFTP download under -I or past --max-filesize as curl's download writer does
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1283]
+depends-on: [BL-1304]
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
 requirement: FR-084
 created: 2026-10-02
 completed:
 ---
-# BL-1284 — Stop a TFTP download under -I or past --max-filesize as curl's download writer does
+# BL-1305 — Stop a TFTP download under -I or past --max-filesize as curl's download writer does
 
 ## Goal
 
