@@ -5,7 +5,8 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: []
+touches: [Audit/Tools/Invoke-DifferentialConformance.ps1]
+lane: no
 requirement: none
 created: 2026-10-03
 completed:
@@ -46,7 +47,14 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
+- 2026-10-03 (dark factory lane 1): the whole fix is in `Audit/Tools/Invoke-DifferentialConformance.ps1`,
+  an audit path (ADR-0267) that a factory lane may neither read nor change, but the task was
+  filed with `touches: []`, so the board offered it to a lane. Set `touches` to that file and
+  `lane: no` so only an interactive session, working on the `audit` branch, is offered it.
+  No code was changed.
+
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Backlog. The fix is in the audit office's differential tool, which only an interactive session may change; marked lane: no
