@@ -38,6 +38,13 @@ namespace Curl.Protocol.Telnet;
 /// exit 23 (<see cref="CurlExitCode.WriteError" />).
 /// </para>
 /// <para>
+/// Received data meets <see cref="ITransferContext.NoBody" /> and
+/// <see cref="ITransferContext.MaxFileSize" /> as curl 8.21.0's download writer meets them
+/// (measured, BL-1306): under <c>-I</c> the first data ends the session with exit 8
+/// (<see cref="CurlExitCode.WeirdServerReply" />), unwritten; data past the limit is cut to
+/// it and the session ends with exit 63 (<see cref="CurlExitCode.FilesizeExceeded" />).
+/// </para>
+/// <para>
 /// The <see cref="ITransferContext.Credentials" /> user name and
 /// <see cref="ITransferContext.TelnetOptions" /> are read by <see cref="TelnetOptionParser" />
 /// once connected, as curl reads them: the user name is sent as the NEW-ENVIRON variable
@@ -221,9 +228,9 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
             data.Clear();
             replies.Clear();
             TelnetReceiveError error = receiver.Receive(buffer.AsSpan(0, count), data, replies);
-            if (await WriteOutputAsync(context.Output, data, cancellationToken).ConfigureAwait(false) is { } accepted)
+            if (await WriteReceivedDataAsync(context, data, bytesWritten).ConfigureAwait(false) is { } writeFailure)
             {
-                return WriteFailure(data.Count, accepted, bytesWritten);
+                return writeFailure;
             }
 
             bytesWritten += data.Count;
@@ -268,6 +275,43 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
             return 0;
         }
     }
+
+    /// <summary>
+    /// Writes one read's data to the output as curl 8.21.0's download writer
+    /// (<c>cw_download_write</c>, <c>lib/sendf.c</c>) does, returning <see langword="null" />
+    /// when it all went out: under <c>-I</c> any data ends the session with exit 8 and is not
+    /// written; data past <c>--max-filesize</c> (0 is no limit) is cut, the part under the
+    /// limit written, and the session ended with exit 63; an output that refuses the write
+    /// ends it with exit 23. The limit counts across reads through
+    /// <paramref name="bytesWritten" />.
+    /// </summary>
+    private static async Task<TransferResult?> WriteReceivedDataAsync(
+        ITransferContext context,
+        List<byte> data,
+        long bytesWritten)
+    {
+        if (data.Count > 0 && context.NoBody)
+        {
+            return new TransferResult(CurlExitCode.WeirdServerReply, bytesWritten, TelnetTraceReporter.WeirdServerReplyMessage);
+        }
+
+        long? limit = context.MaxFileSize is > 0 ? context.MaxFileSize : null;
+        int allowed = limit is { } max ? (int)Math.Clamp(max - bytesWritten, 0, data.Count) : data.Count;
+        bool cut = allowed < data.Count;
+        data.RemoveRange(allowed, data.Count - allowed);
+        if (await WriteOutputAsync(context.Output, data, context.CancellationToken).ConfigureAwait(false) is { } accepted)
+        {
+            return WriteFailure(data.Count, accepted, bytesWritten);
+        }
+
+        return cut ? FileSizeExceeded(limit!.Value, bytesWritten + allowed) : null;
+    }
+
+    private static TransferResult FileSizeExceeded(long limit, long bytesWritten) =>
+        new(
+            CurlExitCode.FilesizeExceeded,
+            bytesWritten,
+            string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({limit}) with {bytesWritten} bytes"));
 
     /// <summary>
     /// Writes received data to the output, returning <see langword="null" /> when the output
