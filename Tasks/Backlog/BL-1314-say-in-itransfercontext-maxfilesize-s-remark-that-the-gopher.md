@@ -1,5 +1,5 @@
 ---
-id: BL-1312
+id: BL-1314
 title: Say in ITransferContext.MaxFileSize's remark that the gopher handler enforces it
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-084
 created: 2026-10-03
 completed:
 ---
-# BL-1312 — Say in ITransferContext.MaxFileSize's remark that the gopher handler enforces it
+# BL-1314 — Say in ITransferContext.MaxFileSize's remark that the gopher handler enforces it
 
 ## Goal
 
