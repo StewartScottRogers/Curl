@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Globalization;
 
 namespace Curl.Protocol.Imap;
@@ -135,7 +136,10 @@ internal static class ImapSessionMessages
     /// </summary>
     /// <param name="message">The failure's message.</param>
     /// <returns><see langword="true" /> when the message is written.</returns>
-    internal static bool IsWrittenByVerbose(string message) =>
-        message is not (MalformedUrl or LoginDenied or RemoteFileNotFound or QuoteCommandFailed
-            or WeirdServerReply or ResponseLineTooLarge or UploadFailed);
+    internal static bool IsWrittenByVerbose(string message) => !ExitCodeTextOnly.Contains(message);
+
+    /// <summary>The failure messages <see cref="IsWrittenByVerbose" /> says <c>-v</c> does not write.</summary>
+    private static readonly FrozenSet<string> ExitCodeTextOnly = FrozenSet.ToFrozenSet(
+        [MalformedUrl, LoginDenied, RemoteFileNotFound, QuoteCommandFailed, WeirdServerReply, ResponseLineTooLarge, UploadFailed],
+        StringComparer.Ordinal);
 }
