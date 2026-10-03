@@ -200,11 +200,12 @@ public sealed class RedirectFollower(
             }
 
             int responseCode = result.Report!.ResponseCode;
+            string? methodSwitchMessage = MethodSwitchMessage(responseCode, hop, http.CustomMethod, policy);
             bodyDropped |= DropsBody(responseCode, hop, policy);
             methodDropped |= DropsCustomMethod(responseCode, hop, policy, bodyDropped);
             bool bodyCannotBeResent = CannotBeResent(bodyContent, bodyDropped);
             log.Limit(policy.MaxRedirects, chain.RedirectCount);
-            if (StopBeforeHop(context, http, ref target, chain, policy, result, bodyCannotBeResent, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
+            if (StopBeforeHop(context, http, ref target, methodSwitchMessage, chain, policy, result, bodyCannotBeResent, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
             {
                 log.Refused(responseCode, target, stop);
                 return chain.Merge(stop);
@@ -231,6 +232,7 @@ public sealed class RedirectFollower(
         ITransferContext first,
         HttpRequestOptions http,
         ref string target,
+        string? methodSwitchMessage,
         RedirectChain chain,
         RedirectPolicy policy,
         TransferResult result,
@@ -239,7 +241,7 @@ public sealed class RedirectFollower(
         out HopProxy hopProxy)
     {
         hopProxy = default;
-        if (Refusal(ref target, first, chain.RedirectCount, policy, out next) is { } refusal)
+        if (Refusal(ref target, methodSwitchMessage, first, chain.RedirectCount, policy, out next) is { } refusal)
         {
             if (!refusal.KeepsRedirectUrl)
             {
@@ -354,6 +356,7 @@ public sealed class RedirectFollower(
     /// </summary>
     private (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl, bool ReachesTarget)? Refusal(
         ref string target,
+        string? methodSwitchMessage,
         ITransferContext first,
         int followed,
         RedirectPolicy policy,
@@ -376,6 +379,11 @@ public sealed class RedirectFollower(
         }
 
         first.Events.ReportInfo(IssueAnotherRequestMessagePrefix + target + "'");
+        if (methodSwitchMessage is not null)
+        {
+            first.Events.ReportInfo(methodSwitchMessage);
+        }
+
         next = SwitchedToHttps(ref target, next, first);
         return ProtocolDisabledRefusal(next.Scheme, policy, first);
     }
@@ -458,6 +466,44 @@ public sealed class RedirectFollower(
     /// </summary>
     private static bool DropsCustomMethod(int responseCode, ITransferContext hop, RedirectPolicy policy, bool bodyDropped) =>
         policy.DropsCustomMethodOnSwitchToGet && (bodyDropped || (responseCode == 303 && hop.Http!.Body is null));
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.21.0's <c>http_switch_to_get</c> writes after
+    /// <c>Issue another request to this URL</c>, or <see langword="null" />: under <c>--follow</c>,
+    /// <c>Switch to GET because of N response</c> when a request that is not a plain GET switches;
+    /// under <c>-L</c>, <c>Stick to M instead of GET</c> when a <c>-X</c> method is kept. curl calls
+    /// it for a POST on a 301 or 302 without <c>--post301</c> or <c>--post302</c>, and for every
+    /// 303 except a POST under <c>--post303</c> (lib/http.c; measured 2026-10-03, BL-1352).
+    /// </summary>
+    private static string? MethodSwitchMessage(int responseCode, ITransferContext hop, string? customMethod, RedirectPolicy policy)
+    {
+        if (!SwitchesToGet(responseCode, hop, policy))
+        {
+            return null;
+        }
+
+        if (policy.DropsCustomMethodOnSwitchToGet && !IsPlainGet(hop, customMethod))
+        {
+            return $"Switch to GET because of {responseCode} response";
+        }
+
+        return customMethod is null ? null : $"Stick to {customMethod} instead of GET";
+    }
+
+    private static bool IsPlainGet(ITransferContext hop, string? customMethod) =>
+        customMethod is null && hop.Http!.Body is null && hop.Upload is null;
+
+    private static bool SwitchesToGet(int responseCode, ITransferContext hop, RedirectPolicy policy)
+    {
+        bool posts = hop.Http!.Body is not null;
+        return responseCode switch
+        {
+            301 => posts && !policy.KeepPostOn301,
+            302 => posts && !policy.KeepPostOn302,
+            303 => !(posts && policy.KeepPostOn303),
+            _ => false,
+        };
+    }
 
     private static HttpRequestOptions HopMethod(HttpRequestOptions http, bool methodDropped) =>
         methodDropped ? http with { CustomMethod = null } : http;

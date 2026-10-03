@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests]
 requirement: FR-088
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1352 — Write curl's 'Switch to GET because of N response' and 'Stick to POST instead of GET' -v lines when a redirect changes or keeps the method
 
@@ -32,14 +32,21 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Core.UnitTests` drive `RedirectFollower` with the fake dispatcher the existing redirect tests use and pin, each as the info line right after `Issue another request to this URL: '...'`: `--follow` (`DropsCustomMethodOnSwitchToGet = true`) with `-X POST` and a 303 gives `Switch to GET because of 303 response`; `--follow` with a POST body and a 302 gives `Switch to GET because of 302 response`; `-L` with `-X POST` and a 303 gives `Stick to POST instead of GET`.
-- [ ] Tests pin no line for: `-L` with a POST body and no `-X` on a 303; `-X PUT -L` on a 302; a POST under `--post302` on a 302; a GET on a 301.
-- [ ] Every existing redirect test passes unchanged except where it pins the full info-line sequence of one of the cases above, which gains the line.
-- [ ] `dotnet build Curl.Core.UnitTests -warnaserror` is clean; `dotnet test Curl.Core.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` reports no failing member.
+- [x] Tests in `Curl.Core.UnitTests` drive `RedirectFollower` with the fake dispatcher the existing redirect tests use and pin, each as the info line right after `Issue another request to this URL: '...'`: `--follow` (`DropsCustomMethodOnSwitchToGet = true`) with `-X POST` and a 303 gives `Switch to GET because of 303 response`; `--follow` with a POST body and a 302 gives `Switch to GET because of 302 response`; `-L` with `-X POST` and a 303 gives `Stick to POST instead of GET`.
+- [x] Tests pin no line for: `-L` with a POST body and no `-X` on a 303; `-X PUT -L` on a 302; a POST under `--post302` on a 302; a GET on a 301.
+- [x] Every existing redirect test passes unchanged except where it pins the full info-line sequence of one of the cases above, which gains the line.
+- [x] `dotnet build Curl.Core.UnitTests -warnaserror` is clean; `dotnet test Curl.Core.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Built directly (small, one-library change) rather than through the full /feature agent chain.
+- `RedirectFollower.MethodSwitchMessage` computes the line from the hop before it is followed and `Refusal` reports it right after `Issue another request to this URL`, before the HSTS switch and the `--proto-redir` refusal, matching curl's order (the switch is in `Curl_http_follow`; HSTS and protocol checks come later, in url.c).
+- `req` is the command line's `-X` (`context.Http.CustomMethod`), not the hop's: curl keeps `STRING_CUSTOMREQUEST` set after `http_ignorecustom`, so a second 303 under `--follow` writes the Switch line again.
+- "Not a GET" is a `-X`, a body, or a `-T` upload (curl's `httpreq != HTTPREQ_GET`); `-T` on a 303 under `--follow` writes the Switch line (pinned). `-I` (`HTTPREQ_HEAD`) is not modelled by `HttpRequestOptions` and so is treated as a GET.
+- Tests: `Curl.Core.UnitTests/RedirectFollowerMethodSwitchLineTests.cs` (13). No existing test pinned a full info sequence for these cases, so none changed. Curl.Core.UnitLibrary measures 100% line and branch, 0 failing members (`IsPlainGet` split out to keep complexity at 10).
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. -v writes curl's 'Switch to GET because of N response' and 'Stick to M instead of GET' lines after a redirect's Issue line

@@ -56,7 +56,11 @@ hop's URL (ADR-0226); without one, only a hop to the first URL's origin keeps it
 user information or fragment, as its `Referer`, and the merged report's `Referer` is the last
 one sent, which `%{referer}` prints (ADR-0101, BL-361). Each target that parses with a scheme
 curl knows is reported as `Issue another request to this URL: '<target>'` before the HSTS
-switch and the `--proto-redir` check, never after a `--max-redirs` refusal (BL-907).
+switch and the `--proto-redir` check, never after a `--max-redirs` refusal (BL-907). Right
+after it comes curl's `http_switch_to_get` line when a redirect switches the method - a POST
+on a 301 or 302 without `--post301`/`--post302`, every 303 but a POST under `--post303`:
+`Switch to GET because of <code> response` under `--follow` for anything but a plain GET, or
+`Stick to <method> instead of GET` under `-L` with `-X` (BL-1352).
 
 `TransferRetrier` runs a transfer again under `--retry` (`RetryPolicy`: `--retry`,
 `--retry-delay`) after curl 8.21.0's transient failures: exit 28, 6, 5 or 12
