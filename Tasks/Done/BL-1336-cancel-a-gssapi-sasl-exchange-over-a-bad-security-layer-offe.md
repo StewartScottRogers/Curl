@@ -8,7 +8,7 @@ depends-on: [BL-1335]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1336 — Cancel a GSSAPI SASL exchange over a bad security-layer offer with curl's 'GSSAPI handshake failure' -v lines
 
@@ -28,14 +28,19 @@ When the GSSAPI exchange's security-layer step cannot answer the server's offer,
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Authentication.UnitTests` drive a GSSAPI exchange through a completed `ScriptedSecurityContext` and pin, for the SSPI wording: an empty offer gives `null` with `CancelReason` `GSSAPI handshake failure (empty security message)`; a failing `Unwrap` gives `GSSAPI handshake failure (decryption failed)`; an unwrapped offer of 3 bytes gives `GSSAPI handshake failure (invalid security data)`; an offer of `{ 0x02, 0, 0, 0 }` gives `GSSAPI handshake failure (invalid security layer)`.
-- [ ] The same tests pin the GSS-API wording: the same texts, except `gss_unwrap() failed: ` for a failing `Unwrap`.
-- [ ] A test pins that a good offer (`{ 0x01, 0, 0x10, 0 }`) still answers with the wrapped `{ 0x01, 0, 0, 0 }` plus the authorization identity and leaves `CancelReason` `null`, and that the NTLM exchange never sets it.
-- [ ] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean; `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary` reports no failing member.
+- [x] Tests in `Curl.Authentication.UnitTests` drive a GSSAPI exchange through a completed `ScriptedSecurityContext` and pin, for the SSPI wording: an empty offer gives `null` with `CancelReason` `GSSAPI handshake failure (empty security message)`; a failing `Unwrap` gives `GSSAPI handshake failure (decryption failed)`; an unwrapped offer of 3 bytes gives `GSSAPI handshake failure (invalid security data)`; an offer of `{ 0x02, 0, 0, 0 }` gives `GSSAPI handshake failure (invalid security layer)`.
+- [x] The same tests pin the GSS-API wording: the same texts, except `gss_unwrap() failed: ` for a failing `Unwrap`.
+- [x] A test pins that a good offer (`{ 0x01, 0, 0x10, 0 }`) still answers with the wrapped `{ 0x01, 0, 0, 0 }` plus the authorization identity and leaves `CancelReason` `null`, and that the NTLM exchange never sets it.
+- [x] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean; `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Plan: `SecurityContextSaslExchange` takes `wordsFailuresAsSspi` and sets `CancelReason` in the security-layer step, checking curl's order (empty, unwrap, length, layer bit). `SaslAuthenticator` passes a new public init property `WordsGssapiFailuresAsSspi` (default `OperatingSystem.IsWindows()`), the same shape as `GssapiDelegation`, so tests pick either wording. Sensible default taken: an init property rather than a new constructor parameter, so no existing caller changes. `ScriptedSecurityContext` gained `UnwrapFails` to drive a failed decryption.
+- An empty offer is now checked before `Unwrap` is called, as curl does.
+- Quality: `Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary` gives 100% line, 99.68% branch; every member this task changed passes. The two failing members are the pre-existing ones BL-1303 already recorded (`NtlmHttpAuthenticator.ContextRequestFor` 80% branch, `SystemSecurityContext.Step` 87.5% branch), in files this task did not change, whose remaining branches are taken by off-Windows tests skipped on Windows.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. A GSSAPI SASL exchange over a security-layer offer curl cannot answer returns null with curl's GSSAPI handshake failure line as CancelReason, in the SSPI or GSS-API wording
