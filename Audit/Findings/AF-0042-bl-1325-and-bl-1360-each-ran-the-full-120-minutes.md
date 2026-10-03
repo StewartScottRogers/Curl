@@ -6,7 +6,7 @@ severity: Low
 status: accepted
 reason: 
 key: process:BL-1325:BL-1325:unfinished-run
-task: none
+task: BL-1385
 found: 2026-10-03
 found-at: 2c24c2d74dc2c9775b64948efc3ca57b8937627e
 scorecard: 2026-10-03_1459.md

@@ -6,7 +6,7 @@ severity: Low
 status: accepted
 reason: 
 key: truthfulness:CLAUDE.md:Glossary:false-statement
-task: none
+task: BL-1383
 found: 2026-10-03
 found-at: 2c24c2d74dc2c9775b64948efc3ca57b8937627e
 scorecard: 2026-10-03_1459.md
