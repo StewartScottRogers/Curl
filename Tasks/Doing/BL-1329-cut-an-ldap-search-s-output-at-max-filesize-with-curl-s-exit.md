@@ -36,3 +36,4 @@ An `ldap://` / `ldaps://` search honours `ITransferContext.MaxFileSize` as curl 
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
