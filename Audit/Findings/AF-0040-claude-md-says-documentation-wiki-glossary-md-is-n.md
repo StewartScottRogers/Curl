@@ -3,8 +3,8 @@ id: AF-0040
 title: CLAUDE.md says Documentation/Wiki/Glossary.md is 'not yet written' but it exists
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:CLAUDE.md:Glossary:false-statement
 task: none
 found: 2026-10-03
@@ -41,3 +41,4 @@ Select-String -Path CLAUDE.md -Pattern 'not yet written'; Test-Path Documentatio
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.
