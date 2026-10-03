@@ -3,10 +3,10 @@ id: AF-0028
 title: BL-1289 was claimed 6 times (134 minutes) before reaching Done
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-1289:BL-1289:redone-work
-task: none
+task: BL-1363
 found: 2026-10-03
 found-at: 454d1d2abbb96213c945e91f0dc3d241bd40cc2d
 scorecard: 2026-10-03_0623.md
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.
