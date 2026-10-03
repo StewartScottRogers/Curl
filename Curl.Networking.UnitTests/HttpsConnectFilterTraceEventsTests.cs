@@ -111,6 +111,104 @@ public sealed class HttpsConnectFilterTraceEventsTests
     }
 
     [TestMethod]
+    public void ReportInfo_WithASecondAttemptVersion_NamesTheSecondAttemptAfterTheFirst()
+    {
+        // curl 8.22.0 --http3 (BL-1284 Notes).
+        var inner = new CountingTransferEvents();
+
+        new HttpsConnectFilterTraceEvents(inner, "h3", "h2").ReportInfo("  Trying 127.0.0.1:443...");
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[HTTPS-CONNECT] connect, init",
+                "[HTTPS-CONNECT] 1st attempt uses h3 from wanted versions",
+                "[HTTPS-CONNECT] 2nd attempt uses h2 from wanted versions",
+                "  Trying 127.0.0.1:443...",
+                Connecting,
+                Pollset,
+            },
+            inner.Calls);
+    }
+
+    [TestMethod]
+    public void ReportTlsHandshake_AFinishedQuicHandshake_IsPrecededByOnePollRound()
+    {
+        var inner = new CountingTransferEvents();
+
+        new HttpsConnectFilterTraceEvents(inner, "h3").ReportTlsHandshake(Handshake(failed: false) with { IsQuic = true });
+
+        CollectionAssert.AreEqual(new[] { Connecting, Pollset, "handshake" }, inner.Calls);
+    }
+
+    [TestMethod]
+    public void ContinueAfterQuicAttempt_AfterAFailedQuicAttempt_StartsH2AndReportsTheQuicFailureAsTheConnects()
+    {
+        // curl 8.22.0 --http3, QUIC refused, both attempts failed: connect -> 56 (BL-1284 Notes).
+        var inner = new CountingTransferEvents();
+        var events = new HttpsConnectFilterTraceEvents(inner, "h3");
+
+        events.ContinueAfterQuicAttempt(CurlExitCode.RecvError, TimeSpan.FromMilliseconds(200), tracesSetup: true);
+        events.ReportInfo("  Trying 127.0.0.1:443...");
+        events.ReportConnectFailed(CurlExitCode.CouldntConnect);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[HTTPS-CONNECT] h3 baller failed, starting h2",
+                "  Trying 127.0.0.1:443...",
+                Connecting,
+                Pollset,
+                "[HTTPS-CONNECT] connect, all attempts failed",
+                "[HTTPS-CONNECT] connect -> 56, done=0",
+            },
+            inner.Calls);
+    }
+
+    [TestMethod]
+    public void ContinueAfterQuicAttempt_WhileTheQuicAttemptIsConnecting_PollsTwiceMoreAndCountsBothSockets()
+    {
+        // curl 8.22.0 --http3 against a silent QUIC peer (BL-1284 Notes).
+        var inner = new CountingTransferEvents();
+        var events = new HttpsConnectFilterTraceEvents(inner, "h3");
+
+        events.ContinueAfterQuicAttempt(null, TimeSpan.FromMilliseconds(200), tracesSetup: true);
+        events.ReportInfo("  Trying 127.0.0.1:443...");
+        events.ReportConnectionOpened(new ConnectionOpenedEvent { HostName = "h", RemoteEndPoint = EndPoint, LocalEndPoint = EndPoint, ConnectionNumber = 0 });
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                Connecting,
+                Pollset,
+                Connecting,
+                Pollset,
+                "[HTTPS-CONNECT] h3 inconclusive after 200, starting h2",
+                "  Trying 127.0.0.1:443...",
+                Connecting,
+                "[HTTPS-CONNECT] adjust_pollset -> 0, 2 socks",
+                "[HTTPS-CONNECT] connect -> 0, done=1",
+                "opened",
+                "[HTTPS-CONNECT] removing connected setup filter",
+                "[HTTPS-CONNECT] destroy",
+                "[SETUP] destroy",
+            },
+            inner.Calls);
+    }
+
+    [TestMethod]
+    public void ContinueAfterQuicAttempt_WithoutTheSetupFilter_WritesNoSetupDestroyOnceConnected()
+    {
+        var inner = new CountingTransferEvents();
+        var events = new HttpsConnectFilterTraceEvents(inner, "h3");
+
+        events.ContinueAfterQuicAttempt(CurlExitCode.RecvError, TimeSpan.FromMilliseconds(200), tracesSetup: false);
+        events.ReportConnectionOpened(new ConnectionOpenedEvent { HostName = "h", RemoteEndPoint = EndPoint, LocalEndPoint = EndPoint, ConnectionNumber = 0 });
+
+        Assert.AreEqual("[HTTPS-CONNECT] destroy", inner.Calls[^1]);
+    }
+
+    [TestMethod]
     public void ReportConnectFailed_BeforeConnecting_WritesNothing()
     {
         var inner = new CountingTransferEvents();

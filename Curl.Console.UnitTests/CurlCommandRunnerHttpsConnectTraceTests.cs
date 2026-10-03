@@ -102,6 +102,29 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     }
 
     [TestMethod]
+    [DataRow("--http3", "h3", "h2")]
+    [DataRow("--http3-only", "h3", null)]
+    [DataRow("--http2", "h2", null)]
+    public void CreateTcpConnector_UnderTraceConfigHttpsConnect_NamesTheAttemptsCurlsNgtcp2BuildNames(string option, string firstAttempt, string? secondAttempt)
+    {
+        // curl.se's curl 8.22.0 ngtcp2 build: --http3 names "2nd attempt uses h2", --http3-only none (BL-1284 Notes).
+        CommandLineParseResult parsed = OpenSslBuildParser.Parse(["-k", "-v", "--trace-config", "https-connect", option, "https://127.0.0.1:18713/"], _ => true);
+        Assert.IsTrue(parsed.IsAccepted);
+
+        TcpConnector connector = CurlComposition.CreateTcpConnector(
+            parsed.Options!,
+            new LoopbackDnsResolver(),
+            new ScriptedTcpDialer(new ScriptedConnector([Response])),
+            new PassThroughTlsProvider(),
+            TimeProvider.System,
+            HttpProxyTunnelOptions.Default);
+
+        Assert.IsTrue(connector.TracesHttpsConnectFilter);
+        Assert.AreEqual(firstAttempt, connector.HttpsConnectFirstAttemptVersion);
+        Assert.AreEqual(secondAttempt, connector.HttpsConnectSecondAttemptVersion);
+    }
+
+    [TestMethod]
     [DataRow("-x", "http://127.0.0.1:18454", "HTTP/1.1 200 Connection established\r\n\r\n", "[SETUP] happy eyeballing to proxy 127.0.0.1:18454", "[SETUP] added HTTP proxy tunnel filter", 1)]
     [DataRow("-x", "socks5h://127.0.0.1:18455", "\u0005\0\u0005\0\0\u0001\u007f\0\0\u0001\u0001\u00bb", "[SETUP] happy eyeballing to origin 127.0.0.1:18455", "[SETUP] added SOCKS filter to example.test:443", 2)]
     public async Task RunAsync_HttpsGetThroughAProxyUnderTraceConfigHttpsConnectAndSetup_WritesTheFiltersLinesAroundTheTunnel(

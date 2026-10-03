@@ -401,3 +401,23 @@ measured order (BL-1283 Context, BL-1255 Notes):
 - `http://` origin: `[SETUP] added` first, then the same lines without the origin's SSL filter.
 
 No behaviour changed; nothing volatile is pinned.
+
+## Amendment, 2026-10-03 (BL-1284): `[HTTPS-CONNECT]` and `[SETUP]` over QUIC
+
+Decided by Claude under Stewart's delegation. The Schannel reference build has no HTTP/3, so the
+lines were measured with curl.se's curl 8.22.0 ngtcp2 build (ADR-0180) against a loopback Kestrel
+HTTP/3 server, a TLS-only server and a silent UDP sink (BL-1284 Notes). 8.22.0 writes the same
+filter lines as 8.21.0 for a TCP connect plus two `HTTPS-RR not available` lines, which are not
+written, as for TCP. `TcpConnector.ConnectMultiplexedAsync` now wraps a direct QUIC connect to an
+`https://` origin in the setup and `[HTTPS-CONNECT]` filters (no `[DNS]` filter, not measured over
+QUIC): `1st attempt uses h3`, then under `--http3` `2nd attempt uses h2 from wanted versions`
+(`TcpConnector.HttpsConnectSecondAttemptVersion`, set by the composition), the setup filter's
+`happy eyeballing`, one poll round after `Trying` and one before the finished QUIC handshake (not
+two, as for TCP), and no `[SETUP] added SSL filter for origin`. Under `--http3-only` a failed QUIC
+connect writes `all attempts failed` and its code. Under `--http3` the failure is kept on the
+target for the TCP attempt the race starts on the same target, which adds no filter and writes
+`h3 baller failed, starting h2` (QUIC failed) or two more poll rounds and `h3 inconclusive after
+<happy-eyeballs ms>, starting h2` (QUIC still connecting, the TCP rounds then counting `2 socks`),
+the QUIC attempt's `[SETUP] destroy` after the filter's own once connected, and the QUIC attempt's
+exit code if TCP fails too. Not written, as for TCP: `[SETUP] query ALPN`. Through a proxy
+(CONNECT-UDP), and for an Alt-Svc race that tries TCP first, QUIC writes no filter lines yet.

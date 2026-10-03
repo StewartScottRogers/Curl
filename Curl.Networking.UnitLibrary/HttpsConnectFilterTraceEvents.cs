@@ -18,10 +18,16 @@ namespace Curl.Networking;
 /// Through a proxy or over a Unix socket the same lines go around the proxy's own (measured, BL-1254
 /// Notes): one more pair after each CONNECT request head, and two before <c>Opened SOCKS
 /// connection</c>, the rounds a loopback SOCKS5 handshake measured (ADR-0357's BL-1254 amendment).
+/// Over QUIC (measured with curl.se's curl 8.22.0 ngtcp2 build, BL-1284 Notes) <c>--http3</c> adds
+/// <c>2nd attempt uses h2 from wanted versions</c> after the first attempt's line, a finished QUIC
+/// handshake has one poll round, not two, and the TCP attempt that follows a QUIC one goes on with
+/// the filter (<see cref="ContinueAfterQuicAttempt" />) rather than adding it again (ADR-0357's
+/// BL-1284 amendment).
 /// </summary>
 /// <param name="inner">The events below the ALPN connect filter: the DNS filter's, or the transfer's own.</param>
 /// <param name="firstAttemptVersion">The HTTP version curl's first attempt uses: <c>h1</c>, <c>h2</c> or <c>h3</c>.</param>
-internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, string firstAttemptVersion) : ITransferEvents
+/// <param name="secondAttemptVersion">The version of the attempt curl may start after the first, if any: <c>h2</c> under <c>--http3</c>.</param>
+internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, string firstAttemptVersion, string? secondAttemptVersion = null) : ITransferEvents
 {
     /// <summary>The line curl writes as it adds the ALPN connect filter, before anything is resolved.</summary>
     public const string AddedLine = "[HTTPS-CONNECT] added";
@@ -30,9 +36,39 @@ internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, strin
     private const string SocksOpenedPrefix = "Opened SOCKS connection ";
     private const string HappyEyeballingPrefix = "[SETUP] happy eyeballing";
     private const string ConnectingLine = "[HTTPS-CONNECT] connect -> 0, done=0";
-    private const string PollsetLine = "[HTTPS-CONNECT] adjust_pollset -> 0, 1 socks";
-
     private bool _connecting;
+    private int _sockets = 1;
+    private CurlExitCode? _firstAttemptFailure;
+    private bool _destroysFirstAttemptSetup;
+
+    /// <summary>
+    /// Goes on, for the TCP attempt curl starts after a QUIC one, from where that attempt's filter
+    /// stood (measured, BL-1284 Notes): <c>h3 baller failed, starting h2</c> when the QUIC attempt
+    /// failed with <paramref name="quicFailure" />, which a failed TCP attempt then reports as the
+    /// connect's code; otherwise two more poll rounds of the QUIC attempt and <c>h3 inconclusive after
+    /// &lt;ms&gt;, starting h2</c>, the TCP attempt's rounds counting both sockets. Once connected,
+    /// the QUIC attempt's setup filter's <c>[SETUP] destroy</c> follows the filter's own when
+    /// <paramref name="tracesSetup" />.
+    /// </summary>
+    /// <param name="quicFailure">The QUIC attempt's exit code, or <see langword="null" /> while it is still connecting.</param>
+    /// <param name="happyEyeballsTimeout">How long curl let the QUIC attempt run alone.</param>
+    /// <param name="tracesSetup">Whether the setup filter is traced.</param>
+    public void ContinueAfterQuicAttempt(CurlExitCode? quicFailure, TimeSpan happyEyeballsTimeout, bool tracesSetup)
+    {
+        _connecting = true;
+        _firstAttemptFailure = quicFailure;
+        _destroysFirstAttemptSetup = tracesSetup;
+        if (quicFailure is not null)
+        {
+            inner.ReportInfo("[HTTPS-CONNECT] h3 baller failed, starting h2");
+            return;
+        }
+
+        WritePollRound();
+        WritePollRound();
+        inner.ReportInfo($"[HTTPS-CONNECT] h3 inconclusive after {(long)happyEyeballsTimeout.TotalMilliseconds}, starting h2");
+        _sockets = 2;
+    }
 
     /// <inheritdoc />
     public void ReportInfo(string text)
@@ -40,9 +76,7 @@ internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, strin
         var trying = text.StartsWith(TryingPrefix, StringComparison.Ordinal);
         if (!_connecting && (trying || text.StartsWith(HappyEyeballingPrefix, StringComparison.Ordinal)))
         {
-            _connecting = true;
-            inner.ReportInfo("[HTTPS-CONNECT] connect, init");
-            inner.ReportInfo($"[HTTPS-CONNECT] 1st attempt uses {firstAttemptVersion} from wanted versions");
+            WriteInitLines();
         }
 
         if (text.StartsWith(SocksOpenedPrefix, StringComparison.Ordinal))
@@ -68,7 +102,7 @@ internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, strin
         if (_connecting)
         {
             inner.ReportInfo("[HTTPS-CONNECT] connect, all attempts failed");
-            inner.ReportInfo($"[HTTPS-CONNECT] connect -> {(int)exitCode}, done=0");
+            inner.ReportInfo($"[HTTPS-CONNECT] connect -> {(int)(_firstAttemptFailure ?? exitCode)}, done=0");
         }
     }
 
@@ -79,6 +113,10 @@ internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, strin
         inner.ReportConnectionOpened(opened);
         inner.ReportInfo("[HTTPS-CONNECT] removing connected setup filter");
         inner.ReportInfo("[HTTPS-CONNECT] destroy");
+        if (_destroysFirstAttemptSetup)
+        {
+            inner.ReportInfo("[SETUP] destroy");
+        }
     }
 
     /// <inheritdoc />
@@ -88,7 +126,7 @@ internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, strin
     public void ReportTlsHandshake(TlsHandshakeEvent handshake)
     {
         WritePollRound();
-        if (!handshake.Failed)
+        if (!handshake.Failed && !handshake.IsQuic)
         {
             WritePollRound();
         }
@@ -128,9 +166,20 @@ internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, strin
     /// <inheritdoc />
     public void ReportDataReceived(ReadOnlySpan<byte> bytes) => inner.ReportDataReceived(bytes);
 
+    private void WriteInitLines()
+    {
+        _connecting = true;
+        inner.ReportInfo("[HTTPS-CONNECT] connect, init");
+        inner.ReportInfo($"[HTTPS-CONNECT] 1st attempt uses {firstAttemptVersion} from wanted versions");
+        if (secondAttemptVersion is not null)
+        {
+            inner.ReportInfo($"[HTTPS-CONNECT] 2nd attempt uses {secondAttemptVersion} from wanted versions");
+        }
+    }
+
     private void WritePollRound()
     {
         inner.ReportInfo(ConnectingLine);
-        inner.ReportInfo(PollsetLine);
+        inner.ReportInfo($"[HTTPS-CONNECT] adjust_pollset -> 0, {_sockets} socks");
     }
 }

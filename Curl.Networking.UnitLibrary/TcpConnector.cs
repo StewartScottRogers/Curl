@@ -593,10 +593,12 @@ public sealed partial class TcpConnector(
         }
 
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);
-        var (request, failure) = await ResolveForQuicAsync(target, cancellationToken).ConfigureAwait(false);
+        var (traced, httpsConnect, attempt) = QuicConnectionFilters(target);
+        var (request, failure) = await ResolveForQuicAsync(traced, cancellationToken).ConfigureAwait(false);
         if (request is null)
         {
             log.Failed(DiagnosticLogComponents.Quic, failure!.ExitCode, failure.ErrorMessage);
+            ReportQuicHttpsConnectFailure(httpsConnect, attempt, failure.ExitCode);
             return failure;
         }
 
@@ -604,6 +606,11 @@ public sealed partial class TcpConnector(
         log.QuicDialling(request.DestinationHost, request.Port, request.Addresses);
         var dialled = await quicDialer.DialAsync(request, cancellationToken).ConfigureAwait(false);
         log.QuicDialled(request.DestinationHost, request.Port, dialled);
+        if (dialled.Connection is null)
+        {
+            ReportQuicHttpsConnectFailure(httpsConnect, attempt, dialled.ExitCode);
+        }
+
         return dialled;
     }
 
@@ -725,7 +732,8 @@ public sealed partial class TcpConnector(
             httpsOrigin,
             TracesSetupFilter,
             below => DnsFilterTraceEvents.Start(below, destination.Host, destination.Port, addressFamily),
-            below => new SetupFilterTraceEvents(below, destination.Host, destination.Port));
+            below => new SetupFilterTraceEvents(below, destination.Host, destination.Port),
+            quicAttempt: TakeQuicHttpsConnectAttempt(target));
         return (target with { Events = events }, trace, httpsConnect);
     }
 
@@ -751,17 +759,25 @@ public sealed partial class TcpConnector(
     // setup filter's first line (the ALPN connect filter's for an https:// origin) is written before
     // the DNS filter's, and the ALPN connect filter's events sit between the two. A direct connect, a
     // proxy's and a Unix socket's each start their own DNS and setup filters (measured, BL-1254 Notes).
+    // A QUIC connect names the attempt after it; the TCP attempt after a QUIC one adds no filter but
+    // goes on from where the QUIC attempt's stood (BL-1284).
     private (ITransferEvents Events, HttpsConnectFilterTraceEvents? HttpsConnect) SetupAndDnsFilterEvents(
         ITransferEvents events,
         bool httpsOrigin,
         bool tracesSetup,
         Func<ITransferEvents, ITransferEvents> startDnsFilter,
-        Func<ITransferEvents, ITransferEvents> startSetupFilter)
+        Func<ITransferEvents, ITransferEvents> startSetupFilter,
+        string? secondAttemptVersion = null,
+        QuicHttpsConnectAttempt? quicAttempt = null)
     {
         var tracesHttpsConnect = TracesHttpsConnectFor(httpsOrigin);
-        WriteFirstFilterAddedLine(events, httpsOrigin, tracesHttpsConnect, tracesSetup);
+        if (quicAttempt is null)
+        {
+            WriteFirstFilterAddedLine(events, httpsOrigin, tracesHttpsConnect, tracesSetup);
+        }
+
         events = TracesDnsFilter ? startDnsFilter(events) : events;
-        var httpsConnect = tracesHttpsConnect ? new HttpsConnectFilterTraceEvents(events, HttpsConnectFirstAttemptVersion) : null;
+        var httpsConnect = tracesHttpsConnect ? HttpsConnectFilterOver(events, tracesSetup, secondAttemptVersion, quicAttempt) : null;
         events = httpsConnect ?? events;
         return (tracesSetup ? startSetupFilter(events) : events, httpsConnect);
     }
@@ -1763,7 +1779,7 @@ public sealed partial class TcpConnector(
     // answers that (measured, BL-1253 Notes; ADR-0357's BL-1260 amendment). Through a proxy or a
     // tunnel the TCP filter sits below the proxy's, so its records are not written.
     internal static TcpIoTraceConnection? TlsRecordTraceFor(IConnection dialed, bool tracesTcpFilter, ConnectTarget target) =>
-        tracesTcpFilter &&target.Proxy is null && !target.IsForwardProxy && target.PoolScheme == "https"
+        tracesTcpFilter && target.Proxy is null && !target.IsForwardProxy && target.PoolScheme == "https"
             ? new TcpIoTraceConnection(dialed, target.Events, TcpIoTraceConnection.HttpsHandshakeLines)
             : null;
 
