@@ -8,7 +8,7 @@ depends-on: [BL-1294]
 touches: [Curl.Protocol.Ws.UnitLibrary, Curl.Protocol.Ws.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1295 — Send Range: bytes= on the WebSocket upgrade request for -r and -C
 
@@ -28,13 +28,17 @@ The `ws://`/`wss://` upgrade request carries `Range: bytes=<text>` for `-r <text
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.Ws.UnitTests` assert the exact upgrade request bytes (with a fixed `IWebSocketRandomSource`) for the two measured runs.
-- [ ] Tests pin that `-C 0` alone sends no `Range`, that `-C 5` with `-r 1-2` sends `Range: bytes=5-`, and that a `-H 'range: x'` header (any letter case) suppresses curl's line and is sent in its own `-H` place.
-- [ ] `dotnet build Curl.Protocol.Ws.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Ws.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ws.UnitLibrary` reports no failing member.
+- [x] Tests in `Curl.Protocol.Ws.UnitTests` assert the exact upgrade request bytes (with a fixed `IWebSocketRandomSource`) for the two measured runs.
+- [x] Tests pin that `-C 0` alone sends no `Range`, that `-C 5` with `-r 1-2` sends `Range: bytes=5-`, and that a `-H 'range: x'` header (any letter case) suppresses curl's line and is sent in its own `-H` place.
+- [x] `dotnet build Curl.Protocol.Ws.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Ws.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ws.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- 2026-10-03 (Claude, lane 3): `WsUpgradeRequestFormatter.RangeValue(resumeFrom, rangeText)` follows curl's `setup_range` (a non-zero `-C n` gives `n-` and wins over `-r`; otherwise the `-r` text as typed; `-C 0` alone gives none). `Format` takes the result as an optional `byteRange` and writes `Range: bytes=<value>` after `Authorization` and before `User-Agent`. Any `-H` header named `Range`, in any letter case, suppresses that line and is sent with the other `-H` headers. The range goes out whatever the method (`-X`, `-I`), because curl tests `httpreq`, which `-X` does not change. No ADR: this is the measured curl behaviour, not a new choice.
+- Tests: `WsProtocolHandlerRangeTests` (the two measured runs plus the edge cases, exact bytes with `FixedRandomSource`) and `WsUpgradeRequestFormatterTests` (placement after `Authorization`, plus a `RangeValue` table). Ws fast tests: 314 pass, 1 skipped (it runs off Windows only). `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ws.UnitLibrary -SkipTestRun`, run on coverage from the Ws test project only (the full-solution run went past 30 minutes), reports 0 failing members.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. ws/wss upgrade sends Range: bytes= for -r and non-zero -C, as curl 8.21.0 does

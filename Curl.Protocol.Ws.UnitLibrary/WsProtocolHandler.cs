@@ -260,7 +260,7 @@ public sealed class WsProtocolHandler(
             options.AuthSchemes,
             IsProxy: false);
         string? authorization = await CreateAuthorizationAsync(authRequest, options, authLines, context.Events, context.CancellationToken).ConfigureAwait(false);
-        byte[] request = WsUpgradeRequestFormatter.Format(context.Url, options, method, NewKey(), authorization);
+        byte[] request = WsUpgradeRequestFormatter.Format(context.Url, options, method, NewKey(), authorization, WsUpgradeRequestFormatter.RangeValue(context.ResumeFrom, context.RangeText));
         context.Events.ReportRequestHeader(request);
         await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
         context.Events.ReportInfo(WsInfoLines.RequestSent);
