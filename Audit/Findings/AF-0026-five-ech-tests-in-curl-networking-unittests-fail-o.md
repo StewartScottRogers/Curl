@@ -6,7 +6,7 @@ severity: Medium
 status: accepted
 reason: 
 key: quality:Curl.Networking.UnitTests/EchTlsClientTests.cs:AuthenticateAsClientAsync_WithEch:failing-baseline
-task: none
+task: BL-1361
 found: 2026-10-03
 found-at: 454d1d2abbb96213c945e91f0dc3d241bd40cc2d
 scorecard: 2026-10-03_0623.md
