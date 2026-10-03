@@ -1,5 +1,5 @@
 ---
-id: BL-1282
+id: BL-1285
 title: Point the audit fuzzer's ssh target at SshWireDecoders
 priority: Low
 assignee: Claude
@@ -11,7 +11,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1282 — Point the audit fuzzer's ssh target at SshWireDecoders
+# BL-1285 — Point the audit fuzzer's ssh target at SshWireDecoders
 
 ## Goal
 

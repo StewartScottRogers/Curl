@@ -41,7 +41,7 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 ## Acceptance criteria
 
-- [x] ~~The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.~~ Split (see Notes): the library now exposes public byte-level readers, `SshWireDecoders`, each covered by `SshWireDecodersTests`; running the reproduction needs the fuzzer pointed at them, which is BL-1282's criterion.
+- [x] ~~The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.~~ Split (see Notes): the library now exposes public byte-level readers, `SshWireDecoders`, each covered by `SshWireDecodersTests`; running the reproduction needs the fuzzer pointed at them, which is BL-1285's criterion.
 - [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
@@ -56,7 +56,7 @@ The finding closes only when a later re-audit by the security auditor confirms t
 - The reproduction could not be run here: the fuzzer lives under the audit folder, which
   the audit guard refuses a dark factory lane to read, run or change (ADR-0267). Whether
   it finds the readers by reflection or needs its `ssh` target rewritten is unknown from
-  here, so the wiring is filed as BL-1282 (interactive only, depends on this task). The
+  here, so the wiring is filed as BL-1285 (interactive only, depends on this task). The
   first criterion was split for that reason; the finding still closes only on re-audit.
 - Added `Curl.Protocol.Ssh.UnitTests` to `touches` for the new tests; no other task in
   Doing on `origin/work/dark-factory` names it.
@@ -67,4 +67,4 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
-- 2026-10-02: Doing -> Done. Curl.Protocol.Ssh.UnitLibrary exposes its server-byte readers through public SshWireDecoders; fuzzer wiring filed as BL-1282
+- 2026-10-02: Doing -> Done. Curl.Protocol.Ssh.UnitLibrary exposes its server-byte readers through public SshWireDecoders; fuzzer wiring filed as BL-1285
