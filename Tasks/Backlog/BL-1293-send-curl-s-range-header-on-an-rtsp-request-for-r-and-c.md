@@ -40,9 +40,11 @@ An `rtsp://` request carries `Range: <text>` for `-r <text>`, and `Range: <offse
 ## Notes
 
 - `-C -` (resume from the output's size) needs an output to measure; pin only the numeric forms here.
+- 2026-10-03, interactive session: timed out after 120 min because `Measure-CodeQuality.ps1 -Library` ran the whole solution's ~25k tests with coverage (40-58 min a run on nine lanes) and other lanes killed runs machine-wide; both fixed (BL-1318). Code and tests were written and green (196/196) before the timeout; only the Measure-CodeQuality check was never completed. Restore the work, rebuild, run the RTSP tests, then `Measure-CodeQuality.ps1 -Library Curl.Protocol.Rtsp.UnitLibrary`, which now takes minutes (BL-1318). The work is in the shared stash `011be235c828c5355b3745fa019d6c7cc6ec5dfc` (never pop a stash; lanes share them). Restore it with `git checkout 011be235c828c5355b3745fa019d6c7cc6ec5dfc -- Curl.Protocol.Rtsp.UnitLibrary/RtspProtocolHandler.cs Curl.Protocol.Rtsp.UnitLibrary/RtspRequestFormatter.cs Curl.Protocol.Rtsp.UnitTests/RtspProtocolHandlerTests.cs Curl.Protocol.Rtsp.UnitTests/RtspRequestFormatterTests.cs` and continue from there.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-03: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1293-20261002-211047-L2.jsonl
+- 2026-10-03: Blocked -> Backlog. Requeued: the timeout was Measure-CodeQuality running the whole solution (fixed in BL-1318); Notes say how to restore the stashed work

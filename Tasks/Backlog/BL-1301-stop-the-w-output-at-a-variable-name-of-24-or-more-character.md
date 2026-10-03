@@ -34,9 +34,11 @@ A `-w` template whose `%{...}` holds a name of 24 or more bytes stops writing th
 - [ ] `dotnet build Curl.Output.UnitTests -warnaserror` is clean; `dotnet test Curl.Output.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary` reports no failing member.
 
 ## Notes
+- 2026-10-03, interactive session: timed out after 120 min because `Measure-CodeQuality.ps1 -Library` ran the whole solution's ~25k tests with coverage (40-58 min a run on nine lanes) and other lanes killed runs machine-wide; both fixed (BL-1318). Code was written and Output's tests green; the whole-solution Measure run failed on a test elsewhere and never reached coverage. Restore, test Output, then `Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary`. The work is in the shared stash `bcbad21733fd8c0605142f9b07739f05084e59b6` (never pop a stash; lanes share them). Restore it with `git checkout bcbad21733fd8c0605142f9b07739f05084e59b6 -- Curl.Output.UnitLibrary/WriteOutTemplateRenderer.cs Curl.Output.UnitTests/WriteOutTemplateRendererTests.cs` and continue from there.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1301-20261002-211047-L8.jsonl
+- 2026-10-03: Blocked -> Backlog. Requeued: the timeout was Measure-CodeQuality running the whole solution (fixed in BL-1318); Notes say how to restore the stashed work

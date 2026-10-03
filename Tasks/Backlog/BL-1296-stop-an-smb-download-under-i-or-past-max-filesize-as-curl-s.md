@@ -34,9 +34,11 @@ An `smb://`/`smbs://` download honours `ITransferContext.NoBody` (`-I`) and `ITr
 - [ ] `dotnet build Curl.Protocol.Smb.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Smb.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smb.UnitLibrary` reports no failing member.
 
 ## Notes
+- 2026-10-03, interactive session: timed out after 120 min because `Measure-CodeQuality.ps1 -Library` ran the whole solution's ~25k tests with coverage (40-58 min a run on nine lanes) and other lanes killed runs machine-wide; both fixed (BL-1318). All four test criteria were written and green (138/138); only the Measure check was never completed. Restore, rebuild, test, then `Measure-CodeQuality.ps1 -Library Curl.Protocol.Smb.UnitLibrary`. The work is in the shared stash `65f0ded78d580000ebe016d63f7f5514d7a9bbc7` (never pop a stash; lanes share them). Restore it with `git checkout 65f0ded78d580000ebe016d63f7f5514d7a9bbc7 -- Curl.Protocol.Smb.UnitLibrary/SmbFileTransfer.cs Curl.Protocol.Smb.UnitLibrary/SmbMessages.cs Curl.Protocol.Smb.UnitTests/SmbFileTransferTests.cs Curl.Protocol.Smb.UnitTests/SmbProtocolHandlerVerboseTests.cs` and continue from there.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1296-20261002-211047-L4.jsonl
+- 2026-10-03: Blocked -> Backlog. Requeued: the timeout was Measure-CodeQuality running the whole solution (fixed in BL-1318); Notes say how to restore the stashed work

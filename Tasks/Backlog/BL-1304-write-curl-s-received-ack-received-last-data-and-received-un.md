@@ -40,9 +40,11 @@ Under `-v`, a `tftp://` transfer that receives an out-of-order packet writes the
 ## Notes
 
 - Out of scope, a known gap for a later task: `tftp_tx` also accepts ACK 65535 when it expects block 0 (the tftpd-hpa wrap bug, lines 377-383); `TftpUpload.AcceptAcknowledgementAsync` does not.
+- 2026-10-03, interactive session: timed out after 120 min because `Measure-CodeQuality.ps1 -Library` ran the whole solution's ~25k tests with coverage (40-58 min a run on nine lanes) and other lanes killed runs machine-wide; both fixed (BL-1318). Essentially done: every criterion was ticked with 100% line and branch coverage (it also covered the older DefaultPort fallback gap in TftpProtocolHandler.ExecuteAsync). Only the final build, commit and Done move were cut off. Restore, verify, commit. The stash also holds an old copy of this task file under Tasks/Doing: restore only the Curl.* files and tick the boxes in this file again. The work is in the shared stash `b4f4bc3da43655ed9059c4a47dac733e8d08e77e` (never pop a stash; lanes share them). Restore it with `git checkout b4f4bc3da43655ed9059c4a47dac733e8d08e77e -- Curl.Protocol.Tftp.UnitLibrary/CLAUDE.md Curl.Protocol.Tftp.UnitLibrary/TftpDownload.cs Curl.Protocol.Tftp.UnitLibrary/TftpTransferEvents.cs Curl.Protocol.Tftp.UnitLibrary/TftpUpload.cs Curl.Protocol.Tftp.UnitTests/TftpProtocolHandlerTests.cs Curl.Protocol.Tftp.UnitTests/TftpTransferEventsTests.cs` and continue from there.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1304-20261002-211047-L6.jsonl
+- 2026-10-03: Blocked -> Backlog. Requeued: the timeout was Measure-CodeQuality running the whole solution (fixed in BL-1318); Notes say how to restore the stashed work

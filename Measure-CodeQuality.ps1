@@ -34,6 +34,12 @@
     assembly - anything named *.UnitLibrary, plus Curl.Console. Curl.Console's
     assembly is named curl, and is reported and matched here as Curl.Console.
 
+    With -Library, the tests that run are only the *.UnitTests projects whose project
+    references reach a named library, directly or through other projects - the only
+    tests that can execute its code - one dotnet test per project into the same
+    results directory (BL-1318). Without it, or when no test project reaches the names,
+    the whole solution runs.
+
 .PARAMETER SkipTestRun
     Reuse the Cobertura files already in ResultsDirectory instead of running tests.
     Without -ResultsDirectory these are the reports this checkout's last run left in
@@ -110,28 +116,73 @@ if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
     $ResultsDirectory = Get-CheckoutResultsDirectory -CheckoutRoot $repositoryRoot
 }
 
+function Get-TestProjectsReaching {
+    # The *.UnitTests project files whose ProjectReference graph reaches a project whose
+    # name matches one of -Library (wildcards allowed; Curl.Console is the console project).
+    param([string] $Root, [string[]] $Library)
+    $projects = @{}
+    foreach ($file in Get-ChildItem -Path $Root -Filter '*.csproj' -Recurse -Depth 1 -File) {
+        $projects[$file.BaseName] = $file.FullName
+    }
+    $references = @{}
+    foreach ($name in $projects.Keys) {
+        [xml] $xml = Get-Content -LiteralPath $projects[$name] -Raw
+        $references[$name] = @($xml.SelectNodes('//ProjectReference') | ForEach-Object {
+            [System.IO.Path]::GetFileNameWithoutExtension(($_.GetAttribute('Include') -replace '\\', '/'))
+        })
+    }
+    $reaching = New-Object System.Collections.Generic.List[string]
+    foreach ($test in @($projects.Keys | Where-Object { $_ -like '*.UnitTests' } | Sort-Object)) {
+        $seen = New-Object System.Collections.Generic.HashSet[string]
+        $queue = New-Object System.Collections.Generic.Queue[string]
+        $queue.Enqueue($test)
+        while ($queue.Count) {
+            $current = $queue.Dequeue()
+            if (-not $seen.Add($current)) { continue }
+            foreach ($next in @($references[$current])) { if ($next -and $references.ContainsKey($next)) { $queue.Enqueue($next) } }
+        }
+        $hit = @($seen | Where-Object { $_ -ne $test } | Where-Object { $name = $_; @($Library | Where-Object { $name -like $_ }).Count -gt 0 })
+        if ($hit.Count) { $reaching.Add($projects[$test]) }
+    }
+    return $reaching
+}
+
 # --- 1. Collect coverage ----------------------------------------------------------
 
 if (-not $SkipTestRun) {
     if (Test-Path $ResultsDirectory) { Remove-Item $ResultsDirectory -Recurse -Force }
     New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
 
-    $solution = Join-Path $repositoryRoot 'Curl.slnx'
-    $testArguments = @(
-        'test', $solution,
-        '--collect:Code Coverage;Format=cobertura',
-        '--results-directory', $ResultsDirectory
-    )
-    if (-not $IncludeIntegration) { $testArguments += @('--filter', 'TestCategory!=Integration') }
+    # With -Library, run only the test projects whose project references reach a named
+    # library, directly or through other projects, rather than the whole solution. Those
+    # are the only tests that can execute its code, so its coverage, merged across them,
+    # is what a whole-solution run would report; on nine busy lanes that is minutes, not
+    # the 40-58 a whole-solution run took (BL-1318). Without -Library, or when no test
+    # project reaches the names given, the whole solution runs as before.
+    $testTargets = @(Join-Path $repositoryRoot 'Curl.slnx')
+    if ($Library) {
+        $covering = @(Get-TestProjectsReaching -Root $repositoryRoot -Library $Library)
+        if ($covering.Count) { $testTargets = $covering }
+    }
 
     Write-Host "Running tests with coverage into $ResultsDirectory ..." -ForegroundColor Cyan
     $testOutput = New-Object System.Collections.Generic.List[string]
-    & dotnet @testArguments | ForEach-Object {
-        $line = [string]$_
-        $testOutput.Add($line)
-        Write-Host $line
+    $testExitCode = 0
+    foreach ($target in $testTargets) {
+        $testArguments = @(
+            'test', $target,
+            '--collect:Code Coverage;Format=cobertura',
+            '--results-directory', $ResultsDirectory
+        )
+        if (-not $IncludeIntegration) { $testArguments += @('--filter', 'TestCategory!=Integration') }
+        Write-Host "dotnet test $(Split-Path $target -Leaf)" -ForegroundColor DarkCyan
+        & dotnet @testArguments | ForEach-Object {
+            $line = [string]$_
+            $testOutput.Add($line)
+            Write-Host $line
+        }
+        if ($LASTEXITCODE -ne 0) { $testExitCode = $LASTEXITCODE }
     }
-    $testExitCode = $LASTEXITCODE
     if ($testExitCode -ne 0) {
         # A scaffolded .UnitTests project with no tests yet prints "No test matches the
         # given testcase filter" and can make dotnet test exit non-zero although nothing

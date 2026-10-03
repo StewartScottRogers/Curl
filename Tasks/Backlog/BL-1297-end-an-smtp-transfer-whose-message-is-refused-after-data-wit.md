@@ -38,9 +38,11 @@ When the server answers the end of an SMTP message with anything but 250, Curl's
 - [ ] `dotnet build Curl.Protocol.Smtp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Smtp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary` reports no failing member.
 
 ## Notes
+- 2026-10-03, interactive session: timed out after 120 min because `Measure-CodeQuality.ps1 -Library` ran the whole solution's ~25k tests with coverage (40-58 min a run on nine lanes) and other lanes killed runs machine-wide; both fixed (BL-1318). Criteria 1-3 were written and green (312/312), but Measure reported 1 failing member in Curl.Protocol.Smtp.UnitLibrary that was never identified. Restore, run `Measure-CodeQuality.ps1 -Library Curl.Protocol.Smtp.UnitLibrary`, read the failing-member table, and cover that member. The work is in the shared stash `41dabaabc70e62a26754d4afd66a1961be406cca` (never pop a stash; lanes share them). Restore it with `git checkout 41dabaabc70e62a26754d4afd66a1961be406cca -- Curl.Protocol.Smtp.UnitLibrary/SmtpProtocolHandler.cs Curl.Protocol.Smtp.UnitLibrary/SmtpSessionMessages.cs Curl.Protocol.Smtp.UnitTests/SmtpProtocolHandlerEventTests.cs Curl.Protocol.Smtp.UnitTests/SmtpProtocolHandlerStateTraceTests.cs` and continue from there.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-03: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1297-20261002-211047-L1.jsonl
+- 2026-10-03: Blocked -> Backlog. Requeued: the timeout was Measure-CodeQuality running the whole solution (fixed in BL-1318); Notes say how to restore the stashed work

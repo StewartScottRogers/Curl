@@ -38,6 +38,15 @@ at its new path. It is the specification: its `Goal`, `Context` and
 As you go, record the plan's summary and anything learned under the task's `Notes`,
 and tick each acceptance box as you verify it.
 
+Up to nine lanes run on this machine at once, each in its own worktree:
+- Measure one library with `Measure-CodeQuality.ps1 -Library <name>`. It runs only the
+  test projects that reach that library (minutes); never measure the whole solution
+  for one task's coverage criterion (BL-1318).
+- Stop only a process you started yourself, by its PID. Never stop processes by name or
+  command line across the machine (`Stop-Process -Name dotnet`, or every process whose
+  command line holds `Measure-CodeQuality`): those are other lanes' runs, and killing
+  them cost five tasks their whole time limit on 2026-10-03.
+
 ## 4. File the outcome
 A task never stays in `Doing` when you finish. It ends in one of these:
 - **Finished.** Every box is ticked and every gate is green:
