@@ -8,7 +8,7 @@ depends-on: [BL-1336, BL-1342]
 touches: [Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1349 — Cancel a POP3 SASL exchange whose mechanism gives a CancelReason, writing it as a -v line first
 
@@ -24,13 +24,16 @@ When `ISaslExchange.RespondAsync` returns `null` with `ISaslExchange.CancelReaso
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Pop3.UnitTests` uses a fake exchange (`ScriptedSaslAuthenticator` or a new fake beside it) whose `RespondAsync` returns `null` with `CancelReason` `GSSAPI handshake failure (invalid security data)` and asserts the reason is reported as an info line, then `*` is sent, and the login goes on as after an undecodable challenge.
-- [ ] A test pins that a `null` answer with no `CancelReason` still ends with exit 67 and no `*`.
-- [ ] `dotnet build Curl.Protocol.Pop3.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Pop3.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Pop3.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Pop3.UnitTests` uses a fake exchange (`ScriptedSaslAuthenticator` or a new fake beside it) whose `RespondAsync` returns `null` with `CancelReason` `GSSAPI handshake failure (invalid security data)` and asserts the reason is reported as an info line, then `*` is sent, and the login goes on as after an undecodable challenge.
+- [x] A test pins that a `null` answer with no `CancelReason` still ends with exit 67 and no `*`.
+- [x] `dotnet build Curl.Protocol.Pop3.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Pop3.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Pop3.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- 2026-10-03: `Pop3Login.AnswerToAsync` now hands a `null` answer to `CancelOrDeny`: a `CancelReason` is reported with `ReportInfo` and answered with `*` (the same `CancelLine` path as an undecodable challenge, so the next mechanism or APOP/USER follows); no reason keeps exit 67 with no `*`. The fake is `RankedSaslAuthenticator.CancelReasons` (per mechanism). Tests: `ExecuteAsync_ExchangeCancelsWithAReason_ReportsItThenCancelsAndFallsBack` and `ExecuteAsync_ExchangeGivesNoAnswerAndNoReason_FailsWithLoginDeniedWithoutCancelling` in `Pop3ProtocolHandlerSaslCancelTests`. Pop3 tests: 312 passed, 5 skipped; Measure-CodeQuality: 0 failing members. No ADR: `ISaslExchange`'s contract (BL-1335) already states this behaviour.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. POP3 writes an exchange's CancelReason as a -v line and cancels with *, going on to the next way to log in
