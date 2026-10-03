@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Measure-Performance.ps1 -Iterations 20 -
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: yes | Ran the reproduction at 20 iterations. large-get median peak working set: curl 9478144 bytes, candidate 31477760 bytes, 3.32x curl's, over the 2x threshold. The ratio is lower than the 3.7x the finding gave but still over the threshold. The cause is still in place: HttpResponseBodyReader.cs:295 allocates `new byte[1]` on every pass of the CopyFramedAsync loop. The same loop makes large-get 278x slower (see the new finding).
+
 ## Log
 
 - 2026-10-02: filed proposed.

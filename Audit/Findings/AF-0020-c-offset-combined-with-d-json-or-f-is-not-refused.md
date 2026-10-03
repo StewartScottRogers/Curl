@@ -38,6 +38,8 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction against curl 8.21.0 Schannel. Both binaries exit 2 with 'curl: cannot mix --continue-at with --data' / '--form' followed by 'curl: (2) Failed initialization', for both -d x and -F a=b. Also checked -C 10 --json {}: both exit 2 with the same --data message.
+
 ## Log
 
 - 2026-10-02: filed proposed.

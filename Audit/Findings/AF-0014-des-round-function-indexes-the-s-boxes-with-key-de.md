@@ -3,15 +3,15 @@ id: AF-0014
 title: DES round function indexes the S-boxes with key-dependent values (NTLM LMOWFv1 and DESL)
 auditor: security
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-03_0623.md: the reproduction no longer reproduces.
 key: security:Curl.Cryptography.UnitLibrary/Des.cs:Round:secret-dependent-lookup
 task: BL-1270
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
-closed:
-closed-by:
+closed: 2026-10-03
+closed-by: 2026-10-03_0623.md
 ---
 # AF-0014 - DES round function indexes the S-boxes with key-dependent values (NTLM LMOWFv1 and DESL)
 
@@ -38,7 +38,10 @@ Select-String -Path Curl.Cryptography.UnitLibrary/Des.cs -Pattern 'SubstitutionB
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Select-String -Path Curl.Cryptography.UnitLibrary/Des.cs -Pattern 'SubstitutionBoxes\[\(box \* 64\)' found no match. Des.SubstituteSix (Des.cs:181-195) scans all 64 entries of the box with mask ((six ^ position) - 1) >> 31; the box slice offset (box * 64) is the public loop counter.
+
 ## Log
 
 - 2026-10-02: filed proposed.
 - 2026-10-02: proposed -> accepted.
+- 2026-10-03: accepted -> closed. Re-audit 2026-10-03_0623.md: the reproduction no longer reproduces.

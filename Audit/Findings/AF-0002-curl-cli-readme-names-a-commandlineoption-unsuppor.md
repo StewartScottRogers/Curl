@@ -39,6 +39,7 @@ Select-String -Path Curl.Cli.UnitLibrary/CommandLineOption.cs,Curl.Cli.UnitLibra
 ## Re-audits
 
 - 2026-10-02 | 2026-10-02_1400.md | reproduces: yes | The UnsupportedFlag reference is gone: no match in Curl.Cli.UnitLibrary. But CommandLineOptionTable.cs:331 still has CommandLineOption.Flag("http2", ...) selecting RequestedHttpVersion.Http2, so --http2 is accepted, while Curl.Cli.UnitLibrary/README.md:20 still says InstalledLibcurlDoesNotSupport covers '--http2 and the other options ADR-0017 refuses'. The false claim that --http2 is refused remains.
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Select-String for 'UnsupportedFlag' finds nothing in CommandLineOption.cs or CommandLineOptionTable.cs, and Curl.Cli.UnitLibrary/README.md does not mention it. The only hit is CommandLineOptionTable.cs:332, Flag("http2", ...).RefusedBySchannelBuild(). That row is the real mechanism: CommandLineOption.cs:83-91 returns CommandLineRefusal.InstalledLibcurlDoesNotSupport, which is what the README now says. ADR-0137 line 84 still names UnsupportedFlag, a stale claim in another document that was not part of this re-audit.
 
 ## Log
 

@@ -38,6 +38,8 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction against curl 8.21.0 Schannel. Location http://127.0.0.1:x/z gives exit 3, num_redirects 1 from both binaries. Location /z gives exit 0, num_redirects 1 from both.
+
 ## Log
 
 - 2026-10-02: filed proposed.

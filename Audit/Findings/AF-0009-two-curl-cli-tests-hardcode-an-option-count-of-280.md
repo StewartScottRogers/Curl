@@ -38,6 +38,8 @@ dotnet test Curl.Cli.UnitTests -c Release --filter "Name=OptionTable_EveryRow_Is
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the dotnet test reproduction: Passed! Failed 0, Passed 2, Total 2. Both tests pass.
+
 ## Log
 
 - 2026-10-02: filed proposed.

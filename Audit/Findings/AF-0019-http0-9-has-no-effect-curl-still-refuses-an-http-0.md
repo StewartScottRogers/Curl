@@ -38,6 +38,8 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction against curl 8.21.0 Schannel (TEMP redirected to the scratch folder): 'curl: exit 0, stdout [just text], stderr []' and 'candidate: exit 0, stdout [just text], stderr []'. Curl now accepts the HTTP/0.9 reply under --http0.9.
+
 ## Log
 
 - 2026-10-02: filed proposed.

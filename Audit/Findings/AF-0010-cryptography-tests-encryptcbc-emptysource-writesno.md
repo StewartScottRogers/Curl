@@ -38,6 +38,8 @@ Select-String -Path Curl.Cryptography.UnitTests/BlowfishTests.cs -Pattern 'Encry
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_0623.md | reproduces: no | BlowfishTests.cs:145-153 EncryptCbc_EmptySource_WritesNothing now asserts Assert.AreEqual("A5A5A5A5A5A5A5A5", ...). Cast128Tests.cs:146 and CamelliaTests.cs:87 assert the same. BlowfishTests Constructor_56ByteKey_IsAccepted (line 167) has CollectionAssert.AreNotEqual and AreEqual at lines 177-178. I did not check the ChaCha20 or Rc4 test files.
+
 ## Log
 
 - 2026-10-02: filed proposed.
