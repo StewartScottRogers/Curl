@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary]
 requirement: FR-084
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1314 — Say in ITransferContext.MaxFileSize's remark that the gopher handler enforces it
 
@@ -22,12 +22,15 @@ The remark on `ITransferContext.MaxFileSize` names every handler that enforces `
 
 ## Acceptance criteria
 
-- [ ] The `MaxFileSize` remark lists the handlers that read it (grep `MaxFileSize` across `Curl.Protocol.*.UnitLibrary`), gopher and FTP included, and drops "no other handler reads it yet" unless that is still true of the rest.
-- [ ] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` is clean.
+- [x] The `MaxFileSize` remark lists the handlers that read it (grep `MaxFileSize` across `Curl.Protocol.*.UnitLibrary`), gopher and FTP included, and drops "no other handler reads it yet" unless that is still true of the rest.
+- [x] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` is clean.
 
 ## Notes
+
+- Grepped `.MaxFileSize` across `Curl.Protocol.*.UnitLibrary`: dict, file, ftp, gopher, http, imap, mqtt, pop3, rtsp, telnet and ws read it; ldap, smb, smtp, ssh (scp/sftp) and tftp do not. The remark now lists both groups and gives gopher's exit-63 message. Comment-only change; Abstractions build clean with -warnaserror, its 681 fast tests pass.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. ITransferContext.MaxFileSize's remark names every handler that enforces --max-filesize, gopher and FTP included

@@ -86,8 +86,12 @@ public interface ITransferContext
     /// then fails with exit 63 (<see cref="CurlExitCode.FilesizeExceeded" />); the limit
     /// counts body bytes only, so headers written to <see cref="HeaderOutput" /> do not use
     /// it up, and an upload ignores it. <c>Curl.Console</c> fills it from <c>--max-filesize</c>.
-    /// The <c>file://</c> and <c>http</c>/<c>https</c> handlers enforce it; no other
-    /// handler reads it yet. Over HTTP a response whose Content-Length is over the limit
+    /// The <c>dict</c>, <c>file://</c>, <c>ftp</c>/<c>ftps</c>, <c>gopher</c>,
+    /// <c>http</c>/<c>https</c>, <c>imap</c>, <c>mqtt</c>, <c>pop3</c>, <c>rtsp</c>,
+    /// <c>telnet</c> and <c>ws</c>/<c>wss</c> handlers enforce it; the <c>ldap</c>,
+    /// <c>smb</c>, <c>smtp</c>, <c>scp</c>/<c>sftp</c> and <c>tftp</c> handlers do not
+    /// read it yet. Over gopher a reply is cut at the limit and fails with exit 63 and
+    /// <c>Exceeded the maximum allowed file size (N) with N bytes</c>. Over HTTP a response whose Content-Length is over the limit
     /// fails before any body is written, with exit 63 and <c>Maximum file size exceeded</c>;
     /// a body with no Content-Length, or one that grows past it, is cut at the limit and
     /// fails with exit 63 and <c>Exceeded the maximum allowed file size (N) with N bytes</c>
