@@ -46,7 +46,7 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 ## Notes
 
-- Plan: replace the secret-indexed S-box read in `Des.Round` with `Des.SubstituteSix`, a masked scan of all 64 entries of the box (mask `((six ^ position) - 1) >> 31`), the pattern BL-1269 used for ARIA. Recorded as ADR-0396, superseding ADR-0156s table look-up.
+- Plan: replace the secret-indexed S-box read in `Des.Round` with `Des.SubstituteSix`, a masked scan of all 64 entries of the box (mask `((six ^ position) - 1) >> 31`), the pattern BL-1269 used for ARIA. Recorded as ADR-0396, superseding ADR-0156's table look-up.
 - `SubstituteSix` has no branches; existing FIPS and NTLM known-answer tests in Curl.Cryptography.UnitTests and Curl.Ntlm.UnitTests cover it, so no new test was needed (the test project is outside `touches`).
 - Reproduction now gives no match. Build clean; fast tests green (Curl.Cryptography.UnitTests 1330 passed).
 
