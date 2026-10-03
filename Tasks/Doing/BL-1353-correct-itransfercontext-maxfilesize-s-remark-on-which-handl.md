@@ -32,3 +32,4 @@ The remark on `ITransferContext.MaxFileSize` in `Curl.Protocol.Abstractions.Unit
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
