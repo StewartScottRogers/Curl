@@ -1,5 +1,5 @@
 ---
-id: BL-1244
+id: BL-1245
 title: Split the comma-joined -Unreliable and -ChangedTree lists so unreliable auditors close nothing
 priority: High
 assignee: Claude
@@ -9,9 +9,9 @@ touches: [Audit/Tools/Write-AuditFindings.ps1, Audit/Tools/Write-AuditScorecard.
 lane: no
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
-# BL-1244 — Split the comma-joined -Unreliable and -ChangedTree lists so unreliable auditors close nothing
+# BL-1245 — Split the comma-joined -Unreliable and -ChangedTree lists so unreliable auditors close nothing
 
 ## Goal
 
@@ -35,3 +35,4 @@ An auditor flagged unreliable on an audit closes no finding and its new findings
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. Unreliable auditors close nothing; the 14:00 audit corrected in PR #50 (commits there say BL-1244)
