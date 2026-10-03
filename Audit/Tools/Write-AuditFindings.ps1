@@ -72,6 +72,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+
+function ConvertTo-NameList([string[]]$Names) {
+    # RunAudit.ps1 passes the list through powershell -File as one comma-joined argument,
+    # which arrives as a single string: split it, or 'quality,process' matches neither
+    # auditor and an unreliable one closes findings (BL-1244).
+    return @($Names | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+$Unreliable = ConvertTo-NameList $Unreliable
 $AuditorOrder = @('quality', 'security', 'performance', 'conformance', 'truthfulness', 'process')
 $Utf8 = New-Object Text.UTF8Encoding $false
 
@@ -243,7 +251,8 @@ if ($SelfTest) {
         Copy-Item -LiteralPath (Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md') -Destination $FindingsDirectory
         $ReportDirectory = Join-Path $work 'reports'
         $Manifest = Join-Path $work 'manifest.json'
-        $Unreliable = @('performance'); $Scorecard = '2026-10-14_0930.md'; $Commit = 'abc1234'; $Date = '2026-10-14'
+        # One comma-joined string, as RunAudit.ps1 passes it through powershell -File (BL-1244).
+        $Unreliable = ConvertTo-NameList @('performance,truthfulness-not-run'); $Scorecard = '2026-10-14_0930.md'; $Commit = 'abc1234'; $Date = '2026-10-14'
         $before = @{}
         foreach ($f in Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md') { $before[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
         $line = Invoke-WriteFindings
@@ -273,6 +282,7 @@ if ($SelfTest) {
         $af9 = Text 'AF-0009'
         Check 'a key matching a closed finding files a new one naming it' ($af4 -ceq $before[(Split-Path (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-0004-*.md').FullName -Leaf)] -and $af9 -match 'Reappeared; previously AF-0004') 'AF-0009'
         Check 'an unreliable auditor''s new finding says so' ((Text 'AF-0008') -match 'flagged unreliable in 2026-10-14_0930.md') 'AF-0008'
+        Check 'a comma-joined -Unreliable is split into names' (((ConvertTo-NameList @('quality, process', 'security')) -join '|') -eq 'quality|process|security') 'quality|process|security'
         $templateFields = @([regex]::Matches([IO.File]::ReadAllText((Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md')), '(?m)^([a-z-]+):') | ForEach-Object { $_.Groups[1].Value }) -join ','
         $newFields = @([regex]::Matches(($af7 -split '\r?\n---')[0], '(?m)^([a-z-]+):') | ForEach-Object { $_.Groups[1].Value }) -join ','
         $sections = @([regex]::Matches($af7, '(?m)^## (.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() }) -join ','

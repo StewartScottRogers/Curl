@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 
 ## Re-audits
 
+- 2026-10-02 | 2026-10-02_1400.md | reproduces: no | Ran the measure tool and the Select-String. BL-564 is not among the 244 tasks and ..\logs has no BL-564-* files, so Select-String finds nothing.
+
 ## Log
 
 - 2026-09-30: filed proposed.

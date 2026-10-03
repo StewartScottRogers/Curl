@@ -38,6 +38,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-02 | 2026-10-02_1400.md | reproduces: no | CLAUDE.md now reads '66 projects, one flat alphabetical run'; Get-ChildItem -Directory -Filter 'Curl.*' counts 66. Statement matches.
+
 ## Log
 
 - 2026-09-30: filed proposed.

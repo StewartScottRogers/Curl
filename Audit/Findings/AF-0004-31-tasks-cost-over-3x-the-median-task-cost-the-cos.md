@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 
 ## Re-audits
 
+- 2026-10-02 | 2026-10-02_1400.md | reproduces: no | The five costliest tasks are BL-1105 8.52, BL-710 7.29, BL-942 7.12, BL-988 6.80 and BL-1049 6.74 USD. BL-703, BL-527, BL-568, BL-658 and BL-708 are absent. 17 tasks are over 3x the median of 1.67 USD, not 31.
+
 ## Log
 
 - 2026-09-30: filed proposed.
