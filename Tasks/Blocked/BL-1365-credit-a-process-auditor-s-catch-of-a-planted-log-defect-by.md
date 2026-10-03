@@ -35,3 +35,4 @@ A process finding that names a planted log defect's catch text is a catch, whate
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Blocked. Built on the audit branch (PR #56, 579e6554); waits for the 3-auditor check run and the merge. An interactive session completes it.
