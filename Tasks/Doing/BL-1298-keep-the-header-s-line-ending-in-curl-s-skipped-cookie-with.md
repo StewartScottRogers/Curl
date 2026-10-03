@@ -42,3 +42,4 @@ The `-v` refusal Curl writes for a `Set-Cookie` whose `Domain` the host may not 
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-03: Backlog -> Doing.
