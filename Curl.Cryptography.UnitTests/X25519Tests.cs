@@ -80,13 +80,29 @@ public sealed class X25519Tests
         Assert.AreEqual(AliceAndBobSharedSecret, Convert.ToHexStringLower(sharedSecret));
     }
 
-    // Low-order u-coordinates (RFC 7748 section 7): 0, 1, and their non-canonical
-    // encodings p and p + 1, which the function reduces modulo p = 2^255 - 19.
+    // Every small-order u-coordinate encoding, from libsodium's blacklist in
+    // crypto_scalarmult/curve25519/ref10/x25519_ref10.c (has_small_order): each gives
+    // the all-zero output that RFC 7748 section 6.1 says a protocol may check for.
+    // In order: 0 (order 4), 1 (order 1), the two order-8 points, p - 1 (order 2),
+    // and the non-canonical p (that is 0) and p + 1 (that is 1), which the function
+    // reduces modulo p = 2^255 - 19. RFC 7748 section 5 masks the top bit, so the
+    // last seven rows, the same encodings with bit 255 set (as Wycheproof's
+    // x25519_test.json feeds them), must give the same result.
     [TestMethod]
     [DataRow("0000000000000000000000000000000000000000000000000000000000000000")]
     [DataRow("0100000000000000000000000000000000000000000000000000000000000000")]
+    [DataRow("e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800")]
+    [DataRow("5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157")]
+    [DataRow("ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f")]
     [DataRow("edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f")]
     [DataRow("eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f")]
+    [DataRow("0000000000000000000000000000000000000000000000000000000000000080")]
+    [DataRow("0100000000000000000000000000000000000000000000000000000000000080")]
+    [DataRow("e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b880")]
+    [DataRow("5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f11d7")]
+    [DataRow("ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")]
+    [DataRow("edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")]
+    [DataRow("eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")]
     public void TryComputeSharedSecret_LowOrderPeerKey_ReturnsFalseWithAnAllZeroSecret(string peerPublicKey)
     {
         byte[] sharedSecret = [.. Enumerable.Repeat((byte)0xAA, X25519.KeySize)];

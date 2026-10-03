@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cryptography.UnitLibrary, Curl.Cryptography.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1234 — Pin X25519 to every small-order u-coordinate libsodium refuses, the order-8 points included
 
@@ -32,13 +32,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `TryComputeSharedSecret_LowOrderPeerKey_ReturnsFalseWithAnAllZeroSecret` (or a sibling test beside it) has a row for each of the seven encodings above and for each of the seven with bit 255 set, with a comment naming libsodium's list and RFC 7748 sections 5 and 6.1; every row passes.
-- [ ] The comment above the rows says which encodings are which point (as in the list above).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `TryComputeSharedSecret_LowOrderPeerKey_ReturnsFalseWithAnAllZeroSecret` (or a sibling test beside it) has a row for each of the seven encodings above and for each of the seven with bit 255 set, with a comment naming libsodium's list and RFC 7748 sections 5 and 6.1; every row passes.
+- [x] The comment above the rows says which encodings are which point (as in the list above).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- Pinning only: all fourteen rows (libsodium's seven small-order encodings, and each with bit 255 set) passed against the existing `X25519.cs` unchanged, so no production change was needed.
+- The rows went into the existing `TryComputeSharedSecret_LowOrderPeerKey_ReturnsFalseWithAnAllZeroSecret` rather than a sibling test: same assertion, one list to read.
+- Measured: `dotnet build Curl.slnx -warnaserror` clean; fast tests green (Curl.Cryptography.UnitTests 1330 passed); Measure-CodeQuality: Curl.Cryptography.UnitLibrary 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. X25519 is pinned to reject all seven libsodium small-order u-coordinates, order-8 points and p - 1 included, with and without bit 255
