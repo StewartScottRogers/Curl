@@ -302,9 +302,17 @@ public sealed partial class TcpConnector(
     /// <summary>
     /// Gets the <c>--connect-timeout</c> whose <c>[TIMER] [CONNECTTIMEOUT]</c> lines a direct connect
     /// writes under <see cref="TracesTimers" />, or <see langword="null" /> when none, or 0, was given:
-    /// curl's default connect timeout and a shorter <c>-m</c> write no such line (measured, BL-1210 Notes).
+    /// curl's default connect timeout writes no such line (measured, BL-1210 Notes), a longer or shorter
+    /// <c>-m</c> leaves it written (measured, BL-1258 Notes).
     /// </summary>
     public TimeSpan? TracedConnectTimeout { get; init; }
+
+    /// <summary>
+    /// Gets the <c>-m</c> whose <c>[TIMER] [TIMEOUT]</c> lines a direct connect writes under
+    /// <see cref="TracesTimers" />, or <see langword="null" /> when none, or 0, was given (measured,
+    /// BL-1258 Notes).
+    /// </summary>
+    public TimeSpan? TracedTransferTimeout { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether a direct connect to an <c>https://</c> origin writes the
@@ -736,7 +744,7 @@ public sealed partial class TcpConnector(
 
     private ConnectAttemptTraceEvents? ConnectAttemptTraceOf(ITransferEvents events, string host) =>
         TracesHappyEyeballsFilter || TracesTcpFilter || TracesTimers
-            ? new ConnectAttemptTraceEvents(events, host, TracesHappyEyeballsFilter, TracesTcpFilter, TracesTimers, TracesTimerExpiry, TracedConnectTimeout)
+            ? new ConnectAttemptTraceEvents(events, host, TracesHappyEyeballsFilter, TracesTcpFilter, TracesTimers, TracesTimerExpiry, TracedConnectTimeout, TracedTransferTimeout)
             : null;
 
     // The [SETUP] filter's events over the [DNS] filter's over the given ones, each when traced; the
