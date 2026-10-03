@@ -3,8 +3,8 @@ id: AF-0034
 title: BL-1360 run (lane 7) ends without DONE or BLOCKED after 87 minutes; BL-1325 blocked after 120 minutes
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-1360:unfinished-run
 task: none
 found: 2026-10-03
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.
