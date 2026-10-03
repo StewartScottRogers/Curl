@@ -38,3 +38,4 @@ Under `--trace-config tcp`, `network`, `all` and `-vvvv`, an `ftp://` transfer w
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
 - 2026-10-03: Doing -> Backlog. Code done in the stashed working tree; coverage measurement and the ADR-0357 amendment remain (run out of budget)
+- 2026-10-03: Backlog -> Doing.
