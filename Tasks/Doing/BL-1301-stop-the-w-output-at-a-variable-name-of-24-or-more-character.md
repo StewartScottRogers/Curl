@@ -38,3 +38,4 @@ A `-w` template whose `%{...}` holds a name of 24 or more bytes stops writing th
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
