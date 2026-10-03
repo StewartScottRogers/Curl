@@ -1,0 +1,40 @@
+---
+id: BL-1296
+title: Stop an SMB download under -I or past --max-filesize as curl's download writer does
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Protocol.Smb.UnitLibrary, Curl.Protocol.Smb.UnitTests]
+requirement: FR-084
+created: 2026-10-02
+completed:
+---
+# BL-1296 — Stop an SMB download under -I or past --max-filesize as curl's download writer does
+
+## Goal
+
+An `smb://`/`smbs://` download honours `ITransferContext.NoBody` (`-I`) and `ITransferContext.MaxFileSize` (`--max-filesize`) as curl 8.21.0 does: under `-I` the first READ data ends the download with exit 8 and writes nothing; past the limit the allowed bytes are written and the download ends with exit 63; either way the file is closed and the tree disconnected before the result is returned.
+
+## Context
+
+- Today `Curl.Protocol.Smb.UnitLibrary/SmbFileTransfer.cs` writes each READ reply's data to `context.Output` (`WriteAsync`, around line 203) after reporting it as received data (`ReportDataReceived`); nothing reads `context.NoBody` or `context.MaxFileSize`. An output write failure (exit 23) already ends through `CloseAsync` and `DisconnectAsync`.
+- curl 8.21.0 (tag `curl-8_21_0`):
+  - `lib/smb.c` lines 1095-1112: each READ_ANDX reply's data goes to `Curl_client_write(data, CLIENTWRITE_BODY, ...)`; a failure is kept in `req->result` and the state machine moves to `SMB_CLOSE`, then `SMB_TREE_DISCONNECT`, then `SMB_DONE` returns `req->result` (lines 1165-1175).
+  - `lib/sendf.c` `cw_download_write`, lines 214-224: with `no_body` set and no headers received, the first body bytes return `CURLE_WEIRD_SERVER_REPLY` (exit 8) without `failf` (no `-v` line; exit text `Weird server reply`); lines 251-291: with `max_filesize` set, a write is cut to the bytes left under the limit, the cut part is written, and when bytes were cut `failf(data, "Exceeded the maximum allowed file size (%ld) with %ld bytes", ...)` returns `CURLE_FILESIZE_EXCEEDED` (exit 63). A file exactly at the limit does not fail; 0 is no limit; the count runs across READ replies.
+  - `smb.c` line 1082 sets the download size from the OPEN reply, but that is progress only; no size check happens before the first READ.
+- Comparison: the curl 8.21.0 source above, not measured. `Curl.Protocol.Smb.UnitTests/SmbRecordedExchange.cs` holds the recorded exchange the existing tests replay; `Record-CurlExchange.ps1 -Script` can serve the same frames to real curl if a measurement is wanted, and its bytes then go into the tests.
+
+## Acceptance criteria
+
+- [ ] A test in `Curl.Protocol.Smb.UnitTests` replays a download with `NoBody = true` and asserts exit 8 (`CurlExitCode.WeirdServerReply`), message `Weird server reply`, nothing written to the output, the READ data still reported as received data, no info line for the failure, and that CLOSE and TREE_DISCONNECT are sent before the transfer returns.
+- [ ] A test with `MaxFileSize = 3` and a longer file asserts exit 63 (`CurlExitCode.FilesizeExceeded`), message `Exceeded the maximum allowed file size (3) with 3 bytes`, the first 3 bytes written, no further READ sent, and CLOSE and TREE_DISCONNECT sent.
+- [ ] A test with a file read in two READ replies and a limit inside the second pins that the first is written whole and the second cut.
+- [ ] Tests pin that `MaxFileSize` of 0, `null` and exactly the file's size end with exit 0 and the whole file; an upload (`-T`) ignores both settings.
+- [ ] `dotnet build Curl.Protocol.Smb.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Smb.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smb.UnitLibrary` reports no failing member.
+
+## Notes
+
+## Log
+
+- 2026-10-02: Created.
