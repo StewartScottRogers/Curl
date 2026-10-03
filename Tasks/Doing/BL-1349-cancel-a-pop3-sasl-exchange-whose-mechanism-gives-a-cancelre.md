@@ -33,3 +33,4 @@ When `ISaslExchange.RespondAsync` returns `null` with `ISaslExchange.CancelReaso
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
