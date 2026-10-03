@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1361 — Fix AF-0026: Five ECH tests in Curl.Networking.UnitTests fail on the unmutated tree, which blocks mutation testing of Curl.Networking.UnitLibrary
 
@@ -41,12 +41,23 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-03: The reproduction does not reproduce. `dotnet test Curl.Networking.UnitTests -c Release -nologo`
+  gives Passed!, Failed: 0, Passed: 2974, Skipped: 30, Total: 3004 on this branch, six runs in a row, so the
+  tests are not flaky. It also passes (Failed: 0, Total: 2951) on 438bfc05, the `origin/work/dark-factory` tip
+  when the audit that reported it started (2026-10-03 06:23 UTC). The finding's Total: 2965 matches neither
+  tree, so the five failures most likely came from the audit's own seeded worktree (a defect planted in the
+  TLS/ECH path, which the mutation baseline then ran against), not from the shipped code. The ECH tests read
+  no clock, environment variable or network: every null-lookup case stays in-process. No code change was
+  needed. A lane may not read the audit office's files to check its planted-defect manifest, so the re-audit
+  confirms it.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. Curl.Networking.UnitTests passes in Release (0 failed of 3004, six runs); the reported failures do not reproduce on the shipped tree
