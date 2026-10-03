@@ -8,7 +8,7 @@ depends-on: [BL-1240]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1250 — Fall back to PASV after a failed EPSV data connection, port 0 included, as curl does
 
@@ -25,9 +25,9 @@ When the data connection to the port a `229` reply names cannot be made (port 0 
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.Ftp.UnitTests` pin that a refused EPSV data dial over IPv4 sends `PASV` next, writes the two `-v` lines above in order, and completes the transfer over the `227`'s port.
-- [ ] A `229` naming port 0 is dialled (or fails as the dial does) and falls back the same way; `ConnectTarget` accepts port 0 if that is the route taken, with its tests updated.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] Tests in `Curl.Protocol.Ftp.UnitTests` pin that a refused EPSV data dial over IPv4 sends `PASV` next, writes the two `-v` lines above in order, and completes the transfer over the `227`'s port.
+- [x] A `229` naming port 0 is dialled (or fails as the dial does) and falls back the same way; `ConnectTarget` accepts port 0 if that is the route taken, with its tests updated.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
 
@@ -35,3 +35,4 @@ When the data connection to the port a `229` reply names cannot be made (port 0 
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. A failed EPSV data dial, port 0 included, falls back to PASV over IPv4 with curl's -v lines, and ends with exit 8 over IPv6

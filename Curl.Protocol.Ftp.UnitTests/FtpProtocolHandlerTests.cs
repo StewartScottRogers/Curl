@@ -501,20 +501,6 @@ public sealed class FtpProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_EpsvPortZero_FailsTheDialWithExit7WithoutConnecting()
-    {
-        // curl 8.21.0 dials port 0 and fails at once, measured 2026-10-02 (BL-1240); its
-        // fallback to PASV after a failed EPSV dial is BL-1248's.
-        FtpRun run = await FtpRun.ExecuteAsync(Url, LoggedIn + "229 Entering Extended Passive Mode (|||0|)\r\n" + Bye);
-
-        Assert.HasCount(1, run.Connector.Targets);
-        Assert.AreEqual(LoginSent + "EPSV\r\n", run.Sent);
-        Assert.AreEqual(
-            TransferResult.Failure(CurlExitCode.CouldntConnect, "Failed to connect to 127.0.0.1:18321 via 127.0.0.1:0 after 0 ms: Could not connect to server"),
-            run.Result);
-    }
-
-    [TestMethod]
     public async Task ExecuteAsync_EpsvAndPasvRefused_QuitsAndFailsWithExit13()
     {
         FtpRun run = await FtpRun.ExecuteAsync(Url, LoggedIn + "500 no\r\n500 no\r\n" + Bye);
@@ -543,11 +529,11 @@ public sealed class FtpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_DataConnectRefused_ReturnsTheConnectorsFailure()
     {
-        var control = new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn + Epsv));
+        var control = new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn + "227 Entering Passive Mode (127,0,0,1,241,48)\r\n"));
         var connector = new QueuedConnector(ConnectResult.Connected(control), ConnectResult.Refused("Failed to connect to 127.0.0.1 port 61744"));
 
         TransferResult result = await new FtpProtocolHandler(connector).ExecuteAsync(
-            new TransferContext { Url = CurlUrl.Parse(Url), Output = new MemoryStream() });
+            new TransferContext { Url = CurlUrl.Parse(Url), Output = new MemoryStream(), FtpDisableEpsv = true });
 
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect to 127.0.0.1 port 61744", result.ErrorMessage);

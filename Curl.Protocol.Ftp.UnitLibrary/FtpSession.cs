@@ -1293,9 +1293,33 @@ internal sealed class FtpSession(
             return await AnswerRefusedEpsvAsync(epsv.Code).ConfigureAwait(false);
         }
 
-        return FtpPassiveReply.TryParseEpsvPort(epsv.LastLine, out int epsvPort, out string unreadable)
-            ? await ConnectDataAsync(context.Url.IdnHost, controlPeerAddress, epsvPort).ConfigureAwait(false)
-            : await QuitAndFailKeepingConnectionAsync(CurlExitCode.FtpWeirdPasvReply, unreadable).ConfigureAwait(false);
+        if (!FtpPassiveReply.TryParseEpsvPort(epsv.LastLine, out int epsvPort, out string unreadable))
+        {
+            return await QuitAndFailKeepingConnectionAsync(CurlExitCode.FtpWeirdPasvReply, unreadable).ConfigureAwait(false);
+        }
+
+        TransferResult? dialFailure = await DialDataAsync(context.Url.IdnHost, controlPeerAddress, epsvPort).ConfigureAwait(false);
+        return dialFailure is null
+            ? await SecureDataConnectionAsync().ConfigureAwait(false)
+            : await AnswerFailedEpsvDialAsync(dialFailure).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Answers a data connection to the <c>229</c>'s port that could not be made: over IPv6
+    /// the transfer ends with exit 8 and the dial's message, no <c>QUIT</c>; otherwise curl
+    /// 8.21.0's <c>-v</c> line and <c>PASV</c>, whose port carries the transfer (measured, BL-1250).
+    /// </summary>
+    private async ValueTask<TransferResult?> AnswerFailedEpsvDialAsync(TransferResult dialFailure)
+    {
+        if (controlPeerIsIPv6)
+        {
+            context.Events.ReportInfo(FtpTransferMessages.EpsvFailedOverIPv6);
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, dialFailure.ErrorMessage!, bytesTransferred);
+        }
+
+        context.Events.ReportInfo(FtpTransferMessages.EpsvFailed);
+        log.EpsvDataConnectFailed();
+        return await EnterPassiveModeAsync(afterSent: null).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1358,7 +1382,15 @@ internal sealed class FtpSession(
     /// its <c>schannel:</c> lines follow the <c>Trying</c> line, as curl 8.21.0 writes them
     /// (measured, BL-1084; BL-1091).
     /// </summary>
-    private async ValueTask<TransferResult?> ConnectDataAsync(string host, string shownHost, int port)
+    private async ValueTask<TransferResult?> ConnectDataAsync(string host, string shownHost, int port) =>
+        await DialDataAsync(host, shownHost, port).ConfigureAwait(false)
+            ?? await SecureDataConnectionAsync().ConfigureAwait(false);
+
+    /// <summary>
+    /// Dials the passive data connection without its TLS handshake: <see langword="null" />
+    /// once it is open, otherwise the failure, its message rewritten as curl 8.21.0 names it.
+    /// </summary>
+    private async ValueTask<TransferResult?> DialDataAsync(string host, string shownHost, int port)
     {
         context.Events.ReportInfo(FtpTransferMessages.ConnectingTo(shownHost, port));
         trace.DoPhaseComplete();
@@ -1366,8 +1398,10 @@ internal sealed class FtpSession(
         if (port == 0)
         {
             // A ConnectTarget carries ports 1 to 65535; curl 8.21.0 dials a 229's port 0 and
-            // the dial fails at once (measured, BL-1240).
-            return TransferResult.Failure(CurlExitCode.CouldntConnect, failure.Rewrite($"Failed to connect to {host}:0 after 0 ms: Could not connect to server"));
+            // the dial fails at once, writing its -v failure line (measured, BL-1240, BL-1250).
+            string message = failure.Rewrite($"Failed to connect to {host}:0 after 0 ms: Could not connect to server");
+            context.Events.ReportInfo(message);
+            return TransferResult.Failure(CurlExitCode.CouldntConnect, message);
         }
 
         var target = new ConnectTarget(host, port, false)
@@ -1384,7 +1418,7 @@ internal sealed class FtpSession(
         }
 
         log.PassiveDataConnected(host, port);
-        return await SecureDataConnectionAsync().ConfigureAwait(false);
+        return null;
     }
 
     /// <summary>Sends <c>TYPE A</c> for a listing or an ASCII transfer, <c>TYPE I</c> otherwise.</summary>
