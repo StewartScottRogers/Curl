@@ -3,15 +3,15 @@ id: AF-0033
 title: BL-1284, BL-1320 and BL-1287 cost over 3x the median task cost
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-03_1459.md: the reproduction no longer reproduces.
 key: process:logs:cost-outliers:cost-outlier
-task: none
+task: BL-1377
 found: 2026-10-03
 found-at: d1db9881553d55cd92c0e74bb41561c3dea9ea84
 scorecard: 2026-10-03_1233.md
-closed:
-closed-by:
+closed: 2026-10-03
+closed-by: 2026-10-03_1459.md
 ---
 # AF-0033 - BL-1284, BL-1320 and BL-1287 cost over 3x the median task cost
 
@@ -38,6 +38,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: no | BL-1284, BL-1320 and BL-1287 are not among the five costliest tasks (BL-1362, BL-1361, then three at $0), so the named outliers do not reproduce.
+
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.
+- 2026-10-03: accepted -> closed. Re-audit 2026-10-03_1459.md: the reproduction no longer reproduces.

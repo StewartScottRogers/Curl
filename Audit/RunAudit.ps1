@@ -88,7 +88,9 @@ $ErrorActionPreference = 'Stop'
 $commonGit = "$(& git -C $PSScriptRoot rev-parse --path-format=absolute --git-common-dir 2>$null)".Trim()
 $repo = if ($commonGit) { Split-Path ($commonGit -replace '/', '\') -Parent } else { (Resolve-Path (Join-Path $PSScriptRoot '..')).Path }
 $Order = @('quality', 'security', 'performance', 'conformance', 'truthfulness', 'process')
-$Models = @{ quality = 'sonnet'; security = 'opus'; performance = 'sonnet'; conformance = 'opus'; truthfulness = 'sonnet'; process = 'sonnet'; seeder = 'sonnet' }
+# quality, truthfulness and process moved from Sonnet to Opus (Stewart, 2026-10-03, BL-1364): on Sonnet they
+# cut their methods short in three audits running, even when told to run every step.
+$Models = @{ quality = 'opus'; security = 'opus'; performance = 'sonnet'; conformance = 'opus'; truthfulness = 'opus'; process = 'opus'; seeder = 'sonnet' }
 $Method = @{ quality = 'Quality'; security = 'Security'; performance = 'Performance'; conformance = 'Conformance'; truthfulness = 'Truthfulness'; process = 'Process' }
 $Dot = [char]0x00B7
 $Started = Get-Date

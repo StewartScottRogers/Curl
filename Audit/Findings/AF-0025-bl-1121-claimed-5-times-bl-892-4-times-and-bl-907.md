@@ -3,15 +3,15 @@ id: AF-0025
 title: BL-1121 claimed 5 times, BL-892 4 times and BL-907 3 times
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-03_1459.md: the reproduction no longer reproduces.
 key: process:logs:BL-1121:redone-work
 task: BL-1281
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
-closed:
-closed-by:
+closed: 2026-10-03
+closed-by: 2026-10-03_1459.md
 ---
 # AF-0025 - BL-1121 claimed 5 times, BL-892 4 times and BL-907 3 times
 
@@ -40,8 +40,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction with -Since 2026-09-30. Only BL-1289 has claims>=3 (6). BL-1121, BL-892 and BL-907 are absent: the log folder holds no logs for them. Absence of logs, not a fix.
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | With -Since 2026-09-30 the only task with claims of 3 or more is BL-1322 (5). BL-1121, BL-892 and BL-907 are absent from the logs.
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: no | No BL-1121, BL-892 or BL-907 in the output. The only task with 3 or more claims is BL-1371 (5 claims, reported as a new finding).
 
 ## Log
 
 - 2026-10-02: filed proposed.
 - 2026-10-02: proposed -> accepted.
+- 2026-10-03: accepted -> closed. Re-audit 2026-10-03_1459.md: the reproduction no longer reproduces.

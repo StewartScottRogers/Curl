@@ -3,10 +3,10 @@ id: AF-0032
 title: Lanes spent 1299 of 1793 idle minutes waiting on overlapping touches (about 38% of lane time)
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:overlap-waits:overlap-wait
-task: none
+task: BL-1374
 found: 2026-10-03
 found-at: d1db9881553d55cd92c0e74bb41561c3dea9ea84
 scorecard: 2026-10-03_1233.md
@@ -38,6 +38,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_1459.md | reproduces: yes | The tool gives laneIdleMinutes=2110 and waitOverlapMinutes=1544, not 1793 and 1299. The defect (overlap waits at about 40% of lane time) persists with different numbers.
+
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.
