@@ -34,3 +34,4 @@ A process finding that names a planted log defect's catch text is a catch, whate
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
