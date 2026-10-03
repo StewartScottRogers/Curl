@@ -37,3 +37,4 @@ When an `ftp://` download is handed `-r` text that names no range (`ITransferCon
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Backlog. Lane 1 could not integrate: fast tests failed twice (Curl.Conformance.UnitTests: test1677; then Curl.Conformance.UnitTests: test1677) after rebasing onto the other lanes' work. The work is on branch factory/BL-1333-lane-1-20261003-061205; start with git cherry-pick --no-commit factory/BL-1333-lane-1-20261003-061205 and fix it.
