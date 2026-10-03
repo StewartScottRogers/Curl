@@ -16,7 +16,8 @@ namespace Curl.Protocol.Smb;
 /// tree disconnect and ends the same way; a negative file size (exit 8), a refused read
 /// (exit 56), a failed output write (exit 23) or a refused write (exit 25) closes the file
 /// and disconnects first. The close and tree disconnect responses are not checked. A frame
-/// the reader refuses (exit 56) ends the transfer at once, and a tree connect or open whose
+/// the reader refuses (exit 56), or a request the connection cannot send (exit 55) or whose
+/// reply it cannot receive (exit 56), ends the transfer at once, and a tree connect or open whose
 /// bytes would pass 1024 is exit 63 with nothing sent, as curl closes the connection on
 /// either. An upload counts the bytes each write response says were written, as curl's
 /// <c>%{size_upload}</c> does, and writes the next piece from there.
@@ -65,7 +66,7 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
         TransferResult.Failure(CurlExitCode.FilesizeExceeded, SmbMessages.MessageTooLarge);
 
     private static TransferResult ReceiveFailure(SmbReceivedMessage message) =>
-        TransferResult.Failure(CurlExitCode.RecvError, message.ErrorMessage!);
+        TransferResult.Failure(message.ExitCode, message.ErrorMessage!);
 
     private static TransferResult NotFoundOrDenied(uint status) =>
         status == DosNoAccess
@@ -229,10 +230,20 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
         return reply.Bytes is null ? ReceiveFailureAfter(reply, outcome) : outcome;
     }
 
+    // A request that cannot be sent fails the exchange with exit 55, as smb_send_and_recv
+    // returns the send error; one that cannot be answered, with the reader's exit 56.
     private async ValueTask<SmbReceivedMessage> ExchangeAsync(byte[] request)
     {
-        await connection.WriteAsync(request, context.CancellationToken).ConfigureAwait(false);
-        await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
+        try
+        {
+            await connection.WriteAsync(request, context.CancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException exception)
+        {
+            return SmbIoFailures.SendFailed(exception);
+        }
+
         return await reader.ReceiveAsync(context.CancellationToken).ConfigureAwait(false);
     }
 }

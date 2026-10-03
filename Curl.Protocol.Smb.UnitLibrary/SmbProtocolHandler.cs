@@ -20,7 +20,9 @@ namespace Curl.Protocol.Smb;
 /// 67 and nothing sent; then <see cref="SmbSessionEstablisher" />'s outcomes; then an
 /// upload source that cannot seek, such as <c>-T -</c>'s standard input, is refused with
 /// exit 55 and nothing more sent, as curl refuses an upload of unknown size; then
-/// <see cref="SmbFileTransfer" />'s. The port
+/// <see cref="SmbFileTransfer" />'s. A connection write or read that throws an
+/// <see cref="IOException" /> at any step ends the transfer with exit 55 or 56
+/// (<see cref="SmbIoFailures" />). The port
 /// defaults to 445 for both schemes. A server that closes the connection mid-exchange is
 /// waited on until <see cref="ITransferContext.CancellationToken" /> ends the transfer, as
 /// curl waits for <c>-m</c>. Each step is written to

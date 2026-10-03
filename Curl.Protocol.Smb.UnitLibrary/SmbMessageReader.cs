@@ -33,7 +33,8 @@ internal sealed class SmbMessageReader(IConnection connection, TimeProvider time
     /// The message, holding every byte received for it (curl's <c>got</c>), which may run
     /// past its NetBIOS length; or exit 56 (<see cref="CurlExitCode.RecvError" />) with
     /// curl's message for a frame that is too large or too small, or whose byte count runs
-    /// past it.
+    /// past it, or for a read that threw an <see cref="IOException" />
+    /// (<see cref="SmbIoFailures.ReceiveFailed" />).
     /// </returns>
     /// <exception cref="OperationCanceledException">
     /// <paramref name="cancellationToken" /> was cancelled. A server that closes the
@@ -45,7 +46,16 @@ internal sealed class SmbMessageReader(IConnection connection, TimeProvider time
         int got = 0;
         while (true)
         {
-            int read = await connection.ReadAsync(buffer.AsMemory(got), cancellationToken).ConfigureAwait(false);
+            int read;
+            try
+            {
+                read = await connection.ReadAsync(buffer.AsMemory(got), cancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException exception)
+            {
+                return SmbIoFailures.ReceiveFailed(exception);
+            }
+
             await WaitUntilCancelledIfClosedAsync(read, cancellationToken).ConfigureAwait(false);
             got += read;
             if (got < SmbMessageHeader.NetBiosHeaderLength)

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Smb.UnitLibrary, Curl.Protocol.Smb.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-02
 ---
 # BL-1231 — Fail an SMB transfer whose connection send or receive breaks with curl's exit 55 or 56
 
@@ -24,14 +24,19 @@ An `smb://` or `smbs://` transfer whose connection write or read throws an `IOEx
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.Smb.UnitTests` with a fake connection that throws on the Nth write pin exit 55 for a failure while sending the negotiate, the session setup, the tree connect and a write request of an upload: `Send failure: Connection was reset` for a reset, `Failed sending data to the peer` otherwise.
-- [ ] Tests with a fake connection that throws on the Nth read pin exit 56 while waiting for the negotiate reply and for a read reply of a download: `Recv failure: Connection was reset` for a reset, `Failure when receiving data from the peer` otherwise, with the bytes already written to the output counted.
-- [ ] A cancelled token still throws `OperationCanceledException`; every existing SMB test passes unchanged.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smb.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] Tests in `Curl.Protocol.Smb.UnitTests` with a fake connection that throws on the Nth write pin exit 55 for a failure while sending the negotiate, the session setup, the tree connect and a write request of an upload: `Send failure: Connection was reset` for a reset, `Failed sending data to the peer` otherwise.
+- [x] Tests with a fake connection that throws on the Nth read pin exit 56 while waiting for the negotiate reply and for a read reply of a download: `Recv failure: Connection was reset` for a reset, `Failure when receiving data from the peer` otherwise, with the bytes already written to the output counted.
+- [x] A cancelled token still throws `OperationCanceledException`; every existing SMB test passes unchanged.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes with no test needing `TestCategory=Integration`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smb.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- `SmbReceivedMessage` now carries an `ExitCode` (56 by default, 55 for a send), so a failed send takes the same path as a refused frame: the transfer ends at once, without the close or tree disconnect, as curl's `connclose` does. `SmbIoFailures` maps the `IOException` (a reset when it wraps `SocketException` `ConnectionReset`) to curl's texts; `SmbMessageReader` catches a throwing read, `SmbSessionEstablisher.SendAsync` and `SmbFileTransfer.ExchangeAsync` a throwing write or flush.
+- `Failed sending data to the peer` joined `SmbMessages`' strerror set, so like `Failure when receiving data from the peer` it gets no `-v` line; the reset texts do.
+- `ScriptedConnection` gained `FailingWrite`, `FailingRead` and `Failure`; the tests are `SmbProtocolHandlerIoFailureTests`. Library coverage: 100% line, 100% branch, 0 failing members.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. SMB send or receive IOExceptions end with exit 55/56 and curl's texts instead of escaping the handler
