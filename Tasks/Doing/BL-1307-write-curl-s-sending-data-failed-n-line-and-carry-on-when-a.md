@@ -60,3 +60,4 @@ When a telnet option negotiation reply (`WILL`/`WONT`/`DO`/`DONT`, or the NAWS s
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-03: Backlog -> Doing.
