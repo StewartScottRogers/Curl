@@ -3,8 +3,8 @@ id: AF-0027
 title: With --tls13-ciphers and -O/--remote-name-all on a URL without a file name, Curl prints the Schannel 'ignoring --tls13-ciphers' warning before 'No remote filename', curl prints them the other way round
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Console/CurlComposition.cs:--tls13-ciphers:stderr
 task: none
 found: 2026-10-03
@@ -41,3 +41,4 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.
