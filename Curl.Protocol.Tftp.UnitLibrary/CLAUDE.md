@@ -19,7 +19,10 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
 ## What is implemented
 
 - Download with curl 8.21.0's default read request (`tsize 0`, `blksize 512`,
-  `timeout 6` when no time limit is given), OACK handling (ACK 0, then the acknowledged `blksize`), ACKs sent to
+  `timeout 6` when no time limit is given), OACK handling (ACK 0, then the acknowledged `blksize`;
+  `TftpOptionAcknowledgement` rejects what curl 8.21.0's `tftp_parse_option_ack` rejects - a
+  malformed pair, a `blksize` that is not 8 to 65464 or exceeds the one requested, a download's
+  `tsize` of 0 - with exit 71 and curl's message, sending nothing, for both directions), ACKs sent to
   the endpoint the DATA came from, and every TFTP ERROR code mapped to curl's exit code
   and message (`TftpErrorMapping`).
 - Upload (`-T`) with curl 8.21.0's default write request (`tsize` = the upload's
@@ -31,7 +34,15 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   absent sends 512. The block size in force is 512 until an OACK grants another, so a
   server that answers with plain DATA is read in 512-byte blocks, as curl does.
 - `--tftp-no-options` (`TftpNoOptions`): the read or write request is the file name
-  and `octet` alone, with no `tsize`, `blksize` or `timeout`.
+  and the mode alone, with no `tsize`, `blksize` or `timeout`.
+- File name and mode (`TftpRequestFile`, BL-1238): a trailing `;mode=netascii` or
+  `;mode=octet` is cut off the URL path and sets the mode; otherwise `-B`/`--use-ascii`
+  (`UseAscii`) sends `netascii`, else `octet`. The name is the path's percent-decoded raw
+  bytes (`%E9` is the byte 0xE9; a malformed escape is kept as written). Once the channel
+  is open and nothing sent, a decoded NUL is exit 3 `URL using bad/illegal format or
+  missing URL`, a name and mode over 512 bytes with their framing exit 71 `TFTP filename
+  too long`, and options that push the request past 512 bytes exit 71 `TFTP buffer too
+  small for options`; each exit 71 message is also reported as a `-v` line.
 - Retransmission and timeouts (`TftpDownload`, `TftpUpload`, `TftpRetrySchedule`,
   `TftpTimeLimits`), as curl 8.21.0's `tftp_set_timeouts` derives them: from the time
   left (`ConnectTimeout`, 300 s by default, or `MaxTime` if sooner; after the first

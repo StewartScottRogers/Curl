@@ -197,8 +197,8 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
-    [DataRow(true, new string[0], DisplayName = "Schannel build")]
-    [DataRow(false, new[] { "allocate connect buffer" }, DisplayName = "OpenSSL build")]
+    [DataRow(true, new[] { "CONNECT: no ALPN negotiated" }, DisplayName = "Schannel build")]
+    [DataRow(false, new[] { "CONNECT: no ALPN negotiated", "allocate connect buffer" }, DisplayName = "OpenSSL build")]
     public async Task ConnectAsync_ThroughAProxy_ReportsTryingTheProxyAndTheConnectionOpenedToIt(bool matchesSchannelBuild, string[] beforeEstablishing)
     {
         var events = new RecordingTransferEvents();

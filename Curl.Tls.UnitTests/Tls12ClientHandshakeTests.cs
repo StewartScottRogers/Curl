@@ -308,6 +308,22 @@ public sealed class Tls12ClientHandshakeTests
             hello.Extensions.Select(extension => extension.Type).ToArray());
     }
 
+    // OpenSSL pads a hello of 256 to 511 bytes to 512, padding last (measured, BL-1156).
+    [TestMethod]
+    [DataRow(true, 10, false)]
+    [DataRow(true, 120, true)]
+    [DataRow(true, 400, false)]
+    [DataRow(false, 120, false)]
+    public void PadHelloPadsOnlyAHelloOf256To511Bytes(bool padHello, int serverNameLength, bool padded)
+    {
+        Tls12ClientHandshake client = Client(DefaultSettings with { PadHello = padHello, ServerName = new string('a', serverNameLength) });
+
+        ClientHello hello = ClientHello.Decode(Body(client.Start().MessagesToSend[0])).Value;
+
+        Assert.AreEqual(padded, hello.Extensions[^1].Type == TlsExtensionType.Padding);
+        Assert.AreEqual(padded, hello.Encode().Length == 512);
+    }
+
     // OpenSSL leaves out both group extensions when there is no group (measured, BL-1094).
     [TestMethod]
     public void AClientHelloWithNoGroupLeavesOutThePointFormatsAndTheGroups()

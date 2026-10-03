@@ -16,7 +16,11 @@ namespace Curl.Protocol.Http;
 /// <param name="transport">The connection the request is sent on; the handler keeps ownership.</param>
 /// <param name="events">Where the switch's <c>-v</c> lines are reported.</param>
 /// <param name="scheme">The URL's scheme.</param>
-internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferEvents events, string scheme) : IConnection
+/// <param name="traceEvents">
+/// Where the switch's and stream 1's <c>--trace-config http/2</c> lines go (<see cref="Http2FrameTrace" />,
+/// BL-1205), or <see langword="null" /> for none.
+/// </param>
+internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferEvents events, string scheme, ITransferEvents? traceEvents = null) : IConnection
 {
     private const int ReadSize = 16384;
 
@@ -170,13 +174,16 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
     {
         byte[] afterHead = [.. received.Skip(switchingHeadLength)];
         events.ReportInfo(HttpConnectionInfoLines.SwitchingToHttp2);
+        Http2FrameTrace? frameTrace = traceEvents is null ? null : new(traceEvents);
+        frameTrace?.UpgradeStarted();
         if (afterHead.Length > 0)
         {
             events.ReportInfo(HttpConnectionInfoLines.CopiedHttp2DataAfterUpgrade(afterHead.Length));
         }
 
+        frameTrace?.SessionCreatedByUpgrade();
         UpgradedSession = new Http2Session(new HttpPrefixedConnection(afterHead, transport));
-        Http2StreamConnection stream = new(UpgradedSession, scheme, 0);
+        Http2StreamConnection stream = new(UpgradedSession, scheme, 0, frameTrace: frameTrace);
         await stream.StartUpgradedAsync(cancellationToken).ConfigureAwait(false);
         return stream;
     }

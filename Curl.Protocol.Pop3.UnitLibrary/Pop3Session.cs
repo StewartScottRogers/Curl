@@ -36,9 +36,11 @@ namespace Curl.Protocol.Pop3;
 /// as it reported it, then <c>CAPA</c> again.</item>
 /// <item>The server closing before a response is complete is exit 56; a line of 65536 bytes
 /// is exit 100; a line holding a NUL byte is exit 8 <c>Nul byte in server response line</c>,
-/// the line itself not reported (BL-1120).</item>
+/// the line itself not reported (BL-1120); a command that cannot be written is exit 55
+/// (<see cref="Pop3SendFailedException" />, BL-1252).</item>
 /// <item>No failure above sends <c>QUIT</c>. Once the session is open, the response to
-/// <c>QUIT</c> is read and whatever it says is ignored, as curl ignores it.</item>
+/// <c>QUIT</c> is read and whatever it says is ignored, as curl ignores it, and a <c>QUIT</c>
+/// that cannot be sent is ignored too.</item>
 /// </list>
 /// </remarks>
 internal sealed class Pop3Session(
@@ -113,6 +115,11 @@ internal sealed class Pop3Session(
         catch (Pop3NulByteInLineException)
         {
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, Pop3SessionMessages.NulByteInLine);
+        }
+        catch (Pop3SendFailedException failure)
+        {
+            // Nothing more is sent or read, not even QUIT (BL-1252).
+            return TransferResult.Failure(CurlExitCode.SendError, failure.Message);
         }
         catch (SaslAuthenticationFailedException failure)
         {
@@ -296,15 +303,18 @@ internal sealed class Pop3Session(
     private async ValueTask QuitAsync()
     {
         channel.StopReporting();
-        await channel.SendAsync("QUIT").ConfigureAwait(false);
         try
         {
+            await channel.SendAsync("QUIT").ConfigureAwait(false);
             await channel.ReadResponseAsync().ConfigureAwait(false);
         }
         catch (Pop3ReplyMissingException)
         {
         }
         catch (InvalidDataException)
+        {
+        }
+        catch (Pop3SendFailedException)
         {
         }
         catch (Pop3NulByteInLineException)

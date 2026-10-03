@@ -121,6 +121,12 @@ public sealed class Http2Connection
     public int OpenStreamCount => streams.Count;
 
     /// <summary>
+    /// Gets or sets who is told of each frame written or read (BL-1167), or <see langword="null" />
+    /// for no one. A HEADERS block's CONTINUATION frames are reported too, one by one.
+    /// </summary>
+    public IHttp2FrameObserver? FrameObserver { get; set; }
+
+    /// <summary>
     /// Sends the client preface, <see cref="ClientSettings" /> and the connection
     /// WINDOW_UPDATE of <see cref="ClientConnectionWindowIncrement" />, in one write.
     /// </summary>
@@ -128,13 +134,16 @@ public sealed class Http2Connection
     /// <returns>A task that completes when the preface is written.</returns>
     public async Task SendPrefaceAsync(CancellationToken cancellationToken)
     {
+        var settings = Http2FrameFactory.CreateSettings(ClientSettings);
+        var windowUpdate = Http2FrameFactory.CreateWindowUpdate(0, ClientConnectionWindowIncrement);
         byte[] bytes =
         [
             .. ClientPrefaceBytes,
-            .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettings(ClientSettings)),
-            .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateWindowUpdate(0, ClientConnectionWindowIncrement)),
+            .. Http2FrameCodec.Serialize(settings),
+            .. Http2FrameCodec.Serialize(windowUpdate),
         ];
         await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+        ReportSent([settings, windowUpdate]);
         _ = ConnectionReceiveWindow.TryAdjust(ClientConnectionWindowIncrement);
         connectionReceiveWindowTarget = ConnectionReceiveWindow.Size;
     }
@@ -224,16 +233,15 @@ public sealed class Http2Connection
         var maximumFrameSize = PeerSettings.MaxFrameSize;
         var fragment = headerBlock[..Math.Min(maximumFrameSize, headerBlock.Length)];
         var remaining = headerBlock[fragment.Length..];
-        var buffer = new ArrayBufferWriter<byte>();
-        buffer.Write(Http2FrameCodec.Serialize(Http2FrameFactory.CreateHeaders(streamId, fragment, isEndStream, remaining.IsEmpty)));
+        List<Http2Frame> frames = [Http2FrameFactory.CreateHeaders(streamId, fragment, isEndStream, remaining.IsEmpty)];
         while (!remaining.IsEmpty)
         {
             fragment = remaining[..Math.Min(maximumFrameSize, remaining.Length)];
             remaining = remaining[fragment.Length..];
-            buffer.Write(Http2FrameCodec.Serialize(Http2FrameFactory.CreateContinuation(streamId, fragment, remaining.IsEmpty)));
+            frames.Add(Http2FrameFactory.CreateContinuation(streamId, fragment, remaining.IsEmpty));
         }
 
-        await stream.WriteAsync(buffer.WrittenMemory, cancellationToken).ConfigureAwait(false);
+        await WriteFramesAsync(frames, cancellationToken).ConfigureAwait(false);
         sendingStream.IsHeadersSent = true;
         highestStartedStreamId = Math.Max(highestStartedStreamId, streamId);
         EndLocally(streamId, sendingStream, isEndStream);
@@ -265,7 +273,7 @@ public sealed class Http2Connection
             return 0;
         }
 
-        await stream.WriteAsync(SerializeDataFrames(streamId, data[..count], isLastFrameEndStream), cancellationToken).ConfigureAwait(false);
+        await WriteFramesAsync(CreateDataFrames(streamId, data[..count], isLastFrameEndStream), cancellationToken).ConfigureAwait(false);
         _ = ConnectionSendWindow.TryConsume(count);
         _ = sendingStream.SendWindow.TryConsume(count);
         EndLocally(streamId, sendingStream, isLastFrameEndStream);
@@ -419,20 +427,44 @@ public sealed class Http2Connection
         }
     }
 
-    private ReadOnlyMemory<byte> SerializeDataFrames(int streamId, ReadOnlyMemory<byte> data, bool isEndStream)
+    private List<Http2Frame> CreateDataFrames(int streamId, ReadOnlyMemory<byte> data, bool isEndStream)
     {
-        var buffer = new ArrayBufferWriter<byte>();
+        List<Http2Frame> frames = [];
         var offset = 0;
         do
         {
             var size = Math.Min(data.Length - offset, PeerSettings.MaxFrameSize);
             var chunk = data.Slice(offset, size);
             offset += size;
-            buffer.Write(Http2FrameCodec.Serialize(Http2FrameFactory.CreateData(streamId, chunk, isEndStream && offset == data.Length)));
+            frames.Add(Http2FrameFactory.CreateData(streamId, chunk, isEndStream && offset == data.Length));
         }
         while (offset < data.Length);
 
-        return buffer.WrittenMemory;
+        return frames;
+    }
+
+    /// <summary>Writes <paramref name="frames" /> in one write, then reports each to <see cref="FrameObserver" />.</summary>
+    private async Task WriteFramesAsync(List<Http2Frame> frames, CancellationToken cancellationToken)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        foreach (var frame in frames)
+        {
+            buffer.Write(Http2FrameCodec.Serialize(frame));
+        }
+
+        await stream.WriteAsync(buffer.WrittenMemory, cancellationToken).ConfigureAwait(false);
+        ReportSent(frames);
+    }
+
+    private void ReportSent(IEnumerable<Http2Frame> frames)
+    {
+        if (FrameObserver is { } observer)
+        {
+            foreach (var frame in frames)
+            {
+                observer.FrameSent(frame);
+            }
+        }
     }
 
     private void ThrowIfFailed()
@@ -474,6 +506,7 @@ public sealed class Http2Connection
             return EndOfConnection();
         }
 
+        FrameObserver?.FrameReceived(frame);
         return await ReceiveFrameAsync(frame, cancellationToken).ConfigureAwait(false);
     }
 
@@ -763,8 +796,11 @@ public sealed class Http2Connection
             : openStream;
     }
 
-    private async Task WriteFrameAsync(Http2Frame frame, CancellationToken cancellationToken) =>
+    private async Task WriteFrameAsync(Http2Frame frame, CancellationToken cancellationToken)
+    {
         await Http2FrameCodec.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+        FrameObserver?.FrameSent(frame);
+    }
 
     /// <summary>A header block whose HEADERS frame has arrived and whose CONTINUATION frames are still coming.</summary>
     private sealed record PendingHeaderBlock(int StreamId, Http2Stream? Stream, bool IsEndStream)

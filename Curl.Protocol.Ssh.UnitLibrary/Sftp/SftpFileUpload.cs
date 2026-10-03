@@ -22,6 +22,12 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// <param name="events">Where the sent bytes, the line after them and each <c>SFTP: creating directory</c> line are reported.</param>
 internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents events)
 {
+    /// <summary>
+    /// Gets where the upload's <c>--trace-config ssh</c> state changes go (BL-1204);
+    /// <see cref="SshStateTrace.Off" /> when not given.
+    /// </summary>
+    internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
+
     /// <summary>How many bytes of the source curl reads at a time: its 64 KiB upload buffer, as measured.</summary>
     internal const int ReadBufferSize = 65536;
 
@@ -68,16 +74,24 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
         SftpQuoteCommands? quotes = null)
     {
         quotes ??= SftpQuoteCommands.None;
+        Trace.Enter("SSH_SFTP_INIT");
         SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
         return await session.CloseChannelOnFailureAsync(
             async () =>
             {
+                Trace.Enter("SSH_SFTP_REALPATH");
                 byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
                 byte[] path = SftpRemotePath.ResolveUrlPath(urlPath, homeDirectory);
+                Trace.EndSftpConnectPhase();
+                Trace.Enter("SSH_SFTP_QUOTE_INIT");
                 await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
-                (byte[] handle, long offset) = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
-                    () => OpenAsync(session, path, options, cancellationToken)).ConfigureAwait(false);
+                Trace.Enter("SSH_SFTP_GETINFO");
+                Trace.Enter("SSH_SFTP_TRANS_INIT");
+                Trace.Enter("SSH_SFTP_UPLOAD_INIT");
+                (byte[] handle, long offset) = await OpenTracedAsync(session, path, options, cancellationToken).ConfigureAwait(false);
+                Trace.Rest();
+                Trace.Write("DO phase is complete");
 
                 // Measured: -a appends the whole source from offset 0 whatever -C says.
                 long writeOffset = options.Append ? 0 : offset;
@@ -90,10 +104,27 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
                     events.ReportInfo(SshInfoLines.UploadSent(result.BytesTransferred));
                 }
 
+                Trace.Enter("SSH_SFTP_CLOSE");
                 result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+                Trace.EndSftpDonePhase();
                 return result with { Report = new TransferReport { UploadSize = result.BytesTransferred } };
             },
             cancellationToken).ConfigureAwait(false);
+    }
+
+    // Measured (BL-1204): curl enters SSH_SFTP_CLOSE before it writes a failed open's line.
+    private async ValueTask<(byte[] Handle, long Offset)> OpenTracedAsync(SftpSession session, byte[] path, SftpUploadOptions options, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await SshConnectionFailure.ReportAsSshLayerErrorAsync(
+                () => OpenAsync(session, path, options, cancellationToken)).ConfigureAwait(false);
+        }
+        catch (SshTransferException)
+        {
+            Trace.Enter("SSH_SFTP_CLOSE");
+            throw;
+        }
     }
 
     // Measured: a file source skips the part the offset covers, up to its end; standard
@@ -116,7 +147,7 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
     private async ValueTask<(byte[] Handle, long Offset)> OpenAsync(SftpSession session, byte[] path, SftpUploadOptions options, CancellationToken cancellationToken)
     {
         long offset = options.ResumeFromRemoteSize
-            ? await session.StatSizeAsync(path, cancellationToken).ConfigureAwait(false) ?? 0
+            ? await RemoteSizeAsync(session, path, cancellationToken).ConfigureAwait(false)
             : options.ResumeFrom;
         uint flags = OpenFlagsFor(options.Append, offset);
 
@@ -128,6 +159,15 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
             ? await CreateDirectoriesAndOpenAsync(session, path, flags, createFileMode, cancellationToken).ConfigureAwait(false)
             : throw SshTransferException.SftpUploadFailed(status);
         return (handle, offset);
+    }
+
+    // Measured: no size, or 0, resumes at 0. From curl 8.21.0's sftp_upload_init
+    // (BL-1241): a size with its top bit set reads as negative and fails with exit 36
+    // before the open.
+    private static async ValueTask<long> RemoteSizeAsync(SftpSession session, byte[] path, CancellationToken cancellationToken)
+    {
+        long size = await session.StatSizeAsync(path, cancellationToken).ConfigureAwait(false) ?? 0;
+        return size >= 0 ? size : throw SshTransferException.SftpBadFileSize(size);
     }
 
     // Measured: one MKDIR for every slash after the first, from the root down, each after

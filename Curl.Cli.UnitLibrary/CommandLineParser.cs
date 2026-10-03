@@ -101,7 +101,23 @@ public static class CommandLineParser
     /// </returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
     public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader) =>
-        Parse(arguments, pathExists, passwordPrompt, dataFileReader, []);
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, OperatingSystem.IsWindows());
+
+    /// <summary>
+    /// Parses <paramref name="arguments"/> as the four-argument overload does, but as curl's build for
+    /// the platform <paramref name="isWindows"/> names reads them rather than as this process's
+    /// platform: off Windows an option value starting with a character in U+2000-U+203F is warned
+    /// about (<see cref="CommandLineOptions.ReadsArgumentsAsUtf8"/>), on Windows it is not.
+    /// </summary>
+    /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
+    /// <param name="pathExists">Reports whether a file or directory exists at a path.</param>
+    /// <param name="passwordPrompt">Asks for the password of a <c>-u</c> user given without one; called at most once.</param>
+    /// <param name="dataFileReader">Reads the file, or standard input, a <c>-d</c> / <c>--data</c> value starting with <c>@</c> or a <c>-K</c> / <c>--config</c> value names.</param>
+    /// <param name="isWindows">Whether to read the arguments as curl's Windows Schannel build does.</param>
+    /// <returns>As the four-argument overload returns.</returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, bool isWindows) =>
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, [], isWindows);
 
     /// <summary>
     /// Parses <paramref name="arguments"/> as the four-argument overload does, after first reading
@@ -124,17 +140,17 @@ public static class CommandLineParser
     {
         ArgumentNullException.ThrowIfNull(defaultConfigFileSearch);
 
-        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths());
+        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), OperatingSystem.IsWindows());
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates)
+    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(pathExists);
         ArgumentNullException.ThrowIfNull(passwordPrompt);
         ArgumentNullException.ThrowIfNull(dataFileReader);
 
-        CommandLineOptions options = new();
+        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows };
         if (!SkipsDefaultConfigFile(arguments))
         {
             ConfigFileApplier.ApplyDefaultFile(options, defaultConfigFileCandidates, pathExists, dataFileReader);
@@ -343,20 +359,13 @@ public static class CommandLineParser
 
     /// <summary>
     /// Refuses <c>--no-&lt;name&gt;</c> where <see cref="CommandLineOptionTable"/> has no row for
-    /// <paramref name="negatedName"/>, as ADR-0137 decides: not reversible when curl 8.21.0 knows the name
-    /// but gives it no <c>--no-</c> prefix, not implemented yet when it gives it one, and unknown otherwise.
+    /// <paramref name="negatedName"/>, as ADR-0137 decides: not implemented yet when curl 8.21.0 knows the
+    /// name, and unknown otherwise. Every curl name that takes no <c>--no-</c> prefix has a row since BL-1135,
+    /// so its "cannot be reversed" refusal comes from the row; <c>CommandLineUnimplementedOptionTests</c>
+    /// fails should a row for such a name ever be removed.
     /// </summary>
-    private static CommandLineRefusal RefuseUnlistedNegation(string argument, string negatedName)
-    {
-        if (!CurlOptionAliasTable.TryFindName(negatedName, out CurlOptionAlias? alias))
-        {
-            return CommandLineRefusal.UnknownOption(argument);
-        }
-
-        return alias.NoPrefix == CurlOptionNoPrefix.NotAccepted
-            ? CommandLineRefusal.CannotBeReversed(argument)
-            : CommandLineRefusal.InstalledLibcurlDoesNotSupport(argument);
-    }
+    private static CommandLineRefusal RefuseUnlistedNegation(string argument, string negatedName) =>
+        RefuseUnlistedName(argument, negatedName);
 
     /// <summary>
     /// Refuses the short letter at <paramref name="letter"/> that <see cref="CommandLineOptionTable"/> has no

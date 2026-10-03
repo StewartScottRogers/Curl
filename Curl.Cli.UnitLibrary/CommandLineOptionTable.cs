@@ -87,7 +87,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("remote-header-name", 'J', (options, on) => options.RemoteHeaderName = on),
         CommandLineOption.Text("output-dir", null, (options, directory) => options.OutputDirectory = directory),
         CommandLineOption.NegatableFlag("create-dirs", null, (options, on) => options.CreateDirectories = on),
-        CommandLineOption.NegatableFlag("clobber", null, (options, on) => options.Clobber = on),
+        CommandLineOption.NegatableFlagThatCanRefuse("clobber", null, SetClobber),
         CommandLineOption.NegatableFlag("skip-existing", null, (options, on) => options.SkipExisting = on),
         CommandLineOption.NegatableFlagThatCanRefuse("remove-on-error", null, SetRemoveOnError),
         CommandLineOption.Value("write-out", 'w', SetWriteOut),
@@ -230,6 +230,9 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("proxy-ca-native", null, (options, on) => options.ProxyUseNativeCaStore = on),
         CommandLineOption.NegatableFlag("proxy-ssl-auto-client-cert", null, (options, on) => options.ProxyAutoClientCertificate = on),
         CommandLineOption.NegatableFlag("proxy-ssl-allow-beast", null, (options, on) => options.ProxyAllowBeast = on),
+        CommandLineOption.Value("proxy-tlsuser", null, AcceptingEmpty((options, user) => options.ProxyTlsUser = user)),
+        CommandLineOption.Text("proxy-tlspassword", null, (options, password) => options.ProxyTlsPassword = password),
+        CommandLineOption.Value("proxy-tlsauthtype", null, (options, value, spelledOption, _, _) => SetTlsAuthType(value, spelledOption, type => options.ProxyTlsAuthType = type)),
         CommandLineOption.FileName("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),
         CommandLineOption.FileName("key", null, (options, key) => options.PrivateKey = key),
         CommandLineOption.Text("cert-type", null, (options, type) => options.ClientCertificateType = type),
@@ -261,7 +264,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Flag("dump-ca-embed", null, options => options.CaEmbedDumpRequested = true),
         CommandLineOption.Text("tlsuser", null, (options, user) => options.TlsUser = user),
         CommandLineOption.Value("tlspassword", null, AcceptingEmpty((options, password) => options.TlsPassword = password)),
-        CommandLineOption.Value("tlsauthtype", null, SetTlsAuthType),
+        CommandLineOption.Value("tlsauthtype", null, (options, value, spelledOption, _, _) => SetTlsAuthType(value, spelledOption, type => options.TlsAuthType = type)),
         CommandLineOption.Value("range", 'r', SetRange),
         CommandLineOption.Value("continue-at", 'C', SetResumeFrom),
         CommandLineOption.Value("max-filesize", null, SetMaxFileSize),
@@ -591,6 +594,7 @@ public static class CommandLineOptionTable
     /// </summary>
     private static void SetFtpFileMethod(CommandLineOptions options, string value)
     {
+        options.FtpFileMethodGiven = true;
         if (Ascii.EqualsIgnoreCase(value, "nocwd"))
         {
             options.FtpFileMethod = FtpFileMethod.NoCwd;
@@ -709,11 +713,12 @@ public static class CommandLineOptionTable
     }
 
     /// <summary>
-    /// Sets <see cref="CommandLineOptions.TlsAuthType"/> as curl 8.21.0 does: an empty value is refused as
-    /// blank, and any value but <c>SRP</c> (compared case-sensitively) with
+    /// Sets <see cref="CommandLineOptions.TlsAuthType"/> or <see cref="CommandLineOptions.ProxyTlsAuthType"/>
+    /// through <paramref name="setAuthType"/> as curl does for <c>--tlsauthtype</c> and <c>--proxy-tlsauthtype</c>:
+    /// an empty value is refused as blank, and any value but <c>SRP</c> (compared case-sensitively) with
     /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/>, the only type it supports.
     /// </summary>
-    private static CommandLineRefusal? SetTlsAuthType(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    private static CommandLineRefusal? SetTlsAuthType(string value, string spelledOption, Action<string> setAuthType)
     {
         if (value.Length == 0)
         {
@@ -725,7 +730,7 @@ public static class CommandLineOptionTable
             return CommandLineRefusal.InstalledLibcurlDoesNotSupport(spelledOption);
         }
 
-        options.TlsAuthType = value;
+        setAuthType(value);
         return null;
     }
 
@@ -1219,6 +1224,7 @@ public static class CommandLineOptionTable
         }
 
         options.DefaultProtocol = scheme;
+        options.DefaultProtocolAsTyped = value;
         return null;
     }
 
@@ -1276,7 +1282,7 @@ public static class CommandLineOptionTable
     /// <summary>
     /// Records a <c>-C</c>/<c>--continue-at</c> value: <c>-</c> for "from the output file's size",
     /// or a byte offset read by <see cref="CommandLineNumber.ParseOffset"/>. It is refused when
-    /// <c>-r</c>/<c>--range</c> or <c>--remove-on-error</c> came first, before the value is looked at, as curl 8.21.0 does.
+    /// <c>-r</c>/<c>--range</c>, <c>--remove-on-error</c> or <c>--no-clobber</c> came first, before the value is looked at, as curl 8.21.0 does.
     /// </summary>
     private static CommandLineRefusal? SetResumeFrom(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
@@ -1288,6 +1294,11 @@ public static class CommandLineOptionTable
         if (options.RemoveOnError)
         {
             return CommandLineRefusal.ContinueAtExclusiveWithRemoveOnError(spelledOption, options.ErrorsHidden);
+        }
+
+        if (options.Clobber == false)
+        {
+            return CommandLineRefusal.ContinueAtExclusiveWithNoClobber(spelledOption, options.ErrorsHidden);
         }
 
         if (value == "-")
@@ -1320,6 +1331,22 @@ public static class CommandLineOptionTable
         }
 
         options.RemoveOnError = on;
+        return null;
+    }
+
+    /// <summary>
+    /// Records <c>--clobber</c> or <c>--no-clobber</c>. Turning clobbering off is refused when
+    /// <c>-C</c>/<c>--continue-at</c> came first, in any form, as curl 8.21.0 refuses it (measured
+    /// 2026-10-02, BL-1223 Notes); <c>--clobber</c> never is.
+    /// </summary>
+    private static CommandLineRefusal? SetClobber(CommandLineOptions options, bool on, string spelledOption)
+    {
+        if (!on && (options.ResumeFrom is not null || options.ResumeFromOutputSize))
+        {
+            return CommandLineRefusal.ContinueAtExclusiveWithNoClobber(spelledOption, options.ErrorsHidden);
+        }
+
+        options.Clobber = on;
         return null;
     }
 
@@ -1678,6 +1705,11 @@ public static class CommandLineOptionTable
     /// </summary>
     private static void SetLocation(CommandLineOptions options, bool on)
     {
+        if (options.FollowRedirectsPerSpec)
+        {
+            options.AddWarningLinesUnlessSilent(CommandLineWarning.LocationOverridesFollow);
+        }
+
         options.FollowRedirects = on;
         options.FollowRedirectsPerSpec = false;
     }
@@ -1689,6 +1721,11 @@ public static class CommandLineOptionTable
     /// </summary>
     private static void SetFollow(CommandLineOptions options, bool on)
     {
+        if (options.FollowRedirects && !options.FollowRedirectsPerSpec)
+        {
+            options.AddWarningLinesUnlessSilent(CommandLineWarning.FollowOverridesLocation);
+        }
+
         options.FollowRedirects = on;
         options.FollowRedirectsPerSpec = on;
     }

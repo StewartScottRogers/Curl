@@ -60,6 +60,26 @@ public sealed class QuicClientSettingsTests
         CollectionAssert.AreEqual(new byte[] { 0x01, 0x01 }, settings.FixedExtensions[4].Data);
     }
 
+    // OpenSSL 3.5.5's own QUIC client with SSL_OP_ALL ("openssl s_client -quic -alpn h3 -bugs
+    // -groups X25519" for a 75-character host name, BL-1156) sent a 335-byte hello with no
+    // padding, where its TCP hello of the same options was padded to 512: QUIC hellos are
+    // never padded, whatever their length.
+    [TestMethod]
+    public void CreateOpenSslTlsSettings_WithX25519AndAHelloOf256To511Bytes_SendsNoPadding()
+    {
+        Tls13ClientSettings settings = QuicClientSettings.CreateOpenSslTlsSettings("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example") with
+        {
+            SupportedGroups = [TlsNamedGroup.X25519],
+            KeyShareGroups = [TlsNamedGroup.X25519],
+        };
+
+        byte[] helloBytes = new Tls13ClientHandshake(settings, new QuicTestRandomSource(), new QuicTestVerifier()).Start().BytesToSend[0].Bytes;
+        ClientHello hello = ClientHello.Decode(helloBytes[4..]).Value!;
+
+        Assert.IsTrue(helloBytes.Length is >= 256 and < 512, $"The hello is {helloBytes.Length} bytes.");
+        Assert.IsFalse(hello.Extensions.Any(extension => extension.Type == TlsExtensionType.Padding));
+    }
+
     [TestMethod]
     public void CreateOpenSslTlsSettings_TakesTheOpenSslProfilesSuitesGroupsAndProtocols()
     {

@@ -23,10 +23,6 @@ internal static class UpstreamTestInstructions
     private static readonly (string Marker, string Name, StringComparison Comparison)[] UnsupportedMarkers =
     [
         ("%days[", "%days", StringComparison.OrdinalIgnoreCase),
-        ("%include ", "%include", StringComparison.Ordinal),
-        ("%includetext ", "%includetext", StringComparison.Ordinal),
-        ("%sha256b64file[", "%sha256b64file", StringComparison.OrdinalIgnoreCase),
-        ("%strippemfile[", "%strippemfile", StringComparison.OrdinalIgnoreCase),
     ];
 
     /// <summary>Replaces <c>%SP</c>, <c>%TAB</c>, <c>%CR</c>, <c>%LT</c>, <c>%GT</c> and <c>%AMP</c>, in that order.</summary>
@@ -47,9 +43,9 @@ internal static class UpstreamTestInstructions
 
     /// <summary>
     /// Adds the name of every instruction in the line that this harness does not carry out
-    /// (<c>%days</c>, <c>%include</c>, <c>%includetext</c>, <c>%sha256b64file</c>,
-    /// <c>%strippemfile</c>) to the list, once each. <c>%include</c> and <c>%includetext</c> match
-    /// case-sensitively, the others case-insensitively, as upstream's expressions do.
+    /// (<c>%days</c>) to the list, once each, matching case-insensitively as upstream's expressions
+    /// do. <c>%include</c> and <c>%includetext</c> are <see cref="UpstreamTestFileInclusions"/>'s,
+    /// <c>%sha256b64file</c> and <c>%strippemfile</c> <see cref="UpstreamTestFileContentInstructions"/>'s.
     /// </summary>
     /// <param name="line">The expanded line.</param>
     /// <param name="unsupported">The names found so far.</param>
@@ -64,7 +60,13 @@ internal static class UpstreamTestInstructions
         }
     }
 
-    private static string ReplaceEach(string text, string opening, string closing, Func<string, string> replace)
+    /// <summary>Replaces the leftmost <paramref name="opening"/>…<paramref name="closing"/>, matched case-insensitively, repeatedly, until none is left.</summary>
+    /// <param name="text">The text.</param>
+    /// <param name="opening">The instruction's opening, such as <c>%b64[</c>.</param>
+    /// <param name="closing">The instruction's closing, such as <c>]b64%</c>.</param>
+    /// <param name="replace">Gives the replacement for the content between them.</param>
+    /// <returns>The text with every instruction replaced.</returns>
+    public static string ReplaceEach(string text, string opening, string closing, Func<string, string> replace)
     {
         while (true)
         {
@@ -134,7 +136,10 @@ internal static class UpstreamTestInstructions
         return lineFeed >= 0 && lineFeed < end ? -1 : end;
     }
 
-    private static string DecodePercentPairs(string content)
+    /// <summary>Turns every <c>%XX</c> hexadecimal pair into the byte it names, one character per byte.</summary>
+    /// <param name="content">The text.</param>
+    /// <returns>The decoded text.</returns>
+    public static string DecodePercentPairs(string content)
     {
         StringBuilder output = new(content.Length);
         for (int index = 0; index < content.Length; index++)

@@ -7,12 +7,12 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineOption
 {
-    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false)
+    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true)
     {
         LongName = longName;
         ShortName = shortName;
         TakesValue = takesValue;
-        Apply = apply;
+        Apply = takesValue && warnsAboutLeadingUnicode ? WarnAboutLeadingUnicodeThen(apply) : apply;
         Negate = negate;
         TakesSubject = takesSubject;
         EndsBundle = endsBundle;
@@ -166,8 +166,27 @@ public sealed class CommandLineOption
     {
         ArgumentNullException.ThrowIfNull(longName);
 
-        return new CommandLineOption(longName, shortName: null, takesValue: true, WarnDeprecatedWithNoFunction(longName));
+        return new CommandLineOption(longName, shortName: null, takesValue: true, WarnDeprecatedWithNoFunction(longName), warnsAboutLeadingUnicode: false);
     }
+
+    /// <summary>
+    /// An applier that first adds <see cref="CommandLineWarning.ArgumentStartsWithUnicode(string)"/>, unless
+    /// <c>-s</c> / <c>--silent</c> has been read already, when the value starts with a character in
+    /// U+2000-U+203F and the parse reads its arguments as UTF-8 (<see cref="CommandLineOptions.ReadsArgumentsAsUtf8"/>),
+    /// and then runs <paramref name="apply"/>. curl 8.21.0's <c>getparameter</c> checks every option value
+    /// this way before using it, except a deprecated option's, so each value row but
+    /// <see cref="NoFunctionValue"/> is built with it (BL-1224).
+    /// </summary>
+    private static CommandLineOptionApplier WarnAboutLeadingUnicodeThen(CommandLineOptionApplier apply) =>
+        (options, value, spelledOption, pathExists, dataFileReader) =>
+        {
+            if (options.ReadsArgumentsAsUtf8 && value.Length > 0 && value[0] is >= ' ' and <= '‿')
+            {
+                options.AddWarningLinesUnlessSilent(CommandLineWarning.ArgumentStartsWithUnicode(value));
+            }
+
+            return apply(options, value, spelledOption, pathExists, dataFileReader);
+        };
 
     /// <summary>An applier that ignores its value and adds curl's no-function warning for <paramref name="longName"/>.</summary>
     private static CommandLineOptionApplier WarnDeprecatedWithNoFunction(string longName) =>

@@ -1,0 +1,20 @@
+{
+  "sha": "9f3c9a1e2b7d4c5a6e8f9b0c1d2e3f4a5b6c7d8e",
+  "url": "https://api.github.com/repos/StewartScottRogers/Curl/git/trees/9f3c9a1e2b7d4c5a6e8f9b0c1d2e3f4a5b6c7d8e",
+  "tree": [
+    { "path": "Audit", "mode": "040000", "type": "tree", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee00" },
+    { "path": "Audit/Findings", "mode": "040000", "type": "tree", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee01" },
+    { "path": "Audit/Findings/README.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee02", "size": 4000 },
+    { "path": "Audit/Findings/FINDING-TEMPLATE.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee03", "size": 900 },
+    { "path": "Audit/Findings/AF-0001-tests-named-for-a-timeout-never-wait.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee11", "size": 900 },
+    { "path": "Audit/Findings/AF-0003-cookie-secret-in-verbose-output.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee13", "size": 900 },
+    { "path": "Audit/Findings/AF-0004-download-slower-than-curl.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee14", "size": 900 },
+    { "path": "Audit/Findings/AF-0005-retry-delay-ignores-retry-after.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee15", "size": 900 },
+    { "path": "Audit/Findings/AF-0006-ftp-list-line-differs.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee16", "size": 900 },
+    { "path": "Audit/Findings/AF-0007-lane-idle-on-empty-queue.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee17", "size": 900 },
+    { "path": "Audit/Findings/AF-0008-missing-text.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee18", "size": 900 },
+    { "path": "Audit/Findings/AF-0009-released-finding.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee19", "size": 500 },
+    { "path": "Audit/Findings/AF-0010-approved-waiting-for-release.md", "mode": "100644", "type": "blob", "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1a", "size": 500 }
+  ],
+  "truncated": false
+}

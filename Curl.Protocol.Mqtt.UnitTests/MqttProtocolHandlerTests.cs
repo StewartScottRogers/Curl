@@ -671,7 +671,7 @@ public sealed class MqttProtocolHandlerTests
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
         Assert.AreEqual(
-            new TransferResult(CurlExitCode.SendError, 0, "Failure when sending data to the peer"),
+            new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"),
             result);
     }
 
@@ -938,7 +938,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await PublishAsync(connection, "mqtt://h/t", "x");
 
-        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failure when sending data to the peer"), result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), result);
     }
 
     /// <summary>

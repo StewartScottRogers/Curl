@@ -25,7 +25,10 @@ and milliseconds) as `info`; the connect target carries the log on.
 `ITransferContext.Events` as data received, the server's close as a zero-byte block, and
 never the selector (curl does not trace it); then `shutting down connection #N`, or for a
 failure other than a malformed selector the failure's message (unless it is curl's
-fallback text for a failed send or receive) and `closing connection #N`.
+fallback text for a failed send or receive), `Failed sending Gopher request` for a failed
+send (BL-1228), and `closing connection #N`. A failed send is exit 55 with
+`Send failure: Connection was reset` for a reset and `Failed sending data to the peer`
+otherwise.
 
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and nothing
 else horizontal. Referencing another protocol library is a build break, and

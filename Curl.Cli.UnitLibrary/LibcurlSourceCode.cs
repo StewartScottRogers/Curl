@@ -22,8 +22,9 @@ namespace Curl.Cli;
 /// <c>-i</c> write nothing of their own) and the connection options (<c>--connect-timeout</c>, <c>-m</c>,
 /// <c>--resolve</c>, <c>--connect-to</c>, <c>-4</c>, <c>-6</c>). A number curl's default already has, such
 /// as a zero timeout, is not written, as curl does not write it. The proxy, TLS and authentication options'
-/// lines (BL-654) are in <c>LibcurlSourceCode.ProxyTlsAndAuthentication.cs</c>; the remaining options' lines
-/// are BL-1106's.
+/// lines (BL-654) are in <c>LibcurlSourceCode.ProxyTlsAndAuthentication.cs</c>, the transfer, redirect, speed and socket options' lines (BL-1106) in <c>LibcurlSourceCode.TransferOptions.cs</c>, the FTP, SSH, TFTP, telnet, mail, verbose, rate-limit and protocol options' lines (BL-1174) in <c>LibcurlSourceCode.ProtocolOptions.cs</c>, and
+/// the lines that need the transfer's files - <c>-T</c>, <c>--etag-compare</c>, <c>-C -</c> and the SSH
+/// known-hosts file (BL-1177) - in <c>LibcurlSourceCode.TransferFiles.cs</c>.
 /// </remarks>
 public static partial class LibcurlSourceCode
 {
@@ -56,13 +57,17 @@ public static partial class LibcurlSourceCode
         "  CURL *curl;",
     ];
 
-    private static readonly string[] UngeneratableOptionLines =
+    private static readonly string[] UngeneratableOptionHeaderLines =
     [
         "",
         "  /* Here is a list of options the curl code used that cannot get generated",
         "     as source easily. You may choose to either not use them or implement",
         "     them yourself.",
         "",
+    ];
+
+    private static readonly string[] StandardUngeneratableOptionLines =
+    [
         "  CURLOPT_WRITEDATA was set to an object pointer",
         "  CURLOPT_INTERLEAVEDATA was set to an object pointer",
         "  CURLOPT_WRITEFUNCTION was set to a function pointer",
@@ -74,6 +79,10 @@ public static partial class LibcurlSourceCode
         "  CURLOPT_HEADERDATA was set to an object pointer",
         "  CURLOPT_ERRORBUFFER was set to an object pointer",
         "  CURLOPT_STDERR was set to an object pointer",
+    ];
+
+    private static readonly string[] UngeneratableOptionFooterLines =
+    [
         "",
         "  */",
         "",
@@ -99,13 +108,36 @@ public static partial class LibcurlSourceCode
     public static string Generate(IReadOnlyList<(CommandLineOptions Options, string Url)> transfers)
     {
         ArgumentNullException.ThrowIfNull(transfers);
+        return Generate([.. transfers.Select(transfer => new LibcurlTransfer(transfer.Options, transfer.Url))]);
+    }
+
+    /// <summary>
+    /// Builds the source file for the transfers performed, in the order they were performed, with what the
+    /// console learnt about each transfer's files. A transfer whose <c>CURLOPT_SSH_KNOWNHOSTS</c> curl's tool
+    /// fails to set (<see cref="LibcurlTransfer.SshKnownHostsFileMissing" />) ends the transfers there, without
+    /// its list of options or <c>curl_easy_perform</c>, as curl 8.21.0 ends them with exit 2.
+    /// </summary>
+    /// <param name="transfers">Each transfer and its facts.</param>
+    /// <returns>The source text, every line ending in <c>\n</c>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="transfers" /> is <see langword="null" />.</exception>
+    public static string Generate(IReadOnlyList<LibcurlTransfer> transfers)
+    {
+        ArgumentNullException.ThrowIfNull(transfers);
 
         LibcurlSourceVariables variables = new();
         List<string> body = [];
-        foreach ((CommandLineOptions options, string url) in transfers)
+        foreach (LibcurlTransfer transfer in transfers)
         {
-            body.AddRange(TransferLines(options, url, variables));
-            body.AddRange(UngeneratableOptionLines);
+            List<string> transferLines = TransferLines(transfer, variables);
+            int failed = transferLines.IndexOf(KnownHostsSetoptFailed);
+            if (failed >= 0)
+            {
+                body.AddRange(transferLines.Take(failed));
+                break;
+            }
+
+            body.AddRange(transferLines);
+            body.AddRange(UngeneratableOptionLinesFor(transfer.Options));
         }
 
         List<string> lines = [.. HeaderLines, .. variables.Declarations];
@@ -169,32 +201,42 @@ public static partial class LibcurlSourceCode
 
     private static string SetoptMilliseconds(string option, TimeSpan time) => Setopt(option, $"{(long)time.TotalMilliseconds}L");
 
-    private static List<string> TransferLines(CommandLineOptions options, string url, LibcurlSourceVariables variables)
+    private static List<string> TransferLines(LibcurlTransfer transfer, LibcurlSourceVariables variables)
     {
-        List<string> lines = [Setopt("CURLOPT_BUFFERSIZE", "102400L"), Setopt("CURLOPT_URL", QuoteCString(url))];
+        CommandLineOptions options = transfer.Options;
+        string scheme = SchemeOf(options, transfer.Url);
+        List<string> lines = [];
+        AddIf(lines, options.Trace != TraceKind.None, SetoptOn("CURLOPT_VERBOSE"));
+        lines.AddRange([BufferSizeLine(options), Setopt("CURLOPT_URL", QuoteCString(QueryUrl.Append(UploadUrlOf(transfer), options)))]);
         AddIf(lines, options.Silent || options.ProgressMeterOff, SetoptOn("CURLOPT_NOPROGRESS"));
         AddIf(lines, options.NoBody, SetoptOn("CURLOPT_NOBODY"));
         lines.AddRange(BearerAndProxyLines(options));
         AddIf(lines, options.FailMode == HttpFailMode.Fail, SetoptOn("CURLOPT_FAILONERROR"));
+        lines.AddRange(TransferModeLines(options, transfer.UploadFile is not null));
         lines.AddRange(NetrcLines(options));
         AddIf(lines, options.Credentials is not null, () => Setopt("CURLOPT_USERPWD", QuoteCString($"{options.Credentials!.UserName}:{options.Credentials.Password}")));
+        AddStringIf(lines, "CURLOPT_RANGE", options.Range);
         AddIf(lines, options.MaxTime > TimeSpan.Zero, () => SetoptMilliseconds("CURLOPT_TIMEOUT_MS", options.MaxTime!.Value));
         lines.AddRange(RequestBodyLines(options, variables));
+        AddIf(lines, options.FormEscape, SetoptOn("CURLOPT_MIME_OPTIONS"));
         lines.AddRange(HttpAuthLines(options));
-        AddStringListIf(lines, "CURLOPT_HTTPHEADER", HttpHeaderLines(options), variables);
-        AddIf(lines, options.Referer is not null, () => Setopt("CURLOPT_REFERER", QuoteCString(options.Referer!)));
+        AddStringListIf(lines, "CURLOPT_HTTPHEADER", [.. HttpHeaderLines(options), .. transfer.IfNoneMatchHeaders], variables);
+        AddStringIf(lines, "CURLOPT_REFERER", options.Referer);
         lines.Add(Setopt("CURLOPT_USERAGENT", QuoteCString(options.UserAgent ?? DefaultUserAgent)));
-        lines.AddRange(SchemeLines(options, SchemeOf(options, url), variables));
-        lines.AddRange(TlsLines(options));
-        AddIf(lines, options.NoBody || options.RemoteTime, SetoptOn("CURLOPT_FILETIME"));
-        AddIf(lines, options.RequestMethod is not null, () => Setopt("CURLOPT_CUSTOMREQUEST", QuoteCString(options.RequestMethod!)));
-        AddIf(lines, options.ConnectTimeout > TimeSpan.Zero, () => SetoptMilliseconds("CURLOPT_CONNECTTIMEOUT_MS", options.ConnectTimeout!.Value));
-        AddIf(lines, options.IpAddressFamily != IpAddressFamilyChoice.Either, () => Setopt("CURLOPT_IPRESOLVE", $"{(int)options.IpAddressFamily}L"));
+        lines.AddRange(SchemeLines(options, scheme, variables));
+        lines.AddRange(SpeedAndResumeLines(options, ResumeOffsetOf(transfer)));
+        lines.AddRange(TlsLines(transfer, scheme));
+        lines.AddRange(PathFileTimeAndConditionLines(options, variables));
+        lines.AddRange(RequestAndConnectionLines(options, variables));
         lines.AddRange(SocksAndServiceLines(options));
-        lines.Add(SetoptOn("CURLOPT_TCP_KEEPALIVE"));
+        lines.AddRange(SocketLines(options));
+        lines.AddRange(MailFileModeAndProtocolLines(options, variables));
         AddStringListIf(lines, "CURLOPT_RESOLVE", options.ResolveEntries, variables);
         AddStringListIf(lines, "CURLOPT_CONNECT_TO", options.ConnectToEntries, variables);
         lines.AddRange(DelegationAndSaslLines(options));
+        lines.AddRange(UnixSocketAndUrlLines(options));
+        lines.AddRange(UploadFlagLines(options));
+        AddIf(lines, transfer.UploadFileSize > 0, () => Setopt("CURLOPT_INFILESIZE_LARGE", $"(curl_off_t){transfer.UploadFileSize}"));
         return lines;
     }
 
@@ -329,24 +371,27 @@ public static partial class LibcurlSourceCode
     private static List<string> SchemeLines(CommandLineOptions options, string scheme, LibcurlSourceVariables variables) => scheme switch
     {
         "http" or "https" => HttpLines(options, scheme, variables),
-        "ftp" or "ftps" => [SetoptOn("CURLOPT_FTP_SKIP_PASV_IP")],
+        "ftp" or "ftps" => FtpLines(options),
         _ => [],
     };
 
     private static List<string> HttpLines(CommandLineOptions options, string scheme, LibcurlSourceVariables variables)
     {
         List<string> lines = [];
-        AddIf(lines, options.FollowRedirects, SetoptOn("CURLOPT_FOLLOWLOCATION"));
+        AddIf(lines, options.FollowRedirects, () => FollowLocationLine(options));
         AddIf(lines, options.SendCredentialsToRedirectHosts, SetoptOn("CURLOPT_UNRESTRICTED_AUTH"));
         AddStringIf(lines, "CURLOPT_AWS_SIGV4", options.AwsSigV4);
         AddIf(lines, options.AutoReferer, SetoptOn("CURLOPT_AUTOREFERER"));
         AddStringListIf(lines, "CURLOPT_PROXYHEADER", options.ProxyHeaders, variables);
-        lines.Add(Setopt("CURLOPT_MAXREDIRS", "50L"));
+        lines.Add(Setopt("CURLOPT_MAXREDIRS", $"{options.MaxRedirects}L"));
+        lines.AddRange(HttpVersionAndPostRedirectLines(options));
         AddIf(lines, options.Compressed, Setopt("CURLOPT_ACCEPT_ENCODING", "\"\""));
+        lines.AddRange(HttpTransferLines(options));
         string[] cookieStrings = [.. options.Cookies.Where(cookie => cookie.IsCookieString).Select(cookie => cookie.Value)];
         AddIf(lines, cookieStrings.Length > 0, () => Setopt("CURLOPT_COOKIE", QuoteCString(string.Join("; ", cookieStrings))));
         lines.AddRange(options.Cookies.Where(cookie => !cookie.IsCookieString).Select(cookie => Setopt("CURLOPT_COOKIEFILE", QuoteCString(cookie.Value))));
-        AddIf(lines, options.CookieJar is not null, () => Setopt("CURLOPT_COOKIEJAR", QuoteCString(options.CookieJar!)));
+        AddStringIf(lines, "CURLOPT_COOKIEJAR", options.CookieJar);
+        AddIf(lines, options.JunkSessionCookies, SetoptOn("CURLOPT_COOKIESESSION"));
         AddIf(lines, SeparatesProxyHeaders(options, scheme), SetoptOn("CURLOPT_HEADEROPT"));
         return lines;
     }

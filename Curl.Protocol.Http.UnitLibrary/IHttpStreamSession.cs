@@ -46,6 +46,10 @@ internal interface IHttpStreamSession
     /// The transfer's diagnostic log, which the stream's frames are written to (<see cref="HttpFrameLog" />),
     /// or <see langword="null" /> for none.
     /// </param>
+    /// <param name="traceEvents">
+    /// Where the session's <c>--trace-config http/2</c> lines go while this stream is the latest opened
+    /// (<see cref="Http2FrameTrace" />, BL-1167), or the stream's <c>--trace-config http/3</c> lines go (<see cref="Http3StreamTrace" />, BL-1168); <see langword="null" /> for none.
+    /// </param>
     /// <returns>The stream.</returns>
-    IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null, IDiagnosticLog? diagnosticLog = null);
+    IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null, IDiagnosticLog? diagnosticLog = null, ITransferEvents? traceEvents = null);
 }

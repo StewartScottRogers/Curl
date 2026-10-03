@@ -107,6 +107,7 @@ public static partial class LibcurlSourceCode
         List<string> lines = [];
         AddIf(lines, options.NetrcUse != NetrcUse.Ignored, () => Setopt("CURLOPT_NETRC", options.NetrcUse == NetrcUse.Optional ? "(long)CURL_NETRC_OPTIONAL" : "(long)CURL_NETRC_REQUIRED"));
         AddStringIf(lines, "CURLOPT_NETRC_FILE", options.NetrcFile);
+        AddIf(lines, options.UseAscii, SetoptOn("CURLOPT_TRANSFERTEXT"));
         AddStringIf(lines, "CURLOPT_LOGIN_OPTIONS", options.LoginOptions);
         return lines;
     }
@@ -126,17 +127,20 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>The TLS lines for the server and the proxy, written after the scheme's lines in curl's order.</summary>
-    private static List<string> TlsLines(CommandLineOptions options)
+    private static List<string> TlsLines(LibcurlTransfer transfer, string scheme)
     {
+        CommandLineOptions options = transfer.Options;
         (string? certificate, string? certificatePassword) = SplitCertificate(options.ClientCertificate);
         (string? proxyCertificate, string? proxyCertificatePassword) = SplitCertificate(options.ProxyClientCertificate);
         List<string> lines = [];
         AddStringIf(lines, "CURLOPT_KEYPASSWD", options.Passphrase ?? certificatePassword);
         AddStringIf(lines, "CURLOPT_PROXY_KEYPASSWD", options.ProxyPassphrase ?? proxyCertificatePassword);
+        lines.AddRange(SshLines(transfer, scheme));
         AddStringIf(lines, "CURLOPT_CAINFO", options.CaCertificateFile);
         AddStringIf(lines, "CURLOPT_PROXY_CAINFO", options.ProxyCaCertificateFile);
         AddStringIf(lines, "CURLOPT_PINNEDPUBLICKEY", options.PinnedPublicKey);
         AddStringIf(lines, "CURLOPT_PROXY_PINNEDPUBLICKEY", options.ProxyPinnedPublicKey);
+        AddIf(lines, options.WriteOut is not null, SetoptOn("CURLOPT_CERTINFO"));
         lines.AddRange(CertificateAndKeyLines(options, certificate, proxyCertificate));
         lines.AddRange(VerificationAndVersionLines(options));
         lines.AddRange(SslOptionAndCipherLines(options));
@@ -186,6 +190,7 @@ public static partial class LibcurlSourceCode
         AddIf(lines, proxySslOptions != 0, () => SetoptBitmask("CURLOPT_PROXY_SSL_OPTIONS", proxySslOptions, SslOptionNames));
         AddStringIf(lines, "CURLOPT_SSL_CIPHER_LIST", options.Ciphers);
         AddStringIf(lines, "CURLOPT_PROXY_SSL_CIPHER_LIST", options.ProxyCiphers);
+        lines.AddRange(UseSslLines(options));
         AddIf(lines, !options.UseAlpn, () => Setopt("CURLOPT_SSL_ENABLE_ALPN", "0L"));
         return lines;
     }
@@ -206,6 +211,7 @@ public static partial class LibcurlSourceCode
     {
         List<string> lines = [];
         AddIf(lines, options.GssApiDelegation != GssApiDelegation.None, () => Setopt("CURLOPT_GSSAPI_DELEGATION", $"{(int)options.GssApiDelegation}L"));
+        AddStringIf(lines, "CURLOPT_MAIL_AUTH", options.MailAuth);
         AddStringIf(lines, "CURLOPT_SASL_AUTHZID", options.SaslAuthorizationIdentity);
         AddIf(lines, options.SaslInitialResponse, SetoptOn("CURLOPT_SASL_IR"));
         return lines;

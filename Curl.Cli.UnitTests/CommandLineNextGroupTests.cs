@@ -42,7 +42,7 @@ public sealed class CommandLineNextGroupTests
         "pinnedpubkey", "cert-status", "ssl-auto-client-cert", "proxy-insecure",
         "proxy-cacert", "proxy-capath", "proxy-cert", "proxy-key", "proxy-cert-type", "proxy-key-type", "proxy-pass",
         "proxy-ciphers", "proxy-tls13-ciphers", "proxy-crlfile", "proxy-pinnedpubkey", "proxy-ca-native",
-        "proxy-ssl-auto-client-cert", "proxy-ssl-allow-beast", "cert", "key", "cert-type", "key-type", "pass", "pubkey", "knownhosts",
+        "proxy-ssl-auto-client-cert", "proxy-ssl-allow-beast", "proxy-tlsuser", "proxy-tlspassword", "proxy-tlsauthtype", "cert", "key", "cert-type", "key-type", "pass", "pubkey", "knownhosts",
         "hostpubmd5", "hostpubsha256", "compressed-ssh", "tlsv1", "tlsv1.0",
         "tlsv1.1", "tlsv1.2", "tlsv1.3", "tls-max", "proxy-tlsv1", "proto", "proto-redir", "proto-default",
         "ciphers", "tls13-ciphers", "curves", "sigalgs", "tls-earlydata", "ech", "engine", "tlsuser",

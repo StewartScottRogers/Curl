@@ -18,8 +18,8 @@ public sealed class Http3SessionTests
         FakeMultiplexedConnection quic = new(new FakeMultiplexedStream(0, []), new FakeMultiplexedStream(4, []));
         Http3Session session = new(quic);
 
-        await session.OpenRequestStreamAsync(CancellationToken.None);
-        var second = await session.OpenRequestStreamAsync(CancellationToken.None);
+        await session.OpenRequestStreamAsync(HttpFrameLog.Silent, CancellationToken.None);
+        var second = await session.OpenRequestStreamAsync(HttpFrameLog.Silent, CancellationToken.None);
 
         Assert.AreEqual(4L, second.StreamId);
         Assert.HasCount(3, quic.UnidirectionalStreams);
@@ -33,7 +33,7 @@ public sealed class Http3SessionTests
         FakeMultiplexedStream control = ServerStream(3, [0x00, .. ServerSettings.ToBytes()]);
         FakeMultiplexedConnection quic = new(request) { ServerStreams = [control] };
         Http3Session session = new(quic);
-        await session.OpenRequestStreamAsync(CancellationToken.None);
+        await session.OpenRequestStreamAsync(HttpFrameLog.Silent, CancellationToken.None);
 
         await session.DisposeAsync();
 
@@ -136,7 +136,7 @@ public sealed class Http3SessionTests
         await using Http3Session session = new(quic);
 
         IMultiplexedStream[] opened = await Task.WhenAll(
-            Enumerable.Range(0, 3).Select(_ => Task.Run(async () => await session.OpenRequestStreamAsync(CancellationToken.None))));
+            Enumerable.Range(0, 3).Select(_ => Task.Run(async () => await session.OpenRequestStreamAsync(HttpFrameLog.Silent, CancellationToken.None))));
 
         CollectionAssert.AreEquivalent(new long[] { 0, 4, 8 }, opened.Select(stream => stream.StreamId).ToArray());
         Assert.HasCount(3, quic.UnidirectionalStreams);
@@ -149,7 +149,7 @@ public sealed class Http3SessionTests
         await using Http3Session session = new(quic);
 
         await Assert.ThrowsAsync<OperationCanceledException>(
-            async () => await session.OpenRequestStreamAsync(new CancellationToken(canceled: true)));
+            async () => await session.OpenRequestStreamAsync(HttpFrameLog.Silent, new CancellationToken(canceled: true)));
     }
 
     [TestMethod]
@@ -351,6 +351,38 @@ public sealed class Http3SessionTests
     }
 
     /// <summary>A server stream that stays open once its bytes are read.</summary>
+    [TestMethod]
+    public async Task LogConnectionFrame_AfterATransferOpenedAStream_LogsSettingsAndGoawayToItAndNoOtherFrame()
+    {
+        RecordingDiagnosticLog log = new();
+        Http3Session session = new(new FakeMultiplexedConnection(new FakeMultiplexedStream(0, [])));
+        await session.OpenRequestStreamAsync(new HttpFrameLog(log, DiagnosticLogComponents.Http3), CancellationToken.None);
+
+        session.LogConnectionFrame(new Http3CancelPushFrame(1));
+        session.LogConnectionFrame(ServerSettings);
+        session.LogConnectionFrame(new Http3GoawayFrame(8));
+
+        CollectionAssert.AreEqual(
+            new[] { "SETTINGS received: MAX_FIELD_SECTION_SIZE 100", "GOAWAY received: stream 8" },
+            log.Lines.Select(line => line.Message).ToArray());
+    }
+
+    [TestMethod]
+    public async Task OpenRequestStreamAsync_SecondTransfer_TakesTheConnectionsLaterFrames()
+    {
+        RecordingDiagnosticLog first = new();
+        RecordingDiagnosticLog second = new();
+        Http3Session session = new(new FakeMultiplexedConnection(new FakeMultiplexedStream(0, []), new FakeMultiplexedStream(4, [])));
+        session.LogConnectionFrame(ServerSettings);
+        await session.OpenRequestStreamAsync(new HttpFrameLog(first, DiagnosticLogComponents.Http3), CancellationToken.None);
+        await session.OpenRequestStreamAsync(new HttpFrameLog(second, DiagnosticLogComponents.Http3), CancellationToken.None);
+
+        session.LogConnectionFrame(new Http3GoawayFrame(8));
+
+        CollectionAssert.AreEqual(new[] { "SETTINGS received: MAX_FIELD_SECTION_SIZE 100" }, first.Lines.Select(line => line.Message).ToArray());
+        CollectionAssert.AreEqual(new[] { "GOAWAY received: stream 8" }, second.Lines.Select(line => line.Message).ToArray());
+    }
+
     private static FakeMultiplexedStream ServerStream(long streamId, byte[] incoming) => new(streamId, incoming) { StaysOpen = true };
 
     private static async Task<HttpTransferException> ReadFailureAsync(Http3Session session)

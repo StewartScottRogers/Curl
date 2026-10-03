@@ -133,6 +133,23 @@ public sealed class SftpFileUploadTests
         AssertRequests(outcome, 3, SftpServerScript.OpenRequest("/m.txt", NewFile, 2), SftpServerScript.WriteRequest(3, 0, Content), SftpServerScript.CloseRequest(4));
     }
 
+    // OpenSSH's sftp-server never reports a size of 2^63 or more, so this is pinned from
+    // curl 8.21.0's sftp_upload_init (lib/vssh/libssh2.c at curl-8_21_0), not measured.
+    [TestMethod]
+    public async Task UploadAsync_ResumeFromRemoteSizeWithItsTopBitSet_ThrowsExit36BadFileSizeAndWritesNothing()
+    {
+        SftpServerScript script = SftpServerScript.Started().HomeDirectory().Size(0x8000000000000000uL, 1);
+        ScriptedConnection connection = new(script.Bytes);
+
+        SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
+            async () => await Upload(connection, "/e.txt", Plain with { ResumeFromRemoteSize = true }));
+
+        Assert.AreEqual(CurlExitCode.BadDownloadResume, failure.ExitCode);
+        Assert.AreEqual("Bad file size (-9223372036854775808)", failure.Message);
+        List<byte[]> requests = SftpServerScript.SftpRequests(connection.Written);
+        CollectionAssert.AreEqual(SftpServerScript.StatRequest("/e.txt", 1), requests[^1]);
+    }
+
     [TestMethod]
     [DataRow(13UL, DisplayName = "remote as long, as measured")]
     [DataRow(20UL, DisplayName = "remote longer, as measured")]

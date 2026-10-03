@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Authentication;
 
@@ -35,12 +36,22 @@ public static class NetrcFile
     /// The user name of the URL, which selects among entries for the host;
     /// <see langword="null" /> when the URL has none.
     /// </param>
+    /// <param name="diagnosticLog">
+    /// Where a matching entry is logged at <c>info</c>, by host and login only, never its password
+    /// (BL-1151); <see langword="null" /> logs nothing.
+    /// </param>
     /// <returns>The entry curl picks, no entry, or a syntax error.</returns>
-    public static NetrcLookupResult Find(string text, string hostName, string? userName)
+    public static NetrcLookupResult Find(string text, string hostName, string? userName, IDiagnosticLog? diagnosticLog = null)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(hostName);
-        return new NetrcLookup(new NetrcTokenScanner(text), hostName, userName).Run();
+        NetrcLookupResult result = new NetrcLookup(new NetrcTokenScanner(text), hostName, userName).Run();
+        if (result.Outcome == NetrcLookupOutcome.Found)
+        {
+            new AuthDiagnosticLog(diagnosticLog).NetrcEntryMatched(hostName, result.Login);
+        }
+
+        return result;
     }
 
     /// <summary>

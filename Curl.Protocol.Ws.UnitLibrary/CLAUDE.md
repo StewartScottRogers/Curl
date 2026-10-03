@@ -20,3 +20,9 @@ component - the upgrade request by method and request target and the upgrade acc
 (`verbose`), a close frame whose code is neither 1000 nor 1001 (`warning`) - and, for every
 transfer, its end: bytes and milliseconds at `info`, or its `CurlExitCode` at `error`. The
 URL's credentials and the `Authorization` value are never written.
+
+`--trace-config ws` (ADR-0370, BL-1164): `WsFrameTrace` writes curl 8.21.0's `[WS]` lines
+through the transfer's events when the handler's `TracesFrames` is set - the chunk size and
+upload reader after the `101`, each frame decoded and each run of payload passed on (from
+`WsFrameDecoder`), the pong sent (from `WsFrameReceiver`), the upload frame encoded and
+`websocket established, callback mode`.

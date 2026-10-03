@@ -83,15 +83,15 @@ internal sealed class Pop3ControlChannel(
 
     /// <summary>
     /// Sends <paramref name="command" /> followed by CRLF, reported as a request header once
-    /// sent. A connection that fails with an <see cref="IOException" /> is left for the next
-    /// read to find closed, and the command is not reported.
+    /// sent. A command that cannot be written is not reported.
     /// </summary>
     /// <param name="command">The command line without its line end, such as <c>CAPA</c>.</param>
     /// <param name="logged">
     /// What the diagnostic log says was sent when <paramref name="command" /> carries a
     /// credential, or <see langword="null" /> to log <paramref name="command" /> itself.
     /// </param>
-    /// <returns>A task that completes once the command is sent or the send has failed.</returns>
+    /// <returns>A task that completes once the command is sent.</returns>
+    /// <exception cref="Pop3SendFailedException">The write failed with an <see cref="IOException" /> (exit 55).</exception>
     public async ValueTask SendAsync(string command, string? logged = null)
     {
         Pop3DiagnosticLogLines.CommandSent(log, logged ?? command);
@@ -101,9 +101,9 @@ internal sealed class Pop3ControlChannel(
             await connection.WriteAsync(line, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (IOException)
+        catch (IOException failure)
         {
-            return;
+            throw new Pop3SendFailedException(failure);
         }
 
         reporting.ReportRequestHeader(line);

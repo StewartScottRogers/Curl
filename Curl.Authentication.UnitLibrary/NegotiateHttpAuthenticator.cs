@@ -23,6 +23,7 @@ namespace Curl.Authentication;
 /// <see langword="false" /> as its GSS-API build does; <see langword="null" /> for this
 /// platform's curl: SSPI on Windows, GSS-API elsewhere.
 /// </param>
+/// <param name="diagnosticLog">Where each round and a failed context are logged (BL-1151); <see langword="null" /> logs nothing.</param>
 /// <remarks>
 /// An explicit <c>-u user:password</c> is passed on (a <c>DOMAIN\user</c> or
 /// <c>DOMAIN/user</c> name split into its domain and user, as curl's SSPI build splits it),
@@ -31,8 +32,10 @@ namespace Curl.Authentication;
 /// the request that sent it draws a continuation, because a Kerberos context cannot be made
 /// again: its authenticator is fresh every time (ADR-0227).
 /// </remarks>
-public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityContexts, NegotiateOptions? options = null, bool? wordsFailuresAsSspi = null)
+public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityContexts, NegotiateOptions? options = null, bool? wordsFailuresAsSspi = null, IDiagnosticLog? diagnosticLog = null)
 {
+    private readonly AuthDiagnosticLog log = new(diagnosticLog);
+
     /// <summary>The service name of an HTTP acceptor's principal, before <c>--service-name</c> changes it.</summary>
     public const string HttpServiceName = "HTTP";
 
@@ -185,6 +188,7 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
         }
 
         ReportFailure(step, events);
+        LogRound(step);
         string? header = step.Status is SecurityContextStatus.ContinueNeeded or SecurityContextStatus.Completed && step.Token.Length != 0
             ? SchemePrefix + Convert.ToBase64String(step.Token)
             : null;
@@ -201,6 +205,22 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
     }
 
     /// <summary>
+    /// Logs, at <c>verbose</c>, that a step left the context needing another round (one whose
+    /// token is sent) or completed it; logs nothing for a failed step.
+    /// </summary>
+    private void LogRound(SecurityContextStep step)
+    {
+        if (step.Status == SecurityContextStatus.ContinueNeeded && step.Token.Length != 0)
+        {
+            log.Round("Negotiate needs another round");
+        }
+        else if (step.Status == SecurityContextStatus.Completed)
+        {
+            log.Round("Negotiate completed");
+        }
+    }
+
+    /// <summary>
     /// Reports the platform curl's failure line to <paramref name="events" /> when
     /// <paramref name="step" /> failed; does nothing for a step that went on or completed.
     /// </summary>
@@ -208,6 +228,7 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
     {
         if (step.Status is not (SecurityContextStatus.ContinueNeeded or SecurityContextStatus.Completed))
         {
+            log.NegotiateContextFailed(step.Status);
             events.ReportInfo(NegotiateFailureLines.For(step.Status, wordsFailuresAsSspi));
         }
     }

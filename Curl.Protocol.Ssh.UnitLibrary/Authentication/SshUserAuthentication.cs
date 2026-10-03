@@ -100,12 +100,25 @@ internal sealed class SshUserAuthentication(
 
     private const string SkEd25519Method = "sk-ssh-ed25519@openssh.com";
 
+    /// <summary>The state curl's state machine enters once the user is authenticated.</summary>
+    internal const string AuthDoneState = "SSH_AUTH_DONE";
+
     // The last server-sig-algs value an SSH_MSG_EXT_INFO carried, or null before one did.
     private string? serverSignatureAlgorithms;
 
     // The method an RSA key found no signature algorithm for. libssh2 keeps it, and every
     // later agent identity starts from it instead of its own key type (ADR-0271).
     private string? leftoverMethod;
+
+    // The --trace-config ssh line for the agent identity being tried (BL-1207), or null
+    // outside the agent step.
+    private string? agentAttemptLine;
+
+    /// <summary>
+    /// Gets where the <c>--trace-config ssh</c> state changes of the <c>publickey</c> attempt go
+    /// (BL-1166); <see cref="SshStateTrace.Off" /> when not given.
+    /// </summary>
+    internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
 
     /// <summary>
     /// Sends <c>SSH_MSG_SERVICE_REQUEST</c> for <c>ssh-userauth</c> and waits for the
@@ -185,23 +198,45 @@ internal sealed class SshUserAuthentication(
     private async ValueTask AuthenticateWithMethodsAsync(string methods, UserCredentials credentials, CancellationToken cancellationToken)
     {
         bool offersPublicKey = methods.Contains(PublicKeyMethod, StringComparison.Ordinal);
+        Trace.Enter("SSH_AUTH_PKEY_INIT");
         if (offersPublicKey && await TryLoggedAsync(PublicKeyMethod, () => TryPublicKeyAsync(credentials.User, cancellationToken)).ConfigureAwait(false))
         {
             return;
         }
 
-        if (methods.Contains(PasswordMethod, StringComparison.Ordinal) && await TryLoggedAsync(PasswordMethod, () => TryPasswordAsync(credentials.User, credentials.Password, cancellationToken)).ConfigureAwait(false))
+        Trace.Enter("SSH_AUTH_PASS_INIT");
+        if (await TryPasswordIfOfferedAsync(methods, credentials, cancellationToken).ConfigureAwait(false))
         {
-            events.ReportInfo(SshInfoLines.PasswordAuthenticated);
             return;
         }
 
+        Trace.Enter("SSH_AUTH_HOST_INIT");
+        Trace.Enter("SSH_AUTH_AGENT_INIT");
         if (offersPublicKey && await TryLoggedAsync(AgentMethod, () => TryAgentAsync(credentials, cancellationToken)).ConfigureAwait(false))
         {
             return;
         }
 
+        Trace.Enter("SSH_AUTH_KEY_INIT");
         await RequireKeyboardInteractiveAsync(methods, credentials.User, credentials.Password, cancellationToken).ConfigureAwait(false);
+    }
+
+    // curl's SSH_AUTH_PASS state, entered only when the server offers password (BL-1204).
+    private async ValueTask<bool> TryPasswordIfOfferedAsync(string methods, UserCredentials credentials, CancellationToken cancellationToken)
+    {
+        if (!methods.Contains(PasswordMethod, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        Trace.Enter("SSH_AUTH_PASS");
+        if (!await TryLoggedAsync(PasswordMethod, () => TryPasswordAsync(credentials.User, credentials.Password, cancellationToken)).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        events.ReportInfo(SshInfoLines.PasswordAuthenticated);
+        return true;
     }
 
     // curl's agent step (ADR-0271): connect, list the identities, then try each in the
@@ -216,6 +251,7 @@ internal sealed class SshUserAuthentication(
             return false;
         }
 
+        Trace.Enter("SSH_AUTH_AGENT_LIST");
         SshAgentClient agent = new(connection);
         await using (agent.ConfigureAwait(false))
         {
@@ -226,6 +262,7 @@ internal sealed class SshUserAuthentication(
                 return false;
             }
 
+            Trace.Enter("SSH_AUTH_AGENT");
             return await TryAgentIdentitiesAsync(agent, identities, credentials, cancellationToken).ConfigureAwait(false);
         }
     }
@@ -234,6 +271,8 @@ internal sealed class SshUserAuthentication(
     {
         foreach (SshAgentIdentity identity in identities)
         {
+            agentAttemptLine = $"[SSH_AUTH_AGENT_LIST] auth user '{credentials.UserName}' for key '{identity.DisplayComment}'";
+            Trace.Write(agentAttemptLine);
             if (await TryAgentIdentityAsync(agent, credentials.User, identity.Blob, cancellationToken).ConfigureAwait(false))
             {
                 events.ReportInfo(SshInfoLines.AgentAuthenticated(credentials.UserName, identity.DisplayComment));
@@ -264,6 +303,7 @@ internal sealed class SshUserAuthentication(
             PublicKeyRequest(user, algorithm, blob, signed: false),
             [SshAuthenticationMessageNumber.Success, SshAuthenticationMessageNumber.Failure, SshAuthenticationMessageNumber.PublicKeyOk],
             cancellationToken).ConfigureAwait(false);
+        TraceAgentAnswer();
         byte answerType = MessageTypeOf(answer);
         return answerType == SshAuthenticationMessageNumber.PublicKeyOk
             ? await SendAgentSignedRequestAsync(agent, user, blob, algorithm, firstAttempt, cancellationToken).ConfigureAwait(false)
@@ -298,8 +338,13 @@ internal sealed class SshUserAuthentication(
             message.ToArray(),
             [SshAuthenticationMessageNumber.Success, SshAuthenticationMessageNumber.Failure],
             cancellationToken).ConfigureAwait(false);
+        TraceAgentAnswer();
         return answer?[0] == SshAuthenticationMessageNumber.Success;
     }
+
+    // Measured (BL-1207): curl writes the identity's line each time it calls libssh2 for it,
+    // once to start and again after each server answer libssh2 waited for.
+    private void TraceAgentAnswer() => Trace.Write(agentAttemptLine!);
 
     // The key type a public key blob names first, or null when its length overruns the blob.
     private static string? KeyTypeOf(byte[] blob)
@@ -361,9 +406,11 @@ internal sealed class SshUserAuthentication(
     {
         if (!methods.Contains(KeyboardInteractiveMethod, StringComparison.Ordinal))
         {
+            Trace.Enter(AuthDoneState);
             throw SshTransferException.AuthenticationFailure();
         }
 
+        Trace.Enter("SSH_AUTH_KEY");
         if (!await TryLoggedAsync(KeyboardInteractiveMethod, () => TryKeyboardInteractiveAsync(user, password, cancellationToken)).ConfigureAwait(false))
         {
             throw SshTransferException.LoginDenied();
@@ -492,6 +539,7 @@ internal sealed class SshUserAuthentication(
         }
 
         events.ReportInfo(SshInfoLines.TryingPrivateKeyFile(files.PrivateKeyPath));
+        Trace.Enter("SSH_AUTH_PKEY");
         string? denial = await DenyPublicKeyAsync(user, files, cancellationToken).ConfigureAwait(false);
         events.ReportInfo(denial is null ? SshInfoLines.AuthenticatedViaPublicKey : SshInfoLines.PublicKeyDenied(denial));
         return denial is null;

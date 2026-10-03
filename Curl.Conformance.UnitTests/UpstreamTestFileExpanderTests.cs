@@ -311,6 +311,191 @@ public sealed class UpstreamTestFileExpanderTests
     }
 
     [TestMethod]
+    [DataRow("\r\n")]
+    [DataRow("\n")]
+    public void Expand_IncludeIsReplacedByTheFileBytesAndConsumesTheLineBreak(string lineBreak)
+    {
+        Dictionary<string, byte[]> files = new() { ["log/5/a.txt"] = Encoding.Latin1.GetBytes("raw\r\nbytes\xff") };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles($"<data>\n%include %LOGDIR/a.txt%{lineBreak}</data>\n", files);
+
+        Assert.AreEqual("<data>\nraw\r\nbytes\xff</data>\n", Text(expansion));
+        Assert.IsEmpty(expansion.UnsupportedInstructions);
+    }
+
+    [TestMethod]
+    public void Expand_IncludeTextTurnsCrlfIntoLfAndSubstitutesTheFileVariables()
+    {
+        Dictionary<string, byte[]> files = new() { ["log/5/t.txt"] = Encoding.Latin1.GetBytes("test %TESTNUMBER\r\nend\rx\r\n") };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("%includetext %LOGDIR/t.txt%\r\n", files);
+
+        Assert.AreEqual("test 5\nend\rx\n", Text(expansion));
+        Assert.IsEmpty(expansion.UnsupportedInstructions);
+    }
+
+    [TestMethod]
+    public void Expand_IncludeRunsAfterMacrosAndBase64SoTheIncludedBytesAreNotExpanded()
+    {
+        Dictionary<string, byte[]> files = new() { ["m"] = Encoding.Latin1.GetBytes("%SP %b64[a]b64% %TESTNUMBER %include m%\n") };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("%b64[a]b64%%SP%include m%\n", files);
+
+        Assert.AreEqual("YQ== %SP %b64[a]b64% %TESTNUMBER %include m%\n", Text(expansion));
+    }
+
+    [TestMethod]
+    public void Expand_IncludeTextBytesGoThroughMacrosButNotAnotherIncludeText()
+    {
+        Dictionary<string, byte[]> files = new() { ["t"] = Encoding.Latin1.GetBytes("a%SPb %includetext t%\n") };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("%includetext t%\n", files);
+
+        Assert.AreEqual("a b %includetext t%\n", Text(expansion));
+    }
+
+    [TestMethod]
+    public void Expand_MissingFileIsIncludedAsNothing()
+    {
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("a\n%include gone%\n%includetext gone%\nb\n", []);
+
+        Assert.AreEqual("a\nb\n", Text(expansion));
+        Assert.IsEmpty(expansion.UnsupportedInstructions);
+    }
+
+    [TestMethod]
+    public void Expand_IncludeWithoutALineBreakAfterIt_IsLeftAsWritten()
+    {
+        Dictionary<string, byte[]> files = new() { ["x"] = "X"u8.ToArray(), ["y"] = "Y"u8.ToArray() };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("%include x% %include y%\r\r\n%include x%", files);
+
+        Assert.AreEqual("%include x% Y%include x%", Text(expansion));
+    }
+
+    [TestMethod]
+    public void Expand_IncludeWithNoClosingPercent_IsLeftAsWritten()
+    {
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("%include x\n%includetext y\n", new() { ["x\n"] = "X"u8.ToArray() });
+
+        Assert.AreEqual("%include x\n%includetext y\n", Text(expansion));
+    }
+
+    [TestMethod]
+    public void Expand_IncludePathIsGivenToTheReaderAsUtf8Text()
+    {
+        List<string> paths = [];
+
+        UpstreamTestFileExpander.Expand(Encoding.Latin1.GetBytes("%include %LOGDIR/f%\n"), new Dictionary<string, string> { ["LOGDIR"] = "d\u00e9" }, NoFeatures, path =>
+        {
+            paths.Add(path);
+            return null;
+        });
+
+        CollectionAssert.AreEqual(new[] { "d\u00e9/f" }, paths);
+    }
+
+    [TestMethod]
+    public void Expand_WithoutAReader_ListsEachIncludeOnce()
+    {
+        UpstreamTestFileExpansion expansion = Expand("%includetext a%\n%include b%\n%includetext c% %include d%\n", NoVariables);
+
+        CollectionAssert.AreEqual(new[] { "%includetext", "%include" }, expansion.UnsupportedInstructions.ToArray());
+    }
+
+    [TestMethod]
+    public void Expand_Sha256b64fileIsTheBase64Sha256OfTheFileBytesInEitherCase()
+    {
+        // SHA-256 of "abc" is ba7816bf…15ad, standard base64 with no line breaks.
+        Dictionary<string, byte[]> files = new() { ["log/5/k.pub"] = "abc"u8.ToArray() };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("pin %sha256b64file[%LOGDIR/k.pub]sha256b64file% %SHA256B64FILE[%LOGDIR/k.pub]SHA256B64FILE%\n", files);
+
+        Assert.AreEqual("pin ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0= ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=\n", Text(expansion));
+        Assert.IsEmpty(expansion.UnsupportedInstructions);
+    }
+
+    [TestMethod]
+    public void Expand_FileInstructionPathHasItsPercentPairsDecodedBeforeTheRead()
+    {
+        List<string> paths = [];
+
+        UpstreamTestFileExpander.Expand(Encoding.Latin1.GetBytes("%sha256b64file[log%2F5/k%2epub]sha256b64file%%strippemfile[a%2Fb]strippemfile%\n"), NoVariables, NoFeatures, path =>
+        {
+            paths.Add(path);
+            return null;
+        });
+
+        CollectionAssert.AreEqual(new[] { "log/5/k.pub", "a/b" }, paths);
+    }
+
+    [TestMethod]
+    public void Expand_MissingFileForAFileInstructionCountsAsEmpty()
+    {
+        // SHA-256 of no bytes is e3b0c442…b855.
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("[%sha256b64file[gone]sha256b64file%][%strippemfile[gone]strippemfile%]\n", []);
+
+        Assert.AreEqual("[47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=][]\n", Text(expansion));
+    }
+
+    // get_file_content over the LF file
+    //   head\n-----BEGIN A-----\nAAA\n-----END A-----\nmid\n-----BEGIN B-----\nBBB\n-----END B-----\ntail\n
+    // 1. s/(^|-----END .*?-----[\r\n]?)(.*?)(-----BEGIN .*?-----|$)/$1$3/gs drops "head\n" (from ^ to
+    //    BEGIN A), "mid\n" (after "END A-----\n" to BEGIN B) and "tail" (after "END B-----\n" to the
+    //    $ before the final \n), leaving
+    //    -----BEGIN A-----\nAAA\n-----END A-----\n-----BEGIN B-----\nBBB\n-----END B-----\n\n
+    // 2. CRLF to LF changes nothing; 3. chomp drops the last \n.
+    // Over the same file with CRLF line ends, [\r\n]? takes only the \r after each END line, so
+    // 1. leaves -----BEGIN A-----\r\nAAA\r\n-----END A-----\r-----BEGIN B-----\r\nBBB\r\n-----END B-----\r\n
+    //    (the \r before the final \n, then that \n);
+    // 2. turns each \r\n into \n, leaving the lone \r after END A; 3. chomp drops the last \n.
+    [TestMethod]
+    [DataRow("\n", "-----BEGIN A-----\nAAA\n-----END A-----\n-----BEGIN B-----\nBBB\n-----END B-----\n")]
+    [DataRow("\r\n", "-----BEGIN A-----\nAAA\n-----END A-----\r-----BEGIN B-----\nBBB\n-----END B-----")]
+    public void Expand_StrippemfileKeepsOnlyThePemBlocksAsGetFileContentDoes(string lineEnd, string expected)
+    {
+        string pem = string.Join(lineEnd, "head", "-----BEGIN A-----", "AAA", "-----END A-----", "mid", "-----BEGIN B-----", "BBB", "-----END B-----", "tail", string.Empty);
+        Dictionary<string, byte[]> files = new() { ["log/5/c.pem"] = Encoding.Latin1.GetBytes(pem) };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("<%strippemfile[%LOGDIR/c.pem]strippemfile%>\n", files);
+
+        Assert.AreEqual($"<{expected}>\n", Text(expansion));
+        Assert.IsEmpty(expansion.UnsupportedInstructions);
+    }
+
+    [TestMethod]
+    public void Expand_TwoStrippemfileInstructionsOnOneLineAreBothReplaced()
+    {
+        Dictionary<string, byte[]> files = new()
+        {
+            ["a"] = "x\n-----BEGIN K-----\nk\n-----END K-----\n"u8.ToArray(),
+            ["b"] = "-----BEGIN C-----\nc\n-----END C-----\ny"u8.ToArray(),
+        };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("%STRIPPEMFILE[a]STRIPPEMFILE%|%strippemfile[b]strippemfile%\n", files);
+
+        Assert.AreEqual("-----BEGIN K-----\nk\n-----END K-----|-----BEGIN C-----\nc\n-----END C-----\n", Text(expansion));
+    }
+
+    [TestMethod]
+    public void Expand_FileInstructionsRunAfterIncludeSoIncludedOnesAreReplaced()
+    {
+        Dictionary<string, byte[]> files = new() { ["i"] = "%sha256b64file[k]sha256b64file%\n"u8.ToArray(), ["k"] = "abc"u8.ToArray() };
+
+        UpstreamTestFileExpansion expansion = ExpandWithFiles("%include i%\n", files);
+
+        Assert.AreEqual("ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=\n", Text(expansion));
+    }
+
+    [TestMethod]
+    public void Expand_WithoutAReader_ListsEachFileInstructionOnceInEitherCase()
+    {
+        UpstreamTestFileExpansion expansion = Expand("%STRIPPEMFILE[a]STRIPPEMFILE%\n%Sha256B64File[b]sha256b64file% %strippemfile[c]strippemfile%\n", NoVariables);
+
+        CollectionAssert.AreEqual(new[] { "%strippemfile", "%sha256b64file" }, expansion.UnsupportedInstructions.ToArray());
+    }
+
+    [TestMethod]
     public void Expand_KeepsAFinalLineWithoutALineFeed()
     {
         UpstreamTestFileExpansion expansion = Expand("a\nb", NoVariables);
@@ -334,6 +519,13 @@ public sealed class UpstreamTestFileExpanderTests
 
     private static UpstreamTestFileExpansion Expand(string file, IReadOnlyDictionary<string, string> variables, params string[] features) =>
         UpstreamTestFileExpander.Expand(Encoding.Latin1.GetBytes(file), variables, features.ToHashSet(StringComparer.Ordinal));
+
+    private static UpstreamTestFileExpansion ExpandWithFiles(string file, Dictionary<string, byte[]> files) =>
+        UpstreamTestFileExpander.Expand(
+            Encoding.Latin1.GetBytes(file),
+            new Dictionary<string, string> { ["LOGDIR"] = "log/5", ["TESTNUMBER"] = "5" },
+            NoFeatures,
+            path => files.GetValueOrDefault(path));
 
     private static string Text(UpstreamTestFileExpansion expansion) => Encoding.Latin1.GetString(expansion.File.Span);
 }

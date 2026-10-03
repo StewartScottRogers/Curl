@@ -42,6 +42,19 @@ internal static class LocalBindLines
         return onWindows ? 23 : onLinux ? 10 : 30;
     }
 
+    /// <summary>
+    /// <c>Local Interface lo is ip 127.0.0.1 using address family 2</c>: a plain or <c>if!</c> name the
+    /// device bind refused, bound by the interface's address of the family dialled (BL-1079; measured with
+    /// curl 8.22.0 on Linux with <c>SO_BINDTODEVICE</c> refused by seccomp).
+    /// </summary>
+    /// <param name="interfaceName">The interface name bound.</param>
+    /// <param name="address">The interface's address bound.</param>
+    /// <param name="onWindows">Whether to number the family as Windows does.</param>
+    /// <param name="onLinux">Whether to number the family as Linux does; ignored on Windows.</param>
+    /// <returns>The line.</returns>
+    public static string LocalInterface(string interfaceName, IPAddress address, bool onWindows, bool onLinux) =>
+        $"Local Interface {interfaceName} is ip {address} using address family {FamilyNumber(address.AddressFamily, onWindows, onLinux)}";
+
     /// <summary><c>Could not resolve host: bogus0</c>: the host to bind resolved to nothing.</summary>
     /// <param name="hostName">The host name bound.</param>
     /// <returns>The line.</returns>

@@ -34,8 +34,11 @@ blocks received, `Remaining length: N bytes` and each PUBLISH body slice as data
 `mqtt_doing: state [N]` lines (one extra `state [0]` straight after the CONNECT), `Got
 DISCONNECT`, `Received ping response.`, `server disconnected` and `State not handled yet`;
 then `MqttProtocolHandler` reports the failure's message unless curl prints it without
-`failf` (`MqttTransferMessages.IsStrerrorText`), and `closing connection #N` after exit 23
-or `shutting down connection #N` after anything else.
+`failf` (`MqttTransferMessages.IsStrerrorText`), then `Error 55 sending MQTT CONNECT
+request` when the CONNECT could not be sent (`MqttTransferException.FollowingLine`,
+BL-1229), and `closing connection #N` after exit 23 or `shutting down connection #N` after
+anything else. A failed send is exit 55 `Send failure: Connection was reset` for a reset
+and `Failed sending data to the peer` otherwise.
 
 Keep-alive (BL-1116): while a packet's first byte is awaited, `MqttSession` races the
 read (`MqttPacketReader.WhenFirstByteReadyAsync`, which keeps the read it starts for the

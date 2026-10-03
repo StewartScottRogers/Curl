@@ -106,7 +106,39 @@ public sealed class CommandLineTraceConfigTests
     [TestMethod]
     public void Parse_NoTraceConfig_TurnsOnNoComponent()
     {
-        Assert.AreEqual(0, Accept("-vvvv").TraceComponents.Count);
+        Assert.AreEqual(0, Accept("-v").TraceComponents.Count);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-vv" }, new[] { "setup", "protocol" })]
+    [DataRow(new[] { "-vsv" }, new[] { "setup", "protocol" })]
+    [DataRow(new[] { "-vvv" }, new[] { "setup", "protocol", "read", "write" })]
+    [DataRow(new[] { "-vvvv" }, new[] { "setup", "protocol", "read", "write", "all" })]
+    [DataRow(new[] { "-vvvvv" }, new[] { "setup", "protocol", "read", "write", "all" })]
+    [DataRow(new[] { "--trace-config", "-setup", "-vv" }, new[] { "setup", "protocol" })]
+    [DataRow(new[] { "-vv", "--trace-config", "-network" }, new[] { "setup", "protocol" })]
+    [DataRow(new[] { "-vvv", "--trace-config", "-read" }, new[] { "setup", "protocol", "write" })]
+    [DataRow(new[] { "-vv", "--trace-config", "-setup" }, new[] { "protocol" })]
+    [DataRow(new[] { "-vv", "--trace-config", "-all" }, new string[0])]
+    [DataRow(new[] { "-vv", "-v" }, new string[0])]
+    [DataRow(new[] { "-vv", "--no-verbose", "-v" }, new string[0])]
+    [DataRow(new[] { "--trace-config", "setup", "-v", "--no-verbose", "-v" }, new string[0])]
+    [DataRow(new[] { "--trace-config", "dns", "-v", "-v" }, new[] { "dns" })]
+    [DataRow(new[] { "-vv", "--trace-config", "setup", "-v" }, new[] { "setup" })]
+    public void Parse_VerbosityAndTraceConfig_TurnOnTheComponentsCurlTurnsOn(string[] arguments, string[] expected)
+    {
+        CollectionAssert.AreEquivalent(expected, Accept(arguments).TraceComponents.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-vvvv" }, new[] { "setup", "protocol", "read", "write", "all" })]
+    [DataRow(new[] { "-vvvv", "--trace-config", "all" }, new[] { "setup", "protocol", "read", "write" })]
+    [DataRow(new[] { "--trace-config", "all", "-vvvv" }, new[] { "setup", "protocol", "read", "write" })]
+    [DataRow(new[] { "-v", "--trace-config", "socks" }, new string[0])]
+    public void Parse_VerbosityAndTraceConfig_KeepsTheComponentsOnlyVerbosityTurnedOn(string[] arguments, string[] expected)
+    {
+        // -vvvv's all does not write [SOCKS] lines, --trace-config all does (BL-1191 Notes).
+        CollectionAssert.AreEquivalent(expected, Accept(arguments).VerbosityTraceComponents.ToArray());
     }
 
     [TestMethod]

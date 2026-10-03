@@ -57,6 +57,23 @@ public sealed partial class SftpFileDownloadTests
         AssertReadsThenClose(outcome, SftpServerScript.CloseRequest(3));
     }
 
+    // OpenSSH's sftp-server never reports a size of 2^63 or more, so this is pinned from
+    // curl 8.21.0's sftp_download_stat (lib/vssh/libssh2.c at curl-8_21_0), not measured.
+    [TestMethod]
+    [DataRow(0x8000000000000000uL, "Bad file size (-9223372036854775808)", DisplayName = "top bit alone, from curl's source")]
+    [DataRow(0xFFFFFFFFFFFFFFFFuL, "Bad file size (-1)", DisplayName = "all bits, from curl's source")]
+    public async Task DownloadAsync_SizeWithItsTopBitSet_EndsWithExit36BadFileSizeAndClosesTheHandle(ulong size, string message)
+    {
+        SftpServerScript script = SftpServerScript.Started().Opened(size).Status(3, SftpStatusCode.Ok);
+
+        Outcome outcome = await DownloadAsync(script, null, 0);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadDownloadResume, message), outcome.Result);
+        Assert.IsEmpty(outcome.Output);
+        Assert.IsEmpty(outcome.Progress);
+        AssertReadsThenClose(outcome, SftpServerScript.CloseRequest(3));
+    }
+
     [TestMethod]
     public async Task DownloadAsync_ResumeAndNoSize_EndsWithExit36AndClosesTheHandleAsMeasured()
     {

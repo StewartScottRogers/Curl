@@ -1,5 +1,6 @@
 using System.Globalization;
 using Curl.Http2;
+using Curl.Http3;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Http;
@@ -8,7 +9,9 @@ namespace Curl.Protocol.Http;
 /// Writes one transfer's HTTP/2 or HTTP/3 frames to Curl's own diagnostic log (ADR-0222,
 /// ADR-0345, BL-1073), under component <c>http2</c> or <c>http3</c>: each frame sent or
 /// received, by type, stream and length, as <c>verbose</c>; the server's SETTINGS as
-/// <c>info</c>; and the server's GOAWAY and stream resets as <c>warning</c>.
+/// <c>info</c>; and the server's GOAWAY and stream resets as <c>warning</c>. HTTP/3's SETTINGS
+/// and GOAWAY arrive on the server's control stream, which <see cref="Http3Session" /> logs
+/// to the transfer that last opened a request stream on it (BL-1155).
 /// </summary>
 /// <param name="log">Where the lines go; <see cref="NoDiagnosticLog.Instance" /> writes nothing.</param>
 /// <param name="component">The <see cref="DiagnosticLogComponents" /> name every line carries.</param>
@@ -19,6 +22,16 @@ namespace Curl.Protocol.Http;
 /// </remarks>
 internal sealed class HttpFrameLog(IDiagnosticLog log, string component)
 {
+    /// <summary>The HTTP/3 settings curl knows, by identifier, as RFC 9114, RFC 9204, RFC 9220 and RFC 9297 name them.</summary>
+    private static readonly Dictionary<long, string> Http3SettingNames = new()
+    {
+        [Http3SettingIdentifier.QpackMaximumTableCapacity] = "QPACK_MAX_TABLE_CAPACITY",
+        [Http3SettingIdentifier.MaximumFieldSectionSize] = "MAX_FIELD_SECTION_SIZE",
+        [Http3SettingIdentifier.QpackBlockedStreams] = "QPACK_BLOCKED_STREAMS",
+        [Http3SettingIdentifier.EnableConnectProtocol] = "ENABLE_CONNECT_PROTOCOL",
+        [Http3SettingIdentifier.H3Datagram] = "H3_DATAGRAM",
+    };
+
     /// <summary>Gets a log that writes nothing, for a stream no transfer gave a log.</summary>
     internal static HttpFrameLog Silent { get; } = new(NoDiagnosticLog.Instance, DiagnosticLogComponents.Http2);
 
@@ -84,6 +97,31 @@ internal sealed class HttpFrameLog(IDiagnosticLog log, string component)
         }
     }
 
+    /// <summary>
+    /// Logs, at <c>info</c>, the HTTP/3 server's SETTINGS in the order it sent them, each by its
+    /// RFC 9114 or RFC 9204 name and value, an unknown one by its hex identifier:
+    /// <c>SETTINGS received: MAX_FIELD_SECTION_SIZE 100, 0x21 7</c>; <c>none</c> when it sent none.
+    /// </summary>
+    /// <param name="settings">The server's SETTINGS frame.</param>
+    internal void Http3SettingsReceived(Http3SettingsFrame settings)
+    {
+        if (log.IsEnabled(DiagnosticLogLevel.Info))
+        {
+            string received = settings.Settings.Count == 0 ? "none" : string.Join(", ", settings.Settings.Select(Http3SettingText));
+            Write(DiagnosticLogLevel.Info, "SETTINGS received: " + received);
+        }
+    }
+
+    /// <summary>Logs, at <c>warning</c>, the HTTP/3 server's GOAWAY with the stream ID it carries.</summary>
+    /// <param name="streamId">The first request stream the server will not process.</param>
+    internal void Http3GoawayReceived(long streamId)
+    {
+        if (log.IsEnabled(DiagnosticLogLevel.Warning))
+        {
+            Write(DiagnosticLogLevel.Warning, string.Create(CultureInfo.InvariantCulture, $"GOAWAY received: stream {streamId}"));
+        }
+    }
+
     /// <summary>Logs, at <c>warning</c>, the HTTP/3 server's reset of a request stream (QUIC RESET_STREAM) with its application error code.</summary>
     /// <param name="streamId">The stream reset.</param>
     /// <param name="errorCode">The HTTP/3 application error code.</param>
@@ -95,6 +133,14 @@ internal sealed class HttpFrameLog(IDiagnosticLog log, string component)
                 CultureInfo.InvariantCulture,
                 $"RESET_STREAM received on stream {streamId}: error 0x{errorCode:x}"));
         }
+    }
+
+    private static string Http3SettingText(Http3Setting setting)
+    {
+        string name = Http3SettingNames.TryGetValue(setting.Identifier, out string? known)
+            ? known
+            : string.Create(CultureInfo.InvariantCulture, $"0x{setting.Identifier:x}");
+        return string.Create(CultureInfo.InvariantCulture, $"{name} {setting.Value}");
     }
 
     private void WriteFrame(string frameType, string direction, long streamId, int length)

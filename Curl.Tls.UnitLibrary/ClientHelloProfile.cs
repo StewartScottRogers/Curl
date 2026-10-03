@@ -91,6 +91,7 @@ public sealed record ClientHelloProfile(
             TlsExtensionType.EcPointFormats, TlsExtensionType.SignatureAlgorithms, TlsExtensionType.SessionTicket,
             TlsExtensionType.ApplicationLayerProtocolNegotiation, TlsExtensionType.ExtendedMasterSecret, TlsExtensionType.RenegotiationInfo,
         ],
+        Tls12RecordVersionIsTheCeiling = true,
     };
 
     /// <summary>
@@ -166,10 +167,19 @@ public sealed record ClientHelloProfile(
     }
 
     /// <summary>
-    /// Gets a value indicating whether the build ends its TLS 1.3 ClientHello over TCP with
-    /// <c>padding</c>, bringing a hello of 256 to 511 bytes up to 512 (OpenSSL's
-    /// <c>tls_construct_ctos_padding</c>, measured under <c>--curves X25519</c>, BL-1048).
-    /// QUIC's hello, built from <see cref="ExtensionOrder" />, is not padded.
+    /// Gets a value indicating whether the hello the build sends below a TLS 1.3 ceiling is in
+    /// a record carrying that ceiling, as Schannel's is (<c>0x0303</c> under <c>--tls-max 1.2</c>,
+    /// <c>0x0301</c> under <c>--tls-max 1.0</c>); otherwise it carries <see cref="RecordVersion" />,
+    /// as OpenSSL's does (measured, BL-1152).
+    /// </summary>
+    public bool Tls12RecordVersionIsTheCeiling { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the build ends its TLS 1.3 and TLS 1.2 ClientHellos
+    /// over TCP with <c>padding</c>, bringing a hello of 256 to 511 bytes up to 512 (OpenSSL's
+    /// <c>tls_construct_ctos_padding</c>, measured under <c>--curves X25519</c>, BL-1048 and
+    /// BL-1156). QUIC's hello, built from <see cref="ExtensionOrder" />, is not padded, as
+    /// OpenSSL 3.5's QUIC client pads none (measured, BL-1156).
     /// </summary>
     public bool PadsTcpHello { get; init; }
 

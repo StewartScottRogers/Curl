@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -79,6 +80,15 @@ public sealed class QuicDialer
         _matchesSchannelBuild = matchesSchannelBuild;
         _verification = new ServerCertificateVerification(options, matchesSchannelBuild, timeProvider);
     }
+
+    /// <summary>
+    /// Gets a value indicating whether a completed handshake writes the <c>[HTTP/3]</c> lines
+    /// curl 8.18.0's ngtcp2 build writes under <c>-v --trace-config http/3</c> between its TLS
+    /// lines and <c>Established connection</c> (BL-1208, ADR-0388): the handshake's time and the
+    /// server's transport parameters, the bidirectional stream limit, <c>peer verified</c> and
+    /// <c>connect -&gt; 0, done=1</c>.
+    /// </summary>
+    public bool WritesHttp3ConnectionLines { get; init; }
 
     /// <summary>
     /// Tries each address in turn until a QUIC handshake completes. A failure moves on to the
@@ -187,11 +197,12 @@ public sealed class QuicDialer
             return (await TrustAnchorsUnusableAsync(channel, tunnel, unusable!).ConfigureAwait(false), false);
         }
 
+        var handshakeStarted = _timeProvider.GetTimestamp();
         var handshake = new QuicClientConnectionState(new QuicClientSettings { Tls = tls }, _random, verifier, _timeProvider);
         var (failure, cancellation) = await RunHandshakeAsync(handshake, channel, handshakeTimeout, cancellationToken).ConfigureAwait(false);
         if (failure is null && cancellation is null)
         {
-            return (Connected(request, endPoint, handshake, channel, verifier), false);
+            return (Connected(request, endPoint, handshake, channel, verifier, handshakeStarted), false);
         }
 
         handshake.Dispose();
@@ -400,7 +411,8 @@ public sealed class QuicDialer
         IPEndPoint endPoint,
         QuicClientConnectionState handshake,
         IDatagramChannel channel,
-        HandBuiltCertificateVerifier verifier)
+        HandBuiltCertificateVerifier verifier,
+        long handshakeStarted)
     {
         var handshakeCompleted = _timeProvider.GetTimestamp();
         var events = request.Target.Events;
@@ -420,6 +432,11 @@ public sealed class QuicDialer
             VerifiedHostName = SslStreamTlsProvider.VerifiedHostName(request.Target.Host, _options.Insecure),
             IsQuic = true,
         });
+        if (WritesHttp3ConnectionLines)
+        {
+            ReportHttp3ConnectionLines(events, handshake, _timeProvider.GetElapsedTime(handshakeStarted, handshakeCompleted));
+        }
+
         events.ReportConnectionOpened(new ConnectionOpenedEvent
         {
             HostName = request.DestinationHost,
@@ -431,6 +448,17 @@ public sealed class QuicDialer
         return MultiplexedConnectResult.Connected(
             new QuicConnection(handshake, channel, _timeProvider),
             new ConnectTimings(request.Started, request.NameResolved, handshakeCompleted, handshakeCompleted));
+    }
+
+    // curl 8.18.0's ngtcp2 build's --trace-config http/3 lines once its handshake completes, as
+    // measured against cloudflare-quic.com (BL-1208 Notes); its I/O loop lines between them are not written.
+    private static void ReportHttp3ConnectionLines(ITransferEvents events, QuicClientConnectionState handshake, TimeSpan handshakeTime)
+    {
+        var server = handshake.ServerTransportParameters!;
+        events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"[HTTP/3] handshake complete after {(long)handshakeTime.TotalMilliseconds}ms, remote transport[max_udp_payload={server.MaxUdpPayloadSize}, initial_max_data={server.InitialMaxData}]"));
+        events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"[HTTP/3] max bidi streams now {handshake.Streams.ClientBidirectionalStreamLimit}, used 0"));
+        events.ReportInfo("[HTTP/3] peer verified");
+        events.ReportInfo("[HTTP/3] connect -> 0, done=1");
     }
 
     // curl's lines for a failed QUIC connect (measured, ADR-0144): the failure, "QUIC connect

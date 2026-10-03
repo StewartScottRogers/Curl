@@ -20,6 +20,10 @@ namespace Curl.Protocol.Ws;
 /// Receives each frame received under the <c>ws</c> component (<see cref="WsTransferLog" />),
 /// or nothing when <see langword="null" />.
 /// </param>
+/// <param name="trace">
+/// Receives curl's <c>--trace-config ws</c> lines for each frame decoded and each pong sent
+/// (<see cref="WsFrameTrace" />, BL-1164); <see langword="null" /> writes none.
+/// </param>
 /// <remarks>
 /// Measured against curl 8.21.0 (BL-581): a close frame is neither answered nor the end, so
 /// reading goes on until the connection closes; every ping answered is echoed in one pong,
@@ -27,11 +31,13 @@ namespace Curl.Protocol.Ws;
 /// curl replaces a pong it has not yet sent. A protocol violation fails with 56 after the
 /// payload decoded before it has been handed on, and no pong is sent for that read.
 /// </remarks>
-internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSource randomSource, ITransferProgress progress, ITransferEvents events, IDiagnosticLog? diagnosticLog = null)
+internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSource randomSource, ITransferProgress progress, ITransferEvents events, IDiagnosticLog? diagnosticLog = null, WsFrameTrace? trace = null)
 {
     private const int ReadBufferSize = 16384;
 
-    private readonly WsFrameDecoder decoder = new(diagnosticLog);
+    private readonly WsFrameTrace trace = trace ?? WsFrameTrace.Off;
+
+    private readonly WsFrameDecoder decoder = new(diagnosticLog, trace);
 
     /// <summary>
     /// Gets how many frame bytes have been received so far, frame heads included: curl's
@@ -124,7 +130,9 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
         if (decoded.LastPing is { } ping)
         {
             byte[] pong = WsFrameEncoder.Encode(WsOpcode.Pong, ping, randomSource);
+            trace.FrameEncoded(WsOpcode.Pong, ping.Length);
             await WsProtocolHandler.SendAsync(connection, pong, cancellationToken).ConfigureAwait(false);
+            trace.Flushed(pong.Length);
             BytesSent += pong.Length;
         }
     }

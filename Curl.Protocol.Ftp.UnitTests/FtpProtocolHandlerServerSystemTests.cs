@@ -33,6 +33,7 @@ public sealed class FtpProtocolHandlerServerSystemTests
     [DataRow("215 Windows_NT", DisplayName = "215 naming another system")]
     [DataRow("215 OS/4000 x", DisplayName = "215 naming a longer word than OS/400")]
     [DataRow("215 ", DisplayName = "215 with no system")]
+    [DataRow("215 OS/400", DisplayName = "215 OS/400 with nothing after it: curl reads the line end into the word (measured)")]
     public async Task ExecuteAsync_RelativePwdAndNoOs400_SendsSystAndCarriesOn(string systReply)
     {
         FtpRun run = await FtpRun.ExecuteAsync(Url, LoggingIn + RelativePwd + systReply + "\r\n" + Download, "hello");
@@ -44,7 +45,7 @@ public sealed class FtpProtocolHandlerServerSystemTests
 
     [TestMethod]
     [DataRow("215 OS/400 is the remote operating system", DisplayName = "215 OS/400 (measured)")]
-    [DataRow("215   os/400", DisplayName = "any letter case, extra spaces, no commentary")]
+    [DataRow("215   os/400 x", DisplayName = "any letter case, extra spaces")]
     public async Task ExecuteAsync_Os400AndNamefmtRefused_SendsSiteNamefmtAndCarriesOn(string systReply)
     {
         FtpRun run = await FtpRun.ExecuteAsync(
@@ -77,7 +78,7 @@ public sealed class FtpProtocolHandlerServerSystemTests
     {
         FtpRun run = await FtpRun.ExecuteAsync(
             Url,
-            LoggingIn + RelativePwd + "215 OS/400\r\n250 ok\r\n257 \"lib\r\n");
+            LoggingIn + RelativePwd + "215 OS/400 x\r\n250 ok\r\n257 \"lib\r\n");
 
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
         Assert.AreEqual(Login + "SYST\r\nSITE NAMEFMT 1\r\nPWD\r\n", run.Sent);

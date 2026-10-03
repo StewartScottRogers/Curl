@@ -25,6 +25,8 @@ public sealed class ScriptedConnection : IConnection
 
     private readonly MemoryStream written = new();
 
+    private readonly List<int> writeLengths = [];
+
     private readonly TaskCompletionSource disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private int responseOffset;
@@ -71,6 +73,9 @@ public sealed class ScriptedConnection : IConnection
     /// <summary>Gets every byte written so far, in order.</summary>
     public byte[] Written => written.ToArray();
 
+    /// <summary>Gets the length of each write made so far, in order: how the bytes were handed to the connection.</summary>
+    public IReadOnlyList<int> WriteLengths => writeLengths;
+
     /// <summary>Gets the number of reads made so far, the one that reported the close included.</summary>
     public int ReadCount { get; private set; }
 
@@ -108,6 +113,7 @@ public sealed class ScriptedConnection : IConnection
     {
         cancellationToken.ThrowIfCancellationRequested();
         written.Write(buffer.Span);
+        writeLengths.Add(buffer.Length);
         return ValueTask.CompletedTask;
     }
 

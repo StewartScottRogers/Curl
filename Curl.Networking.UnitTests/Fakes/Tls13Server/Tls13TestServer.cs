@@ -35,6 +35,9 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
     /// <summary>Gets the data of the <c>quic_transport_parameters</c> extension EncryptedExtensions carries, or <see langword="null" /> to send none.</summary>
     public byte[]? QuicTransportParameters { get; init; }
 
+    /// <summary>Gets the <c>retry_configs</c> EncryptedExtensions carries, or <see langword="null" /> to send none.</summary>
+    public byte[]? EchRetryConfigs { get; init; }
+
     public IReadOnlyList<ushort> ClientCertificateSchemes { get; init; } =
         [TlsSignatureScheme.Ed25519, TlsSignatureScheme.EcdsaSecp256r1Sha256, TlsSignatureScheme.RsaPssRsaeSha256];
 
@@ -201,6 +204,11 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         if (QuicTransportParameters is not null)
         {
             extensions.Add(QuicTransportParametersExtension.Encode(QuicTransportParameters));
+        }
+
+        if (EchRetryConfigs is not null)
+        {
+            extensions.Add(EncryptedClientHelloExtension.EncodeRetryConfigs(EchRetryConfigs));
         }
 
         if (EarlyDataAccepted)

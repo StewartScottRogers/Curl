@@ -121,6 +121,9 @@ internal sealed class FtpDiagnosticLog(IDiagnosticLog log)
         }
     }
 
+    /// <summary>Logs, at <c>warning</c>, that the data connection to the <c>229</c>'s port failed and <c>PASV</c> follows.</summary>
+    public void EpsvDataConnectFailed() => Warning("EPSV data connection failed; falling back to PASV");
+
     /// <summary>Logs, at <c>warning</c>, that <c>EPRT</c> was refused and <c>PORT</c> follows.</summary>
     public void EprtRefused() => Warning("EPRT refused; falling back to PORT");
 

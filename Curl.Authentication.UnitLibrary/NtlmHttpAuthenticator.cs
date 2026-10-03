@@ -219,6 +219,7 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
             throw Failed(CurlExitCode.TooLarge, TooLargeMessageFor(context));
         }
 
+        ReportTargetInfoOutOfRange(request.Events, context);
         ReportRefused(request.Events, NtlmHandshakeLines.BadType2);
         return null;
     }
@@ -231,6 +232,19 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
     {
         log.Failed(SchemeName, exitCode, message);
         return new HttpAuthenticationFailedException(exitCode, message);
+    }
+
+    /// <summary>
+    /// Reports <see cref="NtlmHandshakeLines.TargetInfoOutOfRange" /> when curl's own NTLM could
+    /// not read the Type 2 message because its target information lies outside it, as curl's
+    /// <c>ntlm_decode_type2_target</c> does before its caller's bad type-2 line.
+    /// </summary>
+    private static void ReportTargetInfoOutOfRange(ITransferEvents events, ISecurityContext context)
+    {
+        if (context is HandBuiltNtlmSecurityContext { ChallengeUnreadableBecause: NtlmMessageFailure.TargetInfoOutOfRange })
+        {
+            events.ReportInfo(NtlmHandshakeLines.TargetInfoOutOfRange);
+        }
     }
 
     private static string TooLargeMessageFor(ISecurityContext context) =>

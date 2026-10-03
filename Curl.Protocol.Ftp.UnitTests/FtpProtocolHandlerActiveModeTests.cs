@@ -54,6 +54,9 @@ public sealed class FtpProtocolHandlerActiveModeTests
     /// </summary>
     private const string NotLocalLine = "bind(port=0) on non-local address failed: Address not available";
 
+    /// <summary>curl 8.21.0's <c>-v</c> line once a failure leaves the control connection usable (BL-1251).</summary>
+    private const string LeftIntactLine = "Connection #0 to host 127.0.0.1:18437 left intact";
+
     private static readonly ListenResult NotLocal = ListenResult.Failed(CurlExitCode.FtpPortFailed, NotLocalLine);
 
     [TestMethod]
@@ -329,13 +332,14 @@ public sealed class FtpProtocolHandlerActiveModeTests
     public async Task ExecuteAsync_PortAddressNotLocalAndEprtRefused_RetriesTheBindAgainForPort()
     {
         // curl -v -P 192.0.2.1 ftp://127.0.0.1:47464/f.txt, EPRT and PORT answered 500 no
-        // (measured 2026-09-27, BL-464): each bind retries once, so the line is printed twice.
+        // (measured 2026-09-27, BL-464; the last two lines 2026-10-02, BL-1251): each bind retries once, so the line is printed twice,
+        // with curl's "disabling EPRT usage" between them (BL-1239).
         var events = new RecordingTransferEvents();
         var listener = new QueuedListener(NotLocal, ListenResult.Listening(Pending(61200)), NotLocal, ListenResult.Listening(Pending(61201)));
         ActiveRun run = await RunAsync("/a.txt", "192.0.2.1", LoggedIn + Refused + Refused + Bye, context => context.Events = events, listener);
 
         Assert.AreEqual(LogInSent + "EPRT |1|192.0.2.1|61200|\r\nPORT 192,0,2,1,239,17\r\nQUIT\r\n", run.Sent);
-        CollectionAssert.AreEqual(new[] { NotLocalLine, NotLocalLine }, events.InfoPastTheEntryPath);
+        CollectionAssert.AreEqual(new[] { NotLocalLine, "disabling EPRT usage", NotLocalLine, "Remembering we are in directory \"\"", LeftIntactLine }, events.InfoPastTheEntryPath);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "Failed to do PORT"), run.Result);
     }
 
@@ -343,14 +347,15 @@ public sealed class FtpProtocolHandlerActiveModeTests
     public async Task ExecuteAsync_RetryOnTheControlAddressFailsToo_QuitsWithExit30AndBindFailedWithoutAThirdAttempt()
     {
         // curl 8.21.0's ftp_port_bind_socket retries once; a second failure is
-        // failf(data, "bind(port=%hu) failed: %s") -> exit 30.
+        // failf(data, "bind(port=%hu) failed: %s") -> exit 30, then only the left-intact line, as
+        // measured 2026-10-02 for "bind() failed, ran out of ports" (BL-1251).
         var events = new RecordingTransferEvents();
         var listener = new QueuedListener(NotLocal, NotLocal);
         ActiveRun run = await RunAsync("/a.txt", "192.0.2.1", LoggedIn + Bye, context => context.Events = events, listener);
 
         Assert.AreEqual(LogInSent + "QUIT\r\n", run.Sent);
         Assert.HasCount(2, listener.Targets);
-        CollectionAssert.AreEqual(new[] { NotLocalLine }, events.InfoPastTheEntryPath);
+        CollectionAssert.AreEqual(new[] { NotLocalLine, LeftIntactLine }, events.InfoPastTheEntryPath);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "bind(port=0) failed: Address not available"), run.Result);
     }
 
@@ -364,7 +369,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         ActiveRun run = await RunAsync("/a.txt", "-", LoggedIn + Bye, context => context.Events = events, listener);
 
         Assert.HasCount(1, listener.Targets);
-        Assert.IsEmpty(events.InfoPastTheEntryPath);
+        CollectionAssert.AreEqual(new[] { LeftIntactLine }, events.InfoPastTheEntryPath);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "bind(port=0) failed: Address not available"), run.Result);
     }
 

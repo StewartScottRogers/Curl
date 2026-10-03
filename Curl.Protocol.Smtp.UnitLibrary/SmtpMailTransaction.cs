@@ -43,6 +43,9 @@ internal sealed class SmtpMailTransaction(
 
     private const int MessageAccepted = 250;
 
+    /// <summary>The state curl's SMTP state machine waits for the reply to the message in.</summary>
+    private const string PostData = "POSTDATA";
+
     private int responseCode = channel.LastReplyCode;
 
     private long uploaded;
@@ -75,6 +78,10 @@ internal sealed class SmtpMailTransaction(
         catch (InvalidDataException)
         {
             result = TransferResult.Failure(CurlExitCode.TooLarge, SmtpSessionMessages.ReplyLineTooLarge);
+        }
+        catch (SmtpSendFailedException failure)
+        {
+            result = TransferResult.Failure(CurlExitCode.SendError, failure.Message);
         }
 
         return result with
@@ -116,7 +123,7 @@ internal sealed class SmtpMailTransaction(
 
     private async ValueTask<TransferResult?> SendEnvelopeAsync(MailRequestOptions mail, long? size)
     {
-        SmtpReply reply = await ExchangeAsync(MailCommand(mail, size)).ConfigureAwait(false);
+        SmtpReply reply = await ExchangeAsync(MailCommand(mail, size), "MAIL").ConfigureAwait(false);
         if (!reply.IsCompletion)
         {
             return CommandFailed("MAIL", reply);
@@ -127,8 +134,14 @@ internal sealed class SmtpMailTransaction(
             return refused;
         }
 
-        reply = await ExchangeAsync("DATA").ConfigureAwait(false);
-        return reply.Code == DataAccepted ? null : CommandFailed("DATA", reply);
+        reply = await ExchangeAsync("DATA", "DATA").ConfigureAwait(false);
+        if (reply.Code != DataAccepted)
+        {
+            return CommandFailed("DATA", reply);
+        }
+
+        channel.Trace.DoingDone();
+        return null;
     }
 
     /// <summary>
@@ -142,7 +155,7 @@ internal sealed class SmtpMailTransaction(
         int lastRefusal = 0;
         foreach (string recipient in mail.Recipients)
         {
-            SmtpReply reply = await ExchangeAsync("RCPT TO:" + SmtpMailbox.Bracketed(recipient, commandLineText)).ConfigureAwait(false);
+            SmtpReply reply = await ExchangeAsync("RCPT TO:" + SmtpMailbox.Bracketed(recipient, commandLineText), "RCPT").ConfigureAwait(false);
             if (reply.IsCompletion)
             {
                 anyAccepted = true;
@@ -165,42 +178,63 @@ internal sealed class SmtpMailTransaction(
     private async ValueTask<TransferResult> SendMessageAsync(Stream upload, long? expected)
     {
         // The last piece goes out with the end-of-data mark, one send and one data event, as
-        // curl sends a message that fits its buffer (measured, BL-546).
+        // curl sends a message that fits its buffer (measured, BL-546). Under --trace-config smtp
+        // each piece goes out as it is read and the mark on its own, as curl then sends them (BL-1163),
+        // and so does an upload of unknown size such as standard input, whose end curl learns only
+        // from a read that returns nothing (BL-1198).
+        SmtpStateTrace trace = channel.Trace;
+        bool sendsEachRead = trace.Enabled || expected is null;
         var stuffer = new SmtpDotStuffer();
         byte[] buffer = new byte[ReadBufferSize];
         byte[] pending = [];
         int read;
         while ((read = await upload.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false)) > 0)
         {
-            if (pending.Length > 0)
+            trace.BodyRead(read);
+            await SendMessageBytesAsync(pending, expected).ConfigureAwait(false);
+            pending = stuffer.Encode(buffer.AsSpan(0, read));
+            if (sendsEachRead)
             {
                 await SendMessageBytesAsync(pending, expected).ConfigureAwait(false);
+                pending = [];
             }
-
-            pending = stuffer.Encode(buffer.AsSpan(0, read));
         }
 
+        trace.BodyEnded();
         await SendMessageBytesAsync([.. pending, .. stuffer.EndOfData], expected).ConfigureAwait(false);
         context.Events.ReportInfo(SmtpConnectionInfoLines.UploadSent(uploaded));
+        trace.Enter(PostData);
 
         // Measured: curl reports response code 000 when the server closes instead of answering the message.
         responseCode = 0;
         SmtpReply reply = await ReadReplyAsync().ConfigureAwait(false);
-        return reply.Code == MessageAccepted
-            ? TransferResult.Success(0)
-            : TransferResult.Failure(CurlExitCode.WeirdServerReply, SmtpSessionMessages.WeirdServerReply);
+        if (reply.Code != MessageAccepted)
+        {
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, SmtpSessionMessages.WeirdServerReply);
+        }
+
+        trace.Enter("STOP");
+        return TransferResult.Success(0);
     }
 
+    /// <summary>Sends <paramref name="bytes" /> after <c>DATA</c>; nothing at all when there are none.</summary>
     private async ValueTask SendMessageBytesAsync(byte[] bytes, long? expected)
     {
+        if (bytes.Length == 0)
+        {
+            return;
+        }
+
         await channel.SendBytesAsync(bytes).ConfigureAwait(false);
         uploaded += bytes.Length;
         context.Progress.ReportUploaded(uploaded, expected);
     }
 
-    private async ValueTask<SmtpReply> ExchangeAsync(string command)
+    /// <summary>Sends <paramref name="command" />, which puts curl's state machine in <paramref name="state" />, and reads its reply.</summary>
+    private async ValueTask<SmtpReply> ExchangeAsync(string command, string state)
     {
         await channel.SendAsync(command).ConfigureAwait(false);
+        channel.Trace.CommandSent(state);
         return await ReadReplyAsync().ConfigureAwait(false);
     }
 

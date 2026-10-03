@@ -48,6 +48,9 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
 
     private readonly SemaphoreSlim openingStreams = new(1, 1);
 
+    /// <summary>The server's SETTINGS and GOAWAY that arrived before any transfer opened a stream.</summary>
+    private readonly List<Http3Frame> unloggedConnectionFrames = [];
+
     private volatile Http3ControlStreamReader? controlStream;
 
     private HttpTransferException? connectionError;
@@ -55,6 +58,18 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
     private long connectionErrorCode;
 
     private volatile bool isStoppedByRefusedStream;
+
+    /// <summary>How many request streams the session has opened, for curl's <c>MAX_CONCURRENT</c> line (BL-1208).</summary>
+    private long requestStreamsOpened;
+
+    /// <summary>How many opened request streams have not yet been marked done (<see cref="EndRequestStream" />).</summary>
+    private int requestStreamsInUse;
+
+    /// <summary>
+    /// The frame log of the transfer that last opened a stream, which the server's SETTINGS and
+    /// GOAWAY go to (ADR-0345 point 3), or <see langword="null" /> until one has.
+    /// </summary>
+    private HttpFrameLog? connectionLog;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Http3Session" /> class and starts reading
@@ -143,23 +158,28 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
     public EndPoint? LocalEndPoint => Connection.LocalEndPoint;
 
     /// <inheritdoc />
-    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null, IDiagnosticLog? diagnosticLog = null) =>
-        new Http3StreamConnection(this, scheme, bodyLength, ignoresBody, openedLines, HttpFrameLog.For(diagnosticLog, VersionName));
+    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null, IDiagnosticLog? diagnosticLog = null, ITransferEvents? traceEvents = null) =>
+        new Http3StreamConnection(this, scheme, bodyLength, ignoresBody, openedLines, HttpFrameLog.For(diagnosticLog, VersionName), new Http3StreamTrace(traceEvents));
 
     /// <summary>
     /// Opens the client's control stream with curl's <c>SETTINGS</c> and its QPACK encoder
     /// and decoder streams, unless they are open already, then opens a request stream; one
     /// transfer at a time, as the <c>-Z</c> transfers a pool shares the session between open
-    /// theirs concurrently (BL-735).
+    /// theirs concurrently (BL-735). The server's SETTINGS and GOAWAY are logged to
+    /// <paramref name="transferLog" /> from now on, those that arrived before it included
+    /// (ADR-0345, BL-1155).
     /// </summary>
+    /// <param name="transferLog">The frame log of the transfer opening the stream.</param>
     /// <param name="cancellationToken">Cancels the opens and writes.</param>
     /// <returns>The request stream.</returns>
-    internal async ValueTask<IMultiplexedStream> OpenRequestStreamAsync(CancellationToken cancellationToken)
+    /// <param name="trace">The transfer's <c>--trace-config http/3</c> lines, told of the peer's idle timeout when this is the connection's first request stream (BL-1208), or <see langword="null" />.</param>
+    internal async ValueTask<IMultiplexedStream> OpenRequestStreamAsync(HttpFrameLog transferLog, CancellationToken cancellationToken, Http3StreamTrace? trace = null)
     {
         await openingStreams.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            return await OpenRequestStreamOneAtATimeAsync(cancellationToken).ConfigureAwait(false);
+            UseConnectionLog(transferLog);
+            return await OpenRequestStreamOneAtATimeAsync(trace, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -167,10 +187,26 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
         }
     }
 
-    private async ValueTask<IMultiplexedStream> OpenRequestStreamOneAtATimeAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Marks one transfer's request stream done and says what curl's <c>query conn[&lt;n&gt;]: MAX_CONCURRENT</c>
+    /// line reports (BL-1208): how many more request streams the peer allows, or <see langword="null" />
+    /// when the connection does not know, and how many request streams are still in use.
+    /// </summary>
+    /// <returns>The streams left and the streams still in use.</returns>
+    internal (long? StreamsLeft, int StreamsInUse) EndRequestStream()
+    {
+        lock (gate)
+        {
+            requestStreamsInUse--;
+            return (Connection.BidirectionalStreamLimit - requestStreamsOpened, requestStreamsInUse);
+        }
+    }
+
+    private async ValueTask<IMultiplexedStream> OpenRequestStreamOneAtATimeAsync(Http3StreamTrace? trace, CancellationToken cancellationToken)
     {
         if (openedStreams.Count == 0) // the first request: the three unidirectional streams go first
         {
+            trace?.ConnectionReady(Connection.PeerIdleTimeout);
             await Http3LocalUnidirectionalStreams.OpenControlStreamAsync(await OpenLocalStreamAsync(cancellationToken).ConfigureAwait(false), Http3LocalUnidirectionalStreams.CurlSettings, cancellationToken).ConfigureAwait(false);
             await Http3LocalUnidirectionalStreams.OpenQpackEncoderStreamAsync(await OpenLocalStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
             await Http3LocalUnidirectionalStreams.OpenQpackDecoderStreamAsync(await OpenLocalStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
@@ -178,6 +214,12 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
 
         IMultiplexedStream requestStream = await OpenBidirectionalStreamAsync(cancellationToken).ConfigureAwait(false);
         openedStreams.Add(requestStream);
+        lock (gate)
+        {
+            requestStreamsOpened++;
+            requestStreamsInUse++;
+        }
+
         return requestStream;
     }
 
@@ -355,7 +397,7 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
             case Http3UnidirectionalStreamType.Control:
                 Http3ControlStreamReader reader = new(peer);
                 controlStream = reader;
-                return ReadUntilFailureAsync(async () => await reader.ReadFrameAsync(cancellationToken).ConfigureAwait(false));
+                return ReadUntilFailureAsync(async () => LogConnectionFrame(await reader.ReadFrameAsync(cancellationToken).ConfigureAwait(false)));
             case Http3UnidirectionalStreamType.QpackEncoder:
                 return ReadUntilFailureAsync(async () => await Http3PeerQpackStreams.ReadEncoderStreamAsync(peer, Decoder, buffer, cancellationToken).ConfigureAwait(false));
             case Http3UnidirectionalStreamType.QpackDecoder:
@@ -385,6 +427,58 @@ internal sealed class Http3Session : IHttpStreamSession, IConnection, IConnectio
         }
 
         stopReadingPeerStreams.Cancel();
+    }
+
+    /// <summary>
+    /// Makes <paramref name="transferLog" /> the log the server's SETTINGS and GOAWAY go to,
+    /// and writes there those that arrived while no transfer had opened a stream.
+    /// </summary>
+    private void UseConnectionLog(HttpFrameLog transferLog)
+    {
+        lock (gate)
+        {
+            connectionLog = transferLog;
+            foreach (Http3Frame frame in unloggedConnectionFrames)
+            {
+                WriteConnectionFrame(transferLog, frame);
+            }
+
+            unloggedConnectionFrames.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Logs a SETTINGS or GOAWAY frame from the server's control stream to the transfer that
+    /// last opened a stream, or holds it until one does; other control frames are not logged.
+    /// </summary>
+    internal void LogConnectionFrame(Http3Frame frame)
+    {
+        if (frame is not (Http3SettingsFrame or Http3GoawayFrame))
+        {
+            return;
+        }
+
+        lock (gate)
+        {
+            if (connectionLog is null)
+            {
+                unloggedConnectionFrames.Add(frame);
+                return;
+            }
+
+            WriteConnectionFrame(connectionLog, frame);
+        }
+    }
+
+    private static void WriteConnectionFrame(HttpFrameLog log, Http3Frame frame)
+    {
+        if (frame is Http3SettingsFrame settings)
+        {
+            log.Http3SettingsReceived(settings);
+            return;
+        }
+
+        log.Http3GoawayReceived(((Http3GoawayFrame)frame).Id);
     }
 
     private async ValueTask CloseAsync(long errorCode)

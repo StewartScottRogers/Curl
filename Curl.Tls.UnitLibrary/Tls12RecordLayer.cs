@@ -7,16 +7,18 @@ namespace Curl.Tls;
 /// 6): it reads whole records off the transport and removes their protection with the
 /// current <see cref="Tls12RecordReadState" />, and writes content under the current
 /// <see cref="Tls12RecordWriteState" />; the connection switches each state at its
-/// ChangeCipherSpec. Records before the version is fixed carry TLS 1.0, as OpenSSL's
-/// ClientHello record does; after it, every record read must carry the negotiated
-/// version. Writes are serialised, so an alert sent from a read cannot interleave with an
-/// application write.
+/// ChangeCipherSpec. Records written before the version is fixed carry
+/// <paramref name="firstWriteVersion" />, the ClientHello record's version; after it, every
+/// record read must carry the negotiated version. Writes are serialised, so an alert sent
+/// from a read cannot interleave with an application write.
 /// </summary>
-internal sealed class Tls12RecordLayer(Stream transport) : IDisposable
+/// <param name="transport">The byte stream the records travel over.</param>
+/// <param name="firstWriteVersion">The version of the records written before the server picks one.</param>
+internal sealed class Tls12RecordLayer(Stream transport, TlsProtocolVersion firstWriteVersion) : IDisposable
 {
     private readonly SemaphoreSlim writeLock = new(1, 1);
     private Tls12RecordReadState reader = Tls12RecordReadState.CreatePlaintext(TlsProtocolVersion.Tls10);
-    private Tls12RecordWriteState writer = Tls12RecordWriteState.CreatePlaintext(TlsProtocolVersion.Tls10);
+    private Tls12RecordWriteState writer = Tls12RecordWriteState.CreatePlaintext(firstWriteVersion);
     private TlsProtocolVersion? version;
 
     /// <summary>

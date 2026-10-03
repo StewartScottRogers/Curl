@@ -103,13 +103,13 @@ public sealed class FtpProtocolHandlerPassReplyTests
         // by the ordinary connect, so a name that fails is exit 6 like any other.
         const string message = "Could not resolve host: ftp.invalid";
         var control = new ScriptedConnection(Encoding.Latin1.GetBytes(
-            Greeting + "230 Logged in\r\n257 \"/\" is current directory\r\n229 Entering Extended Passive Mode (|||61744|)\r\n"));
+            Greeting + "230 Logged in\r\n257 \"/\" is current directory\r\n227 Entering Passive Mode (10,0,0,9,241,48)\r\n"));
         var connector = new QueuedConnector(
             ConnectResult.Connected(control),
             ConnectResult.Failed(CurlExitCode.CouldntResolveHost, message));
 
         TransferResult result = await new FtpProtocolHandler(connector).ExecuteAsync(
-            new TransferContext { Url = CurlUrl.Parse("ftp://ftp.invalid/f.txt"), Output = new MemoryStream() });
+            new TransferContext { Url = CurlUrl.Parse("ftp://ftp.invalid/f.txt"), Output = new MemoryStream(), FtpDisableEpsv = true });
 
         Assert.AreEqual(new ConnectTarget("ftp.invalid", 61744, false), connector.Targets[1]);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.CouldntResolveHost, message), result with { Report = null });

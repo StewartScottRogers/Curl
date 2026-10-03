@@ -14,6 +14,12 @@ internal static class RtspVerboseLines
     internal const string RequestSent = "Request completely sent off";
 
     /// <summary>
+    /// The line written after a failed send's own message, as curl 8.21.0's <c>rtsp_do</c>
+    /// writes it (<c>lib/rtsp.c</c>); never the transfer's message (BL-1230).
+    /// </summary>
+    internal const string RequestSendFailed = "Failed sending RTSP request";
+
+    /// <summary>
     /// Determines whether curl keeps the connection a transfer ended with
     /// <paramref name="result" />: after a success, a <c>CSeq</c> mismatch (85) or a refused
     /// <c>-H Session</c> header (43), unless a reply body was read; never after any other

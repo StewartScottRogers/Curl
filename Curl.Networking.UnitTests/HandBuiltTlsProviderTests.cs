@@ -331,6 +331,45 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.IsTrue(handBuilt.PlaintextDisposed);
     }
 
+    // curl 8.18.0 OpenSSL -v, untrusted self-signed root, exit 60: "SSL connection using", the
+    // ALPN answer and the certificate before the error (ADR-0371, BL-1202).
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithAnUntrustedSelfSignedChainInTheOpenSslBuild_ReportsAFailedHandshakeCarryingTheCertificate()
+    {
+        var events = new RecordingTransferEvents();
+
+        var (result, _) = await HandshakeAsync(Provider(Tls12Only(new TlsClientOptions()), OpenSslBuild), CertificateHost, events, Http11);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+        var handshake = Assert.ContainsSingle(events.Handshakes);
+        Assert.IsTrue(handshake.Failed);
+        Assert.AreEqual(SslProtocols.Tls12, handshake.ProtocolVersion);
+        Assert.AreEqual(TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, handshake.CipherSuite);
+        CollectionAssert.AreEqual(Http11, handshake.OfferedApplicationProtocols.ToArray());
+        CollectionAssert.AreEqual(s_serverCertificate.RawData, handshake.ServerCertificate!.RawData);
+        Assert.IsFalse(handshake.CertificateVerified);
+        Assert.AreEqual(CertificateHost, handshake.VerifiedHostName);
+    }
+
+    // curl 8.18.0 OpenSSL -v -k --tlsv1.3 against a TLS 1.2 server, exit 35: the ALPN offer and
+    // nothing negotiated (ADR-0371, BL-1202).
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithATls13FloorAgainstATls12ServerInTheOpenSslBuild_ReportsAFailedHandshakeNegotiatingNothing()
+    {
+        var events = new RecordingTransferEvents();
+
+        var (result, _) = await HandshakeAsync(
+            Provider(new TlsClientOptions(Insecure: true, MinimumVersion: TlsVersion.Tls13), OpenSslBuild), CertificateHost, events, Http11);
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        var handshake = Assert.ContainsSingle(events.Handshakes);
+        Assert.IsTrue(handshake.Failed);
+        Assert.AreEqual(SslProtocols.None, handshake.ProtocolVersion);
+        CollectionAssert.AreEqual(Http11, handshake.OfferedApplicationProtocols.ToArray());
+        Assert.IsNull(handshake.ServerCertificate);
+        Assert.IsNull(handshake.NegotiatedApplicationProtocol);
+    }
+
     [TestMethod]
     [DataRow(SchannelBuild)]
     [DataRow(OpenSslBuild)]
@@ -557,8 +596,8 @@ public sealed partial class HandBuiltTlsProviderTests
 
     [TestMethod]
     [DataRow(SchannelBuild, TlsVersion.SystemDefault, TlsVersion.Tls10, "Recv failure: Connection was reset")]
-    [DataRow(OpenSslBuild, TlsVersion.SystemDefault, TlsVersion.Tls10, "Recv failure: Connection reset by peer")]
-    [DataRow(OpenSslBuild, TlsVersion.Tls11, TlsVersion.Tls11, "Recv failure: Connection reset by peer")]
+    [DataRow(OpenSslBuild, TlsVersion.SystemDefault, TlsVersion.Tls12, "Recv failure: Connection reset by peer")]
+    [DataRow(OpenSslBuild, TlsVersion.Tls12, TlsVersion.Tls12, "Recv failure: Connection reset by peer")]
     [DataRow(OpenSslBuild, TlsVersion.SystemDefault, TlsVersion.SystemDefault, "Recv failure: Connection reset by peer")]
     public async Task AuthenticateAsClientAsync_WhenTheServerResetsMidHandshake_ReportsTheMeasuredLine(
         bool matchesSchannelBuild,
@@ -668,13 +707,14 @@ public sealed partial class HandBuiltTlsProviderTests
     private static async Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeAsync(
         IHandshakeReportingTlsProvider provider,
         string targetHost,
-        RecordingTransferEvents? events = null)
+        RecordingTransferEvents? events = null,
+        IReadOnlyList<string>? applicationProtocols = null)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunEchoServerAsync(server, SslProtocols.Tls12);
 
         var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), targetHost, events ?? new RecordingTransferEvents(), false, [], CancellationToken.None);
+            new StreamConnection(client, ServerEndPoint), targetHost, events ?? new RecordingTransferEvents(), false, applicationProtocols ?? [], CancellationToken.None);
 
         var plaintextDisposed = client.IsDisposed;
         if (plaintextDisposed)

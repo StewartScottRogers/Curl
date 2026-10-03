@@ -4,15 +4,26 @@ namespace Curl.Tls;
 
 /// <summary>
 /// Builds the TLS 1.2 and below ClientHello from <see cref="Tls12ClientSettings" />, its
-/// extensions in <see cref="Tls12ClientSettings.ExtensionOrder" />.
+/// extensions in <see cref="Tls12ClientSettings.ExtensionOrder" />, then with
+/// <see cref="Tls12ClientSettings.PadHello" /> <c>padding</c> by
+/// <see cref="PaddingExtension.DataLengthFor" />'s rule, last, where OpenSSL sends it.
 /// </summary>
 internal static class Tls12ClientHelloBuilder
 {
     // RFC 8422 section 5.1.2: one format, uncompressed.
     private static readonly TlsExtension UncompressedPointFormat = new(TlsExtensionType.EcPointFormats, [1, 0]);
 
-    /// <summary>Returns the ClientHello with <paramref name="random" /> and <paramref name="sessionId" />.</summary>
+    /// <summary>Returns the ClientHello with <paramref name="random" /> and <paramref name="sessionId" />, padded when <see cref="Tls12ClientSettings.PadHello" /> asks.</summary>
     public static ClientHello Build(Tls12ClientSettings settings, byte[] random, byte[] sessionId)
+    {
+        ClientHello hello = BuildUnpadded(settings, random, sessionId);
+        return settings.PadHello && PaddingExtension.DataLengthFor(hello.Encode().Length) is { } length
+            ? hello with { Extensions = [.. hello.Extensions, PaddingExtension.Encode(length)] }
+            : hello;
+    }
+
+    /// <summary>Returns the ClientHello with <paramref name="random" /> and <paramref name="sessionId" />, never padded.</summary>
+    public static ClientHello BuildUnpadded(Tls12ClientSettings settings, byte[] random, byte[] sessionId)
     {
         List<TlsExtension> extensions = [RenegotiationInfoExtension.Encode([])];
         if (settings.ServerName is not null)

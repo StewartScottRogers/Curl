@@ -159,9 +159,9 @@ public sealed class SftpTransferQuoteTests
     }
 
     [TestMethod]
-    public async Task ListAsync_NoBody_RunsBothListsWithNoOpendir()
+    public async Task ListAsync_NoBody_RunsBothListsAroundTheStatWithNoOpendir()
     {
-        SftpServerScript script = SftpServerScript.Started().HomeDirectory().Status(1, SftpStatusCode.Ok).Status(2, SftpStatusCode.Ok).Ssh(ServerClose);
+        SftpServerScript script = SftpServerScript.Started().HomeDirectory().Status(1, SftpStatusCode.Ok).Status(2, SftpStatusCode.Ok).Status(3, SftpStatusCode.Ok).Ssh(ServerClose);
         ScriptedConnection connection = new(script.Bytes);
 
         TransferResult result = await new SftpDirectoryListing(SftpSessionTests.Transport(connection)).ListAsync(
@@ -172,7 +172,8 @@ public sealed class SftpTransferQuoteTests
             connection,
             Realpath,
             SftpQuoteCommandsTests.PathRequest(SftpPacketType.Remove, 1, "/a"),
-            SftpQuoteCommandsTests.PathRequest(SftpPacketType.Remove, 2, "/b"));
+            SftpServerScript.StatRequest("/d/", 2),
+            SftpQuoteCommandsTests.PathRequest(SftpPacketType.Remove, 3, "/b"));
         AssertChannelClosedLast(connection);
     }
 

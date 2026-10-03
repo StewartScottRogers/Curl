@@ -167,10 +167,23 @@ internal sealed class RunningTransferState(
     internal long ProxySslVerifyResult { get; set; }
 
     /// <summary>
+    /// Gets or sets the TLS 1.3 early data bytes the origin connection sent, negative when the
+    /// server rejected them, which <c>%{tls_earlydata}</c> prints; <c>0</c> until one is reported
+    /// (task BL-1150).
+    /// </summary>
+    internal long TlsEarlyDataSent { get; set; }
+
+    /// <summary>
     /// Gets or sets the <c>If-None-Match</c> lines <c>--etag-compare</c> has added to the transfer's option
     /// group, this transfer's last; <see langword="null" /> without <c>--etag-compare</c> (task BL-619).
     /// </summary>
     internal IReadOnlyList<string>? IfNoneMatchHeaders { get; set; }
+
+    /// <summary>
+    /// Gets or sets where the transfer's entry is in the <c>--libcurl</c> file's list of transfers;
+    /// <see langword="null" /> without <c>--libcurl</c> (task BL-1177).
+    /// </summary>
+    internal int? LibcurlTransferIndex { get; set; }
 
     /// <summary>
     /// Gets or sets the transfer's alt-svc cache, read before it connects and written when it is reported;

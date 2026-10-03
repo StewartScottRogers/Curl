@@ -19,6 +19,13 @@ internal sealed record AwsSigV4Scope(string Provider0, string Provider1, string 
     private const string DefaultParameter = "aws:amz";
 
     /// <summary>
+    /// Gets the lines curl's <c>-v</c> writes when the service or region came from the host name,
+    /// <c>aws_sigv4: picked service &lt;service&gt; from host</c> then
+    /// <c>aws_sigv4: picked region &lt;region&gt; from host</c>; empty when the value named both.
+    /// </summary>
+    internal IReadOnlyList<string> PickedFromHostLines { get; init; } = [];
+
+    /// <summary>
     /// Parses an <c>--aws-sigv4</c> value, taking the service and region from the host name's first
     /// two labels when the value does not name the service.
     /// </summary>
@@ -66,6 +73,7 @@ internal sealed record AwsSigV4Scope(string Provider0, string Provider1, string 
             return null;
         }
 
+        List<string> pickedFromHostLines = ["aws_sigv4: picked service " + service + " from host"];
         if (region.Length == 0)
         {
             region = ReadUntil(hostName, ref position, '.');
@@ -74,9 +82,11 @@ internal sealed record AwsSigV4Scope(string Provider0, string Provider1, string 
                 failure = AwsSigV4SigningResult.Failed(CurlExitCode.UrlMalformat, "aws-sigv4: region missing in parameters and hostname");
                 return null;
             }
+
+            pickedFromHostLines.Add("aws_sigv4: picked region " + region + " from host");
         }
 
-        return Succeed(new AwsSigV4Scope(provider0, provider1, region, service), out failure);
+        return Succeed(new AwsSigV4Scope(provider0, provider1, region, service) { PickedFromHostLines = pickedFromHostLines }, out failure);
     }
 
     private static AwsSigV4Scope Succeed(AwsSigV4Scope scope, out AwsSigV4SigningResult? failure)

@@ -9,7 +9,7 @@ public sealed class UpstreamTestFileExpansion
     /// <summary>Creates an expansion.</summary>
     /// <param name="file">The expanded file.</param>
     /// <param name="unknownVariables">Upstream variables the run had no value for, each with its <c>%</c>.</param>
-    /// <param name="unsupportedInstructions">Instructions left as written, such as <c>%include</c>.</param>
+    /// <param name="unsupportedInstructions">Instructions left as written, such as <c>%days</c>.</param>
     /// <param name="conditionError">The stray <c>%else</c> or <c>%endif</c> that stopped expansion, or <see langword="null"/>.</param>
     public UpstreamTestFileExpansion(ReadOnlyMemory<byte> file, IReadOnlyList<string> unknownVariables, IReadOnlyList<string> unsupportedInstructions, string? conditionError)
     {
@@ -36,7 +36,8 @@ public sealed class UpstreamTestFileExpansion
 
     /// <summary>
     /// Each instruction the harness does not carry out that a kept line uses, left as written:
-    /// <c>%days</c>, <c>%include</c>, <c>%includetext</c>, <c>%sha256b64file</c> or <c>%strippemfile</c>.
+    /// <c>%days</c>, and <c>%include</c>, <c>%includetext</c>, <c>%sha256b64file</c> or
+    /// <c>%strippemfile</c> when the expansion was given no way to read files.
     /// </summary>
     public IReadOnlyList<string> UnsupportedInstructions { get; }
 

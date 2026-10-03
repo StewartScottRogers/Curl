@@ -256,6 +256,39 @@ public sealed class SetCookieParserTests
         Assert.AreEqual(kept, Parse("http://localhost/", header) is not null);
     }
 
+    /// <summary>Measured on curl 8.21.0, 2026-10-02 (BL-1225): a 4000-byte name with a 97-byte value is dropped with this line.</summary>
+    [TestMethod]
+    public void Parse_OversizedNameAndValue_RefusesWithOversizedLine()
+    {
+        string header = new string('a', 4000) + "=" + new string('b', 97);
+
+        Cookie? cookie = SetCookieParser.Parse(header, CurlUrl.Parse("http://127.0.0.1/"), DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+
+        Assert.IsNull(cookie);
+        Assert.AreEqual("oversized cookie dropped, name/val 4000 + 97 bytes", refusal);
+    }
+
+    [TestMethod]
+    public void Parse_NameAndValueOfExactly4096_IsStoredWithoutRefusal()
+    {
+        string header = new string('a', 4000) + "=" + new string('b', 96);
+
+        Cookie? cookie = SetCookieParser.Parse(header, CurlUrl.Parse("http://127.0.0.1/"), DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+
+        Assert.IsNotNull(cookie);
+        Assert.IsNull(refusal);
+    }
+
+    [TestMethod]
+    public void Parse_OversizedValueWithSurroundingSpaces_CountsTrimmedNameAndValue()
+    {
+        string header = "  " + new string('a', 4000) + "  =   " + new string('b', 97) + "   ";
+
+        SetCookieParser.Parse(header, CurlUrl.Parse("http://127.0.0.1/"), DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+
+        Assert.AreEqual("oversized cookie dropped, name/val 4000 + 97 bytes", refusal);
+    }
+
     [TestMethod]
     public void Parse_LongPath_IsKept() =>
         Assert.AreEqual(4201, Parse("http://localhost/", "x=v; Path=/" + new string('p', 4200))!.Path.Length);

@@ -30,9 +30,11 @@ public static class CurlVersionText
     /// platform now that <c>--http2</c> is accepted (ADR-0141, Decision 5), and <c>GSS-API</c>,
     /// <c>Kerberos</c> and <c>SPNEGO</c> on every platform now that <c>--negotiate</c> is answered
     /// (ADR-0142, ADR-0176), <c>NTLM</c> on every platform now that <c>--ntlm</c> is (ADR-0181), and
-    /// <c>HTTP3</c> on every platform now that <c>--http3</c> and <c>--http3-only</c> work (ADR-0144).
+    /// <c>HTTP3</c> on every platform now that <c>--http3</c> and <c>--http3-only</c> work (ADR-0144), and
+    /// <c>TLS-SRP</c> on every platform now that <c>--tlsuser</c> and <c>--proxy-tlsuser</c> authenticate the
+    /// hand-built handshake with SRP (ADR-0328, BL-1135), after <c>SSL</c> as curl 8.18.0's OpenSSL build lists it.
     /// </summary>
-    public const string FeaturesLine = "Features: AsynchDNS brotli GSS-API HTTP2 HTTP3 IPv6 Kerberos Largefile libz NTLM SPNEGO SSL";
+    public const string FeaturesLine = "Features: AsynchDNS brotli GSS-API HTTP2 HTTP3 IPv6 Kerberos Largefile libz NTLM SPNEGO SSL TLS-SRP";
 
     /// <summary>Returns the four lines for the platform described, without line terminators.</summary>
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>

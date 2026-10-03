@@ -172,6 +172,260 @@ public sealed class CurlCommandRunnerTransferEventTests
     }
 
     [TestMethod]
+    public async Task RunAsync_TraceConfigRead_WritesTheClientResetLineAsTheTransferStartsAndBeforeTheConnectionIsLeftIntact()
+    {
+        // As curl 8.21.0 wrote -s --trace-config read -v for a 200 (measured 2026-10-02, BL-1159 Notes).
+        int exitCode = await RunAsync(["-s", "--trace-config", "read", "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            ReadResetLine
+            + MeasuredVerboseLines(string.Empty).Replace("* Connection #0", ReadResetLine + "* Connection #0", StringComparison.Ordinal),
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow("dns")]
+    [DataRow("setup")]
+    [DataRow("-read")]
+    public async Task RunAsync_TraceConfigWithoutRead_WritesNoReadLine(string components)
+    {
+        await RunAsync(["-s", "--trace-config", components, "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(MeasuredVerboseLines(string.Empty), StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigReadWithoutVerbose_WritesNothing()
+    {
+        await RunAsync(["-s", "--trace-config", "read", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(string.Empty, StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow("-vvv")]
+    [DataRow("-vvvv")]
+    public async Task RunAsync_ThreeOrMoreVs_WriteBothClientResetLines(string verbosity)
+    {
+        await RunAsync(["-s", verbosity, "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(2, StandardErrorText.Split("* [READ] client_reset, clear readers" + InfoEnd).Length - 1);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigReadWithTraceIds_MarksTheFirstClientResetLineWithAnX()
+    {
+        await RunAsync(["-s", "--trace-config", "read", "-v", "--trace-ids", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        StringAssert.StartsWith(StandardErrorText, "[0-x] " + ReadResetLine + "[0-0] *   Trying 127.0.0.1:18441..." + InfoEnd);
+        StringAssert.EndsWith(StandardErrorText, "[0-0] " + ReadResetLine + "[0-0] * Connection #0 to host 127.0.0.1:18441 left intact" + InfoEnd);
+    }
+
+    private const string ReadResetLine = "* [READ] client_reset, clear readers" + InfoEnd;
+
+    [TestMethod]
+    public async Task RunAsync_VerboseRewindWithoutTraceConfigRead_WritesThePlainLineAndNoReadLine()
+    {
+        // curl -v -d ab -L on a 302: "Need to rewind upload for next request" and no [READ] line (BL-1213 Notes).
+        await RunAsync(["-s", "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], RewindingExchange());
+
+        StringAssert.Contains(StandardErrorText, "* Need to rewind upload for next request" + InfoEnd);
+        Assert.IsFalse(StandardErrorText.Contains("[READ]", StringComparison.Ordinal), StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigReadRewind_WritesTheRewindLinesAroundTheHopsEnd()
+    {
+        // curl -v --trace-config read -d ab -L on a 302 kept alive (BL-1213 Notes).
+        await RunAsync(["-s", "-v", "--trace-config", "read", "http://127.0.0.1:18441/f.txt", "-o", "o"], RewindingExchange());
+
+        StringAssert.Contains(
+            StandardErrorText,
+            "* [READ] client reader needs rewind before next request" + InfoEnd
+            + "* Need to rewind upload for next request" + InfoEnd
+            + "* [READ] client_reset, will rewind reader" + InfoEnd
+            + "* Connection #0 to host 127.0.0.1:18441 left intact" + InfoEnd);
+    }
+
+    private static RecordingProtocolHandler RewindingExchange() =>
+        new("http", context =>
+        {
+            context.Events.ReportInfo("Need to rewind upload for next request");
+            context.Events.ReportInfo("Connection #0 to host 127.0.0.1:18441 left intact");
+            return ValueTask.FromResult(TransferResult.Success(0));
+        });
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigWrite_WritesTheClientWriterLinesAfterEachHeaderAndTheBody()
+    {
+        // The lines curl 8.21.0 wrote under -s -v --trace-config write (measured 2026-10-02, BL-1187 Notes).
+        int exitCode = await RunAsync(["-s", "--trace-config", "write", "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(
+            StandardErrorText,
+            "< HTTP/1.1 200 OK" + HeaderEnd
+            + "* [WRITE] [OUT] wrote 17 header bytes -> 17" + InfoEnd
+            + "* [WRITE] [PAUSE] writing 17/17 bytes of type c -> 0" + InfoEnd
+            + "* [WRITE] download_write header(type=c, blen=17) -> 0" + InfoEnd
+            + "* [WRITE] client_write(type=c, len=17) -> 0" + InfoEnd
+            + "< Content-Type: text/plain" + HeaderEnd
+            + "* [WRITE] header_collect pushed(type=1, len=26) -> 0" + InfoEnd
+            + "* [WRITE] [OUT] wrote 26 header bytes -> 26" + InfoEnd
+            + "* [WRITE] [PAUSE] writing 26/26 bytes of type 4 -> 0" + InfoEnd
+            + "* [WRITE] download_write header(type=4, blen=26) -> 0" + InfoEnd
+            + "* [WRITE] client_write(type=4, len=26) -> 0" + InfoEnd
+            + "< Content-Length: 6" + HeaderEnd);
+        StringAssert.EndsWith(
+            StandardErrorText,
+            "{ [6 bytes data]" + InfoEnd
+            + "* [WRITE] [OUT] wrote 6 body bytes -> 6" + InfoEnd
+            + "* [WRITE] [PAUSE] writing 6/6 bytes of type 1 -> 0" + InfoEnd
+            + "* [WRITE] download_write body(type=1, blen=6) -> 0" + InfoEnd
+            + "* [WRITE] client_write(type=1, len=6) -> 0" + InfoEnd
+            + "* [WRITE] xfer_write_resp(len=70, eos=0) -> 0" + InfoEnd
+            + "* [WRITE] [OUT] done" + InfoEnd
+            + "* Connection #0 to host 127.0.0.1:18441 left intact" + InfoEnd);
+    }
+
+    [TestMethod]
+    [DataRow("network")]
+    [DataRow("read")]
+    [DataRow("-write")]
+    public async Task RunAsync_TraceConfigWithoutWrite_WritesNoWriteLine(string components)
+    {
+        await RunAsync(["-s", "--trace-config", components, "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.DoesNotContain("[WRITE]", StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigWriteWithoutVerbose_WritesNothing()
+    {
+        await RunAsync(["-s", "--trace-config", "write", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(string.Empty, StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow("-vvv")]
+    [DataRow("-vvvv")]
+    public async Task RunAsync_ThreeOrMoreVs_WriteTheClientWriterDoneLine(string verbosity)
+    {
+        await RunAsync(["-s", verbosity, "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(1, StandardErrorText.Split("* [WRITE] [OUT] done" + InfoEnd).Length - 1);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigMulti_WritesTheTransferEngineLinesAroundTheTransfer()
+    {
+        // The lines curl 8.21.0 wrote under -s -v --trace-config multi (measured 2026-10-02, BL-1188 Notes); the
+        // runner's clock stands still, so every [PGRS-*] number is 0.
+        int exitCode = await RunAsync(["-s", "--trace-config", "multi", "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            "* [MULTI] [INIT] added to multi, mid=1, running=1, total=2" + InfoEnd
+            + "* [MULTI] [INIT] pollset[], timeouts=0, paused 0/0 (r/w)" + InfoEnd
+            + "* [MULTI] [INIT] multi_wait(fds=0, timeout=0) tinternal=0" + InfoEnd
+            + "* [MULTI] [INIT] -> [SETUP]" + InfoEnd
+            + "* [MULTI] [SETUP] [PGRS-STARTOP] set" + InfoEnd
+            + "* [MULTI] [SETUP] [PGRS-STARTSINGLE] set" + InfoEnd
+            + "* [MULTI] [SETUP] -> [CONNECT]" + InfoEnd
+            + "* [MULTI] [CONNECT] transfer credentials: -" + InfoEnd
+            + "* [MULTI] [CONNECT] [CPOOL] added connection 0. The cache now contains 1 members" + InfoEnd
+            + "* [MULTI] [CONNECT] [PGRS-POSTQUEUE] set" + InfoEnd
+            + "* [MULTI] [CONNECT] Curl_conn_setup() -> 0" + InfoEnd
+            + "* [MULTI] [CONNECT] -> [CONNECTING]" + InfoEnd
+            + "* [MULTI] [CONNECTING] [PGRS-NAMELOOKUP] added 0ns" + InfoEnd
+            + "* [MULTI] [CONNECTING] cf_setup_connect [0][!DNS][!SETUP]" + InfoEnd
+            + "* [MULTI] [CONNECTING] cf_setup_connect [0][!DNS][!SETUP][!HAPPY-EYEBALLS]" + InfoEnd
+            + "*   Trying 127.0.0.1:18441..." + InfoEnd
+            + "* [MULTI] [CONNECTING] pollset[fd=3 OUT], timeouts=0" + InfoEnd
+            + "* [MULTI] [CONNECTING] multi_wait(fds=1, timeout=1000) tinternal=-1" + InfoEnd
+            + "* [MULTI] [CONNECTING] cf_setup_connect [0][!DNS][!SETUP][!HAPPY-EYEBALLS]" + InfoEnd
+            + "* [MULTI] [CONNECTING] [PGRS-CONNECT] added 0ns" + InfoEnd
+            + "* Established connection to 127.0.0.1 (127.0.0.1 port 18441) from 127.0.0.1 port 55116 " + InfoEnd
+            + "* [MULTI] [CONNECTING] connected [0][DNS][SETUP][HAPPY-EYEBALLS][TCP]" + InfoEnd
+            + "* [MULTI] [CONNECTING] reduced to [0][TCP]" + InfoEnd
+            + "* [MULTI] [CONNECTING] -> [PROTOCONNECT]" + InfoEnd
+            + "* [MULTI] [PROTOCONNECT] -> [DO]" + InfoEnd
+            + "* using HTTP/1.x" + InfoEnd
+            + "* [MULTI] [DO] xfer_setup: recv_idx=0, send_idx=0" + InfoEnd
+            + "> GET /f.txt HTTP/1.1" + HeaderEnd
+            + "> Host: 127.0.0.1:18441" + HeaderEnd
+            + "> User-Agent: curl/8.21.0" + HeaderEnd
+            + "> Accept: */*" + HeaderEnd
+            + "> " + HeaderEnd
+            + "* Request completely sent off" + InfoEnd
+            + "* [MULTI] [DO] -> [DID]" + InfoEnd
+            + "* [MULTI] [DID] [PGRS-PRETRANSFER] added 0ns" + InfoEnd
+            + "* [MULTI] [DID] [PGRS-POSTRANSFER] added 0ns" + InfoEnd
+            + "* [MULTI] [DID] -> [PERFORMING]" + InfoEnd
+            + "* [MULTI] [PERFORMING] pollset[fd=3 IN], timeouts=0" + InfoEnd
+            + "* [MULTI] [PERFORMING] multi_wait(fds=1, timeout=1000) tinternal=-1" + InfoEnd
+            + "< HTTP/1.1 200 OK" + HeaderEnd
+            + "* [MULTI] [PERFORMING] [PGRS-STARTTRANSFER] added 0ns" + InfoEnd
+            + "< Content-Type: text/plain" + HeaderEnd
+            + "< Content-Length: 6" + HeaderEnd
+            + "< " + HeaderEnd
+            + "{ [6 bytes data]" + InfoEnd
+            + "* [MULTI] [PERFORMING] -> [DONE]" + InfoEnd
+            + "* [MULTI] [DONE] multi_done: status: 0 prem: 0 done: 0" + InfoEnd
+            + "* [MULTI] [DONE] multi_done_locked, in use=0" + InfoEnd
+            + "* Connection #0 to host 127.0.0.1:18441 left intact" + InfoEnd
+            + "* [MULTI] [DONE] -> [COMPLETED]" + InfoEnd
+            + "* [MULTI] [COMPLETED] -> [MSGSENT]" + InfoEnd
+            + "* [MULTI] [COMPLETED] removed from multi, mid=1, running=0, total=1" + InfoEnd,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigAll_WritesTheMultiDoneLinesBeforeTheWriteAndReadLines()
+    {
+        // curl 8.21.0 under --trace-config all (measured 2026-10-02, BL-1188 Notes).
+        await RunAsync(["-s", "--trace-config", "all", "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+        string unstamped = string.Join(
+            InfoEnd,
+            StandardErrorText.Split(InfoEnd).Select(line => line[Math.Max(0, line.IndexOf("* ", StringComparison.Ordinal))..]));
+
+        StringAssert.Contains(
+            unstamped,
+            "* [MULTI] [SETUP] -> [CONNECT]" + InfoEnd + "* [READ] client_reset, clear readers" + InfoEnd + "* [MULTI] [CONNECT] transfer credentials: -" + InfoEnd);
+        StringAssert.Contains(
+            unstamped,
+            "* [MULTI] [PERFORMING] -> [DONE]" + InfoEnd
+            + "* [MULTI] [DONE] multi_done: status: 0 prem: 0 done: 0" + InfoEnd
+            + "* [WRITE] [OUT] done" + InfoEnd
+            + "* [READ] client_reset, clear readers" + InfoEnd
+            + "* [MULTI] [DONE] multi_done_locked, in use=0" + InfoEnd
+            + "* Connection #0 to host 127.0.0.1:18441 left intact" + InfoEnd);
+    }
+
+    [TestMethod]
+    [DataRow("--trace-config", "network", "-v")]
+    [DataRow("-s", "-s", "-vvvv")]
+    public async Task RunAsync_NetworkOrFourVs_WriteTheMultiLines(string first, string second, string third)
+    {
+        await RunAsync(["-s", first, second, third, "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        StringAssert.Contains(StandardErrorText, "[MULTI] [COMPLETED] removed from multi, mid=1, running=0, total=1");
+    }
+
+    [TestMethod]
+    [DataRow("--trace-config", "read,write")]
+    [DataRow("--trace-config", "-multi")]
+    [DataRow("-v", "-vvv")]
+    public async Task RunAsync_WithoutMultiNetworkOrAll_WritesNoMultiLine(string option, string value)
+    {
+        await RunAsync(["-s", "-v", option, value, "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.DoesNotContain("[MULTI]", StandardErrorText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_TraceIdsWithResolveEntry_MarksTheLineBeforeTheConnectionWithAnX()
     {
         // curl 8.21.0 wrote "[0-x] * Added a.test:1:127.0.0.1 to DNS cache", then [0-0] (measured 2026-09-29, BL-648 Notes).
@@ -427,6 +681,10 @@ public sealed class CurlCommandRunnerTransferEventTests
         public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
 
         public override DateTimeOffset GetUtcNow() => now;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => now.UtcTicks;
 
         public void Set(int milliseconds) =>
             now = new DateTimeOffset(2026, 9, 27, 11, 54, 11, milliseconds, TimeSpan.Zero);

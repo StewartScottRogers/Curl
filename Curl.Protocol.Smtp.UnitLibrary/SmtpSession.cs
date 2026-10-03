@@ -24,7 +24,8 @@ namespace Curl.Protocol.Smtp;
 /// <c>EHLO</c> again.</item>
 /// <item>The server closing before a reply is complete is exit 56; a reply line of 65536
 /// bytes is exit 100; a reply line holding a NUL byte is exit 8
-/// <c>Nul byte in server response line</c>, the line unreported (BL-1121).</item>
+/// <c>Nul byte in server response line</c>, the line unreported (BL-1121); a command that
+/// cannot be written is exit 55 (<see cref="SmtpSendFailedException" />, BL-1243).</item>
 /// <item>No failure above sends <c>QUIT</c>. Once the session is open, <c>QUIT</c>'s reply is
 /// read and whatever it says is ignored, as curl ignores it.</item>
 /// <item>Given an <see cref="ISaslAuthenticator" />, a session opened with <c>EHLO</c>
@@ -90,12 +91,17 @@ internal sealed class SmtpSession(
         {
             return TransferResult.Failure(CurlExitCode.TooLarge, SmtpSessionMessages.ReplyLineTooLarge);
         }
+        catch (SmtpSendFailedException failure)
+        {
+            return TransferResult.Failure(CurlExitCode.SendError, failure.Message);
+        }
         catch (SaslAuthenticationFailedException failure)
         {
             // Nothing more is sent, not even QUIT, as curl's Schannel build does (BL-781).
             return TransferResult.Failure(failure.ExitCode, failure.Message);
         }
 
+        channel.Trace.PerformStarts();
         return await SendMailOrCommandsAsync().ConfigureAwait(false);
     }
 
@@ -141,6 +147,7 @@ internal sealed class SmtpSession(
 
     private async ValueTask<TransferResult?> OpenAsync()
     {
+        channel.Trace.Enter("SERVERGREET");
         SmtpReply greeting = await ReadReplyAsync().ConfigureAwait(false);
         if (!greeting.IsCompletion)
         {
@@ -153,7 +160,7 @@ internal sealed class SmtpSession(
 
     private async ValueTask<TransferResult?> GreetAsync()
     {
-        SmtpReply ehlo = await ExchangeAsync("EHLO " + domain).ConfigureAwait(false);
+        SmtpReply ehlo = await ExchangeAsync("EHLO " + domain, "EHLO").ConfigureAwait(false);
         capabilities = ehlo.IsCompletion ? ehlo : null;
         if (ehlo.IsCompletion)
         {
@@ -167,7 +174,7 @@ internal sealed class SmtpSession(
 
     private async ValueTask<TransferResult?> HeloAsync()
     {
-        SmtpReply helo = await ExchangeAsync("HELO " + domain).ConfigureAwait(false);
+        SmtpReply helo = await ExchangeAsync("HELO " + domain, "HELO").ConfigureAwait(false);
         return helo.IsCompletion
             ? null
             : TransferResult.Failure(CurlExitCode.RemoteAccessDenied, SmtpSessionMessages.RemoteAccessDenied(helo.Code));
@@ -196,7 +203,7 @@ internal sealed class SmtpSession(
     /// </summary>
     private async ValueTask<TransferResult?> StartTlsAsync()
     {
-        SmtpReply startTls = await ExchangeAsync(StartTlsKeyword).ConfigureAwait(false);
+        SmtpReply startTls = await ExchangeAsync(StartTlsKeyword, StartTlsKeyword).ConfigureAwait(false);
         if (startTls.Code == StartTlsAccepted)
         {
             return await UpgradeAsync().ConfigureAwait(false);
@@ -216,6 +223,7 @@ internal sealed class SmtpSession(
     /// </summary>
     private async ValueTask<TransferResult?> UpgradeAsync()
     {
+        channel.Trace.Enter("UPGRADETLS");
         ConnectResult secured = await tlsProvider
             .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.Events, context.CancellationToken)
             .ConfigureAwait(false);
@@ -236,9 +244,11 @@ internal sealed class SmtpSession(
         return await GreetAsync().ConfigureAwait(false);
     }
 
-    private async ValueTask<SmtpReply> ExchangeAsync(string command)
+    /// <summary>Sends <paramref name="command" />, which puts curl's state machine in <paramref name="state" />, and reads its reply.</summary>
+    private async ValueTask<SmtpReply> ExchangeAsync(string command, string state)
     {
         await channel.SendAsync(command).ConfigureAwait(false);
+        channel.Trace.Enter(state);
         return await ReadReplyAsync().ConfigureAwait(false);
     }
 

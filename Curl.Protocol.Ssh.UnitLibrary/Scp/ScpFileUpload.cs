@@ -21,6 +21,12 @@ namespace Curl.Protocol.Ssh.Scp;
 /// <param name="events">Where the sent bytes and the line after them are reported.</param>
 internal sealed class ScpFileUpload(SshTransport transport, ITransferEvents events)
 {
+    /// <summary>
+    /// Gets where the upload's <c>--trace-config ssh</c> state changes go (BL-1204);
+    /// <see cref="SshStateTrace.Off" /> when not given.
+    /// </summary>
+    internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
+
     /// <summary>How many bytes of the source curl reads at a time: its 64 KiB upload buffer.</summary>
     internal const int ReadBufferSize = 65536;
 
@@ -67,6 +73,9 @@ internal sealed class ScpFileUpload(SshTransport transport, ITransferEvents even
         ITransferProgress progress,
         CancellationToken cancellationToken)
     {
+        Trace.Write("DO phase starts");
+        Trace.Enter("SSH_SCP_TRANS_INIT");
+        Trace.Enter("SSH_SCP_UPLOAD_INIT");
         long size = upload.CanSeek ? Math.Max(0, upload.Length - upload.Position) : throw SshTransferException.ScpUploadSizeUnknown();
         byte[] path = ScpRemotePath.Resolve(urlPath);
         SshSessionChannel channel = new(transport);
@@ -77,13 +86,22 @@ internal sealed class ScpFileUpload(SshTransport transport, ITransferEvents even
             throw failure;
         }
 
+        Trace.Rest();
+        Trace.Write("DO phase is complete");
         TransferResult result = await new Copy(channel, upload, progress, size, events).RunAsync(cancellationToken).ConfigureAwait(false);
         if (result.IsSuccess)
         {
             events.ReportInfo(SshInfoLines.UploadSent(result.BytesTransferred));
         }
 
+        Trace.Enter("SSH_SCP_DONE");
+        Trace.Enter("SSH_SCP_SEND_EOF");
+        Trace.Enter("SSH_SCP_WAIT_EOF");
+        Trace.Enter("SSH_SCP_WAIT_CLOSE");
+        Trace.Enter("SSH_SCP_CHANNEL_FREE");
         await IgnoringConnectionFailureAsync(() => channel.CloseAsync(cancellationToken)).ConfigureAwait(false);
+        Trace.Write("SCP DONE phase complete");
+        Trace.Rest();
         return result with { Report = new TransferReport { UploadSize = result.BytesTransferred } };
     }
 

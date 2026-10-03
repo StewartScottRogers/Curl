@@ -22,7 +22,7 @@ anchor that cannot be loaded included, is an `IOException`, so the sender tries 
 Per ADR-0140 and ADR-0162 (BL-708) there are two TLS providers, and `TlsClientRouting.Choose`
 picks one from a `TlsClientOptions` as one pure function: `HandBuiltTlsProvider` when a row of
 ADR-0140's table holds (today a `MaximumVersion` of TLS 1.0 or 1.1, `RequireCertificateStatus`
-for `--cert-status` by ADR-0191, and `Curves` or `SignatureAlgorithms` by ADR-0151, and `SslSessionsFile` for `--ssl-sessions` by ADR-0319, whose `TlsSessionCache` the hand-built provider offers and keeps TLS 1.3 sessions in, and `Ech` (any mode `EchModes.Of` does not read as `Off`) for `--ech` by ADR-0327, where `EchOffer` decides the TLS 1.3 hello's GREASE or ECH configuration (the `ecl:` list, else the host's HTTPS record through `IEchConfigListLookup`, which `DohDnsResolver` implements), `hard` without a usable one is exit 35 and a rejected offer exit 101, and `TlsUser` for `--tlsuser` by ADR-0328, where `TlsSrp` builds the SRP login, swaps the TLS 1.2 suites for OpenSSL's `SRP` list unless `--ciphers` is given and writes curl's two `-v` lines, no `--tlspassword` being exit 43 and every exit 35 the OpenSSL build's line, and `NoSessionId` for `--no-sessionid` and `AllowBeast` with a TLS 1.0 minimum for `--ssl-allow-beast` by ADR-0330 (BL-713): the hand-built provider offers and keeps the run's `TlsSessionCache` sessions by default, `--ssl-sessions` or not, none under `NoSessionId`, and `AllowBeast` turns off the TLS 1.0 CBC empty fragment (`InsertsEmptyFragment`), and `AllowEarlyData` for `--tls-earlydata` by ADR-0337 (BL-1105): on a resumed TLS 1.3 session allowing early data with an offered ALPN protocol the provider returns an `EarlyDataTlsConnection`, whose first write runs the handshake carrying it as 0-RTT early data, a failure thrown as `DeferredTlsHandshakeFailedException`; each option task
+for `--cert-status` by ADR-0191, and `Curves` or `SignatureAlgorithms` by ADR-0151, and `SslSessionsFile` for `--ssl-sessions` by ADR-0319, whose `TlsSessionCache` the hand-built provider offers and keeps TLS 1.3 sessions in, and `Ech` (any mode `EchModes.Of` does not read as `Off`) for `--ech` by ADR-0327, where `EchOffer` decides the TLS 1.3 hello's GREASE or ECH configuration (the `ecl:` list, else the host's HTTPS record through `IEchConfigListLookup`, which `DohDnsResolver` implements), `hard` without a usable one is exit 35 and a rejected offer exit 101 (per ADR-0359, BL-1107, measured with curl 8.21.0 on OpenSSL 4.0.0: `pn:` or `ecl:` without a mode is `hard`, a usable list below TLS 1.3 is exit 35 with OpenSSL's `no protocols available`, `EchOffer.InfoLines` are curl's `ECH:` setup lines written before the hello, and exit 101 writes `EchRetryConfigsText.Rejected`'s lines, the server's `retry_configs` in base64 and `for <inner> from <outer>, 424 -106` or `ECH: no retry_configs (rv = 1)`, and OpenSSL's `ech required` text; GREASE a server answers with `retry_configs` puts `got retry-configs` in the result and `EchRetryConfigsText.Grease`'s lines in `TlsHandshakeEvent.EchRetryConfigLines`, BL-1171), and `TlsUser` for `--tlsuser` by ADR-0328, where `TlsSrp` builds the SRP login, swaps the TLS 1.2 suites for OpenSSL's `SRP` list unless `--ciphers` is given and writes curl's two `-v` lines, no `--tlspassword` being exit 43 and every exit 35 the OpenSSL build's line, and `NoSessionId` for `--no-sessionid` and `AllowBeast` with a TLS 1.0 minimum for `--ssl-allow-beast` by ADR-0330 (BL-713): the hand-built provider offers and keeps the run's `TlsSessionCache` sessions by default, `--ssl-sessions` or not, none under `NoSessionId`, and `AllowBeast` turns off the TLS 1.0 CBC empty fragment (`InsertsEmptyFragment`), and `AllowEarlyData` for `--tls-earlydata` by ADR-0337 (BL-1105): on a resumed TLS 1.3 session allowing early data with an offered ALPN protocol the provider returns an `EarlyDataTlsConnection`, whose first write runs the handshake carrying it as 0-RTT early data, a failure thrown as `DeferredTlsHandshakeFailedException`; each option task
 adds its row and a data row in `TlsClientRoutingTests`), `SslStreamTlsProvider` otherwise. Per
 ADR-0284 (BL-709) `CurvesAndSignatureAlgorithms.Apply` reads `--curves` through `OpenSslGroupList`
 and `--sigalgs` through `OpenSslSignatureAlgorithmList` (OpenSSL 3.5's syntax on every platform)
@@ -55,8 +55,16 @@ builds the chain and the `SslPolicyErrors` `SslStream` would. Both load `--cert`
 does, and a mismatch is exit 90 in both providers. Per ADR-0336 (BL-877) `Judge` also records on
 `PeerVerification` the server key's `sha256//` hash for a hash pin, which a completed handshake
 carries as `TlsHandshakeEvent.PinnedPublicKeyHash` (`-v`'s ` public key hash:` line) and a refusal
-reports through `ReportPinnedPublicKeyRefusal`: the hash line and the mismatch line, twice in the
-Schannel build and once in the OpenSSL build. Per ADR-0197 the OpenSSL build, unless `-k`,
+reports through `ReportPinnedPublicKeyRefusal`: the mismatch line, twice in the Schannel build and
+once in the OpenSSL build, after the failed handshake event carrying the hash line. Per ADR-0363 (BL-1149) a failed handshake is
+reported as a `TlsHandshakeEvent` with `Failed` set (`ReportFailedHandshake` in each provider), which
+then carries the hash line: always in the Schannel build, whose `-v` prints its ALPN offer before
+any failure, and in the OpenSSL build (ADR-0371, BL-1178) in `SslStreamTlsProvider` before every
+failure, with the version, suite and ALPN answer kept from the certificate callback when the
+certificate or pin was refused (`-v` prints the certificate details first) and nothing negotiated
+otherwise (only the ALPN offer, exit 35), and in `HandBuiltTlsProvider` before every handshake
+failure too (ADR-0387, BL-1202), from the version, suite and ALPN protocol `Curl.Tls` hands the verifier in `ServerCertificateChain`
+(`HandBuiltHandshake.NegotiatedBy`). Per ADR-0197 the OpenSSL build, unless `-k`,
 reads `--crlfile` (`TlsClientOptions.CertificateRevocationListFile`) in `ReadTrustAnchors` through
 `CertificateRevocationListFile` (exit 82 through `CertificateRevocationListFileException` and
 `TrustAnchorsUnusable`) and `Judge` checks every chain certificate against a list from its issuer,
@@ -111,6 +119,11 @@ to `MaximumVersion` (`TlsVersion`; `--tlsv1.x`, `--tls-max`), as `TlsVersionRang
 the one place here that names the obsolete TLS 1.0 and 1.1 members; a minimum above the ceiling
 throws, since the parser refuses it. With a ceiling of TLS 1.0 or 1.1 the Schannel build reports
 any security status as `failed to receive handshake`, as curl's did in every measured case.
+Per ADR-0364 (BL-1152) the hand-built OpenSSL build refuses such a ceiling before any hello, as
+OpenSSL 3's security level does: the trust event, a `protocol_version` alert record
+(`ProtocolVersionAlertRecord`) and exit 35 with `TlsFailureMessages.OpenSslNoProtocolsAvailable`;
+and below a TLS 1.3 ceiling the Schannel build's hello is in a record of the ceiling's version
+(`ClientHelloProfile.Tls12RecordVersionIsTheCeiling`), OpenSSL's in a TLS 1.0 one.
 The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 live in
 `TlsFailureMessages` and nowhere else; the `More details here` block after an exit 60 is
 the console's to print. No type here constructs an `HttpClient`.
@@ -373,11 +386,58 @@ carries `PoolScheme` `https`, so the handshake offers ALPN `http/1.1`. `DohRespo
 response as curl does: status and `Content-Type` ignored, a `Content-Length` or chunked body of at
 most 3000 bytes, anything else a failure. It returns the AAAA answer's addresses, then the A
 answer's; a query that fails yields none, and none from both makes `TcpConnector` fail with exit 6.
+Both answers fill one entry, as curl's `struct dohentry`: `DohQueryResult.AsOneEntry` cuts each,
+A first, to the 24 addresses and 4 CNAMEs the earlier ones left room for (measured, BL-1153).
 IP literals and `localhost` (`TcpConnector.IsLocalhost`) are answered without a query.
 `ResolveHttpsRecordAsync` (ADR-0312, BL-707) POSTs one HTTPS query, for the host on port 443 and
 `_<port>._https.<host>` on any other, and returns the answer's first record decoded, its
 `EchConfigList` the configuration `--ech` uses, or `null`. Its tests
 drive it through `Fakes/FakeConnector`'s `BytesToRead` and through a `TcpConnector` over fakes.
+Per ADR-0356 (BL-1102) its `--trace-config doh` lines go to a `FlowScopedTransferEvents`, an
+`AsyncLocal` view that `TcpConnector.ResolverEvents` points at the resolving target's events before
+each look-up; and `TcpConnector.TracesDnsFilter` wraps a direct connect's events in
+`DnsFilterTraceEvents`, which writes curl 8.21.0's `[DNS]` filter lines around `Trying`,
+`Established connection` and `Failed to connect to`. Per ADR-0366 (BL-1157) a direct connect whose
+resolver answered nothing writes `Could not resolve host:` (twice, once under DoH) and
+`Could not resolve: H:P`, which `DnsFilterTraceEvents` brackets with the negative cache entry and the
+exit 6 lines up to `[DNS] [1] shutdown async`; `AsyncResolveTeardownTraceEvents`, wrapped around each
+transfer's events by the console, writes `[DNS] [1] destroy async` after `closing connection #N`. Per ADR-0381
+(BL-1181) a tunnelling proxy's connect is traced for its first hop, a Unix socket's through
+`DnsFilterTraceEvents.StartOverUnixSocket` (`transport=6`), a negative DNS cache entry writes
+`Could not resolve host:`, `Could not resolve: H:P` and `Could not resolve: H` (the filter adds its type line
+and exit 6), and a looked-up name writes `[DNS] resolve complete for H:P` and, after a refused dial,
+`[DNS] [1] shutdown async`. Per ADR-0357 (BL-1103)
+`TcpConnector.TracesSetupFilter` writes `[SETUP] added` and wraps those events in turn in
+`SetupFilterTraceEvents`, which writes the setup filter's `happy eyeballing to origin` line before
+the first `Trying` and its removal after `Established connection`, so `-vv` prints curl's order.
+Per ADR-0357's BL-1160 amendment, with a `HaproxyProtocolHeader` the setup filter also writes
+`HaproxyFilterAddedLine` beside the PROXY line, and `TcpConnector.TracesHaproxyFilter` writes the
+`[HAPROXY]` filter's removal after the connection is reported opened. Per ADR-0357's BL-1191
+amendment `TcpConnector.TracesSocksFilter` hands the SOCKS handshakes the target's events, on which
+`SocksProxyTunnel.Trace` writes curl's `[SOCKS]` lines (connecting, the handshake states' pollset
+lines, how the destination was resolved, request granted), and under `TracesSetupFilter` a SOCKS hop
+writes `[SETUP] added SOCKS filter to H:P` first. Per BL-1186
+`TcpConnector.TracesHappyEyeballsTimer` (`--trace-config timer`, `network`, `all`) has
+`ConnectAttemptTraceEvents` write `[TIMER] [HAPPY_EYEBALLS] set for <us>ns` and `gives multi timeout in
+<ms>ms` as a second family's delay starts, and `cleared` once an attempt connects, before `Connected to`.
+Per ADR-0357's BL-1195 amendment a plain HTTP connection (`PoolScheme` `http`) dialled under
+`TracesTcpFilter` is wrapped in `TcpIoTraceConnection`, which writes `[TCP] send(len=N) -> 0, N` after
+each write and `[TCP] recv(len=102400) -> 0, N` after each read, `-> 81, 0` first when the read does
+not complete at once, and `TcpConnector` writes `QueryAlpnLine` after the setup filters' removal.
+Per ADR-0357's BL-1192 amendment `TcpConnector.TracesHttpsConnectFilter` puts
+`HttpsConnectFilterTraceEvents` between the `[SETUP]` and `[DNS]` events of a direct connect to an
+`https://` origin, writing curl's `[HTTPS-CONNECT]` lines (`added`, `connect, init`, the
+`HttpsConnectFirstAttemptVersion` line, poll-round pairs fixed to the loopback counts, `done=1`, the
+removal, and `all attempts failed` with the exit code); for such an origin the setup filter writes no
+`[SETUP] added` but `SslFilterAddedLine` before the handshake.
+Per ADR-0357's BL-1193 amendment a CONNECT tunnel through an `Http` or `Http10` proxy writes curl's
+`[HTTP-PROXY]` and `[H1-PROXY]` lines under `TcpConnector.TracesHttpProxyFilter` and
+`TracesH1ProxyFilter` through `HttpProxyTunnelTrace` (carried on the `DialedSocket` as `TunnelTrace`),
+with one poll round fixed, the `[HTTP-PROXY]` removal after the setup filter's and `[H1-PROXY] query
+ALPN` in place of `[TCP] query ALPN`; under `TracesSetupFilter` that path also writes `[SETUP] added`,
+`happy eyeballing to proxy H:P` (`SetupFilterTraceEvents.ToProxy`), `HttpProxyTunnelFilterAddedLine` and,
+for an `https://` origin, `SslFilterAddedLine` after the tunnel. CONNECT reply heads go to the
+`IConnectReplyHeadWritingEvents` the target's events were before any trace filter wrapped them.
 
 Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
 `--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr`, measured against curl 8.22.0's c-ares

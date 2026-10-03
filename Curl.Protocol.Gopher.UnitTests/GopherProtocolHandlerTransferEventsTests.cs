@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Gopher.Fakes;
 
@@ -109,15 +110,56 @@ public sealed class GopherProtocolHandlerTransferEventsTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SendFailsWithCurlsFallbackText_ReportsOnlyClosing()
+    [DataRow(0, DisplayName = "selector")]
+    [DataRow(1, DisplayName = "CRLF")]
+    public async Task ExecuteAsync_SendResetByPeer_ReturnsSendFailureAndReportsItThenTheGopherRequestLine(int failingWrite)
     {
-        ScriptedConnection connection = new() { FailWrites = true };
+        // lib/gopher.c gopher_do: the socket filter's failf("Send failure: ...") is the
+        // message, then failf("Failed sending Gopher request"), then the closing line.
+        ScriptedConnection connection = new()
+        {
+            FailingWriteNumber = failingWrite,
+            WriteFailure = new IOException("reset", new SocketException((int)SocketError.ConnectionReset)),
+        };
         TranscriptTransferEvents events = new();
 
-        TransferResult result = await new GopherProtocolHandler(Connector(connection, 0)).ExecuteAsync(Context("gopher://h/1/", events));
+        TransferResult result = await new GopherProtocolHandler(Connector(connection, 3)).ExecuteAsync(Context("gopher://h/1sel", events));
 
-        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
-        CollectionAssert.AreEqual(new[] { "* closing connection #0" }, events.Transcript);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), result);
+        CollectionAssert.AreEqual(
+            new[] { "* Send failure: Connection was reset", "* Failed sending Gopher request", "* closing connection #3" },
+            events.Transcript);
+    }
+
+    [TestMethod]
+    [DataRow(0, DisplayName = "selector")]
+    [DataRow(1, DisplayName = "CRLF")]
+    public async Task ExecuteAsync_SendFailsOtherwise_ReturnsCurlsFallbackTextAndReportsOnlyTheGopherRequestLine(int failingWrite)
+    {
+        ScriptedConnection connection = new() { FailingWriteNumber = failingWrite };
+        TranscriptTransferEvents events = new();
+
+        TransferResult result = await new GopherProtocolHandler(Connector(connection, 0)).ExecuteAsync(Context("gopher://h/1sel", events));
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
+        CollectionAssert.AreEqual(
+            new[] { "* Failed sending Gopher request", "* closing connection #0" },
+            events.Transcript);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SendFailsWithANonResetSocketError_ReturnsCurlsFallbackText()
+    {
+        ScriptedConnection connection = new()
+        {
+            FailWrites = true,
+            WriteFailure = new IOException("aborted", new SocketException((int)SocketError.ConnectionAborted)),
+        };
+
+        TransferResult result = await new GopherProtocolHandler(Connector(connection, 0))
+            .ExecuteAsync(Context("gopher://h/1sel", new TranscriptTransferEvents()));
+
+        Assert.AreEqual("Failed sending data to the peer", result.ErrorMessage);
     }
 
     [TestMethod]

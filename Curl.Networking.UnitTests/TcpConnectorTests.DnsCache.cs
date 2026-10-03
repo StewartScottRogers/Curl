@@ -96,7 +96,8 @@ public sealed partial class TcpConnectorTests
     public async Task ConnectAsync_AfterAHostThatDidNotResolve_ResolvesItAgainWithoutTheFoundInDnsCacheLine()
     {
         // curl -s -v http://nonexistent.invalid:47181/a http://nonexistent.invalid:47181/b ->
-        // Could not resolve host twice, and no cache line.
+        // Could not resolve host twice and Could not resolve: H:P for each, and no cache line
+        // (BL-1157).
         var resolver = new FakeDnsResolver();
         var connector = CreateConnector(resolver, new FakeTcpDialer(), new FakeTlsProvider());
         var second = new RecordingTransferEvents();
@@ -105,7 +106,9 @@ public sealed partial class TcpConnectorTests
         var result = await connector.ConnectAsync(new ConnectTarget("nonexistent.invalid", 47181, UseTls: false) { Events = second }, CancellationToken.None);
 
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
-        Assert.IsEmpty(second.Info);
+        CollectionAssert.AreEqual(
+            new[] { "Could not resolve host: nonexistent.invalid", "Could not resolve host: nonexistent.invalid", "Could not resolve: nonexistent.invalid:47181" },
+            second.Info.ToArray());
         CollectionAssert.AreEqual(new[] { "nonexistent.invalid", "nonexistent.invalid" }, resolver.ResolvedHosts);
     }
 

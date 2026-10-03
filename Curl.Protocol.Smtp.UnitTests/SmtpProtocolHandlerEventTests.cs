@@ -133,7 +133,7 @@ public sealed class SmtpProtocolHandlerEventTests
         await SmtpRun.ExecuteAsync(context, connection);
 
         CollectionAssert.AreEqual(
-            (string[])["< 220 localhost ESMTP\r\n", "* response reading failed (errno: 0)", "* closing connection #0"],
+            (string[])["< 220 localhost ESMTP\r\n", "* closing connection #0"],
             events.Transcript);
     }
 
@@ -154,7 +154,7 @@ public sealed class SmtpProtocolHandlerEventTests
         await SmtpRun.ExecuteAsync(context, connection);
 
         CollectionAssert.AreEqual(
-            (string[])["> DATA\r\n", "< 354 End data with <CR><LF>.<CR><LF>\r\n", "* upload completely sent off: 8 bytes"],
+            (string[])["> DATA\r\n", "< 354 End data with <CR><LF>.<CR><LF>\r\n", "* closing connection #0"],
             events.Transcript.Skip(OpenedSession.Length + 4).Take(3).ToArray());
     }
 
@@ -213,14 +213,35 @@ public sealed class SmtpProtocolHandlerEventTests
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith('+')));
     }
 
-    private static Task<SmtpRun> RunAsync(string replies, RecordingTransferEvents events, string? upload)
+    [TestMethod]
+    public async Task ExecuteAsync_UploadFromStandardInput_ReportsTheBodyAndThenTheMarkAsBackToBackDataEvents()
+    {
+        // -T - with an 18-byte body: curl learns the end only from a read that returns nothing,
+        // so the mark goes out on its own right after the body, and -v, which writes one
+        // "} [N bytes data]" line for back-to-back data, writes "} [18 bytes data]" (BL-1198).
+        RecordingTransferEvents events = new();
+
+        await RunUploadAsync(
+            Greeting + EhloReply + Ok + Ok + StartData + Accepted + Bye,
+            events,
+            new NonSeekableStream("Subject: x\r\n\r\nhi\r\n"u8.ToArray()));
+
+        CollectionAssert.AreEqual(
+            (string[])["< 354 End data with <CR><LF>.<CR><LF>\r\n", "} 18", "} 3", "* upload completely sent off: 21 bytes"],
+            events.Transcript.SkipWhile(line => !line.StartsWith("< 354", StringComparison.Ordinal)).Take(4).ToArray());
+    }
+
+    private static Task<SmtpRun> RunAsync(string replies, RecordingTransferEvents events, string? upload) =>
+        RunUploadAsync(replies, events, upload is null ? null : new MemoryStream(Encoding.Latin1.GetBytes(upload)));
+
+    private static Task<SmtpRun> RunUploadAsync(string replies, RecordingTransferEvents events, Stream? upload)
     {
         var context = new TransferContext
         {
             Url = CurlUrl.Parse(Url),
             Output = new MemoryStream(),
             Events = events,
-            Upload = upload is null ? null : new MemoryStream(Encoding.Latin1.GetBytes(upload)),
+            Upload = upload,
             Mail = new MailRequestOptions { From = "a@b", Recipients = ["c@d"] },
         };
         return SmtpRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));

@@ -81,7 +81,8 @@ internal sealed class AwsSigV4HttpAuthenticator(IHttpAuthenticator otherSchemes,
 
     /// <summary>
     /// Signs <paramref name="request" /> before any challenge, when it has a credential, and
-    /// reports the <c>-v</c> lines curl 8.21.0 prints for it: the string to sign, the
+    /// reports the <c>-v</c> lines curl 8.21.0 prints for it: the service and region it picked
+    /// from the host name (BL-1244), the string to sign, the
     /// signature, and <c>Server auth using AWS_SIGV4 with user '...'</c>, the last even when
     /// an <c>-H</c> <c>Authorization</c> leaves the request unsigned (measured, BL-629 Notes).
     /// </summary>
@@ -98,6 +99,11 @@ internal sealed class AwsSigV4HttpAuthenticator(IHttpAuthenticator otherSchemes,
         if (result.ErrorMessage is { } message)
         {
             throw new HttpAuthenticationFailedException(result.ExitCode, message);
+        }
+
+        foreach (string line in result.PickedFromHostLines)
+        {
+            request.Events.ReportInfo(line);
         }
 
         string? value = null;

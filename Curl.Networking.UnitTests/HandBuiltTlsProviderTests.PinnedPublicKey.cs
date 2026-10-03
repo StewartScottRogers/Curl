@@ -1,3 +1,5 @@
+using System.Security.Authentication;
+
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
 
@@ -67,18 +69,45 @@ public sealed partial class HandBuiltTlsProviderTests
     }
 
     [TestMethod]
-    [DataRow(SchannelBuild, 2)]
-    [DataRow(OpenSslBuild, 1)]
-    public async Task AuthenticateAsClientAsync_WithAnotherKeysHashPinned_ReportsTheHashAndEachBuildsMismatchLines(bool matchesSchannelBuild, int mismatchLines)
+    public async Task AuthenticateAsClientAsync_WithAnotherKeysHashPinnedInTheSchannelBuild_ReportsAFailedHandshakeWithTheAlpnOfferAndHashThenTwoMismatchLines()
     {
+        // curl 8.21.0 Schannel: "ALPN: curl offers http/1.1", "public key hash:", then the
+        // mismatch line twice (BL-877, BL-1149).
         var events = new RecordingTransferEvents();
 
         var (result, _) = await HandshakeAsync(
-            Provider(Tls12Only(new TlsClientOptions(Insecure: true, PinnedPublicKey: "sha256//AAAA")), matchesSchannelBuild), CertificateHost, events);
+            Provider(Tls12Only(new TlsClientOptions(Insecure: true, PinnedPublicKey: "sha256//AAAA")), SchannelBuild), CertificateHost, events, ["http/1.1"]);
 
         Assert.AreEqual(CurlExitCode.SslPinnedPubKeyNotMatch, result.ExitCode);
+        var handshake = Assert.ContainsSingle(events.Handshakes);
+        Assert.IsTrue(handshake.Failed);
+        Assert.AreEqual(ServerKeyPin, handshake.PinnedPublicKeyHash);
+        CollectionAssert.AreEqual(new[] { "http/1.1" }, handshake.OfferedApplicationProtocols.ToArray());
         CollectionAssert.AreEqual(
-            new[] { " public key hash: " + ServerKeyPin }.Concat(Enumerable.Repeat("SSL: public key does not match pinned public key", mismatchLines)).ToArray(),
+            Enumerable.Repeat("SSL: public key does not match pinned public key", 2).ToArray(),
+            events.Info.Where(line => line.Contains("public key", StringComparison.Ordinal)).ToArray());
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithAnotherKeysHashPinnedInTheOpenSslBuild_ReportsAFailedHandshakeWithWhatWasNegotiatedThenOneMismatchLine()
+    {
+        // curl 8.18.0 OpenSSL -v -k --pinnedpubkey sha256//<wrong>: "SSL connection using", the
+        // certificate, the verify result and " public key hash:", then the mismatch line once
+        // (BL-1149, BL-1178).
+        var events = new RecordingTransferEvents();
+
+        var (result, _) = await HandshakeAsync(
+            Provider(Tls12Only(new TlsClientOptions(Insecure: true, PinnedPublicKey: "sha256//AAAA")), OpenSslBuild), CertificateHost, events);
+
+        Assert.AreEqual(CurlExitCode.SslPinnedPubKeyNotMatch, result.ExitCode);
+        var handshake = Assert.ContainsSingle(events.Handshakes);
+        Assert.IsTrue(handshake.Failed);
+        Assert.AreEqual(SslProtocols.Tls12, handshake.ProtocolVersion);
+        Assert.IsNotNull(handshake.CipherSuite);
+        Assert.IsNotNull(handshake.ServerCertificate);
+        Assert.AreEqual(ServerKeyPin, handshake.PinnedPublicKeyHash);
+        CollectionAssert.AreEqual(
+            new[] { "SSL: public key does not match pinned public key" },
             events.Info.Where(line => line.Contains("public key", StringComparison.Ordinal)).ToArray());
     }
 }

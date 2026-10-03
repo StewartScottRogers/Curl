@@ -238,6 +238,28 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     internal HttpAuthSchemes ProxyAuthSchemes { get; } = proxyAuthSchemes;
 
+    /// <summary>
+    /// Gets or sets whether an HTTP/2 transfer writes curl 8.21.0's <c>--trace-config http/2</c> lines
+    /// (<see cref="Http2FrameTrace" />, BL-1167): the session's creation, every frame sent and received,
+    /// the server's settings and each stream's close. Off by default.
+    /// </summary>
+    public bool TracesHttp2Frames { get; init; }
+
+    /// <summary>
+    /// Gets or sets whether an HTTP/3 transfer writes curl 8.21.0's <c>--trace-config http/3</c> lines
+    /// (<see cref="Http3StreamTrace" />, BL-1168): each response head's end, each piece of body and
+    /// the stream's close. Off by default.
+    /// </summary>
+    public bool TracesHttp3Streams { get; init; }
+
+    /// <summary>
+    /// Gets or sets whether an HTTP/1.x request body's reads write curl 8.21.0's <c>--trace-config read</c>
+    /// lines (<see cref="HttpClientReaderTraceLines" />, BL-1189, BL-1214): the reader added for a <c>-d</c>
+    /// body or a <c>-T</c> upload, and each read into the upload buffer, chunked or not, held back for
+    /// <c>100 Continue</c> or not, a <c>-F</c> body's included. Off by default.
+    /// </summary>
+    public bool TracesClientReaders { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException"><paramref name="context" /> is <see langword="null" />.</exception>
     /// <exception cref="OperationCanceledException">
@@ -968,6 +990,7 @@ public sealed class HttpProtocolHandler(
             Progress = plan.Progress,
             Events = context.Events,
             EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
+            TracesReaders = TracesReadersOf(requestStream),
         };
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
         {
@@ -986,12 +1009,17 @@ public sealed class HttpProtocolHandler(
             Log = exchangeLog,
         };
         int cookiesStored = 0;
+        HttpAuthProblemLines originProblems = new();
+        HttpAuthProblemLines proxyProblems = new();
         HttpResponseHeadReader headReader = new(responseConnection)
         {
             Events = context.Events,
+            LineReporting = line => (requestStream as Http3StreamConnection)?.EchoResponseLineBefore(line),
+            LineReported = line => EchoResponseLineAfter(requestStream, connection, line),
+            StatusLineReported = statusLine => ReportUploadRewind(plan, statusLine),
             HeaderReceived = (statusLine, header) =>
             {
-                ReportAuthProblemLines(plan, statusLine, header);
+                ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
                 cookiesStored = StoreCookie(context, header, cookiesStored);
                 StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
             },
@@ -1057,6 +1085,7 @@ public sealed class HttpProtocolHandler(
             return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
         }
 
+        (requestStream as Http3StreamConnection)?.ReportTransferDone(connect.ConnectionNumber);
         TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
         LogExchanged(exchangeLog, context.TimeProvider, exchange.RequestReady, actedOn!, body);
         return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection)))
@@ -1095,21 +1124,68 @@ public sealed class HttpProtocolHandler(
     /// none), reporting curl's <c>OPENED stream</c> lines once it is opened (<see cref="HttpStreamOpenedLines" />),
     /// or gives <see langword="null" /> when the connection speaks HTTP/1.x.
     /// </summary>
-    private static IHttpStreamConnection? CreateRequestStream(HttpRequestPlan plan, IHttpStreamSession? streams) =>
+    private IHttpStreamConnection? CreateRequestStream(HttpRequestPlan plan, IHttpStreamSession? streams) =>
         streams?.CreateStream(
             plan.Context.Url.Scheme,
             plan.Framing.Body is null ? 0 : plan.Framing.KnownLength,
             plan.Context.NoBody,
             new HttpStreamOpenedLines(plan.Context.Events, HttpUrlText.Effective(plan.Context.Url)),
-            plan.Context.DiagnosticLog);
+            plan.Context.DiagnosticLog,
+            TracesStreamsOf(streams) ? plan.Context.Events : null);
+
+    /// <summary>
+    /// Whether the session's version is traced: <see cref="TracesHttp3Streams" /> for HTTP/3,
+    /// <see cref="TracesHttp2Frames" /> for HTTP/2.
+    /// </summary>
+    private bool TracesStreamsOf(IHttpStreamSession streams) =>
+        streams is Http3Session ? TracesHttp3Streams : TracesHttp2Frames;
+
+    /// <summary>
+    /// Whether the request body's reads write <see cref="TracesClientReaders" />' lines: only over
+    /// HTTP/1.x, without a <paramref name="requestStream" />, the version they were measured on.
+    /// </summary>
+    private bool TracesReadersOf(IHttpStreamConnection? requestStream) => TracesClientReaders && requestStream is null;
 
     /// <summary>
     /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one;
     /// else, for <see cref="HttpVersionPreference.Http2" /> over cleartext, the transport watched for an
     /// h2c upgrade's <c>101</c> (<see cref="HttpH2cUpgradeConnection" />, BL-716); and else the transport itself.
+    /// The upgrade's HTTP/2 lines are traced as <see cref="TracesHttp2Frames" /> says (BL-1205).
     /// </summary>
-    private static IConnection ExchangeConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection transport) =>
-        (IConnection?)requestStream ?? (UpgradesToH2c(plan, transport) ? new HttpH2cUpgradeConnection(transport, plan.Context.Events, plan.Context.Url.Scheme) : transport);
+    private IConnection ExchangeConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection transport) =>
+        (IConnection?)requestStream ?? (UpgradesToH2c(plan, transport)
+            ? new HttpH2cUpgradeConnection(transport, plan.Context.Events, plan.Context.Url.Scheme, TracesHttp2Frames ? plan.Context.Events : null)
+            : transport);
+
+    /// <summary>
+    /// Echoes a response head line as the exchange's HTTP/2 stream's <c>--trace-config http/2</c>
+    /// <c>status:</c> or <c>header:</c> line (BL-1205): the request stream's, else stream 1 of a
+    /// connection switched to HTTP/2 after an h2c upgrade's <c>101</c>; or, over HTTP/3, the status line
+    /// as the request stream's <c>--trace-config http/3</c> <c>status:</c> line (BL-1208); nothing over HTTP/1.x.
+    /// </summary>
+    /// <summary>
+    /// Reports <c>Need to rewind upload for next request</c> after a <c>3xx</c> status line under
+    /// <c>-L</c> when the request sent a body that is not empty, as curl 8.21.0 does whatever the
+    /// redirect then does with the body: a <c>307</c> sends it again, a <c>302</c> drops it
+    /// (measured, BL-1213 Notes).
+    /// </summary>
+    private static void ReportUploadRewind(HttpRequestPlan plan, HttpStatusLine statusLine)
+    {
+        if (plan.Options.FollowRedirects
+            && statusLine.StatusCode is >= 300 and < 400
+            && plan.Framing.Body is not null
+            && plan.Framing.KnownLength != 0)
+        {
+            plan.Context.Events.ReportInfo(HttpConnectionInfoLines.NeedToRewindUpload);
+        }
+    }
+
+    private static void EchoResponseLineAfter(IHttpStreamConnection? requestStream, IConnection connection, byte[] line)
+    {
+        IHttpStreamConnection? stream = TrailerStreamOf(requestStream, connection);
+        (stream as Http2StreamConnection)?.EchoResponseLine(line);
+        (stream as Http3StreamConnection)?.EchoResponseLineAfter(line);
+    }
 
     /// <summary>
     /// Decides whether an HTTP/1.x exchange asks to upgrade to h2c: for <c>--http2</c>
@@ -1221,17 +1297,19 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Reports the <c>authentication problem, ignoring.</c> lines curl writes just before a
-    /// challenge header refusing the Basic or Bearer value the request sent to the proxy or the
-    /// origin (<see cref="HttpAuthProblemLines" />, BL-1040).
+    /// challenge header refusing the Basic, Bearer or Digest value the request sent to the proxy
+    /// or the origin, and its duplicate Digest lines, each read by the head's own
+    /// <see cref="HttpAuthProblemLines" /> (BL-1040, BL-1175).
     /// </summary>
-    private static void ReportAuthProblemLines(HttpRequestPlan plan, HttpStatusLine statusLine, HttpResponseHeader header)
+    private static void ReportAuthProblemLines(
+        HttpRequestPlan plan, HttpStatusLine statusLine, HttpResponseHeader header, HttpAuthProblemLines originProblems, HttpAuthProblemLines proxyProblems)
     {
         if (plan.ProxyAuthRequest is { } proxyRequest)
         {
-            ReportInfoLines(plan.Context.Events, [.. HttpAuthProblemLines.LinesBefore(proxyRequest, plan.ProxyAuthorization, statusLine, header)]);
+            ReportInfoLines(plan.Context.Events, [.. proxyProblems.LinesBefore(proxyRequest, plan.ProxyAuthorization, statusLine, header)]);
         }
 
-        ReportInfoLines(plan.Context.Events, [.. HttpAuthProblemLines.LinesBefore(plan.AuthRequest, plan.Authorization, statusLine, header)]);
+        ReportInfoLines(plan.Context.Events, [.. originProblems.LinesBefore(plan.AuthRequest, plan.Authorization, statusLine, header)]);
     }
 
     /// <summary>Reports <paramref name="line" />, or nothing when it is <see langword="null" />.</summary>
@@ -1870,7 +1948,9 @@ public sealed class HttpProtocolHandler(
     /// <see cref="IHttpAuthenticator.ContinueAuthorizationAsync" /> when the request that drew
     /// them already sent <paramref name="sent" />, even an empty one, an empty answer to which
     /// sends nothing more, so the request is never sent again without a header twice
-    /// (ADR-0232); and else afresh.
+    /// (ADR-0232); and else afresh - as is a Digest answer whose nonce the challenges mark
+    /// <c>stale=true</c>, which curl 8.21.0 answers again with the new nonce, without limit
+    /// (measured, BL-1148 Notes).
     /// </summary>
     /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
     private async ValueTask<string?> AnswerChallengesAsync(HttpAuthRequest request, string? sent, bool sentAnswersChallenge, string[] challenges, CancellationToken cancellationToken)
@@ -1882,7 +1962,7 @@ public sealed class HttpProtocolHandler(
 
         try
         {
-            return sent is not null
+            return sent is not null && !RenewsStaleDigest(sent, challenges)
                 ? NullIfEmpty(await Authenticator.ContinueAuthorizationAsync(request, sent, !sentAnswersChallenge, challenges, cancellationToken).ConfigureAwait(false))
                 : await Authenticator.CreateAuthorizationAsync(request, challenges, cancellationToken).ConfigureAwait(false);
         }
@@ -1891,6 +1971,13 @@ public sealed class HttpProtocolHandler(
             throw new HttpTransferException(failure.ExitCode, failure.Message);
         }
     }
+
+    /// <summary>
+    /// Decides whether <paramref name="challenges" /> mark the nonce of the Digest answer
+    /// <paramref name="sent" /> stale, so it is answered afresh with the new nonce.
+    /// </summary>
+    private static bool RenewsStaleDigest(string sent, string[] challenges) =>
+        sent.StartsWith("Digest ", StringComparison.Ordinal) && HttpDigestStaleChallenge.IsOfferedIn(challenges);
 
     /// <summary>Gives <paramref name="value" />, or <see langword="null" /> when it is empty.</summary>
     private static string? NullIfEmpty(string? value) =>
@@ -1955,7 +2042,7 @@ public sealed class HttpProtocolHandler(
 
         if (responseConnection is HttpContinueWaitConnection waiting)
         {
-            await upload.WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
+            await upload.WriteHeadBeforeContinueAsync(requestBody, cancellationToken).ConfigureAwait(false);
             if (!await waiting.WaitForContinueAsync(context.TimeProvider, cancellationToken).ConfigureAwait(false))
             {
                 return true;

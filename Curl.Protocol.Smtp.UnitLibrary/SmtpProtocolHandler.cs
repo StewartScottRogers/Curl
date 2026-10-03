@@ -128,6 +128,12 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => Schemes;
 
+    /// <summary>
+    /// Gets a value indicating whether each transfer writes curl 8.21.0's <c>--trace-config smtp</c>
+    /// lines, <c>[SMTP] ...</c>, from the SMTP state machine through the transfer's events (BL-1163).
+    /// </summary>
+    public bool TracesStateMachine { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context" /> is <see langword="null" />.
@@ -152,6 +158,8 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
+        var trace = new SmtpStateTrace(context.Events, TracesStateMachine);
+        trace.SetupConnection();
         var connectEvents = new ConnectionOpenedCapturingTransferEvents(context.Events);
         var target = new ConnectTarget(url.IdnHost, url.Port, implicitTls)
         {
@@ -171,13 +179,16 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
         await using (connection.ConfigureAwait(false))
         {
             var channel = new SmtpControlChannel(
-                connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput);
+                connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput)
+            {
+                Trace = trace,
+            };
 
             // curl decodes the path once connected, so a malformed one still costs a connect.
             TransferResult result = SmtpEhloDomain.Read(url, localHostName) is { } domain
                 ? await RunSessionAsync(channel, context, domain, implicitTls, connectEvents.Opened).ConfigureAwait(false)
                 : TransferResult.Failure(CurlExitCode.UrlMalformat, SmtpSessionMessages.MalformedUrl);
-            ReportConnectionEnd(context.Events, result, channel.QuitSent, target, connected.ConnectionNumber);
+            ReportConnectionEnd(context.Events, result, channel, target, connected.ConnectionNumber);
             return result;
         }
     }
@@ -185,24 +196,28 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     /// <summary>
     /// Writes the lines curl 8.21.0's <c>-v</c> ends an SMTP transfer with (BL-546): a failure's
     /// message, but for <c>Login denied</c>, which curl only makes <c>curl: (67)</c> of (BL-1061),
+    /// and <c>Failed sending data to the peer</c>, which no <c>failf</c> writes (BL-1243),
     /// then <c>shutting down connection #N</c> when <c>QUIT</c> was sent and
     /// <c>closing connection #N</c> when it was not; a success ends with
-    /// <c>Connection #N to host H:P left intact</c>.
+    /// <c>Connection #N to host H:P left intact</c>. The <c>--trace-config smtp</c> end lines come
+    /// just before the connection's line, after the failure's message (measured, BL-1163).
     /// </summary>
-    private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, bool quitSent, ConnectTarget target, long connectionNumber)
+    private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, SmtpControlChannel channel, ConnectTarget target, long connectionNumber)
     {
         if (result.ExitCode == CurlExitCode.Ok)
         {
+            channel.Trace.Ended(result.ExitCode);
             events.ReportInfo(SmtpConnectionInfoLines.LeftIntact(connectionNumber, target.Host, target.Port));
             return;
         }
 
-        if (result.ErrorMessage != SmtpSessionMessages.LoginDenied)
+        if (result.ErrorMessage is not (SmtpSessionMessages.LoginDenied or SmtpSessionMessages.SendFailed))
         {
             events.ReportInfo(result.ErrorMessage!);
         }
 
-        events.ReportInfo(quitSent ? SmtpConnectionInfoLines.ShuttingDown(connectionNumber) : SmtpConnectionInfoLines.Closing(connectionNumber));
+        channel.Trace.Ended(result.ExitCode);
+        events.ReportInfo(channel.QuitSent ? SmtpConnectionInfoLines.ShuttingDown(connectionNumber) : SmtpConnectionInfoLines.Closing(connectionNumber));
     }
 
     private async ValueTask<TransferResult> RunSessionAsync(

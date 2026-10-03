@@ -454,22 +454,50 @@ public sealed class FtpProtocolHandlerTests
 
     [TestMethod]
     [DataRow("229 garbage")]
-    [DataRow("229 Entering Extended Passive Mode (|||0|)")]
-    [DataRow("229 Entering Extended Passive Mode (|||70000|)")]
+    [DataRow("229 Entering Extended Passive Mode |||40000|")]
     [DataRow("229 Entering Extended Passive Mode (|!|40000|)")]
     [DataRow("229 Entering Extended Passive Mode (||!40000|)")]
+    [DataRow("229 Entering Extended Passive Mode (||x|)")]
     [DataRow("229 Entering Extended Passive Mode (||")]
-    [DataRow("229 Entering Extended Passive Mode (|||40000")]
-    [DataRow("229 Entering Extended Passive Mode (|||40000|")]
-    [DataRow("229 Entering Extended Passive Mode (|||40000|x")]
+    [DataRow("229 Entering Extended Passive Mode (|||")]
     [DataRow("229 Entering Extended Passive Mode (||||)")]
-    [DataRow("229 Entering Extended Passive Mode (|||4a000|)")]
-    public async Task ExecuteAsync_UnreadableEpsvReply_QuitsAndFailsWithExit13(string reply)
+    public async Task ExecuteAsync_EpsvReplyWithoutThreeDelimitersAndADigit_QuitsAndFailsWithExit13WeirdlyFormatted(string reply)
     {
         FtpRun run = await FtpRun.ExecuteAsync(Url, LoggedIn + reply + "\r\n" + Bye);
 
         Assert.AreEqual(LoginSent + "EPSV\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpWeirdPasvReply, "Weirdly formatted EPSV reply"), run.Result);
+    }
+
+    [TestMethod]
+    [DataRow("229 Entering Extended Passive Mode (|||99999|)")]
+    [DataRow("229 Entering Extended Passive Mode (|||65536|)")]
+    [DataRow("229 Entering Extended Passive Mode (|||99999999999|)")]
+    [DataRow("229 Entering Extended Passive Mode (|||123x)")]
+    [DataRow("229 Entering Extended Passive Mode (|||4a000|)")]
+    [DataRow("229 Entering Extended Passive Mode (|||40000")]
+    [DataRow("229 Entering Extended Passive Mode (1112|)")]
+    public async Task ExecuteAsync_EpsvReplyWithAnUnreadablePort_QuitsAndFailsWithExit13IllegalPort(string reply)
+    {
+        // curl 8.21.0 -v, measured 2026-10-02 for (|||99999|) and (|||123x) (BL-1240).
+        FtpRun run = await FtpRun.ExecuteAsync(Url, LoggedIn + reply + "\r\n" + Bye);
+
+        Assert.AreEqual(LoginSent + "EPSV\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpWeirdPasvReply, "Illegal port number in EPSV reply"), run.Result);
+    }
+
+    [TestMethod]
+    [DataRow("229 Entering Extended Passive Mode (|||65535|)", 65535)]
+    [DataRow("229 Entering Extended Passive Mode (|||40000|", 40000)]
+    [DataRow("229 Entering Extended Passive Mode (|||40000|x", 40000)]
+    [DataRow("229 Entering Extended Passive Mode (!!!40000!)", 40000)]
+    public async Task ExecuteAsync_EpsvPortClosedByTheDelimiter_DialsThatPortWhateverFollows(string reply, int port)
+    {
+        // curl 8.21.0 dials port 0 and (|||40000| with no ')' alike, measured 2026-10-02 (BL-1240).
+        FtpRun run = await FtpRun.ExecuteAsync(Url, LoggedIn + reply + "\r\n" + TypeSet + "213 1\r\n" + Opening + Complete + Bye, "x");
+
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", port, false), run.Connector.Targets[1]);
+        Assert.AreEqual(TransferResult.Success(1), run.Result);
     }
 
     [TestMethod]
@@ -501,11 +529,11 @@ public sealed class FtpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_DataConnectRefused_ReturnsTheConnectorsFailure()
     {
-        var control = new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn + Epsv));
+        var control = new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn + "227 Entering Passive Mode (127,0,0,1,241,48)\r\n"));
         var connector = new QueuedConnector(ConnectResult.Connected(control), ConnectResult.Refused("Failed to connect to 127.0.0.1 port 61744"));
 
         TransferResult result = await new FtpProtocolHandler(connector).ExecuteAsync(
-            new TransferContext { Url = CurlUrl.Parse(Url), Output = new MemoryStream() });
+            new TransferContext { Url = CurlUrl.Parse(Url), Output = new MemoryStream(), FtpDisableEpsv = true });
 
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect to 127.0.0.1 port 61744", result.ErrorMessage);
@@ -685,7 +713,22 @@ public sealed class FtpProtocolHandlerTests
         FtpRun run = await FtpRun.ExecuteAsync(Url, control, new ScriptedConnection());
 
         Assert.AreEqual("USER anonymous\r\n", run.Sent);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failure when sending data to the peer"), run.Result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CommandSendReset_FailsWithExit55SendFailureConnectionWasReset()
+    {
+        var control = new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn))
+        {
+            WritesBeforeFailure = 1,
+            WriteFailure = new IOException("reset", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset)),
+        };
+
+        FtpRun run = await FtpRun.ExecuteAsync(Url, control, new ScriptedConnection());
+
+        Assert.AreEqual("USER anonymous\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), run.Result);
     }
 
     [TestMethod]

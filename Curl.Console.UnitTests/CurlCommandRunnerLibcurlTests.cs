@@ -87,6 +87,50 @@ public sealed class CurlCommandRunnerLibcurlTests
         Assert.IsEmpty(files.Written);
     }
 
+    [TestMethod]
+    public async Task RunAsync_LibcurlWithAnUploadFile_WritesItsUrlUploadAndSize()
+    {
+        files.ExistingContent["up.txt"] = Encoding.ASCII.GetBytes("abcde");
+
+        await RunAsync(["-s", "--libcurl", "-", "-T", "up.txt", Url]);
+
+        Assert.Contains(
+            "  curl_easy_setopt(curl, CURLOPT_URL, \"http://localhost:47652/up.txt\");\n  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n  curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);\n",
+            StandardOutputText);
+        Assert.Contains("  curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)5);\n\n  /* Here is a list", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibcurlWithAnUploadFileThatCannotBeOpened_WritesNoSize()
+    {
+        files.UnreadablePaths.Add("up.txt");
+
+        await RunAsync(["-s", "--libcurl", "-", "-T", "up.txt", Url]);
+
+        Assert.Contains("  curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);\n", StandardOutputText);
+        Assert.DoesNotContain("INFILESIZE", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibcurlWithEtagCompare_AddsTheFilesHeader()
+    {
+        files.ExistingContent["etag.txt"] = Encoding.ASCII.GetBytes("\"x\"\r\nsecond\n");
+
+        await RunAsync(["-s", "--libcurl", "-", "--etag-compare", "etag.txt", Url]);
+
+        Assert.Contains("  slist1 = curl_slist_append(slist1, \"If-None-Match: \\\"x\\\"second\");\n", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibcurlResumingTheOutputFile_WritesItsSize()
+    {
+        files.ExistingContent["out.bin"] = Encoding.ASCII.GetBytes("1234567");
+
+        await RunAsync(["-s", "--libcurl", "-", "-C", "-", "-o", "out.bin", Url]);
+
+        Assert.Contains("  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)7);\n", StandardOutputText);
+    }
+
     private static string ExpectedSource()
     {
         CommandLineOptions options = CommandLineParser.Parse(["-s", Url]).Options!;

@@ -19,6 +19,12 @@ internal sealed class SftpFileDownload(SshTransport transport)
     private static readonly byte[] HomeDirectory = "."u8.ToArray();
 
     /// <summary>
+    /// Gets where the download's <c>--trace-config ssh</c> state changes go (BL-1166);
+    /// <see cref="SshStateTrace.Off" /> when not given.
+    /// </summary>
+    internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
+
+    /// <summary>
     /// Downloads the file at <paramref name="urlPath" /> into <paramref name="output" />.
     /// </summary>
     /// <param name="urlPath">The URL's path, with its percent-escapes.</param>
@@ -53,23 +59,34 @@ internal sealed class SftpFileDownload(SshTransport transport)
         long? resumeFrom = null)
     {
         quotes ??= SftpQuoteCommands.None;
+        Trace.Enter("SSH_SFTP_INIT");
         SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
         return await session.CloseChannelOnFailureAsync(
             async () =>
             {
+                Trace.Enter("SSH_SFTP_REALPATH");
                 byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
                 byte[] path = SftpRemotePath.ResolveUrlPath(urlPath, homeDirectory);
+                Trace.EndSftpConnectPhase();
+                Trace.Enter("SSH_SFTP_QUOTE_INIT");
                 await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
+                Trace.Enter("SSH_SFTP_GETINFO");
+                Trace.Enter("SSH_SFTP_TRANS_INIT");
+                Trace.Enter("SSH_SFTP_DOWNLOAD_INIT");
                 if (await OpenUnlessTheConnectionEndsAsync(session, path, createFileMode, cancellationToken).ConfigureAwait(false) is not { } handle)
                 {
                     return await quotes.FinishAsync(session, null, homeDirectory, TransferResult.Success(0), cancellationToken).ConfigureAwait(false);
                 }
 
+                Trace.Enter("SSH_SFTP_DOWNLOAD_STAT");
                 long? size = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.StatSizeAsync(path, cancellationToken)).ConfigureAwait(false);
-                TransferResult result = await CopyPartAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
-                return await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+                TransferResult result = await CopyPartOfKnownSizeAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
+                Trace.Enter("SSH_SFTP_CLOSE");
+                result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+                Trace.EndSftpDonePhase();
+                return result;
             },
             cancellationToken).ConfigureAwait(false);
     }
@@ -86,6 +103,30 @@ internal sealed class SftpFileDownload(SshTransport transport)
         {
             return null;
         }
+    }
+
+    // From curl 8.21.0's sftp_download_stat (BL-1241): a size with its top bit set reads
+    // as negative and fails with exit 36 before the DO phase completes; the handle is
+    // still closed.
+    private async ValueTask<TransferResult> CopyPartOfKnownSizeAsync(
+        SftpSession session,
+        byte[] handle,
+        long? size,
+        ByteRange? range,
+        long? resumeFrom,
+        Stream output,
+        ITransferProgress progress,
+        CancellationToken cancellationToken)
+    {
+        if (size < 0)
+        {
+            SshTransferException failure = SshTransferException.SftpBadFileSize(size.Value);
+            return TransferResult.Failure(failure.ExitCode, failure.Message);
+        }
+
+        Trace.Rest();
+        Trace.Write("DO phase is complete");
+        return await CopyPartAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
     }
 
     // Measured: a range or -C offset the file cannot serve reads nothing, and the handle

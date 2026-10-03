@@ -9,6 +9,15 @@ internal static class Pop3SessionMessages
     /// <summary>The server closed the connection before a response was complete (exit 56).</summary>
     internal const string ResponseReadingFailed = "response reading failed (errno: 0)";
 
+    /// <summary>A write to the connection was reset by the peer (exit 55, BL-1252).</summary>
+    internal const string SendConnectionReset = "Send failure: Connection was reset";
+
+    /// <summary>
+    /// A write to the connection failed other than by a reset (exit 55, BL-1252); curl prints
+    /// it without a <c>-v</c> line of its own.
+    /// </summary>
+    internal const string SendFailed = "Failed sending data to the peer";
+
     /// <summary>A response line reached 65536 bytes (exit 100).</summary>
     internal const string ResponseLineTooLarge = "A value or data field grew larger than allowed";
 
@@ -48,9 +57,9 @@ internal static class Pop3SessionMessages
     internal const string NoSaslMechanismOverlap = "SASL: no overlap between offered and configured auth mechanisms";
 
     /// <summary>
-    /// The <c>-v</c> line written before <see cref="LoginDenied" /> when the only mechanisms
-    /// offered and allowed are ones curl 8.21.0's Schannel build does not build in, each then
-    /// named by <see cref="SaslMechanismNotBuiltIn" /> (BL-810).
+    /// The <c>-v</c> line written before <see cref="LoginDenied" /> when mechanisms were offered
+    /// and allowed but none could be chosen, each then explained by the lines below (BL-810,
+    /// BL-1221).
     /// </summary>
     internal const string NoSaslMechanismSelectable = "SASL: no auth mechanism offered could be selected";
 
@@ -59,6 +68,24 @@ internal static class Pop3SessionMessages
     /// not built in, after <see cref="NoSaslMechanismSelectable" /> (BL-810).
     /// </summary>
     internal const string SaslMechanismNotBuiltIn = "SASL: {0} not builtin";
+
+    /// <summary>
+    /// The <c>-v</c> line after <see cref="NoSaslMechanismSelectable" /> when <c>AUTH=EXTERNAL</c>
+    /// allowed EXTERNAL but a password was given (BL-1221).
+    /// </summary>
+    internal const string SaslExternalNotChosenWithPassword = "SASL: auth EXTERNAL not chosen with password";
+
+    /// <summary>
+    /// The <c>-v</c> line naming a bearer mechanism, <c>{0}</c>, that was offered and allowed
+    /// without <c>--oauth2-bearer</c>, after <see cref="NoSaslMechanismSelectable" /> (BL-1221).
+    /// </summary>
+    internal const string SaslMechanismMissingBearer = "SASL: {0} is missing CURLOPT_XOAUTH2_BEARER";
+
+    /// <summary>
+    /// The <c>-v</c> line naming a mechanism, <c>{0}</c>, that was offered and allowed with an
+    /// empty user name, after <see cref="NoSaslMechanismSelectable" /> (BL-1221).
+    /// </summary>
+    internal const string SaslMechanismMissingUserName = "SASL: {0} is missing username";
 
     /// <summary>
     /// <c>USER</c> or <c>PASS</c> was refused; <c>{0}</c> is <c>-</c> for <c>-ERR</c>, <c>*</c>
@@ -73,14 +100,21 @@ internal static class Pop3SessionMessages
     internal const string AuthenticationFailed = "Authentication failed: {0}";
 
     /// <summary>
+    /// Every SASL mechanism tried was cancelled with <c>*</c> over a challenge that was not
+    /// base64, and neither <c>APOP</c> nor <c>USER</c>/<c>PASS</c> was possible (exit 67,
+    /// BL-1222).
+    /// </summary>
+    internal const string AuthenticationCancelled = "Authentication cancelled";
+
+    /// <summary>
     /// Tells whether curl 8.21.0's <c>-v</c> writes <paramref name="message" /> as a <c>*</c>
     /// line when the transfer fails with it (BL-552). It does for every message it formats
     /// itself, a TLS failure's included, and not for <see cref="WeirdServerReply" />,
-    /// <see cref="UrlMalformed" />, <see cref="LoginDenied" /> and
-    /// <see cref="ResponseLineTooLarge" />, which are only the exit code's own text.
+    /// <see cref="UrlMalformed" />, <see cref="LoginDenied" />, <see cref="ResponseLineTooLarge" />
+    /// and <see cref="SendFailed" />, which are only the exit code's own text.
     /// </summary>
     /// <param name="message">The failure's message.</param>
     /// <returns><see langword="true" /> when the message is written.</returns>
     internal static bool IsWrittenByVerbose(string message) =>
-        message is not (WeirdServerReply or UrlMalformed or LoginDenied or ResponseLineTooLarge);
+        message is not (WeirdServerReply or UrlMalformed or LoginDenied or ResponseLineTooLarge or SendFailed);
 }

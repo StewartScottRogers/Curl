@@ -85,6 +85,46 @@ public sealed class CurlCommandRunnerHttp3Tests
     }
 
     [TestMethod]
+    [DataRow("quic")]
+    [DataRow("QUIC")]
+    public async Task RunAsync_Http3OnlyVerboseUnderTraceConfigQuic_WritesExactlyTheVerboseLines(string component)
+    {
+        // curl.se's ngtcp2 build writes no [QUIC] lines of its own under --trace-config quic: the
+        // run writes what -v alone writes (BL-1169 Notes, ADR-0376).
+        (int verboseExitCode, _, string verboseLines) = await RunAsync(Http3Connector(), "-s", "-v", "--http3-only", HttpsUrl);
+
+        (int tracedExitCode, string standardOutput, string tracedLines) = await RunAsync(Http3Connector(), "-s", "-v", "--trace-config", component, "--http3-only", HttpsUrl);
+
+        Assert.AreEqual(0, verboseExitCode, verboseLines);
+        Assert.AreEqual(0, tracedExitCode, tracedLines);
+        Assert.AreEqual(verboseLines, tracedLines);
+        Assert.AreEqual("hello", standardOutput);
+    }
+
+    [TestMethod]
+    [DataRow("-v", "--trace-config", "network")]
+    [DataRow("-v", "--trace-config", "protocol")]
+    [DataRow("-v", "--trace-config", "all")]
+    [DataRow("-vvvv")]
+    public async Task RunAsync_Http3OnlyUnderAnUmbrellaComponent_WritesNoQuicLine(params string[] verbosity)
+    {
+        (int exitCode, _, string standardError) = await RunAsync(Http3Connector(), ["-s", .. verbosity, "--http3-only", HttpsUrl]);
+
+        Assert.AreEqual(0, exitCode, standardError);
+        Assert.DoesNotContain("[QUIC]", standardError);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http3OnlyUnderTraceConfigQuicWithoutVerbose_WritesNothing()
+    {
+        (int exitCode, string standardOutput, string standardError) = await RunAsync(Http3Connector(), "-s", "--trace-config", "quic", "--http3-only", HttpsUrl);
+
+        Assert.AreEqual(0, exitCode, standardError);
+        Assert.AreEqual(string.Empty, standardError);
+        Assert.AreEqual("hello", standardOutput);
+    }
+
+    [TestMethod]
     public async Task RunAsync_Http3AndQuicFails_FallsBackToTcp()
     {
         ScriptedConnector tcp = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")]);
@@ -197,6 +237,12 @@ public sealed class CurlCommandRunnerHttp3Tests
                 .. headers.Select(header => new HeaderField(header.Name, header.Value)),
             ]);
         return [.. new Http3HeadersFrame(head).ToBytes(), .. new Http3DataFrame(Encoding.Latin1.GetBytes(body)).ToBytes()];
+    }
+
+    private static ScriptedQuicConnector Http3Connector()
+    {
+        ScriptedMultiplexedConnection quic = new(new ScriptedMultiplexedStream(0, Http3Response("hello"))) { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 18443) };
+        return new(MultiplexedConnectResult.Connected(quic, null), new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
     }
 
     private static string NormalizedNewLines(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);

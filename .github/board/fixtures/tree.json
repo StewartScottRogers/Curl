@@ -30,7 +30,9 @@
     { "path": "Tasks/Done/2026-09-28_0944/BL-201-follow-redirects-with-l.md", "mode": "100644", "type": "blob", "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb01", "size": 800 },
     { "path": "Tasks/Done/2026-09-28_0944/BL-202-send-a-head-request-with-i.md", "mode": "100644", "type": "blob", "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb02", "size": 800 },
     { "path": "Curl.Console", "mode": "040000", "type": "tree", "sha": "cccccccccccccccccccccccccccccccccccccccc" },
-    { "path": "Curl.Console/BL-999-not-a-task.md", "mode": "100644", "type": "blob", "sha": "cccccccccccccccccccccccccccccccccccccc01", "size": 100 }
+    { "path": "Curl.Console/BL-999-not-a-task.md", "mode": "100644", "type": "blob", "sha": "cccccccccccccccccccccccccccccccccccccc01", "size": 100 },
+    { "path": "Audit/Findings/AF-0001-tests-named-for-a-timeout-never-wait.md", "mode": "100644", "type": "blob", "sha": "dddddddddddddddddddddddddddddddddddddd01", "size": 900 },
+    { "path": "Audit/Findings/AF-0002-readme-says-48-projects.md", "mode": "100644", "type": "blob", "sha": "dddddddddddddddddddddddddddddddddddddd02", "size": 900 }
   ],
   "truncated": false
 }

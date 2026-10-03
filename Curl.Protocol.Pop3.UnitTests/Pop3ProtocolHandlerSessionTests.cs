@@ -165,14 +165,15 @@ public sealed class Pop3ProtocolHandlerSessionTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SendFails_FailsWithExit56WhenNoResponseFollows()
+    public async Task ExecuteAsync_SendFails_FailsWithExit55WithoutReadingAResponse()
     {
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting)) { WritesBeforeFailure = 0 };
 
         Pop3Run run = await Pop3Run.ExecuteAsync(Url, connection);
 
         Assert.AreEqual(string.Empty, run.Sent);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, ResponseReadingFailed), run.Result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), run.Result);
+        Assert.AreEqual(1, connection.ReadCount);
     }
 
     [TestMethod]

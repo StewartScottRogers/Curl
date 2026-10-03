@@ -31,6 +31,19 @@ internal sealed class SftpQuoteCommands
             [SftpQuoteOperation.Remove] = (SftpPacketType.Remove, "rm"),
         }.ToFrozenDictionary();
 
+    // The state curl's sftp_quote enters for each command that has its own (BL-1204).
+    private static readonly FrozenDictionary<SftpQuoteOperation, string?> QuoteStates =
+        new Dictionary<SftpQuoteOperation, string?>
+        {
+            [SftpQuoteOperation.PrintWorkingDirectory] = null,
+            [SftpQuoteOperation.MakeDirectory] = "SSH_SFTP_QUOTE_MKDIR",
+            [SftpQuoteOperation.Rename] = "SSH_SFTP_QUOTE_RENAME",
+            [SftpQuoteOperation.RemoveDirectory] = "SSH_SFTP_QUOTE_RMDIR",
+            [SftpQuoteOperation.Remove] = "SSH_SFTP_QUOTE_UNLINK",
+            [SftpQuoteOperation.SymbolicLink] = "SSH_SFTP_QUOTE_SYMLINK",
+            [SftpQuoteOperation.StatFileSystem] = "SSH_SFTP_QUOTE_STATVFS",
+        }.ToFrozenDictionary();
+
     private readonly Stream? headerOutput;
 
     private readonly bool cLongIs32Bits;
@@ -59,6 +72,14 @@ internal sealed class SftpQuoteCommands
         this.cLongIs32Bits = cLongIs32Bits;
     }
 
+    /// <summary>
+    /// Gets where the commands' <c>--trace-config ssh</c> state changes are written:
+    /// <c>SSH_SFTP_QUOTE</c>, each command's own state and <c>SSH_SFTP_NEXT_QUOTE</c>, and
+    /// <c>SSH_SFTP_POSTQUOTE_INIT</c> before those after the transfer (BL-1204);
+    /// <see cref="SshStateTrace.Off" /> when not given.
+    /// </summary>
+    internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
+
     /// <summary>Gets no commands at all.</summary>
     internal static SftpQuoteCommands None { get; } = new([], [], null, cLongIs32Bits: true, NoTransferEvents.Instance);
 
@@ -74,8 +95,9 @@ internal sealed class SftpQuoteCommands
     /// </summary>
     /// <param name="context">The transfer's context, with its <see cref="ITransferContext.QuoteCommands" />, <see cref="ITransferContext.HeaderOutput" /> and <see cref="ITransferContext.Events" />.</param>
     /// <param name="cLongIs32Bits">Whether the platform's C <c>long</c> is 32 bits, as on Windows.</param>
+    /// <param name="trace">Where the commands' state changes are written, or <see langword="null" /> for nowhere.</param>
     /// <returns>The commands.</returns>
-    internal static SftpQuoteCommands From(ITransferContext context, bool cLongIs32Bits)
+    internal static SftpQuoteCommands From(ITransferContext context, bool cLongIs32Bits, SshStateTrace? trace = null)
     {
         List<string> before = [];
         List<string> after = [];
@@ -91,7 +113,7 @@ internal sealed class SftpQuoteCommands
             }
         }
 
-        return new SftpQuoteCommands(before, after, context.HeaderOutput, cLongIs32Bits, context.Events);
+        return new SftpQuoteCommands(before, after, context.HeaderOutput, cLongIs32Bits, context.Events) { Trace = trace ?? SshStateTrace.Off };
     }
 
     /// <summary>
@@ -164,7 +186,14 @@ internal sealed class SftpQuoteCommands
     {
         try
         {
+            if (AfterTransfer.Count > 0)
+            {
+                Trace.Write("SFTP DONE done");
+                Trace.Enter("SSH_SFTP_POSTQUOTE_INIT");
+            }
+
             await RunAsync(AfterTransfer, session, homeDirectory, NoPath, cancellationToken).ConfigureAwait(false);
+            Trace.Enter("SSH_SFTP_CLOSE");
             return result;
         }
         catch (SshTransferException failure)
@@ -183,14 +212,26 @@ internal sealed class SftpQuoteCommands
 
         foreach (string value in commands)
         {
+            Trace.Enter("SSH_SFTP_QUOTE");
             SftpQuoteCommand command = SftpQuoteCommand.Parse(value, homeDirectory);
+            if (StateOf(command.Operation) is { } state)
+            {
+                Trace.Enter(state);
+            }
+
             await SshConnectionFailure.ReportAsSshLayerErrorAsync(async () =>
             {
                 await RunAsync(command, session, workingPath, cancellationToken).ConfigureAwait(false);
                 return true;
             }).ConfigureAwait(false);
+            Trace.Enter("SSH_SFTP_NEXT_QUOTE");
         }
     }
+
+    // The state curl's sftp_quote enters for the command, measured (BL-1204); pwd writes its
+    // line from SSH_SFTP_QUOTE itself, and the attribute commands start in SSH_SFTP_QUOTE_STAT.
+    private static string? StateOf(SftpQuoteOperation operation) =>
+        QuoteStates.TryGetValue(operation, out string? state) ? state : "SSH_SFTP_QUOTE_STAT";
 
     private ValueTask RunAsync(SftpQuoteCommand command, SftpSession session, byte[] workingPath, CancellationToken cancellationToken) =>
         command.Operation switch
@@ -259,6 +300,7 @@ internal sealed class SftpQuoteCommands
         }
 
         SftpAttributes changed = Change(command, current);
+        Trace.Enter("SSH_SFTP_QUOTE_SETSTAT");
         uint setStatus = await session.SetStatAsync(command.SecondPath, changed, cancellationToken).ConfigureAwait(false);
         Require(command, setStatus, $"Attempt to set SFTP stats for \"{Show(command.SecondPath)}\" failed: ");
     }

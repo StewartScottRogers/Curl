@@ -142,8 +142,8 @@ public sealed class TftpProtocolHandler(
     // Downloads or uploads the URL's file over a datagram channel to the server.
     private async ValueTask<TransferResult> TransferFileAsync(ITransferContext context, int port, long startTimestamp)
     {
-        var fileName = Uri.UnescapeDataString(context.Url.AbsolutePath.TrimStart('/'));
-        if (fileName.Length == 0)
+        var file = TftpRequestFile.FromUrlPath(context.Url.AbsolutePath, context.UseAscii);
+        if (file.EncodedName.Length == 0)
         {
             return TransferResult.Failure(CurlExitCode.TftpIllegal, "Missing filename");
         }
@@ -163,8 +163,8 @@ public sealed class TftpProtocolHandler(
         await using (channel.ConfigureAwait(false))
         {
             result = context.Upload is { } upload
-                ? await new TftpUpload(context, channel, upload, startTimestamp).RunAsync(fileName).ConfigureAwait(false)
-                : await new TftpDownload(context, channel, startTimestamp).RunAsync(fileName).ConfigureAwait(false);
+                ? await new TftpUpload(context, channel, upload, startTimestamp).RunAsync(file).ConfigureAwait(false)
+                : await new TftpDownload(context, channel, startTimestamp).RunAsync(file).ConfigureAwait(false);
         }
 
         events.ShuttingDown(opened.ConnectionNumber);

@@ -30,6 +30,14 @@ public sealed class ClientHelloProfileTests
     }
 
     [TestMethod]
+    public void OnlySchannelsTls12HelloIsInARecordOfItsCeiling()
+    {
+        Assert.IsTrue(ClientHelloProfile.Schannel.Tls12RecordVersionIsTheCeiling);
+        Assert.IsFalse(ClientHelloProfile.OpenSsl.Tls12RecordVersionIsTheCeiling);
+        Assert.IsFalse(ClientHelloProfile.LibreSsl.Tls12RecordVersionIsTheCeiling);
+    }
+
+    [TestMethod]
     public void SchannelProfileRebuildsTheCapturedHello()
     {
         AssertProfileRebuilds(ClientHelloProfile.Schannel, Convert.FromHexString(SchannelCapture));

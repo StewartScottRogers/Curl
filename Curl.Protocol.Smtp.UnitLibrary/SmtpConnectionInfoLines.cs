@@ -21,9 +21,10 @@ internal static class SmtpConnectionInfoLines
     internal const string NoSaslMechanismOverlap = "SASL: no overlap between offered and configured auth mechanisms";
 
     /// <summary>
-    /// The line written before exit 67 when the only mechanisms offered and allowed are ones
-    /// curl 8.21.0's Schannel build does not build in, each then named by
-    /// <see cref="SaslMechanismNotBuiltIn" /> (BL-1061).
+    /// The line written before exit 67 when a user was given and mechanisms were offered and
+    /// allowed but none was chosen, each reason then written by
+    /// <see cref="SaslExternalNotChosenWithPassword" />, <see cref="SaslMechanismNotBuiltIn" />
+    /// or <see cref="SaslMechanismMissingBearerToken" /> (BL-1061, BL-1242).
     /// </summary>
     internal const string NoSaslMechanismSelectable = "SASL: no auth mechanism offered could be selected";
 
@@ -34,6 +35,21 @@ internal static class SmtpConnectionInfoLines
     /// <param name="mechanism">The mechanism, as curl names it.</param>
     /// <returns>The line, such as <c>SASL: SCRAM-SHA-256 not builtin</c>.</returns>
     internal static string SaslMechanismNotBuiltIn(string mechanism) => "SASL: " + mechanism + " not builtin";
+
+    /// <summary>
+    /// The line written after <see cref="NoSaslMechanismSelectable" /> when <c>AUTH=EXTERNAL</c>
+    /// named EXTERNAL, the server offered it, and <c>-u</c> gave a password, which makes curl
+    /// pass it over (BL-1242).
+    /// </summary>
+    internal const string SaslExternalNotChosenWithPassword = "SASL: auth EXTERNAL not chosen with password";
+
+    /// <summary>
+    /// Formats the line naming a mechanism that was offered and allowed but needs
+    /// <c>--oauth2-bearer</c>, after <see cref="NoSaslMechanismSelectable" /> (BL-1242).
+    /// </summary>
+    /// <param name="mechanism">The mechanism, as curl names it.</param>
+    /// <returns>The line, such as <c>SASL: XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER</c>.</returns>
+    internal static string SaslMechanismMissingBearerToken(string mechanism) => "SASL: " + mechanism + " is missing CURLOPT_XOAUTH2_BEARER";
 
     /// <summary>
     /// Formats the line written once the message and its end-of-data mark are sent.

@@ -338,6 +338,16 @@ and standard error, with no warning, for a file that cannot be opened. On Window
 mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). Under `--trace-ids` (or `-vv`) each transfer
 reports through a `TraceIdsTransferEvents` view, so its lines carry `[<xfer>-<conn>] ` after the
 stamp, `[<xfer>-x] ` for the `--resolve` and `-b` lines before it connects (ADR-0202, BL-648).
+Under `--trace-config read` (or `all`, `-vvv`, `-vvvv`) the runner writes curl's
+`[READ] client_reset, clear readers` as each transfer starts, after the `--resolve` lines, and
+`ClientReaderResetTraceEvents` writes it again before a finished transfer's `left intact` or
+`shutting down connection` line (ADR-0357's BL-1159 amendment) and after each followed redirect's
+`Issue another request to this URL` line; `CurlTransports.TracesRead` has the HTTP handler write an
+HTTP/1.x `-d` or `-T` body's upload reader lines (ADR-0383, BL-1189).
+Under `--trace-config multi` (or `network`, `all`, `-vvvv`) the runner writes curl's `[MULTI] [INIT]`
+lines up to `[SETUP] -> [CONNECT]` before that, and `MultiStateTraceEvents`, inside the `[READ]` and
+`[WRITE]` events, writes each later group of `[MULTI]` lines beside the transfer line curl writes it
+next to (ADR-0382, BL-1188).
 The lines are only as complete as what the
 handler and connector report (BL-242 Notes name the follow-ups).
 

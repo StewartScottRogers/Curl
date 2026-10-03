@@ -22,7 +22,9 @@ namespace Curl.Conformance;
 /// parallel, and <c>%FILE_PWD</c> is empty, so <c>file://localhost%FILE_PWD/%LOGDIR/…</c> still
 /// names the file. As upstream does, standard output and standard error are saved to
 /// <c>%LOGDIR/stdout%TESTNUMBER</c> and <c>%LOGDIR/stderr%TESTNUMBER</c> before the comparison,
-/// for the cases that verify them as files. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
+/// for the cases that verify them as files. <c>%include</c> and <c>%includetext</c> read the file
+/// they name by its path, relative to the working directory when not absolute, as nothing when it
+/// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
 /// <see cref="HttpPort"/>, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
@@ -47,6 +49,9 @@ public sealed class UpstreamCaseRunner(
 
     private static readonly string[] ClientFileParts = ["file", "file1", "file2", "file3", "file4"];
 
+    // What runtests.pl's open reads: nothing when the file is not there.
+    private static readonly Func<string, byte[]?> ReadIncludedFile = path => File.Exists(path) ? File.ReadAllBytes(path) : null;
+
     /// <summary>Runs one case.</summary>
     /// <param name="testNumber">The case's number, from its file name.</param>
     /// <param name="testFile">The case's file, as vendored.</param>
@@ -68,7 +73,7 @@ public sealed class UpstreamCaseRunner(
         }
 
         string logDirectoryVariable = logDirectory.Replace('\\', '/');
-        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile.Span, Variables(testNumber, logDirectoryVariable), platform.Features);
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile.Span, Variables(testNumber, logDirectoryVariable), platform.Features, ReadIncludedFile);
         UpstreamTestCaseParseResult parsed = expansion.Parse();
         if (!parsed.IsParsed)
         {

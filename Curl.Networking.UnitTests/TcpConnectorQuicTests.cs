@@ -95,6 +95,27 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task ConnectMultiplexedAsync_WritingHttp3ConnectionLines_WritesCurlsLinesBetweenTheTlsLinesAndEstablished()
+    {
+        // curl 8.18.0's ngtcp2 build, -v --trace-config http/3 against cloudflare-quic.com (BL-1208 Notes).
+        var clock = new SteppingTimeProvider(100);
+        var opener = new QuicServerChannelOpener { ServerFor = _ => Server(initialMaxStreamsBidi: 100) };
+        var events = new RecordingTransferEvents();
+        var connector = Connector(opener, clock, writesHttp3ConnectionLines: true);
+
+        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        await using var connection = result.Connection!;
+        string[] lines = [.. events.Info.Skip(4)];
+        Assert.HasCount(4, lines, string.Join('\n', events.Info));
+        Assert.StartsWith("[HTTP/3] handshake complete after ", lines[0]);
+        Assert.EndsWith("ms, remote transport[max_udp_payload=65527, initial_max_data=1048576]", lines[0]);
+        CollectionAssert.AreEqual(new[] { "[HTTP/3] max bidi streams now 100, used 0", "[HTTP/3] peer verified", "[HTTP/3] connect -> 0, done=1" }, lines[1..]);
+        Assert.HasCount(1, events.Opened);
+    }
+
+    [TestMethod]
     public async Task ConnectMultiplexedAsync_ToAHostName_SendsItAsTheServerName()
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
@@ -466,7 +487,8 @@ public sealed partial class TcpConnectorQuicTests
         FakeDnsResolver? resolver = null,
         ResolveOverrides? resolveOverrides = null,
         ConnectToMappings? connectToMappings = null,
-        TimeSpan? connectTimeout = null) =>
+        TimeSpan? connectTimeout = null,
+        bool writesHttp3ConnectionLines = false) =>
         new(
             resolver ?? new FakeDnsResolver(IPAddress.Loopback),
             new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
@@ -475,12 +497,13 @@ public sealed partial class TcpConnectorQuicTests
             resolveOverrides: resolveOverrides,
             connectToMappings: connectToMappings,
             connectTimeout: connectTimeout,
-            quicDialer: new QuicDialer(opener, options ?? new TlsClientOptions(Insecure: true), matchesSchannelBuild, clock, SystemTlsRandomSource.Instance));
+            quicDialer: new QuicDialer(opener, options ?? new TlsClientOptions(Insecure: true), matchesSchannelBuild, clock, SystemTlsRandomSource.Instance) { WritesHttp3ConnectionLines = writesHttp3ConnectionLines });
 
-    private QuicTestServer Server(ulong? closeAfterClientHello = null, bool requestClientCertificate = false, ushort cipherSuite = 0x1301)
+    private QuicTestServer Server(ulong? closeAfterClientHello = null, bool requestClientCertificate = false, ushort cipherSuite = 0x1301, ulong initialMaxStreamsBidi = 0)
     {
         var server = new QuicTestServer
         {
+            ConfigureTransportParameters = parameters => parameters with { InitialMaxStreamsBidi = initialMaxStreamsBidi },
             CloseAfterClientHello = closeAfterClientHello,
             RequestClientCertificate = requestClientCertificate,
             CipherSuite = cipherSuite,

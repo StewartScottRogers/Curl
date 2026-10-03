@@ -17,19 +17,27 @@ namespace Curl.Networking;
 /// What <c>--cert-status</c> found in the stapled OCSP response of a completed handshake, or
 /// <see langword="null" /> when it was not given (BL-875).
 /// </param>
+/// <param name="EchRetryConfigs">
+/// The <c>retry_configs</c> a server that completed a TLS 1.3 handshake sent in answer to
+/// GREASE, or <see langword="null" /> when it sent none (BL-1171).
+/// </param>
 internal sealed record HandBuiltHandshake(
     Stream? Stream,
     SslProtocols ProtocolVersion,
     ushort CipherSuite,
     string? ApplicationProtocol,
     TlsHandshakeFailure? Failure,
-    OcspStapleOutcome? CertificateStatus = null)
+    OcspStapleOutcome? CertificateStatus = null,
+    EchConfigList? EchRetryConfigs = null)
 {
+    // TLS 1.3's version code point, which TlsProtocolVersion does not name.
+    private const ushort Tls13WireVersion = 0x0304;
+
     /// <summary>Describes a completed TLS 1.3 handshake.</summary>
     /// <param name="stream">The connected stream.</param>
     /// <returns>The outcome.</returns>
     internal static HandBuiltHandshake Completed(Tls13ClientStream stream) =>
-        new(stream, SslProtocols.Tls13, stream.Handshake.CipherSuite!.Code, stream.Handshake.ApplicationProtocol, null, stream.Handshake.CertificateStatus);
+        new(stream, SslProtocols.Tls13, stream.Handshake.CipherSuite!.Code, stream.Handshake.ApplicationProtocol, null, stream.Handshake.CertificateStatus, stream.Handshake.EncryptedClientHelloRetryConfigs);
 
     /// <summary>Describes a completed TLS 1.2, 1.1 or 1.0 handshake.</summary>
     /// <param name="stream">The connected stream.</param>
@@ -48,6 +56,19 @@ internal sealed record HandBuiltHandshake(
     /// <returns>The outcome.</returns>
     internal static HandBuiltHandshake Failed(TlsHandshakeFailure failure) =>
         new(null, SslProtocols.None, 0, null, failure);
+
+    /// <summary>
+    /// Describes what a handshake had negotiated when its verifier was presented the server's
+    /// chain, for a handshake that then failed (BL-1178).
+    /// </summary>
+    /// <param name="presented">The chain as presented, or <see langword="null" /> when none was.</param>
+    /// <returns>The version, suite and ALPN protocol; <see cref="SslProtocols.None" /> and zero when no chain was presented.</returns>
+    internal static HandBuiltHandshake NegotiatedBy(ServerCertificateChain? presented) => presented switch
+    {
+        null => new(null, SslProtocols.None, 0, null, null),
+        { ProtocolVersion: Tls13WireVersion } => new(null, SslProtocols.Tls13, presented.CipherSuite, presented.ApplicationProtocol, null),
+        _ => new(null, ToSslProtocols((TlsProtocolVersion)presented.ProtocolVersion), presented.CipherSuite, presented.ApplicationProtocol, null),
+    };
 
     /// <summary>Names a TLS 1.2-and-below version as <see cref="SslProtocols" /> does, for the handshake event.</summary>
     /// <param name="version">The version negotiated.</param>

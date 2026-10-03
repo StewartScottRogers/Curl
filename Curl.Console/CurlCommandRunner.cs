@@ -308,7 +308,7 @@ internal sealed class CurlCommandRunner(
     /// <see cref="DataFileReader" /> and the home directory from the runner's environment (BL-505, BL-791).
     /// </summary>
     private TransferCredentialLookup CredentialLookup =>
-        new(DataFileReader, EnvironmentVariables, runsOnWindows);
+        new(DataFileReader, EnvironmentVariables, runsOnWindows, diagnosticLog);
 
     /// <summary>
     /// Gets where an <c>scp</c> or <c>sftp</c> transfer looks for its known-hosts file, from the runner's
@@ -517,14 +517,25 @@ internal sealed class CurlCommandRunner(
     private const string InterfaceSetoptMessage = "setopt 0x274e got bad argument";
 
     /// <summary>
+    /// The result of a transfer whose <c>--ech</c> mode libcurl refuses when curl sets it
+    /// (<c>CURLOPT_ECH</c>, option 10325, 0x2855): exit 43 with curl 8.21.0's message, before any
+    /// connection (measured with curl's ECH build 2026-10-02, BL-1107; ADR-0378). It is compared by
+    /// reference, so that <see cref="TransferAllAsync" /> stops before the remaining URLs, as curl does.
+    /// </summary>
+    private static readonly TransferResult EchSetoptFailure =
+        TransferResult.Failure(CurlExitCode.BadFunctionArgument, EchSetoptMessage);
+
+    private const string EchSetoptMessage = "setopt 0x2855 got bad argument";
+
+    /// <summary>
     /// Standard output, deferring a write failure as curl's stdio buffer does and recording
     /// it for the current transfer: every transfer's without <c>-Z</c>, and a <c>--trace -</c>
     /// dump's; under <c>-Z</c> each transfer has one of its own (task BL-773).
     /// </summary>
     private readonly StandardOutputFailureDeferringStream deferringStandardOutput = new(standardOutput);
 
-    /// <summary>Each transfer's option group and URL, in the order they started, for the <c>--libcurl</c> file.</summary>
-    private readonly List<(CommandLineOptions Options, string Url)> libcurlTransfers = [];
+    /// <summary>Each transfer's option group, URL and file facts, in the order they started, for the <c>--libcurl</c> file.</summary>
+    private readonly List<LibcurlTransfer> libcurlTransfers = [];
 
     /// <summary>
     /// The state of the transfer the current asynchronous flow is running, set as each transfer
@@ -951,7 +962,8 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="givenUrl">The URL as the glob expanded it, before any scheme is guessed.</param>
-    private void RecordLibcurlTransfer(CommandLineOptions options, string givenUrl)
+    /// <param name="uploadFile">The URL's <c>-T</c> file, or <see langword="null" /> when it uploads nothing.</param>
+    private void RecordLibcurlTransfer(CommandLineOptions options, string givenUrl, string? uploadFile)
     {
         if (options.LibcurlFile is null)
         {
@@ -960,7 +972,26 @@ internal sealed class CurlCommandRunner(
 
         lock (libcurlTransfers)
         {
-            libcurlTransfers.Add((options, givenUrl));
+            Running.LibcurlTransferIndex = libcurlTransfers.Count;
+            libcurlTransfers.Add(new LibcurlTransfer(options, givenUrl) { UploadFile = uploadFile });
+        }
+    }
+
+    /// <summary>
+    /// Notes what the transfer learnt about its files in its <c>--libcurl</c> entry; nothing without
+    /// <c>--libcurl</c>.
+    /// </summary>
+    /// <param name="change">Makes the entry with the new facts from the old one.</param>
+    private void UpdateLibcurlTransfer(Func<LibcurlTransfer, LibcurlTransfer> change)
+    {
+        if (Running.LibcurlTransferIndex is not { } index)
+        {
+            return;
+        }
+
+        lock (libcurlTransfers)
+        {
+            libcurlTransfers[index] = change(libcurlTransfers[index]);
         }
     }
 
@@ -1949,10 +1980,9 @@ internal sealed class CurlCommandRunner(
             return (await ReportIpfsGatewayFailureAsync(options, transfer, ipfsFailure).ConfigureAwait(false), givenUrl, string.Empty);
         }
 
-        RecordLibcurlTransfer(options, givenUrl);
         string? uploadFile = transfer.UploadFile;
-        string transferUrl = UrlSchemeGuesser.AddScheme(givenUrl, options.DefaultProtocol);
-        if (uploadFile is not null && !UploadTransferUrl.TryResolve(transferUrl, uploadFile, out transferUrl))
+        RecordLibcurlTransfer(options, givenUrl, uploadFile);
+        if (!TryResolveTransferUrl(options, givenUrl, uploadFile, out string transferUrl))
         {
             return (UploadUrlMalformedFailure, givenUrl, transferUrl);
         }
@@ -1963,12 +1993,13 @@ internal sealed class CurlCommandRunner(
         }
 
         ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(options, transfer);
-        if (RefuseMalformedInterface(options, eventsBeforeConnecting) is { } setoptFailure)
+        if (RefuseMalformedSetopt(options, eventsBeforeConnecting) is { } setoptFailure)
         {
             return (setoptFailure, givenUrl, transferUrl);
         }
 
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
+        TraceTransferStart(options, eventsBeforeConnecting);
         await LoadCookieFilesAsync(dispatch, options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
         await OpenAltSvcCacheAsync(options, transferUrl).ConfigureAwait(false);
         transferUrl = await SwitchToHttpsForHstsAsync(options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
@@ -1976,6 +2007,31 @@ internal sealed class CurlCommandRunner(
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
     }
+
+    /// <summary>
+    /// Gives a URL typed without a scheme the <c>--proto-default</c> scheme or the one
+    /// <see cref="UrlSchemeGuesser" /> guesses and, for a <c>-T</c> upload, resolves it with
+    /// <see cref="UploadTransferUrl" />.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="givenUrl">The URL as the glob expanded it, after any IPFS rewrite.</param>
+    /// <param name="uploadFile">The transfer's <c>-T</c> file, or <see langword="null" /> when it uploads nothing.</param>
+    /// <param name="transferUrl">The URL to transfer; for a <c>-T</c> URL that cannot be parsed, the empty string.</param>
+    /// <returns><see langword="false" /> when a <c>-T</c> URL cannot be parsed.</returns>
+    private static bool TryResolveTransferUrl(CommandLineOptions options, string givenUrl, string? uploadFile, out string transferUrl)
+    {
+        transferUrl = UrlSchemeGuesser.AddScheme(givenUrl, options.DefaultProtocol);
+        return uploadFile is null || UploadTransferUrl.TryResolve(transferUrl, uploadFile, out transferUrl);
+    }
+
+    /// <summary>
+    /// Refuses an <c>--interface</c> and then an <c>--ech</c> value curl's setopt refuses, before the transfer connects.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="events">The transfer's events before connecting.</param>
+    /// <returns>The first refusal, or <see langword="null" /> when both are accepted.</returns>
+    private static TransferResult? RefuseMalformedSetopt(CommandLineOptions options, ITransferEvents events) =>
+        RefuseMalformedInterface(options, events) ?? RefuseMalformedEchMode(options, events);
 
     /// <summary>
     /// Sets the transfer up for <c>--etag-compare</c> and <c>--etag-save</c>, in that order, as curl 8.21.0
@@ -1994,7 +2050,9 @@ internal sealed class CurlCommandRunner(
         if (options.EtagCompareFile is { } compareFile)
         {
             string header = await ReadIfNoneMatchHeaderAsync(options, compareFile).ConfigureAwait(false);
-            Running.IfNoneMatchHeaders = AddIfNoneMatchHeader(options, header);
+            IReadOnlyList<string> headers = AddIfNoneMatchHeader(options, header);
+            Running.IfNoneMatchHeaders = headers;
+            UpdateLibcurlTransfer(entry => entry with { IfNoneMatchHeaders = headers });
         }
 
         return options.EtagSaveFile is { } saveFile
@@ -2480,6 +2538,7 @@ internal sealed class CurlCommandRunner(
             RetryCount = Running.RetryCount,
             SslVerifyResult = Running.SslVerifyResult,
             ProxySslVerifyResult = Running.ProxySslVerifyResult,
+            TlsEarlyDataSent = Running.TlsEarlyDataSent,
         };
     }
 
@@ -2648,9 +2707,14 @@ internal sealed class CurlCommandRunner(
     /// connects, whose lines carry <c>[&lt;xfer&gt;-x] </c>, as curl 8.21.0 marked
     /// <c>Added a.test:1:127.0.0.1 to DNS cache</c> <c>[0-x]</c> and the lines after it <c>[0-0]</c>
     /// (measured 2026-09-29, BL-648 Notes). With <c>-w</c> the events also record the certificate
-    /// verify codes <c>%{ssl_verify_result}</c> and <c>%{proxy_ssl_verify_result}</c> print
-    /// (<see cref="VerifyResultRecordingTransferEvents" />, BL-661); nothing else reads them.
+    /// verify codes <c>%{ssl_verify_result}</c> and <c>%{proxy_ssl_verify_result}</c> print and the
+    /// early data bytes <c>%{tls_earlydata}</c> prints (<see cref="TlsResultRecordingTransferEvents" />,
+    /// BL-661, BL-1150); nothing else reads them.
     /// Where <c>-w</c> or <c>--trace-ids</c> prints it, a transfer that reuses a connection takes that connection's <c>%{conn_id}</c> (<see cref="ConnectionIdRecordingTransferEvents" />, BL-1052).
+    /// Under <c>--trace-config dns</c> a failed resolve's <c>[DNS] [1] destroy async</c> follows its
+    /// <c>closing connection #N</c> (<see cref="AsyncResolveTeardownTraceEvents" />, BL-1157).
+    /// Under <c>--trace-config read</c> a finished transfer's <c>[READ] client_reset, clear readers</c>
+    /// comes before its connection's last line (<see cref="ClientReaderResetTraceEvents" />, BL-1159).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
@@ -2659,12 +2723,59 @@ internal sealed class CurlCommandRunner(
     {
         RunningTransferState state = Running;
         Func<long> takeConnectionId = () => state.ConnectionId ??= nextConnectionId++;
-        ITransferEvents events = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
-        ITransferEvents recorded = options.WriteOut is null ? events : new VerifyResultRecordingTransferEvents(events, state);
+        ITransferEvents output = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
+        ITransferEvents events = WithTraceLineEvents(options, output, takeConnectionId);
+        ITransferEvents recorded = options.WriteOut is null ? events : new TlsResultRecordingTransferEvents(events, state);
         state.Events = options.WriteOut is null && !options.TraceIds
             ? recorded
             : new ConnectionIdRecordingTransferEvents(recorded, state, connectionIdsByPoolNumber, takeConnectionId);
         return transferEventOutput.EventsFor(transfer.TransferId, () => null);
+    }
+
+    /// <summary>
+    /// Wraps <paramref name="output" /> in the events that add the trace lines the transfer writes
+    /// after its connect has returned: <see cref="AsyncResolveTeardownTraceEvents" /> under
+    /// <see cref="CurlComposition.TracesDns" />, <see cref="MultiStateTraceEvents" /> under
+    /// <see cref="CurlComposition.TracesMulti" />, <see cref="ClientReaderResetTraceEvents" /> under
+    /// <see cref="CurlComposition.TracesRead" /> and, outermost so its <c>[WRITE] [OUT] done</c> comes before
+    /// the <c>[READ]</c> line, <see cref="ClientWriterTraceEvents" /> under <see cref="CurlComposition.TracesWrite" />.
+    /// The <c>[MULTI]</c> lines sit inside the other two, which is what lets them find their place among those lines.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="output">The transfer's own events.</param>
+    /// <param name="takeConnectionId">Gives the number of the connection the transfer opens.</param>
+    /// <returns>The events the transfer reports to.</returns>
+    private ITransferEvents WithTraceLineEvents(CommandLineOptions options, ITransferEvents output, Func<long> takeConnectionId)
+    {
+        ITransferEvents teardown = CurlComposition.TracesDns(options) ? new AsyncResolveTeardownTraceEvents(output) : output;
+        ITransferEvents multi = CurlComposition.TracesMulti(options) ? new MultiStateTraceEvents(teardown, timeProvider, takeConnectionId) : teardown;
+        ITransferEvents readers = CurlComposition.TracesRead(options) ? new ClientReaderResetTraceEvents(multi) : multi;
+        return CurlComposition.TracesWrite(options) ? new ClientWriterTraceEvents(readers) : readers;
+    }
+
+    /// <summary>
+    /// Writes the trace lines curl 8.21.0 writes as the transfer starts, after the <c>--resolve</c> entries'
+    /// lines and before anything it resolves or dials, with <c>[&lt;xfer&gt;-x]</c> under <c>--trace-ids</c>:
+    /// under <c>--trace-config multi</c> (or <c>network</c>, <c>all</c>, <c>-vvvv</c>)
+    /// <see cref="MultiStateTraceEvents.StartLines" /> (BL-1188 Notes), then under <c>--trace-config read</c>
+    /// (or <c>-vvv</c>, <c>all</c>) <see cref="ClientReaderResetTraceEvents.ResetLine" /> (BL-1159 Notes).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="eventsBeforeConnecting">The transfer's events before it has a connection.</param>
+    private static void TraceTransferStart(CommandLineOptions options, ITransferEvents eventsBeforeConnecting)
+    {
+        if (CurlComposition.TracesMulti(options))
+        {
+            foreach (string line in MultiStateTraceEvents.StartLines)
+            {
+                eventsBeforeConnecting.ReportInfo(line);
+            }
+        }
+
+        if (CurlComposition.TracesRead(options))
+        {
+            eventsBeforeConnecting.ReportInfo(ClientReaderResetTraceEvents.ResetLine);
+        }
     }
 
     /// <summary>
@@ -2685,6 +2796,27 @@ internal sealed class CurlCommandRunner(
 
         events.ReportInfo(InterfaceSetoptMessage);
         return InterfaceSetoptFailure;
+    }
+
+    /// <summary>
+    /// Refuses an <c>--ech</c> mode libcurl refuses when curl sets it
+    /// (<see cref="CommandLineOptions.EchModeIsMalformed" />): curl 8.21.0's ECH build reports
+    /// <c>setopt 0x2855 got bad argument</c> and fails the transfer with exit 43 (BL-1107), as it
+    /// fails a malformed <c>--interface</c>, so the <c>-v</c> line and the <c>-w</c> output follow that
+    /// measurement (ADR-0378).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="events">Where the <c>-v</c> line goes.</param>
+    /// <returns><see cref="EchSetoptFailure" />, or <see langword="null" /> when the mode was accepted.</returns>
+    private static TransferResult? RefuseMalformedEchMode(CommandLineOptions options, ITransferEvents events)
+    {
+        if (!options.EchModeIsMalformed)
+        {
+            return null;
+        }
+
+        events.ReportInfo(EchSetoptMessage);
+        return EchSetoptFailure;
     }
 
     /// <summary>
@@ -2743,7 +2875,8 @@ internal sealed class CurlCommandRunner(
     /// The results, compared by reference, after which no further URL is transferred whatever
     /// the options: a resumed <c>-o</c> file, a <c>-T</c> or <c>-D</c> file that cannot be opened,
     /// a <c>--create-dirs</c> directory that cannot be created, an IPFS URL that cannot be
-    /// rewritten or asked for its remote name, and an SSH transfer with no known-hosts file.
+    /// rewritten or asked for its remote name, an SSH transfer with no known-hosts file, and an
+    /// <c>--interface</c> value or <c>--ech</c> mode libcurl refuses when curl sets it.
     /// </summary>
     private static readonly HashSet<TransferResult> RunEndingFailures = new(ReferenceEqualityComparer.Instance)
     {
@@ -2757,6 +2890,7 @@ internal sealed class CurlCommandRunner(
         IpfsRemoteNameFailure,
         KnownHostsFileMissingFailure,
         InterfaceSetoptFailure,
+        EchSetoptFailure,
     };
 
     /// <summary>
@@ -3039,6 +3173,7 @@ internal sealed class CurlCommandRunner(
             return CannotOpenUploadFileResult();
         }
 
+        UpdateLibcurlTransfer(entry => entry with { UploadFileSize = opened.Length });
         await using (upload.ConfigureAwait(false))
         {
             return await TransferUploadingAsync(dispatch, options, url, upload, transfer, headerOutput)
@@ -3206,6 +3341,7 @@ internal sealed class CurlCommandRunner(
         }
 
         string? knownHosts = options.Insecure ? null : options.SshKnownHostsFile ?? KnownHostsSearch.Find(DataFileReader);
+        UpdateLibcurlTransfer(entry => entry with { SshKnownHostsFile = knownHosts, SshKnownHostsFileMissing = knownHosts is null && !options.Insecure });
         if (knownHosts is null && !options.Insecure
             && await ReportKnownHostsFileMissingAsync(options).ConfigureAwait(false) is { } failure)
         {
@@ -3737,6 +3873,7 @@ internal sealed class CurlCommandRunner(
         }
 
         await content.DisposeAsync().ConfigureAwait(false);
+        UpdateLibcurlTransfer(entry => entry with { OutputFileSize = existing.Length });
 
         return existing.Length;
     }

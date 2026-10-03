@@ -185,9 +185,10 @@ public sealed class Tls13ClientHandshake : IDisposable
     public bool EncryptedClientHelloAccepted => ech?.Accepted == true;
 
     /// <summary>
-    /// Gets the <c>retry_configs</c> a server that rejected Encrypted Client Hello sent in its
+    /// Gets the <c>retry_configs</c> a server that rejected Encrypted Client Hello, or answered GREASE, sent in its
     /// EncryptedExtensions, for a retry on a new connection (RFC 9849 section 6.1.6), or
-    /// <see langword="null" /> when it sent none. Those sent in answer to GREASE are checked and dropped.
+    /// <see langword="null" /> when it sent none. Those sent in answer to GREASE are kept too,
+    /// since curl traces them (BL-1171).
     /// </summary>
     public EchConfigList? EncryptedClientHelloRetryConfigs { get; private set; }
 
@@ -653,7 +654,7 @@ public sealed class Tls13ClientHandshake : IDisposable
     /// <summary>
     /// RFC 9849 sections 6.1.4 and 6.2.1: a server that accepted ECH sends no
     /// <c>encrypted_client_hello</c> here (<c>unsupported_extension</c>); one that rejected it,
-    /// or answered GREASE, may send <c>retry_configs</c>, which must decode. Only a rejection's are kept.
+    /// or answered GREASE, may send <c>retry_configs</c>, which must decode, and both are kept.
     /// </summary>
     private TlsAlertDescription? ReadEchRetryConfigs(byte[]? data)
     {
@@ -673,7 +674,7 @@ public sealed class Tls13ClientHandshake : IDisposable
             return configs.Alert;
         }
 
-        EncryptedClientHelloRetryConfigs = ech is null ? null : configs.Value;
+        EncryptedClientHelloRetryConfigs = configs.Value;
         return null;
     }
 
@@ -842,7 +843,12 @@ public sealed class Tls13ClientHandshake : IDisposable
     {
         // RFC 9849 section 6.1.6: after a rejection the server is authenticated as the public name.
         string? name = ech is { Rejected: true } ? ech.Config.PublicName : settings.ServerName;
-        ServerCertificateVerdict verdict = verifier.Verify(new ServerCertificateChain(ServerCertificates, name, ocspResponse));
+        ServerCertificateVerdict verdict = verifier.Verify(new ServerCertificateChain(ServerCertificates, name, ocspResponse)
+        {
+            ProtocolVersion = Tls13ClientHelloBuilder.Tls13Version,
+            CipherSuite = CipherSuite!.Code,
+            ApplicationProtocol = ApplicationProtocol,
+        });
         if (!verdict.IsAccepted)
         {
             certificateRejection = verdict.Rejection;
@@ -1159,6 +1165,6 @@ public sealed class Tls13ClientHandshake : IDisposable
     private void Fail(TlsAlertDescription alert)
     {
         state = State.Failed;
-        Failure = new TlsHandshakeFailure(alert, certificateRejection) { CertificateStatusRejection = certificateStatusRejection };
+        Failure = new TlsHandshakeFailure(alert, certificateRejection) { CertificateStatusRejection = certificateStatusRejection, EchRetryConfigs = EncryptedClientHelloRetryConfigs };
     }
 }

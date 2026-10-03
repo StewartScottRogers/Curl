@@ -227,6 +227,12 @@ public sealed class FtpProtocolHandler : IProtocolHandler
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => schemes;
 
+    /// <summary>
+    /// Gets a value indicating whether each transfer writes curl 8.21.0's <c>--trace-config ftp</c>
+    /// lines, <c>[FTP] ...</c>, from the FTP state machine through the transfer's events (BL-1162).
+    /// </summary>
+    public bool TracesStateMachine { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context" /> is <see langword="null" />.
@@ -242,6 +248,8 @@ public sealed class FtpProtocolHandler : IProtocolHandler
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
         int defaultPort = implicitTls ? DefaultSecurePort : DefaultPort;
+        var trace = new FtpStateTrace(context.Events, TracesStateMachine);
+        trace.SetupConnection();
         var connectEvents = new ConnectionOpenedCapturingTransferEvents(context.Events);
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, implicitTls)
         {
@@ -265,15 +273,15 @@ public sealed class FtpProtocolHandler : IProtocolHandler
         await using (connection.ConfigureAwait(false))
         {
             var name = new FtpControlConnectionName(connected.ConnectionNumber, target.Host, target.Port);
-            return await TransferAsync(connection, name, connectEvents.Opened, context, implicitTls, started).ConfigureAwait(false);
+            return await TransferAsync(connection, name, connectEvents.Opened, context, implicitTls, started, trace).ConfigureAwait(false);
         }
     }
 
-    private async ValueTask<TransferResult> TransferAsync(IConnection control, FtpControlConnectionName name, ConnectionOpenedEvent? controlOpened, ITransferContext context, bool implicitTls, long started)
+    private async ValueTask<TransferResult> TransferAsync(IConnection control, FtpControlConnectionName name, ConnectionOpenedEvent? controlOpened, ITransferContext context, bool implicitTls, long started, FtpStateTrace trace)
     {
         var connections = new FtpSessionConnections(dataConnector, listener, tlsProvider, dnsResolver, interfaceLookup, controlOpened);
         using var connectPhase = new FtpConnectPhaseLimit(context, started);
-        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput), name, context, implicitTls, connectPhase);
+        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput), name, context, implicitTls, connectPhase, trace);
         await using (session.ConfigureAwait(false))
         {
             return await session.RunAsync().ConfigureAwait(false);

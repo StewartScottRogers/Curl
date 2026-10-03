@@ -69,6 +69,12 @@ internal static class Pop3DiagnosticLogLines
     public static void LoggedIn(IDiagnosticLog log, string method) =>
         Write(log, DiagnosticLogLevel.Info, "logged in with ", method);
 
+    /// <summary>Logs that a SASL mechanism was cancelled with <c>*</c>, at <c>warning</c>.</summary>
+    /// <param name="log">The diagnostic log.</param>
+    /// <param name="mechanism">The mechanism cancelled.</param>
+    public static void MechanismCancelled(IDiagnosticLog log, string mechanism) =>
+        Write(log, DiagnosticLogLevel.Warning, "SASL mechanism cancelled, choosing another: ", mechanism);
+
     /// <summary>Logs that none of the offered SASL mechanisms can be used, at <c>warning</c>.</summary>
     /// <param name="log">The diagnostic log.</param>
     /// <param name="offered">The mechanisms the server offered.</param>

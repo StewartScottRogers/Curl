@@ -307,9 +307,9 @@ public sealed class SftpDirectoryListingTests
     }
 
     [TestMethod]
-    public async Task ListAsync_NoBody_StopsBeforeOpeningTheDirectoryAsMeasured()
+    public async Task ListAsync_NoBody_StatsTheDirectoryAndStopsBeforeOpeningItAsMeasured()
     {
-        SftpServerScript script = SftpServerScript.Started().HomeDirectory();
+        SftpServerScript script = SftpServerScript.Started().HomeDirectory().Status(1, SftpStatusCode.Ok);
         ScriptedConnection connection = new(script.Bytes);
         MemoryStream output = new();
 
@@ -318,7 +318,9 @@ public sealed class SftpDirectoryListingTests
 
         Assert.AreEqual(TransferResult.Success(0), result);
         Assert.AreEqual(0, output.Length);
-        Assert.HasCount(2, SftpServerScript.SftpRequests(connection.Written), "INIT and REALPATH only");
+        List<byte[]> requests = [.. SftpServerScript.SftpRequests(connection.Written)];
+        Assert.HasCount(3, requests, "INIT, REALPATH and the STAT for the file time");
+        CollectionAssert.AreEqual(SftpServerScript.StatRequest("/d/", 1), requests[2]);
     }
 
     [TestMethod]

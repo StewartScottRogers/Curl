@@ -299,11 +299,13 @@ public sealed class TftpTransferEventsTests
     [DataRow("blksize\0big\0", "got option=(blksize) value=(big)")]
     [DataRow("blksize\04\0", "got option=(blksize) value=(4)")]
     [DataRow("tsize\0many\0", "got option=(tsize) value=(many)")]
+    [DataRow("blksize\04\0timeout\06\0", "got option=(blksize) value=(4)", DisplayName = "options after a rejected one are not reported")]
     public void OptionsAcknowledged_ValueThatDoesNotParse_ReportsOnlyTheOption(string options, string expected)
     {
         var events = new RecordingTransferEvents();
+        var acknowledgement = TftpOptionAcknowledgement.Parse(Encoding.ASCII.GetBytes(options), 512, isDownload: true);
 
-        new TftpTransferEvents(events).OptionsAcknowledged(Encoding.ASCII.GetBytes(options), isDownload: true, 512);
+        new TftpTransferEvents(events).OptionsAcknowledged(acknowledgement.Options, 512);
 
         Assert.AreEqual(expected, events.Steps.Single());
     }

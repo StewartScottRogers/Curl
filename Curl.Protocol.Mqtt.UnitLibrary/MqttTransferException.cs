@@ -16,4 +16,10 @@ internal sealed class MqttTransferException(CurlExitCode exitCode, string messag
     /// Gets the curl exit code the transfer reports.
     /// </summary>
     internal CurlExitCode ExitCode { get; } = exitCode;
+
+    /// <summary>
+    /// Gets the <c>-v</c> line <c>lib/mqtt.c</c> writes after the message, such as
+    /// <see cref="MqttTransferMessages.ConnectNotSent" />, or <see langword="null" /> for none.
+    /// </summary>
+    internal string? FollowingLine { get; init; }
 }

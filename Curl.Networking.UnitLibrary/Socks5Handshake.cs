@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -43,6 +44,7 @@ internal static class Socks5Handshake
     /// <param name="resolve">Resolves the host for SOCKS5.</param>
     /// <param name="authentication">The methods allowed, and how GSS-API runs.</param>
     /// <param name="events">Receives the <c>-v</c> lines a failed GSS-API negotiation prints.</param>
+    /// <param name="trace">Receives the <c>[SOCKS]</c> lines, or <see langword="null" /> for none.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns><see langword="null" /> when the tunnel is open, else the failure.</returns>
     public static async ValueTask<ConnectResult?> RunAsync(
@@ -53,8 +55,11 @@ internal static class Socks5Handshake
         Func<string, int, CancellationToken, ValueTask<DnsResolution>> resolve,
         Socks5AuthenticationOptions authentication,
         ITransferEvents events,
+        ITransferEvents? trace,
         CancellationToken cancellationToken)
     {
+        // curl 8.21.0 names the destination as given before anything else (BL-1191 Notes).
+        SocksProxyTunnel.Trace(trace, string.Create(CultureInfo.InvariantCulture, $"SOCKS5: connecting to {host}:{port}"));
         var literal = SocksProxyTunnel.ParseAddressLiteral(host);
         var hostName = proxy.Kind == ProxyKind.Socks5Hostname && literal is null ? Encoding.UTF8.GetBytes(host) : null;
         if (hostName?.Length > MaximumHostBytes)
@@ -62,8 +67,9 @@ internal static class Socks5Handshake
             return SocksProxyTunnel.Failed("SOCKS5: the destination hostname is too long to be resolved remotely by the proxy.");
         }
 
-        return await NegotiateAuthenticationAsync(connection, proxy, authentication, events, cancellationToken).ConfigureAwait(false)
-            ?? await RequestConnectAsync(connection, host, port, hostName, literal, resolve, cancellationToken).ConfigureAwait(false);
+        var destination = new Socks5Destination(host, port, hostName, literal, proxy.Kind == ProxyKind.Socks5Hostname);
+        return await NegotiateAuthenticationAsync(connection, proxy, authentication, events, trace, cancellationToken).ConfigureAwait(false)
+            ?? await RequestConnectAsync(connection, destination, resolve, trace, cancellationToken).ConfigureAwait(false);
     }
 
     private static async ValueTask<ConnectResult?> NegotiateAuthenticationAsync(
@@ -71,11 +77,13 @@ internal static class Socks5Handshake
         ProxyEndpoint proxy,
         Socks5AuthenticationOptions authentication,
         ITransferEvents events,
+        ITransferEvents? trace,
         CancellationToken cancellationToken)
     {
         // Without user name and password allowed, curl forgets the credential (measured).
         var credential = authentication.AllowUserNameAndPassword ? proxy.Credential : null;
         await SocksProxyTunnel.SendAsync(connection, Greeting(authentication.AllowGssapi, credential is not null), cancellationToken).ConfigureAwait(false);
+        SocksProxyTunnel.Trace(trace, "adjust pollset in (7)");
 
         return await SocksProxyTunnel.ReadReplyAsync(connection, 2, cancellationToken).ConfigureAwait(false) switch
         {
@@ -152,27 +160,44 @@ internal static class Socks5Handshake
     private static byte[] FormatAuthenticationRequest(byte[] userName, byte[] password) =>
         [1, (byte)userName.Length, .. userName, (byte)password.Length, .. password];
 
-    // hostName is the name SOCKS5h sends, or null to send the host's address.
     private static async ValueTask<ConnectResult?> RequestConnectAsync(
         IConnection connection,
-        string host,
-        int port,
-        byte[]? hostName,
-        IPAddress? literal,
+        Socks5Destination destination,
         Func<string, int, CancellationToken, ValueTask<DnsResolution>> resolve,
+        ITransferEvents? trace,
         CancellationToken cancellationToken)
     {
-        var (address, failure) = hostName is not null
+        var (host, port) = (destination.Host, destination.Port);
+        var (address, failure) = destination.HostName is { } hostName
             ? ([3, (byte)hostName.Length, .. hostName], null)
-            : await ResolveAddressAsync(host, port, literal, resolve, cancellationToken).ConfigureAwait(false);
+            : await ResolveAddressAsync(host, port, destination.Literal, resolve, cancellationToken).ConfigureAwait(false);
         if (failure is not null)
         {
             return failure;
         }
 
+        // SOCKS5h names the host as given, an address literal too; SOCKS5 the address it sends,
+        // an IPv6 one in brackets (measured, BL-1191 Notes).
+        SocksProxyTunnel.Trace(trace, destination.ResolvedRemotely
+            ? string.Create(CultureInfo.InvariantCulture, $"SOCKS5 connect to {host}:{port} (remotely resolved)")
+            : string.Create(CultureInfo.InvariantCulture, $"SOCKS5 connect to {PrintableAddress(address)}:{port} (locally resolved)"));
         byte[] request = [5, 1, 0, .. address, (byte)(port >> 8), (byte)port];
         await SocksProxyTunnel.SendAsync(connection, request, cancellationToken).ConfigureAwait(false);
-        return await ReadConnectReplyAsync(connection, host, cancellationToken).ConfigureAwait(false);
+        SocksProxyTunnel.Trace(trace, "adjust pollset in (15)");
+        var result = await ReadConnectReplyAsync(connection, host, cancellationToken).ConfigureAwait(false);
+        if (result is null)
+        {
+            SocksProxyTunnel.Trace(trace, "SOCKS5 request granted.");
+        }
+
+        return result;
+    }
+
+    // The address field of a request whose address type is IPv4 (1) or IPv6 (4), as curl prints it.
+    private static string PrintableAddress(byte[] address)
+    {
+        var printed = new IPAddress(address.AsSpan(1)).ToString();
+        return address[0] == 4 ? $"[{printed}]" : printed;
     }
 
     private static async ValueTask<(byte[] Address, ConnectResult? Failure)> ResolveAddressAsync(
@@ -194,6 +219,10 @@ internal static class Socks5Handshake
         var addressType = address.AddressFamily == AddressFamily.InterNetworkV6 ? (byte)4 : (byte)1;
         return ([addressType, .. address.GetAddressBytes()], null);
     }
+
+    // The host and port the tunnel reaches; HostName is the name SOCKS5h sends, or null to send
+    // the host's address; ResolvedRemotely is whether the proxy is SOCKS5h.
+    private readonly record struct Socks5Destination(string Host, int Port, byte[]? HostName, IPAddress? Literal, bool ResolvedRemotely);
 
     // The reply is the version, the status, a reserved byte and the bound address, whose
     // length its type gives; all of it is read so the tunnel starts at the next byte.

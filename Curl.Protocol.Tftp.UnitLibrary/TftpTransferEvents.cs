@@ -55,22 +55,26 @@ internal sealed class TftpTransferEvents(ITransferEvents events)
 
     /// <summary>
     /// Reports each option an OACK carried as <c>got option=(name) value=(value)</c>,
-    /// followed for <c>blksize</c> by the size parsed and the size requested, and for a
-    /// download's <c>tsize</c> by the size parsed.
+    /// followed for a <c>blksize</c> granted by the size parsed and the size requested, and
+    /// for a download's <c>tsize</c> taken by the size parsed. An option curl rejected is
+    /// reported with no parsed line, and the options after it not at all, as curl stops there.
     /// </summary>
-    /// <param name="options">The OACK's option bytes, after its opcode.</param>
-    /// <param name="isDownload">Whether the transfer is a download.</param>
+    /// <param name="options">The options read from the OACK (<see cref="TftpOptionAcknowledgement.Options" />).</param>
     /// <param name="requestedBlockSize">The <c>blksize</c> asked for.</param>
-    public void OptionsAcknowledged(ReadOnlySpan<byte> options, bool isDownload, int requestedBlockSize)
+    public void OptionsAcknowledged(IReadOnlyList<TftpAcknowledgedOption> options, int requestedBlockSize)
     {
-        string[] fields = Encoding.UTF8.GetString(options).TrimEnd('\0').Split('\0');
-        for (int index = 0; index + 1 < fields.Length; index += 2)
+        foreach (TftpAcknowledgedOption option in options)
         {
-            string name = fields[index];
-            string value = fields[index + 1];
-            events.ReportInfo($"got option=({name}) value=({value})");
-            ReportParsedBlockSize(name, value, requestedBlockSize);
-            ReportParsedTransferSize(name, value, isDownload);
+            events.ReportInfo($"got option=({option.Name}) value=({option.Value})");
+            if (option.BlockSize is { } blockSize)
+            {
+                events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"blksize parsed from OACK ({blockSize}) requested ({requestedBlockSize})"));
+            }
+
+            if (option.TransferSize is { } transferSize)
+            {
+                events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"tsize parsed from OACK ({transferSize})"));
+            }
         }
     }
 
@@ -104,6 +108,13 @@ internal sealed class TftpTransferEvents(ITransferEvents events)
         }
     }
 
+    /// <summary>
+    /// Reports the message curl 8.21.0 notes when it refuses to send a request, such as
+    /// <c>TFTP filename too long</c>.
+    /// </summary>
+    /// <param name="message">The refusal's message.</param>
+    public void Refused(string message) => events.ReportInfo(message);
+
     /// <summary>Reports a downloaded block's bytes as data received, unless it is empty.</summary>
     /// <param name="payload">The block's bytes.</param>
     public void DataReceived(ReadOnlySpan<byte> payload)
@@ -117,24 +128,4 @@ internal sealed class TftpTransferEvents(ITransferEvents events)
     /// <summary>Reports <c>shutting down connection #N</c>, N the number the channel was opened with (BL-969).</summary>
     /// <param name="connectionNumber">curl's number for the transfer's connection.</param>
     public void ShuttingDown(long connectionNumber) => events.ReportInfo($"shutting down connection #{connectionNumber}");
-
-    private void ReportParsedBlockSize(string name, string value, int requestedBlockSize)
-    {
-        if (string.Equals(name, "blksize", StringComparison.OrdinalIgnoreCase)
-            && int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int blockSize)
-            && blockSize is >= TftpPackets.MinimumBlockSize and <= TftpPackets.MaximumBlockSize)
-        {
-            events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"blksize parsed from OACK ({blockSize}) requested ({requestedBlockSize})"));
-        }
-    }
-
-    private void ReportParsedTransferSize(string name, string value, bool isDownload)
-    {
-        if (isDownload
-            && string.Equals(name, "tsize", StringComparison.OrdinalIgnoreCase)
-            && long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out long transferSize))
-        {
-            events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"tsize parsed from OACK ({transferSize})"));
-        }
-    }
 }

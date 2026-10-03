@@ -82,15 +82,18 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
 
     private int bufferEnd;
 
+    /// <summary>The bytes the reply being read has taken so far, line ends included.</summary>
+    private int replyByteCount;
+
     /// <summary>
     /// Sends <paramref name="command" /> followed by CRLF.
     /// </summary>
     /// <param name="command">The command line without its line end, such as <c>TYPE I</c>.</param>
     /// <returns>
-    /// <see langword="true" /> when it was sent; <see langword="false" /> when the
-    /// connection failed with an <see cref="IOException" />.
+    /// <see langword="null" /> when it was sent; the <see cref="IOException" /> the
+    /// connection failed with otherwise, so a reset can be told from any other failure.
     /// </returns>
-    public async ValueTask<bool> TrySendAsync(string command)
+    public async ValueTask<IOException?> SendAsync(string command)
     {
         byte[] line = Encoding.Latin1.GetBytes(command + "\r\n");
         try
@@ -98,14 +101,14 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
             await connection.WriteAsync(line, CancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(CancellationToken).ConfigureAwait(false);
         }
-        catch (IOException)
+        catch (IOException failure)
         {
-            return false;
+            return failure;
         }
 
         reporting.ReportRequestHeader(line);
         diagnostics.CommandSent(command);
-        return true;
+        return null;
     }
 
     /// <summary>
@@ -127,13 +130,14 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
     public async ValueTask<FtpReply?> ReadReplyAsync()
     {
         string? firstLine = null;
+        replyByteCount = 0;
         while (await ReadLineAsync().ConfigureAwait(false) is { } line)
         {
             firstLine ??= line;
             if (TryParseLastLine(line, out int code))
             {
                 diagnostics.ReplyRead(code, firstLine);
-                return new FtpReply(code, line);
+                return new FtpReply(code, line) { ByteCount = replyByteCount };
             }
         }
 
@@ -168,6 +172,7 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
                     throw new FtpReplyNulByteException();
                 }
 
+                replyByteCount += bytes.Length;
                 reporting.ReportResponseHeader(bytes);
                 await WriteToDumpHeaderOutputAsync(bytes).ConfigureAwait(false);
                 return Encoding.Latin1.GetString(bytes, 0, bytes.Length - 1).TrimEnd('\r');

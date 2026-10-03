@@ -126,9 +126,45 @@ public sealed class SmtpProtocolHandlerAddressEncodingTests
     [TestMethod]
     public void Platform_IsTheHostsArgvEncoding()
     {
-        string expected = SmtpCommandLineText.ForPlatform(OperatingSystem.IsWindows(), CodePagesEncodingProvider.Instance.GetEncoding(0)).ToWire("ö");
+        Encoding? ansi = SmtpCommandLineText.ReadSystemAnsiCodePage(() => CodePagesEncodingProvider.Instance.GetEncoding(0));
+        string expected = SmtpCommandLineText.ForPlatform(OperatingSystem.IsWindows(), ansi).ToWire("ö");
 
         Assert.AreEqual(expected, SmtpCommandLineText.Platform.ToWire("ö"));
+    }
+
+    [TestMethod]
+    public void ReadSystemAnsiCodePage_FirstReadAnswersACodePage_ReadsOnce()
+    {
+        Encoding shiftJis = CodePagesEncodingProvider.Instance.GetEncoding(932)!;
+        int reads = 0;
+
+        Encoding? encoding = SmtpCommandLineText.ReadSystemAnsiCodePage(() => { reads++; return shiftJis; });
+
+        Assert.AreEqual(932, encoding!.CodePage);
+        Assert.AreEqual(1, reads);
+    }
+
+    [TestMethod]
+    public void ReadSystemAnsiCodePage_FirstReadFails_ReadsAgain()
+    {
+        Encoding shiftJis = CodePagesEncodingProvider.Instance.GetEncoding(932)!;
+        int reads = 0;
+
+        Encoding? encoding = SmtpCommandLineText.ReadSystemAnsiCodePage(() => ++reads == 1 ? null : shiftJis);
+
+        Assert.AreEqual(932, encoding!.CodePage);
+        Assert.AreEqual(2, reads);
+    }
+
+    [TestMethod]
+    public void ReadSystemAnsiCodePage_HostHasNone_IsNullAfterTwoReads()
+    {
+        int reads = 0;
+
+        Encoding? encoding = SmtpCommandLineText.ReadSystemAnsiCodePage(() => { reads++; return null; });
+
+        Assert.IsNull(encoding);
+        Assert.AreEqual(2, reads);
     }
 
     [TestMethod]

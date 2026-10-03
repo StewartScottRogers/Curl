@@ -181,15 +181,30 @@ public sealed class RtspProtocolHandlerVerboseTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SendReset_ReportsTheRequestTheMessageAndClosing()
+    public async Task ExecuteAsync_SendReset_ReportsTheRequestTheMessageFailedSendingRtspRequestAndClosing()
     {
         var reset = new IOException("reset", new SocketException((int)SocketError.ConnectionReset));
 
         (TransferResult result, List<string> transcript) = await RunAsync(ConnectResult.Connected(new FailingConnection(writeFailure: reset)));
 
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("Send failure: Connection was reset", result.ErrorMessage);
         CollectionAssert.AreEqual(
-            new[] { "> " + Request, "* Send failure: Connection was reset", "* closing connection #0" },
+            new[] { "> " + Request, "* Send failure: Connection was reset", "* Failed sending RTSP request", "* closing connection #0" },
+            transcript);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SendFailsOtherwise_ReportsTheMessageFailedSendingRtspRequestAndClosing()
+    {
+        var broken = new IOException("broken pipe");
+
+        (TransferResult result, List<string> transcript) = await RunAsync(ConnectResult.Connected(new FailingConnection(writeFailure: broken)));
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("Failed sending data to the peer", result.ErrorMessage);
+        CollectionAssert.AreEqual(
+            new[] { "> " + Request, "* Failed sending data to the peer", "* Failed sending RTSP request", "* closing connection #0" },
             transcript);
     }
 

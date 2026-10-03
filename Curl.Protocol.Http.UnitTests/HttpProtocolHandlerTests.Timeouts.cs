@@ -287,8 +287,9 @@ public sealed partial class HttpProtocolHandlerTests
         IOException failure = reset
             ? new IOException("Reset.", new SocketException((int)SocketError.ConnectionReset))
             : new IOException("Broken.");
+        // The body outgrows the upload buffer the head shares, so it takes a second write (BL-1215).
         FailingSendConnection connection = new(failure, writesBeforeFailure);
-        HttpRequestOptions options = new() { Body = new BytesBody("x=1"u8.ToArray(), "a/b") };
+        HttpRequestOptions options = new() { Body = new BytesBody(new byte[HttpRequestBodyWriter.UploadBufferSize], "a/b") };
 
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(BodyContext("http://127.0.0.1:18174/", options));

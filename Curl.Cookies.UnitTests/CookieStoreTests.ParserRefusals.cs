@@ -80,9 +80,10 @@ public sealed partial class CookieStoreTests
     public void StoreFromResponse_NamePrefixNotSatisfied_ReportsNothing(string header) =>
         AssertReportsNothing(header);
 
+    /// <summary>Measured on curl 8.21.0, 2026-10-02 (BL-1225).</summary>
     [TestMethod]
-    public void StoreFromResponse_NameAndValueTooLong_ReportsNothing() =>
-        AssertReportsNothing($"{new string('a', 4000)}={new string('b', 200)}");
+    public void StoreFromResponse_NameAndValueTooLong_ReportsOversizedCookieDropped() =>
+        AssertReportsOnly(CoUk, $"{new string('a', 4000)}={new string('b', 200)}", "oversized cookie dropped, name/val 4000 + 200 bytes");
 
     [TestMethod]
     public void StoreFromResponse_HeaderTooLong_ReportsNothing() =>

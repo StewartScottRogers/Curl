@@ -106,6 +106,13 @@ internal static class CurlComposition
     /// </param>
     /// <returns>Every registered handler.</returns>
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
+    /// <param name="tracesFtp">Whether the FTP handler writes the <c>--trace-config ftp</c> lines (<see cref="TracesFtp" />, BL-1162).</param>
+    /// <param name="tracesSmtp">Whether the SMTP handler writes the <c>--trace-config smtp</c> lines (<see cref="TracesSmtp" />, BL-1163).</param>
+    /// <param name="tracesWs">Whether the WebSocket handler writes the <c>--trace-config ws</c> lines (<see cref="TracesWs" />, BL-1164).</param>
+    /// <param name="tracesSsh">Whether the SSH handler writes the <c>--trace-config ssh</c> lines (<see cref="TracesSsh" />, BL-1166).</param>
+    /// <param name="tracesHttp2">Whether the HTTP handler writes the <c>--trace-config http/2</c> lines (<see cref="TracesHttp2" />, BL-1167).</param>
+    /// <param name="tracesHttp3">Whether the HTTP handler writes the <c>--trace-config http/3</c> lines (<see cref="TracesHttp3" />, BL-1168).</param>
+    /// <param name="tracesRead">Whether the HTTP handler writes an HTTP/1.x request body's <c>--trace-config read</c> lines (<see cref="TracesRead" />, BL-1189).</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -117,7 +124,14 @@ internal static class CurlComposition
         NegotiateOptions? negotiateOptions = null,
         TimeProvider? signingClock = null,
         IConnector? ftpDataConnector = null,
-        IDiagnosticLog? diagnosticLog = null)
+        IDiagnosticLog? diagnosticLog = null,
+        bool tracesFtp = false,
+        bool tracesSmtp = false,
+        bool tracesWs = false,
+        bool tracesSsh = false,
+        bool tracesHttp2 = false,
+        bool tracesHttp3 = false,
+        bool tracesRead = false)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
@@ -125,8 +139,8 @@ internal static class CurlComposition
         ISecurityContextFactory contexts = securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog);
         RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(contexts, negotiateOptions, diagnosticLog);
         SecurityDelegation saslDelegation = (negotiateOptions ?? NegotiateOptions.Default).Delegation;
-        AwsSigV4Signer signer = new(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
-        HttpProtocolHandler http = new(recordingConnector, new AwsSigV4HttpAuthenticator(httpAuthenticator, signer), cookieStore, proxyAuthSchemes);
+        AwsSigV4Signer signer = new(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), diagnosticLog);
+        HttpProtocolHandler http = new(recordingConnector, new AwsSigV4HttpAuthenticator(httpAuthenticator, signer), cookieStore, proxyAuthSchemes) { TracesHttp2Frames = tracesHttp2, TracesHttp3Streams = tracesHttp3, TracesClientReaders = tracesRead };
 
         IProtocolHandler[] handlers =
         [
@@ -138,20 +152,20 @@ internal static class CurlComposition
             new MqttProtocolHandler(recordingConnector),
             new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
             new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
-            new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
+            new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)) { TracesStateMachine = tracesSmtp },
             new LdapProtocolHandler(recordingConnector, OperatingSystem.IsWindows() ? LdapDialect.WinLdap : LdapDialect.OpenLdap),
-            new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()),
+            new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()) { TracesFrames = tracesWs },
             new RtspProtocolHandler(recordingConnector, httpAuthenticator),
             new SmbProtocolHandler(recordingConnector),
             new SshProtocolHandler(
                 recordingConnector,
                 new PhysicalFileSystem(),
                 OperatingSystem.IsWindows() ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference,
-                CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
+                CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())) { TracesStateMachine = tracesSsh },
             http,
             new RoutingFtpProtocolHandler(
                 http,
-                CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver)),
+                CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver, tracesFtp)),
         ];
 
         return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(handler, recorder))];
@@ -170,9 +184,10 @@ internal static class CurlComposition
     /// <param name="dataConnector">Supplies the passive data connection.</param>
     /// <param name="tlsProvider">Upgrades a connection after an accepted <c>AUTH</c> or <c>PROT P</c>.</param>
     /// <param name="dnsResolver">Resolves a host name given to <c>-P</c>.</param>
+    /// <param name="tracesFtp">Whether it writes the <c>--trace-config ftp</c> lines (<see cref="TracesFtp" />, BL-1162).</param>
     /// <returns>The handler.</returns>
-    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, IConnector dataConnector, ITlsProvider tlsProvider, IDnsResolver dnsResolver) =>
-        new(connector, dataConnector, new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup());
+    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, IConnector dataConnector, ITlsProvider tlsProvider, IDnsResolver dnsResolver, bool tracesFtp = false) =>
+        new(connector, dataConnector, new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup()) { TracesStateMachine = tracesFtp };
 
     /// <summary>
     /// The connector FTP's passive data connections go through: the option group's pooling
@@ -209,7 +224,7 @@ internal static class CurlComposition
         return new RankedHttpAuthenticator(
             new BasicAndBearerAuthenticator(credentialEncoding),
             new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom, diagnosticLog),
-            new NegotiateHttpAuthenticator(securityContexts, negotiateOptions),
+            new NegotiateHttpAuthenticator(securityContexts, negotiateOptions, diagnosticLog: diagnosticLog),
             new NtlmHttpAuthenticator(securityContexts, matchesSspiBuild: OperatingSystem.IsWindows(), diagnosticLog),
             diagnosticLog);
     }
@@ -243,7 +258,7 @@ internal static class CurlComposition
         return new RoutingSecurityContextFactory(
             OperatingSystem.IsWindows(),
             new SystemSecurityContextFactory(),
-            new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), TimeProvider.System, new SystemKerberosRandomSource(), new SystemNtlmRandomSource()),
+            new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), TimeProvider.System, new SystemKerberosRandomSource(), new SystemNtlmRandomSource(), diagnosticLog),
             diagnosticLog);
     }
 
@@ -309,14 +324,17 @@ internal static class CurlComposition
     /// <param name="options">The parsed command line.</param>
     /// <param name="timeProvider">The clock the hand-built resolver and the DoH connections time on.</param>
     /// <param name="tcpDialer">Opens the plaintext TCP connections to the DoH server.</param>
+    /// <param name="dohTrace">
+    /// Receives the DoH resolver's <c>--trace-config doh</c> lines (BL-1102); <see langword="null" />
+    /// for none.
+    /// </param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDnsResolver(CommandLineOptions options, TimeProvider timeProvider, ITcpDialer tcpDialer)
+    internal static IDnsResolver CreateDnsResolver(CommandLineOptions options, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null)
     {
         if (options.DohUrl is { } dohUrl)
         {
-            return CreateDohResolver(dohUrl, CreateDohConnector(options, tcpDialer, timeProvider), AddressFamilyOf(options));
+            return CreateDohResolver(dohUrl, CreateDohConnector(options, tcpDialer, timeProvider), AddressFamilyOf(options), dohTrace);
         }
-
 
         DnsServerResolverOptions resolverOptions = new(
             options.DnsServers,
@@ -340,11 +358,222 @@ internal static class CurlComposition
     /// <param name="addressFamily">
     /// The <c>-4</c> or <c>-6</c> family (<see cref="AddressFamilyOf" />), whose query alone is sent (BL-939).
     /// </param>
+    /// <param name="dohTrace">
+    /// Receives the <c>--trace-config doh</c> lines, with <see cref="CurlEasyErrorText" />'s texts
+    /// (BL-1102), and each DoH sub-transfer's own lines through a <see cref="DohSubTransferEvents" />
+    /// (BL-1180); <see langword="null" /> for none.
+    /// </param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily) =>
+    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily, ITransferEvents? dohTrace = null) =>
         DohUrlOf(dohUrl) is { } url
-            ? new DohDnsResolver(connector, url) { AddressFamily = addressFamily }
+            ? new DohDnsResolver(connector, url, dohTrace ?? NoTransferEvents.Instance, CurlEasyErrorText.Of)
+            {
+                AddressFamily = addressFamily,
+                SubTransferEvents = dohTrace is null ? NoTransferEvents.Instance : new DohSubTransferEvents(dohTrace, PlatformTlsBackend.ForProcess),
+            }
             : new UnusableDohUrlResolver();
+
+    /// <summary>
+    /// Whether <c>--trace-config</c> turned on curl 8.21.0's <c>[DNS]</c> lines: <c>dns</c>, <c>doh</c>,
+    /// <c>network</c> (measured, BL-1103 Notes) and <c>all</c> each turn on the DNS filter's lines and the DoH resolver's alike (measured,
+    /// BL-1102 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesDns(CommandLineOptions options) =>
+        options.TraceComponents.Contains("dns") || options.TraceComponents.Contains("doh") || options.TraceComponents.Contains("network") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[SETUP]</c> lines are written: <c>setup</c> or <c>all</c> is among the
+    /// trace components, which <c>-vv</c> and up put there too (measured, BL-1103 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesSetup(CommandLineOptions options) =>
+        options.TraceComponents.Contains("setup") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[HAPROXY]</c> lines are written: <c>haproxy</c>, <c>proxy</c> or
+    /// <c>all</c> is among the trace components, which <c>-vvvv</c> puts there too; <c>network</c>
+    /// does not turn them on (measured, BL-1160 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesHaproxy(CommandLineOptions options) =>
+        options.TraceComponents.Contains("haproxy") || options.TraceComponents.Contains("proxy") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[SOCKS]</c> lines are written: <c>socks</c>, <c>proxy</c> or a
+    /// <c>--trace-config all</c> is among the trace components; neither <c>network</c> nor the
+    /// <c>all</c> that <c>-vvvv</c> puts there turns them on (measured, BL-1191 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesSocks(CommandLineOptions options) =>
+        options.TraceComponents.Contains("socks")
+        || options.TraceComponents.Contains("proxy")
+        || (options.TraceComponents.Contains("all") && !options.VerbosityTraceComponents.Contains("all"));
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[HTTP-PROXY]</c> lines are written: <c>http-proxy</c>, <c>proxy</c> or
+    /// a <c>--trace-config all</c> is among the trace components; neither <c>network</c> nor the
+    /// <c>all</c> that <c>-vvvv</c> puts there turns them on (measured, BL-1193 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesHttpProxy(CommandLineOptions options) => TracesProxyComponent(options, "http-proxy");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[H1-PROXY]</c> lines are written: <c>h1-proxy</c>, <c>proxy</c> or a
+    /// <c>--trace-config all</c> is among the trace components; neither <c>network</c> nor the
+    /// <c>all</c> that <c>-vvvv</c> puts there turns them on (measured, BL-1193 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesH1Proxy(CommandLineOptions options) => TracesProxyComponent(options, "h1-proxy");
+
+    private static bool TracesProxyComponent(CommandLineOptions options, string component) =>
+        options.TraceComponents.Contains(component)
+        || options.TraceComponents.Contains("proxy")
+        || (options.TraceComponents.Contains("all") && !options.VerbosityTraceComponents.Contains("all"));
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[HAPPY-EYEBALLS]</c> lines are written: <c>happy-eyeballs</c>,
+    /// <c>network</c> or <c>all</c> is among the trace components, which <c>-vvvv</c> puts there too
+    /// (measured, BL-1161 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesHappyEyeballs(CommandLineOptions options) =>
+        options.TraceComponents.Contains("happy-eyeballs") || options.TraceComponents.Contains("network") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[TCP]</c> lines are written: <c>tcp</c>, <c>network</c> or <c>all</c> is
+    /// among the trace components, which <c>-vvvv</c> puts there too (measured, BL-1161 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesTcp(CommandLineOptions options) =>
+        options.TraceComponents.Contains("tcp") || options.TraceComponents.Contains("network") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[TIMER]</c> lines are written: <c>timer</c>, <c>network</c> or <c>all</c>
+    /// is among the trace components, which <c>-vvvv</c> puts there too (measured, BL-1186 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesTimer(CommandLineOptions options) =>
+        options.TraceComponents.Contains("timer") || options.TraceComponents.Contains("network") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[HTTPS-CONNECT]</c> lines are written: <c>https-connect</c> or <c>all</c>
+    /// is among the trace components, which <c>-vvvv</c> puts there too; neither <c>network</c> nor
+    /// <c>proxy</c> turns them on (measured, BL-1192 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesHttpsConnect(CommandLineOptions options) =>
+        options.TraceComponents.Contains("https-connect") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// The HTTP version curl 8.21.0's <c>[HTTPS-CONNECT]</c> filter names for its first attempt:
+    /// <c>h1</c> under <c>--http1.0</c> and <c>--http1.1</c>, <c>h3</c> under <c>--http3</c> and
+    /// <c>--http3-only</c>, else <c>h2</c> (measured for none and <c>--http1.1</c>, BL-1192 Notes).
+    /// </summary>
+    /// <param name="version">The HTTP version option given, if any.</param>
+    /// <returns>The version's name.</returns>
+    internal static string HttpsConnectFirstAttemptVersionOf(RequestedHttpVersion? version) =>
+        version switch
+        {
+            RequestedHttpVersion.Http10 or RequestedHttpVersion.Http11 => "h1",
+            RequestedHttpVersion.Http3 or RequestedHttpVersion.Http3Only => "h3",
+            _ => "h2",
+        };
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[READ]</c> lines are written: <c>read</c> or <c>all</c> is among the
+    /// trace components, which <c>-vvv</c> and up put there too; <c>network</c> does not turn them on
+    /// (measured, BL-1103 and BL-1159 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesRead(CommandLineOptions options) =>
+        options.TraceComponents.Contains("read") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[MULTI]</c> transfer engine lines are written: <c>multi</c>, <c>network</c>
+    /// or <c>all</c> is among the trace components, which <c>-vvvv</c> puts there too (measured, BL-1103
+    /// and BL-1188 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesMulti(CommandLineOptions options) =>
+        options.TraceComponents.Contains("multi") || options.TraceComponents.Contains("network") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[WRITE]</c> client writer lines are written: <c>write</c> or <c>all</c> is
+    /// among the trace components, which <c>-vvv</c> and up put there too; <c>network</c> does not turn them
+    /// on (measured, BL-1103 and BL-1187 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesWrite(CommandLineOptions options) =>
+        options.TraceComponents.Contains("write") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[FTP]</c> lines are written: <c>ftp</c>, <c>protocol</c> or
+    /// <c>all</c> is among the trace components, which <c>-vv</c> and up put there too (measured,
+    /// BL-1162 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesFtp(CommandLineOptions options) =>
+        options.TraceComponents.Contains("ftp") || options.TraceComponents.Contains("protocol") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[SMTP]</c> lines are written: <c>smtp</c>, <c>protocol</c> or
+    /// <c>all</c> is among the trace components, which <c>-vv</c> and up put there too (BL-1163).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesSmtp(CommandLineOptions options) =>
+        options.TraceComponents.Contains("smtp") || options.TraceComponents.Contains("protocol") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[WS]</c> lines are written: <c>ws</c>, <c>protocol</c> or <c>all</c>
+    /// is among the trace components, which <c>-vv</c> and up put there too (BL-1164).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesWs(CommandLineOptions options) =>
+        options.TraceComponents.Contains("ws") || options.TraceComponents.Contains("protocol") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[SSH]</c> lines are written: <c>ssh</c>, <c>protocol</c> or <c>all</c>
+    /// is among the trace components, which <c>-vv</c> and up put there too (BL-1166).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesSsh(CommandLineOptions options) =>
+        options.TraceComponents.Contains("ssh") || options.TraceComponents.Contains("protocol") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[HTTP/2]</c> frame lines are written: <c>http/2</c>, <c>protocol</c> or
+    /// <c>all</c> is among the trace components, which <c>-vv</c> and up put there too (BL-1167).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesHttp2(CommandLineOptions options) =>
+        options.TraceComponents.Contains("http/2") || options.TraceComponents.Contains("protocol") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[HTTP/3]</c> stream lines are written: <c>http/3</c>, <c>protocol</c> or
+    /// <c>all</c> is among the trace components, which <c>-vv</c> and up put there too (BL-1168).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesHttp3(CommandLineOptions options) =>
+        options.TraceComponents.Contains("http/3") || options.TraceComponents.Contains("protocol") || options.TraceComponents.Contains("all");
 
     /// <summary>
     /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
@@ -371,6 +600,8 @@ internal static class CurlComposition
     /// host is), <paramref name="tcpDialer" />, and a TLS provider routed as
     /// <see cref="CreateTlsProvider" /> routes the options <see cref="TlsClientOptionsMapping.DohFromCommandLine" />
     /// maps. No <c>--resolve</c>, <c>--connect-to</c>, proxy or <c>-4</c>/<c>-6</c> applies to it.
+    /// Under <see cref="TracesDns" /> it writes the DNS filter's lines for each DoH sub-transfer too,
+    /// as curl 8.21.0 does (BL-1180).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <param name="tcpDialer">Opens each plaintext connection.</param>
@@ -381,7 +612,10 @@ internal static class CurlComposition
             new SystemDnsResolver(),
             tcpDialer,
             CreateTlsProvider(TlsClientOptionsMapping.DohFromCommandLine(options), timeProvider),
-            timeProvider);
+            timeProvider)
+        {
+            TracesDnsFilter = TracesDns(options),
+        };
 
     /// <summary>
     /// Creates the TLS provider for handshakes run with <paramref name="options" />: the
@@ -432,15 +666,16 @@ internal static class CurlComposition
             FastOpen = options.TcpFastOpen,
             MultipathTcp = options.MultipathTcp,
         });
-        IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer);
+        FlowScopedTransferEvents? resolverEvents = TracesDns(options) ? new() : null;
+        IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer, resolverEvents);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(proxyTlsClientOptions, timeProvider);
         LateBoundSecurityContextFactory proxyContexts = new();
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
-        QuicDialer quicDialer = new(tlsClientOptions, timeProvider);
-        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache);
+        QuicDialer quicDialer = new(tlsClientOptions, timeProvider) { WritesHttp3ConnectionLines = TracesHttp3(options) };
+        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
         UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider, diagnosticLog);
         PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, timeProvider, runConnections);
 
@@ -460,7 +695,14 @@ internal static class CurlComposition
             tcpConnector,
             udpDatagramConnector,
             poolingConnector,
-            diagnosticLog);
+            diagnosticLog,
+            TracesFtp(options),
+            TracesSmtp(options),
+            TracesWs(options),
+            TracesSsh(options),
+            TracesHttp2(options),
+            TracesHttp3(options),
+            TracesRead(options));
     }
 
     /// <summary>
@@ -530,7 +772,13 @@ internal static class CurlComposition
     /// The run's DNS cache, shared by every option group's connector (BL-1053); <see langword="null" /> for
     /// a cache of the connector's own.
     /// </param>
-    /// <returns>The connector.</returns>
+    /// <param name="resolverEvents">
+    /// The events <paramref name="dnsResolver" /> reports its <c>--trace-config doh</c> lines to, which
+    /// the connector points at each resolving transfer's events (BL-1102); <see langword="null" /> for none.
+    /// </param>
+    /// <returns>
+    /// The connector, writing curl's <c>[DNS]</c> filter lines when <see cref="TracesDns" /> says so.
+    /// </returns>
     internal static TcpConnector CreateTcpConnector(
         CommandLineOptions options,
         IDnsResolver dnsResolver,
@@ -541,7 +789,8 @@ internal static class CurlComposition
         ITlsProvider? proxyTlsProvider = null,
         QuicDialer? quicDialer = null,
         ISecurityContextFactory? socks5SecurityContexts = null,
-        DnsCache? runDnsCache = null) =>
+        DnsCache? runDnsCache = null,
+        FlowScopedTransferEvents? resolverEvents = null) =>
         new(
             dnsResolver,
             tcpDialer,
@@ -561,7 +810,23 @@ internal static class CurlComposition
             preProxy: PreProxyOf(options),
             socks5Authentication: Socks5AuthenticationMapping.FromCommandLine(options, socks5SecurityContexts, OperatingSystem.IsWindows()),
             haproxyProtocol: HaproxyProtocolOf(options),
-            dnsCache: runDnsCache);
+            dnsCache: runDnsCache)
+        {
+            TracesDnsFilter = TracesDns(options),
+            TracesSetupFilter = TracesSetup(options),
+            TracesHaproxyFilter = TracesHaproxy(options),
+            TracesSocksFilter = TracesSocks(options),
+            TracesHttpProxyFilter = TracesHttpProxy(options),
+            TracesH1ProxyFilter = TracesH1Proxy(options),
+            TracesHappyEyeballsFilter = TracesHappyEyeballs(options),
+            TracesTcpFilter = TracesTcp(options),
+            TracesTimers = TracesTimer(options),
+            TracesTimerExpiry = TracesMulti(options),
+            TracedConnectTimeout = options.ConnectTimeout > TimeSpan.Zero ? options.ConnectTimeout : null,
+            TracesHttpsConnectFilter = TracesHttpsConnect(options),
+            HttpsConnectFirstAttemptVersion = HttpsConnectFirstAttemptVersionOf(options.HttpVersion),
+            ResolverEvents = resolverEvents,
+        };
 
     /// <summary>
     /// The SOCKS proxy the connector reaches an HTTP or HTTPS proxy through: the <c>--preproxy</c>
@@ -909,7 +1174,7 @@ internal static class CurlComposition
     /// <param name="transports">The run's connectors.</param>
     /// <returns>The dispatcher.</returns>
     internal static ProtocolDispatcher CreateDispatcher(CurlTransports transports) =>
-        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog));
+        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs, tracesSsh: transports.TracesSsh, tracesHttp2: transports.TracesHttp2, tracesHttp3: transports.TracesHttp3, tracesRead: transports.TracesRead));
 
     /// <summary>
     /// Creates what one run transfers through: the production handler set, every TCP handler
@@ -976,7 +1241,7 @@ internal static class CurlComposition
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog)),
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs, tracesSsh: transports.TracesSsh, tracesHttp2: transports.TracesHttp2, tracesHttp3: transports.TracesHttp3, tracesRead: transports.TracesRead)),
             WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild),
             cookies,
             new ProxySelector(Environment.GetEnvironmentVariable),

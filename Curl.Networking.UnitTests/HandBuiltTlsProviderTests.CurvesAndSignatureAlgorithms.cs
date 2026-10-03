@@ -15,6 +15,8 @@ namespace Curl.Networking;
 /// </summary>
 public sealed partial class HandBuiltTlsProviderTests
 {
+    private const string LongHostName = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example";
+
     private static readonly byte[] HandshakeFailureAlert = [0x15, 0x03, 0x03, 0x00, 0x02, 0x02, 0x28];
 
     // What Ubuntu's curl 8.18.0 with OpenSSL 3.5.5 wrote for --curves '*brainpoolP256r1',
@@ -113,6 +115,29 @@ public sealed partial class HandBuiltTlsProviderTests
         CollectionAssert.AreEqual(new ushort[] { 0x001d }, SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray());
         CollectionAssert.AreEqual(new ushort[] { 0x0403 }, SignatureAlgorithmsExtension.Decode(ExtensionData(hello, TlsExtensionType.SignatureAlgorithms)).Value.ToArray());
         Assert.IsFalse(hello.Extensions.Any(extension => extension.Type == TlsExtensionType.KeyShare));
+    }
+
+    // The OpenSSL build's TLS 1.2-ceiling hello under --curves X25519, as measured (BL-1156,
+    // Ubuntu curl 8.18.0, OpenSSL 3.5.5): a short hello is not padded; one of 256 to 511 bytes,
+    // here for a 75-character host name, ends in padding that brings it to 512.
+    [TestMethod]
+    [DataRow(ProfileHost, new ushort[] { 0xff01, 0x0000, 0x000b, 0x000a, 0x0010, 0x0016, 0x0017, 0x000d })]
+    [DataRow(LongHostName, new ushort[] { 0xff01, 0x0000, 0x000b, 0x000a, 0x0010, 0x0016, 0x0017, 0x000d, 0x0015 })]
+    public async Task AuthenticateAsClientAsync_WithCurvesUnderATls12CeilingInTheOpenSslBuild_SendsTheMeasuredExtensions(string host, ushort[] extensionTypes)
+    {
+        var hello = DecodeClientHello(await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Curves: "X25519")), OpenSslBuild, host, Http11));
+
+        CollectionAssert.AreEqual(extensionTypes, ExtensionTypes(hello).Select(type => (ushort)type).ToArray());
+        Assert.AreEqual(extensionTypes[^1] == (ushort)TlsExtensionType.Padding, hello.Encode().Length == 512);
+    }
+
+    // The TLS 1.2 half of a TLS 1.3 hello is never padded on its own: the TLS 1.3 order places padding.
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCurvesAndALongHostInTheOpenSslBuild_SendsOnePadding()
+    {
+        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Curves: "X25519"), OpenSslBuild, LongHostName, Http11));
+
+        Assert.AreEqual(1, hello.Extensions.Count(extension => extension.Type == TlsExtensionType.Padding));
     }
 
     // The failures come before a ClientHello is sent, in the OpenSSL build's order (measured;

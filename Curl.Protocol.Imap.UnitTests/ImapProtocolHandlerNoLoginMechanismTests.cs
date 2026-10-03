@@ -63,6 +63,35 @@ public sealed class ImapProtocolHandlerNoLoginMechanismTests
             events.Transcript.TakeLast(notBuiltIn.Length + 3).ToArray());
     }
 
+    /// <summary>
+    /// Pins the lines curl 8.21.0's <c>Curl_sasl_is_blocked</c> writes after <c>no auth mechanism
+    /// offered could be selected</c> (BL-1219). The first four rows were measured on 2026-10-02
+    /// (BL-1219 Notes); the rest follow <c>sasl_unchosen</c> in <c>lib/curl_sasl.c</c> for
+    /// states the injected authenticator reaches.
+    /// </summary>
+    [TestMethod]
+    [DataRow("IMAP4rev1 AUTH=XOAUTH2 LOGINDISABLED", "user", null, null, "XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER", DisplayName = "-u against XOAUTH2")]
+    [DataRow("IMAP4rev1 AUTH=EXTERNAL LOGINDISABLED", "user", null, "AUTH=EXTERNAL", "auth EXTERNAL not chosen with password", DisplayName = "AUTH=EXTERNAL with a password")]
+    [DataRow("IMAP4rev1 AUTH=OAUTHBEARER AUTH=SCRAM-SHA-1 LOGINDISABLED", "user", null, null, "SCRAM-SHA-1 not builtin|OAUTHBEARER is missing CURLOPT_XOAUTH2_BEARER", DisplayName = "-u against OAUTHBEARER and SCRAM-SHA-1")]
+    [DataRow("IMAP4rev1 AUTH=GSSAPI LOGINDISABLED", "user", null, null, "", DisplayName = "-u against GSSAPI")]
+    [DataRow("IMAP4rev1 AUTH=GSSAPI", null, "tok", "AUTH=GSSAPI", "GSSAPI is missing username", DisplayName = "--oauth2-bearer, AUTH=GSSAPI")]
+    [DataRow("IMAP4rev1 AUTH=OAUTHBEARER", null, "tok", null, "OAUTHBEARER is missing username", DisplayName = "--oauth2-bearer against OAUTHBEARER")]
+    [DataRow("IMAP4rev1 AUTH=xoauth2 LOGINDISABLED", ":secret", null, null, "XOAUTH2 is missing CURLOPT_XOAUTH2_BEARER|XOAUTH2 is missing username", DisplayName = "Empty user against XOAUTH2")]
+    [DataRow("IMAP4rev1 AUTH=EXTERNAL AUTH=DIGEST-MD5", "user:", null, "AUTH=EXTERNAL;AUTH=DIGEST-MD5", "DIGEST-MD5 not builtin", DisplayName = "AUTH=EXTERNAL without a password")]
+    [DataRow("IMAP4rev1 AUTH=EXTERNAL", null, "tok", "AUTH=EXTERNAL", "", DisplayName = "--oauth2-bearer, AUTH=EXTERNAL")]
+    public async Task ExecuteAsync_NoMechanismSelectable_WritesWhyEachWasNotChosen(
+        string capabilities, string? user, string? bearerToken, string? loginOptions, string reasons)
+    {
+        (ImapRun run, RecordingTransferEvents events) = await RunAsync(capabilities, user, bearerToken, loginOptions);
+
+        string[] reasonLines = [.. reasons.Split('|', StringSplitOptions.RemoveEmptyEntries).Select(reason => "* SASL: " + reason)];
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
+        Assert.AreEqual("A001 CAPABILITY\r\n", run.Sent);
+        CollectionAssert.AreEqual(
+            (string[])["< A001 OK done\r\n", "* SASL: no auth mechanism offered could be selected", .. reasonLines, Closing],
+            events.Transcript.TakeLast(reasonLines.Length + 3).ToArray());
+    }
+
     [TestMethod]
     [DataRow("IMAP4rev1 AUTH=FOO", DisplayName = "AUTH=FOO")]
     [DataRow("IMAP4rev1 AUTH=SCRAM-SHA-256", DisplayName = "AUTH=SCRAM-SHA-256")]
@@ -93,14 +122,19 @@ public sealed class ImapProtocolHandlerNoLoginMechanismTests
 
     private static string Caps(string words) => "* CAPABILITY " + words + "\r\nA001 OK done\r\n";
 
+    /// <summary>
+    /// A transfer context; <paramref name="user" /> is <c>name</c>, given password <c>secret</c>,
+    /// or <c>name:password</c> as <c>-u</c> takes it.
+    /// </summary>
     private static TransferContext Context(string? user, string? bearerToken, string? loginOptions, out RecordingTransferEvents events)
     {
         events = new RecordingTransferEvents();
+        string[]? userAndPassword = user?.Split(':', 2);
         return new TransferContext
         {
             Url = CurlUrl.Parse(Url),
             Output = Stream.Null,
-            Credentials = user is null ? null : new NetworkCredential(user, "secret"),
+            Credentials = userAndPassword is null ? null : new NetworkCredential(userAndPassword[0], userAndPassword is [_, string password] ? password : "secret"),
             Mail = new MailRequestOptions { BearerToken = bearerToken, LoginOptions = loginOptions },
             Events = events,
         };

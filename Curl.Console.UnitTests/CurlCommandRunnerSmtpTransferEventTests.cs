@@ -60,6 +60,51 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
     }
 
     [TestMethod]
+    [DataRow("smtp")]
+    [DataRow("protocol")]
+    public async Task RunAsync_VerboseMailUploadWithTheSmtpTraceComponent_WritesTheSmtpLinesAmongTheVerboseLines(string component)
+    {
+        // Measured 2026-10-02 (BL-1163 Notes); "all" also turns the time and id prefixes on, so it is
+        // pinned by CurlCompositionSmtpTraceTests.
+        int exitCode = await RunAsync(["-sv", "--trace-config", component], 18030, 53686, Greeting + EhloReply + Transaction);
+
+        Assert.AreEqual(0, exitCode);
+        string[] lines = Encoding.ASCII.GetString(standardError.ToArray()).Split(InfoEnd);
+        CollectionAssert.AreEqual(
+            (string[])[
+                "* [SMTP] smtp_setup_connection() -> 0",
+                "*   Trying 127.0.0.1:18030...",
+                "* Established connection to 127.0.0.1 (127.0.0.1 port 18030) from 127.0.0.1 port 53686 ",
+                "* [SMTP] state change from STOP to SERVERGREET",
+                "< 220 localhost ESMTP\r",
+                "> EHLO client\r",
+                "* [SMTP] state change from SERVERGREET to EHLO",
+            ],
+            lines.Take(7).ToArray());
+        CollectionAssert.AreEqual(
+            (string[])[
+                "* [SMTP] state change from POSTDATA to STOP",
+                "* [SMTP] smtp_done(status=0, premature=0) -> 0",
+                "* Connection #0 to host 127.0.0.1:18030 left intact",
+                string.Empty,
+            ],
+            lines.TakeLast(4).ToArray());
+        Assert.AreEqual(23, lines.Count(line => line.StartsWith("* [SMTP] ", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    [DataRow("-sv", "--trace-config", "ftp")]
+    [DataRow("-sv")]
+    [DataRow("-s", "--trace-config", "smtp")]
+    public async Task RunAsync_MailUploadWithoutTheSmtpTraceComponentOrVerbose_WritesNoSmtpLines(params string[] arguments)
+    {
+        int exitCode = await RunAsync(arguments, 18030, 53686, Greeting + EhloReply + Transaction);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.DoesNotContain("[SMTP]", Encoding.ASCII.GetString(standardError.ToArray()));
+    }
+
+    [TestMethod]
     public async Task RunAsync_VerboseMailUploadWithAuthPlain_WritesTheCredentialsUnmasked()
     {
         const string ehloReply = "250-localhost\r\n250 AUTH PLAIN\r\n";
@@ -190,21 +235,21 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
         + "< 250 OK message accepted" + HeaderEnd
         + $"* Connection #0 to host 127.0.0.1:{port} left intact" + InfoEnd;
 
-    private Task<int> RunAsync(IReadOnlyList<string> options, int port, int localPort, string replies)
+    private Task<int> RunAsync(IReadOnlyList<string> arguments, int port, int localPort, string replies)
     {
         var connector = new ReportingConnector(new ScriptedConnector([Encoding.ASCII.GetBytes(replies)]), localPort);
 
         return new CurlCommandRunner(
-                _ => new TransferDispatch(
+                options => new TransferDispatch(
                     new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
-                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver()))),
+                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver(), tracesSmtp: CurlComposition.TracesSmtp(options)))),
                 files,
                 files,
                 standardOutput,
                 standardError,
                 new MemoryStream(),
                 runsOnWindows: true)
-            .RunAsync([.. options, "--mail-from", "a@b", "--mail-rcpt", "c@d", "-T", "mail.txt", $"smtp://127.0.0.1:{port}/client"]);
+            .RunAsync([.. arguments, "--mail-from", "a@b", "--mail-rcpt", "c@d", "-T", "mail.txt", $"smtp://127.0.0.1:{port}/client"]);
     }
 
     /// <summary>

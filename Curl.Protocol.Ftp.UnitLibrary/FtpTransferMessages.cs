@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using System.Net.Sockets;
 
 namespace Curl.Protocol.Ftp;
 
@@ -68,8 +69,37 @@ internal static class FtpTransferMessages
         _ => UnsupportedModificationTimeReply,
     };
 
-    /// <summary>The exit 55 message for a command that could not be sent.</summary>
-    internal const string SendFailed = "Failure when sending data to the peer";
+    /// <summary>The exit 55 message for a command or upload write the peer reset.</summary>
+    internal const string SendConnectionReset = "Send failure: Connection was reset";
+
+    /// <summary>
+    /// The exit 55 message for any other failed command or upload write: curl 8.21.0's
+    /// <c>curl_easy_strerror(CURLE_SEND_ERROR)</c>.
+    /// </summary>
+    internal const string SendFailedToPeer = "Failed sending data to the peer";
+
+    /// <summary>
+    /// The exit 55 message for a write that threw <paramref name="exception" />: the reset
+    /// text for a <see cref="SocketError.ConnectionReset" />, otherwise curl's text for the code.
+    /// </summary>
+    /// <param name="exception">What the connection threw.</param>
+    /// <returns>The message.</returns>
+    internal static string SendFailed(IOException exception) =>
+        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
+            ? SendConnectionReset
+            : SendFailedToPeer;
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.21.0's <c>ftp_readresp</c> writes for a <c>421</c> reply,
+    /// before it fails the transfer with exit 28.
+    /// </summary>
+    internal const string Got421Timeout = "We got a 421 - timeout";
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.21.0's <c>ftp_state_port_resp</c> writes when <c>EPRT</c> is
+    /// refused and <c>PORT</c> follows.
+    /// </summary>
+    internal const string DisablingEprt = "disabling EPRT usage";
 
     /// <summary>The exit 56 message for a data connection that failed mid-transfer.</summary>
     internal const string ReceiveFailed = "Failure when receiving data from the peer";
@@ -127,8 +157,17 @@ internal static class FtpTransferMessages
     /// <summary>The exit 9 message for a <c>CWD</c> the server refused.</summary>
     internal const string ChangeDirectoryDenied = "Server denied you to change to the given directory";
 
-    /// <summary>The exit 13 message for a <c>229</c> reply with no port curl can read.</summary>
+    /// <summary>
+    /// The exit 13 message for a <c>229</c> reply with no <c>(</c>, or whose <c>(</c> is not
+    /// followed by three repeats of one delimiter and a digit.
+    /// </summary>
     internal const string WeirdEpsvReply = "Weirdly formatted EPSV reply";
+
+    /// <summary>
+    /// The exit 13 message for a <c>229</c> reply whose port, after <c>(</c> and three
+    /// delimiters, is above 65535 or is not followed by the delimiter (BL-1240).
+    /// </summary>
+    internal const string IllegalEpsvPort = "Illegal port number in EPSV reply";
 
     /// <summary>The exit 14 message for a <c>227</c> reply with no port curl can read.</summary>
     internal const string Weird227Reply = "Could not interpret the 227-response";

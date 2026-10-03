@@ -17,6 +17,8 @@ public sealed class MutableContext
 
     public bool FtpCreateDirectories { get; set; }
 
+    public bool FtpSendPret { get; set; }
+
     public bool ListOnly { get; set; }
 
     public List<string> QuoteCommands { get; } = [];
@@ -29,7 +31,15 @@ public sealed class MutableContext
 
     public ByteRange? Range { get; set; }
 
+    public long? MaxFileSize { get; set; }
+
     public bool NoBody { get; set; }
+
+    public bool RemoteTime { get; set; }
+
+    public string? FtpAccount { get; set; }
+
+    public string? FtpAlternativeToUser { get; set; }
 
     public string? FtpPort { get; set; }
 
@@ -66,13 +76,18 @@ public sealed class MutableContext
             FtpSkipPasvIp = mutable.FtpSkipPasvIp,
             FtpFileMethod = mutable.FtpFileMethod,
             FtpCreateDirectories = mutable.FtpCreateDirectories,
+            FtpSendPret = mutable.FtpSendPret,
             ListOnly = mutable.ListOnly,
             QuoteCommands = mutable.QuoteCommands,
             Upload = mutable.Upload,
             ResumeFrom = mutable.ResumeFrom,
             ResumeUploadFromUnknownOffset = mutable.ResumeUploadFromUnknownOffset,
             Range = mutable.Range,
+            MaxFileSize = mutable.MaxFileSize,
             NoBody = mutable.NoBody,
+            RemoteTime = mutable.RemoteTime,
+            FtpAccount = mutable.FtpAccount,
+            FtpAlternativeToUser = mutable.FtpAlternativeToUser,
             HeaderOutput = mutable.HeaderOutput,
             FtpPort = mutable.FtpPort,
             FtpUseEprt = mutable.FtpUseEprt,

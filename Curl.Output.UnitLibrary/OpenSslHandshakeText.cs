@@ -88,24 +88,43 @@ internal static class OpenSslHandshakeText
 
     private static List<string> Lines(TlsHandshakeEvent handshake, IReadOnlyList<string> alpnLines, bool isLibreSsl)
     {
+        // A handshake that failed before it negotiated anything printed only the ALPN offer
+        // before its ClientHello (exit 35, measured with curl 8.18.0, BL-1178).
+        if (handshake.Failed && handshake.ProtocolVersion == SslProtocols.None)
+        {
+            return [.. alpnLines.Take(1)];
+        }
+
         var lines = new List<string>();
         lines.AddRange(alpnLines.Take(1));
         lines.Add(ConnectionLine(handshake, isLibreSsl));
+        if (handshake.EchResult is { } echResult)
+        {
+            lines.Add("ECH: result: " + echResult);
+        }
+
+        lines.AddRange(handshake.EchRetryConfigLines);
+
         lines.AddRange(alpnLines.Skip(1));
+        AddCertificateLines(handshake, isLibreSsl, lines);
+        return lines;
+    }
+
+    // The server certificate and chain, then the host name check and the verify result.
+    private static void AddCertificateLines(TlsHandshakeEvent handshake, bool isLibreSsl, List<string> lines)
+    {
         if (handshake.ServerCertificate is { } certificate)
         {
             lines.AddRange(OpenSslCertificateText.PeerCertificate(certificate, handshake.IsProxy));
             lines.AddRange(handshake.PeerCertificateChain
                 .Select((chainCertificate, level) => OpenSslCertificateText.CertificateLevel(level, chainCertificate, isLibreSsl))
                 .OfType<string>());
-            if (HostNameMatches(handshake, certificate, lines))
+            if (HostNameMatches(handshake, certificate, lines) && !CertificateRefused(handshake))
             {
                 lines.AddRange(VerifyResult(handshake, isLibreSsl));
                 lines.AddRange(TransferEventInfoText.PinnedPublicKeyHashLines(handshake));
             }
         }
-
-        return lines;
     }
 
     private static string ConnectionLine(TlsHandshakeEvent handshake, bool isLibreSsl)
@@ -134,6 +153,14 @@ internal static class OpenSslHandshakeText
         return matched;
     }
 
+    // A certificate refused without -k is curl's exit 60, whose message is the verify result:
+    // it prints neither verify result line nor the pin's hash (measured with curl 8.18.0, BL-1178).
+    private static bool CertificateRefused(TlsHandshakeEvent handshake) =>
+        handshake.Failed && handshake.VerifiedHostName is not null && VerifyResultOf(handshake) != 0;
+
+    private static long VerifyResultOf(TlsHandshakeEvent handshake) =>
+        handshake.CertificateVerifyResult ?? (handshake.CertificateVerified ? 0 : UnspecifiedVerifyError);
+
     private static string CipherName(TlsCipherSuite? suite)
     {
         return suite is { } negotiated ? CipherNames.GetValueOrDefault(negotiated, negotiated.ToString()) : "(NONE)";
@@ -141,7 +168,7 @@ internal static class OpenSslHandshakeText
 
     private static IEnumerable<string> VerifyResult(TlsHandshakeEvent handshake, bool isLibreSsl)
     {
-        var result = handshake.CertificateVerifyResult ?? (handshake.CertificateVerified ? 0 : UnspecifiedVerifyError);
+        var result = VerifyResultOf(handshake);
         if (!isLibreSsl)
         {
             yield return "OpenSSL verify result: " + result.ToString("x", CultureInfo.InvariantCulture);

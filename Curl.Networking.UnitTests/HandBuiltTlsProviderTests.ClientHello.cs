@@ -199,6 +199,23 @@ public sealed partial class HandBuiltTlsProviderTests
         }
     }
 
+    // Measured with Record-CurlExchange.ps1 -Script (read, close) on 2026-10-02 (BL-1152): the
+    // Windows reference build's --tls-max 1.2 hello is in a 3.3 record and its --tls-max 1.0
+    // hello in a 3.1 one; Ubuntu's OpenSSL build's --tls-max 1.2 hello is in a 3.1 record.
+    // Every one offers an empty legacy session ID.
+    [TestMethod]
+    [DataRow(SchannelBuild, TlsVersion.Tls12, 0x0303)]
+    [DataRow(SchannelBuild, TlsVersion.Tls10, 0x0301)]
+    [DataRow(OpenSslBuild, TlsVersion.Tls12, 0x0301)]
+    public async Task AuthenticateAsClientAsync_BelowATls13Ceiling_SendsTheMeasuredRecordVersionAndAnEmptySessionId(bool matchesSchannelBuild, TlsVersion ceiling, int recordVersion)
+    {
+        var record = await CaptureClientHelloAsync(
+            new TlsClientOptions { MaximumVersion = ceiling }, matchesSchannelBuild, "localhost", ProfileOf(matchesSchannelBuild).ApplicationProtocols);
+
+        Assert.AreEqual(recordVersion, (record[1] << 8) | record[2]);
+        Assert.IsEmpty(DecodeClientHello(record).LegacySessionId);
+    }
+
     private static ClientHelloProfile ProfileOf(bool matchesSchannelBuild) =>
         matchesSchannelBuild ? ClientHelloProfile.Schannel : ClientHelloProfile.OpenSsl;
 

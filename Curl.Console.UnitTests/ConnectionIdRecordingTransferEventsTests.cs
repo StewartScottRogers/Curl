@@ -77,6 +77,7 @@ public sealed class ConnectionIdRecordingTransferEventsTests
         events.ReportTlsMessage(null!);
         events.ReportTlsTrust(null!);
         events.ReportCertificateVerifyResult(18, isProxy: false);
+        events.ReportTlsEarlyData(-7);
         events.ReportRequestHeader([2]);
         events.ReportResponseHeader([3]);
         events.ReportDataSent([4]);
@@ -86,7 +87,7 @@ public sealed class ConnectionIdRecordingTransferEventsTests
             new[]
             {
                 "Info text", "Opened", "Reused", "Handshake", "TlsData 1 True", "TlsMessage", "TlsTrust",
-                "VerifyResult 18 False", "RequestHeader 2", "ResponseHeader 3", "DataSent 4", "DataReceived 5",
+                "VerifyResult 18 False", "EarlyData -7", "RequestHeader 2", "ResponseHeader 3", "DataSent 4", "DataReceived 5",
             },
             inner.Calls);
     }
@@ -135,6 +136,8 @@ public sealed class ConnectionIdRecordingTransferEventsTests
         public void ReportTlsTrust(TlsTrustEvent trust) => Calls.Add("TlsTrust");
 
         public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) => Calls.Add($"VerifyResult {verifyResult} {isProxy}");
+
+        public void ReportTlsEarlyData(long bytes) => Calls.Add($"EarlyData {bytes}");
 
         public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => Calls.Add($"RequestHeader {bytes[0]}");
 

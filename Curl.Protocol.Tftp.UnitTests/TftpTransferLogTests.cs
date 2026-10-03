@@ -70,12 +70,12 @@ public sealed class TftpTransferLogTests
     public async Task ExecuteAsync_ServerChangesBlockSize_LogsAWarning()
     {
         var log = new RecordingDiagnosticLog();
-        var channel = Channel(OptionAcknowledgement("blksize\01024\0"), Data(1, "hello"));
+        var channel = Channel(OptionAcknowledgement("blksize\0256\0"), Data(1, "hello"));
 
         await Handler(channel).ExecuteAsync(Context(log));
 
         CollectionAssert.AreEqual(
-            new[] { "server changed or ignored the blksize asked for: using 1024" },
+            new[] { "server changed or ignored the blksize asked for: using 256" },
             log.MessagesAt(DiagnosticLogLevel.Warning));
     }
 
@@ -83,7 +83,7 @@ public sealed class TftpTransferLogTests
     public async Task ExecuteAsync_ServerChangesBlockSizeAtErrorLevel_LogsNothing()
     {
         var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Error);
-        var channel = Channel(OptionAcknowledgement("blksize\01024\0"), Data(1, "hello"));
+        var channel = Channel(OptionAcknowledgement("blksize\0256\0"), Data(1, "hello"));
 
         await Handler(channel).ExecuteAsync(Context(log));
 

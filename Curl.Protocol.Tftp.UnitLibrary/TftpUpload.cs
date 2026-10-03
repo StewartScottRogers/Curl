@@ -80,21 +80,23 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
     /// <summary>
     /// Runs the upload to its end.
     /// </summary>
-    /// <param name="fileName">The file to write, decoded from the URL path.</param>
+    /// <param name="file">The file to write and the mode to write it in, from the URL path.</param>
     /// <returns>The outcome of the transfer.</returns>
-    internal async ValueTask<TransferResult> RunAsync(string fileName)
+    internal async ValueTask<TransferResult> RunAsync(TftpRequestFile file)
     {
         schedule = limits.RequestSchedule();
         events.TimeoutsSet(TftpTransferEvents.StartState, schedule);
         var transferSize = upload.CanSeek ? upload.Length - upload.Position : 0;
-        await SendAsync(
-                TftpPackets.BuildWriteRequest(
-                    fileName,
-                    transferSize,
-                    TftpPackets.RequestedBlockSize(context),
-                    schedule.RetrySeconds),
-                channel.ServerEndPoint)
-            .ConfigureAwait(false);
+        if (file.TryBuildRequest(
+                (name, mode) => TftpPackets.BuildWriteRequest(
+                    name, mode, transferSize, TftpPackets.RequestedBlockSize(context), schedule.RetrySeconds),
+                events,
+                out byte[] request) is { } refused)
+        {
+            return refused;
+        }
+
+        await SendAsync(request, channel.ServerEndPoint).ConfigureAwait(false);
         retries = 1;
 
         while (true)
@@ -165,17 +167,39 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
                 events.ErrorPacket(receiveBuffer.AsSpan(0, received.Length));
                 return TftpErrorMapping.ToTransferResult(TftpPackets.ReadField(receiveBuffer, 2));
             case TftpPackets.OptionAcknowledgementOpcode:
-                blockSize = TftpPackets.ReadAcknowledgedBlockSize(receiveBuffer.AsSpan(2, received.Length - 2));
-                events.OptionsAcknowledged(
-                    receiveBuffer.AsSpan(2, received.Length - 2),
-                    isDownload: false,
-                    TftpPackets.RequestedBlockSize(context) ?? TftpPackets.DefaultBlockSize);
-                lastSentBlock = 0;
-                lastBlockSent = false;
-                return await AcceptAcknowledgementAsync(0, received.RemoteEndPoint).ConfigureAwait(false);
+                return await AcceptOptionAcknowledgementAsync(received).ConfigureAwait(false);
             default:
                 return null;
         }
+    }
+
+    /// <summary>
+    /// Takes an OACK as the acknowledgement of block 0 with the block size it grants,
+    /// restarting the block count, or ends the upload with exit 71 and sends nothing when
+    /// curl rejects the OACK. An upload ignores <c>tsize</c>.
+    /// </summary>
+    /// <param name="received">The OACK datagram's length and source.</param>
+    /// <returns>
+    /// The failure when the OACK is rejected, otherwise what
+    /// <see cref="AcceptAcknowledgementAsync" /> returns for block 0.
+    /// </returns>
+    private async ValueTask<TransferResult?> AcceptOptionAcknowledgementAsync(DatagramReceived received)
+    {
+        var requestedBlockSize = TftpPackets.RequestedBlockSize(context) ?? TftpPackets.DefaultBlockSize;
+        var acknowledgement = TftpOptionAcknowledgement.Parse(
+            receiveBuffer.AsSpan(2, received.Length - 2),
+            requestedBlockSize,
+            isDownload: false);
+        events.OptionsAcknowledged(acknowledgement.Options, requestedBlockSize);
+        if (acknowledgement.Failure is { } failure)
+        {
+            return TransferResult.Failure(CurlExitCode.TftpIllegal, failure, bytesTransferred);
+        }
+
+        blockSize = acknowledgement.BlockSize;
+        lastSentBlock = 0;
+        lastBlockSent = false;
+        return await AcceptAcknowledgementAsync(0, received.RemoteEndPoint).ConfigureAwait(false);
     }
 
     /// <summary>

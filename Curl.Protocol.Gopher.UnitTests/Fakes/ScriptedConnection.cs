@@ -17,10 +17,25 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
 
     private readonly MemoryStream written = new();
 
+    private int writeCount;
+
     /// <summary>
     /// Gets or sets a value indicating whether every write throws an <see cref="IOException" />.
     /// </summary>
     public bool FailWrites { get; set; }
+
+    /// <summary>
+    /// Gets or sets the zero-based number of the write that throws
+    /// <see cref="WriteFailure" />, such as 1 for the CRLF after the selector;
+    /// <see langword="null" /> for none.
+    /// </summary>
+    public int? FailingWriteNumber { get; set; }
+
+    /// <summary>
+    /// Gets or sets the exception a failing write throws; <see langword="null" /> for a
+    /// plain <see cref="IOException" />.
+    /// </summary>
+    public IOException? WriteFailure { get; set; }
 
     /// <summary>
     /// Gets or sets the exception a <see langword="null" /> chunk's read throws, such as a
@@ -66,9 +81,9 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
     /// <inheritdoc />
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
-        if (FailWrites)
+        if (FailWrites || writeCount++ == FailingWriteNumber)
         {
-            throw new IOException("The scripted peer refused the write.");
+            throw WriteFailure ?? new IOException("The scripted peer refused the write.");
         }
 
         written.Write(buffer.Span);

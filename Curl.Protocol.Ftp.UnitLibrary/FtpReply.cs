@@ -16,4 +16,10 @@ internal sealed record FtpReply(int Code, string LastLine)
     /// Gets a value indicating whether <see cref="Code" /> is a 2xx completion.
     /// </summary>
     public bool IsCompletion => Code / 100 == 2;
+
+    /// <summary>
+    /// Gets how many bytes the reply took on the control connection, every line's CR and LF
+    /// included, which <c>--trace-config ftp</c> reports as <c>nread</c> (BL-1162).
+    /// </summary>
+    public int ByteCount { get; init; }
 }

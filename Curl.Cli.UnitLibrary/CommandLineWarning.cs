@@ -85,6 +85,26 @@ public static class CommandLineWarning
     }
 
     /// <summary>
+    /// The warning curl 8.21.0 prints when <c>-L</c>/<c>--location</c>, <c>--location-trusted</c> or
+    /// either's <c>--no-</c> spelling replaces a <c>--follow</c> still in force (measured 2026-10-02,
+    /// BL-1223 Notes).
+    /// </summary>
+    public static IReadOnlyList<string> LocationOverridesFollow { get; } =
+    [
+        "Warning: --location overrides --follow",
+    ];
+
+    /// <summary>
+    /// The warning curl 8.21.0 prints when <c>--follow</c> or <c>--no-follow</c> replaces a
+    /// <c>-L</c>/<c>--location</c> or <c>--location-trusted</c> still in force (measured 2026-10-02,
+    /// BL-1223 Notes).
+    /// </summary>
+    public static IReadOnlyList<string> FollowOverridesLocation { get; } =
+    [
+        "Warning: --follow overrides --location",
+    ];
+
+    /// <summary>
     /// The warning curl prints for a <c>-r</c>/<c>--range</c> value that starts with a digit and
     /// has no dash, which it reads as the range from that position to the end, as one unwrapped
     /// line; the console layer wraps it at the terminal width as curl does.
@@ -245,6 +265,19 @@ public static class CommandLineWarning
     [
         $"Warning: {longName} is an insecure option, consider --ssl-reqd instead",
     ];
+
+    /// <summary>
+    /// The lines curl's OpenSSL build prints for an option value that starts with a character in
+    /// U+2000-U+203F, such as a dash or a smart quote pasted from a document, before it uses the value
+    /// as given: <c>Warning: The argument '&lt;value&gt;' starts with a Unicode character. Maybe ASCII was
+    /// intended?</c>, wrapped at 79 columns as curl wraps its warnings. From <c>has_leading_unicode</c>
+    /// and <c>getparameter</c> in curl 8.21.0's <c>src/tool_getparam.c</c>; the Windows Schannel build
+    /// reads its arguments in the ANSI code page and never prints it (measured 2026-10-02, BL-1224).
+    /// </summary>
+    /// <param name="value">The value exactly as given.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> ArgumentStartsWithUnicode(string value) =>
+        WrappedMessage.Lines("Warning: ", $"The argument '{value}' starts with a Unicode character. Maybe ASCII was intended?");
 
     /// <summary>
     /// The line curl prints for an option it still accepts but that no longer does anything

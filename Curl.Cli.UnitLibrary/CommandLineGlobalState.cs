@@ -43,6 +43,8 @@ internal sealed class CommandLineGlobalState
 
     public string? LibcurlFile { get; set; }
 
+    public bool ReadsArgumentsAsUtf8 { get; set; }
+
     public bool Silent { get; set; }
 
     public bool ShowError { get; set; }
@@ -69,6 +71,12 @@ internal sealed class CommandLineGlobalState
 
     /// <summary>The trace component names <c>--trace-config</c> turned on, lower case; <c>all</c> among them for every component.</summary>
     public HashSet<string> TraceComponents { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The names in <see cref="TraceComponents"/> that <c>-vv</c>, <c>-vvv</c> or <c>-vvvv</c> put there and
+    /// no <c>--trace-config</c> has named since, which a first <c>-v</c> takes out again.
+    /// </summary>
+    public HashSet<string> VerbosityTraceComponents { get; } = new(StringComparer.Ordinal);
 
     public string? StandardErrorFile { get; set; }
 

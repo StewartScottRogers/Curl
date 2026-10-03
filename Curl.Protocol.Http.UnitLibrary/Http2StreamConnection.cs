@@ -28,7 +28,8 @@ namespace Curl.Protocol.Http;
 /// <param name="bodyLength">The request body's length, 0 when there is none, or <see langword="null" /> when unknown.</param>
 /// <param name="openedLines">Reports curl's <c>-v</c> lines for the stream once its HEADERS are sent, or <see langword="null" /> for none.</param>
 /// <param name="frameLog">Where the stream's frames are logged (BL-1073), or <see langword="null" /> for nowhere.</param>
-internal sealed class Http2StreamConnection(Http2Session session, string scheme, long? bodyLength, HttpStreamOpenedLines? openedLines = null, HttpFrameLog? frameLog = null) : IHttpStreamConnection
+/// <param name="frameTrace">Writes the session's <c>--trace-config http/2</c> lines while this stream is the latest opened (BL-1167), or <see langword="null" /> for none.</param>
+internal sealed class Http2StreamConnection(Http2Session session, string scheme, long? bodyLength, HttpStreamOpenedLines? openedLines = null, HttpFrameLog? frameLog = null, Http2FrameTrace? frameTrace = null) : IHttpStreamConnection
 {
     /// <summary>The length of an RST_STREAM frame's payload: its error code.</summary>
     private const int ResetPayloadLength = 4;
@@ -77,6 +78,25 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     /// <summary>Gets where the stream's frames are logged: its transfer's diagnostic log.</summary>
     internal HttpFrameLog FrameLog { get; } = frameLog ?? HttpFrameLog.Silent;
+
+    /// <summary>Gets what writes the <c>--trace-config http/2</c> lines for this stream's transfer, or <see langword="null" /> for none.</summary>
+    internal Http2FrameTrace? FrameTrace => frameTrace;
+
+    /// <summary>
+    /// Echoes a line of this stream's response head, just reported as a <c>&lt;</c> line, as a
+    /// <c>--trace-config http/2</c> <c>status:</c> or <c>header:</c> line (BL-1205); nothing when the
+    /// transfer traces nothing.
+    /// </summary>
+    /// <param name="line">The line as reported, its line end included.</param>
+    internal void EchoResponseLine(byte[] line) => frameTrace?.ResponseLineReported(streamId, line);
+
+    /// <summary>
+    /// Reports curl's <c>OPENED stream</c> lines for this stream, once it has its identifier and
+    /// before its HEADERS go out, as curl writes them before nghttp2 submits the frame.
+    /// </summary>
+    /// <param name="id">The stream's identifier.</param>
+    /// <param name="fields">The header list the stream sends.</param>
+    internal void ReportOpened(int id, IReadOnlyList<HeaderField> fields) => openedLines?.Report(session.VersionName, id, fields);
 
     /// <inheritdoc />
     /// <exception cref="HttpTransferException">The stream failed (exit 16, 18, 56 or 92).</exception>
@@ -219,7 +239,6 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         {
             List<HeaderField> fields = Http2RequestHeaders.Of(head.Span, scheme);
             streamId = await session.StartStreamAsync(this, fields, isRequestEnded, cancellationToken).ConfigureAwait(false);
-            openedLines?.Report(session.VersionName, streamId, fields);
         }
         catch (InvalidOperationException)
         {

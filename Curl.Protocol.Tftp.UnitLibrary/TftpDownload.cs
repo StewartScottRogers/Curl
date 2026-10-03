@@ -74,18 +74,23 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     /// <summary>
     /// Runs the download to its end.
     /// </summary>
-    /// <param name="fileName">The file to read, decoded from the URL path.</param>
+    /// <param name="file">The file to read and the mode to read it in, from the URL path.</param>
     /// <returns>The outcome of the transfer.</returns>
-    internal async ValueTask<TransferResult> RunAsync(string fileName)
+    internal async ValueTask<TransferResult> RunAsync(TftpRequestFile file)
     {
         schedule = limits.RequestSchedule();
         events.TimeoutsSet(TftpTransferEvents.StartState, schedule);
         int? requestedBlockSize = TftpPackets.RequestedBlockSize(context);
-        await SendAsync(
-                TftpPackets.BuildReadRequest(fileName, requestedBlockSize, schedule.RetrySeconds),
-                channel.ServerEndPoint)
-            .ConfigureAwait(false);
-        log.RequestSent("read", fileName, requestedBlockSize, schedule.RetrySeconds);
+        if (file.TryBuildRequest(
+                (name, mode) => TftpPackets.BuildReadRequest(name, mode, requestedBlockSize, schedule.RetrySeconds),
+                events,
+                out byte[] request) is { } refused)
+        {
+            return refused;
+        }
+
+        await SendAsync(request, channel.ServerEndPoint).ConfigureAwait(false);
+        log.RequestSent("read", file.LoggedName, requestedBlockSize, schedule.RetrySeconds);
         retries = 1;
 
         while (true)
@@ -169,10 +174,10 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     }
 
     /// <summary>
-    /// Takes the block size an OACK grants and acknowledges it as block 0.
+    /// Logs and reports an ERROR packet and ends the download with curl's exit code for it.
     /// </summary>
-    /// <param name="received">The OACK datagram's length and source.</param>
-    /// <returns><see langword="null" />, since an OACK never ends the transfer.</returns>
+    /// <param name="received">The ERROR datagram's length and source.</param>
+    /// <returns>The failure the packet's error code maps to.</returns>
     private TransferResult FailWithErrorPacket(DatagramReceived received)
     {
         log.ErrorPacket(buffer.AsSpan(0, received.Length));
@@ -180,14 +185,28 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         return TftpErrorMapping.ToTransferResult(TftpPackets.ReadField(buffer, 2));
     }
 
+    /// <summary>
+    /// Takes the block size an OACK grants and acknowledges it as block 0, or ends the
+    /// download with exit 71 and sends nothing when curl rejects the OACK.
+    /// </summary>
+    /// <param name="received">The OACK datagram's length and source.</param>
+    /// <returns>The failure when the OACK is rejected, otherwise <see langword="null" />.</returns>
     private async ValueTask<TransferResult?> AcceptOptionAcknowledgementAsync(DatagramReceived received)
     {
-        blockSize = TftpPackets.ReadAcknowledgedBlockSize(buffer.AsSpan(2, received.Length - 2));
-        log.OptionsAgreed(buffer.AsSpan(2, received.Length - 2), TftpPackets.RequestedBlockSize(context), blockSize);
-        events.OptionsAcknowledged(
-            buffer.AsSpan(2, received.Length - 2),
-            isDownload: true,
-            TftpPackets.RequestedBlockSize(context) ?? TftpPackets.DefaultBlockSize);
+        var body = buffer.AsSpan(2, received.Length - 2);
+        var requestedBlockSize = TftpPackets.RequestedBlockSize(context);
+        var acknowledgement = TftpOptionAcknowledgement.Parse(
+            body,
+            requestedBlockSize ?? TftpPackets.DefaultBlockSize,
+            isDownload: true);
+        events.OptionsAcknowledged(acknowledgement.Options, requestedBlockSize ?? TftpPackets.DefaultBlockSize);
+        if (acknowledgement.Failure is { } failure)
+        {
+            return TransferResult.Failure(CurlExitCode.TftpIllegal, failure, bytesTransferred);
+        }
+
+        blockSize = acknowledgement.BlockSize;
+        log.OptionsAgreed(body, requestedBlockSize, blockSize);
         await AcknowledgeNewAsync(0, received.RemoteEndPoint).ConfigureAwait(false);
         return null;
     }

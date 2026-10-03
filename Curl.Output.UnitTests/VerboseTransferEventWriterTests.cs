@@ -319,6 +319,49 @@ public sealed class VerboseTransferEventWriterTests
         Assert.AreEqual("* SSL connection using TLSv1.2 / ECDHE-RSA-AES256-GCM-SHA384 / x25519 / RSASSA-PSS\n", Written());
     }
 
+    // curl 8.21.0 on OpenSSL 4.0.0's ECH build writes its ECH result between `SSL connection
+    // using` and the ALPN answer (ADR-0359, BL-1170).
+    [TestMethod]
+    [DataRow("status is sent GREASE, inner is NULL, outer is NULL")]
+    [DataRow("status is not configured, inner is NULL, outer is NULL")]
+    [DataRow("status is bad name (tolerated without peer verification), inner is curl.test, outer is public.test")]
+    [DataRow("status is success, inner is curl.test, outer is public.test")]
+    public void ReportTlsHandshake_OpenSslWithAnEchResult_WritesItAfterTheConnectionLine(string echResult)
+    {
+        new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.OpenSsl).ReportTlsHandshake(Handshake(["h2", "http/1.1"], null) with
+        {
+            EchResult = echResult,
+        });
+
+        Assert.AreEqual(
+            "* ALPN: curl offers h2,http/1.1\n" +
+            "* SSL connection using TLSv1.3 / (NONE) / [blank] / UNDEF\n" +
+            "* ECH: result: " + echResult + "\n" +
+            "* ALPN: server did not agree on a protocol. Uses default.\n",
+            Written());
+    }
+
+    // A server that answers GREASE with retry_configs: curl traces them straight after the
+    // result line (measured with curl 8.21.0 and OpenSSL 4.0.0, BL-1171).
+    [TestMethod]
+    public void ReportTlsHandshake_OpenSslWithEchRetryConfigLines_WritesThemAfterTheResultLine()
+    {
+        new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.OpenSsl).ReportTlsHandshake(Handshake(["h2", "http/1.1"], null) with
+        {
+            EchResult = "status is sent GREASE, got retry-configs, inner is NULL, outer is NULL",
+            EchRetryConfigLines = ["ECH: retry_configs AAA=", "ECH: retry_configs for NULL from NULL, 0 3"],
+        });
+
+        Assert.AreEqual(
+            "* ALPN: curl offers h2,http/1.1\n" +
+            "* SSL connection using TLSv1.3 / (NONE) / [blank] / UNDEF\n" +
+            "* ECH: result: status is sent GREASE, got retry-configs, inner is NULL, outer is NULL\n" +
+            "* ECH: retry_configs AAA=\n" +
+            "* ECH: retry_configs for NULL from NULL, 0 3\n" +
+            "* ALPN: server did not agree on a protocol. Uses default.\n",
+            Written());
+    }
+
     [TestMethod]
     public void ReportTlsHandshake_OpenSslFactsUnknown_UsesCurlsFallbacks()
     {

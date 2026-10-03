@@ -24,6 +24,12 @@ internal sealed class ScpFileDownload(SshTransport transport)
     internal const int ReadBufferSize = 32768;
 
     /// <summary>
+    /// Gets where the download's <c>--trace-config ssh</c> state changes go (BL-1166);
+    /// <see cref="SshStateTrace.Off" /> when not given.
+    /// </summary>
+    internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
+
+    /// <summary>
     /// Downloads the file at <paramref name="urlPath" /> into <paramref name="output" />.
     /// </summary>
     /// <param name="urlPath">The URL's path, with its percent-escapes.</param>
@@ -47,11 +53,20 @@ internal sealed class ScpFileDownload(SshTransport transport)
         ITransferProgress progress,
         CancellationToken cancellationToken)
     {
+        Trace.Write("DO phase starts");
+        Trace.Enter("SSH_SCP_TRANS_INIT");
+        Trace.Enter("SSH_SCP_DOWNLOAD_INIT");
         SshSessionChannel channel = new(transport);
         await StartAsync(channel, ScpCommand.ForDownload(ScpRemotePath.Resolve(urlPath)), cancellationToken).ConfigureAwait(false);
         long size = await new ScpFileHeaderReader(channel).ReadFileSizeAsync(cancellationToken).ConfigureAwait(false);
+        Trace.Rest();
+        Trace.Write("DO phase is complete");
         TransferResult result = await new Copy(channel, size, output, progress).RunAsync(cancellationToken).ConfigureAwait(false);
+        Trace.Enter("SSH_SCP_DONE");
+        Trace.Enter("SSH_SCP_CHANNEL_FREE");
         await CloseIgnoringFailureAsync(channel, cancellationToken).ConfigureAwait(false);
+        Trace.Write("SCP DONE phase complete");
+        Trace.Rest();
         return result;
     }
 

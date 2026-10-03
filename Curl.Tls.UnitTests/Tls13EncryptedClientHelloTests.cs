@@ -170,6 +170,7 @@ public sealed class Tls13EncryptedClientHelloTests
         Assert.AreEqual(EchTestConfig.DefaultPublicName, verifier.Presented.Single().HostName);
         CollectionAssert.AreEqual(retryConfigs, client.EncryptedClientHelloRetryConfigs!.Encoded);
         Assert.AreEqual(64, client.EncryptedClientHelloRetryConfigs.SupportedConfig!.MaximumNameLength);
+        Assert.AreSame(client.EncryptedClientHelloRetryConfigs, output.Failure.EchRetryConfigs);
     }
 
     [TestMethod]
@@ -360,16 +361,17 @@ public sealed class Tls13EncryptedClientHelloTests
     }
 
     [TestMethod]
-    public void AGreaseHandshakeCompletesAndDropsTheServersRetryConfigs()
+    public void AGreaseHandshakeCompletesAndKeepsTheServersRetryConfigs()
     {
-        Tls13TestServer server = new(TestServerCredential.Ed25519()) { EchRetryConfigs = EchTestConfig.X25519().ConfigList };
+        byte[] retryConfigs = EchTestConfig.X25519().ConfigList;
+        Tls13TestServer server = new(TestServerCredential.Ed25519()) { EchRetryConfigs = retryConfigs };
         using Tls13ClientHandshake client = Client(GreaseSettings);
 
         Tls13HandshakeOutput output = Run(client, server);
 
         Assert.IsTrue(output.IsComplete);
         Assert.IsFalse(client.EncryptedClientHelloAccepted);
-        Assert.IsNull(client.EncryptedClientHelloRetryConfigs);
+        CollectionAssert.AreEqual(retryConfigs, client.EncryptedClientHelloRetryConfigs!.Encoded);
     }
 
     [TestMethod]

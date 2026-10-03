@@ -20,11 +20,19 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
     private static readonly byte[] LinkArrow = " -> "u8.ToArray();
 
     /// <summary>
+    /// Gets where the listing's <c>--trace-config ssh</c> state changes go (BL-1204): one
+    /// <c>SSH_SFTP_READDIR_BOTTOM</c> and back for each long-name line, through
+    /// <c>SSH_SFTP_READDIR_LINK</c> first for a symbolic link (BL-1207), none with <c>-l</c>;
+    /// <see cref="SshStateTrace.Off" /> when not given.
+    /// </summary>
+    internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
+
+    /// <summary>
     /// Lists the directory at <paramref name="urlPath" /> into <paramref name="output" />.
     /// </summary>
     /// <param name="urlPath">The URL's path, with its percent-escapes, ending with a slash.</param>
     /// <param name="listOnly">Whether to write only the names, curl's <c>-l</c>.</param>
-    /// <param name="noBody">Whether to stop before <c>OPENDIR</c>, curl's <c>-I</c>: as measured, nothing is written.</param>
+    /// <param name="noBody">Whether to stop before <c>OPENDIR</c>, curl's <c>-I</c>: as measured, only a <c>STAT</c> of the directory is sent, for the file time, and nothing is written.</param>
     /// <param name="output">Where the listing goes.</param>
     /// <param name="progress">Told the bytes written so far after each line.</param>
     /// <param name="cancellationToken">Cancels the listing.</param>
@@ -51,26 +59,60 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
         SftpQuoteCommands? quotes = null)
     {
         quotes ??= SftpQuoteCommands.None;
+        Trace.Enter("SSH_SFTP_INIT");
         SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
         return await session.CloseChannelOnFailureAsync(
             async () =>
             {
+                Trace.Enter("SSH_SFTP_REALPATH");
                 byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
                 byte[] directory = SftpRemotePath.ResolveUrlPath(urlPath, homeDirectory);
+                Trace.EndSftpConnectPhase();
+                Trace.Enter("SSH_SFTP_QUOTE_INIT");
                 await quotes.RunBeforeTransferAsync(session, homeDirectory, directory, cancellationToken).ConfigureAwait(false);
+                Trace.Enter("SSH_SFTP_GETINFO");
                 if (noBody)
                 {
-                    return await quotes.FinishAsync(session, null, homeDirectory, TransferResult.Success(0), cancellationToken).ConfigureAwait(false);
+                    // Measured (BL-1207): curl's -I asks for the file time, so libssh2 sends
+                    // STAT for the directory and curl ignores the answer; then curl ends the
+                    // DO phase from SSH_SFTP_READDIR_INIT without OPENDIR.
+                    Trace.Enter("SSH_SFTP_FILETIME");
+                    await SshConnectionFailure.ReportAsSshLayerErrorAsync(
+                        () => session.StatAsync(directory, cancellationToken)).ConfigureAwait(false);
+                    Trace.Enter("SSH_SFTP_TRANS_INIT");
+                    Trace.Enter("SSH_SFTP_READDIR_INIT");
+                    Trace.Rest();
+                    Trace.Write("DO phase is complete");
+                    Trace.Enter("SSH_SFTP_CLOSE");
+                    return await FinishAsync(quotes, session, null, homeDirectory, TransferResult.Success(0), cancellationToken).ConfigureAwait(false);
                 }
 
+                Trace.Enter("SSH_SFTP_TRANS_INIT");
+                Trace.Enter("SSH_SFTP_READDIR_INIT");
                 byte[] handle = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.OpenDirectoryAsync(directory, cancellationToken)).ConfigureAwait(false);
-                Listing listing = new(session, handle, directory, listOnly, output, progress);
+                Listing listing = new(session, handle, directory, listOnly, output, progress, Trace);
                 TransferResult result = await listing.RunAsync(cancellationToken).ConfigureAwait(false);
-                return await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+                if (result.IsSuccess)
+                {
+                    Trace.Enter("SSH_SFTP_READDIR_DONE");
+                    Trace.Rest();
+                    Trace.Write("DO phase is complete");
+                    Trace.Enter("SSH_SFTP_CLOSE");
+                }
+
+                return await FinishAsync(quotes, session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
             },
             cancellationToken).ConfigureAwait(false);
+    }
+
+    // Closes the handle and runs the -Q commands after the listing, then ends curl's DONE phase.
+    private async ValueTask<TransferResult> FinishAsync(SftpQuoteCommands quotes, SftpSession session, byte[]? handle, byte[] homeDirectory, TransferResult result, CancellationToken cancellationToken)
+    {
+        TransferResult finished = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+        Trace.EndSftpDonePhase();
+        return finished;
     }
 
     // curl copies each name into a C string, so a NUL byte ends what it prints.
@@ -81,7 +123,7 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
     }
 
     // One listing of the directory to the output, counting the bytes as they go.
-    private sealed class Listing(SftpSession session, byte[] handle, byte[] directory, bool listOnly, Stream output, ITransferProgress progress)
+    private sealed class Listing(SftpSession session, byte[] handle, byte[] directory, bool listOnly, Stream output, ITransferProgress progress, SshStateTrace trace)
     {
         private long written;
 
@@ -106,6 +148,7 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
 
         private async ValueTask ListUntilEndAsync(CancellationToken cancellationToken)
         {
+            trace.Enter("SSH_SFTP_READDIR");
             IReadOnlyList<SftpDirectoryEntry> entries;
             while ((entries = await session.ReadDirectoryAsync(handle, cancellationToken).ConfigureAwait(false)).Count > 0)
             {
@@ -115,7 +158,19 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
                     await output.WriteAsync(line, cancellationToken).ConfigureAwait(false);
                     written += line.Length;
                     progress.ReportDownloaded(written, null);
+                    TraceLineWritten();
                 }
+            }
+        }
+
+        // Measured (BL-1204): curl writes a -l name from SSH_SFTP_READDIR itself, and ends a
+        // long-name line in SSH_SFTP_READDIR_BOTTOM before reading the next entry.
+        private void TraceLineWritten()
+        {
+            if (!listOnly)
+            {
+                trace.Enter("SSH_SFTP_READDIR_BOTTOM");
+                trace.Enter("SSH_SFTP_READDIR");
             }
         }
 
@@ -133,6 +188,7 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
                 return [.. UpToNul(entry.LongName), (byte)'\n'];
             }
 
+            trace.Enter("SSH_SFTP_READDIR_LINK");
             byte[] fileName = [.. UpToNul(entry.FileName)];
             byte[]? target = await session.ReadLinkAsync([.. directory, .. fileName], cancellationToken).ConfigureAwait(false);
             return [.. UpToNul(entry.LongName), .. LinkArrow, .. UpToNul(target ?? fileName), (byte)'\n'];

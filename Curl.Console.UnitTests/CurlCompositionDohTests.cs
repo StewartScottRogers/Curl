@@ -82,6 +82,65 @@ public sealed class CurlCompositionDohTests
     }
 
     [TestMethod]
+    [DataRow("doh")]
+    [DataRow("dns")]
+    [DataRow("network")]
+    public async Task Connect_UnderTraceConfigDnsOrDoh_WritesTheDnsFilterAndDohLinesToTheTransfer(string component)
+    {
+        // curl -v --trace-config doh (or dns, which writes the same) --doh-url ... http://example.test:P/:
+        // the filter's lines, the DoH lines once both queries are done, then the resolve and Trying
+        // (measured, BL-1102 Notes; the DoH lines' texts as BL-850 measured them), each DoH sub-transfer's
+        // [DNS] lines before them (BL-1180; the scripted DoH server reports no connect lines); network's [HAPPY-EYEBALLS], [TCP] and [TIMER] lines (BL-1161, BL-1186) aside.
+        ScriptedConnector dohServer = new([AAnswer, AAnswer]);
+        RecordingEvents events = new();
+
+        ConnectResult result = await ConnectAsync(DohUrl, dohServer, new ScriptedConnector([]), events, "--doh-insecure", "-v", "--trace-config", component);
+
+        Assert.IsNotNull(result.Connection);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[DNS] created DNS filter for example.test:48712, transport=3, queries=3",
+                "[DNS] added",
+                "[DNS] cf_dns_start host example.test:48712",
+                "[DNS] using HTTP/1.x",
+                "[DNS] upload completely sent off: 30 bytes",
+                "[DNS] Connection #1 to host 127.0.0.1:48711 left intact",
+                "[DNS] a DoH request is completed, 1 to go",
+                "[DNS] using HTTP/1.x",
+                "[DNS] upload completely sent off: 30 bytes",
+                "[DNS] Connection #2 to host 127.0.0.1:48711 left intact",
+                "[DNS] a DoH request is completed, 0 to go",
+                "[DNS] DoH: Unexpected TYPE type AAAA for example.test",
+                "[DNS] hostname: example.test",
+                "[DoH] TTL: 60 seconds",
+                "[DoH] A: 127.0.0.1",
+                "[DNS] resolve complete for example.test:48712",
+                "Host example.test:48712 was resolved.",
+                "IPv6: (none)",
+                "IPv4: 127.0.0.1",
+                "  Trying 127.0.0.1:48712...",
+                "[DNS] Curl_conn_connect(block=0) -> 0, done=0",
+                "[DNS] connected filter chain below",
+                "[DNS] Curl_conn_connect(block=0) -> 0, done=1",
+                "[DNS] removing connected setup filter",
+                "[DNS] destroy",
+            },
+            events.Info.Where(line => !line.StartsWith("[HAPPY-EYEBALLS]", StringComparison.Ordinal) && !line.StartsWith("[TCP]", StringComparison.Ordinal) && !line.StartsWith("[TIMER]", StringComparison.Ordinal)).ToArray());
+    }
+
+    [TestMethod]
+    public async Task Connect_UnderAnotherTraceComponent_WritesNoDnsLine()
+    {
+        ScriptedConnector dohServer = new([AAnswer, AAnswer]);
+        RecordingEvents events = new();
+
+        await ConnectAsync(DohUrl, dohServer, new ScriptedConnector([]), events, "--doh-insecure", "-v", "--trace-config", "tls,http/1");
+
+        Assert.IsFalse(events.Info.Any(line => line.StartsWith("[DNS]", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public async Task Connect_WithIpv4Only_PostsOnlyTheAQuery()
     {
         // curl -sS -4 --doh-url https://127.0.0.1:P1/dns-query --doh-insecure http://example.test:P2/
@@ -250,13 +309,15 @@ public sealed class CurlCompositionDohTests
         params string[] arguments)
     {
         CommandLineOptions options = Parse([.. arguments, "--doh-url", dohUrl]);
+        FlowScopedTransferEvents? resolverEvents = CurlComposition.TracesDns(options) ? new() : null;
         TcpConnector connector = CurlComposition.CreateTcpConnector(
             options,
-            CurlComposition.CreateDohResolver(dohUrl, dohServer, CurlComposition.AddressFamilyOf(options)),
+            CurlComposition.CreateDohResolver(dohUrl, dohServer, CurlComposition.AddressFamilyOf(options), resolverEvents),
             new ScriptedTcpDialer(webServer),
             new PassThroughTlsProvider(),
             TimeProvider.System,
-            HttpProxyTunnelOptions.Default);
+            HttpProxyTunnelOptions.Default,
+            resolverEvents: resolverEvents);
 
         return await connector.ConnectAsync(new ConnectTarget("example.test", 48712, false) { Events = events }, CancellationToken.None);
     }

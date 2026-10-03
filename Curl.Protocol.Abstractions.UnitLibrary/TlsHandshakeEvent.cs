@@ -101,4 +101,26 @@ public sealed record TlsHandshakeEvent
     /// or <see langword="null" /> when no <c>sha256//</c> pin was checked (ADR-0336, BL-877).
     /// </summary>
     public string? PinnedPublicKeyHash { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the handshake failed, so that only the lines a curl build
+    /// prints before its failure are printed: the Schannel build's ALPN offer and
+    /// <c> public key hash:</c> line, all of the OpenSSL build's (ADR-0363, BL-1149).
+    /// </summary>
+    public bool Failed { get; init; }
+
+    /// <summary>
+    /// Gets the text curl's OpenSSL ECH build writes after <c>ECH: result: </c>, straight after
+    /// <c>SSL connection using</c>, for a handshake under <c>--ech</c>, such as
+    /// <c>status is sent GREASE, inner is NULL, outer is NULL</c>; or <see langword="null" />
+    /// when <c>--ech</c> is off or the platform does not report it (ADR-0359, BL-1170).
+    /// </summary>
+    public string? EchResult { get; init; }
+
+    /// <summary>
+    /// Gets the lines curl's OpenSSL ECH build writes straight after the <c>ECH: result: </c>
+    /// line when the server sent <c>retry_configs</c> in answer to GREASE, such as
+    /// <c>ECH: retry_configs for NULL from NULL, 0 3</c>; empty when it sent none (BL-1171).
+    /// </summary>
+    public IReadOnlyList<string> EchRetryConfigLines { get; init; } = [];
 }

@@ -99,11 +99,15 @@ public static class SetCookieParser
     /// <item><c>skipped cookie because not 'secure'</c>: <c>Secure</c> from an origin that is not secure.</item>
     /// <item><c>skipped cookie with bad tailmatch domain: </c> and the rest of the header from the
     /// <c>Domain</c> value that failed to match, its leading blanks and one leading dot left out.</item>
+    /// <item><c>oversized cookie dropped, name/val </c><i>n</i><c> + </c><i>v</i><c> bytes</c>: the trimmed
+    /// name's <i>n</i> and value's <i>v</i> characters are more than <see cref="LongestNameAndValue"/> together
+    /// (measured on curl 8.21.0, 2026-10-02, BL-1225: a 4000-byte name and a 97-byte value print
+    /// <c>oversized cookie dropped, name/val 4000 + 97 bytes</c>).</item>
     /// </list>
     /// <para>
-    /// curl prints nothing for a header longer than <see cref="LongestHeaderValue"/>, a name and value longer
-    /// than <see cref="LongestNameAndValue"/>, or a name whose <c>__Secure-</c> or <c>__Host-</c> prefix is
-    /// not satisfied, so <paramref name="refusal"/> is <see langword="null"/> for those.
+    /// curl prints nothing for a header longer than <see cref="LongestHeaderValue"/>, or a name whose
+    /// <c>__Secure-</c> or <c>__Host-</c> prefix is not satisfied, so <paramref name="refusal"/> is
+    /// <see langword="null"/> for those.
     /// </para>
     /// </remarks>
     /// <param name="headerValue">As for <see cref="Parse(string, CurlUrl, DateTimeOffset)"/>.</param>
@@ -343,7 +347,8 @@ public static class SetCookieParser
                 return Refuse("invalid cookie, dropped");
             }
 
-            return name.Length + value.Length <= LongestNameAndValue;
+            return name.Length + value.Length <= LongestNameAndValue
+                || Refuse(string.Create(CultureInfo.InvariantCulture, $"oversized cookie dropped, name/val {name.Length} + {value.Length} bytes"));
         }
 
         private bool TryApplyAttribute(HeaderPart part)

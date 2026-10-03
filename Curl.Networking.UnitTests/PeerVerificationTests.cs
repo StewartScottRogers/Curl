@@ -72,4 +72,16 @@ public sealed class PeerVerificationTests
             new[] { "SSL: public key does not match pinned public key", "SSL: public key does not match pinned public key" },
             events.Info);
     }
+
+    [TestMethod]
+    public void ReportPinnedPublicKeyRefusal_HashPinRefusedInTheOpenSslBuild_ReportsOnlyTheMismatchLine()
+    {
+        // The failed handshake's event prints the " public key hash:" line (BL-1149).
+        var events = new RecordingTransferEvents();
+
+        new PeerVerification(true, 0, []) { PinnedPublicKeyHash = "sha256//AAAA", PinnedPublicKeyRefused = true }
+            .ReportPinnedPublicKeyRefusal(events, matchesSchannelBuild: false);
+
+        CollectionAssert.AreEqual(new[] { "SSL: public key does not match pinned public key" }, events.Info);
+    }
 }

@@ -201,6 +201,49 @@ public sealed class HandBuiltPrivateKeyReaderTests
         }
     }
 
+    [TestMethod]
+    [DataRow(HandBuiltPrivateKeyReader.Ed25519Oid, TlsSignatureScheme.Ed25519)]
+    [DataRow(HandBuiltPrivateKeyReader.MlDsa44Oid, TlsSignatureScheme.MlDsa44)]
+    public void LoadAsOpenSslBuild_WithAnEncryptedPemKeyAndItsPassphrase_GivesAClientCertificateThatSignsWithItsScheme(string keyAlgorithmOid, int scheme)
+    {
+        var (publicKey, privateKeyInfo) = KeyPair(keyAlgorithmOid);
+        using var certificate = CertificateFor(keyAlgorithmOid, publicKey);
+        var keyFile = WriteEncryptedKey(privateKeyInfo);
+
+        var (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(WriteFile("cert.pem", certificate.ExportCertificatePem()), "pass phrase", keyFile, null, null);
+
+        Assert.IsNull(failure);
+        using (loaded)
+        {
+            Assert.IsTrue(HandBuiltTlsProvider.ToTlsClientCertificate(loaded)!.SigningKey.CanSign((ushort)scheme));
+        }
+    }
+
+    [TestMethod]
+    [DataRow("wrong")]
+    [DataRow(null)]
+    public void LoadAsOpenSslBuild_WithAnEncryptedPemKeyAndAWrongOrNoPassphrase_FailsAsAnUnusableKey(string? passphrase)
+    {
+        var (publicKey, privateKeyInfo) = KeyPair(HandBuiltPrivateKeyReader.Ed25519Oid);
+        using var certificate = CertificateFor(HandBuiltPrivateKeyReader.Ed25519Oid, publicKey);
+        var keyFile = WriteEncryptedKey(privateKeyInfo);
+
+        var (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(WriteFile("cert.pem", certificate.ExportCertificatePem()), passphrase, keyFile, null, null);
+
+        Assert.IsNull(loaded);
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, failure!.ExitCode);
+        Assert.AreEqual($"unable to set private key file: '{keyFile}' type PEM", failure.ErrorMessage);
+    }
+
+    private string WriteEncryptedKey(byte[] privateKeyInfo)
+    {
+        var encrypted = EncryptedPrivateKeyInfoDecryptionTests.Encrypt(
+            privateKeyInfo,
+            "pass phrase",
+            new EncryptedPrivateKeyInfoDecryptionTests.Encryption("2.16.840.1.101.3.4.1.42", 32, "1.2.840.113549.2.9"));
+        return WriteFile("key.pem", PemEncoding.WriteString("ENCRYPTED PRIVATE KEY", encrypted));
+    }
+
     private void AssertUnusable(X509Certificate2 certificate, byte[] privateKeyInfo)
     {
         var (loaded, failure) = Load(certificate, privateKeyInfo, asDer: true);
