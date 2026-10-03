@@ -24,16 +24,10 @@ internal static class SmbMessages
     /// <summary>Exit 55, an upload from a source whose size cannot be known, such as <c>-T -</c>.</summary>
     public const string UploadSizeUnknown = "SMB upload needs to know the size up front";
 
-    /// <summary>Exit 55, a request the socket filter could not send because the peer reset the connection.</summary>
-    public const string SendConnectionReset = "Send failure: Connection was reset";
-
-    /// <summary>Exit 55, a request that could not be sent for any other reason.</summary>
+    /// <summary>Exit 55, a request that could not be sent for a reason with no socket error in it.</summary>
     public const string SendFailed = "Failed sending data to the peer";
 
-    /// <summary>Exit 56, a reply the socket filter could not receive because the peer reset the connection.</summary>
-    public const string ReceiveConnectionReset = "Recv failure: Connection was reset";
-
-    /// <summary>Exit 56, a message whose byte count runs past its frame, or a reply that could not be received for any other reason.</summary>
+    /// <summary>Exit 56, a message whose byte count runs past its frame, or a reply that could not be received for a reason with no socket error in it.</summary>
     public const string ReceiveFailed = "Failure when receiving data from the peer";
 
     /// <summary>Exit 56, a read response whose data runs past the bytes received.</summary>

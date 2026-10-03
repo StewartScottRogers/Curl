@@ -8,7 +8,7 @@ depends-on: [BL-1325]
 touches: [Curl.Protocol.Smb.UnitLibrary, Curl.Protocol.Smb.UnitTests]
 requirement: FR-085
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1344 — Word every smb socket send and receive failure with the shared CurlSocketErrorText table
 
@@ -25,14 +25,20 @@ An `smb://` message send or read that fails with any socket error ends with curl
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Smb.UnitTests` makes a read throw `IOException` wrapping `SocketException(SocketError.ConnectionAborted)` and asserts exit 56 with `Recv failure: Connection was aborted` (Windows-only), plus a non-Windows twin with `Recv failure: ` + the exception's own message.
-- [ ] A test makes a send fail the same way and asserts exit 55 with `Send failure: Connection was aborted` (Windows) and its twin.
-- [ ] Every existing reset test is split by platform; an `IOException` with no socket error still gives the fallback texts.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean (the public constants' removal breaks no other project); `dotnet test Curl.Protocol.Smb.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smb.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Smb.UnitTests` makes a read throw `IOException` wrapping `SocketException(SocketError.ConnectionAborted)` and asserts exit 56 with `Recv failure: Connection was aborted` (Windows-only), plus a non-Windows twin with `Recv failure: ` + the exception's own message.
+- [x] A test makes a send fail the same way and asserts exit 55 with `Send failure: Connection was aborted` (Windows) and its twin.
+- [x] Every existing reset test is split by platform; an `IOException` with no socket error still gives the fallback texts.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean (the public constants' removal breaks no other project); `dotnet test Curl.Protocol.Smb.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Smb.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- `SmbIoFailures` now words every socket error through `CurlSocketErrorText.SendFailure` / `ReceiveFailure`, falling back to `SmbMessages.SendFailed` / `ReceiveFailed` when the `IOException` carries no `SocketException`. `SmbMessages.SendConnectionReset` and `ReceiveConnectionReset` are removed; grep found no user outside the library.
+- The `-v` line needs no change: `SmbMessages` already gives every text but `curl_easy_strerror`'s a `-v` line, so the new `Send failure:` / `Recv failure:` texts keep one.
+- Tests: each reset test is split into an `[OSCondition(Windows)]` test pinning the Winsock words and an off-Windows twin asserting `SocketException.Message`; the no-socket-error cases run on every platform. `ConnectionAborted` rows cover a send (session setup write) and a read (negotiate reply).
+- Verified: `dotnet build Curl.slnx -warnaserror` clean; all fast tests green (Smb 140 passed, 10 off-Windows twins skipped); `Measure-CodeQuality.ps1 -Library Curl.Protocol.Smb.UnitLibrary` reports 0 failing members.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. smb send and receive failures word every socket error with CurlSocketErrorText (exit 55/56); fallback texts kept
