@@ -1721,7 +1721,7 @@ public sealed partial class TcpConnector(
             return OpenedInPlaintext(dialed, target, timings, proxyConnectResponseCode);
         }
 
-        var secured = await AuthenticateTargetAsync(dialed.Connection, target, writesSslFilterAdded, cancellationToken).ConfigureAwait(false);
+        var secured = await AuthenticateTracingRecordsAsync(dialed, target, writesSslFilterAdded, cancellationToken).ConfigureAwait(false);
         if (secured.Connection is not { } securedConnection)
         {
             return secured;
@@ -1742,6 +1742,30 @@ public sealed partial class TcpConnector(
             dialed,
             target.Events);
     }
+
+    // Runs the target's handshake over the dialled connection, traced as TLS records when
+    // TlsRecordTraceFor says so, the trace moving to the application data's lines once it succeeds.
+    private async ValueTask<ConnectResult> AuthenticateTracingRecordsAsync(DialedSocket dialed, ConnectTarget target, bool writesSslFilterAdded, CancellationToken cancellationToken)
+    {
+        var recordTrace = TlsRecordTraceFor(dialed.Connection, dialed.TracesTcpFilter, target);
+        var secured = await AuthenticateTargetAsync(recordTrace ?? dialed.Connection, target, writesSslFilterAdded, cancellationToken).ConfigureAwait(false);
+        if (secured.Connection is not null)
+        {
+            recordTrace?.Lines = TcpIoTraceConnection.HttpsApplicationDataLines;
+        }
+
+        return secured;
+    }
+
+    // A direct https connection dialled under TracesTcpFilter writes curl 8.21.0's [TCP] send and recv
+    // lines for the TLS records below the TLS filter: the handshake's with Schannel's 4096-byte reads,
+    // then the application data's with its 103424-byte reads, and no [TCP] query ALPN line, as TLS
+    // answers that (measured, BL-1253 Notes; ADR-0357's BL-1260 amendment). Through a proxy or a
+    // tunnel the TCP filter sits below the proxy's, so its records are not written.
+    internal static TcpIoTraceConnection? TlsRecordTraceFor(IConnection dialed, bool tracesTcpFilter, ConnectTarget target) =>
+        tracesTcpFilter &&target.Proxy is null && !target.IsForwardProxy && target.PoolScheme == "https"
+            ? new TcpIoTraceConnection(dialed, target.Events, TcpIoTraceConnection.HttpsHandshakeLines)
+            : null;
 
     // A plain HTTP connection dialled under TracesTcpFilter writes curl 8.21.0's [TCP] send and recv
     // lines for its I/O, and [TCP] query ALPN after the setup filters' removal, before the handler's

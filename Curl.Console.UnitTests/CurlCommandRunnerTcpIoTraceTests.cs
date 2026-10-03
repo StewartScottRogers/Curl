@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
@@ -23,6 +24,8 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
     private readonly MemoryStream standardError = new();
 
     private byte[][] serverReads = [FortyByteResponse];
+
+    private ITlsProvider tlsProvider = new PassThroughTlsProvider();
 
     [TestMethod]
     [DataRow("tcp")]
@@ -169,6 +172,44 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
                 || line.Contains("] send(len=", StringComparison.Ordinal) || line.Contains("] recv(len=", StringComparison.Ordinal)).ToArray());
     }
 
+    [TestMethod]
+    [DataRow("-v", "--trace-config", "tcp")]
+    [DataRow("-v", "--trace-config", "network")]
+    [DataRow("-v", "--trace-config", "all")]
+    [DataRow("-vvvv")]
+    public async Task RunAsync_HttpsGetUnderTraceConfigTcp_WritesTheHandshakeRecordsThenTheApplicationDataRecordsBesideTheHeaders(params string[] arguments)
+    {
+        // curl -s -v -k --trace-config tcp https://127.0.0.1:P/ (BL-1253 Notes): the handshake's records
+        // with Schannel's 4096-byte reads, the request's and response's with its 103424-byte reads, and
+        // no [TCP] query ALPN. The scripted server answers at once, so no would-block recv line is written.
+        serverReads = [new byte[81], new byte[1175], new byte[51], FortyByteResponse];
+        tlsProvider = new RecordExchangingTlsProvider();
+
+        int exitCode = await RunAsync([.. arguments, "https://127.0.0.1:47195/"]);
+
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[TCP] send(len=429) -> 0, 429",
+                "[TCP] recv(len=4096) -> 0, 81",
+                "[TCP] recv(len=4096) -> 0, 1175",
+                "[TCP] send(len=158) -> 0, 158",
+                "[TCP] recv(len=4096) -> 0, 51",
+                "[TCP] send(len=79) -> 0, 79",
+                "> GET / HTTP/1.1",
+                "> Accept: */*",
+                "[TCP] recv(len=103424) -> 0, 40",
+                "< HTTP/1.1 200 OK",
+                "< ",
+            },
+            StandardErrorLines()
+                .Select(line => line.Contains("[TCP] ", StringComparison.Ordinal) ? line[line.IndexOf("[TCP] ", StringComparison.Ordinal)..] : Regex.Replace(line, @"^.*] (?=[<>] )", ""))
+                .Where(line => (line.StartsWith("[TCP] ", StringComparison.Ordinal) && line.Contains("(len=", StringComparison.Ordinal)) || line.Contains("ALPN", StringComparison.Ordinal)
+                    || line is "> GET / HTTP/1.1" or "> Accept: */*" or "< HTTP/1.1 200 OK" or "< ")
+                .ToArray());
+    }
+
     // The lines from Established connection to the response's blank line, every other component's
     // trace lines set aside.
     private string[] TransferLines()
@@ -196,7 +237,7 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
             parsed.Options,
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector(serverReads)),
-            new PassThroughTlsProvider(),
+            tlsProvider,
             TimeProvider.System,
             HttpProxyTunnelOptions.Default);
         InMemoryFileSystem files = new();
@@ -213,5 +254,24 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
                 new MemoryStream(),
                 runsOnWindows: true)
             .RunAsync(["-s", .. arguments]);
+    }
+
+    /// <summary>
+    /// A TLS provider whose handshake writes and reads records of curl's measured sizes over the
+    /// plaintext connection - a 429-byte hello, two reads, a 158-byte finish and a third read - and
+    /// returns that connection as secured, so the request and response pass through it as written.
+    /// </summary>
+    private sealed class RecordExchangingTlsProvider : ITlsProvider
+    {
+        public async ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, CancellationToken cancellationToken)
+        {
+            byte[] buffer = new byte[4096];
+            await plaintext.WriteAsync(new byte[429], cancellationToken);
+            await plaintext.ReadAsync(buffer, cancellationToken);
+            await plaintext.ReadAsync(buffer, cancellationToken);
+            await plaintext.WriteAsync(new byte[158], cancellationToken);
+            await plaintext.ReadAsync(buffer, cancellationToken);
+            return ConnectResult.Connected(plaintext);
+        }
     }
 }
