@@ -35,3 +35,4 @@ An `rtsp://` request send or reply read that fails with any socket error ends wi
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
