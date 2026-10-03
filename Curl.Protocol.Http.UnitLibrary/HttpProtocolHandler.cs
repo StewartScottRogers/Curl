@@ -1323,7 +1323,8 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Reports that the request went out, as curl 8.21.0 does (measured, BL-407 Notes):
-    /// <c>Request completely sent off</c> for a request without a body, and
+    /// <c>Request completely sent off</c> for a request without a body or whose body put no
+    /// bytes on the wire (an empty <c>-d ''</c> or <c>-T</c> file, BL-1216 Notes), and
     /// <c>upload completely sent off: N bytes</c> once a whole body has been sent; nothing for
     /// a body a final status stopped.
     /// </summary>
@@ -1335,7 +1336,7 @@ public sealed class HttpProtocolHandler(
         }
         else if (!bodyLeftUnsent && !upload.CutShort)
         {
-            events.ReportInfo(HttpConnectionInfoLines.UploadSent(upload.BytesSent));
+            events.ReportInfo(upload.BytesSent == 0 ? HttpConnectionInfoLines.RequestSent : HttpConnectionInfoLines.UploadSent(upload.BytesSent));
         }
     }
 

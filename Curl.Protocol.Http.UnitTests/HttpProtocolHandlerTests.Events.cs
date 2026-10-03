@@ -87,6 +87,52 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_PostWithEmptyData_ReportsRequestCompletelySentOff()
+    {
+        // curl -s -v -d '' http://127.0.0.1:18216/p: no data line, then "Request completely
+        // sent off", not "upload completely sent off: 0 bytes" (BL-1216 Notes).
+        const string head = "POST /p HTTP/1.1\r\nHost: 127.0.0.1:18216\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Content-Length: 0\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n";
+        ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", 65536, head);
+        RecordingTransferEvents events = new();
+        HttpRequestOptions options = new() { Body = new BytesBody(ReadOnlyMemory<byte>.Empty, "application/x-www-form-urlencoded") };
+
+        TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, connectionNumber: 0)))
+            .ExecuteAsync(EventsContext("http://127.0.0.1:18216/p", events, options));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "* using HTTP/1.x", "> " + head, "* Request completely sent off", "< HTTP/1.1 200 OK\r\n" },
+            events.Events.Take(4).ToArray(),
+            string.Join('\n', events.Events));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadOfAnEmptyFile_ReportsRequestCompletelySentOff()
+    {
+        // curl -s -v -T empty.txt http://127.0.0.1:18217/u: "Content-Length: 0", no data
+        // line, then "Request completely sent off" (BL-1216 Notes).
+        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18217\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nContent-Length: 0\r\n\r\n";
+        ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", 65536, head);
+        RecordingTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:18217/u"),
+            Output = new MemoryStream(),
+            Upload = new MemoryStream(),
+            Events = events,
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "* using HTTP/1.x", "> " + head, "* Request completely sent off", "< HTTP/1.1 200 OK\r\n" },
+            events.Events.Take(4).ToArray(),
+            string.Join('\n', events.Events));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ChunkedUploadAfterTheContinueWait_ReportsEachChunkWithItsFramingAndTheBytesOnTheWire()
     {
         // printf abcde | curl -s --trace-ascii - -T - http://127.0.0.1:18475/u: "Done waiting
