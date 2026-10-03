@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
 requirement: FR-034
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1326 — Accept an ACK of block 65535 when a TFTP upload expects block 0, as curl does for tftpd-hpa
 
@@ -24,14 +24,17 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Tftp.UnitTests` runs an upload through the fake datagram channel whose server answers the write request with `ACK 65535` and asserts DATA block 1 is sent next, no `Received ACK for block 65535, expecting 0` info line is reported, and the upload completes with exit 0.
-- [ ] A test runs an upload long enough to wrap (more than 65535 blocks of the smallest block size the tests allow, or a seam that starts the block counter near the wrap if one exists; say which in the test comment), answers the ACK expected as block 0 with `ACK 65535`, and asserts the next block is sent without a resend.
-- [ ] A test pins that an ACK of 65535 while expecting any block other than 0 is still unexpected: the `Received ACK for block 65535, expecting N` line and a resend, as today.
-- [ ] `dotnet build Curl.Protocol.Tftp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Tftp.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Tftp.UnitTests` runs an upload through the fake datagram channel whose server answers the write request with `ACK 65535` and asserts DATA block 1 is sent next, no `Received ACK for block 65535, expecting 0` info line is reported, and the upload completes with exit 0.
+- [x] A test runs an upload long enough to wrap (more than 65535 blocks of the smallest block size the tests allow, or a seam that starts the block counter near the wrap if one exists; say which in the test comment), answers the ACK expected as block 0 with `ACK 65535`, and asserts the next block is sent without a resend.
+- [x] A test pins that an ACK of 65535 while expecting any block other than 0 is still unexpected: the `Received ACK for block 65535, expecting N` line and a resend, as today.
+- [x] `dotnet build Curl.Protocol.Tftp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Tftp.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- `TftpUpload.IsExpectedAcknowledgement` accepts ACK 65535 while block 0 is awaited (`lastSentBlock == 0`), matching curl 8.21.0 `tftp_tx`; the OACK path, which passes block 0, is unaffected. Tests are in `TftpUploadBlockWrapTests`. The wrap test runs 65537 real blocks at OACK `blksize 8`, because no seam starts the counter near the wrap. Delivered directly rather than through the full `/protocol` stages: it is a one-line condition. 209 TFTP tests pass; Measure-CodeQuality reports 0 failing members.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. A TFTP upload takes ACK 65535 as the awaited ACK of block 0 (WRQ and after the wrap), as curl does for tftpd-hpa

@@ -64,7 +64,9 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
 - Upload only: an ACK of the wrong block re-sends the last packet at once and counts a
   retry (one too many is exit 55 `tftp_tx: giving up waiting for block N ack`), without
   moving the next scheduled re-send. Before DATA 1, a re-send after an ACK is the WRQ's
-  first four bytes, as curl sends.
+  first four bytes, as curl sends. While block 0 is awaited (the WRQ's ACK, or the ACK
+  after the block number wraps from 65535 to 0), an ACK of 65535 counts as the awaited
+  one, as curl 8.21.0's `tftp_tx` accepts it for tftpd-hpa (BL-1326).
 - Upload only: an OACK that arrives after DATA 1 is taken as curl 8.21.0 takes it: its
   `blksize` comes into force and the block count restarts, so the next DATA is block 1
   again, carrying the next bytes of the upload (nothing is re-read) at the new size.

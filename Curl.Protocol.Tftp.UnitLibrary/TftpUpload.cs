@@ -205,7 +205,7 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
     /// <summary>
     /// Answers the acknowledgement of <paramref name="block" />: the first one re-derives
     /// the schedule from the maximum time left; one of a block other than the one last sent
-    /// re-sends it; one of the last block ends the transfer; any other sends the next block
+    /// (see <see cref="IsExpectedAcknowledgement" />) re-sends it; one of the last block ends the transfer; any other sends the next block
     /// to the endpoint the acknowledgement came from, which is the server's transfer
     /// identifier (RFC 1350 section 4).
     /// </summary>
@@ -225,7 +225,7 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
             lastPacket = lastPacket[..TftpPackets.DataHeaderLength];
         }
 
-        if (block != lastSentBlock)
+        if (!IsExpectedAcknowledgement(block))
         {
             events.UnexpectedAcknowledgement(block, lastSentBlock);
             return await ResendAsync().ConfigureAwait(false)
@@ -245,6 +245,17 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
         await SendNextBlockAsync(source).ConfigureAwait(false);
         return null;
     }
+
+    /// <summary>
+    /// Tells whether <paramref name="block" /> acknowledges the block last sent. As curl
+    /// 8.21.0's <c>tftp_tx</c> does for a tftpd-hpa bug, an ACK of 65535 also counts while
+    /// block 0 is awaited: the write request's own ACK, and the ACK after the block number
+    /// wraps from 65535 to 0.
+    /// </summary>
+    /// <param name="block">The block acknowledged.</param>
+    /// <returns><see langword="true" /> when the acknowledgement is the one awaited.</returns>
+    private bool IsExpectedAcknowledgement(ushort block) =>
+        block == lastSentBlock || (lastSentBlock == 0 && block == ushort.MaxValue);
 
     /// <summary>
     /// Re-sends the last packet and counts a retry, unless the retries have run out.
