@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Dict;
@@ -11,16 +10,10 @@ namespace Curl.Protocol.Dict;
 /// </summary>
 internal static class DictIoFailures
 {
-    /// <summary>The exit 55 message for a write the peer reset.</summary>
-    internal const string SendConnectionReset = "Send failure: Connection was reset";
-
-    /// <summary>The exit 55 message for any other failed write.</summary>
+    /// <summary>The exit 55 message for a failed write that carries no socket error.</summary>
     internal const string SendFailedMessage = "Failed sending data to the peer";
 
-    /// <summary>The exit 56 message for a read the peer reset.</summary>
-    internal const string ReceiveConnectionReset = "Recv failure: Connection was reset";
-
-    /// <summary>The exit 56 message for any other failed read.</summary>
+    /// <summary>The exit 56 message for a failed read that carries no socket error.</summary>
     internal const string ReceiveFailedMessage = "Failure when receiving data from the peer";
 
     /// <summary>The line <c>lib/dict.c</c> reports through <c>failf</c> after any failed send.</summary>
@@ -30,14 +23,14 @@ internal static class DictIoFailures
     /// <param name="exception">What the connection threw.</param>
     /// <returns>The failed transfer, with nothing written.</returns>
     internal static TransferResult SendFailed(IOException exception) =>
-        TransferResult.Failure(CurlExitCode.SendError, IsReset(exception) ? SendConnectionReset : SendFailedMessage);
+        TransferResult.Failure(CurlExitCode.SendError, CurlSocketErrorText.SendFailure(exception) ?? SendFailedMessage);
 
     /// <summary>Makes the exit 56 result for a read that threw <paramref name="exception" />.</summary>
     /// <param name="bytesWritten">The bytes written to the output before the read failed.</param>
     /// <param name="exception">What the connection threw.</param>
     /// <returns>The failed transfer.</returns>
     internal static TransferResult ReceiveFailed(long bytesWritten, IOException exception) =>
-        new(CurlExitCode.RecvError, bytesWritten, IsReset(exception) ? ReceiveConnectionReset : ReceiveFailedMessage);
+        new(CurlExitCode.RecvError, bytesWritten, CurlSocketErrorText.ReceiveFailure(exception) ?? ReceiveFailedMessage);
 
     /// <summary>Makes the exit 23 result for an output write that threw <paramref name="exception" />.</summary>
     /// <param name="bytesWritten">The bytes written to the output before this write.</param>
@@ -61,7 +54,4 @@ internal static class DictIoFailures
     /// <returns><see langword="true" /> for the two fallback texts.</returns>
     internal static bool IsFallbackText(string message) =>
         message is SendFailedMessage or ReceiveFailedMessage;
-
-    private static bool IsReset(IOException exception) =>
-        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset };
 }

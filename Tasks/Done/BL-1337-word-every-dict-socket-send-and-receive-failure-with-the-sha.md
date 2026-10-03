@@ -8,7 +8,7 @@ depends-on: [BL-1325]
 touches: [Curl.Protocol.Dict.UnitLibrary, Curl.Protocol.Dict.UnitTests]
 requirement: FR-085
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1337 — Word every dict socket send and receive failure with the shared CurlSocketErrorText table
 
@@ -25,15 +25,20 @@ A `dict://` send or receive that fails with any socket error ends with curl 8.21
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Dict.UnitTests` makes the fake connection's read throw `IOException` wrapping `SocketException(SocketError.ConnectionAborted)` and asserts exit 56 (`CurlExitCode.RecvError`) with message `Recv failure: Connection was aborted`, marked Windows-only, and a non-Windows twin asserting `Recv failure: ` + the `SocketException`'s own message.
-- [ ] A test makes the request's send throw the same and asserts exit 55 (`CurlExitCode.SendError`) with `Send failure: Connection was aborted` on Windows, and its non-Windows twin.
-- [ ] Every existing reset test is split by platform as Context describes, and an `IOException` with no socket error inside still gives the fallback texts.
-- [ ] `DictIoFailures` no longer declares its own `Connection was reset` constants.
-- [ ] `dotnet build Curl.Protocol.Dict.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Dict.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Dict.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Dict.UnitTests` makes the fake connection's read throw `IOException` wrapping `SocketException(SocketError.ConnectionAborted)` and asserts exit 56 (`CurlExitCode.RecvError`) with message `Recv failure: Connection was aborted`, marked Windows-only, and a non-Windows twin asserting `Recv failure: ` + the `SocketException`'s own message.
+- [x] A test makes the request's send throw the same and asserts exit 55 (`CurlExitCode.SendError`) with `Send failure: Connection was aborted` on Windows, and its non-Windows twin.
+- [x] Every existing reset test is split by platform as Context describes, and an `IOException` with no socket error inside still gives the fallback texts.
+- [x] `DictIoFailures` no longer declares its own `Connection was reset` constants.
+- [x] `dotnet build Curl.Protocol.Dict.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Dict.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Dict.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Delivered directly (a two-line library change, no plan stage needed): `DictIoFailures` words send and receive failures with `CurlSocketErrorText.SendFailure` / `ReceiveFailure` and keeps its fallback texts for an `IOException` that carries no `SocketException`. The two reset constants and `IsReset` are gone; `IsFallbackText` is unchanged.
+- Tests: the two reset tests are Windows-only, each with a non-Windows twin asserting the `SocketException`'s own message; four new aborted tests (send and receive, each with its twin). The existing `*FailsOtherwise` tests still pin the fallback texts.
+- Gates: `Curl.Protocol.Dict.UnitTests` builds clean with -warnaserror; 85 passed, 4 skipped (the off-Windows twins) on Windows; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Dict.UnitLibrary` reports 0 failing members.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. dict send/receive socket failures are worded by the shared CurlSocketErrorText table per platform
