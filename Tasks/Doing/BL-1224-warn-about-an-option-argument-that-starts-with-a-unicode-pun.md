@@ -36,3 +36,4 @@ On Linux and macOS, `CommandLineParser` writes `Warning: The argument '<value>' 
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
