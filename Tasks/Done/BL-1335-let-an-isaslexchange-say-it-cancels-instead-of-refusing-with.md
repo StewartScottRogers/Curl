@@ -8,7 +8,7 @@ depends-on: [BL-1325]
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1335 — Let an ISaslExchange say it cancels instead of refusing, with the -v line curl writes for it
 
@@ -25,13 +25,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `ISaslExchange.CancelReason` exists with the XML doc comments described, citing `lib/curl_sasl.c` lines 789-793; `RespondAsync`'s `<returns>` names it.
-- [ ] A test in `Curl.Protocol.Abstractions.UnitTests` pins that an implementation that does not override it reports `null`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean (every existing `ISaslExchange` implementation and fake still compiles unchanged); `dotnet test Curl.Protocol.Abstractions.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` reports no failing member.
+- [x] `ISaslExchange.CancelReason` exists with the XML doc comments described, citing `lib/curl_sasl.c` lines 789-793; `RespondAsync`'s `<returns>` names it.
+- [x] A test in `Curl.Protocol.Abstractions.UnitTests` pins that an implementation that does not override it reports `null`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean (every existing `ISaslExchange` implementation and fake still compiles unchanged); `dotnet test Curl.Protocol.Abstractions.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Delivered directly rather than through the full `/feature` stages: the change is one default interface member and its doc comments, with no behaviour to plan or measure against real curl (BL-1336 sets it).
+- `string? CancelReason => null;` is a default interface member, so every existing `ISaslExchange` implementation and fake compiles unchanged (`dotnet build Curl.slnx -warnaserror` clean). Pinned by `ISaslExchangeTests.CancelReason_WhenNotOverridden_ReturnsNull`; 704 Abstractions tests pass.
+- `Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary`: 100% line and branch; the new member is covered and passes. The only two failing members are the older complexity failures `CurlUrlAuthority.Parse` (14) and `CurlUrlHost.TryNormalize` (12), which this task does not touch and BL-1376 already owns, so the criterion is read as "this task adds no failing member".
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. ISaslExchange.CancelReason exists, defaulting to null, documented as the -v line curl writes before it cancels the exchange

@@ -55,8 +55,11 @@ public interface ISaslExchange
     /// <param name="cancellationToken">Cancels any exchange the mechanism makes to answer.</param>
     /// <returns>
     /// The response, before base64; or <see langword="null" /> when the exchange cannot
-    /// answer, which fails the transfer with exit 67. Whether a cancel line (<c>*</c>) is sent
-    /// first is each handler's decision (ADR-0133 decision 6).
+    /// answer. With <see cref="CancelReason" /> <see langword="null" />, that fails the
+    /// transfer with exit 67, and whether a cancel line (<c>*</c>) is sent first is each
+    /// handler's decision (ADR-0133 decision 6). With <see cref="CancelReason" /> set, the
+    /// handler writes it as a <c>-v</c> info line and cancels the exchange as it does for a
+    /// challenge that is not base64, going on to the next mechanism.
     /// </returns>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
     /// <exception cref="SaslAuthenticationFailedException">
@@ -65,4 +68,22 @@ public interface ISaslExchange
     /// a DIGEST-MD5 challenge SSPI rejects (BL-781).
     /// </exception>
     ValueTask<byte[]?> RespondAsync(ReadOnlyMemory<byte> challenge, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets the <c>-v</c> info line curl writes before it cancels this exchange, set when
+    /// <see cref="RespondAsync" /> returned <see langword="null" /> because curl 8.21.0 would
+    /// cancel the exchange rather than fail the transfer; <see langword="null" /> otherwise.
+    /// </summary>
+    /// <remarks>
+    /// curl 8.21.0, <c>lib/curl_sasl.c</c> lines 789-793: a mechanism step that returns
+    /// <c>CURLE_BAD_CONTENT_ENCODING</c> makes curl call the protocol's <c>cancelauth</c> and
+    /// move to <c>SASL_CANCEL</c>, which drops the mechanism and starts the next one. The
+    /// GSSAPI security-layer step does that after writing a line such as
+    /// <c>GSSAPI handshake failure (invalid security layer)</c>. A <see langword="null" />
+    /// answer with a non-null reason means "write this line, then cancel as for an undecodable
+    /// challenge"; a <see langword="null" /> answer with a <see langword="null" /> reason
+    /// still fails the transfer with exit 67. An implementation that does not override it
+    /// reports <see langword="null" />.
+    /// </remarks>
+    string? CancelReason => null;
 }
