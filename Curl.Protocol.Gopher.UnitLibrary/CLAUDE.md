@@ -8,6 +8,11 @@ connection, as curl 8.21.0 does. `GopherSelector` builds the selector: the path 
 query as written (dot segments removed, still percent-encoded) less their first two
 characters, then percent-decoded.
 
+`-I` and `--max-filesize` (BL-1308): under `ITransferContext.NoBody` the handler sends the
+selector and ends with exit 0 without reading; with `ITransferContext.MaxFileSize` above 0
+it writes the reply up to the limit and, when a read goes past it, cuts it there and ends
+with exit 63 and `Exceeded the maximum allowed file size (N) with N bytes`.
+
 **URL schemes:** `gopher` (default port 70), `gophers` (default port 70, the same
 handler with `ConnectTarget.UseTls` true)
 

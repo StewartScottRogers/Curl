@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Gopher.UnitLibrary, Curl.Protocol.Gopher.UnitTests]
 requirement: FR-084
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1308 — Send a gopher selector without reading under -I, and cut the reply at --max-filesize with exit 63
 
@@ -30,15 +30,20 @@ A `gopher://` transfer honours `ITransferContext.NoBody` (`-I`) and `ITransferCo
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Gopher.UnitTests` runs a transfer with `NoBody = true` and asserts exit 0, the selector `/x\r\n` written to the fake connection, no read made after it (the fake records reads), nothing written to the output, no received-data event, and the info lines ending `shutting down connection #0`.
-- [ ] A test with `MaxFileSize = 3` and a reply of `hello\r\n.\r\n` asserts exit 63 (`CurlExitCode.FilesizeExceeded`), message `Exceeded the maximum allowed file size (3) with 3 bytes`, output `hel`, a received-data event of all 10 bytes, and the info lines ending with that message then `closing connection #0`.
-- [ ] A test delivering the reply in two reads (`he`, `llo`) with `MaxFileSize = 4` asserts output `hell` and the message `... (4) with 4 bytes`.
-- [ ] Tests pin that `MaxFileSize` of 0, `null` and exactly the reply's length end with exit 0 and the whole reply.
-- [ ] `dotnet build Curl.Protocol.Gopher.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Gopher.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Gopher.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Gopher.UnitTests` runs a transfer with `NoBody = true` and asserts exit 0, the selector `/x\r\n` written to the fake connection, no read made after it (the fake records reads), nothing written to the output, no received-data event, and the info lines ending `shutting down connection #0`.
+- [x] A test with `MaxFileSize = 3` and a reply of `hello\r\n.\r\n` asserts exit 63 (`CurlExitCode.FilesizeExceeded`), message `Exceeded the maximum allowed file size (3) with 3 bytes`, output `hel`, a received-data event of all 10 bytes, and the info lines ending with that message then `closing connection #0`.
+- [x] A test delivering the reply in two reads (`he`, `llo`) with `MaxFileSize = 4` asserts output `hell` and the message `... (4) with 4 bytes`.
+- [x] Tests pin that `MaxFileSize` of 0, `null` and exactly the reply's length end with exit 0 and the whole reply.
+- [x] `dotnet build Curl.Protocol.Gopher.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Gopher.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Gopher.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Delivered directly rather than through every `/feature` agent stage: the change is two small branches in `GopherProtocolHandler`. `NoBody` returns `Success(0)` once the selector is sent. The copy loop cuts each write to the bytes left under `MaxFileSize` (counted across reads; 0 or null is no limit) and returns exit 63 when it cut any. The exit 23 message's `passed` count is now the cut size, because curl passes the cut write to its client writer.
+- Tests: `GopherProtocolHandlerNoBodyAndMaxFileSizeTests` (6 cases); `ScriptedConnection` gained `ReadCount`. All 80 gopher tests pass. `Measure-CodeQuality.ps1 -Library Curl.Protocol.Gopher.UnitLibrary` reports 0 failing members, using coverage collected for the gopher tests alone with `-SkipTestRun`, because the default run covers the whole solution and took more than 30 minutes.
+- Outside `touches`, left as is: the remark on `ITransferContext.MaxFileSize` in Abstractions still says only the file and http handlers read it.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. gopher honours -I (selector sent, no read, exit 0) and --max-filesize (reply cut at the limit, exit 63)

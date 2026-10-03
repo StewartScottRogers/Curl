@@ -60,10 +60,16 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
     /// <inheritdoc />
     public EndPoint? RemoteEndPoint => null;
 
+    /// <summary>
+    /// Gets the number of reads the handler made.
+    /// </summary>
+    public int ReadCount { get; private set; }
+
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ReadCount++;
         if (!pendingReads.TryDequeue(out byte[]? chunk))
         {
             return ValueTask.FromResult(0);
