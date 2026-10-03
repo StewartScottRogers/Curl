@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 
 ## Re-audits
 
+- 2026-10-03 | 2026-10-03_1233.md | reproduces: no | BL-1289 is absent from the tool output; only BL-1322 has 3 or more claims.
+
 ## Log
 
 - 2026-10-03: filed proposed.

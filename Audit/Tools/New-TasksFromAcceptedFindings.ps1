@@ -167,7 +167,7 @@ if ($SelfTest) {
             $touchesLine = if ($t -match '(?m)^touches:[^\r\n]*') { $Matches[0] } else { '(none)' }
             Check 'touches the folder the location names' ($touchesLine -eq 'touches: [Curl.Cli.UnitTests]') $touchesLine
             Check 'no template comment left' ($t -notmatch '<!--') 'none'
-            Check 'the finding names the task' ([IO.File]::ReadAllText((Join-Path $work 'findings\AF-0001-x.md')) -match "(?m)^task: $id$") $id
+            Check 'the finding names the task' ([IO.File]::ReadAllText((Join-Path $work 'findings\AF-0001-x.md')) -match "(?m)^task: $id\r?$") $id
         }
         $others = @('AF-0002-x.md', 'AF-0003-x.md', 'AF-0004-x.md', 'AF-0005-x.md', 'AF-0006-x.md' | Where-Object { [IO.File]::ReadAllText((Join-Path $work "findings\$_")) -cne $before[$_] })
         Check 'the other five findings, deferred and blocked included, are byte-identical' ($others.Count -eq 0) "changed: $($others -join ',')"

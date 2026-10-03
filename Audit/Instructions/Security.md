@@ -102,3 +102,7 @@ Follow the key rule in [Report-Format.md](Report-Format.md). Kinds: `fuzz-crash`
 `timing-leak`, `secret-dependent-branch`, `secret-dependent-lookup` (a table read at a secret
 index, as in an S-box cipher), `secret-in-output`, `secret-in-log`,
 `untested-parser`, `unfuzzable`.
+
+## Method counts
+
+Run every step above on every audit; re-audits come on top, never instead. Report ``method.fuzzTargets`` and ``method.timingSitesRead`` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).

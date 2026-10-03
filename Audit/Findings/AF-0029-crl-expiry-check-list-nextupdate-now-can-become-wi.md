@@ -1,0 +1,43 @@
+---
+id: AF-0029
+title: CRL expiry check `list.NextUpdate < now` can become `<=` with no test failing
+auditor: quality
+severity: Medium
+status: proposed
+reason:
+key: quality:Curl.Networking.UnitLibrary/CertificateRevocationListFile.cs:NextUpdateExpiryCheck:surviving-mutant
+task: none
+found: 2026-10-03
+found-at: d1db9881553d55cd92c0e74bb41561c3dea9ea84
+scorecard: 2026-10-03_1233.md
+closed:
+closed-by:
+---
+# AF-0029 - CRL expiry check `list.NextUpdate < now` can become `<=` with no test failing
+
+## Summary
+
+Medium finding from the quality auditor at `Curl.Networking.UnitLibrary/CertificateRevocationListFile.cs:116`: CRL expiry check `list.NextUpdate < now` can become `<=` with no test failing. Reported by an auditor flagged unreliable in 2026-10-03_1233.md.
+
+## Evidence
+
+Location: `Curl.Networking.UnitLibrary/CertificateRevocationListFile.cs:116`
+
+Invoke-MutationTest (seed 0) mutated `return list.NextUpdate < now ? OpenSslVerifyResult.CertificateRevocationListHasExpired : null;` to `<=`; outcome survived. The boundary decides whether a CRL is reported as expired, a refusal a user can see.
+
+## Reproduction
+
+Run from the repository root:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 0 -TimeoutSeconds 300 -OutFile $env:TEMP\mutation-net.json
+```
+
+- Expected: Mutant at CertificateRevocationListFile.cs:116 is killed.
+- Actual: survived  Curl.Networking.UnitLibrary/CertificateRevocationListFile.cs:116 <
+
+## Re-audits
+
+## Log
+
+- 2026-10-03: filed proposed.

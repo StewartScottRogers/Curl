@@ -40,6 +40,7 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-0
 
 - 2026-10-02 | 2026-10-02_1400.md | reproduces: no | The five costliest tasks are BL-1105 8.52, BL-710 7.29, BL-942 7.12, BL-988 6.80 and BL-1049 6.74 USD. BL-703, BL-527, BL-568, BL-658 and BL-708 are absent. 17 tasks are over 3x the median of 1.67 USD, not 31.
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction. The top five by costUsd are now BL-1259 (6.54), BL-1192, BL-1189, BL-1193 and BL-1188, not BL-703, BL-527, BL-568, BL-658 and BL-708. Nine tasks now exceed 3x the median cost (median 1.39), against 31 originally. The cost-outlier pattern persists but the named finding does not reproduce, and the log folder no longer holds the earlier tasks' logs.
+- 2026-10-03 | 2026-10-03_1233.md | reproduces: no | The top 5 by cost are BL-1284, BL-1320, BL-1287, BL-1355 and BL-1312, not BL-703, BL-527, BL-568, BL-658 and BL-708. Three tasks exceed 3x the median, not 31.
 
 ## Log
 

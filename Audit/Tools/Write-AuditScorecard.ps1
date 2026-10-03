@@ -149,12 +149,17 @@ function Test-AtPlantedLine([string]$Location, $Planted) {
     return ($line -ge $first - 2) -and ($line -le $last + 2)
 }
 
+function Test-LogPlant($Planted) {
+    # The same rule as Write-AuditFindings.ps1 (BL-1365).
+    return ("$($Planted.auditor)" -eq 'process') -and ("$($Planted.file)" -notmatch '[\\/]')
+}
 function Test-Caught($Planted, $Report) {
     foreach ($f in @($Report.findings | Where-Object { $_ })) {
         $sameFile = Test-SamePath (ConvertTo-Normalised $f.location) (ConvertTo-Normalised $Planted.file)
         $text = "$($f.title) $($f.key) $($f.evidence)"
         $fragment = "$($Planted.catch)".Trim()
         $named = $fragment -and $text.IndexOf($fragment, [StringComparison]::OrdinalIgnoreCase) -ge 0
+        if (Test-LogPlant $Planted) { if ($named) { return $true } else { continue } }
         if ($sameFile -and ($named -or (Test-AtPlantedLine "$($f.location)" $Planted))) { return $true }
     }
     return $false
@@ -173,6 +178,29 @@ function Read-Findings([string]$Directory) {
     return $all
 }
 
+# The counts each auditor reports in metrics to show it ran every step of its method
+# (Report-Format.md, "Method counts"). An auditor whose report lacks one, or gives it as
+# null or 0, ran less than its method and is unreliable: two audits running, the
+# truthfulness and process auditors did their re-audits only (BL-1364).
+$MethodCounts = @{
+    quality      = @('method.librariesMutated', 'method.testsRead')
+    security     = @('method.fuzzTargets', 'method.timingSitesRead')
+    performance  = @('method.scenariosRun')
+    conformance  = @('method.casesRun')
+    truthfulness = @('method.names', 'method.docComments', 'method.documentStatements', 'method.adrs', 'method.scriptStatements')
+    process      = @('method.rulesChecked')
+}
+
+function Get-MissingMethodCounts([string]$Auditor, $Report) {
+    $required = @($MethodCounts[$Auditor] | Where-Object { $_ })
+    if (-not $Report) { return $required }
+    $metrics = $Report.metrics
+    return @($required | Where-Object {
+        $property = if ($metrics) { $metrics.PSObject.Properties[$_] } else { $null }
+        (-not $property) -or ($null -eq $property.Value) -or ([double]$property.Value -le 0)
+    })
+}
+
 function Get-AuditState {
     # Which auditors ran, their reports, the planted defects and catches, and who is unreliable.
     $planted = @()
@@ -184,7 +212,8 @@ function Get-AuditState {
         $report = if ($ran) { Get-ReportBlock $path } else { $null }
         $mine = @($planted | Where-Object { $_.auditor -eq $a })
         $caught = @($mine | Where-Object { $report -and (Test-Caught $_ $report) }).Count
-        $unreliable = $ran -and ((-not $report) -or ($caught -lt $mine.Count) -or ($ChangedTree -contains $a))
+        $skipped = @(Get-MissingMethodCounts $a $report)
+        $unreliable = $ran -and ((-not $report) -or ($caught -lt $mine.Count) -or ($ChangedTree -contains $a) -or $skipped.Count)
         $state[$a] = [pscustomobject]@{ Ran = $ran; Report = $report; Assigned = $mine.Count; Caught = $caught; Unreliable = $unreliable }
     }
     return [pscustomobject]@{ Auditors = $state; PlantedCount = $planted.Count }
@@ -329,6 +358,10 @@ if ($SelfTest) {
         Check 'catch rates per auditor' ($rates -eq 'quality 1/1, security 0/1, performance 1/1, conformance 0/1, truthfulness 1/1, process 1/1') $rates
         $unreliable = (Get-UnreliableNames $state) -join ','
         Check 'the auditor that missed and the one with no block are unreliable, nobody else' ($unreliable -eq 'security,conformance') $unreliable
+        $reauditOnly = [pscustomobject]@{ metrics = [pscustomobject]@{} }
+        $partial = [pscustomobject]@{ metrics = [pscustomobject]@{ 'method.rulesChecked' = 0 } }
+        $full = [pscustomobject]@{ metrics = [pscustomobject]@{ 'method.rulesChecked' = 8 } }
+        Check 'a report without its method counts is a skipped method' ((@(Get-MissingMethodCounts 'truthfulness' $reauditOnly).Count -eq 5) -and (@(Get-MissingMethodCounts 'process' $partial).Count -eq 1) -and (@(Get-MissingMethodCounts 'process' $full).Count -eq 0)) 'truthfulness 5 missing, process 0 counts as missing, 8 does not'
         Check 'a catch by the wrong auditor does not count' ($state.Auditors['security'].Caught -eq 0 -and $state.Auditors['truthfulness'].Caught -eq 1) "security caught $($state.Auditors['security'].Caught)"
         $only = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -ReliabilityOnly -ReportDirectory $ReportDirectory -Manifest $Manifest -FindingsDirectory $FindingsDirectory) -join ','
         Check '-ReliabilityOnly prints exactly the two names' ($only -eq 'security,conformance') $only
@@ -347,6 +380,13 @@ if ($SelfTest) {
         Check 'the model column comes from -Models' ($text -match '\| process \| sonnet \|' -and $text -match '\| security \| opus \|') 'process sonnet, security opus'
         Check 'new findings listed' ($text -match '- \[AF-0002\]\(\.\./Findings/AF-0002-x\.md\) - High - quality - New quality finding') 'AF-0002'
         Check 'a process defect cited under logs/ is the same file' ((Test-SamePath 'logs/ci-runs.json' 'ci-runs.json') -and -not (Test-SamePath 'logs/other-ci-runs.json' 'ci-runs.json') -and (Test-SamePath 'Curl.Tls.UnitLibrary/TlsMac.cs' 'Curl.Tls.UnitLibrary/TlsMac.cs')) 'logs/ci-runs.json'
+        # The two real process reports of planted log defects (2026-10-02 and 2026-10-03, BL-1365).
+        $plant1 = [pscustomobject]@{ id = 'PD-501'; auditor = 'process'; file = 'DarkFactory-20261001-120001-L9.log'; line = $null; catch = 'BL-1121' }
+        $plant2 = [pscustomobject]@{ id = 'PD-501'; auditor = 'process'; file = 'DarkFactory-20261002-231500-L9.log'; line = 2; catch = 'BL-1289' }
+        $report1 = [pscustomobject]@{ key = 'process:logs:BL-1121:redone-work'; title = 'BL-1121 claimed 5 times'; location = 'logs/BL-1121'; evidence = 'claimed 5 times' }
+        $report2 = [pscustomobject]@{ key = 'process:logs:BL-1289:redone-work'; title = 'BL-1289 was claimed 6 times (134 minutes) before reaching Done'; location = 'logs/BL-1289-20261002-211047-L1.jsonl:1'; evidence = 'six claims' }
+        $other = [pscustomobject]@{ key = 'process:logs:BL-1300:redone-work'; title = 'BL-1300 claimed 3 times'; location = 'logs/DarkFactory-20261001-120001-L9.log'; evidence = 'three claims' }
+        Check 'a process report naming a planted log defect''s catch text is a catch, whatever file it cites' ((Test-Caught $plant1 ([pscustomobject]@{ findings = @($report1) })) -and (Test-Caught $plant2 ([pscustomobject]@{ findings = @($report2) })) -and -not (Test-Caught $plant1 ([pscustomobject]@{ findings = @($other) }))) 'both PD-501 reports; not another task'
         Check 'two runs give the same bytes' ([IO.File]::ReadAllText($second) -ceq $text) (Split-Path $second -Leaf)
     }
     finally { Remove-Item -Recurse -Force -LiteralPath $work -ErrorAction SilentlyContinue }
