@@ -44,6 +44,12 @@ internal static class ImapSessionMessages
     /// </summary>
     internal const string LoginDenied = "Login denied";
 
+    /// <summary>
+    /// Every mechanism tried was cancelled with <c>*</c> over a challenge that was not base64,
+    /// and <c>LOGIN</c> may not be sent (exit 67, BL-1220); <c>-v</c> writes it.
+    /// </summary>
+    internal const string AuthenticationCancelled = "Authentication cancelled";
+
     /// <summary><c>SELECT</c> was answered other than <c>OK</c> (exit 67).</summary>
     internal const string SelectFailed = "Select failed";
 
