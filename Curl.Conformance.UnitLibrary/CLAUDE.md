@@ -79,7 +79,11 @@ than `http`, `file` or `none`, a missing feature, a variable with no value, an u
 outside the case's log directory), writes `<client><file>` parts into
 the case's log directory, splits `<client><command>` with `UpstreamCommandLineSplitter` as
 the shell `runtests.pl` uses would, and runs curl through an `UpstreamCurlInvocation` against
-the `sws` emulation and `UnreachableDatagramConnector`, under a time limit from an injected
+the `sws` emulation and `UnreachableDatagramConnector`. The emulation's clock is the real one
+only when `CurlTimerOptions` finds a curl timer that races the server (`-m`, `-y`, `-Y`,
+`--connect-timeout`, `--expect100-timeout`); otherwise it is a `WaitSkippingTimeProvider`, which
+moves on by each wait at once, so `writedelay` and `<postcmd>` `wait` keep their order and take
+no real time (ADR-0404, BL-1355). The run is under a time limit from an injected
 `TimeProvider` (a run past it cannot be stopped, since curl's runner takes no cancellation
 token, so the case fails and the run is abandoned). `UpstreamCaseVerification` compares the `UpstreamCaseRun` against
 `<verify>` (protocol after `<strip>` / `<strippart>`, run as `UpstreamPerlSubstitution`s
