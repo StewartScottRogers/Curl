@@ -1,5 +1,5 @@
 ---
-id: BL-1282
+id: BL-1286
 title: Re-run AF-0025's reproduction after BL-1281 and have the process measurer count only pushed claims
 priority: Normal
 assignee: Claude
@@ -11,7 +11,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1282 — Re-run AF-0025's reproduction after BL-1281 and have the process measurer count only pushed claims
+# BL-1286 — Re-run AF-0025's reproduction after BL-1281 and have the process measurer count only pushed claims
 
 ## Goal
 

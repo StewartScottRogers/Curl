@@ -41,7 +41,7 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded. (Handed to BL-1282, interactive only - see Notes.)
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded. (Handed to BL-1286, interactive only - see Notes.)
 - [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
@@ -54,7 +54,7 @@ Causes, from `Curl.logs` and `git log` (the measurer itself is an audit path a l
 
 Fix in `RunDarkFactory.ps1`: `Test-RemoteReachable` and `Wait-RemoteReachable` (waits up to an hour, tracing `offline`/`online`); `Invoke-Claim` and each `Invoke-Integrate` attempt wait for origin first, so an outage no longer parks finished work; a refused claim push is traced `race`, an unheard one not at all, so only pushed claims are traced `claim`. Help text updated. `-TestPark` gained two cases (reachable origin; unreachable origin traced and reported) - 9/9 pass.
 
-Decision (default taken): the first criterion cannot be checked by a lane - the reproduction runs an audit-office tool the guard refuses lanes, and its `-Since 2026-09-30` window will always contain the historical log lines. Its verification, and making the measurer count only real claims, is filed as BL-1282 (`lane: no`); the finding closes only on a re-audit anyway.
+Decision (default taken): the first criterion cannot be checked by a lane - the reproduction runs an audit-office tool the guard refuses lanes, and its `-Since 2026-09-30` window will always contain the historical log lines. Its verification, and making the measurer count only real claims, is filed as BL-1286 (`lane: no`); the finding closes only on a re-audit anyway.
 
 ## Log
 
