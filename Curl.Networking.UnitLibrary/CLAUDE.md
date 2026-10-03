@@ -430,6 +430,14 @@ Per ADR-0357's BL-1192 amendment `TcpConnector.TracesHttpsConnectFilter` puts
 `HttpsConnectFirstAttemptVersion` line, poll-round pairs fixed to the loopback counts, `done=1`, the
 removal, and `all attempts failed` with the exit code); for such an origin the setup filter writes no
 `[SETUP] added` but `SslFilterAddedLine` before the handshake.
+Per ADR-0357's BL-1193 amendment a CONNECT tunnel through an `Http` or `Http10` proxy writes curl's
+`[HTTP-PROXY]` and `[H1-PROXY]` lines under `TcpConnector.TracesHttpProxyFilter` and
+`TracesH1ProxyFilter` through `HttpProxyTunnelTrace` (carried on the `DialedSocket` as `TunnelTrace`),
+with one poll round fixed, the `[HTTP-PROXY]` removal after the setup filter's and `[H1-PROXY] query
+ALPN` in place of `[TCP] query ALPN`; under `TracesSetupFilter` that path also writes `[SETUP] added`,
+`happy eyeballing to proxy H:P` (`SetupFilterTraceEvents.ToProxy`), `HttpProxyTunnelFilterAddedLine` and,
+for an `https://` origin, `SslFilterAddedLine` after the tunnel. CONNECT reply heads go to the
+`IConnectReplyHeadWritingEvents` the target's events were before any trace filter wrapped them.
 
 Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
 `--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr`, measured against curl 8.22.0's c-ares

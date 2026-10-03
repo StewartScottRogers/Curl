@@ -219,3 +219,28 @@ Schannel) and `Record-CurlExchange.ps1 -Tls` (BL-1192 Notes).
   written for it, and `[SETUP] added SSL filter for origin` is, before the handshake's lines (after
   any `[SETUP] added HAPROXY filter`, by curl's setup-filter order; unmeasured over HAPROXY).
 - Not written: through a tunnelling proxy, over a Unix socket, and over QUIC (BL-1254).
+
+## BL-1193 amendment: the [HTTP-PROXY] and [H1-PROXY] lines of a CONNECT tunnel
+
+Decided by Claude under Stewart's delegation, 2026-10-02. Measured with curl 8.21.0 (mingw,
+Schannel) and `Record-CurlExchange.ps1 -Script` playing a plain HTTP proxy (BL-1193 Notes).
+
+- `--trace-config http-proxy` writes `[HTTP-PROXY]`, `h1-proxy` writes `[H1-PROXY]`, and `proxy` and
+  a named `all` write both; `network` does not, nor does the `all` that `-vvvv` puts among the
+  components (as for `[SOCKS]`). `TcpConnector.TracesHttpProxyFilter` and `TracesH1ProxyFilter` turn
+  them on for a tunnel through an `Http` or `Http10` proxy, written by `HttpProxyTunnelTrace`.
+- Volatile: curl writes `[HTTP-PROXY] CONNECT`, `[H1-PROXY] connect` and `[H1-PROXY] CONNECT receive`
+  once more for each poll round that finds the CONNECT reply not there yet. Curl writes one such
+  round, as every loopback measurement had, between `CONNECT receive` and the reply's head.
+- `[H1-PROXY] new tunnel state 'failed'` follows `CONNECT tunnel established` too, as curl clears a
+  finished tunnel through that state; after a refusal (measured 403) it follows `CONNECT response`.
+  The `[HTTP-PROXY]` filter's removal follows the `[SETUP]` filter's, and the HTTP handler's ALPN
+  query of a plain tunnel is `[H1-PROXY] query ALPN`, never `[TCP] query ALPN`.
+- The setup filter on this path: `[SETUP] added` (not for an `https://` origin) before the `[DNS]`
+  lines, `happy eyeballing to proxy H:P` naming the proxy, `added HTTP proxy tunnel filter` before
+  `CONNECT: no ALPN negotiated`, `added SSL filter for origin` after the tunnel for an `https://`
+  origin, and its removal after `Established connection`. A refused dial writes no tunnel line.
+- The CONNECT reply heads go to the header output the target's events were before any trace filter
+  wrapped them, so tracing never loses them.
+- Not written: through an HTTPS proxy (its TLS filter's lines are unmeasured, BL-1255), and the
+  sequence of a second CONNECT after a `407` is unmeasured: each CONNECT writes the same lines.

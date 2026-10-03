@@ -242,6 +242,27 @@ public sealed partial class TcpConnector(
     public bool TracesSocksFilter { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a CONNECT tunnel through a plain HTTP proxy writes curl
+    /// 8.21.0's <c>[HTTP-PROXY]</c> lines under <c>--trace-config http-proxy</c>, <c>proxy</c> or a
+    /// named <c>all</c> (<see cref="HttpProxyTunnelTrace" />, measured, BL-1193 Notes).
+    /// </summary>
+    public bool TracesHttpProxyFilter { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a CONNECT tunnel through a plain HTTP proxy writes curl
+    /// 8.21.0's <c>[H1-PROXY]</c> lines under <c>--trace-config h1-proxy</c>, <c>proxy</c> or a
+    /// named <c>all</c> (<see cref="HttpProxyTunnelTrace" />, measured, BL-1193 Notes).
+    /// </summary>
+    public bool TracesH1ProxyFilter { get; init; }
+
+    /// <summary>
+    /// The line curl 8.21.0's setup filter writes, under <see cref="TracesSetupFilter" />, as it adds
+    /// the tunnel filter once a plain HTTP proxy's socket connected, before <c>CONNECT: no ALPN
+    /// negotiated</c> (measured, BL-1193 Notes).
+    /// </summary>
+    public const string HttpProxyTunnelFilterAddedLine = "[SETUP] added HTTP proxy tunnel filter";
+
+    /// <summary>
     /// Gets a value indicating whether a direct connect writes the <c>[HAPPY-EYEBALLS]</c> lines curl
     /// 8.21.0 writes around its connect attempts under <c>--trace-config happy-eyeballs</c>,
     /// <c>network</c> or <c>all</c> (<see cref="ConnectAttemptTraceEvents" />, BL-1161).
@@ -1055,13 +1076,8 @@ public sealed partial class TcpConnector(
         CancellationToken cancellationToken)
     {
         var firstHop = FirstHopTo(proxy);
-
-        // curl 8.21.0's DNS filter resolves the proxy it dials first (measured, BL-1181 Notes).
-        if (TracesDnsFilter)
-        {
-            target = target with { Events = DnsFilterTraceEvents.Start(target.Events, firstHop.Host, firstHop.Port, addressFamily) };
-        }
-
+        var headOutput = target.Events as IConnectReplyHeadWritingEvents;
+        target = TracingTunnelFilters(target, proxy, firstHop);
         var (addresses, failure) = await ResolveWithFailureReasonAsync(firstHop.Host, firstHop.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
@@ -1079,7 +1095,10 @@ public sealed partial class TcpConnector(
             // A 407 answered on a connection the proxy closes is sent again on a new one, as
             // curl 8.21.0 connects again ("Connect me again please", BL-602 Notes).
             var (result, redialAuthorization) = await DialAndOpenThroughProxyAsync(
-                addresses, new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge, authenticatorEvents), proxyAuthorization, cancellationToken).ConfigureAwait(false);
+                addresses,
+                new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge, authenticatorEvents) { HeadOutput = headOutput },
+                proxyAuthorization,
+                cancellationToken).ConfigureAwait(false);
             if (result is not null)
             {
                 return result;
@@ -1093,6 +1112,29 @@ public sealed partial class TcpConnector(
 
             proxyAuthorization = redialAuthorization;
             answersChallenge = true;
+        }
+    }
+
+    // curl 8.21.0's DNS filter resolves the proxy it dials first (measured, BL-1181 Notes). Through
+    // a plain HTTP proxy its setup filter writes [SETUP] added (not for an https:// origin, whose
+    // ALPN connect filter adds it) before the DNS filter's lines, and happy eyeballing to proxy
+    // before the first Trying (measured, BL-1193 Notes).
+    private ConnectTarget TracingTunnelFilters(ConnectTarget target, ProxyEndpoint proxy, ProxyEndpoint firstHop)
+    {
+        var tracesSetup = TracesSetupFilterThrough(proxy);
+        WriteTunnelSetupAddedLine(target, tracesSetup);
+        var events = TracesDnsFilter ? DnsFilterTraceEvents.Start(target.Events, firstHop.Host, firstHop.Port, addressFamily) : target.Events;
+        return target with { Events = tracesSetup ? new SetupFilterTraceEvents(events, firstHop.Host, firstHop.Port, SetupFilterTraceEvents.ToProxy) : events };
+    }
+
+    private bool TracesSetupFilterThrough(ProxyEndpoint proxy) =>
+        TracesSetupFilter && proxy.Kind is ProxyKind.Http or ProxyKind.Http10;
+
+    private static void WriteTunnelSetupAddedLine(ConnectTarget target, bool tracesSetup)
+    {
+        if (tracesSetup && !IsHttpsOrigin(target))
+        {
+            target.Events.ReportInfo(SetupFilterTraceEvents.AddedLine);
         }
     }
 
@@ -1182,14 +1224,27 @@ public sealed partial class TcpConnector(
     /// Opens the tunnel through a plain HTTP proxy after saying no ALPN was negotiated, as both
     /// builds of curl 8.21.0 do on every dial, before the CONNECT's lines (measured, BL-863, BL-1145).
     /// </summary>
+    /// <remarks>
+    /// The setup filter's line adding the tunnel filter and the tunnel's
+    /// <see cref="HttpProxyTunnelTrace" /> lines go around it, each when traced (measured, BL-1193 Notes).
+    /// </remarks>
     private ValueTask<(ConnectResult? Result, string? RedialAuthorization)> OpenPlainTunnelAsync(
         DialedSocket dialed,
         TunnelRequest tunnel,
         string? proxyAuthorization,
         CancellationToken cancellationToken)
     {
-        tunnel.Target.Events.ReportInfo(ConnectTunnelVerboseLines.NoAlpnNegotiated);
-        return OpenTunnelAsync(dialed, tunnel, proxyAuthorization, cancellationToken);
+        var events = tunnel.Target.Events;
+        var trace = new HttpProxyTunnelTrace(TracesHttpProxyFilter, TracesH1ProxyFilter);
+        if (TracesSetupFilter)
+        {
+            events.ReportInfo(HttpProxyTunnelFilterAddedLine);
+        }
+
+        trace.ReportConnecting(events);
+        events.ReportInfo(ConnectTunnelVerboseLines.NoAlpnNegotiated);
+        trace.ReportSubfilterInstalled(events);
+        return OpenTunnelAsync(dialed with { TunnelTrace = trace }, tunnel, proxyAuthorization, cancellationToken);
     }
 
     private async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> OpenTunnelOverTlsAsync(
@@ -1308,11 +1363,16 @@ public sealed partial class TcpConnector(
     {
         EndProxyAuthorization(proxyAuthorization);
         ConnectTunnelVerboseLines.ReportTunnelEstablished(tunnel.Target.Events, statusCode);
+        dialed.TunnelTrace?.ReportEstablished(tunnel.Target.Events);
 
         // For a tunnel, %{time_connect} is when the tunnel is open (ConnectTimings.Connected).
         var timings = new ConnectTimings(tunnel.Started, tunnel.NameResolved, timeProvider.GetTimestamp(), null);
         new NetworkDiagnosticLog(tunnel.Target.DiagnosticLog).TunnelEstablished(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port, statusCode);
-        return await SecureWhenAskedAsync(dialed, tunnel.Target, timings, statusCode, cancellationToken).ConfigureAwait(false);
+
+        // Through a plain HTTP proxy the setup filter adds an https:// origin's SSL filter once the
+        // tunnel is open (measured, BL-1193 Notes).
+        var writesSslFilterAdded = dialed.TunnelTrace is not null && WritesSslFilterAddedFor(tunnel.Target);
+        return await SecureWhenAskedAsync(dialed, tunnel.Target, timings, statusCode, cancellationToken, writesSslFilterAdded).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1336,7 +1396,7 @@ public sealed partial class TcpConnector(
         while (true)
         {
             log.TunnelRequested(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port);
-            var (reply, exception) = await RequestTunnelAsync(connection, tunnel, proxyAuthorization, answersChallenge, cancellationToken).ConfigureAwait(false);
+            var (reply, exception) = await RequestTunnelAsync(connection, tunnel with { Trace = dialed.TunnelTrace }, proxyAuthorization, answersChallenge, cancellationToken).ConfigureAwait(false);
             if (exception is null && reply.OpensTunnel)
             {
                 return (await SecureOpenedTunnelAsync(dialed, tunnel, reply.StatusCode, proxyAuthorization, cancellationToken).ConfigureAwait(false), null);
@@ -1495,13 +1555,16 @@ public sealed partial class TcpConnector(
             var destination = tunnel.Destination;
             var events = tunnel.Target.Events;
             ConnectTunnelVerboseLines.ReportBeforeConnect(events, ProxyAuthRequestOf(destination, tunnel.Proxy), proxyAuthorization, answersChallenge);
+            tunnel.Trace?.ReportSending(events);
             var request = HttpProxyTunnel.BuildConnectRequest(destination.Host, destination.Port, tunnel.Proxy, _proxyTunnelOptions, proxyAuthorization);
             events.ReportRequestHeader(request);
             await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            tunnel.Trace?.ReportReceiving(events);
             var reply = await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false);
             ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization, DigestStaleChallenge.IsOfferedIn(reply.ProxyAuthenticate));
-            if (tunnel.Target.Events is IConnectReplyHeadWritingEvents headOutput && !reply.Head.IsEmpty)
+            tunnel.Trace?.ReportResponse(events, reply.OpensTunnel);
+            if (tunnel.HeadOutput is { } headOutput && !reply.Head.IsEmpty)
             {
                 await headOutput.WriteConnectReplyHeadAsync(reply.Head, cancellationToken).ConfigureAwait(false);
             }
@@ -1595,12 +1658,22 @@ public sealed partial class TcpConnector(
         var opened = WithSetupFiltersRemoved(
             Opened(dialed, target.Events, connection, timings, proxyConnectResponseCode, peerCertificates: null, applicationProtocol: null),
             dialed, target.Events);
-        if (tracesIo)
-        {
-            target.Events.ReportInfo(QueryAlpnLine);
-        }
-
+        WriteQueryAlpnLine(dialed, target.Events, tracesIo);
         return opened;
+    }
+
+    // Through a plain HTTP proxy's tunnel the ALPN query is the [H1-PROXY] filter's, never [TCP]'s
+    // (measured, BL-1193 Notes).
+    private static void WriteQueryAlpnLine(DialedSocket dialed, ITransferEvents events, bool tracesIo)
+    {
+        if (dialed.TunnelTrace is { } tunnelTrace)
+        {
+            tunnelTrace.ReportAlpnQueried(events);
+        }
+        else if (tracesIo)
+        {
+            events.ReportInfo(QueryAlpnLine);
+        }
     }
     // curl 8.21.0 writes the PROXY line after any tunnel and before TLS, from the socket's own ends
     // (BL-616), its setup filter first reporting that it added the HAPROXY filter (BL-1160 Notes).
@@ -1620,6 +1693,8 @@ public sealed partial class TcpConnector(
     // (BL-1161 Notes).
     private ConnectResult WithSetupFiltersRemoved(ConnectResult opened, DialedSocket dialed, ITransferEvents events)
     {
+        // The [HTTP-PROXY] filter's removal follows the [SETUP] filter's (measured, BL-1193 Notes).
+        dialed.TunnelTrace?.ReportFilterRemoved(events);
         if (haproxyProtocol is not null && TracesHaproxyFilter)
         {
             events.ReportInfo("[HAPROXY] removing connected setup filter");
@@ -1889,6 +1964,12 @@ public sealed partial class TcpConnector(
         /// so a plain HTTP connection over it writes its I/O's too (BL-1195).
         /// </summary>
         public bool TracesTcpFilter { get; init; }
+
+        /// <summary>
+        /// Gets the <c>[HTTP-PROXY]</c> and <c>[H1-PROXY]</c> lines of the CONNECT tunnel opened over
+        /// the socket through a plain HTTP proxy (BL-1193); <see langword="null" /> for any other socket.
+        /// </summary>
+        public HttpProxyTunnelTrace? TunnelTrace { get; init; }
     }
 
     /// <summary>
@@ -1905,5 +1986,18 @@ public sealed partial class TcpConnector(
         long Started,
         long NameResolved,
         bool AuthorizationAnswersChallenge,
-        SspiFailureRecordingTransferEvents AuthenticatorEvents);
+        SspiFailureRecordingTransferEvents AuthenticatorEvents)
+    {
+        /// <summary>
+        /// Gets the transfer's header output for the CONNECT reply heads: the target's events as
+        /// given, before any trace filter wrapped them, when they take the heads.
+        /// </summary>
+        public IConnectReplyHeadWritingEvents? HeadOutput { get; init; }
+
+        /// <summary>
+        /// Gets the tunnel's <c>[HTTP-PROXY]</c> and <c>[H1-PROXY]</c> lines through a plain HTTP
+        /// proxy; <see langword="null" /> through an HTTPS proxy, whose lines are not measured.
+        /// </summary>
+        public HttpProxyTunnelTrace? Trace { get; init; }
+    }
 }

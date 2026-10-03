@@ -415,6 +415,29 @@ internal static class CurlComposition
         || (options.TraceComponents.Contains("all") && !options.VerbosityTraceComponents.Contains("all"));
 
     /// <summary>
+    /// Whether curl 8.21.0's <c>[HTTP-PROXY]</c> lines are written: <c>http-proxy</c>, <c>proxy</c> or
+    /// a <c>--trace-config all</c> is among the trace components; neither <c>network</c> nor the
+    /// <c>all</c> that <c>-vvvv</c> puts there turns them on (measured, BL-1193 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesHttpProxy(CommandLineOptions options) => TracesProxyComponent(options, "http-proxy");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[H1-PROXY]</c> lines are written: <c>h1-proxy</c>, <c>proxy</c> or a
+    /// <c>--trace-config all</c> is among the trace components; neither <c>network</c> nor the
+    /// <c>all</c> that <c>-vvvv</c> puts there turns them on (measured, BL-1193 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesH1Proxy(CommandLineOptions options) => TracesProxyComponent(options, "h1-proxy");
+
+    private static bool TracesProxyComponent(CommandLineOptions options, string component) =>
+        options.TraceComponents.Contains(component)
+        || options.TraceComponents.Contains("proxy")
+        || (options.TraceComponents.Contains("all") && !options.VerbosityTraceComponents.Contains("all"));
+
+    /// <summary>
     /// Whether curl 8.21.0's <c>[HAPPY-EYEBALLS]</c> lines are written: <c>happy-eyeballs</c>,
     /// <c>network</c> or <c>all</c> is among the trace components, which <c>-vvvv</c> puts there too
     /// (measured, BL-1161 Notes).
@@ -793,6 +816,8 @@ internal static class CurlComposition
             TracesSetupFilter = TracesSetup(options),
             TracesHaproxyFilter = TracesHaproxy(options),
             TracesSocksFilter = TracesSocks(options),
+            TracesHttpProxyFilter = TracesHttpProxy(options),
+            TracesH1ProxyFilter = TracesH1Proxy(options),
             TracesHappyEyeballsFilter = TracesHappyEyeballs(options),
             TracesTcpFilter = TracesTcp(options),
             TracesHappyEyeballsTimer = TracesTimer(options),

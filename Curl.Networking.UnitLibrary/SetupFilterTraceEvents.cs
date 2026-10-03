@@ -14,8 +14,16 @@ namespace Curl.Networking;
 /// <param name="inner">The events below the setup filter: the DNS filter's, or the transfer's own.</param>
 /// <param name="host">The host the connection dials, after any <c>--connect-to</c> mapping.</param>
 /// <param name="port">The port it dials.</param>
-internal sealed class SetupFilterTraceEvents(ITransferEvents inner, string host, int port) : ITransferEvents
+/// <param name="peer">What the connection dials: <see cref="ToOrigin" />, or <see cref="ToProxy" /> for a
+/// CONNECT tunnel through a plain HTTP proxy (measured, BL-1193 Notes).</param>
+internal sealed class SetupFilterTraceEvents(ITransferEvents inner, string host, int port, string peer = SetupFilterTraceEvents.ToOrigin) : ITransferEvents
 {
+    /// <summary>The peer a direct connect dials.</summary>
+    public const string ToOrigin = "origin";
+
+    /// <summary>The peer a CONNECT tunnel dials.</summary>
+    public const string ToProxy = "proxy";
+
     /// <summary>The line curl writes as it adds the setup filter, before anything is resolved.</summary>
     public const string AddedLine = "[SETUP] added";
 
@@ -29,7 +37,7 @@ internal sealed class SetupFilterTraceEvents(ITransferEvents inner, string host,
         if (!_eyeballing && text.StartsWith(TryingPrefix, StringComparison.Ordinal))
         {
             _eyeballing = true;
-            inner.ReportInfo($"[SETUP] happy eyeballing to origin {host}:{port}");
+            inner.ReportInfo($"[SETUP] happy eyeballing to {peer} {host}:{port}");
         }
 
         inner.ReportInfo(text);
