@@ -54,8 +54,8 @@ Decisions (ADR-0357's BL-1191 amendment):
 - The bracketed numbers are curl's handshake states, the same on every run, so they are pinned.
 - To tell `-vvvv`'s `all` from `--trace-config all`, `CommandLineOptions` exposes `VerbosityTraceComponents`; so `Curl.Cli.UnitLibrary` and `Curl.Cli.UnitTests` joined `touches` (no task in Doing named them).
 - `[SETUP] added SOCKS filter to H:P` is written too, since it is measured and orders the lines under `all`.
-- `[SOCKS] query ALPN` is filed as BL-1217 (the HTTP layer's ALPN query, beside BL-1195's `[TCP] query ALPN`). SOCKS5 user name and password and GSS-API lines are unmeasured; the lines are written around them where the state machine puts them.
-- `Measure-CodeQuality.ps1`: Curl.Networking.UnitLibrary and Curl.Cli.UnitLibrary 0 failing members. Curl.Console reports one, `CurlCommandRunner.TransferUrlAsync` at complexity 12, which this task did not touch; filed as BL-1218. Curl.Console's new `TracesSocks` is fully covered.
+- `[SOCKS] query ALPN` is filed as BL-1246 (the HTTP layer's ALPN query, beside BL-1195's `[TCP] query ALPN`). SOCKS5 user name and password and GSS-API lines are unmeasured; the lines are written around them where the state machine puts them.
+- `Measure-CodeQuality.ps1`: Curl.Networking.UnitLibrary and Curl.Cli.UnitLibrary 0 failing members. Curl.Console reports one, `CurlCommandRunner.TransferUrlAsync` at complexity 12, which this task did not touch; filed as BL-1247. Curl.Console's new `TracesSocks` is fully covered.
 
 ## Log
 

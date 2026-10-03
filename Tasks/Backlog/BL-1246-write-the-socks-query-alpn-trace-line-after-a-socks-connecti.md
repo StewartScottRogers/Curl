@@ -1,5 +1,5 @@
 ---
-id: BL-1217
+id: BL-1246
 title: Write the [SOCKS] query ALPN trace line after a SOCKS connection is established
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1217 — Write the [SOCKS] query ALPN trace line after a SOCKS connection is established
+# BL-1246 — Write the [SOCKS] query ALPN trace line after a SOCKS connection is established
 
 ## Goal
 
@@ -32,3 +32,4 @@ Curl writes curl 8.21.0's `[SOCKS] query ALPN` line after `Established connectio
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Renumbered from BL-1217, which the archived Done/2026-10-02_1625 task already holds.

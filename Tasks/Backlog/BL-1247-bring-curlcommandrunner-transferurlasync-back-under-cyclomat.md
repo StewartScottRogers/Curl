@@ -1,5 +1,5 @@
 ---
-id: BL-1218
+id: BL-1247
 title: Bring CurlCommandRunner.TransferUrlAsync back under cyclomatic complexity 10
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-02
 completed:
 ---
-# BL-1218 — Bring CurlCommandRunner.TransferUrlAsync back under cyclomatic complexity 10
+# BL-1247 — Bring CurlCommandRunner.TransferUrlAsync back under cyclomatic complexity 10
 
 ## Goal
 
@@ -31,3 +31,4 @@ completed:
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Renumbered from BL-1218, which the archived Done/2026-10-02_1625 task already holds.
