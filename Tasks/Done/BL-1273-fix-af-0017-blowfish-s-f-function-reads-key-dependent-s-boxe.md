@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cryptography.UnitLibrary]
+touches: [Curl.Cryptography.UnitLibrary, Curl.Cryptography.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-02
 ---
 # BL-1273 — Fix AF-0017: Blowfish's F-function reads key-dependent S-boxes at data-dependent indexes (SSH blowfish-cbc, bcrypt_pbkdf)
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- `BlowfishState.Mix` (the F function) now reads all 1,024 S-box words by one `Vector<uint>` masked scan, so no address depends on the key, passphrase or block; `Blowfish` and `BcryptPbkdf` are constant-time (ADR-0400). The reproduction finds no match.
+- Added `Curl.Cryptography.UnitTests` to `touches` for the new `Mix` test against the direct look-up formula at every index; no other task in Doing names it.
+- Default taken: a vectorised scan, not RC4's scalar one - scalar made one bcrypt hash take seconds. Loads use `Vector.LoadUnsafe` at fixed offsets so Debug test runs stay fast (span slicing was five times slower there). Cost: about 50 ms per bcrypt hash in Release.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-02: Backlog -> Doing.
+- 2026-10-02: Doing -> Done. Blowfish's F function reads its S-boxes by vectorised masked scan; AF-0017's reproduction no longer matches (ADR-0400)
