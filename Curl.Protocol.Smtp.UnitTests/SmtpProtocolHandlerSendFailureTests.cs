@@ -7,9 +7,10 @@ namespace Curl.Protocol.Smtp;
 
 /// <summary>
 /// Pins how an SMTP transfer ends when a command or the message cannot be written (BL-1243):
-/// curl 8.21.0 ends it at once with exit 55, <c>Send failure: Connection was reset</c> for a
-/// reset (the socket filter's <c>failf</c>) and <c>Failed sending data to the peer</c> for any
-/// other failure, and sends and reads nothing more, not even <c>QUIT</c>.
+/// curl 8.21.0 ends it at once with exit 55, <c>Send failure: &lt;words&gt;</c> for any socket
+/// error (the socket filter's <c>failf</c>, Winsock's words on Windows and <c>strerror</c>'s
+/// elsewhere, BL-1345) and <c>Failed sending data to the peer</c> for a failure with no socket
+/// error in it, and sends and reads nothing more, not even <c>QUIT</c>.
 /// </summary>
 [TestClass]
 public sealed class SmtpProtocolHandlerSendFailureTests
@@ -35,10 +36,11 @@ public sealed class SmtpProtocolHandlerSendFailureTests
     private const string Envelope = MailFrom + "RCPT TO:<c@d>\r\nDATA\r\n";
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     [DataRow(0, "", 1, DisplayName = "EHLO")]
     [DataRow(1, Ehlo, 2, DisplayName = "MAIL FROM")]
     [DataRow(4, Ehlo + Envelope, 5, DisplayName = "the message body")]
-    public async Task ExecuteAsync_WriteReset_FailsWithExit55SendFailureAndStops(int writesBeforeFailure, string sent, int reads)
+    public async Task ExecuteAsync_WriteResetOnWindows_FailsWithExit55WinsockWordsAndStops(int writesBeforeFailure, string sent, int reads)
     {
         ScriptedConnection connection = Conversation(writesBeforeFailure, Reset());
 
@@ -46,6 +48,57 @@ public sealed class SmtpProtocolHandlerSendFailureTests
 
         Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
         Assert.AreEqual("Send failure: Connection was reset", run.Result.ErrorMessage);
+        Assert.AreEqual(sent, run.Sent);
+        Assert.AreEqual(reads, connection.ReadCount);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [DataRow(0, "", 1, DisplayName = "EHLO")]
+    [DataRow(1, Ehlo, 2, DisplayName = "MAIL FROM")]
+    [DataRow(4, Ehlo + Envelope, 5, DisplayName = "the message body")]
+    public async Task ExecuteAsync_WriteResetOffWindows_FailsWithExit55StrerrorWordsAndStops(int writesBeforeFailure, string sent, int reads)
+    {
+        IOException failure = Reset();
+        ScriptedConnection connection = Conversation(writesBeforeFailure, failure);
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(MailContext(new RecordingTransferEvents()), connection);
+
+        Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        Assert.AreEqual("Send failure: " + failure.InnerException!.Message, run.Result.ErrorMessage);
+        Assert.AreEqual(sent, run.Sent);
+        Assert.AreEqual(reads, connection.ReadCount);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    [DataRow(1, Ehlo, 2, DisplayName = "MAIL FROM")]
+    [DataRow(4, Ehlo + Envelope, 5, DisplayName = "the message body")]
+    public async Task ExecuteAsync_WriteAbortedOnWindows_FailsWithExit55ConnectionWasAborted(int writesBeforeFailure, string sent, int reads)
+    {
+        ScriptedConnection connection = Conversation(writesBeforeFailure, Aborted());
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(MailContext(new RecordingTransferEvents()), connection);
+
+        Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        Assert.AreEqual("Send failure: Connection was aborted", run.Result.ErrorMessage);
+        Assert.AreEqual(sent, run.Sent);
+        Assert.AreEqual(reads, connection.ReadCount);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [DataRow(1, Ehlo, 2, DisplayName = "MAIL FROM")]
+    [DataRow(4, Ehlo + Envelope, 5, DisplayName = "the message body")]
+    public async Task ExecuteAsync_WriteAbortedOffWindows_FailsWithExit55StrerrorWords(int writesBeforeFailure, string sent, int reads)
+    {
+        IOException failure = Aborted();
+        ScriptedConnection connection = Conversation(writesBeforeFailure, failure);
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(MailContext(new RecordingTransferEvents()), connection);
+
+        Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        Assert.AreEqual("Send failure: " + failure.InnerException!.Message, run.Result.ErrorMessage);
         Assert.AreEqual(sent, run.Sent);
         Assert.AreEqual(reads, connection.ReadCount);
     }
@@ -67,7 +120,8 @@ public sealed class SmtpProtocolHandlerSendFailureTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_CommandWriteReset_ReportsTheFailureAndClosesTheConnection()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_CommandWriteResetOnWindows_ReportsTheFailureAndClosesTheConnection()
     {
         RecordingTransferEvents events = new();
 
@@ -77,6 +131,23 @@ public sealed class SmtpProtocolHandlerSendFailureTests
             (string[])[
                 "< 220 localhost ESMTP\r\n", "> EHLO client\r\n", "< 250-localhost\r\n", "< 250 SMTPUTF8\r\n",
                 "* Send failure: Connection was reset", "* closing connection #0",
+            ],
+            events.Transcript);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_CommandWriteResetOffWindows_ReportsTheFailureAndClosesTheConnection()
+    {
+        RecordingTransferEvents events = new();
+        IOException failure = Reset();
+
+        await SmtpRun.ExecuteAsync(MailContext(events), Conversation(1, failure));
+
+        CollectionAssert.AreEqual(
+            (string[])[
+                "< 220 localhost ESMTP\r\n", "> EHLO client\r\n", "< 250-localhost\r\n", "< 250 SMTPUTF8\r\n",
+                "* Send failure: " + failure.InnerException!.Message, "* closing connection #0",
             ],
             events.Transcript);
     }
@@ -114,7 +185,8 @@ public sealed class SmtpProtocolHandlerSendFailureTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_CommandsWriteReset_FailsWithExit55()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_CommandsWriteResetOnWindows_FailsWithExit55()
     {
         var connection = new ScriptedConnection(Bytes(Greeting), Bytes(EhloReply), Bytes(SmtpRun.HelpReply)) { WritesBeforeFailure = 1, WriteFailure = Reset() };
 
@@ -122,6 +194,21 @@ public sealed class SmtpProtocolHandlerSendFailureTests
 
         Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
         Assert.AreEqual("Send failure: Connection was reset", run.Result.ErrorMessage);
+        Assert.AreEqual(Ehlo, run.Sent);
+        Assert.AreEqual(2, connection.ReadCount);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_CommandsWriteResetOffWindows_FailsWithExit55()
+    {
+        IOException failure = Reset();
+        var connection = new ScriptedConnection(Bytes(Greeting), Bytes(EhloReply), Bytes(SmtpRun.HelpReply)) { WritesBeforeFailure = 1, WriteFailure = failure };
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(Url, connection);
+
+        Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        Assert.AreEqual("Send failure: " + failure.InnerException!.Message, run.Result.ErrorMessage);
         Assert.AreEqual(Ehlo, run.Sent);
         Assert.AreEqual(2, connection.ReadCount);
     }
@@ -139,6 +226,9 @@ public sealed class SmtpProtocolHandlerSendFailureTests
 
     private static IOException Reset() =>
         new("Unable to write data to the transport connection.", new SocketException((int)SocketError.ConnectionReset));
+
+    private static IOException Aborted() =>
+        new("Unable to write data to the transport connection.", new SocketException((int)SocketError.ConnectionAborted));
 
     private static byte[] Bytes(string text) => Encoding.Latin1.GetBytes(text);
 

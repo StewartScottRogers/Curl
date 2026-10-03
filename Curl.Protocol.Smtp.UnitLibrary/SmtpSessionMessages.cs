@@ -11,11 +11,8 @@ internal static class SmtpSessionMessages
     /// <summary>The server closed the connection before a reply was complete (exit 56).</summary>
     internal const string ResponseReadingFailed = "response reading failed (errno: 0)";
 
-    /// <summary>A write to the connection was reset by the peer (exit 55, BL-1243).</summary>
-    internal const string SendConnectionReset = "Send failure: Connection was reset";
-
     /// <summary>
-    /// A write to the connection failed other than by a reset (exit 55, BL-1243); curl prints
+    /// A write to the connection failed with no socket error in it (exit 55, BL-1243); curl prints
     /// it without a <c>-v</c> line of its own.
     /// </summary>
     internal const string SendFailed = "Failed sending data to the peer";
