@@ -28,6 +28,30 @@ public sealed class VerboseTransferEventWriterTests
     private readonly MemoryStream output = new();
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void Timestamp_OnWindows_ShowsTheClocksMilliseconds()
+    {
+        DateTimeOffset instant = new DateTimeOffset(2026, 9, 27, 23, 4, 5, TimeSpan.Zero).AddTicks(1_234_567);
+        VerboseTransferEventWriter writer = new(output, writesDataLines: false, writesTimestamps: true, new QueuedTimeProvider(instant));
+
+        writer.ReportInfo("x");
+
+        Assert.AreEqual("23:04:05.123000 * x\n", Written());
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Timestamp_OffWindows_ShowsTheClocksMicroseconds()
+    {
+        DateTimeOffset instant = new DateTimeOffset(2026, 9, 27, 23, 4, 5, TimeSpan.Zero).AddTicks(1_234_567);
+        VerboseTransferEventWriter writer = new(output, writesDataLines: false, writesTimestamps: true, new QueuedTimeProvider(instant));
+
+        writer.ReportInfo("x");
+
+        Assert.AreEqual("23:04:05.123456 * x\n", Written());
+    }
+
+    [TestMethod]
     public void HttpExchange_RendersAsCurl()
     {
         VerboseTransferEventWriter writer = new(output, writesDataLines: true);

@@ -8,7 +8,7 @@ depends-on: [BL-1301]
 touches: [Curl.Output.UnitLibrary, Curl.Output.UnitTests]
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-03
 ---
 # BL-1302 — Write --trace-time stamps to the millisecond on Windows, as curl's GetSystemTime clock does
 
@@ -25,16 +25,18 @@ On Windows, every `--trace-time` stamp Curl writes has its six fractional digits
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Output.UnitTests` with a fixed `TimeProvider` at `03:30:30.939512` local time assert `03:30:30.939000 ` when truncating to the millisecond and `03:30:30.939512 ` when not.
-- [ ] A test marked `[OSCondition(OperatingSystems.Windows)]` asserts the default stamp is truncated, and one marked `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]` asserts it is not.
-- [ ] Tests through `TraceTransferEventWriter` and `VerboseTransferEventWriter` with timestamps on pin that both writers use the same rule.
-- [ ] `dotnet build Curl.Output.UnitTests -warnaserror` is clean; `dotnet test Curl.Output.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary` reports no failing member.
+- [x] Tests in `Curl.Output.UnitTests` with a fixed `TimeProvider` at `03:30:30.939512` local time assert `03:30:30.939000 ` when truncating to the millisecond and `03:30:30.939512 ` when not.
+- [x] A test marked `[OSCondition(OperatingSystems.Windows)]` asserts the default stamp is truncated, and one marked `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]` asserts it is not.
+- [x] Tests through `TraceTransferEventWriter` and `VerboseTransferEventWriter` with timestamps on pin that both writers use the same rule.
+- [x] `dotnet build Curl.Output.UnitTests -warnaserror` is clean; `dotnet test Curl.Output.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary` reports no failing member.
 
 ## Notes
 
 - If the writers are constructed in `Curl.Console` with no way to pass the choice, default it inside `Curl.Output` from `OperatingSystem.IsWindows()` rather than touching `Curl.Console`, which is outside this task.
+- Done (2026-10-03): `TraceTimeStamp.Read(TimeProvider, bool truncatesToMillisecond)` does the arithmetic and is tested both ways on every OS (`TraceTimeStampTests`); `Read(TimeProvider)` defaults it from `OperatingSystem.IsWindows()` inside `Curl.Output`, so neither writer nor `Curl.Console` changed shape. Both writers call that default, pinned per platform by `Timestamp_OnWindows_ShowsTheClocksMilliseconds` and `Timestamp_OffWindows_ShowsTheClocksMicroseconds` in `TraceTransferEventWriterTests` and `VerboseTransferEventWriterTests` (the old platform-blind microsecond test became that pair). Measure-CodeQuality: 0 failing members.
 
 ## Log
 
 - 2026-10-02: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. --trace-time stamps end in 000 on Windows, as curl's GetSystemTime clock gives them; full microseconds elsewhere
