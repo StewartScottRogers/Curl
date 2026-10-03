@@ -318,6 +318,21 @@ public sealed partial class TlsFailureMessagesTests
         Assert.AreEqual("SSL: certificate subject name 'localhost' does not match target hostname 'otherhost'", message);
     }
 
+    // AF-0031: the line names the certificate's subject, never its issuer.
+    [TestMethod]
+    public void OpenSslPeerFailedVerification_WithANameMismatchOnAnIssuedCertificate_NamesTheSubjectNotTheIssuer()
+    {
+        using var authority = CreateAuthority(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        using var leaf = CreateLeaf(authority);
+        using var chain = CreateTrustingChain(authority);
+        chain.Build(leaf);
+
+        var message = TlsFailureMessages.OpenSslPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateNameMismatch, chain, "otherhost");
+
+        Assert.AreEqual("SSL: certificate subject name 'localhost' does not match target hostname 'otherhost'", message);
+    }
+
     // BL-150, measured: an untrusted or expired certificate that also names another host
     // is reported by its name.
     [TestMethod]
