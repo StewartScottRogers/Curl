@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary]
 requirement: FR-084
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1353 — Correct ITransferContext.MaxFileSize's remark on which handlers read it
 
@@ -24,12 +24,16 @@ The remark on `ITransferContext.MaxFileSize` in `Curl.Protocol.Abstractions.Unit
 
 ## Acceptance criteria
 
-- [ ] The remark lists `ldap`, `smb` and `tftp` among the handlers that enforce `MaxFileSize`, and no handler that does not read it is listed as enforcing it (check with `grep -rn MaxFileSize Curl.Protocol.*.UnitLibrary`).
-- [ ] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` is clean.
+- [x] The remark lists `ldap`, `smb` and `tftp` among the handlers that enforce `MaxFileSize`, and no handler that does not read it is listed as enforcing it (check with `grep -rn MaxFileSize Curl.Protocol.*.UnitLibrary`).
+- [x] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` is clean.
 
 ## Notes
+
+- `grep -rn MaxFileSize Curl.Protocol.*.UnitLibrary`: BL-1327 is Done and `SftpFileDownload` enforces the limit, so `sftp` is listed as enforcing. The SCP path in `SshProtocolHandler` and the SMTP handler still do not read it, so the remark names `scp` and `smtp` as not reading it yet. The enforcing list is now alphabetical.
+- Only a doc comment changed: the library builds clean with `-warnaserror` and `Curl.Protocol.Abstractions.UnitTests` passes 681 of 681 fast tests.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. ITransferContext.MaxFileSize's remark names ldap, sftp, smb and tftp as enforcing the limit, scp and smtp as not
