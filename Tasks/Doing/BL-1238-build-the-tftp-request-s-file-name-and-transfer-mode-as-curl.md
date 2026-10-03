@@ -42,3 +42,4 @@ The read and write requests `TftpProtocolHandler` sends carry the file name as t
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
