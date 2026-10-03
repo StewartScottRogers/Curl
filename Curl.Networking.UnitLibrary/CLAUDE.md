@@ -436,7 +436,11 @@ Per ADR-0357's BL-1193 amendment a CONNECT tunnel through an `Http` or `Http10` 
 with one poll round fixed, the `[HTTP-PROXY]` removal after the setup filter's and `[H1-PROXY] query
 ALPN` in place of `[TCP] query ALPN`; under `TracesSetupFilter` that path also writes `[SETUP] added`,
 `happy eyeballing to proxy H:P` (`SetupFilterTraceEvents.ToProxy`), `HttpProxyTunnelFilterAddedLine` and,
-for an `https://` origin, `SslFilterAddedLine` after the tunnel. CONNECT reply heads go to the
+for an `https://` origin, `SslFilterAddedLine` after the tunnel. Per its BL-1255 amendment an `Https`
+proxy's tunnel writes the same lines, with `HttpsProxySslFilterAddedLine` before
+`HttpProxyTunnelFilterAddedLine` and the proxy's handshake, and the handshake's two poll rounds
+(`HttpProxyTunnelTrace.ReportProxyHandshakePolled`) before `CONNECT: ... negotiated`; no `[SSL-PROXY]`
+line is written. CONNECT reply heads go to the
 `IConnectReplyHeadWritingEvents` the target's events were before any trace filter wrapped them.
 Per ADR-0357's BL-1254 amendment the `[HTTPS-CONNECT]` filter goes around a connect through any
 proxy and over a Unix socket too (`SetupAndDnsFilterEvents` builds it for every route), with a

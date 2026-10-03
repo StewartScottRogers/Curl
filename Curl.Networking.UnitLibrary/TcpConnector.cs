@@ -242,14 +242,14 @@ public sealed partial class TcpConnector(
     public bool TracesSocksFilter { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether a CONNECT tunnel through a plain HTTP proxy writes curl
+    /// Gets a value indicating whether a CONNECT tunnel through a plain HTTP or HTTPS proxy writes curl
     /// 8.21.0's <c>[HTTP-PROXY]</c> lines under <c>--trace-config http-proxy</c>, <c>proxy</c> or a
     /// named <c>all</c> (<see cref="HttpProxyTunnelTrace" />, measured, BL-1193 Notes).
     /// </summary>
     public bool TracesHttpProxyFilter { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether a CONNECT tunnel through a plain HTTP proxy writes curl
+    /// Gets a value indicating whether a CONNECT tunnel through a plain HTTP or HTTPS proxy writes curl
     /// 8.21.0's <c>[H1-PROXY]</c> lines under <c>--trace-config h1-proxy</c>, <c>proxy</c> or a
     /// named <c>all</c> (<see cref="HttpProxyTunnelTrace" />, measured, BL-1193 Notes).
     /// </summary>
@@ -261,6 +261,13 @@ public sealed partial class TcpConnector(
     /// negotiated</c> (measured, BL-1193 Notes).
     /// </summary>
     public const string HttpProxyTunnelFilterAddedLine = "[SETUP] added HTTP proxy tunnel filter";
+
+    /// <summary>
+    /// The line curl 8.21.0's setup filter writes, under <see cref="TracesSetupFilter" />, as it adds
+    /// an HTTPS proxy's SSL filter once the proxy's socket connected, before
+    /// <see cref="HttpProxyTunnelFilterAddedLine" /> and the proxy's handshake (measured, BL-1255 Notes).
+    /// </summary>
+    public const string HttpsProxySslFilterAddedLine = "[SETUP] added SSL filter for HTTP proxy";
 
     /// <summary>
     /// Gets a value indicating whether a direct connect writes the <c>[HAPPY-EYEBALLS]</c> lines curl
@@ -1184,7 +1191,7 @@ public sealed partial class TcpConnector(
     // curl 8.21.0's DNS filter resolves the proxy it dials first (measured, BL-1181 Notes). Through
     // a plain HTTP proxy its setup filter writes [SETUP] added (not for an https:// origin, whose
     // ALPN connect filter adds it) before the DNS filter's lines, and happy eyeballing to proxy
-    // before the first Trying (measured, BL-1193 Notes). Through a SOCKS proxy it eyeballs to origin,
+    // before the first Trying (measured, BL-1193 Notes), through an HTTPS proxy too (BL-1255 Notes). Through a SOCKS proxy it eyeballs to origin,
     // the SOCKS proxy it dials (measured, BL-1254 Notes). An https:// origin's ALPN connect filter
     // goes around them as for a direct connect, its added line first (measured, BL-1254 Notes).
     private (ConnectTarget Target, HttpsConnectFilterTraceEvents? HttpsConnect) TracingTunnelFilters(ConnectTarget target, ProxyEndpoint proxy, ProxyEndpoint firstHop)
@@ -1193,15 +1200,11 @@ public sealed partial class TcpConnector(
         var (events, httpsConnect) = SetupAndDnsFilterEvents(
             target.Events,
             IsHttpsOrigin(target),
-            TracesSetupFilterThrough(proxy),
+            TracesSetupFilter,
             below => DnsFilterTraceEvents.Start(below, firstHop.Host, firstHop.Port, addressFamily),
             below => new SetupFilterTraceEvents(below, firstHop.Host, firstHop.Port, peer));
         return (target with { Events = events }, httpsConnect);
     }
-
-    // An HTTPS proxy's own [SETUP] lines are not written yet (BL-1254 Notes).
-    private bool TracesSetupFilterThrough(ProxyEndpoint proxy) =>
-        TracesSetupFilter && proxy.Kind is not ProxyKind.Https;
 
     private static bool IsSocks(ProxyEndpoint proxy) =>
         proxy.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a or ProxyKind.Socks5 or ProxyKind.Socks5Hostname;
@@ -1321,6 +1324,19 @@ public sealed partial class TcpConnector(
         string? proxyAuthorization,
         CancellationToken cancellationToken)
     {
+        // The setup filter adds the proxy's SSL filter and the tunnel filter once the socket
+        // connected, and the HTTP proxy filter polls its CONNECT before, during and after the
+        // proxy's handshake (measured, BL-1255 Notes; the poll rounds fixed, ADR-0357).
+        var events = tunnel.Target.Events;
+        var trace = new HttpProxyTunnelTrace(TracesHttpProxyFilter, TracesH1ProxyFilter);
+        if (TracesSetupFilter)
+        {
+            events.ReportInfo(HttpsProxySslFilterAddedLine);
+            events.ReportInfo(HttpProxyTunnelFilterAddedLine);
+        }
+
+        trace.ReportConnecting(events);
+
         // curl 8.21.0 verifies the proxy against its own host name and reports a failed
         // handshake to it with the same exit code and message as one to a target (measured).
         // It verifies with the --proxy-* TLS options, not -k or --cacert, so the proxy's own
@@ -1334,12 +1350,14 @@ public sealed partial class TcpConnector(
 
         // Both builds say what the proxy's ALPN agreed before the CONNECT, with and without
         // --no-alpn (measured, BL-872).
-        tunnel.Target.Events.ReportInfo(securedProxy.ApplicationProtocol is { } agreed
+        trace.ReportProxyHandshakePolled(events);
+        events.ReportInfo(securedProxy.ApplicationProtocol is { } agreed
             ? $"CONNECT: '{agreed}' negotiated"
             : ConnectTunnelVerboseLines.NoAlpnNegotiated);
+        trace.ReportSubfilterInstalled(events);
 
         // CONNECT and the target's TLS run over the proxy's TLS; the socket's local end point stays.
-        var securedDialed = dialed with { Connection = proxyConnection };
+        var securedDialed = dialed with { Connection = proxyConnection, TunnelTrace = trace };
         return await OpenTunnelAsync(securedDialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false);
     }
 

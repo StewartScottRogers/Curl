@@ -313,3 +313,22 @@ an HTTPS proxy) under `-s -k -v --trace-config https-connect,setup` (BL-1254 Not
   `added HTTP proxy tunnel filter`, measured; BL-1283), so through it only the `[HTTPS-CONNECT]`
   lines are written; and `--http3`, which the reference build cannot do, so it could not be measured
   (BL-1284).
+
+## Amendment, 2026-10-02 (BL-1255): the tunnel lines through an HTTPS proxy
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and
+`Record-CurlExchange.ps1 -Tls -Script` playing an HTTPS proxy (TLS, then the CONNECT and the
+tunnel's bytes), `--trace-config proxy,setup`, `http-proxy`, `ssl` and `all` (BL-1255 Notes).
+
+- Through an `Https` proxy the setup filter writes what it writes through a plain one (`[SETUP]
+  added`, `happy eyeballing to proxy H:P`, its removal; a refused dial writes nothing more), and
+  after the dial `added SSL filter for HTTP proxy` (`TcpConnector.HttpsProxySslFilterAddedLine`) and
+  `added HTTP proxy tunnel filter`, before the proxy's handshake. The tunnel's `[HTTP-PROXY]` and
+  `[H1-PROXY]` lines are the plain tunnel's, after `CONNECT: ... negotiated`.
+- Volatile: `[HTTP-PROXY] CONNECT` is written once before the proxy's handshake and once more for
+  each poll round the handshake waits; the loopback measurement had two. Curl writes both once the
+  handshake is done, before `CONNECT: ... negotiated`, so they follow the handshake's `-v` lines
+  rather than sitting among them. A failed proxy handshake writes only the first.
+- Not written: curl's `[SSL-PROXY]` lines (`cf_connect()`, `adjust_pollset, POLLIN fd=N`, `query
+  ALPN`), which `--trace-config proxy` and `ssl` both turn on. No `[SSL]` filter line is written
+  anywhere yet; they wait for that filter's own task.

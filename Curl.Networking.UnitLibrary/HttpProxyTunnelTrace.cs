@@ -4,7 +4,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Writes the <c>[HTTP-PROXY]</c> and <c>[H1-PROXY]</c> lines curl 8.21.0 writes around a CONNECT
-/// tunnel through a plain HTTP proxy under <c>--trace-config http-proxy</c>, <c>h1-proxy</c>,
+/// tunnel through a plain HTTP or HTTPS proxy under <c>--trace-config http-proxy</c>, <c>h1-proxy</c>,
 /// <c>proxy</c> or a named <c>all</c> (measured with <c>Record-CurlExchange.ps1</c>, BL-1193 Notes).
 /// Each method writes one step's lines, each line only when its filter is traced. curl writes a
 /// poll round's three lines each time it finds the reply not there yet, so the count is fixed to the
@@ -17,6 +17,19 @@ internal sealed class HttpProxyTunnelTrace(bool tracesHttpProxy, bool tracesH1Pr
     /// <summary>Writes the lines before <c>CONNECT: no ALPN negotiated</c>.</summary>
     /// <param name="events">The target's events.</param>
     public void ReportConnecting(ITransferEvents events) => WriteHttpProxy(events, "CONNECT");
+
+    /// <summary>
+    /// Writes the lines an HTTPS proxy's handshake adds between <see cref="ReportConnecting" /> and
+    /// <c>CONNECT: ... negotiated</c>: one per poll round curl waits on the handshake, fixed to the two
+    /// a loopback proxy measured and written once the handshake is done (BL-1255 Notes, ADR-0357's
+    /// BL-1255 amendment).
+    /// </summary>
+    /// <param name="events">The target's events.</param>
+    public void ReportProxyHandshakePolled(ITransferEvents events)
+    {
+        WriteHttpProxy(events, "CONNECT");
+        WriteHttpProxy(events, "CONNECT");
+    }
 
     /// <summary>
     /// Writes the lines between <c>CONNECT: no ALPN negotiated</c> and the CONNECT's own lines
