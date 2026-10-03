@@ -173,6 +173,29 @@ function Read-Findings([string]$Directory) {
     return $all
 }
 
+# The counts each auditor reports in metrics to show it ran every step of its method
+# (Report-Format.md, "Method counts"). An auditor whose report lacks one, or gives it as
+# null or 0, ran less than its method and is unreliable: two audits running, the
+# truthfulness and process auditors did their re-audits only (BL-1364).
+$MethodCounts = @{
+    quality      = @('method.librariesMutated', 'method.testsRead')
+    security     = @('method.fuzzTargets', 'method.timingSitesRead')
+    performance  = @('method.scenariosRun')
+    conformance  = @('method.casesRun')
+    truthfulness = @('method.names', 'method.docComments', 'method.documentStatements', 'method.adrs', 'method.scriptStatements')
+    process      = @('method.rulesChecked')
+}
+
+function Get-MissingMethodCounts([string]$Auditor, $Report) {
+    $required = @($MethodCounts[$Auditor] | Where-Object { $_ })
+    if (-not $Report) { return $required }
+    $metrics = $Report.metrics
+    return @($required | Where-Object {
+        $property = if ($metrics) { $metrics.PSObject.Properties[$_] } else { $null }
+        (-not $property) -or ($null -eq $property.Value) -or ([double]$property.Value -le 0)
+    })
+}
+
 function Get-AuditState {
     # Which auditors ran, their reports, the planted defects and catches, and who is unreliable.
     $planted = @()
@@ -184,7 +207,8 @@ function Get-AuditState {
         $report = if ($ran) { Get-ReportBlock $path } else { $null }
         $mine = @($planted | Where-Object { $_.auditor -eq $a })
         $caught = @($mine | Where-Object { $report -and (Test-Caught $_ $report) }).Count
-        $unreliable = $ran -and ((-not $report) -or ($caught -lt $mine.Count) -or ($ChangedTree -contains $a))
+        $skipped = @(Get-MissingMethodCounts $a $report)
+        $unreliable = $ran -and ((-not $report) -or ($caught -lt $mine.Count) -or ($ChangedTree -contains $a) -or $skipped.Count)
         $state[$a] = [pscustomobject]@{ Ran = $ran; Report = $report; Assigned = $mine.Count; Caught = $caught; Unreliable = $unreliable }
     }
     return [pscustomobject]@{ Auditors = $state; PlantedCount = $planted.Count }
@@ -329,6 +353,10 @@ if ($SelfTest) {
         Check 'catch rates per auditor' ($rates -eq 'quality 1/1, security 0/1, performance 1/1, conformance 0/1, truthfulness 1/1, process 1/1') $rates
         $unreliable = (Get-UnreliableNames $state) -join ','
         Check 'the auditor that missed and the one with no block are unreliable, nobody else' ($unreliable -eq 'security,conformance') $unreliable
+        $reauditOnly = [pscustomobject]@{ metrics = [pscustomobject]@{} }
+        $partial = [pscustomobject]@{ metrics = [pscustomobject]@{ 'method.rulesChecked' = 0 } }
+        $full = [pscustomobject]@{ metrics = [pscustomobject]@{ 'method.rulesChecked' = 8 } }
+        Check 'a report without its method counts is a skipped method' ((@(Get-MissingMethodCounts 'truthfulness' $reauditOnly).Count -eq 5) -and (@(Get-MissingMethodCounts 'process' $partial).Count -eq 1) -and (@(Get-MissingMethodCounts 'process' $full).Count -eq 0)) 'truthfulness 5 missing, process 0 counts as missing, 8 does not'
         Check 'a catch by the wrong auditor does not count' ($state.Auditors['security'].Caught -eq 0 -and $state.Auditors['truthfulness'].Caught -eq 1) "security caught $($state.Auditors['security'].Caught)"
         $only = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -ReliabilityOnly -ReportDirectory $ReportDirectory -Manifest $Manifest -FindingsDirectory $FindingsDirectory) -join ','
         Check '-ReliabilityOnly prints exactly the two names' ($only -eq 'security,conformance') $only

@@ -318,7 +318,7 @@ try {
         $open = @(Get-OpenFindings (Join-Path $auditTree 'Audit\Findings') $a)
         $reaudit = if ($open.Count) { "Re-audit these open findings by running each reproduction:`n" + ($open -join "`n") } else { 'There are no findings to re-audit.' }
         $logsLine = if ($a -eq 'process') { " The factory's log folder is $logs; the previous scorecard's date is $($since.ToString('yyyy-MM-dd'))." } else { '' }
-        $prompt = "Audit the tree at $plantedTree (commit $auditedCommit; auditor fingerprint $fingerprint).$logsLine Your temporary folder is $scratch. $reaudit Follow Audit/Instructions/Auditor-Rules.md and Audit/Instructions/$($Method[$a]).md in that tree, and end with exactly one json report block."
+        $prompt = "Audit the tree at $plantedTree (commit $auditedCommit; auditor fingerprint $fingerprint).$logsLine Your temporary folder is $scratch. Do every step of your method in full and report its method counts; the re-audits below come on top of it, never instead. $reaudit Follow Audit/Instructions/Auditor-Rules.md and Audit/Instructions/$($Method[$a]).md in that tree, and end with exactly one json report block."
         $exit = Invoke-Agent "audit-$a" $Models[$a] $prompt $plantedTree (Join-Path $RunDir "reports\$a.md")
         $dirty = @(Invoke-Git @('-C', $plantedTree, 'status', '--porcelain') | Where-Object { $_ })
         if ($dirty.Count) {

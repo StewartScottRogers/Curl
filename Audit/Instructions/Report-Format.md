@@ -18,8 +18,8 @@ anything not in the block is lost to them. The rules every auditor follows are i
 - The block is one JSON object that parses with PowerShell's `ConvertFrom-Json`: no
   comments, no trailing commas, strings escaped (`\"`, `\\`, `\n`).
 - Every top-level key below is present. An auditor with no findings writes
-  `"findings": []`; one given nothing to re-audit writes `"reaudits": []`; the
-  truthfulness auditor writes `"metrics": {}`.
+  `"findings": []`; one given nothing to re-audit writes `"reaudits": []`; every
+  auditor's `metrics` holds at least its [method counts](#method-counts).
 
 ```
 { "auditor", "commit", "fingerprint",
@@ -88,6 +88,21 @@ issue found again gets the same key, character for character.
 name, not nesting) and each value is a JSON number. A required metric the auditor could
 not measure is `null`, and a finding says why. The tools read only the names below; an
 auditor may add others, which are kept in its saved reply and nowhere else.
+
+### Method counts
+
+Every auditor reports how much of its method it ran, so a run that did only its re-audits
+shows. `Write-AuditScorecard.ps1` marks an auditor **unreliable** when any of its counts
+is missing, `null` or 0 (BL-1364). Re-audits never count toward them.
+
+| Auditor | Names | Counts |
+| --- | --- | --- |
+| quality | `method.librariesMutated`, `method.testsRead` | Libraries mutation-tested; tests read in full. |
+| security | `method.fuzzTargets`, `method.timingSitesRead` | Parsers fuzzed; secret-handling sites read for timing. |
+| performance | `method.scenariosRun` | Scenarios measured (six in a full run). |
+| conformance | `method.casesRun` | Generated command lines run through both binaries. |
+| truthfulness | `method.names`, `method.docComments`, `method.documentStatements`, `method.adrs`, `method.scriptStatements` | Items checked in steps 1 to 5. |
+| process | `method.rulesChecked` | Rules in its method checked against the measurements. |
 
 ### performance
 
