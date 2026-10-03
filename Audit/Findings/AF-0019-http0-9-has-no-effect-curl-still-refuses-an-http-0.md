@@ -3,8 +3,8 @@ id: AF-0019
 title: --http0.9 has no effect: Curl still refuses an HTTP/0.9 reply with exit 1 where curl prints it and exits 0
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Protocol.Http.UnitLibrary/HttpStatusLine.cs:--http0.9:exit-code
 task: none
 found: 2026-10-02
@@ -41,3 +41,4 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 ## Log
 
 - 2026-10-02: filed proposed.
+- 2026-10-02: proposed -> accepted.
