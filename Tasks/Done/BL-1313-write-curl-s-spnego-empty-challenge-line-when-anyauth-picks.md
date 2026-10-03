@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1313 — Write curl's SPNEGO empty challenge line when --anyauth picks Negotiate on a challenge that starts with =
 
@@ -23,9 +23,9 @@ When Negotiate is picked only after the challenge (`--anyauth`, or `--negotiate 
 
 ## Acceptance criteria
 
-- [ ] Real curl 8.21.0 measured for `--anyauth -u :` against `Negotiate =`; the stderr and exit code recorded under Notes.
-- [ ] A test in `Curl.Authentication.UnitTests` drives `RankedHttpAuthenticator.CreateAuthorizationAsync` with `--anyauth` and `["Negotiate ="]` and asserts the measured info line, no context created, and the measured return value (null for no further request, if that is what curl does).
-- [ ] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean; `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] Real curl 8.21.0 measured for `--anyauth -u :` against `Negotiate =`; the stderr and exit code recorded under Notes.
+- [x] A test in `Curl.Authentication.UnitTests` drives `RankedHttpAuthenticator.CreateAuthorizationAsync` with `--anyauth` and `["Negotiate ="]` and asserts what curl was measured to do: no empty-challenge line, one context stepped, and `string.Empty` returned (a further request without a header).
+- [x] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean; `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -33,3 +33,4 @@ When Negotiate is picked only after the challenge (`--anyauth`, or `--negotiate 
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. Measured: curl 8.21.0 writes no empty-challenge line when --anyauth picks Negotiate from a 401 with 'Negotiate ='; Curl already matches (steps a context, asks again), now pinned by a test

@@ -8,7 +8,9 @@ namespace Curl.Authentication;
 /// Pins curl 8.21.0's answer to a <c>Negotiate</c> challenge whose token starts with <c>=</c>
 /// (BL-1303): <c>Curl_auth_decode_spnego_message</c> never decodes such a token, so on the SSPI
 /// and the GSS-API build alike it writes <c>SPNEGO handshake failure (empty challenge
-/// message)</c> and steps no context, and the 401 is the result.
+/// message)</c> and steps no context, and the 401 is the result. When Negotiate is picked only
+/// after the challenge (<c>--anyauth</c>, BL-1313) there is no context yet, so curl ignores the
+/// token: no line, a context stepped, and the request asked for again.
 /// </summary>
 [TestClass]
 public sealed class NegotiateEmptyChallengeMessageTests
@@ -102,6 +104,29 @@ public sealed class NegotiateEmptyChallengeMessageTests
         Assert.IsTrue(context.IsDisposed);
         Assert.HasCount(1, context.IncomingTokens);
         Assert.IsEmpty(events.Info);
+    }
+
+    // curl -sv --anyauth -u : (and --negotiate --basic -u :) against "WWW-Authenticate: Negotiate =",
+    // measured on curl 8.21.0 Schannel (BL-1313 Notes): with no context yet, curl ignores the
+    // token, steps a context, reports its failure and asks for the request again without a header.
+    [TestMethod]
+    [DataRow(HttpAuthSchemes.Any, true, DisplayName = "--anyauth, SSPI wording")]
+    [DataRow(HttpAuthSchemes.Any, false, DisplayName = "--anyauth, GSS-API wording")]
+    [DataRow(HttpAuthSchemes.Negotiate | HttpAuthSchemes.Basic, true, DisplayName = "--negotiate --basic")]
+    public async Task CreateAuthorizationAsync_NegotiatePickedAfterA401WithEquals_StepsAContextWithoutTheLineAndAsksAgain(HttpAuthSchemes allowed, bool wordsAsSspi)
+    {
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
+        ScriptedSecurityContextFactory contexts = new(context);
+        RecordingInfoEvents events = new();
+        HttpAuthRequest request = NegotiateRequest() with { AllowedSchemes = allowed, Events = events };
+
+        string? value = await Ranked(contexts, wordsAsSspi).CreateAuthorizationAsync(request, ["Negotiate ="], CancellationToken.None);
+
+        Assert.AreEqual(string.Empty, value);
+        Assert.HasCount(1, contexts.Requests);
+        Assert.HasCount(1, context.IncomingTokens);
+        CollectionAssert.AreEqual(new[] { NegotiateFailureLines.For(SecurityContextStatus.NoCredentials, wordsAsSspi) }, events.Info);
+        CollectionAssert.DoesNotContain(events.Info, NegotiateHttpAuthenticator.EmptyChallengeMessageLine);
     }
 
     [TestMethod]
