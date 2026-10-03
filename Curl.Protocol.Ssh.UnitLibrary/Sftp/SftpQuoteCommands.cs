@@ -31,6 +31,19 @@ internal sealed class SftpQuoteCommands
             [SftpQuoteOperation.Remove] = (SftpPacketType.Remove, "rm"),
         }.ToFrozenDictionary();
 
+    // The state curl's sftp_quote enters for each command that has its own (BL-1204).
+    private static readonly FrozenDictionary<SftpQuoteOperation, string?> QuoteStates =
+        new Dictionary<SftpQuoteOperation, string?>
+        {
+            [SftpQuoteOperation.PrintWorkingDirectory] = null,
+            [SftpQuoteOperation.MakeDirectory] = "SSH_SFTP_QUOTE_MKDIR",
+            [SftpQuoteOperation.Rename] = "SSH_SFTP_QUOTE_RENAME",
+            [SftpQuoteOperation.RemoveDirectory] = "SSH_SFTP_QUOTE_RMDIR",
+            [SftpQuoteOperation.Remove] = "SSH_SFTP_QUOTE_UNLINK",
+            [SftpQuoteOperation.SymbolicLink] = "SSH_SFTP_QUOTE_SYMLINK",
+            [SftpQuoteOperation.StatFileSystem] = "SSH_SFTP_QUOTE_STATVFS",
+        }.ToFrozenDictionary();
+
     private readonly Stream? headerOutput;
 
     private readonly bool cLongIs32Bits;
@@ -217,17 +230,8 @@ internal sealed class SftpQuoteCommands
 
     // The state curl's sftp_quote enters for the command, measured (BL-1204); pwd writes its
     // line from SSH_SFTP_QUOTE itself, and the attribute commands start in SSH_SFTP_QUOTE_STAT.
-    private static string? StateOf(SftpQuoteOperation operation) => operation switch
-    {
-        SftpQuoteOperation.PrintWorkingDirectory => null,
-        SftpQuoteOperation.MakeDirectory => "SSH_SFTP_QUOTE_MKDIR",
-        SftpQuoteOperation.Rename => "SSH_SFTP_QUOTE_RENAME",
-        SftpQuoteOperation.RemoveDirectory => "SSH_SFTP_QUOTE_RMDIR",
-        SftpQuoteOperation.Remove => "SSH_SFTP_QUOTE_UNLINK",
-        SftpQuoteOperation.SymbolicLink => "SSH_SFTP_QUOTE_SYMLINK",
-        SftpQuoteOperation.StatFileSystem => "SSH_SFTP_QUOTE_STATVFS",
-        _ => "SSH_SFTP_QUOTE_STAT",
-    };
+    private static string? StateOf(SftpQuoteOperation operation) =>
+        QuoteStates.TryGetValue(operation, out string? state) ? state : "SSH_SFTP_QUOTE_STAT";
 
     private ValueTask RunAsync(SftpQuoteCommand command, SftpSession session, byte[] workingPath, CancellationToken cancellationToken) =>
         command.Operation switch
