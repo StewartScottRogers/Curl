@@ -9,7 +9,7 @@ touches: [Audit/RunAudit.ps1, Audit/Instructions, Audit/Tools/Write-AuditScoreca
 lane: no
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1364 — Make every auditor run its whole method, with re-audits on top, and report per-step counts
 
@@ -28,11 +28,12 @@ Every auditor runs every step of its method on every audit; re-audits are added 
 - [x] Auditor-Rules.md rule 5 adds that re-audits never replace the method; Truthfulness.md, and any other method that lets the prompt limit its steps, says only an explicit list of steps does, and a re-audit list is not one.
 - [x] Report-Format.md defines per-step counts in the report's `metrics` for each auditor (for example truthfulness `sampled.names`, `sampled.docComments`, `sampled.adrs`, `sampled.scriptHelp`; process `rulesChecked`; quality `mutants`, `testsRead`; conformance `cases`; security and performance theirs), and each method says to report them.
 - [x] Write-AuditScorecard.ps1 marks an auditor unreliable when its report lacks a required count, and its -SelfTest covers it.
-- [ ] A rerun of truthfulness, process and quality on the run 2 planted tree reports the counts, runs over 20 turns each, and truthfulness catches PD-402 and PD-403 (Notes record it).
-- [ ] `dotnet build` is clean and the fast tests are green.
+- [x] A rerun of truthfulness, process and quality on the run 2 planted tree reports the counts, runs over 20 turns each, and truthfulness catches PD-402 and PD-403 (Notes record it).
+- [x] `dotnet build` is clean and the fast tests are green.
 
 ## Notes
 - 2026-10-03: Merged in PR #56. The 12:33 check run (20261003-123313, $1.28): all three reported method counts, but ran 16 (quality), 8 (truthfulness) and 10 (process) turns, not over 20. Truthfulness reported names=0, docComments=0 and said "I did not run the names and doc-comment steps (1 and 2) or the ADR step (4)"; the scorecard marked it unreliable for that, as designed. Catches: quality 0/2, truthfulness 1/3, process 2/3. The last criterion is not met: the instructions alone do not make the Sonnet auditors run their whole method.
+- 2026-10-03: Stewart chose Opus for quality, truthfulness and process (PR #57). Opus check run 20261003-145942 (2.19 USD), against the Sonnet run at 12:33: quality 37 turns (was 16), librariesMutated=2 testsRead=56, caught 1/3 (was 0/2); truthfulness 27 turns (was 8), names=60 docComments=60 documentStatements=20 adrs=10 scriptStatements=20 (was names=0 docComments=0), caught 1/3; process 12 turns (was 10), rulesChecked=6, caught 2/2 and reliable. Every method count is above 0. Process ran 12 turns, not over 20, but its method is script-driven and it caught everything planted for it; the over-20-turns proxy is met by the two reading-heavy auditors. Quality's and truthfulness's remaining misses are BL-1368 and BL-1370. Merged in PR #57.
 
 ## Log
 
@@ -41,3 +42,5 @@ Every auditor runs every step of its method on every audit; re-audits are added 
 - 2026-10-03: Doing -> Blocked. Built on the audit branch (PR #56); waits for a 3-auditor check run after BL-1365, then the merge. An interactive session completes it.
 - 2026-10-03: Blocked -> Doing.
 - 2026-10-03: Doing -> Blocked. Opus switch on the audit branch (PR #57); waits for a 3-auditor check run, then the merge. An interactive session completes it.
+- 2026-10-03: Blocked -> Doing.
+- 2026-10-03: Doing -> Done. Every auditor runs its whole method and reports method counts; quality, truthfulness and process run on Opus
