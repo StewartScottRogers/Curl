@@ -54,3 +54,4 @@ Stewart turns his approved audit findings into Curl tasks from the board page's 
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-02: Backlog -> Doing.
