@@ -37,3 +37,4 @@ An `ftp://` control-connection send or data-connection receive that fails with a
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
