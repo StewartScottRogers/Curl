@@ -108,6 +108,13 @@ internal sealed class TftpTransferEvents(ITransferEvents events)
         }
     }
 
+    /// <summary>
+    /// Reports the message curl 8.21.0 notes when it refuses to send a request, such as
+    /// <c>TFTP filename too long</c>.
+    /// </summary>
+    /// <param name="message">The refusal's message.</param>
+    public void Refused(string message) => events.ReportInfo(message);
+
     /// <summary>Reports a downloaded block's bytes as data received, unless it is empty.</summary>
     /// <param name="payload">The block's bytes.</param>
     public void DataReceived(ReadOnlySpan<byte> payload)

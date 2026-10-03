@@ -34,7 +34,15 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   absent sends 512. The block size in force is 512 until an OACK grants another, so a
   server that answers with plain DATA is read in 512-byte blocks, as curl does.
 - `--tftp-no-options` (`TftpNoOptions`): the read or write request is the file name
-  and `octet` alone, with no `tsize`, `blksize` or `timeout`.
+  and the mode alone, with no `tsize`, `blksize` or `timeout`.
+- File name and mode (`TftpRequestFile`, BL-1238): a trailing `;mode=netascii` or
+  `;mode=octet` is cut off the URL path and sets the mode; otherwise `-B`/`--use-ascii`
+  (`UseAscii`) sends `netascii`, else `octet`. The name is the path's percent-decoded raw
+  bytes (`%E9` is the byte 0xE9; a malformed escape is kept as written). Once the channel
+  is open and nothing sent, a decoded NUL is exit 3 `URL using bad/illegal format or
+  missing URL`, a name and mode over 512 bytes with their framing exit 71 `TFTP filename
+  too long`, and options that push the request past 512 bytes exit 71 `TFTP buffer too
+  small for options`; each exit 71 message is also reported as a `-v` line.
 - Retransmission and timeouts (`TftpDownload`, `TftpUpload`, `TftpRetrySchedule`,
   `TftpTimeLimits`), as curl 8.21.0's `tftp_set_timeouts` derives them: from the time
   left (`ConnectTimeout`, 300 s by default, or `MaxTime` if sooner; after the first

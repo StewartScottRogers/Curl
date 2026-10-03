@@ -63,11 +63,12 @@ internal static class TftpPackets
                 : Math.Clamp(context.TftpBlockSize.Value, MinimumBlockSize, MaximumBlockSize);
 
     /// <summary>
-    /// Builds the read request curl 8.21.0 sends: octet mode, then <c>tsize 0</c>,
-    /// <c>blksize</c> and <c>timeout</c>, each string null-terminated, or octet mode
-    /// alone when there are no options.
+    /// Builds the read request curl 8.21.0 sends: the file name, the mode, then
+    /// <c>tsize 0</c>, <c>blksize</c> and <c>timeout</c>, each null-terminated, or the
+    /// name and mode alone when there are no options.
     /// </summary>
-    /// <param name="fileName">The file name from the URL path, decoded.</param>
+    /// <param name="fileName">The file name's bytes, percent-decoded from the URL path.</param>
+    /// <param name="mode">The transfer mode, <c>octet</c> or <c>netascii</c>.</param>
     /// <param name="blockSize">
     /// The <c>blksize</c> to ask for, or <see langword="null" /> to send no options.
     /// </param>
@@ -76,15 +77,16 @@ internal static class TftpPackets
     /// <see cref="TftpRetrySchedule.RetrySeconds" />, 6 by default.
     /// </param>
     /// <returns>The whole datagram.</returns>
-    internal static byte[] BuildReadRequest(string fileName, int? blockSize, int timeoutSeconds) =>
-        BuildRequest(ReadRequestOpcode, fileName, 0, blockSize, timeoutSeconds);
+    internal static byte[] BuildReadRequest(byte[] fileName, string mode, int? blockSize, int timeoutSeconds) =>
+        BuildRequest(ReadRequestOpcode, fileName, mode, 0, blockSize, timeoutSeconds);
 
     /// <summary>
-    /// Builds the write request curl 8.21.0 sends: octet mode, then <c>tsize</c> with the
-    /// upload's length, <c>blksize</c> and <c>timeout</c>, each string null-terminated,
-    /// or octet mode alone when there are no options.
+    /// Builds the write request curl 8.21.0 sends: the file name, the mode, then
+    /// <c>tsize</c> with the upload's length, <c>blksize</c> and <c>timeout</c>, each
+    /// null-terminated, or the name and mode alone when there are no options.
     /// </summary>
-    /// <param name="fileName">The file name from the URL path, decoded.</param>
+    /// <param name="fileName">The file name's bytes, percent-decoded from the URL path.</param>
+    /// <param name="mode">The transfer mode, <c>octet</c> or <c>netascii</c>.</param>
     /// <param name="transferSize">
     /// The upload's length in bytes, or 0 when it is not known, as curl sends for an
     /// upload read from a pipe.
@@ -97,8 +99,8 @@ internal static class TftpPackets
     /// <see cref="TftpRetrySchedule.RetrySeconds" />, 6 by default.
     /// </param>
     /// <returns>The whole datagram.</returns>
-    internal static byte[] BuildWriteRequest(string fileName, long transferSize, int? blockSize, int timeoutSeconds) =>
-        BuildRequest(WriteRequestOpcode, fileName, transferSize, blockSize, timeoutSeconds);
+    internal static byte[] BuildWriteRequest(byte[] fileName, string mode, long transferSize, int? blockSize, int timeoutSeconds) =>
+        BuildRequest(WriteRequestOpcode, fileName, mode, transferSize, blockSize, timeoutSeconds);
 
     /// <summary>
     /// Builds the DATA packet that carries block <paramref name="blockNumber" />.
@@ -142,20 +144,20 @@ internal static class TftpPackets
     /// Builds a read or write request with curl 8.21.0's options, or none.
     /// </summary>
     /// <param name="opcode">The request's opcode.</param>
-    /// <param name="fileName">The file name from the URL path, decoded.</param>
+    /// <param name="fileName">The file name's bytes, percent-decoded from the URL path.</param>
+    /// <param name="mode">The transfer mode, <c>octet</c> or <c>netascii</c>.</param>
     /// <param name="transferSize">The <c>tsize</c> option's value.</param>
     /// <param name="blockSize">
     /// The <c>blksize</c> option's value, or <see langword="null" /> to send no options.
     /// </param>
     /// <param name="timeoutSeconds">The <c>timeout</c> option's value.</param>
     /// <returns>The whole datagram.</returns>
-    private static byte[] BuildRequest(ushort opcode, string fileName, long transferSize, int? blockSize, int timeoutSeconds)
+    private static byte[] BuildRequest(ushort opcode, byte[] fileName, string mode, long transferSize, int? blockSize, int timeoutSeconds)
     {
         string[] fields = blockSize is { } requested
             ?
             [
-                fileName,
-                "octet",
+                mode,
                 "tsize",
                 transferSize.ToString(CultureInfo.InvariantCulture),
                 "blksize",
@@ -163,14 +165,16 @@ internal static class TftpPackets
                 "timeout",
                 timeoutSeconds.ToString(CultureInfo.InvariantCulture),
             ]
-            : [fileName, "octet"];
+            : [mode];
 
         using var packet = new MemoryStream();
         packet.WriteByte(0);
         packet.WriteByte((byte)opcode);
+        packet.Write(fileName);
+        packet.WriteByte(0);
         foreach (var field in fields)
         {
-            packet.Write(Encoding.UTF8.GetBytes(field));
+            packet.Write(Encoding.ASCII.GetBytes(field));
             packet.WriteByte(0);
         }
 

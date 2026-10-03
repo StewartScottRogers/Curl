@@ -80,21 +80,23 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
     /// <summary>
     /// Runs the upload to its end.
     /// </summary>
-    /// <param name="fileName">The file to write, decoded from the URL path.</param>
+    /// <param name="file">The file to write and the mode to write it in, from the URL path.</param>
     /// <returns>The outcome of the transfer.</returns>
-    internal async ValueTask<TransferResult> RunAsync(string fileName)
+    internal async ValueTask<TransferResult> RunAsync(TftpRequestFile file)
     {
         schedule = limits.RequestSchedule();
         events.TimeoutsSet(TftpTransferEvents.StartState, schedule);
         var transferSize = upload.CanSeek ? upload.Length - upload.Position : 0;
-        await SendAsync(
-                TftpPackets.BuildWriteRequest(
-                    fileName,
-                    transferSize,
-                    TftpPackets.RequestedBlockSize(context),
-                    schedule.RetrySeconds),
-                channel.ServerEndPoint)
-            .ConfigureAwait(false);
+        if (file.TryBuildRequest(
+                (name, mode) => TftpPackets.BuildWriteRequest(
+                    name, mode, transferSize, TftpPackets.RequestedBlockSize(context), schedule.RetrySeconds),
+                events,
+                out byte[] request) is { } refused)
+        {
+            return refused;
+        }
+
+        await SendAsync(request, channel.ServerEndPoint).ConfigureAwait(false);
         retries = 1;
 
         while (true)

@@ -74,18 +74,23 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     /// <summary>
     /// Runs the download to its end.
     /// </summary>
-    /// <param name="fileName">The file to read, decoded from the URL path.</param>
+    /// <param name="file">The file to read and the mode to read it in, from the URL path.</param>
     /// <returns>The outcome of the transfer.</returns>
-    internal async ValueTask<TransferResult> RunAsync(string fileName)
+    internal async ValueTask<TransferResult> RunAsync(TftpRequestFile file)
     {
         schedule = limits.RequestSchedule();
         events.TimeoutsSet(TftpTransferEvents.StartState, schedule);
         int? requestedBlockSize = TftpPackets.RequestedBlockSize(context);
-        await SendAsync(
-                TftpPackets.BuildReadRequest(fileName, requestedBlockSize, schedule.RetrySeconds),
-                channel.ServerEndPoint)
-            .ConfigureAwait(false);
-        log.RequestSent("read", fileName, requestedBlockSize, schedule.RetrySeconds);
+        if (file.TryBuildRequest(
+                (name, mode) => TftpPackets.BuildReadRequest(name, mode, requestedBlockSize, schedule.RetrySeconds),
+                events,
+                out byte[] request) is { } refused)
+        {
+            return refused;
+        }
+
+        await SendAsync(request, channel.ServerEndPoint).ConfigureAwait(false);
+        log.RequestSent("read", file.LoggedName, requestedBlockSize, schedule.RetrySeconds);
         retries = 1;
 
         while (true)
