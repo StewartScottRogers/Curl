@@ -3,8 +3,8 @@ id: AF-0033
 title: BL-1284, BL-1320 and BL-1287 cost over 3x the median task cost
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:cost-outliers:cost-outlier
 task: none
 found: 2026-10-03
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.
