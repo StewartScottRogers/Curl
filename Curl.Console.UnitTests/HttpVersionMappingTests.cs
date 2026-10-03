@@ -22,6 +22,7 @@ public sealed class HttpVersionMappingTests
     [DataRow(RequestedHttpVersion.Http2PriorKnowledge, HttpVersionPreference.Http2PriorKnowledge)]
     [DataRow(RequestedHttpVersion.Http3, HttpVersionPreference.Http3)]
     [DataRow(RequestedHttpVersion.Http3Only, HttpVersionPreference.Http3Only)]
+    [DataRow((RequestedHttpVersion)99, HttpVersionPreference.Http11)]
     public void ToHttpVersionPreference_MapsEachVersionOption(RequestedHttpVersion? version, HttpVersionPreference expected)
     {
         Assert.AreEqual(expected, HttpVersionMapping.ToHttpVersionPreference(version));

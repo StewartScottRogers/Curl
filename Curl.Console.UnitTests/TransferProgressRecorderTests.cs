@@ -323,4 +323,16 @@ public sealed class TransferProgressRecorderTests
             "\r" + new string('#', 36).PadRight(72) + "  50.0%" + "\r" + new string('#', 54).PadRight(72) + "  75.0%",
             bar.Drawn);
     }
+
+    [TestMethod]
+    public void ReportUploaded_InAParallelRun_PassesTheBytesOnToItsShareOfTheCombinedMeter()
+    {
+        ParallelTransferProgress share = new ParallelProgressMeter(new ManualTimerTimeProvider(), new WriteGate(), _ => { }).AddTransfer();
+        TransferProgressRecorder recorder = new(clock, parallelProgress: share);
+
+        recorder.ReportUploaded(5, 20);
+
+        Assert.AreEqual(5, share.Uploaded);
+        Assert.AreEqual(20, share.UploadTotal);
+    }
 }

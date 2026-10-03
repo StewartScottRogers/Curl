@@ -153,14 +153,14 @@ internal static class CurlComposition
             new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
             new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
             new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)) { TracesStateMachine = tracesSmtp },
-            new LdapProtocolHandler(recordingConnector, OperatingSystem.IsWindows() ? LdapDialect.WinLdap : LdapDialect.OpenLdap),
+            new LdapProtocolHandler(recordingConnector, LdapDialectFor(OperatingSystem.IsWindows())),
             new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()) { TracesFrames = tracesWs },
             new RtspProtocolHandler(recordingConnector, httpAuthenticator),
             new SmbProtocolHandler(recordingConnector),
             new SshProtocolHandler(
                 recordingConnector,
                 new PhysicalFileSystem(),
-                OperatingSystem.IsWindows() ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference,
+                SshAlgorithmPreferencesFor(OperatingSystem.IsWindows()),
                 CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())) { TracesStateMachine = tracesSsh },
             http,
             new RoutingFtpProtocolHandler(
@@ -170,6 +170,23 @@ internal static class CurlComposition
 
         return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(handler, recorder))];
     }
+
+    /// <summary>
+    /// Gives the LDAP library the platform's curl is built with: WinLDAP on Windows, OpenLDAP elsewhere.
+    /// </summary>
+    /// <param name="runsOnWindows">Whether the run is on Windows.</param>
+    /// <returns>The dialect.</returns>
+    internal static LdapDialect LdapDialectFor(bool runsOnWindows) =>
+        runsOnWindows ? LdapDialect.WinLdap : LdapDialect.OpenLdap;
+
+    /// <summary>
+    /// Gives the SSH algorithms the platform's curl offers: the Schannel build's on Windows, the
+    /// OpenSSL build's elsewhere.
+    /// </summary>
+    /// <param name="runsOnWindows">Whether the run is on Windows.</param>
+    /// <returns>The algorithm preferences.</returns>
+    internal static SshAlgorithmPreferences SshAlgorithmPreferencesFor(bool runsOnWindows) =>
+        runsOnWindows ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference;
 
     /// <summary>
     /// Creates the FTP handler for <c>ftp</c> and <c>ftps</c> (ADR-0102): the control connection

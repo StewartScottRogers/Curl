@@ -699,17 +699,49 @@ internal sealed class CurlCommandRunner(
     {
         RecordingDataFileReader parseFileReader = new(DataFileReader);
         CommandLineParseResult parsed = ParseCommandLine(arguments, parseFileReader);
-        try
-        {
-            await WriteWarningLinesRedirectingStandardErrorAsync(parsed).ConfigureAwait(false);
 
-            return await RunParsedAsync(parsed, parseFileReader.FilesTried).ConfigureAwait(false);
-        }
-        finally
-        {
-            await CloseDiagnosticLogAsync().ConfigureAwait(false);
-            await CloseStandardErrorFileAsync().ConfigureAwait(false);
-        }
+        return await ThenCleanUpAsync(RunWarnedAsync(parsed, parseFileReader.FilesTried), CloseRunOutputsAsync).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes the parser's warning lines, following its <c>--stderr</c> redirects, then runs the parse result.
+    /// </summary>
+    /// <param name="parsed">The parse result.</param>
+    /// <param name="filesTriedWhileParsing">The files the parse tried to read, in order, and whether each was read.</param>
+    /// <returns>The process exit code.</returns>
+    private async Task<int> RunWarnedAsync(CommandLineParseResult parsed, IReadOnlyList<(string Path, bool WasRead)> filesTriedWhileParsing)
+    {
+        await WriteWarningLinesRedirectingStandardErrorAsync(parsed).ConfigureAwait(false);
+
+        return await RunParsedAsync(parsed, filesTriedWhileParsing).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Closes the run's diagnostic log and then its <c>--stderr</c> file.
+    /// </summary>
+    /// <returns>A task that completes when both are closed.</returns>
+    private async Task CloseRunOutputsAsync()
+    {
+        await CloseDiagnosticLogAsync().ConfigureAwait(false);
+        await CloseStandardErrorFileAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for <paramref name="work" /> to end, however it ends, then runs <paramref name="cleanUp" />,
+    /// then gives the work's result or throws its exception: a <c>finally</c> block, without the
+    /// branches the compiler writes to rethrow after an awaited one, which no test can take (BL-1356).
+    /// As with a <c>finally</c> block, an exception from <paramref name="cleanUp" /> replaces the work's.
+    /// </summary>
+    /// <typeparam name="T">The work's result.</typeparam>
+    /// <param name="work">The work, already started.</param>
+    /// <param name="cleanUp">What runs once the work has ended.</param>
+    /// <returns>The work's result.</returns>
+    private static async Task<T> ThenCleanUpAsync<T>(Task<T> work, Func<Task> cleanUp)
+    {
+        await Task.WhenAny(work).ConfigureAwait(false);
+        await cleanUp().ConfigureAwait(false);
+
+        return await work.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1063,19 +1095,35 @@ internal sealed class CurlCommandRunner(
         standardError = writeGate.Guard(standardError);
         await WriteTlsSessionLinesAsync(groups[0], TlsSessionFileLines.Load).ConfigureAwait(false);
         parallelRun = groups[0].Parallel ? NewParallelRun(groups[0]) : null;
-        try
-        {
-            CurlExitCode? exitCode = await TransferGroupsInOrderAsync(groups).ConfigureAwait(false);
-            exitCode = parallelRun is { } run ? await EndParallelRunAsync(run, exitCode).ConfigureAwait(false) : exitCode;
 
-            return await ReportNoTransferPerformedAsync(exitCode).ConfigureAwait(false);
-        }
-        finally
-        {
-            await (runConnectionCache?.DisposeAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
-            await WriteTlsSessionLinesAsync(groups[0], (sessions, options) => TlsSessionFileLines.Save(sessions, options, runsOnWindows)).ConfigureAwait(false);
-            await transferEventOutput.DisposeAsync().ConfigureAwait(false);
-        }
+        return await ThenCleanUpAsync(TransferGroupsAndEndRunAsync(groups), () => CloseRunAsync(groups[0])).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Runs the option groups in order, then ends a <c>-Z</c> run and reports a run whose every
+    /// transfer was skipped.
+    /// </summary>
+    /// <param name="groups">The option groups to run.</param>
+    /// <returns>As <see cref="TransferAllGroupsAsync" />.</returns>
+    private async Task<CurlExitCode?> TransferGroupsAndEndRunAsync(IReadOnlyList<CommandLineOptions> groups)
+    {
+        CurlExitCode? exitCode = await TransferGroupsInOrderAsync(groups).ConfigureAwait(false);
+        exitCode = parallelRun is { } run ? await EndParallelRunAsync(run, exitCode).ConfigureAwait(false) : exitCode;
+
+        return await ReportNoTransferPerformedAsync(exitCode).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Closes what the run kept open across its groups, whatever its outcome: the connection cache,
+    /// then the <c>--ssl-sessions</c> file, saved, then the <c>-v</c> and trace output.
+    /// </summary>
+    /// <param name="firstGroup">The first option group, which holds the global <c>--ssl-sessions</c>.</param>
+    /// <returns>A task that completes when all three are closed.</returns>
+    private async Task CloseRunAsync(CommandLineOptions firstGroup)
+    {
+        await (runConnectionCache?.DisposeAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
+        await WriteTlsSessionLinesAsync(firstGroup, (sessions, options) => TlsSessionFileLines.Save(sessions, options, runsOnWindows)).ConfigureAwait(false);
+        await transferEventOutput.DisposeAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1285,15 +1333,21 @@ internal sealed class CurlCommandRunner(
     {
         firstTransferIdOfGroup = nextTransferId;
         TransferDispatch dispatch = createTransferDispatch(options);
-        try
-        {
-            return await TransferEachUrlAsync(dispatch, options, exitCode).ConfigureAwait(false);
-        }
-        finally
-        {
-            await CloseDispatchAsync(dispatch).ConfigureAwait(false);
-            firstUrlNumberOfGroup += options.Urls.Count;
-        }
+
+        return await ThenCleanUpAsync(TransferEachUrlAsync(dispatch, options, exitCode), () => EndGroupAsync(dispatch, options)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ends an option group whatever its outcome: closes its dispatch and counts its URLs, so the next
+    /// group's <c>%{urlnum}</c> counts on from them.
+    /// </summary>
+    /// <param name="dispatch">The group's dispatch.</param>
+    /// <param name="options">The option group.</param>
+    /// <returns>A task that completes when the group is ended.</returns>
+    private async Task EndGroupAsync(TransferDispatch dispatch, CommandLineOptions options)
+    {
+        await CloseDispatchAsync(dispatch).ConfigureAwait(false);
+        firstUrlNumberOfGroup += options.Urls.Count;
     }
 
     /// <summary>
@@ -2374,13 +2428,13 @@ internal sealed class CurlCommandRunner(
         !options.UseAscii && !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure);
 
     /// <summary>
-    /// Gives the output entry of the URL at <paramref name="index" />.
+    /// Gives the output entry of the URL at <paramref name="index" />: the parser gives every URL
+    /// one, at the URL's own position, whether or not an output option was paired with it.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="index">The URL's position on the command line.</param>
-    /// <returns>The entry, or <see langword="null" /> when no output option was paired with the URL.</returns>
-    private static UrlOutput? UrlOutputOf(CommandLineOptions options, int index) =>
-        index < options.UrlOutputs.Count ? options.UrlOutputs[index] : null;
+    /// <returns>The entry.</returns>
+    private static UrlOutput UrlOutputOf(CommandLineOptions options, int index) => options.UrlOutputs[index];
 
     /// <summary>
     /// Tells whether the URL at <paramref name="index" /> saves its body to a file: an <c>-o</c>
@@ -3733,18 +3787,32 @@ internal sealed class CurlCommandRunner(
             return result;
         }
 
-        if ((result.IsSuccess || result.ExitCode == CurlExitCode.HttpReturnedError || state.Progress.HasTransferStarted)
-            && ShowsProgressMeter(options, toStandardOutput))
+        if (EndsWithProgressMeter(options, result, state, toStandardOutput))
         {
             FinishTransferProgress(state.Progress, result);
             await WriteErrorLinesAsync([.. TakeProgressMeterHeaderLines(state, resumeFrom), state.Progress.TakeUnwrittenStatusLines()])
                 .ConfigureAwait(false);
         }
 
-        eventStandardError?.Release();
+        // Every transfer runs after TransferEachUrlAsync has opened the event output.
+        eventStandardError!.Release();
 
         return result;
     }
+
+    /// <summary>
+    /// Tells whether a finished transfer writes its progress meter's end: after a success, after a
+    /// <c>-f</c> failure (exit 22) and after a failure once the handler reported the transfer
+    /// started, when <see cref="ShowsProgressMeter" /> says the meter is shown.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <param name="state">The transfer's state.</param>
+    /// <param name="toStandardOutput">Whether the transfer wrote its body to standard output.</param>
+    /// <returns><see langword="true" /> when the meter's end is written.</returns>
+    private bool EndsWithProgressMeter(CommandLineOptions options, TransferResult result, RunningTransferState state, bool toStandardOutput) =>
+        (result.IsSuccess || result.ExitCode == CurlExitCode.HttpReturnedError || state.Progress.HasTransferStarted)
+        && ShowsProgressMeter(options, toStandardOutput);
 
     /// <summary>
     /// Makes the draws curl 8.21.0 makes as <paramref name="progress" />'s transfer ends: a
