@@ -32,3 +32,4 @@ completed:
 
 - 2026-10-02: Created.
 - 2026-10-02: Renumbered from BL-1218, which the archived Done/2026-10-02_1625 task already holds.
+- 2026-10-02: Backlog -> Doing.
