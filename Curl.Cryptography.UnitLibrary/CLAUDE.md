@@ -270,8 +270,9 @@ Namespace `Curl.Cryptography`. It holds:
   secret: select and swap with masks (`ConstantTime`), fixed-width limbs, never `/`, `%`
   or `BigInteger` on a secret. Compare tags and MACs with
   `CryptographicOperations.FixedTimeEquals`. Each public type says in its XML docs
-  whether it is constant-time; Blowfish, CAST-128, RC4, Camellia (ADR-0145), ARIA (ADR-0147) and DES (ADR-0156) are not,
-  by design, and say so.
+  whether it is constant-time; Blowfish, CAST-128, RC4 and DES (ADR-0156) are not,
+  by design, and say so. Camellia (ADR-0393) and ARIA (ADR-0395) read their S-boxes by
+  masked scan and are.
 - **Zeroing.** Every secret, `stackalloc` temporaries and intermediate key material
   included, is cleared with `CryptographicOperations.ZeroMemory` in a `finally` block or
   in `Dispose`. Keyed types copy the key in their constructor, implement `IDisposable`,
