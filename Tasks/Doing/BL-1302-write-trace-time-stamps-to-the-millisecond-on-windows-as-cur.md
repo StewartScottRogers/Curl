@@ -37,3 +37,4 @@ On Windows, every `--trace-time` stamp Curl writes has its six fractional digits
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-03: Backlog -> Doing.
