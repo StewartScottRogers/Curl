@@ -8,8 +8,10 @@ namespace Curl.Protocol.Telnet;
 /// Pins how a <c>telnet://</c> session meets a negotiation reply the connection cannot send,
 /// against curl 8.21.0 measured on 2026-10-02 (BL-1307's Context): each reply is its own
 /// write, and one that fails is reported as <c>Sending data failed (N)</c>, the socket error
-/// number, while the session goes on to exit 0. A failed upload write still ends it with
-/// exit 55.
+/// number, while the session goes on to exit 0. The window size inside a NAWS
+/// subnegotiation is the exception: curl sends it through <c>send_telnet_data</c>, whose
+/// socket filter writes <c>Send failure: &lt;text&gt;</c> instead (BL-1312, ADR-0403). A
+/// failed upload write still ends the session with exit 55.
 /// </summary>
 [TestClass]
 public sealed class TelnetProtocolHandlerSendFailureTests
@@ -56,10 +58,29 @@ public sealed class TelnetProtocolHandlerSendFailureTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_WindowSizeWriteFailsOnWindows_ReportsTheSchannelBuildsSendFailureBetweenTheSuboptionFailures()
+    {
+        Session session = await RunWindowSizeFailureAsync();
+
+        Assert.AreEqual("* Send failure: Connection was aborted", session.Transcript[6]);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_WindowSizeWriteFailsOffWindows_ReportsStrerrorsSendFailureBetweenTheSuboptionFailures()
+    {
+        Session session = await RunWindowSizeFailureAsync();
+
+        Assert.AreEqual("* Send failure: Software caused connection abort", session.Transcript[6]);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_WindowSizeSubnegotiationWritesFail_ReportsFailuresAfterTheSuboptionAndGoesOn()
     {
         var connection = new SocketFailingConnection(Hex("FF FD 1F"), Latin1("hi")) { SuccessfulWrites = 1 };
         string failed = $"* Sending data failed ({connection.Failure.NativeErrorCode})";
+        string sendFailure = "* Send failure: " + TelnetSocketErrorText.Current(connection.Failure);
 
         Session session = await RunAsync(connection, ["WS=80x24"]);
 
@@ -70,7 +91,7 @@ public sealed class TelnetProtocolHandlerSendFailureTests
             {
                 "* RCVD DO NAWS", "* SENT WILL NAWS",
                 "* SENT IAC SB ", "* NAWS", "* Width: 80 ; Height: 24",
-                failed, failed,
+                failed, sendFailure, failed,
                 failed, "* SENT WILL BINARY",
                 failed, "* SENT DO BINARY",
                 failed, "* SENT WILL SUPPRESS GO AHEAD",
@@ -104,6 +125,9 @@ public sealed class TelnetProtocolHandlerSendFailureTests
         Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 5, "Send failure: Connection was reset"), session.Result);
         Assert.AreEqual("* SENT WONT TERM TYPE", session.Transcript[1]);
     }
+
+    private static Task<Session> RunWindowSizeFailureAsync() =>
+        RunAsync(new SocketFailingConnection(Hex("FF FD 1F"), Latin1("hi")) { SuccessfulWrites = 1 }, ["WS=80x24"]);
 
     private static async Task<Session> RunAsync(IConnection connection, string[] telnetOptions, byte[]? upload = null)
     {

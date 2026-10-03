@@ -416,8 +416,8 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     /// <summary>
     /// Sends the replies a read called for, one write each, as curl 8.21.0's
     /// <c>send_negotiation</c> and <c>sendsuboption</c> do: a write the connection fails with
-    /// a socket error is reported as <c>Sending data failed (N)</c> and the session goes on,
-    /// as curl's do (BL-1307). Returns <see langword="false" /> for a write that fails
+    /// a socket error is reported in curl's words for it and the session goes on, as curl's
+    /// do (BL-1307, BL-1312). Returns <see langword="false" /> for a write that fails
     /// otherwise, which still ends the session with exit 55.
     /// </summary>
     private static async Task<bool> TrySendRepliesAsync(
@@ -439,11 +439,10 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
     /// <summary>
     /// Sends one reply, returning <see langword="null" /> when the connection took it, or
-    /// the socket error number - the WSA code on Windows, the errno elsewhere, as curl's
-    /// <c>SOCKERRNO</c> is - when it failed with a <see cref="SocketException" /> inside its
-    /// <see cref="IOException" />. Any other <see cref="IOException" /> is thrown.
+    /// the <see cref="SocketException" /> inside its <see cref="IOException" /> when it failed
+    /// with one. Any other <see cref="IOException" /> is thrown.
     /// </summary>
-    private static async Task<int?> SendReplyAsync(
+    private static async Task<SocketException?> SendReplyAsync(
         IConnection connection,
         SemaphoreSlim sendLock,
         byte[] reply,
@@ -458,7 +457,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         }
         catch (IOException failure) when (failure.InnerException is SocketException socketError)
         {
-            return socketError.NativeErrorCode;
+            return socketError;
         }
         finally
         {

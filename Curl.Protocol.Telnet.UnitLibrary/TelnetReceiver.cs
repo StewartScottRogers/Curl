@@ -417,7 +417,7 @@ internal sealed class TelnetReceiver
         AppendDoublingInterpretAsCommand((byte)size.Columns, sizeBytes);
         AppendDoublingInterpretAsCommand((byte)(size.Rows >> 8), sizeBytes);
         AppendDoublingInterpretAsCommand((byte)size.Rows, sizeBytes);
-        replies.SendUnreported([.. sizeBytes]);
+        replies.SendTelnetData([.. sizeBytes]);
         replies.Send([TelnetByte.InterpretAsCommand, TelnetByte.SubnegotiationEnd]);
     }
 
