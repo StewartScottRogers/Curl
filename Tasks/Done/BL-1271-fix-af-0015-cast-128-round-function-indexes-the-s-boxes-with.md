@@ -51,7 +51,7 @@ The finding closes only when a later re-audit by the security auditor confirms t
   internal `Cast128.ReadBox`: a masked scan of all 256 entries with
   `ConstantTime.EqualMask`, as BL-1270 did for DES. Output unchanged; RFC 2144's
   known-answer tests pass.
-- Decision recorded in ADR-0397 (decided by Claude under Stewart's delegation); the
+- Decision recorded in ADR-0398 (decided by Claude under Stewart's delegation); the
   library's `CLAUDE.md` and `Cast128`'s XML docs now say constant-time.
 - No new test: `Curl.Cryptography.UnitTests` is outside `touches`, and `ReadBox` has no
   branch, so the existing known-answer tests cover every line of it.
