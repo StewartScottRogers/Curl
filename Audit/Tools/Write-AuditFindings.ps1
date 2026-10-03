@@ -155,6 +155,12 @@ function Test-AtPlantedLine([string]$Location, $Planted) {
     return ($line -ge $first - 2) -and ($line -le $last + 2)
 }
 
+function Test-LogPlant($Planted) {
+    # A process plant edits one file of the log copy (a lane trace, a run log, ci-runs.json),
+    # named bare, with no project folder. A finding about it names the task or run it shows,
+    # rarely the one file the seeder edited, so its catch text alone identifies it (BL-1365).
+    return ("$($Planted.auditor)" -eq 'process') -and ("$($Planted.file)" -notmatch '[\\/]')
+}
 function Test-Catch($Finding, [string]$Auditor, [object[]]$Planted) {
     # A catch: the planted defect's own auditor, in the defect's file, with the manifest's catch
     # fragment in the finding's title, key or evidence, or with a location at the planted line.
@@ -165,6 +171,7 @@ function Test-Catch($Finding, [string]$Auditor, [object[]]$Planted) {
         $haystack = "$($Finding.title) $($Finding.key) $($Finding.evidence)"
         $catchText = "$($p.catch)".Trim()
         $named = $catchText -and $haystack.IndexOf($catchText, [StringComparison]::OrdinalIgnoreCase) -ge 0
+        if (Test-LogPlant $p) { if ($named) { return $p } else { continue } }
         if ($sameFile -and ($named -or (Test-AtPlantedLine "$($Finding.location)" $p))) { return $p }
     }
     return $null
@@ -305,6 +312,13 @@ if ($SelfTest) {
         Check 'a differently worded report at the planted line is a catch, not a finding' (-not ((Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -match 'returns at the first differing byte')) 'TlsMac.cs:41'
         $plantedAt40 = [pscustomobject]@{ line = 40 }
         Check 'the planted-line window is 2 lines' ((Test-AtPlantedLine 'x.cs:42' $plantedAt40) -and -not (Test-AtPlantedLine 'x.cs:43' $plantedAt40) -and (Test-AtPlantedLine 'x.cs:30-38' $plantedAt40) -and -not (Test-AtPlantedLine 'x.cs:30-37' $plantedAt40) -and -not (Test-AtPlantedLine 'x.cs' $plantedAt40) -and -not (Test-AtPlantedLine 'x.cs:40' ([pscustomobject]@{ line = $null }))) '42 yes, 43 no, 30-38 yes, 30-37 no, no line no'
+        # The two real process reports of planted log defects (2026-10-02 and 2026-10-03, BL-1365).
+        $plant1 = [pscustomobject]@{ id = 'PD-501'; auditor = 'process'; file = 'DarkFactory-20261001-120001-L9.log'; line = $null; catch = 'BL-1121' }
+        $plant2 = [pscustomobject]@{ id = 'PD-501'; auditor = 'process'; file = 'DarkFactory-20261002-231500-L9.log'; line = 2; catch = 'BL-1289' }
+        $report1 = [pscustomobject]@{ key = 'process:logs:BL-1121:redone-work'; title = 'BL-1121 claimed 5 times'; location = 'logs/BL-1121'; evidence = 'claimed 5 times' }
+        $report2 = [pscustomobject]@{ key = 'process:logs:BL-1289:redone-work'; title = 'BL-1289 was claimed 6 times (134 minutes) before reaching Done'; location = 'logs/BL-1289-20261002-211047-L1.jsonl:1'; evidence = 'six claims' }
+        $other = [pscustomobject]@{ key = 'process:logs:BL-1300:redone-work'; title = 'BL-1300 claimed 3 times'; location = 'logs/DarkFactory-20261001-120001-L9.log'; evidence = 'three claims' }
+        Check 'a process report naming a planted log defect''s catch text is a catch, whatever file it cites' ((Test-Catch $report1 'process' @($plant1)) -and (Test-Catch $report2 'process' @($plant2)) -and -not (Test-Catch $other 'process' @($plant1)) -and -not (Test-Catch $report1 'security' @($plant1))) 'both PD-501 reports; not another task, not another auditor'
         Check 'summary line' ($line -eq 'findings: new 3, still open 1, closed 1, catches 2') $line
         exit $(if ($failed) { 1 } else { 0 })
     }

@@ -18,8 +18,10 @@ pipeline run) fixes. For what counts as a misaligned name or a false document, u
 
 Every step takes a fixed sample, so audits are comparable. Choose the samples with
 `System.Random` and a seed you record in your summary (for example the audited commit's first
-eight hex digits as a number), so a re-audit can draw the same ones. The prompt may limit you to
-some steps; do only those, and say which you left out.
+eight hex digits as a number), so a re-audit can draw the same ones. Only a prompt that names
+the steps to run limits you to them, and you then say which you left out; a list of
+findings to re-audit is not such a limit, and every step below still runs (BL-1364).
+Report the method counts in `metrics` ([Report-Format.md](Report-Format.md#method-counts)).
 
 ## 1. Names - 30 types, 30 methods
 

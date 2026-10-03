@@ -26,8 +26,11 @@ checkable by someone else. The design is
    The findings you are asked to re-audit are given in the prompt.
 4. **No evidence, no finding.** Every finding has evidence (file and line, command
    output, measurement) and a reproduction a stranger can run from the repository root.
-5. **Re-audit what you are given.** Re-audit each listed finding by running its
-   reproduction, and report whether it still reproduces.
+5. **Re-audit what you are given, on top of your method.** Re-audit each listed finding by
+   running its reproduction, and report whether it still reproduces. Re-audits never
+   replace your method: run every step of it as well, and report its method counts
+   ([Report-Format.md](Report-Format.md#method-counts)). An auditor whose report lacks
+   them is unreliable on that audit's scorecard (BL-1364).
 6. **End with one report block.** End with exactly one report block in the format of
    [Report-Format.md](Report-Format.md).
 7. **No Python, no network.** PowerShell or C# file-based apps only; no network beyond
