@@ -182,7 +182,10 @@
     task-board.ps1 capacity as -Lanes Auto does and retires idle lanes down to it, so no
     lane polls "every ready task overlaps one in Doing" for hours; when the capacity rises
     again it adds one lane per step, never above N. Each change traces
-    "lanes a -> b (reason)", e.g. "lanes 9 -> 4 (4 ready tasks can run at once)".
+    "lanes a -> b (reason)", e.g. "lanes 9 -> 4 (4 ready tasks can run at once)". The shift
+    also starts no more lanes than that capacity, nor fewer than the lanes it adopts
+    (BL-1384, AF-0041), tracing e.g. "lanes: starting at 4 (-Lanes 9, capped at 4: 4 ready
+    tasks can run at once)", so lanes do not open the shift waiting on overlapping touches.
 
     AUTO LANES (-Lanes Auto)
 
@@ -1244,6 +1247,21 @@ function Get-CapacityLaneCount {
     return [pscustomobject]@{ Lanes = $lanes; Changed = ($lanes -ne $Current); Reason = "$step ($limit)" }
 }
 
+function Get-FixedStartCount {
+    # The lanes a fixed -Lanes N shift starts with (BL-1384, AF-0041): -Requested capped by
+    # the board's -Capacity (at least 1), never below -Adopted, the highest lane number
+    # adopted from the previous shift. Why is the log text, e.g. "-Lanes 9, capped at 4: 4
+    # ready tasks can run at once".
+    param([int]$Requested, [int]$Capacity, [int]$Adopted = 0)
+    $count = [math]::Max(1, [math]::Min($Requested, $Capacity))
+    $why = if ($count -ge $Requested) { "-Lanes $Requested" }
+        elseif ($Capacity -le 0) { "-Lanes $Requested, capped at 1: no ready task can run" }
+        elseif ($Capacity -eq 1) { "-Lanes $Requested, capped at 1: 1 ready task can run at once" }
+        else { "-Lanes $Requested, capped at ${count}: $Capacity ready tasks can run at once" }
+    if ($Adopted -gt $count) { $count = $Adopted; $why = "lane $Adopted adopted from the previous shift" }
+    return [pscustomobject]@{ Count = $count; Why = $why }
+}
+
 function Test-LanesFinished {
     # True once every active lane is among the finished ones (has written its summary).
     param([int[]]$Active, [int[]]$Finished)
@@ -1329,6 +1347,11 @@ if ($TestAutoLanes) {
         ,@('capacity 4 lanes capacity 6', 'lanes 4 -> 5 (6 ready tasks can run at once)', (Get-CapacityLaneCount -Current 4 -Capacity 6 -Requested 9 -Idle 0).Reason)
         ,@('capacity 9 lanes capacity 12', 'lanes 9 held (-Lanes 9)', (Get-CapacityLaneCount -Current 9 -Capacity 12 -Requested 9 -Idle 0).Reason)
         ,@('capacity 8 lanes capacity 12', 'lanes 8 -> 9 (-Lanes 9)', (Get-CapacityLaneCount -Current 8 -Capacity 12 -Requested 9 -Idle 0).Reason)
+        ,@('fixed start 9 capacity 4', '4 (-Lanes 9, capped at 4: 4 ready tasks can run at once)', "$((Get-FixedStartCount -Requested 9 -Capacity 4) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('fixed start 9 capacity 12', '9 (-Lanes 9)', "$((Get-FixedStartCount -Requested 9 -Capacity 12) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('fixed start 9 capacity 1', '1 (-Lanes 9, capped at 1: 1 ready task can run at once)', "$((Get-FixedStartCount -Requested 9 -Capacity 1) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('fixed start 9 capacity 0', '1 (-Lanes 9, capped at 1: no ready task can run)', "$((Get-FixedStartCount -Requested 9 -Capacity 0) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('fixed start 9 capacity 2 adopted 6', '6 (lane 6 adopted from the previous shift)', "$((Get-FixedStartCount -Requested 9 -Capacity 2 -Adopted 6) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('lanes-finished 1,3 of 1,2', 'False', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 2)")
         ,@('lanes-finished 1,3 of 1,3', 'True', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 3)")
         ,@('start saved 2', '3 (last shift saved 2, raised to 3 by -MinStartLanes)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 2 }) 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
@@ -3837,6 +3860,14 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         $LaneCount = [math]::Max($LaneCount, $start.Count)
         Write-Trace '-' 'lanes' "lanes auto: starting at $LaneCount ($why)" 'Cyan'
         Set-AutoLanesStatus -Lanes $LaneCount -Target $null -Binding 'no burn rate' -Reason "lanes auto: starting at $LaneCount ($why)"
+    } elseif ($LaneCount -gt 1) {
+        # A fixed count starts no more lanes than the board can run at once (BL-1384, AF-0041),
+        # so lanes do not open the shift polling "every ready task overlaps one in Doing";
+        # capacity steps add the rest, one every 5 minutes, as the capacity rises.
+        $adoptedMax = if ($adopt.Count) { [int]($adopt.Keys | Measure-Object -Maximum).Maximum } else { 0 }
+        $start = Get-FixedStartCount -Requested ([int]$Lanes) -Capacity (Get-ShiftCapacity -Fallback ([int]$Lanes)) -Adopted $adoptedMax
+        $LaneCount = $start.Count
+        Write-Trace '-' 'lanes' "lanes: starting at $LaneCount ($($start.Why))" 'Cyan'
     }
 
     # The previous shift stopped claiming work near the end of its session; this one starts
@@ -4023,7 +4054,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     }
 
     # The lane count a fixed shift asked for; capacity steps never go above it.
-    $requestedLanes = $LaneCount
+    $requestedLanes = if ($AutoLanes) { $LaneCount } else { [math]::Max([int]$Lanes, $LaneCount) }
     foreach ($n in 1..$LaneCount) {
         $where = Start-Lane -N $n
         $activeLanes.Add($n)
