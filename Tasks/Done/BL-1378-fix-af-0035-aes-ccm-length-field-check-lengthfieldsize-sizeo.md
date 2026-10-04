@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cryptography.UnitLibrary]
+touches: [Curl.Cryptography.UnitLibrary, Curl.Cryptography.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1378 — Fix AF-0035: AES-CCM length-field check `lengthFieldSize < sizeof(int)` can become `<=` with no test failing
 
@@ -41,12 +41,26 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The production code was right; the gap was a test. Added
+  `AeadAesCcmTests.EncryptAndTryDecrypt_ElevenByteNonce_MatchTheBclCiphertextAndTag`:
+  NIST SP 800-38C's key, its nonce cut to 11 bytes (a 4-byte length field), 20 bytes of
+  associated data and the 24-byte payload, with ciphertext and tag pinned to the BCL's
+  `AesCcm` on Windows (2026-10-03). No published vector uses an 11-byte nonce, so the BCL
+  is the reference, as the file's other BCL-pinned tests do.
+- Added `Curl.Cryptography.UnitTests` to `touches`: the fix is a test. No other task in
+  Doing on `origin/work/dark-factory` names it.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1` (the audit-path guard), so
+  the mutant was checked by hand: with `lengthFieldSize <= sizeof(int)` at
+  `AeadAesCcm.cs:168` the new test fails (Encrypt throws `ArgumentException`); with the
+  original `<` it passes. The quality auditor's re-audit confirms it with the tool.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. An 11-byte-nonce AES-CCM test pinned to the BCL kills the AF-0035 mutant at AeadAesCcm.cs:168

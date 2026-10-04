@@ -107,6 +107,22 @@ public sealed class AeadAesCcmTests
         AssertSealsAndOpens(NistKey, NistNonce[..24], [0x00], [], [], Convert.FromHexString("483C9B51B98D7E989063DE09E88F4E09"));
     }
 
+    // An 11-byte nonce leaves a 4-byte length field, the one width where the length check
+    // must not shift by 32 (AF-0035). NIST's key, its nonce cut to 11 bytes, 20 bytes of
+    // associated data and the 24-byte payload: ciphertext and tag pinned to the BCL's
+    // AesCcm on Windows, 2026-10-03.
+    [TestMethod]
+    public void EncryptAndTryDecrypt_ElevenByteNonce_MatchTheBclCiphertextAndTag()
+    {
+        AssertSealsAndOpens(
+            NistKey,
+            NistNonce[..22],
+            Convert.FromHexString(NistAssociatedData),
+            Convert.FromHexString(NistPayload),
+            Convert.FromHexString("D6D28B1B24B85B4FFBE0998809DAB62E35428A3CCA41BDC8"),
+            Convert.FromHexString("C8B439BFF187669ACF5B3A26AB35E946"));
+    }
+
     // RFC 3610 packet vector 1 with one bit changed in the tag, the ciphertext or the
     // header: the tag fails, and the plaintext buffer is left all zero.
     [TestMethod]
