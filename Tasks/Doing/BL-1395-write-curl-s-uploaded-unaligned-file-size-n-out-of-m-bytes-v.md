@@ -39,3 +39,4 @@ When an FTP upload of a known size (`-T <file>`) ends with exit 9, 25 or another
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
