@@ -1074,8 +1074,9 @@ public sealed class HttpProtocolHandler(
             ReportIgnoredBody(plan, actedOn, discardsBody);
             delivery = DeliveryOf(plan, actedOn, discardsBody);
             HttpDownloadConditions.ReportUndeliveredBody(context, actedOn, delivery);
+            bool ignoresBody = IgnoresBody(plan, actedOn, delivery, discardsBody);
             headReader.ReportHeldLines();
-            await ReadBodyAsync(plan, actedOn, body, TrailerStreamOf(requestStream, connection), delivery, discardsBody, cancellationToken).ConfigureAwait(false);
+            await ReadBodyAsync(plan, actedOn, body, TrailerStreamOf(requestStream, connection), delivery, ignoresBody, cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(fail, HttpFailMode.FailWithBody, actedOn);
         }
         catch (HttpTransferException failure)
@@ -1416,6 +1417,33 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Tells whether the response's body is read and discarded: one <c>-L</c> or a retry
+    /// discards, or a 416's to a resume (<see cref="HttpDownloadConditions.IsServerAnswer" />),
+    /// which curl 8.21.0 reads and ignores, writing <c>setting size while ignoring</c> before
+    /// the head's empty line when a Content-Length gives its size (measured, BL-1412 Notes). A
+    /// real 304 under <c>-z</c> has no body to read.
+    /// </summary>
+    private static bool IgnoresBody(HttpRequestPlan plan, HttpResponseHead head, HttpBodyDelivery delivery, bool discardsBody)
+    {
+        if (discardsBody)
+        {
+            return true;
+        }
+
+        if (!HttpDownloadConditions.IsServerAnswer(head, delivery))
+        {
+            return false;
+        }
+
+        if (HttpResponseBodyReader.HasBody(head, plan.Context.NoBody) && IgnoredBodyLength(plan, head) is not null)
+        {
+            plan.Context.Events.ReportInfo(HttpConnectionInfoLines.SettingSizeWhileIgnoring);
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Gives the Content-Length of a body read only to be discarded, or <see langword="null" />
     /// when it has none it stops at: framed as <see cref="HttpResponseBodyFraming" /> says when
     /// the response has a body, and for a response to HEAD, which has none, its Content-Length
@@ -1536,7 +1564,7 @@ public sealed class HttpProtocolHandler(
     /// closed it (<see cref="IHttpStreamSession.AcceptsNewStreams" />).
     /// </remarks>
     private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery, IHttpStreamSession? streams) =>
-        DeliveredWhole(upload, headReader, delivery)
+        DeliveredWhole(head, upload, headReader, delivery)
             && (streams?.AcceptsNewStreams
                 ?? HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding));
 
@@ -1547,17 +1575,19 @@ public sealed class HttpProtocolHandler(
     /// reports it dead before any reuse (ADR-0112).
     /// </summary>
     private static bool LeftIntactAfterServerClosed(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
-        DeliveredWhole(upload, headReader, delivery)
+        DeliveredWhole(head, upload, headReader, delivery)
             && HttpConnectionPersistence.KeepsHttp10AliveUntilServerCloses(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
 
     /// <summary>
     /// Decides whether the exchange ran whole: its request body was not cut short, its
-    /// response body was delivered, and the response did not switch protocols, unless it
-    /// switched to HTTP/2 after an h2c upgrade's <c>101</c> and was read from stream 1 (BL-866).
+    /// response body was delivered, or was the server's own answer to <c>-C</c> or <c>-z</c>
+    /// (<see cref="HttpDownloadConditions.IsServerAnswer" />), and the response did not switch
+    /// protocols, unless it switched to HTTP/2 after an h2c upgrade's <c>101</c> and was read
+    /// from stream 1 (BL-866).
     /// </summary>
-    private static bool DeliveredWhole(HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
+    private static bool DeliveredWhole(HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
         !upload.CutShort
-            && delivery == HttpBodyDelivery.Deliver
+            && (delivery == HttpBodyDelivery.Deliver || HttpDownloadConditions.IsServerAnswer(head, delivery))
             && (!headReader.SwitchedProtocols || headReader.IsSwitchedToHttp2());
 
     /// <summary>
@@ -1679,12 +1709,13 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Reads the body into the transfer's output, or into nothing when it is discarded, as
     /// <see cref="SetBodyLimitAndSinks" /> sets it up, then writes a chunked body's trailers; or reads
-    /// nothing when <paramref name="delivery" /> says there is no body to deliver. Over HTTP/2 and HTTP/3
+    /// nothing when <paramref name="delivery" /> says there is no body to deliver and it is not
+    /// being discarded (a 416's is, <see cref="IgnoresBody" />). Over HTTP/2 and HTTP/3
     /// the trailers are the stream's trailing field section, read once the stream has ended. An
     /// HTTP/2 stream's discarded body is not read at all: the stream is given up
     /// (<see cref="Http2StreamConnection.AbandonResponseAsync" />), as curl resets it (BL-970).
     /// </summary>
-    private static async ValueTask ReadBodyAsync(
+    private static ValueTask ReadBodyAsync(
         HttpRequestPlan plan,
         HttpResponseHead head,
         HttpResponseBodyReader body,
@@ -1693,17 +1724,28 @@ public sealed class HttpProtocolHandler(
         bool discardsBody,
         CancellationToken cancellationToken)
     {
-        if (delivery != HttpBodyDelivery.Deliver)
+        if (delivery != HttpBodyDelivery.Deliver && !discardsBody)
         {
-            return;
+            return ValueTask.CompletedTask;
         }
 
-        if (discardsBody && requestStream is Http2StreamConnection http2Stream)
-        {
-            await http2Stream.AbandonResponseAsync(cancellationToken).ConfigureAwait(false);
-            return;
-        }
+        return discardsBody && requestStream is Http2StreamConnection http2Stream
+            ? http2Stream.AbandonResponseAsync(cancellationToken)
+            : CopyBodyAsync(plan, head, body, requestStream, discardsBody, cancellationToken);
+    }
 
+    /// <summary>
+    /// Copies the body into the transfer's output, or into nothing when it is discarded, then
+    /// writes its trailers (<see cref="ReadBodyAsync" />).
+    /// </summary>
+    private static async ValueTask CopyBodyAsync(
+        HttpRequestPlan plan,
+        HttpResponseHead head,
+        HttpResponseBodyReader body,
+        IHttpStreamConnection? requestStream,
+        bool discardsBody,
+        CancellationToken cancellationToken)
+    {
         ITransferContext context = plan.Context;
         Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
         SetBodyLimitAndSinks(plan, body, discardsBody);

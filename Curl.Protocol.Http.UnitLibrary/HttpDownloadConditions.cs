@@ -103,6 +103,20 @@ internal static class HttpDownloadConditions
     }
 
     /// <summary>
+    /// Determines whether the server's own answer, not a body curl chose to leave, ends the
+    /// exchange: a 416 to a resume, whose body is read and ignored, or a real 304 under
+    /// <c>-z</c>, which has none. curl 8.21.0 leaves the connection intact after either, but
+    /// closes it after a resume at the Content-Length or a <c>Last-Modified</c> that fails
+    /// <c>-z</c>, whose body it never reads (measured, BL-1412 Notes).
+    /// </summary>
+    /// <param name="head">The final response's head.</param>
+    /// <param name="delivery">What <see cref="Decide" /> made of the body.</param>
+    /// <returns><see langword="true" /> for a 416 to a resume or a real 304 under <c>-z</c>.</returns>
+    internal static bool IsServerAnswer(HttpResponseHead head, HttpBodyDelivery delivery) =>
+        (delivery, head.StatusLine.StatusCode) is (HttpBodyDelivery.NothingLeftToResume, RangeNotSatisfiable)
+            or (HttpBodyDelivery.TimeConditionUnmet, NotModified);
+
+    /// <summary>
     /// Determines whether a document last modified at <paramref name="documentTime" /> meets
     /// <paramref name="condition" />: newer than its time for <c>-z date</c>, older for
     /// <c>-z -date</c>, so an equal time meets neither; an unknown time always meets it.
