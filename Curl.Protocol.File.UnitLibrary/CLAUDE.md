@@ -45,6 +45,12 @@ Every row was read from `FileProtocolHandler.cs` — `ExecuteAsync`, `DownloadFr
 and the `TimeProvider` and `DiagnosticLog` rows on 2026-09-29 (BL-927). When the handler
 starts or stops reading a member, change its row in the same commit.
 
+A directory takes the download path's listing branch (`ListDirectoryAsync`, BL-1401) when
+`FileProtocolHandler.ListsDirectories` is set - by default everywhere but Windows - and the
+`IFileSystem` is also an `IDirectoryLister`; it honours `TimeCondition`, `HeaderOutput`
+(only `Last-Modified`), `NoBody` and `MaxFileSize` as a file does, and ignores `Range`,
+`RangeText` and `ResumeFrom` beyond skipping `-z`. Otherwise a directory is exit 37.
+
 `TimeProvider` only times the diagnostic log's transfer-end line: nothing in a local file
 transfer is timed out or retried, and `-z`/`--time-cond` compares against the timestamp the open
 reported (`FileOpenResult.LastWriteTimeUtc`), not against now.

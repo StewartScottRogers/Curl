@@ -138,6 +138,15 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     {
     }
 
+    /// <summary>
+    /// Gets a value indicating whether a <c>file://</c> URL naming a directory lists the
+    /// directory's entry names, as curl 8.21.0's Linux and macOS builds do with
+    /// <c>opendir</c>/<c>readdir</c>, rather than failing with exit 37, as its Windows
+    /// build does because it cannot open a directory. It is the platform's answer unless a
+    /// test sets the other one.
+    /// </summary>
+    internal bool ListsDirectories { get; init; } = !OperatingSystem.IsWindows();
+
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => Schemes;
 
@@ -214,7 +223,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     private static TransferResult ReportFailure(ITransferEvents events, TransferResult result)
     {
         if (result.ErrorMessage is { } message
-            && message is not (FileTransferMessages.DestinationWriteFailed or FileTransferMessages.RangeNotDelivered))
+            && message is not (FileTransferMessages.DestinationWriteFailed or FileTransferMessages.RangeNotDelivered or FileTransferMessages.DirectoryListingFailed))
         {
             events.ReportInfo(message);
         }
@@ -264,6 +273,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
             .ConfigureAwait(false);
 
         var transferLog = new FileTransferLog(context.DiagnosticLog);
+        if (DirectoryListerFor(opened) is { } lister)
+        {
+            return await ListDirectoryAsync(context, path, opened, lister).ConfigureAwait(false);
+        }
+
         if (!opened.IsOpen || opened.Content is null)
         {
             transferLog.OpenFailed(path.OsPath, "reading", opened);
@@ -291,6 +305,23 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
             result = await DownloadFromAsync(context, source, opened).ConfigureAwait(false);
         }
 
+        return EndDownload(context, result, connectionNumber, opened);
+    }
+
+    /// <summary>
+    /// Reports how a download that got past its open ended and hands back its outcome.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="result">The outcome of the download.</param>
+    /// <param name="connectionNumber">The number the transfer's connection was given.</param>
+    /// <param name="opened">The metadata that came with the open.</param>
+    /// <returns><paramref name="result" />, with the source's timestamp when it succeeded.</returns>
+    private static TransferResult EndDownload(
+        ITransferContext context,
+        TransferResult result,
+        long connectionNumber,
+        FileOpenResult opened)
+    {
         ReportConnectionEnd(context, result, connectionNumber);
 
         // -R/--remote-time is applied by whoever owns the output file, so a successful
@@ -299,6 +330,121 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         return result.IsSuccess
             ? result with { SourceLastWriteTimeUtc = TruncateToWholeSeconds(opened.LastWriteTimeUtc) }
             : result;
+    }
+
+    /// <summary>
+    /// Picks the lister that serves an open which found a directory: the file system,
+    /// when this handler lists directories and the file system can list.
+    /// </summary>
+    /// <param name="opened">The outcome of the open.</param>
+    /// <returns>
+    /// The lister, or <see langword="null" /> when the open did not find a directory, this
+    /// handler answers a directory as the Windows build does, or the file system cannot
+    /// list - each of which keeps exit 37.
+    /// </returns>
+    private IDirectoryLister? DirectoryListerFor(FileOpenResult opened) =>
+        opened.Status == FileAccessStatus.IsDirectory && ListsDirectories
+            ? fileSystem as IDirectoryLister
+            : null;
+
+    /// <summary>
+    /// Lists a directory as curl 8.21.0's Linux and macOS builds do (<c>lib/file.c</c>,
+    /// <c>file_do</c>): numbers the connection and starts the meter as for a file, then
+    /// applies <c>-z</c>, writes the <c>-i</c> header block, stops there for <c>-I</c>, and
+    /// writes the entry names.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="path">The parsed URL path.</param>
+    /// <param name="opened">The open that found the directory, carrying its timestamp.</param>
+    /// <param name="lister">The lister to read the entry names from.</param>
+    /// <returns>The outcome of the listing.</returns>
+    private async ValueTask<TransferResult> ListDirectoryAsync(
+        ITransferContext context,
+        FileUrlPath path,
+        FileOpenResult opened,
+        IDirectoryLister lister)
+    {
+        long connectionNumber = connectionNumbers.NumberNextConnection();
+        context.Progress.ReportTransferStarted();
+
+        KeyValuePair<string, string>[] headers = FileTransferMessages.DirectoryPseudoHeaders(opened.LastWriteTimeUtc);
+        TransferResult result = await StartBodyAsync(context, opened, headers).ConfigureAwait(false)
+            ?? WithPseudoHeaders(
+                context.NoBody
+                    ? TransferResult.Success(0)
+                    : await WriteEntryNamesAsync(context, path, lister).ConfigureAwait(false),
+                headers);
+
+        return EndDownload(context, result, connectionNumber, opened);
+    }
+
+    /// <summary>
+    /// Writes each entry name that does not start with <c>.</c>, then <c>\n</c>, as two
+    /// body writes, in the lister's order, stopping at <c>--max-filesize</c> as any body
+    /// write does (curl's <c>cw_download_write</c> writes what fits, then fails).
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="path">The parsed URL path.</param>
+    /// <param name="lister">The lister to read the entry names from.</param>
+    /// <returns>
+    /// A success carrying the bytes written; exit 26 when the directory cannot be listed;
+    /// exit 23 when the output refused a write; exit 63 at <c>--max-filesize</c>.
+    /// </returns>
+    private static async ValueTask<TransferResult> WriteEntryNamesAsync(
+        ITransferContext context,
+        FileUrlPath path,
+        IDirectoryLister lister)
+    {
+        if (await lister.ListEntryNamesAsync(path.OsPath, context.CancellationToken).ConfigureAwait(false) is not { } names)
+        {
+            return TransferResult.Failure(CurlExitCode.ReadError, FileTransferMessages.DirectoryListingFailed);
+        }
+
+        long maxWritten = context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue;
+        long transferred = 0;
+
+        foreach (byte[] piece in ListingWrites(names))
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            context.Events.ReportDataReceived(piece);
+            int allowed = (int)Math.Min(piece.Length, maxWritten - transferred);
+
+            if (await TryWriteInSlicesAsync(context.Output, piece.AsMemory(0, allowed), ChunkSize, context.CancellationToken)
+                    .ConfigureAwait(false) is { } failure)
+            {
+                return TransferResult.Failure(
+                    CurlExitCode.WriteError,
+                    FileTransferMessages.OutputWriteFailed(failure.Offered, failure.Accepted),
+                    transferred + failure.WrittenBefore);
+            }
+
+            transferred += allowed;
+
+            if (allowed < piece.Length)
+            {
+                return new TransferResult(
+                    CurlExitCode.FilesizeExceeded,
+                    transferred,
+                    FileTransferMessages.MaxFileSizeExceeded(maxWritten, transferred));
+            }
+        }
+
+        return TransferResult.Success(transferred);
+    }
+
+    /// <summary>
+    /// The body writes of a directory listing: each entry name that does not start with
+    /// <c>.</c>, in UTF-8, followed by a write of <c>\n</c>.
+    /// </summary>
+    /// <param name="names">Every entry name, in the order the lister gave them.</param>
+    /// <returns>The writes, in order.</returns>
+    private static IEnumerable<byte[]> ListingWrites(IReadOnlyList<string> names)
+    {
+        foreach (string name in names.Where(name => !name.StartsWith('.')))
+        {
+            yield return Encoding.UTF8.GetBytes(name);
+            yield return FileTransferMessages.DirectoryEntrySeparator;
+        }
     }
 
     /// <summary>
@@ -327,22 +473,43 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         Stream source,
         FileOpenResult opened)
     {
-        if (!HasRange(context) && !MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
-        {
-            context.Events.ReportInfo(FileTransferMessages.TimeConditionNotMet(context.TimeCondition!.Kind));
-            return TransferResult.TimeConditionNotMet();
-        }
+        KeyValuePair<string, string>[] headers = FileTransferMessages.PseudoHeaders(opened.Length, opened.LastWriteTimeUtc);
 
-        if (await WriteHeadersAsync(context, opened).ConfigureAwait(false) is { } headerFailure)
+        if (await StartBodyAsync(context, opened, headers).ConfigureAwait(false) is { } ended)
         {
-            return headerFailure;
+            return ended;
         }
 
         TransferResult result = context.NoBody
             ? TransferResult.Success(0)
             : await DownloadBodyAsync(context, source, opened.Length).ConfigureAwait(false);
 
-        return WithPseudoHeaders(result, opened);
+        return WithPseudoHeaders(result, headers);
+    }
+
+    /// <summary>
+    /// Applies the time condition and writes the header block, the steps a file and a
+    /// listed directory share before their bodies.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="opened">The metadata that came with the open.</param>
+    /// <param name="headers">The pseudo-headers to write.</param>
+    /// <returns>
+    /// <see langword="null" /> when the body follows; otherwise the unmet time condition's
+    /// success or the failed header write.
+    /// </returns>
+    private static async ValueTask<TransferResult?> StartBodyAsync(
+        ITransferContext context,
+        FileOpenResult opened,
+        KeyValuePair<string, string>[] headers)
+    {
+        if (!HasRange(context) && !MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
+        {
+            context.Events.ReportInfo(FileTransferMessages.TimeConditionNotMet(context.TimeCondition!.Kind));
+            return TransferResult.TimeConditionNotMet();
+        }
+
+        return await WriteHeadersAsync(context, FileTransferMessages.HeaderLines(headers)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -351,18 +518,18 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// wrote them anywhere and whatever the body did after, as measured in BL-285.
     /// </summary>
     /// <param name="result">The outcome of the body stage.</param>
-    /// <param name="opened">The metadata the pseudo-headers were built from.</param>
+    /// <param name="headers">The pseudo-headers the transfer produced.</param>
     /// <returns>
     /// <paramref name="result" /> with a report of the pseudo-headers and, because a report
     /// replaces <see cref="TransferResult.BytesTransferred" /> as the source of
     /// <c>%{size_download}</c>, its byte count.
     /// </returns>
-    private static TransferResult WithPseudoHeaders(TransferResult result, FileOpenResult opened) =>
+    private static TransferResult WithPseudoHeaders(TransferResult result, KeyValuePair<string, string>[] headers) =>
         result with
         {
             Report = new TransferReport
             {
-                PseudoHeaders = FileTransferMessages.PseudoHeaders(opened.Length, opened.LastWriteTimeUtc),
+                PseudoHeaders = headers,
                 DownloadSize = result.BytesTransferred,
             },
         };
@@ -938,7 +1105,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// <c>curl: (23)</c> (measured 2026-09-26, BL-111 Notes).
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
-    /// <param name="opened">The metadata that came with the open.</param>
+    /// <param name="lines">The header lines to write, the blank line last.</param>
     /// <returns>
     /// <see langword="null" /> when the headers were written or not asked for, otherwise
     /// the exit 23 failure, reporting the length of the line that failed as the bytes
@@ -946,14 +1113,14 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// </returns>
     private static async ValueTask<TransferResult?> WriteHeadersAsync(
         ITransferContext context,
-        FileOpenResult opened)
+        string[] lines)
     {
         if (context.HeaderOutput is not { } headerOutput)
         {
             return null;
         }
 
-        foreach (string line in FileTransferMessages.PseudoHeaderLines(opened.Length, opened.LastWriteTimeUtc))
+        foreach (string line in lines)
         {
             byte[] bytes = Encoding.ASCII.GetBytes(line);
 
