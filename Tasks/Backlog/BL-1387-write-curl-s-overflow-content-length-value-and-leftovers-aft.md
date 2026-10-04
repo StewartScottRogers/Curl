@@ -4,7 +4,7 @@ title: Write curl's 'Overflow Content-Length: value' and 'Leftovers after chunki
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1386]
+depends-on: [BL-1398]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: FR-067
 created: 2026-10-03
@@ -25,7 +25,7 @@ An HTTP/1.x response whose `Content-Length` is too large for a signed 64-bit num
   - `-sv` against `HTTP/1.1 200 OK\r\nContent-Length: 99999999999999999999\r\n\r\nhello`: `< HTTP/1.1 200 OK`, `* Overflow Content-Length: value`, `< Content-Length: 99999999999999999999`, `< `, `{ [5 bytes data]`, `* shutting down connection #0`; stdout `hello`; exit 0.
   - the same with `--max-filesize 10`: `< HTTP/1.1 200 OK`, `* Maximum file size exceeded`, `* closing connection #0` (the `Content-Length` line is not written); nothing on stdout; exit 63.
   - `-sv` against `HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\nEXTRA` (all in one write): `< Transfer-Encoding: chunked`, `< `, `{ [20 bytes data]`, `* Leftovers after chunking: 5 bytes`, `* Connection #0 to host 127.0.0.1:PORT left intact`; stdout `hello`; exit 0.
-- BL-1386 changes the same handler first; build on it.
+- BL-1398 changes the same handler first; build on it.
 
 ## Acceptance criteria
 

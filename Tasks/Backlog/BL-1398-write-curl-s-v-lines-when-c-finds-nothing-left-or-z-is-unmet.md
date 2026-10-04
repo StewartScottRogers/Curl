@@ -1,5 +1,5 @@
 ---
-id: BL-1386
+id: BL-1398
 title: Write curl's -v lines when -C finds nothing left or -z is unmet on an HTTP response, and shut the connection down
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-080
 created: 2026-10-03
 completed:
 ---
-# BL-1386 — Write curl's -v lines when -C finds nothing left or -z is unmet on an HTTP response, and shut the connection down
+# BL-1398 — Write curl's -v lines when -C finds nothing left or -z is unmet on an HTTP response, and shut the connection down
 
 ## Goal
 
