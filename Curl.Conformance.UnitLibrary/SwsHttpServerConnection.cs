@@ -35,7 +35,8 @@ internal sealed class SwsHttpServerConnection : IConnection
     // sws reads an upgraded connection until a select() of one second finds nothing to read.
     private static readonly TimeSpan UpgradedTrafficQuietTime = TimeSpan.FromSeconds(1);
 
-    // No case's timing depends on a gap this short, and no healthy timer fires this late.
+    // No case's timing depends on a gap this short, and no healthy timer fires this late; so a wait
+    // no longer than this is too short for a stall inside it to reorder the timers a case races.
     private static readonly TimeSpan LateWakeLimit = TimeSpan.FromSeconds(1);
 
     private static readonly TimeSpan StalledTimersSettleTime = TimeSpan.FromMilliseconds(250);
@@ -202,10 +203,13 @@ internal sealed class SwsHttpServerConnection : IConnection
     // A system timer can fire a little before the time provider's timestamp reaches the moment,
     // and a read that woke early would find nothing sent and return 0, ending the reply early;
     // so the wait goes on until the moment has passed.
-    // A wake more than LateWakeLimit past the moment means the process stalled (a busy CI runner),
-    // and every other timer that fell due in the stall - curl's -m among them - fires now, in no
-    // set order; so the server waits StalledTimersSettleTime more for them to go first, and a stall
-    // cannot put the close of test29's ten-second wait ahead of its two-second -m (BL-1321).
+    // A process that stalls (a busy CI runner starving the thread pool) runs every timer that fell
+    // due in the stall - curl's -m among them - when it recovers, in no set order; so after a wait
+    // long enough for a stall to hide in, or a wake more than LateWakeLimit past the moment, the
+    // server waits StalledTimersSettleTime more for them to go first, and a stall cannot put the
+    // close of test29's ten-second wait ahead of its two-second -m. A late wake alone does not
+    // show the stall (BL-1321): one from 1.9 s to 10.4 s wakes the close only 0.4 s late, beside
+    // a -m 8.4 s overdue (BL-1441).
     private async ValueTask WaitUntilAsync(TimeSpan moment, CancellationToken cancellationToken)
     {
         TimeSpan remaining = moment - Now;
@@ -214,6 +218,7 @@ internal sealed class SwsHttpServerConnection : IConnection
             return;
         }
 
+        bool longWait = remaining > LateWakeLimit;
         do
         {
             await Task.Delay(remaining, timeProvider, cancellationToken);
@@ -221,7 +226,7 @@ internal sealed class SwsHttpServerConnection : IConnection
         }
         while (remaining > TimeSpan.Zero);
 
-        if (-remaining > LateWakeLimit)
+        if (longWait || -remaining > LateWakeLimit)
         {
             await Task.Delay(StalledTimersSettleTime, timeProvider, cancellationToken);
         }
