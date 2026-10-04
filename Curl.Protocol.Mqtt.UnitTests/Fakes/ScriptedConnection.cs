@@ -19,6 +19,14 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
 
     private int writeCount;
 
+    private int readCount;
+
+    /// <summary>
+    /// Gets the zero-based numbers of the scripted reads that do not complete at once,
+    /// the way a socket read waits when the peer's next bytes have not arrived yet.
+    /// </summary>
+    public ISet<int> HeldReads { get; } = new HashSet<int>();
+
     /// <summary>
     /// Gets or sets a value indicating whether every write throws an <see cref="IOException" />.
     /// </summary>
@@ -72,7 +80,17 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
         }
 
         chunk.CopyTo(buffer);
-        return ValueTask.FromResult(chunk.Length);
+        return HeldReads.Contains(readCount++) ? ReadAfterYieldingAsync(chunk.Length) : ValueTask.FromResult(chunk.Length);
+    }
+
+    /// <summary>
+    /// Returns a read that is still pending when <see cref="ReadAsync" /> returns, as a
+    /// socket read is when nothing has arrived yet, and completes on the next turn.
+    /// </summary>
+    private static async ValueTask<int> ReadAfterYieldingAsync(int length)
+    {
+        await Task.Yield();
+        return length;
     }
 
     /// <inheritdoc />

@@ -128,6 +128,52 @@ public sealed class MqttProtocolHandlerTransferEventsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_PublishPayloadReadPending_ReportsAgainOnceBeforeThePayload()
+    {
+        // Measured (BL-1434): the fixed header 30 0B, a gap, then the whole body; curl wrote
+        // "EEEE AAAAGAIN" once, after "Remaining length: 11 bytes" and before the data.
+        Run run = await RunHeldAsync(
+            "mqtt://h/t", null, [3], Hex(Connack), Hex(Suback), Hex("30 0B"), Hex("00 01 74 68 65 6C 6C 6F 77 6F 72"));
+
+        CollectionAssert.AreEqual(
+            ConnectedAndSubscribed()
+                .Concat(
+                [
+                    State(0), Received("30"), Received("0B"), State(5), "* Remaining length: 11 bytes",
+                    "* EEEE AAAAGAIN", "<= " + Latin1("00 01 74 68 65 6C 6C 6F 77 6F 72"),
+                    State(0), "* Connection disconnected", "* shutting down connection #0",
+                ])
+                .ToArray(),
+            run.Transcript);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PublishPayloadInTwoPendingParts_ReportsAgainBeforeEachPart()
+    {
+        // Measured (BL-1434): 30 0B, a gap, 00 01 74 68 65 6C, a gap, 6C 6F 77 6F 72; curl
+        // wrote "EEEE AAAAGAIN" once before each part.
+        Run run = await RunHeldAsync(
+            "mqtt://h/t", null, [3, 4], Hex(Connack), Hex(Suback), Hex("30 0B"), Hex("00 01 74 68 65 6C"), Hex("6C 6F 77 6F 72"));
+
+        string[] transcript = [.. run.Transcript];
+        int remaining = Array.IndexOf(transcript, "* Remaining length: 11 bytes");
+        CollectionAssert.AreEqual(
+            new[] { "* EEEE AAAAGAIN", "* EEEE AAAAGAIN", "<= " + Latin1("00 01 74 68 65 6C 6C 6F 77 6F 72") },
+            transcript[(remaining + 1)..(remaining + 4)]);
+        Assert.AreEqual(2, transcript.Count(line => line == "* EEEE AAAAGAIN"));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PublishPayloadBufferedWithItsHeader_ReportsNoAgain()
+    {
+        // Measured (BL-1434): the PUBLISH in one segment; curl wrote no "EEEE AAAAGAIN".
+        Run run = await RunHeldAsync("mqtt://h/t", null, [3], Hex(Connack), Hex(Suback + Publish), Hex("E0 00"));
+
+        CollectionAssert.DoesNotContain(run.Transcript, "* EEEE AAAAGAIN");
+        CollectionAssert.Contains(run.Transcript, "* Got DISCONNECT");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_PublishClosedBeforeAnyBody_ReportsServerDisconnectedAtOnce()
     {
         Run run = await RunAsync("mqtt://h/t", Hex(Connack), Hex(Suback + "30 08"));
@@ -340,9 +386,13 @@ public sealed class MqttProtocolHandlerTransferEventsTests
 
     private static Task<Run> RunAsync(string url, params byte[][] reads) => RunTransferAsync(url, null, reads);
 
-    private static async Task<Run> RunTransferAsync(string url, byte[]? postData, params byte[][] reads)
+    private static Task<Run> RunTransferAsync(string url, byte[]? postData, params byte[][] reads) =>
+        RunHeldAsync(url, postData, [], reads);
+
+    private static async Task<Run> RunHeldAsync(string url, byte[]? postData, int[] heldReads, params byte[][] reads)
     {
         ScriptedConnection connection = new(reads);
+        connection.HeldReads.UnionWith(heldReads);
         TranscriptTransferEvents events = new();
         TransferContext context = new()
         {

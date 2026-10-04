@@ -86,12 +86,20 @@ internal sealed class MqttPacketReader(IConnection connection, ITransferEvents e
     /// Reads whatever the peer has sent, up to <paramref name="maximum" /> bytes.
     /// </summary>
     /// <param name="maximum">The most bytes to return; more than zero.</param>
+    /// <param name="whenReadMustWait">
+    /// Called before waiting when nothing is buffered and the connection's read does not
+    /// complete at once, or <see langword="null" />.
+    /// </param>
     /// <returns>
     /// The bytes, valid only until the next read; empty once the peer has closed.
     /// </returns>
-    internal async ValueTask<ReadOnlyMemory<byte>> ReadChunkAsync(int maximum)
+    /// <remarks>
+    /// A read from <see cref="IConnection.ReadAsync" /> that is not complete when it
+    /// returns is taken as curl's <c>CURLE_AGAIN</c>: no data was waiting on the socket.
+    /// </remarks>
+    internal async ValueTask<ReadOnlyMemory<byte>> ReadChunkAsync(int maximum, Action? whenReadMustWait = null)
     {
-        if (start == end && !await FillAsync().ConfigureAwait(false))
+        if (start == end && !await FillAsync(whenReadMustWait).ConfigureAwait(false))
         {
             return ReadOnlyMemory<byte>.Empty;
         }
@@ -175,10 +183,15 @@ internal sealed class MqttPacketReader(IConnection connection, ITransferEvents e
             TaskScheduler.Default);
     }
 
-    private async ValueTask<bool> FillAsync()
+    private async ValueTask<bool> FillAsync(Action? whenReadMustWait = null)
     {
         Task<int> read = pendingRead ?? ReadConnectionAsync();
         pendingRead = null;
+        if (!read.IsCompleted)
+        {
+            whenReadMustWait?.Invoke();
+        }
+
         end = await read.ConfigureAwait(false);
         start = 0;
         return end > 0;

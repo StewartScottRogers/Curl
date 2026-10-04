@@ -394,7 +394,7 @@ internal sealed class MqttSession(
         while (body.Length < header.RemainingLength)
         {
             ReadOnlyMemory<byte> chunk = await reader
-                .ReadChunkAsync(header.RemainingLength - (int)body.Length)
+                .ReadChunkAsync(header.RemainingLength - (int)body.Length, ReportReadMustWait)
                 .ConfigureAwait(false);
             if (chunk.IsEmpty)
             {
@@ -408,6 +408,13 @@ internal sealed class MqttSession(
 
         await WriteOutputAsync(body.ToArray()).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Writes curl 8.21.0's <c>EEEE AAAAGAIN</c> line, which <c>mqtt_read_publish</c> writes
+    /// each time reading the rest of a PUBLISH body returns <c>CURLE_AGAIN</c>; here, each
+    /// time the body's next read has to wait for the server (measured, BL-1434).
+    /// </summary>
+    private void ReportReadMustWait() => events.ReportInfo(MqttTransferMessages.ReadMustWait);
 
     /// <summary>
     /// Writes bytes to the output in slices of at most <see cref="OutputWriteSize" />, as

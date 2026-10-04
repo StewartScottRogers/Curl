@@ -109,6 +109,12 @@ internal static class MqttTransferMessages
     internal static string RemainingLength(int remainingLength) =>
         string.Create(CultureInfo.InvariantCulture, $"Remaining length: {remainingLength} bytes");
 
+    /// <summary>
+    /// The <c>-v</c> line curl writes each time the rest of a PUBLISH body has not arrived
+    /// yet and its read has to wait.
+    /// </summary>
+    internal const string ReadMustWait = "EEEE AAAAGAIN";
+
     /// <summary>The <c>-v</c> line that ends the connection after anything but exit 23.</summary>
     /// <param name="connectionNumber">The connection's number.</param>
     /// <returns>The line, such as <c>shutting down connection #0</c>.</returns>
