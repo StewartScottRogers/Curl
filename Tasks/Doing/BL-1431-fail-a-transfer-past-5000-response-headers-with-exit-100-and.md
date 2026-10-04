@@ -35,3 +35,4 @@ A response that carries more than 5000 header lines fails with curl 8.21.0's `cu
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
