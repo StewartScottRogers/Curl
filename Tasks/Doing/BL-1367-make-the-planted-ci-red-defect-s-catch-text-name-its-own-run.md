@@ -34,3 +34,4 @@ The planted CI-red defect (PD-502) is caught only by a finding about the planted
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-04: Backlog -> Doing.
