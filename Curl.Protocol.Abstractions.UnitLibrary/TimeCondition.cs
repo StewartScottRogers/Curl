@@ -18,4 +18,35 @@ namespace Curl.Protocol.Abstractions;
 /// evaluated and the body is transferred, as libcurl 8.21.0's
 /// <c>Curl_meets_timecondition</c> does for an unknown document time.
 /// </remarks>
-public sealed record TimeCondition(DateTimeOffset Value, TimeConditionKind Kind);
+public sealed record TimeCondition(DateTimeOffset Value, TimeConditionKind Kind)
+{
+    /// <summary>
+    /// Gets the timestamp in seconds since 1970-01-01T00:00:00Z - the one stored value behind
+    /// <see cref="Value" />, and the 64-bit <c>time_t</c> libcurl compares in, so a
+    /// <c>-z</c> date past 9999-12-31T23:59:59Z is kept. See ADR-0410.
+    /// </summary>
+    public long ValueUnixSeconds { get; init; } = Value.ToUnixTimeSeconds();
+
+    /// <summary>
+    /// Gets the timestamp, the <see cref="DateTimeOffset" /> view of
+    /// <see cref="ValueUnixSeconds" />, clamped to <see cref="DateTimeOffset.MaxValue" /> or
+    /// <see cref="DateTimeOffset.MinValue" /> when it falls outside
+    /// <see cref="DateTimeOffset" />'s range. Setting it stores its whole Unix seconds,
+    /// dropping any fraction of a second as curl's <c>time_t</c> does.
+    /// </summary>
+    public DateTimeOffset Value
+    {
+        get => UnixSeconds.ToTimeClamped(ValueUnixSeconds);
+        init => ValueUnixSeconds = value.ToUnixTimeSeconds();
+    }
+
+    /// <summary>
+    /// Creates a condition from a timestamp in Unix seconds, which may lie outside
+    /// <see cref="DateTimeOffset" />'s range.
+    /// </summary>
+    /// <param name="unixSeconds">The timestamp, in seconds since 1970-01-01T00:00:00Z.</param>
+    /// <param name="kind">Which way round the comparison runs.</param>
+    /// <returns>A <see cref="TimeCondition" /> whose <see cref="ValueUnixSeconds" /> is <paramref name="unixSeconds" />.</returns>
+    public static TimeCondition FromUnixSeconds(long unixSeconds, TimeConditionKind kind) =>
+        new(DateTimeOffset.UnixEpoch, kind) { ValueUnixSeconds = unixSeconds };
+}
