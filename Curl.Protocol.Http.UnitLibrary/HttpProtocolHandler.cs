@@ -1015,6 +1015,7 @@ public sealed class HttpProtocolHandler(
         {
             PassesTransferCoding = options.Raw,
             IgnoresContentLength = options.IgnoreContentLength,
+            LimitsFileSize = HttpDownloadConditions.LimitOf(context.MaxFileSize) is not null,
             DecodesTransferCoding = options.TransferEncoding,
             Log = exchangeLog,
         };
@@ -1036,6 +1037,7 @@ public sealed class HttpProtocolHandler(
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
             IsHttp2OrHttp3 = requestStream is not null,
             AcceptsHttp09 = options.AllowHttp09Reply,
+            IgnoresContentLength = options.IgnoreContentLength,
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
             DefersFrom = (statusLine, header) => framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };

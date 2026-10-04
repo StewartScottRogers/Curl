@@ -12,7 +12,8 @@ namespace Curl.Protocol.Http;
 /// spaces or tabs around it, and every number in every Content-Length header must be the
 /// same: <c>5, 5</c> is 5, while <c>5,6</c>, <c>+5</c>, <c>0x5</c>, <c>5 x</c>, an empty
 /// value, an empty list item, or a second header saying 3 are exit 8. A number too large
-/// for a signed 64-bit integer leaves the length unknown, so the body is read to close.
+/// for a signed 64-bit integer leaves the length unknown, so the body is read to close,
+/// written after <see cref="HttpConnectionInfoLines.OverflowContentLength" /> (BL-1387).
 /// </remarks>
 internal static class HttpContentLength
 {
@@ -47,6 +48,35 @@ internal static class HttpContentLength
 
         return length;
     }
+
+    /// <summary>
+    /// Determines whether any Content-Length header holds a decimal number too large for a
+    /// signed 64-bit integer, which curl 8.21.0 answers with
+    /// <see cref="HttpConnectionInfoLines.OverflowContentLength" /> and a connection it shuts down,
+    /// or, under <c>--max-filesize</c>, with exit 63 (<c>lib/http.c</c>, BL-1387).
+    /// </summary>
+    /// <param name="headers">The headers to look through.</param>
+    /// <returns><see langword="true" /> when one of them overflows.</returns>
+    internal static bool Overflows(IReadOnlyList<HttpResponseHeader> headers) =>
+        headers.Any(header => IsContentLength(header) && ValueOverflows(header.Value));
+
+    /// <summary>
+    /// Determines whether one header line is a Content-Length header holding a decimal number
+    /// too large for a signed 64-bit integer (<see cref="Overflows" />).
+    /// </summary>
+    /// <param name="headerLine">The header line's text, without its line end.</param>
+    /// <returns><see langword="true" /> when the line's number overflows.</returns>
+    internal static bool OverflowsLine(string headerLine)
+    {
+        int colon = headerLine.IndexOf(':', StringComparison.Ordinal);
+        return colon >= 0
+            && string.Equals(headerLine[..colon], HeaderName, StringComparison.OrdinalIgnoreCase)
+            && ValueOverflows(headerLine[(colon + 1)..]);
+    }
+
+    private static bool ValueOverflows(string value) =>
+        value.Split(',').Select(item => item.Trim(Blanks)).Any(item =>
+            item.Length > 0 && item.All(char.IsAsciiDigit) && !long.TryParse(item, NumberStyles.None, CultureInfo.InvariantCulture, out _));
 
     /// <summary>
     /// Checks one number against the ones before it.

@@ -136,6 +136,12 @@ internal sealed class HttpResponseHeadReader
     internal bool AcceptsHttp09 { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>--ignore-content-length</c> leaves Content-Length
+    /// unread, so no <see cref="HttpConnectionInfoLines.OverflowContentLength" /> line is written.
+    /// </summary>
+    internal bool IgnoresContentLength { get; init; }
+
+    /// <summary>
     /// Gets what tells, before each status line is parsed, whether the connection has switched
     /// to HTTP/2 after an h2c upgrade's <c>101</c> (<see cref="HttpH2cUpgradeConnection.IsUpgraded" />),
     /// so the line is an HTTP/2 stream's as for <see cref="IsHttp2OrHttp3" />. By default it never has.
@@ -164,7 +170,7 @@ internal sealed class HttpResponseHeadReader
 
     private readonly List<HeldHeader> deferredHeaders = [];
 
-    private bool heldHeaderKeepsHttp10Alive;
+    private string? heldHeaderInfoLine;
 
     private bool holdsWholeHeaders;
 
@@ -292,7 +298,7 @@ internal sealed class HttpResponseHeadReader
         HttpResponseHead head = new(statusLine, [.. heldHeaders.Select(held => held.Header)], read.HeadBytes, ReadOnlyMemory<byte>.Empty);
         Refusal = FindRefusal(head) ?? throw failure;
         heldHeaderLines.Clear();
-        heldHeaderKeepsHttp10Alive = false;
+        heldHeaderInfoLine = null;
         ReleaseHeadBeforeRefusal();
         return head;
     }
@@ -386,7 +392,9 @@ internal sealed class HttpResponseHeadReader
     /// each header's held lines once the header is whole; the empty line of a head that is not
     /// informational is held for <see cref="ReportHeldLines" /> rather than reported. In an
     /// HTTP/1.0 head, a header line that <see cref="HttpConnectionPersistence.KeepsHttp10Alive" />
-    /// is preceded by <see cref="HttpConnectionInfoLines.Http10KeepAlive" />.
+    /// is preceded by <see cref="HttpConnectionInfoLines.Http10KeepAlive" />, and a Content-Length
+    /// header line too large to hold by <see cref="HttpConnectionInfoLines.OverflowContentLength" />
+    /// (<see cref="InfoLineBefore" />).
     /// </summary>
     /// <param name="statusLine">The head's status line.</param>
     /// <param name="cancellationToken">Cancels every read.</param>
@@ -394,7 +402,6 @@ internal sealed class HttpResponseHeadReader
     private async ValueTask<bool> ReadHeaderLinesAsync(HttpStatusLine statusLine, CancellationToken cancellationToken)
     {
         bool informational = statusLine.IsInformational;
-        bool http10 = statusLine.Version == new Version(1, 0);
         holdsWholeHeaders = !informational;
         headStatusLine = statusLine;
         while (await lines.ReadLineAsync(false, cancellationToken).ConfigureAwait(false) is { } bytes)
@@ -417,7 +424,7 @@ internal sealed class HttpResponseHeadReader
             if (!line.IsContinuation)
             {
                 ReleaseHeldHeader();
-                heldHeaderKeepsHttp10Alive = http10 && HttpConnectionPersistence.KeepsHttp10Alive(line.Content);
+                heldHeaderInfoLine = InfoLineBefore(statusLine, line.Content);
             }
 
             heldHeaderLines.Add(bytes);
@@ -427,6 +434,34 @@ internal sealed class HttpResponseHeadReader
         ReleaseHeldHeader();
         return true;
     }
+
+    /// <summary>
+    /// Finds the <c>-v</c> line curl 8.21.0 writes before a header line:
+    /// <see cref="HttpConnectionInfoLines.Http10KeepAlive" /> in an HTTP/1.0 head when the line
+    /// <see cref="HttpConnectionPersistence.KeepsHttp10Alive" />, and
+    /// <see cref="HttpConnectionInfoLines.OverflowContentLength" /> when it is a Content-Length too
+    /// large to hold (<see cref="HttpContentLength.OverflowsLine" />) in a head that may carry a
+    /// body - not a 1xx, 204 or 304 - and <see cref="IgnoresContentLength" /> is not set
+    /// (<c>lib/http.c</c>, measured, BL-1387).
+    /// </summary>
+    /// <param name="statusLine">The head's status line.</param>
+    /// <param name="headerLine">The header line's text, without its line end.</param>
+    /// <returns>The line, or <see langword="null" /> for none.</returns>
+    private string? InfoLineBefore(HttpStatusLine statusLine, string headerLine)
+    {
+        if (statusLine.Version == new Version(1, 0) && HttpConnectionPersistence.KeepsHttp10Alive(headerLine))
+        {
+            return HttpConnectionInfoLines.Http10KeepAlive;
+        }
+
+        return ReadsOverflowingContentLength(statusLine, headerLine) ? HttpConnectionInfoLines.OverflowContentLength : null;
+    }
+
+    private bool ReadsOverflowingContentLength(HttpStatusLine statusLine, string headerLine) =>
+        !statusLine.IsInformational
+            && statusLine.StatusCode is not (204 or 304)
+            && !IgnoresContentLength
+            && HttpContentLength.OverflowsLine(headerLine);
 
     /// <summary>
     /// Releases the header the builder has just completed: in a 1xx head, tells
@@ -443,9 +478,9 @@ internal sealed class HttpResponseHeadReader
 
         if (holdsWholeHeaders)
         {
-            heldHeaders.Add(new HeldHeader(builder.LastHeader, [.. heldHeaderLines], heldHeaderKeepsHttp10Alive));
+            heldHeaders.Add(new HeldHeader(builder.LastHeader, [.. heldHeaderLines], heldHeaderInfoLine));
             heldHeaderLines.Clear();
-            heldHeaderKeepsHttp10Alive = false;
+            heldHeaderInfoLine = null;
             return;
         }
 
@@ -524,7 +559,7 @@ internal sealed class HttpResponseHeadReader
             HeaderReceived(headStatusLine!, held.Header);
         }
 
-        ReportHeaderLines(held.Lines, held.KeepsHttp10Alive);
+        ReportHeaderLines(held.Lines, held.InfoLine);
     }
 
     /// <summary>
@@ -532,21 +567,19 @@ internal sealed class HttpResponseHeadReader
     /// </summary>
     private void ReportHeldHeaderLines()
     {
-        ReportHeaderLines(heldHeaderLines, heldHeaderKeepsHttp10Alive);
-        heldHeaderKeepsHttp10Alive = false;
+        ReportHeaderLines(heldHeaderLines, heldHeaderInfoLine);
+        heldHeaderInfoLine = null;
         heldHeaderLines.Clear();
     }
 
     /// <summary>
-    /// Reports one header's lines, preceded by
-    /// <see cref="HttpConnectionInfoLines.Http10KeepAlive" /> when the header keeps an HTTP/1.0
-    /// connection alive.
+    /// Reports one header's lines, preceded by its info line (<see cref="InfoLineBefore" />), if any.
     /// </summary>
-    private void ReportHeaderLines(IReadOnlyList<byte[]> headerLines, bool keepsHttp10Alive)
+    private void ReportHeaderLines(IReadOnlyList<byte[]> headerLines, string? infoLine)
     {
-        if (keepsHttp10Alive)
+        if (infoLine is not null)
         {
-            Events.ReportInfo(HttpConnectionInfoLines.Http10KeepAlive);
+            Events.ReportInfo(infoLine);
         }
 
         foreach (byte[] held in headerLines)
@@ -560,8 +593,8 @@ internal sealed class HttpResponseHeadReader
     /// </summary>
     /// <param name="Header">The header, its continuation lines folded in.</param>
     /// <param name="Lines">Its lines as received, line ends included.</param>
-    /// <param name="KeepsHttp10Alive">Whether it keeps an HTTP/1.0 connection alive.</param>
-    private sealed record HeldHeader(HttpResponseHeader Header, byte[][] Lines, bool KeepsHttp10Alive)
+    /// <param name="InfoLine">The <c>-v</c> line written before its lines, or <see langword="null" /> for none (<see cref="InfoLineBefore" />).</param>
+    private sealed record HeldHeader(HttpResponseHeader Header, byte[][] Lines, string? InfoLine)
     {
         /// <summary>
         /// Gets a value indicating whether curl 8.21.0 acts on the header, so

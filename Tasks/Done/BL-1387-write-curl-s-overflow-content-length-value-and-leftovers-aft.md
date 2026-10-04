@@ -8,7 +8,7 @@ depends-on: [BL-1398]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: FR-067
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1387 — Write curl's 'Overflow Content-Length: value' and 'Leftovers after chunking: N bytes' -v lines, with exit 63 for an overflowing length under --max-filesize
 
@@ -29,17 +29,23 @@ An HTTP/1.x response whose `Content-Length` is too large for a signed 64-bit num
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Http.UnitTests` pins the first overflow case: the info line between the status line and the `Content-Length` header line, the body read to close and written, `shutting down connection #0`, exit 0.
-- [ ] A test pins the `--max-filesize 10` overflow case: exit 63 (`CurlExitCode.FilesizeExceeded`) with message `Maximum file size exceeded`, no `Content-Length` header line in the `-v` output, nothing written.
-- [ ] A test feeds the chunked response above in one read and pins `Leftovers after chunking: 5 bytes` after the data line and before the left-intact line, output `hello`, exit 0; a test with the trailing bytes arriving in a later read than the last chunk (nothing left over in the read that completes the body) pins no such line.
-- [ ] Existing `HttpContentLengthTests` and chunked-body tests pass unchanged except where they pin a full `-v` sequence for one of these responses.
-- [ ] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports no failing member in the code this task changed.
+- [x] A test in `Curl.Protocol.Http.UnitTests` pins the first overflow case: the info line between the status line and the `Content-Length` header line, the body read to close and written, `shutting down connection #0`, exit 0.
+- [x] A test pins the `--max-filesize 10` overflow case: exit 63 (`CurlExitCode.FilesizeExceeded`) with message `Maximum file size exceeded`, no `Content-Length` header line in the `-v` output, nothing written.
+- [x] A test feeds the chunked response above in one read and pins `Leftovers after chunking: 5 bytes` after the data line and before the left-intact line, output `hello`, exit 0; a test with the trailing bytes arriving in a later read than the last chunk (nothing left over in the read that completes the body) pins no such line.
+- [x] Existing `HttpContentLengthTests` and chunked-body tests pass unchanged except where they pin a full `-v` sequence for one of these responses.
+- [x] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports no failing member in the code this task changed.
 
 ## Notes
 
 - HTTP/2 and HTTP/3 carry no chunked framing, so the leftovers line is HTTP/1.x only.
+- Overflow: `HttpContentLength.Overflows`/`OverflowsLine` find a Content-Length item of digits too large for a long. `HttpResponseHeadReader.InfoLineBefore` (generalising the HTTP/1.0 keep-alive line) writes `Overflow Content-Length: value` before that header line in a head that may carry a body (not 1xx, 204, 304), unless `--ignore-content-length`. The connection already closes because the body runs to close; `HttpConnectionPersistence.LacksEndOfMessageIndicator` now leaves out the `no chunk, no close, no size` line for it, as curl's `streamclose` does.
+- `--max-filesize`: the body reader's new `LimitsFileSize` (set whenever `--max-filesize` is above 0, as curl checks `data->set.max_filesize`) makes `FindHeadRefusal` refuse the overflowing header with exit 63, so the existing refusal path writes the head only up to it and nothing of the body.
+- Leftovers: `CopyChunkedAsync` reports `Leftovers after chunking: N bytes` for the bytes left in the read that completed the body.
+- Measure-CodeQuality (Curl.Protocol.Http.UnitLibrary): 100% lines; `InfoLineBefore` first measured complexity 16, so its overflow test moved to `ReadsOverflowingContentLength`. The one failing member left, `HttpContentLength.TryParseItem` (83.33% branch), is code this task did not change.
+- Left as curl-unmeasured edges (sensible default, not pinned): a `-I` response with an overflowing length still writes the line but keeps the connection (HEAD has no body here); an HTTP/1.0 keep-alive response with one is still reported left intact.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. -v writes Overflow Content-Length: value and Leftovers after chunking: N bytes; an overflowing length under --max-filesize fails with exit 63

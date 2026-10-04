@@ -52,6 +52,14 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal ReadOnlyMemory<byte> TrailerBytes => decoder?.TrailerBytes ?? ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
+    /// Gets or sets a value indicating whether <c>--max-filesize</c> was given, so a
+    /// Content-Length too large for a signed 64-bit integer is refused with exit 63 as the head
+    /// is read (<see cref="FindHeadRefusal" />), as curl 8.21.0 does whether or not the body is
+    /// kept (<c>lib/http.c</c>, measured, BL-1387).
+    /// </summary>
+    internal bool LimitsFileSize { get; set; }
+
+    /// <summary>
     /// Gets or sets the most body bytes the output may be given, <c>--max-filesize</c>'s limit,
     /// or <see langword="null" /> for no limit. A body that grows past it has as many bytes
     /// written as the limit allows, then fails with exit 63.
@@ -121,7 +129,8 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
     /// <summary>
     /// Finds the first header curl 8.21.0 refuses while it reads the head, in the order the
-    /// headers arrived (measured, BL-364 and BL-412 Notes): an invalid Content-Length (exit 8),
+    /// headers arrived (measured, BL-364, BL-412 and BL-1387 Notes): an invalid Content-Length (exit 8),
+    /// or, under <see cref="LimitsFileSize" />, one too large for a 64-bit integer (exit 63),
     /// unless <c>--ignore-content-length</c>; a Transfer-Encoding
     /// <see cref="HttpResponseBodyFraming.Of" /> refuses (exit 61), but not for <c>-I</c>; and,
     /// for <c>--compressed</c>, the Content-Encoding header that takes the codings past
@@ -198,13 +207,23 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
                 HttpResponseBodyFraming.Of(checkedHeaders, PassesTransferCoding, IgnoresContentLength, DecodesTransferCoding);
             }
 
-            return null;
+            return RefusesOverflow(checkedHeaders)
+                ? new HttpTransferException(CurlExitCode.FilesizeExceeded, HttpTransferMessages.MaximumFileSizeExceeded)
+                : null;
         }
         catch (HttpTransferException failure)
         {
             return failure;
         }
     }
+
+    /// <summary>
+    /// Determines whether <see cref="LimitsFileSize" /> refuses a Content-Length among
+    /// <paramref name="headers" /> that <see cref="HttpContentLength.Overflows" />, unless
+    /// <c>--ignore-content-length</c> leaves it unread.
+    /// </summary>
+    private bool RefusesOverflow(IReadOnlyList<HttpResponseHeader> headers) =>
+        LimitsFileSize && !IgnoresContentLength && HttpContentLength.Overflows(headers);
 
     /// <summary>
     /// Reads the body and writes it to <paramref name="output" />, or reads nothing when the
@@ -326,6 +345,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
             if (decoder.IsComplete)
             {
+                ReportLeftovers(bytes);
                 return;
             }
 
@@ -337,6 +357,18 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
             bytes = buffer.AsMemory(0, read);
             ReportReceived(bytes);
+        }
+    }
+
+    /// <summary>
+    /// Reports <see cref="HttpConnectionInfoLines.LeftoversAfterChunking" /> for the bytes left
+    /// in the read that completed a chunked body, or nothing when there are none.
+    /// </summary>
+    private void ReportLeftovers(ReadOnlyMemory<byte> leftovers)
+    {
+        if (!leftovers.IsEmpty)
+        {
+            Events.ReportInfo(HttpConnectionInfoLines.LeftoversAfterChunking(leftovers.Length));
         }
     }
 
