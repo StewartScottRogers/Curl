@@ -33,3 +33,4 @@ Off Windows, `PhysicalFileSystem.OpenForReadAsync` on a directory returns `FileA
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
