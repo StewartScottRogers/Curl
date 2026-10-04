@@ -36,3 +36,4 @@ Off Windows, `--proxy-http2` and `--no-proxy-http2` parse into a proxy-HTTP/2 se
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
