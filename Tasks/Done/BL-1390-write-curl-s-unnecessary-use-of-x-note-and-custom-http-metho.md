@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: FR-054
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1390 — Write curl's 'Unnecessary use of -X' note and 'custom HTTP method to HEAD' warning before each transfer whose -X repeats or overrides the inferred method
 
@@ -29,17 +29,21 @@ Before each transfer, Curl writes curl 8.21.0's `customrequest_helper` lines to 
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Console.UnitTests` run `CurlCommandRunner` over fake connectors and pin, as whole stderr lines: the GET note under `-v -X GET`; the POST note under `-v -X post -d x`; the PUT note under `-v -X PUT -T <file>`; the HEAD note under `-v -X HEAD -I`; the GET note for an `ftp://` URL.
-- [ ] Tests pin the two wrapped HEAD warning lines for `-X HEAD` and `-X head` without `-s`, and nothing with `-s`.
-- [ ] Tests pin no note without `-v`, no note for `-X GET -d x` (inferred POST), and the note or warning repeated before the second of two URLs, in the measured position.
-- [ ] `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member in the code this task changed.
+- [x] Tests in `Curl.Console.UnitTests` run `CurlCommandRunner` over fake connectors and pin, as whole stderr lines: the GET note under `-v -X GET`; the POST note under `-v -X post -d x`; the PUT note under `-v -X PUT -T <file>`; the HEAD note under `-v -X HEAD -I`; the GET note for an `ftp://` URL.
+- [x] Tests pin the two wrapped HEAD warning lines for `-X HEAD` and `-X head` without `-s`, and nothing with `-s`.
+- [x] Tests pin no note without `-v`, no note for `-X GET -d x` (inferred POST), and the note or warning repeated before the second of two URLs, in the measured position.
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member in the code this task changed.
 
 ## Notes
 
 - No option changes, so `--ai-help` is unaffected.
 - Test paths for `-T` must be platform-neutral (a temporary file from `Path.GetTempPath()`).
+- The `-T` test uses the in-memory file system with a relative `up.txt`, which is platform-neutral without touching the disk, so no `Path.GetTempPath()` file is needed.
+- Inferred method, in curl's precedence: `-I` HEAD; `-F` POST; `-d`/`--json` without `-G` POST; `-T` PUT; else GET (`--no-head` and `-G` included). Implemented as `CurlCommandRunner.WriteCustomRequestLinesAsync`/`InferredRequestMethod`, called from `TransferAsync` after the existing per-transfer warning lines, so it repeats before every transfer. The note is gated on `Trace != None` (`-v` or a `--trace` option, as `notef` and the other notes are); the HEAD warning on `!Silent`.
+- Measure-CodeQuality -Library Curl.Console: 0 failing members. Curl.Console.UnitTests: 2537 passed, 24 skipped.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. Curl writes curl's 'Unnecessary use of -X' note under -v and the -X HEAD warning before each transfer

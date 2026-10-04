@@ -3221,10 +3221,62 @@ internal sealed class CurlCommandRunner(
             await WriteErrorLinesAsync(dispatch.WarningLinesBeforeEachTransfer).ConfigureAwait(false);
         }
 
+        await WriteCustomRequestLinesAsync(options, uploadFile).ConfigureAwait(false);
         Stream? etagWatchedHeaderOutput = Running.SaveEtag is { } saveEtag ? new EtagSaveStream(saveEtag, headerOutput) : headerOutput;
         return NoCryptoEngines.LoadFailure(options.Engine, runsOnWindows)
             ?? await TransferOpeningUploadFileAsync(dispatch, options, url, uploadFile, transfer, etagWatchedHeaderOutput).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Writes curl 8.21.0's <c>customrequest_helper</c> lines (<c>src/tool_helpers.c</c>) before a
+    /// transfer whose <c>-X</c> method is given: under <c>-v</c> or a <c>--trace</c> option, <c>-s</c>
+    /// or not, <c>Note: Unnecessary use of -X or --request, &lt;METHOD&gt; is already inferred.</c>
+    /// when the method equals, ignoring case, the one <see cref="InferredRequestMethod" /> names;
+    /// otherwise, when the method is <c>HEAD</c> in any case and <c>-s</c> was not given, the warning
+    /// to use <c>-I</c> instead. Both wrap at <c>terminalColumns</c> (measured 2026-10-03, BL-1390).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="uploadFile">The URL's <c>-T</c> file, or <see langword="null" /> when it uploads nothing.</param>
+    /// <returns>A task that completes when the lines, if any, are flushed.</returns>
+    private async Task WriteCustomRequestLinesAsync(CommandLineOptions options, string? uploadFile)
+    {
+        if (options.RequestMethod is not { } method)
+        {
+            return;
+        }
+
+        string inferred = InferredRequestMethod(options, uploadFile);
+        if (string.Equals(method, inferred, StringComparison.OrdinalIgnoreCase))
+        {
+            await (options.Trace == TraceKind.None
+                ? Task.CompletedTask
+                : WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"Unnecessary use of -X or --request, {inferred} is already inferred.", terminalColumns)))
+                .ConfigureAwait(false);
+        }
+        else if (string.Equals(method, "HEAD", StringComparison.OrdinalIgnoreCase) && !options.Silent)
+        {
+            await WriteErrorPiecesAsync(WarningLineWrapper.WrapText(
+                "Setting custom HTTP method to HEAD with -X/--request may not work the way you want. Consider using -I/--head instead.",
+                terminalColumns)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// The method the options other than <c>-X</c> imply, as curl 8.21.0's <c>customrequest_helper</c>
+    /// spells it: <c>HEAD</c> for <c>-I</c>; <c>POST</c> for <c>-F</c>, and for <c>-d</c> /
+    /// <c>--json</c> without <c>-G</c>; <c>PUT</c> for <c>-T</c>; <c>GET</c> otherwise.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="uploadFile">The URL's <c>-T</c> file, or <see langword="null" /> when it uploads nothing.</param>
+    /// <returns>The inferred method, upper case.</returns>
+    private static string InferredRequestMethod(CommandLineOptions options, string? uploadFile) =>
+        options.HttpMethodSelected switch
+        {
+            SelectedHttpMethod.Head => "HEAD",
+            SelectedHttpMethod.MultipartFormPost => "POST",
+            _ when options.PostData is not null && !options.DataInQuery => "POST",
+            _ => uploadFile is null ? "GET" : "PUT",
+        };
 
     /// <summary>
     /// Performs one transfer for <see cref="TransferAsync" /> once its warning lines are written,
