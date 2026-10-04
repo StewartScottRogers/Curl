@@ -1,5 +1,5 @@
 ---
-id: BL-1441
+id: BL-1446
 title: Match curl's -v lines after a 417 that arrives while the body is being sent
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-090
 created: 2026-10-04
 completed:
 ---
-# BL-1441 — Match curl's -v lines after a 417 that arrives while the body is being sent
+# BL-1446 — Match curl's -v lines after a 417 that arrives while the body is being sent
 
 ## Goal
 

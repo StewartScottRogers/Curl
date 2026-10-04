@@ -60,7 +60,7 @@ lines and before `Ignoring the response-body` and the empty line; a 417 under `-
 past the `-f` check. The line is written before the `--max-redirs` exit 47 check, as curl sets
 `newurl` first.
 
-Follow-up filed: BL-1441 - curl's `Need to rewind upload` / `abort upload` lines after a 417 while
+Follow-up filed: BL-1446 - curl's `Need to rewind upload` / `abort upload` lines after a 417 while
 sending, and whether `Ignoring the response-body` belongs there.
 
 Tests: 13 in `HttpProtocolHandlerTests.ProxyConnectionAnd417Lines.cs`; Curl.Protocol.Http.UnitTests
