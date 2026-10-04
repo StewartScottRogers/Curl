@@ -15,9 +15,9 @@ public sealed class ScriptedAltSvcStore(params AltSvcAlternative[] added) : IAlt
     public List<(CurlUrl Origin, string AltSvcHeader, Version ResponseVersion, DateTimeOffset Now)> Responses { get; } = [];
 
     /// <inheritdoc />
-    public IReadOnlyList<AltSvcAlternative> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now)
+    public IReadOnlyList<AltSvcHeaderOutcome> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now)
     {
         Responses.Add((origin, altSvcHeader, responseVersion, now));
-        return added;
+        return [.. added.Select(AltSvcHeaderOutcome.Adding)];
     }
 }

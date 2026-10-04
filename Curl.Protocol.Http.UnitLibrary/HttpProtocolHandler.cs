@@ -1822,7 +1822,8 @@ public sealed class HttpProtocolHandler(
     /// <c>https</c> URL and <paramref name="store" /> is set, to the store with the transfer's
     /// URL as the origin, and reports curl 8.21.0's <c>Added alt-svc: &lt;host&gt;:&lt;port&gt; over
     /// &lt;id&gt;</c> for each alternative it added, before the header line (measured, BL-623
-    /// Notes). curl learns no alternative over plain <c>http</c>. The store is told
+    /// Notes); a skipped alternative writes nothing yet (BL-1420, ADR-0409). curl learns no
+    /// alternative over plain <c>http</c>. The store is told
     /// <paramref name="responseVersion" />, the version the response came over, as curl 8.21.0
     /// passes <c>k->httpversion</c> to <c>Curl_altsvc_parse</c> (BL-947).
     /// </summary>
@@ -1835,7 +1836,8 @@ public sealed class HttpProtocolHandler(
             return;
         }
 
-        foreach (AltSvcAlternative added in store.StoreFromResponse(context.Url, header.Value, responseVersion, context.TimeProvider.GetUtcNow()))
+        IReadOnlyList<AltSvcHeaderOutcome> outcomes = store.StoreFromResponse(context.Url, header.Value, responseVersion, context.TimeProvider.GetUtcNow());
+        foreach (AltSvcAlternative added in outcomes.Select(outcome => outcome.Added).OfType<AltSvcAlternative>())
         {
             context.Events.ReportInfo($"Added alt-svc: {added.Host}:{added.Port} over {added.Alpn}");
         }

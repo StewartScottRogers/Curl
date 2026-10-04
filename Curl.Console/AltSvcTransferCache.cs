@@ -126,7 +126,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     }
 
     /// <inheritdoc />
-    public IReadOnlyList<AltSvcAlternative> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now)
+    public IReadOnlyList<AltSvcHeaderOutcome> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now)
     {
         HashSet<AltSvcEntry> held = new(cache.Entries, ReferenceEqualityComparer.Instance);
         cache.ApplyHeader(altSvcHeader, SourceAlpnOf(responseVersion), origin.IdnHost, origin.Port);
@@ -134,7 +134,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
         [
             .. cache.Entries
                 .Where(entry => !held.Contains(entry))
-                .Select(entry => new AltSvcAlternative(AltSvcAlpnToken.Format(entry.DestinationAlpn), entry.DestinationHost, entry.DestinationPort)),
+                .Select(entry => AltSvcHeaderOutcome.Adding(new AltSvcAlternative(AltSvcAlpnToken.Format(entry.DestinationAlpn), entry.DestinationHost, entry.DestinationPort))),
         ];
     }
 
