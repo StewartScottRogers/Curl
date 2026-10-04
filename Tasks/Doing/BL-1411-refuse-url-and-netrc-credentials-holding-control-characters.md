@@ -43,3 +43,4 @@ Before connecting, a transfer whose URL user name or password percent-decodes to
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
