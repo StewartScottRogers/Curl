@@ -89,12 +89,17 @@ internal sealed class TransferCredentialLookup(
     /// The exit-3 failure for URL credentials holding a control character, or the exit-26 one for
     /// the netrc file, the transfer ends with, when it fails.
     /// </param>
+    /// <param name="reportInfo">
+    /// Gets curl 8.21.0's <c>-v</c> line <see cref="HostNotFoundLine" /> when the file was looked in
+    /// and gave the host nothing; <see langword="null" /> writes nothing, as for a redirect hop.
+    /// </param>
     /// <returns><see langword="false" /> when the transfer fails before it starts.</returns>
     internal bool TryLookUp(
         CommandLineOptions options,
         CurlUrl url,
         out NetworkCredential? credentials,
-        [NotNullWhen(false)] out TransferResult? failure)
+        [NotNullWhen(false)] out TransferResult? failure,
+        Action<string>? reportInfo = null)
     {
         credentials = null;
         if (!TryCheckUrlCredentials(options, url, out failure) || UserOptionWins(options))
@@ -108,10 +113,35 @@ internal sealed class TransferCredentialLookup(
             return true;
         }
 
+        return TryLookUpInNetrcFile(options, url, out credentials, out failure, reportInfo);
+    }
+
+    /// <summary>
+    /// Looks <paramref name="url" />'s host up in the netrc file, for <see cref="TryLookUp" />, once
+    /// neither <c>-u</c> nor the absence of a netrc option has decided the credentials.
+    /// </summary>
+    /// <param name="options">The option group of the transfer.</param>
+    /// <param name="url">The transfer's URL.</param>
+    /// <param name="credentials">The credentials to send, as <see cref="TryLookUp" /> describes them.</param>
+    /// <param name="failure">The exit-26 failure the netrc file ends the transfer with, when it does.</param>
+    /// <param name="reportInfo">Gets <see cref="HostNotFoundLine" /> when the file gave the host nothing, or <see langword="null" />.</param>
+    /// <returns><see langword="false" /> when the transfer fails before it starts.</returns>
+    private bool TryLookUpInNetrcFile(
+        CommandLineOptions options,
+        CurlUrl url,
+        out NetworkCredential? credentials,
+        [NotNullWhen(false)] out TransferResult? failure,
+        Action<string>? reportInfo)
+    {
         string? urlUser = DecodedUserInformation(url.User);
         string? text = ReadNetrcText(options);
         NetrcLookupResult result = text is null ? NetrcLookupResult.NotFound : NetrcFile.Find(text, url.Host, urlUser, diagnosticLog);
         failure = FailureOf(options.NetrcUse, FailureMessageOf(text, result)) ?? NetrcControlCodeFailure(url, result);
+        if (failure is null && result.Outcome != NetrcLookupOutcome.Found)
+        {
+            reportInfo?.Invoke(HostNotFoundLine(url.Host, options.NetrcFile));
+        }
+
         credentials = CredentialsOf(result, urlUser, DecodedUserInformation(url.Password));
         return failure is null;
     }
@@ -147,6 +177,18 @@ internal sealed class TransferCredentialLookup(
     /// <returns><see langword="true" /> for <see cref="UrlCredentialsMessage" /> and <see cref="NetrcControlCodeMessage" />.</returns>
     internal static bool IsControlCodeRefusal(TransferResult failure) =>
         failure.ErrorMessage is UrlCredentialsMessage or NetrcControlCodeMessage;
+
+    /// <summary>
+    /// curl 8.21.0's <c>-v</c> line for a netrc file that gave the host no entry, or, under
+    /// <c>--netrc-optional</c>, could not be read or parsed (<c>lib/url.c</c>'s <c>override_login</c>,
+    /// measured 2026-10-04, BL-1432 Notes): the host as the URL spells it, and the
+    /// <c>--netrc-file</c> path as given or the literal <c>.netrc</c>.
+    /// </summary>
+    /// <param name="host">The URL's host.</param>
+    /// <param name="netrcFile">The <c>--netrc-file</c> path, or <see langword="null" />.</param>
+    /// <returns>The line, without its <c>* </c> prefix.</returns>
+    internal static string HostNotFoundLine(string host, string? netrcFile) =>
+        $"Could not find host {host} in the {netrcFile ?? ".netrc"} file; using defaults";
 
     /// <summary>Whether <c>-u</c> gives a user name, which wins over the URL's and the netrc file's credentials.</summary>
     /// <param name="options">The option group of the transfer.</param>

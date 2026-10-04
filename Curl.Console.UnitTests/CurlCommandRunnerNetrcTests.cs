@@ -481,6 +481,81 @@ public sealed class CurlCommandRunnerNetrcTests
         Assert.IsEmpty(dataFiles.PathsRead);
     }
 
+    [TestMethod]
+    public async Task RunAsync_VerboseNetrcFileWithoutTheHost_WritesCouldNotFindHostFirst()
+    {
+        // curl -v --netrc-file <file naming example.com> http://127.0.0.1:<port>/ (measured
+        // 2026-10-04, BL-1432 Notes): the line is the first one, before "Trying", and exit 0.
+        dataFiles.Files["."] = Encoding.UTF8.GetBytes("machine example.com login a password b\n");
+
+        int exitCode = await RunAsync(["-v", "--netrc-file", ".", Url]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.StartsWith("* Could not find host 127.0.0.1 in the . file; using defaults\n", StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow("-n", DisplayName = "-n")]
+    [DataRow("--netrc-optional", DisplayName = "--netrc-optional")]
+    public async Task RunAsync_VerboseDefaultNetrcWithoutTheHost_NamesTheFileDotNetrc(string option)
+    {
+        // curl -v -n with HOME's .netrc naming another host: "in the .netrc file".
+        dataFiles.Files["home/.netrc"] = Encoding.UTF8.GetBytes("machine example.com login a password b\n");
+
+        int exitCode = await RunAsync(["-v", option, "http://LOCALHOST:18505/"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.StartsWith("* Could not find host LOCALHOST in the .netrc file; using defaults\n", StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_VerboseNetrcOptionalWithTheFileMissing_WritesCouldNotFindHost()
+    {
+        // curl -v --netrc-optional http://LOCALHOST:<port>/ with HOME an empty directory (measured
+        // 2026-10-04): "* Could not find host LOCALHOST in the .netrc file; using defaults", exit 0.
+        int exitCode = await RunAsync(["-v", "--netrc-optional", "http://LOCALHOST:18505/"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.StartsWith("* Could not find host LOCALHOST in the .netrc file; using defaults\n", StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow(true, new[] { "-v", "--netrc-file", "." }, DisplayName = "entry found")]
+    [DataRow(false, new[] { "-v", "-u", "u:p", "--netrc-file", "." }, DisplayName = "-u user:password skips the lookup")]
+    [DataRow(false, new[] { "--netrc-file", "." }, DisplayName = "without -v")]
+    public async Task RunAsync_NetrcLookupNotReportedAsMissing_WritesNoCouldNotFindHostLine(bool hasEntry, string[] options)
+    {
+        // Measured 2026-10-04: none of these writes the line.
+        dataFiles.Files["."] = Encoding.UTF8.GetBytes(hasEntry ? Entry : "machine example.com login a password b\n");
+
+        int exitCode = await RunAsync([.. options, Url]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.DoesNotContain("Could not find host", StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UnsupportedSchemeWithNetrcMissing_FailsWithExit1BeforeTheNetrcLookup()
+    {
+        // curl -n qttp://x/ with no .netrc (measured 2026-10-04, upstream test 760):
+        // curl: (1) Protocol "qttp" not supported, not exit 26.
+        int exitCode = await RunAsync(["-n", "qttp://x/"]);
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual("curl: (1) Protocol \"qttp\" not supported" + NewLine, StandardErrorText);
+        Assert.IsEmpty(dataFiles.PathsRead);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_VerboseUnsupportedScheme_WritesTheProtocolInfoLineOnce()
+    {
+        // curl -v -n qttp://x/: * Protocol "qttp" not supported, then the curl: (1) line.
+        int exitCode = await RunAsync(["-v", "-n", "QTTP://x/"]);
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual("* Protocol \"qttp\" not supported\ncurl: (1) Protocol \"qttp\" not supported" + NewLine, StandardErrorText);
+    }
+
     private async Task<string[]> RunRedirectedToLocalhostAsync(string[] options)
     {
         ScriptedConnector server = new(

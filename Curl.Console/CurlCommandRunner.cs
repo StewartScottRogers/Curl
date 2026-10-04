@@ -3419,7 +3419,7 @@ internal sealed class CurlCommandRunner(
         if (options.FormParts.Count == 0)
         {
             return await TransferWithBodyAsync(
-                    follower, dispatch.ProxySelector, options, transferUrl, transfer, range, headerOutput, null, upload)
+                    follower, dispatch, options, transferUrl, transfer, range, headerOutput, null, upload)
                 .ConfigureAwait(false);
         }
 
@@ -3437,7 +3437,7 @@ internal sealed class CurlCommandRunner(
         await using (form.Body.Content.ConfigureAwait(false))
         {
             return await TransferWithBodyAsync(
-                    follower, dispatch.ProxySelector, options, transferUrl, transfer, range, headerOutput, form.Body, upload)
+                    follower, dispatch, options, transferUrl, transfer, range, headerOutput, form.Body, upload)
                 .ConfigureAwait(false);
         }
     }
@@ -3498,7 +3498,7 @@ internal sealed class CurlCommandRunner(
     /// with <see cref="TransferCredentialLookup" />, which it keeps as the running transfer's
     /// <see cref="RunningTransferState.LookedUpCredentials" /> for every attempt's context.
     /// </summary>
-    /// <param name="proxySelector">Chooses the transfer's proxy.</param>
+    /// <param name="dispatch">The run's dispatch: its dispatcher says whether the URL's scheme is served, its proxy selector chooses the proxy.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">The transfer's URL.</param>
     /// <param name="transfer">
@@ -3509,19 +3509,28 @@ internal sealed class CurlCommandRunner(
     /// <param name="failure">The proxy's, the credentials' or the netrc file's failure, when one refuses the transfer.</param>
     /// <returns><see langword="false" /> when the transfer ends before it starts.</returns>
     private bool TrySelectProxyAndCredentials(
-        ProxySelector proxySelector,
+        TransferDispatch dispatch,
         CommandLineOptions options,
         CurlUrl url,
         UrlTransfer transfer,
         out ProxyEndpoint? proxy,
         [NotNullWhen(false)] out TransferResult? failure)
     {
-        if (!TransferProxySelection.TrySelect(proxySelector, options, url, out proxy, out failure, diagnosticLog))
+        proxy = null;
+        if (!dispatch.Dispatcher.Serves(url.Scheme))
+        {
+            failure = TransferResult.Failure(CurlExitCode.UnsupportedProtocol, $"Protocol \"{url.Scheme.ToLowerInvariant()}\" not supported");
+            EventsBeforeConnecting(transfer).ReportInfo(failure.ErrorMessage!);
+            return false;
+        }
+
+        if (!TransferProxySelection.TrySelect(dispatch.ProxySelector, options, url, out proxy, out failure, diagnosticLog))
         {
             return false;
         }
 
-        bool looked = CredentialLookup.TryLookUp(options, url, out NetworkCredential? lookedUpCredentials, out failure);
+        bool looked = CredentialLookup.TryLookUp(
+            options, url, out NetworkCredential? lookedUpCredentials, out failure, EventsBeforeConnecting(transfer).ReportInfo);
         Running.LookedUpCredentials = lookedUpCredentials;
         if (failure is not null && TransferCredentialLookup.IsControlCodeRefusal(failure))
         {
@@ -3596,7 +3605,7 @@ internal sealed class CurlCommandRunner(
     /// failure and nothing is sent (<see cref="TrySelectProxyAndCredentials" />).
     /// </summary>
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
-    /// <param name="proxySelector">Chooses the transfer's proxy from <c>-x</c>, <c>--noproxy</c> and the proxy environment variables.</param>
+    /// <param name="dispatch">The run's dispatch, whose dispatcher says whether the URL's scheme is served and whose proxy selector chooses the transfer's proxy.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
     /// <param name="transfer">The transfer, which names its output.</param>
@@ -3612,7 +3621,7 @@ internal sealed class CurlCommandRunner(
     /// </returns>
     private async Task<TransferResult> TransferWithBodyAsync(
         RedirectFollower follower,
-        ProxySelector proxySelector,
+        TransferDispatch dispatch,
         CommandLineOptions options,
         CurlUrl url,
         UrlTransfer transfer,
@@ -3629,7 +3638,7 @@ internal sealed class CurlCommandRunner(
             return unstarted;
         }
 
-        if (!TrySelectProxyAndCredentials(proxySelector, options, url, transfer, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
+        if (!TrySelectProxyAndCredentials(dispatch, options, url, transfer, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
             return proxyFailure;
         }
