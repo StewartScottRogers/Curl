@@ -212,7 +212,8 @@ public sealed class CommandLineOption
     /// <summary>
     /// An applier that first adds <see cref="CommandLineWarning.ArgumentStartsWithUnicode(string)"/>, unless
     /// <c>-s</c> / <c>--silent</c> has been read already, when the value starts with a character in
-    /// U+2000-U+203F and the parse reads its arguments as UTF-8 (<see cref="CommandLineOptions.ReadsArgumentsAsUtf8"/>),
+    /// U+2000-U+203F and the value is read as UTF-8: the parse reads its arguments so (<see cref="CommandLineOptions.ReadsArgumentsAsUtf8"/>)
+    /// or it comes from a <c>-K</c> file, whose lines are UTF-8 bytes on every platform (BL-1438),
     /// and then runs <paramref name="apply"/>. curl 8.21.0's <c>getparameter</c> checks every option value
     /// this way before using it, except a deprecated option's, so each value row but
     /// <see cref="NoFunctionValue"/> is built with it (BL-1224).
@@ -220,7 +221,7 @@ public sealed class CommandLineOption
     private static CommandLineOptionApplier WarnAboutLeadingUnicodeThen(CommandLineOptionApplier apply) =>
         (options, value, spelledOption, pathExists, dataFileReader) =>
         {
-            if (options.ReadsArgumentsAsUtf8 && value.Length > 0 && value[0] is >= ' ' and <= '‿')
+            if ((options.ReadsArgumentsAsUtf8 || options.ReadingConfigFile) && value.Length > 0 && value[0] is >= ' ' and <= '‿')
             {
                 options.AddWarningLinesUnlessSilent(CommandLineWarning.ArgumentStartsWithUnicode(value));
             }

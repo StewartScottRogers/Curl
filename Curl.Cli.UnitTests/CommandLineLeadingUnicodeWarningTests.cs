@@ -147,6 +147,42 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     }
 
     [TestMethod]
+    public void ConfigFileHeaderValueStartingWithLeftDoubleQuoteIsWarnedAboutOnWindows()
+    {
+        // Measured with real curl 8.21.0 (Windows, Schannel, 2026-10-04): a -K file's lines are UTF-8 bytes
+        // on every platform, so its Windows build warns about them as its other builds do (upstream test 470).
+        CommandLineParseResult result = ParseConfigFile("-H “host:fake”\n", silentFirst: false);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Warning: The argument '“host:fake”' starts with a Unicode character. Maybe ",
+                "Warning: ASCII was intended?",
+            },
+            result.WarningLines.ToList());
+        CollectionAssert.AreEqual(new[] { "“host:fake”" }, result.Options.Headers.ToList());
+    }
+
+    [TestMethod]
+    public void CommandLineHeaderValueStartingWithLeftDoubleQuoteIsNotWarnedAboutOnWindows()
+    {
+        CommandLineParseResult result = Parse(["-H", "“host:fake”", Url], isWindows: true);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    public void SilentBeforeTheConfigFileHidesItsWarningOnWindows()
+    {
+        CommandLineParseResult result = ParseConfigFile("-H “host:fake”\n", silentFirst: true);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
     public void ReadsArgumentsAsUtf8FollowsThePlatformSwitch()
     {
         Assert.IsTrue(Parse([Url], isWindows: false).Options!.ReadsArgumentsAsUtf8);
@@ -163,6 +199,14 @@ public sealed class CommandLineLeadingUnicodeWarningTests
 
     private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, bool isWindows) =>
         CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), new RecordingDataFileReader(), isWindows);
+
+    private static CommandLineParseResult ParseConfigFile(string contents, bool silentFirst)
+    {
+        RecordingDataFileReader reader = new();
+        reader.Files["config.txt"] = Encoding.UTF8.GetBytes(contents);
+        string[] arguments = silentFirst ? ["-s", "-K", "config.txt", Url] : ["-K", "config.txt", Url];
+        return CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader, isWindows: true);
+    }
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
     {

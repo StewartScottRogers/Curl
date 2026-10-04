@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: FR-046
 created: 2026-10-04
-completed:
+completed: 2026-10-04
 ---
 # BL-1438 — Warn about a leading Unicode character in a -K config file value on Windows as curl does
 
@@ -24,13 +24,17 @@ On Windows, an option value read from a `-K` config file that starts with a char
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Cli.UnitTests` parses, as the Windows build (`isWindows: true`), a config file whose `-H` value starts with U+201C and asserts the two warning lines byte for byte; another asserts the same value given as a command-line argument on the Windows build adds no warning; the existing non-Windows tests still pass.
-- [ ] `-s` before `-K` still silences the warning, as it does for command-line values today.
-- [ ] `dotnet build Curl.Cli.UnitTests -warnaserror` is clean; `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Cli.UnitTests` parses, as the Windows build (`isWindows: true`), a config file whose `-H` value starts with U+201C and asserts the two warning lines byte for byte; another asserts the same value given as a command-line argument on the Windows build adds no warning; the existing non-Windows tests still pass.
+- [x] `-s` before `-K` still silences the warning, as it does for command-line values today.
+- [x] `dotnet build Curl.Cli.UnitTests -warnaserror` is clean; `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- `WarnAboutLeadingUnicodeThen` now warns when `ReadsArgumentsAsUtf8` or `ReadingConfigFile` is set; `ReadingConfigFile` is already true while `CommandLineParser.ApplyConfigFileLine` applies a `-K` (or default `.curlrc`) line, so no new state was needed. Windows command-line arguments are unchanged.
+- Tests: `ConfigFileHeaderValueStartingWithLeftDoubleQuoteIsWarnedAboutOnWindows`, `CommandLineHeaderValueStartingWithLeftDoubleQuoteIsNotWarnedAboutOnWindows`, `SilentBeforeTheConfigFileHidesItsWarningOnWindows` in `CommandLineLeadingUnicodeWarningTests`. Curl.Cli.UnitTests: 3770 passed, 16 skipped. Measure-CodeQuality -Library Curl.Cli.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-04: Backlog -> Doing.
+- 2026-10-04: Doing -> Done. A -K config file value starting with U+2000-U+203F now gets curl's Unicode warning on Windows too
