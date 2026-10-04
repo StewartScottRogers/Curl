@@ -35,3 +35,4 @@ An HTTP `Last-Modified` with a year past 9999 is read into `TransferResult.Sourc
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
