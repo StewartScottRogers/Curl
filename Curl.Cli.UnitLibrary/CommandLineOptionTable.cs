@@ -216,6 +216,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("cert-status", null, (options, on) => options.RequireCertificateStatus = on),
         CommandLineOption.NegatableFlag("ssl-auto-client-cert", null, (options, on) => options.AutoClientCertificate = on),
         CommandLineOption.NegatableFlag("proxy-insecure", null, (options, on) => options.ProxyInsecure = on),
+        CommandLineOption.NegatableFlag("proxy-http2", null, (options, on) => options.ProxyHttp2 = on).RefusedBySchannelBuild(),
         CommandLineOption.Value("proxy-cacert", null, SettingExistingFile("--proxy-cacert", (options, file) => options.ProxyCaCertificateFile = file)),
         CommandLineOption.FileName("proxy-capath", null, (options, directory) => options.ProxyCaCertificateDirectory = directory),
         CommandLineOption.FileName("proxy-cert", null, (options, certificate) => options.ProxyClientCertificate = certificate),

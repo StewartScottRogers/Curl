@@ -82,21 +82,27 @@ public sealed class CommandLineOption
     /// <returns>The row, refused on the Windows Schannel build.</returns>
     public CommandLineOption RefusedBySchannelBuild()
     {
-        CommandLineOptionApplier apply = Apply;
         return new CommandLineOption(
             LongName,
             ShortName,
             TakesValue,
-            (options, value, spelledOption, pathExists, dataFileReader) => options.ActsAsWindowsSchannelBuild
-                ? CommandLineRefusal.InstalledLibcurlDoesNotSupport(spelledOption)
-                : apply(options, value, spelledOption, pathExists, dataFileReader),
-            Negate,
+            RefusingOnSchannelBuild(Apply),
+            Negate is null ? null : RefusingOnSchannelBuild(Negate),
             TakesSubject,
             EndsBundle,
             ShortNameTurnsOff,
             warnsAboutLeadingUnicode: false,
             refusedByWindowsSchannelBuild: true);
     }
+
+    /// <summary>
+    /// Wraps <paramref name="apply"/> so it refuses on the Windows Schannel build. curl 8.21.0 checks the
+    /// feature before it reads the toggle, so the <c>--no-</c> spelling is refused too (<c>--no-proxy-http2</c>).
+    /// </summary>
+    private static CommandLineOptionApplier RefusingOnSchannelBuild(CommandLineOptionApplier apply) =>
+        (options, value, spelledOption, pathExists, dataFileReader) => options.ActsAsWindowsSchannelBuild
+            ? CommandLineRefusal.InstalledLibcurlDoesNotSupport(spelledOption)
+            : apply(options, value, spelledOption, pathExists, dataFileReader);
 
     /// <summary>
     /// Creates a row for an option that takes no value and whose <c>--no-</c> spelling curl refuses
