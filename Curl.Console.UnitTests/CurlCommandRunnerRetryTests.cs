@@ -262,6 +262,209 @@ public sealed class CurlCommandRunnerRetryTests
         Assert.IsFalse(log.Contains("[info]", StringComparison.Ordinal), log);
     }
 
+    [TestMethod]
+    public async Task RunAsync_RetriedResumeAfterRangesAccepted_KeepsTheBytesAndResumesAfterThem()
+    {
+        // curl -v -C - --retry 1 --retry-all-errors -o out.txt (BL-1402 Context).
+        ScriptedConnector server = ShortOkThen(AcceptsRanges, PartialRest);
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, ResumingRetryArguments("-v", "-C", "-"));
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(StandardErrorText, EndOfResponseLine + AllErrorsRetryWarningLine + "Note: Keeping 5 bytes" + NewLine);
+        StringAssert.Contains(SecondRequest(server), "\r\nRange: bytes=5-\r\n");
+        Assert.AreEqual("hello56789", OutputFileText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetriedResumeWithoutAcceptRanges_ThrowsTheBytesAwayAndStartsAgain()
+    {
+        ScriptedConnector server = ShortOkThen(string.Empty, FullOk);
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, ResumingRetryArguments("-v", "-C", "-"));
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(StandardErrorText, AllErrorsRetryWarningLine + "Note: Throwing away 5 bytes" + NewLine);
+        Assert.IsFalse(SecondRequest(server).Contains("Range:", StringComparison.Ordinal));
+        Assert.AreEqual("0123456789", OutputFileText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetriedResumeWithoutAcceptRangesOrVerbose_ThrowsTheBytesAwayWithoutANote()
+    {
+        ScriptedConnector server = ShortOkThen(string.Empty, FullOk);
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, ResumingRetryArguments("-C", "-"));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.IsFalse(StandardErrorText.Contains("Note:", StringComparison.Ordinal), StandardErrorText);
+        Assert.AreEqual("0123456789", OutputFileText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetryWithoutResumeAfterRangesAccepted_ThrowsTheBytesAway()
+    {
+        ScriptedConnector server = ShortOkThen(AcceptsRanges, FullOk);
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, ResumingRetryArguments("-v"));
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(StandardErrorText, AllErrorsRetryWarningLine + "Note: Throwing away 5 bytes" + NewLine);
+        Assert.IsFalse(StandardErrorText.Contains("Keeping", StringComparison.Ordinal), StandardErrorText);
+        Assert.IsFalse(SecondRequest(server).Contains("Range:", StringComparison.Ordinal));
+        Assert.AreEqual("0123456789", OutputFileText);
+    }
+
+    [TestMethod]
+    [DataRow("-X", "GET")]
+    [DataRow("-d", "x")]
+    public async Task RunAsync_RetriedResumeOfARequestNotAPlainGet_ThrowsTheBytesAway(string option, string value)
+    {
+        ScriptedConnector server = ShortOkThen(AcceptsRanges, FullOk);
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, ResumingRetryArguments("-v", "-C", "-", option, value));
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(StandardErrorText, "Note: Throwing away 5 bytes" + NewLine);
+        Assert.AreEqual("0123456789", OutputFileText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetriedResumeOfAnAttemptThatFailedToWrite_KeepsNothing()
+    {
+        HelloWritingHandler handler = new(
+            "http",
+            TransferResult.Failure(CurlExitCode.WriteError, "Failure writing output to destination") with { Report = AcceptingRangesReport });
+
+        int exitCode = await RunAsync(handler, writesProgressMeter: false, ResumingRetryArguments("-v", "-C", "-"));
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(StandardErrorText, "Note: Throwing away 5 bytes" + NewLine);
+        Assert.AreEqual("hello", OutputFileText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetriedResumeOfAnAttemptThatAcceptedRanges_KeepsTheBytes()
+    {
+        HelloWritingHandler handler = new(
+            "http",
+            TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 5 bytes missing") with { Report = AcceptingRangesReport });
+
+        int exitCode = await RunAsync(handler, writesProgressMeter: false, ResumingRetryArguments("-v", "-C", "-"));
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(StandardErrorText, "Note: Keeping 5 bytes" + NewLine);
+        Assert.AreEqual("hellohello", OutputFileText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetriedResumeAnsweredPartialToAResume_KeepsTheBytesAgain()
+    {
+        TransferResult shortPartial = TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 5 bytes missing");
+        HelloWritingHandler handler = new(
+            "http",
+            shortPartial with { Report = AcceptingRangesReport },
+            shortPartial with { Report = AcceptingRangesReport with { ResponseCode = 206, ResponseHeaders = [] } });
+
+        int exitCode = await RunAsync(handler, writesProgressMeter: false, "-v", "-C", "-", "--no-progress-meter", "--retry", "2", "--retry-all-errors", "-o", "out.txt", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(2, StandardErrorText.Split("Note: Keeping 5 bytes").Length - 1, StandardErrorText);
+        Assert.AreEqual("hellohellohello", OutputFileText);
+    }
+
+    [TestMethod]
+    [DataRow(206, "GET", CurlExitCode.PartialFile, "http", DisplayName = "206 to a request that did not resume")]
+    [DataRow(503, "GET", CurlExitCode.PartialFile, "http", DisplayName = "neither 200 nor 206")]
+    [DataRow(200, "GET", CurlExitCode.RangeError, "http", DisplayName = "exit 33")]
+    [DataRow(200, "GET", CurlExitCode.PartialFile, "ftp", DisplayName = "not http")]
+    [DataRow(0, null, CurlExitCode.PartialFile, "http", DisplayName = "no report")]
+    public async Task RunAsync_RetriedResumeTheServerDidNotTake_ThrowsTheBytesAway(int responseCode, string? method, CurlExitCode exit, string scheme)
+    {
+        TransferResult first = TransferResult.Failure(exit, "failed") with
+        {
+            Report = method is null ? null : AcceptingRangesReport with { ResponseCode = responseCode },
+        };
+        HelloWritingHandler handler = new(scheme, first);
+
+        int exitCode = await RunAsync(handler, writesProgressMeter: false, "-v", "-C", "-", "--no-progress-meter", "--retry", "1", "--retry-all-errors", "-o", "out.txt", $"{scheme}://127.0.0.1:18241/a");
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(StandardErrorText, "Note: Throwing away 5 bytes" + NewLine);
+        Assert.AreEqual("hello", OutputFileText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetriedResumeToStandardOutput_KeepsAndNotesNothing()
+    {
+        ScriptedConnector server = ShortOkThen(AcceptsRanges, FullOk);
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, "-v", "-C", "-", "--no-progress-meter", "--retry", "1", "--retry-all-errors", "--retry-delay", "1", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.IsFalse(StandardErrorText.Contains("Note:", StringComparison.Ordinal), StandardErrorText);
+        Assert.IsFalse(SecondRequest(server).Contains("Range:", StringComparison.Ordinal));
+        Assert.AreEqual("hello0123456789", StandardOutputText);
+    }
+
+    private const string AcceptsRanges = "Accept-Ranges: bytes\r\n";
+
+    private const string PartialRest = "HTTP/1.1 206 Partial\r\nContent-Range: bytes 5-9/10\r\nContent-Length: 5\r\n\r\n56789";
+
+    private const string FullOk = "HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n0123456789";
+
+    private static readonly string EndOfResponseLine = "curl: (18) end of response with 5 bytes missing" + NewLine;
+
+    private static readonly string AllErrorsRetryWarningLine =
+        "Warning: Problem (retrying all errors). Retrying in 1 second. 1 retry left." + NewLine;
+
+    private static readonly TransferReport AcceptingRangesReport = new()
+    {
+        ResponseCode = 200,
+        Method = "GET",
+        ResponseHeaders = [new("Accept-Ranges", "bytes")],
+    };
+
+    private string OutputFileText => Encoding.Latin1.GetString(outputFiles.Written["out.txt"].ToArray());
+
+    private static string[] ResumingRetryArguments(params string[] options) =>
+        [.. options, "--no-progress-meter", "--retry", "1", "--retry-all-errors", "--retry-delay", "1", "-o", "out.txt", Url];
+
+    /// <summary>
+    /// Serves a <c>200</c> promising ten bytes that closes after <c>hello</c>, with
+    /// <paramref name="firstHeaders" />, then <paramref name="second" />; the empty read between
+    /// them is the first connection closing.
+    /// </summary>
+    private static ScriptedConnector ShortOkThen(string firstHeaders, string second) =>
+        new(new[] { $"HTTP/1.1 200 OK\r\n{firstHeaders}Content-Length: 10\r\n\r\nhello", string.Empty, second }.Select(Encoding.Latin1.GetBytes));
+
+    /// <summary>Gets the second request <paramref name="server" /> was sent.</summary>
+    private static string SecondRequest(ScriptedConnector server)
+    {
+        string sent = Encoding.Latin1.GetString(server.Written);
+        int second = sent.IndexOf("GET ", 1, StringComparison.Ordinal);
+
+        return second < 0 ? string.Empty : sent[second..];
+    }
+
+    /// <summary>
+    /// A handler for <paramref name="scheme" /> whose every attempt writes <c>hello</c>: the first
+    /// ones end with <paramref name="firstResults" />, in order, and the rest succeed.
+    /// </summary>
+    private sealed class HelloWritingHandler(string scheme, params TransferResult[] firstResults) : IProtocolHandler
+    {
+        private int attempts;
+
+        public IReadOnlyCollection<string> SupportedSchemes { get; } = [scheme];
+
+        public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
+        {
+            await context.Output.WriteAsync("hello"u8.ToArray());
+
+            return attempts < firstResults.Length ? firstResults[attempts++] : TransferResult.Success(5);
+        }
+    }
+
     private Task<int> RunAsync(string[] responses, params string[] arguments) =>
         RunAsync(responses, writesProgressMeter: false, arguments);
 

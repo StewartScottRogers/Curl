@@ -3622,7 +3622,7 @@ internal sealed class CurlCommandRunner(
         {
             bool toStandardOutput = !transfer.DiscardsBody;
             StartTransferProgress(options, options.ResumeFrom, toStandardOutput);
-            Func<TransferContext> createAttemptContext = () => transferContextFactory.Create(
+            Func<long?, TransferContext> createAttemptContext = _ => transferContextFactory.Create(
                 options,
                 url,
                 RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
@@ -4324,12 +4324,12 @@ internal sealed class CurlCommandRunner(
             TransferResult fileResult = await FollowRetryingAsync(
                     follower,
                     options,
-                    () => transferContextFactory.Create(
+                    attemptResumeFrom => transferContextFactory.Create(
                         options,
                         url,
                         RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)),
                         range,
-                        resumeFrom,
+                        attemptResumeFrom,
                         headerOutput,
                         formBody,
                         upload,
@@ -4394,7 +4394,7 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult> TransferToStandardOutputAsync(
         RedirectFollower follower,
         CommandLineOptions options,
-        Func<TransferContext> createAttemptContext)
+        Func<long?, TransferContext> createAttemptContext)
     {
         RunningTransferState state = Running;
         state.StandardOutput.ClearWriteFailure();
@@ -4413,30 +4413,34 @@ internal sealed class CurlCommandRunner(
     /// <param name="follower">Performs each attempt, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="createAttemptContext">
-    /// Creates an attempt's context, on the transfer's current <see cref="RunningTransferState.Progress" />; called
-    /// once before the first attempt and again after each retried one's lines are written.
+    /// Creates an attempt's context from the <c>-C</c> offset it resumes from, on the transfer's
+    /// current <see cref="RunningTransferState.Progress" />; called once before the first attempt
+    /// and again after each retried one's lines are written.
     /// </param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <param name="outputFile">
-    /// The <c>-o</c> file, cut back before each retry; <see langword="null" /> when the body goes
+    /// The <c>-o</c> file, whose retried attempt's bytes are kept or cut back
+    /// (<see cref="AttemptBytesKeptForResume" />); <see langword="null" /> when the body goes
     /// to standard output, where every attempt's body stays, as curl 8.21.0 leaves it.
     /// </param>
     /// <returns>The result of the attempt not retried.</returns>
     private async Task<TransferResult> FollowRetryingAsync(
         RedirectFollower follower,
         CommandLineOptions options,
-        Func<TransferContext> createAttemptContext,
+        Func<long?, TransferContext> createAttemptContext,
         long? resumeFrom,
         DeferredOutputFileStream? outputFile)
     {
         RedirectPolicy redirectPolicy = RedirectPolicyMapping.FromCommandLine(options);
-        TransferContext? firstContext = createAttemptContext();
+        long? attemptResumeFrom = resumeFrom;
+        TransferContext? firstContext = createAttemptContext(attemptResumeFrom);
+        string scheme = firstContext.Url.Scheme;
         Task retryLinesWritten = Task.CompletedTask;
         TransferRetrier retrier = new(async _ =>
         {
             await retryLinesWritten.ConfigureAwait(false);
             RecordSerialAttemptStart();
-            TransferContext context = firstContext ?? createAttemptContext();
+            TransferContext context = firstContext ?? createAttemptContext(attemptResumeFrom);
             firstContext = null;
             TransferResult attemptResult = await FollowWatchingSpeedAsync(follower, context, redirectPolicy).ConfigureAwait(false);
             KeepRetriedConnectionIdWhenReused(context, attemptResult);
@@ -4451,7 +4455,10 @@ internal sealed class CurlCommandRunner(
                 {
                     Running.RetryCount++;
                     TakeNextAttemptIds();
-                    retryLinesWritten = WriteRetryLinesAsync(options, attempt, warning, resumeFrom, outputFile);
+                    long? retriedResumeFrom = attemptResumeFrom;
+                    long keptBytes = AttemptBytesKeptForResume(options, attempt, scheme, retriedResumeFrom, outputFile);
+                    attemptResumeFrom = keptBytes > 0 ? retriedResumeFrom.GetValueOrDefault() + keptBytes : retriedResumeFrom;
+                    retryLinesWritten = WriteRetryLinesAsync(options, attempt, warning, new RetriedAttemptOffsets(retriedResumeFrom, attemptResumeFrom), outputFile);
                 },
                 (_, warning) => retryLinesWritten = WriteWarningUnlessSilentAsync(options, warning))
             .ConfigureAwait(false);
@@ -4579,33 +4586,128 @@ internal sealed class CurlCommandRunner(
     /// Writes what curl 8.21.0 prints for an attempt <c>--retry</c> runs again, and readies the
     /// next attempt: the attempt's progress, its failure lines unless <c>-s</c> was given
     /// without <c>-S</c>, then the retry warning unless <c>-s</c> was given, whether or not with
-    /// <c>-S</c> (measured 2026-09-27, BL-241 Notes). The <c>-o</c> file is then cut back and the
-    /// next attempt gets fresh progress.
+    /// <c>-S</c> (measured 2026-09-27, BL-241 Notes). The attempt's <c>-o</c> bytes are then kept
+    /// or cut back (<see cref="KeepOrThrowAwayAttemptBytesAsync" />) and the next attempt gets
+    /// fresh progress.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="attempt">The attempt's result.</param>
     /// <param name="warning">The retry warning, unwrapped.</param>
-    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+    /// <param name="offsets">The <c>-C</c> offsets the retried attempt and the next one resume from.</param>
     /// <param name="outputFile">The <c>-o</c> file, or <see langword="null" /> for standard output.</param>
     /// <returns>A task that completes when the lines are written.</returns>
     private async Task WriteRetryLinesAsync(
         CommandLineOptions options,
         TransferResult attempt,
         string warning,
-        long? resumeFrom,
+        RetriedAttemptOffsets offsets,
         DeferredOutputFileStream? outputFile)
     {
         bool toStandardOutput = outputFile is null;
-        await WriteProgressAsync(options, attempt, resumeFrom, toStandardOutput).ConfigureAwait(false);
+        await WriteProgressAsync(options, attempt, offsets.Retried, toStandardOutput).ConfigureAwait(false);
         if (ShowsErrors(options) && attempt.ErrorMessage is not null)
         {
             await WriteFailureLinesAsync(attempt).ConfigureAwait(false);
         }
 
         await WriteWarningUnlessSilentAsync(options, warning).ConfigureAwait(false);
-        outputFile?.TruncateForRetry();
-        StartTransferProgress(options, resumeFrom, toStandardOutput);
+        if (outputFile is not null)
+        {
+            await KeepOrThrowAwayAttemptBytesAsync(options, outputFile, keeps: offsets.Next != offsets.Retried).ConfigureAwait(false);
+        }
+
+        StartTransferProgress(options, offsets.Next, toStandardOutput);
     }
+
+    /// <summary>
+    /// Keeps a retried attempt's <c>-o</c> bytes for the next attempt to resume after, or cuts the
+    /// file back, as curl 8.21.0's <c>retrycheck</c> does, noting either under <c>-v</c> or a
+    /// <c>--trace</c> option when the attempt wrote any: <c>Note: Keeping 5 bytes</c> or
+    /// <c>Note: Throwing away 5 bytes</c> (measured 2026-10-03, BL-1402 Context).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="outputFile">The <c>-o</c> file.</param>
+    /// <param name="keeps">Whether the attempt's bytes are kept (<see cref="AttemptBytesKeptForResume" />).</param>
+    /// <returns>A task that completes when the note is written.</returns>
+    private async Task KeepOrThrowAwayAttemptBytesAsync(CommandLineOptions options, DeferredOutputFileStream outputFile, bool keeps)
+    {
+        long bytes = outputFile.AttemptBytesWritten;
+        if (keeps)
+        {
+            outputFile.KeepForRetry();
+        }
+        else
+        {
+            outputFile.TruncateForRetry();
+        }
+
+        if (bytes > 0 && options.Trace != TraceKind.None)
+        {
+            string note = string.Create(CultureInfo.InvariantCulture, $"{(keeps ? "Keeping" : "Throwing away")} {bytes} bytes");
+            await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText(note, terminalColumns)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Works out how many of a retried attempt's <c>-o</c> bytes curl 8.21.0 keeps for the next
+    /// attempt to resume after (<c>is_outfile_auto_resumable</c> and <c>retrycheck</c> in
+    /// <c>src/tool_operate.c</c>): all of them when <c>-C -</c> was given without <c>-X</c>, the
+    /// attempt wrote some and did not fail with exit 23 or 33, and it was an <c>http</c> or
+    /// <c>https</c> <c>GET</c> answered <c>206</c> to a resume or <c>200</c> with
+    /// <c>Accept-Ranges: bytes</c>; otherwise none.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="attempt">The retried attempt's result.</param>
+    /// <param name="scheme">The transfer's scheme, in lower case.</param>
+    /// <param name="resumeFrom">The <c>-C</c> offset the attempt resumed from, or <see langword="null" />.</param>
+    /// <param name="outputFile">The <c>-o</c> file, or <see langword="null" /> for standard output.</param>
+    /// <returns>The bytes kept, or zero.</returns>
+    private static long AttemptBytesKeptForResume(
+        CommandLineOptions options,
+        TransferResult attempt,
+        string scheme,
+        long? resumeFrom,
+        DeferredOutputFileStream? outputFile) =>
+        outputFile is not null && IsAutoResumable(options, attempt) && IsHttpScheme(scheme) && TakesTheResume(attempt.Report, resumeFrom)
+            ? outputFile.AttemptBytesWritten
+            : 0;
+
+    /// <summary>
+    /// Tells whether curl 8.21.0's <c>is_outfile_auto_resumable</c> lets a retried attempt resume:
+    /// <c>-C -</c> without <c>-X</c>, and an attempt that did not fail with exit 23 or 33.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="attempt">The retried attempt's result.</param>
+    /// <returns><see langword="true" /> when the attempt may be resumed.</returns>
+    private static bool IsAutoResumable(CommandLineOptions options, TransferResult attempt) =>
+        options.ResumeFromOutputSize
+        && options.RequestMethod is null
+        && attempt.ExitCode != CurlExitCode.WriteError
+        && attempt.ExitCode != CurlExitCode.RangeError;
+
+    /// <summary>
+    /// Tells whether an attempt's response lets the next attempt resume: a <c>GET</c> answered
+    /// <c>206</c> to a request that resumed, or <c>200</c> with <c>Accept-Ranges: bytes</c>.
+    /// </summary>
+    /// <param name="report">The attempt's report, or <see langword="null" /> when it made none.</param>
+    /// <param name="resumeFrom">The <c>-C</c> offset the attempt resumed from, or <see langword="null" />.</param>
+    /// <returns><see langword="true" /> when the server takes ranges.</returns>
+    private static bool TakesTheResume(TransferReport? report, long? resumeFrom) =>
+        report is { Method: "GET" }
+        && (report.ResponseCode == 206 ? resumeFrom > 0 : report.ResponseCode == 200 && AcceptsByteRanges(report));
+
+    /// <summary>Tells whether a response carries <c>Accept-Ranges: bytes</c>.</summary>
+    /// <param name="report">The attempt's report.</param>
+    /// <returns><see langword="true" /> when the header says <c>bytes</c>.</returns>
+    private static bool AcceptsByteRanges(TransferReport report) =>
+        report.ResponseHeaders.Any(header =>
+            header.Key.Equals("Accept-Ranges", StringComparison.OrdinalIgnoreCase)
+            && header.Value.Trim().Equals("bytes", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The <c>-C</c> offsets a retried attempt resumed from and the next attempt resumes from.</summary>
+    /// <param name="Retried">The retried attempt's offset, or <see langword="null" />.</param>
+    /// <param name="Next">The next attempt's offset: past the retried attempt's bytes when they are kept.</param>
+    private readonly record struct RetriedAttemptOffsets(long? Retried, long? Next);
 
     /// <summary>
     /// Writes a warning line, such as a <see cref="TransferRetrier" /> one, wrapped as every <c>Warning: </c>

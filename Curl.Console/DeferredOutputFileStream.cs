@@ -68,7 +68,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     private Stream? file;
     private FileWriteMode openMode = writeMode;
     private long? failedWriteLength;
-    private long lengthWhenOpened;
+    private long lengthAtAttemptStart;
 
     /// <summary>
     /// Gets the file this stream writes: the path it was created with, until
@@ -290,7 +290,21 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     }
 
     /// <summary>
-    /// Cuts the file back to the length it had when it was opened, before <c>--retry</c> runs
+    /// Gets the bytes the current attempt wrote to the file: those past the length it had when it
+    /// was opened, or when <see cref="KeepForRetry" /> last kept an attempt's bytes. A file not yet
+    /// opened, or one that cannot seek, counts none, as curl 8.21.0 counts only a regular file.
+    /// </summary>
+    internal long AttemptBytesWritten => file is { CanSeek: true } opened ? opened.Position - lengthAtAttemptStart : 0;
+
+    /// <summary>
+    /// Keeps the bytes the current attempt wrote, before <c>--retry</c> resumes the transfer after
+    /// them, so the next attempt's bytes are the ones a later <see cref="TruncateForRetry" /> cuts.
+    /// </summary>
+    internal void KeepForRetry() => lengthAtAttemptStart += AttemptBytesWritten;
+
+    /// <summary>
+    /// Cuts the file back to the length it had when it was opened, or when
+    /// <see cref="KeepForRetry" /> last kept an attempt's bytes, before <c>--retry</c> runs
     /// the transfer again, as curl 8.21.0 does (<c>ftruncate</c> to the length at open): a
     /// retried 503 written with <c>-o</c> left one copy of the body, not two (measured
     /// 2026-09-27, BL-241 Notes). A file not yet opened, or one that cannot seek, is left as
@@ -301,20 +315,20 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         if (file is { CanSeek: true } opened)
         {
             opened.Flush();
-            opened.SetLength(lengthWhenOpened);
-            opened.Position = lengthWhenOpened;
+            opened.SetLength(lengthAtAttemptStart);
+            opened.Position = lengthAtAttemptStart;
         }
     }
 
     /// <summary>
     /// Takes <paramref name="opened" /> as the file, and remembers its length for
-    /// <see cref="TruncateForRetry" />.
+    /// <see cref="TruncateForRetry" /> and <see cref="AttemptBytesWritten" />.
     /// </summary>
     /// <param name="opened">The file just opened, or <see langword="null" /> when the open failed.</param>
     private void Adopt(Stream? opened)
     {
         file = opened;
-        lengthWhenOpened = opened is { CanSeek: true } ? opened.Length : 0;
+        lengthAtAttemptStart = opened is { CanSeek: true } ? opened.Length : 0;
     }
 
     /// <summary>
