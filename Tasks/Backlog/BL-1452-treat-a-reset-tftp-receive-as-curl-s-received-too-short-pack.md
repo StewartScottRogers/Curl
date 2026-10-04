@@ -1,5 +1,5 @@
 ---
-id: BL-1444
+id: BL-1452
 title: Treat a reset TFTP receive as curl's 'Received too short packet' instead of crashing
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-032
 created: 2026-10-04
 completed:
 ---
-# BL-1444 — Treat a reset TFTP receive as curl's 'Received too short packet' instead of crashing
+# BL-1452 — Treat a reset TFTP receive as curl's 'Received too short packet' instead of crashing
 
 ## Goal
 

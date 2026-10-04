@@ -1,5 +1,5 @@
 ---
-id: BL-1441
+id: BL-1449
 title: Fail with exit 56 Recv failure instead of crashing when the proxy drops a CONNECT reply read
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-091
 created: 2026-10-04
 completed:
 ---
-# BL-1441 — Fail with exit 56 Recv failure instead of crashing when the proxy drops a CONNECT reply read
+# BL-1449 — Fail with exit 56 Recv failure instead of crashing when the proxy drops a CONNECT reply read
 
 ## Goal
 

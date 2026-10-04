@@ -1,16 +1,16 @@
 ---
-id: BL-1442
+id: BL-1450
 title: Report a peer's reset as curl's 'Connection was reset', not 'Connection was aborted', on Windows
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1441]
+depends-on: [BL-1449]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-04
 completed:
 ---
-# BL-1442 — Report a peer's reset as curl's 'Connection was reset', not 'Connection was aborted', on Windows
+# BL-1450 — Report a peer's reset as curl's 'Connection was reset', not 'Connection was aborted', on Windows
 
 ## Goal
 
@@ -21,7 +21,7 @@ On Windows, a server that resets the connection right after accepting it makes C
 - Measured 2026-10-04 on Windows with `Record-CurlExchange.ps1 -Reset` (the recorder closes each accepted socket with zero linger, so Windows sends an RST) and `-CurlArgs "-sS,-m,5,-u,a:b,<url>"`: real curl 8.21.0 prints `curl: (56) Recv failure: Connection was reset` for `http://`, `dict://`, `gopher://`, `mqtt://` and `ws://` URLs; `Curl.Console` prints `curl: (56) Recv failure: Connection was aborted` for every one of them, every time (four reruns of `http://` and `dict://` on 2026-10-04 agreed; an `https://` URL gives `curl: (35) Recv failure: Connection was aborted` in both, since the TLS client hello is sent first). (`ftp`, `smtp`, `imap` and `pop3` print `response reading failed (errno: 0)` in both; `telnet` exits 0 in both.)
 - The wording comes from `Curl.Protocol.Abstractions.UnitLibrary/CurlSocketErrorText.cs` (BL-1325), which maps the `SocketError` it is given; the difference is in the error Curl receives. WSAECONNABORTED is what Windows reports for a socket the local stack already aborted - for instance when an earlier send on it failed after the RST arrived, or when the read is cancelled and retried - whereas curl's `recv` sees the RST itself. Start in `Curl.Networking.UnitLibrary/StreamConnection.cs` (`ReadAsync`, line 36) and `TcpConnector`, and find which operation first sees WSAECONNRESET and why it is not the one reported.
 - Upstream (tag `curl-8_21_0`): `lib/cf-socket.c` `cf_socket_recv` reports the `SOCKERRNO` of the failing `recv` through `Curl_strerror`, giving `Recv failure: Connection was reset` on the Schannel build.
-- Linux and macOS are not measured here; on those platforms keep whatever the existing platform tests pin. Depends on BL-1441 only because both change `Curl.Networking.UnitLibrary`.
+- Linux and macOS are not measured here; on those platforms keep whatever the existing platform tests pin. Depends on BL-1449 only because both change `Curl.Networking.UnitLibrary`.
 
 ## Acceptance criteria
 

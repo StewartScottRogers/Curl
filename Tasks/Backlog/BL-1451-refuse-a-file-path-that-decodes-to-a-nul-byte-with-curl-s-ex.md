@@ -1,5 +1,5 @@
 ---
-id: BL-1443
+id: BL-1451
 title: Refuse a file:// path that decodes to a NUL byte with curl's exit 3 before opening anything
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-019
 created: 2026-10-04
 completed:
 ---
-# BL-1443 — Refuse a file:// path that decodes to a NUL byte with curl's exit 3 before opening anything
+# BL-1451 — Refuse a file:// path that decodes to a NUL byte with curl's exit 3 before opening anything
 
 ## Goal
 
