@@ -142,13 +142,13 @@ public sealed class HttpsConnectFilterTraceEventsTests
     }
 
     [TestMethod]
-    public void ContinueAfterQuicAttempt_AfterAFailedQuicAttempt_StartsH2AndReportsTheQuicFailureAsTheConnects()
+    public void ContinueAfterFirstAttempt_AfterAFailedQuicAttempt_StartsH2AndReportsTheQuicFailureAsTheConnects()
     {
         // curl 8.22.0 --http3, QUIC refused, both attempts failed: connect -> 56 (BL-1284 Notes).
         var inner = new CountingTransferEvents();
         var events = new HttpsConnectFilterTraceEvents(inner, "h3");
 
-        events.ContinueAfterQuicAttempt(CurlExitCode.RecvError, TimeSpan.FromMilliseconds(200), tracesSetup: true);
+        events.ContinueAfterFirstAttempt("h3", "h2", CurlExitCode.RecvError, TimeSpan.FromMilliseconds(200), tracesSetup: true);
         events.ReportInfo("  Trying 127.0.0.1:443...");
         events.ReportConnectFailed(CurlExitCode.CouldntConnect);
 
@@ -166,13 +166,13 @@ public sealed class HttpsConnectFilterTraceEventsTests
     }
 
     [TestMethod]
-    public void ContinueAfterQuicAttempt_WhileTheQuicAttemptIsConnecting_PollsTwiceMoreAndCountsBothSockets()
+    public void ContinueAfterFirstAttempt_WhileTheQuicAttemptIsConnecting_PollsTwiceMoreAndCountsBothSockets()
     {
         // curl 8.22.0 --http3 against a silent QUIC peer (BL-1284 Notes).
         var inner = new CountingTransferEvents();
         var events = new HttpsConnectFilterTraceEvents(inner, "h3");
 
-        events.ContinueAfterQuicAttempt(null, TimeSpan.FromMilliseconds(200), tracesSetup: true);
+        events.ContinueAfterFirstAttempt("h3", "h2", null, TimeSpan.FromMilliseconds(200), tracesSetup: true);
         events.ReportInfo("  Trying 127.0.0.1:443...");
         events.ReportConnectionOpened(new ConnectionOpenedEvent { HostName = "h", RemoteEndPoint = EndPoint, LocalEndPoint = EndPoint, ConnectionNumber = 0 });
 
@@ -197,15 +197,40 @@ public sealed class HttpsConnectFilterTraceEventsTests
     }
 
     [TestMethod]
-    public void ContinueAfterQuicAttempt_WithoutTheSetupFilter_WritesNoSetupDestroyOnceConnected()
+    public void ContinueAfterFirstAttempt_WithoutTheSetupFilter_WritesNoSetupDestroyOnceConnected()
     {
         var inner = new CountingTransferEvents();
         var events = new HttpsConnectFilterTraceEvents(inner, "h3");
 
-        events.ContinueAfterQuicAttempt(CurlExitCode.RecvError, TimeSpan.FromMilliseconds(200), tracesSetup: false);
+        events.ContinueAfterFirstAttempt("h3", "h2", CurlExitCode.RecvError, TimeSpan.FromMilliseconds(200), tracesSetup: false);
         events.ReportConnectionOpened(new ConnectionOpenedEvent { HostName = "h", RemoteEndPoint = EndPoint, LocalEndPoint = EndPoint, ConnectionNumber = 0 });
 
         Assert.AreEqual("[HTTPS-CONNECT] destroy", inner.Calls[^1]);
+    }
+
+    [TestMethod]
+    public void ContinueAfterFirstAttempt_WhileAPreferredTcpAttemptIsConnecting_CallsItInconclusiveAndStartsH3()
+    {
+        var inner = new CountingTransferEvents();
+        var events = new HttpsConnectFilterTraceEvents(inner, "h1", "h3", firstAttemptIsPreferred: true);
+
+        events.ContinueAfterFirstAttempt("h1", "h3", null, TimeSpan.FromMilliseconds(200), tracesSetup: true);
+
+        Assert.AreEqual("[HTTPS-CONNECT] h1 inconclusive after 200, starting h3", inner.Calls[^1]);
+    }
+
+    [TestMethod]
+    public void ReportInfo_WithAPreferredFirstAttempt_NamesItFromPreferredVersionAndH3Second()
+    {
+        // curl 8.22.0 --http3 with an --alt-svc entry naming the origin with h2 (BL-1320 Notes).
+        var inner = new CountingTransferEvents();
+        var events = new HttpsConnectFilterTraceEvents(inner, "h2", "h3", firstAttemptIsPreferred: true);
+
+        events.ReportInfo("  Trying 127.0.0.1:443...");
+
+        CollectionAssert.AreEqual(
+            new[] { "[HTTPS-CONNECT] connect, init", "[HTTPS-CONNECT] 1st attempt uses h2 from preferred version", "[HTTPS-CONNECT] 2nd attempt uses h3 from wanted versions" },
+            inner.Calls[..3]);
     }
 
     [TestMethod]

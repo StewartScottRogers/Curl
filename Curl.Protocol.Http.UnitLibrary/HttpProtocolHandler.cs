@@ -669,9 +669,12 @@ public sealed class HttpProtocolHandler(
     /// two attempts swapped, so the QUIC connect starts when the TCP connect fails or once the
     /// happy-eyeballs timeout has passed, and when both fail the transfer fails with the TCP
     /// attempt's result, the first attempt's, as curl's <c>cf_hc_connect</c> reports it.
+    /// Both attempts get one target naming the TCP attempt's version (<see cref="ConnectTarget.TcpFirstAttemptVersion" />),
+    /// so a connector can write the <c>[HTTPS-CONNECT]</c> lines of the race (BL-1360).
     /// </summary>
     private async ValueTask<ConnectResult> RaceTcpAgainstQuicAsync(HttpRequestPlan plan, ConnectTarget target)
     {
+        target = target with { TcpFirstAttemptVersion = plan.Options.TcpFirstAttemptVersion };
         using CancellationTokenSource quicAbandoned = new();
         using CancellationTokenSource tcpAbandoned = new();
         Task<ConnectResult> tcp = plan.Deadline.ConnectAsync(connector, target, tcpAbandoned.Token).AsTask();

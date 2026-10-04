@@ -32,6 +32,12 @@ public sealed class RacingConnector : IConnector
     /// <summary>Gets the token the TCP connect was given.</summary>
     public CancellationToken TcpToken { get; private set; }
 
+    /// <summary>Gets the target the TCP connect was given.</summary>
+    public ConnectTarget? TcpTarget { get; private set; }
+
+    /// <summary>Gets the target the QUIC connect was given.</summary>
+    public ConnectTarget? QuicTarget { get; private set; }
+
     /// <summary>Gets how many TCP connects were started.</summary>
     public int TcpConnects { get; private set; }
 
@@ -39,6 +45,7 @@ public sealed class RacingConnector : IConnector
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         TcpToken = cancellationToken;
+        TcpTarget = target;
         TcpConnects++;
         tcpStarted.TrySetResult();
         return await TcpResult.Task;
@@ -48,6 +55,7 @@ public sealed class RacingConnector : IConnector
     public async ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         QuicToken = cancellationToken;
+        QuicTarget = target;
         quicStarted.TrySetResult();
         return await QuicResult.Task;
     }

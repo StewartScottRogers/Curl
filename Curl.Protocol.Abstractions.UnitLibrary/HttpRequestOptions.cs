@@ -219,9 +219,21 @@ public sealed record HttpRequestOptions
     /// <remarks>
     /// Set for an <c>--alt-svc</c> entry that names the origin itself with <c>h2</c> or <c>h1</c>, which
     /// curl 8.21.0 makes the preferred first attempt (<c>cf_hc_get_pref_alpn</c>, BL-948). Any other
-    /// version ignores it.
+    /// version ignores it. It is <see langword="true" /> exactly when <see cref="TcpFirstAttemptVersion" /> is set.
     /// </remarks>
-    public bool TriesTcpBeforeQuic { get; init; }
+    public bool TriesTcpBeforeQuic => TcpFirstAttemptVersion is not null;
+
+    /// <summary>
+    /// Gets the HTTP version, <c>h2</c> or <c>h1</c>, of the <c>--alt-svc</c> entry naming the origin
+    /// itself that makes TCP the first attempt of a <see cref="HttpVersionPreference.Http3" /> transfer
+    /// (<see cref="TriesTcpBeforeQuic" />), or <see langword="null" />, the default, to start with QUIC.
+    /// </summary>
+    /// <remarks>
+    /// The handler puts it on the <see cref="ConnectTarget" /> of the race, where the connector names it in
+    /// curl 8.22.0's <c>[HTTPS-CONNECT] 1st attempt uses &lt;version&gt; from preferred version</c> line
+    /// (measured, BL-1320 Notes).
+    /// </remarks>
+    public string? TcpFirstAttemptVersion { get; init; }
 
     /// <summary>
     /// Gets the store each <c>Alt-Svc</c> header of an HTTPS response is handed to

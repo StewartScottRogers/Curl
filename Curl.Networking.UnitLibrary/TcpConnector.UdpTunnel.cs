@@ -42,7 +42,7 @@ public sealed partial class TcpConnector
         var result = await ConnectMultiplexedThroughProxyTracedAsync(traced, new ProxyRoute(proxy, headOutput, timeProvider.GetTimestamp()), dialer, cancellationToken).ConfigureAwait(false);
         if (result.Connection is null)
         {
-            ReportQuicHttpsConnectFailure(httpsConnect, attempt, result.ExitCode);
+            ReportHttpsConnectAttemptFailure(httpsConnect, attempt, result.ExitCode);
         }
 
         return result;

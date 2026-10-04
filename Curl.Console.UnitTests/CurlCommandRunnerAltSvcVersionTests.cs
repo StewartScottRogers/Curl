@@ -174,6 +174,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
         Assert.AreEqual(1, connector.TcpConnectCount);
         Assert.IsEmpty(connector.QuicTargets);
         Assert.IsNull(tcp.Targets.Single().AltSvcRoute);
+        Assert.AreEqual(alpn, tcp.Targets.Single().TcpFirstAttemptVersion);
     }
 
     [TestMethod]

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1360 — Write the [HTTPS-CONNECT] lines of the --http3 race that tries TCP first for an --alt-svc entry naming h2 or h1
 
@@ -22,11 +22,13 @@ Split from BL-1320, which wrote them for QUIC through a CONNECT-UDP proxy and me
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Networking.UnitTests` pin the measured lines for TCP connecting first (h2 and h1 entries) and for TCP refused with QUIC refused (`h2 baller failed, starting h3`, then `connect, all attempts failed` / `connect -> 7, done=0`).
-- [ ] ADR-0357 gets an amendment.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage for each library changed.
+- [x] Tests in `Curl.Networking.UnitTests` pin the measured lines for TCP connecting first (h2 and h1 entries) and for TCP refused with QUIC refused (`h2 baller failed, starting h3`, then `connect, all attempts failed` / `connect -> 7, done=0`).
+- [x] ADR-0357 gets an amendment.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage for each library changed.
 
 ## Notes
+
+- 2026-10-03, interactive session: lane 7 had the code and its tests done by 11:13 (40/40); it then measured each of its four libraries separately, about 30 minutes each, and timed out. One run had also written coverage files into the worktree through an unquoted path with a space. Restored from stash 4ee2e7be with `git diff ^1 | git apply --3way` (copying the stash's files would have undone BL-1340's change to HttpProtocolHandler.cs) and its new test file from `^3`, without the stray coverage files. `TcpConnector.QuicConnectionFilters` came out at complexity 14 and is split into `TcpAttemptBefore` and `QuicAttemptKeptFor`. One `Measure-CodeQuality.ps1 -Library` run over the four libraries: Console, Networking and Http at 100% line and branch with 0 failing members; Abstractions' two failing members (CurlUrlAuthority.Parse, CurlUrlHost.TryNormalize) predate this task and are BL-1376. ADR-0357 has the amendment. Solution build clean with -warnaserror; fast tests green.
 
 ## Log
 
@@ -34,3 +36,4 @@ Split from BL-1320, which wrote them for QUIC through a CONNECT-UDP proxy and me
 - 2026-10-03: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Stewart: dark factory timed out after 120 min; see Z:\repos\Curl.logs\BL-1360-20261003-061205-L7.jsonl
 - 2026-10-03: Blocked -> Doing.
+- 2026-10-03: Doing -> Done. The --http3 race that tries TCP first writes its [HTTPS-CONNECT] lines

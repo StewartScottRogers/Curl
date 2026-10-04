@@ -120,6 +120,12 @@ public sealed class HttpRequestOptionsTests
     }
 
     [TestMethod]
+    public void TriesTcpBeforeQuic_WithATcpFirstAttemptVersion_IsTrue()
+    {
+        Assert.IsTrue(new HttpRequestOptions { TcpFirstAttemptVersion = "h1" }.TriesTcpBeforeQuic);
+    }
+
+    [TestMethod]
     public void With_ChangingOneMember_KeepsTheRest()
     {
         var get = new HttpRequestOptions { UserAgent = "agent/1", FollowRedirects = true };

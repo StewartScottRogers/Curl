@@ -618,7 +618,7 @@ public sealed partial class TcpConnector(
         if (request is null)
         {
             log.Failed(DiagnosticLogComponents.Quic, failure!.ExitCode, failure.ErrorMessage);
-            ReportQuicHttpsConnectFailure(httpsConnect, attempt, failure.ExitCode);
+            ReportHttpsConnectAttemptFailure(httpsConnect, attempt, failure.ExitCode);
             return failure;
         }
 
@@ -628,7 +628,7 @@ public sealed partial class TcpConnector(
         log.QuicDialled(request.DestinationHost, request.Port, dialled);
         if (dialled.Connection is null)
         {
-            ReportQuicHttpsConnectFailure(httpsConnect, attempt, dialled.ExitCode);
+            ReportHttpsConnectAttemptFailure(httpsConnect, attempt, dialled.ExitCode);
         }
 
         return dialled;
@@ -739,13 +739,13 @@ public sealed partial class TcpConnector(
     // race to tell; otherwise the target is as given. Under TracesHttpsConnectFilter an https://
     // origin's [HTTPS-CONNECT] events sit between the [SETUP] and [DNS] ones, given back for a failed
     // connect to report on (BL-1192).
-    private (ConnectTarget Target, ConnectAttemptTraceEvents? Trace, HttpsConnectFilterTraceEvents? HttpsConnect) TracingConnectionFilters(ConnectTarget target, ConnectDestination destination)
+    private (ConnectTarget Target, ConnectAttemptTraceEvents? Trace, HttpsConnectFilterTraceEvents? HttpsConnect, FirstHttpsConnectAttempt? Attempt) TracingConnectionFilters(ConnectTarget target, ConnectDestination destination)
     {
         var trace = ConnectAttemptTraceOf(target.Events, destination.Host);
         var httpsOrigin = IsHttpsOrigin(target);
         if (!TracesAnyFilterAbove(trace, httpsOrigin))
         {
-            return (target, null, null);
+            return (target, null, null, null);
         }
 
         trace?.ConnectStarting();
@@ -755,8 +755,9 @@ public sealed partial class TcpConnector(
             TracesSetupFilter,
             below => DnsFilterTraceEvents.Start(below, destination.Host, destination.Port, addressFamily),
             below => new SetupFilterTraceEvents(below, destination.Host, destination.Port),
-            quicAttempt: TakeQuicHttpsConnectAttempt(target));
-        return (target with { Events = events }, trace, httpsConnect);
+            firstAttempt: target.TcpFirstAttemptVersion is null ? TakeFirstHttpsConnectAttempt(target) : null,
+            tcpFirstAttemptVersion: target.TcpFirstAttemptVersion);
+        return (target with { Events = events }, trace, httpsConnect, TcpFirstAttemptOf(target, httpsConnect));
     }
 
     private bool TracesAnyFilterAbove(ConnectAttemptTraceEvents? trace, bool httpsOrigin) =>
@@ -782,7 +783,8 @@ public sealed partial class TcpConnector(
     // the DNS filter's, and the ALPN connect filter's events sit between the two. A direct connect, a
     // proxy's and a Unix socket's each start their own DNS and setup filters (measured, BL-1254 Notes).
     // A QUIC connect names the attempt after it; the TCP attempt after a QUIC one adds no filter but
-    // goes on from where the QUIC attempt's stood (BL-1284).
+    // goes on from where the QUIC attempt's stood (BL-1284), and the QUIC attempt after a TCP one an
+    // --alt-svc entry put first from where the TCP attempt's stood (BL-1360).
     private (ITransferEvents Events, HttpsConnectFilterTraceEvents? HttpsConnect) SetupAndDnsFilterEvents(
         ITransferEvents events,
         bool httpsOrigin,
@@ -790,16 +792,17 @@ public sealed partial class TcpConnector(
         Func<ITransferEvents, ITransferEvents> startDnsFilter,
         Func<ITransferEvents, ITransferEvents> startSetupFilter,
         string? secondAttemptVersion = null,
-        QuicHttpsConnectAttempt? quicAttempt = null)
+        FirstHttpsConnectAttempt? firstAttempt = null,
+        string? tcpFirstAttemptVersion = null)
     {
         var tracesHttpsConnect = TracesHttpsConnectFor(httpsOrigin);
-        if (quicAttempt is null)
+        if (firstAttempt is null)
         {
             WriteFirstFilterAddedLine(events, httpsOrigin, tracesHttpsConnect, tracesSetup);
         }
 
         events = TracesDnsFilter ? startDnsFilter(events) : events;
-        var httpsConnect = tracesHttpsConnect ? HttpsConnectFilterOver(events, tracesSetup, secondAttemptVersion, quicAttempt) : null;
+        var httpsConnect = tracesHttpsConnect ? HttpsConnectFilterOver(events, tracesSetup, secondAttemptVersion, firstAttempt, tcpFirstAttemptVersion) : null;
         events = httpsConnect ?? events;
         return (tracesSetup ? startSetupFilter(events) : events, httpsConnect);
     }
@@ -836,17 +839,17 @@ public sealed partial class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        (target, var trace, var httpsConnect) = TracingConnectionFilters(target, destination);
+        (target, var trace, var httpsConnect, var attempt) = TracingConnectionFilters(target, destination);
         var result = await ConnectDirectlyTracedAsync(target, destination, started, trace, cancellationToken).ConfigureAwait(false);
-        ReportHttpsConnectFailure(httpsConnect, result);
+        ReportHttpsConnectFailure(httpsConnect, result, attempt);
         return result;
     }
 
-    private static void ReportHttpsConnectFailure(HttpsConnectFilterTraceEvents? httpsConnect, ConnectResult result)
+    private static void ReportHttpsConnectFailure(HttpsConnectFilterTraceEvents? httpsConnect, ConnectResult result, FirstHttpsConnectAttempt? attempt = null)
     {
         if (result.ExitCode != CurlExitCode.Ok)
         {
-            httpsConnect?.ReportConnectFailed(result.ExitCode);
+            ReportHttpsConnectAttemptFailure(httpsConnect, attempt, result.ExitCode);
         }
     }
 
@@ -1249,7 +1252,7 @@ public sealed partial class TcpConnector(
             TracesSetupFilter,
             below => DnsFilterTraceEvents.Start(below, firstHop.Host, firstHop.Port, addressFamily),
             below => new SetupFilterTraceEvents(below, firstHop.Host, firstHop.Port, peer),
-            quicAttempt: TakeQuicHttpsConnectAttempt(target));
+            firstAttempt: TakeFirstHttpsConnectAttempt(target));
         return (target with { Events = events }, httpsConnect);
     }
 

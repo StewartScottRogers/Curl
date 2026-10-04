@@ -21,13 +21,14 @@ namespace Curl.Networking;
 /// Over QUIC (measured with curl.se's curl 8.22.0 ngtcp2 build, BL-1284 Notes) <c>--http3</c> adds
 /// <c>2nd attempt uses h2 from wanted versions</c> after the first attempt's line, a finished QUIC
 /// handshake has one poll round, not two, and the TCP attempt that follows a QUIC one goes on with
-/// the filter (<see cref="ContinueAfterQuicAttempt" />) rather than adding it again (ADR-0357's
+/// the filter (<see cref="ContinueAfterFirstAttempt" />) rather than adding it again (ADR-0357's
 /// BL-1284 amendment).
 /// </summary>
 /// <param name="inner">The events below the ALPN connect filter: the DNS filter's, or the transfer's own.</param>
 /// <param name="firstAttemptVersion">The HTTP version curl's first attempt uses: <c>h1</c>, <c>h2</c> or <c>h3</c>.</param>
-/// <param name="secondAttemptVersion">The version of the attempt curl may start after the first, if any: <c>h2</c> under <c>--http3</c>.</param>
-internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, string firstAttemptVersion, string? secondAttemptVersion = null) : ITransferEvents
+/// <param name="secondAttemptVersion">The version of the attempt curl may start after the first, if any: <c>h2</c> under <c>--http3</c>, <c>h3</c> after a preferred TCP attempt.</param>
+/// <param name="firstAttemptIsPreferred"><see langword="true" /> when an <c>--alt-svc</c> entry chose the first attempt's version, which curl names <c>from preferred version</c> (BL-1320 Notes).</param>
+internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, string firstAttemptVersion, string? secondAttemptVersion = null, bool firstAttemptIsPreferred = false) : ITransferEvents
 {
     /// <summary>The line curl writes as it adds the ALPN connect filter, before anything is resolved.</summary>
     public const string AddedLine = "[HTTPS-CONNECT] added";
@@ -42,31 +43,33 @@ internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, strin
     private bool _destroysFirstAttemptSetup;
 
     /// <summary>
-    /// Goes on, for the TCP attempt curl starts after a QUIC one, from where that attempt's filter
-    /// stood (measured, BL-1284 Notes): <c>h3 baller failed, starting h2</c> when the QUIC attempt
-    /// failed with <paramref name="quicFailure" />, which a failed TCP attempt then reports as the
-    /// connect's code; otherwise two more poll rounds of the QUIC attempt and <c>h3 inconclusive after
-    /// &lt;ms&gt;, starting h2</c>, the TCP attempt's rounds counting both sockets. Once connected,
-    /// the QUIC attempt's setup filter's <c>[SETUP] destroy</c> follows the filter's own when
-    /// <paramref name="tracesSetup" />.
+    /// Goes on, for the attempt curl starts after the first one of a race, from where that attempt's
+    /// filter stood (measured, BL-1284 and BL-1320 Notes): <c>&lt;first&gt; baller failed, starting
+    /// &lt;second&gt;</c> when the first attempt failed with <paramref name="firstFailure" />, which a
+    /// failed second attempt then reports as the connect's code; otherwise two more poll rounds of the
+    /// first attempt and <c>&lt;first&gt; inconclusive after &lt;ms&gt;, starting &lt;second&gt;</c>,
+    /// the second attempt's rounds counting both sockets. Once connected, the first attempt's setup
+    /// filter's <c>[SETUP] destroy</c> follows the filter's own when <paramref name="tracesSetup" />.
     /// </summary>
-    /// <param name="quicFailure">The QUIC attempt's exit code, or <see langword="null" /> while it is still connecting.</param>
-    /// <param name="happyEyeballsTimeout">How long curl let the QUIC attempt run alone.</param>
+    /// <param name="firstVersion">The first attempt's HTTP version: <c>h3</c> for QUIC, <c>h2</c> or <c>h1</c> for TCP.</param>
+    /// <param name="secondVersion">The second attempt's HTTP version.</param>
+    /// <param name="firstFailure">The first attempt's exit code, or <see langword="null" /> while it is still connecting.</param>
+    /// <param name="happyEyeballsTimeout">How long curl let the first attempt run alone.</param>
     /// <param name="tracesSetup">Whether the setup filter is traced.</param>
-    public void ContinueAfterQuicAttempt(CurlExitCode? quicFailure, TimeSpan happyEyeballsTimeout, bool tracesSetup)
+    public void ContinueAfterFirstAttempt(string firstVersion, string secondVersion, CurlExitCode? firstFailure, TimeSpan happyEyeballsTimeout, bool tracesSetup)
     {
         _connecting = true;
-        _firstAttemptFailure = quicFailure;
+        _firstAttemptFailure = firstFailure;
         _destroysFirstAttemptSetup = tracesSetup;
-        if (quicFailure is not null)
+        if (firstFailure is not null)
         {
-            inner.ReportInfo("[HTTPS-CONNECT] h3 baller failed, starting h2");
+            inner.ReportInfo($"[HTTPS-CONNECT] {firstVersion} baller failed, starting {secondVersion}");
             return;
         }
 
         WritePollRound();
         WritePollRound();
-        inner.ReportInfo($"[HTTPS-CONNECT] h3 inconclusive after {(long)happyEyeballsTimeout.TotalMilliseconds}, starting h2");
+        inner.ReportInfo($"[HTTPS-CONNECT] {firstVersion} inconclusive after {(long)happyEyeballsTimeout.TotalMilliseconds}, starting {secondVersion}");
         _sockets = 2;
     }
 
@@ -170,7 +173,7 @@ internal sealed class HttpsConnectFilterTraceEvents(ITransferEvents inner, strin
     {
         _connecting = true;
         inner.ReportInfo("[HTTPS-CONNECT] connect, init");
-        inner.ReportInfo($"[HTTPS-CONNECT] 1st attempt uses {firstAttemptVersion} from wanted versions");
+        inner.ReportInfo($"[HTTPS-CONNECT] 1st attempt uses {firstAttemptVersion} from {(firstAttemptIsPreferred ? "preferred version" : "wanted versions")}");
         if (secondAttemptVersion is not null)
         {
             inner.ReportInfo($"[HTTPS-CONNECT] 2nd attempt uses {secondAttemptVersion} from wanted versions");

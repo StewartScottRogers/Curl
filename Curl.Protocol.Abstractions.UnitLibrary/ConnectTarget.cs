@@ -128,6 +128,19 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// </remarks>
     public IReadOnlyList<string>? ApplicationProtocols { get; init; }
 
+    /// <summary>
+    /// Gets the HTTP version, <c>h2</c> or <c>h1</c>, of the TCP attempt an <c>--http3</c> race starts
+    /// before its QUIC one for an <c>--alt-svc</c> entry naming the origin itself, or
+    /// <see langword="null" />, the default, when QUIC goes first or nothing races.
+    /// </summary>
+    /// <remarks>
+    /// The HTTP handler sets it on both attempts' target. A connector tracing curl's
+    /// <c>[HTTPS-CONNECT]</c> filter writes <c>1st attempt uses &lt;version&gt; from preferred
+    /// version</c> and <c>2nd attempt uses h3 from wanted versions</c> for the TCP attempt, and goes on
+    /// with that filter for the QUIC one (measured, BL-1320 Notes; BL-1360).
+    /// </remarks>
+    public string? TcpFirstAttemptVersion { get; init; }
+
     private static string RequireHost(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host, nameof(Host));

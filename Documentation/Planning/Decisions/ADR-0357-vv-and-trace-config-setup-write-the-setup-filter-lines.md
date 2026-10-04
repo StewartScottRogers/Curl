@@ -439,7 +439,23 @@ writes `CONNECT-UDP phase completed for HTTP proxy` before `established` (measur
 QUIC handshake's one round, `done=1` and the removals follow as for a direct QUIC connect (not
 measured: no CONNECT-UDP proxy was at hand). An HTTPS proxy writes `[SETUP] added SSL filter for
 HTTP proxy` and the tunnel filter line before its handshake, as its CONNECT tunnel does (not
-measured). The Alt-Svc race that tries TCP first is BL-1360: the connector cannot yet tell it apart.
+measured). The Alt-Svc race that tries TCP first is BL-1360 (its amendment below).
+
+## Amendment, 2026-10-03 (BL-1360): `[HTTPS-CONNECT]` for the `--http3` race that tries TCP first
+
+Decided by Claude under Stewart's delegation. Measured with curl.se's curl 8.22.0 ngtcp2 build,
+`-v --trace-config https-connect` and `Record-CurlExchange.ps1 -Tls [-UdpSink | -NoServer]` with an
+`--alt-svc` file line naming the origin itself with `h2` or `h1` (BL-1320 Notes). The connector now
+tells this race from the QUIC-first one: `AltSvcTransferCache` keeps the entry's version as
+`HttpRequestOptions.TcpFirstAttemptVersion` (`h2` or `h1`; `TriesTcpBeforeQuic` is now true exactly
+when it is set), and `HttpProtocolHandler.RaceTcpAgainstQuicAsync` puts it on both attempts'
+`ConnectTarget`. The TCP attempt writes `1st attempt uses <h2|h1> from preferred version` and
+`2nd attempt uses h3 from wanted versions`, and keeps its filter state on the target, as the QUIC
+attempt does the other way round; a TCP attempt that connects writes no QUIC lines. After a refused
+TCP attempt the QUIC one goes on from the kept state with `<h2|h1> baller failed, starting h3`, and
+with QUIC refused too, `connect, all attempts failed` and `connect -> 7, done=0`. A TCP-first target
+without the `[HTTPS-CONNECT]` filter keeps no attempt, and a QUIC attempt with no TCP attempt before
+it starts the filter afresh. Pinned in `TcpConnectorQuicTests.TcpFirstHttpsConnectTrace.cs`.
 
 ## Amendment, 2026-10-03 (BL-1287): the `[SSL]` and `[SSL-PROXY]` lines of a TLS handshake
 
