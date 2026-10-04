@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ws.UnitLibrary, Curl.Protocol.Ws.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1404 — Read a refused WebSocket upgrade reply's Content-Length as curl does: exit 8 for a bad or disagreeing value, the overflow line, exit 63 under --max-filesize
 
@@ -30,16 +30,20 @@ A `ws://` or `wss://` upgrade reply that is not `101` has its `Content-Length` h
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.Ws.UnitTests` drive the handler with each measured reply and pin the `-v` sequence, exit code and message above, the failing header line not written in the exit 8 and exit 63 cases.
-- [ ] A test pins that a `101` reply with `Content-Length: abc` still switches to WebSocket.
-- [ ] `Content-Length: 2, 2` on a `200` is accepted (exit 22 as today) and `2,3` gives exit 8.
-- [ ] `dotnet build Curl.Protocol.Ws.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Ws.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ws.UnitLibrary` reports no failing member in the code this task changed.
+- [x] Tests in `Curl.Protocol.Ws.UnitTests` drive the handler with each measured reply and pin the `-v` sequence, exit code and message above, the failing header line not written in the exit 8 and exit 63 cases.
+- [x] A test pins that a `101` reply with `Content-Length: abc` still switches to WebSocket.
+- [x] `Content-Length: 2, 2` on a `200` is accepted (exit 22 as today) and `2,3` gives exit 8.
+- [x] `dotnet build Curl.Protocol.Ws.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Ws.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ws.UnitLibrary` reports no failing member in the code this task changed.
 
 ## Notes
 
 - The HTTP library's own copy of this parse is `Curl.Protocol.Http.UnitLibrary/HttpContentLength.cs`; protocol libraries never reference each other, so the WebSocket library needs its own.
+- Done as `WsContentLength` (checks a refused head line by line) returning `WsContentLengthCheck` (how much of the head is accepted, the overflow lines, any failure); `WsProtocolHandler` writes only the accepted part to `-D` and `-v`, and `TransferReport.HeaderSize` counts only that part, since curl counts header bytes as it accepts each line.
+- Defaults taken: `--ignore-content-length` skips the check, as curl's `!data->set.ignorecl` does; `--max-filesize 0` counts as unset, as curl's `if(data->set.max_filesize)`; a list item that overflows ends that header's check (overflow line once per header); the exit 8/63 failure returns before Negotiate is stepped, since curl fails while reading the header, before the head ends. None of these was measured beyond the cases in Context.
+- Quality: Measure-CodeQuality -Library Curl.Protocol.Ws.UnitLibrary: 100% line, 100% branch, 0 failing members, worst CRAP 10. 331 fast tests pass.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. A refused ws/wss upgrade's Content-Length is checked as curl does: exit 8 for a bad or disagreeing value, the overflow line, exit 63 under --max-filesize

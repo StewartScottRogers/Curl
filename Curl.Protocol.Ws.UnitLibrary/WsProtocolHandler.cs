@@ -30,7 +30,10 @@ namespace Curl.Protocol.Ws;
 /// Matches curl 8.21.0, measured against a loopback listener (ADR-0128, BL-580). Any status
 /// but <c>101</c> fails with exit 22, <c>Refused WebSocket upgrade: &lt;code&gt;</c>, and
 /// nothing written to the output; <c>Sec-WebSocket-Accept</c>, <c>Upgrade</c> and
-/// <c>Connection</c> in a <c>101</c> are not checked, because curl does not check them. The
+/// <c>Connection</c> in a <c>101</c> are not checked, because curl does not check them. A refusal's
+/// <c>Content-Length</c> is checked as curl's header code checks it (<see cref="WsContentLength" />,
+/// BL-1404): exit 8 for a bad or disagreeing value, exit 63 for one past 64 bits under
+/// <c>--max-filesize</c>, the failing header line neither written nor reported. The
 /// reply head, <c>101</c> or not, is written to <see cref="ITransferContext.HeaderOutput" />
 /// (<c>-D</c>). A connect failure is returned as the connector reported it. The upgrade, each
 /// frame and the transfer's end are written to <see cref="ITransferContext.DiagnosticLog" />
@@ -143,9 +146,11 @@ public sealed class WsProtocolHandler(
     /// curl 8.21.0 writes <c>Refused WebSocket upgrade</c> (BL-584), and
     /// <paramref name="challengeLines" /> just before the first <c>WWW-Authenticate</c> header
     /// offering Negotiate, where curl writes a 401's Negotiate failure (BL-955), and, for
-    /// <paramref name="problemScheme" />, its problem line before each challenge offering it (BL-953).
+    /// <paramref name="problemScheme" />, its problem line before each challenge offering it (BL-953),
+    /// and <c>Overflow Content-Length: value</c> before each line <paramref name="overflowLineStarts" />
+    /// names (<see cref="WsContentLength" />, BL-1404).
     /// </summary>
-    private static void ReportHead(ITransferEvents events, byte[] head, string? refusal, IReadOnlyList<string> challengeLines, string? problemScheme)
+    private static void ReportHead(ITransferEvents events, byte[] head, string? refusal, IReadOnlyList<string> challengeLines, string? problemScheme, IReadOnlyList<int> overflowLineStarts)
     {
         bool challengeLinesPending = challengeLines.Count > 0;
         int lineStart = 0;
@@ -157,6 +162,11 @@ public sealed class WsProtocolHandler(
             if (lineEnd == head.Length && refusal is not null)
             {
                 events.ReportInfo(refusal);
+            }
+
+            if (overflowLineStarts.Contains(lineStart))
+            {
+                events.ReportInfo(WsContentLength.OverflowValue);
             }
 
             events.ReportResponseHeader(line);
@@ -268,24 +278,34 @@ public sealed class WsProtocolHandler(
         log.UpgradeRequested(method, WsUpgradeRequestFormatter.RequestTarget(context.Url));
         WsUpgradeResponse response = await WsUpgradeResponseReader.ReadAsync(connection, context.CancellationToken).ConfigureAwait(false);
         EndSentAuthorization(authorization);
-        await WriteHeadAsync(context.HeaderOutput, response.Head, context.CancellationToken).ConfigureAwait(false);
+        WsContentLengthCheck lengths = CheckContentLength(response, options, context.MaxFileSize);
+        await WriteHeadAsync(context.HeaderOutput, response.Head[..lengths.AcceptedLength], context.CancellationToken).ConfigureAwait(false);
         TransferReport report = new()
         {
             ResponseCode = response.StatusCode,
             HttpVersion = HttpVersion.Version11,
             Method = method,
-            HeaderSize = response.Head.Length,
+            HeaderSize = lengths.AcceptedLength,
             RequestSize = request.Length,
         };
         if (response.StatusCode != SwitchingProtocols)
         {
-            return (await RefuseAsync(context, authRequest, authorization, response, connectionNumber).ConfigureAwait(false)) with { Report = report };
+            return (await RefuseAsync(context, authRequest, authorization, response, lengths, connectionNumber).ConfigureAwait(false)) with { Report = report };
         }
 
-        ReportHead(context.Events, response.Head, refusal: null, challengeLines: [], problemScheme: null);
+        ReportHead(context.Events, response.Head, refusal: null, challengeLines: [], problemScheme: null, overflowLineStarts: []);
         log.UpgradeAccepted();
         return await SwitchToWebSocketAsync(connection, context, response.Remaining, report, connectionNumber).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Checks a refused reply's <c>Content-Length</c> headers as curl 8.21.0 does (BL-1404); a
+    /// <c>101</c> is bodyless and <c>--ignore-content-length</c> skips the header, so neither is checked.
+    /// </summary>
+    private static WsContentLengthCheck CheckContentLength(WsUpgradeResponse response, HttpRequestOptions options, long? maxFileSize) =>
+        response.StatusCode == SwitchingProtocols || options.IgnoreContentLength
+            ? WsContentLengthCheck.Unchecked(response.Head.Length)
+            : WsContentLength.Check(response.Head, maxFileSize);
 
     /// <summary>
     /// Takes an accepted upgrade on to WebSocket as curl 8.21.0 does: its <c>Received 101</c>
@@ -336,11 +356,21 @@ public sealed class WsProtocolHandler(
         HttpAuthRequest authRequest,
         string? authorization,
         WsUpgradeResponse response,
+        WsContentLengthCheck lengths,
         long connectionNumber)
     {
+        string? problemScheme = WsAuthProblemLines.ProblemScheme(authRequest, response.StatusCode);
+        if (lengths.FailureMessage is { } failure)
+        {
+            ReportHead(context.Events, response.Head[..lengths.AcceptedLength], refusal: null, challengeLines: [], problemScheme, lengths.OverflowLineStarts);
+            context.Events.ReportInfo(failure);
+            context.Events.ReportInfo(WsInfoLines.Closing(connectionNumber));
+            return TransferResult.Failure(lengths.FailureExitCode, failure);
+        }
+
         IReadOnlyList<string> challengeLines = await StepNegotiateForChallengeAsync(authRequest, authorization, response, context.CancellationToken).ConfigureAwait(false);
         string message = string.Create(CultureInfo.InvariantCulture, $"Refused WebSocket upgrade: {response.StatusCode}");
-        ReportHead(context.Events, response.Head, message, challengeLines, WsAuthProblemLines.ProblemScheme(authRequest, response.StatusCode));
+        ReportHead(context.Events, response.Head, message, challengeLines, problemScheme, lengths.OverflowLineStarts);
         context.Events.ReportInfo(WsInfoLines.Closing(connectionNumber));
         return TransferResult.Failure(CurlExitCode.HttpReturnedError, challengeLines.FirstOrDefault() ?? message);
     }
