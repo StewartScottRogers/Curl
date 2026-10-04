@@ -33,3 +33,4 @@ Off Windows, `curl --proxy-http2 -x https://proxy ...` reaches the connector wit
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
