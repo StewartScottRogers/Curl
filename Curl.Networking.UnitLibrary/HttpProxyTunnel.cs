@@ -133,7 +133,11 @@ internal static class HttpProxyTunnel
     /// The status code, <c>0</c> when the first line is not an HTTP status line, as curl
     /// reports it, with the <c>Proxy-Authenticate</c> values, the body length and whether the
     /// connection can carry another CONNECT; or the exit 56 message when the proxy closed the connection before the
-    /// header block ended or sent more than curl reads.
+    /// header block ended or sent more than curl reads. A read that fails with a socket error
+    /// before the reply's first byte is <see cref="CurlSocketErrorText.ReceiveFailure(IOException)" />'s
+    /// <c>Recv failure: ...</c>, as curl 8.21.0's socket filter words it (BL-1449); one that
+    /// fails with one after part of the head is <c>Proxy CONNECT aborted</c>; any other
+    /// exception the read throws escapes.
     /// </returns>
     public static ValueTask<HttpProxyTunnelReply> ReadReplyAsync(IConnection connection, CancellationToken cancellationToken) =>
         ReadReplyAsync(connection, forConnectUdp: false, cancellationToken);
@@ -159,12 +163,22 @@ internal static class HttpProxyTunnel
         var header = new List<byte>();
         var oneByte = new byte[1];
         var lineStart = 0;
-        while (await connection.ReadAsync(oneByte, cancellationToken).ConfigureAwait(false) == 1)
+        try
         {
-            header.Add(oneByte[0]);
-            if (ReplyAfterLatestByte(header, ref lineStart, forConnectUdp) is { } reply)
+            while (await connection.ReadAsync(oneByte, cancellationToken).ConfigureAwait(false) == 1)
             {
-                return reply;
+                header.Add(oneByte[0]);
+                if (ReplyAfterLatestByte(header, ref lineStart, forConnectUdp) is { } reply)
+                {
+                    return reply;
+                }
+            }
+        }
+        catch (IOException failure) when (CurlSocketErrorText.ReceiveFailure(failure) is { } receiveFailure)
+        {
+            if (header.Count == 0)
+            {
+                return HttpProxyTunnelReply.Failed(receiveFailure);
             }
         }
 

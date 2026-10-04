@@ -35,6 +35,12 @@ public sealed class ScriptedConnection(byte[] bytesToRead) : IConnection
     public Exception? ReadException { get; init; }
 
     /// <summary>
+    /// Gets the exception a read throws once every scripted byte has been read, or
+    /// <see langword="null" /> to report the peer closed instead.
+    /// </summary>
+    public Exception? ExceptionAfterScript { get; init; }
+
+    /// <summary>
     /// Gets the number of bytes not yet read.
     /// </summary>
     public int UnreadCount => bytesToRead.Length - _readPosition;
@@ -51,6 +57,11 @@ public sealed class ScriptedConnection(byte[] bytesToRead) : IConnection
         if (ReadException is not null)
         {
             throw ReadException;
+        }
+
+        if (UnreadCount == 0 && ExceptionAfterScript is not null)
+        {
+            throw ExceptionAfterScript;
         }
 
         var count = Math.Min(buffer.Length, UnreadCount);

@@ -98,15 +98,16 @@ public sealed class ConnectTunnelVerboseLinesTests
     }
 
     [TestMethod]
-    public void ReportReplyFailure_WritesTheUnsupportedContentLengthLineOnly()
+    public void ReportReplyFailure_WritesTheUnsupportedContentLengthAndRecvFailureLinesOnly()
     {
         var events = new RecordingTransferEvents();
 
         ConnectTunnelVerboseLines.ReportReplyFailure(events, HttpProxyTunnelReply.Failed("Proxy CONNECT aborted"));
         ConnectTunnelVerboseLines.ReportReplyFailure(events, new HttpProxyTunnelReply(407, null));
         ConnectTunnelVerboseLines.ReportReplyFailure(events, HttpProxyTunnelReply.Failed("Unsupported Content-Length value") with { FailureExitCode = CurlExitCode.WeirdServerReply });
+        ConnectTunnelVerboseLines.ReportReplyFailure(events, HttpProxyTunnelReply.Failed("Recv failure: Connection was reset"));
 
-        CollectionAssert.AreEqual(new[] { "* Unsupported Content-Length value" }, events.Transcript);
+        CollectionAssert.AreEqual(new[] { "* Unsupported Content-Length value", "* Recv failure: Connection was reset" }, events.Transcript);
     }
 
     [TestMethod]
