@@ -142,6 +142,13 @@ internal sealed class HttpResponseHeadReader
     internal bool IgnoresContentLength { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the connection goes through an HTTP proxy, so a
+    /// <c>Proxy-Connection</c> header may draw <see cref="HttpConnectionInfoLines.Http10ProxyKeepAlive" />
+    /// or <see cref="HttpConnectionInfoLines.Http11ProxyClose" /> (BL-1430).
+    /// </summary>
+    internal bool IsThroughHttpProxy { get; init; }
+
+    /// <summary>
     /// Gets what tells, before each status line is parsed, whether the connection has switched
     /// to HTTP/2 after an h2c upgrade's <c>101</c> (<see cref="HttpH2cUpgradeConnection.IsUpgraded" />),
     /// so the line is an HTTP/2 stream's as for <see cref="IsHttp2OrHttp3" />. By default it never has.
@@ -454,7 +461,35 @@ internal sealed class HttpResponseHeadReader
             return HttpConnectionInfoLines.Http10KeepAlive;
         }
 
+        if (ProxyConnectionLineBefore(statusLine, headerLine) is { } proxyLine)
+        {
+            return proxyLine;
+        }
+
         return ReadsOverflowingContentLength(statusLine, headerLine) ? HttpConnectionInfoLines.OverflowContentLength : null;
+    }
+
+    /// <summary>
+    /// Finds the <c>-v</c> line curl 8.21.0 writes before a <c>Proxy-Connection</c> header line when
+    /// <see cref="IsThroughHttpProxy" />: <see cref="HttpConnectionInfoLines.Http10ProxyKeepAlive" />
+    /// in an HTTP/1.0 head naming <c>keep-alive</c>, <see cref="HttpConnectionInfoLines.Http11ProxyClose" />
+    /// in an HTTP/1.1 head naming <c>close</c>, and none otherwise (<c>lib/http.c</c>, measured, BL-1430 Notes).
+    /// </summary>
+    private string? ProxyConnectionLineBefore(HttpStatusLine statusLine, string headerLine)
+    {
+        if (!IsThroughHttpProxy)
+        {
+            return null;
+        }
+
+        if (statusLine.Version == new Version(1, 0) && HttpConnectionPersistence.ProxyConnectionNames(headerLine, "keep-alive"))
+        {
+            return HttpConnectionInfoLines.Http10ProxyKeepAlive;
+        }
+
+        return statusLine.Version == new Version(1, 1) && HttpConnectionPersistence.ProxyConnectionNames(headerLine, "close")
+            ? HttpConnectionInfoLines.Http11ProxyClose
+            : null;
     }
 
     private bool ReadsOverflowingContentLength(HttpStatusLine statusLine, string headerLine) =>

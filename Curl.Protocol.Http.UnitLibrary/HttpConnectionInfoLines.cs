@@ -83,6 +83,29 @@ internal static class HttpConnectionInfoLines
     internal const string Http10KeepAlive = "HTTP/1.0 connection set to keep alive";
 
     /// <summary>
+    /// The line written before a <c>Proxy-Connection</c> header line naming <c>keep-alive</c> in an
+    /// HTTP/1.0 head received through an HTTP proxy (<c>lib/http.c</c>, measured, BL-1430 Notes).
+    /// </summary>
+    internal const string Http10ProxyKeepAlive = "HTTP/1.0 proxy connection set to keep alive";
+
+    /// <summary>
+    /// The line written before a <c>Proxy-Connection</c> header line naming <c>close</c> in an
+    /// HTTP/1.1 head received through an HTTP proxy (<c>lib/http.c</c>, measured, BL-1430 Notes).
+    /// </summary>
+    internal const string Http11ProxyClose = "HTTP/1.1 proxy connection set close";
+
+    /// <summary>
+    /// The line written before a request is resent without <c>Expect</c> after a <c>417</c> that
+    /// arrived while the body still waited for <c>100 Continue</c> (<c>lib/http.c</c>, BL-1430).
+    /// </summary>
+    internal const string Got417WhileWaiting = "Got HTTP failure 417 while waiting for a 100";
+
+    /// <summary>
+    /// The line written before a request is resent without <c>Expect</c> after a <c>417</c> that
+    /// arrived while the body was being sent (<c>lib/http.c</c>, measured, BL-319 and BL-1430 Notes).
+    /// </summary>
+    internal const string Got417WhileSending = "Got HTTP failure 417 while sending data";
+    /// <summary>
     /// The line written before the empty line of an HTTP/1.1 head whose body can only end when
     /// the server closes (<see cref="HttpConnectionPersistence.LacksEndOfMessageIndicator" />,
     /// measured, BL-467 Notes).

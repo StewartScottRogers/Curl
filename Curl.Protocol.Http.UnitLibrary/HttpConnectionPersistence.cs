@@ -113,6 +113,22 @@ internal static class HttpConnectionPersistence
         !headers.Any(header => string.Equals(header.Name, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
             && (ignoresContentLength || (HttpContentLength.Find(headers) is null && !HttpContentLength.Overflows(headers)));
 
+    /// <summary>
+    /// Decides whether one header line is a <c>Proxy-Connection</c> header naming
+    /// <paramref name="option" />, as curl 8.21.0's <c>HD_IS_AND_SAYS</c> matches it: the name and
+    /// the option compared without regard to case (BL-1430).
+    /// </summary>
+    /// <param name="headerLine">The header line's text, without its line end.</param>
+    /// <param name="option">The option looked for, such as <c>close</c>.</param>
+    /// <returns><see langword="true" /> when the line names the option.</returns>
+    internal static bool ProxyConnectionNames(string headerLine, string option)
+    {
+        int colon = headerLine.IndexOf(':', StringComparison.Ordinal);
+        return colon >= 0
+            && string.Equals(headerLine[..colon], "Proxy-Connection", StringComparison.OrdinalIgnoreCase)
+            && NamesOption(headerLine[(colon + 1)..], option);
+    }
+
     private static bool NamesConnectionOption(HttpResponseHead head, string option) =>
         head.Headers
             .Where(header => string.Equals(header.Name, "Connection", StringComparison.OrdinalIgnoreCase))

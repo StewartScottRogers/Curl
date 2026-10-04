@@ -1039,7 +1039,8 @@ public sealed class HttpProtocolHandler(
             IsHttp2OrHttp3 = requestStream is not null,
             AcceptsHttp09 = options.AllowHttp09Reply,
             IgnoresContentLength = options.IgnoreContentLength,
-            IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
+            IsThroughHttpProxy = options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https },
+            IsSwitchedToHttp2 =() => IsSwitchedToHttp2(connection),
             DefersFrom = (statusLine, header) => framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };
         HttpRequestPlan? retry = null;
@@ -1908,6 +1909,7 @@ public sealed class HttpProtocolHandler(
             return null;
         }
 
+        plan.Context.Events.ReportInfo(bodyLeftUnsent ? HttpConnectionInfoLines.Got417WhileWaiting : HttpConnectionInfoLines.Got417WhileSending);
         ThrowIfRedirectLimitReached(plan);
         return plan.WithoutExpect(upload.Rewound(plan.Framing.Body!), keepsCustomWait: !bodyLeftUnsent);
     }
