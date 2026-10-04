@@ -254,8 +254,11 @@ public sealed class CookieStore : ICookieStore
     /// <see cref="LoadCookieFileAsync(IFileSystem, string, bool, DateTimeOffset, CancellationToken)"/> does,
     /// reporting its refused <c>Set-Cookie:</c> lines to <paramref name="events"/> as
     /// <see cref="LoadCookieFile(TextReader, bool, DateTimeOffset, ITransferEvents)"/> does. A file that cannot
-    /// be opened, a directory included, reports curl 8.21.0's <c>WARNING: failed to open cookie file "&lt;path&gt;"</c>
-    /// line with <paramref name="path"/> as given (BL-487).
+    /// be opened loads nothing and reports the line <see cref="DescribeCookieFileOpenFailure"/> gives for this
+    /// platform, with <paramref name="path"/> as given: on Windows curl 8.21.0's
+    /// <c>WARNING: failed to open cookie file "&lt;path&gt;"</c> for every failure, a directory included (BL-487);
+    /// on Linux and macOS <c>WARNING: cookie filename points to a directory: "&lt;path&gt;"</c> for a directory and
+    /// the first line for any other failure (BL-1393).
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="fileSystem"/>, <paramref name="path"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
     public async Task LoadCookieFileAsync(IFileSystem fileSystem, string path, bool discardSessionCookies, DateTimeOffset now, ITransferEvents events, CancellationToken cancellationToken)
@@ -267,7 +270,7 @@ public sealed class CookieStore : ICookieStore
         FileOpenResult opened = await fileSystem.OpenForReadAsync(path, cancellationToken).ConfigureAwait(false);
         if (!opened.IsOpen)
         {
-            events.ReportInfo($"WARNING: failed to open cookie file \"{path}\"");
+            events.ReportInfo(DescribeCookieFileOpenFailure(path, opened.Status, OperatingSystem.IsWindows()));
             return;
         }
 
@@ -279,6 +282,25 @@ public sealed class CookieStore : ICookieStore
 
         using StringReader textReader = new(text);
         LoadCookieFile(textReader, discardSessionCookies, now, events);
+    }
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.21.0 writes when the <c>-b</c> file at <paramref name="path"/> cannot be loaded for
+    /// <paramref name="status"/>. <c>lib/cookie.c</c> opens the file and only then asks whether it is a directory; on
+    /// Windows that open fails for a directory, so every failure is
+    /// <c>WARNING: failed to open cookie file "&lt;path&gt;"</c>, while on Linux and macOS the open succeeds and a
+    /// directory is <c>WARNING: cookie filename points to a directory: "&lt;path&gt;"</c> (BL-1393).
+    /// </summary>
+    /// <param name="path">The <c>-b</c> path, as given.</param>
+    /// <param name="status">Why the file could not be opened.</param>
+    /// <param name="isWindows">Whether to answer as the Windows build does.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is <see langword="null"/>.</exception>
+    public static string DescribeCookieFileOpenFailure(string path, FileAccessStatus status, bool isWindows)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        return status == FileAccessStatus.IsDirectory && !isWindows
+            ? $"WARNING: cookie filename points to a directory: \"{path}\""
+            : $"WARNING: failed to open cookie file \"{path}\"";
     }
 
     /// <summary>Writes the <c>-c</c> jar as curl does: every cookie that has not expired by <paramref name="now"/>, newest first.</summary>

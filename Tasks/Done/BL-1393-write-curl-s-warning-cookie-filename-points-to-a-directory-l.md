@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cookies.UnitLibrary, Curl.Cookies.UnitTests]
 requirement: FR-099
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1393 — Write curl's 'WARNING: cookie filename points to a directory' line for a -b directory off Windows
 
@@ -25,16 +25,20 @@ Off Windows, a `-b <path>` that names a directory writes curl 8.21.0's `* WARNIN
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Cookies.UnitTests` marked `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]` (or one that injects the non-Windows choice) loads a path the fake file system reports as `IsDirectory` and asserts the single info line `WARNING: cookie filename points to a directory: "<path>"` with the path as given, and that nothing is loaded.
-- [ ] A test marked `[OSCondition(OperatingSystems.Windows)]` (or injecting the Windows choice) pins `WARNING: failed to open cookie file "<path>"` for the same directory; `NotFound` and `AccessDenied` keep that line on every platform.
-- [ ] `LoadCookieFileAsync`'s doc comment says which line each platform writes.
-- [ ] `dotnet build Curl.Cookies.UnitTests -warnaserror` is clean; `dotnet test Curl.Cookies.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cookies.UnitLibrary` reports no failing member in the code this task changed.
+- [x] A test in `Curl.Cookies.UnitTests` marked `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]` (or one that injects the non-Windows choice) loads a path the fake file system reports as `IsDirectory` and asserts the single info line `WARNING: cookie filename points to a directory: "<path>"` with the path as given, and that nothing is loaded.
+- [x] A test marked `[OSCondition(OperatingSystems.Windows)]` (or injecting the Windows choice) pins `WARNING: failed to open cookie file "<path>"` for the same directory; `NotFound` and `AccessDenied` keep that line on every platform.
+- [x] `LoadCookieFileAsync`'s doc comment says which line each platform writes.
+- [x] `dotnet build Curl.Cookies.UnitTests -warnaserror` is clean; `dotnet test Curl.Cookies.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cookies.UnitLibrary` reports no failing member in the code this task changed.
 
 ## Notes
 
 - Test paths are drive-less (`/dir/cookies`) so they pass on all three platforms.
+- Platform choice: `CookieStore.DescribeCookieFileOpenFailure(path, status, isWindows)` is a public static that picks the line, and `LoadCookieFileAsync` passes `OperatingSystem.IsWindows()`. Why: no `InternalsVisibleTo` in the library, and an injected flag lets one data-driven test pin both platforms' lines (and keep 100% branch coverage) on any machine; the two `OSCondition` tests pin the wired-up path on each platform.
+- The old `"adir"` DataRow of `LoadCookieFileAsync_CannotOpen_ReportsTheWarning` was removed: its fake reported `NotFound`, not a directory; the directory case now has its own platform tests. The fake gained `ReadFailure`.
+- `Measure-CodeQuality.ps1 -Library Curl.Cookies.UnitLibrary`: 0 failing members. Cookies tests: 370 passed, 1 skipped (the off-Windows test, on Windows).
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. Off Windows a -b directory writes curl's 'WARNING: cookie filename points to a directory' line; Windows keeps 'failed to open cookie file'
