@@ -36,3 +36,4 @@ Off Windows, Curl words a failed `-R` time stamp and a `--create-dirs` directory
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
