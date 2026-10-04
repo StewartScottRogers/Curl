@@ -35,3 +35,4 @@ The planted CI-red defect (PD-502) is caught only by a finding about the planted
 
 - 2026-10-03: Created.
 - 2026-10-04: Backlog -> Doing.
+- 2026-10-04: Doing -> Blocked. On the audit branch (PR #61); waits for CI and the merge. An interactive session completes it.
