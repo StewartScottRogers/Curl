@@ -215,6 +215,16 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
         new(CurlExitCode.RangeError, "Bad range: start offset larger than end offset");
 
     /// <summary>
+    /// Creates the failure curl 8.21.0's <c>Curl_ssh_range</c> returns, with no message of its
+    /// own, for <c>-r</c> text it cannot read - an overflowing number, no number at all, text
+    /// left over, or <c>-0</c> - so curl prints its <c>CURLE_RANGE_ERROR</c> text: exit 33 and
+    /// <c>Requested range was not delivered by the server</c> (BL-1396).
+    /// </summary>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpRangeNotDelivered() =>
+        new(CurlExitCode.RangeError, "Requested range was not delivered by the server");
+
+    /// <summary>
     /// Creates the failure curl 8.21.0 reports when an SFTP download resumes with <c>-C</c>
     /// and <c>STAT</c> gave no size: exit 36 and <c>Offset (N) was beyond file size (S)</c>,
     /// measured 2026-09-29 as <c>Offset (3) was beyond file size (0)</c> for <c>-C 3</c> on an

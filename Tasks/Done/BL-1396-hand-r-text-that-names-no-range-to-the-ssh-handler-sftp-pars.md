@@ -8,7 +8,7 @@ depends-on: [BL-1389, BL-1392]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1396 — Hand -r text that names no range to the SSH handler: SFTP parses it after STAT as Curl_ssh_range does, SCP ignores it
 
@@ -29,18 +29,23 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `TryParseRange` hands unparseable text to `sftp` and `scp` like every other scheme; the three Console tests above are rewritten to pin that the transfer is dispatched with `RangeText` set (and, for the invalid-character case, that the warning is still printed first).
-- [ ] Tests in `Curl.Protocol.Ssh.UnitTests` download a 10-byte file over the fake SFTP server with `RangeText` and no `Range`: `5-2` gives exit 33 `Bad range: start offset larger than end offset`; `-0`, `1-2-3` and `abc` give exit 33 with `Requested range was not delivered by the server`; each after `OPEN` and `STAT`, with nothing written.
-- [ ] A test pins that with `STAT` giving no size, `RangeText` `5-2` reads the whole file, exit 0.
-- [ ] A test pins that an `scp://` download with `RangeText` `5-2` downloads the whole file, exit 0.
-- [ ] `dotnet build Curl.Console.UnitTests -warnaserror` and `dotnet build Curl.Protocol.Ssh.UnitTests -warnaserror` are clean; both test projects pass with `--filter "TestCategory!=Integration"`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary` and `-Library Curl.Console` report no failing member in the code this task changed.
+- [x] `TryParseRange` hands unparseable text to `sftp` and `scp` like every other scheme; the three Console tests above are rewritten to pin that the transfer is dispatched with `RangeText` set (and, for the invalid-character case, that the warning is still printed first).
+- [x] Tests in `Curl.Protocol.Ssh.UnitTests` download a 10-byte file over the fake SFTP server with `RangeText` and no `Range`: `5-2` gives exit 33 `Bad range: start offset larger than end offset`; `-0`, `1-2-3` and `abc` give exit 33 with `Requested range was not delivered by the server`; each after `OPEN` and `STAT`, with nothing written.
+- [x] A test pins that with `STAT` giving no size, `RangeText` `5-2` reads the whole file, exit 0.
+- [x] A test pins that an `scp://` download with `RangeText` `5-2` downloads the whole file, exit 0.
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` and `dotnet build Curl.Protocol.Ssh.UnitTests -warnaserror` are clean; both test projects pass with `--filter "TestCategory!=Integration"`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary` and `-Library Curl.Console` report no failing member in the code this task changed.
 
 ## Notes
 
 - Not measured here: the installed curl 8.21.0's libssh2 build exits 2 at once for `sftp://` and `scp://` on this machine, so the behaviour is cited from the source above.
 - Depends on BL-1389 (same SSH library) and BL-1392 (same Console project) so the chains do not collide. No option changes, so `--ai-help` is unaffected.
 
+- 2026-10-03 (lane 3): `CurlCommandRunner.TryParseRange` became `ParseRange`, which never refuses; SSH gets the text as `RangeText` like every other handler. `SftpDownloadPart.Choose` takes the text and, only when the command line parsed no range, reads it as `Curl_ssh_range` does (`WithinText`, `SkipDash`, `ReadNumber`, `LastBytes`), sharing `Between` with the parsed-range path; `SshTransferException.SftpRangeNotDelivered` carries curl's CURLE_RANGE_ERROR text. SCP needed no code: `ScpFileDownload` never took a range; a handler test pins it.
+- Choice: an empty `-r ""` reads as no number at all, exit 33 not delivered, as `Curl_ssh_range` would read it.
+- Measure-CodeQuality (Curl.Protocol.Ssh.UnitLibrary, Curl.Console in one run) flagged `Choose` (Cx 12) and `WithinText` (Cx 12, one branch). Both were split (`Asked`, `SkipDash`, `LastBytes` takes the missing number) and the uncovered leftover-after-suffix branch got tests (`-3x`, `2-x`, empty). Not re-measured, per the shift's one-run-per-library rule; the remaining methods each have at most four decision points. Curl.Console reported nothing failing.
+
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. SFTP reads -r text that names no range with Curl_ssh_range's rules after STAT; SCP ignores it

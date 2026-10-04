@@ -124,10 +124,9 @@ name already taken is refused with `File exists` and exit 23. Measured on curl 8
 
 `TransferContextFactory` builds each transfer's context from the parsed options; the
 context carries the `-r` text as given (`RangeText`, which the HTTP handler sends verbatim)
-and its parsed range (`ByteRangeParser`; text that names no range ends the transfer with exit
-33 before it is dispatched only on an `sftp`/`scp` URL; every other handler gets it with a `null`
-range, as curl 8.21.0 hands it on: FTP and file parse it themselves, HTTP, RTSP and WebSocket send
-it, the rest ignore it, BL-386, BL-1322), the `-C` offset and the
+and its parsed range (`ByteRangeParser`; text that names no range goes to every handler with a `null` range, as
+curl 8.21.0 hands it on: FTP and file parse it themselves, SFTP after `STAT`, HTTP, RTSP and
+WebSocket send it, the rest, SCP among them, ignore it, BL-386, BL-1322, BL-1396), the `-C` offset and the
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
 Every context also carries `Http`, which `HttpRequestOptionsMapping` fills from `-X`,

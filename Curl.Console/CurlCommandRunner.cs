@@ -3201,8 +3201,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <returns>
     /// The transfer's result; <see cref="NoCryptoEngines.LoadFailure" />'s failure, before any upload
-    /// file is opened or the URL parsed, for an <c>--engine</c> off Windows; <see cref="ByteRangeParser.NotDeliveredFailure" />, with nothing
-    /// transferred, when the <c>-r</c> text names no range on an <c>sftp</c> or <c>scp</c> URL, as curl 8.21.0 reports it; the
+    /// file is opened or the URL parsed, for an <c>--engine</c> off Windows; the
     /// <c>-F</c> body's build failure, with nothing transferred, when a form file cannot be opened;
     /// <see cref="CannotOpenUploadFileResult" />, with nothing transferred, when the <c>-T</c> file
     /// cannot be opened, after curl's <c>curl: cannot open</c> and try-help lines, which curl 8.21.0
@@ -3404,10 +3403,7 @@ internal sealed class CurlCommandRunner(
             return refusal;
         }
 
-        if (!TryParseRange(options.Range, transferUrl, out ByteRange? range))
-        {
-            return ByteRangeParser.NotDeliveredFailure;
-        }
+        ByteRange? range = ParseRange(options.Range);
 
         if (options.FormParts.Count == 0)
         {
@@ -4047,25 +4043,18 @@ internal sealed class CurlCommandRunner(
     /// Parses the <c>-r</c> / <c>--range</c> text, when there is any.
     /// </summary>
     /// <param name="rangeText">The text, or <see langword="null" /> when <c>-r</c> was not given.</param>
-    /// <param name="url">The transfer's URL.</param>
-    /// <param name="range">
-    /// The range; <see langword="null" /> for the whole resource, and for text that names no
-    /// range on any URL but an <c>sftp</c> or <c>scp</c> one.
-    /// </param>
     /// <returns>
-    /// <see langword="false" /> when the text names no range and the URL is SSH's, so the
-    /// transfer must end with <see cref="ByteRangeParser.NotDeliveredFailure" />. Every other
-    /// handler gets the text as <see cref="ITransferContext.RangeText" />, as curl 8.21.0 hands
-    /// it on: HTTP, RTSP and WebSocket send it verbatim, FTP and file parse it themselves
-    /// (<c>Curl_range</c>), and the rest ignore it (BL-386, BL-1322 Notes).
+    /// The range, or <see langword="null" /> for the whole resource and for text that names no
+    /// range. Every handler also gets the text as <see cref="ITransferContext.RangeText" />, as
+    /// curl 8.21.0 hands it on: HTTP, RTSP and WebSocket send it verbatim, FTP and file parse it
+    /// themselves (<c>Curl_range</c>), SFTP parses it after <c>STAT</c> (<c>Curl_ssh_range</c>),
+    /// and the rest, SCP among them, ignore it (BL-386, BL-1322 Notes, BL-1396).
     /// </returns>
-    private static bool TryParseRange(string? rangeText, CurlUrl url, out ByteRange? range)
+    private static ByteRange? ParseRange(string? rangeText)
     {
-        range = null;
-
-        return rangeText is null
-            || ByteRangeParser.TryParse(rangeText, out range)
-            || url.Scheme is not ("sftp" or "scp");
+        ByteRange? range = null;
+        _ = rangeText is not null && ByteRangeParser.TryParse(rangeText, out range);
+        return range;
     }
 
     /// <summary>
