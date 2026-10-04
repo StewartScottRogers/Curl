@@ -34,3 +34,4 @@ An RTSP reply header line holding a NUL byte fails with exit 8 `Nul byte in head
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
