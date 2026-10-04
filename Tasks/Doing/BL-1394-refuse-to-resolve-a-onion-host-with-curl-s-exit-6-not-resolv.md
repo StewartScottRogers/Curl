@@ -43,3 +43,4 @@ A transfer whose host Curl itself would resolve and whose name ends in `.onion` 
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
