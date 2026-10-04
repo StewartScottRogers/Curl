@@ -34,3 +34,4 @@ The quality auditor's scripted checks cover every *.UnitTests project, so a plan
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-04: Backlog -> Doing.
