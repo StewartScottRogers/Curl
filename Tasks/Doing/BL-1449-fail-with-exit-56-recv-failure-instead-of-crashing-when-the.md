@@ -35,3 +35,4 @@ When the proxy drops the connection while Curl reads a CONNECT reply - as after 
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
