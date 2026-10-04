@@ -37,7 +37,7 @@ A response that carries more than 5000 header lines fails with curl 8.21.0's `cu
 - Choice: the refusal is found when the 5001st header is whole (the next line has begun), as for every other refused header; curl refuses it as soon as its own line ends. Only a peer that holds the connection open right after the 5001st line could tell; left as is.
 - `test747` now passes: `dotnet test Curl.Conformance.UnitTests --filter "TestCategory=Conformance"` reports `test747 passes; add 747 to PassingUpstreamCases.txt` (listing it is left to the conformance tasks).
 - HTTP/2: `HttpStreamOpenedLines.Report` writes `Http2HeadersTooLongWarning` after the last header line when the names and values (pseudo-headers included, Latin-1 so length is bytes) total more than 60000; HTTP/3 never does. Upstream text, `lib/http2.c`; not measured here (the Schannel build has no HTTP/2 to loopback without TLS).
-- Follow-up filed: BL-1447, counting across redirect hops, trailers and CONNECT heads.
+- Follow-up filed: BL-1448, counting across redirect hops, trailers and CONNECT heads.
 - `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary`: 0 failing members. Fast tests: 1838 passed, 18 skipped.
 
 ## Log

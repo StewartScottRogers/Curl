@@ -1,5 +1,5 @@
 ---
-id: BL-1447
+id: BL-1448
 title: Count response headers across redirect hops, trailers and CONNECT heads toward curl's 5000 limit
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-067
 created: 2026-10-04
 completed:
 ---
-# BL-1447 — Count response headers across redirect hops, trailers and CONNECT heads toward curl's 5000 limit
+# BL-1448 — Count response headers across redirect hops, trailers and CONNECT heads toward curl's 5000 limit
 
 ## Goal
 
