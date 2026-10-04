@@ -42,3 +42,4 @@ Before each transfer, Curl writes curl 8.21.0's `customrequest_helper` lines to 
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
