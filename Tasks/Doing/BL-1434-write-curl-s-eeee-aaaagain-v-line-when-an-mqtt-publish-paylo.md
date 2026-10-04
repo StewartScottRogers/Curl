@@ -35,3 +35,4 @@ Under `-v`, when an MQTT PUBLISH body has not fully arrived and the next read wo
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
