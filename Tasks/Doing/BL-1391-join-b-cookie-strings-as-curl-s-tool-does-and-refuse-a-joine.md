@@ -41,3 +41,4 @@ Several `-b name=value` strings are joined into one `Cookie` value exactly as cu
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
