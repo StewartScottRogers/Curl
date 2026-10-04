@@ -33,3 +33,4 @@ The remark on `ITransferContext.MaxFileSize` names exactly the handlers that rea
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
