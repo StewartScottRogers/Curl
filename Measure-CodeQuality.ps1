@@ -98,6 +98,11 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = $PSScriptRoot
 
+# Through powershell -File, "-Library A,B" arrives as the one string "A,B", which matches
+# no project, so the run fell back to the whole solution and the report named nothing.
+# Split it into names (BL-1360, the same trap as the audit tools' BL-1245).
+$Library = @($Library | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+
 function Get-CheckoutResultsDirectory {
     param([string] $CheckoutRoot)
     $fullPath = [System.IO.Path]::GetFullPath($CheckoutRoot).TrimEnd([char] '\', [char] '/').ToLowerInvariant()
