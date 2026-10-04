@@ -36,7 +36,7 @@ A TFTP transfer that receives a packet whose opcode curl does not expect in its 
 ## Notes
 
 - Criteria 1 and 3 were corrected by measurement, as the Goal asks ("exactly as curl 8.21.0 does"):
-  - An ACK as a download's *first* reply does not fail with 71: curl connects for transmit, sends an empty DATA 1 and ends exit 28 `tftp_tx: internal error, event: 3`. It stays ignored, as before, and is filed as BL-1441. An ACK after DATA 1 fails with 71 as the criterion says.
+  - An ACK as a download's *first* reply does not fail with 71: curl connects for transmit, sends an empty DATA 1 and ends exit 28 `tftp_tx: internal error, event: 3`. It stays ignored, as before, and is filed as BL-1444. An ACK after DATA 1 fails with 71 as the criterion says.
   - One existing test, `ExecuteAsync_UnexpectedOpcodeAndWrongBlock_AreIgnored`, pinned the old behaviour (opcode 9 ignored). Its opcode is now 7, which is still ignored, and it is renamed `ExecuteAsync_FirstReplyAckTimeoutOpcodeAndWrongBlock_AreIgnored`. Every other TFTP test passes unchanged.
 - Extended `Record-CurlExchange.ps1` (added to `touches`; no task in Doing on `origin/work/dark-factory` names it): `-TftpReply '<step>=PACKET <hex>'` sends a raw datagram just before the server's own answer to that step.
 - Measured with curl 8.21.0 (mingw64, Schannel), `-v`, `-TftpNoOack -TftpData <600 x>`. The `-v` lines after `Established connection`, then the exit:
@@ -45,7 +45,7 @@ A TFTP transfer that receives a packet whose opcode curl does not expect in its 
   - Download after DATA 1, ACK 1: the same lines without the unexpected-packet line; exit 71 `tftp_rx: internal error`.
   - Upload after ACK 0, DATA: `* tftp_tx: internal error, event: 3`, then ACK 1; exit 0. Opcode 9, 1 or 0: `* Internal error: Unexpected packet`, `* tftp_tx: internal error, event: 9|1|0`; exit 0.
   - Upload, first reply opcode 9: `* tftp_send_first: internal error`; exit 71 `Internal error: Unexpected packet`.
-  - Not modelled (BL-1441): opcode 0 as the first reply makes curl re-send the RRQ, and opcode 7 is its TIMEOUT event and re-sends the last packet. Both exit 0.
+  - Not modelled (BL-1444): opcode 0 as the first reply makes curl re-send the RRQ, and opcode 7 is its TIMEOUT event and re-sends the last packet. Both exit 0.
 - Implementation: `TftpUnexpectedOpcode` (the messages, `IsUnknown`, `IsIgnored`), plus `AnswerUnexpectedOpcode` in `TftpDownload` and in `TftpUpload`, and `TftpTransferEvents.InternalError`.
 - Measure-CodeQuality: Curl.Protocol.Tftp.UnitLibrary at 100% line and 100% branch coverage, 0 failing members. 226 TFTP tests pass.
 

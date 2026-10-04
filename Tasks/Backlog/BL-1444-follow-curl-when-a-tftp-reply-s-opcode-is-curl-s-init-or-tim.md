@@ -1,5 +1,5 @@
 ---
-id: BL-1441
+id: BL-1444
 title: Follow curl when a TFTP reply's opcode is curl's INIT or TIMEOUT event or switches the transfer's direction
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-035
 created: 2026-10-04
 completed:
 ---
-# BL-1441 — Follow curl when a TFTP reply's opcode is curl's INIT or TIMEOUT event or switches the transfer's direction
+# BL-1444 — Follow curl when a TFTP reply's opcode is curl's INIT or TIMEOUT event or switches the transfer's direction
 
 ## Goal
 
