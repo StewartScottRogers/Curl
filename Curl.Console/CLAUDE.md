@@ -324,7 +324,10 @@ attempt gets a fresh `-m`. HTTP, TFTP and telnet (`Time-out`) keep their own mea
 Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result carries
 `SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
-failed stamp is ignored for now; curl's warning lines for it are BL-139.
+failed stamp prints curl's `Failed to set filetime` warning lines unless `-s`. On Windows a
+time before 1752-09-14T00:00:00Z is first capped to it with `Warning: Capping set filetime to
+minimum to avoid overflow` (unless `-s`), as curl 8.21.0 does; off Windows it is set as given
+(BL-1392).
 
 Under `--xattr`, just before that stamp, a successful transfer to an `-o`/`-O` file it opened itself
 (not one created empty afterwards) gets curl's four extended attributes - `user.creator`,

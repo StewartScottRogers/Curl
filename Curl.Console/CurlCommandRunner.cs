@@ -337,6 +337,15 @@ internal sealed class CurlCommandRunner(
     private Func<string, string?> EnvironmentVariables => readEnvironmentVariable ?? NoEnvironmentVariables;
 
     /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
+    /// <summary>
+    /// The earliest time curl 8.21.0 sets on a Windows file for <c>-R</c>, 1752-09-14T00:00:00Z
+    /// (Unix -6857222400); an earlier source time is capped to it.
+    /// </summary>
+    private static readonly DateTimeOffset WindowsMinimumFileTimeUtc = DateTimeOffset.FromUnixTimeSeconds(-6857222400);
+
+    /// <summary>The warning curl 8.21.0 writes on Windows when it caps an <c>-R</c> time to the minimum.</summary>
+    private const string FileTimeCappedToMinimumWarning = "Warning: Capping set filetime to minimum to avoid overflow";
+
     private const string StandardOutputHeaderFile = "-";
 
     /// <summary>The <c>--stderr</c> value that sends standard error to standard output.</summary>
@@ -4229,13 +4238,24 @@ internal sealed class CurlCommandRunner(
     /// curl 8.21.0 (Windows, measured 2026-09-26) mutes the warning under <c>-s</c> and under
     /// <c>-s -S</c> alike: <c>-S</c> brings back error messages, not warnings. The line is the
     /// Windows form on every platform, for the reason <see cref="RemoteTimeFailureWarning" />
-    /// gives.
+    /// gives. On Windows a time before <see cref="WindowsMinimumFileTimeUtc" /> is first capped
+    /// to it with <see cref="FileTimeCappedToMinimumWarning" /> (muted by <c>-s</c>), as
+    /// curl 8.21.0's <c>setfiletime</c> caps it; off Windows it is set as given (BL-1392).
     /// </remarks>
     private async Task StampOutputFileTimeAsync(
         CommandLineOptions options,
         string outputFile,
         DateTimeOffset sourceLastWriteTimeUtc)
     {
+        if (runsOnWindows && sourceLastWriteTimeUtc < WindowsMinimumFileTimeUtc)
+        {
+            sourceLastWriteTimeUtc = WindowsMinimumFileTimeUtc;
+            if (!options.Silent)
+            {
+                await WriteErrorLineAsync(FileTimeCappedToMinimumWarning).ConfigureAwait(false);
+            }
+        }
+
         if (!outputFileTimeSetter.TrySetLastWriteTimeUtc(outputFile, sourceLastWriteTimeUtc, out int errorCode)
             && !options.Silent)
         {

@@ -8,7 +8,7 @@ depends-on: [BL-1391]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: FR-011
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1392 — Cap an -R time before 14 September 1752 to that date on Windows with curl's 'Capping set filetime to minimum' warning
 
@@ -28,17 +28,21 @@ On Windows, `-R`/`--remote-time` stamps an output file whose source time is earl
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Console.UnitTests` marked `[OSCondition(OperatingSystems.Windows)]` runs an `-R -o` transfer whose source time is 1700-01-01T00:00:00Z through a recording fake `IFileTimeSetter` and asserts the time set is 1752-09-14T00:00:00Z and the stderr line `Warning: Capping set filetime to minimum to avoid overflow`, written before any `Failed to set filetime` warning would be.
-- [ ] Windows-only tests pin 1752-09-14T00:00:00Z exactly (no warning, unchanged) and one second earlier under `-s` (capped, no warning).
-- [ ] A test marked `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]` pins that off Windows the 1700 time is passed unchanged and no warning is written.
-- [ ] `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member in the code this task changed.
+- [x] A test in `Curl.Console.UnitTests` marked `[OSCondition(OperatingSystems.Windows)]` runs an `-R -o` transfer whose source time is 1700-01-01T00:00:00Z through a recording fake `IFileTimeSetter` and asserts the time set is 1752-09-14T00:00:00Z and the stderr line `Warning: Capping set filetime to minimum to avoid overflow`, written before any `Failed to set filetime` warning would be.
+- [x] Windows-only tests pin 1752-09-14T00:00:00Z exactly (no warning, unchanged) and one second earlier under `-s` (capped, no warning).
+- [x] A test marked `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]` pins that off Windows the 1700 time is passed unchanged and no warning is written.
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member in the code this task changed.
 
 ## Notes
 
 - The maximum cap needs source times past year 9999, which `TransferResult`'s `DateTimeOffset` cannot carry; carrying them is a change to `Curl.Protocol.Abstractions.UnitLibrary` and the protocol parsers, left for its own task.
 - Depends on BL-1391 only because both change `Curl.Console`. No option changes, so `--ai-help` is unaffected.
+- Done: `StampOutputFileTimeAsync` caps a time before `WindowsMinimumFileTimeUtc` when the runner's injected `runsOnWindows` is true, writing `FileTimeCappedToMinimumWarning` unless `-s`, before the set (so before any `Failed to set filetime` line).
+- Choice: the tests inject `runsOnWindows: true` / `false` rather than carry `[OSCondition]`, as the runner already decides Windows behaviour from that flag; so all four run, and pin both platforms, on every CI OS - stronger than the OS-gated tests the criteria name.
+- Measure-CodeQuality -Library Curl.Console: 0 failing members.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. -R caps a pre-1752-09-14 time to that date on Windows with curl's Capping set filetime to minimum warning
