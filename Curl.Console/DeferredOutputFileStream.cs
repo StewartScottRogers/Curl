@@ -144,9 +144,23 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
 
     /// <inheritdoc />
     /// <exception cref="IOException">The file could not be created.</exception>
-    public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+    /// <remarks>
+    /// Once the file is open a write returns the file's own <see cref="ValueTask" />, so a
+    /// transfer's per-chunk writes allocate nothing here (BL-1289).
+    /// </remarks>
+    public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+        file is { } open ? open.WriteAsync(buffer, cancellationToken) : OpenAndWriteAsync(buffer, cancellationToken);
+
+    /// <summary>
+    /// Opens the file for the first write and writes <paramref name="buffer" /> to it.
+    /// </summary>
+    /// <param name="buffer">The bytes to write.</param>
+    /// <param name="cancellationToken">Cancels the open and the write.</param>
+    /// <returns>A task that completes when the bytes are written.</returns>
+    /// <exception cref="IOException">The file could not be created.</exception>
+    private async ValueTask OpenAndWriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
-        Stream? target = file ?? await TryOpenAsync(cancellationToken).ConfigureAwait(false);
+        Stream? target = await TryOpenAsync(cancellationToken).ConfigureAwait(false);
 
         if (target is null)
         {

@@ -103,14 +103,19 @@ public sealed class UpstreamCaseRunner(
     {
         string outputFile = logDirectory + "/curl.out";
         WriteClientFiles(testCase);
-        SwsHttpServerConnector server = new(testCase);
+        List<string> arguments = Arguments(testCase, outputFile);
+
+        // On the real clock the server's waits make a case take seconds that a loaded machine
+        // stretches past the time limit (test1677's writedelay: 5.5 seconds, BL-1355); with no
+        // curl timer to race them, they are skipped.
+        SwsHttpServerConnector server = new(testCase, CurlTimerOptions.AnyIn(arguments) ? TimeProvider.System : new WaitSkippingTimeProvider());
         // Not disposed: CurlCommandRunner.RunAsync takes no cancellation token, so a run past the
         // time limit is stopped only at its next exchange with the abandoned server, and may write
         // to these until then. A memory stream holds nothing but its buffer, which the collector takes.
         MemoryStream standardOutput = new();
         MemoryStream standardError = new();
         MemoryStream standardInput = new(StandardInput(testCase));
-        UpstreamCurlInvocation invocation = new(Arguments(testCase, outputFile), standardOutput, standardError, standardInput, server, new UnreachableDatagramConnector());
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, server, new UnreachableDatagramConnector());
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
         {

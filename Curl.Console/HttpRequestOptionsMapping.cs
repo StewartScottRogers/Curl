@@ -74,7 +74,7 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="CommandLineOptions.HttpVersion" /> as <see cref="HttpRequestOptions.Version" />, as
     /// <see cref="HttpVersionMapping.ToHttpVersionPreference" /> maps it; and <see cref="CommandLineOptions.Compressed" />,
     /// <see cref="CommandLineOptions.TransferEncoding" />, <see cref="CommandLineOptions.Raw" /> and
-    /// <see cref="CommandLineOptions.IgnoreContentLength" /> verbatim; and
+    /// <see cref="CommandLineOptions.IgnoreContentLength" /> and <see cref="CommandLineOptions.AllowHttp09Reply" /> verbatim; and
     /// <paramref name="proxy" /> as <see cref="HttpRequestOptions.ForwardProxy" /> with
     /// <see cref="CommandLineOptions.ProxyTunnel" /> as <see cref="HttpRequestOptions.ProxyTunnel" />; and
     /// whether <see cref="CommandLineOptions.UnixSocketPath" /> is set as <see cref="HttpRequestOptions.OverUnixSocket" />; and
@@ -110,6 +110,7 @@ internal static class HttpRequestOptionsMapping
             TransferEncoding = options.TransferEncoding,
             Raw = options.Raw,
             IgnoreContentLength = options.IgnoreContentLength,
+            AllowHttp09Reply = options.AllowHttp09Reply,
             ForwardProxy = proxy,
             ProxyTunnel = options.ProxyTunnel,
             OverUnixSocket = options.UnixSocketPath is not null,

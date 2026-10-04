@@ -28,9 +28,13 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     /// <summary>Gets every byte written so far, in order.</summary>
     public byte[] Sent => [.. sent];
 
+    /// <summary>Gets how many reads have been made so far.</summary>
+    public int ReadCount { get; private set; }
+
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
+        ReadCount++;
         if (nextRead == reads.Length)
         {
             return ValueTask.FromResult(0);

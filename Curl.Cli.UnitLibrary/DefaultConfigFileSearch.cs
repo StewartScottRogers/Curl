@@ -61,14 +61,14 @@ public sealed class DefaultConfigFileSearch(Func<string, string?> readEnvironmen
 
     /// <summary>
     /// The search this process makes: its environment variables, the directory of
-    /// <see cref="Environment.ProcessPath"/>, the home directory .NET reports for the account, and
+    /// <see cref="Environment.ProcessPath"/>, the account home directory off Windows (<see cref="AccountHomeDirectory"/>), and
     /// Windows' order when running on Windows.
     /// </summary>
     public static DefaultConfigFileSearch ForProcess { get; } = new(
         Environment.GetEnvironmentVariable,
         OperatingSystem.IsWindows(),
         Path.GetDirectoryName(Environment.ProcessPath),
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        AccountHomeDirectory.ForProcess);
 
     /// <summary>Lists the paths curl tries for its default config file, in the order it tries them.</summary>
     /// <returns>The paths; the first one that can be read is the file.</returns>

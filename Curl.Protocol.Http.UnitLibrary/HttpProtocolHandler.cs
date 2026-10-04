@@ -669,9 +669,12 @@ public sealed class HttpProtocolHandler(
     /// two attempts swapped, so the QUIC connect starts when the TCP connect fails or once the
     /// happy-eyeballs timeout has passed, and when both fail the transfer fails with the TCP
     /// attempt's result, the first attempt's, as curl's <c>cf_hc_connect</c> reports it.
+    /// Both attempts get one target naming the TCP attempt's version (<see cref="ConnectTarget.TcpFirstAttemptVersion" />),
+    /// so a connector can write the <c>[HTTPS-CONNECT]</c> lines of the race (BL-1360).
     /// </summary>
     private async ValueTask<ConnectResult> RaceTcpAgainstQuicAsync(HttpRequestPlan plan, ConnectTarget target)
     {
+        target = target with { TcpFirstAttemptVersion = plan.Options.TcpFirstAttemptVersion };
         using CancellationTokenSource quicAbandoned = new();
         using CancellationTokenSource tcpAbandoned = new();
         Task<ConnectResult> tcp = plan.Deadline.ConnectAsync(connector, target, tcpAbandoned.Token).AsTask();
@@ -803,7 +806,7 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static void SettleConnection(HttpRequestPlan plan, IConnection connection, IHttpStreamSession? streams, HttpAttemptOutcome outcome)
     {
-        if (outcome.ReportsLeftIntact && streams is null or Http2Session or Http3Session { AcceptsNewStreams: true })
+        if (outcome.ReportsLeftIntact && TakesNewRequests(streams))
         {
             connection.MarkReusable();
         }
@@ -813,6 +816,13 @@ public sealed class HttpProtocolHandler(
             HttpExchangeLog.For(plan.Context.DiagnosticLog, streams).RetryingOnFreshConnection(outcome.RetryCount);
         }
     }
+
+    /// <summary>
+    /// Tells whether a connection can carry another request once its response is left intact:
+    /// always over HTTP/1.x and HTTP/2, and over HTTP/3 while the session takes new streams.
+    /// </summary>
+    private static bool TakesNewRequests(IHttpStreamSession? streams) =>
+        streams is not Http3Session { AcceptsNewStreams: false };
 
     /// <summary>
     /// Sends <paramref name="plan" />, framed for HTTP/2 or HTTP/3 when <paramref name="streams" /> is set,
@@ -1025,6 +1035,7 @@ public sealed class HttpProtocolHandler(
             },
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
             IsHttp2OrHttp3 = requestStream is not null,
+            AcceptsHttp09 = options.AllowHttp09Reply,
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
             DefersFrom = (statusLine, header) => framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };
@@ -1055,9 +1066,9 @@ public sealed class HttpProtocolHandler(
             ReportNoEndOfMessageIndicator(plan, actedOn, headReader);
             retry = await RetryOfAsync(plan, actedOn, bodyLeftUnsent, upload, cancellationToken).ConfigureAwait(false);
             headReader.ReleaseDeferredHeaders();
-            HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
+            HttpFailMode fail = FailModeOf(options, retry);
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
-            bool discardsBody = retry is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
+            bool discardsBody = DiscardsBody(options, retry, exchange.RedirectUrl);
             ReportIgnoredBody(plan, actedOn, discardsBody);
             headReader.ReportHeldLines();
             delivery = DeliveryOf(plan, actedOn, discardsBody);
@@ -1085,7 +1096,7 @@ public sealed class HttpProtocolHandler(
             return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
         }
 
-        (requestStream as Http3StreamConnection)?.ReportTransferDone(connect.ConnectionNumber);
+        ReportTransferDone(requestStream, connect);
         TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
         LogExchanged(exchangeLog, context.TimeProvider, exchange.RequestReady, actedOn!, body);
         return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection)))
@@ -1094,6 +1105,27 @@ public sealed class HttpProtocolHandler(
             UpgradedSession = UpgradedSessionOf(connection),
         };
     }
+
+    /// <summary>
+    /// Gives how <c>-f</c> or <c>--fail-with-body</c> applies to a response: as asked, unless
+    /// the handler answers it with <paramref name="retry" />, which no failing mode stops.
+    /// </summary>
+    private static HttpFailMode FailModeOf(HttpRequestOptions options, HttpRequestPlan? retry) =>
+        retry is null ? options.Fail : HttpFailMode.None;
+
+    /// <summary>
+    /// Tells whether the response's body is read and discarded rather than delivered: when the
+    /// handler answers it with <paramref name="retry" />, or follows its redirect.
+    /// </summary>
+    private static bool DiscardsBody(HttpRequestOptions options, HttpRequestPlan? retry, string? redirectUrl) =>
+        retry is not null || (options.FollowRedirects && redirectUrl is not null);
+
+    /// <summary>
+    /// Marks an HTTP/3 request stream's transfer done with its session and writes its
+    /// <c>--trace-config http/3</c> lines (<see cref="Http3StreamConnection.ReportTransferDone" />); other streams need neither.
+    /// </summary>
+    private static void ReportTransferDone(IHttpStreamConnection? requestStream, ConnectResult connect) =>
+        (requestStream as Http3StreamConnection)?.ReportTransferDone(connect.ConnectionNumber);
 
     /// <summary>
     /// Gives the session the exchange ran on: <paramref name="streams" /> when it began on one,
@@ -1323,7 +1355,8 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Reports that the request went out, as curl 8.21.0 does (measured, BL-407 Notes):
-    /// <c>Request completely sent off</c> for a request without a body, and
+    /// <c>Request completely sent off</c> for a request without a body or whose body put no
+    /// bytes on the wire (an empty <c>-d ''</c> or <c>-T</c> file, BL-1216 Notes), and
     /// <c>upload completely sent off: N bytes</c> once a whole body has been sent; nothing for
     /// a body a final status stopped.
     /// </summary>
@@ -1335,7 +1368,7 @@ public sealed class HttpProtocolHandler(
         }
         else if (!bodyLeftUnsent && !upload.CutShort)
         {
-            events.ReportInfo(HttpConnectionInfoLines.UploadSent(upload.BytesSent));
+            events.ReportInfo(upload.BytesSent == 0 ? HttpConnectionInfoLines.RequestSent : HttpConnectionInfoLines.UploadSent(upload.BytesSent));
         }
     }
 
@@ -1397,14 +1430,14 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Reports a read the peer reset as the <c>-v</c> line curl 8.21.0 prints for it,
-    /// <c>Recv failure: Connection was reset</c>, before the connection's end is reported
-    /// (measured, BL-449 Notes), and an HTTP/3 stream the server refused as the line curl 8.21.0's
+    /// Reports a read a socket error failed as the <c>-v</c> line curl 8.21.0's <c>failf</c> prints
+    /// for it, such as <c>Recv failure: Connection was reset</c>, before the connection's end is
+    /// reported (measured, BL-449 Notes), and an HTTP/3 stream the server refused as the line curl 8.21.0's
     /// <c>cf-ngtcp2.c</c> prints for it (ADR-0187). Any other failure is left to the transfer's result.
     /// </summary>
     private static void ReportReceiveFailure(ITransferEvents events, HttpTransferException failure)
     {
-        if (failure.IsStreamRefused || failure.Message == HttpTransferMessages.ConnectionReset)
+        if (failure.IsStreamRefused || failure.Message.StartsWith(HttpTransferMessages.ReceiveFailurePrefix, StringComparison.Ordinal))
         {
             events.ReportInfo(failure.Message);
         }

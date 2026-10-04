@@ -79,9 +79,12 @@ public sealed class CamelliaTests
     public void EncryptCbc_EmptySource_WritesNothing()
     {
         using Camellia camellia = new(Convert.FromHexString(ChainKey128));
+        byte[] buffer = [0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5];
 
-        camellia.EncryptCbc(Convert.FromHexString(ChainVector), [], []);
-        camellia.DecryptCbc(Convert.FromHexString(ChainVector), [], []);
+        camellia.EncryptCbc(Convert.FromHexString(ChainVector), [], buffer.AsSpan(0, 0));
+        camellia.DecryptCbc(Convert.FromHexString(ChainVector), [], buffer.AsSpan(0, 0));
+
+        Assert.AreEqual("A5A5A5A5A5A5A5A5", Convert.ToHexString(buffer));
     }
 
     [TestMethod]

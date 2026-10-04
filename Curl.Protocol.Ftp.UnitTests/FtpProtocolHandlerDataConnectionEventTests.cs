@@ -91,6 +91,47 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_RetrOfAKnownSize_ReadsTheBytesStillExpectedAndNoFurther()
+    {
+        // curl -s -v --trace-config tcp ftp://127.0.0.1:P/a.txt: [TCP-1] recv(len=<bytes still
+        // expected>), and no read after the last byte (BL-1259 Notes).
+        var data = new ScriptedConnection(Encoding.Latin1.GetBytes("hello "), Encoding.Latin1.GetBytes("ftp\r\n"));
+
+        DataRun run = await RunAsync("/file.txt", LoggedIn + Epsv + Retrieved, _ => { }, data);
+
+        CollectionAssert.AreEqual(new[] { 11, 5 }, data.ReadLengths);
+        CollectionAssert.AreEqual(new[] { "hello ", "ftp\r\n", string.Empty }, run.Events.DataReceived);
+        Assert.AreEqual(TransferResult.Success(11), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RetrSendingMoreThanSizeAnnounced_IsCutOffAtTheAnnouncedSize()
+    {
+        // Record-CurlExchange.ps1 -Ftp -FtpData hello -FtpReply 'SIZE=213 3': curl writes "hel",
+        // exit 0, after [TCP-1] recv(len=3) -> 0, 3 (BL-1259 Notes).
+        var data = new ScriptedConnection(Encoding.Latin1.GetBytes(File));
+
+        DataRun run = await RunAsync("/file.txt", LoggedIn + Epsv + "200 Type set\r\n213 3\r\n" + Opened + Complete + Bye, _ => { }, data);
+
+        CollectionAssert.AreEqual(new[] { 3 }, data.ReadLengths);
+        CollectionAssert.AreEqual(new[] { "hel", string.Empty }, run.Events.DataReceived);
+        Assert.AreEqual(TransferResult.Success(3), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ListOfAnUnknownSize_ReadsCurlsWholeBufferToTheEnd()
+    {
+        // curl -s -v --trace-config tcp ftp://127.0.0.1:P/: [TCP-1] recv(len=102400) -> 0, 14, then
+        // -> 0, 0 (BL-1259 Notes).
+        var data = new ScriptedConnection(Encoding.Latin1.GetBytes(File));
+
+        DataRun run = await RunAsync("/", LoggedIn + Epsv + "200 Type set\r\n" + Opened + Complete + Bye, _ => { }, data);
+
+        CollectionAssert.AreEqual(new[] { 102400, 102400 }, data.ReadLengths);
+        Assert.AreEqual(TransferResult.Success(11), run.Result);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ActiveRetr_ReportsTheAcceptedConnectionBeforeTheData()
     {
         // curl -v -P - ftp://127.0.0.1:47931/file.txt

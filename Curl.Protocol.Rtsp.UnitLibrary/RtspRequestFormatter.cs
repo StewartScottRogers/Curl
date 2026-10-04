@@ -9,10 +9,10 @@ namespace Curl.Protocol.Rtsp;
 /// Writes an RTSP/1.0 request head byte for byte as curl 8.21.0 writes it (ADR-0169).
 /// </summary>
 /// <remarks>
-/// The order is the request line, <c>CSeq</c>, <c>Session</c>, <c>Referer</c>,
+/// The order is the request line, <c>CSeq</c>, <c>Session</c>, <c>Range</c>, <c>Referer</c>,
 /// <c>User-Agent</c>, <c>Authorization</c>, then the <c>-H</c> headers in command-line order.
-/// A <c>-H</c> header of the same name suppresses <c>Referer</c>, <c>User-Agent</c> and
-/// <c>Authorization</c>, and is sent in its own place among the <c>-H</c> headers (measured,
+/// A <c>-H</c> header of the same name suppresses <c>Range</c>, <c>Referer</c>,
+/// <c>User-Agent</c> and <c>Authorization</c>, and is sent in its own place among the <c>-H</c> headers (measured,
 /// BL-591): <c>-H 'X-A: 1' -H 'User-Agent: mine' -e http://r/ -u u:p</c> sends <c>CSeq</c>,
 /// <c>Referer</c>, <c>Authorization</c>, <c>X-A: 1</c>, <c>User-Agent: mine</c>. A <c>-H</c>
 /// header naming <c>CSeq</c> or <c>Session</c> is refused before the request is written
@@ -52,11 +52,26 @@ internal static class RtspRequestFormatter
     internal static bool NamesSession(HttpRequestOptions options) =>
         options.Headers.Any(entry => RtspCustomHeader.Parse(entry).Names("Session"));
 
+    /// <summary>
+    /// Gives the <c>Range</c> value curl 8.21.0 sends for <c>-C</c> and <c>-r</c>, as
+    /// <c>lib/url.c</c>'s <c>setup_range</c> builds it (BL-1293): a non-zero <c>-C &lt;n&gt;</c>
+    /// gives <c>&lt;n&gt;-</c> and wins over <c>-r</c>; otherwise the <c>-r</c> text as typed,
+    /// with no <c>bytes=</c>; <c>-C 0</c> alone gives none.
+    /// </summary>
+    /// <param name="resumeFrom">The <c>-C</c> offset, or <see langword="null" /> when not resuming.</param>
+    /// <param name="rangeText">The <c>-r</c> text as typed, or <see langword="null" /> when not given.</param>
+    /// <returns>The <c>Range</c> value, or <see langword="null" /> for none.</returns>
+    internal static string? RangeValue(long? resumeFrom, string? rangeText) =>
+        resumeFrom is { } offset and not 0
+            ? offset.ToString(CultureInfo.InvariantCulture) + "-"
+            : rangeText;
+
     /// <summary>Writes the request head.</summary>
     /// <param name="method">The request method.</param>
     /// <param name="target">The request target: <c>*</c> for <c>OPTIONS</c>.</param>
     /// <param name="sequenceNumber">The <c>CSeq</c> value.</param>
     /// <param name="sessionId">The <c>Session</c> value, sent even when empty, or <see langword="null" /> for none.</param>
+    /// <param name="range">The <c>Range</c> value (<see cref="RangeValue" />), or <see langword="null" /> for none.</param>
     /// <param name="options">The HTTP options that reach the request: <c>-H</c>, <c>-A</c>, <c>-e</c>.</param>
     /// <param name="authorization">The <c>Authorization</c> value, or <see langword="null" /> for none.</param>
     /// <returns>The request head, Latin-1 encoded, ending with the blank line.</returns>
@@ -65,6 +80,7 @@ internal static class RtspRequestFormatter
         string target,
         long sequenceNumber,
         string? sessionId,
+        string? range,
         HttpRequestOptions options,
         string? authorization)
     {
@@ -77,6 +93,7 @@ internal static class RtspRequestFormatter
             head.Append("Session: ").Append(sessionId).Append("\r\n");
         }
 
+        AppendUnlessOverridden(head, customHeaders, "Range", HeadText(range, options));
         AppendUnlessOverridden(head, customHeaders, "Referer", HeadText(options.Referer, options));
         AppendUnlessOverridden(head, customHeaders, "User-Agent", HeadText(options.UserAgent, options) ?? DefaultUserAgent);
         AppendUnlessOverridden(head, customHeaders, "Authorization", authorization);

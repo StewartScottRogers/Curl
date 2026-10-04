@@ -130,7 +130,7 @@ public sealed class AuthDiagnosticLogNetrcSigV4NegotiateTests
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Warning);
         ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.NoMechanism, []));
 
-        await new NegotiateHttpAuthenticator(new ScriptedSecurityContextFactory(context), diagnosticLog: log).StepWithoutAnsweringAsync(Request(), CancellationToken.None);
+        await new NegotiateHttpAuthenticator(new ScriptedSecurityContextFactory(context), diagnosticLog: log).StepWithoutAnsweringAsync(Request(), ["Negotiate"], CancellationToken.None);
 
         CollectionAssert.AreEqual(new[] { "Negotiate context failed: NoMechanism" }, log.At(DiagnosticLogLevel.Warning));
     }

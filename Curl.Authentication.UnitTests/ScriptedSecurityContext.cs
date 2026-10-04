@@ -25,8 +25,11 @@ internal sealed class ScriptedSecurityContext(params SecurityContextStep[] steps
     /// <summary>Wraps by prefixing <c>E</c> when asked to encrypt and <c>S</c> otherwise, so a test sees the call arrive.</summary>
     public byte[]? Wrap(ReadOnlySpan<byte> message, bool encrypt) => [(byte)(encrypt ? 'E' : 'S'), .. message];
 
-    /// <summary>Unwraps by dropping the first byte; an empty message does not unwrap.</summary>
-    public byte[]? Unwrap(ReadOnlySpan<byte> wrappedMessage) => wrappedMessage.IsEmpty ? null : wrappedMessage[1..].ToArray();
+    /// <summary>Gets or sets whether <see cref="Unwrap" /> fails for every message, as a failed decryption does.</summary>
+    public bool UnwrapFails { get; set; }
+
+    /// <summary>Unwraps by dropping the first byte; an empty message does not unwrap, nor does any while <see cref="UnwrapFails" />.</summary>
+    public byte[]? Unwrap(ReadOnlySpan<byte> wrappedMessage) => wrappedMessage.IsEmpty || UnwrapFails ? null : wrappedMessage[1..].ToArray();
 
     public void Dispose() => IsDisposed = true;
 }

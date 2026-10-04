@@ -17,7 +17,7 @@ public sealed class CommandLineProxyVariantOptionTests
     [TestMethod]
     public void Parse_NoneOfTheOptions_LeavesEveryPropertyAtItsDefault()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.PreProxy);
@@ -33,7 +33,7 @@ public sealed class CommandLineProxyVariantOptionTests
     [TestMethod]
     public void Parse_Proxy10_RecordsAnHttp10Proxy()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proxy1.0", "proxy.example:3128", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--proxy1.0", "proxy.example:3128", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(new CommandLineProxy("proxy.example:3128", ProxyKind.Http10), result.Options.Proxy);
@@ -46,7 +46,7 @@ public sealed class CommandLineProxyVariantOptionTests
     [DataRow(new[] { "--proxy1.0", "a:1", "--socks5", "b:2" }, "b:2", ProxyKind.Socks5)]
     public void Parse_Proxy10AndAnotherProxyOption_TheLastWinsWithItsKind(string[] options, string address, ProxyKind kind)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. options, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([.. options, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(new CommandLineProxy(address, kind), result.Options.Proxy);
@@ -55,7 +55,7 @@ public sealed class CommandLineProxyVariantOptionTests
     [TestMethod]
     public void Parse_PreProxy_RecordsTheLastValueVerbatim()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--preproxy", "socks5://a:1", "--preproxy", "socks4://b:2", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--preproxy", "socks5://a:1", "--preproxy", "socks4://b:2", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("socks4://b:2", result.Options.PreProxy);
@@ -67,7 +67,7 @@ public sealed class CommandLineProxyVariantOptionTests
     [DataRow("HTTP/service")]
     public void Parse_Socks5GssapiService_RecordsTheLastValueEvenWhenEmpty(string service)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--socks5-gssapi-service", "other", "--socks5-gssapi-service", service, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--socks5-gssapi-service", "other", "--socks5-gssapi-service", service, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(service, result.Options.Socks5GssapiServiceName);
@@ -76,7 +76,7 @@ public sealed class CommandLineProxyVariantOptionTests
     [TestMethod]
     public void Parse_HaproxyClientIp_RecordsTheLastValueUnvalidated()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--haproxy-clientip", "10.0.0.1", "--haproxy-clientip", "x", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--haproxy-clientip", "10.0.0.1", "--haproxy-clientip", "x", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("x", result.Options.HaproxyClientIp);
@@ -90,7 +90,7 @@ public sealed class CommandLineProxyVariantOptionTests
     [DataRow("--suppress-connect-headers")]
     public void Parse_Flag_TurnsOnOnlyItsOwnProperty(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { spelledOption }, FlagsTurnedOn(result.Options));
@@ -104,7 +104,7 @@ public sealed class CommandLineProxyVariantOptionTests
     [DataRow("--suppress-connect-headers")]
     public void Parse_FlagThenItsNoSpelling_TurnsItOff(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "--no-" + spelledOption[2..], Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, "--no-" + spelledOption[2..], Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(FlagsTurnedOn(result.Options));
@@ -118,7 +118,7 @@ public sealed class CommandLineProxyVariantOptionTests
     [DataRow("--suppress-connect-headers")]
     public void Parse_NoSpellingThenFlag_TurnsItOn(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-" + spelledOption[2..], spelledOption + "=x", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--no-" + spelledOption[2..], spelledOption + "=x", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { spelledOption }, FlagsTurnedOn(result.Options));
@@ -130,7 +130,7 @@ public sealed class CommandLineProxyVariantOptionTests
     [DataRow("--haproxy-clientip")]
     public void Parse_EmptyValue_RefusesAsBlank(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, "", Url]);
 
         AssertRefused(result, $"curl: option {spelledOption}: blank argument where content is expected");
     }
@@ -146,7 +146,7 @@ public sealed class CommandLineProxyVariantOptionTests
     [DataRow("--no-haproxy-clientip=x")]
     public void Parse_NoSpellingOfAValueOption_IsRefusedAsNotReversible(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, Url]);
 
         AssertRefused(result, $"curl: option {spelledOption}: the given option cannot be reversed with a --no- prefix");
     }

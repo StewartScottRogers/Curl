@@ -452,6 +452,23 @@ public sealed class HttpProxyTunnelTests
     }
 
     [TestMethod]
+    [DataRow(438, "Proxy CONNECT aborted")]
+    [DataRow(439, "Too large response headers: 307201 > 307200")]
+    public async Task ReadReplyAsync_WhenALineEndsTheHeaderBlockAt307200Bytes_KeepsReading(int lastPadding, string expected)
+    {
+        // 17 status bytes + 304 lines of 1009 bytes + a last line of 9 + lastPadding bytes:
+        // exactly 307200 bytes is still within the limit, one more is over it.
+        var line = "X-Pad: " + new string('a', 1000) + "\r\n";
+        var reply = "HTTP/1.1 200 OK\r\n" + string.Concat(Enumerable.Repeat(line, 304))
+            + "X-Pad: " + new string('a', lastPadding) + "\r\n";
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(reply));
+
+        var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+
+        Assert.AreEqual(HttpProxyTunnelReply.Failed(expected), result);
+    }
+
+    [TestMethod]
     public async Task ReadReplyAsync_LeavesTheBytesAfterTheHeaderBlockUnread()
     {
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n\r\ntunnel"));

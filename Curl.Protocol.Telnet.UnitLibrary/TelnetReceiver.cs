@@ -131,13 +131,13 @@ internal sealed class TelnetReceiver
     /// </summary>
     /// <param name="received">The bytes read from the server.</param>
     /// <param name="data">Receives the bytes to write to the output.</param>
-    /// <param name="replies">Receives the bytes to send to the server.</param>
+    /// <param name="replies">Receives each write to send to the server, in order with the reports around it.</param>
     /// <returns>
     /// <see cref="TelnetReceiveError.None" />, or the error that ends the session, in
     /// which case <paramref name="data" /> and <paramref name="replies" /> hold what came
     /// before it and the rest of <paramref name="received" /> is left unprocessed.
     /// </returns>
-    public TelnetReceiveError Receive(ReadOnlySpan<byte> received, List<byte> data, List<byte> replies)
+    public TelnetReceiveError Receive(ReadOnlySpan<byte> received, List<byte> data, TelnetOutbox replies)
     {
         runStart = data.Count;
         foreach (byte value in received)
@@ -167,7 +167,7 @@ internal sealed class TelnetReceiver
         }
     }
 
-    private TelnetReceiveError ReceiveByte(byte value, List<byte> data, List<byte> replies)
+    private TelnetReceiveError ReceiveByte(byte value, List<byte> data, TelnetOutbox replies)
     {
         if (state == TelnetReceiveState.SubnegotiationCommand)
         {
@@ -246,7 +246,7 @@ internal sealed class TelnetReceiver
         }
     }
 
-    private void ReceiveNegotiation(byte option, List<byte> replies)
+    private void ReceiveNegotiation(byte option, TelnetOutbox replies)
     {
         serverNegotiated = true;
         log.OptionReceived(negotiationCommand, option);
@@ -285,7 +285,7 @@ internal sealed class TelnetReceiver
         subnegotiation.Add(value);
     }
 
-    private TelnetReceiveError ReceiveSubnegotiationCommand(byte value, List<byte> replies)
+    private TelnetReceiveError ReceiveSubnegotiationCommand(byte value, TelnetOutbox replies)
     {
         if (value == TelnetByte.InterpretAsCommand)
         {
@@ -305,7 +305,7 @@ internal sealed class TelnetReceiver
         return error;
     }
 
-    private TelnetReceiveError AnswerSubnegotiation(List<byte> replies)
+    private TelnetReceiveError AnswerSubnegotiation(TelnetOutbox replies)
     {
         if (subnegotiation.Count == 0)
         {
@@ -339,7 +339,7 @@ internal sealed class TelnetReceiver
         byte option,
         string? value,
         TelnetReceiveError tooLong,
-        List<byte> replies)
+        TelnetOutbox replies)
     {
         if (value is null)
         {
@@ -351,37 +351,39 @@ internal sealed class TelnetReceiver
             return tooLong;
         }
 
-        int start = replies.Count;
-        AppendSubnegotiationStart(option, replies);
-        replies.AddRange(Encoding.ASCII.GetBytes(value));
-        ReportSubnegotiationSent(replies, start);
-        AppendSubnegotiationEnd(replies);
+        var reply = new List<byte>();
+        AppendSubnegotiationStart(option, reply);
+        reply.AddRange(Encoding.ASCII.GetBytes(value));
+        SendSubnegotiation(reply, replies);
         return TelnetReceiveError.None;
     }
 
-    private void AnswerNewEnvironment(List<byte> replies)
+    private void AnswerNewEnvironment(TelnetOutbox replies)
     {
-        int start = replies.Count;
-        AppendSubnegotiationStart(TelnetByte.NewEnvironmentOption, replies);
+        var reply = new List<byte>();
+        AppendSubnegotiationStart(TelnetByte.NewEnvironmentOption, reply);
         foreach (string variable in optionValues.EnvironmentVariables)
         {
-            if (replies.Count - start + variable.Length + 1 < NewEnvironmentReplyLimit)
+            if (reply.Count + variable.Length + 1 < NewEnvironmentReplyLimit)
             {
-                AppendEnvironmentVariable(variable, replies);
+                AppendEnvironmentVariable(variable, reply);
             }
         }
 
-        ReportSubnegotiationSent(replies, start);
-        AppendSubnegotiationEnd(replies);
+        SendSubnegotiation(reply, replies);
     }
 
     /// <summary>
-    /// Reports the subnegotiation appended to <paramref name="replies" /> from
-    /// <paramref name="start" />, less its opening <c>IAC SB</c>; its <c>IAC SE</c> is not
-    /// appended yet.
+    /// Reports the subnegotiation in <paramref name="reply" />, less its opening
+    /// <c>IAC SB</c>, then closes it with <c>IAC SE</c> and sends it as one write, as curl's
+    /// <c>suboption</c> prints it before its one <c>swrite</c>.
     /// </summary>
-    private void ReportSubnegotiationSent(List<byte> replies, int start) =>
-        trace.SubnegotiationSent(CollectionsMarshal.AsSpan(replies)[(start + 2)..]);
+    private void SendSubnegotiation(List<byte> reply, TelnetOutbox replies)
+    {
+        trace.SubnegotiationSent(CollectionsMarshal.AsSpan(reply)[2..]);
+        AppendSubnegotiationEnd(reply);
+        replies.Send([.. reply]);
+    }
 
     private static void AppendEnvironmentVariable(string variable, List<byte> replies)
     {
@@ -398,7 +400,7 @@ internal sealed class TelnetReceiver
         replies.AddRange(Encoding.ASCII.GetBytes(variable[(comma + 1)..]));
     }
 
-    private void AppendWindowSize(List<byte> replies)
+    private void AppendWindowSize(TelnetOutbox replies)
     {
         TelnetWindowSize size = optionValues.WindowSize ?? new TelnetWindowSize(0, 0);
         trace.SubnegotiationSent(
@@ -409,14 +411,14 @@ internal sealed class TelnetReceiver
             (byte)(size.Rows >> 8),
             (byte)size.Rows,
         ]);
-        replies.Add(TelnetByte.InterpretAsCommand);
-        replies.Add(TelnetByte.SubnegotiationBegin);
-        replies.Add(TelnetByte.WindowSizeOption);
-        AppendDoublingInterpretAsCommand((byte)(size.Columns >> 8), replies);
-        AppendDoublingInterpretAsCommand((byte)size.Columns, replies);
-        AppendDoublingInterpretAsCommand((byte)(size.Rows >> 8), replies);
-        AppendDoublingInterpretAsCommand((byte)size.Rows, replies);
-        AppendSubnegotiationEnd(replies);
+        replies.Send([TelnetByte.InterpretAsCommand, TelnetByte.SubnegotiationBegin, TelnetByte.WindowSizeOption]);
+        var sizeBytes = new List<byte>();
+        AppendDoublingInterpretAsCommand((byte)(size.Columns >> 8), sizeBytes);
+        AppendDoublingInterpretAsCommand((byte)size.Columns, sizeBytes);
+        AppendDoublingInterpretAsCommand((byte)(size.Rows >> 8), sizeBytes);
+        AppendDoublingInterpretAsCommand((byte)size.Rows, sizeBytes);
+        replies.SendTelnetData([.. sizeBytes]);
+        replies.Send([TelnetByte.InterpretAsCommand, TelnetByte.SubnegotiationEnd]);
     }
 
     private static void AppendDoublingInterpretAsCommand(byte value, List<byte> replies)
@@ -465,7 +467,7 @@ internal sealed class TelnetReceiver
         }
     }
 
-    private void OfferOptionsOnce(List<byte> replies)
+    private void OfferOptionsOnce(TelnetOutbox replies)
     {
         if (!serverNegotiated || optionsOffered)
         {

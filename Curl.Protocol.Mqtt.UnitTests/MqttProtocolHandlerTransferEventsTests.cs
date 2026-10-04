@@ -241,6 +241,74 @@ public sealed class MqttProtocolHandlerTransferEventsTests
             events.Transcript.TakeLast(4).ToArray());
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_SubscribeUnderNoBodyReceivingPublish_IsWeirdServerReplyWithNothingWritten()
+    {
+        // Measured on curl 8.21.0 (BL-1310): -sv -I, SUBACK and a PUBLISH of "hi" to t in one read; exit 8.
+        ScriptedConnection connection = new(Hex(Connack), Hex(Suback + "30 05 00 01 74 68 69"));
+        TranscriptTransferEvents events = new();
+        RecordingStream output = new();
+        TransferContext context = new() { Url = CurlUrl.Parse("mqtt://h/t"), Output = output, Events = events, NoBody = true };
+
+        TransferResult result = await Handler(connection, 0).ExecuteAsync(context);
+
+        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Weird server reply"), result);
+        Assert.IsEmpty(output.Writes);
+        CollectionAssert.AreEqual(
+            ConnectedAndSubscribed()
+                .Concat([State(0), Received("30"), Received("05"), State(5), "* Remaining length: 5 bytes", "<= " + Latin1("00 01 74 68 69"), "* shutting down connection #0"])
+                .ToArray(),
+            events.Transcript);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PublishOverMaxFileSizeUnderNoBody_IsStillFilesizeExceeded()
+    {
+        // curl 8.21.0's mqtt_read_publish checks --max-filesize before any body is written (BL-1310).
+        ScriptedConnection connection = new(Hex(Connack), Hex(Suback), Hex("30 0A 00 03 74 2F 78 68 65 6C 6C 6F"));
+        TranscriptTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("mqtt://h/t/x"),
+            Output = new RecordingStream(),
+            Events = events,
+            MaxFileSize = 9,
+            NoBody = true,
+        };
+
+        TransferResult result = await Handler(connection, 0).ExecuteAsync(context);
+
+        Assert.AreEqual(new TransferResult(CurlExitCode.FilesizeExceeded, 0, "Maximum file size exceeded"), result);
+        CollectionAssert.AreEqual(
+            new[] { "* Remaining length: 10 bytes", "* Maximum file size exceeded", "* shutting down connection #0" },
+            events.Transcript.TakeLast(3).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PublishUnderNoBody_SendsThePublishAndSucceeds()
+    {
+        // Only a subscribe receives a body, so -I leaves a publish (-d) as it is (BL-1310).
+        ScriptedConnection connection = new(Hex(Connack));
+        TranscriptTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("mqtt://h/t"),
+            Output = new RecordingStream(),
+            PostData = Encoding.ASCII.GetBytes("payload"),
+            Events = events,
+            NoBody = true,
+        };
+
+        TransferResult result = await Handler(connection, 0).ExecuteAsync(context);
+
+        Assert.AreEqual(TransferResult.Success(0), result);
+        CollectionAssert.AreEqual(
+            ConnectAccepted()
+                .Concat([Sent("30 0A 00 01 74 70 61 79 6C 6F 61 64"), Sent("E0 00"), "* shutting down connection #0"])
+                .ToArray(),
+            events.Transcript);
+    }
+
     /// <summary>What every transfer reports up to and including the CONNECT sent.</summary>
     private static string[] ConnectSent() =>
         ["* Using client id 'curl" + FixedSuffix + "'", Sent(Connect), State(0)];

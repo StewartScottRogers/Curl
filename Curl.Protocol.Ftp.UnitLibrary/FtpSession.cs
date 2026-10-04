@@ -140,6 +140,9 @@ internal sealed class FtpSession(
 
     private const int ReadBufferSize = 16384;
 
+    /// <summary>The most a data read asks for: curl 8.21.0's receive buffer (measured, BL-1259 Notes).</summary>
+    private const int DataReadBufferSize = 102400;
+
     /// <summary>
     /// How long curl 8.21.0 waits for the server to open an active-mode data connection,
     /// measured with <c>-P -</c> whatever <c>--connect-timeout</c> says.
@@ -606,7 +609,7 @@ internal sealed class FtpSession(
         bool listing = IsListing(path);
         bool ascii = listing || typeCode.UseAscii;
         window = DownloadWindowOf(listing);
-        return await OpenDataConnectionAsync(DownloadPretArgument(path, listing)).ConfigureAwait(false)
+        return await OpenDownloadDataConnectionAsync(DownloadPretArgument(path, listing)).ConfigureAwait(false)
             ?? await SetTypeAsync(ascii).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
             ?? await ReadSizeAsync(path.FileName, ascii).ConfigureAwait(false)
@@ -629,6 +632,34 @@ internal sealed class FtpSession(
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Opens a download's data connection, then ends the download there when its <c>-r</c>
+    /// text names no range (<see cref="EndWhenRangeTextNamesNoRangeAsync" />).
+    /// </summary>
+    private async ValueTask<TransferResult?> OpenDownloadDataConnectionAsync(string pretArgument) =>
+        await OpenDataConnectionAsync(pretArgument).ConfigureAwait(false)
+            ?? await EndWhenRangeTextNamesNoRangeAsync().ConfigureAwait(false);
+
+    /// <summary>
+    /// Ends a download, a listing included, whose <c>-r</c> text names no range (<c>abc</c>, <c>-0</c>,
+    /// <c>5-2</c>: <see cref="ITransferContext.RangeText" /> set, <see cref="ITransferContext.Range" />
+    /// <see langword="null" />) once its data connection is open, with no <c>TYPE</c>,
+    /// <c>SIZE</c> or <c>RETR</c>, and exit 0: curl 8.21.0's <c>ftp_do_more</c> parses the
+    /// range only then, and the range error it gets does not reach the exit code (measured,
+    /// BL-1333).
+    /// </summary>
+    /// <returns><see langword="null" /> when the download goes on.</returns>
+    private async ValueTask<TransferResult?> EndWhenRangeTextNamesNoRangeAsync()
+    {
+        if (context.Range is not null || context.RangeText is null)
+        {
+            return null;
+        }
+
+        context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
+        return await QuitAndKeepConnectionAsync().ConfigureAwait(false);
     }
 
     /// <summary>Whether a download is a listing: the path names a directory, or <c>-l</c> or <c>;type=d</c> asks for one.</summary>
@@ -1409,6 +1440,7 @@ internal sealed class FtpSession(
             Proxy = context.Proxy,
             Events = new FtpDataConnectEvents(context.Events, failure, controlName.Host, trace),
             DiagnosticLog = context.DiagnosticLog,
+            TcpIoTrace = protectData ? null : FtpTcpIoTraces.Data,
         };
         ConnectResult connected = await connections.DataConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         dataConnection = connected.Connection;
@@ -1575,17 +1607,17 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult?> CopyDataAsync()
     {
         IConnection data = dataConnection!;
-        byte[] buffer = new byte[ReadBufferSize];
-        while (!IsWindowRead())
+        byte[] buffer = new byte[DataReadBufferSize];
+        while (!IsWindowRead() && !IsExpectedSizeRead())
         {
             int read;
             try
             {
-                read = await data.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false);
+                read = await data.ReadAsync(buffer.AsMemory(0, NextDataReadLength()), context.CancellationToken).ConfigureAwait(false);
             }
-            catch (IOException)
+            catch (IOException failure)
             {
-                return TransferResult.Failure(CurlExitCode.RecvError, FtpTransferMessages.ReceiveFailed, bytesTransferred);
+                return TransferResult.Failure(CurlExitCode.RecvError, FtpTransferMessages.ReceiveFailed(failure), bytesTransferred);
             }
 
             int wanted = CountWithinWindow(read);
@@ -1607,6 +1639,13 @@ internal sealed class FtpSession(
             {
                 return TransferResult.Failure(CurlExitCode.FilesizeExceeded, FtpTransferMessages.MaxFileSizeExceededWhileReading(maxFileSize!.Value, bytesTransferred), bytesTransferred);
             }
+        }
+
+        // Read to the announced size, curl shuts the data connection down and writes the empty
+        // block, { [0 bytes data], an end of data would have written (measured, BL-1259 Notes).
+        if (!IsWindowRead())
+        {
+            context.Events.ReportDataReceived([]);
         }
 
         return null;
@@ -1647,6 +1686,20 @@ internal sealed class FtpSession(
     /// data connection.
     /// </summary>
     private bool IsWindowRead() => window.MaxDownload is { } max && bytesTransferred >= max;
+
+    /// <summary>
+    /// Whether the size <c>SIZE</c> announced has been read: curl 8.21.0 reads no further, and a
+    /// server that sends more is cut off there (measured, BL-1259 Notes).
+    /// </summary>
+    private bool IsExpectedSizeRead() => expectedSize is { } expected && bytesTransferred >= expected;
+
+    /// <summary>
+    /// The length of the next data read: the bytes still expected, at most curl's 102400-byte
+    /// buffer, or the whole buffer when the size is unknown, as curl 8.21.0 sizes its reads and
+    /// writes them under <c>--trace-config tcp</c> (measured, BL-1259 Notes).
+    /// </summary>
+    private int NextDataReadLength() =>
+        expectedSize is { } expected ? (int)Math.Min(DataReadBufferSize, expected - bytesTransferred) : DataReadBufferSize;
 
     /// <summary>The bytes of a read of <paramref name="read" /> bytes that lie within the window.</summary>
     private int CountWithinWindow(int read) =>

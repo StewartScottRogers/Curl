@@ -63,6 +63,29 @@ public sealed class WriteGateStreamTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_InsideTheGate_WritesAtOnce()
+    {
+        WriteGate gate = new();
+        using MemoryStream inner = new();
+        await using Stream stream = gate.Guard(inner);
+
+        await gate.RunExclusiveAsync(() => stream.WriteAsync("x"u8.ToArray()).AsTask());
+
+        Assert.AreEqual(1, inner.Length);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_InnerWriteThrows_LetsTheGateGo()
+    {
+        WriteGate gate = new();
+        await using Stream stream = gate.Guard(new ClosedStandardOutputStream());
+
+        await Assert.ThrowsExactlyAsync<IOException>(() => stream.WriteAsync("x"u8.ToArray()).AsTask());
+
+        Assert.IsTrue(gate.RunExclusiveAsync(() => Task.CompletedTask).IsCompleted);
+    }
+
+    [TestMethod]
     public void Dispose_LeavesTheInnerStreamOpen()
     {
         using MemoryStream inner = new();

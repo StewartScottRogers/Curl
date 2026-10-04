@@ -94,6 +94,48 @@ public sealed class RtspProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(null, "1-2", null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nUser-Agent: curl/8.21.0\r\n\r\n")]
+    [DataRow(5L, null, null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 5-\r\nUser-Agent: curl/8.21.0\r\n\r\n")]
+    [DataRow(null, "1-2", "Range: npt=0-", "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nRange: npt=0-\r\n\r\n")]
+    [DataRow(0L, null, null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\n\r\n")]
+    [DataRow(5L, "1-2", null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 5-\r\nUser-Agent: curl/8.21.0\r\n\r\n")]
+    public async Task ExecuteAsync_ResumeAndRange_SendsCurlsRangeLine(long? resumeFrom, string? rangeText, string? header, string expected)
+    {
+        ScriptedConnection server = Server(Ok);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("rtsp://127.0.0.1:47950/media"),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { Headers = header is null ? [] : [header] },
+            ResumeFrom = resumeFrom,
+            RangeText = rangeText,
+        };
+
+        await Handler(server).ExecuteAsync(context);
+
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(server.Sent));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RangeAndReferer_SendsRangeBeforeReferer()
+    {
+        ScriptedConnection server = Server(Ok);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("rtsp://127.0.0.1:47950/media"),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { Referer = "http://r/" },
+            RangeText = "1-2",
+        };
+
+        await Handler(server).ExecuteAsync(context);
+
+        Assert.AreEqual(
+            "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nReferer: http://r/\r\nUser-Agent: curl/8.21.0\r\n\r\n",
+            Encoding.Latin1.GetString(server.Sent));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_CustomMethodTargetAndBody_StillSendsOptionsStar()
     {
         ScriptedConnection server = Server(Ok);
@@ -684,7 +726,8 @@ public sealed class RtspProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SendReset_FailsWith55()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_SendReset_FailsWith55AndTheWinsockWords()
     {
         var connection = new FailingConnection(writeFailure: Reset());
 
@@ -692,6 +735,40 @@ public sealed class RtspProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual("Send failure: Connection was reset", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_SendReset_FailsWith55AndTheSocketErrorsOwnMessage()
+    {
+        IOException reset = Reset();
+
+        TransferResult result = await Handler(new FailingConnection(writeFailure: reset)).ExecuteAsync(Context());
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("Send failure: " + reset.InnerException!.Message, result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_SendAborted_FailsWith55AndTheWinsockWords()
+    {
+        TransferResult result = await Handler(new FailingConnection(writeFailure: Aborted())).ExecuteAsync(Context());
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("Send failure: Connection was aborted", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_SendAborted_FailsWith55AndTheSocketErrorsOwnMessage()
+    {
+        IOException aborted = Aborted();
+
+        TransferResult result = await Handler(new FailingConnection(writeFailure: aborted)).ExecuteAsync(Context());
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("Send failure: " + aborted.InnerException!.Message, result.ErrorMessage);
     }
 
     [TestMethod]
@@ -704,12 +781,47 @@ public sealed class RtspProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ReceiveReset_FailsWith56()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_ReceiveReset_FailsWith56AndTheWinsockWords()
     {
         TransferResult result = await Handler(new FailingConnection(readFailure: Reset())).ExecuteAsync(Context());
 
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("Recv failure: Connection was reset", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_ReceiveReset_FailsWith56AndTheSocketErrorsOwnMessage()
+    {
+        IOException reset = Reset();
+
+        TransferResult result = await Handler(new FailingConnection(readFailure: reset)).ExecuteAsync(Context());
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Recv failure: " + reset.InnerException!.Message, result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_ReceiveAborted_FailsWith56AndTheWinsockWords()
+    {
+        TransferResult result = await Handler(new FailingConnection(readFailure: Aborted())).ExecuteAsync(Context());
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Recv failure: Connection was aborted", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_ReceiveAborted_FailsWith56AndTheSocketErrorsOwnMessage()
+    {
+        IOException aborted = Aborted();
+
+        TransferResult result = await Handler(new FailingConnection(readFailure: aborted)).ExecuteAsync(Context());
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Recv failure: " + aborted.InnerException!.Message, result.ErrorMessage);
     }
 
     [TestMethod]
@@ -774,6 +886,8 @@ public sealed class RtspProtocolHandlerTests
     private static byte[] Bytes(string text) => Encoding.Latin1.GetBytes(text);
 
     private static IOException Reset() => new("reset", new SocketException((int)SocketError.ConnectionReset));
+
+    private static IOException Aborted() => new("aborted", new SocketException((int)SocketError.ConnectionAborted));
 
     private static TransferContext Context(
         string url = "rtsp://127.0.0.1:47950/media",

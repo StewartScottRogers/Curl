@@ -19,6 +19,7 @@ public sealed class UpstreamConformanceTests
 
     // The runner fails a slow curl run itself after TimeLimit; this bounds the rest of the case
     // (expansion, screening, verification) so no row can hold up the fast suite, whatever it does.
+    // Past it the case is judged failed, so only a listed case fails its row.
     private static readonly TimeSpan CaseHangLimit = TimeSpan.FromSeconds(30);
 
     private static readonly string UpstreamTestDataFolder = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
@@ -50,6 +51,13 @@ public sealed class UpstreamConformanceTests
         {
             UpstreamCaseRunner runner = new(RunCurlAsync, OperatingSystem.IsWindows() ? UpstreamCurlPlatform.Windows : UpstreamCurlPlatform.Unix, TimeProvider.System, TimeLimit);
             outcome = await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName)).WaitAsync(CaseHangLimit);
+        }
+        catch (TimeoutException)
+        {
+            // A failure of the case, judged like any other: a listed case fails the row, an
+            // unlisted one is Inconclusive, so a loaded machine stretching an unlisted case's real
+            // retry waits (test3035, BL-1359) cannot fail the fast suite.
+            outcome = UpstreamCaseOutcome.Failed($"the case did not finish within {CaseHangLimit.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds");
         }
         finally
         {

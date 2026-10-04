@@ -11,7 +11,7 @@ namespace Curl.Protocol.Ws;
 /// as curl 8.21.0 writes it (ADR-0128).
 /// </summary>
 /// <remarks>
-/// The order is the request line, <c>Host</c>, <c>Authorization</c>, <c>User-Agent</c>,
+/// The order is the request line, <c>Host</c>, <c>Authorization</c>, <c>Range</c>, <c>User-Agent</c>,
 /// <c>Accept</c>, <c>Referer</c>, <c>Upgrade: websocket</c>, <c>Sec-WebSocket-Version: 13</c>,
 /// <c>Sec-WebSocket-Key</c>, the <c>-H</c> headers, and <c>Connection: Upgrade</c> last; a
 /// <c>-H 'Connection: …'</c> value is kept with <c>, Upgrade</c> appended. A <c>-H</c> header
@@ -33,14 +33,16 @@ internal static class WsUpgradeRequestFormatter
     /// <param name="method">The request method: <c>GET</c>, or the one <c>-X</c> names.</param>
     /// <param name="key">The <c>Sec-WebSocket-Key</c> value.</param>
     /// <param name="authorization">The <c>Authorization</c> value, or <see langword="null" /> for none.</param>
+    /// <param name="byteRange">The <c>Range</c> value after <c>bytes=</c>, from <see cref="RangeValue" />, or <see langword="null" /> for none.</param>
     /// <returns>The request head, Latin-1 encoded, ending with the blank line.</returns>
-    internal static byte[] Format(CurlUrl url, HttpRequestOptions options, string method, string key, string? authorization)
+    internal static byte[] Format(CurlUrl url, HttpRequestOptions options, string method, string key, string? authorization, string? byteRange = null)
     {
         WsCustomHeader[] customHeaders = [.. options.Headers.Select(entry => WsCustomHeader.Parse(HeadText(entry, options)))];
         StringBuilder head = new();
         head.Append(method).Append(' ').Append(RequestTarget(url)).Append(" HTTP/1.1\r\n");
         AppendHost(head, url, customHeaders);
         AppendUnlessOverridden(head, customHeaders, "Authorization", authorization);
+        AppendUnlessOverridden(head, customHeaders, "Range", byteRange is null ? null : "bytes=" + byteRange);
         AppendUnlessOverridden(head, customHeaders, "User-Agent", HeadText(options.UserAgent, options) ?? DefaultUserAgent);
         AppendUnlessOverridden(head, customHeaders, "Accept", "*/*");
         AppendUnlessOverridden(head, customHeaders, "Referer", HeadText(options.Referer, options));
@@ -69,6 +71,17 @@ internal static class WsUpgradeRequestFormatter
 
         return url.Query is null ? target.ToString() : target.Append('?').Append(Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(url.Query))).ToString();
     }
+
+    /// <summary>
+    /// Picks the byte range the upgrade asks for, as curl 8.21.0's <c>setup_range</c> does: a
+    /// non-zero <c>-C</c> offset <c>n</c> as <c>n-</c>, which wins over <c>-r</c>; otherwise the
+    /// <c>-r</c> text as typed; otherwise none (so <c>-C 0</c> alone asks for no range).
+    /// </summary>
+    /// <param name="resumeFrom">The <c>-C</c> offset, or <see langword="null" /> when not resuming.</param>
+    /// <param name="rangeText">The <c>-r</c> text, or <see langword="null" /> when none was given.</param>
+    /// <returns>The text to follow <c>bytes=</c>, or <see langword="null" /> for no <c>Range</c> header.</returns>
+    internal static string? RangeValue(long? resumeFrom, string? rangeText) =>
+        resumeFrom > 0 ? string.Create(CultureInfo.InvariantCulture, $"{resumeFrom}-") : rangeText;
 
     /// <summary>Decides whether an <c>-H</c> value names the header <paramref name="name" />, in any case, to set, blank or remove it.</summary>
     /// <param name="options">The HTTP options whose <c>-H</c> values are looked at.</param>

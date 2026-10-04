@@ -291,6 +291,14 @@ public sealed class DnsAnswerDecoderTests
     }
 
     [TestMethod]
+    public void Decode_ACnameLabelEndingExactlyAtTheMessageEnd_IsReadAndThenFailsWithOutOfRange()
+    {
+        var message = Message(Header("8180", 1, 1) + QuestionA + "C00C0005000100000E100002" + "0161");
+
+        Assert.AreEqual(DnsMessageFailure.OutOfRange, DnsAnswerDecoder.Decode(message, DnsRecordType.A).Failure);
+    }
+
+    [TestMethod]
     public void Decode_ACnamePointerPastTheMessage_FailsWithOutOfRange()
     {
         var message = Message(Header("8180", 1, 1) + QuestionA + "C00C0005000100000E100002" + "C0FF");

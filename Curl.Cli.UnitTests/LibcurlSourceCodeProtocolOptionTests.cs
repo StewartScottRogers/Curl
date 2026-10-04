@@ -295,7 +295,7 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
                 + "|--happy-eyeballs-timeout-ms|300|--disallow-username-in-url|--upload-flags|deleted|" + HttpUrl));
 
     private static CommandLineOptions Parse(string arguments) =>
-        CommandLineParser.Parse(["-s", .. arguments.Split('|')], _ => true).Options!;
+        OpenSslBuildParser.Parse(["-s", .. arguments.Split('|')], _ => true).Options!;
 
     /// <summary>The transfer's <c>curl_easy_setopt</c> lines: from after <c>curl_easy_init</c> to the list of options that cannot be generated.</summary>
     private static string SetoptLinesFor(string arguments)

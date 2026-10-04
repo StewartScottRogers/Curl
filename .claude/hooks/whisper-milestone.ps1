@@ -46,6 +46,12 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
+# Stewart's off switch (2026-10-03, "turn audio off", BL-1317): while this file exists,
+# nothing here speaks - not the hook's phrases, not the Backlog depth, not the factory's
+# "CI failure filed". One file outside the repository, so every lane and session obeys it
+# at once. Delete it to turn the whispers back on.
+if (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'Curl\audio-off')) { exit 0 }
+
 function Invoke-Whisper([string[]] $Phrases, [int] $PauseSeconds = 0) {
     # "BL-199" reads as "B L 199"; slashes, dashes and colons as pauses.
     function Get-Spoken([string]$Text) {

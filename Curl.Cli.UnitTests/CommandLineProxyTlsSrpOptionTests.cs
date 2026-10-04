@@ -19,7 +19,7 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     [TestMethod]
     public void Parse_NoneOfTheOptions_LeavesThemNotGiven()
     {
-        CommandLineOptions options = CommandLineParser.Parse([Url]).Options!;
+        CommandLineOptions options = OpenSslBuildParser.Parse([Url]).Options!;
 
         Assert.IsNull(options.ProxyTlsUser);
         Assert.IsNull(options.ProxyTlsPassword);
@@ -29,7 +29,7 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     [TestMethod]
     public void Parse_EveryOption_RecordsTheLastValueVerbatimApartFromTheTargetOptions()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = OpenSslBuildParser.Parse(
         [
             "--proxy-tlsuser", "u1", "--proxy-tlsuser", "proxyuser",
             "--proxy-tlspassword", "p1", "--proxy-tlspassword", "proxysecret",
@@ -50,7 +50,7 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     [TestMethod]
     public void Parse_EmptyProxyTlsUser_IsAccepted()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-tlsuser", string.Empty, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--proxy-tlsuser", string.Empty, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(string.Empty, result.Options.ProxyTlsUser);
@@ -61,7 +61,7 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     [DataRow("--proxy-tlsauthtype")]
     public void Parse_EmptyValue_RefusesAsBlank(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, string.Empty, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, string.Empty, Url]);
 
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
@@ -75,7 +75,7 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     [DataRow("SRP ")]
     public void Parse_ProxyTlsAuthTypeOtherThanSrp_RefusesAsUnsupported(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-tlsauthtype", value, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--proxy-tlsauthtype", value, Url]);
 
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
@@ -89,7 +89,7 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     [DataRow("--no-proxy-tlsauthtype")]
     public void Parse_NegatedOption_CannotBeReversed(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, Url]);
 
         CollectionAssert.AreEqual(
             new[] { $"curl: option {spelledOption}: the given option cannot be reversed with a --no- prefix", TryHelp },

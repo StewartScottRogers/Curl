@@ -8,12 +8,13 @@ using Curl.Protocol.Smb.Fakes;
 namespace Curl.Protocol.Smb;
 
 /// <summary>
-/// Pins an SMB transfer whose connection breaks (BL-1231), from <c>lib/smb.c</c> at
-/// <c>curl-8_21_0</c>: a write that throws is exit 55, <c>Send failure: Connection was
-/// reset</c> for a reset and <c>Failed sending data to the peer</c> otherwise; a read that
-/// throws is exit 56, <c>Recv failure: Connection was reset</c> or <c>Failure when receiving
-/// data from the peer</c>, keeping the bytes already written; the reset texts get a
-/// <c>-v</c> line and the fallback texts do not.
+/// Pins an SMB transfer whose connection breaks (BL-1231, BL-1344), from <c>lib/smb.c</c> at
+/// <c>curl-8_21_0</c>: a write that throws is exit 55, <c>Send failure: &lt;words&gt;</c> for
+/// any socket error (Winsock words on Windows, the error's own message elsewhere) and
+/// <c>Failed sending data to the peer</c> otherwise; a read that throws is exit 56,
+/// <c>Recv failure: &lt;words&gt;</c> or <c>Failure when receiving data from the peer</c>,
+/// keeping the bytes already written; the socket texts get a <c>-v</c> line and the fallback
+/// texts do not.
 /// </summary>
 [TestClass]
 public sealed class SmbProtocolHandlerIoFailureTests
@@ -29,107 +30,115 @@ public sealed class SmbProtocolHandlerIoFailureTests
     private const int SecondReadReplyRead = 6;
 
     [TestMethod]
-    [DataRow(NegotiateWrite, true, "Send failure: Connection was reset")]
-    [DataRow(NegotiateWrite, false, "Failed sending data to the peer")]
-    [DataRow(SessionSetupWrite, true, "Send failure: Connection was reset")]
-    [DataRow(SessionSetupWrite, false, "Failed sending data to the peer")]
-    [DataRow(TreeConnectWrite, true, "Send failure: Connection was reset")]
-    [DataRow(TreeConnectWrite, false, "Failed sending data to the peer")]
-    public async Task ExecuteAsync_DownloadWriteThrows_Exits55(int failingWrite, bool reset, string message)
+    [OSCondition(OperatingSystems.Windows)]
+    [DataRow(NegotiateWrite, SocketError.ConnectionReset, "Connection was reset")]
+    [DataRow(SessionSetupWrite, SocketError.ConnectionReset, "Connection was reset")]
+    [DataRow(TreeConnectWrite, SocketError.ConnectionReset, "Connection was reset")]
+    [DataRow(SessionSetupWrite, SocketError.ConnectionAborted, "Connection was aborted")]
+    public async Task ExecuteAsync_DownloadWriteSocketErrorOnWindows_Exits55WithWinsockWords(int failingWrite, SocketError error, string words)
     {
-        var connection = new ScriptedConnection(DownloadReplies()) { FailingWrite = failingWrite, Failure = Broken(reset) };
+        TransferResult result = await DownloadWithFailingWrite(failingWrite, Broken(error));
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl));
-
-        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
-        Assert.AreEqual(message, result.ErrorMessage);
-        Assert.AreEqual(0L, result.BytesTransferred);
-        Assert.IsTrue(connection.IsDisposed);
+        Assert.AreEqual("Send failure: " + words, result.ErrorMessage);
     }
 
     [TestMethod]
-    [DataRow(true, "Send failure: Connection was reset")]
-    [DataRow(false, "Failed sending data to the peer")]
-    public async Task ExecuteAsync_UploadWriteRequestThrows_Exits55WithNothingMoreSent(bool reset, string message)
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [DataRow(NegotiateWrite, SocketError.ConnectionReset)]
+    [DataRow(SessionSetupWrite, SocketError.ConnectionReset)]
+    [DataRow(TreeConnectWrite, SocketError.ConnectionReset)]
+    [DataRow(SessionSetupWrite, SocketError.ConnectionAborted)]
+    public async Task ExecuteAsync_DownloadWriteSocketErrorOffWindows_Exits55WithTheErrorsOwnMessage(int failingWrite, SocketError error)
     {
-        var connection = new ScriptedConnection(
-            SmbRecordedExchange.NegotiateResponse,
-            SmbRecordedExchange.SessionSetupAccepted,
-            SmbRecordedExchange.TreeConnectAccepted,
-            SmbRecordedExchange.UploadOpenCreated,
-            SmbRecordedExchange.WriteAccepted(11),
-            SmbRecordedExchange.CloseAccepted,
-            SmbRecordedExchange.TreeDisconnectAccepted)
-        { FailingWrite = UploadWriteRequestWrite, Failure = Broken(reset) };
-        var context = Context(SmbRecordedExchange.UploadUrl, upload: new MemoryStream(Encoding.ASCII.GetBytes(SmbRecordedExchange.FileContent)));
+        TransferResult result = await DownloadWithFailingWrite(failingWrite, Broken(error));
 
-        TransferResult result = await Handler(connection).ExecuteAsync(context);
-
-        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
-        Assert.AreEqual(message, result.ErrorMessage);
-        Assert.AreEqual(0L, result.Report!.UploadSize);
-        Assert.IsTrue(connection.Sent.AsSpan().EndsWith(SmbRecordedExchange.UploadOpenRequest));
+        Assert.AreEqual("Send failure: " + OwnWords(error), result.ErrorMessage);
     }
 
     [TestMethod]
-    [DataRow(true, "Recv failure: Connection was reset")]
-    [DataRow(false, "Failure when receiving data from the peer")]
-    public async Task ExecuteAsync_NegotiateReplyReadThrows_Exits56(bool reset, string message)
+    [DataRow(NegotiateWrite)]
+    [DataRow(SessionSetupWrite)]
+    [DataRow(TreeConnectWrite)]
+    public async Task ExecuteAsync_DownloadWriteThrowsWithNoSocketError_Exits55FailedSendingData(int failingWrite)
     {
-        var connection = new ScriptedConnection(DownloadReplies()) { FailingRead = NegotiateRead, Failure = Broken(reset) };
+        TransferResult result = await DownloadWithFailingWrite(failingWrite, Broken());
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl));
-
-        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
-        Assert.AreEqual(message, result.ErrorMessage);
-        CollectionAssert.AreEqual(SmbRecordedExchange.NegotiateRequest, connection.Sent);
+        Assert.AreEqual("Failed sending data to the peer", result.ErrorMessage);
     }
 
     [TestMethod]
-    [DataRow(true, "Recv failure: Connection was reset")]
-    [DataRow(false, "Failure when receiving data from the peer")]
-    public async Task ExecuteAsync_ReadReplyThrowsAfterAFullRead_Exits56CountingTheBytesWritten(bool reset, string message)
-    {
-        byte[] first = new byte[SmbReadRequest.MaxPayloadSize];
-        var output = new MemoryStream();
-        var connection = new ScriptedConnection(
-            SmbRecordedExchange.NegotiateResponse,
-            SmbRecordedExchange.SessionSetupAccepted,
-            SmbRecordedExchange.TreeConnectAccepted,
-            SmbRecordedExchange.OpenAccepted,
-            ReadResponse(first),
-            SmbRecordedExchange.ReadAccepted)
-        { FailingRead = SecondReadReplyRead, Failure = Broken(reset) };
-
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, output: output));
-
-        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
-        Assert.AreEqual(message, result.ErrorMessage);
-        Assert.AreEqual((long)SmbReadRequest.MaxPayloadSize, result.BytesTransferred);
-        Assert.AreEqual((long)SmbReadRequest.MaxPayloadSize, output.Length);
-    }
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_UploadWriteRequestResetOnWindows_Exits55WithWinsockWords() =>
+        await AssertUploadWriteRequestFails(Broken(SocketError.ConnectionReset), "Send failure: Connection was reset");
 
     [TestMethod]
-    public async Task ExecuteAsync_ResetBeforeTheSession_ReportsTheTextThenClosing()
-    {
-        var events = new TranscriptTransferEvents();
-        var connection = new ScriptedConnection(DownloadReplies()) { FailingWrite = SessionSetupWrite, Failure = Broken(reset: true) };
-
-        await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, events));
-
-        CollectionAssert.AreEqual(new[] { "* Send failure: Connection was reset", "* closing connection #0" }, events.Transcript.ToArray());
-    }
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_UploadWriteRequestResetOffWindows_Exits55WithTheErrorsOwnMessage() =>
+        await AssertUploadWriteRequestFails(Broken(SocketError.ConnectionReset), "Send failure: " + OwnWords(SocketError.ConnectionReset));
 
     [TestMethod]
-    public async Task ExecuteAsync_ResetAfterTheSession_ReportsTheTextThenShuttingDown()
-    {
-        var events = new TranscriptTransferEvents();
-        var connection = new ScriptedConnection(DownloadReplies()) { FailingWrite = TreeConnectWrite, Failure = Broken(reset: true) };
+    public async Task ExecuteAsync_UploadWriteRequestThrowsWithNoSocketError_Exits55FailedSendingData() =>
+        await AssertUploadWriteRequestFails(Broken(), "Failed sending data to the peer");
 
-        await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, events));
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    [DataRow(SocketError.ConnectionReset, "Connection was reset")]
+    [DataRow(SocketError.ConnectionAborted, "Connection was aborted")]
+    public async Task ExecuteAsync_NegotiateReplyReadSocketErrorOnWindows_Exits56WithWinsockWords(SocketError error, string words) =>
+        await AssertNegotiateReplyReadFails(Broken(error), "Recv failure: " + words);
 
-        CollectionAssert.AreEqual(new[] { "* Send failure: Connection was reset", "* shutting down connection #0" }, events.Transcript.ToArray());
-    }
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [DataRow(SocketError.ConnectionReset)]
+    [DataRow(SocketError.ConnectionAborted)]
+    public async Task ExecuteAsync_NegotiateReplyReadSocketErrorOffWindows_Exits56WithTheErrorsOwnMessage(SocketError error) =>
+        await AssertNegotiateReplyReadFails(Broken(error), "Recv failure: " + OwnWords(error));
+
+    [TestMethod]
+    public async Task ExecuteAsync_NegotiateReplyReadThrowsWithNoSocketError_Exits56FailureWhenReceiving() =>
+        await AssertNegotiateReplyReadFails(Broken(), "Failure when receiving data from the peer");
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_ReadReplyResetAfterAFullReadOnWindows_Exits56CountingTheBytesWritten() =>
+        await AssertReadReplyFailsAfterAFullRead(Broken(SocketError.ConnectionReset), "Recv failure: Connection was reset");
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_ReadReplyResetAfterAFullReadOffWindows_Exits56CountingTheBytesWritten() =>
+        await AssertReadReplyFailsAfterAFullRead(Broken(SocketError.ConnectionReset), "Recv failure: " + OwnWords(SocketError.ConnectionReset));
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReadReplyThrowsWithNoSocketErrorAfterAFullRead_Exits56CountingTheBytesWritten() =>
+        await AssertReadReplyFailsAfterAFullRead(Broken(), "Failure when receiving data from the peer");
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_ResetBeforeTheSessionOnWindows_ReportsTheTextThenClosing() =>
+        CollectionAssert.AreEqual(
+            new[] { "* Send failure: Connection was reset", "* closing connection #0" },
+            await TranscriptOfResetWrite(SessionSetupWrite));
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_ResetBeforeTheSessionOffWindows_ReportsTheTextThenClosing() =>
+        CollectionAssert.AreEqual(
+            new[] { "* Send failure: " + OwnWords(SocketError.ConnectionReset), "* closing connection #0" },
+            await TranscriptOfResetWrite(SessionSetupWrite));
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_ResetAfterTheSessionOnWindows_ReportsTheTextThenShuttingDown() =>
+        CollectionAssert.AreEqual(
+            new[] { "* Send failure: Connection was reset", "* shutting down connection #0" },
+            await TranscriptOfResetWrite(TreeConnectWrite));
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_ResetAfterTheSessionOffWindows_ReportsTheTextThenShuttingDown() =>
+        CollectionAssert.AreEqual(
+            new[] { "* Send failure: " + OwnWords(SocketError.ConnectionReset), "* shutting down connection #0" },
+            await TranscriptOfResetWrite(TreeConnectWrite));
 
     [TestMethod]
     [DataRow(NegotiateWrite, 0)]
@@ -141,7 +150,7 @@ public sealed class SmbProtocolHandlerIoFailureTests
         {
             FailingWrite = failingWrite,
             FailingRead = failingRead,
-            Failure = Broken(reset: false),
+            Failure = Broken(),
         };
 
         await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, events));
@@ -160,10 +169,88 @@ public sealed class SmbProtocolHandlerIoFailureTests
         await Assert.ThrowsAsync<OperationCanceledException>(async () => await Handler(connection).ExecuteAsync(context));
     }
 
-    private static IOException Broken(bool reset) =>
-        reset
-            ? new IOException("Unable to write data to the transport connection.", new SocketException((int)SocketError.ConnectionReset))
-            : new IOException("The connection broke.");
+    private static IOException Broken(SocketError error) =>
+        new("Unable to write data to the transport connection.", new SocketException((int)error));
+
+    private static IOException Broken() => new("The connection broke.");
+
+    // The words curl's OpenSSL build takes from strerror, which SocketException.Message is off Windows.
+    private static string OwnWords(SocketError error) => new SocketException((int)error).Message;
+
+    private static async Task<TransferResult> DownloadWithFailingWrite(int failingWrite, IOException failure)
+    {
+        var connection = new ScriptedConnection(DownloadReplies()) { FailingWrite = failingWrite, Failure = failure };
+
+        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl));
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual(0L, result.BytesTransferred);
+        Assert.IsTrue(connection.IsDisposed);
+        return result;
+    }
+
+    private static async Task AssertUploadWriteRequestFails(IOException failure, string message)
+    {
+        var connection = new ScriptedConnection(
+            SmbRecordedExchange.NegotiateResponse,
+            SmbRecordedExchange.SessionSetupAccepted,
+            SmbRecordedExchange.TreeConnectAccepted,
+            SmbRecordedExchange.UploadOpenCreated,
+            SmbRecordedExchange.WriteAccepted(11),
+            SmbRecordedExchange.CloseAccepted,
+            SmbRecordedExchange.TreeDisconnectAccepted)
+        { FailingWrite = UploadWriteRequestWrite, Failure = failure };
+        var context = Context(SmbRecordedExchange.UploadUrl, upload: new MemoryStream(Encoding.ASCII.GetBytes(SmbRecordedExchange.FileContent)));
+
+        TransferResult result = await Handler(connection).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+        Assert.AreEqual(0L, result.Report!.UploadSize);
+        Assert.IsTrue(connection.Sent.AsSpan().EndsWith(SmbRecordedExchange.UploadOpenRequest));
+    }
+
+    private static async Task AssertNegotiateReplyReadFails(IOException failure, string message)
+    {
+        var connection = new ScriptedConnection(DownloadReplies()) { FailingRead = NegotiateRead, Failure = failure };
+
+        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+        CollectionAssert.AreEqual(SmbRecordedExchange.NegotiateRequest, connection.Sent);
+    }
+
+    private static async Task AssertReadReplyFailsAfterAFullRead(IOException failure, string message)
+    {
+        byte[] first = new byte[SmbReadRequest.MaxPayloadSize];
+        var output = new MemoryStream();
+        var connection = new ScriptedConnection(
+            SmbRecordedExchange.NegotiateResponse,
+            SmbRecordedExchange.SessionSetupAccepted,
+            SmbRecordedExchange.TreeConnectAccepted,
+            SmbRecordedExchange.OpenAccepted,
+            ReadResponse(first),
+            SmbRecordedExchange.ReadAccepted)
+        { FailingRead = SecondReadReplyRead, Failure = failure };
+
+        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, output: output));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+        Assert.AreEqual((long)SmbReadRequest.MaxPayloadSize, result.BytesTransferred);
+        Assert.AreEqual((long)SmbReadRequest.MaxPayloadSize, output.Length);
+    }
+
+    private static async Task<string[]> TranscriptOfResetWrite(int failingWrite)
+    {
+        var events = new TranscriptTransferEvents();
+        var connection = new ScriptedConnection(DownloadReplies()) { FailingWrite = failingWrite, Failure = Broken(SocketError.ConnectionReset) };
+
+        await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, events));
+
+        return events.Transcript.ToArray();
+    }
 
     private static byte[][] DownloadReplies() =>
     [

@@ -41,12 +41,10 @@ namespace Curl.Protocol.Http;
 /// final head ends the stream instead of failing it.
 /// </param>
 /// <param name="openedLines">Reports curl's <c>-v</c> lines for the stream once it is opened, or <see langword="null" /> for none.</param>
-/// <param name="frameLog">Where the stream's frames are logged (BL-1073), or <see langword="null" /> for nowhere.</param>
+/// <param name="frameLog">Where the stream's frames are logged (BL-1073); <see cref="HttpFrameLog.Silent" /> for nowhere.</param>
 /// <param name="trace">Writes the stream's <c>--trace-config http/3</c> lines (BL-1168); one made with no events writes none.</param>
-internal sealed class Http3StreamConnection(Http3Session session, string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines, HttpFrameLog? frameLog, Http3StreamTrace trace) : IHttpStreamConnection
+internal sealed class Http3StreamConnection(Http3Session session, string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines, HttpFrameLog frameLog, Http3StreamTrace trace) : IHttpStreamConnection
 {
-    private readonly HttpFrameLog frameLog = frameLog ?? HttpFrameLog.Silent;
-
     /// <summary>
     /// The longest payload of a frame other than <c>DATA</c> read off a request stream, which
     /// is read whole; <c>DATA</c> of any length streams through <see cref="dataBuffer" />

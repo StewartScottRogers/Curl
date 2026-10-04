@@ -49,7 +49,10 @@ to negotiate the keys. SASL exchanges are awaited (`GetInitialResponseAsync`, `R
 SASL GSSAPI and NTLM (BL-538, ADR-0184): `SaslAuthenticator`, given an `ISecurityContextFactory`,
 answers both on one `SecurityContextSaslExchange` per exchange, for the SASL service on the
 URL's host: NTLM's Type 1 then Type 3; GSSAPI's raw Kerberos tokens until established, then the
-wrapped RFC 4752 security-layer answer (no layer, size 0, `--sasl-authzid`). Without a factory
+wrapped RFC 4752 security-layer answer (no layer, size 0, `--sasl-authzid`). An offer curl
+cannot answer gives `null` with `CancelReason` set to curl's `GSSAPI handshake failure (...)`
+line, worded as the SSPI or GSS-API build per `SaslAuthenticator.WordsGssapiFailuresAsSspi`
+(BL-1336). Without a factory
 both stay not offered; `Curl.Console` does not pass one yet (BL-852).
 Tests fake the seam with `ScriptedSecurityContext` and run the hand-built route against
 `Curl.Kerberos.UnitTests`' `FakeKdc` and `FakeGssAcceptor`, linked into the test project.

@@ -43,6 +43,17 @@ internal static class HttpTransferMessages
     internal const string HeaderWithoutColon = "Header without colon";
 
     /// <summary>
+    /// The exit 8 message for a head line holding a NUL byte (curl 8.21.0, <c>lib/http.c</c>).
+    /// </summary>
+    internal const string NulByteInHeader = "Nul byte in header";
+
+    /// <summary>
+    /// The exit 8 message for a second non-empty <c>Location</c> header whose value differs
+    /// from the first (curl 8.21.0, <c>http_header_l</c>).
+    /// </summary>
+    internal const string MultipleLocationHeaders = "Multiple Location headers";
+
+    /// <summary>
     /// The exit 8 message for a carriage return inside a head line rather than before its
     /// line feed.
     /// </summary>
@@ -60,9 +71,10 @@ internal static class HttpTransferMessages
     internal const string EmptyReply = "Empty reply from server";
 
     /// <summary>
-    /// The exit 56 message for a read the peer reset.
+    /// The prefix of the exit 56 message for a read a socket error failed, as
+    /// <see cref="CurlSocketErrorText" /> words it.
     /// </summary>
-    internal const string ConnectionReset = "Recv failure: Connection was reset";
+    internal const string ReceiveFailurePrefix = "Recv failure: ";
 
     /// <summary>
     /// The exit 56 message curl falls back to for any other failed read.
@@ -419,22 +431,17 @@ internal static class HttpTransferMessages
 
     /// <summary>
     /// Chooses the exit 56 message for a failed read: the TLS build's own text when the
-    /// connection ended without <c>close_notify</c> (ADR-0221), <see cref="ConnectionReset" />
-    /// when the peer reset the connection, and <see cref="ReceiveFailed" /> for anything else.
+    /// connection ended without <c>close_notify</c> (ADR-0221),
+    /// <c>Recv failure: &lt;words&gt;</c> from <see cref="CurlSocketErrorText" /> when a socket
+    /// error failed it (curl 8.21.0, <c>lib/cf-socket.c</c> line 1618), and
+    /// <see cref="ReceiveFailed" /> for anything else.
     /// </summary>
     /// <param name="exception">The failure the read threw.</param>
     /// <returns>The message.</returns>
     internal static string ReceiveFailure(IOException exception) =>
         exception is MissingCloseNotifyException
             ? exception.Message
-            : exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
-                ? ConnectionReset
-                : ReceiveFailed;
-
-    /// <summary>
-    /// The exit 55 message for a write the peer reset (measured, BL-174 Notes).
-    /// </summary>
-    internal const string SendConnectionReset = "Send failure: Connection was reset";
+            : CurlSocketErrorText.ReceiveFailure(exception) ?? ReceiveFailed;
 
     /// <summary>
     /// The exit 55 message curl falls back to for any other failed write: the text
@@ -443,15 +450,14 @@ internal static class HttpTransferMessages
     internal const string SendFailed = "Failed sending data to the peer";
 
     /// <summary>
-    /// Chooses the exit 55 message for a failed write: <see cref="SendConnectionReset" />
-    /// when the peer reset the connection, and <see cref="SendFailed" /> for anything else.
+    /// Chooses the exit 55 message for a failed write: <c>Send failure: &lt;words&gt;</c> from
+    /// <see cref="CurlSocketErrorText" /> when a socket error failed it (curl 8.21.0,
+    /// <c>lib/cf-socket.c</c> line 1562), and <see cref="SendFailed" /> for anything else.
     /// </summary>
     /// <param name="exception">The failure the write threw.</param>
     /// <returns>The message.</returns>
     internal static string SendFailure(IOException exception) =>
-        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
-            ? SendConnectionReset
-            : SendFailed;
+        CurlSocketErrorText.SendFailure(exception) ?? SendFailed;
 
     /// <summary>
     /// Formats the exit 28 message for a connect that the connect timeout or <c>-m</c> ended

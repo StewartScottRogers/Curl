@@ -53,10 +53,10 @@ Namespace `Curl.Cryptography`. It holds:
   bcrypt's salted one); `BcryptPbkdf` reuses it.
 - `Blowfish` (public, `IDisposable`): the block cipher, keys of 1 to 56 bytes -
   `EncryptBlock`, `DecryptBlock`, and the CBC mode of SSH's `blowfish-cbc`, `EncryptCbc`
-  and `DecryptCbc`. Not constant-time.
+  and `DecryptCbc`. Constant-time (ADR-0400).
 - `BcryptPbkdf` (public): OpenBSD's `bcrypt_pbkdf`, the KDF of encrypted
-  `openssh-key-v1` keys - `DeriveKey`, plus the internal bcrypt `ComputeHash`. Not
-  constant-time.
+  `openssh-key-v1` keys - `DeriveKey`, plus the internal bcrypt `ComputeHash`.
+  Constant-time (ADR-0400).
 - `Camellia` (public, `IDisposable`): RFC 3713, keys of 16, 24 or 32 bytes - `EncryptBlock`,
   `DecryptBlock`, and the CBC mode of TLS's Camellia suites (RFC 5932), `EncryptCbc` and
   `DecryptCbc`, plus the internal F, FL and FLINV functions. Not constant-time (ADR-0145).
@@ -128,17 +128,17 @@ Namespace `Curl.Cryptography`. It holds:
 - `Rc4` (public, `IDisposable`): the RC4 stream cipher, keys of 1 to 256 bytes -
   `ApplyKeyStream`, which keeps its place in the keystream between calls, and
   `DiscardKeyStream`, with `Rfc4345DiscardLength` (1536) for SSH's `arcfour128` and
-  `arcfour256`. Not constant-time.
+  `arcfour256`. Constant-time (ADR-0399).
 - `Des` (public, `IDisposable`): FIPS 46-3 DES, an 8-byte key whose parity bits are
   ignored and every weak key accepted (the BCL's `DES` refuses them; ADR-0156) -
   `EncryptBlock` and `DecryptBlock`, plus the internal round function `Round`. NTLM's
-  `LMOWFv1` and `DESL` use it. Not constant-time.
+  `LMOWFv1` and `DESL` use it. Constant-time (ADR-0396).
 - `Cast128SubstitutionBoxes` (internal): RFC 2144 Appendix A's S1 to S4 (`RoundBoxes`)
   and S5 to S8 (`KeyScheduleBoxes`).
 - `Cast128` (public, `IDisposable`): RFC 2144, keys of 5 to 16 bytes (12 rounds up to 10
   bytes, 16 above) - `EncryptBlock`, `DecryptBlock`, and the CBC mode of SSH's
   `cast128-cbc`, `EncryptCbc` and `DecryptCbc`, plus the internal round function
-  `Round`. The key schedule is RFC 2144 section 2.4 as a row table. Not constant-time.
+  `Round`. The key schedule is RFC 2144 section 2.4 as a row table. Constant-time (ADR-0398).
 - `Uint14Division` (internal): constant-time division of a secret 32-bit value by a public
   modulus below 2^14, NTRU Prime's `uint32_divmod_uint14` and `int32_mod_uint14`.
 - `SortingNetwork` (internal): djbsort's constant-time `crypto_sort_uint32`.
@@ -270,8 +270,9 @@ Namespace `Curl.Cryptography`. It holds:
   secret: select and swap with masks (`ConstantTime`), fixed-width limbs, never `/`, `%`
   or `BigInteger` on a secret. Compare tags and MACs with
   `CryptographicOperations.FixedTimeEquals`. Each public type says in its XML docs
-  whether it is constant-time; Blowfish, CAST-128, RC4, Camellia (ADR-0145), ARIA (ADR-0147) and DES (ADR-0156) are not,
-  by design, and say so.
+  whether it is constant-time. Camellia (ADR-0393), ARIA (ADR-0395), DES (ADR-0396),
+  CAST-128 (ADR-0398), RC4 (ADR-0399) and Blowfish (ADR-0400) read their tables by masked
+  scan and are.
 - **Zeroing.** Every secret, `stackalloc` temporaries and intermediate key material
   included, is cleared with `CryptographicOperations.ZeroMemory` in a `finally` block or
   in `Dispose`. Keyed types copy the key in their constructor, implement `IDisposable`,

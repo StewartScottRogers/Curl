@@ -260,7 +260,7 @@ public sealed class WsProtocolHandler(
             options.AuthSchemes,
             IsProxy: false);
         string? authorization = await CreateAuthorizationAsync(authRequest, options, authLines, context.Events, context.CancellationToken).ConfigureAwait(false);
-        byte[] request = WsUpgradeRequestFormatter.Format(context.Url, options, method, NewKey(), authorization);
+        byte[] request = WsUpgradeRequestFormatter.Format(context.Url, options, method, NewKey(), authorization, WsUpgradeRequestFormatter.RangeValue(context.ResumeFrom, context.RangeText));
         context.Events.ReportRequestHeader(request);
         await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
         context.Events.ReportInfo(WsInfoLines.RequestSent);
@@ -284,6 +284,15 @@ public sealed class WsProtocolHandler(
 
         ReportHead(context.Events, response.Head, refusal: null, challengeLines: [], problemScheme: null);
         log.UpgradeAccepted();
+        return await SwitchToWebSocketAsync(connection, context, response.Remaining, report, connectionNumber).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Takes an accepted upgrade on to WebSocket as curl 8.21.0 does: its <c>Received 101</c>
+    /// lines, then the frames (or, for <c>-I</c>, none), then the transfer's closing line.
+    /// </summary>
+    private async ValueTask<TransferResult> SwitchToWebSocketAsync(IConnection connection, ITransferContext context, byte[] alreadyReceived, TransferReport report, long connectionNumber)
+    {
         var trace = new WsFrameTrace(context.Events, TracesFrames);
         context.Events.ReportInfo(WsInfoLines.SwitchingToWebSocket);
         trace.UsingChunkSize();
@@ -294,8 +303,8 @@ public sealed class WsProtocolHandler(
         }
 
         TransferResult result = context.NoBody
-            ? EndWithoutFrames(context, response.Remaining, report, trace)
-            : await ExchangeFramesAsync(connection, context, response.Remaining, report, trace).ConfigureAwait(false);
+            ? EndWithoutFrames(context, alreadyReceived, report, trace)
+            : await ExchangeFramesAsync(connection, context, alreadyReceived, report, trace).ConfigureAwait(false);
         ReportTransferEnd(context.Events, result, connectionNumber);
         return result;
     }
@@ -400,7 +409,8 @@ public sealed class WsProtocolHandler(
     /// bytes, heads included; <c>%{size_delivered}</c> the payload bytes written, close frame
     /// payloads included (BL-777); <c>%{size_upload}</c> the upload frame; <c>%{size_request}</c>
     /// the upgrade request, the upload frame and every pong. A failure keeps the report, so
-    /// <c>%{http_code}</c> is still <c>101</c>. <c>-m</c> cancels the reads, and the
+    /// <c>%{http_code}</c> is still <c>101</c>. <c>--max-filesize</c> counts the frame bytes and
+    /// cuts the transfer with exit 63 (BL-1294). <c>-m</c> cancels the reads, and the
     /// cancellation escapes for the runner's exit 28 (ADR-0117).
     /// </remarks>
     private async Task<TransferResult> ExchangeFramesAsync(
@@ -410,7 +420,7 @@ public sealed class WsProtocolHandler(
         TransferReport report,
         WsFrameTrace trace)
     {
-        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events, context.DiagnosticLog, trace);
+        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events, context.DiagnosticLog, trace, context.MaxFileSize);
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload =
             (payload, token) => WriteAsync(context.Output, payload, token);
         long uploaded = 0;

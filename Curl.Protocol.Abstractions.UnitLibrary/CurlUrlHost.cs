@@ -45,7 +45,19 @@ internal static class CurlUrlHost
             return rejection == CurlUrlRejection.None;
         }
 
-        rejection = CurlUrlRejection.BadHostname;
+        bool accepted = TryNormalizeAddressOrName(host, out normalized, out idnHost);
+        rejection = accepted ? CurlUrlRejection.None : CurlUrlRejection.BadHostname;
+
+        return accepted;
+    }
+
+    /// <summary>
+    /// Normalises a host that is not bracketed: an IPv4 address in any form
+    /// <c>inet_aton</c> reads, or else a name. One trailing dot is allowed; an empty host
+    /// or two trailing dots are not.
+    /// </summary>
+    private static bool TryNormalizeAddressOrName(string host, out string normalized, out string idnHost)
+    {
         idnHost = normalized = string.Empty;
         string withoutTrailingDot = host.EndsWith('.') ? host[..^1] : host;
         if (withoutTrailingDot.Length == 0 || withoutTrailingDot.EndsWith('.'))
@@ -53,22 +65,14 @@ internal static class CurlUrlHost
             return false;
         }
 
-        bool accepted = CurlUrlIPv4Address.TryNormalize(withoutTrailingDot, out string address);
-        if (accepted)
+        if (CurlUrlIPv4Address.TryNormalize(withoutTrailingDot, out string address))
         {
             idnHost = normalized = address;
-        }
-        else
-        {
-            accepted = TryNormalizeName(host, out normalized, out idnHost);
+
+            return true;
         }
 
-        if (accepted)
-        {
-            rejection = CurlUrlRejection.None;
-        }
-
-        return accepted;
+        return TryNormalizeName(host, out normalized, out idnHost);
     }
 
     private static bool TryNormalizeName(string host, out string normalized, out string idnHost)

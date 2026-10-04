@@ -76,6 +76,13 @@
     rather than a FIN. Use it to measure what curl prints when the server resets the
     connection, as during a TLS handshake (BL-369). request.bin is then empty.
 
+.PARAMETER ResetAfterResponse
+    After sending each response (and after HoldOpenMilliseconds, when given), close the
+    connection with a zero linger time, so Windows sends a TCP RST rather than a FIN and
+    curl's next write fails with a connection reset at once. Use it to measure what curl
+    prints when a write fails after the server has spoken, as for a telnet negotiation
+    reply (BL-1312). Default off: close with a FIN.
+
 .PARAMETER HoldOpenMilliseconds
     After sending each response, keep the connection open instead of closing it, until
     curl closes its end or this many milliseconds pass without a byte from curl, and
@@ -563,6 +570,7 @@ param(
     [ValidateRange(1, 1000)] [int] $Connections = 1,
     [ValidateRange(0, 600000)] [int] $ResponseDelayMilliseconds = 0,
     [switch] $Reset,
+    [switch] $ResetAfterResponse,
     [ValidateRange(0, 600000)] [int] $HoldOpenMilliseconds = 0,
     [ValidateRange(0, 1000)] [int] $AnswerHeldRequests = 0,
     [ValidateRange(-1, [int]::MaxValue)] [int] $RespondAfterBodyBytes = -1,
@@ -697,7 +705,7 @@ function ConvertTo-CommandLineArgument {
 # The server runs in its own runspace so curl can run in this one. It returns one
 # byte array per connection served.
 $serveConnections = {
-    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen, [bool] $CloseNotify, [int] $AnswerHeld)
+    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen, [bool] $CloseNotify, [int] $AnswerHeld, [bool] $ResetAfterAnswer)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -811,6 +819,8 @@ $serveConnections = {
                 try { $stream.ShutdownAsync().Wait() } catch { }  # curl may have hung up already.
             }
         } finally {
+            # A zero linger time makes Close send RST instead of FIN.
+            if ($ResetAfterAnswer) { $client.LingerState = New-Object System.Net.Sockets.LingerOption($true, 0) }
             $client.Close()
         }
     }
@@ -2618,7 +2628,7 @@ try {
     } elseif ($Script) {
         [void] $server.AddScript($serveScriptedSession).AddArgument($listener).AddArgument($scriptSteps).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ScriptIdleMilliseconds).AddArgument($ScriptGapMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
-        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests)
+        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests).AddArgument([bool] $ResetAfterResponse)
     }
     if ($null -ne $server) { $serverRun = $server.BeginInvoke() }
 

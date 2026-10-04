@@ -162,7 +162,10 @@ internal sealed class TransferCredentialLookup(
         message is not null && use == NetrcUse.Required ? TransferResult.Failure(CurlExitCode.ReadError, message) : null;
 
     /// <summary>
-    /// Gets the credentials to send: a matching entry's merged with the URL's, else the URL's own.
+    /// Gets the credentials to send: a matching entry's, with the URL's user name when the entry has
+    /// no login, else the URL's own. The URL's password never fills an entry's missing password:
+    /// curl 8.21.0 sends <c>lo:</c> for <c>http://:up@host/</c> and an entry with only
+    /// <c>login lo</c> (measured 2026-10-03, BL-1356 Notes).
     /// </summary>
     /// <param name="result">The lookup in the netrc file.</param>
     /// <param name="urlUser">The URL's decoded user name, or <see langword="null" />.</param>
@@ -170,7 +173,7 @@ internal sealed class TransferCredentialLookup(
     /// <returns>The credentials, or <see langword="null" /> when neither gives a user name.</returns>
     private static NetworkCredential? CredentialsOf(NetrcLookupResult result, string? urlUser, string? urlPassword) =>
         result.Outcome == NetrcLookupOutcome.Found
-            ? new NetworkCredential(result.Login ?? urlUser ?? string.Empty, result.Password ?? urlPassword ?? string.Empty)
+            ? new NetworkCredential(result.Login ?? urlUser ?? string.Empty, result.Password ?? string.Empty)
             : CredentialsOfUrl(urlUser, urlPassword);
 
     /// <summary>

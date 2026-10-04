@@ -54,5 +54,5 @@ internal sealed class WriteGateStream(Stream inner, WriteGate gate) : Stream
 
     /// <inheritdoc />
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
-        new(gate.RunExclusiveAsync(() => inner.WriteAsync(buffer, cancellationToken).AsTask()));
+        gate.WriteExclusiveAsync(inner, buffer, cancellationToken);
 }

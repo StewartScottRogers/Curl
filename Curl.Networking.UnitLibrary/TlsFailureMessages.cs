@@ -20,7 +20,11 @@ namespace Curl.Networking;
 /// </remarks>
 internal static class TlsFailureMessages
 {
-    private const string SchannelUntrustedRoot =
+    /// <summary>
+    /// The Schannel build's exit 60 message for a chain that ends in an untrusted root, which
+    /// <see cref="SchannelFailureEcho" /> also reports under <c>-v</c> (BL-1323).
+    /// </summary>
+    internal const string SchannelUntrustedRoot =
         "schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted.";
 
     private const string SchannelCaCertificateFileAnchorsNothing =

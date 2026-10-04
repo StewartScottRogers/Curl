@@ -25,6 +25,12 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
     public bool FailWrites { get; set; }
 
     /// <summary>
+    /// Gets or sets the exception a <see langword="null" /> read chunk throws, or
+    /// <see langword="null" /> for a plain <see cref="IOException" /> with no socket error.
+    /// </summary>
+    public IOException? ReadFailure { get; set; }
+
+    /// <summary>
     /// Gets or sets the exception every write from <see cref="WritesBeforeFailure" /> on
     /// throws, or <see langword="null" /> for none.
     /// </summary>
@@ -62,7 +68,7 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
 
         if (chunk is null)
         {
-            throw new IOException("The scripted peer reset the connection.");
+            throw ReadFailure ?? new IOException("The scripted peer reset the connection.");
         }
 
         chunk.CopyTo(buffer);

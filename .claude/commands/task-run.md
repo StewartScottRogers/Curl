@@ -38,6 +38,24 @@ at its new path. It is the specification: its `Goal`, `Context` and
 As you go, record the plan's summary and anything learned under the task's `Notes`,
 and tick each acceptance box as you verify it.
 
+Up to nine lanes run on this machine at once, each in its own worktree:
+- Measure with `Measure-CodeQuality.ps1 -Library <name>[,<name>...]`, naming every
+  library the task changed in one call: it runs only the test projects that reach them,
+  once. Never measure the whole solution for a task's coverage criterion (BL-1318), and
+  never one library at a time: Curl.Console, Curl.Networking.UnitLibrary,
+  Curl.Protocol.Abstractions.UnitLibrary and Curl.Protocol.Http.UnitLibrary each reach
+  nearly every test project, so four separate runs cost BL-1360 its whole time limit.
+  Quote any path you pass (`-ResultsDirectory "C:\Users\Stewart Rogers\..."`): an
+  unquoted space split one run's path and left coverage files in the worktree.
+- To resume a task from its stash, apply only the stash's changes, never whole files:
+  `git diff <sha>^1 <sha> -- <files> | git apply --3way` for tracked files, and
+  `git checkout <sha>^3 -- <new files>` for the ones it added (`git stash show` does not
+  list those). Copying files from the stash undoes what other lanes changed since.
+- Stop only a process you started yourself, by its PID. Never stop processes by name or
+  command line across the machine (`Stop-Process -Name dotnet`, or every process whose
+  command line holds `Measure-CodeQuality`): those are other lanes' runs, and killing
+  them cost five tasks their whole time limit on 2026-10-03.
+
 ## 4. File the outcome
 A task never stays in `Doing` when you finish. It ends in one of these:
 - **Finished.** Every box is ticked and every gate is green:

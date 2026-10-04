@@ -260,6 +260,85 @@ public sealed class ConnectAttemptTraceEventsTests
     }
 
     [TestMethod]
+    public void MaxTimeOnAPlainConnect_WritesTheTimeoutsSetAndGivesLines()
+    {
+        // curl -s -v --trace-config timer -m 5 http://127.0.0.1:P/ (BL-1258 Notes).
+        var inner = new CountingTransferEvents();
+        var events = new ConnectAttemptTraceEvents(inner, "127.0.0.1", false, false, tracesTimer: true, transferTimeout: TimeSpan.FromSeconds(5));
+
+        events.ConnectStarting();
+        events.ReportInfo("  Trying 127.0.0.1:48763...");
+        events.AttemptConnected(IPv4);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[TIMER] [TIMEOUT] set for 5000000ns",
+                "  Trying 127.0.0.1:48763...",
+                "[TIMER] [TIMEOUT] gives multi timeout in 5000ms",
+                "[TIMER] [HAPPY_EYEBALLS] cleared",
+            },
+            inner.Calls);
+    }
+
+    [TestMethod]
+    [DataRow(5, 1, "CONNECTTIMEOUT", 1000, "[TIMER] [CONNECTTIMEOUT] expires in 1000000ns", "[TIMER] [TIMEOUT] expires in 5000000ns")]
+    [DataRow(1, 5, "TIMEOUT", 1000, "[TIMER] [TIMEOUT] expires in 1000000ns", "[TIMER] [CONNECTTIMEOUT] expires in 5000000ns")]
+    public void MaxTimeAndAConnectTimeout_SetBothAndTheNearestGivesTheMultiTimeout(
+        int maxTimeSeconds, int connectTimeoutSeconds, string nearest, int nearestMilliseconds, string firstExpiry, string secondExpiry)
+    {
+        // curl -s -v --trace-config network -m 5 --connect-timeout 1 (and -m 1 --connect-timeout 5) http://127.0.0.1:P/ (BL-1258 Notes).
+        var inner = new CountingTransferEvents();
+        var events = new ConnectAttemptTraceEvents(
+            inner, "127.0.0.1", false, false, tracesTimer: true, tracesTimerExpiry: true,
+            TimeSpan.FromSeconds(connectTimeoutSeconds), TimeSpan.FromSeconds(maxTimeSeconds));
+
+        events.ConnectStarting();
+        events.ReportInfo("  Trying 127.0.0.1:48763...");
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                $"[TIMER] [TIMEOUT] set for {maxTimeSeconds * 1000000}ns",
+                $"[TIMER] [CONNECTTIMEOUT] set for {connectTimeoutSeconds * 1000000}ns",
+                "  Trying 127.0.0.1:48763...",
+                firstExpiry,
+                secondExpiry,
+                $"[TIMER] [{nearest}] gives multi timeout in {nearestMilliseconds}ms",
+            },
+            inner.Calls);
+    }
+
+    [TestMethod]
+    public void MaxTimeAcrossTwoFamilies_GivesTheTimeoutLessTheSecondFamilysDelay()
+    {
+        // curl -s -v --trace-config timer -m 5 http://localhost:P/, IPv4 winning: 4791ms measured,
+        // 4800ms from the configured delays (BL-1258 Notes, ADR-0357).
+        var inner = new CountingTransferEvents();
+        var events = new ConnectAttemptTraceEvents(inner, "localhost", false, false, tracesTimer: true, transferTimeout: TimeSpan.FromSeconds(5));
+
+        events.ConnectStarting();
+        events.RaceStarting(TimeSpan.FromMilliseconds(200));
+        events.ReportInfo("  Trying [::1]:48763...");
+        events.SecondFamilyDue();
+        events.ReportInfo("  Trying 127.0.0.1:48763...");
+        events.AttemptConnected(IPv4);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[TIMER] [TIMEOUT] set for 5000000ns",
+                "  Trying [::1]:48763...",
+                "[TIMER] [HAPPY_EYEBALLS] set for 200000ns",
+                "[TIMER] [HAPPY_EYEBALLS] gives multi timeout in 200ms",
+                "  Trying 127.0.0.1:48763...",
+                "[TIMER] [TIMEOUT] gives multi timeout in 4800ms",
+                "[TIMER] [HAPPY_EYEBALLS] cleared",
+            },
+            inner.Calls);
+    }
+
+    [TestMethod]
     public void AConnectTimeoutShorterThanTheSecondFamilysDelay_GivesTheMultiTimeoutRoundedUp()
     {
         var inner = new CountingTransferEvents();

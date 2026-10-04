@@ -22,6 +22,7 @@ public sealed class HttpVersionMappingTests
     [DataRow(RequestedHttpVersion.Http2PriorKnowledge, HttpVersionPreference.Http2PriorKnowledge)]
     [DataRow(RequestedHttpVersion.Http3, HttpVersionPreference.Http3)]
     [DataRow(RequestedHttpVersion.Http3Only, HttpVersionPreference.Http3Only)]
+    [DataRow((RequestedHttpVersion)99, HttpVersionPreference.Http11)]
     public void ToHttpVersionPreference_MapsEachVersionOption(RequestedHttpVersion? version, HttpVersionPreference expected)
     {
         Assert.AreEqual(expected, HttpVersionMapping.ToHttpVersionPreference(version));
@@ -80,7 +81,7 @@ public sealed class HttpVersionMappingTests
     [DataRow("--http3-only", HttpVersionPreference.Http3Only)]
     public void HttpRequestOptionsFromCommandLine_Http2OrHttp3Option_SetsTheVersion(string option, HttpVersionPreference expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([option, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([option, Url]);
         Assert.IsTrue(result.IsAccepted);
 
         Assert.AreEqual(expected, HttpRequestOptionsMapping.FromCommandLine(result.Options).Version);
@@ -88,7 +89,7 @@ public sealed class HttpVersionMappingTests
 
     private static string OfferedBy(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(arguments);
         Assert.IsTrue(result.IsAccepted);
 
         CurlTransports transports = CurlComposition.CreateTransports(result.Options, TimeProvider.System);

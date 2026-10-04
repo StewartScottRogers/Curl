@@ -11,8 +11,8 @@ namespace Curl.Cryptography;
 /// interleaved across the blocks.
 /// </summary>
 /// <remarks>
-/// Not constant-time: its core is Blowfish, whose S-box lookups depend on the password
-/// (ADR-0118). Every intermediate hash and the Blowfish state are zeroed before returning.
+/// Constant-time in the password and the salt: its core is Blowfish, whose S-box look-ups
+/// read every entry and keep the one they need by mask (ADR-0400). Every intermediate hash and the Blowfish state are zeroed before returning.
 /// </remarks>
 public static class BcryptPbkdf
 {

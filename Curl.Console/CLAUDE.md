@@ -125,7 +125,9 @@ name already taken is refused with `File exists` and exit 23. Measured on curl 8
 `TransferContextFactory` builds each transfer's context from the parsed options; the
 context carries the `-r` text as given (`RangeText`, which the HTTP handler sends verbatim)
 and its parsed range (`ByteRangeParser`; text that names no range ends the transfer with exit
-33 before it is dispatched, except on an `http`/`https` URL, BL-386), the `-C` offset and the
+33 before it is dispatched only on an `sftp`/`scp` URL; every other handler gets it with a `null`
+range, as curl 8.21.0 hands it on: FTP and file parse it themselves, HTTP, RTSP and WebSocket send
+it, the rest ignore it, BL-386, BL-1322), the `-C` offset and the
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
 Every context also carries `Http`, which `HttpRequestOptionsMapping` fills from `-X`,
@@ -266,8 +268,9 @@ Under `-n`, `--netrc-file` or `--netrc-optional` the netrc file has its say too,
 `-u`'s. A `-u` with a user name wins and no file is read. The file is the `--netrc-file` one, else
 `.netrc` in `HOME` (on Windows `_netrc` after it, and `USERPROFILE` when `HOME` is not set), read
 through the runner's `IDataFileReader` and environment. The URL's percent-decoded user name picks
-the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; with no entry the
-URL's user and password are sent. A required file that is missing or malformed fails each URL with
+the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; an entry with no
+login takes the URL's user name, and one with no password sends an empty one, never the URL's
+(BL-1356); with no entry the URL's user and password are sent. A required file that is missing or malformed fails each URL with
 `curl: (26) .netrc error: no such file` or `syntax error` before anything is sent;
 `--netrc-optional` ignores both. When the file is in use, `TransferCredentialLookup.ForRedirectHops`
 gives `RedirectFollower` the same lookup for each redirect hop's URL, so every hop sends its own
@@ -335,7 +338,9 @@ as a glob and closes after the last transfer (ADR-0046): `-v` is `Curl.Output`'s
 output is a terminal; a trace is its `TraceTransferEventWriter`, stamped under `--trace-time`, into
 the named file (opened once per run, truncated), standard output for `-`, standard error for `%`,
 and standard error, with no warning, for a file that cannot be opened. On Windows each is text
-mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). Under `--trace-ids` (or `-vv`) each transfer
+mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). A transfer URL curl's parser rejects is
+reported to the transfer's events before connecting as the info line `URL rejected: <reason>`,
+ahead of its `curl: (3)` (or `(67)`) line, as curl 8.21.0's `failf` does (BL-1332). Under `--trace-ids` (or `-vv`) each transfer
 reports through a `TraceIdsTransferEvents` view, so its lines carry `[<xfer>-<conn>] ` after the
 stamp, `[<xfer>-x] ` for the `--resolve` and `-b` lines before it connects (ADR-0202, BL-648).
 Under `--trace-config read` (or `all`, `-vvv`, `-vvvv`) the runner writes curl's
@@ -347,7 +352,10 @@ HTTP/1.x `-d` or `-T` body's upload reader lines (ADR-0383, BL-1189).
 Under `--trace-config multi` (or `network`, `all`, `-vvvv`) the runner writes curl's `[MULTI] [INIT]`
 lines up to `[SETUP] -> [CONNECT]` before that, and `MultiStateTraceEvents`, inside the `[READ]` and
 `[WRITE]` events, writes each later group of `[MULTI]` lines beside the transfer line curl writes it
-next to (ADR-0382, BL-1188).
+next to (ADR-0382, BL-1188). Its poll lines give `timeouts=` and `tinternal=` from `TransferTimers`
+(a positive `-m` and `--connect-timeout`), and under `--trace-config timer` the response wait's
+`[TIMER]` lines (`TransferTimers.WaitLines`) go between its `PERFORMING` poll lines; with the multi
+not traced, `ResponseWaitTimerTraceEvents` writes them after `Request completely sent off` (ADR-0401, BL-1258).
 The lines are only as complete as what the
 handler and connector report (BL-242 Notes name the follow-ups).
 

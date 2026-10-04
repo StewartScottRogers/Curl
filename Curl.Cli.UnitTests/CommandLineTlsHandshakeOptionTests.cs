@@ -21,7 +21,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [TestMethod]
     public void Parse_NoneOfTheOptions_LeavesThemNotGiven()
     {
-        CommandLineOptions options = CommandLineParser.Parse([Url]).Options!;
+        CommandLineOptions options = OpenSslBuildParser.Parse([Url]).Options!;
 
         Assert.IsNull(options.Curves);
         Assert.IsNull(options.SignatureAlgorithms);
@@ -41,7 +41,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [TestMethod]
     public void Parse_EveryValueOption_RecordsTheLastValueVerbatim()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = OpenSslBuildParser.Parse(
         [
             "--curves", "P-256", "--curves", "X25519:P-384",
             "--sigalgs", "x", "--sigalgs", "rsa_pss_rsae_sha256:ECDSA+SHA256",
@@ -75,7 +75,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [DataRow("--tlsauthtype")]
     public void Parse_EmptyValue_RefusesAsBlank(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, string.Empty, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, string.Empty, Url]);
 
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
@@ -86,7 +86,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [TestMethod]
     public void Parse_EmptyTlsPassword_IsAccepted()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--tlspassword", string.Empty, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--tlspassword", string.Empty, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(string.Empty, result.Options.TlsPassword);
@@ -98,7 +98,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [DataRow("SRP ")]
     public void Parse_TlsAuthTypeOtherThanSrp_RefusesAsUnsupported(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--tlsauthtype", value, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--tlsauthtype", value, Url]);
 
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
@@ -112,7 +112,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [DataRow(new[] { "--no-tls-earlydata", "--tls-earlydata" }, true)]
     public void Parse_TlsEarlyData_TheLastSpellingWins(string[] arguments, bool expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([.. arguments, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.TlsEarlyData);
@@ -130,7 +130,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [DataRow("--no-tlsauthtype")]
     public void Parse_NegatedValueOption_CannotBeReversed(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, Url]);
 
         CollectionAssert.AreEqual(
             new[] { $"curl: option {spelledOption}: the given option cannot be reversed with a --no- prefix", TryHelp },
@@ -140,7 +140,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [TestMethod]
     public void Parse_SslSessionsFileLikeAFlag_WarnsAndKeepsIt()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ssl-sessions", "-x", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--ssl-sessions", "-x", Url]);
 
         Assert.AreEqual("-x", result.Options!.SslSessionsFile);
         CollectionAssert.AreEqual(new[] { "Warning: The filename argument '-x' looks like a flag." }, result.WarningLines.ToArray());
@@ -149,7 +149,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [TestMethod]
     public void Parse_SslSessions_IsSharedByEveryGroup()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, "--next", "--ssl-sessions", "sess.bin", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([Url, "--next", "--ssl-sessions", "sess.bin", Url]);
 
         Assert.AreEqual("sess.bin", result.Groups[0].SslSessionsFile);
         Assert.AreEqual("sess.bin", result.Groups[1].SslSessionsFile);
@@ -166,7 +166,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [DataRow("ecl:x")]
     public void Parse_EchKeyword_RecordsTheModeUnchecked(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ech", value, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--ech", value, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(value, result.Options.Ech);
@@ -184,7 +184,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     public void Parse_EchModeLibcurlAccepts_IsNotMalformed(string value)
     {
         // libcurl's setopt_ech (curl 8.21.0) accepts the four keywords, "pn:" with a name and "ecl:" with a list.
-        CommandLineOptions options = CommandLineParser.Parse(["--ech", value, Url]).Options!;
+        CommandLineOptions options = OpenSslBuildParser.Parse(["--ech", value, Url]).Options!;
 
         Assert.IsFalse(options.EchModeIsMalformed);
     }
@@ -201,7 +201,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     {
         // curl --ech bogus https://... -> curl: (43) setopt 0x2855 got bad argument (ECH build, BL-1107);
         // setopt_ech compares case-sensitively, so a keyword or prefix in another case is refused too.
-        CommandLineParseResult result = CommandLineParser.Parse(["--ech", value, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--ech", value, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.EchModeIsMalformed);
@@ -210,7 +210,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [TestMethod]
     public void Parse_NoEchMode_IsNotMalformed()
     {
-        CommandLineOptions options = CommandLineParser.Parse(["--ech", "pn:example.com", Url]).Options!;
+        CommandLineOptions options = OpenSslBuildParser.Parse(["--ech", "pn:example.com", Url]).Options!;
 
         Assert.IsFalse(options.EchModeIsMalformed);
     }
@@ -220,7 +220,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [DataRow("PN:ab", "ab")]
     public void Parse_EchPublicName_RecordsTheNameWithoutItsPrefix(string value, string expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ech", "true", "--ech", value, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--ech", "true", "--ech", value, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.EchPublicName);
@@ -232,7 +232,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [DataRow("ECL:ab", "ab")]
     public void Parse_EchConfigList_RecordsTheListWithoutItsPrefix(string value, string expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ech", value, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--ech", value, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.EchConfigList);
@@ -293,7 +293,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     {
         string[] arguments = value is null ? [option, "--bogus"] : [option, value, "--bogus"];
 
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(arguments);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.EngineListRequested);
@@ -303,7 +303,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [TestMethod]
     public void Parse_EngineListCased_IsAnEngineName()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--engine", "LIST", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--engine", "LIST", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.EngineListRequested);
@@ -313,7 +313,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [TestMethod]
     public void Parse_DumpCaEmbed_EndsTheCommandLineAsARequestForInformation()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--dump-ca-embed", "--bogus"]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--dump-ca-embed", "--bogus"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.CaEmbedDumpRequested);
@@ -335,7 +335,7 @@ public sealed class CommandLineTlsHandshakeOptionTests
     }
 
     private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader) =>
-        CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+        OpenSslBuildParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
     {

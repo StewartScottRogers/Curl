@@ -25,6 +25,7 @@ proxy code.
 - `TelnetReceiver` turns received bytes into output data and replies, byte for byte
   as curl 8.21.0 does; it is pure, with no I/O.
 - `TelnetOptionSide` is RFC 1143 option state for one side of the connection.
+- `TelnetOutbox` queues, in order, the reply writes a read calls for and the `-v` reports around them.
 - `TelnetOptionParser` reads `ITransferContext.TelnetOptions` (`-t`) into
   `TelnetOptionValues` once connected, refusing a bad option with exit 48 or 49
   before a byte is sent. It first adds the `-u` user name as the NEW-ENVIRON variable
@@ -32,9 +33,14 @@ proxy code.
   refuses BINARY both ways; `WS` makes this side offer NAWS and is the size sent once
   NAWS is agreed (0x0 without it, since curl agrees to NAWS regardless).
 
-A connection read that fails ends the session with exit 0, a send that fails with
-exit 55 and an output write that fails with exit 23, as curl 8.21.0 on Windows does
-(measured in BL-077's Notes).
+A connection read that fails ends the session with exit 0, an upload send that fails
+with exit 55 and an output write that fails with exit 23, as curl 8.21.0 on Windows
+does (measured in BL-077's Notes). Each negotiation reply goes out as its own write
+through `TelnetOutbox`, which also queues the `-v` lines around it so they keep curl's
+order; a reply write failing with a `SocketException` inside its `IOException` is
+reported as `Sending data failed (N)` (its `NativeErrorCode`) and the session goes on,
+as curl's `send_negotiation` and `sendsuboption` do (BL-1307); any other reply write
+failure still ends it with exit 55.
 
 Curl's own diagnostic log (`--log-level`, ADR-0222, BL-928): `TelnetDiagnosticLog`
 writes component `telnet` from `ITransferContext.DiagnosticLog` - the failure that ends

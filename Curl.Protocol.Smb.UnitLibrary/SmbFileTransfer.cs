@@ -20,7 +20,9 @@ namespace Curl.Protocol.Smb;
 /// reply it cannot receive (exit 56), ends the transfer at once, and a tree connect or open whose
 /// bytes would pass 1024 is exit 63 with nothing sent, as curl closes the connection on
 /// either. An upload counts the bytes each write response says were written, as curl's
-/// <c>%{size_upload}</c> does, and writes the next piece from there.
+/// <c>%{size_upload}</c> does, and writes the next piece from there. A download under
+/// <c>-I</c> ends at the first bytes read with exit 8, and one past <c>--max-filesize</c>
+/// writes the bytes allowed and ends with exit 63; both close the file and disconnect first.
 /// </remarks>
 /// <param name="connection">The connection the session was set up on.</param>
 /// <param name="reader">Reads the server's messages from <paramref name="connection" />.</param>
@@ -141,9 +143,9 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
             }
 
             ReportDataReceived(data.Span);
-            if (await WriteAsync(data, offset).ConfigureAwait(false) is { } writeFailure)
+            if (await DeliverAsync(data, offset).ConfigureAwait(false) is { } stopped)
             {
-                return (writeFailure, false);
+                return (stopped, false);
             }
 
             offset += data.Length;
@@ -198,6 +200,28 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
         {
             context.Events.ReportDataReceived(data);
         }
+    }
+
+    // A read's bytes pass through curl's download writer (lib/sendf.c cw_download_write):
+    // under -I the first bytes end the download with exit 8 and write nothing; past
+    // --max-filesize, counted from the file's first byte, the bytes still allowed are
+    // written and the download ends with exit 63. Null means carry on reading.
+    private async ValueTask<TransferResult?> DeliverAsync(ReadOnlyMemory<byte> data, long offset)
+    {
+        if (context.NoBody && !data.IsEmpty)
+        {
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, SmbMessages.WeirdServerReply, offset);
+        }
+
+        long allowed = context.MaxFileSize is > 0 and long max ? Math.Min(max - offset, data.Length) : data.Length;
+        if (await WriteAsync(data[..(int)allowed], offset).ConfigureAwait(false) is { } writeFailure)
+        {
+            return writeFailure;
+        }
+
+        return allowed < data.Length
+            ? TransferResult.Failure(CurlExitCode.FilesizeExceeded, SmbMessages.MaxFileSizeExceeded(context.MaxFileSize!.Value, offset + allowed), offset + allowed)
+            : null;
     }
 
     private async ValueTask<TransferResult?> WriteAsync(ReadOnlyMemory<byte> data, long offset)

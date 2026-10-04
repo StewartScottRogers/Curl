@@ -1,4 +1,5 @@
 using System.Net;
+using System.Runtime.CompilerServices;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Http;
@@ -31,6 +32,7 @@ internal sealed class HttpFirstByteTimingConnection(IConnection connection, Time
     public EndPoint? RemoteEndPoint => connection.RemoteEndPoint;
 
     /// <inheritdoc />
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         int read = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);

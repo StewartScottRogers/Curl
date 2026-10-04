@@ -145,9 +145,12 @@ public sealed class BlowfishTests
     public void EncryptCbc_EmptySource_WritesNothing()
     {
         using Blowfish blowfish = new(Convert.FromHexString(ChainKey));
+        byte[] buffer = [0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5];
 
-        blowfish.EncryptCbc(Convert.FromHexString(ChainVector), [], []);
-        blowfish.DecryptCbc(Convert.FromHexString(ChainVector), [], []);
+        blowfish.EncryptCbc(Convert.FromHexString(ChainVector), [], buffer.AsSpan(0, 0));
+        blowfish.DecryptCbc(Convert.FromHexString(ChainVector), [], buffer.AsSpan(0, 0));
+
+        Assert.AreEqual("A5A5A5A5A5A5A5A5", Convert.ToHexString(buffer));
     }
 
     [TestMethod]
@@ -164,6 +167,15 @@ public sealed class BlowfishTests
     public void Constructor_56ByteKey_IsAccepted()
     {
         using Blowfish blowfish = new(new byte[Blowfish.MaximumKeySize]);
+        byte[] plaintext = new byte[Blowfish.BlockSize];
+        byte[] ciphertext = new byte[Blowfish.BlockSize];
+        byte[] decrypted = new byte[Blowfish.BlockSize];
+
+        blowfish.EncryptBlock(plaintext, ciphertext);
+        blowfish.DecryptBlock(ciphertext, decrypted);
+
+        CollectionAssert.AreNotEqual(plaintext, ciphertext);
+        CollectionAssert.AreEqual(plaintext, decrypted);
     }
 
     [TestMethod]

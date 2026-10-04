@@ -29,6 +29,9 @@ public sealed partial class SslStreamTlsProviderTests
 
     private const bool OpenSslBuild = false;
 
+    private const string UntrustedRootLine =
+        "schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted.";
+
     private const string CorruptCertificatePem = "-----BEGIN CERTIFICATE-----\nnot base64 !!!\n-----END CERTIFICATE-----\n";
 
     // Base64, so ImportFromPem decodes it, but not a certificate, so it throws.
@@ -191,6 +194,42 @@ public sealed partial class SslStreamTlsProviderTests
             result.Result.ErrorMessage);
     }
 
+    // curl 8.21.0 Schannel -v, untrusted self-signed certificate: failf writes the exit 60 text
+    // as an info line after "ALPN: curl offers http/1.1", before "closing connection #0"
+    // (measured 2026-10-03, BL-1323).
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithUntrustedSelfSignedCertificateInTheSchannelBuild_ReportsSecEUntrustedRootOnceAfterTheFailedHandshake()
+    {
+        var handshakesBeforeEcho = -1;
+        RecordingTransferEvents? events = null;
+        events = new RecordingTransferEvents { OnInfo = _ => handshakesBeforeEcho = events!.Handshakes.Count };
+
+        var result = await PinReportingHandshakeAsync(new TlsClientOptions(), events, SchannelBuild, ["http/1.1"]);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+        Assert.AreEqual(UntrustedRootLine, result.ErrorMessage);
+        Assert.AreEqual(UntrustedRootLine, Assert.ContainsSingle(events.Info));
+        Assert.AreEqual(1, handshakesBeforeEcho);
+        Assert.IsTrue(Assert.ContainsSingle(events.Handshakes).Failed);
+    }
+
+    // Neither -k in the Schannel build nor the OpenSSL build refusing the same certificate prints it.
+    [TestMethod]
+    [DataRow(SchannelBuild, true)]
+    [DataRow(OpenSslBuild, false)]
+    public async Task AuthenticateAsClientAsync_WithUntrustedSelfSignedCertificateInsecureOrInTheOpenSslBuild_ReportsNoSecEUntrustedRootLine(bool matchesSchannelBuild, bool insecure)
+    {
+        var events = new RecordingTransferEvents();
+
+        var result = await PinReportingHandshakeAsync(new TlsClientOptions(Insecure: insecure), events, matchesSchannelBuild, ["http/1.1"]);
+
+        CollectionAssert.DoesNotContain(events.Info, UntrustedRootLine);
+        if (result.Connection is { } connection)
+        {
+            await connection.DisposeAsync();
+        }
+    }
+
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithUntrustedSelfSignedCertificateInTheOpenSslBuild_ReportsVerifyResult18()
     {
@@ -335,6 +374,42 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(expected, result.ErrorMessage);
         Assert.IsTrue(client.IsDisposed);
+    }
+
+    // curl 8.21.0 Schannel -v, --tlsv1.3 against a TLS 1.2-only server, exit 35: failf writes
+    // the text as an info line after the ALPN offer, before "closing connection #0" (measured
+    // 2026-10-03, BL-1324); the OpenSSL build's lines are BL-1178's and gain nothing here.
+    [TestMethod]
+    [DataRow(SchannelBuild, 1)]
+    [DataRow(OpenSslBuild, 0)]
+    public async Task AuthenticateAsClientAsync_WhenTheServerClosesMidHandshake_EchoesTheFailureOnlyInTheSchannelBuild(
+        bool matchesSchannelBuild,
+        int expectedEchoes)
+    {
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var closeAfterClientHello = Task.Run(async () =>
+        {
+            await server.ReadExactlyAsync(new byte[1], CancellationToken.None);
+            await server.DisposeAsync();
+        });
+        var handshakesAtLastInfo = -1;
+        RecordingTransferEvents? events = null;
+        events = new RecordingTransferEvents { OnInfo = _ => handshakesAtLastInfo = events!.Handshakes.Count };
+        var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true), matchesSchannelBuild);
+
+        var result = await provider.AuthenticateAsClientAsync(
+            new StreamConnection(client, ServerEndPoint), CertificateHost, events, false, ["http/1.1"], CancellationToken.None);
+
+        await closeAfterClientHello;
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual(expectedEchoes, events.Info.Count(line => line == result.ErrorMessage));
+        if (matchesSchannelBuild)
+        {
+            Assert.AreEqual("schannel: failed to receive handshake, SSL/TLS connection failed", result.ErrorMessage);
+            Assert.AreEqual(result.ErrorMessage, events.Info[^1]);
+            Assert.AreEqual(1, handshakesAtLastInfo);
+            Assert.IsTrue(Assert.ContainsSingle(events.Handshakes).Failed);
+        }
     }
 
     // BL-369 measured both builds against a server that resets the connection mid-handshake.

@@ -276,17 +276,42 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
-    [DataRow(0, true, "Send failure: Connection was reset")]
-    [DataRow(0, false, "Failed sending data to the peer")]
-    [DataRow(1, true, "Send failure: Connection was reset")]
-    [DataRow(null, true, "Send failure: Connection was reset")]
-    public async Task ExecuteAsync_ConnectionFailsASend_FailsWithExit55AndTheMeasuredMessage(int? writesBeforeFailure, bool reset, string message)
+    [OSCondition(OperatingSystems.Windows)]
+    [DataRow(0, SocketError.ConnectionReset, "Send failure: Connection was reset")]
+    [DataRow(1, SocketError.ConnectionReset, "Send failure: Connection was reset")]
+    [DataRow(null, SocketError.ConnectionReset, "Send failure: Connection was reset")]
+    [DataRow(0, SocketError.ConnectionAborted, "Send failure: Connection was aborted")]
+    [DataRow(1, SocketError.ConnectionAborted, "Send failure: Connection was aborted")]
+    public async Task ExecuteAsync_SocketErrorFailsASend_FailsWithExit55AndTheWinsockWords(int? writesBeforeFailure, SocketError socketError, string message)
     {
         // A server that answered and reset while curl still sent a 50 MB body:
-        // curl: (55) Send failure: Connection was reset. The other text is curl_easy_strerror(55).
-        IOException failure = reset
-            ? new IOException("Reset.", new SocketException((int)SocketError.ConnectionReset))
-            : new IOException("Broken.");
+        // curl: (55) Send failure: Connection was reset (lib/cf-socket.c line 1562).
+        await AssertSendFailsAsync(writesBeforeFailure, new IOException("Reset.", new SocketException((int)socketError)), message);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [DataRow(0, SocketError.ConnectionReset)]
+    [DataRow(1, SocketError.ConnectionReset)]
+    [DataRow(null, SocketError.ConnectionReset)]
+    [DataRow(0, SocketError.ConnectionAborted)]
+    [DataRow(1, SocketError.ConnectionAborted)]
+    public async Task ExecuteAsync_SocketErrorFailsASend_FailsWithExit55AndTheSocketErrorsOwnWords(int? writesBeforeFailure, SocketError socketError)
+    {
+        SocketException failure = new((int)socketError);
+
+        await AssertSendFailsAsync(writesBeforeFailure, new IOException("Reset.", failure), "Send failure: " + failure.Message);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SendFailsWithNoSocketError_FailsWithExit55AndCurlsGenericText()
+    {
+        // The text is curl_easy_strerror(55).
+        await AssertSendFailsAsync(0, new IOException("Broken."), "Failed sending data to the peer");
+    }
+
+    private static async Task AssertSendFailsAsync(int? writesBeforeFailure, IOException failure, string message)
+    {
         // The body outgrows the upload buffer the head shares, so it takes a second write (BL-1215).
         FailingSendConnection connection = new(failure, writesBeforeFailure);
         HttpRequestOptions options = new() { Body = new BytesBody(new byte[HttpRequestBodyWriter.UploadBufferSize], "a/b") };
@@ -313,16 +338,37 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
-    [DataRow(true, "Recv failure: Connection was reset")]
-    [DataRow(false, "Failure when receiving data from the peer")]
-    public async Task ExecuteAsync_ConnectionFailsAReceive_FailsWithExit56AndTheMeasuredMessage(bool reset, string message)
+    [OSCondition(OperatingSystems.Windows)]
+    [DataRow(SocketError.ConnectionReset, "Recv failure: Connection was reset")]
+    [DataRow(SocketError.ConnectionAborted, "Recv failure: Connection was aborted")]
+    public async Task ExecuteAsync_SocketErrorFailsAReceive_FailsWithExit56AndTheWinsockWords(SocketError socketError, string message)
     {
         // A server that reset the connection after reading the request: curl: (56) Recv failure: Connection was reset.
+        await AssertReceiveFailsAsync(() => new IOException("Reset.", new SocketException((int)socketError)), message);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [DataRow(SocketError.ConnectionReset)]
+    [DataRow(SocketError.ConnectionAborted)]
+    public async Task ExecuteAsync_SocketErrorFailsAReceive_FailsWithExit56AndTheSocketErrorsOwnWords(SocketError socketError)
+    {
+        string words = new SocketException((int)socketError).Message;
+
+        await AssertReceiveFailsAsync(() => new IOException("Reset.", new SocketException((int)socketError)), "Recv failure: " + words);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReceiveFailsWithNoSocketError_FailsWithExit56AndCurlsGenericText()
+    {
+        await AssertReceiveFailsAsync(() => new IOException("Broken."), "Failure when receiving data from the peer");
+    }
+
+    private static async Task AssertReceiveFailsAsync(Func<IOException> newFailure, string message)
+    {
         foreach (int chunkSize in ChunkSizes)
         {
-            IOException failure = reset
-                ? new IOException("Reset.", new SocketException((int)SocketError.ConnectionReset))
-                : new IOException("Broken.");
+            IOException failure = newFailure();
             ScriptedConnection connection = new(Encoding.Latin1.GetBytes(ContentLengthHead + "hello"), chunkSize, null, failure);
             MemoryStream output = new();
 

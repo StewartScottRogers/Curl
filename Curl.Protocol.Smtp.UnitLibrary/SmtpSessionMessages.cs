@@ -11,11 +11,8 @@ internal static class SmtpSessionMessages
     /// <summary>The server closed the connection before a reply was complete (exit 56).</summary>
     internal const string ResponseReadingFailed = "response reading failed (errno: 0)";
 
-    /// <summary>A write to the connection was reset by the peer (exit 55, BL-1243).</summary>
-    internal const string SendConnectionReset = "Send failure: Connection was reset";
-
     /// <summary>
-    /// A write to the connection failed other than by a reset (exit 55, BL-1243); curl prints
+    /// A write to the connection failed with no socket error in it (exit 55, BL-1243); curl prints
     /// it without a <c>-v</c> line of its own.
     /// </summary>
     internal const string SendFailed = "Failed sending data to the peer";
@@ -44,7 +41,10 @@ internal static class SmtpSessionMessages
     /// </summary>
     internal const string AuthenticationCancelled = "Authentication cancelled";
 
-    /// <summary>The reply to the end of the message was not 250 (exit 8, BL-542).</summary>
+    /// <summary>
+    /// The reply to the end of the message was not 250 (exit 8, BL-542); <c>-v</c> writes no
+    /// line for it and leaves the connection intact (BL-1297).
+    /// </summary>
     internal const string WeirdServerReply = "Weird server reply";
 
     /// <summary>
@@ -62,6 +62,13 @@ internal static class SmtpSessionMessages
     /// </summary>
     internal static string EveryRecipientRefused(int code) =>
         string.Create(CultureInfo.InvariantCulture, $"RCPT failed: {code} (last error)");
+
+    /// <summary>
+    /// The replies of a session with no message passed <c>--max-filesize</c> (exit 63, BL-1386),
+    /// such as <c>Exceeded the maximum allowed file size (10) with 10 bytes</c>.
+    /// </summary>
+    internal static string MaxFileSizeExceeded(long maxFileSize, long written) =>
+        string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({maxFileSize}) with {written} bytes");
 
     /// <summary>The greeting was not a 2xx reply (exit 8).</summary>
     internal static string UnexpectedResponse(int code) =>

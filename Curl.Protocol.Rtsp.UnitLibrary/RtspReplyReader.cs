@@ -43,13 +43,13 @@ internal static class RtspReplyReader
     /// <param name="headerOutput">Where the head is written, or <see langword="null" /> for nowhere.</param>
     /// <param name="events">Where each head line is reported.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
-    /// <param name="log">Receives each header line's name, or nothing when <see langword="null" />.</param>
+    /// <param name="log">Receives each header line's name.</param>
+    /// <param name="maxFileSize">The transfer's <c>--max-filesize</c> limit, handed to <see cref="RtspReplyHeadParser" />.</param>
     /// <returns>What was read of the head.</returns>
     /// <exception cref="RtspTransferException">The reply is refused, or a read or write failed.</exception>
-    internal static async ValueTask<RtspReplyHead> ReadHeadAsync(IConnection connection, RtspSessionState session, Stream? headerOutput, ITransferEvents events, CancellationToken cancellationToken, RtspTransferLog? log = null)
+    internal static async ValueTask<RtspReplyHead> ReadHeadAsync(IConnection connection, RtspSessionState session, Stream? headerOutput, ITransferEvents events, CancellationToken cancellationToken, RtspTransferLog log, long? maxFileSize)
     {
-        log ??= new RtspTransferLog(NoDiagnosticLog.Instance);
-        RtspReplyHeadParser parser = new(session);
+        RtspReplyHeadParser parser = new(session, maxFileSize);
         byte[] buffer = new byte[BufferSize];
         int received = 0;
         int processed = 0;

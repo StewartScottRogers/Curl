@@ -14,6 +14,12 @@ internal sealed class ManualTimeProvider : TimeProvider
     /// </summary>
     public TimeSpan TimersFireEarlyBy { get; init; }
 
+    /// <summary>
+    /// How much later than asked every timer fires, as on a machine that stalled; zero unless a
+    /// test sets it.
+    /// </summary>
+    public TimeSpan TimersFireLateBy { get; init; }
+
     /// <summary>How far the clock has moved since it was created.</summary>
     public TimeSpan Now { get; private set; }
 
@@ -26,7 +32,7 @@ internal sealed class ManualTimeProvider : TimeProvider
     /// <inheritdoc />
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
-        ManualTimer timer = new(this, callback, state, Now + (dueTime > TimersFireEarlyBy ? dueTime - TimersFireEarlyBy : dueTime));
+        ManualTimer timer = new(this, callback, state, Now + (dueTime > TimersFireEarlyBy ? dueTime - TimersFireEarlyBy : dueTime) + TimersFireLateBy);
         timers.Add(timer);
         return timer;
     }

@@ -128,6 +128,7 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
                 standardError,
                 new MemoryStream(),
                 runsOnWindows: false,
+                parsesAsWindowsBuild: false,
                 writesProgressMeter: false)
             .RunAsync(arguments);
 }

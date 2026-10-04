@@ -118,6 +118,6 @@ public sealed class ConnectToMappingsTests
         // curl --connect-to <mapping> http://a/ -> curl: (49) <message>
         var mappings = new ConnectToMappings([mapping]);
 
-        Assert.AreEqual(message, mappings.Map("a", 80).ParseError);
+        Assert.AreEqual(new ConnectDestination(string.Empty, 0, IsMapped: false, message), mappings.Map("a", 80));
     }
 }

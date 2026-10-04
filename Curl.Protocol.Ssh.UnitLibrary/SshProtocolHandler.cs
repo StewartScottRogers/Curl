@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Authentication;
@@ -78,6 +79,14 @@ public sealed class SshProtocolHandler : IProtocolHandler
     /// </param>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null" />.</exception>
     public SshProtocolHandler(IConnector connector, IFileSystem fileSystem, SshAlgorithmPreferences preferences, Encoding credentialEncoding)
+        : this(connector, fileSystem, preferences, credentialEncoding, Environment.GetEnvironmentVariable)
+    {
+    }
+
+    // Converts Environment.GetEnvironmentVariable to a delegate once: the compiler caches each
+    // method-group conversion behind a null check, and a second conversion of the same method
+    // shares the first's cache, so its null branch could never run (BL-1357).
+    private SshProtocolHandler(IConnector connector, IFileSystem fileSystem, SshAlgorithmPreferences preferences, Encoding credentialEncoding, Func<string, string?> readEnvironmentVariable)
         : this(
             connector,
             fileSystem,
@@ -85,8 +94,8 @@ public sealed class SshProtocolHandler : IProtocolHandler
             credentialEncoding,
             new SystemSshRandomSource(),
             new SystemSshEphemeralKeySource(),
-            Environment.GetEnvironmentVariable,
-            PlatformSshAgentConnector.Create(Environment.GetEnvironmentVariable, OperatingSystem.IsWindows(), new WindowsPageantWindow()))
+            readEnvironmentVariable,
+            PlatformSshAgentConnector.Create(readEnvironmentVariable, OperatingSystem.IsWindows(), new WindowsPageantWindow()))
     {
     }
 
@@ -261,14 +270,22 @@ public sealed class SshProtocolHandler : IProtocolHandler
         long started = context.TimeProvider.GetTimestamp();
         SshKeyExchangeResult keys = await transport.ExchangeKeysAsync(handshake, context.CancellationToken).ConfigureAwait(false);
         log.KeysExchanged(handshake.Algorithms.KeyExchange, context.TimeProvider.GetElapsedTime(started));
+        // Not an await in a finally: the compiler's rethrow for one tests whether the captured
+        // object is an Exception, a branch no C# code can take the other way (BL-1357).
+        TransferResult? result = null;
+        ExceptionDispatchInfo? failure = null;
         try
         {
-            return await AuthenticateAndTransferAsync(context, target, transport, keys.HostKey, trace).ConfigureAwait(false);
+            result = await AuthenticateAndTransferAsync(context, target, transport, keys.HostKey, trace).ConfigureAwait(false);
         }
-        finally
+        catch (Exception exception)
         {
-            await DisconnectIgnoringFailureAsync(transport, context.CancellationToken).ConfigureAwait(false);
+            failure = ExceptionDispatchInfo.Capture(exception);
         }
+
+        await DisconnectIgnoringFailureAsync(transport, context.CancellationToken).ConfigureAwait(false);
+        failure?.Throw();
+        return result!;
     }
 
     private async ValueTask<TransferResult> AuthenticateAndTransferAsync(ITransferContext context, SshSessionTarget target, SshTransport transport, byte[] hostKey, SshStateTrace trace)
@@ -363,7 +380,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     private static async ValueTask<TransferResult> TransferOverScpAsync(ITransferContext context, SshTransport transport, Stream output, SshStateTrace trace) =>
         context.Upload is { } upload
             ? await new ScpFileUpload(transport, context.Events) { Trace = trace }.UploadAsync(context.Url.AbsolutePath, context.CreateFileMode, upload, context.Progress, context.CancellationToken).ConfigureAwait(false)
-            : await new ScpFileDownload(transport) { Trace = trace }.DownloadAsync(context.Url.AbsolutePath, output, context.Progress, context.CancellationToken).ConfigureAwait(false);
+            : await new ScpFileDownload(transport) { Trace = trace }.DownloadAsync(context.Url.AbsolutePath, output, context.Progress, context.CancellationToken, context.MaxFileSize).ConfigureAwait(false);
 
     // An upload is sent (ADR-0244); otherwise a path ending with a slash is listed and any
     // other is downloaded (ADR-0241). Each runs the -Q commands around it (ADR-0247), with
@@ -379,7 +396,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
 
         return SftpRemotePath.NamesDirectory(urlPath)
             ? await new SftpDirectoryListing(transport) { Trace = trace }.ListAsync(urlPath, context.ListOnly, context.NoBody, output, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false)
-            : await new SftpFileDownload(transport) { Trace = trace }.DownloadAsync(urlPath, context.CreateFileMode, output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom).ConfigureAwait(false);
+            : await new SftpFileDownload(transport) { Trace = trace }.DownloadAsync(urlPath, context.CreateFileMode, output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom, context.MaxFileSize).ConfigureAwait(false);
     }
 
     // What the host-key check and the key files need to know about the session.

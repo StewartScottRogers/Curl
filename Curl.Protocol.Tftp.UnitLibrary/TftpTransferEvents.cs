@@ -9,7 +9,8 @@ namespace Curl.Protocol.Tftp;
 /// Reports a TFTP transfer's steps to <see cref="ITransferEvents" /> in curl 8.21.0's words,
 /// for <c>-v</c>, <c>--trace</c> and <c>--trace-ascii</c> (ADR-0046): the connect lines,
 /// each <c>set timeouts</c> line, the options an OACK carried, <c>Connected for receive</c>
-/// or <c>transmit</c>, a retransmission's <c>Timeout waiting</c> line, an ERROR packet's
+/// or <c>transmit</c>, a retransmission's <c>Timeout waiting</c> line, the <c>Received</c>
+/// lines for an out-of-order ACK or DATA block, an ERROR packet's
 /// text, each downloaded block's bytes as data received, and <c>shutting down
 /// connection</c> (measured by BL-933).
 /// </summary>
@@ -93,6 +94,23 @@ internal sealed class TftpTransferEvents(ITransferEvents events)
     public void TimedOut(int block, int retries) =>
         events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"Timeout waiting for block {block} ACK. Retries = {retries}"));
 
+    /// <summary>Reports <c>Received ACK for block N, expecting M</c> for an upload's out-of-order ACK.</summary>
+    /// <param name="block">The block the ACK named.</param>
+    /// <param name="expectedBlock">The block last sent, which the ACK should have named.</param>
+    public void UnexpectedAcknowledgement(ushort block, ushort expectedBlock) =>
+        events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"Received ACK for block {block}, expecting {expectedBlock}"));
+
+    /// <summary>Reports <c>Received last DATA packet block N again.</c> for a download's repeated block.</summary>
+    /// <param name="block">The block received again.</param>
+    public void RepeatedData(ushort block) =>
+        events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"Received last DATA packet block {block} again."));
+
+    /// <summary>Reports <c>Received unexpected DATA packet block N, expecting block M</c> for a download's out-of-order block.</summary>
+    /// <param name="block">The block received.</param>
+    /// <param name="expectedBlock">The next block, which wraps from 65535 to 0.</param>
+    public void UnexpectedData(ushort block, ushort expectedBlock) =>
+        events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"Received unexpected DATA packet block {block}, expecting block {expectedBlock}"));
+
     /// <summary>
     /// Reports <c>TFTP error: &lt;text&gt;</c> for an ERROR packet whose text ends in a NUL,
     /// and nothing for one whose text does not, as curl does.
@@ -114,6 +132,13 @@ internal sealed class TftpTransferEvents(ITransferEvents events)
     /// </summary>
     /// <param name="message">The refusal's message.</param>
     public void Refused(string message) => events.ReportInfo(message);
+
+    /// <summary>
+    /// Reports the message curl 8.21.0's download writer notes when a download passes
+    /// <c>--max-filesize</c>, such as <c>Exceeded the maximum allowed file size (3) with 3 bytes</c>.
+    /// </summary>
+    /// <param name="message">The message.</param>
+    public void MaxFileSizeExceeded(string message) => events.ReportInfo(message);
 
     /// <summary>Reports a downloaded block's bytes as data received, unless it is empty.</summary>
     /// <param name="payload">The block's bytes.</param>

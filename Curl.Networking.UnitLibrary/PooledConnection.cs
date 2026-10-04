@@ -1,4 +1,5 @@
 using System.Net;
+using System.Runtime.CompilerServices;
 
 using Curl.Protocol.Abstractions;
 
@@ -51,6 +52,7 @@ public sealed class PooledConnection : IConnection
     /// connection, so the pool reports it dead rather than reusing it (ADR-0112); so does a
     /// read that finds a TLS connection ended without <c>close_notify</c> (ADR-0221).
     /// </remarks>
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         int read;

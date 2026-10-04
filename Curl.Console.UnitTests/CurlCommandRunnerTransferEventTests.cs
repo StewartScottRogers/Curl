@@ -383,6 +383,68 @@ public sealed class CurlCommandRunnerTransferEventTests
     }
 
     [TestMethod]
+    public async Task RunAsync_TraceConfigNetworkWithMaxTimeAndAConnectTimeout_WritesTheResponseWaitsTimerLinesAmongThePollLines()
+    {
+        // curl 8.21.0 under -s -v --trace-config network -m 5 --connect-timeout 1 (measured 2026-10-02, BL-1258 Notes).
+        await RunAsync(
+            ["-s", "--trace-config", "network", "-v", "-m", "5", "--connect-timeout", "1", "http://127.0.0.1:18441/f.txt", "-o", "o"],
+            MeasuredExchange(18441, 55116));
+
+        StringAssert.Contains(
+            StandardErrorText,
+            "* [MULTI] [DID] -> [PERFORMING]" + InfoEnd
+            + "* [MULTI] [PERFORMING] pollset[fd=3 IN], timeouts=2" + InfoEnd
+            + "* [TIMER] [CONNECTTIMEOUT] expires in 1000000ns" + InfoEnd
+            + "* [TIMER] [TIMEOUT] expires in 5000000ns" + InfoEnd
+            + "* [TIMER] [CONNECTTIMEOUT] gives multi timeout in 1000ms" + InfoEnd
+            + "* [MULTI] [PERFORMING] multi_wait(fds=1, timeout=1000) tinternal=1000" + InfoEnd);
+        StringAssert.Contains(
+            StandardErrorText,
+            "timeouts=2" + InfoEnd + "* [MULTI] [CONNECTING] multi_wait(fds=1, timeout=1000) tinternal=1000" + InfoEnd);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigMultiWithMaxTimeButNotTimer_WritesThePollLinesTimersButNoTimerLine()
+    {
+        // curl 8.21.0's multi counts the -m timer whether or not [TIMER] is traced (BL-1258 Notes).
+        await RunAsync(["-s", "--trace-config", "multi", "-v", "-m", "5", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        StringAssert.Contains(
+            StandardErrorText,
+            "* [MULTI] [PERFORMING] pollset[fd=3 IN], timeouts=1" + InfoEnd
+            + "* [MULTI] [PERFORMING] multi_wait(fds=1, timeout=1000) tinternal=5000" + InfoEnd);
+        Assert.DoesNotContain("[TIMER]", StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TraceConfigTimerWithoutMaxTimeOrConnectTimeout_WritesNoResponseWaitTimerLine()
+    {
+        await RunAsync(["-s", "--trace-config", "timer", "-v", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116));
+
+        Assert.DoesNotContain("gives multi timeout", StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow("-m|5", "TIMEOUT", "5000")]
+    [DataRow("-m|5|--connect-timeout|1", "CONNECTTIMEOUT", "1000")]
+    [DataRow("-m|1|--connect-timeout|5", "TIMEOUT", "1000")]
+    public async Task RunAsync_TraceConfigTimerWithTimeouts_TheNearestGivesTheMultiTimeoutAfterTheRequest(string timeouts, string nearest, string milliseconds)
+    {
+        // curl 8.21.0 under -s -v --trace-config timer -m 5, -m 5 --connect-timeout 1 and -m 1 --connect-timeout 5
+        // (measured 2026-10-02, BL-1258 Notes): the response had not arrived at the first poll.
+        await RunAsync(
+            ["-s", "--trace-config", "timer", "-v", .. timeouts.Split('|'), "http://127.0.0.1:18441/f.txt", "-o", "o"],
+            MeasuredExchange(18441, 55116));
+
+        StringAssert.Contains(
+            StandardErrorText,
+            "* Request completely sent off" + InfoEnd
+            + $"* [TIMER] [{nearest}] gives multi timeout in {milliseconds}ms" + InfoEnd
+            + "< HTTP/1.1 200 OK");
+        Assert.HasCount(1, StandardErrorText.Split("gives multi timeout").Skip(1));
+    }
+
+    [TestMethod]
     public async Task RunAsync_TraceConfigAll_WritesTheMultiDoneLinesBeforeTheWriteAndReadLines()
     {
         // curl 8.21.0 under --trace-config all (measured 2026-10-02, BL-1188 Notes).

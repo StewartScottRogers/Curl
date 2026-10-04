@@ -250,8 +250,8 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// was made or sent is <c>Login denied</c>, as it is anywhere before curl's final state.
     /// </remarks>
     /// <returns>
-    /// Whether the exchange was cancelled with <c>*</c> over a challenge that was not base64,
-    /// and otherwise <see langword="null" /> once logged in or the failure.
+    /// Whether the exchange was cancelled with <c>*</c> over a challenge that was not base64
+    /// or one the exchange cancelled with a reason, and otherwise <see langword="null" /> once logged in or the failure.
     /// </returns>
     private async ValueTask<(bool Cancelled, TransferResult? Result)> AuthenticateAsync(ISaslExchange exchange)
     {
@@ -324,8 +324,8 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// The line that answers a response other than <c>+OK</c>, for a continuation: the unsent
     /// initial response, the one made now when it is due, or the exchange's answer to the
     /// challenge, each encoded; <see cref="CancelLine" /> for a challenge that is not base64
-    /// and that the mechanism reads; <see langword="null" /> for <c>-ERR</c> or a challenge the
-    /// exchange cannot answer.
+    /// and that the mechanism reads, or one the exchange cancels with a reason;
+    /// <see langword="null" /> for <c>-ERR</c> or a challenge the exchange cannot answer.
     /// </summary>
     private async ValueTask<string?> AnswerToAsync(Pop3Response response, byte[]? unsentInitialResponse, bool initialResponseDue, ISaslExchange exchange)
     {
@@ -347,7 +347,30 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
             return CancelLine;
         }
 
-        return await exchange.RespondAsync(challenge, context.CancellationToken).ConfigureAwait(false) is { } answer ? Encode(answer) : null;
+        if (await exchange.RespondAsync(challenge, context.CancellationToken).ConfigureAwait(false) is { } answer)
+        {
+            return Encode(answer);
+        }
+
+        return CancelOrDeny(exchange);
+    }
+
+    /// <summary>
+    /// The line for a challenge the exchange did not answer: with a
+    /// <see cref="ISaslExchange.CancelReason" />, curl's <c>infof</c> line for it is written
+    /// and the exchange is cancelled with <see cref="CancelLine" />, as curl 8.21.0's
+    /// <c>CURLE_BAD_CONTENT_ENCODING</c> step does (BL-1349); without one,
+    /// <see langword="null" />, which is <c>Login denied</c>.
+    /// </summary>
+    private string? CancelOrDeny(ISaslExchange exchange)
+    {
+        if (exchange.CancelReason is not { } reason)
+        {
+            return null;
+        }
+
+        context.Events.ReportInfo(reason);
+        return CancelLine;
     }
 
     /// <summary>

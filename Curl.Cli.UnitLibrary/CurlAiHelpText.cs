@@ -16,6 +16,10 @@ public static class CurlAiHelpText
 {
     private const string AllSubject = "all";
 
+    /// <summary>The line an option's section carries when curl's Windows Schannel build refuses it (ADR-0397).</summary>
+    private const string SchannelBuildRefusalLine =
+        "- On Windows: refused with exit 2 (`the installed libcurl version does not support this`), as curl's Schannel build refuses it; accepted on Linux and macOS.";
+
     /// <summary>
     /// The rows <c>--ai-help</c> documents that curl's <c>--help</c> does not: Curl's own options, which
     /// <see cref="CurlHelpTable"/> must not gain so <c>--help</c> stays byte-identical to curl 8.21.0.
@@ -172,6 +176,7 @@ public static class CurlAiHelpText
         lines.Add($"- Repeat: {RepeatMeaning(longName)}");
         lines.AddRange(OtherSpellingLines.TryGetValue(RowName(longName), out string? otherSpelling) ? [otherSpelling] : []);
         lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName)) ? [] : ["- Not supported by this build yet: curl refuses it with exit 2."]);
+        lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && row.RefusedByWindowsSchannelBuild) ? [SchannelBuildRefusalLine] : []);
         lines.AddRange([string.Empty, CurlManualMarkdown.Escape(entry.Description) + "."]);
         lines.AddRange(CurlManualMarkdown.TryGetOptionMarkdown(longName, out IReadOnlyList<string> manual) ? [string.Empty, .. manual] : []);
         return lines;

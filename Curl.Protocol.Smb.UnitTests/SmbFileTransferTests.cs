@@ -16,7 +16,7 @@ namespace Curl.Protocol.Smb;
 /// frame during or after the writes (exit 56).
 /// </summary>
 [TestClass]
-public sealed class SmbFileTransferTests
+public sealed partial class SmbFileTransferTests
 {
     private const ushort UserId = 0x0064;
 

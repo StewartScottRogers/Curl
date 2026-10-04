@@ -16,6 +16,9 @@ public sealed class RankedSaslAuthenticator(params (string Mechanism, byte[]? In
     /// <summary>Gets every challenge handed to an exchange, with its mechanism, in order.</summary>
     public List<(string Mechanism, byte[] Challenge)> Challenges { get; } = [];
 
+    /// <summary>Gets the <see cref="ISaslExchange.CancelReason" /> every exchange gives, read once it has run out of answers.</summary>
+    public string? CancelReason { get; init; }
+
     /// <inheritdoc />
     public string? ChooseMechanism(SaslRequest request, IReadOnlyList<string> offeredMechanisms)
     {
@@ -33,6 +36,8 @@ public sealed class RankedSaslAuthenticator(params (string Mechanism, byte[]? In
         private int answersGiven;
 
         public string Mechanism => script.Mechanism;
+
+        public string? CancelReason => owner.CancelReason;
 
         public ValueTask<byte[]?> GetInitialResponseAsync(CancellationToken cancellationToken) => ValueTask.FromResult(script.InitialResponse);
 

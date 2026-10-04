@@ -151,7 +151,11 @@ public sealed class ChaCha20Tests
     [TestMethod]
     public void ApplyKeyStream_EmptySource_WritesNothing()
     {
-        ChaCha20.ApplyKeyStream(Convert.FromHexString(ZeroKey), Convert.FromHexString(ZeroNonce), uint.MaxValue, [], []);
+        byte[] buffer = [0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5];
+
+        ChaCha20.ApplyKeyStream(Convert.FromHexString(ZeroKey), Convert.FromHexString(ZeroNonce), uint.MaxValue, [], buffer.AsSpan(0, 0));
+
+        Assert.AreEqual("A5A5A5A5A5A5A5A5", Convert.ToHexString(buffer));
     }
 
     // The original ChaCha puts a 64-bit counter in words 12 and 13 and an 8-byte nonce in

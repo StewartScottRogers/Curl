@@ -91,6 +91,13 @@ internal static class FileTransferMessages
     internal const string ResumeFailed = "failed to resume file:// transfer";
 
     /// <summary>
+    /// The exit 33 message for <c>-r</c>/<c>--range</c> text that names no range, such as
+    /// <c>5-2</c>, <c>abc</c> or <c>-0</c>: curl 8.21.0's <c>Curl_range</c> answers it with
+    /// <c>CURLE_RANGE_ERROR</c>, whose easy error text this is.
+    /// </summary>
+    internal const string RangeNotDelivered = "Requested range was not delivered by the server";
+
+    /// <summary>
     /// The exit 36 message for a suffix range — <c>-r -12</c> — asking for more trailing
     /// bytes than the file can bear. Measured against curl 8.21.0, which prints this and
     /// not <see cref="ResumeFailed" /> for that one case: on a ten-byte file <c>-r -11</c>

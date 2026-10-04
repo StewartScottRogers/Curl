@@ -18,7 +18,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [TestMethod]
     public void Parse_NoAuthOption_AllowsBasic()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(HttpAuthSchemes.Basic, result.Options.AuthSchemes);
@@ -53,7 +53,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [DataRow(new[] { "--anyauth", "--oauth2-bearer", "tok" }, HttpAuthSchemes.Any | HttpAuthSchemes.Bearer)]
     public void Parse_AuthSchemeOptions_AllowTheSchemesCurlAsksFor(string[] options, HttpAuthSchemes expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. options, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([.. options, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.AuthSchemes);
@@ -79,7 +79,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [DataRow(new[] { "--proxy-anyauth", "--no-proxy-anyauth", "--proxy-digest" }, HttpAuthSchemes.Digest)]
     public void Parse_ProxyAuthSchemeOptions_AllowTheOneSchemeCurlPicks(string[] options, HttpAuthSchemes expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. options, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([.. options, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.ProxyAuthSchemes);
@@ -88,7 +88,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [TestMethod]
     public void Parse_ProxyAndServerAuthSchemeOptions_SetTheirOwnSets()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-digest", "--ntlm", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--proxy-digest", "--ntlm", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(HttpAuthSchemes.Digest, result.Options.ProxyAuthSchemes);
@@ -98,7 +98,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [TestMethod]
     public void Parse_OAuth2Bearer_RecordsTheLastToken()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--oauth2-bearer", "one", "--oauth2-bearer", "two", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--oauth2-bearer", "one", "--oauth2-bearer", "two", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("two", result.Options.BearerToken);
@@ -107,7 +107,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [TestMethod]
     public void Parse_NoAwsSigV4_LeavesItNull()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.AwsSigV4);
@@ -123,7 +123,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [DataRow(new[] { "--aws-sigv4", "" }, "")]
     public void Parse_AwsSigV4_RecordsTheLastValueVerbatim(string[] arguments, string expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([.. arguments, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.AwsSigV4);
@@ -138,7 +138,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [DataRow("--socks5-hostname")]
     public void Parse_EmptyValue_RefusesAsBlank(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, "", Url]);
 
         AssertRefused(result, $"curl: option {spelledOption}: blank argument where content is expected");
     }
@@ -152,7 +152,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [DataRow("--socks5-hostname", "proxy.example:1080", ProxyKind.Socks5Hostname)]
     public void Parse_ProxyOption_RecordsTheValueAndTheKindItNames(string spelledOption, string address, ProxyKind kind)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, address, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, address, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(new CommandLineProxy(address, kind), result.Options.Proxy);
@@ -161,7 +161,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [TestMethod]
     public void Parse_NoProxyOption_HasNoProxy()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.Proxy);
@@ -173,7 +173,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [TestMethod]
     public void Parse_EmptyProxy_IsKeptAsNoProxyAtAll()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-x", "a:1", "-x", "", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["-x", "a:1", "-x", "", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(new CommandLineProxy(string.Empty, ProxyKind.Http), result.Options.Proxy);
@@ -182,7 +182,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [TestMethod]
     public void Parse_Socks5ThenProxy_TheLastWinsWithItsKind()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--socks5", "a:1", "-x", "b:2", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--socks5", "a:1", "-x", "b:2", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(new CommandLineProxy("b:2", ProxyKind.Http), result.Options.Proxy);
@@ -191,7 +191,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [TestMethod]
     public void Parse_ProxyThenSocks5_TheLastWinsWithItsKind()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-x", "a:1", "--socks5", "b:2", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["-x", "a:1", "--socks5", "b:2", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(new CommandLineProxy("b:2", ProxyKind.Socks5), result.Options.Proxy);
@@ -200,7 +200,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [TestMethod]
     public void Parse_ProxyValueThatLooksLikeAFlag_IsTakenWithoutAWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-x", "-s", "--noproxy", "-s", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["-x", "-s", "--noproxy", "-s", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("-s", result.Options.Proxy!.Address);
@@ -213,7 +213,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [DataRow("--proxy-user")]
     public void Parse_ProxyUser_SplitsAtTheFirstColon(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "bob:se:cret", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, "bob:se:cret", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("bob", result.Options.ProxyCredentials!.UserName);
@@ -227,7 +227,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [DataRow("example.com,.local,10.0.0.0/8")]
     public void Parse_NoProxy_RecordsTheValueVerbatim(string hosts)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--noproxy", "other", "--noproxy", hosts, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--noproxy", "other", "--noproxy", hosts, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(hosts, result.Options.NoProxy);
@@ -240,7 +240,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [DataRow(new[] { "--no-proxytunnel", "-p" }, true)]
     public void Parse_ProxyTunnel_LastSpellingWins(string[] options, bool expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. options, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([.. options, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.ProxyTunnel);
@@ -253,7 +253,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [DataRow("--proxytunnel=x")]
     public void Parse_FlagWithAttachedValue_IsAccepted(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, Url]);
 
         Assert.IsTrue(result.IsAccepted);
     }
@@ -279,7 +279,7 @@ public sealed class CommandLineAuthAndProxyOptionTests
     [DataRow("--no-socks5-hostname=x")]
     public void Parse_NoSpellingCurlRefuses_IsRefusedAsNotReversible(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, Url]);
 
         AssertRefused(result, $"curl: option {spelledOption}: {CannotBeReversed}");
     }

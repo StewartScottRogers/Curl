@@ -18,7 +18,8 @@ namespace Curl.Protocol.Rtsp;
 /// <c>Unable to read the CSeq header: [&lt;line&gt;]</c>. A <c>Content-Length</c> is a comma list
 /// of equal decimal numbers (<c>2, 2</c>), and a second one must agree with the first; anything
 /// else fails with 8, <c>Invalid Content-Length: value</c>, while a number too large for 64 bits
-/// is accepted and leaves no body (BL-840). A carriage return inside a line fails with 8,
+/// is accepted and leaves no body (BL-840), unless a <c>--max-filesize</c> limit is set, when it fails
+/// with 63, <c>Maximum file size exceeded</c> (BL-1292). A carriage return inside a line fails with 8,
 /// <c>Carriage return found in header</c> (on the status line only once it has passed the
 /// status check), and a header line with no colon with 8, <c>Header without colon</c>; each
 /// header line arrives with its continuation lines already joined (<see cref="RtspHeaderFolding" />).
@@ -26,13 +27,20 @@ namespace Curl.Protocol.Rtsp;
 /// the first ID and fails a different one with 86 as the line is read (BL-592).
 /// </remarks>
 /// <param name="session">The transfer's session state, which reads each <c>Session</c> header.</param>
-internal sealed class RtspReplyHeadParser(RtspSessionState session)
+/// <param name="maxFileSize">
+/// The transfer's <c>--max-filesize</c> limit; when it is above 0, a <c>Content-Length</c> number
+/// too large for 64 bits fails with 63 as its line is read, the line not written (BL-1292).
+/// </param>
+internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFileSize = null)
 {
     /// <summary>The exit 8 message for a status line curl does not accept.</summary>
     internal const string WeirdServerReply = "Weird server reply";
 
     /// <summary>The exit 8 message for a <c>Content-Length</c> that is not a number.</summary>
     internal const string InvalidContentLength = "Invalid Content-Length: value";
+
+    /// <summary>The exit 63 message for a <c>Content-Length</c> over the <c>--max-filesize</c> limit.</summary>
+    internal const string MaxFileSizeExceeded = "Maximum file size exceeded";
 
     /// <summary>The exit 8 message for a carriage return inside a line of the head.</summary>
     internal const string CarriageReturnInHeader = "Carriage return found in header";
@@ -186,7 +194,20 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session)
         }
 
         lengthTooLarge = !long.TryParse(item, NumberStyles.None, CultureInfo.InvariantCulture, out long length);
+        RefuseTooLargeLengthUnderLimit();
         declaredLength = lengthTooLarge || declaredLength is null || declaredLength == length ? length : throw InvalidLength();
+    }
+
+    /// <summary>
+    /// Fails with 63 when the number just read is too large for 64 bits and a
+    /// <c>--max-filesize</c> limit above 0 is set, as curl 8.21.0 does (measured, BL-1292).
+    /// </summary>
+    private void RefuseTooLargeLengthUnderLimit()
+    {
+        if (lengthTooLarge && maxFileSize > 0)
+        {
+            throw new RtspTransferException(CurlExitCode.FilesizeExceeded, MaxFileSizeExceeded);
+        }
     }
 
     private static RtspTransferException InvalidLength() => new(CurlExitCode.WeirdServerReply, InvalidContentLength);

@@ -16,7 +16,12 @@ namespace Curl.Authentication;
 /// carries, empty for none; <see langword="null" /> for NTLM, which has no security-layer
 /// message.
 /// </param>
-internal sealed class SecurityContextSaslExchange(string mechanism, ISecurityContext context, byte[]? securityLayerAuthorizationIdentity) : ISaslExchange
+/// <param name="wordsFailuresAsSspi">
+/// Whether a security-layer offer curl cannot answer is worded as curl's Windows (SSPI) build
+/// words it, rather than as its GSS-API build does; the two differ only for an offer that does
+/// not unwrap (BL-1336).
+/// </param>
+internal sealed class SecurityContextSaslExchange(string mechanism, ISecurityContext context, byte[]? securityLayerAuthorizationIdentity, bool wordsFailuresAsSspi) : ISaslExchange
 {
     /// <summary>RFC 4752 section 3.3's bit for "no security layer".</summary>
     private const byte NoSecurityLayer = 0x01;
@@ -27,6 +32,19 @@ internal sealed class SecurityContextSaslExchange(string mechanism, ISecurityCon
 
     /// <inheritdoc />
     public string Mechanism => mechanism;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Set when the GSSAPI security-layer offer cannot be answered, to the line curl 8.21.0's
+    /// <c>Curl_auth_create_gssapi_security_message</c> writes before it cancels: an empty
+    /// offer, one that does not unwrap, one that is not four bytes, or one without the
+    /// no-security-layer bit (<c>lib/vauth/krb5_sspi.c</c> lines 268-318,
+    /// <c>lib/vauth/krb5_gssapi.c</c> lines 198-233). For an offer that does not unwrap, the
+    /// GSS-API build appends the GSS library's own status text to <c>gss_unwrap() failed: </c>;
+    /// the hand-built Kerberos has no MIT krb5 message table, so that text is left out, a
+    /// known divergence still to be measured. A context token step that fails never sets it.
+    /// </remarks>
+    public string? CancelReason { get; private set; }
 
     /// <summary>
     /// Gets the security context request for <paramref name="mechanism" /> to the SASL service on
@@ -85,11 +103,23 @@ internal sealed class SecurityContextSaslExchange(string mechanism, ISecurityCon
     // the layer, a zero size and the authorization identity, wrapped without encryption.
     private byte[]? AnswerSecurityLayerOffer(ReadOnlySpan<byte> wrappedOffer, byte[] authorizationIdentity)
     {
-        byte[]? offer = context.Unwrap(wrappedOffer);
-        return offer is [var layers, _, _, _] && (layers & NoSecurityLayer) != 0
+        CancelReason = wrappedOffer.IsEmpty
+            ? "GSSAPI handshake failure (empty security message)"
+            : SecurityLayerFailure(context.Unwrap(wrappedOffer));
+        return CancelReason is null
             ? context.Wrap([NoSecurityLayer, 0, 0, 0, .. authorizationIdentity], encrypt: false)
             : null;
     }
+
+    // The line curl writes for an unwrapped offer it cannot answer, checked in curl's order;
+    // null for an offer it answers.
+    private string? SecurityLayerFailure(byte[]? offer) => offer switch
+    {
+        null => wordsFailuresAsSspi ? "GSSAPI handshake failure (decryption failed)" : "gss_unwrap() failed: ",
+        not [_, _, _, _] => "GSSAPI handshake failure (invalid security data)",
+        [var layers, ..] when (layers & NoSecurityLayer) == 0 => "GSSAPI handshake failure (invalid security layer)",
+        _ => null,
+    };
 
     private async ValueTask<byte[]?> StepAsync(ReadOnlyMemory<byte> incomingToken, CancellationToken cancellationToken)
     {

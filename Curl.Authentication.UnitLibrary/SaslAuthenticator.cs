@@ -121,6 +121,13 @@ public sealed class SaslAuthenticator(
     /// </summary>
     public SecurityDelegation GssapiDelegation { get; init; }
 
+    /// <summary>
+    /// Gets whether a GSSAPI security-layer offer curl cannot answer is worded as curl's
+    /// Windows (SSPI) build words it rather than as its GSS-API build does (BL-1336); the
+    /// platform's build by default, so both wordings are testable everywhere.
+    /// </summary>
+    public bool WordsGssapiFailuresAsSspi { get; init; } = OperatingSystem.IsWindows();
+
     /// <inheritdoc />
     public string? ChooseMechanism(SaslRequest request, IReadOnlyList<string> offeredMechanisms)
     {
@@ -186,8 +193,9 @@ public sealed class SaslAuthenticator(
             ? new SecurityContextSaslExchange(
                 name,
                 contexts.Create(SecurityContextSaslExchange.ContextRequestFor(SecurityMechanism.Kerberos, request) with { MessageProtection = ProtectionLevel.Sign, Delegation = GssapiDelegation }),
-                credentialEncoding.GetBytes(request.AuthorizationIdentity ?? string.Empty))
-            : new SecurityContextSaslExchange(name, contexts.Create(SecurityContextSaslExchange.ContextRequestFor(SecurityMechanism.Ntlm, request)), securityLayerAuthorizationIdentity: null);
+                credentialEncoding.GetBytes(request.AuthorizationIdentity ?? string.Empty),
+                WordsGssapiFailuresAsSspi)
+            : new SecurityContextSaslExchange(name, contexts.Create(SecurityContextSaslExchange.ContextRequestFor(SecurityMechanism.Ntlm, request)), securityLayerAuthorizationIdentity: null, WordsGssapiFailuresAsSspi);
 
     // RFC 2195: the user name, a space, and the HMAC-MD5 of the challenge keyed with the
     // password, in lower-case hexadecimal.

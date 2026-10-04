@@ -16,6 +16,12 @@ public sealed class RankedSaslAuthenticator(params (string Mechanism, byte[]? In
     /// </summary>
     public bool ChoosesUnoffered { get; set; }
 
+    /// <summary>
+    /// Gets each mechanism's <see cref="ISaslExchange.CancelReason" />, given once its scripted
+    /// answers run out; a mechanism not listed gives none.
+    /// </summary>
+    public Dictionary<string, string> CancelReasons { get; } = [];
+
     /// <summary>Gets the offered list of every <see cref="ChooseMechanism" /> call.</summary>
     public List<string[]> Offers { get; } = [];
 
@@ -39,6 +45,8 @@ public sealed class RankedSaslAuthenticator(params (string Mechanism, byte[]? In
         private int answersGiven;
 
         public string Mechanism => script.Mechanism;
+
+        public string? CancelReason => owner.CancelReasons.GetValueOrDefault(script.Mechanism);
 
         public ValueTask<byte[]?> GetInitialResponseAsync(CancellationToken cancellationToken) => ValueTask.FromResult(script.InitialResponse);
 

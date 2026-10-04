@@ -10,10 +10,11 @@ namespace Curl.Cryptography;
 /// <see cref="Rfc4345DiscardLength" /> (RFC 4345 section 4).
 /// </summary>
 /// <remarks>
-/// Not constant-time: RC4 indexes its key-dependent permutation with key-dependent
-/// positions by design (ADR-0118); it exists because curl's SSH backends and Kerberos
-/// <c>rc4-hmac</c> use it. The permutation and its two indices live in the instance and
-/// are zeroed by <see cref="Dispose" />.
+/// Constant-time in the key: every read and swap at the key-dependent index reads and
+/// rewrites all 256 entries of the permutation in order and picks the one it needs by
+/// mask, so no memory address depends on the key (ADR-0399). It exists because curl's SSH
+/// backends and Kerberos <c>rc4-hmac</c> use it. The permutation and its two indices live
+/// in the instance and are zeroed by <see cref="Dispose" />.
 /// </remarks>
 public sealed class Rc4 : IDisposable
 {
@@ -58,7 +59,7 @@ public sealed class Rc4 : IDisposable
         for (int index = 0; index < permutation.Length; index++)
         {
             position = (byte)(position + permutation[index] + key[index % key.Length]);
-            (permutation[index], permutation[position]) = (permutation[position], permutation[index]);
+            SwapWithSecretIndex(permutation, index, position);
         }
     }
 
@@ -108,8 +109,48 @@ public sealed class Rc4 : IDisposable
     private byte NextKeyStreamByte()
     {
         first++;
-        second += permutation[first];
-        (permutation[first], permutation[second]) = (permutation[second], permutation[first]);
-        return permutation[(byte)(permutation[first] + permutation[second])];
+        byte atFirst = permutation[first];
+        second += atFirst;
+        byte atSecond = SwapWithSecretIndex(permutation, first, second);
+        return ReadAtSecretIndex(permutation, (byte)(atFirst + atSecond));
+    }
+
+    /// <summary>
+    /// Swaps the entries of <paramref name="table" /> at the public
+    /// <paramref name="publicIndex" /> and the secret <paramref name="secretIndex" /> without
+    /// a secret-dependent address (ADR-0399): every entry is read and rewritten, in order,
+    /// and only the one at <paramref name="secretIndex" /> changes, chosen by a mask
+    /// computed without a branch. Returns the entry that was at
+    /// <paramref name="secretIndex" />.
+    /// </summary>
+    internal static byte SwapWithSecretIndex(Span<byte> table, int publicIndex, byte secretIndex)
+    {
+        uint atPublic = table[publicIndex];
+        uint atSecret = 0;
+        for (int position = 0; position < table.Length; position++)
+        {
+            uint mask = ConstantTime.EqualMask((uint)position, secretIndex);
+            atSecret |= mask & table[position];
+            table[position] = (byte)ConstantTime.Select(mask, atPublic, table[position]);
+        }
+
+        table[publicIndex] = (byte)atSecret;
+        return (byte)atSecret;
+    }
+
+    /// <summary>
+    /// Entry <paramref name="secretIndex" /> of <paramref name="table" />, without a
+    /// secret-dependent address (ADR-0399): every entry is read, in order, once, and kept
+    /// only where its position equals <paramref name="secretIndex" />.
+    /// </summary>
+    internal static byte ReadAtSecretIndex(ReadOnlySpan<byte> table, byte secretIndex)
+    {
+        uint result = 0;
+        for (int position = 0; position < table.Length; position++)
+        {
+            result |= ConstantTime.EqualMask((uint)position, secretIndex) & table[position];
+        }
+
+        return (byte)result;
     }
 }

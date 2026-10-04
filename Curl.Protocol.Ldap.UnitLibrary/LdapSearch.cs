@@ -34,8 +34,9 @@ namespace Curl.Protocol.Ldap;
 /// with exit 56. A connection reset, on a send or a receive, is a server that closed (BL-845).
 /// </para>
 /// <para>
-/// An output that stops accepting bytes ends the transfer with exit 23 as
-/// <see cref="LdapEntryWriter" /> words it (BL-845): the OpenLDAP build then abandons the search
+/// An output that stops accepting bytes ends the transfer with exit 23, and output past
+/// <see cref="ITransferContext.MaxFileSize" /> with exit 63, as <see cref="LdapEntryWriter" />
+/// words them (BL-845, BL-1329): the OpenLDAP build then abandons the search
 /// and unbinds, the Windows build, whose entries are written after the search, unbinds.
 /// </para>
 /// </remarks>

@@ -19,7 +19,7 @@ public sealed class TcpIoTraceConnectionTests
     {
         var inner = new ScriptedConnection([]);
         var events = new CountingTransferEvents();
-        var connection = new TcpIoTraceConnection(inner, events);
+        var connection = new TcpIoTraceConnection(inner, events, TcpIoTraceConnection.HttpLines);
 
         await connection.WriteAsync(new byte[79], CancellationToken.None);
 
@@ -31,7 +31,7 @@ public sealed class TcpIoTraceConnectionTests
     public async Task ReadAsync_AReadThatCompletesAtOnce_WritesOneRecvLineWithCurlsBufferLength()
     {
         var events = new CountingTransferEvents();
-        var connection = new TcpIoTraceConnection(new ScriptedConnection(new byte[40]), events);
+        var connection = new TcpIoTraceConnection(new ScriptedConnection(new byte[40]), events, TcpIoTraceConnection.HttpLines);
 
         var read = await connection.ReadAsync(new byte[16384], CancellationToken.None);
 
@@ -45,10 +45,10 @@ public sealed class TcpIoTraceConnectionTests
         // curl -s -v --trace-config tcp http://127.0.0.1:P/ before the server answered (BL-1161 Notes).
         var events = new CountingTransferEvents();
         var inner = new PendingReadConnection();
-        var connection = new TcpIoTraceConnection(inner, events);
+        var connection = new TcpIoTraceConnection(inner, events, TcpIoTraceConnection.HttpLines);
 
         var reading = connection.ReadAsync(new byte[16384], CancellationToken.None);
-        CollectionAssert.AreEqual(new[] { TcpIoTraceConnection.WouldBlockLine }, events.Calls);
+        CollectionAssert.AreEqual(new[] { "[TCP] recv(len=102400) -> 81, 0" }, events.Calls);
         inner.Answer(40);
         var read = await reading;
 
@@ -57,10 +57,42 @@ public sealed class TcpIoTraceConnectionTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_LinesWithAFixedLengthAndNoWouldBlock_WriteOnlyTheResultWithThatLength()
+    {
+        // FTP's control connection: curl -s -v --trace-config tcp ftp://127.0.0.1:P/a.txt (BL-1259 Notes).
+        var events = new CountingTransferEvents();
+        var inner = new PendingReadConnection();
+        var connection = new TcpIoTraceConnection(inner, events, new TcpIoTraceLines("TCP", 900, WritesWouldBlockReads: false));
+
+        var reading = connection.ReadAsync(new byte[4096], CancellationToken.None);
+        Assert.IsEmpty(events.Calls);
+        inner.Answer(20);
+        await reading;
+        await connection.WriteAsync(new byte[16], CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "[TCP] recv(len=900) -> 0, 20", "[TCP] send(len=16) -> 0, 16" }, events.Calls);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_LinesWithNoFixedLength_WriteEachReadsBufferLengthUnderTheirFilterName()
+    {
+        // FTP's data connection, 5 bytes expected: [TCP-1] recv(len=5) -> 81, 0, then -> 0, 5 (BL-1259 Notes).
+        var events = new CountingTransferEvents();
+        var inner = new PendingReadConnection();
+        var connection = new TcpIoTraceConnection(inner, events, new TcpIoTraceLines("TCP-1", ReceiveLength: null, WritesWouldBlockReads: true));
+
+        var reading = connection.ReadAsync(new byte[5], CancellationToken.None);
+        inner.Answer(5);
+        await reading;
+
+        CollectionAssert.AreEqual(new[] { "[TCP-1] recv(len=5) -> 81, 0", "[TCP-1] recv(len=5) -> 0, 5" }, events.Calls);
+    }
+
+    [TestMethod]
     public async Task EveryOtherMember_PassesThroughToTheInnerConnection()
     {
         var inner = new PendingReadConnection();
-        var connection = new TcpIoTraceConnection(inner, new CountingTransferEvents());
+        var connection = new TcpIoTraceConnection(inner, new CountingTransferEvents(), TcpIoTraceConnection.HttpLines);
         var session = new RecordingConnectionSession(new ScriptedConnection([]));
 
         await connection.FlushAsync(CancellationToken.None);

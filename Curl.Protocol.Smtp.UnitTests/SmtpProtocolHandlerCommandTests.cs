@@ -27,6 +27,9 @@ public sealed class SmtpProtocolHandlerCommandTests
 
     private const string Verified = "250 Recorder <recorder@localhost>\r\n";
 
+    /// <summary>The 35-byte <c>VRFY</c> reply the <c>--max-filesize</c> cases were recorded with (BL-1386).</summary>
+    private const string LongReply = "250 a-reply-longer-than-ten-bytes\r\n";
+
     private const string Bye = "221 Bye\r\n";
 
     private const string Ehlo = "EHLO dom\r\n";
@@ -282,6 +285,50 @@ public sealed class SmtpProtocolHandlerCommandTests
         AssertResult(run.Result, CurlExitCode.TooLarge, "A value or data field grew larger than allowed", 250, 0);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_ReplyLongerThanMaxFileSize_CutsItAtTheLimitAndFailsWithExit63AfterQuit()
+    {
+        // Measured (BL-1386): --max-filesize 10 --mail-rcpt a@b, VRFY=250 a-reply-longer-than-ten-bytes:
+        // stdout "250 a-repl", exit 63, QUIT still sent.
+        CommandRun run = await RunAsync(EhloReply + LongReply + Bye, new MailRequestOptions { Recipients = ["a@b"] }, maxFileSize: 10);
+
+        Assert.AreEqual(Ehlo + "VRFY a@b\r\n" + Quit, run.Sent);
+        Assert.AreEqual("250 a-repl", run.Output);
+        AssertResult(run.Result, CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (10) with 10 bytes", 250, 10);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SecondReplyPassesMaxFileSize_TriesNoFurtherRecipient()
+    {
+        // Measured (BL-1386): --max-filesize 40 and three recipients: VRFY a@b, VRFY c@d, QUIT;
+        // stdout the first reply and "250 a", exit 63.
+        CommandRun run = await RunAsync(
+            EhloReply + LongReply + LongReply + Bye, new MailRequestOptions { Recipients = ["a@b", "c@d", "e@f"] }, maxFileSize: 40);
+
+        Assert.AreEqual(Ehlo + "VRFY a@b\r\nVRFY c@d\r\n" + Quit, run.Sent);
+        Assert.AreEqual(LongReply + "250 a", run.Output);
+        AssertResult(run.Result, CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (40) with 40 bytes", 250, 40);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReplyExactlyMaxFileSize_Succeeds()
+    {
+        // Measured (BL-1386): --max-filesize 35 and a 35-byte reply: exit 0, the whole reply written.
+        CommandRun run = await RunAsync(EhloReply + LongReply + Bye, new MailRequestOptions { Recipients = ["a@b"] }, maxFileSize: 35);
+
+        Assert.AreEqual(LongReply, run.Output);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 250, 35);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ContinuationLinePassesMaxFileSize_CutsItAndKeepsTheEarlierCode()
+    {
+        CommandRun run = await RunAsync(EhloReply + "214-first line\r\n214 end\r\n" + Bye, new MailRequestOptions(), maxFileSize: 5);
+
+        Assert.AreEqual("214-f", run.Output);
+        AssertResult(run.Result, CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (5) with 5 bytes", 250, 5);
+    }
+
     private static void AssertResult(TransferResult result, CurlExitCode exitCode, string? message, int responseCode, long downloadSize)
     {
         Assert.AreEqual(exitCode, result.ExitCode);
@@ -290,7 +337,7 @@ public sealed class SmtpProtocolHandlerCommandTests
         Assert.AreEqual(responseCode, result.Report!.ResponseCode);
     }
 
-    private static async Task<CommandRun> RunAsync(string replies, MailRequestOptions? mail, bool noBody = false)
+    private static async Task<CommandRun> RunAsync(string replies, MailRequestOptions? mail, bool noBody = false, long? maxFileSize = null)
     {
         var output = new MemoryStream();
         var progress = new RecordingProgress();
@@ -300,6 +347,7 @@ public sealed class SmtpProtocolHandlerCommandTests
             Output = output,
             Mail = mail,
             NoBody = noBody,
+            MaxFileSize = maxFileSize,
             Progress = progress,
         };
 

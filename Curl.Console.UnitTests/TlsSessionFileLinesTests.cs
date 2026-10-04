@@ -89,6 +89,7 @@ public sealed class TlsSessionFileLinesTests
                 standardError,
                 new MemoryStream(),
                 runsOnWindows: false,
+                parsesAsWindowsBuild: false,
                 tlsSessions: new TlsSessionCache(TimeProvider.System))
             .RunAsync(["-sv", "--ssl-sessions", _file, "http://h:18234/"]);
 
@@ -110,5 +111,5 @@ public sealed class TlsSessionFileLinesTests
     }
 
     private static CommandLineOptions Parse(params string[] arguments) =>
-        CommandLineParser.Parse(arguments, _ => true).Options!;
+        OpenSslBuildParser.Parse(arguments, _ => true).Options!;
 }

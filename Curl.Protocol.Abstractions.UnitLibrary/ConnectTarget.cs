@@ -92,6 +92,18 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     public string? PoolScheme { get; init; }
 
     /// <summary>
+    /// Gets how a plain connection's I/O is written as curl's TCP filter lines when the connector
+    /// traces that filter, or <see langword="null" />, the default, to leave it to
+    /// <see cref="PoolScheme" />: an <c>http</c> connection is written as <c>[TCP]</c> with curl's
+    /// 102400-byte receive buffer, any other connection not at all (ADR-0357).
+    /// </summary>
+    /// <remarks>
+    /// The FTP handler sets it for its control and data connections, which curl reads with other
+    /// lengths and names <c>[TCP]</c> and <c>[TCP-1]</c> (measured, BL-1259 Notes).
+    /// </remarks>
+    public TcpIoTraceLines? TcpIoTrace { get; init; }
+
+    /// <summary>
     /// Gets the alternative service to dial in place of <see cref="Host" /> and
     /// <see cref="Port" /> (<c>--alt-svc</c>), or <see langword="null" />, the default, to dial
     /// them.
@@ -115,6 +127,19 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// handshake ignores it.
     /// </remarks>
     public IReadOnlyList<string>? ApplicationProtocols { get; init; }
+
+    /// <summary>
+    /// Gets the HTTP version, <c>h2</c> or <c>h1</c>, of the TCP attempt an <c>--http3</c> race starts
+    /// before its QUIC one for an <c>--alt-svc</c> entry naming the origin itself, or
+    /// <see langword="null" />, the default, when QUIC goes first or nothing races.
+    /// </summary>
+    /// <remarks>
+    /// The HTTP handler sets it on both attempts' target. A connector tracing curl's
+    /// <c>[HTTPS-CONNECT]</c> filter writes <c>1st attempt uses &lt;version&gt; from preferred
+    /// version</c> and <c>2nd attempt uses h3 from wanted versions</c> for the TCP attempt, and goes on
+    /// with that filter for the QUIC one (measured, BL-1320 Notes; BL-1360).
+    /// </remarks>
+    public string? TcpFirstAttemptVersion { get; init; }
 
     private static string RequireHost(string host)
     {

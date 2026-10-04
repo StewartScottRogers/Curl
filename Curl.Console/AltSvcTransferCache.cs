@@ -114,14 +114,14 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
         HttpVersionPreference version = HttpVersionMapping.ToHttpVersionPreference(requestedVersion);
         return MatchFor(url) switch
         {
-            null => http with { AltSvcRoute = null, Version = version, TriesTcpBeforeQuic = false },
+            null => http with { AltSvcRoute = null, Version = version, TcpFirstAttemptVersion = null },
             { IsSameDestination: true } same => http with
             {
                 AltSvcRoute = null,
                 Version = SameDestinationVersion(same.Entry.DestinationAlpn, version),
-                TriesTcpBeforeQuic = same.Entry.DestinationAlpn != AltSvcAlpn.H3,
+                TcpFirstAttemptVersion = TcpFirstAttemptVersionOf(same.Entry.DestinationAlpn),
             },
-            { } other => http with { AltSvcRoute = RouteTo(other), Version = SwitchedVersion(other, version), TriesTcpBeforeQuic = false },
+            { } other => http with { AltSvcRoute = RouteTo(other), Version = SwitchedVersion(other, version), TcpFirstAttemptVersion = null },
         };
     }
 
@@ -236,6 +236,18 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// </summary>
     private HttpVersionPreference SameDestinationVersion(AltSvcAlpn destination, HttpVersionPreference version) =>
         destination == AltSvcAlpn.H3 && requestedVersion is null ? HttpVersionPreference.Http3 : version;
+
+    /// <summary>
+    /// The version a TCP attempt that goes before QUIC names for an entry naming the origin itself:
+    /// <c>h2</c> or <c>h1</c>, and <see langword="null" /> for <c>h3</c>, which leaves QUIC first.
+    /// </summary>
+    private static string? TcpFirstAttemptVersionOf(AltSvcAlpn destination) =>
+        destination switch
+        {
+            AltSvcAlpn.H2 => "h2",
+            AltSvcAlpn.H1 => "h1",
+            _ => null,
+        };
 
     /// <summary>
     /// The version a connection to another host or port uses: <paramref name="version" /> when the entry

@@ -98,7 +98,9 @@ public static class SetCookieParser
     /// <item><c>invalid cookie, dropped</c>: the first part has no <c>=</c>, or an empty name.</item>
     /// <item><c>skipped cookie because not 'secure'</c>: <c>Secure</c> from an origin that is not secure.</item>
     /// <item><c>skipped cookie with bad tailmatch domain: </c> and the rest of the header from the
-    /// <c>Domain</c> value that failed to match, its leading blanks and one leading dot left out.</item>
+    /// <c>Domain</c> value that failed to match, its leading blanks and one leading dot left out, then the
+    /// line's CR LF, which curl's <c>%s</c> prints too (BL-1298). A header line received with a bare LF
+    /// would print only LF in curl; the header value no longer says which ending it had.</item>
     /// <item><c>oversized cookie dropped, name/val </c><i>n</i><c> + </c><i>v</i><c> bytes</c>: the trimmed
     /// name's <i>n</i> and value's <i>v</i> characters are more than <see cref="LongestNameAndValue"/> together
     /// (measured on curl 8.21.0, 2026-10-02, BL-1225: a 4000-byte name and a 97-byte value print
@@ -395,7 +397,10 @@ public static class SetCookieParser
 
         /// <summary>
         /// Sets the domain, or refuses the cookie when the host may not set it; curl's refusal line then
-        /// prints the rest of the header from the domain, as its <c>%s</c> of a pointer into the line does.
+        /// prints the rest of the header from the domain, as its <c>%s</c> of a pointer into the line does,
+        /// the line's CR LF included (curl 8.21.0 <c>lib/cookie.c</c> lines 518-525, measured 2026-10-02,
+        /// BL-1298). The header reaches the parser without its line ending, so CR LF is appended: HTTP/2 and
+        /// HTTP/3 lines are rebuilt with it, and only a server ending a line with a bare LF would differ.
         /// </summary>
         private bool TrySetDomain(HeaderPart part)
         {
@@ -411,7 +416,7 @@ public static class SetCookieParser
             bool matches = hostIsIpAddress ? string.Equals(candidate, host, StringComparison.Ordinal) : CookieOrigin.IsDomainOrSubdomain(candidate, host);
             domain = candidate;
             includesSubdomains = !hostIsIpAddress;
-            return matches || Refuse($"skipped cookie with bad tailmatch domain: {headerValue[(part.ValueStart + dotLength)..]}");
+            return matches || Refuse($"skipped cookie with bad tailmatch domain: {headerValue[(part.ValueStart + dotLength)..]}\r\n");
         }
 
         private long ExpiryFromMaxAge(string attributeValue)

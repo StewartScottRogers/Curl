@@ -254,7 +254,7 @@ public sealed class CurlCommandRunnerHttp3Tests
         using MemoryStream standardInput = new();
 
         int exitCode = await CurlComposition
-            .CreateRunner(standardOutput, standardError, standardInput, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"))
+            .CreateRunner(standardOutput, standardError, standardInput, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), parsesAsWindowsBuild: false)
             .RunAsync(arguments);
 
         return (exitCode, Encoding.Latin1.GetString(standardOutput.ToArray()), Encoding.Latin1.GetString(standardError.ToArray()));

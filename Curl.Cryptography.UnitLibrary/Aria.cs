@@ -12,9 +12,10 @@ namespace Curl.Cryptography;
 /// as RFC 5794 specifies.
 /// </summary>
 /// <remarks>
-/// Not constant-time: the substitution layers index ARIA's fixed S-boxes with key-mixed
-/// data bytes, as OpenSSL's own ARIA does (ADR-0147); it exists because curl's OpenSSL
-/// builds offer the ARIA suites (ADR-0140). The round keys are held in the instance and
+/// Constant-time in the key and the data: the substitution layers read every entry of
+/// ARIA's four fixed S-boxes in order and keep the ones they need by mask, so no memory
+/// address depends on a key-mixed byte (ADR-0395, superseding ADR-0147's S-box choice). It
+/// exists because curl's OpenSSL builds offer the ARIA suites (ADR-0140). The round keys are held in the instance and
 /// zeroed by <see cref="Dispose" />.
 /// </remarks>
 public sealed class Aria : IBlockCipher, IDisposable
@@ -187,26 +188,51 @@ public sealed class Aria : IBlockCipher, IDisposable
 
     /// <summary>
     /// RFC 5794 section 2.4.2: SL1 (<paramref name="oddRound" /> <c>true</c>) or SL2, the
-    /// bytes through SB1, SB2, SB3 and SB4 in turn, SL2 starting at SB3.
+    /// bytes through SB1, SB2, SB3 and SB4 in turn, SL2 starting at SB3. Each box is read
+    /// whole by <see cref="SubstituteBytes" />, so no address depends on the bytes (ADR-0395).
     /// </summary>
     internal static UInt128 Substitute(UInt128 value, bool oddRound)
     {
-        Span<byte> bytes = stackalloc byte[BlockSize];
-        try
+        int firstBox = oddRound ? 0 : 2;
+        ulong high = (ulong)(value >> 64);
+        ulong low = (ulong)value;
+        ulong highResult = 0;
+        ulong lowResult = 0;
+        for (int box = 0; box < 4; box++)
         {
-            BinaryPrimitives.WriteUInt128BigEndian(bytes, value);
-            int firstBox = oddRound ? 0 : 2;
-            for (int index = 0; index < BlockSize; index++)
-            {
-                bytes[index] = SubstitutionBoxes[(((index + firstBox) % 4) * 256) + bytes[index]];
-            }
+            // Byte i (big-endian) goes through box (i + firstBox) % 4, so this box serves the
+            // bytes at i % 4 == lane, two in each 64-bit half.
+            int lane = (box - firstBox + 4) % 4;
+            ulong lanes = 0x000000FF000000FFUL << (8 * (3 - lane));
+            ReadOnlySpan<byte> table = SubstitutionBoxes.Slice(box * 256, 256);
+            highResult |= lanes & SubstituteBytes(high, table);
+            lowResult |= lanes & SubstituteBytes(low, table);
+        }
 
-            return BinaryPrimitives.ReadUInt128BigEndian(bytes);
-        }
-        finally
+        return new UInt128(highResult, lowResult);
+    }
+
+    /// <summary>
+    /// Each of the eight bytes of <paramref name="indices" /> through the 256-byte
+    /// <paramref name="table" />, without a secret-dependent address (ADR-0395): every entry
+    /// is read, in order, once, and kept in each byte whose index equals its position,
+    /// chosen by a mask computed without a branch.
+    /// </summary>
+    internal static ulong SubstituteBytes(ulong indices, ReadOnlySpan<byte> table)
+    {
+        const ulong Ones = 0x0101010101010101UL;
+        const ulong LowSevenBits = 0x7F7F7F7F7F7F7F7FUL;
+        ulong result = 0;
+        for (int position = 0; position < table.Length; position++)
         {
-            CryptographicOperations.ZeroMemory(bytes);
+            ulong difference = indices ^ ((ulong)position * Ones);
+            // The high bit of each byte is set exactly where that byte of difference is zero.
+            ulong zeroBytes = ~(((difference & LowSevenBits) + LowSevenBits) | difference | LowSevenBits);
+            ulong mask = (zeroBytes >> 7) * 0xFF;
+            result |= mask & (table[position] * Ones);
         }
+
+        return result;
     }
 
     /// <summary>RFC 5794 section 2.4.3, the diffusion layer A, an involution.</summary>

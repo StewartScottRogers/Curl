@@ -92,7 +92,7 @@ public sealed class FtpProtocolHandlerDataConnectFailureTests
             TransferResult.Failure(CurlExitCode.OperationTimedOut, "Failed to connect to 127.0.0.1:47911 via 10.255.255.1:1025 after 21125 ms: Could not connect to server"),
             result with { Report = null });
         Assert.HasCount(1, controlConnector.Targets);
-        Assert.AreEqual(new ConnectTarget("10.255.255.1", 1025, false), dataConnector.Targets.Single() with { DiagnosticLog = NoDiagnosticLog.Instance });
+        Assert.AreEqual(new ConnectTarget("10.255.255.1", 1025, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, dataConnector.Targets.Single() with { DiagnosticLog = NoDiagnosticLog.Instance });
     }
 
     [TestMethod]

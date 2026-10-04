@@ -34,7 +34,27 @@ public sealed partial class TcpConnector
         QuicDialer dialer,
         CancellationToken cancellationToken)
     {
-        var started = timeProvider.GetTimestamp();
+        // The [SETUP] and [HTTPS-CONNECT] filters go around the tunnel and the QUIC connect as around
+        // a direct one, eyeballing to the proxy; the reply head goes to the output the target's
+        // events were before they wrapped them (measured, BL-1320 Notes).
+        var headOutput = target.Events as IConnectReplyHeadWritingEvents;
+        var (traced, httpsConnect, attempt) = QuicConnectionFilters(target, proxy);
+        var result = await ConnectMultiplexedThroughProxyTracedAsync(traced, new ProxyRoute(proxy, headOutput, timeProvider.GetTimestamp()), dialer, cancellationToken).ConfigureAwait(false);
+        if (result.Connection is null)
+        {
+            ReportHttpsConnectAttemptFailure(httpsConnect, attempt, result.ExitCode);
+        }
+
+        return result;
+    }
+
+    private async ValueTask<MultiplexedConnectResult> ConnectMultiplexedThroughProxyTracedAsync(
+        ConnectTarget target,
+        ProxyRoute route,
+        QuicDialer dialer,
+        CancellationToken cancellationToken)
+    {
+        var started = route.Started;
         LoadResolveEntriesUnlessLoaded(target.Events);
         var destination = DestinationOf(target);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
@@ -48,7 +68,7 @@ public sealed partial class TcpConnector
         UdpTunnel tunnel;
         try
         {
-            var (opened, failure) = await OpenUdpTunnelAsync(target, destination, proxy, started, limited.Token).ConfigureAwait(false);
+            var (opened, failure) = await OpenUdpTunnelAsync(target, destination, route, limited.Token).ConfigureAwait(false);
             if (opened is null)
             {
                 return failure!;
@@ -76,17 +96,17 @@ public sealed partial class TcpConnector
     }
 
     /// <summary>
-    /// Resolves and dials <paramref name="proxy" />, secures it when it is an HTTPS proxy, and
-    /// opens the CONNECT-UDP tunnel to <paramref name="destination" /> through it: the tunnel,
-    /// or the failure with curl 8.22.0's exit code and message.
+    /// Resolves and dials the <paramref name="route" />'s proxy, secures it when it is an HTTPS
+    /// proxy, and opens the CONNECT-UDP tunnel to <paramref name="destination" /> through it: the
+    /// tunnel, or the failure with curl 8.22.0's exit code and message.
     /// </summary>
     private async ValueTask<(UdpTunnel? Tunnel, MultiplexedConnectResult? Failure)> OpenUdpTunnelAsync(
         ConnectTarget target,
         ConnectDestination destination,
-        ProxyEndpoint proxy,
-        long started,
+        ProxyRoute route,
         CancellationToken cancellationToken)
     {
+        var (proxy, _, started) = route;
         var (addresses, resolveFailure) = await ResolveWithFailureReasonAsync(proxy.Host, proxy.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
@@ -114,7 +134,7 @@ public sealed partial class TcpConnector
             return (null, tlsFailure);
         }
 
-        var replyFailure = await RequestUdpTunnelAsync(connection, target, destination, proxy, cancellationToken).ConfigureAwait(false);
+        var replyFailure = await RequestUdpTunnelAsync(connection, target, destination, route, cancellationToken).ConfigureAwait(false);
         return replyFailure is null
             ? (new UdpTunnel(new CapsuleDatagramChannel(connection, dialed.RemoteEndPoint!), dialed.RemoteEndPoint!, nameResolved), null)
             : (null, replyFailure);
@@ -123,7 +143,10 @@ public sealed partial class TcpConnector
     /// <summary>
     /// The connection the CONNECT-UDP request goes on: the dialled one to an HTTP proxy, the
     /// proxy's TLS stream to an HTTPS proxy, its handshake run as the CONNECT path runs it and
-    /// followed by curl 8.22.0's <c>CONNECT-UDP:</c> ALPN line (measured, BL-942).
+    /// followed by curl 8.22.0's <c>CONNECT-UDP:</c> ALPN line (measured, BL-942), which an HTTP
+    /// proxy's connection writes too. Under <see cref="TracesSetupFilter" /> the setup filter adds
+    /// the tunnel filter first, after the HTTPS proxy's SSL filter, as for a CONNECT tunnel
+    /// (measured through an HTTP proxy, BL-1320 Notes).
     /// </summary>
     private async ValueTask<(IConnection? Connection, MultiplexedConnectResult? Failure)> SecureUdpTunnelProxyAsync(
         DialedSocket dialed,
@@ -133,9 +156,13 @@ public sealed partial class TcpConnector
     {
         if (proxy.Kind != ProxyKind.Https)
         {
+            ReportSetupFilterAdded(target.Events, HttpProxyTunnelFilterAddedLine);
+            target.Events.ReportInfo("CONNECT-UDP: no ALPN negotiated");
             return (dialed.Connection, null);
         }
 
+        ReportSetupFilterAdded(target.Events, HttpsProxySslFilterAddedLine);
+        ReportSetupFilterAdded(target.Events, HttpProxyTunnelFilterAddedLine);
         var secured = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, proxy.Host, target, isProxy: true, applicationProtocols: HttpApplicationProtocols.Http11Only, cancellationToken).ConfigureAwait(false);
         if (secured.Connection is null)
         {
@@ -148,25 +175,34 @@ public sealed partial class TcpConnector
         return (secured.Connection, null);
     }
 
+    private void ReportSetupFilterAdded(ITransferEvents events, string addedLine)
+    {
+        if (TracesSetupFilter)
+        {
+            events.ReportInfo(addedLine);
+        }
+    }
+
     /// <summary>
     /// Sends the CONNECT-UDP request with the pre-emptive <c>Proxy-Authorization</c> and reads
     /// the proxy's reply, whose head goes to the header output as a CONNECT reply's does:
     /// <see langword="null" /> once a <c>101</c> or <c>2xx</c> opened the tunnel, reported as
-    /// <c>CONNECT-UDP tunnel established, response &lt;n&gt;</c>; else the connection is
-    /// disposed and the failure returned - exit 56 for a reply curl gives up on, exit 7
-    /// <c>CONNECT-UDP tunnel failed, response &lt;n&gt;</c> for any other status, also reported
-    /// as <c>-v</c> repeats it (measured, BL-942).
+    /// <c>CONNECT-UDP phase completed for HTTP proxy</c> and <c>CONNECT-UDP tunnel established,
+    /// response &lt;n&gt;</c>; else the connection is disposed and the failure returned - exit 56
+    /// for a reply curl gives up on, exit 7 <c>CONNECT-UDP tunnel failed, response &lt;n&gt;</c>
+    /// for any other status, also reported as <c>-v</c> repeats it (measured, BL-942).
     /// </summary>
     private async ValueTask<MultiplexedConnectResult?> RequestUdpTunnelAsync(
         IConnection connection,
         ConnectTarget target,
         ConnectDestination destination,
-        ProxyEndpoint proxy,
+        ProxyRoute route,
         CancellationToken cancellationToken)
     {
-        var (reply, exception) = await ExchangeUdpTunnelRequestAsync(connection, target, destination, proxy, cancellationToken).ConfigureAwait(false);
+        var (reply, exception) = await ExchangeUdpTunnelRequestAsync(connection, target, destination, route, cancellationToken).ConfigureAwait(false);
         if (exception is null && reply.OpensUdpTunnel)
         {
+            target.Events.ReportInfo("CONNECT-UDP phase completed for HTTP proxy");
             target.Events.ReportInfo($"CONNECT-UDP tunnel established, response {reply.StatusCode}");
             return null;
         }
@@ -182,23 +218,31 @@ public sealed partial class TcpConnector
 
     /// <summary>
     /// Writes the CONNECT-UDP request and reads the reply, its head written to the header
-    /// output when the events take it: the reply, or what was thrown along the way.
+    /// output the route carries: the reply, or what was thrown along the way. <c>-v</c> shows
+    /// <c>Establishing HTTP proxy UDP tunnel to &lt;host&gt;:&lt;port&gt;</c>, the request head and
+    /// the reply's header lines, as curl 8.22.0 writes them (measured, BL-1320 Notes).
     /// </summary>
     private async ValueTask<(HttpProxyTunnelReply Reply, ExceptionDispatchInfo? Exception)> ExchangeUdpTunnelRequestAsync(
         IConnection connection,
         ConnectTarget target,
         ConnectDestination destination,
-        ProxyEndpoint proxy,
+        ProxyRoute route,
         CancellationToken cancellationToken)
     {
         try
         {
+            var (proxy, headOutput, _) = route;
+            var events = target.Events;
             var proxyAuthorization = await CreateProxyAuthorizationAsync(destination, proxy, [], NoTransferEvents.Instance, cancellationToken).ConfigureAwait(false);
-            await connection.WriteAsync(HttpProxyTunnel.BuildConnectUdpRequest(destination.Host, destination.Port, proxy, _proxyTunnelOptions, proxyAuthorization), cancellationToken).ConfigureAwait(false);
+            events.ReportInfo($"Establishing HTTP proxy UDP tunnel to {HttpProxyTunnel.FormatAuthority(destination.Host, destination.Port)}");
+            var request = HttpProxyTunnel.BuildConnectUdpRequest(destination.Host, destination.Port, proxy, _proxyTunnelOptions, proxyAuthorization);
+            events.ReportRequestHeader(request);
+            await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
             var reply = await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false);
             EndProxyAuthorization(proxyAuthorization);
-            if (target.Events is IConnectReplyHeadWritingEvents headOutput && !reply.Head.IsEmpty)
+            ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization);
+            if (headOutput is not null && !reply.Head.IsEmpty)
             {
                 await headOutput.WriteConnectReplyHeadAsync(reply.Head, cancellationToken).ConfigureAwait(false);
             }

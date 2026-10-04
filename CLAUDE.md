@@ -142,7 +142,7 @@ Every session, lanes included, whispers milestones to Stewart through the PostTo
 `.claude/hooks/whisper-milestone.ps1`: a task moved to Done, a CI failure filed, a commit
 made, a branch deleted - quietly, in Windows' Zira voice, one phrase at a time. The same
 script, run by `task-board.ps1`, whispers the Backlog's depth ("Backlog depth, 63.") a minute
-after a move takes a task out of `Backlog`, once per burst of moves (BL-1182).
+after a move takes a task out of `Backlog`, once per burst of moves (BL-1182). All of it is silent while `%LOCALAPPDATA%\Curl\audio-off` exists (BL-1317); while it does, Claude also starts shifts with `-QuietAlarm`, so alarms and notices stay on screen.
 ## Audit office
 An independent team of AI auditors audits the dark factory and the code it produced, from
 outside the factory's reach (ADR-0267; `Audit/README.md` maps the folder). Six read-only
@@ -225,8 +225,7 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
   parameter, test, script, task - says exactly what the thing does, and the thing does
   nothing its name hides. No generic names (`Process`, `Handle`, `Manager`, `Helper`,
   `Utils`, `Data`) where a specific one exists; one concept has one name, the one in
-  `Documentation/Wiki/Glossary.md` (not yet written; `align-and-document` starts it on
-  its first run). Documents obey the same rule: every statement is true
+  `Documentation/Wiki/Glossary.md`, which `align-and-document` keeps current. Documents obey the same rule: every statement is true
   of the code as it is now, and intent is written as intent. A misaligned name or document
   is a defect, because it is how an agent reading this repository comes to believe
   something false. The `align-and-document` agent owns this.

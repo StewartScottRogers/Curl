@@ -108,7 +108,9 @@ built alongside it.
 `Curl.Protocol.Ftp` and `Curl.Protocol.Ssh`: a second transport shape, a control
 channel beside data channels, without distorting the design.
 
-- **Status:** In progress. FTP is built and registered; SCP and SFTP are being built.
+- **Status:** Done. FTP, SCP and SFTP are built and registered in `Curl.Console`
+  (`ftp`, `ftps`, `scp` and `sftp`); every task under "Delivers" is in `Tasks/Done`,
+  and `--krb` for FTP (BL-693) stays deferred.
 - **Decisions that stand:** ADR-0122 (SCP and SFTP offer each platform curl's libssh2
   algorithms), ADR-0206 (key exchange failures), ADR-0212 (packet protection), ADR-0213
   (host key checks) and ADR-0215 (user authentication).
@@ -193,8 +195,8 @@ shipped in Milestone 1.
 `Curl.Protocol.Ldap`, `Curl.Protocol.Smb` and `Curl.Protocol.Rtsp`: the awkward
 remainder.
 
-- **Status:** In progress. LDAP and RTSP are built and registered; SMB is built but
-  not yet registered in `Curl.Console`.
+- **Status:** Done. LDAP, RTSP and SMB (`smb`, `smbs`) are built and registered in
+  `Curl.Console`; every task under "Delivers" is in `Tasks/Done`.
 - **Decisions that stand:** ADR-0166 (LDAP on `IConnection`, as each platform's WinLDAP
   or OpenLDAP build answers), ADR-0169 (RTSP requests and replies) and ADR-0200 (SMB
   and SMBS speak curl's SMBv1 on every platform).

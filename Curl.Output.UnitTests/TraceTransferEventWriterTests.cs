@@ -47,7 +47,20 @@ public sealed class TraceTransferEventWriterTests
     }
 
     [TestMethod]
-    public void Timestamp_ShowsTheClocksMicroseconds()
+    [OSCondition(OperatingSystems.Windows)]
+    public void Timestamp_OnWindows_ShowsTheClocksMilliseconds()
+    {
+        DateTimeOffset instant = new DateTimeOffset(2026, 9, 27, 23, 4, 5, TimeSpan.Zero).AddTicks(1_234_567);
+        TraceTransferEventWriter writer = new(output, TraceDumpFormat.TextOnly, writesTimestamps: true, new QueuedTimeProvider(instant));
+
+        writer.ReportInfo("x");
+
+        Assert.AreEqual("23:04:05.123000 * x\n", Written());
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Timestamp_OffWindows_ShowsTheClocksMicroseconds()
     {
         DateTimeOffset instant = new DateTimeOffset(2026, 9, 27, 23, 4, 5, TimeSpan.Zero).AddTicks(1_234_567);
         TraceTransferEventWriter writer = new(output, TraceDumpFormat.TextOnly, writesTimestamps: true, new QueuedTimeProvider(instant));

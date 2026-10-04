@@ -153,6 +153,41 @@ public sealed class CurlCommandRunnerTransferWarningTests
     }
 
     [TestMethod]
+    [DataRow("-O")]
+    [DataRow("--remote-name-all")]
+    public async Task RunAsync_Tls13CipherWarningAndRemoteNameWithoutFileName_PrintsNoRemoteFilenameFirst(string remoteName)
+    {
+        // Measured, curl 8.21.0 Schannel (BL-1362, AF-0027): --tls13-ciphers x -O http://127.0.0.1:PORT/
+        // names the output file before it sets the transfer's options.
+        string[] lines = ["Warning: ignoring --tls13-ciphers, not supported by libcurl with Schannel"];
+
+        int exitCode = await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([RecordingProtocolHandler.WritingPath("http")]), lines),
+                fileSystem,
+                fileSystem,
+                standardOutput,
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: false,
+                79)
+            .RunAsync([remoteName, "http://127.0.0.1:1/"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            "Warning: No remote filename, uses \"curl_response\"" + Environment.NewLine + lines[0] + Environment.NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteNameOnAUrlThatDoesNotParse_PrintsNoRemoteFilenameWarning()
+    {
+        int exitCode = await RunAsync(["-O", "http://exa mple.com/"], RecordingProtocolHandler.WritingPath("http"));
+
+        Assert.AreEqual(3, exitCode);
+        Assert.IsFalse(StandardErrorText.Contains("No remote filename", StringComparison.Ordinal), StandardErrorText);
+    }
+
+    [TestMethod]
     [DataRow("-s")]
     [DataRow("-sS")]
     public async Task RunAsync_SilentAnywhereWithCaPathWarnings_PrintsNoWarning(string silent)

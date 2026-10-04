@@ -104,4 +104,15 @@ public sealed class ConnectTunnelVerboseLinesTests
 
         CollectionAssert.AreEqual(new[] { Establishing }, events.Transcript);
     }
+
+    [TestMethod]
+    public void ReportBeforeConnect_WithASentValueAndNoCredential_NamesAnEmptyUser()
+    {
+        var events = new RecordingTransferEvents();
+        var request = new HttpAuthRequest("CONNECT", CurlUrl.Parse("http://127.0.0.1:18602/"), "example.test:80", null, null, HttpAuthSchemes.Ntlm, IsProxy: true);
+
+        ConnectTunnelVerboseLines.ReportBeforeConnect(events, request, "NTLM TlRM", answersChallenge: false);
+
+        CollectionAssert.AreEqual(new[] { "* Proxy auth using NTLM with user ''", Establishing }, events.Transcript);
+    }
 }

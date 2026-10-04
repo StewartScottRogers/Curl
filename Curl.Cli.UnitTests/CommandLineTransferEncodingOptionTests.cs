@@ -22,7 +22,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [TestMethod]
     public void Parse_NoTransferEncodingOptions_LeavesThemAtCurlDefaults()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.Compressed);
@@ -159,7 +159,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [TestMethod]
     public void Parse_EmptyRequestTarget_IsRefusedAsBlank()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--request-target=", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--request-target=", Url]);
 
         AssertRefused(result, "curl: option --request-target=: blank argument where content is expected");
     }
@@ -168,7 +168,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [TestMethod]
     public void Parse_RequestTargetLast_IsRefusedAsNeedingParameter()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, "--request-target"]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([Url, "--request-target"]);
 
         AssertRefused(result, "curl: option --request-target: requires parameter");
     }
@@ -196,7 +196,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [TestMethod]
     public void Parse_Http11ThenHttp10_KeepsTheLastAndWarns()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--http1.1", "-0", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--http1.1", "-0", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(RequestedHttpVersion.Http10, result.Options.HttpVersion);
@@ -206,7 +206,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [TestMethod]
     public void Parse_Http10ThenHttp11ThenHttp10_WarnsTwice()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-0", "--http1.1", "-0", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["-0", "--http1.1", "-0", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(RequestedHttpVersion.Http10, result.Options.HttpVersion);
@@ -219,7 +219,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [DataRow("--http1.0", "--http1.0=x")]
     public void Parse_SameHttpVersionTwice_DoesNotWarn(string first, string second)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([first, second, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([first, second, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
@@ -228,7 +228,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [TestMethod]
     public void Parse_HttpVersionOverriddenAfterSilent_DoesNotWarn()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--http1.0", "--http1.1", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["-s", "--http1.0", "--http1.1", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(RequestedHttpVersion.Http11, result.Options.HttpVersion);
@@ -238,7 +238,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [TestMethod]
     public void Parse_HttpVersionOverriddenBeforeSilent_StillWarns()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--http1.0", "--http1.1", "-s", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["--http1.0", "--http1.1", "-s", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { OverridesWarning }, result.WarningLines.ToArray());
@@ -248,7 +248,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [DataRow("--http2", RequestedHttpVersion.Http2)]
     [DataRow("--http2=x", RequestedHttpVersion.Http2)]
     [DataRow("--http2-prior-knowledge", RequestedHttpVersion.Http2PriorKnowledge)]
-    public void Parse_Http2Option_IsAcceptedOnEveryPlatform(string spelling, RequestedHttpVersion expected)
+    public void Parse_Http2Option_IsAcceptedByTheOpenSslBuild(string spelling, RequestedHttpVersion expected)
     {
         Assert.AreEqual(expected, Accept(spelling).HttpVersion);
     }
@@ -259,7 +259,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [DataRow("--http2", "--http2-prior-knowledge", RequestedHttpVersion.Http2PriorKnowledge)]
     public void Parse_Http2OptionAndAnotherVersion_KeepsTheLastAndWarns(string first, string second, RequestedHttpVersion expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([first, second, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([first, second, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.HttpVersion);
@@ -273,9 +273,9 @@ public sealed class CommandLineTransferEncodingOptionTests
     [DataRow("--http3", RequestedHttpVersion.Http3)]
     [DataRow("--http3=x", RequestedHttpVersion.Http3)]
     [DataRow("--http3-only", RequestedHttpVersion.Http3Only)]
-    public void Parse_Http3Option_IsAcceptedOnEveryPlatform(string spelling, RequestedHttpVersion expected)
+    public void Parse_Http3Option_IsAcceptedByTheOpenSslBuild(string spelling, RequestedHttpVersion expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelling, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelling, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.HttpVersion);
@@ -292,7 +292,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [DataRow("-0", "--http3", RequestedHttpVersion.Http3)]
     public void Parse_Http3OptionAndAnotherVersion_KeepsTheLastAndWarns(string first, string second, RequestedHttpVersion expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([first, second, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([first, second, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.HttpVersion);
@@ -304,7 +304,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [DataRow("--http3-only")]
     public void Parse_Http3OptionTwice_KeepsItWithoutAWarning(string spelling)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelling, spelling, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelling, spelling, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
@@ -313,7 +313,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [TestMethod]
     public void Parse_Http3AfterSilent_IsAcceptedWithoutAWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--http2", "--http3", Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["-s", "--http2", "--http3", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(RequestedHttpVersion.Http3, result.Options.HttpVersion);
@@ -332,7 +332,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [DataRow("--no-request-target=x")]
     public void Parse_NotReversibleNoSpelling_IsRefusedAsNotReversible(string spelling)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelling, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([spelling, Url]);
 
         AssertRefused(result, $"curl: option {spelling}: {CannotBeReversed}");
     }
@@ -343,7 +343,7 @@ public sealed class CommandLineTransferEncodingOptionTests
         RecordingDataFileReader reader = new();
         reader.Files["k.txt"] = "http3-only\n"u8.ToArray();
 
-        CommandLineParseResult result = CommandLineParser.Parse(["-K", "k.txt", Url], _ => true, ConsolePasswordPrompt.ForProcessConsole, reader);
+        CommandLineParseResult result = OpenSslBuildParser.Parse(["-K", "k.txt", Url], _ => true, ConsolePasswordPrompt.ForProcessConsole, reader);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(RequestedHttpVersion.Http3Only, result.Options.HttpVersion);
@@ -357,7 +357,7 @@ public sealed class CommandLineTransferEncodingOptionTests
 
     private static CommandLineOptions Accept(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = OpenSslBuildParser.Parse([.. arguments, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         return result.Options;

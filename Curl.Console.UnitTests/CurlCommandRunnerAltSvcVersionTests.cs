@@ -174,6 +174,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
         Assert.AreEqual(1, connector.TcpConnectCount);
         Assert.IsEmpty(connector.QuicTargets);
         Assert.IsNull(tcp.Targets.Single().AltSvcRoute);
+        Assert.AreEqual(alpn, tcp.Targets.Single().TcpFirstAttemptVersion);
     }
 
     [TestMethod]
@@ -397,6 +398,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
                 standardError,
                 new MemoryStream(),
                 runsOnWindows: true,
+                parsesAsWindowsBuild: false,
                 timeProvider: new FixedUtcClock(Now))
             .RunAsync(arguments);
 

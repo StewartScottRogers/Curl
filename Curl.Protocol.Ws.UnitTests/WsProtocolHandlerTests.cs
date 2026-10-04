@@ -530,14 +530,51 @@ public sealed class WsProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SendResetByThePeer_FailsWithSendFailure()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_SendResetByThePeer_FailsWithTheWinsockWords()
     {
-        var reset = new IOException("reset", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset));
+        var reset = new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset);
 
-        TransferResult result = await Handler(new FailingConnection(writeFailure: reset)).ExecuteAsync(Context("ws://h/"));
+        TransferResult result = await Handler(new FailingConnection(writeFailure: new IOException("reset", reset))).ExecuteAsync(Context("ws://h/"));
 
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual("Send failure: Connection was reset", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_SendResetByThePeer_FailsWithTheSocketErrorsOwnMessage()
+    {
+        var reset = new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset);
+
+        TransferResult result = await Handler(new FailingConnection(writeFailure: new IOException("reset", reset))).ExecuteAsync(Context("ws://h/"));
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("Send failure: " + reset.Message, result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_UpgradeSendAborted_FailsWithTheWinsockWords()
+    {
+        var aborted = new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionAborted);
+
+        TransferResult result = await Handler(new FailingConnection(writeFailure: new IOException("aborted", aborted))).ExecuteAsync(Context("ws://h/"));
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("Send failure: Connection was aborted", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_UpgradeSendAborted_FailsWithTheSocketErrorsOwnMessage()
+    {
+        var aborted = new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionAborted);
+
+        TransferResult result = await Handler(new FailingConnection(writeFailure: new IOException("aborted", aborted))).ExecuteAsync(Context("ws://h/"));
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("Send failure: " + aborted.Message, result.ErrorMessage);
     }
 
     [TestMethod]

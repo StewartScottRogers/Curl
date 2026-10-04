@@ -23,13 +23,7 @@ internal static class GopherTransferMessages
     internal const string ReceiveFailed = "Failure when receiving data from the peer";
 
     /// <summary>
-    /// The exit 55 message for a selector write the peer reset, which curl's socket filter
-    /// reports through <c>failf</c>.
-    /// </summary>
-    internal const string SendConnectionReset = "Send failure: Connection was reset";
-
-    /// <summary>
-    /// The exit 55 message curl falls back to for any other failed send:
+    /// The exit 55 message curl falls back to for a failed send with no socket error:
     /// <c>curl_easy_strerror(CURLE_SEND_ERROR)</c>.
     /// </summary>
     internal const string SendFailed = "Failed sending data to the peer";
@@ -50,6 +44,18 @@ internal static class GopherTransferMessages
         string.Create(
             CultureInfo.InvariantCulture,
             $"Failure writing output to destination, passed {passed} returned {returned}");
+
+    /// <summary>
+    /// The exit 63 message for a reply cut at <c>--max-filesize</c>, as
+    /// <c>lib/sendf.c</c>'s <c>cw_download_write</c> words it.
+    /// </summary>
+    /// <param name="maxFileSize">The limit <c>--max-filesize</c> gave.</param>
+    /// <param name="delivered">The bytes written to the output, which reach the limit.</param>
+    /// <returns>The message, such as <c>Exceeded the maximum allowed file size (3) with 3 bytes</c>.</returns>
+    internal static string MaxFileSizeExceeded(long maxFileSize, long delivered) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"Exceeded the maximum allowed file size ({maxFileSize}) with {delivered} bytes");
 
     /// <summary>
     /// The exit 23 message for a piece of the sent request the <c>-D</c> stream refused, as

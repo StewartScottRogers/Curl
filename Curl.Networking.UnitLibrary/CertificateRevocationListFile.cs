@@ -113,7 +113,8 @@ internal sealed class CertificateRevocationListFile
             return OpenSslVerifyResult.CertificateRevocationListNotYetValid;
         }
 
-        return list.NextUpdate < now ? OpenSslVerifyResult.CertificateRevocationListHasExpired : null;
+        // OpenSSL's X509_cmp_time counts a nextUpdate equal to the moment as already past.
+        return list.NextUpdate <= now ? OpenSslVerifyResult.CertificateRevocationListHasExpired : null;
     }
 
     private static bool AllowsSigningRevocationLists(X509Certificate2 issuer) =>
