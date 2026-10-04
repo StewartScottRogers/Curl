@@ -34,10 +34,10 @@ An ADR, "Decided by Claude under Stewart's delegation", says how Curl implements
 
 - No code changes in this task.
 - Decided in ADR-0408: `--proxy-http2` refused on Windows (Schannel build has no HTTP2), accepted off Windows (measured: WSL curl 8.18.0 OpenSSL with nghttp2 accepts it); `--proxy-http3` refused everywhere (no reference build has HTTP3 or USE_PROXY_HTTP3; 8.18.0 does not know the option). Tunnel in Curl.Networking.UnitLibrary using Curl.Http2.UnitLibrary, ALPN `h2,http/1.1`, falls back to the HTTP/1.1 tunnel.
-- Filed in dependency order: BL-1412 (Cli parsing, --ai-help), BL-1413 (Record-CurlExchange.ps1 -Http2 to measure the -v lines), BL-1414 (Networking tunnel, depends on BL-1413), BL-1415 (Console wiring, depends on BL-1412 and BL-1414).
+- Filed in dependency order: BL-1416 (Cli parsing, --ai-help), BL-1413 (Record-CurlExchange.ps1 -Http2 to measure the -v lines), BL-1414 (Networking tunnel, depends on BL-1413), BL-1415 (Console wiring, depends on BL-1416 and BL-1414).
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
-- 2026-10-03: Doing -> Done. ADR-0408 decides --proxy-http2/--proxy-http3 per platform; BL-1412..BL-1415 filed
+- 2026-10-03: Doing -> Done. ADR-0408 decides --proxy-http2/--proxy-http3 per platform; BL-1416..BL-1415 filed

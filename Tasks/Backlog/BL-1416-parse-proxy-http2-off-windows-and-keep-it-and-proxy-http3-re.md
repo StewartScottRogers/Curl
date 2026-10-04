@@ -1,5 +1,5 @@
 ---
-id: BL-1412
+id: BL-1416
 title: Parse --proxy-http2 off Windows, refuse it on Windows and refuse --proxy-http3 everywhere (ADR-0408)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-03
 completed:
 ---
-# BL-1412 — Parse --proxy-http2 off Windows, refuse it on Windows and refuse --proxy-http3 everywhere (ADR-0408)
+# BL-1416 — Parse --proxy-http2 off Windows, refuse it on Windows and refuse --proxy-http3 everywhere (ADR-0408)
 
 ## Goal
 
