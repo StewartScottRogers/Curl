@@ -11,9 +11,26 @@ failing.
 
 Work in this order.
 
-## 1. Test names against bodies
+## 0. Scan every test project
 
-For each `.UnitTests` project in scope (the prompt names them; by default the twins of the
+Run the scan over the whole audited tree, every `*.UnitTests` project included, before you
+choose any project to read (BL-1368):
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Find-WeakTests.ps1 -Root <audited tree> -OutFile <temp folder>\weak-tests.json
+```
+
+It lists candidates of four kinds: `ignored-test` (`[Ignore]` or `Assert.Inconclusive`),
+`no-assertion` (no assertion once comments are removed), `weak-assertion` (only `IsNotNull`, or
+an `IsTrue` of a length, count or `Any()` above zero) and `name-lies` (a name with `ExitsWith<N>`
+or `ThrowsExit<N>` whose body never mentions N or its `CurlExitCode`, or `_Throws<X>` whose body
+never mentions X). Read every candidate's test: file the ones that really are what the scan says,
+under steps 1 and 2's kinds, and say in your summary how many candidates you read and how many
+you filed. A candidate is not a finding until you have read it. The scan sees only what the text
+shows; a test that lost one of several assertions is for step 3's mutants to find.
+
+## 1. Test names against bodies
+Beyond step 0's candidates, for each `.UnitTests` project in scope (the prompt names them; by default the twins of the
 libraries you mutate in step 3), read its test methods: all of them in a project with fewer
 than 200 tests, otherwise a sample of at least 50 spread across its files. For each, ask:
 does the body exercise the behaviour the name states, and assert the outcome the name promises?
@@ -92,4 +109,4 @@ product today.
 
 ## Method counts
 
-Run every step above on every audit; re-audits come on top, never instead. Report `method.librariesMutated` and `method.testsRead` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).
+Run every step above on every audit; re-audits come on top, never instead. Report `method.librariesMutated` and `method.testsRead` (step 0's candidates read plus the tests read in step 1) in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).
