@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.File;
 
@@ -96,6 +97,19 @@ internal static class FileTransferMessages
     /// <c>CURLE_RANGE_ERROR</c>, whose easy error text this is.
     /// </summary>
     internal const string RangeNotDelivered = "Requested range was not delivered by the server";
+
+    /// <summary>
+    /// The information line for a file that fails <c>-z</c>: curl 8.21.0's
+    /// <c>Curl_meets_timecondition</c> (<c>lib/transfer.c</c>) writes
+    /// <c>The requested document is not new enough</c> for <c>-z date</c> and
+    /// <c>... not old enough</c> for <c>-z -date</c>, measured on 2026-10-03 (BL-1388).
+    /// </summary>
+    /// <param name="kind">Which way the unmet condition runs.</param>
+    /// <returns>The line, without the <c>* </c> prefix.</returns>
+    internal static string TimeConditionNotMet(TimeConditionKind kind) =>
+        kind == TimeConditionKind.IfModifiedSince
+            ? "The requested document is not new enough"
+            : "The requested document is not old enough";
 
     /// <summary>
     /// The exit 36 message for a suffix range — <c>-r -12</c> — asking for more trailing

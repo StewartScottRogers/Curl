@@ -327,8 +327,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         Stream source,
         FileOpenResult opened)
     {
-        if (!MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
+        if (!HasRange(context) && !MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
         {
+            context.Events.ReportInfo(FileTransferMessages.TimeConditionNotMet(context.TimeCondition!.Kind));
             return TransferResult.TimeConditionNotMet();
         }
 
@@ -1000,6 +1001,18 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
             || lastWriteTimeUtc is not { } knownLastWriteTimeUtc
             || MeetsKnownTimeCondition(condition, knownLastWriteTimeUtc);
     }
+
+    /// <summary>
+    /// Tells whether the transfer asks for part of the file, which is when curl 8.21.0's
+    /// <c>file_do</c> skips the time condition (<c>lib/file.c</c>: it checks
+    /// <c>-z</c> only when <c>state.range</c> is unset): <c>-r</c> text, parsable or not,
+    /// or a positive <c>-C</c> offset. Measured on 2026-10-03: <c>-r 0-0 -z</c> and
+    /// <c>-C 1 -z</c> with an unmet date both transfer (BL-1388).
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <returns><see langword="true" /> when the transfer has a range.</returns>
+    private static bool HasRange(ITransferContext context) =>
+        context.Range is not null || context.RangeText is not null || context.ResumeFrom is > 0;
 
     /// <summary>
     /// Compares a known file timestamp with a time condition, in whole seconds.
