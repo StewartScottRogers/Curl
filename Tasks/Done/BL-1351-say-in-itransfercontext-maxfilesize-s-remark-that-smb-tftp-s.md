@@ -8,7 +8,7 @@ depends-on: [BL-1335, BL-1327, BL-1328, BL-1329]
 touches: [Curl.Protocol.Abstractions.UnitLibrary]
 requirement: FR-084
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1351 — Say in ITransferContext.MaxFileSize's remark that smb, tftp, scp, sftp and ldap enforce it
 
@@ -24,13 +24,18 @@ The remark on `ITransferContext.MaxFileSize` names exactly the handlers that rea
 
 ## Acceptance criteria
 
-- [ ] The `MaxFileSize` remark lists every handler that reads `MaxFileSize`, `smb`, `tftp`, `scp`/`sftp` and `ldap` included, and names any that still do not with the reason.
-- [ ] The remark keeps its HTTP and gopher sentences and its ADR-0044 reference.
-- [ ] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` is clean.
+- [x] The `MaxFileSize` remark lists every handler that reads `MaxFileSize`, `smb`, `tftp`, `scp`/`sftp` and `ldap` included, and names any that still do not with the reason.
+- [x] The remark keeps its HTTP and gopher sentences and its ADR-0044 reference.
+- [x] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` is clean.
 
 ## Notes
+
+- Grepped `MaxFileSize` across `Curl.Protocol.*.UnitLibrary`: ldap, sftp, smb and tftp were already listed by earlier tasks; scp now reads it too (`ScpFileDownload`, BL-1328), so it joined the list. Done directly rather than through align-and-document: a one-sentence comment change.
+- smtp does not only upload: `SmtpCommandTransfer` writes the replies of a session with no message (`VRFY`, `-X`, `HELP`) to the output without the limit. The remark says so; whether curl cuts those replies is unmeasured, filed as BL-1386.
+- Build clean (0 warnings); `Curl.Protocol.Abstractions.UnitTests` fast tests 705/705 green.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. MaxFileSize remark lists scp with the other enforcing handlers and says why smtp does not read it
