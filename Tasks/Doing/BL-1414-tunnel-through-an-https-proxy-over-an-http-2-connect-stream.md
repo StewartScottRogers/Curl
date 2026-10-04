@@ -36,3 +36,4 @@ When proxy HTTP/2 is requested with an `https://` proxy, `Curl.Networking.UnitLi
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
