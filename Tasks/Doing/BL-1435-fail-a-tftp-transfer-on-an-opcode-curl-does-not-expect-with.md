@@ -38,3 +38,4 @@ A TFTP transfer that receives a packet whose opcode curl does not expect in its 
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
