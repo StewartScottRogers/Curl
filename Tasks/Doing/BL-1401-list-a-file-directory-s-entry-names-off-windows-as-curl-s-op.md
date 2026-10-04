@@ -38,3 +38,4 @@ On Linux and macOS a `file://` URL naming a directory writes the names of its en
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
