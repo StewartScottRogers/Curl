@@ -3,10 +3,10 @@ id: AF-0042
 title: BL-1325 and BL-1360 each ran the full 120 minutes and were Blocked by the factory timeout, with uncommitted work stashed
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-1325:BL-1325:unfinished-run
-task: none
+task: BL-1385
 found: 2026-10-03
 found-at: 2c24c2d74dc2c9775b64948efc3ca57b8937627e
 scorecard: 2026-10-03_1459.md
@@ -41,3 +41,4 @@ Select-String -Path ..\logs\DarkFactory-20261003-061205-L2.log,..\logs\DarkFacto
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.

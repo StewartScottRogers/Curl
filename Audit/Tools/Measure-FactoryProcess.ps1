@@ -46,6 +46,13 @@
       tokensOutput              output_tokens over every run's result event
       costUsd                   total_cost_usd over every run's result event
       costUsdPerTaskDone        costUsd / tasksDone
+      laneMinutes               every lane log's time from its first line to its last, summed:
+                                the lane time the idle rules are a share of
+    and these lists (evidence, not metrics; BL-1366):
+      ciRedSpells               each red spell behind ciRedMinutes: start, end (UTC), minutes,
+                                runId (the CI run that turned it red) and stillRed
+      unfinishedRuns            run-log file names (<ID>-<stamp>-L<n>.jsonl) with no result
+                                event and no FACTORY: DONE or FACTORY: BLOCKED line
     and tasks: one row per task claimed since -Since: id, claims, minutes (last claim to its
     end, or to the last line seen when still open), costUsd (its runs), outcome (done,
     requeued, blocked, parked or open).
@@ -113,8 +120,10 @@ function Get-RunResults([string]$Root, [datetime]$From) {
         if (-not $stamp -or $stamp.Date -lt $From.Date) { continue }
         $id = if ($file.Name -match '^(BL-\d+)-') { $Matches[1] } else { continue }
         $resultLine = $null
+        $factoryEnd = $false
         foreach ($line in [IO.File]::ReadLines($file.FullName)) {
             if ($line.Contains('"type":"result"')) { $resultLine = $line }
+            if ($line.Contains('FACTORY: DONE') -or $line.Contains('FACTORY: BLOCKED')) { $factoryEnd = $true }
         }
         $cost = 0.0; $in = [long]0; $out = [long]0
         if ($resultLine) {
@@ -127,23 +136,37 @@ function Get-RunResults([string]$Root, [datetime]$From) {
                 if ($r.usage.PSObject.Properties['output_tokens']) { $out = [long]$r.usage.output_tokens }
             }
         }
-        $runs += [pscustomobject]@{ Id = $id; Resumed = $file.Name -like '*-resumed.jsonl'; CostUsd = $cost; TokensIn = $in; TokensOut = $out; HasResult = [bool]$resultLine }
+        $runs += [pscustomobject]@{ Id = $id; File = $file.Name; Resumed = $file.Name -like '*-resumed.jsonl'; CostUsd = $cost; TokensIn = $in; TokensOut = $out; HasResult = [bool]$resultLine; Finished = ([bool]$resultLine) -or $factoryEnd }
     }
     return $runs
 }
 
-function Get-CiRedMinutes([object[]]$Runs, [datetime]$From) {
+function Get-CiRedSpells([object[]]$Runs, [datetime]$From) {
+    # Each red spell: from the end of the first failed run after a success to the end of the next
+    # successful run (or of the last finished run, when still red), with the run that turned it
+    # red, so the process auditor can name the spell, not only the total (BL-1366).
     $finished = @($Runs | Where-Object { $_.status -eq 'completed' -and $_.conclusion -in 'success', 'failure' } |
-        ForEach-Object { [pscustomobject]@{ Conclusion = $_.conclusion; Created = ([datetimeoffset]$_.createdAt).UtcDateTime; Ended = ([datetimeoffset]$_.updatedAt).UtcDateTime } } |
+        ForEach-Object { [pscustomobject]@{ Id = $_.databaseId; Conclusion = $_.conclusion; Created = ([datetimeoffset]$_.createdAt).UtcDateTime; Ended = ([datetimeoffset]$_.updatedAt).UtcDateTime } } |
         Where-Object { $_.Created -ge $From.ToUniversalTime() -or $_.Created.Date -ge $From.Date } | Sort-Object Created)
-    $red = 0.0
-    $redSince = $null
+    $spells = @()
+    $redSince = $null; $redRun = $null
     foreach ($run in $finished) {
-        if ($run.Conclusion -eq 'failure' -and -not $redSince) { $redSince = $run.Ended }
-        elseif ($run.Conclusion -eq 'success' -and $redSince) { $red += ($run.Ended - $redSince).TotalMinutes; $redSince = $null }
+        if ($run.Conclusion -eq 'failure' -and -not $redSince) { $redSince = $run.Ended; $redRun = $run.Id }
+        elseif ($run.Conclusion -eq 'success' -and $redSince) {
+            $spells += [ordered]@{ start = $redSince.ToString('yyyy-MM-ddTHH:mm:ssZ'); end = $run.Ended.ToString('yyyy-MM-ddTHH:mm:ssZ'); minutes = [math]::Round(($run.Ended - $redSince).TotalMinutes, 2); runId = $redRun; stillRed = $false }
+            $redSince = $null
+        }
     }
-    if ($redSince -and $finished.Count) { $red += [math]::Max(0, ($finished[-1].Ended - $redSince).TotalMinutes) }
-    return [math]::Round($red, 2)
+    if ($redSince -and $finished.Count) {
+        $end = $finished[-1].Ended
+        $spells += [ordered]@{ start = $redSince.ToString('yyyy-MM-ddTHH:mm:ssZ'); end = $end.ToString('yyyy-MM-ddTHH:mm:ssZ'); minutes = [math]::Round([math]::Max(0, ($end - $redSince).TotalMinutes), 2); runId = $redRun; stillRed = $true }
+    }
+    return $spells
+}
+
+function Get-CiRedMinutes([object[]]$Runs, [datetime]$From) {
+    $minutes = @(Get-CiRedSpells $Runs $From | ForEach-Object { [double]$_.minutes })
+    return [math]::Round([double]($minutes | Measure-Object -Sum).Sum, 2)
 }
 
 function Get-Median([double[]]$Values) {
@@ -198,6 +221,13 @@ function Measure-Process([string]$Root, [datetime]$From, [object[]]$CiRuns) {
         }
     }
 
+    # Lane time: each lane log from its first line to its last, so idle minutes have a denominator.
+    $laneMinutes = 0.0
+    foreach ($lane in @($events | Group-Object Lane)) {
+        $lines = @($lane.Group)
+        if ($lines.Count -gt 1) { $laneMinutes += ($lines[-1].At - $lines[0].At).TotalMinutes }
+    }
+
     $tokensIn = [long](@($runs | Measure-Object TokensIn -Sum).Sum)
     $tokensOut = [long](@($runs | Measure-Object TokensOut -Sum).Sum)
     $cost = [double](@($runs | Measure-Object CostUsd -Sum).Sum)
@@ -211,6 +241,8 @@ function Measure-Process([string]$Root, [datetime]$From, [object[]]$CiRuns) {
         requeues = @($events | Where-Object { $_.Verb -eq 'REQUEUE' }).Count
         resumedRuns = @($runs | Where-Object { $_.Resumed }).Count
         ciRedMinutes = Get-CiRedMinutes $CiRuns $From
+        ciRedSpells = @(Get-CiRedSpells $CiRuns $From)
+        laneMinutes = [math]::Round($laneMinutes, 2)
         laneIdleMinutes = [math]::Round($overlap + $nothing + $other, 2)
         waitOverlapMinutes = [math]::Round($overlap, 2)
         waitNothingReadyMinutes = [math]::Round($nothing, 2)
@@ -219,6 +251,7 @@ function Measure-Process([string]$Root, [datetime]$From, [object[]]$CiRuns) {
         tokensOutput = $tokensOut
         costUsd = [math]::Round($cost, 4)
         costUsdPerTaskDone = $(if ($done) { [math]::Round($cost / $done, 4) } else { $null })
+        unfinishedRuns = @($runs | Where-Object { -not $_.Finished } | ForEach-Object { $_.File } | Sort-Object)
         tasks = $rows
     }
 }
@@ -242,6 +275,18 @@ if ($SelfTest) {
     $ok = $bl002.claims -eq 2 -and "$($bl002.minutes)" -eq '20' -and "$($bl002.costUsd)" -eq '0.75' -and $bl002.outcome -eq 'done'
     if (-not $ok) { $failed++ }
     Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) task row BL-002: claims $($bl002.claims), minutes $($bl002.minutes), costUsd $($bl002.costUsd), $($bl002.outcome)"
+    # BL-1366: the run that never finished, each red spell named by the run that turned it red, and
+    # lane time as the denominator for idle time.
+    $ok = (@($m.unfinishedRuns) -join ',') -eq 'BL-004-20260101-100000-L2.jsonl'
+    if (-not $ok) { $failed++ }
+    Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) unfinishedRuns: $(@($m.unfinishedRuns) -join ',')"
+    $spells = @($m.ciRedSpells)
+    $ok = $spells.Count -eq 2 -and $spells[0].runId -eq 2 -and "$($spells[0].minutes)" -eq '60' -and $spells[0].start -eq '2026-01-01T10:10:00Z' -and $spells[1].runId -eq 6 -and $spells[1].end -eq '2026-01-01T13:05:00Z' -and -not $spells[1].stillRed
+    if (-not $ok) { $failed++ }
+    Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) ciRedSpells: $(($spells | ForEach-Object { "$($_.runId):$($_.minutes)" }) -join ', ')"
+    $ok = "$($m.laneMinutes)" -eq '941.42'
+    if (-not $ok) { $failed++ }
+    Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) laneMinutes: $($m.laneMinutes) (expected 941.42)"
     $bl004 = @($m.tasks | Where-Object { $_.id -eq 'BL-004' })[0]
     $ok = $bl004.outcome -eq 'open'
     if (-not $ok) { $failed++ }

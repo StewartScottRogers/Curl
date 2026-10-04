@@ -141,6 +141,7 @@ authoritative definition of each; units and a short meaning here:
 | `laneIdleMinutes` | minutes | Sum of the lanes' `wait` phases. |
 | `waitOverlapMinutes` | minutes | The part of `laneIdleMinutes` spent waiting because a ready task overlapped one in Doing. |
 | `waitNothingReadyMinutes` | minutes | The rest of `laneIdleMinutes`: waiting with nothing ready. |
+| `laneMinutes` | minutes | Every lane's time from its first to its last log line, summed: what the idle shares are of (BL-1366). |
 | `tokensInput` | tokens | Input tokens of all runs. |
 | `tokensOutput` | tokens | Output tokens of all runs. |
 | `costUsd` | US dollars | Cost of all runs. |

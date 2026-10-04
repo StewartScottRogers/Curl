@@ -80,4 +80,4 @@ Follow the key rule in [Report-Format.md](Report-Format.md). `<where>` is the op
 
 ## Method counts
 
-Run every step above on every audit; re-audits come on top, never instead. Report ``method.casesRun`` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).
+Run every step above on every audit; re-audits come on top, never instead. Report `method.casesRun` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).
