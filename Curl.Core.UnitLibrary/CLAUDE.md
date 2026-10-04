@@ -110,7 +110,9 @@ under `/dev/` off Windows, which `SeekableFileLength` sends chunked as libcurl d
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and
 curl's `<reason> in position N:` message, caret and all; `Unglobbed` is the URL under `-g`.
 A glob may be named, `{<name>a,b}` or `[<name>1-3]` (at most 64 characters; a name used
-twice is exit 3, `Duplicate glob name`; BL-1436).
+twice is exit 3, `Duplicate glob name`; BL-1436). The 256th piece (literal run, set or
+range) is exit 3, `too many {} sets`, and every glob message is cut to curl's 511
+characters, caret line and all (BL-1437).
 `Expand()` yields each URL lazily, rightmost glob fastest, and `UrlGlobMatch.SubstituteGlobValues`
 replaces `#N` and `#<name>` in an `-o` name; `UrlGlobMatch.TryResolveOutputFileName` also
 fails a `#<name>` naming no glob as curl does (exit 43, `no glob exists with this name`). `UrlGlobMatch.ResolveOutputFileName` is the name curl

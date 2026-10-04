@@ -59,6 +59,49 @@ public sealed class UrlGlobTests
     }
 
     [TestMethod]
+    [DataRow("http://testingthis/", "{a}b", 128, 403)]
+    [DataRow("http://testingthis/", "{a}b", 201, 403)]
+    [DataRow("http://t/", "{a}b", 128, 393)]
+    [DataRow("http://testingthis/", "[1-1]b", 128, 787)]
+    [DataRow("http://x/", "b{a}", 128, 394)]
+    public void TryParse_256thPiece_IsTooManySetsAtCurlsMeasuredPosition(string prefix, string repeated, int copies, int column)
+    {
+        string url = prefix + string.Concat(Enumerable.Repeat(repeated, copies));
+
+        Assert.IsFalse(UrlGlob.TryParse(url, out UrlGlob? glob, out TransferResult? failure));
+
+        Assert.IsNull(glob);
+        Assert.AreEqual(CurlExitCode.UrlMalformat, failure.ExitCode);
+        string message = $"too many {{}} sets in position {column}:\n{url}\n{new string(' ', column - 1)}^";
+        Assert.AreEqual(message[..511], failure.ErrorMessage);
+    }
+
+    [TestMethod]
+    public void TryParse_UrlPastCurlsMessageBuffer_IsCutTo511CharactersAsUpstreamTest761Expects()
+    {
+        string url = "http://testingthis/" + string.Concat(Enumerable.Repeat("{a}b", 201));
+
+        Assert.IsFalse(UrlGlob.TryParse(url, out _, out TransferResult? failure));
+
+        string expected = "too many {} sets in position 403:\nhttp://testingthis/" + string.Concat(Enumerable.Repeat("{a}b", 114)) + "{a";
+        Assert.AreEqual(expected, failure.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow("http://testingthis/", "{a}b", 127, "http://testingthis/")]
+    [DataRow("http://t/", "{a}", 130, "http://t/")]
+    public void TryParse_255PiecesOrFewer_Parses(string prefix, string repeated, int copies, string expectedPrefix)
+    {
+        string url = prefix + string.Concat(Enumerable.Repeat(repeated, copies));
+
+        Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out _));
+
+        string expanded = glob.Expand().Single().Url;
+        Assert.StartsWith(expectedPrefix, expanded);
+        Assert.DoesNotContain("{", expanded);
+    }
+
+    [TestMethod]
     public void Expand_NumberRangeToOneBelowMaximum_IsProducedLazily()
     {
         Assert.IsTrue(UrlGlob.TryParse("file:///n/[0-9223372036854775806]", out UrlGlob? glob, out _));

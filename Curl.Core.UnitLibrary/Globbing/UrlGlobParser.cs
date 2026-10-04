@@ -41,6 +41,12 @@ internal sealed class UrlGlobParser(string url)
 
     private const int MaxCharacterSpan = 'z' - 'a';
 
+    /// <summary>
+    /// The piece count at which curl 8.21.0 refuses a glob with <c>too many {} sets</c>:
+    /// every literal run, set and range is one piece, and the 256th fails.
+    /// </summary>
+    private const int MaxPieceCount = 256;
+
     private static readonly System.Buffers.SearchValues<char> ZoneCharacters = System.Buffers.SearchValues.Create(
         "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-._~");
 
@@ -66,11 +72,18 @@ internal sealed class UrlGlobParser(string url)
         error = null;
         while (index < url.Length && error is null)
         {
-            error = ReadNextPiece();
+            error = ReadNextPiece() ?? RefuseTooManyPieces();
         }
 
         return error is null;
     }
+
+    /// <summary>
+    /// Refuses the piece just read when it is the 256th, at the column just past it, as
+    /// curl's <c>add_glob</c> does when its piece array would grow past 255 entries.
+    /// </summary>
+    private UrlGlobError? RefuseTooManyPieces() =>
+        pieces.Count >= MaxPieceCount ? ErrorAtIndex("too many {} sets") : null;
 
     private UrlGlobError? ReadNextPiece()
     {
