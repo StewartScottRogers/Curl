@@ -89,10 +89,11 @@ public interface ITransferContext
     /// The <c>dict</c>, <c>file://</c>, <c>ftp</c>/<c>ftps</c>, <c>gopher</c>,
     /// <c>http</c>/<c>https</c>, <c>imap</c>, <c>ldap</c>, <c>mqtt</c>, <c>pop3</c>,
     /// <c>rtsp</c>, <c>scp</c>, <c>sftp</c>, <c>smb</c>, <c>telnet</c>, <c>tftp</c> and
-    /// <c>ws</c>/<c>wss</c> handlers enforce it. The <c>smtp</c> handler does not read it:
-    /// it sends a message, which as an upload ignores the limit, and writes the replies of a
-    /// session with no message (<c>VRFY</c>, <c>-X</c>, <c>HELP</c>) without counting them
-    /// against it. Over gopher a reply is cut at the limit and fails with exit 63 and
+    /// <c>ws</c>/<c>wss</c> handlers enforce it. The <c>smtp</c> handler ignores it when it
+    /// sends a message, an upload, but counts the replies of a session with no message
+    /// (<c>VRFY</c>, <c>-X</c>, <c>HELP</c>) against it: the reply that passes it is cut at the
+    /// limit and fails with exit 63 and <c>Exceeded the maximum allowed file size (N) with N
+    /// bytes</c>, <c>QUIT</c> still sent (BL-1386). Over gopher a reply is cut at the limit and fails with exit 63 and
     /// <c>Exceeded the maximum allowed file size (N) with N bytes</c>. Over HTTP a response whose Content-Length is over the limit
     /// fails before any body is written, with exit 63 and <c>Maximum file size exceeded</c>;
     /// a body with no Content-Length, or one that grows past it, is cut at the limit and

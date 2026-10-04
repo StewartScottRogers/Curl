@@ -63,6 +63,13 @@ internal static class SmtpSessionMessages
     internal static string EveryRecipientRefused(int code) =>
         string.Create(CultureInfo.InvariantCulture, $"RCPT failed: {code} (last error)");
 
+    /// <summary>
+    /// The replies of a session with no message passed <c>--max-filesize</c> (exit 63, BL-1386),
+    /// such as <c>Exceeded the maximum allowed file size (10) with 10 bytes</c>.
+    /// </summary>
+    internal static string MaxFileSizeExceeded(long maxFileSize, long written) =>
+        string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({maxFileSize}) with {written} bytes");
+
     /// <summary>The greeting was not a 2xx reply (exit 8).</summary>
     internal static string UnexpectedResponse(int code) =>
         string.Create(CultureInfo.InvariantCulture, $"Got unexpected smtp-server response: {code}");

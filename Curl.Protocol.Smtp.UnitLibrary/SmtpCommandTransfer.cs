@@ -23,6 +23,10 @@ namespace Curl.Protocol.Smtp;
 /// line once the reply is accepted. A reply is accepted when it is 2xx, or 553 for a
 /// command about a recipient; any other is exit 8, <c>Command failed: 550</c>, after which
 /// no further recipient is tried and <c>QUIT</c> is still sent.</item>
+/// <item>The replies written count against <c>--max-filesize</c>: the write that would pass
+/// it is cut at the limit and the commands end with exit 63, <c>Exceeded the maximum allowed
+/// file size (N) with N bytes</c>; no further recipient is tried and <c>QUIT</c> is still
+/// sent (BL-1386).</item>
 /// <item>The server closing before a reply is complete is exit 56, a reply line of 65536
 /// bytes exit 100 and a reply line holding a NUL byte exit 8, none with <c>QUIT</c>.</item>
 /// <item>Every result carries the bytes written as <see cref="TransferResult.BytesTransferred" />
@@ -52,7 +56,7 @@ internal sealed class SmtpCommandTransfer(
         TransferResult result;
         try
         {
-            result = await SendCommandsAsync(mail).ConfigureAwait(false);
+            result = await SendCommandsWithinLimitAsync(mail).ConfigureAwait(false);
             if (result.ExitCode == CurlExitCode.Ok)
             {
                 channel.Trace.DoingDone();
@@ -82,6 +86,18 @@ internal sealed class SmtpCommandTransfer(
             BytesTransferred = written,
             Report = new TransferReport { ResponseCode = responseCode },
         };
+    }
+
+    private async ValueTask<TransferResult> SendCommandsWithinLimitAsync(MailRequestOptions mail)
+    {
+        try
+        {
+            return await SendCommandsAsync(mail).ConfigureAwait(false);
+        }
+        catch (SmtpMaxFileSizeExceededException exceeded)
+        {
+            return TransferResult.Failure(CurlExitCode.FilesizeExceeded, exceeded.Message);
+        }
     }
 
     private async ValueTask<TransferResult> SendCommandsAsync(MailRequestOptions mail)
@@ -144,9 +160,20 @@ internal sealed class SmtpCommandTransfer(
         }
 
         byte[] bytes = Encoding.Latin1.GetBytes(line);
+        long? limit = context.MaxFileSize;
+        bool exceeds = written + bytes.Length > limit;
+        if (exceeds)
+        {
+            bytes = bytes[..(int)(limit!.Value - written)];
+        }
+
         await context.Output.WriteAsync(bytes, context.CancellationToken).ConfigureAwait(false);
         context.Events.ReportDataReceived(bytes);
         written += bytes.Length;
         context.Progress.ReportDownloaded(written, null);
+        if (exceeds)
+        {
+            throw new SmtpMaxFileSizeExceededException(limit!.Value, written);
+        }
     }
 }
