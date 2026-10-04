@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1407 — Decide how an Alt-Svc or Strict-Transport-Security header the caches ignore is reported as curl's -v line before that header line
 
@@ -27,15 +27,18 @@ An ADR, "Decided by Claude under Stewart's delegation", fixes how Curl writes cu
 
 ## Acceptance criteria
 
-- [ ] A new ADR under `Documentation/Planning/Decisions/` marked "Decided by Claude under Stewart's delegation" names the contract changes, the projects each touches (all existing in `Curl.slnx`), the measured lines above as the behaviour to pin, and why the design was chosen over writing the lines after the transfer.
-- [ ] The implementation tasks are filed with `task-board.ps1 new` in dependency order (contract first, then Core, then the HTTP handler and Curl.Console wiring), each with exact `touches` and checkable criteria that pin the measured `-v` sequences.
-- [ ] `Documentation/Planning/Decisions/README.md` lists the ADR if it keeps an index.
+- [x] A new ADR under `Documentation/Planning/Decisions/` marked "Decided by Claude under Stewart's delegation" names the contract changes, the projects each touches (all existing in `Curl.slnx`), the measured lines above as the behaviour to pin, and why the design was chosen over writing the lines after the transfer.
+- [x] The implementation tasks are filed with `task-board.ps1 new` in dependency order (contract first, then Core, then the HTTP handler and Curl.Console wiring), each with exact `touches` and checkable criteria that pin the measured `-v` sequences.
+- [x] `Documentation/Planning/Decisions/README.md` lists the ADR if it keeps an index.
 
 ## Notes
 
 - No code changes in this task.
+- ADR-0409 decides: `IAltSvcStore` returns ordered `AltSvcHeaderOutcome`s (added alternative or `AltSvcSkipReason`), a new `IHstsStore` on `HttpRequestOptions.HstsStore` learns HSTS per header during the transfer, and the HTTP handler owns the `-v` texts. Chosen over writing after the transfer because the lines must sit before their header line.
+- Filed in dependency order: BL-1418 (Abstractions contract, with the minimal compile fixes in its implementers), BL-1419 (Core parser reasons and `HstsTransferPolicy` as `IHstsStore`), BL-1420 (HTTP handler lines and Curl.Console wiring, removing `LearnFrom`).
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. ADR-0409 decides how skipped Alt-Svc and illegal STS headers are reported; BL-1418..1420 filed

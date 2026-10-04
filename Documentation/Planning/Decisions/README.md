@@ -418,6 +418,7 @@ choices do not need one.
 | [0406](ADR-0406-a-fixed-lane-shift-retires-idle-lanes-down-to-the-boards-capacity.md) | A fixed `-Lanes N` shift retires idle lanes down to the board's capacity every 5 minutes and adds them back one a step up to N, and every retire goes to an idle lane first, so lanes stop polling overlapping touches (BL-1374, AF-0032) | Accepted | 2026-10-03 |
 | [0407](ADR-0407-the-run-cost-cap-follows-the-median-run.md) | `RunDarkFactory.ps1` caps each headless run at 2.7 times the median of the newest 40 task runs' costs, between $2 and `-TaskBudgetUsd`, so runs stay under three times the median as it moves (BL-1377, AF-0033) | Accepted | 2026-10-03 |
 | [0408](ADR-0408-proxy-http2-tunnels-over-an-h2-proxy-off-windows-and-proxy-http3-stays-refused.md) | `--proxy-http2` keeps the refusal on Windows and, off Windows, offers `h2` to an HTTPS proxy and tunnels through an HTTP/2 CONNECT stream in `Curl.Networking.UnitLibrary`, falling back to HTTP/1.1; `--proxy-http3` stays refused everywhere, as the reference builds refuse it (BL-1397) | Accepted | 2026-10-03 |
+| [0409](ADR-0409-skipped-alt-svc-and-illegal-sts-headers-are-reported-before-their-header-line.md) | A skipped `Alt-Svc` alternative and an illegal `Strict-Transport-Security` header are reported with curl 8.21.0's `-v` lines just before their header line: `IAltSvcStore` returns ordered outcomes with skip reasons, and a new `IHstsStore` learns HSTS per header during the transfer (BL-1407) | Accepted | 2026-10-03 |
 
 ## Template
 
