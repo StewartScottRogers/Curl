@@ -35,3 +35,4 @@ An ADR, "Decided by Claude under Stewart's delegation", says how Curl carries a 
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
