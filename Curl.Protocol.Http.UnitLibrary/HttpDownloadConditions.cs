@@ -122,11 +122,16 @@ internal static class HttpDownloadConditions
     /// <c>-z -date</c>, so an equal time meets neither; an unknown time always meets it.
     /// </summary>
     /// <param name="condition">The <c>-z</c> condition.</param>
-    /// <param name="documentTime">The document's last-modified time, or <see langword="null" />.</param>
+    /// <param name="documentTime">
+    /// The document's last-modified time in seconds since the Unix epoch, or
+    /// <see langword="null" />. It is compared with <see cref="TimeCondition.ValueUnixSeconds" />,
+    /// as curl 8.21.0's <c>Curl_meets_timecondition</c> compares <c>time_t</c>s, so a year past
+    /// 9999 compares too (ADR-0410).
+    /// </param>
     /// <returns><see langword="true" /> when the body is to be delivered.</returns>
-    internal static bool IsMet(TimeCondition condition, DateTimeOffset? documentTime) =>
+    internal static bool IsMet(TimeCondition condition, long? documentTime) =>
         documentTime is not { } time
-        || (condition.Kind == TimeConditionKind.IfUnmodifiedSince ? time < condition.Value : time > condition.Value);
+        || (condition.Kind == TimeConditionKind.IfUnmodifiedSince ? time < condition.ValueUnixSeconds : time > condition.ValueUnixSeconds);
 
     /// <summary>
     /// Compares the response's <c>Last-Modified</c> with the <c>-z</c> condition, when there is

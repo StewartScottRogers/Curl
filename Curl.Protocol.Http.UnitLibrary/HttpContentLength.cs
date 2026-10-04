@@ -100,7 +100,7 @@ internal static class HttpContentLength
     /// <exception cref="HttpTransferException">The item is not a decimal number (exit 8).</exception>
     private static bool TryParseItem(string item, out long value)
     {
-        if (item.Length == 0 || !item.All(char.IsAsciiDigit))
+        if (item.Length == 0 || item.AsSpan().ContainsAnyExceptInRange('0', '9'))
         {
             throw Invalid();
         }
