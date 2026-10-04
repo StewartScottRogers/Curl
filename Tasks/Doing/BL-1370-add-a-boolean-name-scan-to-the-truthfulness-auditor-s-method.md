@@ -34,3 +34,4 @@ The truthfulness auditor checks every public bool member named Is, Has, Lacks, C
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-04: Backlog -> Doing.
