@@ -25,7 +25,7 @@ internal sealed class MqttPacketReader(IConnection connection, ITransferEvents e
     private int end;
 
     /// <summary>
-    /// The read <see cref="WhenFirstByteReadyAsync" /> started and no fill has taken yet,
+    /// The read <see cref="IsNextByteReady" /> or <see cref="WhenNextByteReadyAsync" /> started and no fill has taken yet,
     /// or <see langword="null" />.
     /// </summary>
     private Task<int>? pendingRead;
@@ -86,20 +86,12 @@ internal sealed class MqttPacketReader(IConnection connection, ITransferEvents e
     /// Reads whatever the peer has sent, up to <paramref name="maximum" /> bytes.
     /// </summary>
     /// <param name="maximum">The most bytes to return; more than zero.</param>
-    /// <param name="whenReadMustWait">
-    /// Called before waiting when nothing is buffered and the connection's read does not
-    /// complete at once, or <see langword="null" />.
-    /// </param>
     /// <returns>
     /// The bytes, valid only until the next read; empty once the peer has closed.
     /// </returns>
-    /// <remarks>
-    /// A read from <see cref="IConnection.ReadAsync" /> that is not complete when it
-    /// returns is taken as curl's <c>CURLE_AGAIN</c>: no data was waiting on the socket.
-    /// </remarks>
-    internal async ValueTask<ReadOnlyMemory<byte>> ReadChunkAsync(int maximum, Action? whenReadMustWait = null)
+    internal async ValueTask<ReadOnlyMemory<byte>> ReadChunkAsync(int maximum)
     {
-        if (start == end && !await FillAsync(whenReadMustWait).ConfigureAwait(false))
+        if (start == end && !await FillAsync().ConfigureAwait(false))
         {
             return ReadOnlyMemory<byte>.Empty;
         }
@@ -159,39 +151,47 @@ internal sealed class MqttPacketReader(IConnection connection, ITransferEvents e
     }
 
     /// <summary>
-    /// Waits until the next fixed header's first byte, or the peer's close or failure, can
-    /// be read without waiting, starting a read from the connection if nothing is buffered.
-    /// The read started here is the one the next <see cref="ReadFixedHeaderAsync" /> takes,
-    /// so a caller that stops waiting neither loses nor repeats it.
+    /// Whether the next byte, or the peer's close or failure, can be read without waiting,
+    /// starting a read from the connection if nothing is buffered. The read started here is
+    /// the one the next read takes, so asking neither loses nor repeats it.
     /// </summary>
     /// <returns>
-    /// A task that completes, never faulted, when the first byte is ready; a failed read
-    /// throws from <see cref="ReadFixedHeaderAsync" /> instead.
+    /// <see langword="true" /> when a byte is buffered or the connection's read completed at
+    /// once; <see langword="false" /> when that read is still pending, which is taken as
+    /// curl's <c>CURLE_AGAIN</c>: no data was waiting on the socket.
     /// </returns>
-    internal Task WhenFirstByteReadyAsync()
+    internal bool IsNextByteReady() => start < end || StartPendingRead().IsCompleted;
+
+    /// <summary>
+    /// Waits until the next byte, or the peer's close or failure, can be read without
+    /// waiting, starting a read from the connection if nothing is buffered. The read started
+    /// here is the one the next read takes, so a caller that stops waiting neither loses nor
+    /// repeats it.
+    /// </summary>
+    /// <returns>
+    /// A task that completes, never faulted, when the next byte is ready; a failed read
+    /// throws from the next read instead.
+    /// </returns>
+    internal Task WhenNextByteReadyAsync()
     {
         if (start < end)
         {
             return Task.CompletedTask;
         }
 
-        pendingRead ??= ReadConnectionAsync();
-        return pendingRead.ContinueWith(
+        return StartPendingRead().ContinueWith(
             static _ => { },
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
     }
 
-    private async ValueTask<bool> FillAsync(Action? whenReadMustWait = null)
+    private Task<int> StartPendingRead() => pendingRead ??= ReadConnectionAsync();
+
+    private async ValueTask<bool> FillAsync()
     {
         Task<int> read = pendingRead ?? ReadConnectionAsync();
         pendingRead = null;
-        if (!read.IsCompleted)
-        {
-            whenReadMustWait?.Invoke();
-        }
-
         end = await read.ConfigureAwait(false);
         start = 0;
         return end > 0;

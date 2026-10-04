@@ -49,12 +49,14 @@ namespace Curl.Protocol.Mqtt;
 /// </para>
 /// <para>
 /// A received PUBLISH is written as curl writes it: its whole body after the fixed header -
-/// the two-byte topic length, the topic, then the payload - with nothing parsed out. Each
-/// one is gathered whole, however the peer split it, then written in slices of at most
-/// 4096 bytes, so one PUBLISH of up to 4096 bytes is one write to the output; that is how
-/// curl's writes measured on loopback, where each of its 4096-byte reads came back full.
-/// One cut short by the peer closing is written as far as it got, as curl's is, before the
-/// transfer fails with exit 18.
+/// the two-byte topic length, the topic, then the payload - with nothing parsed out. It is
+/// written as it arrives, one write per run of curl's <c>MQTT_PUB_REMAIN</c> state: each
+/// write holds every byte that could be read without waiting, up to 4096, as one of curl's
+/// socket reads into its 4096-byte buffer does. A run that finds nothing waiting writes
+/// <c>EEEE AAAAGAIN</c> and waits; every run after the first writes
+/// <c>mqtt_doing: state [6]</c> (measured, BL-1434, BL-1442). One cut short by the peer
+/// closing is written as far as it got, as curl's is, before the transfer fails with
+/// exit 18.
 /// </para>
 /// <para>
 /// A packet with no body moves the session as curl's does, however odd the result: a
@@ -105,6 +107,13 @@ internal sealed class MqttSession(
 
     /// <summary>The body length of the PUBLISH being written, reported as the expected download size.</summary>
     private long publishLength;
+
+    /// <summary>
+    /// Whether the last run of a PUBLISH body stopped short because the connection's next
+    /// read was still pending, so the next run finds nothing waiting, as curl's next socket
+    /// read returns <c>CURLE_AGAIN</c>.
+    /// </summary>
+    private bool publishReadPending;
 
     /// <summary>
     /// Gets the number of bytes written to the output so far.
@@ -164,7 +173,7 @@ internal sealed class MqttSession(
     /// </remarks>
     private async ValueTask<MqttFixedHeader> ReadFixedHeaderPingingWhenIdleAsync()
     {
-        Task firstByte = reader.WhenFirstByteReadyAsync();
+        Task firstByte = reader.WhenNextByteReadyAsync();
         if (!pingSent && !firstByte.IsCompleted)
         {
             await PingIfIdleBeforeAsync(firstByte).ConfigureAwait(false);
@@ -378,8 +387,11 @@ internal sealed class MqttSession(
         body[0] == 0x00 && body[1] == MqttPackets.SubscribePacketIdentifier && body[2] == 0x00;
 
     /// <summary>
-    /// Gathers a PUBLISH body as it arrives, growing only as bytes do rather than trusting
-    /// the length the peer claimed, then writes it.
+    /// Writes a PUBLISH body as it arrives, in the runs curl 8.21.0's
+    /// <c>mqtt_read_publish</c> makes (measured, BL-1434, BL-1442): each run after the first
+    /// writes <c>mqtt_doing: state [6]</c>, then either finds nothing waiting, writes
+    /// <c>EEEE AAAAGAIN</c> and ends once the server's next bytes arrive, or reads what is
+    /// waiting, up to <see cref="OutputWriteSize" /> bytes, and writes it.
     /// </summary>
     private async ValueTask WritePublishAsync(MqttFixedHeader header)
     {
@@ -390,48 +402,73 @@ internal sealed class MqttSession(
             throw new MqttTransferException(CurlExitCode.FilesizeExceeded, MqttTransferMessages.MaximumFileSizeExceeded);
         }
 
-        using MemoryStream body = new();
-        while (body.Length < header.RemainingLength)
+        int left = header.RemainingLength;
+        for (bool firstRun = true; left > 0; firstRun = false)
         {
-            ReadOnlyMemory<byte> chunk = await reader
-                .ReadChunkAsync(header.RemainingLength - (int)body.Length, ReportReadMustWait)
-                .ConfigureAwait(false);
-            if (chunk.IsEmpty)
-            {
-                await WriteOutputAsync(body.ToArray()).ConfigureAwait(false);
-                ReportServerDisconnected(body.Length);
-                throw new MqttTransferException(CurlExitCode.PartialFile, MqttTransferMessages.PartialFile);
-            }
-
-            body.Write(chunk.Span);
-        }
-
-        await WriteOutputAsync(body.ToArray()).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Writes curl 8.21.0's <c>EEEE AAAAGAIN</c> line, which <c>mqtt_read_publish</c> writes
-    /// each time reading the rest of a PUBLISH body returns <c>CURLE_AGAIN</c>; here, each
-    /// time the body's next read has to wait for the server (measured, BL-1434).
-    /// </summary>
-    private void ReportReadMustWait() => events.ReportInfo(MqttTransferMessages.ReadMustWait);
-
-    /// <summary>
-    /// Writes bytes to the output in slices of at most <see cref="OutputWriteSize" />, as
-    /// curl passes a PUBLISH body on in reads of at most its 4096-byte buffer.
-    /// </summary>
-    private async ValueTask WriteOutputAsync(byte[] bytes)
-    {
-        for (int offset = 0; offset < bytes.Length; offset += OutputWriteSize)
-        {
-            if (offset > 0)
+            if (!firstRun)
             {
                 ReportDoingState(PublishRemainState);
             }
 
-            await WriteOutputSliceAsync(bytes.AsMemory(offset, Math.Min(OutputWriteSize, bytes.Length - offset)))
-                .ConfigureAwait(false);
+            left -= await RunPublishReadAsync(Math.Min(OutputWriteSize, left)).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// One run of curl's <c>MQTT_PUB_REMAIN</c> state: waits for the server, writing curl's
+    /// <c>EEEE AAAAGAIN</c>, when nothing is waiting, and otherwise writes the waiting bytes.
+    /// </summary>
+    /// <param name="maximum">The most bytes the run may read.</param>
+    /// <returns>How many bytes the run wrote; 0 for a run that waited.</returns>
+    /// <exception cref="MqttTransferException">The server closed first (exit 18).</exception>
+    private async ValueTask<int> RunPublishReadAsync(int maximum)
+    {
+        if (publishReadPending || !reader.IsNextByteReady())
+        {
+            publishReadPending = false;
+            events.ReportInfo(MqttTransferMessages.ReadMustWait);
+            await reader.WhenNextByteReadyAsync().ConfigureAwait(false);
+            return 0;
+        }
+
+        byte[] waiting = await ReadWaitingBytesAsync(maximum).ConfigureAwait(false);
+        if (waiting.Length == 0)
+        {
+            events.ReportInfo(MqttTransferMessages.ServerDisconnected);
+            throw new MqttTransferException(CurlExitCode.PartialFile, MqttTransferMessages.PartialFile);
+        }
+
+        await WriteOutputSliceAsync(waiting).ConfigureAwait(false);
+        return waiting.Length;
+    }
+
+    /// <summary>
+    /// Reads every byte that can be read without waiting, up to <paramref name="maximum" />,
+    /// as one socket read of curl's takes all the socket holds; the first byte is ready.
+    /// </summary>
+    /// <returns>The bytes; empty when the server has closed.</returns>
+    /// <remarks>
+    /// Stopping at a pending read sets <see cref="publishReadPending" />, so the wait is
+    /// reported by the next run however soon that read completes.
+    /// </remarks>
+    private async ValueTask<byte[]> ReadWaitingBytesAsync(int maximum)
+    {
+        byte[] waiting = new byte[maximum];
+        int filled = 0;
+        while (filled < maximum && !publishReadPending)
+        {
+            ReadOnlyMemory<byte> chunk = await reader.ReadChunkAsync(maximum - filled).ConfigureAwait(false);
+            if (chunk.IsEmpty)
+            {
+                break;
+            }
+
+            chunk.CopyTo(waiting.AsMemory(filled));
+            filled += chunk.Length;
+            publishReadPending = filled < maximum && !reader.IsNextByteReady();
+        }
+
+        return waiting[..filled];
     }
 
     /// <summary>
@@ -466,20 +503,6 @@ internal sealed class MqttSession(
 
         BytesWritten += slice.Length;
         progress.ReportDownloaded(BytesWritten, publishLength);
-    }
-
-    /// <summary>
-    /// Reports the peer closing inside a PUBLISH body as curl does: after the run that read
-    /// part of it, one more run (<c>MQTT_PUB_REMAIN</c>) finds the close.
-    /// </summary>
-    private void ReportServerDisconnected(long bytesRead)
-    {
-        if (bytesRead > 0)
-        {
-            ReportDoingState(PublishRemainState);
-        }
-
-        events.ReportInfo(MqttTransferMessages.ServerDisconnected);
     }
 
     /// <summary>
