@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1394 — Refuse to resolve a .onion host with curl's exit 6 'Not resolving .onion address (RFC 7686)'
 
@@ -31,16 +31,21 @@ A transfer whose host Curl itself would resolve and whose name ends in `.onion` 
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Networking.UnitTests` connect to `example.onion:80`, `example.onion.:80` and `a.ONION:21` through the connector with a fake resolver that fails the test if it is called, and assert exit 6 (`CurlExitCode.CouldntResolveHost`), message `Not resolving .onion address (RFC 7686)`, and the `-v` lines in the measured order.
-- [ ] A test pins that a `--resolve` mapping for `x.onion:80` is not used: the refusal comes after the `Added ... to DNS cache` line and no dial is made.
-- [ ] Tests pin that `onion`, `x.onion.example` and a connect through an HTTP proxy to an `.onion` target are not refused.
-- [ ] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean; `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no failing member in the code this task changed.
+- [x] Tests in `Curl.Networking.UnitTests` connect to `example.onion:80`, `example.onion.:80` and `a.ONION:21` through the connector with a fake resolver that fails the test if it is called, and assert exit 6 (`CurlExitCode.CouldntResolveHost`), message `Not resolving .onion address (RFC 7686)`, and the `-v` lines in the measured order.
+- [x] A test pins that a `--resolve` mapping for `x.onion:80` is not used: the refusal comes after the `Added ... to DNS cache` line and no dial is made.
+- [x] Tests pin that `onion`, `x.onion.example` and a connect through an HTTP proxy to an `.onion` target are not refused.
+- [x] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean; `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no failing member in the code this task changed.
 
 ## Notes
 
 - If the `Added ... to DNS cache` line is written outside `Curl.Networking.UnitLibrary`, pin only what this library writes and say so in the Notes when finishing.
+- Done: `OnionAddress.IsRefused` (curl's `Curl_resolv` suffix test: at least 7 characters, ending `.onion` or `.onion.`, any case) is checked in `TcpConnector`'s direct connect and QUIC resolve, after the `--resolve` entries load (so `Added ... to DNS cache` is written by this library and pinned) and `--connect-to` maps the host, before the DNS cache or resolver. The refusal writes `Not resolving .onion address (RFC 7686)`, `Could not resolve: H:P` and `Could not resolve: H`, exit 6. A tunnelling proxy's connect never reaches the check, so the proxy resolves the name, as measured.
+- Also refused in `UdpDatagramConnector.OpenAsync` (TFTP), which writes no `-v` lines of its own: same message and exit 6, logged at `dns` error.
+- `closing connection #0` is written by the protocol layer, not this library, so it is not pinned here.
+- The checks sit in non-async wrappers (`ConnectDirectlyTracedAsync`, `ResolveForQuicAsync`) so the async bodies stay within complexity 10. Measure-CodeQuality: 100% line and branch, 0 failing members, worst CRAP 10.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. A .onion host fails with exit 6 'Not resolving .onion address (RFC 7686)' before any lookup or --resolve entry

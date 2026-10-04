@@ -636,7 +636,7 @@ public sealed partial class TcpConnector(
 
     // Everything ConnectMultiplexedAsync does before the QUIC dial: the --resolve entries, the
     // --connect-to mapping and the resolve, with ConnectAsync's failures for each.
-    private async ValueTask<(QuicDialRequest? Request, MultiplexedConnectResult? Failure)> ResolveForQuicAsync(
+    private ValueTask<(QuicDialRequest? Request, MultiplexedConnectResult? Failure)> ResolveForQuicAsync(
         ConnectTarget target,
         CancellationToken cancellationToken)
     {
@@ -645,9 +645,24 @@ public sealed partial class TcpConnector(
         var destination = DestinationOf(target);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
-            return (null, MultiplexedConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError));
+            return ValueTask.FromResult<(QuicDialRequest?, MultiplexedConnectResult?)>((null, MultiplexedConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError)));
         }
 
+        if (OnionAddress.IsRefused(destination.Host))
+        {
+            ReportOnionRefused(target.Events, destination);
+            return ValueTask.FromResult<(QuicDialRequest?, MultiplexedConnectResult?)>((null, MultiplexedConnectResult.Failed(CurlExitCode.CouldntResolveHost, OnionAddress.RefusalMessage)));
+        }
+
+        return ResolveQuicDestinationAsync(target, destination, started, cancellationToken);
+    }
+
+    private async ValueTask<(QuicDialRequest? Request, MultiplexedConnectResult? Failure)> ResolveQuicDestinationAsync(
+        ConnectTarget target,
+        ConnectDestination destination,
+        long started,
+        CancellationToken cancellationToken)
+    {
         var (addresses, failure) = await ResolveWithFailureReasonAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
@@ -853,7 +868,23 @@ public sealed partial class TcpConnector(
         }
     }
 
-    private async ValueTask<ConnectResult> ConnectDirectlyTracedAsync(
+    private ValueTask<ConnectResult> ConnectDirectlyTracedAsync(
+        ConnectTarget target,
+        ConnectDestination destination,
+        long started,
+        ConnectAttemptTraceEvents? trace,
+        CancellationToken cancellationToken)
+    {
+        if (OnionAddress.IsRefused(destination.Host))
+        {
+            ReportOnionRefused(target.Events, destination);
+            return ValueTask.FromResult(ConnectResult.Failed(CurlExitCode.CouldntResolveHost, OnionAddress.RefusalMessage));
+        }
+
+        return ResolveAndDialDirectlyAsync(target, destination, started, trace, cancellationToken);
+    }
+
+    private async ValueTask<ConnectResult> ResolveAndDialDirectlyAsync(
         ConnectTarget target,
         ConnectDestination destination,
         long started,
@@ -1053,6 +1084,19 @@ public sealed partial class TcpConnector(
         }
 
         return ConnectResult.Failed(exitCode, message);
+    }
+
+    /// <summary>
+    /// Reports the refusal to connect to a <c>.onion</c> name, made before any <c>--resolve</c> entry, cached answer or
+    /// look-up, as curl 8.21.0 reports it before its exit 6 <c>Not resolving .onion address (RFC 7686)</c>: the
+    /// <c>-v</c> lines <c>Not resolving .onion address (RFC 7686)</c>, <c>Could not resolve:
+    /// &lt;host&gt;:&lt;port&gt;</c> and <c>Could not resolve: &lt;host&gt;</c> (measured, BL-1394).
+    /// </summary>
+    private static void ReportOnionRefused(ITransferEvents events, ConnectDestination destination)
+    {
+        events.ReportInfo(OnionAddress.RefusalMessage);
+        events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine(destination.Host, destination.Port));
+        events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine(destination.Host));
     }
 
     private static void ReportNegativeEntryFailed(ITransferEvents events, ConnectDestination destination, string message)
