@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1417 — List ipfs, ipns and every feature Curl implements on -V's Protocols and Features lines
 
@@ -29,7 +29,7 @@ completed:
 - [x] `CurlVersionTextTests` pins both lines.
 - [x] ADR-0021 gets an amendment: `Protocols:` also lists schemes the tool serves by rewriting (ipfs, ipns), as curl does; and the Features audit, with any feature deliberately left out and why.
 - [x] `--ai-help` still describes `-V` correctly (no option changes).
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` reports no failing member; `dotnet build` is clean and the fast tests are green.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` reports no failing member; `dotnet build` is clean and the fast tests are green.
 
 ## Notes
 
@@ -49,9 +49,16 @@ completed:
   shift's stash. Done so far and green: build, Curl.Cli.UnitTests (3764 passed), Curl.Console.UnitTests
   CurlComposition* (516 passed). Left: re-run the fast tests, `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`
   (constants and doc comments only; no new branches), then Done.
+- 2026-10-03 (lane 4): resumed from stash 56282083 (applied as a diff, cleanly); BL-1396 is Done, so
+  Curl.Console.UnitTests no longer overlaps. Build clean, every fast test project green (Curl.Cli.UnitTests
+  3764 passed, Curl.Console.UnitTests 2550 passed). `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`:
+  99.98% line / 99.89% branch, worst CRAP 10; the three failing members (`ArgumentReader.PeekNext`,
+  `CommandLineParser.RefuseUnlistedLetter`, `AccountHomeDirectory`'s lambda) predate this task, none is in its
+  diff, and BL-1421 in Backlog already covers all three, so they are left to it.
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
 - 2026-10-03: Doing -> Backlog. Needs Curl.Console.UnitTests (two -V Protocols assertions), which BL-1396 in Doing touches; code and ADR amendment done and green, left uncommitted for the stash
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. curl -V lists ipfs ipns on Protocols and every implemented feature on Features, in curl's order
