@@ -441,3 +441,4 @@ What this makes easy, and what it makes hard. Both, honestly.
 Each option and the specific reason it lost.
 ```
 | [0410](ADR-0410-remote-file-times-travel-as-unix-seconds-so-r-can-stamp-and-cap-times-past-year-9999.md) | A remote file time travels as Unix seconds (`TransferResult.SourceLastWriteUnixSeconds`, with the `DateTimeOffset` property as an in-range view), so HTTP and `file://` times past year 9999 reach `-R`, which caps above 30827-12-31T23:59:59Z on Windows with curl's `Capping set filetime to max` warning and passes the time on elsewhere (BL-1409) | Accepted | 2026-10-03 |
+| [0411](ADR-0411-a-file-source-time-past-what-curl-holds-reads-as-minus-one-on-windows.md) | A `file://` source time past what curl holds reads as -1 on Windows (from local 3002-01-01: `-z` compares -1, `-R` leaves the output alone) and whole in Unix seconds elsewhere, read from the handle with `GetFileTime` (BL-1423) | Accepted | 2026-10-03 |

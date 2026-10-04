@@ -109,10 +109,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     private static readonly string[] Schemes = ["file"];
 
     /// <summary>
-    /// The Unix epoch as <see cref="WholeSeconds" /> counts it: the value libcurl holds as a
-    /// <c>time_t</c> of 0.
+    /// The Unix seconds of 9999-12-31T23:59:59Z, the last whole second
+    /// <see cref="DateTimeOffset" />, and so <see cref="FileOpenResult.LastWriteTimeUtc" />,
+    /// holds.
     /// </summary>
-    private static readonly long UnixEpochWholeSeconds = WholeSeconds(DateTimeOffset.UnixEpoch);
+    private const long MaxDateTimeOffsetUnixSeconds = 253_402_300_799;
 
     private readonly IFileSystem fileSystem =
         fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
@@ -146,6 +147,25 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// test sets the other one.
     /// </summary>
     internal bool ListsDirectories { get; init; } = !OperatingSystem.IsWindows();
+
+    /// <summary>
+    /// Gets the reader of a source's raw last-write time, for a time past 9999 that
+    /// <see cref="FileOpenResult.LastWriteTimeUtc" /> cannot carry: <c>GetFileTime</c> on
+    /// Windows, and none yet elsewhere. It is the platform's reader unless a test sets another.
+    /// </summary>
+    internal ISourceLastWriteReader SourceLastWriteReader { get; init; } = PlatformSourceLastWriteReader();
+
+    /// <summary>
+    /// Gets the last source time, in Unix seconds, the platform's curl can represent, or
+    /// <see langword="null" /> when it represents every 64-bit time. curl 8.21.0's Windows
+    /// build reads a source time through the C runtime's <c>_fstat64</c>, which fails from
+    /// local 3002-01-01T00:00:00 on: curl then holds <c>time_t</c> -1, so <c>-R</c> leaves
+    /// the output's time alone, <c>-z</c> compares against -1 and the header block says
+    /// <c>Last-Modified: Thu, 31 Dec 1969 23:59:59 GMT</c> (measured 2026-10-03, BL-1423,
+    /// ADR-0411). The OpenSSL builds read <c>st_mtime</c> whole. It is the platform's answer
+    /// unless a test sets another.
+    /// </summary>
+    internal long? LastRepresentableUnixSeconds { get; init; } = PlatformLastRepresentableUnixSeconds();
 
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => Schemes;
@@ -297,15 +317,87 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         context.Progress.ReportTransferStarted();
 
         Stream source = opened.Content;
+        SourceLastWrite lastWrite = LastWriteOf(opened);
 
         TransferResult result;
 
         await using (source.ConfigureAwait(false))
         {
-            result = await DownloadFromAsync(context, source, opened).ConfigureAwait(false);
+            result = await DownloadFromAsync(context, source, opened, lastWrite).ConfigureAwait(false);
         }
 
-        return EndDownload(context, result, connectionNumber, opened);
+        return EndDownload(context, result, connectionNumber, lastWrite);
+    }
+
+    /// <summary>
+    /// Gets the source's last-write time as curl holds it: the time
+    /// <see cref="FileOpenResult.LastWriteTimeUtc" /> carries, unless the raw time the
+    /// <see cref="SourceLastWriteReader" /> reads lies past what that or the platform's curl
+    /// can hold.
+    /// </summary>
+    /// <param name="opened">The metadata that came with the open.</param>
+    /// <returns>The source's last-write time.</returns>
+    private SourceLastWrite LastWriteOf(FileOpenResult opened)
+    {
+        long? rawUnixSeconds = opened.Content is { } content
+            ? SourceLastWriteReader.ReadLastWriteUnixSeconds(content)
+            : null;
+        long lastRepresentable = Math.Min(LastRepresentableUnixSeconds ?? long.MaxValue, MaxDateTimeOffsetUnixSeconds);
+
+        if (rawUnixSeconds is not { } raw || raw <= lastRepresentable)
+        {
+            return new SourceLastWrite(opened.LastWriteTimeUtc?.ToUnixTimeSeconds(), opened.LastWriteTimeUtc, true);
+        }
+
+        return raw > LastRepresentableUnixSeconds
+            ? new SourceLastWrite(-1, DateTimeOffset.FromUnixTimeSeconds(-1), false)
+            : new SourceLastWrite(raw, null, true);
+    }
+
+    /// <summary>The platform's source time reader: <c>GetFileTime</c> on Windows, none elsewhere.</summary>
+    /// <returns>The reader.</returns>
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification = "ADR-0083: the platform picks the branch.")]
+    private static ISourceLastWriteReader PlatformSourceLastWriteReader() =>
+        OperatingSystem.IsWindows() ? new Win32SourceLastWriteReader() : new NoRawSourceLastWriteReader();
+
+    /// <summary>The platform's curl's last representable source time; none off Windows.</summary>
+    /// <returns>The Unix seconds, or <see langword="null" />.</returns>
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification = "ADR-0083: the platform picks the branch.")]
+    private static long? PlatformLastRepresentableUnixSeconds() =>
+        OperatingSystem.IsWindows() ? WindowsCrtLastRepresentableUnixSeconds() : null;
+
+    /// <summary>
+    /// The last local second, in Unix seconds, the Windows C runtime's <c>_fstat64</c>
+    /// converts: 3001-12-31T23:59:59 local time, measured on curl 8.21.0 in BL-1423.
+    /// </summary>
+    /// <returns>The Unix seconds of that local time.</returns>
+    private static long WindowsCrtLastRepresentableUnixSeconds()
+    {
+        var firstUnrepresentableLocal = new DateTime(3002, 1, 1);
+        TimeSpan offset = TimeZoneInfo.Local.GetUtcOffset(firstUnrepresentableLocal);
+
+        return new DateTimeOffset(firstUnrepresentableLocal, offset).ToUnixTimeSeconds() - 1;
+    }
+
+    /// <summary>
+    /// A source's last-write time as curl holds it.
+    /// </summary>
+    /// <param name="UnixSeconds">
+    /// The time in whole Unix seconds, which <c>-z</c> compares, or <see langword="null" />
+    /// when unknown.
+    /// </param>
+    /// <param name="HeaderTime">
+    /// The time the header block's <c>Last-Modified</c> line reports, or
+    /// <see langword="null" /> for no line.
+    /// </param>
+    /// <param name="AppliesToRemoteTime">
+    /// Whether <c>-R</c> stamps the output with <see cref="UnixSeconds" />: not for a time
+    /// the platform's curl could not represent.
+    /// </param>
+    private readonly record struct SourceLastWrite(long? UnixSeconds, DateTimeOffset? HeaderTime, bool AppliesToRemoteTime)
+    {
+        /// <summary>Gets the time <c>-R</c> stamps the output with, or <see langword="null" /> for none.</summary>
+        public long? RemoteTimeUnixSeconds => AppliesToRemoteTime ? UnixSeconds : null;
     }
 
     /// <summary>
@@ -314,21 +406,21 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// <param name="context">The transfer being performed.</param>
     /// <param name="result">The outcome of the download.</param>
     /// <param name="connectionNumber">The number the transfer's connection was given.</param>
-    /// <param name="opened">The metadata that came with the open.</param>
+    /// <param name="lastWrite">The source's last-write time.</param>
     /// <returns><paramref name="result" />, with the source's timestamp when it succeeded.</returns>
     private static TransferResult EndDownload(
         ITransferContext context,
         TransferResult result,
         long connectionNumber,
-        FileOpenResult opened)
+        SourceLastWrite lastWrite)
     {
         ReportConnectionEnd(context, result, connectionNumber);
 
         // -R/--remote-time is applied by whoever owns the output file, so a successful
         // download, an unmet -z included, hands the source's timestamp back in whole
-        // seconds, the resolution curl 8.21.0 applies it at. A failure carries none.
+        // Unix seconds, the resolution curl 8.21.0 applies it at. A failure carries none.
         return result.IsSuccess
-            ? result with { SourceLastWriteTimeUtc = TruncateToWholeSeconds(opened.LastWriteTimeUtc) }
+            ? result with { SourceLastWriteUnixSeconds = lastWrite.RemoteTimeUnixSeconds }
             : result;
     }
 
@@ -367,15 +459,16 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         long connectionNumber = connectionNumbers.NumberNextConnection();
         context.Progress.ReportTransferStarted();
 
-        KeyValuePair<string, string>[] headers = FileTransferMessages.DirectoryPseudoHeaders(opened.LastWriteTimeUtc);
-        TransferResult result = await StartBodyAsync(context, opened, headers).ConfigureAwait(false)
+        SourceLastWrite lastWrite = LastWriteOf(opened);
+        KeyValuePair<string, string>[] headers = FileTransferMessages.DirectoryPseudoHeaders(lastWrite.HeaderTime);
+        TransferResult result = await StartBodyAsync(context, lastWrite, headers).ConfigureAwait(false)
             ?? WithPseudoHeaders(
                 context.NoBody
                     ? TransferResult.Success(0)
                     : await WriteEntryNamesAsync(context, path, lister).ConfigureAwait(false),
                 headers);
 
-        return EndDownload(context, result, connectionNumber, opened);
+        return EndDownload(context, result, connectionNumber, lastWrite);
     }
 
     /// <summary>
@@ -448,34 +541,23 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     }
 
     /// <summary>
-    /// Drops everything below the second from a timestamp, keeping its offset.
-    /// </summary>
-    /// <param name="timestamp">The timestamp, or <see langword="null" /> when unknown.</param>
-    /// <returns>
-    /// The timestamp with zero sub-second ticks, or <see langword="null" /> when
-    /// <paramref name="timestamp" /> is.
-    /// </returns>
-    private static DateTimeOffset? TruncateToWholeSeconds(DateTimeOffset? timestamp) =>
-        timestamp is { } value
-            ? new DateTimeOffset(value.Ticks - (value.Ticks % TimeSpan.TicksPerSecond), value.Offset)
-            : null;
-
-    /// <summary>
     /// Applies the time condition, emits the headers, applies every other option that can
     /// stop the body, then moves it.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="source">The opened source, which this method does not dispose.</param>
     /// <param name="opened">The metadata that came with the open.</param>
+    /// <param name="lastWrite">The source's last-write time.</param>
     /// <returns>The outcome of the download.</returns>
     private static async ValueTask<TransferResult> DownloadFromAsync(
         ITransferContext context,
         Stream source,
-        FileOpenResult opened)
+        FileOpenResult opened,
+        SourceLastWrite lastWrite)
     {
-        KeyValuePair<string, string>[] headers = FileTransferMessages.PseudoHeaders(opened.Length, opened.LastWriteTimeUtc);
+        KeyValuePair<string, string>[] headers = FileTransferMessages.PseudoHeaders(opened.Length, lastWrite.HeaderTime);
 
-        if (await StartBodyAsync(context, opened, headers).ConfigureAwait(false) is { } ended)
+        if (await StartBodyAsync(context, lastWrite, headers).ConfigureAwait(false) is { } ended)
         {
             return ended;
         }
@@ -492,7 +574,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// listed directory share before their bodies.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
-    /// <param name="opened">The metadata that came with the open.</param>
+    /// <param name="lastWrite">The source's last-write time.</param>
     /// <param name="headers">The pseudo-headers to write.</param>
     /// <returns>
     /// <see langword="null" /> when the body follows; otherwise the unmet time condition's
@@ -500,10 +582,10 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// </returns>
     private static async ValueTask<TransferResult?> StartBodyAsync(
         ITransferContext context,
-        FileOpenResult opened,
+        SourceLastWrite lastWrite,
         KeyValuePair<string, string>[] headers)
     {
-        if (!HasRange(context) && !MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
+        if (!HasRange(context) && !MeetsTimeCondition(context.TimeCondition, lastWrite.UnixSeconds))
         {
             context.Events.ReportInfo(FileTransferMessages.TimeConditionNotMet(context.TimeCondition!.Kind));
             return TransferResult.TimeConditionNotMet();
@@ -1139,9 +1221,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// Applies <c>-z</c>/<c>--time-cond</c> to the timestamp the open reported.
     /// </summary>
     /// <param name="condition">The condition, or <see langword="null" /> for none.</param>
-    /// <param name="lastWriteTimeUtc">
-    /// The file's last-write timestamp, or <see langword="null" /> when the file system
-    /// could not determine one.
+    /// <param name="lastWriteUnixSeconds">
+    /// The file's last-write time in whole Unix seconds, or <see langword="null" /> when the
+    /// file system could not determine one.
     /// </param>
     /// <returns>
     /// <see langword="true" /> when the body should be transferred. An unmet condition is
@@ -1162,11 +1244,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// </remarks>
     private static bool MeetsTimeCondition(
         TimeCondition? condition,
-        DateTimeOffset? lastWriteTimeUtc)
+        long? lastWriteUnixSeconds)
     {
         return condition is null
-            || lastWriteTimeUtc is not { } knownLastWriteTimeUtc
-            || MeetsKnownTimeCondition(condition, knownLastWriteTimeUtc);
+            || lastWriteUnixSeconds is not { } knownLastWriteUnixSeconds
+            || MeetsKnownTimeCondition(condition, knownLastWriteUnixSeconds);
     }
 
     /// <summary>
@@ -1182,22 +1264,22 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         context.Range is not null || context.RangeText is not null || context.ResumeFrom is > 0;
 
     /// <summary>
-    /// Compares a known file timestamp with a time condition, in whole seconds.
+    /// Compares a known file time with a time condition in whole Unix seconds, which reach
+    /// past 9999 where <see cref="DateTimeOffset" /> stops.
     /// </summary>
     /// <param name="condition">The condition to apply.</param>
-    /// <param name="lastWriteTimeUtc">The file's last-modified timestamp.</param>
+    /// <param name="fileSeconds">The file's last-modified time in whole Unix seconds.</param>
     /// <returns>
     /// <see langword="true" /> when the body should be transferred, including when either
-    /// side truncates to the Unix epoch, which curl reads as unknown.
+    /// side is the Unix epoch, which curl reads as unknown.
     /// </returns>
     private static bool MeetsKnownTimeCondition(
         TimeCondition condition,
-        DateTimeOffset lastWriteTimeUtc)
+        long fileSeconds)
     {
-        long fileSeconds = WholeSeconds(lastWriteTimeUtc);
-        long conditionSeconds = WholeSeconds(condition.Value);
+        long conditionSeconds = condition.ValueUnixSeconds;
 
-        if (fileSeconds == UnixEpochWholeSeconds || conditionSeconds == UnixEpochWholeSeconds)
+        if (fileSeconds == 0 || conditionSeconds == 0)
         {
             return true;
         }
@@ -1206,15 +1288,6 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
             ? fileSeconds > conditionSeconds
             : fileSeconds < conditionSeconds;
     }
-
-    /// <summary>
-    /// Counts the whole seconds from <see cref="DateTimeOffset.MinValue" /> to
-    /// <paramref name="value" /> in UTC, dropping any fraction of a second.
-    /// </summary>
-    /// <param name="value">The timestamp to truncate.</param>
-    /// <returns>The timestamp as a count of whole seconds.</returns>
-    private static long WholeSeconds(DateTimeOffset value) =>
-        value.UtcTicks / TimeSpan.TicksPerSecond;
 
     /// <summary>
     /// Turns <c>-C</c>/<c>--continue-at</c> or <c>-r</c>/<c>--range</c> into the window of
