@@ -8,7 +8,7 @@ depends-on: []
 touches: [CLAUDE.md]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1383 — Fix AF-0040: CLAUDE.md says Documentation/Wiki/Glossary.md is 'not yet written' but it exists
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- CLAUDE.md now says the glossary exists and that `align-and-document` keeps it current; the reproduction finds no "not yet written" in CLAUDE.md. Done directly in the session rather than through `align-and-document`: a one-line wording fix in one file. Build clean, 33 fast test assemblies green, none failed.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. CLAUDE.md no longer claims Documentation/Wiki/Glossary.md is not yet written

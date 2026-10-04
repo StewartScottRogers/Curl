@@ -225,8 +225,7 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
   parameter, test, script, task - says exactly what the thing does, and the thing does
   nothing its name hides. No generic names (`Process`, `Handle`, `Manager`, `Helper`,
   `Utils`, `Data`) where a specific one exists; one concept has one name, the one in
-  `Documentation/Wiki/Glossary.md` (not yet written; `align-and-document` starts it on
-  its first run). Documents obey the same rule: every statement is true
+  `Documentation/Wiki/Glossary.md`, which `align-and-document` keeps current. Documents obey the same rule: every statement is true
   of the code as it is now, and intent is written as intent. A misaligned name or document
   is a defect, because it is how an agent reading this repository comes to believe
   something false. The `align-and-document` agent owns this.
