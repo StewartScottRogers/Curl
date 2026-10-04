@@ -16,6 +16,14 @@ namespace Curl.Protocol.Http;
 /// </remarks>
 internal sealed class HttpResponseHeadReader
 {
+    /// <summary>
+    /// The number of headers curl 8.21.0 accepts across every head of a response, 1xx heads
+    /// included, a continuation line folding into the header before it: the next header fails
+    /// with exit 100, <see cref="HttpTransferMessages.TooManyResponseHeaders" />
+    /// (<c>MAX_HTTP_RESP_HEADER_COUNT</c>, <c>lib/headers.c</c>; measured, BL-1431 Notes).
+    /// </summary>
+    internal const int MaximumHeaderCount = 5000;
+
     // The defaults are made once here, in the static constructor, which the compiler does not
     // cache delegates in, so they add no branch to the instance constructor (BL-1354).
     private static readonly Action<byte[]> IgnoreLine = static _ => { };
@@ -189,6 +197,8 @@ internal sealed class HttpResponseHeadReader
 
     private byte[]? heldEmptyLine;
 
+    private int informationalHeaderCount;
+
     /// <summary>
     /// Reports the lines <see cref="ReadAsync" /> still holds, once: the whole headers of a
     /// final head a failure cut off, each after <see cref="HeaderReceived" /> is told of it, then
@@ -256,7 +266,7 @@ internal sealed class HttpResponseHeadReader
             {
                 EndedAtEmptyLine = !closed;
                 HttpResponseHead head = builder.Build(statusLine, closed ? [] : lines.TakeRemaining());
-                Refusal = FindRefusal(closed && !endedAtRefusedHeader ? HeadBeforeLastHeader(head) : head);
+                Refusal = FindRefusalOrTooMany(closed && !endedAtRefusedHeader ? HeadBeforeLastHeader(head) : head);
                 ReleaseHeadBeforeRefusal();
                 return head;
             }
@@ -303,7 +313,7 @@ internal sealed class HttpResponseHeadReader
     {
         HttpResponseHead read = builder.Build(statusLine, []);
         HttpResponseHead head = new(statusLine, [.. heldHeaders.Select(held => held.Header)], read.HeadBytes, ReadOnlyMemory<byte>.Empty);
-        Refusal = FindRefusal(head) ?? throw failure;
+        Refusal = FindRefusalOrTooMany(head) ?? throw failure;
         heldHeaderLines.Clear();
         heldHeaderInfoLine = null;
         ReleaseHeadBeforeRefusal();
@@ -339,9 +349,30 @@ internal sealed class HttpResponseHeadReader
             headers.Add(builder.PendingHeader);
         }
 
-        endedAtRefusedHeader = FindRefusal(new HttpResponseHead(headStatusLine!, headers, ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty)) is not null;
+        endedAtRefusedHeader = FindRefusalOrTooMany(new HttpResponseHead(headStatusLine!, headers, ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty)) is not null;
         return endedAtRefusedHeader;
     }
+
+    /// <summary>
+    /// Finds the header of a final head curl 8.21.0 refuses: the first that
+    /// <see cref="FindRefusal" /> refuses among those within <see cref="MaximumHeaderCount" />,
+    /// counting the 1xx heads' headers before them, or else the first past it, refused with exit
+    /// 100 and its lines still reported (<see cref="HttpHeadRefusal.ReportsRefusedHeaderLines" />).
+    /// </summary>
+    private HttpHeadRefusal? FindRefusalOrTooMany(HttpResponseHead head)
+    {
+        int allowed = MaximumHeaderCount - informationalHeaderCount;
+        if (head.Headers.Count <= allowed)
+        {
+            return FindRefusal(head);
+        }
+
+        HttpResponseHead counted = new(head.StatusLine, [.. head.Headers.Take(allowed)], head.HeadBytes, head.BodyPrefix);
+        return FindRefusal(counted) ?? new HttpHeadRefusal(allowed, TooManyHeaders()) { ReportsRefusedHeaderLines = true };
+    }
+
+    private static HttpTransferException TooManyHeaders() =>
+        new(CurlExitCode.TooLarge, HttpTransferMessages.TooManyResponseHeaders);
 
     /// <summary>
     /// Determines whether the unfinished line shows the header whose lines are held is whole:
@@ -435,6 +466,10 @@ internal sealed class HttpResponseHeadReader
             }
 
             heldHeaderLines.Add(bytes);
+            if (informationalHeaderCount == MaximumHeaderCount)
+            {
+                throw TooManyHeaders();
+            }
         }
 
         builder.EndHeadAtClose();
@@ -519,6 +554,7 @@ internal sealed class HttpResponseHeadReader
             return;
         }
 
+        informationalHeaderCount++;
         HeaderReceived(headStatusLine!, builder.LastHeader);
         ReportHeldHeaderLines();
     }
@@ -536,6 +572,11 @@ internal sealed class HttpResponseHeadReader
     {
         if (Refusal is { } refusal)
         {
+            if (refusal.ReportsRefusedHeaderLines)
+            {
+                heldHeaderLines.AddRange(heldHeaders[refusal.HeaderIndex].Lines);
+            }
+
             heldHeaders.RemoveRange(refusal.HeaderIndex, heldHeaders.Count - refusal.HeaderIndex);
             heldEmptyLine = null;
         }
