@@ -270,11 +270,11 @@ public sealed class TftpProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_UnexpectedOpcodeAndWrongBlock_AreIgnored()
+    public async Task ExecuteAsync_FirstReplyAckTimeoutOpcodeAndWrongBlock_AreIgnored()
     {
         var channel = Channel(
             ([0, 4, 0, 1], TransferEndPoint),
-            ([0, 9, 0, 1], TransferEndPoint),
+            ([0, 7, 0, 1], TransferEndPoint),
             Data(2, "early"),
             Data(1, "hello"));
         var output = new MemoryStream();

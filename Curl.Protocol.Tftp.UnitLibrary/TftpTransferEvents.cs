@@ -134,6 +134,13 @@ internal sealed class TftpTransferEvents(ITransferEvents events)
     public void Refused(string message) => events.ReportInfo(message);
 
     /// <summary>
+    /// Reports a message curl 8.21.0 notes for a packet whose opcode the transfer's state
+    /// does not handle, such as <c>tftp_rx: internal error</c> (<see cref="TftpUnexpectedOpcode" />).
+    /// </summary>
+    /// <param name="message">The message.</param>
+    public void InternalError(string message) => events.ReportInfo(message);
+
+    /// <summary>
     /// Reports the message curl 8.21.0's download writer notes when a download passes
     /// <c>--max-filesize</c>, such as <c>Exceeded the maximum allowed file size (3) with 3 bytes</c>.
     /// </summary>

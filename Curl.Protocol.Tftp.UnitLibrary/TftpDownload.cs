@@ -21,8 +21,9 @@ namespace Curl.Protocol.Tftp;
 /// The first datagram received pins the server's endpoint; a later one from anywhere else
 /// ends the transfer with exit 56 (<see cref="CurlExitCode.RecvError" />) and sends the
 /// stranger nothing, as curl does. A repeat of the last block is acknowledged again and
-/// not written twice. Any other unexpected block and an opcode a download never receives
-/// are ignored, and the download waits on.
+/// not written twice. Any other unexpected block is ignored, and the download waits on. An
+/// opcode a download does not handle ends it with exit 71, as curl does
+/// (<see cref="TftpUnexpectedOpcode" />).
 /// </para>
 /// <para>
 /// A datagram shorter than four bytes re-sends the last packet (the read request or the
@@ -165,8 +166,42 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
             TftpPackets.DataOpcode => AcceptDataAsync(received),
             TftpPackets.ErrorOpcode => ValueTask.FromResult<TransferResult?>(FailWithErrorPacket(received)),
             TftpPackets.OptionAcknowledgementOpcode => AcceptOptionAcknowledgementAsync(received),
-            _ => ValueTask.FromResult<TransferResult?>(null),
+            var opcode => ValueTask.FromResult(AnswerUnexpectedOpcode(opcode)),
         };
+    }
+
+    /// <summary>
+    /// Answers an opcode a download does not handle as curl does
+    /// (<see cref="TftpUnexpectedOpcode" />): before the server has answered, exit 71 with
+    /// <c>tftp_send_first: internal error</c> noted; after, an ACK ends it with exit 71
+    /// <c>tftp_rx: internal error</c>, and any other opcode notes
+    /// <c>Internal error: Unexpected packet</c> first and ends it with that message. Nothing
+    /// is sent to the server.
+    /// </summary>
+    /// <param name="opcode">The packet's opcode.</param>
+    /// <returns>The failure, or <see langword="null" /> for an opcode the download ignores.</returns>
+    private TransferResult? AnswerUnexpectedOpcode(ushort opcode)
+    {
+        if (TftpUnexpectedOpcode.IsIgnored(opcode, answered, TftpPackets.AcknowledgementOpcode))
+        {
+            return null;
+        }
+
+        if (!answered)
+        {
+            events.InternalError(TftpUnexpectedOpcode.SendFirstMessage);
+            return TransferResult.Failure(CurlExitCode.TftpIllegal, TftpUnexpectedOpcode.UnexpectedPacketMessage, bytesTransferred);
+        }
+
+        var message = TftpUnexpectedOpcode.ReceiveMessage;
+        if (TftpUnexpectedOpcode.IsUnknown(opcode))
+        {
+            message = TftpUnexpectedOpcode.UnexpectedPacketMessage;
+            events.InternalError(message);
+        }
+
+        events.InternalError(TftpUnexpectedOpcode.ReceiveMessage);
+        return TransferResult.Failure(CurlExitCode.TftpIllegal, message, bytesTransferred);
     }
 
     /// <summary>

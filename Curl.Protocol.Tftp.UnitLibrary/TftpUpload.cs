@@ -45,8 +45,9 @@ namespace Curl.Protocol.Tftp;
 /// An option acknowledgement after the first block has gone is taken as curl 8.21.0
 /// takes it: its <c>blksize</c> comes into force and the block count restarts, so the
 /// next DATA packet is block 1 again, carrying the upload's next bytes at the new size
-/// (an empty block 1 when the last block had already gone). An opcode an upload never
-/// receives is ignored.
+/// (an empty block 1 when the last block had already gone). An opcode an upload does not
+/// handle ends it with exit 71 before the server has answered, and once it has is noted
+/// and the upload waits on for its ACK, as curl does (<see cref="TftpUnexpectedOpcode" />).
 /// </para>
 /// </remarks>
 internal sealed class TftpUpload(ITransferContext context, IDatagramChannel channel, Stream upload, long startTimestamp)
@@ -168,9 +169,40 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
                 return TftpErrorMapping.ToTransferResult(TftpPackets.ReadField(receiveBuffer, 2));
             case TftpPackets.OptionAcknowledgementOpcode:
                 return await AcceptOptionAcknowledgementAsync(received).ConfigureAwait(false);
-            default:
-                return null;
+            case var opcode:
+                return AnswerUnexpectedOpcode(opcode);
         }
+    }
+
+    /// <summary>
+    /// Answers an opcode an upload does not handle as curl does
+    /// (<see cref="TftpUnexpectedOpcode" />): before the server has answered, exit 71 with
+    /// <c>tftp_send_first: internal error</c> noted; after, it notes
+    /// <c>Internal error: Unexpected packet</c> for an opcode curl does not know, then
+    /// <c>tftp_tx: internal error, event: N</c>, and waits on.
+    /// </summary>
+    /// <param name="opcode">The packet's opcode.</param>
+    /// <returns>The failure before the server has answered, otherwise <see langword="null" />.</returns>
+    private TransferResult? AnswerUnexpectedOpcode(ushort opcode)
+    {
+        if (TftpUnexpectedOpcode.IsIgnored(opcode, answered, TftpPackets.DataOpcode))
+        {
+            return null;
+        }
+
+        if (!answered)
+        {
+            events.InternalError(TftpUnexpectedOpcode.SendFirstMessage);
+            return TransferResult.Failure(CurlExitCode.TftpIllegal, TftpUnexpectedOpcode.UnexpectedPacketMessage, bytesTransferred);
+        }
+
+        if (TftpUnexpectedOpcode.IsUnknown(opcode))
+        {
+            events.InternalError(TftpUnexpectedOpcode.UnexpectedPacketMessage);
+        }
+
+        events.InternalError(string.Create(CultureInfo.InvariantCulture, $"tftp_tx: internal error, event: {opcode}"));
+        return null;
     }
 
     /// <summary>
