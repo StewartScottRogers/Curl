@@ -20,7 +20,8 @@ namespace Curl.Core.FileSystem;
 /// rejects (<c>c|/Windows</c>, a literal <c>%</c>). Every exception
 /// <see cref="FileOpenFailure.IsOpenFailure(Exception)" /> names is absorbed into
 /// <see cref="FileOpenResult.Failed(FileAccessStatus, Exception?)" />, which carries it; the only exception either open
-/// lets out is the <see cref="OperationCanceledException" /> of a cancelled token.
+/// lets out is the <see cref="OperationCanceledException" /> of a cancelled token. An open
+/// that fails because the path is a directory carries the directory's last-write time.
 /// </para>
 /// <para>
 /// A read open is seekable for a regular file. A handle the operating system cannot seek -
@@ -237,10 +238,28 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
         }
         catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
         {
-            return FileOpenResult.Failed(FileOpenFailure.StatusFor(exception, Directory.Exists(path)), exception);
+            return FailedOpenOf(path, exception);
         }
 
         return FileOpenResult.Opened(stream, LengthOf(stream), LastWriteTimeUtcOf(stream));
+    }
+
+    /// <summary>
+    /// The result of an open that threw; for a directory it carries the directory's
+    /// last-write time, as curl's <c>fstat</c> of a directory records its modification
+    /// time, so a listing can write <c>Last-Modified</c> and apply <c>-z</c>.
+    /// </summary>
+    /// <param name="path">The operating-system path that failed to open.</param>
+    /// <param name="exception">The exception the open threw.</param>
+    /// <returns>The failed result.</returns>
+    private static FileOpenResult FailedOpenOf(string path, Exception exception)
+    {
+        bool isDirectory = Directory.Exists(path);
+        FileOpenResult failed = FileOpenResult.Failed(FileOpenFailure.StatusFor(exception, isDirectory), exception);
+
+        return failed.Status == FileAccessStatus.IsDirectory
+            ? failed with { LastWriteTimeUtc = new DateTimeOffset(Directory.GetLastWriteTimeUtc(path), TimeSpan.Zero) }
+            : failed;
     }
 
     /// <summary>

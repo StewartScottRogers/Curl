@@ -8,7 +8,7 @@ depends-on: [BL-1401]
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests]
 requirement: FR-004
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1422 — Report a directory's last-write time from PhysicalFileSystem's IsDirectory open
 
@@ -24,13 +24,18 @@ Off Windows, `PhysicalFileSystem.OpenForReadAsync` on a directory returns `FileA
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Core.UnitTests` (Integration, off Windows) opens a temporary directory and asserts `Status == IsDirectory` and `LastWriteTimeUtc == Directory.GetLastWriteTimeUtc(path)`.
-- [ ] Windows keeps returning `IsDirectory` (with or without a timestamp; the handler does not list there).
-- [ ] `dotnet build` clean; fast tests green; `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` reports no failing member in the changed code.
+- [x] A test in `Curl.Core.UnitTests` (Integration, off Windows) opens a temporary directory and asserts `Status == IsDirectory` and `LastWriteTimeUtc == Directory.GetLastWriteTimeUtc(path)`.
+- [x] Windows keeps returning `IsDirectory` (with or without a timestamp; the handler does not list there).
+- [x] `dotnet build` clean; fast tests green; `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` reports no failing member in the changed code.
 
 ## Notes
+
+- `PhysicalFileSystem.FailedOpenOf` adds `Directory.GetLastWriteTimeUtc(path)` to every `IsDirectory` failure, read and write opens alike and on every platform: one path, no platform branch, and harmless on Windows where the handler does not list.
+- The test is a fast, platform-neutral one (`OpenForReadAsync_Directory_ReportsDirectoryLastWriteTime`) rather than an off-Windows Integration test: it touches only a temporary directory, so it runs on all three CI platforms and the fast run on Windows covers the new branch for the coverage gate. `OpenForReadAsync_MissingFile_ReportsNoLastWriteTime` covers the other branch.
+- Measure-CodeQuality -Library Curl.Core.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. A directory's failed open carries its last-write time, so file:// listings write Last-Modified and apply -z

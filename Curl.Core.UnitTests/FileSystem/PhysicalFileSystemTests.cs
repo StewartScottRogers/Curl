@@ -91,6 +91,29 @@ public sealed class PhysicalFileSystemTests
         AssertFailed(FileAccessStatus.IsDirectory, result);
     }
 
+    [TestMethod]
+    public async Task OpenForReadAsync_Directory_ReportsDirectoryLastWriteTime()
+    {
+        using var directory = new TemporaryDirectory();
+        var expected = new DateTimeOffset(Directory.GetLastWriteTimeUtc(directory.Path), TimeSpan.Zero);
+
+        var result = await new PhysicalFileSystem().OpenForReadAsync(directory.Path, CancellationToken.None);
+
+        Assert.AreEqual(FileAccessStatus.IsDirectory, result.Status);
+        Assert.AreEqual(expected, result.LastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public async Task OpenForReadAsync_MissingFile_ReportsNoLastWriteTime()
+    {
+        using var directory = new TemporaryDirectory();
+
+        var result = await new PhysicalFileSystem().OpenForReadAsync(directory.Combine("missing.txt"), CancellationToken.None);
+
+        Assert.AreEqual(FileAccessStatus.NotFound, result.Status);
+        Assert.IsNull(result.LastWriteTimeUtc);
+    }
+
     // FileUrlPath forwards c|/Windows with its bar. Windows rejects the bar as an invalid
     // name character, an IOException; elsewhere it is a legal name whose parent "c|" is
     // missing.
