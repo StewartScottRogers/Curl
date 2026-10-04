@@ -37,22 +37,14 @@ public sealed class CommandLineUnimplementedOptionTests
         }
     }
 
+    /// <summary>
+    /// The parser refuses a letter without a row as unknown (BL-1421), which is right only while every one of
+    /// curl 8.21.0's letters has a row; this fails, naming the letter, should one ever be removed.
+    /// </summary>
     [TestMethod]
-    public void Parse_EveryLetterWithoutARow_IsRefusedAsNotSupported()
+    public void EveryCurlLetter_HasARow()
     {
-        foreach (char letter in UnimplementedLetters)
-        {
-            AssertRefused(CommandLineParser.Parse([$"-{letter}", Url]), $"curl: option -{letter}: {NotSupported}");
-        }
-    }
-
-    [TestMethod]
-    public void Parse_EveryLetterWithoutARowInABundle_IsRefusedSpelledAsTheWholeArgument()
-    {
-        foreach (char letter in UnimplementedLetters)
-        {
-            AssertRefused(CommandLineParser.Parse([$"-s{letter}", Url]), $"curl: option -s{letter}: {NotSupported}");
-        }
+        Assert.AreEqual(string.Empty, string.Concat(UnimplementedLetters));
     }
 
     [TestMethod]

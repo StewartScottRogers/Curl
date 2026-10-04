@@ -22,6 +22,28 @@ public sealed record TransferResult(
     DateTimeOffset? SourceLastWriteTimeUtc = null)
 {
     /// <summary>
+    /// Gets the modification time of the resource that was read, in seconds since
+    /// 1970-01-01T00:00:00Z - the one stored value behind
+    /// <see cref="SourceLastWriteTimeUtc" />, and the 64-bit <c>time_t</c> curl keeps it in,
+    /// so a time past 9999-12-31T23:59:59Z travels to <c>-R</c>/<c>--remote-time</c> too;
+    /// <see langword="null" /> when it is unknown or no source was opened. See ADR-0410.
+    /// </summary>
+    public long? SourceLastWriteUnixSeconds { get; init; } = SourceLastWriteTimeUtc?.ToUnixTimeSeconds();
+
+    /// <summary>
+    /// Gets the modification time of the resource that was read, the
+    /// <see cref="DateTimeOffset" /> view of <see cref="SourceLastWriteUnixSeconds" />:
+    /// <see langword="null" /> when that is unknown or outside <see cref="DateTimeOffset" />'s
+    /// range. Setting it stores its whole Unix seconds, dropping any fraction of a second as
+    /// curl's <c>time_t</c> does.
+    /// </summary>
+    public DateTimeOffset? SourceLastWriteTimeUtc
+    {
+        get => UnixSeconds.ToTimeInRange(SourceLastWriteUnixSeconds);
+        init => SourceLastWriteUnixSeconds = value?.ToUnixTimeSeconds();
+    }
+
+    /// <summary>
     /// Gets a value indicating whether the transfer succeeded.
     /// </summary>
     public bool IsSuccess => ExitCode == CurlExitCode.Ok;

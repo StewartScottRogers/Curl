@@ -118,7 +118,7 @@ public sealed class HttpDownloadConditionsTests
     [DataRow(TimeConditionKind.IfUnmodifiedSince, 0, false, DisplayName = "-z -, equal")]
     [DataRow(TimeConditionKind.IfUnmodifiedSince, 1, false, DisplayName = "-z -, newer")]
     public void IsMet_ComparesStrictly(TimeConditionKind kind, int days, bool expected) =>
-        Assert.AreEqual(expected, HttpDownloadConditions.IsMet(new TimeCondition(ConditionTime, kind), ConditionTime.AddDays(days)));
+        Assert.AreEqual(expected, HttpDownloadConditions.IsMet(new TimeCondition(ConditionTime, kind), ConditionTime.AddDays(days).ToUnixTimeSeconds()));
 
     [TestMethod]
     public void IsMet_UnknownDocumentTime_IsMet() =>

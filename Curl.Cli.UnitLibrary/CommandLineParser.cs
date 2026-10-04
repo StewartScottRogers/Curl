@@ -407,14 +407,13 @@ public static class CommandLineParser
         RefuseUnlistedName(argument, negatedName);
 
     /// <summary>
-    /// Refuses the short letter at <paramref name="letter"/> that <see cref="CommandLineOptionTable"/> has no
-    /// row for, spelled as the whole argument: not implemented yet when it is one of curl 8.21.0's letters
-    /// (ADR-0137), unknown otherwise.
+    /// Refuses a short letter <see cref="CommandLineOptionTable"/> has no row for, spelled as the whole
+    /// argument, as an unknown option. Every one of curl 8.21.0's letters has a row (BL-1421), so such a
+    /// letter is never one curl knows; <c>CommandLineUnimplementedOptionTests</c> fails should a row for
+    /// one ever be removed.
     /// </summary>
-    private static CommandLineRefusal RefuseUnlistedLetter(string argument, int letter) =>
-        CurlOptionAliasTable.IsLetter(argument[letter])
-            ? CommandLineRefusal.InstalledLibcurlDoesNotSupport(argument)
-            : CommandLineRefusal.UnknownOption(argument);
+    private static CommandLineRefusal RefuseUnlistedLetter(string argument) =>
+        CommandLineRefusal.UnknownOption(argument);
 
     /// <summary>Reads a long name that is not in the table: as <c>--expand-&lt;name&gt;</c>, or else as <c>--no-&lt;name&gt;</c>.</summary>
     private static CommandLineRefusal? ParseUnlistedLong(CommandLineOptions options, string argument, string longName, string? attachedValue, ArgumentReader reader) =>
@@ -498,7 +497,7 @@ public static class CommandLineParser
     {
         if (!CommandLineOptionTable.TryFindShort(argument[letter], out CommandLineOption? option))
         {
-            refusal = RefuseUnlistedLetter(argument, letter);
+            refusal = RefuseUnlistedLetter(argument);
             return true;
         }
 

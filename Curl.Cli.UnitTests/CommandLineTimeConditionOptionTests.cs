@@ -71,21 +71,44 @@ public sealed class CommandLineTimeConditionOptionTests
 
     /// <summary>
     /// curl 8.21.0, <c>curl -z "1 Jan 099999999" file:///...</c>: no warning, and a 2026 file is
-    /// not new enough, so the date is read as the last second of year 9999 (ADR-0073). So is
-    /// <c>31 Dec 9999 23:00 -1400</c>, after 9999 once its zone is applied.
+    /// not new enough. curl keeps the date in its 64-bit <c>time_t</c>, so the condition keeps its
+    /// Unix seconds whole, and its <see cref="TimeCondition.Value"/> reads as the end of
+    /// year 9999 (ADR-0073, ADR-0410). So is <c>31 Dec 9999 23:00 -1400</c>, after 9999 once its
+    /// zone is applied.
     /// </summary>
     /// <param name="value">The value after <c>-z</c>.</param>
+    /// <param name="unixSeconds">The Unix seconds curl reads the date as.</param>
     [TestMethod]
-    [DataRow("1 Jan 099999999")]
-    [DataRow("31 Dec 9999 23:00 -1400")]
-    public void Parse_TimeCondDateAfterYear9999_IsIfModifiedSinceTheLastSecondOfYear9999WithNoWarning(string value)
+    [DataRow("1 Jan 099999999", 3155633001244800L)]
+    [DataRow("31 Dec 9999 23:00 -1400", 253402347600L)]
+    public void Parse_TimeCondDateAfterYear9999_KeepsItsUnixSecondsAndReadsAsTheEndOfYear9999WithNoWarning(string value, long unixSeconds)
     {
         CommandLineParseResult result = Parse(["-z", value, Url], new RecordingDataFileReader());
 
         Assert.IsTrue(result.IsAccepted);
-        Assert.AreEqual(
-            new TimeCondition(new DateTimeOffset(9999, 12, 31, 23, 59, 59, TimeSpan.Zero), TimeConditionKind.IfModifiedSince),
-            result.Options.TimeCondition);
+        Assert.AreEqual(TimeCondition.FromUnixSeconds(unixSeconds, TimeConditionKind.IfModifiedSince), result.Options.TimeCondition);
+        Assert.AreEqual(DateTimeOffset.MaxValue, result.Options.TimeCondition?.Value);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    /// <summary>
+    /// curl 8.21.0 reads <c>-z "Mon, 01 Jan 40000 00:00:00 GMT"</c> with <c>curl_getdate</c> into
+    /// its 64-bit <c>time_t</c> with no warning; a leading <c>-</c> turns the condition round
+    /// (BL-1424). On Windows the transfer then fails with exit 43, <c>Invalid TIMEVALUE</c>, which
+    /// the HTTP handler decides, not the parser (measured 2026-10-03, BL-1424 Notes).
+    /// </summary>
+    /// <param name="value">The value after <c>-z</c>.</param>
+    /// <param name="kind">The condition's direction.</param>
+    [TestMethod]
+    [DataRow("Mon, 01 Jan 40000 00:00:00 GMT", TimeConditionKind.IfModifiedSince)]
+    [DataRow("-Mon, 01 Jan 40000 00:00:00 GMT", TimeConditionKind.IfUnmodifiedSince)]
+    public void Parse_TimeCondYear40000_IsThatYearsUnixSecondsWithNoWarning(string value, TimeConditionKind kind)
+    {
+        CommandLineParseResult result = Parse(["-z", value, Url], new RecordingDataFileReader());
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(1200110860800L, result.Options.TimeCondition?.ValueUnixSeconds);
+        Assert.AreEqual(kind, result.Options.TimeCondition?.Kind);
         Assert.IsEmpty(result.WarningLines);
     }
 

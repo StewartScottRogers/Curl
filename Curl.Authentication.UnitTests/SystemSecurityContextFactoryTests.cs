@@ -214,6 +214,37 @@ public sealed class SystemSecurityContextFactoryTests
         Assert.AreEqual(expected, NegotiateAuthenticationStatusMapping.StatusOf(code));
     }
 
+    [TestMethod]
+    [DataRow(NegotiateAuthenticationStatusCode.ContinueNeeded, SecurityContextStatus.ContinueNeeded)]
+    [DataRow(NegotiateAuthenticationStatusCode.Completed, SecurityContextStatus.Completed)]
+    public void StepOf_GoingOnOrCompletedWithAToken_CarriesTheToken(NegotiateAuthenticationStatusCode code, SecurityContextStatus expected)
+    {
+        SecurityContextStep step = SystemSecurityContext.StepOf(code, [0x4E, 0x54]);
+
+        Assert.AreEqual(expected, step.Status);
+        CollectionAssert.AreEqual(new byte[] { 0x4E, 0x54 }, step.Token);
+    }
+
+    [TestMethod]
+    [DataRow(NegotiateAuthenticationStatusCode.ContinueNeeded, SecurityContextStatus.ContinueNeeded)]
+    [DataRow(NegotiateAuthenticationStatusCode.Completed, SecurityContextStatus.Completed)]
+    public void StepOf_GoingOnOrCompletedWithNoToken_CarriesAnEmptyToken(NegotiateAuthenticationStatusCode code, SecurityContextStatus expected)
+    {
+        SecurityContextStep step = SystemSecurityContext.StepOf(code, null);
+
+        Assert.AreEqual(expected, step.Status);
+        Assert.IsEmpty(step.Token);
+    }
+
+    [TestMethod]
+    public void StepOf_FailureWithAToken_DropsTheToken()
+    {
+        SecurityContextStep step = SystemSecurityContext.StepOf(NegotiateAuthenticationStatusCode.InvalidToken, [0x4E, 0x54]);
+
+        Assert.AreEqual(SecurityContextStatus.MalformedToken, step.Status);
+        Assert.IsEmpty(step.Token);
+    }
+
     /// <summary>Steps <paramref name="context" /> against <paramref name="acceptor" /> until both are established.</summary>
     private static async Task EstablishAsync(ISecurityContext context, NegotiateAuthentication acceptor)
     {

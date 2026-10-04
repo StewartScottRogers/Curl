@@ -104,6 +104,60 @@ public sealed class CommandLineSchannelBuildRefusalTests
     }
 
     [TestMethod]
+    public void Parse_ProxyHttp2OnTheOpenSslBuild_SetsProxyHttp2()
+    {
+        CommandLineParseResult result = ParseAsOpenSslBuild(["--proxy-http2", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.ProxyHttp2);
+    }
+
+    [TestMethod]
+    public void Parse_NoProxyHttp2AfterProxyHttp2OnTheOpenSslBuild_ClearsProxyHttp2()
+    {
+        CommandLineParseResult result = ParseAsOpenSslBuild(["--proxy-http2", "--no-proxy-http2", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.ProxyHttp2);
+    }
+
+    [TestMethod]
+    public void Parse_NoProxyOption_LeavesProxyHttp2Off()
+    {
+        CommandLineParseResult result = ParseAsOpenSslBuild([Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.ProxyHttp2);
+    }
+
+    [TestMethod]
+    [DataRow("--proxy-http2")]
+    [DataRow("--no-proxy-http2")]
+    public void Parse_ProxyHttp2OnTheSchannelBuild_IsRefusedAsNotSupported(string spelling)
+    {
+        AssertRefused(ParseAsWindowsBuild(["-s", spelling, Url]), $"curl: option {spelling}: {NotSupported}");
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void Parse_ProxyHttp3OnEitherBuild_IsRefusedAsNotSupported(bool isWindows)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--proxy-http3", Url], _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows);
+
+        AssertRefused(result, $"curl: option --proxy-http3: {NotSupported}");
+    }
+
+    [TestMethod]
+    public void AiHelp_ProxyHttp3Section_SaysItIsRefusedEverywhere()
+    {
+        string section = AiHelpSection("## --proxy-http3\n");
+
+        StringAssert.Contains(section, "- Not supported by this build yet: curl refuses it with exit 2.");
+        Assert.DoesNotContain("On Windows: refused", section);
+    }
+
+    [TestMethod]
     public void Parse_DefaultConfigFileSearchOverloadAsTheWindowsBuild_RefusesHttp3()
     {
         CommandLineParseResult result = CommandLineParser.Parse(
@@ -123,6 +177,7 @@ public sealed class CommandLineSchannelBuildRefusalTests
     [DataRow("## --tlsuser\n")]
     [DataRow("## --proxy-tlsauthtype\n")]
     [DataRow("## --ssl-sessions\n")]
+    [DataRow("## --proxy-http2\n")]
     public void AiHelp_SectionOfAnOptionTheSchannelBuildLacks_SaysWindowsRefusesIt(string heading)
     {
         string section = AiHelpSection(heading);
@@ -151,6 +206,9 @@ public sealed class CommandLineSchannelBuildRefusalTests
 
     private static CommandLineParseResult ParseAsWindowsBuild(IReadOnlyList<string> arguments) =>
         CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: true);
+
+    private static CommandLineParseResult ParseAsOpenSslBuild(IReadOnlyList<string> arguments) =>
+        CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: false);
 
     private static void AssertRefused(CommandLineParseResult result, string optionLine)
     {

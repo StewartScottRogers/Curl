@@ -126,17 +126,8 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     }
 
     /// <inheritdoc />
-    public IReadOnlyList<AltSvcAlternative> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now)
-    {
-        HashSet<AltSvcEntry> held = new(cache.Entries, ReferenceEqualityComparer.Instance);
+    public IReadOnlyList<AltSvcHeaderOutcome> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now) =>
         cache.ApplyHeader(altSvcHeader, SourceAlpnOf(responseVersion), origin.IdnHost, origin.Port);
-        return
-        [
-            .. cache.Entries
-                .Where(entry => !held.Contains(entry))
-                .Select(entry => new AltSvcAlternative(AltSvcAlpnToken.Format(entry.DestinationAlpn), entry.DestinationHost, entry.DestinationPort)),
-        ];
-    }
 
     /// <summary>
     /// The source ALPN a header is learned under, from the version its response came over, as curl 8.21.0's

@@ -41,6 +41,22 @@ public sealed class UdpDatagramConnectorTests
     }
 
     [TestMethod]
+    public async Task OpenAsync_ToAnOnionName_FailsWithExit6BeforeAnyLookUp()
+    {
+        // curl tftp://x.onion/f -> curl: (6) Not resolving .onion address (RFC 7686) (BL-1394).
+        var resolver = new FakeDnsResolver(IPAddress.Loopback);
+        var opened = new List<IPEndPoint>();
+        var connector = CreateConnector(resolver, OpenFake(opened));
+
+        var result = await connector.OpenAsync("x.onion", 69, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.AreEqual("Not resolving .onion address (RFC 7686)", result.ErrorMessage);
+        Assert.IsEmpty(resolver.ResolvedHosts);
+        Assert.IsEmpty(opened);
+    }
+
+    [TestMethod]
     public async Task OpenAsync_WhenTheResolverExplainsTheFailure_AddsTheReason()
     {
         // curl --dns-servers <nxdomain> tftp://bl694.example/x -> curl: (6) Could not resolve host: bl694.example (Domain name not found)

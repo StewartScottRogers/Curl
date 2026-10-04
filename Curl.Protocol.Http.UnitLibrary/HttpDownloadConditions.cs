@@ -13,6 +13,14 @@ internal static class HttpDownloadConditions
 
     private const int RangeNotSatisfiable = 416;
 
+    private const string EntireDocumentAlreadyDownloaded = "The entire document is already downloaded";
+
+    private const string DocumentNotNewEnough = "The requested document is not new enough";
+
+    private const string DocumentNotOldEnough = "The requested document is not old enough";
+
+    private const string SimulateNotModified = "Simulate an HTTP 304 response";
+
     /// <summary>
     /// Gives the body size <c>--max-filesize</c> allows: <see langword="null" /> when none was
     /// given or it is zero, which curl also takes as no limit.
@@ -70,16 +78,60 @@ internal static class HttpDownloadConditions
     }
 
     /// <summary>
+    /// Reports the <c>-v</c> lines curl 8.21.0's <c>http_firstwrite</c> writes, before the head's
+    /// empty line, for a body it leaves unread although the response has one (measured, BL-1398
+    /// Notes): <c>The entire document is already downloaded</c> for a resume at the
+    /// Content-Length, and <c>The requested document is not new enough</c> (or <c>not old
+    /// enough</c>) then <c>Simulate an HTTP 304 response</c> for a <c>Last-Modified</c> that fails
+    /// <c>-z</c>. A 416 or a real 304 writes neither.
+    /// </summary>
+    /// <param name="context">The transfer.</param>
+    /// <param name="head">The final response's head.</param>
+    /// <param name="delivery">What <see cref="Decide" /> made of the body.</param>
+    internal static void ReportUndeliveredBody(ITransferContext context, HttpResponseHead head, HttpBodyDelivery delivery)
+    {
+        int statusCode = head.StatusLine.StatusCode;
+        if (delivery == HttpBodyDelivery.NothingLeftToResume && statusCode != RangeNotSatisfiable)
+        {
+            context.Events.ReportInfo(EntireDocumentAlreadyDownloaded);
+        }
+        else if (delivery == HttpBodyDelivery.TimeConditionUnmet && statusCode != NotModified)
+        {
+            context.Events.ReportInfo(context.TimeCondition!.Kind == TimeConditionKind.IfUnmodifiedSince ? DocumentNotOldEnough : DocumentNotNewEnough);
+            context.Events.ReportInfo(SimulateNotModified);
+        }
+    }
+
+    /// <summary>
+    /// Determines whether the server's own answer, not a body curl chose to leave, ends the
+    /// exchange: a 416 to a resume, whose body is read and ignored, or a real 304 under
+    /// <c>-z</c>, which has none. curl 8.21.0 leaves the connection intact after either, but
+    /// closes it after a resume at the Content-Length or a <c>Last-Modified</c> that fails
+    /// <c>-z</c>, whose body it never reads (measured, BL-1412 Notes).
+    /// </summary>
+    /// <param name="head">The final response's head.</param>
+    /// <param name="delivery">What <see cref="Decide" /> made of the body.</param>
+    /// <returns><see langword="true" /> for a 416 to a resume or a real 304 under <c>-z</c>.</returns>
+    internal static bool IsServerAnswer(HttpResponseHead head, HttpBodyDelivery delivery) =>
+        (delivery, head.StatusLine.StatusCode) is (HttpBodyDelivery.NothingLeftToResume, RangeNotSatisfiable)
+            or (HttpBodyDelivery.TimeConditionUnmet, NotModified);
+
+    /// <summary>
     /// Determines whether a document last modified at <paramref name="documentTime" /> meets
     /// <paramref name="condition" />: newer than its time for <c>-z date</c>, older for
     /// <c>-z -date</c>, so an equal time meets neither; an unknown time always meets it.
     /// </summary>
     /// <param name="condition">The <c>-z</c> condition.</param>
-    /// <param name="documentTime">The document's last-modified time, or <see langword="null" />.</param>
+    /// <param name="documentTime">
+    /// The document's last-modified time in seconds since the Unix epoch, or
+    /// <see langword="null" />. It is compared with <see cref="TimeCondition.ValueUnixSeconds" />,
+    /// as curl 8.21.0's <c>Curl_meets_timecondition</c> compares <c>time_t</c>s, so a year past
+    /// 9999 compares too (ADR-0410).
+    /// </param>
     /// <returns><see langword="true" /> when the body is to be delivered.</returns>
-    internal static bool IsMet(TimeCondition condition, DateTimeOffset? documentTime) =>
+    internal static bool IsMet(TimeCondition condition, long? documentTime) =>
         documentTime is not { } time
-        || (condition.Kind == TimeConditionKind.IfUnmodifiedSince ? time < condition.Value : time > condition.Value);
+        || (condition.Kind == TimeConditionKind.IfUnmodifiedSince ? time < condition.ValueUnixSeconds : time > condition.ValueUnixSeconds);
 
     /// <summary>
     /// Compares the response's <c>Last-Modified</c> with the <c>-z</c> condition, when there is

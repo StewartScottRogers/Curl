@@ -636,7 +636,7 @@ public sealed partial class TcpConnector(
 
     // Everything ConnectMultiplexedAsync does before the QUIC dial: the --resolve entries, the
     // --connect-to mapping and the resolve, with ConnectAsync's failures for each.
-    private async ValueTask<(QuicDialRequest? Request, MultiplexedConnectResult? Failure)> ResolveForQuicAsync(
+    private ValueTask<(QuicDialRequest? Request, MultiplexedConnectResult? Failure)> ResolveForQuicAsync(
         ConnectTarget target,
         CancellationToken cancellationToken)
     {
@@ -645,9 +645,24 @@ public sealed partial class TcpConnector(
         var destination = DestinationOf(target);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
-            return (null, MultiplexedConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError));
+            return ValueTask.FromResult<(QuicDialRequest?, MultiplexedConnectResult?)>((null, MultiplexedConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError)));
         }
 
+        if (OnionAddress.IsRefused(destination.Host))
+        {
+            ReportOnionRefused(target.Events, destination);
+            return ValueTask.FromResult<(QuicDialRequest?, MultiplexedConnectResult?)>((null, MultiplexedConnectResult.Failed(CurlExitCode.CouldntResolveHost, OnionAddress.RefusalMessage)));
+        }
+
+        return ResolveQuicDestinationAsync(target, destination, started, cancellationToken);
+    }
+
+    private async ValueTask<(QuicDialRequest? Request, MultiplexedConnectResult? Failure)> ResolveQuicDestinationAsync(
+        ConnectTarget target,
+        ConnectDestination destination,
+        long started,
+        CancellationToken cancellationToken)
+    {
         var (addresses, failure) = await ResolveWithFailureReasonAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
@@ -853,7 +868,23 @@ public sealed partial class TcpConnector(
         }
     }
 
-    private async ValueTask<ConnectResult> ConnectDirectlyTracedAsync(
+    private ValueTask<ConnectResult> ConnectDirectlyTracedAsync(
+        ConnectTarget target,
+        ConnectDestination destination,
+        long started,
+        ConnectAttemptTraceEvents? trace,
+        CancellationToken cancellationToken)
+    {
+        if (OnionAddress.IsRefused(destination.Host))
+        {
+            ReportOnionRefused(target.Events, destination);
+            return ValueTask.FromResult(ConnectResult.Failed(CurlExitCode.CouldntResolveHost, OnionAddress.RefusalMessage));
+        }
+
+        return ResolveAndDialDirectlyAsync(target, destination, started, trace, cancellationToken);
+    }
+
+    private async ValueTask<ConnectResult> ResolveAndDialDirectlyAsync(
         ConnectTarget target,
         ConnectDestination destination,
         long started,
@@ -1053,6 +1084,19 @@ public sealed partial class TcpConnector(
         }
 
         return ConnectResult.Failed(exitCode, message);
+    }
+
+    /// <summary>
+    /// Reports the refusal to connect to a <c>.onion</c> name, made before any <c>--resolve</c> entry, cached answer or
+    /// look-up, as curl 8.21.0 reports it before its exit 6 <c>Not resolving .onion address (RFC 7686)</c>: the
+    /// <c>-v</c> lines <c>Not resolving .onion address (RFC 7686)</c>, <c>Could not resolve:
+    /// &lt;host&gt;:&lt;port&gt;</c> and <c>Could not resolve: &lt;host&gt;</c> (measured, BL-1394).
+    /// </summary>
+    private static void ReportOnionRefused(ITransferEvents events, ConnectDestination destination)
+    {
+        events.ReportInfo(OnionAddress.RefusalMessage);
+        events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine(destination.Host, destination.Port));
+        events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine(destination.Host));
     }
 
     private static void ReportNegativeEntryFailed(ITransferEvents events, ConnectDestination destination, string message)
@@ -1421,8 +1465,10 @@ public sealed partial class TcpConnector(
         // handshake to it with the same exit code and message as one to a target (measured).
         // It verifies with the --proxy-* TLS options, not -k or --cacert, so the proxy's own
         // provider runs this handshake (ADR-0061). It offers http/1.1 through ALPN whatever the
-        // HTTP version options say, and none under --no-alpn (measured on both builds, ADR-0190).
-        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, tunnel.Proxy.Host, tunnel.Target, isProxy: true, applicationProtocols: HttpApplicationProtocols.Http11Only, cancellationToken).ConfigureAwait(false);
+        // HTTP version options say, and none under --no-alpn (measured on both builds, ADR-0190);
+        // under --proxy-http2 it offers h2,http/1.1 (measured, BL-1413 Notes, ADR-0408).
+        var proxyApplicationProtocols = _proxyTunnelOptions.ProxyHttp2 ? HttpApplicationProtocols.H2ThenHttp11 : HttpApplicationProtocols.Http11Only;
+        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, tunnel.Proxy.Host, tunnel.Target, isProxy: true, applicationProtocols: proxyApplicationProtocols, cancellationToken).ConfigureAwait(false);
         sslTrace.ReportFinished(events, securedProxy);
         if (securedProxy.Connection is not { } proxyConnection)
         {
@@ -1436,11 +1482,66 @@ public sealed partial class TcpConnector(
         events.ReportInfo(securedProxy.ApplicationProtocol is { } agreed
             ? $"CONNECT: '{agreed}' negotiated"
             : ConnectTunnelVerboseLines.NoAlpnNegotiated);
+        if (securedProxy.ApplicationProtocol == Http2ApplicationProtocol)
+        {
+            return (await OpenHttp2TunnelAsync(dialed with { Connection = proxyConnection }, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false), null);
+        }
+
         trace.ReportSubfilterInstalled(events);
 
         // CONNECT and the target's TLS run over the proxy's TLS; the socket's local end point stays.
         var securedDialed = dialed with { Connection = proxyConnection, TunnelTrace = trace };
         return await OpenTunnelAsync(securedDialed, trace, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The ALPN identifier of HTTP/2 over TLS, on which an HTTPS proxy is tunnelled through an HTTP/2 stream.</summary>
+    private const string Http2ApplicationProtocol = "h2";
+
+    /// <summary>
+    /// Tunnels through an HTTPS proxy that agreed on <c>h2</c> with an HTTP/2 <c>CONNECT</c> stream
+    /// (<see cref="Http2ProxyTunnelConnection" />, ADR-0408), with curl 8.18.0's <c>-v</c> lines
+    /// (measured, BL-1413 Notes): <c>Establish HTTP/2 proxy tunnel to</c> first; on a <c>2xx</c>
+    /// <c>CONNECT tunnel established, response</c> then <c>CONNECT phase completed</c>, the reverse
+    /// of the HTTP/1.1 tunnel's order. Any other answer, or none, is exit 7 with curl's
+    /// <c>Could not connect to server</c> and no line for the proxy's reply.
+    /// </summary>
+    private async ValueTask<ConnectResult> OpenHttp2TunnelAsync(
+        DialedSocket dialed,
+        TunnelRequest tunnel,
+        string? proxyAuthorization,
+        CancellationToken cancellationToken)
+    {
+        var events = tunnel.Target.Events;
+        var authority = HttpProxyTunnel.FormatAuthority(tunnel.Destination.Host, tunnel.Destination.Port);
+        events.ReportInfo($"Establish HTTP/2 proxy tunnel to {authority}");
+        new NetworkDiagnosticLog(tunnel.Target.DiagnosticLog).TunnelRequested(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port);
+        var headerFields = Http2ProxyTunnelConnection.ConnectHeaderFields(authority, proxyAuthorization, _proxyTunnelOptions.UserAgent);
+        (int StatusCode, Http2ProxyTunnelConnection? Tunnel) opened = default;
+        ExceptionDispatchInfo? exception = null;
+        try
+        {
+            opened = await Http2ProxyTunnelConnection.OpenAsync(dialed.Connection, headerFields, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception caught)
+        {
+            exception = ExceptionDispatchInfo.Capture(caught);
+        }
+
+        var (statusCode, tunnelConnection) = opened;
+        if (tunnelConnection is null)
+        {
+            // The proxy's connection goes whether the CONNECT was refused or could not be exchanged.
+            await dialed.Connection.DisposeAsync().ConfigureAwait(false);
+            exception?.Throw();
+            return ConnectResult.Failed(CurlExitCode.CouldntConnect, "Could not connect to server");
+        }
+
+        EndProxyAuthorization(proxyAuthorization);
+        events.ReportInfo($"CONNECT tunnel established, response {statusCode}");
+        events.ReportInfo("CONNECT phase completed");
+        var timings = new ConnectTimings(tunnel.Started, tunnel.NameResolved, timeProvider.GetTimestamp(), null);
+        new NetworkDiagnosticLog(tunnel.Target.DiagnosticLog).TunnelEstablished(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port, statusCode);
+        return await SecureWhenAskedAsync(dialed with { Connection = tunnelConnection }, tunnel.Target, timings, statusCode, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask<ConnectResult> OpenSocksTunnelAsync(
@@ -1735,6 +1836,7 @@ public sealed partial class TcpConnector(
             trace.ReportReceiving(events);
             var reply = await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false);
             ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization, DigestStaleChallenge.IsOfferedIn(reply.ProxyAuthenticate));
+            ConnectTunnelVerboseLines.ReportReplyFailure(events, reply);
             trace.ReportResponse(events, reply.OpensTunnel);
             if (tunnel.HeadOutput is { } headOutput && !reply.Head.IsEmpty)
             {
@@ -1776,8 +1878,8 @@ public sealed partial class TcpConnector(
     }
 
     private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure) =>
-        reply.RecvErrorMessage is { } recvErrorMessage
-            ? ConnectResult.Failed(CurlExitCode.RecvError, firstSspiFailure ?? recvErrorMessage)
+        reply.FailureMessage is { } failureMessage
+            ? ConnectResult.Failed(reply.FailureExitCode, firstSspiFailure ?? failureMessage)
             : ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? $"CONNECT tunnel failed, response {reply.StatusCode}");
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(

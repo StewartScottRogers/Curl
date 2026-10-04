@@ -18,10 +18,14 @@ namespace Curl.Protocol.Rtsp;
 /// <c>Unable to read the CSeq header: [&lt;line&gt;]</c>. A <c>Content-Length</c> is a comma list
 /// of equal decimal numbers (<c>2, 2</c>), and a second one must agree with the first; anything
 /// else fails with 8, <c>Invalid Content-Length: value</c>, while a number too large for 64 bits
-/// is accepted and leaves no body (BL-840), unless a <c>--max-filesize</c> limit is set, when it fails
+/// is accepted and leaves no body (BL-840), its line reported after <c>Overflow Content-Length: value</c>
+/// and the connection closed after the transfer (BL-1403), unless a <c>--max-filesize</c> limit is set, when it fails
 /// with 63, <c>Maximum file size exceeded</c> (BL-1292). A carriage return inside a line fails with 8,
 /// <c>Carriage return found in header</c> (on the status line only once it has passed the
-/// status check), and a header line with no colon with 8, <c>Header without colon</c>; each
+/// status check), a NUL byte anywhere in a line, checked before the carriage return and colon
+/// and on the status line too once it has passed the status check, with 8, <c>Nul byte in header</c>
+/// (BL-1406), a second <c>Location</c> whose value differs from the first with 8,
+/// <c>Multiple Location headers</c> (BL-1406), and a header line with no colon with 8, <c>Header without colon</c>; each
 /// header line arrives with its continuation lines already joined (<see cref="RtspHeaderFolding" />).
 /// The line that fails is not written. A <c>Session</c> header, in any case, is handed to <c>session</c>, which keeps
 /// the first ID and fails a different one with 86 as the line is read (BL-592).
@@ -42,11 +46,20 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
     /// <summary>The exit 63 message for a <c>Content-Length</c> over the <c>--max-filesize</c> limit.</summary>
     internal const string MaxFileSizeExceeded = "Maximum file size exceeded";
 
+    /// <summary>The <c>-v</c> line for a <c>Content-Length</c> number too large for 64 bits.</summary>
+    internal const string OverflowContentLength = "Overflow Content-Length: value";
+
     /// <summary>The exit 8 message for a carriage return inside a line of the head.</summary>
     internal const string CarriageReturnInHeader = "Carriage return found in header";
 
     /// <summary>The exit 8 message for a header line with no colon.</summary>
     internal const string HeaderWithoutColon = "Header without colon";
+
+    /// <summary>The exit 8 message for a NUL byte in a line of the head.</summary>
+    internal const string NulByteInHeader = "Nul byte in header";
+
+    /// <summary>The exit 8 message for a second <c>Location</c> header that differs from the first.</summary>
+    internal const string MultipleLocationHeaders = "Multiple Location headers";
 
     private const string Version = "RTSP/1.0";
 
@@ -57,6 +70,8 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
     private long? declaredLength;
 
     private bool lengthTooLarge;
+
+    private string? location;
 
     /// <summary>Gets a value indicating whether the status line has been read.</summary>
     internal bool HasStatus { get; private set; }
@@ -76,15 +91,24 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
     /// </summary>
     internal long ContentLength => declaredLength ?? 0;
 
+    /// <summary>
+    /// Gets a value indicating whether the line just read is a <c>Content-Length</c> whose number
+    /// is too large for 64 bits, for which curl 8.21.0 reports <see cref="OverflowContentLength" />
+    /// before the line itself (measured, BL-1403).
+    /// </summary>
+    internal bool LineOverflowedContentLength { get; private set; }
+
     /// <summary>Reads one line of the head.</summary>
     /// <param name="line">The line, with its line ending.</param>
     /// <exception cref="RtspTransferException">curl refuses the line.</exception>
     internal void Accept(ReadOnlySpan<byte> line)
     {
         string text = Encoding.Latin1.GetString(line);
+        LineOverflowedContentLength = false;
         if (!HasStatus)
         {
             StatusCode = ParseStatusCode(text);
+            RefuseNulByte(text);
             RefuseCarriageReturn(text);
             HasStatus = true;
         }
@@ -94,9 +118,19 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
         }
         else
         {
+            RefuseNulByte(text);
             RefuseCarriageReturn(text);
             RefuseMissingColon(text);
             AcceptHeader(text);
+        }
+    }
+
+    /// <summary>Fails with 8 when a NUL byte comes anywhere in the line.</summary>
+    private static void RefuseNulByte(string line)
+    {
+        if (line.Contains('\0'))
+        {
+            throw new RtspTransferException(CurlExitCode.WeirdServerReply, NulByteInHeader);
         }
     }
 
@@ -150,6 +184,10 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
         {
             AcceptContentLength(line["Content-Length:".Length..]);
         }
+        else if (line.StartsWith("Location:", StringComparison.OrdinalIgnoreCase))
+        {
+            KeepLocation(line.AsSpan("Location:".Length).Trim(WhiteSpace).ToString());
+        }
         else if (line.StartsWith("Session:", StringComparison.OrdinalIgnoreCase))
         {
             session.AcceptSession(line["Session:".Length..]);
@@ -195,6 +233,8 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
 
         lengthTooLarge = !long.TryParse(item, NumberStyles.None, CultureInfo.InvariantCulture, out long length);
         RefuseTooLargeLengthUnderLimit();
+        LineOverflowedContentLength = lengthTooLarge;
+        CloseConnectionOnOverflow();
         declaredLength = lengthTooLarge || declaredLength is null || declaredLength == length ? length : throw InvalidLength();
     }
 
@@ -208,6 +248,34 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
         {
             throw new RtspTransferException(CurlExitCode.FilesizeExceeded, MaxFileSizeExceeded);
         }
+    }
+
+    private void CloseConnectionOnOverflow()
+    {
+        if (lengthTooLarge)
+        {
+            session.CloseConnection();
+        }
+    }
+
+    /// <summary>
+    /// Keeps the first non-empty <c>Location</c> value and refuses a later one that differs from
+    /// it, as curl 8.21.0's shared <c>http_header_l</c> does; an empty value, or a repeat that
+    /// differs only in surrounding blanks, is ignored (measured, BL-1406).
+    /// </summary>
+    private void KeepLocation(string value)
+    {
+        if (value.Length == 0)
+        {
+            return;
+        }
+
+        if (location is not null && !location.Equals(value, StringComparison.Ordinal))
+        {
+            throw new RtspTransferException(CurlExitCode.WeirdServerReply, MultipleLocationHeaders);
+        }
+
+        location = value;
     }
 
     private static RtspTransferException InvalidLength() => new(CurlExitCode.WeirdServerReply, InvalidContentLength);

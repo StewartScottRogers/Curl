@@ -126,18 +126,18 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
         {
             var session = new RtspSessionState(connect.IsReused ? ReusedFirstSequenceNumber : FirstSequenceNumber);
             TransferResult result = await ExchangeAsync(connection, context, session).ConfigureAwait(false);
-            ReportConnectionEnd(context.Events, target, connect, result);
+            ReportConnectionEnd(context.Events, target, connect, result, session.ClosesConnection);
             return result;
         }
     }
 
     /// <summary>
     /// Hands the connection back to the pool and reports it left intact when curl 8.21.0 keeps
-    /// it; otherwise reports it shut down or closed, as measured (BL-593).
+    /// it; otherwise reports it shut down or closed, as measured (BL-593, BL-1403).
     /// </summary>
-    private static void ReportConnectionEnd(ITransferEvents events, ConnectTarget target, ConnectResult connect, TransferResult result)
+    private static void ReportConnectionEnd(ITransferEvents events, ConnectTarget target, ConnectResult connect, TransferResult result, bool closesConnection)
     {
-        if (RtspVerboseLines.LeavesIntact(result))
+        if (!closesConnection && RtspVerboseLines.LeavesIntact(result))
         {
             connect.Connection!.MarkReusable();
             events.ReportInfo(RtspVerboseLines.LeftIntact(connect.ConnectionNumber, target.Host, target.Port));

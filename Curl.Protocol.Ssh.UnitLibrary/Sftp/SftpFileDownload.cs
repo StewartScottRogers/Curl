@@ -36,6 +36,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
     /// <param name="range">The <c>-r</c> range, read as <see cref="SftpDownloadPart.Choose" /> reads it; the whole file when not given.</param>
     /// <param name="resumeFrom">The <c>-C</c> offset; no resume when not given or 0.</param>
     /// <param name="maxFileSize">The <c>--max-filesize</c> limit; no limit when not given or 0 (BL-1327).</param>
+    /// <param name="rangeText">The <c>-r</c> text, read with curl's <c>Curl_ssh_range</c> rules when <paramref name="range" /> is not given (BL-1396).</param>
     /// <returns>
     /// Success with the bytes downloaded; exit 33 or 36, with nothing read, for a range or
     /// <c>-C</c> offset the file cannot serve (<see cref="SftpDownloadPart.Choose" />); exit 18, <c>end of response with N bytes
@@ -60,7 +61,8 @@ internal sealed class SftpFileDownload(SshTransport transport)
         SftpQuoteCommands? quotes = null,
         ByteRange? range = null,
         long? resumeFrom = null,
-        long? maxFileSize = null)
+        long? maxFileSize = null,
+        string? rangeText = null)
     {
         quotes ??= SftpQuoteCommands.None;
         Trace.Enter("SSH_SFTP_INIT");
@@ -86,7 +88,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 Trace.Enter("SSH_SFTP_DOWNLOAD_STAT");
                 long? size = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.StatSizeAsync(path, cancellationToken)).ConfigureAwait(false);
-                TransferResult result = await CopyPartOfKnownSizeAsync(session, handle, size, range, resumeFrom, maxFileSize, output, progress, cancellationToken).ConfigureAwait(false);
+                TransferResult result = await CopyPartOfKnownSizeAsync(session, handle, size, new SftpRangeRequest(range, rangeText), resumeFrom, maxFileSize, output, progress, cancellationToken).ConfigureAwait(false);
                 Trace.Enter("SSH_SFTP_CLOSE");
                 result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
                 Trace.EndSftpDonePhase();
@@ -116,7 +118,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
         SftpSession session,
         byte[] handle,
         long? size,
-        ByteRange? range,
+        SftpRangeRequest range,
         long? resumeFrom,
         long? maxFileSize,
         Stream output,
@@ -140,7 +142,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
         SftpSession session,
         byte[] handle,
         long? size,
-        ByteRange? range,
+        SftpRangeRequest range,
         long? resumeFrom,
         long? maxFileSize,
         Stream output,
@@ -150,7 +152,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
         SftpDownloadPart part;
         try
         {
-            part = SftpDownloadPart.Choose(range, resumeFrom, size);
+            part = SftpDownloadPart.Choose(range.Range, resumeFrom, size, range.Text);
         }
         catch (SshTransferException failure)
         {
@@ -212,4 +214,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 ? TransferResult.Failure(CurlExitCode.PartialFile, $"end of response with {known - received} bytes missing", received)
                 : TransferResult.Success(received);
     }
+
+    // The -r range as the command line parsed it, and its text for when it could not.
+    private sealed record SftpRangeRequest(ByteRange? Range, string? Text);
 }

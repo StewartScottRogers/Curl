@@ -135,7 +135,26 @@ internal static class HttpProxyTunnel
     /// connection can carry another CONNECT; or the exit 56 message when the proxy closed the connection before the
     /// header block ended or sent more than curl reads.
     /// </returns>
-    public static async ValueTask<HttpProxyTunnelReply> ReadReplyAsync(IConnection connection, CancellationToken cancellationToken)
+    public static ValueTask<HttpProxyTunnelReply> ReadReplyAsync(IConnection connection, CancellationToken cancellationToken) =>
+        ReadReplyAsync(connection, forConnectUdp: false, cancellationToken);
+
+    /// <summary>
+    /// Reads the proxy's reply to CONNECT, or to CONNECT-UDP when <paramref name="forConnectUdp" />
+    /// is set, up to and including the empty line that ends its header block.
+    /// </summary>
+    /// <param name="connection">The connection to the proxy.</param>
+    /// <param name="forConnectUdp">
+    /// <see langword="true" /> for a CONNECT-UDP reply, whose <c>101</c> ignores <c>Content-Length</c>
+    /// as a <c>2xx</c> does (curl 8.21.0's <c>lib/cf-h1-proxy.c</c>, BL-1399).
+    /// </param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>
+    /// The reply as <see cref="ReadReplyAsync(IConnection, CancellationToken)" /> returns it; a
+    /// reply whose status does not ignore <c>Content-Length</c> (<see cref="IgnoresBodyFields" />)
+    /// and whose <c>Content-Length</c> is not a number is exit 8
+    /// <see cref="UnsupportedContentLength" />, its head ending with that field's line.
+    /// </returns>
+    public static async ValueTask<HttpProxyTunnelReply> ReadReplyAsync(IConnection connection, bool forConnectUdp, CancellationToken cancellationToken)
     {
         var header = new List<byte>();
         var oneByte = new byte[1];
@@ -143,7 +162,7 @@ internal static class HttpProxyTunnel
         while (await connection.ReadAsync(oneByte, cancellationToken).ConfigureAwait(false) == 1)
         {
             header.Add(oneByte[0]);
-            if (ReplyAfterLatestByte(header, ref lineStart) is { } reply)
+            if (ReplyAfterLatestByte(header, ref lineStart, forConnectUdp) is { } reply)
             {
                 return reply;
             }
@@ -154,7 +173,7 @@ internal static class HttpProxyTunnel
 
     // The reply once the byte just added ends it, or null while more is to be read; a line
     // holding nothing but an optional CR ends the block, as curl accepts bare LF line endings.
-    private static HttpProxyTunnelReply? ReplyAfterLatestByte(List<byte> header, ref int lineStart)
+    private static HttpProxyTunnelReply? ReplyAfterLatestByte(List<byte> header, ref int lineStart, bool forConnectUdp)
     {
         var lineBytes = header.Count - lineStart;
         if (lineBytes > MaximumLineBytes)
@@ -175,7 +194,7 @@ internal static class HttpProxyTunnel
 
         if (IsEmptyLine(header, lineStart))
         {
-            return ParseReply(header);
+            return ParseReply(header, forConnectUdp);
         }
 
         lineStart = header.Count;
@@ -186,23 +205,48 @@ internal static class HttpProxyTunnel
     private static bool IsEmptyLine(List<byte> header, int lineStart) =>
         header.Count - lineStart == 1 || (header.Count - lineStart == 2 && header[lineStart] == '\r');
 
+    /// <summary>
+    /// The message curl 8.21.0 fails a reply with, exit 8, when its status does not ignore
+    /// <c>Content-Length</c> and the value is not a number (measured, BL-1399).
+    /// </summary>
+    internal const string UnsupportedContentLength = "Unsupported Content-Length value";
+
+    /// <summary>
+    /// Decides whether curl 8.21.0 ignores a reply's <c>Content-Length</c> and
+    /// <c>Transfer-Encoding</c>, as RFC 9110 section 9.3.6 has a client do for a <c>2xx</c> to
+    /// CONNECT: any <c>2xx</c>, and for CONNECT-UDP a <c>101</c> too (<c>lib/cf-h1-proxy.c</c>).
+    /// </summary>
+    /// <param name="statusCode">The reply's status code.</param>
+    /// <param name="forConnectUdp">Whether the reply answers CONNECT-UDP.</param>
+    /// <returns><see langword="true" /> when the fields are ignored.</returns>
+    internal static bool IgnoresBodyFields(int statusCode, bool forConnectUdp) =>
+        statusCode / 100 == 2 || (forConnectUdp && statusCode == 101);
+
     // The status code and the fields curl 8.21.0 acts on after a CONNECT: Proxy-Authenticate,
-    // Content-Length, Connection and Proxy-Connection close, and a chunked Transfer-Encoding.
-    private static HttpProxyTunnelReply ParseReply(List<byte> header)
+    // Content-Length, Connection and Proxy-Connection close, and a chunked Transfer-Encoding;
+    // or exit 8 at the first Content-Length that is not a number, unless the status ignores it.
+    private static HttpProxyTunnelReply ParseReply(List<byte> header, bool forConnectUdp)
     {
+        var statusCode = ParseStatusCode(header);
+        var readsContentLength = !IgnoresBodyFields(statusCode, forConnectUdp);
         List<string> proxyAuthenticate = [];
         long contentLength = 0;
         var reusable = true;
         var chunked = false;
-        foreach (var (name, value) in HeaderFields(header))
+        foreach (var (name, value, lineEnd) in HeaderFields(header))
         {
             switch (name.ToUpperInvariant())
             {
                 case "PROXY-AUTHENTICATE":
                     proxyAuthenticate.Add(value);
                     break;
-                case "CONTENT-LENGTH":
-                    contentLength = long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var length) ? length : contentLength;
+                case "CONTENT-LENGTH" when readsContentLength:
+                    if (ContentLengthOf(value) is not { } length)
+                    {
+                        return UnsupportedContentLengthReply(header, lineEnd);
+                    }
+
+                    contentLength = length;
                     break;
                 case "CONNECTION" or "PROXY-CONNECTION":
                     reusable &= !HasToken(value, "close");
@@ -213,7 +257,7 @@ internal static class HttpProxyTunnel
             }
         }
 
-        return new HttpProxyTunnelReply(ParseStatusCode(header), null)
+        return new HttpProxyTunnelReply(statusCode, null)
         {
             ProxyAuthenticate = proxyAuthenticate,
             ContentLength = contentLength,
@@ -223,15 +267,43 @@ internal static class HttpProxyTunnel
         };
     }
 
-    // Every "name: value" line after the status line, the value without the blanks around it;
-    // a line with no colon, or nothing before it, is not a field.
-    private static IEnumerable<(string Name, string Value)> HeaderFields(List<byte> header) =>
-        Encoding.Latin1.GetString([.. header])
-            .Split('\n')
-            .Skip(1)
-            .Select(line => (Line: line, Colon: line.IndexOf(':', StringComparison.Ordinal)))
-            .Where(field => field.Colon > 0)
-            .Select(field => (field.Line[..field.Colon], field.Line[(field.Colon + 1)..].Trim(' ', '\t', '\r')));
+    // The exit 8 reply, its head the bytes up to the end of the offending line, as curl's -v
+    // shows no reply line after it (measured, BL-1399).
+    private static HttpProxyTunnelReply UnsupportedContentLengthReply(List<byte> header, int lineEnd) =>
+        HttpProxyTunnelReply.Failed(UnsupportedContentLength) with
+        {
+            FailureExitCode = CurlExitCode.WeirdServerReply,
+            Head = header[..lineEnd].ToArray(),
+        };
+
+    // The number a Content-Length value starts with, as curl's curlx_str_numblanks reads it - its
+    // leading digits, the blanks before them already trimmed - or null when it starts with no
+    // digit or overflows.
+    private static long? ContentLengthOf(string value)
+    {
+        var digits = value.Length - value.AsSpan().TrimStart("0123456789").Length;
+        return long.TryParse(value.AsSpan(0, digits), NumberStyles.None, CultureInfo.InvariantCulture, out var length) ? length : null;
+    }
+
+    // Every "name: value" line after the status line, the value without the blanks around it,
+    // and the offset just past the line's LF; a line with no colon, or nothing before it, is not
+    // a field. The head ends with an LF, so every line has one.
+    private static IEnumerable<(string Name, string Value, int LineEnd)> HeaderFields(List<byte> header)
+    {
+        var text = Encoding.Latin1.GetString([.. header]);
+        for (var lineStart = text.IndexOf('\n', StringComparison.Ordinal) + 1; lineStart < text.Length;)
+        {
+            var lineEnd = text.IndexOf('\n', lineStart) + 1;
+            var line = text[lineStart..(lineEnd - 1)];
+            var colon = line.IndexOf(':', StringComparison.Ordinal);
+            if (colon > 0)
+            {
+                yield return (line[..colon], line[(colon + 1)..].Trim(' ', '\t', '\r'), lineEnd);
+            }
+
+            lineStart = lineEnd;
+        }
+    }
 
     // The comma-separated value names the token, compared without regard to case.
     internal static bool HasToken(string value, string token) =>

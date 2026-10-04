@@ -42,6 +42,13 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     internal IDiagnosticLog DiagnosticLog { get; set; } = NoDiagnosticLog.Instance;
 
     /// <summary>
+    /// Gets or sets every context's <see cref="HttpRequestOptions.HstsStore" />: the run's HSTS cache, which the
+    /// runner sets once it has opened the diagnostic log, so the HTTP handler learns each
+    /// <c>Strict-Transport-Security</c> header as it arrives (ADR-0409); <see langword="null" /> until then.
+    /// </summary>
+    internal IHstsStore? HstsStore { get; set; }
+
+    /// <summary>
     /// Creates the context for one transfer, carrying every option a handler reads.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
@@ -188,7 +195,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Proxy = proxy,
             Http = HttpOptionsWithAltSvc(
                 url,
-                HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders),
+                HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with { HstsStore = HstsStore },
                 altSvc),
             Mail = MailRequestOptionsMapping.FromCommandLine(options, url.Scheme),
             Ssh = ssh,

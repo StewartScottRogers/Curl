@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Core.AltSvc;
 
 /// <summary>
@@ -131,6 +133,52 @@ public sealed class AltSvcHeaderParserTests
     [TestMethod]
     public void Parse_Null_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => AltSvcHeaderParser.Parse(null!));
+
+    [TestMethod]
+    [DataRow("h2=\":abc\"")]
+    [DataRow("h2=\"[::1]:99999\"")]
+    [DataRow("h2=\"host:\"")]
+    [DataRow("h2=\"[::1]443\"")]
+    [DataRow("h2=\"host\"")]
+    public void Parse_EmptyBadOrMissingPort_SaysUnknownPortNumber(string value) =>
+        Assert.AreEqual(AltSvcSkipReason.UnknownPortNumber, AltSvcHeaderParser.Parse(value).SkipReason);
+
+    [TestMethod]
+    public void Parse_UnclosedIpv6Literal_SaysBadIpv6Hostname() =>
+        Assert.AreEqual(AltSvcSkipReason.BadIpv6Hostname, AltSvcHeaderParser.Parse("h2=\"[::1:443\"").SkipReason);
+
+    [TestMethod]
+    public void Parse_HostOneCharacterOverTheLimit_SaysBadHostname() =>
+        Assert.AreEqual(
+            AltSvcSkipReason.BadHostname,
+            AltSvcHeaderParser.Parse($"h2=\"{new string('a', AltSvcEntry.MaxHostLength + 1)}:443\"").SkipReason);
+
+    [TestMethod]
+    public void Parse_HostAtTheLimit_ReadsItWithNoSkipReason()
+    {
+        string host = new('a', AltSvcEntry.MaxHostLength);
+
+        AltSvcHeader header = AltSvcHeaderParser.Parse($"h2=\"{host}:443\"");
+
+        Assert.IsNull(header.SkipReason);
+        CollectionAssert.AreEqual(new[] { new AltSvcAlternative(AltSvcAlpn.H2, host, 443, Day, false) }, header.Alternatives.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("h2=\":443\"")]
+    [DataRow("h2=\":443")]
+    [DataRow("h2=:443")]
+    public void Parse_GoodAlternativeOrStopWithoutACurlLine_HasNoSkipReason(string value) =>
+        Assert.IsNull(AltSvcHeaderParser.Parse(value).SkipReason);
+
+    [TestMethod]
+    public void Parse_BadPortAfterAGoodAlternative_KeepsTheGoodOneAndSaysWhy()
+    {
+        AltSvcHeader header = AltSvcHeaderParser.Parse("h2=\"a.test:443\", h2=\":abc\"");
+
+        Assert.AreEqual(AltSvcSkipReason.UnknownPortNumber, header.SkipReason);
+        CollectionAssert.AreEqual(new[] { new AltSvcAlternative(AltSvcAlpn.H2, "a.test", 443, Day, false) }, header.Alternatives.ToArray());
+    }
 
     private static void AssertAlternatives(string value, params AltSvcAlternative[] expected)
     {

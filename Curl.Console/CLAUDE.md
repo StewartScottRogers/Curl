@@ -124,10 +124,9 @@ name already taken is refused with `File exists` and exit 23. Measured on curl 8
 
 `TransferContextFactory` builds each transfer's context from the parsed options; the
 context carries the `-r` text as given (`RangeText`, which the HTTP handler sends verbatim)
-and its parsed range (`ByteRangeParser`; text that names no range ends the transfer with exit
-33 before it is dispatched only on an `sftp`/`scp` URL; every other handler gets it with a `null`
-range, as curl 8.21.0 hands it on: FTP and file parse it themselves, HTTP, RTSP and WebSocket send
-it, the rest ignore it, BL-386, BL-1322), the `-C` offset and the
+and its parsed range (`ByteRangeParser`; text that names no range goes to every handler with a `null` range, as
+curl 8.21.0 hands it on: FTP and file parse it themselves, SFTP after `STAT`, HTTP, RTSP and
+WebSocket send it, the rest, SCP among them, ignore it, BL-386, BL-1322, BL-1396), the `-C` offset and the
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
 Every context also carries `Http`, which `HttpRequestOptionsMapping` fills from `-X`,
@@ -158,7 +157,10 @@ bytes and output as BL-177, BL-180 and BL-315 measured them.
 With `-b` or `-c` the handler also gets the option group's `CookieEngine`: one `CookieStore`
 shared by every URL of every group (`CurlComposition.SharingRunCookies`), the `-b` files loaded before the first transfer (session cookies dropped under
 `-j`, a missing file ignored), the `-b name=value` strings sent after the stored cookies (left out when an `-H` value names
-`Cookie`, BL-291), and
+`Cookie`, BL-291) as one string joined as curl's `cookie_setopts` joins them (`;` and a space,
+no space before a string starting with a blank; one of 8200 bytes or more fails every transfer
+of the group before it connects with exit 100, after `Warning: skipped provided cookie ...`
+unless `-s`, BL-1391), and
 the `-c` jar written after every `http`/`https` transfer, after its `-w` output, whatever its
 outcome, and after no other scheme's (`-c -` prints it to standard output each time, in the
 mode standard output is in). With nothing but `-b` strings, received cookies are not stored,
@@ -275,6 +277,10 @@ login takes the URL's user name, and one with no password sends an empty one, ne
 `--netrc-optional` ignores both. When the file is in use, `TransferCredentialLookup.ForRedirectHops`
 gives `RedirectFollower` the same lookup for each redirect hop's URL, so every hop sends its own
 host's entry or none, `--location-trusted` or not (BL-790). Measured on curl 8.21.0 (BL-505 Notes).
+URL credentials that percent-decode to a byte below 0x20 (only `%00` for `http`, `https`, `ws` and
+`wss`) fail with `curl: (3) error extracting credentials from URL` before connecting, a redirect
+hop's too, and a matching netrc entry holding one with `curl: (26) control code detected in .netrc
+credentials` except over those four schemes; `-v` writes each as an info line first (BL-1411).
 An `ftp` or `ftps` URL is claimed by `RoutingFtpProtocolHandler`, which hands an `ftp` one to
 the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
@@ -321,7 +327,10 @@ attempt gets a fresh `-m`. HTTP, TFTP and telnet (`Time-out`) keep their own mea
 Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result carries
 `SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
-failed stamp is ignored for now; curl's warning lines for it are BL-139.
+failed stamp prints curl's `Failed to set filetime` warning lines unless `-s`. On Windows a
+time before 1752-09-14T00:00:00Z is first capped to it with `Warning: Capping set filetime to
+minimum to avoid overflow` (unless `-s`), as curl 8.21.0 does; off Windows it is set as given
+(BL-1392).
 
 Under `--xattr`, just before that stamp, a successful transfer to an `-o`/`-O` file it opened itself
 (not one created empty afterwards) gets curl's four extended attributes - `user.creator`,

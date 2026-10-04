@@ -417,6 +417,8 @@ choices do not need one.
 | [0405](ADR-0405-a-crl-is-expired-from-its-nextupdate-moment-on.md) | A `--crlfile` list whose `nextUpdate` equals the moment checked has expired, as OpenSSL's `X509_cmp_time` counts an equal time as past (AF-0029, BL-1371) | Accepted | 2026-10-03 |
 | [0406](ADR-0406-a-fixed-lane-shift-retires-idle-lanes-down-to-the-boards-capacity.md) | A fixed `-Lanes N` shift retires idle lanes down to the board's capacity every 5 minutes and adds them back one a step up to N, and every retire goes to an idle lane first, so lanes stop polling overlapping touches (BL-1374, AF-0032) | Accepted | 2026-10-03 |
 | [0407](ADR-0407-the-run-cost-cap-follows-the-median-run.md) | `RunDarkFactory.ps1` caps each headless run at 2.7 times the median of the newest 40 task runs' costs, between $2 and `-TaskBudgetUsd`, so runs stay under three times the median as it moves (BL-1377, AF-0033) | Accepted | 2026-10-03 |
+| [0408](ADR-0408-proxy-http2-tunnels-over-an-h2-proxy-off-windows-and-proxy-http3-stays-refused.md) | `--proxy-http2` keeps the refusal on Windows and, off Windows, offers `h2` to an HTTPS proxy and tunnels through an HTTP/2 CONNECT stream in `Curl.Networking.UnitLibrary`, falling back to HTTP/1.1; `--proxy-http3` stays refused everywhere, as the reference builds refuse it (BL-1397) | Accepted | 2026-10-03 |
+| [0409](ADR-0409-skipped-alt-svc-and-illegal-sts-headers-are-reported-before-their-header-line.md) | A skipped `Alt-Svc` alternative and an illegal `Strict-Transport-Security` header are reported with curl 8.21.0's `-v` lines just before their header line: `IAltSvcStore` returns ordered outcomes with skip reasons, and a new `IHstsStore` learns HSTS per header during the transfer (BL-1407) | Accepted | 2026-10-03 |
 
 ## Template
 
@@ -438,3 +440,7 @@ What this makes easy, and what it makes hard. Both, honestly.
 ## Alternatives considered
 Each option and the specific reason it lost.
 ```
+| [0410](ADR-0410-remote-file-times-travel-as-unix-seconds-so-r-can-stamp-and-cap-times-past-year-9999.md) | A remote file time travels as Unix seconds (`TransferResult.SourceLastWriteUnixSeconds`, with the `DateTimeOffset` property as an in-range view), so HTTP and `file://` times past year 9999 reach `-R`, which caps above 30827-12-31T23:59:59Z on Windows with curl's `Capping set filetime to max` warning and passes the time on elsewhere (BL-1409) | Accepted | 2026-10-03 |
+| [0411](ADR-0411-a-file-source-time-past-what-curl-holds-reads-as-minus-one-on-windows.md) | A `file://` source time past what curl holds reads as -1 on Windows (from local 3002-01-01: `-z` compares -1, `-R` leaves the output alone) and whole in Unix seconds elsewhere, read from the handle with `GetFileTime` (BL-1423) | Accepted | 2026-10-03 |
+| [0412](ADR-0412-http-last-modified-is-read-with-curls-getdate.md) | HTTP `Last-Modified` is read with `CurlDateParser`, curl's `parsedate`, into Unix seconds, so a year past 9999 reaches `-R` and `-z` compares in Unix seconds (BL-1428) | Accepted | 2026-10-03 |
+| [0413](ADR-0413-credentials-with-control-characters-are-refused-only-when-they-would-be-used.md) | URL and netrc credentials holding a control character are refused only when they would be used: not beside a `-u` user name, under `--netrc-optional` too, and on every redirect hop's own URL (BL-1411) | Accepted | 2026-10-03 |

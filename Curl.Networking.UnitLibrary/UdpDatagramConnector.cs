@@ -120,6 +120,12 @@ public sealed class UdpDatagramConnector : IDatagramConnector
             return DatagramOpenResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
         }
 
+        if (OnionAddress.IsRefused(destination.Host))
+        {
+            _log.Failed(DiagnosticLogComponents.Dns, CurlExitCode.CouldntResolveHost, OnionAddress.RefusalMessage);
+            return DatagramOpenResult.Failed(CurlExitCode.CouldntResolveHost, OnionAddress.RefusalMessage);
+        }
+
         var resolveStarted = _timeProvider.GetTimestamp();
         var (addresses, failure) = await ResolveAsync(destination, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)

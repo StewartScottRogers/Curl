@@ -15,7 +15,7 @@ namespace Curl.Core.Hsts;
 /// Entries keep the order they were read or learned in. An entry expires once the current
 /// second of the injected <see cref="TimeProvider" /> reaches its expiry: it is skipped when
 /// read, and removed by every lookup that passes it - <see cref="Find" />, and the lookups
-/// <see cref="ReadFile" /> and <see cref="ApplyHeader" /> make - but an entry still held is
+/// <see cref="ReadFile" /> and <see cref="ApplyHeader(string, string)" /> make - but an entry still held is
 /// written back whether or not it has expired, as curl does. Host names compare ignoring ASCII
 /// case and one trailing dot.
 /// </remarks>
@@ -108,26 +108,49 @@ public sealed class HstsCache(TimeProvider timeProvider, IDiagnosticLog? diagnos
     /// </summary>
     /// <param name="headerValue">The header value, as received.</param>
     /// <param name="host">The host the response came from, an IPv6 address without brackets.</param>
-    public void ApplyHeader(string headerValue, string host)
+    /// <returns>
+    /// <see langword="false" /> only when <see cref="HstsHeaderParser" /> refuses the value from a
+    /// host that is not an IP address, where curl writes <c>Illegal STS header skipped</c>.
+    /// </returns>
+    public bool ApplyHeader(string headerValue, string host) => ApplyHeader(headerValue, host, timeProvider.GetUtcNow());
+
+    /// <summary>
+    /// Learns from one <c>Strict-Transport-Security</c> header as
+    /// <see cref="ApplyHeader(string, string)" /> does, counting <c>max-age</c> from
+    /// <paramref name="now" /> instead of the clock.
+    /// </summary>
+    /// <param name="headerValue">The header value, as received.</param>
+    /// <param name="host">The host the response came from, an IPv6 address without brackets.</param>
+    /// <param name="now">The receive time <c>max-age</c> counts from.</param>
+    /// <returns>
+    /// <see langword="false" /> only when <see cref="HstsHeaderParser" /> refuses the value from a
+    /// host that is not an IP address, where curl writes <c>Illegal STS header skipped</c>.
+    /// </returns>
+    public bool ApplyHeader(string headerValue, string host, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(headerValue);
         ArgumentNullException.ThrowIfNull(host);
 
-        HstsHeader? header = IsIpAddress(host) ? null : HstsHeaderParser.Parse(headerValue);
+        if (IsIpAddress(host))
+        {
+            return true;
+        }
+
+        HstsHeader? header = HstsHeaderParser.Parse(headerValue);
         if (header is null)
         {
-            return;
+            return false;
         }
 
         int index = IndexOf(host, includingParents: false);
         if (header.MaxAgeSeconds == 0)
         {
             RemoveAt(index);
-            return;
+            return true;
         }
 
-        long now = NowSeconds();
-        long expires = long.MaxValue - now < header.MaxAgeSeconds ? HstsEntry.UnlimitedExpiry : now + header.MaxAgeSeconds;
+        long nowSeconds = now.ToUnixTimeSeconds();
+        long expires = long.MaxValue - nowSeconds < header.MaxAgeSeconds ? HstsEntry.UnlimitedExpiry : nowSeconds + header.MaxAgeSeconds;
         if (index < 0)
         {
             Add(host, header.IncludeSubDomains, expires);
@@ -138,6 +161,7 @@ public sealed class HstsCache(TimeProvider timeProvider, IDiagnosticLog? diagnos
         }
 
         LogVerbose("stored entry for ", host, string.Empty);
+        return true;
     }
 
     /// <summary>

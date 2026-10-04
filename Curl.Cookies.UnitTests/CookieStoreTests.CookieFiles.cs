@@ -175,6 +175,8 @@ public sealed partial class CookieStoreTests
 
         public Stream? WriteTarget { get; init; }
 
+        public FileAccessStatus ReadFailure { get; init; } = FileAccessStatus.NotFound;
+
         public FileAccessStatus WriteFailure { get; init; } = FileAccessStatus.AccessDenied;
 
         public string? OpenedPath { get; private set; }
@@ -186,7 +188,7 @@ public sealed partial class CookieStoreTests
             OpenedPath = path;
             return ValueTask.FromResult(
                 ReadContent is null
-                    ? FileOpenResult.Failed(FileAccessStatus.NotFound)
+                    ? FileOpenResult.Failed(ReadFailure)
                     : FileOpenResult.Opened(new MemoryStream(ReadContent), ReadContent.Length, null));
         }
 

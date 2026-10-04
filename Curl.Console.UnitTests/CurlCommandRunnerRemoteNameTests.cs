@@ -360,6 +360,27 @@ public sealed class CurlCommandRunnerRemoteNameTests
         Assert.AreEqual("x.txt", outputFiles.LastWriteTimesSet.Single().Path);
     }
 
+    /// <summary>
+    /// curl 8.21.0 (mingw, Schannel), measured 2026-10-03: <c>--no-progress-meter -R -o</c>
+    /// against <c>Last-Modified: Mon, 01 Jan 40000 00:00:00 GMT</c> prints only the capping
+    /// warning, stamps 30827-12-31T23:59:59Z and exits 0 (BL-1425).
+    /// </summary>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    public async Task RunAsync_OnWindowsRemoteTimePast30827_CapsTheStampToTheMaximumWithCurlsWarning()
+    {
+        string response = "HTTP/1.1 200 OK\r\nLast-Modified: Mon, 01 Jan 40000 00:00:00 GMT\r\nContent-Length: 5\r\n\r\nhello";
+
+        int exitCode = await RunAsync([response], true, "--no-progress-meter", "-R", "-o", "out.txt", Host + "/u.txt");
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("hello", WrittenText("out.txt"));
+        Assert.AreEqual(("out.txt", 910670515199L, false), outputFiles.LastWriteTimesSet.Single());
+        Assert.AreEqual(
+            "Warning: Capping set filetime to max to avoid overflow" + Environment.NewLine,
+            Encoding.UTF8.GetString(standardError.ToArray()));
+    }
+
     [TestMethod]
     public async Task RunAsync_CreateDirectoriesWithoutGivenOutputPaths_UsesTheDiskAndCreatesNothingForABareName()
     {

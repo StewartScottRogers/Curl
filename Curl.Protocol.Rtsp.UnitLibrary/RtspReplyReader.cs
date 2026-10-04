@@ -61,6 +61,7 @@ internal static class RtspReplyReader
             {
                 byte[] line = RtspHeaderFolding.Unfold(buffer.AsSpan(processed, lineEnd - processed));
                 parser.Accept(line);
+                ReportOverflow(parser, events);
                 await WriteAsync(headerOutput, line, cancellationToken).ConfigureAwait(false);
                 if (parser.IsComplete)
                 {
@@ -118,6 +119,18 @@ internal static class RtspReplyReader
 
         progress.ReportDownloaded(bodyRead, contentLength);
         return bodyRead;
+    }
+
+    /// <summary>
+    /// Reports <c>Overflow Content-Length: value</c> before a <c>Content-Length</c> line whose
+    /// number is too large for 64 bits, as curl 8.21.0 does (measured, BL-1403).
+    /// </summary>
+    private static void ReportOverflow(RtspReplyHeadParser parser, ITransferEvents events)
+    {
+        if (parser.LineOverflowedContentLength)
+        {
+            events.ReportInfo(RtspReplyHeadParser.OverflowContentLength);
+        }
     }
 
     private static void ReportReceived(ITransferEvents events, ReadOnlySpan<byte> bytes)

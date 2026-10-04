@@ -80,4 +80,26 @@ public sealed class HttpContentLengthTests
         // Measured: Content-Length 99999999999999999999 wrote "hello" and exited 0.
         Assert.IsNull(HttpContentLength.Find([new HttpResponseHeader("Content-Length", "99999999999999999999")]));
     }
+
+    [TestMethod]
+    [DataRow("Content-Length", "99999999999999999999", true, DisplayName = "Too large")]
+    [DataRow("content-length", " 5, 99999999999999999999\t", true, DisplayName = "Second item too large")]
+    [DataRow("Content-Length", "9223372036854775807", false, DisplayName = "long.MaxValue")]
+    [DataRow("Content-Length", "x99999999999999999999", false, DisplayName = "Not a number")]
+    [DataRow("Content-Length", "", false, DisplayName = "Empty")]
+    [DataRow("X-Length", "99999999999999999999", false, DisplayName = "Another header")]
+    public void Overflows_Header_IsTrueOnlyForAContentLengthTooLargeToHold(string name, string value, bool overflows)
+    {
+        Assert.AreEqual(overflows, HttpContentLength.Overflows([new HttpResponseHeader(name, value)]));
+    }
+
+    [TestMethod]
+    [DataRow("Content-Length: 99999999999999999999", true, DisplayName = "Too large")]
+    [DataRow("Content-Length: 5", false, DisplayName = "Fits")]
+    [DataRow("X-Length: 99999999999999999999", false, DisplayName = "Another header")]
+    [DataRow("Content-Length 99999999999999999999", false, DisplayName = "No colon")]
+    public void OverflowsLine_HeaderLine_IsTrueOnlyForAContentLengthTooLargeToHold(string line, bool overflows)
+    {
+        Assert.AreEqual(overflows, HttpContentLength.OverflowsLine(line));
+    }
 }

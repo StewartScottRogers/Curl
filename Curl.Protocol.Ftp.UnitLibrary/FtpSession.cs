@@ -216,6 +216,9 @@ internal sealed class FtpSession(
 
     private long bytesTransferred;
 
+    /// <summary>The bytes an upload of a known size has to send, or <see langword="null" /> for a download or an upload of unknown size.</summary>
+    private long? uploadSize;
+
     /// <summary>The <c>--max-filesize</c> limit, or <see langword="null" /> when there is none; 0 is none, as in curl.</summary>
     private readonly long? maxFileSize = context.MaxFileSize > 0 ? context.MaxFileSize : null;
 
@@ -705,6 +708,7 @@ internal sealed class FtpSession(
             return TransferResult.Failure(CurlExitCode.UrlMalformat, FtpTransferMessages.UploadWithoutFileName);
         }
 
+        uploadSize = KnownSizeOf(upload);
         ReportWhetherInEntryDirectory(path);
         trace.DoPhaseStarts("STOR");
         return await SendQuotesAsync(quotes.AfterLogin, FtpQuoteStage.AfterLogin).ConfigureAwait(false)
@@ -754,6 +758,7 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult> SendUploadAsync(string command, Stream upload)
     {
+        uploadSize = KnownSizeOf(upload);
         FtpReply opened = await ExchangeAsync(command).ConfigureAwait(false);
         if (opened.Code >= 400)
         {
@@ -786,7 +791,7 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult?> CopyUploadAsync(Stream upload)
     {
         IConnection data = dataConnection!;
-        long? expected = upload.CanSeek ? Math.Max(0, upload.Length - upload.Position) : null;
+        long? expected = uploadSize;
         byte[] buffer = new byte[ReadBufferSize];
         Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = context.ConvertLineEndings
             ? new CrlfUploadConverter(ReadBufferSize).Convert
@@ -815,6 +820,13 @@ internal sealed class FtpSession(
         context.Events.ReportInfo(FtpTransferMessages.UploadSent(bytesTransferred));
         return null;
     }
+
+    /// <summary>
+    /// The bytes left in <paramref name="upload" /> when it can say, as curl knows the size of a
+    /// file named to <c>-T</c>; <see langword="null" /> for one that cannot, as standard input.
+    /// </summary>
+    private static long? KnownSizeOf(Stream upload) =>
+        upload.CanSeek ? Math.Max(0, upload.Length - upload.Position) : null;
 
     private async ValueTask<int> ReadUploadAsync(Stream upload, byte[] buffer)
     {
@@ -1802,9 +1814,24 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult> QuitAndFailLeavingConnectionIntactAsync(CurlExitCode exitCode, string message)
     {
+        ReportUnalignedUpload();
         context.Events.ReportInfo(FtpTransferMessages.ConnectionLeftIntact(controlName.Number, controlName.Host, controlName.Port));
         await QuitAsync().ConfigureAwait(false);
         return TransferResult.Failure(exitCode, message, bytesTransferred);
+    }
+
+    /// <summary>
+    /// Reports curl 8.21.0's <c>Uploaded unaligned file size</c> <c>-v</c> line, which its
+    /// <c>ftp_done_check_partial</c> writes for an upload of a known size whose sent bytes
+    /// differ from that size - or, under <c>--crlf</c>, which may add bytes, fall short of it
+    /// (BL-1395). Every failure that ends here is one <c>ftp_done</c> maps to OK first.
+    /// </summary>
+    private void ReportUnalignedUpload()
+    {
+        if (uploadSize is { } size && (context.ConvertLineEndings ? bytesTransferred < size : bytesTransferred != size))
+        {
+            context.Events.ReportInfo(FtpTransferMessages.UploadedUnalignedFileSize(bytesTransferred, size));
+        }
     }
 
     /// <summary>

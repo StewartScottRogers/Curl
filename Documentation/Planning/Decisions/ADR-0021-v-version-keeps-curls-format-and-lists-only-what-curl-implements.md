@@ -194,3 +194,58 @@ version.
   it couples the CLI library to the composition root, and curl's list also depends on
   build options Curl does not have; a pinned list with the Decision 6 rule is simpler
   and is what BL-200 is scoped to (`Curl.Cli.UnitLibrary` only).
+
+## Amendment 2026-10-03 (BL-1417): rewritten schemes and the Features audit
+
+Decided by Claude under Stewart's delegation.
+
+**`Protocols:` also lists the schemes the tool serves by rewriting.** Curl serves
+`ipfs://` and `ipns://` by rewriting them to a gateway URL (BL-210, BL-372, BL-403), as
+the curl tool does, and every curl 8.21.0 build lists `ipfs ipns` on `Protocols:` (the
+installed mingw build prints `... imap imaps ipfs ipns ldap ...`). Decision 4 is widened
+from "schemes a registered handler serves" to "schemes Curl serves", so both are listed in
+curl's alphabetical place. ADR-0189 is unchanged: libcurl does not know these schemes, so
+they stay out of the `--proto` scheme list.
+
+**Features audit.** Every feature name in curl 8.21.0's `lib/version.c` table, checked
+against the code. `FeaturesLine` lists exactly the "Yes" rows, in curl's order
+(alphabetical, ignoring case):
+
+`Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL TLS-SRP UnixSockets zstd`
+
+| curl feature | Listed | Evidence, or why not |
+| --- | --- | --- |
+| `alt-svc` | Yes | `--alt-svc` and `AltSvcTransferCache` (`Curl.Console`). |
+| `AsynchDNS` | Yes | As in Context. |
+| `asyn-rr` | No | Names c-ares resolving HTTPS records beside the threaded resolver; Curl has no c-ares and fetches HTTPS records only over DoH (see `HTTPSRR`). |
+| `brotli` | Yes | `HttpContentDecoder` decodes `br` (`Curl.Protocol.Http.UnitLibrary`). |
+| `CharConv` | No | EBCDIC host conversion; Curl runs only on ASCII hosts. |
+| `Debug` | No | A debug build of libcurl; Curl ships one release build. |
+| `ECH` | Yes | `--ech` reaches the hand-built `EchClientHello`, `EchConfigList` (`Curl.Tls.UnitLibrary`); `DohDnsResolver` fetches the ECH config from HTTPS records. |
+| `gsasl` | No | SCRAM through libgsasl; Curl, like the Schannel reference, answers SCRAM with `not builtin` (`ImapAuthentication`, `Pop3Login`). |
+| `GSS-API` | Yes | As before (ADR-0142, ADR-0176). |
+| `HSTS` | Yes | `--hsts` and `HstsTransferPolicy` (`Curl.Core.UnitLibrary`). |
+| `HTTP2` | Yes | As before (ADR-0141). |
+| `HTTP3` | Yes | As before (ADR-0144). |
+| `HTTPS-proxy` | Yes | `TcpConnector` tunnels through an `https://` proxy over TLS (`Curl.Networking.UnitLibrary`). |
+| `HTTPSRR` | Yes | `DohDnsResolver.ResolveHttpsRecordAsync` queries and decodes HTTPS (type 65) records (BL-707). |
+| `IDN` | Yes | `CurlUrlHost` maps internationalised hosts to punycode with `IdnMapping`; HSTS and the public suffix list do the same. |
+| `IPv6` | Yes | As in Context. |
+| `Kerberos` | Yes | As before (ADR-0142). |
+| `Largefile` | Yes | As in Context. |
+| `libz` | Yes | `HttpContentDecoder` decodes `gzip` and `deflate`. |
+| `MultiSSL` | No | Names a libcurl built with several TLS backends to choose from; Curl has one. |
+| `NTLM` | Yes | As before (ADR-0181). |
+| `PSL` | Yes | `PublicSuffixList` (`Curl.Cookies.UnitLibrary`) rejects cookies for public suffixes. |
+| `SPNEGO` | Yes | As before (ADR-0176). |
+| `SSL` | Yes | As in Context. |
+| `SSLS-EXPORT` | No | Left out although `--ssl-sessions` exists: curl lists it only with an experimental build flag no reference build sets, and no measured build prints it. |
+| `SSPI` | No | Names Windows' SSPI as the provider for Kerberos, NTLM and SPNEGO; Curl hand-builds them and calls no SSPI, on any platform. |
+| `threadsafe` | No | As in Context: describes libcurl's global initialisation; Curl exposes no libcurl API. |
+| `TLS-SRP` | Yes | As before (ADR-0328). |
+| `TrackMemory` | No | A libcurl memory-debug build. |
+| `Unicode` | No | Names the Windows build's wide-character file and argument handling as a build option; the measured mingw 8.21.0 build does not print it, so neither does Curl. |
+| `UnixSockets` | Yes | `--unix-socket` and `--abstract-unix-socket` dial through `UnixSocketAddress` (`Curl.Networking.UnitLibrary`). |
+| `zstd` | Yes | `HttpContentDecoder` decodes `zstd`. |
+
+The line stays the same on every platform: no "Yes" row depends on the platform.

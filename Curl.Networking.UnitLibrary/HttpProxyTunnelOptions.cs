@@ -64,4 +64,12 @@ public sealed record HttpProxyTunnelOptions(string? UserAgent, Encoding Credenti
     /// by default: Schannel on Windows, OpenSSL elsewhere.
     /// </summary>
     public bool MatchesSchannelBuild { get; init; } = OperatingSystem.IsWindows();
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--proxy-http2</c> asked for an HTTP/2 tunnel: an
+    /// <c>https://</c> proxy's handshake then offers <c>h2,http/1.1</c> instead of <c>http/1.1</c>
+    /// alone, and a proxy that picks <c>h2</c> is tunnelled through over an HTTP/2 <c>CONNECT</c>
+    /// stream (<see cref="Http2ProxyTunnelConnection" />, ADR-0408). <see langword="false" /> by default.
+    /// </summary>
+    public bool ProxyHttp2 { get; init; }
 }

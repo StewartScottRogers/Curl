@@ -69,4 +69,40 @@ public sealed class TimeConditionTests
         Assert.AreEqual(Instant, original.Value);
         Assert.AreEqual(TimeConditionKind.IfModifiedSince, original.Kind);
     }
+
+    [TestMethod]
+    public void Constructor_FromADateTimeOffset_StoresItsUnixSeconds()
+    {
+        var condition = new TimeCondition(Instant, TimeConditionKind.IfModifiedSince);
+
+        Assert.AreEqual(Instant.ToUnixTimeSeconds(), condition.ValueUnixSeconds);
+    }
+
+    [TestMethod]
+    public void FromUnixSeconds_PastYear9999_KeepsTheSecondsAndClampsValue()
+    {
+        // 40000-01-01T00:00:00Z.
+        var condition = TimeCondition.FromUnixSeconds(1200110860800, TimeConditionKind.IfUnmodifiedSince);
+
+        Assert.AreEqual(1200110860800L, condition.ValueUnixSeconds);
+        Assert.AreEqual(DateTimeOffset.MaxValue, condition.Value);
+        Assert.AreEqual(TimeConditionKind.IfUnmodifiedSince, condition.Kind);
+    }
+
+    [TestMethod]
+    public void FromUnixSeconds_InRange_EqualsTheConditionBuiltFromTheTime()
+    {
+        var fromSeconds = TimeCondition.FromUnixSeconds(Instant.ToUnixTimeSeconds(), TimeConditionKind.IfModifiedSince);
+
+        Assert.AreEqual(Instant, fromSeconds.Value);
+        Assert.AreEqual(new TimeCondition(Instant, TimeConditionKind.IfModifiedSince), fromSeconds);
+    }
+
+    [TestMethod]
+    public void Value_WhenSet_DropsTheFractionOfASecond()
+    {
+        var condition = new TimeCondition(Instant.AddMilliseconds(250), TimeConditionKind.IfModifiedSince);
+
+        Assert.AreEqual(Instant, condition.Value);
+    }
 }

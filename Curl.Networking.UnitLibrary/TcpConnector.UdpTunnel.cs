@@ -209,8 +209,8 @@ public sealed partial class TcpConnector
 
         await connection.DisposeAsync().ConfigureAwait(false);
         exception?.Throw();
-        var (exitCode, message) = reply.RecvErrorMessage is { } recvErrorMessage
-            ? (CurlExitCode.RecvError, recvErrorMessage)
+        var (exitCode, message) = reply.FailureMessage is { } failureMessage
+            ? (reply.FailureExitCode, failureMessage)
             : (CurlExitCode.CouldntConnect, $"CONNECT-UDP tunnel failed, response {reply.StatusCode}");
         target.Events.ReportInfo(message);
         return MultiplexedConnectResult.Failed(exitCode, message);
@@ -239,9 +239,9 @@ public sealed partial class TcpConnector
             events.ReportRequestHeader(request);
             await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-            var reply = await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false);
+            var reply = await HttpProxyTunnel.ReadReplyAsync(connection, forConnectUdp: true, cancellationToken).ConfigureAwait(false);
             EndProxyAuthorization(proxyAuthorization);
-            ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization);
+            ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization, digestNonceIsStale: false, forConnectUdp: true);
             if (headOutput is not null && !reply.Head.IsEmpty)
             {
                 await headOutput.WriteConnectReplyHeadAsync(reply.Head, cancellationToken).ConfigureAwait(false);

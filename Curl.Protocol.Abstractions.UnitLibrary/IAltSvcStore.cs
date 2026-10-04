@@ -30,8 +30,9 @@ public interface IAltSvcStore
     /// </param>
     /// <param name="now">The receive time that each alternative's <c>ma</c> counts from.</param>
     /// <returns>
-    /// The alternatives the header added, in header order, for the caller's
-    /// <c>Added alt-svc</c> lines; empty when it added none.
+    /// One outcome per alternative the header named and the store read, in header order: the
+    /// <see cref="AltSvcAlternative" /> added, for the caller's <c>Added alt-svc</c> line, or the
+    /// <see cref="AltSvcSkipReason" /> it was skipped for (ADR-0409); empty when it read none.
     /// </returns>
-    IReadOnlyList<AltSvcAlternative> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now);
+    IReadOnlyList<AltSvcHeaderOutcome> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now);
 }

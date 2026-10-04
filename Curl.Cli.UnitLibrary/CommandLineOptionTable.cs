@@ -216,6 +216,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("cert-status", null, (options, on) => options.RequireCertificateStatus = on),
         CommandLineOption.NegatableFlag("ssl-auto-client-cert", null, (options, on) => options.AutoClientCertificate = on),
         CommandLineOption.NegatableFlag("proxy-insecure", null, (options, on) => options.ProxyInsecure = on),
+        CommandLineOption.NegatableFlag("proxy-http2", null, (options, on) => options.ProxyHttp2 = on).RefusedBySchannelBuild(),
         CommandLineOption.Value("proxy-cacert", null, SettingExistingFile("--proxy-cacert", (options, file) => options.ProxyCaCertificateFile = file)),
         CommandLineOption.FileName("proxy-capath", null, (options, directory) => options.ProxyCaCertificateDirectory = directory),
         CommandLineOption.FileName("proxy-cert", null, (options, certificate) => options.ProxyClientCertificate = certificate),
@@ -1636,9 +1637,9 @@ public static class CommandLineOptionTable
     {
         TimeConditionKind kind = value.StartsWith('-') ? TimeConditionKind.IfUnmodifiedSince : TimeConditionKind.IfModifiedSince;
         string date = value.StartsWith('-') || value.StartsWith('+') || value.StartsWith('=') ? value[1..] : value;
-        if (TryReadTimeConditionDate(date, dataFileReader, out DateTimeOffset instant, out string? failureReason))
+        if (TryReadTimeConditionDate(date, dataFileReader, out long unixSeconds, out string? failureReason))
         {
-            options.TimeCondition = new TimeCondition(instant, kind);
+            options.TimeCondition = TimeCondition.FromUnixSeconds(unixSeconds, kind);
             return null;
         }
 
@@ -1664,28 +1665,22 @@ public static class CommandLineOptionTable
 
     /// <summary>
     /// Reads a <c>-z</c> date, without its prefix, as a date or, failing that, as the name of a file
-    /// whose modification time is the date, as curl 8.21.0's tool does.
+    /// whose modification time is the date, as curl 8.21.0's tool does. The date is kept in Unix
+    /// seconds, as curl's 64-bit <c>time_t</c> keeps it, so a year past 9999 is read whole
+    /// (<c>Mon, 01 Jan 40000 00:00:00 GMT</c> is 1200110860800; ADR-0410, BL-1424).
     /// </summary>
-    private static bool TryReadTimeConditionDate(string date, IDataFileReader dataFileReader, out DateTimeOffset instant, out string? failureReason)
+    private static bool TryReadTimeConditionDate(string date, IDataFileReader dataFileReader, out long unixSeconds, out string? failureReason)
     {
         failureReason = null;
-        if (CurlDateParser.TryParse(date, out long unixSeconds))
+        if (CurlDateParser.TryParse(date, out unixSeconds))
         {
-            instant = TimeConditionInstant(unixSeconds);
             return true;
         }
 
-        return dataFileReader.TryReadModificationTime(date, out instant, out failureReason);
+        bool read = dataFileReader.TryReadModificationTime(date, out DateTimeOffset modificationTime, out failureReason);
+        unixSeconds = modificationTime.ToUnixTimeSeconds();
+        return read;
     }
-
-    /// <summary>
-    /// The instant a <c>-z</c> date's Unix seconds name. One after the last whole second a
-    /// <see cref="DateTimeOffset"/> holds, which curl computes in a 64-bit <c>time_t</c>, reads as that
-    /// second, 9999-12-31 23:59:59 UTC (ADR-0073); <see cref="CurlDateParser"/> refuses every year
-    /// before 1583, so none falls before year 1.
-    /// </summary>
-    private static DateTimeOffset TimeConditionInstant(long unixSeconds) =>
-        DateTimeOffset.FromUnixTimeSeconds(Math.Min(unixSeconds, DateTimeOffset.MaxValue.ToUnixTimeSeconds()));
 
     /// <summary>
     /// Turns <c>--location-trusted</c> on or off: it follows redirects and sends credentials to every

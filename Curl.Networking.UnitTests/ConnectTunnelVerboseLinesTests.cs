@@ -49,7 +49,7 @@ public sealed class ConnectTunnelVerboseLinesTests
     [TestMethod]
     [DataRow(407, "transfer-encoding: gzip, Chunked\r\n", true, DisplayName = "a 407, chunked last in any case")]
     [DataRow(403, "Transfer-Encoding: chunked", true, DisplayName = "a 403, no line feed")]
-    [DataRow(200, "Transfer-Encoding: chunked\r\n", false, DisplayName = "a 2xx")]
+    [DataRow(101, "Transfer-Encoding: chunked\r\n", true, DisplayName = "a 101 to CONNECT")]
     [DataRow(407, "Transfer-Encoding: gzip\r\n", false, DisplayName = "not chunked")]
     [DataRow(407, "X-Transfer-Encoding: chunked\r\n", false, DisplayName = "another field")]
     public void ReportReplyHead_ReportsRespondedChunkedAfterANon2xxChunkedTransferEncodingLine(int statusCode, string field, bool expected)
@@ -64,6 +64,49 @@ public sealed class ConnectTunnelVerboseLinesTests
                 ? new[] { $"< HTTP/1.1 {statusCode} X", "< " + field.TrimEnd('\r', '\n'), "* CONNECT responded chunked" }
                 : new[] { $"< HTTP/1.1 {statusCode} X", "< " + field.TrimEnd('\r', '\n') },
             events.Transcript);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 Connection established\r\nContent-Length: 5\r\n\r\n", 200, false, "* Ignoring Content-Length in CONNECT 200 response", DisplayName = "a 200, measured")]
+    [DataRow("HTTP/1.1 200 Connection established\r\nTransfer-Encoding: chunked\r\n\r\n", 200, false, "* Ignoring Transfer-Encoding in CONNECT 200 response", DisplayName = "a chunked 200, measured")]
+    [DataRow("HTTP/1.1 299 Fine\r\ncontent-length: 5\r\n\r\n", 299, false, "* Ignoring Content-Length in CONNECT 299 response", DisplayName = "a 299, measured")]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\nContent-Length: 5\r\n\r\n", 101, true, "* Ignoring Content-Length in CONNECT-UDP 101 response", DisplayName = "CONNECT-UDP 101")]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\nTransfer-Encoding: chunked\r\n\r\n", 101, true, "* Ignoring Transfer-Encoding in CONNECT-UDP 101 response", DisplayName = "CONNECT-UDP chunked 101")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n", 200, true, "* Ignoring Content-Length in CONNECT-UDP 200 response", DisplayName = "CONNECT-UDP 200")]
+    [DataRow("HTTP/1.1 200 OK\r\nTRANSFER-ENCODING: gzip\r\n\r\n", 200, true, "* Ignoring Transfer-Encoding in CONNECT-UDP 200 response", DisplayName = "CONNECT-UDP 200 any encoding")]
+    public void ReportReplyHead_WritesTheIgnoringLineAfterABodyFieldTheStatusIgnores(string head, int statusCode, bool forConnectUdp, string expected)
+    {
+        // Measured (BL-1399): the line comes right after the field's line, before the empty one.
+        var events = new RecordingTransferEvents();
+        var lines = head.Split("\r\n");
+
+        ConnectTunnelVerboseLines.ReportReplyHead(events, System.Text.Encoding.Latin1.GetBytes(head), statusCode, null, digestNonceIsStale: false, forConnectUdp);
+
+        CollectionAssert.AreEqual(new[] { "< " + lines[0], "< " + lines[1], expected, "< " }, events.Transcript);
+    }
+
+    [TestMethod]
+    [DataRow(101, false, DisplayName = "a 101 to CONNECT")]
+    [DataRow(407, true, DisplayName = "a 407 to CONNECT-UDP")]
+    public void ReportReplyHead_WritesNoIgnoringLineWhenTheStatusReadsTheBodyFields(int statusCode, bool forConnectUdp)
+    {
+        var events = new RecordingTransferEvents();
+
+        ConnectTunnelVerboseLines.ReportReplyHead(events, "HTTP/1.1 101 X\r\nContent-Length: 0\r\nX-Length: 1\r\n\r\n"u8, statusCode, null, digestNonceIsStale: false, forConnectUdp);
+
+        Assert.IsFalse(events.Transcript.Any(line => line.StartsWith("* ", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ReportReplyFailure_WritesTheUnsupportedContentLengthLineOnly()
+    {
+        var events = new RecordingTransferEvents();
+
+        ConnectTunnelVerboseLines.ReportReplyFailure(events, HttpProxyTunnelReply.Failed("Proxy CONNECT aborted"));
+        ConnectTunnelVerboseLines.ReportReplyFailure(events, new HttpProxyTunnelReply(407, null));
+        ConnectTunnelVerboseLines.ReportReplyFailure(events, HttpProxyTunnelReply.Failed("Unsupported Content-Length value") with { FailureExitCode = CurlExitCode.WeirdServerReply });
+
+        CollectionAssert.AreEqual(new[] { "* Unsupported Content-Length value" }, events.Transcript);
     }
 
     [TestMethod]

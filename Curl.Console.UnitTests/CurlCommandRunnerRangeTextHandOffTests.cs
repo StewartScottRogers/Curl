@@ -6,8 +6,8 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins that <c>-r</c> text naming no range (<c>5-2</c>) reaches every handler but SSH's, as
-/// curl 8.21.0 hands it on (BL-1322): only <c>Curl_range</c> in FTP and file and SSH's own
+/// Pins that <c>-r</c> text naming no range (<c>5-2</c>) reaches every handler, as curl 8.21.0
+/// hands it on (BL-1322, BL-1396): only <c>Curl_range</c> in FTP and file and SFTP's
 /// <c>Curl_ssh_range</c> parse it. Measured 2026-10-03 with curl 8.21.0 (mingw, Schannel) against
 /// a 12-byte file: <c>-sv -r 5-2 file://...</c> writes only <c>* shutting down connection #0</c>
 /// and exits 33; with the meter, the meter comes first and <c>curl: (33) Requested range was not
@@ -132,15 +132,14 @@ public sealed class CurlCommandRunnerRangeTextHandOffTests
     [TestMethod]
     [DataRow("sftp")]
     [DataRow("scp")]
-    public async Task RunAsync_SshRangeThatNamesNoRange_IsRefusedWithExit33BeforeConnecting(string scheme)
+    public async Task RunAsync_SshRangeThatNamesNoRange_GoesOnToConnect(string scheme)
     {
         RefusingConnector connector = new();
 
-        int exitCode = await RunAsync(connector, "-k", "-r", "5-2", scheme + "://127.0.0.1/f");
+        int exitCode = await RunAsync(connector, "-s", "-k", "-r", "5-2", scheme + "://127.0.0.1:1/f");
 
-        Assert.AreEqual(33, exitCode);
-        Assert.AreEqual(NotDeliveredLine + Environment.NewLine, StandardErrorText);
-        Assert.IsEmpty(connector.Targets);
+        Assert.AreEqual((int)CurlExitCode.CouldntConnect, exitCode);
+        Assert.HasCount(1, connector.Targets);
     }
 
     private string CreateTemporaryFileUrl()

@@ -12,7 +12,14 @@ public static class AccountHomeDirectory
 {
     /// <summary>This process's account home directory where curl reads it; <see langword="null"/> on Windows.</summary>
     public static string? ForProcess { get; } =
-        ReadOffWindows(OperatingSystem.IsWindows(), () => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        ReadOffWindows(OperatingSystem.IsWindows(), ReadFromUserDatabase);
+
+    /// <summary>
+    /// Reads the account home directory from the user database, on any platform; on Windows this loads
+    /// <c>shell32.dll</c>, so <see cref="ForProcess"/> calls it only off Windows.
+    /// </summary>
+    /// <returns>The user profile folder.</returns>
+    public static string ReadFromUserDatabase() => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
     /// <summary>Reads the account home directory unless running on Windows, where curl never searches it.</summary>
     /// <param name="isWindows">Whether the process runs on Windows.</param>

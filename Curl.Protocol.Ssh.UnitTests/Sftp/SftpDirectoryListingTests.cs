@@ -181,6 +181,47 @@ public sealed class SftpDirectoryListingTests
     }
 
     [TestMethod]
+    [DataRow(false, "LONG-abcdef\nLONG-ghijkl\n", "LONG-abcde", DisplayName = "long names")]
+    [DataRow(true, "abcdef\nghijkl\n", "abcdef\nghi", DisplayName = "-l")]
+    public async Task ListAsync_ListingOverTheMaxFileSize_WritesTheBytesUnderItAndEndsWithExit63ThenCloses(bool listOnly, string whole, string expected)
+    {
+        Assert.IsGreaterThan(10, whole.Length);
+        SftpServerScript script = SftpServerScript.Started()
+            .OpenedDirectory()
+            .Names(2, SftpServerScript.Entry("abcdef", "LONG-abcdef"), SftpServerScript.Entry("ghijkl", "LONG-ghijkl"))
+            .Status(3, SftpStatusCode.Ok);
+
+        Outcome outcome = await ListAsync(script, "/d/", listOnly, maxFileSize: 10);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (10) with 10 bytes", 10), outcome.Result);
+        Assert.AreEqual(expected, Encoding.UTF8.GetString(outcome.Output));
+        Assert.AreEqual((10L, (long?)null), outcome.Progress[^1]);
+        AssertRequests(outcome, 3, SftpServerScript.ReadDirectoryRequest(2), SftpServerScript.CloseRequest(3));
+    }
+
+    [TestMethod]
+    [DataRow(false, null, DisplayName = "long names, no limit")]
+    [DataRow(false, 0L, DisplayName = "long names, 0 is no limit")]
+    [DataRow(false, 24L, DisplayName = "long names, exactly the listing")]
+    [DataRow(true, null, DisplayName = "-l, no limit")]
+    [DataRow(true, 0L, DisplayName = "-l, 0 is no limit")]
+    [DataRow(true, 14L, DisplayName = "-l, exactly the listing")]
+    public async Task ListAsync_ListingWithinTheMaxFileSize_WritesTheWholeListing(bool listOnly, long? maxFileSize)
+    {
+        SftpServerScript script = SftpServerScript.Started()
+            .OpenedDirectory()
+            .Names(2, SftpServerScript.Entry("abcdef", "LONG-abcdef"), SftpServerScript.Entry("ghijkl", "LONG-ghijkl"))
+            .Status(3, SftpStatusCode.EndOfFile)
+            .Status(4, SftpStatusCode.Ok);
+
+        Outcome outcome = await ListAsync(script, "/d/", listOnly, maxFileSize);
+
+        string expected = listOnly ? "abcdef\nghijkl\n" : "LONG-abcdef\nLONG-ghijkl\n";
+        Assert.AreEqual(TransferResult.Success(expected.Length), outcome.Result);
+        Assert.AreEqual(expected, Encoding.UTF8.GetString(outcome.Output));
+    }
+
+    [TestMethod]
     [DataRow(false, DisplayName = "failed status, as measured")]
     [DataRow(true, DisplayName = "no names, as measured")]
     public async Task ListAsync_ReadLinkFails_EndsWithExit27AfterTheLinesSoFarAndStillClosesAsMeasured(bool answerNoNames)
@@ -373,13 +414,13 @@ public sealed class SftpDirectoryListingTests
         new SftpDirectoryListing(SftpSessionTests.Transport(connection))
             .ListAsync(urlPath, listOnly: false, noBody: false, new MemoryStream(), new RecordingProgress(), CancellationToken.None);
 
-    private static async Task<Outcome> ListAsync(SftpServerScript script, string urlPath, bool listOnly = false)
+    private static async Task<Outcome> ListAsync(SftpServerScript script, string urlPath, bool listOnly = false, long? maxFileSize = null)
     {
         ScriptedConnection connection = new(script.Bytes);
         MemoryStream output = new();
         RecordingProgress progress = new();
         TransferResult result = await new SftpDirectoryListing(SftpSessionTests.Transport(connection))
-            .ListAsync(urlPath, listOnly, noBody: false, output, progress, CancellationToken.None);
+            .ListAsync(urlPath, listOnly, noBody: false, output, progress, CancellationToken.None, maxFileSize: maxFileSize);
         return new Outcome(result, output.ToArray(), progress.Reports, connection.Written);
     }
 
