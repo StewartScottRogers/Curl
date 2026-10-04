@@ -34,7 +34,7 @@ When the proxy drops the connection while Curl reads a CONNECT reply - as after 
 
 - `HttpProxyTunnel.ReadReplyAsync` now catches an `IOException` that holds a `SocketException` (found by `CurlSocketErrorText.ReceiveFailure`). Before the reply's first byte it returns exit 56 `Recv failure: <words>`. After part of a head it returns `Proxy CONNECT aborted`, the same as a close at that point. Decision (sensible default): an `IOException` with no socket error inside still escapes as before, so the existing "reading the reply throws, dispose and rethrow" tests keep pinning that path and an unexpected failure stays visible.
 - Real curl also writes `* Recv failure: Connection was reset` as a `-v` line before `* closing connection #0`. `ConnectTunnelVerboseLines.ReportReplyFailure` now writes a `Recv failure: ...` failure as an info line.
-- Measured: real curl also writes `* Proxy CONNECT aborted` for a head cut short (`-ResetAfterResponse`) and Curl does not. That gap predates this task; filed as BL-1454.
+- Measured: real curl also writes `* Proxy CONNECT aborted` for a head cut short (`-ResetAfterResponse`) and Curl does not. That gap predates this task; filed as BL-1455.
 - `ScriptedConnection` gained `ExceptionAfterScript`: the exception a read throws once the scripted bytes run out, so a test can serve a 407 and then a reset.
 - Reproduction against `Curl.Console` (Debug build) after the fix: exit 56, no stack trace. Last lines of standard error:
   ```

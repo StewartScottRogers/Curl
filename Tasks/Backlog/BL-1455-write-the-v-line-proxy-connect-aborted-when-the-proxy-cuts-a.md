@@ -1,5 +1,5 @@
 ---
-id: BL-1454
+id: BL-1455
 title: Write the -v line Proxy CONNECT aborted when the proxy cuts a CONNECT reply head short
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-091
 created: 2026-10-04
 completed:
 ---
-# BL-1454 — Write the -v line Proxy CONNECT aborted when the proxy cuts a CONNECT reply head short
+# BL-1455 — Write the -v line Proxy CONNECT aborted when the proxy cuts a CONNECT reply head short
 
 ## Goal
 
