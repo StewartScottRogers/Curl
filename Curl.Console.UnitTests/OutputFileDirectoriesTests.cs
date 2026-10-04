@@ -54,8 +54,29 @@ public sealed class OutputFileDirectoriesTests
     {
         paths.UncreatableDirectories.Add("blk/b");
 
-        Assert.AreEqual("blk/b", OutputFileDirectories.CreateLeadingDirectories(paths, "blk/b/c/d.txt", runsOnWindows: false));
+        Assert.AreEqual(new DirectoryCreationFailure("blk/b", 22), OutputFileDirectories.CreateLeadingDirectories(paths, "blk/b/c/d.txt", runsOnWindows: false));
 
         CollectionAssert.AreEqual(new[] { "blk" }, paths.CreatedDirectories);
+    }
+
+    [TestMethod]
+    [DataRow(13)]
+    [DataRow(17)]
+    public void CreateLeadingDirectories_PermissionDeniedOrExists_SkipsToTheNextDirectory(int errorNumber)
+    {
+        paths.DirectoryErrorNumbers.Add("top", errorNumber);
+
+        Assert.IsNull(OutputFileDirectories.CreateLeadingDirectories(paths, "top/sub/f.txt", runsOnWindows: false));
+
+        CollectionAssert.AreEqual(new[] { "top/sub" }, paths.CreatedDirectories);
+    }
+
+    [TestMethod]
+    public void CreateLeadingDirectories_ReadOnlyFileSystem_GivesTheDirectoryWithItsErrno()
+    {
+        paths.DirectoryErrorNumbers.Add("top", 13);
+        paths.DirectoryErrorNumbers.Add("top/sub", 30);
+
+        Assert.AreEqual(new DirectoryCreationFailure("top/sub", 30), OutputFileDirectories.CreateLeadingDirectories(paths, "top/sub/f.txt", runsOnWindows: false));
     }
 }

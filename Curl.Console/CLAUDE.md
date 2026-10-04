@@ -115,8 +115,10 @@ segment, still percent-encoded; none gives `curl_response` and curl's
 `WindowsOutputFileNameSanitizer.SanitizeRemoteName` (`:` becomes `_`, DOS device names are
 renamed). `--output-dir` is put in front of either with `/`, as typed. `--create-dirs` makes
 each leading directory through `IOutputPaths` (`PhysicalOutputPaths` in production) before the
-transfer; one that cannot be made prints `curl: Error creating directory <dir>` and stops the
-run with exit 23. Under `-J` a remote-named file's header output goes through
+transfer; one that cannot be made prints `curl: Error creating directory <dir>`, or curl's own
+message for `ENAMETOOLONG`, `EROFS`, `ENOSPC` or `EDQUOT` (`DirectoryCreationFailure`), and stops
+the run with exit 23; an `EACCES` or `EEXIST` directory is passed over so the next is tried, as
+curl's `create_dir_hierarchy` does (BL-1433). Under `-J` a remote-named file's header output goes through
 `RemoteHeaderNameStream`, which opens the file under the first `Content-Disposition`
 `filename=` (`ContentDispositionFileName`) of a 2xx or 3xx response before the lines go on; a
 name already taken is refused with `File exists` and exit 23. Measured on curl 8.21.0
@@ -327,7 +329,9 @@ attempt gets a fresh `-m`. HTTP, TFTP and telnet (`Time-out`) keep their own mea
 Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result carries
 `SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
-failed stamp prints curl's `Failed to set filetime` warning lines unless `-s`. On Windows a
+failed stamp prints curl's `Failed to set filetime` warning lines unless `-s`: the Windows
+build's `CreateFile failed: GetLastError` form on Windows, and elsewhere the POSIX build's
+`on '<file>': <strerror>`, worded from `utimes`'s errno by `CRuntimeErrorNumbers` (BL-1433). On Windows a
 time before 1752-09-14T00:00:00Z is first capped to it with `Warning: Capping set filetime to
 minimum to avoid overflow` (unless `-s`), as curl 8.21.0 does; off Windows it is set as given
 (BL-1392).

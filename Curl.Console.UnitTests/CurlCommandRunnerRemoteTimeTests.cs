@@ -145,7 +145,7 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         outputFiles = new InMemoryFileSystem { FileTimeErrorCode = 2 };
 
-        int exitCode = await RunAsync(["-R", "-o", "out2.txt", SourceUrl], WritingBody(DateTimeOffset.FromUnixTimeSeconds(1577959445)));
+        int exitCode = await RunAsync(["-R", "-o", "out2.txt", SourceUrl], WritingBody(DateTimeOffset.FromUnixTimeSeconds(1577959445)), runsOnWindows: true);
 
         Assert.AreEqual((int)CurlExitCode.Ok, exitCode);
         Assert.EndsWith(
@@ -160,12 +160,31 @@ public sealed class CurlCommandRunnerRemoteTimeTests
         outputFiles = new InMemoryFileSystem { FileTimeErrorCode = 5 };
         DateTimeOffset fractional = DateTimeOffset.FromUnixTimeMilliseconds(1577959445678);
 
-        int exitCode = await RunAsync(["-R", "-o", "out2.txt", SourceUrl], WritingBody(fractional));
+        int exitCode = await RunAsync(["-R", "-o", "out2.txt", SourceUrl], WritingBody(fractional), runsOnWindows: true);
 
         Assert.AreEqual(0, exitCode);
         Assert.EndsWith(
             "Warning: Failed to set filetime 1577959445 on outfile: CreateFile failed: " + Environment.NewLine
             + "Warning: GetLastError 0x00000005" + Environment.NewLine,
+            Encoding.UTF8.GetString(standardError.ToArray()));
+    }
+
+    /// <summary>
+    /// Off Windows the line is curl 8.21.0's POSIX one, <c>tool_filetime.c</c>'s
+    /// <c>Failed to set filetime %ld on '%s': %s</c> with <c>strerror</c> (BL-1433): the file as
+    /// given and <c>utimes</c>'s <c>errno</c> in words, on one line.
+    /// </summary>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    public async Task RunAsync_RemoteTimeCannotSetOffWindows_PrintsThePosixWarningNamingTheFile()
+    {
+        outputFiles = new InMemoryFileSystem { FileTimeErrorCode = 2 };
+
+        int exitCode = await RunAsync(["-R", "-o", "o", SourceUrl], WritingBody(DateTimeOffset.FromUnixTimeSeconds(1700000000)), runsOnWindows: false);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.EndsWith(
+            "Warning: Failed to set filetime 1700000000 on 'o': No such file or directory" + Environment.NewLine,
             Encoding.UTF8.GetString(standardError.ToArray()));
     }
 

@@ -71,6 +71,15 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   `blksize` comes into force and the block count restarts, so the next DATA is block 1
   again, carrying the next bytes of the upload (nothing is re-read) at the new size.
   An OACK after the last block has gone sends an empty DATA 1.
+- An opcode the transfer's state does not handle (`TftpUnexpectedOpcode`, BL-1435): before
+  the server has answered, exit 71 `Internal error: Unexpected packet` after the `-v` line
+  `tftp_send_first: internal error`; a download that has started ends with exit 71 - an
+  ACK with `tftp_rx: internal error`, opcode 0, 1, 2 or 8 and up with `Internal error:
+  Unexpected packet` noted before `tftp_rx: internal error`; an upload that has started
+  notes `Internal error: Unexpected packet` (not for DATA) and `tftp_tx: internal error,
+  event: N`, then waits on for its ACK. Not modelled, still ignored: opcode 7 (curl's
+  TIMEOUT event), and before the answer opcode 0 (INIT), an ACK to a download or DATA to
+  an upload (curl switches direction).
 - Through an HTTP or HTTPS proxy (`ITransferContext.Proxy` of kind `Http`, `Http10` or
   `Https`), no datagram is sent: the optional `IConnector` connects to the proxy (TLS for
   `Https`, `IsForwardProxy` set), the MASQUE `connect-udp` request curl 8.21.0's Schannel

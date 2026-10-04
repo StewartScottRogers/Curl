@@ -12,7 +12,7 @@ public sealed class PhysicalOutputPathsTests
     private readonly PhysicalOutputPaths outputPaths = new();
 
     // No regular-file test, as on Windows: every platform reaches the delete itself.
-    private readonly PhysicalOutputPaths windowsOutputPaths = new(isRegularFile: null);
+    private readonly PhysicalOutputPaths windowsOutputPaths = new(isRegularFile: null, CRuntimeErrorNumbers.Windows);
     private readonly string root = Path.Combine(Path.GetTempPath(), "curl-output-paths-" + Guid.NewGuid().ToString("N"));
 
     [TestInitialize]
@@ -26,7 +26,8 @@ public sealed class PhysicalOutputPathsTests
     {
         string directory = Path.Combine(root, "d");
 
-        Assert.IsTrue(outputPaths.TryCreateDirectory(directory));
+        Assert.IsTrue(outputPaths.TryCreateDirectory(directory, out int errorNumber));
+        Assert.AreEqual(0, errorNumber);
         Assert.IsTrue(Directory.Exists(directory));
     }
 
@@ -36,12 +37,12 @@ public sealed class PhysicalOutputPathsTests
         string file = Path.Combine(root, "blk");
         File.WriteAllText(file, "x");
 
-        Assert.IsTrue(outputPaths.TryCreateDirectory(file));
+        Assert.IsTrue(outputPaths.TryCreateDirectory(file, out _));
         Assert.IsTrue(File.Exists(file));
     }
 
     [TestMethod]
-    public void TryCreateDirectory_DirectoryThere_IsTrue() => Assert.IsTrue(outputPaths.TryCreateDirectory(root));
+    public void TryCreateDirectory_DirectoryThere_IsTrue() => Assert.IsTrue(outputPaths.TryCreateDirectory(root, out _));
 
     [TestMethod]
     public void TryCreateDirectory_UnderAFile_IsFalse()
@@ -49,7 +50,8 @@ public sealed class PhysicalOutputPathsTests
         string file = Path.Combine(root, "blk");
         File.WriteAllText(file, "x");
 
-        Assert.IsFalse(outputPaths.TryCreateDirectory(Path.Combine(file, "b")));
+        Assert.IsFalse(outputPaths.TryCreateDirectory(Path.Combine(file, "b"), out int errorNumber));
+        Assert.AreNotEqual(0, errorNumber);
     }
 
     [TestMethod]
@@ -92,7 +94,7 @@ public sealed class PhysicalOutputPathsTests
     {
         string file = Path.Combine(root, "dev");
         File.WriteAllText(file, "x");
-        PhysicalOutputPaths outputPathsSeeingADevice = new(path => path != file);
+        PhysicalOutputPaths outputPathsSeeingADevice = new(path => path != file, CRuntimeErrorNumbers.Linux);
 
         Assert.AreEqual(OutputFileRemoval.NotRegularFile, outputPathsSeeingADevice.RemoveFile(file));
         Assert.IsTrue(File.Exists(file));
@@ -103,7 +105,7 @@ public sealed class PhysicalOutputPathsTests
     {
         string file = Path.Combine(root, "f");
         File.WriteAllText(file, "x");
-        PhysicalOutputPaths outputPathsSeeingAFile = new(path => path == file);
+        PhysicalOutputPaths outputPathsSeeingAFile = new(path => path == file, CRuntimeErrorNumbers.Linux);
 
         Assert.AreEqual(OutputFileRemoval.Removed, outputPathsSeeingAFile.RemoveFile(file));
         Assert.IsFalse(File.Exists(file));
@@ -156,4 +158,35 @@ public sealed class PhysicalOutputPathsTests
     [TestMethod]
     public void IsCreateFailure_AnyOtherException_IsFalse() =>
         Assert.IsFalse(PhysicalOutputPaths.IsCreateFailure(new InvalidOperationException()));
+
+    [TestMethod]
+    public void ErrorNumberOf_UnauthorizedAccess_IsPermissionDenied() =>
+        Assert.AreEqual(13, PhysicalOutputPaths.ErrorNumberOf(new UnauthorizedAccessException(), CRuntimeErrorNumbers.Linux));
+
+    [TestMethod]
+    public void ErrorNumberOf_PathTooLong_IsThePlatformsNameTooLong() =>
+        Assert.AreEqual(63, PhysicalOutputPaths.ErrorNumberOf(new PathTooLongException(), CRuntimeErrorNumbers.MacOS));
+
+    [TestMethod]
+    public void ErrorNumberOf_MissingParent_IsNoSuchFileOrDirectory()
+    {
+        Assert.AreEqual(2, PhysicalOutputPaths.ErrorNumberOf(new DirectoryNotFoundException(), CRuntimeErrorNumbers.Linux));
+        Assert.AreEqual(2, PhysicalOutputPaths.ErrorNumberOf(new FileNotFoundException(), CRuntimeErrorNumbers.Linux));
+    }
+
+    /// <summary>
+    /// Off Windows .NET sets an <see cref="IOException" />'s <see cref="Exception.HResult" /> to the
+    /// raw <c>errno</c> it has no type for; a Win32 code is mapped as the Windows C runtime maps it.
+    /// </summary>
+    /// <param name="hresult">The exception's HResult.</param>
+    /// <param name="expected">The errno.</param>
+    [TestMethod]
+    [DataRow(30, 30)]
+    [DataRow(122, 122)]
+    [DataRow(unchecked((int)0x80070070), 28)]
+    [DataRow(unchecked((int)0x80070050), 17)]
+    [DataRow(unchecked((int)0x800700B7), 17)]
+    [DataRow(unchecked((int)0x80070057), 22)]
+    public void ErrorNumberOf_IOException_ReadsItsHResult(int hresult, int expected) =>
+        Assert.AreEqual(expected, PhysicalOutputPaths.ErrorNumberOf(new IOException("x", hresult), CRuntimeErrorNumbers.Linux));
 }

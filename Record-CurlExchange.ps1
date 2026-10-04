@@ -335,7 +335,11 @@
     or DATA, drops the n-th packet of that kind once, whichever side sends it: one curl
     sends is ignored the first time it arrives, one the server sends is not sent the first
     time, so curl times out and retransmits. E.g. 'ACK1=DROP' on a download ignores curl's
-    ACK 1, and 'DATA1=DROP' does not send block 1 until curl asks again.
+    ACK 1, and 'DATA1=DROP' does not send block 1 until curl asks again. '<step>=PACKET <hex>'
+    sends the raw datagram given in hex once, just before the server's own answer to that
+    step, where the step is RRQ, WRQ, or the ACK or DATA curl sends: e.g. 'RRQ=PACKET
+    00040000' answers a read request with ACK 0 before its first DATA or OACK, and
+    'DATA1=PACKET 0009' sends opcode 9 before acknowledging an upload's block 1.
 
 .PARAMETER TftpNoOack
     In -Tftp mode, ignore the options a request carries: answer with no OACK and transfer
@@ -357,6 +361,8 @@
       read ber    read one whole BER element (X.690 8.1), such as one LDAP message,
                   from its identifier and definite length octets
       send <b>    send the bytes <b>, with the same backslash escapes as Response
+      pause <N>   wait N milliseconds before the next step, so a reply can be split
+                  across segments with a gap between them (BL-1434)
       close       close the connection and end the session
       reset       reset the connection (RST, not FIN) and end the session, so curl's
                   next receive or send fails with an I/O error (BL-845)
@@ -1812,6 +1818,9 @@ $serveScriptedSession = {
                 $stream.Write($step.Bytes, 0, $step.Bytes.Length)
                 $stream.Flush()
                 [void] $Transcript.Append("< $(ConvertTo-Hex -Bytes $step.Bytes)`r`n")
+            } elseif ($step.Kind -eq 'pause') {
+                Start-Sleep -Milliseconds $step.Milliseconds
+                [void] $Transcript.Append("= paused $($step.Milliseconds) ms`r`n")
             } elseif ($step.Kind -eq 'reset') {
                 # A zero linger time makes Close send RST instead of FIN.
                 $client.LingerState = New-Object System.Net.Sockets.LingerOption($true, 0)
@@ -1850,6 +1859,8 @@ function ConvertFrom-ExchangeScript {
         $argument = if ($text -match '^\S+\s+(.*)$') { $Matches[1] } else { '' }
         if ($verb -ceq 'send') {
             $steps.Add(@{ Kind = 'send'; Bytes = [byte[]] (ConvertFrom-EscapedResponse -Text $argument); Text = $text })
+        } elseif ($verb -ceq 'pause' -and $argument -match '^\d+$') {
+            $steps.Add(@{ Kind = 'pause'; Milliseconds = [int] $argument; Text = $text })
         } elseif ($verb -ceq 'close' -and $argument -eq '') {
             $steps.Add(@{ Kind = 'close'; Text = $text })
         } elseif ($verb -ceq 'reset' -and $argument -eq '') {
@@ -2004,7 +2015,9 @@ $pop3Overrides = ConvertTo-ReplyOverrides -Entries $Pop3Reply -ParameterName 'Po
 $tftpOverrides = ConvertTo-ReplyOverrides -Entries $TftpReply -ParameterName 'TftpReply'
 foreach ($step in $tftpOverrides.Keys) {
     $reply = $tftpOverrides[$step][0]
-    if ($step -match '^(RRQ|WRQ)$') {
+    if ($reply -match '^PACKET ') {
+        if ($step -notmatch '^(RRQ|WRQ|(ACK|DATA)\d{1,5})$' -or $reply -notmatch '^PACKET ([0-9a-fA-F]{2})+$') { throw "TftpReply '$step=$reply': 'PACKET <hex>' needs whole bytes in hex, on step RRQ, WRQ, ACK<n> or DATA<n>." }
+    } elseif ($step -match '^(RRQ|WRQ)$') {
         if ($reply -notmatch '^ERROR (\d{1,5})( |$)' -or [int] $Matches[1] -gt 65535) { throw "TftpReply '$step=$reply': a request is answered 'ERROR <code> <text>', the code 0 to 65535." }
     } elseif ($step -match '^(ACK|DATA)\d{1,5}$') {
         if ($reply -ne 'DROP') { throw "TftpReply '$step=$reply': an ACK or DATA packet can only be DROP." }
@@ -2821,7 +2834,8 @@ public sealed class RecorderTftpResponder
                 return;
             }
             string reply;
-            if (_overrides.TryGetValue(opcode == 1 ? "RRQ" : "WRQ", out reply))
+            SendInjected(opcode == 1 ? "RRQ" : "WRQ");
+            if (_overrides.TryGetValue(opcode == 1 ? "RRQ" : "WRQ", out reply) && reply.StartsWith("ERROR "))
             {
                 // "ERROR <code> <text>", checked by the script before the responder starts.
                 string[] parts = reply.Split(new[] { ' ' }, 3);
@@ -2865,6 +2879,7 @@ public sealed class RecorderTftpResponder
             int block = Number(packet, 2);
             if (block != expectedAck) { Resend(_lastSent); continue; }
             if (DropOnce("ACK" + block)) { continue; }
+            SendInjected("ACK" + block);
             if (finalSent) { return; }
             expectedAck = (expectedAck + 1) & 0xFFFF;
             finalSent = SendDataBlock(expectedAck, blockSize);
@@ -2891,6 +2906,7 @@ public sealed class RecorderTftpResponder
             if (block != expectedData) { Resend(_lastSent); continue; }
             if (DropOnce("DATA" + block)) { continue; }
             lock (_upload) { _upload.Write(packet, 4, packet.Length - 4); }
+            SendInjected("DATA" + block);
             Send(Ack(block), "ACK" + block);
             expectedData = (expectedData + 1) & 0xFFFF;
         }
@@ -2908,6 +2924,18 @@ public sealed class RecorderTftpResponder
         if (length > 0) { Array.Copy(_data, offset, packet, 4, length); }
         Send(packet, "DATA" + block);
         return length < blockSize;
+    }
+
+    /// Sends the raw datagram a step is overridden with, "PACKET <hex>", once.
+    private void SendInjected(string step)
+    {
+        string reply;
+        if (!_overrides.TryGetValue(step, out reply) || !reply.StartsWith("PACKET ") || !_dropped.Add(step + " PACKET")) { return; }
+        string hex = reply.Substring(7);
+        var packet = new byte[hex.Length / 2];
+        for (int i = 0; i < packet.Length; i++) { packet[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16); }
+        _transfer.SendTo(packet, _peer);
+        Record('<', packet);
     }
 
     /// True, once, when the step is overridden with DROP.

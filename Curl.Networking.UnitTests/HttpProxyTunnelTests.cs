@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 using Curl.Networking.Fakes;
@@ -242,6 +243,48 @@ public sealed class HttpProxyTunnelTests
         var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
 
         Assert.AreEqual(head, Encoding.Latin1.GetString(result.Head.Span));
+    }
+
+    [TestMethod]
+    [DataRow(SocketError.ConnectionReset)]
+    [DataRow(SocketError.ConnectionAborted)]
+    public async Task ReadReplyAsync_WhenTheReadFailsBeforeAnyReplyByte_ReturnsTheRecvFailure(SocketError socketError)
+    {
+        // BL-1449: curl 8.21.0's socket filter words the failed read as curl: (56) Recv failure: Connection was reset.
+        var failure = new IOException("Unable to read data from the transport connection.", new SocketException((int)socketError));
+        var connection = new ScriptedConnection([]) { ReadException = failure };
+
+        var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.FailureExitCode);
+        Assert.AreEqual(CurlSocketErrorText.ReceiveFailure(failure), result.FailureMessage);
+        StringAssert.StartsWith(result.FailureMessage, "Recv failure: ");
+        Assert.IsTrue(result.Head.IsEmpty);
+    }
+
+    [TestMethod]
+    public async Task ReadReplyAsync_WhenTheReadFailsWithoutASocketError_LetsTheExceptionEscape()
+    {
+        var connection = new ScriptedConnection([]) { ReadException = new IOException("The stream was closed.") };
+
+        await Assert.ThrowsExactlyAsync<IOException>(
+            async () => await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task ReadReplyAsync_WhenTheReadFailsAfterPartOfTheHead_ReturnsProxyConnectAborted()
+    {
+        // Measured with Record-CurlExchange.ps1 -ResetAfterResponse: curl: (56) Proxy CONNECT aborted.
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n"))
+        {
+            ExceptionAfterScript = new IOException("Unable to read data from the transport connection.", new SocketException((int)SocketError.ConnectionReset)),
+        };
+
+        var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.FailureExitCode);
+        Assert.AreEqual("Proxy CONNECT aborted", result.FailureMessage);
+        Assert.IsTrue(result.Head.IsEmpty);
     }
 
     [TestMethod]

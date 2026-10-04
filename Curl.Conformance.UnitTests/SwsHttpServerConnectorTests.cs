@@ -455,7 +455,7 @@ public sealed class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
-    public async Task PostcmdWait_HoldsTheCloseBackThatManySeconds()
+    public async Task PostcmdWait_HoldsTheCloseBackThatManySecondsAndTheSettleTime()
     {
         ManualTimeProvider clock = new();
         IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "reply swsclose\n"), Reply("postcmd", "wait 2\n")), clock));
@@ -463,7 +463,7 @@ public sealed class SwsHttpServerConnectorTests
 
         Assert.AreEqual("reply swsclose\n", await ReadOnceAsync(connection));
         Task<string> close = ReadOnceAsync(connection);
-        clock.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromTicks(1));
+        clock.Advance(TimeSpan.FromSeconds(2) + TimeSpan.FromMilliseconds(250) - TimeSpan.FromTicks(1));
         Assert.IsFalse(close.IsCompleted);
         clock.Advance(TimeSpan.FromTicks(1));
         Assert.AreEqual(string.Empty, await close);
@@ -504,12 +504,62 @@ public sealed class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
-    [DataRow("wait 1\n", 1)]
-    [DataRow("wait 1\nwait 2\n", 3)]
-    [DataRow("  wait\t2\r\n", 2)]
-    [DataRow("wait -3\nwait 1\n", 1)]
-    [DataRow("sleep 5\nwait\nwait x\nwait10 1\nWAIT 4\nwait 1\n", 1)]
-    public async Task PostcmdWait_HoldsTheNextReplyBackThatManySeconds(string postCommands, int seconds)
+    public async Task PostcmdWait_OfOneSecondWokenSecondsLate_ClosesOnceTheOverdueTimersHaveHadTheirTurn()
+    {
+        ManualTimeProvider clock = new() { TimersFireLateBy = TimeSpan.FromSeconds(8) };
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "reply swsclose\n"), Reply("postcmd", "wait 1\n")), clock));
+        await WriteAsync(connection, Get);
+        Assert.AreEqual("reply swsclose\n", await ReadOnceAsync(connection));
+
+        Task<string> close = ReadOnceAsync(connection);
+        clock.Advance(TimeSpan.FromSeconds(9));
+        clock.Advance(TimeSpan.FromSeconds(8) + TimeSpan.FromMilliseconds(250) - TimeSpan.FromTicks(1));
+        Assert.IsFalse(close.IsCompleted);
+        clock.Advance(TimeSpan.FromTicks(1));
+
+        Assert.AreEqual(string.Empty, await close);
+    }
+
+    [TestMethod]
+    public async Task PostcmdWait_LongerThanASecondAndWokenOnTime_HoldsTheCloseSoATimeoutStarvedInsideTheWaitGoesFirst()
+    {
+        ManualTimeProvider clock = new();
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "reply swsclose\n"), Reply("postcmd", "wait 10\n")), clock));
+        await WriteAsync(connection, Get);
+        Assert.AreEqual("reply swsclose\n", await ReadOnceAsync(connection));
+        using CancellationTokenSource maxTime = new();
+
+        Task<string> close = ReadOnceAsync(connection, maxTime.Token);
+        clock.Advance(TimeSpan.FromSeconds(10));
+        Assert.IsFalse(close.IsCompleted, "a stall from 1.9 s to 10.4 s wakes the close on time beside a -m 8 s overdue");
+        await maxTime.CancelAsync();
+
+        await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => close);
+    }
+
+    [TestMethod]
+    public async Task PostcmdWait_LongerThanASecondAndWokenOnTime_ClosesOnceTheOverdueTimersHaveHadTheirTurn()
+    {
+        ManualTimeProvider clock = new();
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "reply swsclose\n"), Reply("postcmd", "wait 10\n")), clock));
+        await WriteAsync(connection, Get);
+        Assert.AreEqual("reply swsclose\n", await ReadOnceAsync(connection));
+
+        Task<string> close = ReadOnceAsync(connection);
+        clock.Advance(TimeSpan.FromSeconds(10) + TimeSpan.FromMilliseconds(250) - TimeSpan.FromTicks(1));
+        Assert.IsFalse(close.IsCompleted);
+        clock.Advance(TimeSpan.FromTicks(1));
+
+        Assert.AreEqual(string.Empty, await close);
+    }
+
+    [TestMethod]
+    [DataRow("wait 1\n", 1, 0)]
+    [DataRow("wait 1\nwait 2\n", 3, 250)]
+    [DataRow("  wait\t2\r\n", 2, 250)]
+    [DataRow("wait -3\nwait 1\n", 1, 0)]
+    [DataRow("sleep 5\nwait\nwait x\nwait10 1\nWAIT 4\nwait 1\n", 1, 0)]
+    public async Task PostcmdWait_HoldsTheNextReplyBackThatManySecondsAndAnyLongWaitsSettleTime(string postCommands, int seconds, int settleMilliseconds)
     {
         ManualTimeProvider clock = new();
         IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "first\n"), Reply("postcmd", postCommands)), clock));
@@ -518,7 +568,7 @@ public sealed class SwsHttpServerConnectorTests
         await WriteAsync(connection, Get);
 
         Task<string> next = ReadOnceAsync(connection);
-        clock.Advance(TimeSpan.FromSeconds(seconds) - TimeSpan.FromTicks(1));
+        clock.Advance(TimeSpan.FromSeconds(seconds) + TimeSpan.FromMilliseconds(settleMilliseconds) - TimeSpan.FromTicks(1));
         Assert.IsFalse(next.IsCompleted);
         clock.Advance(TimeSpan.FromTicks(1));
         Assert.AreEqual("first\n", await next);
@@ -664,7 +714,7 @@ public sealed class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
-    public async Task Upgrade_QuietSecondStartsAfterThePostReplyWait()
+    public async Task Upgrade_QuietSecondStartsAfterThePostReplyWaitAndCloseWaitsTheSettleTime()
     {
         ManualTimeProvider clock = new();
         IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "switched\n"), Reply("servercmd", "upgrade\n"), Reply("postcmd", "wait 2\n")), clock));
@@ -672,7 +722,7 @@ public sealed class SwsHttpServerConnectorTests
         Assert.AreEqual("switched\n", await ReadOnceAsync(connection));
 
         Task<string> close = ReadOnceAsync(connection);
-        clock.Advance(TimeSpan.FromSeconds(3) - TimeSpan.FromTicks(1));
+        clock.Advance(TimeSpan.FromSeconds(3) + TimeSpan.FromMilliseconds(250) - TimeSpan.FromTicks(1));
         Assert.IsFalse(close.IsCompleted);
         clock.Advance(TimeSpan.FromTicks(1));
 

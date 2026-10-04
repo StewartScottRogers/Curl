@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 using Curl.Authentication;
@@ -164,6 +165,30 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(UnauthenticatedConnect, Encoding.Latin1.GetString([.. first.Written]));
         Assert.AreEqual(expectedSecondConnect, Encoding.Latin1.GetString([.. second.Written]));
+    }
+
+    [TestMethod]
+    [DataRow(SocketError.ConnectionReset)]
+    [DataRow(SocketError.ConnectionAborted)]
+    public async Task ConnectAsync_WithProxyAnyAuth_WhenTheSecondConnectsReplyReadFails_FailsWithTheRecvFailure(SocketError socketError)
+    {
+        // BL-1449: a 407 with no Content-Length leaves the connection reusable, so curl 8.21.0 sends the
+        // answer on it; the proxy had closed it, and curl: (56) Recv failure: Connection was reset.
+        var failure = new IOException("Unable to read data from the transport connection.", new SocketException((int)socketError));
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(
+            "HTTP/1.1 407 Need\r\nProxy-Authenticate: Basic realm=\"r\"\r\n\r\n"))
+        {
+            ExceptionAfterScript = failure,
+        };
+        var (connector, dialer) = CreateAuthenticatingConnector(HttpAuthSchemes.Any, connection);
+
+        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual(CurlSocketErrorText.ReceiveFailure(failure), result.ErrorMessage);
+        Assert.AreEqual(UnauthenticatedConnect + BasicConnect, Encoding.Latin1.GetString([.. connection.Written]));
+        Assert.IsTrue(connection.IsDisposed);
+        Assert.HasCount(1, dialer.DialedEndPoints);
     }
 
     [TestMethod]

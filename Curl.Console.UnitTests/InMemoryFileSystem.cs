@@ -17,7 +17,8 @@ namespace Curl.Console;
 /// <see cref="ExistingContent" />, which only feeds reads); a path added to it by
 /// <see cref="BeforeCreateNew" /> just before the open counts too. As <see cref="IOutputPaths" />,
 /// every directory is created, into
-/// <see cref="CreatedDirectories" />, except those in <see cref="UncreatableDirectories" />, and a
+/// <see cref="CreatedDirectories" />, except those in <see cref="UncreatableDirectories" />, which fail
+/// with <c>EINVAL</c>, and those in <see cref="DirectoryErrorNumbers" />, which fail with their errno; a
 /// path exists when it is in <see cref="ExistingPaths" />. Removing a file records the path in
 /// <see cref="DeleteAttempts" />; a path in <see cref="NonRegularPaths" /> is not a regular file,
 /// one in <see cref="UndeletablePaths" /> fails, and any other is dropped from
@@ -30,6 +31,8 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
     public Action<string>? BeforeCreateNew { get; set; }
 
     public HashSet<string> UncreatableDirectories { get; } = [];
+
+    public Dictionary<string, int> DirectoryErrorNumbers { get; } = [];
 
     public List<string> CreatedDirectories { get; } = [];
 
@@ -122,9 +125,15 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
         return errorCode == 0;
     }
 
-    public bool TryCreateDirectory(string path)
+    public bool TryCreateDirectory(string path, out int errorNumber)
     {
-        if (UncreatableDirectories.Contains(path))
+        if (DirectoryErrorNumbers.TryGetValue(path, out errorNumber))
+        {
+            return false;
+        }
+
+        errorNumber = UncreatableDirectories.Contains(path) ? 22 : 0;
+        if (errorNumber != 0)
         {
             return false;
         }

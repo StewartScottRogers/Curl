@@ -21,23 +21,41 @@ internal static class OutputFileDirectories
     /// <param name="runsOnWindows">Whether <c>\</c> separates directories as well as <c>/</c>.</param>
     /// <returns>
     /// The first directory that could not be created, as a leading part of
-    /// <paramref name="outputFile" />; <see langword="null" /> when all of them exist now.
+    /// <paramref name="outputFile" />, with its <c>errno</c>; <see langword="null" /> when every
+    /// directory exists now or failed only with <c>EACCES</c> or <c>EEXIST</c>, which curl
+    /// ignores so traversal of an unreadable or existing parent goes on (BL-1433).
     /// </returns>
-    internal static string? CreateLeadingDirectories(IOutputPaths outputPaths, string outputFile, bool runsOnWindows)
+    internal static DirectoryCreationFailure? CreateLeadingDirectories(IOutputPaths outputPaths, string outputFile, bool runsOnWindows)
     {
         char[] separators = runsOnWindows ? ['/', '\\'] : ['/'];
 
         for (int end = outputFile.IndexOfAny(separators); end >= 0; end = outputFile.IndexOfAny(separators, end + 1))
         {
-            string directory = outputFile[..end];
-            if (!IsRootOrRepeatedSeparator(directory, separators) && !outputPaths.TryCreateDirectory(directory))
+            if (CreateDirectory(outputPaths, outputFile[..end], separators) is { } failure)
             {
-                return directory;
+                return failure;
             }
         }
 
         return null;
     }
+
+    /// <summary>
+    /// Creates one leading directory, as one pass of curl's loop does.
+    /// </summary>
+    /// <param name="outputPaths">Checks and creates the directory.</param>
+    /// <param name="directory">The leading part of the path.</param>
+    /// <param name="separators">The directory separators.</param>
+    /// <returns>
+    /// The failure, or <see langword="null" /> when there was nothing to create, it exists now,
+    /// or it failed with <c>EACCES</c> or <c>EEXIST</c>.
+    /// </returns>
+    private static DirectoryCreationFailure? CreateDirectory(IOutputPaths outputPaths, string directory, char[] separators) =>
+        IsRootOrRepeatedSeparator(directory, separators)
+        || outputPaths.TryCreateDirectory(directory, out int errorNumber)
+        || errorNumber is CRuntimeErrorNumbers.PermissionDenied or CRuntimeErrorNumbers.AlreadyExists
+            ? null
+            : new DirectoryCreationFailure(directory, errorNumber);
 
     /// <summary>
     /// Tells whether a leading part of the path names no directory to create: it is empty,

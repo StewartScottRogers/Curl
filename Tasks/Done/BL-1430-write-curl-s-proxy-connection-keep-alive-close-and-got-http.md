@@ -1,0 +1,73 @@
+---
+id: BL-1430
+title: Write curl's Proxy-Connection keep-alive/close and Got HTTP failure 417 -v lines
+priority: Normal
+assignee: Claude
+pipeline: direct
+depends-on: []
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+requirement: FR-090
+created: 2026-10-04
+completed: 2026-10-04
+---
+# BL-1430 — Write curl's Proxy-Connection keep-alive/close and Got HTTP failure 417 -v lines
+
+## Goal
+
+Curl writes curl 8.21.0's `-v` lines `HTTP/1.0 proxy connection set to keep alive` and `HTTP/1.1 proxy connection set close` for a `Proxy-Connection` response header, and `Got HTTP failure 417 while waiting for a 100` / `Got HTTP failure 417 while sending data` before it resends a request a 417 refused, where and when curl writes them.
+
+## Context
+
+- Upstream (tag `curl-8_21_0`), `lib/http.c` lines 3428-3452 (`http_header_p`): a `Proxy-Connection:` header, when the connection goes through an HTTP proxy (`conn->http_proxy.peer`), writes `infof("HTTP/1.0 proxy connection set to keep alive")` when the response is HTTP/1.0 and the value says `keep-alive`, and `infof("HTTP/1.1 proxy connection set close")` when the response is HTTP/1.1 and the value says `close`. `HD_IS_AND_SAYS` compares the header name and the value case-insensitively. No line is written without a proxy, or for any other version/value pair.
+- Upstream `lib/http.c` lines 4046-4067: a 417 that arrives before the whole body is sent, while curl's `Expect: 100-continue` is in use, writes `Got HTTP failure 417 while waiting for a 100` when nothing of the body was sent yet and the wait was still running, else `Got HTTP failure 417 while sending data`; then curl drops `Expect` and resends.
+- Curl today: `Curl.Protocol.Http.UnitLibrary/HttpResponseHeadReader.cs` `InfoLineBefore` already writes the analogous `HTTP/1.0 connection set to keep alive` line (`HttpConnectionInfoLines.Http10KeepAlive`) before a header line; nothing writes the two proxy lines (no `Proxy-Connection` handling exists in the library). The 417 resend is built (`HttpProtocolHandler.RetriesWithoutExpect`, BL-260, BL-319, BL-396) but writes neither 417 line.
+- Measure before pinning the placement: `Record-CurlExchange.ps1` with `-x http://127.0.0.1:<port>` and a canned `HTTP/1.0 200 OK\r\nProxy-Connection: keep-alive\r\n...` (and an `HTTP/1.1` one with `Proxy-Connection: close`), and for the 417 a `-H "Expect: 100-continue" -d x` request answered `HTTP/1.1 417 Expectation Failed` (wait still running), plus `-d @<file of 2 MiB>` with `-ResponseDelayMilliseconds 1500` (body already being sent). Record which line each `*` line comes before in `stderr.txt` and put it in this task's Notes.
+
+## Acceptance criteria
+
+- [x] `HttpConnectionInfoLines` holds the four texts byte for byte as above.
+- [x] Tests in `Curl.Protocol.Http.UnitTests` pin, through an HTTP proxy: an HTTP/1.0 response with `Proxy-Connection: Keep-Alive` writes `* HTTP/1.0 proxy connection set to keep alive` at the measured position; an HTTP/1.1 response with `Proxy-Connection: close` writes `* HTTP/1.1 proxy connection set close`; and an HTTP/1.1 `keep-alive`, an HTTP/1.0 `close`, and either header on a direct (no proxy) transfer write neither line.
+- [x] Tests pin `Got HTTP failure 417 while waiting for a 100` for a 417 received while the 100-continue wait runs with no body byte sent, and `Got HTTP failure 417 while sending data` for one received once the body is being sent, each at the measured position, followed by the resend that already happens today; a 417 that does not lead to a resend (under `-f`, or one that closes the connection) writes neither line unless the measurement shows curl writes it there too.
+- [x] Nothing else in the existing `-v` tests changes; `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports no failing member.
+
+## Notes
+
+Measured on 2026-10-04, curl 8.21.0 (mingw, Schannel), `Record-CurlExchange.ps1`:
+
+| Command / reply | stderr around the line |
+| --- | --- |
+| `-v -x http://127.0.0.1:18431 http://example.invalid/a`, `HTTP/1.0 200 OK` / `Proxy-Connection: Keep-Alive` / `Content-Length: 2` | `* HTTP 1.0, assume close after body`, `< HTTP/1.0 200 OK`, `* HTTP/1.0 proxy connection set to keep alive`, `< Proxy-Connection: Keep-Alive`, `< Content-Length: 2`, `< `, `... left intact` |
+| same, `HTTP/1.1 200 OK` / `Proxy-Connection: close` | `< HTTP/1.1 200 OK`, `* HTTP/1.1 proxy connection set close`, `< Proxy-Connection: close`, ..., `* shutting down connection #0` |
+
+So the proxy lines go right before their header line, as `HTTP/1.0 connection set to keep alive` does
+(both are `infof` calls in `lib/http.c`'s header handling); Curl writes them from
+`HttpResponseHeadReader.InfoLineBefore`, when `IsThroughHttpProxy` - an HTTP-kind
+`ForwardProxy` (`Http`, `Http10`, `Https`), tunnelled or not, as `conn->http_proxy.peer` is set
+for both. `Proxy-Connection` is matched like `HD_IS_AND_SAYS`: name and token case-insensitive
+(`HttpConnectionPersistence.ProxyConnectionNames`).
+
+The 417 lines: a `-H "Expect: 100-continue" -d x` run without `-RespondAfterBodyBytes` got the
+417 only after the wait ran out and the body was sent (no line, no resend), and a
+`-RespondAfterBodyBytes 0` run hung past the 30-minute tool limit, so the placement comes from
+upstream and BL-319's measurement instead: `lib/http.c` writes the line in `http_on_response`,
+before `Ignoring the response-body` (measured before the head's empty line, BL-449), and BL-319
+measured `* Done waiting for 100-continue`, `* Got HTTP failure 417 while sending data`, `* Need to
+rewind upload for next request`, ... `* Issue another request`. Curl writes it in
+`HttpProtocolHandler.RetryOfAsync` once `RetriesWithoutExpect` accepts the 417: `while waiting
+for a 100` when the body was left unsent, else `while sending data`. It comes after the 417's header
+lines and before `Ignoring the response-body` and the empty line; a 417 under `-f` or with
+`Connection: close` writes neither, as curl reaches the line only inside `!conn->bits.close` and
+past the `-f` check. The line is written before the `--max-redirs` exit 47 check, as curl sets
+`newurl` first.
+
+Follow-up filed: BL-1446 - curl's `Need to rewind upload` / `abort upload` lines after a 417 while
+sending, and whether `Ignoring the response-body` belongs there.
+
+Tests: 13 in `HttpProtocolHandlerTests.ProxyConnectionAnd417Lines.cs`; Curl.Protocol.Http.UnitTests
+1829 passed, 18 skipped. `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary`: 0 failing members.
+
+## Log
+
+- 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
+- 2026-10-04: Doing -> Done. curl's Proxy-Connection keep-alive/close and Got HTTP failure 417 -v lines are written where curl writes them

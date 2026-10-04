@@ -245,6 +245,12 @@ internal static class HttpTransferMessages
     internal const string LineTooLarge = "A value or data field grew larger than allowed";
 
     /// <summary>
+    /// The exit 100 message for a response header past
+    /// <see cref="HttpResponseHeadReader.MaximumHeaderCount" />.
+    /// </summary>
+    internal const string TooManyResponseHeaders = "Too many response headers, 5000 is max";
+
+    /// <summary>
     /// The exit 56 message for a chunk size of more than
     /// <see cref="HttpChunkedDecoder.MaximumSizeDigits" /> hexadecimal digits.
     /// </summary>

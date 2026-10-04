@@ -25,6 +25,23 @@ internal static partial class NativeFileTimeSetter
     /// <summary>The <c>FILETIME</c> intervals in one second.</summary>
     private const long FileTimeIntervalsPerSecond = 10_000_000;
 
+    /// <summary>The Unix seconds of 0001-01-01T00:00:00Z, the earliest <see cref="DateTime" />.</summary>
+    private const long MinimumDateTimeUnixSeconds = -62135596800;
+
+    /// <summary>The Unix seconds of 9999-12-31T23:59:59Z, the latest whole second of <see cref="DateTime" />.</summary>
+    private const long MaximumDateTimeUnixSeconds = 253402300799;
+
+    /// <summary>
+    /// Tells whether a time must be set with this class rather than
+    /// <see cref="File.SetLastWriteTimeUtc(string, DateTime)" />: every time off Windows, so a
+    /// failure reports <c>utimes</c>'s <c>errno</c> for curl's <c>strerror</c> text (BL-1433), and
+    /// on Windows a time <see cref="DateTime" /> cannot hold.
+    /// </summary>
+    /// <param name="unixSeconds">The time in seconds since 1970-01-01T00:00:00Z.</param>
+    /// <returns><see langword="true" /> when this class sets it.</returns>
+    internal static bool IsNeededFor(long unixSeconds) =>
+        !OperatingSystem.IsWindows() || unixSeconds is < MinimumDateTimeUnixSeconds or > MaximumDateTimeUnixSeconds;
+
     /// <summary>
     /// Sets the last-write time of the file at <paramref name="path" />.
     /// </summary>

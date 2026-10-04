@@ -390,6 +390,9 @@ internal sealed class CurlCommandRunner(
             MultipartBoundary.CreateRandom,
             standardInput);
 
+    /// <summary>The C runtime numbers <c>--create-dirs</c> and <c>-R</c> failures are worded in (BL-1433).</summary>
+    private readonly CRuntimeErrorNumbers errorNumbers = CRuntimeErrorNumbers.For(runsOnWindows, OperatingSystem.IsMacOS());
+
     /// <summary>The <see cref="IOutputPaths" /> used when the runner is given none.</summary>
     private static readonly PhysicalOutputPaths DiskOutputPaths = new();
 
@@ -2212,9 +2215,9 @@ internal sealed class CurlCommandRunner(
         }
 
         if (options.CreateDirectories
-            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, saveFile, runsOnWindows) is { } directory)
+            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, saveFile, runsOnWindows) is { } failure)
         {
-            return await ReportCannotCreateDirectoryAsync(options, directory).ConfigureAwait(false);
+            return await ReportCannotCreateDirectoryAsync(options, failure).ConfigureAwait(false);
         }
 
         FileOpenResult opened = await fileSystem
@@ -3419,7 +3422,7 @@ internal sealed class CurlCommandRunner(
         if (options.FormParts.Count == 0)
         {
             return await TransferWithBodyAsync(
-                    follower, dispatch.ProxySelector, options, transferUrl, transfer, range, headerOutput, null, upload)
+                    follower, dispatch, options, transferUrl, transfer, range, headerOutput, null, upload)
                 .ConfigureAwait(false);
         }
 
@@ -3437,7 +3440,7 @@ internal sealed class CurlCommandRunner(
         await using (form.Body.Content.ConfigureAwait(false))
         {
             return await TransferWithBodyAsync(
-                    follower, dispatch.ProxySelector, options, transferUrl, transfer, range, headerOutput, form.Body, upload)
+                    follower, dispatch, options, transferUrl, transfer, range, headerOutput, form.Body, upload)
                 .ConfigureAwait(false);
         }
     }
@@ -3498,7 +3501,7 @@ internal sealed class CurlCommandRunner(
     /// with <see cref="TransferCredentialLookup" />, which it keeps as the running transfer's
     /// <see cref="RunningTransferState.LookedUpCredentials" /> for every attempt's context.
     /// </summary>
-    /// <param name="proxySelector">Chooses the transfer's proxy.</param>
+    /// <param name="dispatch">The run's dispatch: its dispatcher says whether the URL's scheme is served, its proxy selector chooses the proxy.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">The transfer's URL.</param>
     /// <param name="transfer">
@@ -3509,19 +3512,28 @@ internal sealed class CurlCommandRunner(
     /// <param name="failure">The proxy's, the credentials' or the netrc file's failure, when one refuses the transfer.</param>
     /// <returns><see langword="false" /> when the transfer ends before it starts.</returns>
     private bool TrySelectProxyAndCredentials(
-        ProxySelector proxySelector,
+        TransferDispatch dispatch,
         CommandLineOptions options,
         CurlUrl url,
         UrlTransfer transfer,
         out ProxyEndpoint? proxy,
         [NotNullWhen(false)] out TransferResult? failure)
     {
-        if (!TransferProxySelection.TrySelect(proxySelector, options, url, out proxy, out failure, diagnosticLog))
+        proxy = null;
+        if (!dispatch.Dispatcher.Serves(url.Scheme))
+        {
+            failure = TransferResult.Failure(CurlExitCode.UnsupportedProtocol, $"Protocol \"{url.Scheme.ToLowerInvariant()}\" not supported");
+            EventsBeforeConnecting(transfer).ReportInfo(failure.ErrorMessage!);
+            return false;
+        }
+
+        if (!TransferProxySelection.TrySelect(dispatch.ProxySelector, options, url, out proxy, out failure, diagnosticLog))
         {
             return false;
         }
 
-        bool looked = CredentialLookup.TryLookUp(options, url, out NetworkCredential? lookedUpCredentials, out failure);
+        bool looked = CredentialLookup.TryLookUp(
+            options, url, out NetworkCredential? lookedUpCredentials, out failure, EventsBeforeConnecting(transfer).ReportInfo);
         Running.LookedUpCredentials = lookedUpCredentials;
         if (failure is not null && TransferCredentialLookup.IsControlCodeRefusal(failure))
         {
@@ -3596,7 +3608,7 @@ internal sealed class CurlCommandRunner(
     /// failure and nothing is sent (<see cref="TrySelectProxyAndCredentials" />).
     /// </summary>
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
-    /// <param name="proxySelector">Chooses the transfer's proxy from <c>-x</c>, <c>--noproxy</c> and the proxy environment variables.</param>
+    /// <param name="dispatch">The run's dispatch, whose dispatcher says whether the URL's scheme is served and whose proxy selector chooses the transfer's proxy.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
     /// <param name="transfer">The transfer, which names its output.</param>
@@ -3612,7 +3624,7 @@ internal sealed class CurlCommandRunner(
     /// </returns>
     private async Task<TransferResult> TransferWithBodyAsync(
         RedirectFollower follower,
-        ProxySelector proxySelector,
+        TransferDispatch dispatch,
         CommandLineOptions options,
         CurlUrl url,
         UrlTransfer transfer,
@@ -3629,7 +3641,7 @@ internal sealed class CurlCommandRunner(
             return unstarted;
         }
 
-        if (!TrySelectProxyAndCredentials(proxySelector, options, url, transfer, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
+        if (!TrySelectProxyAndCredentials(dispatch, options, url, transfer, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
             return proxyFailure;
         }
@@ -3703,9 +3715,9 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult?> CreateOutputDirectoriesOrSkipAsync(CommandLineOptions options, string outputFile)
     {
         if (options.CreateDirectories
-            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, outputFile, runsOnWindows) is { } directory)
+            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, outputFile, runsOnWindows) is { } failure)
         {
-            return await ReportCannotCreateDirectoryAsync(options, directory).ConfigureAwait(false);
+            return await ReportCannotCreateDirectoryAsync(options, failure).ConfigureAwait(false);
         }
 
         return options.SkipExisting && OutputPaths.Exists(outputFile)
@@ -3817,18 +3829,19 @@ internal sealed class CurlCommandRunner(
         options.RemoteHeaderName && transfer.OutputFileName is null;
 
     /// <summary>
-    /// Prints curl's <c>curl: Error creating directory &lt;dir&gt;</c> line for a
-    /// <c>--create-dirs</c> directory that could not be created, unless <c>-s</c> was given
+    /// Prints curl's line for a <c>--create-dirs</c> directory that could not be created -
+    /// <c>curl: Error creating directory &lt;dir&gt;</c> or the errno's own message
+    /// (<see cref="DirectoryCreationFailure.Message" />, BL-1433) - unless <c>-s</c> was given
     /// without <c>-S</c>, as curl 8.21.0 does (measured 2026-09-27, BL-239 Notes).
     /// </summary>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="directory">The directory, as a leading part of the output path.</param>
+    /// <param name="failure">The directory and why it could not be created.</param>
     /// <returns><see cref="CannotCreateDirectoryFailure" />.</returns>
-    private async Task<TransferResult> ReportCannotCreateDirectoryAsync(CommandLineOptions options, string directory)
+    private async Task<TransferResult> ReportCannotCreateDirectoryAsync(CommandLineOptions options, DirectoryCreationFailure failure)
     {
         if (ShowsErrors(options))
         {
-            await WriteErrorLineAsync($"curl: Error creating directory {directory}").ConfigureAwait(false);
+            await WriteErrorLineAsync(failure.Message(errorNumbers)).ConfigureAwait(false);
         }
 
         return CannotCreateDirectoryFailure;
@@ -4247,8 +4260,8 @@ internal sealed class CurlCommandRunner(
     /// <remarks>
     /// curl 8.21.0 (Windows, measured 2026-09-26) mutes the warning under <c>-s</c> and under
     /// <c>-s -S</c> alike: <c>-S</c> brings back error messages, not warnings. The line is the
-    /// Windows form on every platform, for the reason <see cref="RemoteTimeFailureWarning" />
-    /// gives. On Windows a time outside <see cref="WindowsMinimumFileTimeUnixSeconds" /> to
+    /// Windows <c>CreateFile</c> form on Windows and the POSIX <c>strerror</c> form naming the
+    /// file elsewhere, as <see cref="RemoteTimeFailureWarning" /> describes (BL-1433). On Windows a time outside <see cref="WindowsMinimumFileTimeUnixSeconds" /> to
     /// <see cref="WindowsMaximumFileTimeUnixSeconds" /> is first capped to the nearer end with
     /// <see cref="FileTimeCappedToMinimumWarning" /> or <see cref="FileTimeCappedToMaximumWarning" />
     /// (muted by <c>-s</c>), as curl 8.21.0's <c>setfiletime</c> caps it; off Windows it is
@@ -4273,10 +4286,23 @@ internal sealed class CurlCommandRunner(
         if (!outputFileTimeSetter.TrySetLastWriteUnixSeconds(outputFile, sourceLastWriteUnixSeconds, out int errorCode)
             && !options.Silent)
         {
-            await WriteErrorLineAsync(RemoteTimeFailureWarning.For(sourceLastWriteUnixSeconds, errorCode))
+            await WriteErrorLineAsync(FileTimeFailureWarning(outputFile, sourceLastWriteUnixSeconds, errorCode))
                 .ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Gives the platform's <see cref="RemoteTimeFailureWarning" /> line: the Windows
+    /// <c>CreateFile</c> form on Windows, the POSIX <c>strerror</c> form elsewhere (BL-1433).
+    /// </summary>
+    /// <param name="outputFile">The <c>-o</c> file.</param>
+    /// <param name="sourceLastWriteUnixSeconds">The time that could not be set, in Unix seconds.</param>
+    /// <param name="errorCode">The Win32 error code on Windows, <c>utimes</c>'s <c>errno</c> elsewhere.</param>
+    /// <returns>The warning line.</returns>
+    private string FileTimeFailureWarning(string outputFile, long sourceLastWriteUnixSeconds, int errorCode) =>
+        runsOnWindows
+            ? RemoteTimeFailureWarning.ForWindowsOpen(sourceLastWriteUnixSeconds, errorCode)
+            : RemoteTimeFailureWarning.ForPosix(sourceLastWriteUnixSeconds, outputFile, errorCode, errorNumbers);
 
     /// <summary>
     /// Caps an <c>-R</c> time to the range curl 8.21.0 sets on a Windows file.

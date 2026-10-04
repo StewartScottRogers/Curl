@@ -36,6 +36,9 @@ internal static class ConnectTunnelVerboseLines
     /// </summary>
     internal const string AllocateConnectBuffer = "allocate connect buffer";
 
+    // How CurlSocketErrorText.ReceiveFailure begins a failed read's message.
+    private const string ReceiveFailurePrefix = "Recv failure: ";
+
     /// <summary>
     /// The line curl writes after a non-<c>2xx</c> reply's <c>Transfer-Encoding</c> line that
     /// names <c>chunked</c> (measured, BL-1144 Notes).
@@ -171,7 +174,8 @@ internal static class ConnectTunnelVerboseLines
     /// <summary>
     /// Reports the failure curl writes as a <c>-v</c> line right after a reply line, the
     /// <c>Content-Length</c> line of an exit 8 <see cref="HttpProxyTunnel.UnsupportedContentLength" />
-    /// reply; nothing for any other reply (measured, BL-1399).
+    /// reply, and the <c>Recv failure: ...</c> of a read that failed before the reply's first
+    /// byte (BL-1449); nothing for any other reply (measured, BL-1399).
     /// </summary>
     /// <param name="events">Where the line goes.</param>
     /// <param name="reply">The reply read.</param>
@@ -180,6 +184,11 @@ internal static class ConnectTunnelVerboseLines
         if (reply.FailureExitCode == CurlExitCode.WeirdServerReply)
         {
             events.ReportInfo(HttpProxyTunnel.UnsupportedContentLength);
+        }
+        else if (reply.FailureMessage?.StartsWith(ReceiveFailurePrefix, StringComparison.Ordinal) == true)
+        {
+            // The socket filter's failf, measured: "* Recv failure: Connection was reset" (BL-1449).
+            events.ReportInfo(reply.FailureMessage);
         }
     }
 

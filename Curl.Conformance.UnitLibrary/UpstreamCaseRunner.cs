@@ -175,12 +175,17 @@ public sealed class UpstreamCaseRunner(
         {
             string path = part.GetAttribute("name")!;
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllBytes(path, UpstreamTestPartBodies.WithoutFinalNewline(part.Content.ToArray(), part));
+            File.WriteAllBytes(path, ClientBytes(part));
         }
     }
 
     private static byte[] StandardInput(UpstreamTestCase testCase) =>
         testCase.Find("client", "stdin") is { } part
-            ? UpstreamTestPartBodies.WithoutFinalNewline(part.Content.ToArray(), part)
+            ? ClientBytes(part)
             : [];
+
+    // A <file> or <stdin> part as runtests.pl writes it: the last line chomped under nonewline,
+    // then CRLF forced on every line under crlf="yes" or on header lines under crlf="headers".
+    private static byte[] ClientBytes(UpstreamTestSection part) =>
+        UpstreamTestPartBodies.WithCrlf(UpstreamTestPartBodies.WithoutFinalNewline(part.Content.ToArray(), part), part);
 }

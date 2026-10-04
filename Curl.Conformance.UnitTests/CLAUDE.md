@@ -38,6 +38,7 @@ skipped cases are not runnable).
 | --- | ---: | ---: | ---: | ---: | ---: |
 | 2026-09-26 | 137 | 324 | 1552 | 461 | 29.7% |
 | 2026-09-27 | 206 | 271 | 1536 | 477 | 43.2% |
+| 2026-10-04 | 392 | 82 | 1539 | 474 | 82.7% |
 
 The whole conformance run of 2013 cases takes about 8 seconds on the development machine and opens no socket: every
 connection goes to the in-memory `sws` emulation, and UDP to `UnreachableDatagramConnector`.

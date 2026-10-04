@@ -124,8 +124,10 @@ internal static class UpstreamCaseVerification
         return exitCode == expected ? null : $"<verify><errorcode>: expected exit code {expected}, got {exitCode}";
     }
 
+    // nonewline before crlf, as runtests.pl chomps the last line before subnewlines: forcing CRLF
+    // first would leave a carriage return the request never ends in.
     private static byte[] Expected(UpstreamTestSection part) =>
-        UpstreamTestPartBodies.WithoutFinalNewline(UpstreamTestPartBodies.WithCrlf(part.Content.ToArray(), part), part);
+        UpstreamTestPartBodies.WithCrlf(UpstreamTestPartBodies.WithoutFinalNewline(part.Content.ToArray(), part), part);
 
     private static byte[] Normalized(byte[] body, UpstreamTestSection? part) =>
         part?.GetAttribute("mode") == "text" ? UpstreamTestSectionLineEndings.NormalizeText(body) : body;

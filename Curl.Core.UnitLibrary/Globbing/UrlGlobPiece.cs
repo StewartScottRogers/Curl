@@ -15,6 +15,12 @@ internal abstract class UrlGlobPiece
     /// <summary>Gets whether the piece is a set or range, which <c>#N</c> counts.</summary>
     public abstract bool IsGlob { get; }
 
+    /// <summary>
+    /// Gets or sets the glob's <c>&lt;name&gt;</c>, which <c>#&lt;name&gt;</c> stands for;
+    /// <see langword="null" /> for an unnamed glob or literal text.
+    /// </summary>
+    public string? Name { get; set; }
+
     public static UrlGlobPiece Fixed(string text) => new SetPiece([text], isGlob: false);
 
     public static UrlGlobPiece Set(IReadOnlyList<string> elements) => new SetPiece(elements, isGlob: true);
