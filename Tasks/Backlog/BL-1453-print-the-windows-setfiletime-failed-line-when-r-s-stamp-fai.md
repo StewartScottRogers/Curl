@@ -1,5 +1,5 @@
 ---
-id: BL-1449
+id: BL-1453
 title: Print the Windows SetFileTime failed line when -R's stamp fails after the file opened
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-011
 created: 2026-10-04
 completed:
 ---
-# BL-1449 — Print the Windows SetFileTime failed line when -R's stamp fails after the file opened
+# BL-1453 — Print the Windows SetFileTime failed line when -R's stamp fails after the file opened
 
 ## Goal
 
