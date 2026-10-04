@@ -35,3 +35,4 @@ Curl writes curl 8.21.0's `-v` lines `HTTP/1.0 proxy connection set to keep aliv
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
