@@ -3223,9 +3223,22 @@ internal sealed class CurlCommandRunner(
 
         await WriteCustomRequestLinesAsync(options, uploadFile).ConfigureAwait(false);
         Stream? etagWatchedHeaderOutput = Running.SaveEtag is { } saveEtag ? new EtagSaveStream(saveEtag, headerOutput) : headerOutput;
-        return NoCryptoEngines.LoadFailure(options.Engine, runsOnWindows)
+        return await SetupFailureAsync(dispatch, options).ConfigureAwait(false)
             ?? await TransferOpeningUploadFileAsync(dispatch, options, url, uploadFile, transfer, etagWatchedHeaderOutput).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// The failure a transfer ends with while curl 8.21.0 sets its options, before any upload file
+    /// is opened or the URL parsed: <see cref="CookieLineTooLongFailureAsync" />'s when the group's
+    /// joined <c>-b name=value</c> strings are too long, else <see cref="NoCryptoEngines.LoadFailure" />'s.
+    /// </summary>
+    /// <param name="dispatch">The option group's dispatch, which holds its cookies.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns>The failure, or <see langword="null" /> when the transfer goes ahead.</returns>
+    private async Task<TransferResult?> SetupFailureAsync(TransferDispatch dispatch, CommandLineOptions options) =>
+        dispatch.Cookies is { CookieLineTooLong: true }
+            ? await CookieLineTooLongFailureAsync(options).ConfigureAwait(false)
+            : NoCryptoEngines.LoadFailure(options.Engine, runsOnWindows);
 
     /// <summary>
     /// Writes curl 8.21.0's <c>customrequest_helper</c> lines (<c>src/tool_helpers.c</c>) before a
@@ -3259,6 +3272,25 @@ internal sealed class CurlCommandRunner(
                 "Setting custom HTTP method to HEAD with -X/--request may not work the way you want. Consider using -I/--head instead.",
                 terminalColumns)).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Fails a transfer whose joined <c>-b name=value</c> strings reach
+    /// <see cref="CookieEngine.LongestCookieLine" /> bytes before it connects, as curl 8.21.0's
+    /// <c>cookie_setopts</c> does: <see cref="CookieEngine.CookieLineTooLongWarning" />, wrapped,
+    /// unless <c>-s</c>, then exit 100 with <c>A value or data field grew larger than allowed</c>
+    /// (measured 2026-10-03, BL-1391).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns>The transfer's failure.</returns>
+    private async Task<TransferResult> CookieLineTooLongFailureAsync(CommandLineOptions options)
+    {
+        if (!options.Silent)
+        {
+            await WriteErrorPiecesAsync(WarningLineWrapper.WrapText(CookieEngine.CookieLineTooLongWarning, terminalColumns)).ConfigureAwait(false);
+        }
+
+        return TransferResult.Failure(CurlExitCode.TooLarge, CurlEasyErrorText.Of(CurlExitCode.TooLarge));
     }
 
     /// <summary>

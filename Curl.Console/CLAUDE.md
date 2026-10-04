@@ -158,7 +158,10 @@ bytes and output as BL-177, BL-180 and BL-315 measured them.
 With `-b` or `-c` the handler also gets the option group's `CookieEngine`: one `CookieStore`
 shared by every URL of every group (`CurlComposition.SharingRunCookies`), the `-b` files loaded before the first transfer (session cookies dropped under
 `-j`, a missing file ignored), the `-b name=value` strings sent after the stored cookies (left out when an `-H` value names
-`Cookie`, BL-291), and
+`Cookie`, BL-291) as one string joined as curl's `cookie_setopts` joins them (`;` and a space,
+no space before a string starting with a blank; one of 8200 bytes or more fails every transfer
+of the group before it connects with exit 100, after `Warning: skipped provided cookie ...`
+unless `-s`, BL-1391), and
 the `-c` jar written after every `http`/`https` transfer, after its `-w` output, whatever its
 outcome, and after no other scheme's (`-c -` prints it to standard output each time, in the
 mode standard output is in). With nothing but `-b` strings, received cookies are not stored,

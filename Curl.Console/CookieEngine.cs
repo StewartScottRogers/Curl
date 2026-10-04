@@ -31,7 +31,21 @@ internal sealed class CookieEngine
 
     private readonly CookieStore store;
 
-    private readonly List<string> cookieStrings = [];
+    /// <summary>
+    /// curl's <c>MAX_COOKIE_LINE</c>: the joined <c>-b name=value</c> strings must stay shorter
+    /// than this many bytes.
+    /// </summary>
+    internal const int LongestCookieLine = 8200;
+
+    /// <summary>
+    /// The warning text, after <c>Warning: </c>, curl 8.21.0's <c>cookie_setopts</c> writes before
+    /// it fails a transfer whose joined <c>-b name=value</c> strings reach <see cref="LongestCookieLine" />.
+    /// </summary>
+    internal const string CookieLineTooLongWarning = "skipped provided cookie, the cookie header would go over 8200 bytes";
+
+    private readonly StringBuilder joinedCookieStrings = new();
+
+    private readonly List<string> sentCookieStrings = [];
 
     private readonly List<string> cookieFiles = [];
 
@@ -48,9 +62,18 @@ internal sealed class CookieEngine
         cookieJar = options.CookieJar;
         discardSessionCookies = options.JunkSessionCookies;
         HandlerStore = cookieFiles.Count > 0 || cookieJar is not null
-            ? new GroupCookies(store, cookieStrings)
-            : new CookieStringSender(cookieStrings);
+            ? new GroupCookies(store, sentCookieStrings)
+            : new CookieStringSender(sentCookieStrings);
     }
+
+    /// <summary>
+    /// Gets a value indicating whether the group's <c>-b name=value</c> strings, joined as
+    /// <see cref="JoinCookieString" /> joins them, reach <see cref="LongestCookieLine" /> bytes in
+    /// UTF-8, so every transfer of the group fails with exit 100 before it connects, as curl
+    /// 8.21.0's <c>cookie_setopts</c> fails it - whether or not an <c>-H</c> value names
+    /// <c>Cookie</c> (measured 2026-10-03, BL-1391).
+    /// </summary>
+    internal bool CookieLineTooLong => Encoding.UTF8.GetByteCount(joinedCookieStrings.ToString()) >= LongestCookieLine;
 
     /// <summary>
     /// Gets the store the HTTP handler reads and writes: the run's <see cref="CookieStore" />, with
@@ -146,24 +169,45 @@ internal sealed class CookieEngine
     }
 
     /// <summary>
-    /// Keeps each <c>-b</c> file to load and puts each <c>-b name=value</c> string in the store,
-    /// unless <paramref name="sendCookieStrings" /> is <see langword="false" />.
+    /// Keeps each <c>-b</c> file to load and joins the <c>-b name=value</c> strings into one, which
+    /// is sent unless <paramref name="sendCookieStrings" /> is <see langword="false" />.
     /// </summary>
     /// <param name="cookies">The <c>-b</c> values, in command-line order.</param>
-    /// <param name="sendCookieStrings">Whether the <c>name=value</c> strings are sent.</param>
+    /// <param name="sendCookieStrings">Whether the joined <c>name=value</c> string is sent.</param>
     private void AddCookies(IEnumerable<CommandLineCookie> cookies, bool sendCookieStrings)
     {
         foreach (CommandLineCookie cookie in cookies)
         {
-            if (!cookie.IsCookieString)
+            if (cookie.IsCookieString)
+            {
+                JoinCookieString(cookie.Value);
+            }
+            else
             {
                 cookieFiles.Add(cookie.Value);
             }
-            else if (sendCookieStrings)
-            {
-                cookieStrings.Add(cookie.Value);
-            }
         }
+
+        if (sendCookieStrings && joinedCookieStrings.Length > 0)
+        {
+            sentCookieStrings.Add(joinedCookieStrings.ToString());
+        }
+    }
+
+    /// <summary>
+    /// Appends one <c>-b name=value</c> string as curl 8.21.0's <c>cookie_setopts</c> does: the
+    /// first as it is, each later one after <c>;</c> and a space, the space left out when the
+    /// string already starts with a space or a tab.
+    /// </summary>
+    /// <param name="cookieString">The <c>-b</c> value.</param>
+    private void JoinCookieString(string cookieString)
+    {
+        if (joinedCookieStrings.Length > 0)
+        {
+            joinedCookieStrings.Append(cookieString.StartsWith(' ') || cookieString.StartsWith('\t') ? ";" : "; ");
+        }
+
+        joinedCookieStrings.Append(cookieString);
     }
 
     /// <summary>

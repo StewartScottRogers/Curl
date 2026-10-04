@@ -8,7 +8,7 @@ depends-on: [BL-1390]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: FR-098
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1391 — Join -b cookie strings as curl's tool does and refuse a joined string of 8200 bytes or more with exit 100
 
@@ -28,17 +28,21 @@ Several `-b name=value` strings are joined into one `Cookie` value exactly as cu
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Console.UnitTests` pin the sent `Cookie` header for `-b a=1 -b " b=2" -b "\tc=3"` with the cookie engine off and for `-b a=1 -b " b=2" -c <jar>` with it on, as measured.
-- [ ] Tests pin that one string of 8199 bytes is sent, and that 8200 bytes - as one string, and as two strings whose joined length is 8200 - give exit 100 with `curl: (100) A value or data field grew larger than allowed`, the wrapped warning line first unless `-s`, and no connection made (the fake connector records none).
-- [ ] `CookieStore` (in `Curl.Cookies.UnitLibrary`) is not changed: Curl.Console hands it the one joined string.
-- [ ] `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member in the code this task changed.
+- [x] Tests in `Curl.Console.UnitTests` pin the sent `Cookie` header for `-b a=1 -b " b=2" -b "\tc=3"` with the cookie engine off and for `-b a=1 -b " b=2" -c <jar>` with it on, as measured.
+- [x] Tests pin that one string of 8199 bytes is sent, and that 8200 bytes - as one string, and as two strings whose joined length is 8200 - give exit 100 with `curl: (100) A value or data field grew larger than allowed`, the wrapped warning line first unless `-s`, and no connection made (the fake connector records none).
+- [x] `CookieStore` (in `Curl.Cookies.UnitLibrary`) is not changed: Curl.Console hands it the one joined string.
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member in the code this task changed.
 
 ## Notes
 
 - Depends on BL-1390 only because both change `Curl.Console`; no option changes, so `--ai-help` is unaffected.
 - Exit 100 is `CurlExitCode.TooLarge` (already in `Curl.Protocol.Abstractions.UnitLibrary/CurlExitCode.cs`); this task does not change Abstractions.
+- Done: `CookieEngine` joins the group's `-b` strings into one (`JoinCookieString`) and hands `CookieStore` a one-item list, so the store is unchanged. `CurlCommandRunner.SetupFailureAsync` fails the transfer with exit 100 (after the wrapped warning unless `-s`) before the upload file, URL parse or connect, ahead of the `--engine` check.
+- Choices taken: the 8200-byte limit counts UTF-8 bytes (curl counts the bytes of its argument, UTF-8 on Linux/macOS and under the Windows UTF-8 build); the check applies to every scheme, since curl runs `cookie_setopts` while setting the transfer's options whatever the URL; and it applies even when an `-H` value names `Cookie`, because the tool joins the strings before libcurl drops them for that header.
+- Measure-CodeQuality -Library Curl.Console: 100% line, 100% branch, 0 failing members (TransferAsync was split once into `SetupFailureAsync` to keep it under complexity 10). Tests: `CurlCommandRunnerCookieStringJoinTests` (9); Curl.Console.UnitTests 2546 passed, 24 skipped.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. -b strings join as curl's tool joins them; a joined string of 8200 bytes or more fails with exit 100 before connecting
