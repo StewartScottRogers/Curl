@@ -3,10 +3,10 @@ id: AF-0041
 title: Lanes spent 1544 of 2110 idle minutes (about 40% of lane time) waiting on overlapping touches
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:logs:overlap-wait
-task: none
+task: BL-1384
 found: 2026-10-03
 found-at: 2c24c2d74dc2c9775b64948efc3ca57b8937627e
 scorecard: 2026-10-03_1459.md
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.

@@ -3,10 +3,10 @@ id: AF-0036
 title: `accepted.NoDelay = true` can become false with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpPendingConnection.cs:accepted.NoDelay:surviving-mutant
-task: none
+task: BL-1379
 found: 2026-10-03
 found-at: 2c24c2d74dc2c9775b64948efc3ca57b8937627e
 scorecard: 2026-10-03_1459.md
@@ -41,3 +41,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 ## Log
 
 - 2026-10-03: filed proposed.
+- 2026-10-03: proposed -> accepted.
