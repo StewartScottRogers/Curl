@@ -1020,7 +1020,8 @@ internal static class CurlComposition
     /// <c>--proxy-anyauth</c> after a <c>407</c> (ADR-0186), NTLM's Type 1 and Type 3 and
     /// Negotiate's tokens on the same connection (ADR-0270). Its Negotiate and NTLM contexts come
     /// from <paramref name="securityContexts" />, with the <c>--proxy-service-name</c> and
-    /// <c>--delegation</c> of <see cref="NegotiateOptionsMapping.FromCommandLine" />.
+    /// <c>--delegation</c> of <see cref="NegotiateOptionsMapping.FromCommandLine" />; and an HTTP/2
+    /// tunnel through an <c>https://</c> proxy when <c>--proxy-http2</c> asked for one (ADR-0408).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <param name="securityContexts">Makes the proxy's NTLM and Negotiate contexts: <see cref="CreateSecurityContextFactory" />'s router in production.</param>
@@ -1040,6 +1041,7 @@ internal static class CurlComposition
             CommandLineTextEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()),
             ProxyAuthSchemes = options.ProxyAuthSchemes,
             ProxyAuthenticator = CreateHttpAuthenticator(securityContexts, NegotiateOptionsMapping.FromCommandLine(options), diagnosticLog),
+            ProxyHttp2 = options.ProxyHttp2,
         };
 
     /// <summary>
