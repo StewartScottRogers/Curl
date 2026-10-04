@@ -395,7 +395,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         }
 
         return SftpRemotePath.NamesDirectory(urlPath)
-            ? await new SftpDirectoryListing(transport) { Trace = trace }.ListAsync(urlPath, context.ListOnly, context.NoBody, output, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false)
+            ? await new SftpDirectoryListing(transport) { Trace = trace }.ListAsync(urlPath, context.ListOnly, context.NoBody, output, context.Progress, context.CancellationToken, quotes, context.MaxFileSize).ConfigureAwait(false)
             : await new SftpFileDownload(transport) { Trace = trace }.DownloadAsync(urlPath, context.CreateFileMode, output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom, context.MaxFileSize).ConfigureAwait(false);
     }
 

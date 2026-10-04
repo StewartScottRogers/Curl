@@ -43,6 +43,39 @@ public sealed partial class SshProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(false, "-rw-r--r--", DisplayName = "long names")]
+    [DataRow(true, "hello.txt\n", DisplayName = "-l")]
+    public async Task ExecuteAsync_SftpListingOverTheMaxFileSize_IsExit63WithTheInfoLineAndClosesTheHandle(bool listOnly, string expected)
+    {
+        InMemorySshServer server = Server();
+        server.Files["/data/hello.txt"] = HelloLine;
+        server.Files["/data/world.txt"] = HelloLine;
+        MemoryStream output = new();
+        TranscriptTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse($"sftp://{Host}/data/"),
+            Output = output,
+            Credentials = new NetworkCredential(User, Password),
+            Events = events,
+            ListOnly = listOnly,
+            MaxFileSize = 10,
+        };
+
+        TransferResult result = await Handler(server).ExecuteAsync(context);
+        await server.WhenSessionsEndAsync();
+
+        Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Assert.AreEqual("Exceeded the maximum allowed file size (10) with 10 bytes", result.ErrorMessage);
+        Assert.AreEqual(expected, System.Text.Encoding.UTF8.GetString(output.ToArray()));
+        CollectionAssert.Contains(events.Transcript, "* Exceeded the maximum allowed file size (10) with 10 bytes");
+        string[] serverEvents = [.. server.Events];
+        int subsystem = Array.IndexOf(serverEvents, "subsystem sftp");
+        string[] expectedEvents = ["sftp 16 .", "sftp 11 /data/", "sftp 12 /data/", "sftp 4 /data/", .. ChannelClosedThenDisconnected];
+        Assert.AreEqual(string.Join(" | ", expectedEvents), string.Join(" | ", serverEvents[(subsystem + 1)..]));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_SftpUploadWithAMaxFileSize_IgnoresIt()
     {
         InMemorySshServer server = Server();
