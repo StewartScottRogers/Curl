@@ -776,6 +776,7 @@ internal sealed class CurlCommandRunner(
 
         diagnosticLog = runDiagnosticLog.Log;
         transferContextFactory.DiagnosticLog = diagnosticLog;
+        transferContextFactory.HstsStore = Hsts;
         lateBoundDiagnosticLog?.Bind(diagnosticLog);
         LogCommandLine(parsed, filesTriedWhileParsing);
     }

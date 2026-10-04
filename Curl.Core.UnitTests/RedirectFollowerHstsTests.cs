@@ -8,7 +8,8 @@ namespace Curl.Core;
 /// <summary>
 /// Pins how <see cref="RedirectFollower" /> uses the run's HSTS cache, as curl 8.21.0 does (measured
 /// 2026-09-29, BL-621 Notes): every hop's <c>https</c> response is learned from, with or without
-/// <c>-L</c>, and an <c>http</c> redirect target the cache then knows is switched to <c>https</c>,
+/// <c>-L</c>, by the HTTP handler through the hop's <see cref="HttpRequestOptions.HstsStore" />
+/// (ADR-0409; the scripted handler here does it as that handler does), and an <c>http</c> redirect target the cache then knows is switched to <c>https</c>,
 /// reported, and checked against <c>--proto-redir</c> as switched.
 /// </summary>
 [TestClass]
@@ -105,7 +106,7 @@ public sealed class RedirectFollowerHstsTests
         {
             Url = CurlUrl.Parse(url),
             Output = Stream.Null,
-            Http = http,
+            Http = http with { HstsStore = hsts },
             TimeProvider = TimeProvider.System,
             Events = events,
         };
@@ -121,7 +122,10 @@ public sealed class RedirectFollowerHstsTests
             },
         };
 
-    /// <summary>Serves http and https, answering each call with the next scripted result.</summary>
+    /// <summary>
+    /// Serves http and https, answering each call with the next scripted result after handing its
+    /// <c>Strict-Transport-Security</c> header to the hop's <see cref="HttpRequestOptions.HstsStore" />, as the HTTP handler does.
+    /// </summary>
     private sealed class ScriptedHandler(params TransferResult[] script) : IProtocolHandler
     {
         public List<CurlUrl> Urls { get; } = [];
@@ -131,7 +135,13 @@ public sealed class RedirectFollowerHstsTests
         public ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
         {
             Urls.Add(context.Url);
-            return ValueTask.FromResult(script[Urls.Count - 1]);
+            TransferResult result = script[Urls.Count - 1];
+            foreach (KeyValuePair<string, string> header in result.Report!.ResponseHeaders)
+            {
+                context.Http!.HstsStore?.StoreFromResponse(context.Url, header.Value, Now);
+            }
+
+            return ValueTask.FromResult(result);
         }
     }
 }

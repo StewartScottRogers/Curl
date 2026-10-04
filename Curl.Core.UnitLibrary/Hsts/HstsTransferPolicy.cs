@@ -94,31 +94,6 @@ public sealed class HstsTransferPolicy(TimeProvider timeProvider, IDiagnosticLog
     }
 
     /// <summary>
-    /// Learns each <c>Strict-Transport-Security</c> header of <paramref name="report" />, in the order
-    /// received, when <paramref name="url" /> is <c>https</c>, as <see cref="StoreFromResponse" /> does
-    /// for each at the clock's current time.
-    /// </summary>
-    /// <param name="url">The URL the response came from.</param>
-    /// <param name="report">The response's report; <see langword="null" /> when there was none.</param>
-    public void LearnFrom(CurlUrl url, TransferReport? report)
-    {
-        ArgumentNullException.ThrowIfNull(url);
-
-        if (report is null)
-        {
-            return;
-        }
-
-        foreach (KeyValuePair<string, string> header in report.ResponseHeaders)
-        {
-            if (string.Equals(header.Key, HeaderName, StringComparison.OrdinalIgnoreCase))
-            {
-                StoreFromResponse(url, header.Value, timeProvider.GetUtcNow());
-            }
-        }
-    }
-
-    /// <summary>
     /// Learns one <c>Strict-Transport-Security</c> header of a response from <paramref name="origin" />,
     /// as <see cref="HstsCache.ApplyHeader(string, string, DateTimeOffset)" /> does, when the origin is
     /// <c>https</c>; a header received over plain <c>http</c> is ignored (ADR-0409).

@@ -90,7 +90,7 @@ namespace Curl.Core;
 /// <see cref="OperatingSystem.IsWindows" />.
 /// </param>
 /// <param name="hsts">
-/// The run's HSTS cache, which learns from every hop's response and switches every <c>http</c>
+/// The run's HSTS cache, which switches every <c>http</c>
 /// redirect target it knows to <c>https</c> before the target's scheme is checked, reporting
 /// <see cref="HstsTransferPolicy.SwitchedMessagePrefix" /> and the URL to the hop's events, as
 /// curl 8.21.0 does after <c>Issue another request to this URL</c> (BL-621 Notes);
@@ -168,13 +168,9 @@ public sealed class RedirectFollower(
             : DispatchAsync(context, policy);
     }
 
-    /// <summary>Performs one hop and teaches the HSTS cache from its response.</summary>
-    private async ValueTask<TransferResult> DispatchAsync(ITransferContext hop, RedirectPolicy policy)
-    {
-        TransferResult result = await dispatcher.DispatchAsync(hop, policy.AllowedTransferSchemes);
-        hsts?.LearnFrom(hop.Url, result.Report);
-        return result;
-    }
+    /// <summary>Performs one hop.</summary>
+    private ValueTask<TransferResult> DispatchAsync(ITransferContext hop, RedirectPolicy policy) =>
+        dispatcher.DispatchAsync(hop, policy.AllowedTransferSchemes);
 
     private async ValueTask<TransferResult> FollowChainAsync(
         ITransferContext context,

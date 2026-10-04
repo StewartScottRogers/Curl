@@ -20,7 +20,7 @@ public sealed class HstsTransferPolicyDiagnosticLogTests
     {
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Verbose);
         HstsTransferPolicy hsts = new(new FakeTimeProvider(Start), log);
-        hsts.LearnFrom(CurlUrl.Parse("https://example.com/"), Sts("max-age=60"));
+        hsts.StoreFromResponse(CurlUrl.Parse("https://example.com/"), "max-age=60", Start);
         const string url = "http://user:s3cret@example.com/x";
 
         bool switched = hsts.TrySwitchToHttps(url, CurlUrl.Parse(url), out _);
@@ -54,14 +54,11 @@ public sealed class HstsTransferPolicyDiagnosticLogTests
     {
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Error);
         HstsTransferPolicy hsts = new(new FakeTimeProvider(Start), log);
-        hsts.LearnFrom(CurlUrl.Parse("https://example.com/"), Sts("max-age=60"));
+        hsts.StoreFromResponse(CurlUrl.Parse("https://example.com/"), "max-age=60", Start);
 
         hsts.TrySwitchToHttps("http://example.com/", CurlUrl.Parse("http://example.com/"), out _);
         hsts.TrySwitchToHttps(UnknownUrl, CurlUrl.Parse(UnknownUrl), out _);
 
         Assert.IsEmpty(log.Lines);
     }
-
-    private static TransferReport Sts(string value) =>
-        new() { ResponseHeaders = [new("Strict-Transport-Security", value)] };
 }
