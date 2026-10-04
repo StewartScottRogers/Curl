@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1380 — Fix AF-0037: Certificate name lookup `forIssuer: false` can become true with no test failing
 
@@ -41,12 +41,22 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- AF-0037 reports the same mutant as AF-0031, which BL-1373 (commit 98622b66) already fixed
+  with `OpenSslPeerFailedVerification_WithANameMismatchOnAnIssuedCertificate_NamesTheSubjectNotTheIssuer`:
+  a leaf issued by `CN=Test Authority`, so subject and issuer differ. No code change was needed.
+- Verified by hand, since a lane may not run `Audit/Tools/Invoke-MutationTest.ps1` (the guard
+  refuses audit paths): with line 320 changed to `forIssuer: true`, that test fails
+  (1 failed, 16 passed of the `OpenSslPeerFailedVerification` tests); the mutant was then reverted.
+  The re-audit by the quality auditor confirms it with the reproduction itself.
+- `dotnet build`: 0 warnings, 0 errors. Fast tests: all green (Curl.Networking.UnitTests 2976 passed, 28 skipped).
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. The forIssuer mutant at TlsFailureMessages.cs:320 is killed by BL-1373's issued-certificate test
