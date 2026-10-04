@@ -2,7 +2,7 @@ namespace Curl.Protocol.Tftp;
 
 /// <summary>
 /// curl 8.21.0's words and rules for a packet whose opcode the transfer's state does not
-/// handle (measured by BL-1435): <c>tftp_receive_packet</c> notes
+/// handle (measured by BL-1435 and BL-1444): <c>tftp_receive_packet</c> notes
 /// <c>Internal error: Unexpected packet</c> for any opcode but DATA, ACK, ERROR and OACK,
 /// and the state machine then fails before the server has answered
 /// (<c>tftp_send_first: internal error</c>, exit 71), fails a download that has
@@ -10,11 +10,11 @@ namespace Curl.Protocol.Tftp;
 /// (<c>tftp_tx: internal error, event: N</c>), which carries on.
 /// </summary>
 /// <remarks>
-/// curl reads an opcode as its state machine's event, so opcode 0 (its INIT event) before
-/// the server has answered re-sends the request, opcode 7 (its TIMEOUT event) re-sends the
-/// last packet, an ACK as a download's first reply turns it into a transmit and a DATA
-/// packet as an upload's first reply into a receive. Those are not modelled here: the
-/// transfer ignores them and waits on, as it did before.
+/// curl reads an opcode as its state machine's event, so opcode 0 (its INIT event) and
+/// opcode 7 (its TIMEOUT event) before the server has answered re-send the request, and
+/// opcode 7 after re-sends the last packet as a timeout would. An ACK as a download's first
+/// reply turns it into a transmit and a DATA packet as an upload's first reply into a
+/// receive (<see cref="TftpHandOver" />).
 /// </remarks>
 internal static class TftpUnexpectedOpcode
 {
@@ -27,11 +27,11 @@ internal static class TftpUnexpectedOpcode
     /// <summary>The message curl notes when a download that has started receives an opcode it does not handle.</summary>
     internal const string ReceiveMessage = "tftp_rx: internal error";
 
+    /// <summary>The opcode curl reads as its TIMEOUT event.</summary>
+    internal const ushort TimeoutEventOpcode = 7;
+
     /// <summary>The opcode curl reads as its INIT event.</summary>
     private const ushort InitEventOpcode = 0;
-
-    /// <summary>The opcode curl reads as its TIMEOUT event.</summary>
-    private const ushort TimeoutEventOpcode = 7;
 
     /// <summary>
     /// Tells whether <c>tftp_receive_packet</c> notes <see cref="UnexpectedPacketMessage" />
@@ -46,15 +46,11 @@ internal static class TftpUnexpectedOpcode
             or TftpPackets.OptionAcknowledgementOpcode);
 
     /// <summary>
-    /// Tells whether the transfer ignores the opcode and waits on: opcode 7 at any point,
-    /// and before the server has answered opcode 0 and the opcode that would switch the
-    /// transfer's direction (see the remarks).
+    /// Tells whether the opcode, as the server's first reply, re-sends the request: curl's
+    /// INIT and TIMEOUT events, opcodes 0 and 7.
     /// </summary>
     /// <param name="opcode">The packet's opcode.</param>
-    /// <param name="answered">Whether the server has answered.</param>
-    /// <param name="directionSwitchingOpcode">ACK for a download, DATA for an upload.</param>
-    /// <returns><see langword="true" /> when the packet is ignored.</returns>
-    internal static bool IsIgnored(ushort opcode, bool answered, ushort directionSwitchingOpcode) =>
-        opcode == TimeoutEventOpcode
-        || (!answered && (opcode == InitEventOpcode || opcode == directionSwitchingOpcode));
+    /// <returns><see langword="true" /> when curl re-sends the request.</returns>
+    internal static bool ResendsTheRequest(ushort opcode) =>
+        opcode is InitEventOpcode or TimeoutEventOpcode;
 }

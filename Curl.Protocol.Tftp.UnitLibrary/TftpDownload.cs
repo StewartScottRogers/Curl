@@ -21,9 +21,11 @@ namespace Curl.Protocol.Tftp;
 /// The first datagram received pins the server's endpoint; a later one from anywhere else
 /// ends the transfer with exit 56 (<see cref="CurlExitCode.RecvError" />) and sends the
 /// stranger nothing, as curl does. A repeat of the last block is acknowledged again and
-/// not written twice. Any other unexpected block is ignored, and the download waits on. An
-/// opcode a download does not handle ends it with exit 71, as curl does
-/// (<see cref="TftpUnexpectedOpcode" />).
+/// not written twice. Any other unexpected block is ignored, and the download waits on. As
+/// curl does (<see cref="TftpUnexpectedOpcode" />), opcode 0 or 7 as the first reply
+/// re-sends the request, opcode 7 later is taken as a timeout, an ACK as the first reply
+/// turns the download into an upload of nothing (<see cref="TftpHandOver" />), and any other
+/// opcode a download does not handle ends it with exit 71.
 /// </para>
 /// <para>
 /// A datagram shorter than four bytes re-sends the last packet (the read request or the
@@ -73,7 +75,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     private long bytesTransferred;
     private EndPoint? pinnedEndPoint;
     private bool answered;
-    private bool tooShortReceived;
+    private string? notedFailure;
     private TftpRetrySchedule schedule;
     private int retries;
     private TimeSpan resendAt;
@@ -101,16 +103,47 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         await SendAsync(request, channel.ServerEndPoint).ConfigureAwait(false);
         log.RequestSent("read", file.LoggedName, requestedBlockSize, schedule.RetrySeconds);
         retries = 1;
+        return await AnswerUntilEndAsync(null).ConfigureAwait(false);
+    }
 
+    /// <summary>
+    /// Takes over an upload whose first reply was a DATA packet, as curl 8.21.0's
+    /// <c>tftp_send_first</c> connects for receive on DATA whatever the request asked: the
+    /// reply is answered as a download's first DATA block, written to the output and
+    /// acknowledged, and the transfer runs on as a download.
+    /// </summary>
+    /// <param name="handOver">The upload's state and its first reply.</param>
+    /// <returns>The outcome of the transfer.</returns>
+    internal ValueTask<TransferResult> TakeOverAsync(TftpHandOver handOver)
+    {
+        schedule = limits.RequestSchedule();
+        lastPacket = handOver.Request;
+        retries = handOver.Retries;
+        resendAt = handOver.ResendAt;
+        notedFailure = handOver.NotedFailure;
+        handOver.Reply.CopyTo(buffer, 0);
+        return AnswerUntilEndAsync(new DatagramReceived(handOver.Reply.Length, handOver.Source));
+    }
+
+    /// <summary>
+    /// Answers each datagram, and each silence, until one ends the download. Once curl has
+    /// noted a failure, whatever failure ends the download carries that message.
+    /// </summary>
+    /// <param name="pending">A datagram already received and not yet answered, if any.</param>
+    /// <returns>The outcome of the transfer.</returns>
+    private async ValueTask<TransferResult> AnswerUntilEndAsync(DatagramReceived? pending)
+    {
         while (true)
         {
-            var outcome = await limits.ReceiveBeforeAsync(channel, buffer, resendAt).ConfigureAwait(false) is { } received
+            var received = pending ?? await limits.ReceiveBeforeAsync(channel, buffer, resendAt).ConfigureAwait(false);
+            pending = null;
+            var outcome = received is not null
                 ? await AnswerAsync(received).ConfigureAwait(false)
                 : await AnswerSilenceAsync().ConfigureAwait(false);
             if (outcome is not null)
             {
-                return tooShortReceived && !outcome.IsSuccess
-                    ? outcome with { ErrorMessage = TooShortMessage }
+                return notedFailure is { } noted && !outcome.IsSuccess
+                    ? outcome with { ErrorMessage = noted }
                     : outcome;
             }
         }
@@ -166,31 +199,69 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
             TftpPackets.DataOpcode => AcceptDataAsync(received),
             TftpPackets.ErrorOpcode => ValueTask.FromResult<TransferResult?>(FailWithErrorPacket(received)),
             TftpPackets.OptionAcknowledgementOpcode => AcceptOptionAcknowledgementAsync(received),
-            var opcode => ValueTask.FromResult(AnswerUnexpectedOpcode(opcode)),
+            var opcode => AnswerOtherOpcodeAsync(opcode, received),
         };
     }
 
     /// <summary>
-    /// Answers an opcode a download does not handle as curl does
-    /// (<see cref="TftpUnexpectedOpcode" />): before the server has answered, exit 71 with
-    /// <c>tftp_send_first: internal error</c> noted; after, an ACK ends it with exit 71
-    /// <c>tftp_rx: internal error</c>, and any other opcode notes
-    /// <c>Internal error: Unexpected packet</c> first and ends it with that message. Nothing
-    /// is sent to the server.
+    /// Answers an opcode other than DATA, ERROR and OACK, as a first reply
+    /// (<see cref="AnswerUnexpectedFirstReplyAsync" />) or once the download has started
+    /// (<see cref="AnswerUnexpectedOpcodeAsync" />).
     /// </summary>
     /// <param name="opcode">The packet's opcode.</param>
-    /// <returns>The failure, or <see langword="null" /> for an opcode the download ignores.</returns>
-    private TransferResult? AnswerUnexpectedOpcode(ushort opcode)
+    /// <param name="received">The packet's length and source.</param>
+    /// <returns>The transfer's outcome when the packet ended it, otherwise <see langword="null" />.</returns>
+    private ValueTask<TransferResult?> AnswerOtherOpcodeAsync(ushort opcode, DatagramReceived received) =>
+        answered ? AnswerUnexpectedOpcodeAsync(opcode) : AnswerUnexpectedFirstReplyAsync(opcode, received);
+
+    /// <summary>
+    /// Answers a first reply a download does not handle as curl does
+    /// (<see cref="TftpUnexpectedOpcode" />): an ACK hands the transfer over to an upload of
+    /// nothing (<see cref="TftpUpload.TakeOverAsync" />), opcode 0 or 7 notes
+    /// <c>Internal error: Unexpected packet</c> and re-sends the request, and any other
+    /// opcode ends the download with exit 71 after <c>tftp_send_first: internal error</c>.
+    /// </summary>
+    /// <param name="opcode">The packet's opcode.</param>
+    /// <param name="received">The packet's length and source.</param>
+    /// <returns>The transfer's outcome when the packet ended it, otherwise <see langword="null" />.</returns>
+    private async ValueTask<TransferResult?> AnswerUnexpectedFirstReplyAsync(ushort opcode, DatagramReceived received)
     {
-        if (TftpUnexpectedOpcode.IsIgnored(opcode, answered, TftpPackets.AcknowledgementOpcode))
+        if (opcode == TftpPackets.AcknowledgementOpcode)
         {
-            return null;
+            var handOver = new TftpHandOver(
+                lastPacket, retries, resendAt, notedFailure, buffer[..received.Length], received.RemoteEndPoint);
+            return await new TftpUpload(context, channel, Stream.Null, startTimestamp)
+                .TakeOverAsync(handOver)
+                .ConfigureAwait(false);
         }
 
-        if (!answered)
+        if (TftpUnexpectedOpcode.ResendsTheRequest(opcode))
         {
-            events.InternalError(TftpUnexpectedOpcode.SendFirstMessage);
-            return TransferResult.Failure(CurlExitCode.TftpIllegal, TftpUnexpectedOpcode.UnexpectedPacketMessage, bytesTransferred);
+            NoteUnexpectedPacket();
+            return await ResendOrRunOutAsync().ConfigureAwait(false);
+        }
+
+        events.InternalError(TftpUnexpectedOpcode.SendFirstMessage);
+        return TransferResult.Failure(CurlExitCode.TftpIllegal, TftpUnexpectedOpcode.UnexpectedPacketMessage, bytesTransferred);
+    }
+
+    /// <summary>
+    /// Answers an opcode a download that has started does not handle as curl does
+    /// (<see cref="TftpUnexpectedOpcode" />): opcode 7 notes
+    /// <c>Internal error: Unexpected packet</c> and is taken as a timeout, re-sending the
+    /// last ACK; an ACK ends the download with exit 71 <c>tftp_rx: internal error</c>, and
+    /// any other opcode notes <c>Internal error: Unexpected packet</c> first and ends it with
+    /// that message, sending nothing.
+    /// </summary>
+    /// <param name="opcode">The packet's opcode.</param>
+    /// <returns>The transfer's outcome when the packet ended it, otherwise <see langword="null" />.</returns>
+    private ValueTask<TransferResult?> AnswerUnexpectedOpcodeAsync(ushort opcode)
+    {
+        if (opcode == TftpUnexpectedOpcode.TimeoutEventOpcode)
+        {
+            NoteUnexpectedPacket();
+            events.TimedOut(expectedBlock, retries + 1);
+            return ResendOrRunOutAsync();
         }
 
         var message = TftpUnexpectedOpcode.ReceiveMessage;
@@ -201,7 +272,18 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         }
 
         events.InternalError(TftpUnexpectedOpcode.ReceiveMessage);
-        return TransferResult.Failure(CurlExitCode.TftpIllegal, message, bytesTransferred);
+        return ValueTask.FromResult<TransferResult?>(
+            TransferResult.Failure(CurlExitCode.TftpIllegal, message, bytesTransferred));
+    }
+
+    /// <summary>
+    /// Notes <c>Internal error: Unexpected packet</c> as curl does, keeping it as the message
+    /// of whatever failure ends the download unless an earlier one was noted.
+    /// </summary>
+    private void NoteUnexpectedPacket()
+    {
+        notedFailure ??= TftpUnexpectedOpcode.UnexpectedPacketMessage;
+        events.InternalError(TftpUnexpectedOpcode.UnexpectedPacketMessage);
     }
 
     /// <summary>
@@ -361,11 +443,19 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     /// moving the next scheduled re-send.
     /// </summary>
     /// <returns>The failure when the retries had already run out, otherwise <see langword="null" />.</returns>
-    private async ValueTask<TransferResult?> AnswerTooShortAsync()
+    private ValueTask<TransferResult?> AnswerTooShortAsync()
     {
-        tooShortReceived = true;
-        return await ResendAsync().ConfigureAwait(false) ? null : RetriesRunOut();
+        notedFailure ??= TooShortMessage;
+        return ResendOrRunOutAsync();
     }
+
+    /// <summary>
+    /// Re-sends the last packet at once and counts a retry, without moving the next
+    /// scheduled re-send, or ends the download when the retries have already run out.
+    /// </summary>
+    /// <returns>The failure when the retries had already run out, otherwise <see langword="null" />.</returns>
+    private async ValueTask<TransferResult?> ResendOrRunOutAsync() =>
+        await ResendAsync().ConfigureAwait(false) ? null : RetriesRunOut();
 
     /// <summary>
     /// Re-sends the last packet and counts a retry, unless the retries have run out.
