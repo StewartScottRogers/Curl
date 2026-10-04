@@ -299,7 +299,8 @@ param(
     [double]$Hours = 8,
     # Stop after this many tasks. 0 means no limit.
     [int]$MaxTasks = 0,
-    # A single task run is killed after this long and filed as stalled.
+    # A single task run is killed after this long; a task still in Doing then gets one
+    # overtime run of a quarter of this (at least 30 min) and is Blocked if killed again.
     [int]$TaskMinutes = 120,
     # The most a single headless run may cost, in US dollars (claude's
     # --max-budget-usd); the cap is 2.7 times the median recent run up to this, and a run
@@ -2813,6 +2814,18 @@ starting over.
 
 '@
 
+# Put in front of either prompt when a task runs once more after its run was killed at
+# -TaskMinutes with the task still in Doing (AF-0042): its work stays in place, not stashed.
+$OvertimeNote = @'
+OVERTIME. The previous run of {ID} was killed at its time limit with the task still in
+Doing. Its work is still here: read git status, git log and the task file, and do not
+start over. This is the last run, {MINUTES} minutes long: do not run
+Measure-CodeQuality.ps1 again if a report from the previous run is in the log or on disk.
+Finish the task now if build and fast tests pass and its criteria are met, or move it to
+Backlog with a -Reason saying what is left. A run killed again ends Blocked.
+
+'@
+
 # A lane's run: the shift has claimed the task already, and the shift - not the run -
 # integrates and pushes, so parallel lanes never race each other to the shared branch.
 $LanePrompt = @'
@@ -3012,9 +3025,10 @@ function Invoke-TaskRun {
     # One headless Claude run in this checkout. By default it is the task run; a lane
     # passes its own prompt and deny list, and a log suffix for the resolver's run.
     # -Resume is the task run again after the usage limit cut the last one off.
-    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0, [switch]$Resume)
+    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0, [switch]$Resume, [switch]$Overtime)
     if (-not $Text) { $Text = if ($Lane) { $LanePrompt } else { $Prompt } }
-    if ($Resume) { $Text = $ResumeNote + $Text; $Suffix += '-resumed' }
+    if ($Overtime) { $Text = $OvertimeNote + $Text; $Suffix += '-overtime' }
+    elseif ($Resume) { $Text = $ResumeNote + $Text; $Suffix += '-resumed' }
     if ($null -eq $Deny) { $Deny = if ($Lane) { $LaneForbidden } else { $Forbidden } }
     if ($Minutes -le 0) { $Minutes = $TaskMinutes }
     # The run is told when it will be killed, so it can hand the task back before then (AF-0034).
@@ -4064,8 +4078,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $restarts = @{}
     # A lane is finished once it has written its summary. A herdr tab has no process to
     # watch, so the summaries are the signal; a lane that dies without one is given up on
-    # after the shift's length plus one task's time limit.
-    $giveUp = $shiftEnd.AddMinutes($TaskMinutes + 30)
+    # after the shift's length plus one task's time limit and its overtime run (AF-0042).
+    $giveUp = $shiftEnd.AddMinutes($TaskMinutes + [math]::Max(30, [int]($TaskMinutes / 4)) + 30)
     $tick = Get-Date
     $nextAutoStep = (Get-Date).AddMinutes(15)
     $nextCapacityStep = (Get-Date).AddMinutes(5)
@@ -4209,6 +4223,10 @@ $stopWhy = ''
 $resumeId = ''
 # How many times in a row the current task's run died on the API.
 $apiRetries = 0
+# The task whose run was killed at -TaskMinutes in Doing and now gets one overtime run of
+# $overtimeMinutes with its work in place, instead of a stash and Blocked (AF-0042).
+$overtimeId = ''
+$overtimeMinutes = [math]::Max(30, [int]($TaskMinutes / 4))
 
 Write-Heartbeat 'starting'
 if ($Lane) {
@@ -4283,8 +4301,19 @@ while ($true) {
     if (-not $resuming) { Write-Trace $id 'claim' (Get-Short (Get-TaskTitle $id)) 'Cyan' }
     if ($Lane) { Set-OwnTabLabel "$id $(Get-TaskTitle $id)" }
     Write-Heartbeat 'run'
-    $run = Invoke-TaskRun $id -Resume:$resuming
+    $inOvertime = $overtimeId -eq $id
+    $overtimeId = ''
+    $run = if ($inOvertime) { Invoke-TaskRun $id -Minutes $overtimeMinutes -Overtime } else { Invoke-TaskRun $id -Resume:$resuming }
     $state = Get-TaskState $id
+
+    # A run killed at its time limit keeps its claim and its work for one overtime run, so
+    # work with passing tests is finished rather than stashed and Blocked (AF-0042).
+    if ($run.TimedOut -and $state -eq 'Doing' -and -not $inOvertime) {
+        Write-Trace $id 'overtime' "timed out after $TaskMinutes min; one more run of $overtimeMinutes min with its work in place" 'Yellow'
+        $overtimeId = $id
+        $resumeId = $id
+        continue
+    }
 
     # Out of tokens is not a stall. The task keeps its claim and its partial work - nothing
     # is stashed or blocked - the shift waits for the new session and runs it again, and
@@ -4309,7 +4338,8 @@ while ($true) {
     $apiRetries = 0
 
     if ($state -eq 'Doing') {
-        $why = if ($run.TimedOut) { "timed out after $TaskMinutes min" }
+        $why = if ($run.TimedOut -and $inOvertime) { "timed out after $TaskMinutes min and again after $overtimeMinutes min of overtime" }
+            elseif ($run.TimedOut) { "timed out after $TaskMinutes min" }
             elseif (Test-BudgetSpent) { "stopped at its $($script:RunBudgetUsd) US dollar cost cap (2.7 times the median run, at most -TaskBudgetUsd), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
         Save-StrayChanges $id
         Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $(Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl")") | Out-Null
