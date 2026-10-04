@@ -35,3 +35,4 @@ Under `-v`, a transfer that looks in a netrc file and finds no entry for its hos
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
