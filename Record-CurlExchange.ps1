@@ -357,6 +357,8 @@
       read ber    read one whole BER element (X.690 8.1), such as one LDAP message,
                   from its identifier and definite length octets
       send <b>    send the bytes <b>, with the same backslash escapes as Response
+      pause <N>   wait N milliseconds before the next step, so a reply can be split
+                  across segments with a gap between them (BL-1434)
       close       close the connection and end the session
       reset       reset the connection (RST, not FIN) and end the session, so curl's
                   next receive or send fails with an I/O error (BL-845)
@@ -1812,6 +1814,9 @@ $serveScriptedSession = {
                 $stream.Write($step.Bytes, 0, $step.Bytes.Length)
                 $stream.Flush()
                 [void] $Transcript.Append("< $(ConvertTo-Hex -Bytes $step.Bytes)`r`n")
+            } elseif ($step.Kind -eq 'pause') {
+                Start-Sleep -Milliseconds $step.Milliseconds
+                [void] $Transcript.Append("= paused $($step.Milliseconds) ms`r`n")
             } elseif ($step.Kind -eq 'reset') {
                 # A zero linger time makes Close send RST instead of FIN.
                 $client.LingerState = New-Object System.Net.Sockets.LingerOption($true, 0)
@@ -1850,6 +1855,8 @@ function ConvertFrom-ExchangeScript {
         $argument = if ($text -match '^\S+\s+(.*)$') { $Matches[1] } else { '' }
         if ($verb -ceq 'send') {
             $steps.Add(@{ Kind = 'send'; Bytes = [byte[]] (ConvertFrom-EscapedResponse -Text $argument); Text = $text })
+        } elseif ($verb -ceq 'pause' -and $argument -match '^\d+$') {
+            $steps.Add(@{ Kind = 'pause'; Milliseconds = [int] $argument; Text = $text })
         } elseif ($verb -ceq 'close' -and $argument -eq '') {
             $steps.Add(@{ Kind = 'close'; Text = $text })
         } elseif ($verb -ceq 'reset' -and $argument -eq '') {
