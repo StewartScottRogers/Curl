@@ -28,6 +28,17 @@ public sealed class ProtocolDispatcherTests
     }
 
     [TestMethod]
+    [DataRow("dict", true)]
+    [DataRow("DICT", true)]
+    [DataRow("qttp", false)]
+    public void Serves_Scheme_SaysWhetherAHandlerIsRegisteredForItInAnyCase(string scheme, bool served)
+    {
+        ProtocolDispatcher dispatcher = new([new RecordingHandler(TransferResult.Success(0), "dict")]);
+
+        Assert.AreEqual(served, dispatcher.Serves(scheme));
+    }
+
+    [TestMethod]
     public async Task DispatchAsync_UppercaseSchemeOfRegisteredHandler_ReachesThatHandler()
     {
         TransferResult dictResult = TransferResult.Success(3);

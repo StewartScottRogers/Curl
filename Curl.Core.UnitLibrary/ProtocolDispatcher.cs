@@ -44,6 +44,15 @@ public sealed class ProtocolDispatcher
     }
 
     /// <summary>
+    /// Whether a registered handler serves <paramref name="scheme" />, in any case, so a transfer
+    /// can be refused with <c>Protocol "&lt;scheme&gt;" not supported</c> before anything else about
+    /// it, such as the netrc file, is looked at, as curl 8.21.0 resolves the scheme first (BL-1432).
+    /// </summary>
+    /// <param name="scheme">The URL's scheme.</param>
+    /// <returns><see langword="true" /> when a handler serves the scheme.</returns>
+    public bool Serves(string scheme) => handlersByScheme.ContainsKey(scheme);
+
+    /// <summary>
     /// Performs the transfer with the handler registered for its URL's scheme.
     /// </summary>
     /// <param name="context">The transfer to perform, passed to the handler unchanged.</param>
