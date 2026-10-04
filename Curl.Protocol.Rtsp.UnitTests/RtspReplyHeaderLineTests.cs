@@ -164,10 +164,46 @@ public sealed class RtspReplyHeaderLineTests
         Assert.IsFalse(transcript.Exists(line => line.StartsWith('{')));
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_ContentLengthTooLarge_ReportsOverflowBeforeTheLineAndWritesNothing()
+    {
+        var output = new MemoryStream();
+        (TransferResult result, _, List<string> transcript) = await RunAsync(
+            new ScriptedConnection(Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 99999999999999999999\r\n\r\nhello")),
+            output);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(0, output.Length);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "< RTSP/1.0 200 OK\r\n",
+                "< CSeq: 1\r\n",
+                "* Overflow Content-Length: value",
+                "< Content-Length: 99999999999999999999\r\n",
+                "< \r\n",
+                "* shutting down connection #0",
+            },
+            transcript[^6..]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TwoEqualTooLargeContentLengthNumbersOnOneLine_ReportOneOverflowAndExit0()
+    {
+        (TransferResult result, _, List<string> transcript) = await RunAsync(
+            "RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 99999999999999999999, 99999999999999999999\r\n\r\nhello");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "< CSeq: 1\r\n", "* Overflow Content-Length: value", "< Content-Length: 99999999999999999999, 99999999999999999999\r\n", "< \r\n" },
+            transcript[^5..^1]);
+        Assert.AreEqual(1, transcript.Count(line => line.StartsWith("* Overflow", StringComparison.Ordinal)));
+    }
+
     private static Task<(TransferResult Result, string Headers, List<string> Transcript)> RunAsync(string reply) =>
         RunAsync(new ScriptedConnection(Bytes(reply)));
 
-    private static async Task<(TransferResult Result, string Headers, List<string> Transcript)> RunAsync(ScriptedConnection server)
+    private static async Task<(TransferResult Result, string Headers, List<string> Transcript)> RunAsync(ScriptedConnection server, Stream? output = null)
     {
         var headers = new MemoryStream();
         var events = new RecordingTransferEvents();
@@ -175,7 +211,7 @@ public sealed class RtspReplyHeaderLineTests
             .ExecuteAsync(new TransferContext
             {
                 Url = CurlUrl.Parse("rtsp://127.0.0.1:47950/media"),
-                Output = new MemoryStream(),
+                Output = output ?? new MemoryStream(),
                 HeaderOutput = headers,
                 Events = events,
             });

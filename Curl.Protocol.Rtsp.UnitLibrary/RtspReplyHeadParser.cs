@@ -18,7 +18,8 @@ namespace Curl.Protocol.Rtsp;
 /// <c>Unable to read the CSeq header: [&lt;line&gt;]</c>. A <c>Content-Length</c> is a comma list
 /// of equal decimal numbers (<c>2, 2</c>), and a second one must agree with the first; anything
 /// else fails with 8, <c>Invalid Content-Length: value</c>, while a number too large for 64 bits
-/// is accepted and leaves no body (BL-840), unless a <c>--max-filesize</c> limit is set, when it fails
+/// is accepted and leaves no body (BL-840), its line reported after <c>Overflow Content-Length: value</c>
+/// and the connection closed after the transfer (BL-1403), unless a <c>--max-filesize</c> limit is set, when it fails
 /// with 63, <c>Maximum file size exceeded</c> (BL-1292). A carriage return inside a line fails with 8,
 /// <c>Carriage return found in header</c> (on the status line only once it has passed the
 /// status check), and a header line with no colon with 8, <c>Header without colon</c>; each
@@ -41,6 +42,9 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
 
     /// <summary>The exit 63 message for a <c>Content-Length</c> over the <c>--max-filesize</c> limit.</summary>
     internal const string MaxFileSizeExceeded = "Maximum file size exceeded";
+
+    /// <summary>The <c>-v</c> line for a <c>Content-Length</c> number too large for 64 bits.</summary>
+    internal const string OverflowContentLength = "Overflow Content-Length: value";
 
     /// <summary>The exit 8 message for a carriage return inside a line of the head.</summary>
     internal const string CarriageReturnInHeader = "Carriage return found in header";
@@ -76,12 +80,20 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
     /// </summary>
     internal long ContentLength => declaredLength ?? 0;
 
+    /// <summary>
+    /// Gets a value indicating whether the line just read is a <c>Content-Length</c> whose number
+    /// is too large for 64 bits, for which curl 8.21.0 reports <see cref="OverflowContentLength" />
+    /// before the line itself (measured, BL-1403).
+    /// </summary>
+    internal bool LineOverflowedContentLength { get; private set; }
+
     /// <summary>Reads one line of the head.</summary>
     /// <param name="line">The line, with its line ending.</param>
     /// <exception cref="RtspTransferException">curl refuses the line.</exception>
     internal void Accept(ReadOnlySpan<byte> line)
     {
         string text = Encoding.Latin1.GetString(line);
+        LineOverflowedContentLength = false;
         if (!HasStatus)
         {
             StatusCode = ParseStatusCode(text);
@@ -195,6 +207,8 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
 
         lengthTooLarge = !long.TryParse(item, NumberStyles.None, CultureInfo.InvariantCulture, out long length);
         RefuseTooLargeLengthUnderLimit();
+        LineOverflowedContentLength = lengthTooLarge;
+        CloseConnectionOnOverflow();
         declaredLength = lengthTooLarge || declaredLength is null || declaredLength == length ? length : throw InvalidLength();
     }
 
@@ -207,6 +221,14 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
         if (lengthTooLarge && maxFileSize > 0)
         {
             throw new RtspTransferException(CurlExitCode.FilesizeExceeded, MaxFileSizeExceeded);
+        }
+    }
+
+    private void CloseConnectionOnOverflow()
+    {
+        if (lengthTooLarge)
+        {
+            session.CloseConnection();
         }
     }
 
