@@ -244,6 +244,16 @@ internal static class FtpTransferMessages
     /// <returns>The message to report.</returns>
     internal static string UploadRefused(int code) => Format($"Failed FTP upload: {code}");
 
+    /// <summary>
+    /// curl 8.21.0's <c>-v</c> line when an upload of a known size ends, on a failure that
+    /// leaves the control connection usable, without its bytes all sent (BL-1395).
+    /// </summary>
+    /// <param name="bytesSent">The bytes written to the data connection.</param>
+    /// <param name="uploadSize">The size of the upload.</param>
+    /// <returns>The line, such as <c>Uploaded unaligned file size (0 out of 92 bytes)</c>.</returns>
+    internal static string UploadedUnalignedFileSize(long bytesSent, long uploadSize) =>
+        Format($"Uploaded unaligned file size ({bytesSent} out of {uploadSize} bytes)");
+
     /// <summary>The exit 23 message for an <c>-I</c> header line the header output refused.</summary>
     /// <param name="passed">The length of the refused line.</param>
     /// <returns>The message to report.</returns>
