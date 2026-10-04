@@ -39,3 +39,4 @@ Reading a proxy's reply to `CONNECT` (and to `CONNECT-UDP`), Curl writes curl 8.
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
