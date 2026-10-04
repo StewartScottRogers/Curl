@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1382 — Fix AF-0039: FailureToOpenSocket_WithMultipathTcpOnWindows_IsTheSystemsRefusal asserts only IsNotNull on the result
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now asserts `SocketError.ProtocolNotSupported` (WSAEPROTONOSUPPORT, the "Protocol not supported" curl 8.21.0 prints on Windows per BL-647) as the refusal's `SocketErrorCode`. The code, not the message, is pinned because `SocketException.Message` is localised. No production change.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. MPTCP-on-Windows test asserts SocketError.ProtocolNotSupported, not just non-null (AF-0039)

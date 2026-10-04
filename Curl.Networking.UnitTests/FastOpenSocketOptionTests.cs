@@ -101,7 +101,9 @@ public sealed class FastOpenSocketOptionTests
     public void FailureToOpenSocket_WithMultipathTcpOnWindows_IsTheSystemsRefusal()
     {
         // Windows has no Multipath TCP: curl 8.21.0 fails to open the socket there too (BL-647 Notes).
-        Assert.IsNotNull(new TcpDialer(new TcpSocketOptions(MultipathTcp: true)).FailureToOpenSocket(AddressFamily.InterNetwork));
+        var refusal = new TcpDialer(new TcpSocketOptions(MultipathTcp: true)).FailureToOpenSocket(AddressFamily.InterNetwork);
+
+        Assert.AreEqual(SocketError.ProtocolNotSupported, refusal?.SocketErrorCode);
     }
 
     [TestMethod]
