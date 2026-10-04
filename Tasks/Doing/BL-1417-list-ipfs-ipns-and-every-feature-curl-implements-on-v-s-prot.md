@@ -54,3 +54,4 @@ completed:
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
 - 2026-10-03: Doing -> Backlog. Needs Curl.Console.UnitTests (two -V Protocols assertions), which BL-1396 in Doing touches; code and ADR amendment done and green, left uncommitted for the stash
+- 2026-10-03: Backlog -> Doing.
