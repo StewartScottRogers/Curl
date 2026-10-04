@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.File;
 
@@ -89,6 +90,26 @@ internal static class FileTransferMessages
     /// The exit 36 message for a resume offset or range start past the end of the file.
     /// </summary>
     internal const string ResumeFailed = "failed to resume file:// transfer";
+
+    /// <summary>
+    /// The exit 33 message for <c>-r</c>/<c>--range</c> text that names no range, such as
+    /// <c>5-2</c>, <c>abc</c> or <c>-0</c>: curl 8.21.0's <c>Curl_range</c> answers it with
+    /// <c>CURLE_RANGE_ERROR</c>, whose easy error text this is.
+    /// </summary>
+    internal const string RangeNotDelivered = "Requested range was not delivered by the server";
+
+    /// <summary>
+    /// The information line for a file that fails <c>-z</c>: curl 8.21.0's
+    /// <c>Curl_meets_timecondition</c> (<c>lib/transfer.c</c>) writes
+    /// <c>The requested document is not new enough</c> for <c>-z date</c> and
+    /// <c>... not old enough</c> for <c>-z -date</c>, measured on 2026-10-03 (BL-1388).
+    /// </summary>
+    /// <param name="kind">Which way the unmet condition runs.</param>
+    /// <returns>The line, without the <c>* </c> prefix.</returns>
+    internal static string TimeConditionNotMet(TimeConditionKind kind) =>
+        kind == TimeConditionKind.IfModifiedSince
+            ? "The requested document is not new enough"
+            : "The requested document is not old enough";
 
     /// <summary>
     /// The exit 36 message for a suffix range — <c>-r -12</c> — asking for more trailing
@@ -205,20 +226,57 @@ internal static class FileTransferMessages
         "closing connection #" + connectionNumber.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// The pseudo-header lines curl synthesises for a local file, each with its CRLF,
-    /// followed by the blank line that ends a header block. They are kept apart because
-    /// curl writes them apart, and a failing header output reports the length of the line
-    /// it failed on (<see cref="HeaderWriteFailed" />).
+    /// Turns pseudo-headers into the lines that are written, each with its CRLF, followed
+    /// by the blank line that ends a header block. They are kept apart because curl writes
+    /// them apart, and a failing header output reports the length of the line it failed on
+    /// (<see cref="HeaderWriteFailed" />).
     /// </summary>
-    /// <param name="length">
-    /// The length of the whole file. It stays the whole file even when a range was asked
-    /// for, which is measured behaviour rather than an oversight.
+    /// <param name="headers">The headers, in the order they are written.</param>
+    /// <returns>The header lines to write, in order.</returns>
+    internal static string[] HeaderLines(KeyValuePair<string, string>[] headers) =>
+        [
+            .. headers.Select(header => header.Key + ": " + header.Value + "\r\n"),
+            EndOfHeaders,
+        ];
+
+    /// <summary>
+    /// The pseudo-headers curl's Linux and macOS builds synthesise for a directory they
+    /// list: only <c>Last-Modified</c>, because curl 8.21.0's <c>file_do</c>
+    /// (<c>lib/file.c</c> lines 414-444) leaves a directory's size unknown and writes
+    /// <c>Content-Length</c> and <c>Accept-ranges</c> only for a known size.
+    /// </summary>
+    /// <param name="lastWriteTimeUtc">
+    /// The directory's last-write timestamp, or <see langword="null" /> when the file
+    /// system could not determine one, which leaves no header at all.
     /// </param>
+    /// <returns>No headers or one.</returns>
+    internal static KeyValuePair<string, string>[] DirectoryPseudoHeaders(DateTimeOffset? lastWriteTimeUtc) =>
+        lastWriteTimeUtc is { } knownLastWriteTimeUtc ? [LastModified(knownLastWriteTimeUtc)] : [];
+
+    /// <summary>
+    /// The exit 26 message for a directory that cannot be listed: curl 8.21.0's
+    /// <c>file_do</c> returns <c>CURLE_READ_ERROR</c> when <c>opendir</c> fails without a
+    /// <c>failf</c>, so the message is that code's easy error text and no <c>-v</c> line
+    /// precedes it.
+    /// </summary>
+    internal const string DirectoryListingFailed = "Failed to open/read local data from file/application";
+
+    /// <summary>
+    /// The byte curl writes after each listed directory entry name.
+    /// </summary>
+    internal static readonly byte[] DirectoryEntrySeparator = [(byte)'\n'];
+
+    /// <summary>
+    /// The pseudo-headers curl synthesises for a local file, as name and value pairs,
+    /// without line endings or the blank line, in the order they are written: what the
+    /// handler reports as <see cref="Abstractions.TransferReport.PseudoHeaders" />.
+    /// </summary>
+    /// <param name="length">The length of the whole file.</param>
     /// <param name="lastWriteTimeUtc">
     /// The file's last-write timestamp, or <see langword="null" /> when the file system
-    /// could not determine one.
+    /// could not determine one, which leaves <c>Last-Modified</c> out.
     /// </param>
-    /// <returns>The header lines to write, in order.</returns>
+    /// <returns>Two or three headers.</returns>
     /// <remarks>
     /// <para>
     /// With a timestamp the block is three lines: <c>Content-Length</c>,
@@ -237,23 +295,6 @@ internal static class FileTransferMessages
     /// measurement.
     /// </para>
     /// </remarks>
-    internal static string[] PseudoHeaderLines(long length, DateTimeOffset? lastWriteTimeUtc) =>
-        [
-            .. PseudoHeaders(length, lastWriteTimeUtc).Select(header => header.Key + ": " + header.Value + "\r\n"),
-            EndOfHeaders,
-        ];
-
-    /// <summary>
-    /// The pseudo-headers of <see cref="PseudoHeaderLines" /> as name and value pairs,
-    /// without line endings or the blank line, in the order they are written: what the
-    /// handler reports as <see cref="Abstractions.TransferReport.PseudoHeaders" />.
-    /// </summary>
-    /// <param name="length">The length of the whole file.</param>
-    /// <param name="lastWriteTimeUtc">
-    /// The file's last-write timestamp, or <see langword="null" /> when the file system
-    /// could not determine one, which leaves <c>Last-Modified</c> out.
-    /// </param>
-    /// <returns>Two or three headers.</returns>
     internal static KeyValuePair<string, string>[] PseudoHeaders(long length, DateTimeOffset? lastWriteTimeUtc)
     {
         KeyValuePair<string, string> contentLength = new("Content-Length", length.ToString(CultureInfo.InvariantCulture));

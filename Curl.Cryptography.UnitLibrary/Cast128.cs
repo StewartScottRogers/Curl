@@ -14,9 +14,11 @@ namespace Curl.Cryptography;
 /// big-endian, as RFC 2144's test vectors are.
 /// </summary>
 /// <remarks>
-/// Not constant-time: CAST-128 indexes its S-boxes with key- and data-dependent bytes by
-/// design (ADR-0118); it exists because curl's SSH backends offer it. The 32 subkeys are
-/// copied into the instance and zeroed by <see cref="Dispose" />.
+/// Constant-time in the key and the data: the round function and the key schedule read
+/// every entry of each S-box in order and keep the one they need by mask, so no memory
+/// address depends on a key- or data-mixed byte (ADR-0398). It exists because curl's SSH
+/// backends offer it. The 32 subkeys are copied into the instance and zeroed by
+/// <see cref="Dispose" />.
 /// </remarks>
 public sealed class Cast128 : IDisposable
 {
@@ -239,16 +241,34 @@ public sealed class Cast128 : IDisposable
             _ => maskingKey - data,
         };
         uint input = BitOperations.RotateLeft(combined, rotationKey);
-        uint s1 = boxes[(int)(input >> 24)];
-        uint s2 = boxes[BoxLength + (int)((input >> 16) & 0xFF)];
-        uint s3 = boxes[(2 * BoxLength) + (int)((input >> 8) & 0xFF)];
-        uint s4 = boxes[(3 * BoxLength) + (int)(input & 0xFF)];
+        uint s1 = ReadBox(boxes, 0, input >> 24);
+        uint s2 = ReadBox(boxes, 1, (input >> 16) & 0xFF);
+        uint s3 = ReadBox(boxes, 2, (input >> 8) & 0xFF);
+        uint s4 = ReadBox(boxes, 3, input & 0xFF);
         return type switch
         {
             0 => ((s1 ^ s2) - s3) + s4,
             1 => ((s1 - s2) + s3) ^ s4,
             _ => ((s1 + s2) ^ s3) - s4,
         };
+    }
+
+    /// <summary>
+    /// Entry <paramref name="index" /> of 256-entry S-box number <paramref name="box" /> in
+    /// <paramref name="boxes" />, without a secret-dependent address (ADR-0398): every entry
+    /// of the box is read, in order, once, and kept only where its position equals
+    /// <paramref name="index" />, chosen by a mask computed without a branch.
+    /// </summary>
+    internal static uint ReadBox(ReadOnlySpan<uint> boxes, int box, uint index)
+    {
+        ReadOnlySpan<uint> table = boxes.Slice(box * BoxLength, BoxLength);
+        uint result = 0;
+        for (int position = 0; position < BoxLength; position++)
+        {
+            result |= ConstantTime.EqualMask((uint)position, index) & table[position];
+        }
+
+        return result;
     }
 
     private static void ScheduleKey(ReadOnlySpan<byte> key, Span<uint> destination)
@@ -277,11 +297,11 @@ public sealed class Cast128 : IDisposable
     private static int ApplyKeyScheduleRow(ReadOnlySpan<byte> row, Span<byte> buffer, Span<uint> destination, int next)
     {
         ReadOnlySpan<uint> boxes = Cast128SubstitutionBoxes.KeyScheduleBoxes;
-        uint mix = boxes[buffer[row[2]]]
-            ^ boxes[BoxLength + buffer[row[3]]]
-            ^ boxes[(2 * BoxLength) + buffer[row[4]]]
-            ^ boxes[(3 * BoxLength) + buffer[row[5]]]
-            ^ boxes[(row[6] * BoxLength) + buffer[row[7]]];
+        uint mix = ReadBox(boxes, 0, buffer[row[2]])
+            ^ ReadBox(boxes, 1, buffer[row[3]])
+            ^ ReadBox(boxes, 2, buffer[row[4]])
+            ^ ReadBox(boxes, 3, buffer[row[5]])
+            ^ ReadBox(boxes, row[6], buffer[row[7]]);
         if (row[0] == Subkey)
         {
             destination[next] = mix;

@@ -324,7 +324,7 @@ public sealed class CurlCompositionDohTests
 
     private static CommandLineOptions Parse(params string[] arguments)
     {
-        CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "http://example.test:48712/"], _ => true);
+        CommandLineParseResult parsed = OpenSslBuildParser.Parse([.. arguments, "http://example.test:48712/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;
     }

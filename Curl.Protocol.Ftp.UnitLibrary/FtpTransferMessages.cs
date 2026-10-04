@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Ftp;
 
@@ -69,24 +70,23 @@ internal static class FtpTransferMessages
         _ => UnsupportedModificationTimeReply,
     };
 
-    /// <summary>The exit 55 message for a command or upload write the peer reset.</summary>
-    internal const string SendConnectionReset = "Send failure: Connection was reset";
-
     /// <summary>
-    /// The exit 55 message for any other failed command or upload write: curl 8.21.0's
-    /// <c>curl_easy_strerror(CURLE_SEND_ERROR)</c>.
+    /// The exit 55 message for a failed command or upload write with no socket error inside:
+    /// curl 8.21.0's <c>curl_easy_strerror(CURLE_SEND_ERROR)</c>.
     /// </summary>
     internal const string SendFailedToPeer = "Failed sending data to the peer";
 
     /// <summary>
-    /// The exit 55 message for a write that threw <paramref name="exception" />: the reset
-    /// text for a <see cref="SocketError.ConnectionReset" />, otherwise curl's text for the code.
+    /// The exit 55 message for a write that threw <paramref name="exception" />: curl 8.21.0's
+    /// <c>Send failure: &lt;words&gt;</c> from <see cref="CurlSocketErrorText" /> when the
+    /// exception directly wraps a <see cref="SocketException" />, otherwise
+    /// <see cref="SendFailedToPeer" />.
     /// </summary>
     /// <param name="exception">What the connection threw.</param>
     /// <returns>The message.</returns>
     internal static string SendFailed(IOException exception) =>
-        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
-            ? SendConnectionReset
+        exception.InnerException is SocketException
+            ? CurlSocketErrorText.SendFailure(exception)!
             : SendFailedToPeer;
 
     /// <summary>
@@ -101,8 +101,24 @@ internal static class FtpTransferMessages
     /// </summary>
     internal const string DisablingEprt = "disabling EPRT usage";
 
-    /// <summary>The exit 56 message for a data connection that failed mid-transfer.</summary>
-    internal const string ReceiveFailed = "Failure when receiving data from the peer";
+    /// <summary>
+    /// The exit 56 message for a data connection that failed mid-transfer with no socket error
+    /// inside: curl 8.21.0's <c>curl_easy_strerror(CURLE_RECV_ERROR)</c>.
+    /// </summary>
+    internal const string ReceiveFailedFromPeer = "Failure when receiving data from the peer";
+
+    /// <summary>
+    /// The exit 56 message for a data read that threw <paramref name="exception" />: curl
+    /// 8.21.0's <c>Recv failure: &lt;words&gt;</c> from <see cref="CurlSocketErrorText" /> when
+    /// the exception directly wraps a <see cref="SocketException" />, otherwise
+    /// <see cref="ReceiveFailedFromPeer" />.
+    /// </summary>
+    /// <param name="exception">What the connection threw.</param>
+    /// <returns>The message.</returns>
+    internal static string ReceiveFailed(IOException exception) =>
+        exception.InnerException is SocketException
+            ? CurlSocketErrorText.ReceiveFailure(exception)!
+            : ReceiveFailedFromPeer;
 
     /// <summary>The exit 3 message for a path that decodes to a control character.</summary>
     internal const string PathHasControlCharacters = "path contains control characters";
@@ -227,6 +243,16 @@ internal static class FtpTransferMessages
     /// <param name="code">The reply's code.</param>
     /// <returns>The message to report.</returns>
     internal static string UploadRefused(int code) => Format($"Failed FTP upload: {code}");
+
+    /// <summary>
+    /// curl 8.21.0's <c>-v</c> line when an upload of a known size ends, on a failure that
+    /// leaves the control connection usable, without its bytes all sent (BL-1395).
+    /// </summary>
+    /// <param name="bytesSent">The bytes written to the data connection.</param>
+    /// <param name="uploadSize">The size of the upload.</param>
+    /// <returns>The line, such as <c>Uploaded unaligned file size (0 out of 92 bytes)</c>.</returns>
+    internal static string UploadedUnalignedFileSize(long bytesSent, long uploadSize) =>
+        Format($"Uploaded unaligned file size ({bytesSent} out of {uploadSize} bytes)");
 
     /// <summary>The exit 23 message for an <c>-I</c> header line the header output refused.</summary>
     /// <param name="passed">The length of the refused line.</param>

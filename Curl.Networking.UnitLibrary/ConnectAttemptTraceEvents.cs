@@ -10,8 +10,9 @@ namespace Curl.Networking;
 /// <c>[TCP]</c> lines curl 8.21.0 writes around its connect attempts under <c>--trace-config
 /// happy-eyeballs</c>, <c>tcp</c>, <c>network</c> or <c>all</c> (measured, BL-1161 Notes), and the
 /// <c>[TIMER] [HAPPY_EYEBALLS]</c> lines of its second-family timer under <c>timer</c>, <c>network</c> or
-/// <c>all</c> (measured, BL-1186 Notes), with a given <c>--connect-timeout</c>'s <c>[TIMER] [CONNECTTIMEOUT]</c>
-/// lines and, when the multi is traced too, each timer's <c>expires in</c> line (measured, BL-1210 Notes;
+/// <c>all</c> (measured, BL-1186 Notes), with a given <c>-m</c>'s <c>[TIMER] [TIMEOUT]</c> and
+/// <c>--connect-timeout</c>'s <c>[TIMER] [CONNECTTIMEOUT]</c> lines and, when the multi is traced too, each
+/// timer's <c>expires in</c> line (measured, BL-1210 and BL-1258 Notes;
 /// <see cref="ConnectStarting" />). It sits below
 /// the <c>[DNS]</c> and <c>[SETUP]</c> filters' events, so the lines it writes as a <c>Trying</c> line
 /// passes through come before theirs; the <see cref="AddressFamilyRace" /> tells it the rest
@@ -38,6 +39,10 @@ namespace Curl.Networking;
 /// The <c>--connect-timeout</c> given, whose <c>[TIMER] [CONNECTTIMEOUT]</c> lines are written, or
 /// <see langword="null" /> when none was: curl's default connect timeout writes none (measured, BL-1210 Notes).
 /// </param>
+/// <param name="transferTimeout">
+/// The <c>-m</c> given, whose <c>[TIMER] [TIMEOUT]</c> lines are written, or <see langword="null" /> when
+/// none was (measured, BL-1258 Notes).
+/// </param>
 internal sealed class ConnectAttemptTraceEvents(
     ITransferEvents inner,
     string host,
@@ -45,10 +50,12 @@ internal sealed class ConnectAttemptTraceEvents(
     bool tracesTcp,
     bool tracesTimer = false,
     bool tracesTimerExpiry = false,
-    TimeSpan? connectTimeout = null) : ITransferEvents
+    TimeSpan? connectTimeout = null,
+    TimeSpan? transferTimeout = null) : ITransferEvents
 {
     private const string HappyEyeballsTimer = "HAPPY_EYEBALLS";
     private const string ConnectTimeoutTimer = "CONNECTTIMEOUT";
+    private const string TransferTimeoutTimer = "TIMEOUT";
 
     /// <summary>The descriptor the first socket of a connect is written with.</summary>
     public const int FirstSocketDescriptor = 3;
@@ -81,15 +88,33 @@ internal sealed class ConnectAttemptTraceEvents(
     public void RaceStarting(TimeSpan timeout) => _secondFamilyTimeout = timeout;
 
     /// <summary>
-    /// Writes the <c>[TIMER] [CONNECTTIMEOUT] set for</c> line curl writes as the transfer sets up,
-    /// before any connection filter's line, when a <c>--connect-timeout</c> was given.
+    /// Writes the <c>[TIMER] [TIMEOUT] set for</c> line of a given <c>-m</c>, then the <c>[TIMER]
+    /// [CONNECTTIMEOUT] set for</c> line of a given <c>--connect-timeout</c>, which curl writes as the
+    /// transfer sets up, before any connection filter's line (measured, BL-1210 and BL-1258 Notes).
     /// </summary>
     public void ConnectStarting()
     {
-        if (connectTimeout is { } timeout)
+        foreach (var (name, timeout) in GivenTimers())
         {
-            WriteTimer(ConnectTimeoutTimer, $"set for {Microseconds(timeout)}ns");
+            WriteTimer(name, $"set for {Microseconds(timeout)}ns");
         }
+    }
+
+    // The timers of the -m and --connect-timeout given, in the order curl sets them.
+    private List<(string Name, TimeSpan Remaining)> GivenTimers()
+    {
+        var timers = new List<(string Name, TimeSpan Remaining)>();
+        if (transferTimeout is { } transfer)
+        {
+            timers.Add((TransferTimeoutTimer, transfer));
+        }
+
+        if (connectTimeout is { } connect)
+        {
+            timers.Add((ConnectTimeoutTimer, connect));
+        }
+
+        return timers;
     }
 
     /// <summary>Writes the poll round in which the second family's delay ran out.</summary>
@@ -242,26 +267,23 @@ internal sealed class ConnectAttemptTraceEvents(
             pending.Add((HappyEyeballsTimer, secondFamily));
         }
 
-        if (connectTimeout is { } timeout)
-        {
-            pending.Add((ConnectTimeoutTimer, timeout));
-        }
-
+        pending.AddRange(GivenTimers());
         WriteWait(pending);
     }
 
-    // Once the second family started on time, the connect timeout is the only timer left, with the
-    // second family's delay gone from it.
+    // Once the second family started on time, the -m and connect timeouts are the only timers left,
+    // with the second family's delay gone from each.
     private void WriteWaitAfterSecondFamilyDue()
     {
-        if (_attempts == 1 && _secondFamilyStartedOnTime && connectTimeout is { } timeout)
+        if (_attempts == 1 && _secondFamilyStartedOnTime)
         {
-            WriteWait([(ConnectTimeoutTimer, timeout - _secondFamilyTimeout!.Value)]);
+            WriteWait([.. GivenTimers().Select(timer => (timer.Name, timer.Remaining - _secondFamilyTimeout!.Value))]);
         }
     }
 
-    // curl's multi writes each pending timer's "expires in" line when it is traced, then names the
-    // nearest as the one that "gives multi timeout", in milliseconds rounded up (measured, BL-1210 Notes).
+    // curl's multi writes each pending timer's "expires in" line when it is traced, nearest first, then
+    // names the nearest as the one that "gives multi timeout", in milliseconds rounded up (measured,
+    // BL-1210 and BL-1258 Notes).
     private void WriteWait(List<(string Name, TimeSpan Remaining)> pending)
     {
         if (pending.Count == 0)
@@ -269,15 +291,16 @@ internal sealed class ConnectAttemptTraceEvents(
             return;
         }
 
+        var nearestFirst = pending.OrderBy(timer => timer.Remaining).ToList();
         if (tracesTimerExpiry)
         {
-            foreach (var (name, remaining) in pending)
+            foreach (var (name, remaining) in nearestFirst)
             {
                 WriteTimer(name, $"expires in {Microseconds(remaining)}ns");
             }
         }
 
-        var nearest = pending.MinBy(timer => timer.Remaining);
+        var nearest = nearestFirst[0];
         WriteTimer(nearest.Name, $"gives multi timeout in {(long)Math.Ceiling(nearest.Remaining.TotalMilliseconds)}ms");
     }
 

@@ -59,7 +59,7 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
 
         if (StepsNegotiateWithoutAnswering(request, challenges))
         {
-            await negotiate.StepWithoutAnsweringAsync(request, cancellationToken).ConfigureAwait(false);
+            await negotiate.StepWithoutAnsweringAsync(request, challenges, cancellationToken).ConfigureAwait(false);
             return null;
         }
 
@@ -109,7 +109,7 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
         {
             if (AnswersWithNegotiate(request, challenges))
             {
-                await negotiate.StepWithoutAnsweringAsync(request, cancellationToken).ConfigureAwait(false);
+                await negotiate.StepWithoutAnsweringAsync(request, challenges, cancellationToken).ConfigureAwait(false);
             }
 
             return null;

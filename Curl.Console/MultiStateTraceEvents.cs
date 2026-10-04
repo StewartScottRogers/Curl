@@ -87,6 +87,8 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
     private readonly ITransferEvents inner;
     private readonly TimeProvider timeProvider;
     private readonly Func<long> takeConnectionId;
+    private readonly TransferTimers timers;
+    private readonly IReadOnlyList<string> responseWaitTimerLines;
     private readonly long startTimestamp;
     private readonly Milestone[] failedConnectMilestones;
     private Milestone[] milestones;
@@ -100,11 +102,28 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
     /// <param name="inner">The transfer's own events.</param>
     /// <param name="timeProvider">The clock the <c>[PGRS-*] added</c> numbers are measured on.</param>
     /// <param name="takeConnectionId">Gives the number of the connection the transfer opens.</param>
-    public MultiStateTraceEvents(ITransferEvents inner, TimeProvider timeProvider, Func<long> takeConnectionId)
+    /// <param name="timers">
+    /// The transfer's <c>-m</c> and <c>--connect-timeout</c> timers, whose count and nearest delay the poll
+    /// lines give as <c>timeouts=</c> and <c>tinternal=</c> (measured, BL-1258 Notes); none when
+    /// <see langword="null" />.
+    /// </param>
+    /// <param name="responseWaitTimerLines">
+    /// The <c>[TIMER]</c> lines written between the response wait's poll lines, empty unless
+    /// <c>--trace-config timer</c> is on too (<see cref="TransferTimers.WaitLines" />); none when
+    /// <see langword="null" />.
+    /// </param>
+    public MultiStateTraceEvents(
+        ITransferEvents inner,
+        TimeProvider timeProvider,
+        Func<long> takeConnectionId,
+        TransferTimers? timers = null,
+        IReadOnlyList<string>? responseWaitTimerLines = null)
     {
         this.inner = inner;
         this.timeProvider = timeProvider;
         this.takeConnectionId = takeConnectionId;
+        this.timers = timers ?? new TransferTimers(null, null);
+        this.responseWaitTimerLines = responseWaitTimerLines ?? [];
         startTimestamp = timeProvider.GetTimestamp();
         milestones =
         [
@@ -300,8 +319,8 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
 
     private string[] ConnectPolledLines() =>
     [
-        Invariant($"[MULTI] [CONNECTING] pollset[fd={socketDescriptor} OUT], timeouts=0"),
-        "[MULTI] [CONNECTING] multi_wait(fds=1, timeout=1000) tinternal=-1",
+        Invariant($"[MULTI] [CONNECTING] pollset[fd={socketDescriptor} OUT], timeouts={timers.Count}"),
+        $"[MULTI] [CONNECTING] multi_wait(fds=1, timeout=1000) tinternal={timers.InternalTimeout}",
         "[MULTI] [CONNECTING] cf_setup_connect [0][!DNS][!SETUP][!HAPPY-EYEBALLS]",
     ];
 
@@ -310,10 +329,13 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
     private string[] RequestSentLines() =>
         ["[MULTI] [DO] -> [DID]", Added("DID", "PRETRANSFER"), Added("DID", "POSTRANSFER"), "[MULTI] [DID] -> [PERFORMING]"];
 
+    // curl writes its [TIMER] lines for the response wait between the poll set and the wait (measured,
+    // BL-1258 Notes).
     private string[] ResponsePolledLines() =>
     [
-        Invariant($"[MULTI] [PERFORMING] pollset[fd={socketDescriptor} IN], timeouts=0"),
-        "[MULTI] [PERFORMING] multi_wait(fds=1, timeout=1000) tinternal=-1",
+        Invariant($"[MULTI] [PERFORMING] pollset[fd={socketDescriptor} IN], timeouts={timers.Count}"),
+        .. responseWaitTimerLines,
+        $"[MULTI] [PERFORMING] multi_wait(fds=1, timeout=1000) tinternal={timers.InternalTimeout}",
     ];
 
     private string[] ResponseStartedLines() => [Added("PERFORMING", "STARTTRANSFER")];

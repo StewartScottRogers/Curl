@@ -244,3 +244,244 @@ Schannel) and `Record-CurlExchange.ps1 -Script` playing a plain HTTP proxy (BL-1
   wrapped them, so tracing never loses them.
 - Not written: through an HTTPS proxy (its TLS filter's lines are unmeasured, BL-1255), and the
   sequence of a second CONNECT after a `407` is unmeasured: each CONNECT writes the same lines.
+
+## Amendment, 2026-10-02 (BL-1246): `[SOCKS] query ALPN`
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and
+`Record-CurlExchange.ps1 -Script` playing a SOCKS5h proxy (BL-1246 Notes).
+
+- The ALPN query is answered by the connection's topmost filter, and only that filter writes the
+  line. Through a SOCKS proxy (or a `--preproxy` in front of a forward HTTP proxy) to a plain
+  `http://` target that is the SOCKS filter: `TcpConnector.SocksQueryAlpnLine`, `[SOCKS] query ALPN`,
+  after `Established connection` and before `using HTTP/1.x`, under `TracesSocksFilter` (`socks`,
+  `proxy`, a named `all`). It replaces `[TCP] query ALPN`: under `socks` and `tcp` together only the
+  `[SOCKS]` line is written, and under `network`, `-vvvv` or plain `-v` no `query ALPN` line at all.
+- Written once per new connection; a reused connection writes no second line (measured).
+- Not written over TLS: for an `https://` target the TLS filter sits above the SOCKS filter and
+  answers. The scripted proxy cannot finish a TLS handshake, so this follows from the filter order
+  and from the `network` measurement (only the topmost filter writes the line), not from a recording.
+  Through a CONNECT tunnel behind a pre-proxy the `[H1-PROXY]` filter answers, as before.
+
+## Amendment, 2026-10-02 (BL-1253): `[TCP]` I/O through a proxy, for the PROXY line, and what is left
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and
+`Record-CurlExchange.ps1` under `-s -v --trace-config tcp` (BL-1253 Notes).
+
+- `--haproxy-protocol`: the TCP filter sits below the HAPROXY filter, so the PROXY line's write is
+  traced like any other send, `[TCP] send(len=44) -> 0, 44` for a TCP4 line, after the dial's
+  `[TCP]` lines and before `Established connection`. `TcpConnector` writes it after writing the
+  line whenever the dial traces the TCP filter, over TLS too, since the line goes out before the
+  handshake.
+- A forward HTTP proxy (`-x http://...` to an `http://` URL) writes exactly what a direct plain
+  connection does (`query ALPN`, `send(len=131)` for the absolute-form request, `recv(len=102400)`);
+  its target already carries `PoolScheme` `http`, so the BL-1195 wrapper covered it and only a test
+  was added.
+- Left to their own tasks, because neither can be written from `Curl.Networking` alone:
+  - `https://`: curl's Schannel build traces the TLS records below the TLS filter, the handshake's
+    reads as `recv(len=4096)` and the application data's as `recv(len=103424)`, with record sizes
+    (`send(len=429)` for the ClientHello) that depend on the TLS stack's own messages and buffer
+    sizes; no `query ALPN` line. Matching that needs the record layer's read sizes, not a wrapper.
+  - FTP: the control connection reads as `recv(len=900)` and the data connection writes
+    `[TCP-1]` lines whose `len=` is the bytes still expected. The FTP control and data targets
+    look alike to `TcpConnector` (no `PoolScheme`), so the FTP handler has to say which is which
+    and what length to report, a change to `Curl.Protocol.Ftp.UnitLibrary` and `ConnectTarget`.
+
+## Amendment, 2026-10-02 (BL-1254): `[HTTPS-CONNECT]` through a proxy and over a Unix socket
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and
+`Record-CurlExchange.ps1` (`-Script` playing an HTTP or SOCKS5 proxy, `-UnixSocket`, `-Tls` playing
+an HTTPS proxy) under `-s -k -v --trace-config https-connect,setup` (BL-1254 Notes).
+
+- An `https://` origin reached through an HTTP, HTTPS or SOCKS proxy, or over `--unix-socket`, writes
+  the same `[HTTPS-CONNECT]` lines as a direct connect: `added` first, `connect, init` and the
+  `1st attempt` line before the setup filter's `happy eyeballing` line (or `Trying`), a poll-round
+  pair after `Trying`, the handshake's pairs, and `done=1` and the removal, or `all attempts failed`
+  and the exit code. `TcpConnector` builds the filter for each route through one helper
+  (`SetupAndDnsFilterEvents`), each route giving its own DNS and setup filters.
+- Through a proxy the filter also polls while the proxy works: one pair after the CONNECT request
+  head (before the reply's lines), and two before `Opened SOCKS connection`. As in the BL-1192
+  amendment the counts follow curl's poll timing; they are fixed to the loopback measurement. A
+  SOCKS handshake that fails writes none of its pairs (curl wrote four for a SOCKS5 whose local
+  resolve failed); the failure lines still end it.
+- The setup filter through a SOCKS proxy (not only its `added SOCKS filter` line) is now traced, for
+  every origin: `[SETUP] added` (none for an `https://` origin), `happy eyeballing to origin
+  <proxy>:<port>` (the SOCKS proxy is its origin, unlike an HTTP proxy's `to proxy`), and for an
+  `https://` origin `added SSL filter for origin` once the tunnel is open. Over a Unix socket it
+  eyeballs to `origin <path>:0`, the whole path though `Trying` cuts it to 45 characters, and adds the
+  SSL filter for an `https://` origin before the handshake.
+- Left to their own tasks: an HTTPS proxy's own `[SETUP]` lines (`added SSL filter for HTTP proxy`,
+  `added HTTP proxy tunnel filter`, measured; BL-1283), so through it only the `[HTTPS-CONNECT]`
+  lines are written; and `--http3`, which the reference build cannot do, so it could not be measured
+  (BL-1284).
+
+## Amendment, 2026-10-02 (BL-1255): the tunnel lines through an HTTPS proxy
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and
+`Record-CurlExchange.ps1 -Tls -Script` playing an HTTPS proxy (TLS, then the CONNECT and the
+tunnel's bytes), `--trace-config proxy,setup`, `http-proxy`, `ssl` and `all` (BL-1255 Notes).
+
+- Through an `Https` proxy the setup filter writes what it writes through a plain one (`[SETUP]
+  added`, `happy eyeballing to proxy H:P`, its removal; a refused dial writes nothing more), and
+  after the dial `added SSL filter for HTTP proxy` (`TcpConnector.HttpsProxySslFilterAddedLine`) and
+  `added HTTP proxy tunnel filter`, before the proxy's handshake. The tunnel's `[HTTP-PROXY]` and
+  `[H1-PROXY]` lines are the plain tunnel's, after `CONNECT: ... negotiated`.
+- Volatile: `[HTTP-PROXY] CONNECT` is written once before the proxy's handshake and once more for
+  each poll round the handshake waits; the loopback measurement had two. Curl writes both once the
+  handshake is done, before `CONNECT: ... negotiated`, so they follow the handshake's `-v` lines
+  rather than sitting among them. A failed proxy handshake writes only the first.
+- Not written: curl's `[SSL-PROXY]` lines (`cf_connect()`, `adjust_pollset, POLLIN fd=N`, `query
+  ALPN`), which `--trace-config proxy` and `ssl` both turn on. No `[SSL]` filter line is written
+  anywhere yet; they wait for that filter's own task.
+
+## Amendment, 2026-10-03 (BL-1259): `[TCP]` and `[TCP-1]` I/O of an FTP transfer
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and
+`Record-CurlExchange.ps1` under `-s -v --trace-config tcp` for a download, an upload (`-T`) and a
+listing (BL-1259 Notes).
+
+- `ConnectTarget.TcpIoTrace` (a `TcpIoTraceLines`: filter name, receive length, whether a read that
+  cannot complete at once is first written as `recv(len=<n>) -> 81, 0`) lets a handler say how its
+  connection's I/O is traced. `TcpConnector` wraps the connection in `TcpIoTraceConnection` with
+  those lines when the dial traces the TCP filter; a target without them keeps the BL-1195 rule
+  (`PoolScheme` `http` gets the HTTP lines and the `query ALPN` line, anything else none).
+- The control connection, when it stays plain: `[TCP] send(len=<n>) -> 0, <n>` before each `>`
+  command and `[TCP] recv(len=900) -> 0, <n>` before each `<` reply. No would-block line: curl's
+  `recv(len=900) -> 81, 0` before the final `226` is a race with the server (absent after a
+  listing), so it is not written. `QUIT` is sent as curl closes the connection and writes no
+  `[TCP]` line; the handler stops the control connection's info lines before it
+  (`InfoLineStoppingTransferEvents`).
+- The data connection, curl's second filter chain: `[TCP-1] recv(len=<bytes still expected>)`,
+  preceded by the would-block line for a read the server has not answered yet. With a known size
+  curl reads no end of file and stops at `SIZE`, so the session sizes its reads to the bytes still
+  expected and stops there; a listing reads `recv(len=102400)` to `-> 0, 0`; an upload writes
+  `[TCP-1] send(len=<n>) -> 0, <n>`.
+- `ftps://` and `--ssl`/`--ssl-reqd` transfers write none of these lines, as the reads below TLS
+  are records, not FTP's reads; they wait for the TLS record layer's task, like `https://`.
+
+## Amendment, 2026-10-03 (BL-1260): `[TCP]` I/O of an `https://` connection's TLS records
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) under
+`-s -v -k --trace-config tcp https://127.0.0.1:P/` (BL-1253 Notes): after `ALPN: curl offers
+http/1.1`, `send(len=429)`, `recv(len=4096) -> 81, 0`, `recv(len=4096) -> 0, 1175`, `send(len=158)`,
+`recv(len=4096) -> 0, 51`; then `send(len=108)` before the `>` lines and `recv(len=103424) -> 81, 0`,
+`recv(len=103424) -> 0, 72` before the `<` lines; no `[TCP] query ALPN`.
+
+- `TcpConnector.TlsRecordTraceFor` wraps a direct connection to an `https` origin (`PoolScheme`
+  `https`, no `Proxy`, not a forward proxy) dialled under `TracesTcpFilter` in `TcpIoTraceConnection`
+  before the TLS handshake, so the provider's record reads and writes are written. Its lines start as
+  `HttpsHandshakeLines` (`recv(len=4096)`) and change to `HttpsApplicationDataLines`
+  (`recv(len=103424)`) once the handshake succeeds; a read that cannot complete at once is first
+  written as `-> 81, 0`, as for plain HTTP. No `[TCP] query ALPN` is written: TLS answers that query.
+- What matches curl exactly: the order of the lines beside the TLS info lines and the `>`/`<` lines,
+  the `send` lines' form, the receive lengths, and the would-block lines when the server has not
+  answered yet. The receive lengths 4096 and 103424 are Schannel's buffers, pinned as constants
+  whatever buffer `SslStream` or the hand-built TLS client passes, since they say how curl reads, not
+  how many bytes arrive.
+- What cannot match byte for byte: the record sizes (`send(len=429)`, `1175`, `158`, `108`, ...) are
+  whatever the TLS stack in use writes and the server sends - `SslStream` (Schannel or OpenSSL
+  underneath) or `Curl.Tls` - so a different ClientHello, key share or session ticket gives other
+  numbers, and a stack that reads a record in two reads writes two `recv` lines. The handshake's
+  `adjust_pollset, !active, POLLIN fd=N` lines are poll rounds of curl's event loop with a socket
+  number Curl does not have; they are not written.
+- The OpenSSL build's lines on Linux and macOS were not reachable from the lane; Curl writes the
+  Schannel build's receive lengths on every platform until they are measured.
+- Through a proxy or a tunnel the TCP filter sits below the proxy's filter and the target's records
+  ride inside it; those connections keep writing no record lines.
+
+## Amendment, 2026-10-03 (BL-1283): the `[SETUP]` lines through an HTTPS proxy, end to end
+
+Decided by Claude under Stewart's delegation. BL-1255 already writes the setup filter's lines
+through `-x https://` in `TcpConnector`; BL-1283 pins them from the command line in
+`CurlCommandRunnerHttpsConnectTraceTests`, under `--trace-config setup` and `all`, against the
+measured order (BL-1283 Context, BL-1255 Notes):
+
+- `https://` origin: `happy eyeballing to proxy <host>:<port>`, `added SSL filter for HTTP proxy`,
+  `added HTTP proxy tunnel filter`, `added SSL filter for origin` once the tunnel is open, then the
+  removal. No bare `[SETUP] added`: the origin's ALPN connect filter adds the setup filter.
+- `http://` origin: `[SETUP] added` first, then the same lines without the origin's SSL filter.
+
+No behaviour changed; nothing volatile is pinned.
+
+## Amendment, 2026-10-03 (BL-1284): `[HTTPS-CONNECT]` and `[SETUP]` over QUIC
+
+Decided by Claude under Stewart's delegation. The Schannel reference build has no HTTP/3, so the
+lines were measured with curl.se's curl 8.22.0 ngtcp2 build (ADR-0180) against a loopback Kestrel
+HTTP/3 server, a TLS-only server and a silent UDP sink (BL-1284 Notes). 8.22.0 writes the same
+filter lines as 8.21.0 for a TCP connect plus two `HTTPS-RR not available` lines, which are not
+written, as for TCP. `TcpConnector.ConnectMultiplexedAsync` now wraps a direct QUIC connect to an
+`https://` origin in the setup and `[HTTPS-CONNECT]` filters (no `[DNS]` filter, not measured over
+QUIC): `1st attempt uses h3`, then under `--http3` `2nd attempt uses h2 from wanted versions`
+(`TcpConnector.HttpsConnectSecondAttemptVersion`, set by the composition), the setup filter's
+`happy eyeballing`, one poll round after `Trying` and one before the finished QUIC handshake (not
+two, as for TCP), and no `[SETUP] added SSL filter for origin`. Under `--http3-only` a failed QUIC
+connect writes `all attempts failed` and its code. Under `--http3` the failure is kept on the
+target for the TCP attempt the race starts on the same target, which adds no filter and writes
+`h3 baller failed, starting h2` (QUIC failed) or two more poll rounds and `h3 inconclusive after
+<happy-eyeballs ms>, starting h2` (QUIC still connecting, the TCP rounds then counting `2 socks`),
+the QUIC attempt's `[SETUP] destroy` after the filter's own once connected, and the QUIC attempt's
+exit code if TCP fails too. Not written, as for TCP: `[SETUP] query ALPN`. Through a proxy
+(CONNECT-UDP), and for an Alt-Svc race that tries TCP first, QUIC writes no filter lines yet.
+
+## Amendment, 2026-10-03 (BL-1320): `[HTTPS-CONNECT]` and `[SETUP]` through a CONNECT-UDP proxy
+
+Decided by Claude under Stewart's delegation. Measured with curl.se's curl 8.22.0 ngtcp2 build,
+`-v --trace-config https-connect,setup`, `Record-CurlExchange.ps1` as an HTTP proxy answering 403
+(BL-1320 Notes). A QUIC connect through an HTTP or HTTPS proxy now goes through the same filters as
+a direct one (`TcpConnector.ConnectMultiplexedThroughProxyAsync`): `added`, `connect, init`, the
+attempt lines, `[SETUP] happy eyeballing to proxy <proxy>:<port>`, the proxy's `Trying` and one poll
+round, `[SETUP] added HTTP proxy tunnel filter`, `CONNECT-UDP: no ALPN negotiated` (now written for
+an HTTP proxy too), `Establishing HTTP proxy UDP tunnel to <host>:<port>`, the request head (now
+reported) and one poll round, the reply's header lines (now reported) and `CONNECT-UDP tunnel
+failed, response <n>`; under `--http3-only` then `all attempts failed` and its code. Under `--http3`
+the CONNECT tunnel that follows on the same target goes on from the kept state, as after a direct
+QUIC attempt: `h3 baller failed, starting h2`, then the CONNECT path's own lines. An opened tunnel
+writes `CONNECT-UDP phase completed for HTTP proxy` before `established` (measured, BL-942), and the
+QUIC handshake's one round, `done=1` and the removals follow as for a direct QUIC connect (not
+measured: no CONNECT-UDP proxy was at hand). An HTTPS proxy writes `[SETUP] added SSL filter for
+HTTP proxy` and the tunnel filter line before its handshake, as its CONNECT tunnel does (not
+measured). The Alt-Svc race that tries TCP first is BL-1360 (its amendment below).
+
+## Amendment, 2026-10-03 (BL-1360): `[HTTPS-CONNECT]` for the `--http3` race that tries TCP first
+
+Decided by Claude under Stewart's delegation. Measured with curl.se's curl 8.22.0 ngtcp2 build,
+`-v --trace-config https-connect` and `Record-CurlExchange.ps1 -Tls [-UdpSink | -NoServer]` with an
+`--alt-svc` file line naming the origin itself with `h2` or `h1` (BL-1320 Notes). The connector now
+tells this race from the QUIC-first one: `AltSvcTransferCache` keeps the entry's version as
+`HttpRequestOptions.TcpFirstAttemptVersion` (`h2` or `h1`; `TriesTcpBeforeQuic` is now true exactly
+when it is set), and `HttpProtocolHandler.RaceTcpAgainstQuicAsync` puts it on both attempts'
+`ConnectTarget`. The TCP attempt writes `1st attempt uses <h2|h1> from preferred version` and
+`2nd attempt uses h3 from wanted versions`, and keeps its filter state on the target, as the QUIC
+attempt does the other way round; a TCP attempt that connects writes no QUIC lines. After a refused
+TCP attempt the QUIC one goes on from the kept state with `<h2|h1> baller failed, starting h3`, and
+with QUIC refused too, `connect, all attempts failed` and `connect -> 7, done=0`. A TCP-first target
+without the `[HTTPS-CONNECT]` filter keeps no attempt, and a QUIC attempt with no TCP attempt before
+it starts the filter afresh. Pinned in `TcpConnectorQuicTests.TcpFirstHttpsConnectTrace.cs`.
+
+## Amendment, 2026-10-03 (BL-1287): the `[SSL]` and `[SSL-PROXY]` lines of a TLS handshake
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, Schannel) and
+`Record-CurlExchange.ps1 -Tls` for a direct `https://` transfer and, with `-Script`, through an
+HTTPS proxy, under `--trace-config ssl`, `proxy`, `network`, `tls`, `all` and `-vvvv` (BL-1287 Notes).
+
+- Which components: `[SSL]` (the origin's SSL filter) under `ssl`, `network` and `all`, `-vvvv`'s
+  included; `[SSL-PROXY]` (an HTTPS proxy's) only under `proxy` and a named `all`, not under `ssl`,
+  `network` or `-vvvv`. `tls` turns on neither. This corrects the BL-1255 amendment, which said
+  `ssl` turns on `[SSL-PROXY]` too: measured, it does not.
+- `SslFilterTrace` writes them from `TcpConnector`: `cf_connect()` before the handshake's trust
+  lines; once the handshake returns, its poll rounds (`cf_connect() -> 0, done=0`,
+  `adjust_pollset, POLLIN fd=N`, and `cf_connect()` again, each round of an HTTPS proxy's handshake
+  writing `[HTTP-PROXY] CONNECT` before its `cf_connect()`), then `cf_connect() -> 0, done=1`
+  before `Established connection`. The ALPN query, `query ALPN` and `query ALPN: returning '<p>'`
+  (`(nil)` when ALPN agreed nothing), is answered by the topmost filter: the origin's SSL filter for
+  an `https` transfer after `Established connection` and the setup filters' removal, before
+  `using HTTP/1.x`; the proxy's SSL filter before `CONNECT: ... negotiated`. A forward HTTPS proxy's
+  handshake writes `[SSL-PROXY]` lines and no ALPN query (unmeasured; follows from the filter names).
+- Volatile, fixed: the poll rounds, two on loopback, are written as two for a handshake that
+  succeeded and one for one that failed (measured once each); the descriptor `fd=N` is written as
+  the first socket's, `fd=3`, as the `[TCP]` lines do. The rounds are written once the handshake is
+  done, so they follow its `-v` lines (`ALPN: server ...`) rather than sitting between its `ALPN:
+  curl offers` and `ALPN: server ...` lines: the handshake's lines are rendered from one event in
+  `Curl.Output`, outside this task. This replaces `HttpProxyTunnelTrace.ReportProxyHandshakePolled`.
+- A failed handshake ends with `cf_connect() -> <exit code>, done=0` (measured `60` for an untrusted
+  certificate); through an HTTPS proxy its one round writes a second `[HTTP-PROXY] CONNECT`.
+- Not written: curl's `[SSLS]` session-cache lines under `all`.

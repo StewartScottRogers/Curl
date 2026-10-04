@@ -35,7 +35,8 @@ handler holds no proxy code.
   data received, the server's close as a zero-byte block, and then
   `shutting down connection #N`, which a refused path reports too.
 - `DictIoFailures` turns a failed send, receive or output write into curl's exit
-  55, 56 or 23 and its message (BL-1125); the handler returns it rather than
+  55, 56 or 23 and its message (BL-1125), wording any socket error with the
+  shared `CurlSocketErrorText` table (BL-1337); the handler returns it rather than
   throwing, and `-v` then shows the message (unless it is curl's fallback text),
   `Failed sending DICT request` after a failed send, and `closing connection #N`.
 

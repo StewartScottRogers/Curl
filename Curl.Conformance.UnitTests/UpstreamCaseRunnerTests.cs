@@ -166,6 +166,41 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_WriteDelaysWithNoCurlTimer_AreSkippedSoTheCaseTakesNoRealTime()
+    {
+        // Two writes a minute apart would take two minutes on the real clock; the limit is ten seconds.
+        string testFile = HttpCase.Replace("</reply>", "<servercmd>\nwritedelay: 60000\n</servercmd>\n</reply>", StringComparison.Ordinal);
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.21.0\r\n\r\n", invocation.Arguments[1]);
+            return 0;
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_WriteDelaysWithACurlTimer_TakeRealTime()
+    {
+        string testFile = HttpCase
+            .Replace("</reply>", "<servercmd>\nwritedelay: 300\n</servercmd>\n</reply>", StringComparison.Ordinal)
+            .Replace("%TESTNUMBER\n</command>", "%TESTNUMBER -m 5\n</command>", StringComparison.Ordinal);
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.21.0\r\n\r\n", invocation.Arguments[1]);
+            return 0;
+        });
+        long startedAt = TimeProvider.System.GetTimestamp();
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.IsGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(300), TimeProvider.System.GetElapsedTime(startedAt));
+    }
+
+    [TestMethod]
     public async Task RunAsync_CurlThatThrows_FailsNamingTheException()
     {
         UpstreamCaseRunner runner = Runner(_ => throw new InvalidOperationException("boom"));

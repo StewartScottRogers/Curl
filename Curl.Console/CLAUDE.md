@@ -124,8 +124,9 @@ name already taken is refused with `File exists` and exit 23. Measured on curl 8
 
 `TransferContextFactory` builds each transfer's context from the parsed options; the
 context carries the `-r` text as given (`RangeText`, which the HTTP handler sends verbatim)
-and its parsed range (`ByteRangeParser`; text that names no range ends the transfer with exit
-33 before it is dispatched, except on an `http`/`https` URL, BL-386), the `-C` offset and the
+and its parsed range (`ByteRangeParser`; text that names no range goes to every handler with a `null` range, as
+curl 8.21.0 hands it on: FTP and file parse it themselves, SFTP after `STAT`, HTTP, RTSP and
+WebSocket send it, the rest, SCP among them, ignore it, BL-386, BL-1322, BL-1396), the `-C` offset and the
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
 Every context also carries `Http`, which `HttpRequestOptionsMapping` fills from `-X`,
@@ -156,7 +157,10 @@ bytes and output as BL-177, BL-180 and BL-315 measured them.
 With `-b` or `-c` the handler also gets the option group's `CookieEngine`: one `CookieStore`
 shared by every URL of every group (`CurlComposition.SharingRunCookies`), the `-b` files loaded before the first transfer (session cookies dropped under
 `-j`, a missing file ignored), the `-b name=value` strings sent after the stored cookies (left out when an `-H` value names
-`Cookie`, BL-291), and
+`Cookie`, BL-291) as one string joined as curl's `cookie_setopts` joins them (`;` and a space,
+no space before a string starting with a blank; one of 8200 bytes or more fails every transfer
+of the group before it connects with exit 100, after `Warning: skipped provided cookie ...`
+unless `-s`, BL-1391), and
 the `-c` jar written after every `http`/`https` transfer, after its `-w` output, whatever its
 outcome, and after no other scheme's (`-c -` prints it to standard output each time, in the
 mode standard output is in). With nothing but `-b` strings, received cookies are not stored,
@@ -266,12 +270,17 @@ Under `-n`, `--netrc-file` or `--netrc-optional` the netrc file has its say too,
 `-u`'s. A `-u` with a user name wins and no file is read. The file is the `--netrc-file` one, else
 `.netrc` in `HOME` (on Windows `_netrc` after it, and `USERPROFILE` when `HOME` is not set), read
 through the runner's `IDataFileReader` and environment. The URL's percent-decoded user name picks
-the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; with no entry the
-URL's user and password are sent. A required file that is missing or malformed fails each URL with
+the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; an entry with no
+login takes the URL's user name, and one with no password sends an empty one, never the URL's
+(BL-1356); with no entry the URL's user and password are sent. A required file that is missing or malformed fails each URL with
 `curl: (26) .netrc error: no such file` or `syntax error` before anything is sent;
 `--netrc-optional` ignores both. When the file is in use, `TransferCredentialLookup.ForRedirectHops`
 gives `RedirectFollower` the same lookup for each redirect hop's URL, so every hop sends its own
 host's entry or none, `--location-trusted` or not (BL-790). Measured on curl 8.21.0 (BL-505 Notes).
+URL credentials that percent-decode to a byte below 0x20 (only `%00` for `http`, `https`, `ws` and
+`wss`) fail with `curl: (3) error extracting credentials from URL` before connecting, a redirect
+hop's too, and a matching netrc entry holding one with `curl: (26) control code detected in .netrc
+credentials` except over those four schemes; `-v` writes each as an info line first (BL-1411).
 An `ftp` or `ftps` URL is claimed by `RoutingFtpProtocolHandler`, which hands an `ftp` one to
 the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
@@ -318,7 +327,10 @@ attempt gets a fresh `-m`. HTTP, TFTP and telnet (`Time-out`) keep their own mea
 Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result carries
 `SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
-failed stamp is ignored for now; curl's warning lines for it are BL-139.
+failed stamp prints curl's `Failed to set filetime` warning lines unless `-s`. On Windows a
+time before 1752-09-14T00:00:00Z is first capped to it with `Warning: Capping set filetime to
+minimum to avoid overflow` (unless `-s`), as curl 8.21.0 does; off Windows it is set as given
+(BL-1392).
 
 Under `--xattr`, just before that stamp, a successful transfer to an `-o`/`-O` file it opened itself
 (not one created empty afterwards) gets curl's four extended attributes - `user.creator`,
@@ -335,7 +347,9 @@ as a glob and closes after the last transfer (ADR-0046): `-v` is `Curl.Output`'s
 output is a terminal; a trace is its `TraceTransferEventWriter`, stamped under `--trace-time`, into
 the named file (opened once per run, truncated), standard output for `-`, standard error for `%`,
 and standard error, with no warning, for a file that cannot be opened. On Windows each is text
-mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). Under `--trace-ids` (or `-vv`) each transfer
+mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). A transfer URL curl's parser rejects is
+reported to the transfer's events before connecting as the info line `URL rejected: <reason>`,
+ahead of its `curl: (3)` (or `(67)`) line, as curl 8.21.0's `failf` does (BL-1332). Under `--trace-ids` (or `-vv`) each transfer
 reports through a `TraceIdsTransferEvents` view, so its lines carry `[<xfer>-<conn>] ` after the
 stamp, `[<xfer>-x] ` for the `--resolve` and `-b` lines before it connects (ADR-0202, BL-648).
 Under `--trace-config read` (or `all`, `-vvv`, `-vvvv`) the runner writes curl's
@@ -347,7 +361,10 @@ HTTP/1.x `-d` or `-T` body's upload reader lines (ADR-0383, BL-1189).
 Under `--trace-config multi` (or `network`, `all`, `-vvvv`) the runner writes curl's `[MULTI] [INIT]`
 lines up to `[SETUP] -> [CONNECT]` before that, and `MultiStateTraceEvents`, inside the `[READ]` and
 `[WRITE]` events, writes each later group of `[MULTI]` lines beside the transfer line curl writes it
-next to (ADR-0382, BL-1188).
+next to (ADR-0382, BL-1188). Its poll lines give `timeouts=` and `tinternal=` from `TransferTimers`
+(a positive `-m` and `--connect-timeout`), and under `--trace-config timer` the response wait's
+`[TIMER]` lines (`TransferTimers.WaitLines`) go between its `PERFORMING` poll lines; with the multi
+not traced, `ResponseWaitTimerTraceEvents` writes them after `Request completely sent off` (ADR-0401, BL-1258).
 The lines are only as complete as what the
 handler and connector report (BL-242 Notes name the follow-ups).
 

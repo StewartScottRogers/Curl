@@ -206,7 +206,13 @@ jobs:
             $body = (@("Released by the Release approved findings workflow ($env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID):", '') + $released +
               @('', 'An interactive session merges this once CI is green; this workflow never merges it.')) -join "`n"
             gh pr create --repo $env:GITHUB_REPOSITORY --head audit --base master --title "audit: findings $findingList become $taskList" --body $body
-            if ($LASTEXITCODE -ne 0) { throw 'Could not open the audit pull request.' }
+            # The repository does not let GitHub Actions create pull requests, so a refusal
+            # is expected: the tasks and findings are already pushed, and an interactive
+            # session opens the pull request.
+            if ($LASTEXITCODE -ne 0) {
+              "The audit branch is pushed, but GitHub Actions may not open pull requests here: an interactive session opens audit -> master." | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+              Write-Host '::warning::Could not open the audit pull request; an interactive session opens it.'
+            }
           }
 
           # 6. The released pairs, in the job summary.

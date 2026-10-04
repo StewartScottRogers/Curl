@@ -12,13 +12,19 @@ namespace Curl.Protocol.Telnet;
 /// <c>lib/telnet.c</c>'s <c>printsub</c> writes, one information line each, each run of
 /// output data as data received, and the line the connection ends with.
 /// </summary>
-/// <param name="events">Where the lines and blocks go.</param>
+/// <param name="events">Where the lines and blocks are queued, in order with the replies they surround.</param>
 /// <remarks>
 /// Nothing sent is reported as data - neither negotiation nor the upload - because curl
 /// traces neither, and the server's close is not reported as a zero-byte block.
 /// </remarks>
-internal sealed class TelnetTraceReporter(ITransferEvents events)
+internal sealed class TelnetTraceReporter(TelnetOutbox events)
 {
+    /// <summary>
+    /// The exit 8 text for data received under <c>-I</c>: curl 8.21.0's download writer
+    /// returns <c>CURLE_WEIRD_SERVER_REPLY</c> without <c>failf</c>, so no <c>-v</c> line.
+    /// </summary>
+    internal const string WeirdServerReplyMessage = "Weird server reply";
+
     /// <summary>The first option number <c>lib/telnet.c</c> has no name for.</summary>
     private const int FirstUnnamedOption = 40;
 
@@ -123,7 +129,9 @@ internal sealed class TelnetTraceReporter(ITransferEvents events)
     /// returns without calling <c>failf</c>, and so without a <c>-v</c> line.
     /// </summary>
     private static bool IsStrerrorText(string message) =>
-        message is TelnetOptionParser.BadFunctionArgumentMessage or TelnetOptionParser.UnknownOptionMessage;
+        message is TelnetOptionParser.BadFunctionArgumentMessage
+            or TelnetOptionParser.UnknownOptionMessage
+            or WeirdServerReplyMessage;
 
     private static string NegotiationLine(string direction, byte command, byte option)
     {

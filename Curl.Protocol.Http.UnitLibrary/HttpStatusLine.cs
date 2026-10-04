@@ -7,8 +7,8 @@ namespace Curl.Protocol.Http;
 /// The status line of one HTTP/1.x response, parsed as curl 8.21.0 parses it, or of an
 /// HTTP/2 response as <see cref="Http2ResponseHead" /> writes it.
 /// </summary>
-/// <param name="version">The protocol version: <see cref="HttpVersion.Version10" />, <see cref="HttpVersion.Version11" /> or <see cref="HttpVersion.Version20" />.</param>
-/// <param name="statusCode">The three-digit status code, from 100 to 999.</param>
+/// <param name="version">The protocol version: <see cref="HttpVersion.Version10" />, <see cref="HttpVersion.Version11" /> or <see cref="HttpVersion.Version20" />, or 0.9 for <see cref="Http09" />.</param>
+/// <param name="statusCode">The three-digit status code, from 100 to 999, or 0 for <see cref="Http09" />.</param>
 /// <param name="reasonPhrase">The text after the status code, without leading blanks; empty when there is none.</param>
 internal sealed class HttpStatusLine(Version version, int statusCode, string reasonPhrase)
 {
@@ -17,12 +17,12 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
     private const int ReasonOffset = CodeOffset + 3;
 
     /// <summary>
-    /// Gets the protocol version: <see cref="HttpVersion.Version10" />, <see cref="HttpVersion.Version11" /> or <see cref="HttpVersion.Version20" />.
+    /// Gets the protocol version: <see cref="HttpVersion.Version10" />, <see cref="HttpVersion.Version11" /> or <see cref="HttpVersion.Version20" />, or 0.9 for <see cref="Http09" />.
     /// </summary>
     internal Version Version { get; } = version;
 
     /// <summary>
-    /// Gets the three-digit status code, from 100 to 999.
+    /// Gets the three-digit status code, from 100 to 999, or 0 for <see cref="Http09" />.
     /// </summary>
     internal int StatusCode { get; } = statusCode;
 
@@ -93,13 +93,33 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
     /// </exception>
     internal static void RejectHttp09(ReadOnlySpan<byte> received)
     {
-        ReadOnlySpan<byte> prefix = "HTTP/"u8;
-        int length = Math.Min(received.Length, prefix.Length);
-        if (!System.Text.Ascii.EqualsIgnoreCase(received[..length], prefix[..length]))
+        if (!CanBeginHttp(received))
         {
             throw Unsupported(HttpTransferMessages.Http09NotAllowed);
         }
     }
+
+    /// <summary>
+    /// Tells whether bytes received so far could still begin a status line: they match
+    /// <c>HTTP/</c>, in any letter case, as far as they go.
+    /// </summary>
+    /// <param name="received">The first bytes of the response.</param>
+    /// <returns><see langword="false" /> when they cannot, so the response is HTTP/0.9.</returns>
+    internal static bool CanBeginHttp(ReadOnlySpan<byte> received)
+    {
+        ReadOnlySpan<byte> prefix = "HTTP/"u8;
+        int length = Math.Min(received.Length, prefix.Length);
+        return System.Text.Ascii.EqualsIgnoreCase(received[..length], prefix[..length]);
+    }
+
+    /// <summary>
+    /// Gives the status line of an HTTP/0.9 response that <c>--http0.9</c> accepts, which has
+    /// none: version 0.9, status code 0 and no reason phrase, so <c>%{http_code}</c> writes
+    /// <c>000</c> and <c>%{http_version}</c> writes <c>0</c>, as curl 8.21.0 does (measured,
+    /// BL-1275 Notes).
+    /// </summary>
+    /// <returns>The HTTP/0.9 status line.</returns>
+    internal static HttpStatusLine Http09() => new(new Version(0, 9), 0, string.Empty);
 
     private static HttpStatusLine ParseMajorVersion(string line) => line[5] switch
     {

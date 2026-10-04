@@ -90,7 +90,7 @@ namespace Curl.Core;
 /// <see cref="OperatingSystem.IsWindows" />.
 /// </param>
 /// <param name="hsts">
-/// The run's HSTS cache, which learns from every hop's response and switches every <c>http</c>
+/// The run's HSTS cache, which switches every <c>http</c>
 /// redirect target it knows to <c>https</c> before the target's scheme is checked, reporting
 /// <see cref="HstsTransferPolicy.SwitchedMessagePrefix" /> and the URL to the hop's events, as
 /// curl 8.21.0 does after <c>Issue another request to this URL</c> (BL-621 Notes);
@@ -168,13 +168,9 @@ public sealed class RedirectFollower(
             : DispatchAsync(context, policy);
     }
 
-    /// <summary>Performs one hop and teaches the HSTS cache from its response.</summary>
-    private async ValueTask<TransferResult> DispatchAsync(ITransferContext hop, RedirectPolicy policy)
-    {
-        TransferResult result = await dispatcher.DispatchAsync(hop, policy.AllowedTransferSchemes);
-        hsts?.LearnFrom(hop.Url, result.Report);
-        return result;
-    }
+    /// <summary>Performs one hop.</summary>
+    private ValueTask<TransferResult> DispatchAsync(ITransferContext hop, RedirectPolicy policy) =>
+        dispatcher.DispatchAsync(hop, policy.AllowedTransferSchemes);
 
     private async ValueTask<TransferResult> FollowChainAsync(
         ITransferContext context,
@@ -200,11 +196,12 @@ public sealed class RedirectFollower(
             }
 
             int responseCode = result.Report!.ResponseCode;
+            string? methodSwitchMessage = MethodSwitchMessage(responseCode, hop, http.CustomMethod, policy);
             bodyDropped |= DropsBody(responseCode, hop, policy);
             methodDropped |= DropsCustomMethod(responseCode, hop, policy, bodyDropped);
             bool bodyCannotBeResent = CannotBeResent(bodyContent, bodyDropped);
             log.Limit(policy.MaxRedirects, chain.RedirectCount);
-            if (StopBeforeHop(context, http, ref target, chain, policy, result, bodyCannotBeResent, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
+            if (StopBeforeHop(context, http, ref target, methodSwitchMessage, chain, policy, result, bodyCannotBeResent, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
             {
                 log.Refused(responseCode, target, stop);
                 return chain.Merge(stop);
@@ -231,6 +228,7 @@ public sealed class RedirectFollower(
         ITransferContext first,
         HttpRequestOptions http,
         ref string target,
+        string? methodSwitchMessage,
         RedirectChain chain,
         RedirectPolicy policy,
         TransferResult result,
@@ -239,8 +237,13 @@ public sealed class RedirectFollower(
         out HopProxy hopProxy)
     {
         hopProxy = default;
-        if (Refusal(ref target, first, chain.RedirectCount, policy, out next) is { } refusal)
+        if (Refusal(ref target, methodSwitchMessage, first, chain.RedirectCount, policy, out next) is { } refusal)
         {
+            if (!refusal.KeepsRedirectUrl)
+            {
+                chain.CountRefused(refusal.ReachesTarget ? target : null);
+            }
+
             chain.Refused(refusal.KeepsRedirectUrl);
             return TransferResult.Failure(refusal.ExitCode, refusal.Message, result.BytesTransferred);
         }
@@ -341,12 +344,15 @@ public sealed class RedirectFollower(
     /// Why <paramref name="target" /> is not followed, or <see langword="null" /> when it is.
     /// Only the limit refusal keeps <see cref="TransferReport.RedirectUrl" />: curl 8.21.0 writes
     /// an empty <c>%{redirect_url}</c> after refusing a target that does not parse or whose
-    /// scheme it refuses (measured, BL-289). A target that parses is switched to <c>https</c>
+    /// scheme it refuses (measured, BL-289). Every other refusal counts the redirect in
+    /// <c>%{num_redirects}</c>, and only the <c>--proto-redir</c> or <c>--proto</c> refusal
+    /// (<c>ReachesTarget</c>) moves <c>%{url_effective}</c> to the target (measured, BL-1277). A target that parses is switched to <c>https</c>
     /// (<see cref="SwitchedToHttps" />) before its scheme is checked, as curl switches it before
     /// looking the scheme up.
     /// </summary>
-    private (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? Refusal(
+    private (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl, bool ReachesTarget)? Refusal(
         ref string target,
+        string? methodSwitchMessage,
         ITransferContext first,
         int followed,
         RedirectPolicy policy,
@@ -355,20 +361,25 @@ public sealed class RedirectFollower(
         next = null;
         if (policy.MaxRedirects >= 0 && followed >= policy.MaxRedirects)
         {
-            return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed", true);
+            return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed", true, false);
         }
 
         if (!CurlUrl.TryParse(target, first.PathAsIs, out next))
         {
-            return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false);
+            return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false, false);
         }
 
         if (!SchemesCurlParses.Contains(next.Scheme))
         {
-            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false);
+            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false, false);
         }
 
         first.Events.ReportInfo(IssueAnotherRequestMessagePrefix + target + "'");
+        if (methodSwitchMessage is not null)
+        {
+            first.Events.ReportInfo(methodSwitchMessage);
+        }
+
         next = SwitchedToHttps(ref target, next, first);
         return ProtocolDisabledRefusal(next.Scheme, policy, first);
     }
@@ -395,7 +406,7 @@ public sealed class RedirectFollower(
     /// reported to the hop's events, as curl 8.21.0's <c>-v</c> writes it before its
     /// <c>curl: (1)</c> line (measured, BL-805 Notes).
     /// </summary>
-    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? ProtocolDisabledRefusal(
+    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl, bool ReachesTarget)? ProtocolDisabledRefusal(
         string scheme,
         RedirectPolicy policy,
         ITransferContext first)
@@ -407,7 +418,7 @@ public sealed class RedirectFollower(
 
         string message = $"Protocol \"{scheme}\" is disabled (in redirect)";
         first.Events.ReportInfo(message);
-        return (CurlExitCode.UnsupportedProtocol, message, false);
+        return (CurlExitCode.UnsupportedProtocol, message, false, true);
     }
 
     private static string UnparsableUrlReason(string target)
@@ -451,6 +462,44 @@ public sealed class RedirectFollower(
     /// </summary>
     private static bool DropsCustomMethod(int responseCode, ITransferContext hop, RedirectPolicy policy, bool bodyDropped) =>
         policy.DropsCustomMethodOnSwitchToGet && (bodyDropped || (responseCode == 303 && hop.Http!.Body is null));
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.21.0's <c>http_switch_to_get</c> writes after
+    /// <c>Issue another request to this URL</c>, or <see langword="null" />: under <c>--follow</c>,
+    /// <c>Switch to GET because of N response</c> when a request that is not a plain GET switches;
+    /// under <c>-L</c>, <c>Stick to M instead of GET</c> when a <c>-X</c> method is kept. curl calls
+    /// it for a POST on a 301 or 302 without <c>--post301</c> or <c>--post302</c>, and for every
+    /// 303 except a POST under <c>--post303</c> (lib/http.c; measured 2026-10-03, BL-1352).
+    /// </summary>
+    private static string? MethodSwitchMessage(int responseCode, ITransferContext hop, string? customMethod, RedirectPolicy policy)
+    {
+        if (!SwitchesToGet(responseCode, hop, policy))
+        {
+            return null;
+        }
+
+        if (policy.DropsCustomMethodOnSwitchToGet && !IsPlainGet(hop, customMethod))
+        {
+            return $"Switch to GET because of {responseCode} response";
+        }
+
+        return customMethod is null ? null : $"Stick to {customMethod} instead of GET";
+    }
+
+    private static bool IsPlainGet(ITransferContext hop, string? customMethod) =>
+        customMethod is null && hop.Http!.Body is null && hop.Upload is null;
+
+    private static bool SwitchesToGet(int responseCode, ITransferContext hop, RedirectPolicy policy)
+    {
+        bool posts = hop.Http!.Body is not null;
+        return responseCode switch
+        {
+            301 => posts && !policy.KeepPostOn301,
+            302 => posts && !policy.KeepPostOn302,
+            303 => !(posts && policy.KeepPostOn303),
+            _ => false,
+        };
+    }
 
     private static HttpRequestOptions HopMethod(HttpRequestOptions http, bool methodDropped) =>
         methodDropped ? http with { CustomMethod = null } : http;
@@ -652,6 +701,17 @@ public sealed class RedirectFollower(
         /// <see cref="TransferReport.RedirectUrl" /> unless <paramref name="keepsRedirectUrl" />.
         /// </summary>
         public void Refused(bool keepsRedirectUrl) => redirectUrlCleared = !keepsRedirectUrl;
+
+        /// <summary>
+        /// Counts a redirect whose target was refused, as curl does for every refusal but the
+        /// <c>--max-redirs</c> limit, moving the effective URL to <paramref name="reachedUrl" />
+        /// unless it is <see langword="null" />.
+        /// </summary>
+        public void CountRefused(string? reachedUrl)
+        {
+            effectiveUrl = reachedUrl ?? effectiveUrl;
+            RedirectCount++;
+        }
 
         public TransferResult Merge(TransferResult outcome)
         {

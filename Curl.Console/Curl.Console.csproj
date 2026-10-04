@@ -28,6 +28,23 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <!--
+    ILC links the runtime's COM calls (CoCreateGuid, CoInitializeEx, CoWaitForMultipleHandles
+    and four more) against ole32.lib, and ole32.dll statically imports user32 and gdi32, which
+    load gdi32full, win32u and imm32 too: about 1.1 MB of working set real curl.exe never maps.
+    mincore.lib binds the same functions to the api-ms-win-core-com API sets, which combase.dll
+    serves without user32 (BL-1290, ADR-0402). The link step reads @(LinkerArg), which
+    SetupOSSpecificProps has already built from @(SdkNativeLibrary), so the swap is made there.
+  -->
+  <Target Name="LinkComThroughApiSetsNotOle32"
+          AfterTargets="SetupOSSpecificProps"
+          Condition=" $(RuntimeIdentifier.StartsWith('win')) ">
+    <ItemGroup>
+      <LinkerArg Remove="&quot;ole32.lib&quot;" />
+      <LinkerArg Include="&quot;mincore.lib&quot;" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Console.UnitTests" />
     <InternalsVisibleTo Include="Curl.Conformance.UnitTests" />

@@ -27,6 +27,16 @@ internal sealed class RtspSessionState(long firstSequenceNumber)
     /// </summary>
     internal string? SessionId { get; private set; }
 
+    /// <summary>
+    /// Gets a value indicating whether a reply has made curl close the connection after the
+    /// transfer instead of keeping it, as a <c>Content-Length</c> too large for 64 bits does
+    /// (curl's <c>streamclose</c>, measured, BL-1403).
+    /// </summary>
+    internal bool ClosesConnection { get; private set; }
+
+    /// <summary>Marks the connection to be closed, not kept, once the transfer ends.</summary>
+    internal void CloseConnection() => ClosesConnection = true;
+
     /// <summary>Takes the <c>CSeq</c> for a request and moves the counter on by one.</summary>
     /// <returns>The <c>CSeq</c> to send.</returns>
     internal long TakeSequenceNumber() => NextSequenceNumber++;

@@ -55,7 +55,7 @@ public sealed class LibcurlSourceCodeOptionCoverageTests
         "disable-epsv", "epsv", "disable-eprt", "eprt", "krb4", "krb", "ipfs-gateway", "log-level", "log-file",
         "dns-servers", "dns-interface", "dns-ipv4-addr", "dns-ipv6-addr", "knownhosts", "ech", "ssl-sessions", "tlsuser",
         "tlspassword", "tlsauthtype", "proxy-tlsuser", "proxy-tlspassword", "proxy-tlsauthtype", "http2",
-        "http2-prior-knowledge", "http3", "http3-only",
+        "http2-prior-knowledge", "http3", "http3-only", "proxy-http2",
     ];
 
 

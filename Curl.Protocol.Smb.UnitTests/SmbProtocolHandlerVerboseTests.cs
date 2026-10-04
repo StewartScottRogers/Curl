@@ -94,10 +94,51 @@ public sealed class SmbProtocolHandlerVerboseTests
             events.Transcript);
     }
 
-    private static async Task<string[]> RunAsync(string url, NetworkCredential? credentials, params byte[][] replies)
+    [TestMethod]
+    public async Task ExecuteAsync_FileUnderNoBody_ReportsTheDataThenShuttingDownWithNoLineForExit8()
+    {
+        string[] transcript = await RunAsync(SmbRecordedExchange.DownloadUrl, User, DownloadReplies(), noBody: true);
+
+        CollectionAssert.AreEqual(new[] { "<= hello world", "* shutting down connection #0" }, transcript);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FilePastMaxFileSize_ReportsTheDataThenTheLimitThenShuttingDown()
+    {
+        string[] transcript = await RunAsync(SmbRecordedExchange.DownloadUrl, User, DownloadReplies(), maxFileSize: 3);
+
+        CollectionAssert.AreEqual(
+            new[] { "<= hello world", "* Exceeded the maximum allowed file size (3) with 3 bytes", "* shutting down connection #0" },
+            transcript);
+    }
+
+    private static byte[][] DownloadReplies() =>
+    [
+        SmbRecordedExchange.NegotiateResponse,
+        SmbRecordedExchange.SessionSetupAccepted,
+        SmbRecordedExchange.TreeConnectAccepted,
+        SmbRecordedExchange.OpenAccepted,
+        SmbRecordedExchange.ReadAccepted,
+        SmbRecordedExchange.CloseAccepted,
+        SmbRecordedExchange.TreeDisconnectAccepted,
+    ];
+
+    private static Task<string[]> RunAsync(string url, NetworkCredential? credentials, params byte[][] replies) =>
+        RunAsync(url, credentials, replies, noBody: false);
+
+    private static async Task<string[]> RunAsync(
+        string url, NetworkCredential? credentials, byte[][] replies, bool noBody = false, long? maxFileSize = null)
     {
         var events = new TranscriptTransferEvents();
-        var context = new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream(), Credentials = credentials, Events = events };
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(url),
+            Output = new MemoryStream(),
+            Credentials = credentials,
+            Events = events,
+            NoBody = noBody,
+            MaxFileSize = maxFileSize,
+        };
 
         await Handler(new ScriptedConnection(replies)).ExecuteAsync(context);
 

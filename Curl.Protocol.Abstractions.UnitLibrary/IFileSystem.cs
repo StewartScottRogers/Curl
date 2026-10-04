@@ -26,6 +26,13 @@ namespace Curl.Protocol.Abstractions;
 /// read <see cref="FileOpenResult.Status" /> on the way back.
 /// </para>
 /// <para>
+/// A directory is where the platforms' curl builds part. The Windows build cannot open a
+/// directory at all and fails with exit 37; the Linux and macOS builds list it with
+/// <c>opendir</c>/<c>readdir</c> (curl 8.21.0, <c>lib/file.c</c> lines 568-589). Listing is
+/// not a member here but the separate <see cref="IDirectoryLister" />, which an
+/// implementation that can list also implements.
+/// </para>
+/// <para>
 /// A handler receives this interface and constructs no <see cref="FileStream" /> of its
 /// own, so its tests drive it against an in-memory implementation with no disk access
 /// at all.

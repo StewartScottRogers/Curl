@@ -420,10 +420,15 @@ writes `[SETUP] added SOCKS filter to H:P` first. Per BL-1186
 `TcpConnector.TracesHappyEyeballsTimer` (`--trace-config timer`, `network`, `all`) has
 `ConnectAttemptTraceEvents` write `[TIMER] [HAPPY_EYEBALLS] set for <us>ns` and `gives multi timeout in
 <ms>ms` as a second family's delay starts, and `cleared` once an attempt connects, before `Connected to`.
+Per ADR-0390 and ADR-0401 (BL-1210, BL-1258) it also writes the `[TIMER] [TIMEOUT]` lines of
+`TracedTransferTimeout` (`-m`) and the `[TIMER] [CONNECTTIMEOUT]` lines of `TracedConnectTimeout`: both
+`set` lines first, then after the first attempt every pending timer's `expires in` (under
+`TracesTimerExpiry`, nearest first) and the nearest's `gives multi timeout`, from the configured delays.
 Per ADR-0357's BL-1195 amendment a plain HTTP connection (`PoolScheme` `http`) dialled under
 `TracesTcpFilter` is wrapped in `TcpIoTraceConnection`, which writes `[TCP] send(len=N) -> 0, N` after
 each write and `[TCP] recv(len=102400) -> 0, N` after each read, `-> 81, 0` first when the read does
-not complete at once, and `TcpConnector` writes `QueryAlpnLine` after the setup filters' removal.
+not complete at once, and `TcpConnector` writes `QueryAlpnLine` after the setup filters' removal. Per its BL-1246 amendment a plain HTTP connection whose topmost filter is SOCKS (a SOCKS `Proxy`, or the pre-proxy of a forward proxy) writes `SocksQueryAlpnLine` there instead, under `TracesSocksFilter` only, and no `[TCP]` one.
+Per its BL-1260 amendment a direct `https` connection dialled under `TracesTcpFilter` is wrapped before the TLS handshake (`TcpConnector.TlsRecordTraceFor`), its records written with `TcpIoTraceConnection.HttpsHandshakeLines` (`recv(len=4096)`) and, once the handshake succeeds, `HttpsApplicationDataLines` (`recv(len=103424)`), and no `query ALPN` line.
 Per ADR-0357's BL-1192 amendment `TcpConnector.TracesHttpsConnectFilter` puts
 `HttpsConnectFilterTraceEvents` between the `[SETUP]` and `[DNS]` events of a direct connect to an
 `https://` origin, writing curl's `[HTTPS-CONNECT]` lines (`added`, `connect, init`, the
@@ -436,8 +441,17 @@ Per ADR-0357's BL-1193 amendment a CONNECT tunnel through an `Http` or `Http10` 
 with one poll round fixed, the `[HTTP-PROXY]` removal after the setup filter's and `[H1-PROXY] query
 ALPN` in place of `[TCP] query ALPN`; under `TracesSetupFilter` that path also writes `[SETUP] added`,
 `happy eyeballing to proxy H:P` (`SetupFilterTraceEvents.ToProxy`), `HttpProxyTunnelFilterAddedLine` and,
-for an `https://` origin, `SslFilterAddedLine` after the tunnel. CONNECT reply heads go to the
+for an `https://` origin, `SslFilterAddedLine` after the tunnel. Per its BL-1255 amendment an `Https`
+proxy's tunnel writes the same lines, with `HttpsProxySslFilterAddedLine` before
+`HttpProxyTunnelFilterAddedLine` and the proxy's handshake, and the handshake's two poll rounds
+(`HttpProxyTunnelTrace.ReportProxyHandshakePolled`) before `CONNECT: ... negotiated`; no `[SSL-PROXY]`
+line is written. CONNECT reply heads go to the
 `IConnectReplyHeadWritingEvents` the target's events were before any trace filter wrapped them.
+Per ADR-0357's BL-1254 amendment the `[HTTPS-CONNECT]` filter goes around a connect through any
+proxy and over a Unix socket too (`SetupAndDnsFilterEvents` builds it for every route), with a
+poll-round pair after each CONNECT request head and two before `Opened SOCKS connection`; the setup
+filter is traced through a SOCKS proxy (`happy eyeballing to origin <proxy>`) and over a Unix socket
+(`happy eyeballing to origin <path>:0`), adding an `https://` origin's SSL filter there as well.
 
 Per ADR-0170 (BL-694) `DnsServerResolver` is the hand-built DNS client behind `--dns-servers`,
 `--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr`, measured against curl 8.22.0's c-ares
@@ -475,7 +489,10 @@ Per ADR-0250 (BL-942) a target whose `Proxy` is an HTTP, HTTP/1.0 or HTTPS proxy
 resolved: `TcpConnector.UdpTunnel.cs` dials the proxy, sends curl 8.22.0's CONNECT-UDP request
 (`HttpProxyTunnel.BuildConnectUdpRequest`), takes a `101` or `2xx` (`OpensUdpTunnel`), and hands
 `QuicDialer.DialThroughTunnelAsync` a `CapsuleDatagramChannel`, which carries each datagram as an
-RFC 9297 `DATAGRAM` capsule over the proxy connection. Tests run the handshake through
+RFC 9297 `DATAGRAM` capsule over the proxy connection. Per ADR-0357's BL-1320 amendment it writes
+curl's `Establishing HTTP proxy UDP tunnel to`, request head and reply lines, and goes through the
+`[SETUP]` (to proxy) and `[HTTPS-CONNECT]` filters as a direct QUIC connect does, the CONNECT
+tunnel `--http3` tries next going on from its state. Tests run the handshake through
 `Fakes/CapsuleQuicProxyConnection`, which feeds the capsules to a `QuicTestServer`.
 
 Per ADR-0222 (BL-920) `TcpConnector` and `PoolingConnector` write the connect steps to

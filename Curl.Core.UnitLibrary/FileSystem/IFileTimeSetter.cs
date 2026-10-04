@@ -15,7 +15,10 @@ public interface IFileTimeSetter
     /// Sets the last-write time of the file at <paramref name="path" />.
     /// </summary>
     /// <param name="path">The operating-system path of an existing file.</param>
-    /// <param name="lastWriteTimeUtc">The time to set.</param>
+    /// <param name="unixSeconds">
+    /// The time to set, in seconds since 1970-01-01T00:00:00Z: Unix seconds rather than a
+    /// <see cref="DateTimeOffset" />, so a time past year 9999 reaches the file (BL-1425).
+    /// </param>
     /// <param name="errorCode">
     /// Zero when the time was set; otherwise the Win32 error code of the failure, such as
     /// <c>2</c> (<c>ERROR_FILE_NOT_FOUND</c>) for a missing file, which curl 8.21.0 prints in
@@ -25,5 +28,5 @@ public interface IFileTimeSetter
     /// <see langword="true" /> when the time was set; <see langword="false" /> when it could
     /// not be, for example because the file does not exist.
     /// </returns>
-    bool TrySetLastWriteTimeUtc(string path, DateTimeOffset lastWriteTimeUtc, out int errorCode);
+    bool TrySetLastWriteUnixSeconds(string path, long unixSeconds, out int errorCode);
 }

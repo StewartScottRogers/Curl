@@ -242,18 +242,38 @@ public sealed partial class TcpConnector(
     public bool TracesSocksFilter { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether a CONNECT tunnel through a plain HTTP proxy writes curl
+    /// Gets a value indicating whether a CONNECT tunnel through a plain HTTP or HTTPS proxy writes curl
     /// 8.21.0's <c>[HTTP-PROXY]</c> lines under <c>--trace-config http-proxy</c>, <c>proxy</c> or a
     /// named <c>all</c> (<see cref="HttpProxyTunnelTrace" />, measured, BL-1193 Notes).
     /// </summary>
     public bool TracesHttpProxyFilter { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether a CONNECT tunnel through a plain HTTP proxy writes curl
+    /// Gets a value indicating whether a CONNECT tunnel through a plain HTTP or HTTPS proxy writes curl
     /// 8.21.0's <c>[H1-PROXY]</c> lines under <c>--trace-config h1-proxy</c>, <c>proxy</c> or a
     /// named <c>all</c> (<see cref="HttpProxyTunnelTrace" />, measured, BL-1193 Notes).
     /// </summary>
     public bool TracesH1ProxyFilter { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether an origin's TLS handshake writes curl 8.21.0's <c>[SSL]</c> lines
+    /// under <c>--trace-config ssl</c>, <c>network</c> or <c>all</c> (<see cref="SslFilterTrace" />,
+    /// measured, BL-1287 Notes).
+    /// </summary>
+    public bool TracesSslFilter { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether an HTTPS proxy's TLS handshake writes curl 8.21.0's
+    /// <c>[SSL-PROXY]</c> lines under <c>--trace-config proxy</c> or a named <c>all</c>, but not
+    /// <c>ssl</c> or <c>network</c> (<see cref="SslFilterTrace" />, measured, BL-1287 Notes).
+    /// </summary>
+    public bool TracesSslProxyFilter { get; init; }
+
+    /// <summary>The name an origin's SSL filter writes its lines under.</summary>
+    internal const string SslFilterName = "SSL";
+
+    /// <summary>The name an HTTPS proxy's SSL filter writes its lines under.</summary>
+    internal const string SslProxyFilterName = "SSL-PROXY";
 
     /// <summary>
     /// The line curl 8.21.0's setup filter writes, under <see cref="TracesSetupFilter" />, as it adds
@@ -261,6 +281,13 @@ public sealed partial class TcpConnector(
     /// negotiated</c> (measured, BL-1193 Notes).
     /// </summary>
     public const string HttpProxyTunnelFilterAddedLine = "[SETUP] added HTTP proxy tunnel filter";
+
+    /// <summary>
+    /// The line curl 8.21.0's setup filter writes, under <see cref="TracesSetupFilter" />, as it adds
+    /// an HTTPS proxy's SSL filter once the proxy's socket connected, before
+    /// <see cref="HttpProxyTunnelFilterAddedLine" /> and the proxy's handshake (measured, BL-1255 Notes).
+    /// </summary>
+    public const string HttpsProxySslFilterAddedLine = "[SETUP] added SSL filter for HTTP proxy";
 
     /// <summary>
     /// Gets a value indicating whether a direct connect writes the <c>[HAPPY-EYEBALLS]</c> lines curl
@@ -295,9 +322,17 @@ public sealed partial class TcpConnector(
     /// <summary>
     /// Gets the <c>--connect-timeout</c> whose <c>[TIMER] [CONNECTTIMEOUT]</c> lines a direct connect
     /// writes under <see cref="TracesTimers" />, or <see langword="null" /> when none, or 0, was given:
-    /// curl's default connect timeout and a shorter <c>-m</c> write no such line (measured, BL-1210 Notes).
+    /// curl's default connect timeout writes no such line (measured, BL-1210 Notes), a longer or shorter
+    /// <c>-m</c> leaves it written (measured, BL-1258 Notes).
     /// </summary>
     public TimeSpan? TracedConnectTimeout { get; init; }
+
+    /// <summary>
+    /// Gets the <c>-m</c> whose <c>[TIMER] [TIMEOUT]</c> lines a direct connect writes under
+    /// <see cref="TracesTimers" />, or <see langword="null" /> when none, or 0, was given (measured,
+    /// BL-1258 Notes).
+    /// </summary>
+    public TimeSpan? TracedTransferTimeout { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether a direct connect to an <c>https://</c> origin writes the
@@ -331,6 +366,13 @@ public sealed partial class TcpConnector(
     /// connection is asked its ALPN protocol, after the setup filters' removal (BL-1195 Notes).
     /// </summary>
     public const string QueryAlpnLine = "[TCP] query ALPN";
+
+    /// <summary>
+    /// The line curl 8.21.0's SOCKS filter writes, under <see cref="TracesSocksFilter" />, as a new
+    /// plain HTTP connection through a SOCKS proxy or pre-proxy is asked its ALPN protocol, after
+    /// <c>Established connection</c> and before <c>using HTTP/1.x</c> (BL-1246 Notes).
+    /// </summary>
+    public const string SocksQueryAlpnLine = "[SOCKS] query ALPN";
 
     /// <summary>
     /// Gets the events a resolver built once per run reports to, such as the
@@ -571,10 +613,12 @@ public sealed partial class TcpConnector(
         }
 
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);
-        var (request, failure) = await ResolveForQuicAsync(target, cancellationToken).ConfigureAwait(false);
+        var (traced, httpsConnect, attempt) = QuicConnectionFilters(target);
+        var (request, failure) = await ResolveForQuicAsync(traced, cancellationToken).ConfigureAwait(false);
         if (request is null)
         {
             log.Failed(DiagnosticLogComponents.Quic, failure!.ExitCode, failure.ErrorMessage);
+            ReportHttpsConnectAttemptFailure(httpsConnect, attempt, failure.ExitCode);
             return failure;
         }
 
@@ -582,12 +626,17 @@ public sealed partial class TcpConnector(
         log.QuicDialling(request.DestinationHost, request.Port, request.Addresses);
         var dialled = await quicDialer.DialAsync(request, cancellationToken).ConfigureAwait(false);
         log.QuicDialled(request.DestinationHost, request.Port, dialled);
+        if (dialled.Connection is null)
+        {
+            ReportHttpsConnectAttemptFailure(httpsConnect, attempt, dialled.ExitCode);
+        }
+
         return dialled;
     }
 
     // Everything ConnectMultiplexedAsync does before the QUIC dial: the --resolve entries, the
     // --connect-to mapping and the resolve, with ConnectAsync's failures for each.
-    private async ValueTask<(QuicDialRequest? Request, MultiplexedConnectResult? Failure)> ResolveForQuicAsync(
+    private ValueTask<(QuicDialRequest? Request, MultiplexedConnectResult? Failure)> ResolveForQuicAsync(
         ConnectTarget target,
         CancellationToken cancellationToken)
     {
@@ -596,9 +645,24 @@ public sealed partial class TcpConnector(
         var destination = DestinationOf(target);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
-            return (null, MultiplexedConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError));
+            return ValueTask.FromResult<(QuicDialRequest?, MultiplexedConnectResult?)>((null, MultiplexedConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError)));
         }
 
+        if (OnionAddress.IsRefused(destination.Host))
+        {
+            ReportOnionRefused(target.Events, destination);
+            return ValueTask.FromResult<(QuicDialRequest?, MultiplexedConnectResult?)>((null, MultiplexedConnectResult.Failed(CurlExitCode.CouldntResolveHost, OnionAddress.RefusalMessage)));
+        }
+
+        return ResolveQuicDestinationAsync(target, destination, started, cancellationToken);
+    }
+
+    private async ValueTask<(QuicDialRequest? Request, MultiplexedConnectResult? Failure)> ResolveQuicDestinationAsync(
+        ConnectTarget target,
+        ConnectDestination destination,
+        long started,
+        CancellationToken cancellationToken)
+    {
         var (addresses, failure) = await ResolveWithFailureReasonAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
@@ -637,12 +701,14 @@ public sealed partial class TcpConnector(
         using var limited = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         try
         {
-            return (UnixSocket, TunnelProxyOf(target)) switch
+            if (UnixSocket is { } unixSocketAddress)
             {
-                ({ } unixSocketAddress, _) => await ConnectOverUnixSocketAsync(target, unixSocketAddress, started, limited.Token).ConfigureAwait(false),
-                (null, { } proxy) => await ConnectThroughProxyAsync(target, destination, proxy, started, limited.Token).ConfigureAwait(false),
-                _ => await ConnectDirectlyAsync(target, destination, started, limited.Token).ConfigureAwait(false),
-            };
+                return await ConnectOverUnixSocketAsync(target, unixSocketAddress, started, limited.Token).ConfigureAwait(false);
+            }
+
+            return TunnelProxyOf(target) is { } proxy
+                ? await ConnectThroughProxyAsync(target, destination, proxy, started, limited.Token).ConfigureAwait(false)
+                : await ConnectDirectlyAsync(target, destination, started, limited.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= connectLimit)
         {
@@ -688,18 +754,25 @@ public sealed partial class TcpConnector(
     // race to tell; otherwise the target is as given. Under TracesHttpsConnectFilter an https://
     // origin's [HTTPS-CONNECT] events sit between the [SETUP] and [DNS] ones, given back for a failed
     // connect to report on (BL-1192).
-    private (ConnectTarget Target, ConnectAttemptTraceEvents? Trace, HttpsConnectFilterTraceEvents? HttpsConnect) TracingConnectionFilters(ConnectTarget target, ConnectDestination destination)
+    private (ConnectTarget Target, ConnectAttemptTraceEvents? Trace, HttpsConnectFilterTraceEvents? HttpsConnect, FirstHttpsConnectAttempt? Attempt) TracingConnectionFilters(ConnectTarget target, ConnectDestination destination)
     {
         var trace = ConnectAttemptTraceOf(target.Events, destination.Host);
         var httpsOrigin = IsHttpsOrigin(target);
         if (!TracesAnyFilterAbove(trace, httpsOrigin))
         {
-            return (target, null, null);
+            return (target, null, null, null);
         }
 
         trace?.ConnectStarting();
-        var (events, httpsConnect) = SetupAndDnsFilterEvents(trace ?? target.Events, destination, httpsOrigin);
-        return (target with { Events = events }, trace, httpsConnect);
+        var (events, httpsConnect) = SetupAndDnsFilterEvents(
+            trace ?? target.Events,
+            httpsOrigin,
+            TracesSetupFilter,
+            below => DnsFilterTraceEvents.Start(below, destination.Host, destination.Port, addressFamily),
+            below => new SetupFilterTraceEvents(below, destination.Host, destination.Port),
+            firstAttempt: target.TcpFirstAttemptVersion is null ? TakeFirstHttpsConnectAttempt(target) : null,
+            tcpFirstAttemptVersion: target.TcpFirstAttemptVersion);
+        return (target with { Events = events }, trace, httpsConnect, TcpFirstAttemptOf(target, httpsConnect));
     }
 
     private bool TracesAnyFilterAbove(ConnectAttemptTraceEvents? trace, bool httpsOrigin) =>
@@ -717,32 +790,45 @@ public sealed partial class TcpConnector(
 
     private ConnectAttemptTraceEvents? ConnectAttemptTraceOf(ITransferEvents events, string host) =>
         TracesHappyEyeballsFilter || TracesTcpFilter || TracesTimers
-            ? new ConnectAttemptTraceEvents(events, host, TracesHappyEyeballsFilter, TracesTcpFilter, TracesTimers, TracesTimerExpiry, TracedConnectTimeout)
+            ? new ConnectAttemptTraceEvents(events, host, TracesHappyEyeballsFilter, TracesTcpFilter, TracesTimers, TracesTimerExpiry, TracedConnectTimeout, TracedTransferTimeout)
             : null;
 
     // The [SETUP] filter's events over the [DNS] filter's over the given ones, each when traced; the
     // setup filter's first line (the ALPN connect filter's for an https:// origin) is written before
-    // the DNS filter's, and the ALPN connect filter's events sit between the two.
+    // the DNS filter's, and the ALPN connect filter's events sit between the two. A direct connect, a
+    // proxy's and a Unix socket's each start their own DNS and setup filters (measured, BL-1254 Notes).
+    // A QUIC connect names the attempt after it; the TCP attempt after a QUIC one adds no filter but
+    // goes on from where the QUIC attempt's stood (BL-1284), and the QUIC attempt after a TCP one an
+    // --alt-svc entry put first from where the TCP attempt's stood (BL-1360).
     private (ITransferEvents Events, HttpsConnectFilterTraceEvents? HttpsConnect) SetupAndDnsFilterEvents(
         ITransferEvents events,
-        ConnectDestination destination,
-        bool httpsOrigin)
+        bool httpsOrigin,
+        bool tracesSetup,
+        Func<ITransferEvents, ITransferEvents> startDnsFilter,
+        Func<ITransferEvents, ITransferEvents> startSetupFilter,
+        string? secondAttemptVersion = null,
+        FirstHttpsConnectAttempt? firstAttempt = null,
+        string? tcpFirstAttemptVersion = null)
     {
         var tracesHttpsConnect = TracesHttpsConnectFor(httpsOrigin);
-        WriteFirstFilterAddedLine(events, httpsOrigin, tracesHttpsConnect);
-        events = TracesDnsFilter ? DnsFilterTraceEvents.Start(events, destination.Host, destination.Port, addressFamily) : events;
-        var httpsConnect = tracesHttpsConnect ? new HttpsConnectFilterTraceEvents(events, HttpsConnectFirstAttemptVersion) : null;
+        if (firstAttempt is null)
+        {
+            WriteFirstFilterAddedLine(events, httpsOrigin, tracesHttpsConnect, tracesSetup);
+        }
+
+        events = TracesDnsFilter ? startDnsFilter(events) : events;
+        var httpsConnect = tracesHttpsConnect ? HttpsConnectFilterOver(events, tracesSetup, secondAttemptVersion, firstAttempt, tcpFirstAttemptVersion) : null;
         events = httpsConnect ?? events;
-        return (TracesSetupFilter ? new SetupFilterTraceEvents(events, destination.Host, destination.Port) : events, httpsConnect);
+        return (tracesSetup ? startSetupFilter(events) : events, httpsConnect);
     }
 
-    private void WriteFirstFilterAddedLine(ITransferEvents events, bool httpsOrigin, bool tracesHttpsConnect)
+    private static void WriteFirstFilterAddedLine(ITransferEvents events, bool httpsOrigin, bool tracesHttpsConnect, bool tracesSetup)
     {
         if (tracesHttpsConnect)
         {
             events.ReportInfo(HttpsConnectFilterTraceEvents.AddedLine);
         }
-        else if (TracesSetupFilter && !httpsOrigin)
+        else if (tracesSetup && !httpsOrigin)
         {
             events.ReportInfo(SetupFilterTraceEvents.AddedLine);
         }
@@ -768,17 +854,37 @@ public sealed partial class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        (target, var trace, var httpsConnect) = TracingConnectionFilters(target, destination);
+        (target, var trace, var httpsConnect, var attempt) = TracingConnectionFilters(target, destination);
         var result = await ConnectDirectlyTracedAsync(target, destination, started, trace, cancellationToken).ConfigureAwait(false);
-        if (result.ExitCode != CurlExitCode.Ok)
-        {
-            httpsConnect?.ReportConnectFailed(result.ExitCode);
-        }
-
+        ReportHttpsConnectFailure(httpsConnect, result, attempt);
         return result;
     }
 
-    private async ValueTask<ConnectResult> ConnectDirectlyTracedAsync(
+    private static void ReportHttpsConnectFailure(HttpsConnectFilterTraceEvents? httpsConnect, ConnectResult result, FirstHttpsConnectAttempt? attempt = null)
+    {
+        if (result.ExitCode != CurlExitCode.Ok)
+        {
+            ReportHttpsConnectAttemptFailure(httpsConnect, attempt, result.ExitCode);
+        }
+    }
+
+    private ValueTask<ConnectResult> ConnectDirectlyTracedAsync(
+        ConnectTarget target,
+        ConnectDestination destination,
+        long started,
+        ConnectAttemptTraceEvents? trace,
+        CancellationToken cancellationToken)
+    {
+        if (OnionAddress.IsRefused(destination.Host))
+        {
+            ReportOnionRefused(target.Events, destination);
+            return ValueTask.FromResult(ConnectResult.Failed(CurlExitCode.CouldntResolveHost, OnionAddress.RefusalMessage));
+        }
+
+        return ResolveAndDialDirectlyAsync(target, destination, started, trace, cancellationToken);
+    }
+
+    private async ValueTask<ConnectResult> ResolveAndDialDirectlyAsync(
         ConnectTarget target,
         ConnectDestination destination,
         long started,
@@ -834,11 +940,26 @@ public sealed partial class TcpConnector(
                 CurlErrorBuffer.Truncate($"Unix socket path too long: '{unixSocket.Path}'"));
         }
 
-        if (TracesDnsFilter)
-        {
-            target = target with { Events = DnsFilterTraceEvents.StartOverUnixSocket(target.Events, unixSocket.Path) };
-        }
+        // Over a Unix socket the setup filter eyeballs to the socket's path, port 0, and an https://
+        // origin's ALPN connect filter goes around it as for a direct connect (measured, BL-1254 Notes).
+        var httpsOrigin = IsHttpsOrigin(target);
+        var (events, httpsConnect) = SetupAndDnsFilterEvents(
+            target.Events,
+            httpsOrigin,
+            TracesSetupFilter,
+            below => DnsFilterTraceEvents.StartOverUnixSocket(below, unixSocket.Path),
+            below => new SetupFilterTraceEvents(below, unixSocket.Path, 0));
+        var result = await ConnectOverUnixSocketTracedAsync(target with { Events = events }, unixSocket, started, cancellationToken).ConfigureAwait(false);
+        ReportHttpsConnectFailure(httpsConnect, result);
+        return result;
+    }
 
+    private async ValueTask<ConnectResult> ConnectOverUnixSocketTracedAsync(
+        ConnectTarget target,
+        UnixSocketAddress unixSocket,
+        long started,
+        CancellationToken cancellationToken)
+    {
         var name = unixSocket.RemoteIpText;
         target.Events.ReportInfo($"  Trying {name}:0...");
         var nameResolved = timeProvider.GetTimestamp();
@@ -865,7 +986,7 @@ public sealed partial class TcpConnector(
         new NetworkDiagnosticLog(target.DiagnosticLog).UnixSocketConnected(unixSocket.Path);
         var dialed = new DialedSocket(connection, null, unixSocket.Path, null, name, unixSocket.Path);
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
-        return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken).ConfigureAwait(false);
+        return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken, WritesSslFilterAddedFor(target)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -963,6 +1084,19 @@ public sealed partial class TcpConnector(
         }
 
         return ConnectResult.Failed(exitCode, message);
+    }
+
+    /// <summary>
+    /// Reports the refusal to connect to a <c>.onion</c> name, made before any <c>--resolve</c> entry, cached answer or
+    /// look-up, as curl 8.21.0 reports it before its exit 6 <c>Not resolving .onion address (RFC 7686)</c>: the
+    /// <c>-v</c> lines <c>Not resolving .onion address (RFC 7686)</c>, <c>Could not resolve:
+    /// &lt;host&gt;:&lt;port&gt;</c> and <c>Could not resolve: &lt;host&gt;</c> (measured, BL-1394).
+    /// </summary>
+    private static void ReportOnionRefused(ITransferEvents events, ConnectDestination destination)
+    {
+        events.ReportInfo(OnionAddress.RefusalMessage);
+        events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine(destination.Host, destination.Port));
+        events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine(destination.Host));
     }
 
     private static void ReportNegativeEntryFailed(ITransferEvents events, ConnectDestination destination, string message)
@@ -1094,7 +1228,22 @@ public sealed partial class TcpConnector(
     {
         var firstHop = FirstHopTo(proxy);
         var headOutput = target.Events as IConnectReplyHeadWritingEvents;
-        target = TracingTunnelFilters(target, proxy, firstHop);
+        (target, var httpsConnect) = TracingTunnelFilters(target, proxy, firstHop);
+        var result = await ConnectThroughProxyTracedAsync(target, destination, proxy, new ProxyRoute(firstHop, headOutput, started), cancellationToken).ConfigureAwait(false);
+        ReportHttpsConnectFailure(httpsConnect, result);
+        return result;
+    }
+
+    private readonly record struct ProxyRoute(ProxyEndpoint FirstHop, IConnectReplyHeadWritingEvents? HeadOutput, long Started);
+
+    private async ValueTask<ConnectResult> ConnectThroughProxyTracedAsync(
+        ConnectTarget target,
+        ConnectDestination destination,
+        ProxyEndpoint proxy,
+        ProxyRoute route,
+        CancellationToken cancellationToken)
+    {
+        var (firstHop, headOutput, started) = route;
         var (addresses, failure) = await ResolveWithFailureReasonAsync(firstHop.Host, firstHop.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
@@ -1135,25 +1284,24 @@ public sealed partial class TcpConnector(
     // curl 8.21.0's DNS filter resolves the proxy it dials first (measured, BL-1181 Notes). Through
     // a plain HTTP proxy its setup filter writes [SETUP] added (not for an https:// origin, whose
     // ALPN connect filter adds it) before the DNS filter's lines, and happy eyeballing to proxy
-    // before the first Trying (measured, BL-1193 Notes).
-    private ConnectTarget TracingTunnelFilters(ConnectTarget target, ProxyEndpoint proxy, ProxyEndpoint firstHop)
+    // before the first Trying (measured, BL-1193 Notes), through an HTTPS proxy too (BL-1255 Notes). Through a SOCKS proxy it eyeballs to origin,
+    // the SOCKS proxy it dials (measured, BL-1254 Notes). An https:// origin's ALPN connect filter
+    // goes around them as for a direct connect, its added line first (measured, BL-1254 Notes).
+    private (ConnectTarget Target, HttpsConnectFilterTraceEvents? HttpsConnect) TracingTunnelFilters(ConnectTarget target, ProxyEndpoint proxy, ProxyEndpoint firstHop)
     {
-        var tracesSetup = TracesSetupFilterThrough(proxy);
-        WriteTunnelSetupAddedLine(target, tracesSetup);
-        var events = TracesDnsFilter ? DnsFilterTraceEvents.Start(target.Events, firstHop.Host, firstHop.Port, addressFamily) : target.Events;
-        return target with { Events = tracesSetup ? new SetupFilterTraceEvents(events, firstHop.Host, firstHop.Port, SetupFilterTraceEvents.ToProxy) : events };
+        var peer = IsSocks(proxy) ? SetupFilterTraceEvents.ToOrigin : SetupFilterTraceEvents.ToProxy;
+        var (events, httpsConnect) = SetupAndDnsFilterEvents(
+            target.Events,
+            IsHttpsOrigin(target),
+            TracesSetupFilter,
+            below => DnsFilterTraceEvents.Start(below, firstHop.Host, firstHop.Port, addressFamily),
+            below => new SetupFilterTraceEvents(below, firstHop.Host, firstHop.Port, peer),
+            firstAttempt: TakeFirstHttpsConnectAttempt(target));
+        return (target with { Events = events }, httpsConnect);
     }
 
-    private bool TracesSetupFilterThrough(ProxyEndpoint proxy) =>
-        TracesSetupFilter && proxy.Kind is ProxyKind.Http or ProxyKind.Http10;
-
-    private static void WriteTunnelSetupAddedLine(ConnectTarget target, bool tracesSetup)
-    {
-        if (tracesSetup && !IsHttpsOrigin(target))
-        {
-            target.Events.ReportInfo(SetupFilterTraceEvents.AddedLine);
-        }
-    }
+    private static bool IsSocks(ProxyEndpoint proxy) =>
+        proxy.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a or ProxyKind.Socks5 or ProxyKind.Socks5Hostname;
 
     /// <summary>
     /// Dials the proxy and opens the tunnel through it, sending
@@ -1172,15 +1320,7 @@ public sealed partial class TcpConnector(
         var (dialed, lastDialError, lastBindFailure) = await DialFirstReachableAsync(addresses, firstHop.Port, firstHop.Host, target, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
-            // Through a pre-proxy curl 8.21.0 names the HTTP proxy as what it failed to reach (measured, BL-614).
-            var reached = ReferenceEquals(firstHop, proxy) ? $"{target.Host}:{target.Port}" : $"{proxy.Host}:{proxy.Port}";
-            var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
-            return (DialFailure(
-                target.Events,
-                lastDialError,
-                lastBindFailure,
-                new ConnectTimings(started, nameResolved, null, null),
-                $"Failed to connect to {reached} over proxy {firstHop.Host} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}"), null);
+            return (ProxyDialFailure(tunnel, firstHop, lastDialError, lastBindFailure), null);
         }
 
         if (!ReferenceEquals(firstHop, proxy)
@@ -1189,12 +1329,48 @@ public sealed partial class TcpConnector(
             return (preProxyFailure, null);
         }
 
-        return proxy.Kind switch
+        return await OpenThroughProxyKindAsync(dialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The failure of a dial that reached no address of the first hop. Through a pre-proxy curl
+    /// 8.21.0 names the HTTP proxy as what it failed to reach (measured, BL-614).
+    /// </summary>
+    private ConnectResult ProxyDialFailure(TunnelRequest tunnel, ProxyEndpoint firstHop, SocketError lastDialError, LocalBindFailure? lastBindFailure)
+    {
+        var (target, _, proxy, started, nameResolved, _, _) = tunnel;
+        var reached = ReferenceEquals(firstHop, proxy) ? $"{target.Host}:{target.Port}" : $"{proxy.Host}:{proxy.Port}";
+        var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
+        return DialFailure(
+            target.Events,
+            lastDialError,
+            lastBindFailure,
+            new ConnectTimings(started, nameResolved, null, null),
+            $"Failed to connect to {reached} over proxy {firstHop.Host} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}");
+    }
+
+    /// <summary>
+    /// Opens the tunnel over the socket dialled to the proxy the way its kind does: CONNECT in the
+    /// clear or over TLS to an HTTP or HTTPS proxy, a SOCKS handshake to any other.
+    /// </summary>
+    private async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> OpenThroughProxyKindAsync(
+        DialedSocket dialed,
+        TunnelRequest tunnel,
+        string? proxyAuthorization,
+        CancellationToken cancellationToken)
+    {
+        var (target, destination, proxy, started, nameResolved, _, _) = tunnel;
+        if (proxy.Kind is ProxyKind.Https)
         {
-            ProxyKind.Http or ProxyKind.Http10 => await OpenPlainTunnelAsync(dialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false),
-            ProxyKind.Https => await OpenTunnelOverTlsAsync(dialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false),
-            _ => (await OpenSocksTunnelAsync(dialed, target, destination, proxy, new ConnectTimings(started, nameResolved, 0, null), cancellationToken).ConfigureAwait(false), null),
-        };
+            return await OpenTunnelOverTlsAsync(dialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (proxy.Kind is ProxyKind.Http or ProxyKind.Http10)
+        {
+            return await OpenPlainTunnelAsync(dialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false);
+        }
+
+        return (await OpenSocksTunnelAsync(dialed, target, destination, proxy, new ConnectTimings(started, nameResolved, 0, null), cancellationToken).ConfigureAwait(false), null);
     }
 
     /// <summary>
@@ -1261,7 +1437,7 @@ public sealed partial class TcpConnector(
         trace.ReportConnecting(events);
         events.ReportInfo(ConnectTunnelVerboseLines.NoAlpnNegotiated);
         trace.ReportSubfilterInstalled(events);
-        return OpenTunnelAsync(dialed with { TunnelTrace = trace }, tunnel, proxyAuthorization, cancellationToken);
+        return OpenTunnelAsync(dialed with { TunnelTrace = trace }, trace, tunnel, proxyAuthorization, cancellationToken);
     }
 
     private async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> OpenTunnelOverTlsAsync(
@@ -1270,26 +1446,102 @@ public sealed partial class TcpConnector(
         string? proxyAuthorization,
         CancellationToken cancellationToken)
     {
+        // The setup filter adds the proxy's SSL filter and the tunnel filter once the socket
+        // connected, and the HTTP proxy filter polls its CONNECT before, during and after the
+        // proxy's handshake (measured, BL-1255 Notes; the poll rounds fixed, ADR-0357).
+        var events = tunnel.Target.Events;
+        var trace = new HttpProxyTunnelTrace(TracesHttpProxyFilter, TracesH1ProxyFilter);
+        if (TracesSetupFilter)
+        {
+            events.ReportInfo(HttpsProxySslFilterAddedLine);
+            events.ReportInfo(HttpProxyTunnelFilterAddedLine);
+        }
+
+        trace.ReportConnecting(events);
+        var sslTrace = new SslFilterTrace(SslProxyFilterName, TracesSslProxyFilter, trace);
+        sslTrace.ReportConnecting(events);
+
         // curl 8.21.0 verifies the proxy against its own host name and reports a failed
         // handshake to it with the same exit code and message as one to a target (measured).
         // It verifies with the --proxy-* TLS options, not -k or --cacert, so the proxy's own
         // provider runs this handshake (ADR-0061). It offers http/1.1 through ALPN whatever the
-        // HTTP version options say, and none under --no-alpn (measured on both builds, ADR-0190).
-        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, tunnel.Proxy.Host, tunnel.Target, isProxy: true, applicationProtocols: HttpApplicationProtocols.Http11Only, cancellationToken).ConfigureAwait(false);
+        // HTTP version options say, and none under --no-alpn (measured on both builds, ADR-0190);
+        // under --proxy-http2 it offers h2,http/1.1 (measured, BL-1413 Notes, ADR-0408).
+        var proxyApplicationProtocols = _proxyTunnelOptions.ProxyHttp2 ? HttpApplicationProtocols.H2ThenHttp11 : HttpApplicationProtocols.Http11Only;
+        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, tunnel.Proxy.Host, tunnel.Target, isProxy: true, applicationProtocols: proxyApplicationProtocols, cancellationToken).ConfigureAwait(false);
+        sslTrace.ReportFinished(events, securedProxy);
         if (securedProxy.Connection is not { } proxyConnection)
         {
             return (securedProxy, null);
         }
 
         // Both builds say what the proxy's ALPN agreed before the CONNECT, with and without
-        // --no-alpn (measured, BL-872).
-        tunnel.Target.Events.ReportInfo(securedProxy.ApplicationProtocol is { } agreed
+        // --no-alpn (measured, BL-872); the proxy's SSL filter answers the tunnel's ALPN query first
+        // (measured, BL-1287 Notes).
+        sslTrace.ReportAlpnQueried(events, securedProxy.ApplicationProtocol);
+        events.ReportInfo(securedProxy.ApplicationProtocol is { } agreed
             ? $"CONNECT: '{agreed}' negotiated"
             : ConnectTunnelVerboseLines.NoAlpnNegotiated);
+        if (securedProxy.ApplicationProtocol == Http2ApplicationProtocol)
+        {
+            return (await OpenHttp2TunnelAsync(dialed with { Connection = proxyConnection }, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false), null);
+        }
+
+        trace.ReportSubfilterInstalled(events);
 
         // CONNECT and the target's TLS run over the proxy's TLS; the socket's local end point stays.
-        var securedDialed = dialed with { Connection = proxyConnection };
-        return await OpenTunnelAsync(securedDialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false);
+        var securedDialed = dialed with { Connection = proxyConnection, TunnelTrace = trace };
+        return await OpenTunnelAsync(securedDialed, trace, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The ALPN identifier of HTTP/2 over TLS, on which an HTTPS proxy is tunnelled through an HTTP/2 stream.</summary>
+    private const string Http2ApplicationProtocol = "h2";
+
+    /// <summary>
+    /// Tunnels through an HTTPS proxy that agreed on <c>h2</c> with an HTTP/2 <c>CONNECT</c> stream
+    /// (<see cref="Http2ProxyTunnelConnection" />, ADR-0408), with curl 8.18.0's <c>-v</c> lines
+    /// (measured, BL-1413 Notes): <c>Establish HTTP/2 proxy tunnel to</c> first; on a <c>2xx</c>
+    /// <c>CONNECT tunnel established, response</c> then <c>CONNECT phase completed</c>, the reverse
+    /// of the HTTP/1.1 tunnel's order. Any other answer, or none, is exit 7 with curl's
+    /// <c>Could not connect to server</c> and no line for the proxy's reply.
+    /// </summary>
+    private async ValueTask<ConnectResult> OpenHttp2TunnelAsync(
+        DialedSocket dialed,
+        TunnelRequest tunnel,
+        string? proxyAuthorization,
+        CancellationToken cancellationToken)
+    {
+        var events = tunnel.Target.Events;
+        var authority = HttpProxyTunnel.FormatAuthority(tunnel.Destination.Host, tunnel.Destination.Port);
+        events.ReportInfo($"Establish HTTP/2 proxy tunnel to {authority}");
+        new NetworkDiagnosticLog(tunnel.Target.DiagnosticLog).TunnelRequested(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port);
+        var headerFields = Http2ProxyTunnelConnection.ConnectHeaderFields(authority, proxyAuthorization, _proxyTunnelOptions.UserAgent);
+        (int StatusCode, Http2ProxyTunnelConnection? Tunnel) opened = default;
+        ExceptionDispatchInfo? exception = null;
+        try
+        {
+            opened = await Http2ProxyTunnelConnection.OpenAsync(dialed.Connection, headerFields, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception caught)
+        {
+            exception = ExceptionDispatchInfo.Capture(caught);
+        }
+
+        var (statusCode, tunnelConnection) = opened;
+        if (tunnelConnection is null)
+        {
+            // The proxy's connection goes whether the CONNECT was refused or could not be exchanged.
+            await dialed.Connection.DisposeAsync().ConfigureAwait(false);
+            exception?.Throw();
+            return ConnectResult.Failed(CurlExitCode.CouldntConnect, "Could not connect to server");
+        }
+
+        EndProxyAuthorization(proxyAuthorization);
+        events.ReportInfo($"CONNECT tunnel established, response {statusCode}");
+        events.ReportInfo("CONNECT phase completed");
+        var timings = new ConnectTimings(tunnel.Started, tunnel.NameResolved, timeProvider.GetTimestamp(), null);
+        new NetworkDiagnosticLog(tunnel.Target.DiagnosticLog).TunnelEstablished(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port, statusCode);
+        return await SecureWhenAskedAsync(dialed with { Connection = tunnelConnection }, tunnel.Target, timings, statusCode, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask<ConnectResult> OpenSocksTunnelAsync(
@@ -1305,8 +1557,9 @@ public sealed partial class TcpConnector(
             return failure;
         }
 
-        // As through an HTTP proxy, %{time_connect} is when the tunnel is open.
-        return await SecureWhenAskedAsync(dialed, target, timings with { Connected = timeProvider.GetTimestamp() }, 0, cancellationToken).ConfigureAwait(false);
+        // As through an HTTP proxy, %{time_connect} is when the tunnel is open, and the setup filter
+        // adds an https:// origin's SSL filter then (measured, BL-1254 Notes).
+        return await SecureWhenAskedAsync(dialed, target, timings with { Connected = timeProvider.GetTimestamp() }, 0, cancellationToken, WritesSslFilterAddedFor(target)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1373,6 +1626,7 @@ public sealed partial class TcpConnector(
     /// </summary>
     private async ValueTask<ConnectResult> SecureOpenedTunnelAsync(
         DialedSocket dialed,
+        HttpProxyTunnelTrace trace,
         TunnelRequest tunnel,
         int statusCode,
         string? proxyAuthorization,
@@ -1380,7 +1634,7 @@ public sealed partial class TcpConnector(
     {
         EndProxyAuthorization(proxyAuthorization);
         ConnectTunnelVerboseLines.ReportTunnelEstablished(tunnel.Target.Events, statusCode);
-        dialed.TunnelTrace?.ReportEstablished(tunnel.Target.Events);
+        trace.ReportEstablished(tunnel.Target.Events);
 
         // For a tunnel, %{time_connect} is when the tunnel is open (ConnectTimings.Connected).
         var timings = new ConnectTimings(tunnel.Started, tunnel.NameResolved, timeProvider.GetTimestamp(), null);
@@ -1388,7 +1642,7 @@ public sealed partial class TcpConnector(
 
         // Through a plain HTTP proxy the setup filter adds an https:// origin's SSL filter once the
         // tunnel is open (measured, BL-1193 Notes).
-        var writesSslFilterAdded = dialed.TunnelTrace is not null && WritesSslFilterAddedFor(tunnel.Target);
+        var writesSslFilterAdded = WritesSslFilterAddedFor(tunnel.Target);
         return await SecureWhenAskedAsync(dialed, tunnel.Target, timings, statusCode, cancellationToken, writesSslFilterAdded).ConfigureAwait(false);
     }
 
@@ -1402,6 +1656,7 @@ public sealed partial class TcpConnector(
     /// </summary>
     private async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> OpenTunnelAsync(
         DialedSocket dialed,
+        HttpProxyTunnelTrace trace,
         TunnelRequest tunnel,
         string? proxyAuthorization,
         CancellationToken cancellationToken)
@@ -1413,10 +1668,10 @@ public sealed partial class TcpConnector(
         while (true)
         {
             log.TunnelRequested(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port);
-            var (reply, exception) = await RequestTunnelAsync(connection, tunnel with { Trace = dialed.TunnelTrace }, proxyAuthorization, answersChallenge, cancellationToken).ConfigureAwait(false);
+            var (reply, exception) = await RequestTunnelAsync(connection, tunnel, trace, proxyAuthorization, answersChallenge, cancellationToken).ConfigureAwait(false);
             if (exception is null && reply.OpensTunnel)
             {
-                return (await SecureOpenedTunnelAsync(dialed, tunnel, reply.StatusCode, proxyAuthorization, cancellationToken).ConfigureAwait(false), null);
+                return (await SecureOpenedTunnelAsync(dialed, trace, tunnel, reply.StatusCode, proxyAuthorization, cancellationToken).ConfigureAwait(false), null);
             }
 
             var (answer, onThisConnection, failure) = exception is null
@@ -1563,6 +1818,7 @@ public sealed partial class TcpConnector(
     private async ValueTask<(HttpProxyTunnelReply Reply, ExceptionDispatchInfo? Exception)> RequestTunnelAsync(
         IConnection connection,
         TunnelRequest tunnel,
+        HttpProxyTunnelTrace trace,
         string? proxyAuthorization,
         bool answersChallenge,
         CancellationToken cancellationToken)
@@ -1572,15 +1828,16 @@ public sealed partial class TcpConnector(
             var destination = tunnel.Destination;
             var events = tunnel.Target.Events;
             ConnectTunnelVerboseLines.ReportBeforeConnect(events, ProxyAuthRequestOf(destination, tunnel.Proxy), proxyAuthorization, answersChallenge);
-            tunnel.Trace?.ReportSending(events);
+            trace.ReportSending(events);
             var request = HttpProxyTunnel.BuildConnectRequest(destination.Host, destination.Port, tunnel.Proxy, _proxyTunnelOptions, proxyAuthorization);
             events.ReportRequestHeader(request);
             await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-            tunnel.Trace?.ReportReceiving(events);
+            trace.ReportReceiving(events);
             var reply = await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false);
             ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization, DigestStaleChallenge.IsOfferedIn(reply.ProxyAuthenticate));
-            tunnel.Trace?.ReportResponse(events, reply.OpensTunnel);
+            ConnectTunnelVerboseLines.ReportReplyFailure(events, reply);
+            trace.ReportResponse(events, reply.OpensTunnel);
             if (tunnel.HeadOutput is { } headOutput && !reply.Head.IsEmpty)
             {
                 await headOutput.WriteConnectReplyHeadAsync(reply.Head, cancellationToken).ConfigureAwait(false);
@@ -1621,8 +1878,8 @@ public sealed partial class TcpConnector(
     }
 
     private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure) =>
-        reply.RecvErrorMessage is { } recvErrorMessage
-            ? ConnectResult.Failed(CurlExitCode.RecvError, firstSspiFailure ?? recvErrorMessage)
+        reply.FailureMessage is { } failureMessage
+            ? ConnectResult.Failed(reply.FailureExitCode, firstSspiFailure ?? failureMessage)
             : ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? $"CONNECT tunnel failed, response {reply.StatusCode}");
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(
@@ -1643,7 +1900,7 @@ public sealed partial class TcpConnector(
             return OpenedInPlaintext(dialed, target, timings, proxyConnectResponseCode);
         }
 
-        var secured = await AuthenticateTargetAsync(dialed.Connection, target, writesSslFilterAdded, cancellationToken).ConfigureAwait(false);
+        var secured = await AuthenticateTracingRecordsAsync(dialed, target, writesSslFilterAdded, cancellationToken).ConfigureAwait(false);
         if (secured.Connection is not { } securedConnection)
         {
             return secured;
@@ -1652,7 +1909,7 @@ public sealed partial class TcpConnector(
         // A provider that measured its handshake is trusted for the moment it completed; for
         // one that did not, the moment it returned is that moment.
         var handshakeCompleted = secured.Timings?.TlsHandshakeCompleted ?? timeProvider.GetTimestamp();
-        return WithSetupFiltersRemoved(
+        var opened = WithSetupFiltersRemoved(
             Opened(
                 dialed,
                 target.Events,
@@ -1663,35 +1920,93 @@ public sealed partial class TcpConnector(
                 secured.ApplicationProtocol),
             dialed,
             target.Events);
-    }
-
-    // A plain HTTP connection dialled under TracesTcpFilter writes curl 8.21.0's [TCP] send and recv
-    // lines for its I/O, and [TCP] query ALPN after the setup filters' removal, before the handler's
-    // "using HTTP/1.x" (measured, BL-1195 Notes).
-    private ConnectResult OpenedInPlaintext(DialedSocket dialed, ConnectTarget target, ConnectTimings timings, int proxyConnectResponseCode)
-    {
-        var tracesIo = dialed.TracesTcpFilter && target.PoolScheme == "http";
-        var connection = tracesIo ? new TcpIoTraceConnection(dialed.Connection, target.Events) : dialed.Connection;
-        var opened = WithSetupFiltersRemoved(
-            Opened(dialed, target.Events, connection, timings, proxyConnectResponseCode, peerCertificates: null, applicationProtocol: null),
-            dialed, target.Events);
-        WriteQueryAlpnLine(dialed, target.Events, tracesIo);
+        WriteSslQueryAlpnLines(target, secured.ApplicationProtocol);
         return opened;
     }
 
-    // Through a plain HTTP proxy's tunnel the ALPN query is the [H1-PROXY] filter's, never [TCP]'s
-    // (measured, BL-1193 Notes).
-    private static void WriteQueryAlpnLine(DialedSocket dialed, ITransferEvents events, bool tracesIo)
+    // The HTTP handler asks the topmost filter, the origin's SSL filter, which protocol ALPN
+    // agreed, before using HTTP/1.x (measured, BL-1287 Notes).
+    private void WriteSslQueryAlpnLines(ConnectTarget target, string? applicationProtocol)
+    {
+        if (target.PoolScheme == "https" && !target.IsForwardProxy)
+        {
+            SslTraceFor(target).ReportAlpnQueried(target.Events, applicationProtocol);
+        }
+    }
+
+    // Runs the target's handshake over the dialled connection, traced as TLS records when
+    // TlsRecordTraceFor says so, the trace moving to the application data's lines once it succeeds.
+    private async ValueTask<ConnectResult> AuthenticateTracingRecordsAsync(DialedSocket dialed, ConnectTarget target, bool writesSslFilterAdded, CancellationToken cancellationToken)
+    {
+        var recordTrace = TlsRecordTraceFor(dialed.Connection, dialed.TracesTcpFilter, target);
+        var secured = await AuthenticateTargetAsync(recordTrace ?? dialed.Connection, target, writesSslFilterAdded, cancellationToken).ConfigureAwait(false);
+        if (secured.Connection is not null)
+        {
+            recordTrace?.Lines = TcpIoTraceConnection.HttpsApplicationDataLines;
+        }
+
+        return secured;
+    }
+
+    // A direct https connection dialled under TracesTcpFilter writes curl 8.21.0's [TCP] send and recv
+    // lines for the TLS records below the TLS filter: the handshake's with Schannel's 4096-byte reads,
+    // then the application data's with its 103424-byte reads, and no [TCP] query ALPN line, as TLS
+    // answers that (measured, BL-1253 Notes; ADR-0357's BL-1260 amendment). Through a proxy or a
+    // tunnel the TCP filter sits below the proxy's, so its records are not written.
+    internal static TcpIoTraceConnection? TlsRecordTraceFor(IConnection dialed, bool tracesTcpFilter, ConnectTarget target) =>
+        tracesTcpFilter && target.Proxy is null && !target.IsForwardProxy && target.PoolScheme == "https"
+            ? new TcpIoTraceConnection(dialed, target.Events, TcpIoTraceConnection.HttpsHandshakeLines)
+            : null;
+
+    // A plain HTTP connection dialled under TracesTcpFilter writes curl 8.21.0's [TCP] send and recv
+    // lines for its I/O, and [TCP] query ALPN after the setup filters' removal, before the handler's
+    // "using HTTP/1.x" (measured, BL-1195 Notes). A target that names its own TcpIoTrace, as FTP's
+    // control and data connections do, is written as it says, with no query ALPN line (BL-1259 Notes).
+    private ConnectResult OpenedInPlaintext(DialedSocket dialed, ConnectTarget target, ConnectTimings timings, int proxyConnectResponseCode)
+    {
+        var lines = !dialed.TracesTcpFilter ? null : target.TcpIoTrace ?? (target.PoolScheme == "http" ? TcpIoTraceConnection.HttpLines : null);
+        var tracesHttpIo = ReferenceEquals(lines, TcpIoTraceConnection.HttpLines);
+        var connection = lines is null ? dialed.Connection : new TcpIoTraceConnection(dialed.Connection, target.Events, lines);
+        var opened = WithSetupFiltersRemoved(
+            Opened(dialed, target.Events, connection, timings, proxyConnectResponseCode, peerCertificates: null, applicationProtocol: null),
+            dialed, target.Events);
+        WriteQueryAlpnLine(dialed, target, tracesHttpIo);
+        return opened;
+    }
+
+    // The topmost filter answers the ALPN query: through a plain HTTP proxy's tunnel the [H1-PROXY]
+    // filter, through a SOCKS proxy or pre-proxy the [SOCKS] filter, never [TCP], so under network
+    // alone a SOCKS connection writes none (measured, BL-1193 and BL-1246 Notes).
+    private void WriteQueryAlpnLine(DialedSocket dialed, ConnectTarget target, bool tracesIo)
     {
         if (dialed.TunnelTrace is { } tunnelTrace)
         {
-            tunnelTrace.ReportAlpnQueried(events);
+            tunnelTrace.ReportAlpnQueried(target.Events);
+        }
+        else if (IsThroughSocks(target))
+        {
+            WriteSocksQueryAlpnLine(target);
         }
         else if (tracesIo)
         {
-            events.ReportInfo(QueryAlpnLine);
+            target.Events.ReportInfo(QueryAlpnLine);
         }
     }
+
+    // Only a new plain HTTP connection is asked; a reused one writes no second line (measured,
+    // BL-1246 Notes).
+    private void WriteSocksQueryAlpnLine(ConnectTarget target)
+    {
+        if (TracesSocksFilter && target.PoolScheme == "http")
+        {
+            target.Events.ReportInfo(SocksQueryAlpnLine);
+        }
+    }
+
+    // Whether the SOCKS filter is the connection's topmost: the target's own SOCKS proxy, or the
+    // pre-proxy in front of a forward HTTP proxy. Through a CONNECT tunnel the proxy's filter is above it.
+    private bool IsThroughSocks(ConnectTarget target) =>
+        TunnelProxyOf(target)?.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a or ProxyKind.Socks5 or ProxyKind.Socks5Hostname;
     // curl 8.21.0 writes the PROXY line after any tunnel and before TLS, from the socket's own ends
     // (BL-616), its setup filter first reporting that it added the HAPROXY filter (BL-1160 Notes).
     private async ValueTask WriteHaproxyLineAsync(HaproxyProtocolHeader header, DialedSocket dialed, ITransferEvents events, CancellationToken cancellationToken)
@@ -1701,7 +2016,15 @@ public sealed partial class TcpConnector(
             events.ReportInfo(HaproxyFilterAddedLine);
         }
 
-        await dialed.Connection.WriteAsync(header.Build(dialed.LocalEndPoint, dialed.RemoteEndPoint), cancellationToken).ConfigureAwait(false);
+        var line = header.Build(dialed.LocalEndPoint, dialed.RemoteEndPoint);
+        await dialed.Connection.WriteAsync(line, cancellationToken).ConfigureAwait(false);
+
+        // The TCP filter sits below the HAPROXY filter, so it traces the line's send like any other,
+        // before Established connection, over TLS too (measured, BL-1253 Notes).
+        if (dialed.TracesTcpFilter)
+        {
+            events.ReportInfo($"[TCP] send(len={line.Length}) -> 0, {line.Length}");
+        }
     }
 
     // Under TracesHaproxyFilter a connection that wrote the PROXY line reports curl 8.21.0's
@@ -1771,8 +2094,8 @@ public sealed partial class TcpConnector(
     // (measured, BL-405).
     // Under writesSslFilterAdded the setup filter first reports adding the SSL filter, after any
     // HAPROXY filter and before the handshake's own lines (measured for a direct https:// connect,
-    // BL-1192 Notes).
-    private ValueTask<ConnectResult> AuthenticateTargetAsync(
+    // BL-1192 Notes). The SSL filter's own lines go around the handshake (measured, BL-1287 Notes).
+    private async ValueTask<ConnectResult> AuthenticateTargetAsync(
         IConnection plaintext,
         ConnectTarget target,
         bool writesSslFilterAdded,
@@ -1783,8 +2106,18 @@ public sealed partial class TcpConnector(
             target.Events.ReportInfo(SslFilterAddedLine);
         }
 
-        return AuthenticateTargetAsync(plaintext, target, cancellationToken);
+        var sslTrace = SslTraceFor(target);
+        sslTrace.ReportConnecting(target.Events);
+        var secured = await AuthenticateTargetAsync(plaintext, target, cancellationToken).ConfigureAwait(false);
+        sslTrace.ReportFinished(target.Events, secured);
+        return secured;
     }
+
+    // A forward proxy is the target itself, so its handshake is the proxy's SSL filter's.
+    private SslFilterTrace SslTraceFor(ConnectTarget target) =>
+        target.IsForwardProxy
+            ? new SslFilterTrace(SslProxyFilterName, TracesSslProxyFilter)
+            : new SslFilterTrace(SslFilterName, TracesSslFilter);
 
     private ValueTask<ConnectResult> AuthenticateTargetAsync(
         IConnection plaintext,
@@ -2010,11 +2343,5 @@ public sealed partial class TcpConnector(
         /// given, before any trace filter wrapped them, when they take the heads.
         /// </summary>
         public IConnectReplyHeadWritingEvents? HeadOutput { get; init; }
-
-        /// <summary>
-        /// Gets the tunnel's <c>[HTTP-PROXY]</c> and <c>[H1-PROXY]</c> lines through a plain HTTP
-        /// proxy; <see langword="null" /> through an HTTPS proxy, whose lines are not measured.
-        /// </summary>
-        public HttpProxyTunnelTrace? Trace { get; init; }
     }
 }

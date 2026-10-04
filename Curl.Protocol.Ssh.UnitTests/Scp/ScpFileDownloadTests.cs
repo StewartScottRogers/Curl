@@ -15,7 +15,7 @@ namespace Curl.Protocol.Ssh.Scp;
 /// sent (BL-574, ADR-0225).
 /// </summary>
 [TestClass]
-public sealed class ScpFileDownloadTests
+public sealed partial class ScpFileDownloadTests
 {
     private const string FailedToReceive = "Failed to recv file";
 
@@ -335,7 +335,7 @@ public sealed class ScpFileDownloadTests
             async () => await new ScpFileDownload(SftpSessionTests.Transport(new ScriptedConnection(script.Bytes)))
                 .DownloadAsync("/f", new MemoryStream(), new RecordingProgress(), CancellationToken.None));
 
-    private static async Task<Outcome> DownloadAsync(ScpServerScript script, string urlPath)
+    private static async Task<Outcome> DownloadAsync(ScpServerScript script, string urlPath, long? maxFileSize = null)
     {
         ScriptedConnection connection = new(script.Bytes);
         MemoryStream output = new();
@@ -343,7 +343,7 @@ public sealed class ScpFileDownloadTests
         try
         {
             TransferResult result = await new ScpFileDownload(SftpSessionTests.Transport(connection))
-                .DownloadAsync(urlPath, output, progress, CancellationToken.None);
+                .DownloadAsync(urlPath, output, progress, CancellationToken.None, maxFileSize);
             return new Outcome(result, null, output.ToArray(), progress.Reports, connection.Written);
         }
         catch (SshTransferException failure)

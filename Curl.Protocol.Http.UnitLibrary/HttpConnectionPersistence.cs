@@ -96,7 +96,8 @@ internal static class HttpConnectionPersistence
     /// Not for HTTP/1.0, a 204, a 304 or a response to HEAD; not when a Transfer-Encoding
     /// header is present, since a chunked one gives the body its end and, under
     /// <c>--tr-encoding</c>, any other already closes the connection; and not for a
-    /// Content-Length unless <c>--ignore-content-length</c> is given.
+    /// Content-Length unless <c>--ignore-content-length</c> is given, nor one too large to hold,
+    /// which curl answers by closing the connection (BL-1387).
     /// </summary>
     /// <param name="head">The final response's head, already checked for a refused header.</param>
     /// <param name="noBody"><see langword="true" /> for a request made with HEAD (<c>-I</c>).</param>
@@ -110,7 +111,7 @@ internal static class HttpConnectionPersistence
 
     private static bool HasNoSizeOrChunk(IReadOnlyList<HttpResponseHeader> headers, bool ignoresContentLength) =>
         !headers.Any(header => string.Equals(header.Name, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
-            && (ignoresContentLength || HttpContentLength.Find(headers) is null);
+            && (ignoresContentLength || (HttpContentLength.Find(headers) is null && !HttpContentLength.Overflows(headers)));
 
     private static bool NamesConnectionOption(HttpResponseHead head, string option) =>
         head.Headers

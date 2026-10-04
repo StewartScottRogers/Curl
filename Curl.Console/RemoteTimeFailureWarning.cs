@@ -31,12 +31,11 @@ internal static class RemoteTimeFailureWarning
     /// <summary>
     /// Builds the warning line, without a line terminator.
     /// </summary>
-    /// <param name="sourceLastWriteTimeUtc">
-    /// The source's time that could not be set; printed as Unix seconds, truncated to whole
-    /// seconds as curl's <c>time_t</c> is.
+    /// <param name="sourceLastWriteUnixSeconds">
+    /// The source's time that could not be set, in Unix seconds as curl's <c>time_t</c> holds it.
     /// </param>
     /// <param name="errorCode">The Win32 error code, printed as <c>0x</c> and eight lowercase hex digits.</param>
     /// <returns>The warning line.</returns>
-    internal static string For(DateTimeOffset sourceLastWriteTimeUtc, int errorCode) =>
-        $"Warning: Failed to set filetime {sourceLastWriteTimeUtc.ToUnixTimeSeconds()} on outfile: CreateFile failed: GetLastError 0x{errorCode:x8}";
+    internal static string For(long sourceLastWriteUnixSeconds, int errorCode) =>
+        $"Warning: Failed to set filetime {sourceLastWriteUnixSeconds} on outfile: CreateFile failed: GetLastError 0x{errorCode:x8}";
 }

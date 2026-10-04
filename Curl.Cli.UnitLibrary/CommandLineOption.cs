@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineOption
 {
-    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true)
+    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true, bool refusedByWindowsSchannelBuild = false)
     {
         LongName = longName;
         ShortName = shortName;
@@ -17,6 +17,7 @@ public sealed class CommandLineOption
         TakesSubject = takesSubject;
         EndsBundle = endsBundle;
         ShortNameTurnsOff = shortNameTurnsOff;
+        RefusedByWindowsSchannelBuild = refusedByWindowsSchannelBuild;
     }
 
     /// <summary>
@@ -63,6 +64,45 @@ public sealed class CommandLineOption
     /// Only a row built with <see cref="NegatableFlag"/> or <see cref="NegatableFlagThatCanRefuse"/> has one.
     /// </summary>
     public CommandLineOptionApplier? Negate { get; }
+
+    /// <summary>
+    /// <see langword="true"/> for a row returned by <see cref="RefusedBySchannelBuild"/>: curl's Windows Schannel
+    /// build refuses the option with exit 2, and so does Curl when it reads as that build.
+    /// </summary>
+    public bool RefusedByWindowsSchannelBuild { get; }
+
+    /// <summary>
+    /// Returns this row refused with <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> whenever
+    /// the parse reads as curl's Windows Schannel build (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild"/>),
+    /// whose libcurl was built without the feature the option asks for, and otherwise applied as before. The
+    /// refusal comes after a missing value is refused as <c>requires parameter</c> and before the value is
+    /// checked, so <c>--tlsauthtype ''</c> is refused as unsupported, not as blank (measured with curl 8.21.0
+    /// Schannel, 2026-10-02, BL-1278).
+    /// </summary>
+    /// <returns>The row, refused on the Windows Schannel build.</returns>
+    public CommandLineOption RefusedBySchannelBuild()
+    {
+        return new CommandLineOption(
+            LongName,
+            ShortName,
+            TakesValue,
+            RefusingOnSchannelBuild(Apply),
+            Negate is null ? null : RefusingOnSchannelBuild(Negate),
+            TakesSubject,
+            EndsBundle,
+            ShortNameTurnsOff,
+            warnsAboutLeadingUnicode: false,
+            refusedByWindowsSchannelBuild: true);
+    }
+
+    /// <summary>
+    /// Wraps <paramref name="apply"/> so it refuses on the Windows Schannel build. curl 8.21.0 checks the
+    /// feature before it reads the toggle, so the <c>--no-</c> spelling is refused too (<c>--no-proxy-http2</c>).
+    /// </summary>
+    private static CommandLineOptionApplier RefusingOnSchannelBuild(CommandLineOptionApplier apply) =>
+        (options, value, spelledOption, pathExists, dataFileReader) => options.ActsAsWindowsSchannelBuild
+            ? CommandLineRefusal.InstalledLibcurlDoesNotSupport(spelledOption)
+            : apply(options, value, spelledOption, pathExists, dataFileReader);
 
     /// <summary>
     /// Creates a row for an option that takes no value and whose <c>--no-</c> spelling curl refuses

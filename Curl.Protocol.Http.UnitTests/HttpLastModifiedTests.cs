@@ -1,12 +1,12 @@
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Pins <see cref="HttpLastModified" /> to the three HTTP-date forms (ADR-0044).
+/// Pins <see cref="HttpLastModified" /> to the three HTTP-date forms (ADR-0044) and a year past 9999 (ADR-0410).
 /// </summary>
 [TestClass]
 public sealed class HttpLastModifiedTests
 {
-    private static readonly DateTimeOffset ConditionTime = new(1994, 11, 6, 8, 49, 37, TimeSpan.Zero);
+    private static readonly long ConditionTime = new DateTimeOffset(1994, 11, 6, 8, 49, 37, TimeSpan.Zero).ToUnixTimeSeconds();
 
     [TestMethod]
     [DataRow("Sun, 06 Nov 1994 08:49:37 GMT", DisplayName = "IMF-fixdate")]
@@ -14,6 +14,10 @@ public sealed class HttpLastModifiedTests
     [DataRow("Sun Nov  6 08:49:37 1994", DisplayName = "asctime")]
     public void Find_HttpDate_GivesItsTime(string value) =>
         Assert.AreEqual(ConditionTime, HttpLastModified.Find(Head(200, "last-modified: " + value)));
+
+    [TestMethod]
+    public void Find_YearPast9999_GivesItsUnixSeconds() =>
+        Assert.AreEqual(1_200_110_860_800L, HttpLastModified.Find(Head(200, "Last-Modified: Mon, 01 Jan 40000 00:00:00 GMT")));
 
     [TestMethod]
     public void Find_SeveralLastModified_TakesTheLast() =>

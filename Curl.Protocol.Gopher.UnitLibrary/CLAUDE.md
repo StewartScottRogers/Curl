@@ -8,6 +8,11 @@ connection, as curl 8.21.0 does. `GopherSelector` builds the selector: the path 
 query as written (dot segments removed, still percent-encoded) less their first two
 characters, then percent-decoded.
 
+`-I` and `--max-filesize` (BL-1308): under `ITransferContext.NoBody` the handler sends the
+selector and ends with exit 0 without reading; with `ITransferContext.MaxFileSize` above 0
+it writes the reply up to the limit and, when a read goes past it, cuts it there and ends
+with exit 63 and `Exceeded the maximum allowed file size (N) with N bytes`.
+
 **URL schemes:** `gopher` (default port 70), `gophers` (default port 70, the same
 handler with `ConnectTarget.UseTls` true)
 
@@ -26,9 +31,12 @@ and milliseconds) as `info`; the connect target carries the log on.
 never the selector (curl does not trace it); then `shutting down connection #N`, or for a
 failure other than a malformed selector the failure's message (unless it is curl's
 fallback text for a failed send or receive), `Failed sending Gopher request` for a failed
-send (BL-1228), and `closing connection #N`. A failed send is exit 55 with
-`Send failure: Connection was reset` for a reset and `Failed sending data to the peer`
-otherwise.
+send (BL-1228), and `closing connection #N`. A failed send is exit 55 and a failed read
+exit 56, worded by the shared `CurlSocketErrorText` (BL-1339) when a `SocketException` is
+inside - `Send failure: <words>` / `Recv failure: <words>`, Winsock words on Windows and
+`strerror`'s elsewhere - and `Failed sending data to the peer` / `Failure when receiving
+data from the peer` when none is; a `gophers` read that ends without `close_notify` keeps
+its own text.
 
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and nothing
 else horizontal. Referencing another protocol library is a build break, and

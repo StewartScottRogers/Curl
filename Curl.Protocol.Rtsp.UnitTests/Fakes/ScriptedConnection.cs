@@ -31,6 +31,9 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     /// <summary>Gets every byte written so far, in order.</summary>
     public byte[] Sent => [.. sent];
 
+    /// <summary>Gets a value indicating whether some scripted bytes have not been read yet.</summary>
+    public bool HasUnreadBytes => nextRead < reads.Length;
+
     /// <summary>Gets a value indicating whether the handler marked the connection for reuse.</summary>
     public bool IsMarkedReusable { get; private set; }
 

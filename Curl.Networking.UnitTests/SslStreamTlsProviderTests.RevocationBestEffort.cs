@@ -95,7 +95,7 @@ public sealed partial class SslStreamTlsProviderTests
 
         var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, null, CertificateHost, []);
 
-        Assert.IsNotNull(failure);
+        Assert.AreEqual((CurlExitCode.PeerFailedVerification, UntrustedRootLine), failure);
     }
 
     [TestMethod]

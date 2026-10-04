@@ -42,6 +42,12 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
     /// <summary>What every header value this authenticator makes starts with.</summary>
     public const string SchemePrefix = "Negotiate ";
 
+    /// <summary>
+    /// The info line curl 8.21.0 writes, on its SSPI and GSS-API builds alike, for a
+    /// <c>Negotiate</c> challenge whose token starts with <c>=</c> (BL-1303).
+    /// </summary>
+    public const string EmptyChallengeMessageLine = "SPNEGO handshake failure (empty challenge message)";
+
     private readonly NegotiateOptions options = options ?? NegotiateOptions.Default;
 
     private readonly bool wordsFailuresAsSspi = wordsFailuresAsSspi ?? OperatingSystem.IsWindows();
@@ -63,14 +69,23 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
     /// Steps a new context for <paramref name="request" /> and disposes of it without making a
     /// header value, as curl's <c>Curl_input_negotiate</c> does for a 401 it will not answer
     /// because no <c>-u</c> was given: nothing is sent, but a failure is still reported to
-    /// <see cref="HttpAuthRequest.Events" /> (measured, BL-843 Notes).
+    /// <see cref="HttpAuthRequest.Events" /> (measured, BL-843 Notes). A challenge whose token
+    /// starts with <c>=</c> steps no context: curl reports
+    /// <see cref="EmptyChallengeMessageLine" /> instead (BL-1303).
     /// </summary>
     /// <param name="request">The request being authorised.</param>
+    /// <param name="challenges">The response's challenges.</param>
     /// <param name="cancellationToken">Cancels a KDC exchange.</param>
     /// <returns>A task that completes when the context has stepped.</returns>
-    public async ValueTask StepWithoutAnsweringAsync(HttpAuthRequest request, CancellationToken cancellationToken)
+    public async ValueTask StepWithoutAnsweringAsync(HttpAuthRequest request, IReadOnlyList<string> challenges, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(challenges);
+        if (ReportsAnEmptyChallengeMessage(HttpChallengeSchemes.NegotiateTokenOf(challenges), request.Events))
+        {
+            return;
+        }
+
         using ISecurityContext context = securityContexts.Create(ContextRequestFor(request));
         ReportFailure(await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false), request.Events);
     }
@@ -97,7 +112,8 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
             return null;
         }
 
-        if (DecodeBase64(HttpChallengeSchemes.NegotiateTokenOf(challenges)) is not { Length: > 0 } incomingToken)
+        string? token = HttpChallengeSchemes.NegotiateTokenOf(challenges);
+        if (ReportsAnEmptyChallengeMessage(token, request.Events) || DecodeBase64(token) is not { Length: > 0 } incomingToken)
         {
             context.Dispose();
             return null;
@@ -155,6 +171,24 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
         return separator < 0
             ? (credential.Domain.Length == 0 ? null : credential.Domain, name)
             : (name[..separator], name[(separator + 1)..]);
+    }
+
+    /// <summary>
+    /// Reports <see cref="EmptyChallengeMessageLine" /> to <paramref name="events" /> when
+    /// <paramref name="token" /> starts with <c>=</c>, as curl 8.21.0's
+    /// <c>Curl_auth_decode_spnego_message</c> does on both builds before any context step: such
+    /// a token is never base64-decoded, so the challenge message is empty (BL-1303).
+    /// </summary>
+    /// <returns><see langword="true" /> when the line was reported and no context may be stepped.</returns>
+    private static bool ReportsAnEmptyChallengeMessage(string? token, ITransferEvents events)
+    {
+        if (token is null || !token.StartsWith('='))
+        {
+            return false;
+        }
+
+        events.ReportInfo(EmptyChallengeMessageLine);
+        return true;
     }
 
     private static byte[]? DecodeBase64(string? text)

@@ -36,6 +36,26 @@ public sealed class WsUpgradeRequestFormatterTests
     }
 
     [TestMethod]
+    public void Format_AuthorizationAndRange_PutsRangeAfterAuthorizationAndBeforeUserAgent()
+    {
+        string head = Encoding.Latin1.GetString(WsUpgradeRequestFormatter.Format(CurlUrl.Parse("ws://127.0.0.1:47901/"), new HttpRequestOptions(), "GET", Key, "Basic dXNlcjpwdw==", "1-2"));
+
+        StringAssert.StartsWith(head, "GET / HTTP/1.1\r\nHost: 127.0.0.1:47901\r\nAuthorization: Basic dXNlcjpwdw==\r\nRange: bytes=1-2\r\nUser-Agent: curl/8.21.0\r\n");
+    }
+
+    [TestMethod]
+    [DataRow(null, null, null)]
+    [DataRow(0L, null, null)]
+    [DataRow(0L, "1-2", "1-2")]
+    [DataRow(null, "abc", "abc")]
+    [DataRow(5L, null, "5-")]
+    [DataRow(5L, "1-2", "5-")]
+    public void RangeValue_ResumeOffsetAndRangeText_PicksWhatCurlsSetupRangeDoes(long? resumeFrom, string? rangeText, string? expected)
+    {
+        Assert.AreEqual(expected, WsUpgradeRequestFormatter.RangeValue(resumeFrom, rangeText));
+    }
+
+    [TestMethod]
     public void Format_HeaderAgentAndAuthorization_PlacesEachWhereCurlDoes()
     {
         var options = new HttpRequestOptions { Headers = ["X-Test: 1"], UserAgent = "agent/1" };

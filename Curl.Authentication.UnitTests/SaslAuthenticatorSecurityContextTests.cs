@@ -265,18 +265,55 @@ public sealed class SaslAuthenticatorSecurityContextTests
     }
 
     [TestMethod]
-    [DataRow(new byte[] { (byte)'X', 0x06, 0x00, 0x10, 0x00 }, DisplayName = "Only integrity and confidentiality offered")]
-    [DataRow(new byte[] { (byte)'X', 0x01, 0x00, 0x10 }, DisplayName = "Three bytes")]
-    [DataRow(new byte[] { (byte)'X', 0x01, 0x00, 0x10, 0x00, 0x00 }, DisplayName = "Five bytes")]
-    [DataRow(new byte[0], DisplayName = "Does not unwrap")]
-    public async Task Begin_GssapiOfferCurlRefuses_AnswersNull(byte[] wrappedOffer)
+    [DataRow(true, new byte[] { (byte)'X', 0x06, 0x00, 0x10, 0x00 }, false, "GSSAPI handshake failure (invalid security layer)", DisplayName = "SSPI: only integrity and confidentiality offered")]
+    [DataRow(true, new byte[] { (byte)'X', 0x02, 0x00, 0x00, 0x00 }, false, "GSSAPI handshake failure (invalid security layer)", DisplayName = "SSPI: 0x02 offered")]
+    [DataRow(true, new byte[] { (byte)'X', 0x01, 0x00, 0x10 }, false, "GSSAPI handshake failure (invalid security data)", DisplayName = "SSPI: three bytes")]
+    [DataRow(true, new byte[] { (byte)'X', 0x01, 0x00, 0x10, 0x00, 0x00 }, false, "GSSAPI handshake failure (invalid security data)", DisplayName = "SSPI: five bytes")]
+    [DataRow(true, new byte[0], false, "GSSAPI handshake failure (empty security message)", DisplayName = "SSPI: empty")]
+    [DataRow(true, new byte[] { (byte)'X', 0x01, 0x00, 0x10, 0x00 }, true, "GSSAPI handshake failure (decryption failed)", DisplayName = "SSPI: does not unwrap")]
+    [DataRow(false, new byte[] { (byte)'X', 0x02, 0x00, 0x00, 0x00 }, false, "GSSAPI handshake failure (invalid security layer)", DisplayName = "GSS-API: 0x02 offered")]
+    [DataRow(false, new byte[] { (byte)'X', 0x01, 0x00, 0x10 }, false, "GSSAPI handshake failure (invalid security data)", DisplayName = "GSS-API: three bytes")]
+    [DataRow(false, new byte[0], false, "GSSAPI handshake failure (empty security message)", DisplayName = "GSS-API: empty")]
+    [DataRow(false, new byte[] { (byte)'X', 0x01, 0x00, 0x10, 0x00 }, true, "gss_unwrap() failed: ", DisplayName = "GSS-API: does not unwrap")]
+    public async Task Begin_GssapiOfferCurlRefuses_AnswersNullWithCurlsCancelLine(bool wordsFailuresAsSspi, byte[] wrappedOffer, bool unwrapFails, string expectedReason)
     {
-        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.Completed, KerberosToken)) { IsCompleted = true };
-        ISaslExchange exchange = Authenticator(new ScriptedSecurityContextFactory(context)).Begin("GSSAPI", Request(new NetworkCredential("", "")));
+        // curl 8.21.0's Curl_auth_create_gssapi_security_message: an infof line, then a cancel (BL-1336).
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.Completed, KerberosToken)) { IsCompleted = true, UnwrapFails = unwrapFails };
+        ISaslExchange exchange = new SaslAuthenticator(Windows1252, new ScriptedSecurityContextFactory(context)) { WordsGssapiFailuresAsSspi = wordsFailuresAsSspi }
+            .Begin("GSSAPI", Request(new NetworkCredential("", "")));
         await exchange.GetInitialResponseAsync(CancellationToken.None);
+        Assert.IsNull(exchange.CancelReason);
 
         Assert.IsNull(await exchange.RespondAsync(wrappedOffer, CancellationToken.None));
+        Assert.AreEqual(expectedReason, exchange.CancelReason);
         Assert.IsTrue(context.IsDisposed);
+    }
+
+    [TestMethod]
+    [DataRow(true, DisplayName = "SSPI wording")]
+    [DataRow(false, DisplayName = "GSS-API wording")]
+    public async Task Begin_GssapiGoodOffer_AnswersTheWrappedChoiceAndLeavesCancelReasonNull(bool wordsFailuresAsSspi)
+    {
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.Completed, KerberosToken)) { IsCompleted = true };
+        ISaslExchange exchange = new SaslAuthenticator(Windows1252, new ScriptedSecurityContextFactory(context)) { WordsGssapiFailuresAsSspi = wordsFailuresAsSspi }
+            .Begin("GSSAPI", Request(new NetworkCredential("", ""), "z"));
+        await exchange.GetInitialResponseAsync(CancellationToken.None);
+
+        CollectionAssert.AreEqual(new byte[] { (byte)'S', 0x01, 0, 0, 0, (byte)'z' }, await exchange.RespondAsync(WrappedOffer(0x01, 0, 0x10, 0), CancellationToken.None));
+        Assert.IsNull(exchange.CancelReason);
+    }
+
+    [TestMethod]
+    public async Task Begin_NtlmRefusedType2_NeverSetsCancelReason()
+    {
+        ScriptedSecurityContext context = new(new(SecurityContextStatus.ContinueNeeded, Type1), new(SecurityContextStatus.Refused, []));
+        ISaslExchange exchange = Authenticator(new ScriptedSecurityContextFactory(context)).Begin("NTLM", Request(new NetworkCredential("u", "p")));
+
+        CollectionAssert.AreEqual(Type1, await exchange.GetInitialResponseAsync(CancellationToken.None));
+        Assert.IsNull(await exchange.RespondAsync(Type2, CancellationToken.None));
+        Assert.IsNull(exchange.CancelReason);
+        Assert.IsNull(await exchange.RespondAsync(Type2, CancellationToken.None));
+        Assert.IsNull(exchange.CancelReason);
     }
 
     [TestMethod]
@@ -287,6 +324,7 @@ public sealed class SaslAuthenticatorSecurityContextTests
         await exchange.GetInitialResponseAsync(CancellationToken.None);
 
         Assert.IsNull(await exchange.RespondAsync("bad"u8.ToArray(), CancellationToken.None));
+        Assert.IsNull(exchange.CancelReason, "A refused context token fails the transfer with exit 67, not a cancel.");
         Assert.IsNull(await exchange.RespondAsync(WrappedOffer(0x01, 0, 0, 0), CancellationToken.None));
     }
 

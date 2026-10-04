@@ -154,4 +154,62 @@ public sealed class TransferResultTests
         Assert.IsFalse(TransferResult.Failure(CurlExitCode.CouldntConnect, "failed").IsConnectionRefused);
         Assert.IsTrue((TransferResult.Failure(CurlExitCode.CouldntConnect, "failed") with { IsConnectionRefused = true }).IsConnectionRefused);
     }
+
+    [TestMethod]
+    public void SourceLastWriteUnixSeconds_PastYear9999_ReadsBackNullFromSourceLastWriteTimeUtc()
+    {
+        // 40000-01-01T00:00:00Z, the Last-Modified curl 8.21.0 stamps a file from (BL-1409).
+        var result = TransferResult.Success(10) with { SourceLastWriteUnixSeconds = 1200110860800 };
+
+        Assert.AreEqual(1200110860800L, result.SourceLastWriteUnixSeconds);
+        Assert.IsNull(result.SourceLastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public void SourceLastWriteTimeUtc_WhenSet_StoresItsWholeUnixSeconds()
+    {
+        var result = TransferResult.Success(10, SourceTime.AddMilliseconds(750));
+
+        Assert.AreEqual(SourceTime.ToUnixTimeSeconds(), result.SourceLastWriteUnixSeconds);
+        Assert.AreEqual(SourceTime, result.SourceLastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public void With_SourceLastWriteTimeUtc_ReplacesTheStoredSecondsAndLeavesOriginalUnchanged()
+    {
+        var original = TransferResult.Success(10, SourceTime);
+        var later = SourceTime.AddDays(1);
+
+        var copy = original with { SourceLastWriteTimeUtc = later };
+        var cleared = original with { SourceLastWriteTimeUtc = null };
+
+        Assert.AreEqual(later, copy.SourceLastWriteTimeUtc);
+        Assert.AreEqual(later.ToUnixTimeSeconds(), copy.SourceLastWriteUnixSeconds);
+        Assert.IsNull(cleared.SourceLastWriteUnixSeconds);
+        Assert.AreEqual(SourceTime, original.SourceLastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public void Equals_ForInRangeTimes_ComparesTheTimes()
+    {
+        Assert.AreEqual(TransferResult.Success(10, SourceTime), TransferResult.Success(10, SourceTime));
+        Assert.AreEqual(
+            TransferResult.Success(10, SourceTime).GetHashCode(),
+            TransferResult.Success(10, SourceTime).GetHashCode());
+        Assert.AreNotEqual(TransferResult.Success(10, SourceTime), TransferResult.Success(10, SourceTime.AddSeconds(1)));
+        Assert.AreEqual(
+            TransferResult.Success(10, SourceTime),
+            TransferResult.Success(10) with { SourceLastWriteUnixSeconds = SourceTime.ToUnixTimeSeconds() });
+    }
+
+    [TestMethod]
+    public void Deconstruct_GivesTheDateTimeOffsetView()
+    {
+        var (exitCode, bytes, message, time) = TransferResult.Success(10, SourceTime);
+
+        Assert.AreEqual(CurlExitCode.Ok, exitCode);
+        Assert.AreEqual(10L, bytes);
+        Assert.IsNull(message);
+        Assert.AreEqual(SourceTime, time);
+    }
 }

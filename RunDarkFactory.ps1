@@ -36,12 +36,14 @@
 
     COST CAP
 
-    Each headless run is capped at -TaskBudgetUsd (default $6, under three times the median
-    task's cost; AF-0004, ADR-0288) with claude's --max-budget-usd. A task run that reaches
-    the cap stops; like a timed-out run, its partial work is stashed and the task goes to
-    Blocked for Stewart, since it is too big for one run and wants splitting. claude checks
-    the cap between turns, so a run can end one turn's cost above it. -TaskBudgetUsd 0
-    removes the cap.
+    Each headless run is capped with claude's --max-budget-usd at 2.7 times the median cost
+    of the newest 40 task runs in the log folder, never below $2 and never above
+    -TaskBudgetUsd (default $6; AF-0004, AF-0033, ADR-0288, ADR-0407). 2.7 rather than 3
+    because claude checks the cap between turns, so a run can end one turn's cost above
+    it; with fewer than 10 logged runs the cap is -TaskBudgetUsd itself. A task run that
+    reaches the cap stops; like a timed-out run, its partial work is stashed and the task
+    goes to Blocked for Stewart, since it is too big for one run and wants splitting.
+    -TaskBudgetUsd 0 removes the cap. -TestTaskBudget proves the arithmetic.
 
     OUT OF TOKENS
 
@@ -147,7 +149,12 @@
       claim      A lane takes the next task the board offers - one whose `touches` do
                  not overlap any task in Doing - moves it to Doing, commits and pushes
                  that move. The push is the lock: if another lane got there first, the
-                 push is refused and the lane picks again.
+                 push is refused, traced as "race", and the lane picks again. Only
+                 a pushed claim is traced as "claim".
+      offline    Before a claim or an integration attempt the lane checks that
+                 origin answers, and waits up to an hour for it when it does not, so
+                 a GitHub outage never parks finished work or counts as a lost race
+                 (AF-0025, BL-1281).
       run        /task-run in the lane's worktree. The run commits but never pushes.
       integrate  The lane rebases its commits onto the shared branch, rebuilds, runs
                  the fast tests and pushes. Red fast tests are run once more, with the
@@ -167,7 +174,18 @@
     lane-<n>.retire beside the lane's state. A lane asked to retire is never stopped
     mid-task: it finishes and integrates the task it holds, and stops with "retired"
     before its next claim. Restarts cover the active lanes, and the end-of-shift report
-    covers every lane started, retired ones included.
+    covers every lane started, retired ones included. A retire goes to the highest-numbered
+    lane that holds no task, when there is one.
+
+    A fixed lane count (-Lanes N, N > 1) is capped by the board's capacity too (BL-1374,
+    AF-0032): every 5 minutes, except while waiting for tokens, the coordinator reads
+    task-board.ps1 capacity as -Lanes Auto does and retires idle lanes down to it, so no
+    lane polls "every ready task overlaps one in Doing" for hours; when the capacity rises
+    again it adds one lane per step, never above N. Each change traces
+    "lanes a -> b (reason)", e.g. "lanes 9 -> 4 (4 ready tasks can run at once)". The shift
+    also starts no more lanes than that capacity, nor fewer than the lanes it adopts
+    (BL-1384, AF-0041), tracing e.g. "lanes: starting at 4 (-Lanes 9, capped at 4: 4 ready
+    tasks can run at once)", so lanes do not open the shift waiting on overlapping touches.
 
     AUTO LANES (-Lanes Auto)
 
@@ -273,6 +291,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestHeartbeat
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestCiWatch
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskIds
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskBudget
 #>
 [CmdletBinding()]
 param(
@@ -280,10 +299,12 @@ param(
     [double]$Hours = 8,
     # Stop after this many tasks. 0 means no limit.
     [int]$MaxTasks = 0,
-    # A single task run is killed after this long and filed as stalled.
+    # A single task run is killed after this long; a task still in Doing then gets one
+    # overtime run of a quarter of this (at least 30 min) and is Blocked if killed again.
     [int]$TaskMinutes = 120,
-    # A single headless run is stopped once it has cost this many US dollars (claude's
-    # --max-budget-usd) and its task filed as Blocked. 0 means no cap (ADR-0288).
+    # The most a single headless run may cost, in US dollars (claude's
+    # --max-budget-usd); the cap is 2.7 times the median recent run up to this, and a run
+    # that reaches it has its task filed as Blocked. 0 means no cap (ADR-0288, ADR-0407).
     [double]$TaskBudgetUsd = 6,
     # Model for each run. "opus" is the moving alias RunClaude.cmd also uses.
     [string]$Model = $(if ($env:CLAUDE_MODEL) { $env:CLAUDE_MODEL } else { 'opus' }),
@@ -327,6 +348,8 @@ param(
     # -Reason text, status lines and file names, and that a wait logs next's reason line
     # rather than a WARNING printed before it, and exit.
     [switch]$TestTaskIds,
+    # Prove the cost cap follows 2.7 times the median recent run cost (AF-0033), and exit.
+    [switch]$TestTaskBudget,
     # Prove the audit cadence: the shift-end audit check and the start refusal (BL-1022), and exit.
     [switch]$TestAuditCadence,
     # Prove the CURL_DARK_FACTORY_LANE marker's value for a lane, a coordinator and a
@@ -1197,10 +1220,47 @@ function Get-LaneToAdd {
 
 function Get-LaneToRetire {
     # The highest-numbered active lane not already retiring, or $null when there is none.
-    param([int[]]$Active, [int[]]$Retiring)
+    # One among -Idle (lanes holding no task) is preferred, so it stops within a minute
+    # instead of after a task (BL-1374).
+    param([int[]]$Active, [int[]]$Retiring, [int[]]$Idle = @())
     $candidates = @($Active | Where-Object { $Retiring -notcontains $_ } | Sort-Object -Descending)
+    $idleCandidates = @($candidates | Where-Object { $Idle -contains $_ })
+    if ($idleCandidates.Count) { return $idleCandidates[0] }
     if ($candidates.Count) { return $candidates[0] }
     return $null
+}
+
+function Get-CapacityLaneCount {
+    # One capacity step of a fixed -Lanes N shift (BL-1374): straight down to the board's
+    # -Capacity (at least 1) when more lanes run, but by no more than the -Idle lanes; up
+    # one lane when the capacity allows it, never above -Requested. Reason is the log line,
+    # e.g. "lanes 9 -> 4 (4 ready tasks can run at once)".
+    param([int]$Current, [int]$Capacity, [int]$Requested, [int]$Idle)
+    $ceiling = [math]::Max(1, [math]::Min($Capacity, $Requested))
+    $lanes = $Current
+    if ($Current -gt $ceiling) { $lanes = [math]::Max($ceiling, $Current - $Idle) }
+    elseif ($Current -lt $ceiling) { $lanes = $Current + 1 }
+    $limit = if ($Capacity -ge $Requested) { "-Lanes $Requested" }
+        elseif ($Capacity -eq 1) { '1 ready task can run at once' }
+        elseif ($Capacity -le 0) { 'no ready task can run' }
+        else { "$Capacity ready tasks can run at once" }
+    $step = if ($lanes -eq $Current) { "lanes $Current held" } else { "lanes $Current -> $lanes" }
+    return [pscustomobject]@{ Lanes = $lanes; Changed = ($lanes -ne $Current); Reason = "$step ($limit)" }
+}
+
+function Get-FixedStartCount {
+    # The lanes a fixed -Lanes N shift starts with (BL-1384, AF-0041): -Requested capped by
+    # the board's -Capacity (at least 1), never below -Adopted, the highest lane number
+    # adopted from the previous shift. Why is the log text, e.g. "-Lanes 9, capped at 4: 4
+    # ready tasks can run at once".
+    param([int]$Requested, [int]$Capacity, [int]$Adopted = 0)
+    $count = [math]::Max(1, [math]::Min($Requested, $Capacity))
+    $why = if ($count -ge $Requested) { "-Lanes $Requested" }
+        elseif ($Capacity -le 0) { "-Lanes $Requested, capped at 1: no ready task can run" }
+        elseif ($Capacity -eq 1) { "-Lanes $Requested, capped at 1: 1 ready task can run at once" }
+        else { "-Lanes $Requested, capped at ${count}: $Capacity ready tasks can run at once" }
+    if ($Adopted -gt $count) { $count = $Adopted; $why = "lane $Adopted adopted from the previous shift" }
+    return [pscustomobject]@{ Count = $count; Why = $why }
 }
 
 function Test-LanesFinished {
@@ -1279,6 +1339,20 @@ if ($TestAutoLanes) {
         ,@('lane-to-add 1..16', 'null', "$(if ($null -eq (Get-LaneToAdd -Active (1..16) -Max 16)) { 'null' } else { 'a lane' })")
         ,@('lane-to-retire 1,2,3 retiring 3', '2', "$(Get-LaneToRetire -Active 1, 2, 3 -Retiring 3)")
         ,@('lane-to-retire 1,2,3 retiring 1,2,3', 'null', "$(if ($null -eq (Get-LaneToRetire -Active 1, 2, 3 -Retiring 1, 2, 3)) { 'null' } else { 'a lane' })")
+        ,@('lane-to-retire 1,2,3,4 idle 1,2', '2', "$(Get-LaneToRetire -Active 1, 2, 3, 4 -Retiring @() -Idle 1, 2)")
+        ,@('lane-to-retire 1,2,3 retiring 2 idle 2', '3', "$(Get-LaneToRetire -Active 1, 2, 3 -Retiring 2 -Idle 2)")
+        ,@('capacity 9 lanes capacity 4 idle 6', 'lanes 9 -> 4 (4 ready tasks can run at once)', (Get-CapacityLaneCount -Current 9 -Capacity 4 -Requested 9 -Idle 6).Reason)
+        ,@('capacity 9 lanes capacity 4 idle 2', 'lanes 9 -> 7 (4 ready tasks can run at once)', (Get-CapacityLaneCount -Current 9 -Capacity 4 -Requested 9 -Idle 2).Reason)
+        ,@('capacity 3 lanes capacity 0', 'lanes 3 -> 1 (no ready task can run)', (Get-CapacityLaneCount -Current 3 -Capacity 0 -Requested 9 -Idle 3).Reason)
+        ,@('capacity 1 lane capacity 1', 'lanes 1 held (1 ready task can run at once)', (Get-CapacityLaneCount -Current 1 -Capacity 1 -Requested 9 -Idle 1).Reason)
+        ,@('capacity 4 lanes capacity 6', 'lanes 4 -> 5 (6 ready tasks can run at once)', (Get-CapacityLaneCount -Current 4 -Capacity 6 -Requested 9 -Idle 0).Reason)
+        ,@('capacity 9 lanes capacity 12', 'lanes 9 held (-Lanes 9)', (Get-CapacityLaneCount -Current 9 -Capacity 12 -Requested 9 -Idle 0).Reason)
+        ,@('capacity 8 lanes capacity 12', 'lanes 8 -> 9 (-Lanes 9)', (Get-CapacityLaneCount -Current 8 -Capacity 12 -Requested 9 -Idle 0).Reason)
+        ,@('fixed start 9 capacity 4', '4 (-Lanes 9, capped at 4: 4 ready tasks can run at once)', "$((Get-FixedStartCount -Requested 9 -Capacity 4) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('fixed start 9 capacity 12', '9 (-Lanes 9)', "$((Get-FixedStartCount -Requested 9 -Capacity 12) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('fixed start 9 capacity 1', '1 (-Lanes 9, capped at 1: 1 ready task can run at once)', "$((Get-FixedStartCount -Requested 9 -Capacity 1) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('fixed start 9 capacity 0', '1 (-Lanes 9, capped at 1: no ready task can run)', "$((Get-FixedStartCount -Requested 9 -Capacity 0) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('fixed start 9 capacity 2 adopted 6', '6 (lane 6 adopted from the previous shift)', "$((Get-FixedStartCount -Requested 9 -Capacity 2 -Adopted 6) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('lanes-finished 1,3 of 1,2', 'False', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 2)")
         ,@('lanes-finished 1,3 of 1,3', 'True', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 3)")
         ,@('start saved 2', '3 (last shift saved 2, raised to 3 by -MinStartLanes)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 2 }) 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
@@ -1727,6 +1801,74 @@ if ($TestTaskIds) {
             (Get-WaitReason "WARNING: Duplicate task ID BL-806: `r`nTasks\Backlog\BL-806-write-curl-s-v-tls-lines.md, `r`nTasks\Done\2026-09-28_1849\BL-806-stop-lanes-auto.md`r`nNo task can start yet: every ready task overlaps one in Doing or waits behind one that does, e.g. BL-806 with BL-797."))
         ,@('a wait reason when nothing is ready, after a warning', 'No task is ready.', (Get-WaitReason "WARNING: Duplicate task ID BL-806: Tasks\Backlog\a.md, Tasks\Done\b.md`nNo task is ready."))
         ,@('a wait reason with no warning', 'No task is ready.', (Get-WaitReason 'No task is ready.')))
+    $failed = 0
+    foreach ($case in $cases) {
+        if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
+        else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $($case[2])" -ForegroundColor Red; $failed++ }
+    }
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
+function Get-MedianCost {
+    # The median of a list of run costs in US dollars, or 0 for an empty list.
+    param([double[]]$Costs)
+    $sorted = @($Costs | Sort-Object)
+    if ($sorted.Count -eq 0) { return 0.0 }
+    $mid = [int][math]::Floor($sorted.Count / 2)
+    if ($sorted.Count % 2) { return [double]$sorted[$mid] }
+    return ([double]$sorted[$mid - 1] + [double]$sorted[$mid]) / 2
+}
+
+function Get-RunBudgetUsd {
+    # The cost cap for the next headless run (AF-0033, ADR-0407): 2.7 times the median of
+    # the recent task runs' costs, so a run that ends one turn above it still stays under
+    # three times the median, never above -TaskBudgetUsd and never below $2. Fewer than 10
+    # recent costs leaves -TaskBudgetUsd as it is; -TaskBudgetUsd 0 means no cap.
+    param([double]$Ceiling, [double[]]$RecentCosts)
+    if ($Ceiling -le 0) { return 0.0 }
+    $costs = @($RecentCosts | Where-Object { $_ -gt 0 })
+    if ($costs.Count -lt 10) { return $Ceiling }
+    $cap = [math]::Round(2.7 * (Get-MedianCost $costs), 2)
+    return [math]::Min($Ceiling, [math]::Max(2.0, $cap))
+}
+
+function Get-RecentRunCosts {
+    # total_cost_usd from the result events of the newest task runs' logs in a log folder
+    # (BL-1377-20261003-145757-L1.jsonl and its -resumed run; resolver runs are not tasks).
+    param([string]$Dir, [int]$Count = 40)
+    if (-not (Test-Path $Dir)) { return @() }
+    $logs = Get-ChildItem $Dir -Filter 'BL-*.jsonl' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^BL-\d+-\d{8}-\d{6}(-L\d+)?(-resumed)?\.jsonl$' } |
+        Sort-Object LastWriteTime -Descending | Select-Object -First $Count
+    foreach ($log in $logs) {
+        $line = Get-Content $log.FullName -Tail 5 -ErrorAction SilentlyContinue | Where-Object { $_ -match '"total_cost_usd"' } | Select-Object -Last 1
+        if (-not $line) { continue }
+        $evt = try { $line | ConvertFrom-Json } catch { $null }
+        if ($evt -and $evt.type -eq 'result') { [double]$evt.total_cost_usd }
+    }
+}
+
+if ($TestTaskBudget) {
+    $twelve = [double[]](1.0, 1.0, 1.0, 1.2, 1.2, 1.3, 1.3, 1.4, 1.5, 2.0, 4.0, 5.4)
+    $cases = @(
+        ,@('median of an odd list', '2', "$(Get-MedianCost 3.0, 1.0, 2.0)")
+        ,@('median of an even list', '1.5', "$(Get-MedianCost 1.0, 2.0, 4.0, 1.0)")
+        ,@('median of nothing', '0', "$(Get-MedianCost @())")
+        ,@('cap at 2.7 times the median 1.3', '3.51', "$(Get-RunBudgetUsd 6 $twelve)")
+        ,@('cap under three times the median with a turn over it', 'True', "$((Get-RunBudgetUsd 6 $twelve) + 0.3 -lt 3 * (Get-MedianCost $twelve))")
+        ,@('cap held at -TaskBudgetUsd', '3', "$(Get-RunBudgetUsd 3 $twelve)")
+        ,@('cap floor of 2 dollars', '2', "$(Get-RunBudgetUsd 6 ([double[]](0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)))")
+        ,@('fewer than 10 costs keeps -TaskBudgetUsd', '6', "$(Get-RunBudgetUsd 6 ([double[]](1.0, 1.0, 1.0)))")
+        ,@('-TaskBudgetUsd 0 is no cap', '0', "$(Get-RunBudgetUsd 0 $twelve)")
+        ,@('no log folder gives no costs', '0', "$(@(Get-RecentRunCosts (Join-Path ([IO.Path]::GetTempPath()) 'no-such-dark-factory-logs')).Count)"))
+    $dir = Join-Path ([IO.Path]::GetTempPath()) "DarkFactoryBudget-$PID"
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    Set-Content (Join-Path $dir 'BL-1-20261003-100000-L1.jsonl') '{"type":"assistant"}', '{"type":"result","total_cost_usd":1.25}'
+    Set-Content (Join-Path $dir 'BL-2-20261003-100000-L2-resumed.jsonl') '{"total_cost_usd":2.5,"type":"result"}'
+    Set-Content (Join-Path $dir 'BL-3-20261003-100000-L3-resolve.jsonl') '{"type":"result","total_cost_usd":9}'
+    Set-Content (Join-Path $dir 'BL-4-20261003-100000-L4.jsonl') '{"type":"assistant"}'
+    $cases += ,@('costs read from task and resumed runs only', '1.25,2.5', ((@(Get-RecentRunCosts $dir) | Sort-Object) -join ','))
+    Remove-Item -Recurse -Force $dir
     $failed = 0
     foreach ($case in $cases) {
         if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
@@ -2651,6 +2793,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
    dotnet build and dotnet test in the foreground with the Bash tool and a timeout of up
    to 3600000 ms, and never end your reply to wait for a notification.
+8. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
+   killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
+   take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
+   read the report rather than running it again. If the task cannot be finished before
+   the deadline, move it to Backlog before then with a -Reason saying what is left.
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -2664,6 +2811,18 @@ RESUMING. The previous run of {ID} was cut off before the task was finished - th
 ran out of tokens, the API failed, or the lane was stopped and restarted. Whatever that run had done is still here: read git status, git log
 and the task file before changing anything, and carry on from that work rather than
 starting over.
+
+'@
+
+# Put in front of either prompt when a task runs once more after its run was killed at
+# -TaskMinutes with the task still in Doing (AF-0042): its work stays in place, not stashed.
+$OvertimeNote = @'
+OVERTIME. The previous run of {ID} was killed at its time limit with the task still in
+Doing. Its work is still here: read git status, git log and the task file, and do not
+start over. This is the last run, {MINUTES} minutes long: do not run
+Measure-CodeQuality.ps1 again if a report from the previous run is in the log or on disk.
+Finish the task now if build and fast tests pass and its criteria are met, or move it to
+Backlog with a -Reason saying what is left. A run killed again ends Blocked.
 
 '@
 
@@ -2716,6 +2875,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
    dotnet build and dotnet test in the foreground with the Bash tool and a timeout of up
    to 3600000 ms, and never end your reply to wait for a notification.
+9. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
+   killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
+   take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
+   read the report rather than running it again. If the task cannot be finished before
+   the deadline, move it to Backlog before then with a -Reason saying what is left.
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -2861,12 +3025,16 @@ function Invoke-TaskRun {
     # One headless Claude run in this checkout. By default it is the task run; a lane
     # passes its own prompt and deny list, and a log suffix for the resolver's run.
     # -Resume is the task run again after the usage limit cut the last one off.
-    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0, [switch]$Resume)
+    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0, [switch]$Resume, [switch]$Overtime)
     if (-not $Text) { $Text = if ($Lane) { $LanePrompt } else { $Prompt } }
-    if ($Resume) { $Text = $ResumeNote + $Text; $Suffix += '-resumed' }
+    if ($Overtime) { $Text = $OvertimeNote + $Text; $Suffix += '-overtime' }
+    elseif ($Resume) { $Text = $ResumeNote + $Text; $Suffix += '-resumed' }
     if ($null -eq $Deny) { $Deny = if ($Lane) { $LaneForbidden } else { $Forbidden } }
     if ($Minutes -le 0) { $Minutes = $TaskMinutes }
+    # The run is told when it will be killed, so it can hand the task back before then (AF-0034).
+    $deadline = (Get-Date).AddMinutes($Minutes)
     $Text = $Text.Replace('{ID}', $Id).Replace('{LANE}', "$Lane").Replace('{BRANCH}', $Branch)
+    $Text = $Text.Replace('{DEADLINE}', $deadline.ToString('HH:mm')).Replace('{MINUTES}', "$Minutes")
     $raw = Join-Path $LogDir "$Id-$Stamp$LaneTag$Suffix.jsonl"
     $err = Join-Path $LogDir "$Id-$Stamp$LaneTag$Suffix.err.txt"
     $script:RunResult = $null
@@ -2878,14 +3046,15 @@ function Invoke-TaskRun {
     # lanes build at once: a tool call past its timeout is moved to the background, and a
     # headless run that then ends its reply to wait for it exits with the task still in
     # Doing (BL-855). It inherits CURL_DARK_FACTORY_LANE.
-    # The cost cap (AF-0004): the run stops once it has cost -TaskBudgetUsd.
-    $budget = if ($TaskBudgetUsd -gt 0) { ' --max-budget-usd ' + $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture) } else { '' }
+    # The cost cap (AF-0004, AF-0033): the run stops once it has cost 2.7 times the median
+    # recent run, at most -TaskBudgetUsd.
+    $script:RunBudgetUsd = Get-RunBudgetUsd $TaskBudgetUsd @(Get-RecentRunCosts $LogDir)
+    $budget = if ($script:RunBudgetUsd -gt 0) { ' --max-budget-usd ' + $script:RunBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture) } else { '' }
     $psi = New-ClaudeRunStartInfo "/d /c claude -p --model $Model --dangerously-skip-permissions --output-format stream-json --verbose$budget --disallowedTools $denied 2>`"$err`""
     $p = [System.Diagnostics.Process]::Start($psi)
     $p.StandardInput.Write($Text)
     $p.StandardInput.Close()
 
-    $deadline = (Get-Date).AddMinutes($Minutes)
     $timedOut = $false
     $pending = $p.StandardOutput.ReadLineAsync()
     while ($true) {
@@ -2900,6 +3069,9 @@ function Invoke-TaskRun {
         } elseif ((Get-Date) -gt $deadline) {
             & taskkill /T /F /PID $p.Id 2>&1 | Out-Null
             $timedOut = $true
+            # A killed run sends no result event, so its end is traced here: without it the
+            # lane log's last line for the run is whatever step it was in (AF-0034).
+            Write-Trace $Id 'end' "killed: timed out after $Minutes min" 'Red'
             break
         }
     }
@@ -2932,6 +3104,31 @@ function Enter-Lock {
     }
 }
 
+function Test-RemoteReachable {
+    # Whether origin answers at all, so a failed fetch or push can be told apart: refused by
+    # a remote that answers (another lane pushed first) or never heard (GitHub out of reach).
+    & git -C $Root ls-remote -q origin "refs/heads/$Branch" 2>&1 | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Wait-RemoteReachable {
+    # Waits for origin to answer, up to -Minutes, polling every -PollSeconds. An outage at
+    # GitHub is no reason to park finished work, or to trace a claim that was never refused
+    # as a lost race: on 2026-09-30 a few minutes of "unable to access" parked BL-892, which
+    # was finished, and another lane did it again (AF-0025, BL-1281). Returns $true once
+    # origin answers, $false when it never did.
+    param([string]$Id = '-', [int]$Minutes = 60, [int]$PollSeconds = 30)
+    if (Test-RemoteReachable) { return $true }
+    Write-Trace $Id 'offline' "origin out of reach; waiting up to $Minutes min for it" 'DarkYellow'
+    $deadline = (Get-Date).AddMinutes($Minutes)
+    while ((Get-Date) -lt $deadline) {
+        Write-HeartbeatIfDue
+        Start-Sleep -Seconds $PollSeconds
+        if (Test-RemoteReachable) { Write-Trace $Id 'online' 'origin answers again'; return $true }
+    }
+    return $false
+}
+
 function Sync-Lane {
     # Puts this lane's checkout exactly on the shared branch as it is on the remote.
     Save-StrayChanges 'sync'
@@ -2959,6 +3156,7 @@ function Invoke-Claim {
     $lock = Enter-Lock
     try {
         foreach ($attempt in 1..5) {
+            if (-not (Wait-RemoteReachable)) { return @{ Wait = $true; Why = 'origin out of reach' } }
             if (-not (Sync-Lane)) { Start-Sleep -Seconds 10; continue }
             $requeued = @(Invoke-Requeue)
             if ($requeued.Count) {
@@ -2979,7 +3177,9 @@ function Invoke-Claim {
             Invoke-Git @('add', '-A', 'Tasks') | Out-Null
             Invoke-Git @('commit', '-q', '-m', "chore(tasks): claim $id on dark factory lane $Lane") | Out-Null
             if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return @{ Id = $id } }
-            Write-Trace $id 'claim' 'lost the race; picking again' 'DarkYellow'
+            # Only a claim that was pushed is traced as 'claim', so the log counts claims
+            # truly; a refused push is 'race', and an unheard one is no race at all.
+            if (Test-RemoteReachable) { Write-Trace $id 'race' 'another lane pushed first; picking again' 'DarkYellow' }
         }
         return @{ Wait = $true; Why = 'claim kept losing races' }
     } finally { $lock.Dispose() }
@@ -3022,6 +3222,9 @@ function Invoke-Integrate {
     Write-Heartbeat 'integrate'
     try {
         foreach ($attempt in 1..3) {
+            # Finished work is parked only for what origin refused, never because origin was
+            # out of reach (AF-0025): each attempt starts once origin answers.
+            if (-not (Wait-RemoteReachable -Id $Id)) { return 'origin stayed out of reach for an hour' }
             if (-not (Invoke-Git @('fetch', '-q', 'origin', $Branch))) { Start-Sleep -Seconds 10; continue }
             if (-not (Invoke-Git @('rebase', '-q', "origin/$Branch"))) {
                 if (Test-Rebasing) {
@@ -3154,6 +3357,7 @@ if ($TestPark) {
     $quiet = { param([string[]]$Reasons) $script:Alarmed = $Reasons }
     $failed = 0
     $cases = @(
+        ,@('an origin that answers is reachable at once', 'True', { "$(Wait-RemoteReachable -Minutes 0 -PollSeconds 0)" })
         ,@('a park pushes its move to Backlog, naming the branch', "'' Backlog factory/BL-001-lane-9-test", {
             Set-Content -Path (Join-Path $repo 'work.txt') -Value 'work'
             git -C $repo add -A 2>&1 | Out-Null; git -C $repo commit -q -m work 2>&1 | Out-Null
@@ -3166,6 +3370,12 @@ if ($TestPark) {
             # The git failures it traces are expected here, so they are not printed.
             $r = Invoke-Park -Id 'BL-002' -Why 'push kept being refused' -RetrySeconds @(0) 6>$null
             "$(if ($r -match '^BL-002 PARK NOT PUSHED ') { 'BL-002 PARK NOT PUSHED' } else { "'$r'" }), $(if ($r -match 'still in Doing') { 'still in Doing' } else { 'state not said' }), $(if ((Get-ParkedBranches 'BL-002' $repo) -contains 'factory/BL-002-lane-9-test') { 'branch kept' } else { 'no branch' })" })
+        ,@('an origin out of reach is waited for, then reported unreachable', 'False offline', {
+            New-Item -ItemType Directory -Force -Path $script:LogDir | Out-Null
+            $script:TraceFile = Join-Path $script:LogDir 'trace.log'
+            $r = Wait-RemoteReachable -Minutes 0 -PollSeconds 0 6>$null
+            $traced = (Get-Content -Path $TraceFile -ErrorAction SilentlyContinue) -join ' '
+            "$r $(if ($traced -match 'offline +origin out of reach') { 'offline' } else { 'not traced' })" })
         ,@('an orphan with a parked branch and clean lanes goes to Backlog', 'backlog factory/BL-002-lane-9-test', {
             $a = Get-OrphanAction -Id 'BL-002' -ParkedBranches (Get-ParkedBranches 'BL-002' $repo) -DirtyLanes @(@(9) | Where-Object { Test-WorktreeDirty $repo })
             "$($a.Action) $($a.Branch)" })
@@ -3664,6 +3874,14 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         $LaneCount = [math]::Max($LaneCount, $start.Count)
         Write-Trace '-' 'lanes' "lanes auto: starting at $LaneCount ($why)" 'Cyan'
         Set-AutoLanesStatus -Lanes $LaneCount -Target $null -Binding 'no burn rate' -Reason "lanes auto: starting at $LaneCount ($why)"
+    } elseif ($LaneCount -gt 1) {
+        # A fixed count starts no more lanes than the board can run at once (BL-1384, AF-0041),
+        # so lanes do not open the shift polling "every ready task overlaps one in Doing";
+        # capacity steps add the rest, one every 5 minutes, as the capacity rises.
+        $adoptedMax = if ($adopt.Count) { [int]($adopt.Keys | Measure-Object -Maximum).Maximum } else { 0 }
+        $start = Get-FixedStartCount -Requested ([int]$Lanes) -Capacity (Get-ShiftCapacity -Fallback ([int]$Lanes)) -Adopted $adoptedMax
+        $LaneCount = $start.Count
+        Write-Trace '-' 'lanes' "lanes: starting at $LaneCount ($($start.Why))" 'Cyan'
     }
 
     # The previous shift stopped claiming work near the end of its session; this one starts
@@ -3746,10 +3964,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     }
 
     function Request-LaneRetire {
-        # Asks the highest-numbered active lane not already retiring to stop after its
-        # current task, and returns it; $null when every active lane is already retiring.
+        # Asks the highest-numbered active lane not already retiring, an idle one first, to
+        # stop after its current task, and returns it; $null when every active lane is
+        # already retiring.
         $retiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
-        $n = Get-LaneToRetire -Active @($activeLanes) -Retiring $retiring
+        $n = Get-LaneToRetire -Active @($activeLanes) -Retiring $retiring -Idle @(Get-IdleLanes)
         if ($null -eq $n) { return $null }
         Set-Content -Path (Get-LaneStatePath $n 'retire') -Value (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') -Encoding ASCII
         Write-Trace '-' 'lane' "lane $n asked to retire after its current task"
@@ -3825,6 +4044,31 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         Save-AutoLanes $script:LaneCount
     }
 
+    function Get-IdleLanes {
+        # The active lanes holding no task: claiming, waiting on overlapping touches, or starting.
+        return @($activeLanes | Where-Object { -not (Get-LaneState $_ 'task') })
+    }
+
+    function Invoke-CapacityLaneStep {
+        # One capacity step of a fixed -Lanes N shift (BL-1374, AF-0032): idle lanes beyond
+        # the board's capacity retire, and lanes come back one a step, up to N, as it rises.
+        $retiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
+        $current = @($activeLanes | Where-Object { $retiring -notcontains $_ }).Count
+        if ((Get-UsageStop) -or (Get-Date) -gt $shiftEnd) { return }
+        $capacity = Get-ShiftCapacity -Fallback $current
+        $idle = @(Get-IdleLanes | Where-Object { $retiring -notcontains $_ })
+        $step = Get-CapacityLaneCount -Current $current -Capacity $capacity -Requested $requestedLanes -Idle $idle.Count
+        if (-not $step.Changed) { return }
+        Write-Trace '-' 'lanes' $step.Reason 'Cyan'
+        if ($step.Lanes -gt $current) {
+            if ($null -eq (Add-Lane)) { Write-Trace '-' 'lanes' 'no lane to add' 'Yellow' }
+            return
+        }
+        foreach ($i in 1..($current - $step.Lanes)) { if ($null -eq (Request-LaneRetire)) { break } }
+    }
+
+    # The lane count a fixed shift asked for; capacity steps never go above it.
+    $requestedLanes = if ($AutoLanes) { $LaneCount } else { [math]::Max([int]$Lanes, $LaneCount) }
     foreach ($n in 1..$LaneCount) {
         $where = Start-Lane -N $n
         $activeLanes.Add($n)
@@ -3834,10 +4078,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $restarts = @{}
     # A lane is finished once it has written its summary. A herdr tab has no process to
     # watch, so the summaries are the signal; a lane that dies without one is given up on
-    # after the shift's length plus one task's time limit.
-    $giveUp = $shiftEnd.AddMinutes($TaskMinutes + 30)
+    # after the shift's length plus one task's time limit and its overtime run (AF-0042).
+    $giveUp = $shiftEnd.AddMinutes($TaskMinutes + [math]::Max(30, [int]($TaskMinutes / 4)) + 30)
     $tick = Get-Date
     $nextAutoStep = (Get-Date).AddMinutes(15)
+    $nextCapacityStep = (Get-Date).AddMinutes(5)
     while ((Get-Date) -lt $giveUp) {
         # The coordinator announces the usage limit for every lane, and lanes waiting for a
         # new session add that wait to their shift, so the coordinator waits longer too.
@@ -3877,6 +4122,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if ($AutoLanes -and (Get-Date) -ge $nextAutoStep -and -not (Test-WaitingForSession)) {
             Invoke-AutoLaneStep
             $nextAutoStep = (Get-Date).AddMinutes(15)
+        }
+        # A fixed count of lanes steps to the board's capacity every 5 minutes (BL-1374).
+        if (-not $AutoLanes -and $requestedLanes -gt 1 -and (Get-Date) -ge $nextCapacityStep -and -not (Test-WaitingForSession)) {
+            Invoke-CapacityLaneStep
+            $nextCapacityStep = (Get-Date).AddMinutes(5)
         }
         # The coordinator is the board branch's one writer for a lane shift.
         Publish-BoardStatusIfDue -Branch $branch
@@ -3973,6 +4223,10 @@ $stopWhy = ''
 $resumeId = ''
 # How many times in a row the current task's run died on the API.
 $apiRetries = 0
+# The task whose run was killed at -TaskMinutes in Doing and now gets one overtime run of
+# $overtimeMinutes with its work in place, instead of a stash and Blocked (AF-0042).
+$overtimeId = ''
+$overtimeMinutes = [math]::Max(30, [int]($TaskMinutes / 4))
 
 Write-Heartbeat 'starting'
 if ($Lane) {
@@ -4047,8 +4301,19 @@ while ($true) {
     if (-not $resuming) { Write-Trace $id 'claim' (Get-Short (Get-TaskTitle $id)) 'Cyan' }
     if ($Lane) { Set-OwnTabLabel "$id $(Get-TaskTitle $id)" }
     Write-Heartbeat 'run'
-    $run = Invoke-TaskRun $id -Resume:$resuming
+    $inOvertime = $overtimeId -eq $id
+    $overtimeId = ''
+    $run = if ($inOvertime) { Invoke-TaskRun $id -Minutes $overtimeMinutes -Overtime } else { Invoke-TaskRun $id -Resume:$resuming }
     $state = Get-TaskState $id
+
+    # A run killed at its time limit keeps its claim and its work for one overtime run, so
+    # work with passing tests is finished rather than stashed and Blocked (AF-0042).
+    if ($run.TimedOut -and $state -eq 'Doing' -and -not $inOvertime) {
+        Write-Trace $id 'overtime' "timed out after $TaskMinutes min; one more run of $overtimeMinutes min with its work in place" 'Yellow'
+        $overtimeId = $id
+        $resumeId = $id
+        continue
+    }
 
     # Out of tokens is not a stall. The task keeps its claim and its partial work - nothing
     # is stashed or blocked - the shift waits for the new session and runs it again, and
@@ -4073,8 +4338,9 @@ while ($true) {
     $apiRetries = 0
 
     if ($state -eq 'Doing') {
-        $why = if ($run.TimedOut) { "timed out after $TaskMinutes min" }
-            elseif (Test-BudgetSpent) { "stopped at its $TaskBudgetUsd US dollar cost cap (-TaskBudgetUsd), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
+        $why = if ($run.TimedOut -and $inOvertime) { "timed out after $TaskMinutes min and again after $overtimeMinutes min of overtime" }
+            elseif ($run.TimedOut) { "timed out after $TaskMinutes min" }
+            elseif (Test-BudgetSpent) { "stopped at its $($script:RunBudgetUsd) US dollar cost cap (2.7 times the median run, at most -TaskBudgetUsd), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
         Save-StrayChanges $id
         Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $(Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl")") | Out-Null
         git -C $Root add -A Tasks 2>&1 | Out-Null

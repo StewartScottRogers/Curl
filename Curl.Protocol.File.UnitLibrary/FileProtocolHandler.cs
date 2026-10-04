@@ -60,7 +60,7 @@ namespace Curl.Protocol.File;
 /// Of the options on <see cref="ITransferContext" />, the download path ignores
 /// <see cref="ITransferContext.ConvertLineEndings" /> and
 /// <see cref="ITransferContext.CreateFileMode" />, and the upload path ignores
-/// <see cref="ITransferContext.Range" />, <see cref="ITransferContext.NoBody" />,
+/// <see cref="ITransferContext.Range" />, <see cref="ITransferContext.RangeText" />, <see cref="ITransferContext.NoBody" />,
 /// <see cref="ITransferContext.TimeCondition" />, <see cref="ITransferContext.HeaderOutput" />
 /// and <see cref="ITransferContext.MaxFileSize" />. Both read
 /// <see cref="ITransferContext.TimeProvider" /> only to time the diagnostic log's
@@ -109,10 +109,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     private static readonly string[] Schemes = ["file"];
 
     /// <summary>
-    /// The Unix epoch as <see cref="WholeSeconds" /> counts it: the value libcurl holds as a
-    /// <c>time_t</c> of 0.
+    /// The Unix seconds of 9999-12-31T23:59:59Z, the last whole second
+    /// <see cref="DateTimeOffset" />, and so <see cref="FileOpenResult.LastWriteTimeUtc" />,
+    /// holds.
     /// </summary>
-    private static readonly long UnixEpochWholeSeconds = WholeSeconds(DateTimeOffset.UnixEpoch);
+    private const long MaxDateTimeOffsetUnixSeconds = 253_402_300_799;
 
     private readonly IFileSystem fileSystem =
         fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
@@ -137,6 +138,34 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         : this(fileSystem, new ConnectionNumberSequence())
     {
     }
+
+    /// <summary>
+    /// Gets a value indicating whether a <c>file://</c> URL naming a directory lists the
+    /// directory's entry names, as curl 8.21.0's Linux and macOS builds do with
+    /// <c>opendir</c>/<c>readdir</c>, rather than failing with exit 37, as its Windows
+    /// build does because it cannot open a directory. It is the platform's answer unless a
+    /// test sets the other one.
+    /// </summary>
+    internal bool ListsDirectories { get; init; } = !OperatingSystem.IsWindows();
+
+    /// <summary>
+    /// Gets the reader of a source's raw last-write time, for a time past 9999 that
+    /// <see cref="FileOpenResult.LastWriteTimeUtc" /> cannot carry: <c>GetFileTime</c> on
+    /// Windows, and none yet elsewhere. It is the platform's reader unless a test sets another.
+    /// </summary>
+    internal ISourceLastWriteReader SourceLastWriteReader { get; init; } = PlatformSourceLastWriteReader();
+
+    /// <summary>
+    /// Gets the last source time, in Unix seconds, the platform's curl can represent, or
+    /// <see langword="null" /> when it represents every 64-bit time. curl 8.21.0's Windows
+    /// build reads a source time through the C runtime's <c>_fstat64</c>, which fails from
+    /// local 3002-01-01T00:00:00 on: curl then holds <c>time_t</c> -1, so <c>-R</c> leaves
+    /// the output's time alone, <c>-z</c> compares against -1 and the header block says
+    /// <c>Last-Modified: Thu, 31 Dec 1969 23:59:59 GMT</c> (measured 2026-10-03, BL-1423,
+    /// ADR-0411). The OpenSSL builds read <c>st_mtime</c> whole. It is the platform's answer
+    /// unless a test sets another.
+    /// </summary>
+    internal long? LastRepresentableUnixSeconds { get; init; } = PlatformLastRepresentableUnixSeconds();
 
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => Schemes;
@@ -203,15 +232,18 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// Reports a failed transfer's message as an information line, as libcurl's
     /// <c>failf</c> does under <c>-v</c> and <c>--trace</c>: curl 8.21.0 prints
     /// <c>* Could not open file ...</c> before <c>curl: (37)</c>, measured in BL-936. Exit 55
-    /// is the exception: its message is only <c>curl_easy_strerror</c>'s text, which no
-    /// <c>failf</c> wrote, so curl prints no line for it.
+    /// and the exit 33 of <c>-r</c> text that names no range are the exceptions: each message
+    /// is only <c>curl_easy_strerror</c>'s text, which no <c>failf</c> wrote, so curl prints no
+    /// line for it (<c>curl -sv -r 5-2 file://...</c> writes only <c>* shutting down
+    /// connection #0</c>, measured in BL-1322).
     /// </summary>
     /// <param name="events">Where the line goes.</param>
     /// <param name="result">The outcome of the transfer.</param>
     /// <returns><paramref name="result" />, unchanged.</returns>
     private static TransferResult ReportFailure(ITransferEvents events, TransferResult result)
     {
-        if (result.ErrorMessage is { } message && message != FileTransferMessages.DestinationWriteFailed)
+        if (result.ErrorMessage is { } message
+            && message is not (FileTransferMessages.DestinationWriteFailed or FileTransferMessages.RangeNotDelivered or FileTransferMessages.DirectoryListingFailed))
         {
             events.ReportInfo(message);
         }
@@ -261,6 +293,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
             .ConfigureAwait(false);
 
         var transferLog = new FileTransferLog(context.DiagnosticLog);
+        if (DirectoryListerFor(opened) is { } lister)
+        {
+            return await ListDirectoryAsync(context, path, opened, lister).ConfigureAwait(false);
+        }
+
         if (!opened.IsOpen || opened.Content is null)
         {
             transferLog.OpenFailed(path.OsPath, "reading", opened);
@@ -280,36 +317,228 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         context.Progress.ReportTransferStarted();
 
         Stream source = opened.Content;
+        SourceLastWrite lastWrite = LastWriteOf(opened);
 
         TransferResult result;
 
         await using (source.ConfigureAwait(false))
         {
-            result = await DownloadFromAsync(context, source, opened).ConfigureAwait(false);
+            result = await DownloadFromAsync(context, source, opened, lastWrite).ConfigureAwait(false);
         }
 
+        return EndDownload(context, result, connectionNumber, lastWrite);
+    }
+
+    /// <summary>
+    /// Gets the source's last-write time as curl holds it: the time
+    /// <see cref="FileOpenResult.LastWriteTimeUtc" /> carries, unless the raw time the
+    /// <see cref="SourceLastWriteReader" /> reads lies past what that or the platform's curl
+    /// can hold.
+    /// </summary>
+    /// <param name="opened">The metadata that came with the open.</param>
+    /// <returns>The source's last-write time.</returns>
+    private SourceLastWrite LastWriteOf(FileOpenResult opened)
+    {
+        long? rawUnixSeconds = opened.Content is { } content
+            ? SourceLastWriteReader.ReadLastWriteUnixSeconds(content)
+            : null;
+        long lastRepresentable = Math.Min(LastRepresentableUnixSeconds ?? long.MaxValue, MaxDateTimeOffsetUnixSeconds);
+
+        if (rawUnixSeconds is not { } raw || raw <= lastRepresentable)
+        {
+            return new SourceLastWrite(opened.LastWriteTimeUtc?.ToUnixTimeSeconds(), opened.LastWriteTimeUtc, true);
+        }
+
+        return raw > LastRepresentableUnixSeconds
+            ? new SourceLastWrite(-1, DateTimeOffset.FromUnixTimeSeconds(-1), false)
+            : new SourceLastWrite(raw, null, true);
+    }
+
+    /// <summary>The platform's source time reader: <c>GetFileTime</c> on Windows, none elsewhere.</summary>
+    /// <returns>The reader.</returns>
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification = "ADR-0083: the platform picks the branch.")]
+    private static ISourceLastWriteReader PlatformSourceLastWriteReader() =>
+        OperatingSystem.IsWindows() ? new Win32SourceLastWriteReader() : new NoRawSourceLastWriteReader();
+
+    /// <summary>The platform's curl's last representable source time; none off Windows.</summary>
+    /// <returns>The Unix seconds, or <see langword="null" />.</returns>
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification = "ADR-0083: the platform picks the branch.")]
+    private static long? PlatformLastRepresentableUnixSeconds() =>
+        OperatingSystem.IsWindows() ? WindowsCrtLastRepresentableUnixSeconds() : null;
+
+    /// <summary>
+    /// The last local second, in Unix seconds, the Windows C runtime's <c>_fstat64</c>
+    /// converts: 3001-12-31T23:59:59 local time, measured on curl 8.21.0 in BL-1423.
+    /// </summary>
+    /// <returns>The Unix seconds of that local time.</returns>
+    private static long WindowsCrtLastRepresentableUnixSeconds()
+    {
+        var firstUnrepresentableLocal = new DateTime(3002, 1, 1);
+        TimeSpan offset = TimeZoneInfo.Local.GetUtcOffset(firstUnrepresentableLocal);
+
+        return new DateTimeOffset(firstUnrepresentableLocal, offset).ToUnixTimeSeconds() - 1;
+    }
+
+    /// <summary>
+    /// A source's last-write time as curl holds it.
+    /// </summary>
+    /// <param name="UnixSeconds">
+    /// The time in whole Unix seconds, which <c>-z</c> compares, or <see langword="null" />
+    /// when unknown.
+    /// </param>
+    /// <param name="HeaderTime">
+    /// The time the header block's <c>Last-Modified</c> line reports, or
+    /// <see langword="null" /> for no line.
+    /// </param>
+    /// <param name="AppliesToRemoteTime">
+    /// Whether <c>-R</c> stamps the output with <see cref="UnixSeconds" />: not for a time
+    /// the platform's curl could not represent.
+    /// </param>
+    private readonly record struct SourceLastWrite(long? UnixSeconds, DateTimeOffset? HeaderTime, bool AppliesToRemoteTime)
+    {
+        /// <summary>Gets the time <c>-R</c> stamps the output with, or <see langword="null" /> for none.</summary>
+        public long? RemoteTimeUnixSeconds => AppliesToRemoteTime ? UnixSeconds : null;
+    }
+
+    /// <summary>
+    /// Reports how a download that got past its open ended and hands back its outcome.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="result">The outcome of the download.</param>
+    /// <param name="connectionNumber">The number the transfer's connection was given.</param>
+    /// <param name="lastWrite">The source's last-write time.</param>
+    /// <returns><paramref name="result" />, with the source's timestamp when it succeeded.</returns>
+    private static TransferResult EndDownload(
+        ITransferContext context,
+        TransferResult result,
+        long connectionNumber,
+        SourceLastWrite lastWrite)
+    {
         ReportConnectionEnd(context, result, connectionNumber);
 
         // -R/--remote-time is applied by whoever owns the output file, so a successful
         // download, an unmet -z included, hands the source's timestamp back in whole
-        // seconds, the resolution curl 8.21.0 applies it at. A failure carries none.
+        // Unix seconds, the resolution curl 8.21.0 applies it at. A failure carries none.
         return result.IsSuccess
-            ? result with { SourceLastWriteTimeUtc = TruncateToWholeSeconds(opened.LastWriteTimeUtc) }
+            ? result with { SourceLastWriteUnixSeconds = lastWrite.RemoteTimeUnixSeconds }
             : result;
     }
 
     /// <summary>
-    /// Drops everything below the second from a timestamp, keeping its offset.
+    /// Picks the lister that serves an open which found a directory: the file system,
+    /// when this handler lists directories and the file system can list.
     /// </summary>
-    /// <param name="timestamp">The timestamp, or <see langword="null" /> when unknown.</param>
+    /// <param name="opened">The outcome of the open.</param>
     /// <returns>
-    /// The timestamp with zero sub-second ticks, or <see langword="null" /> when
-    /// <paramref name="timestamp" /> is.
+    /// The lister, or <see langword="null" /> when the open did not find a directory, this
+    /// handler answers a directory as the Windows build does, or the file system cannot
+    /// list - each of which keeps exit 37.
     /// </returns>
-    private static DateTimeOffset? TruncateToWholeSeconds(DateTimeOffset? timestamp) =>
-        timestamp is { } value
-            ? new DateTimeOffset(value.Ticks - (value.Ticks % TimeSpan.TicksPerSecond), value.Offset)
+    private IDirectoryLister? DirectoryListerFor(FileOpenResult opened) =>
+        opened.Status == FileAccessStatus.IsDirectory && ListsDirectories
+            ? fileSystem as IDirectoryLister
             : null;
+
+    /// <summary>
+    /// Lists a directory as curl 8.21.0's Linux and macOS builds do (<c>lib/file.c</c>,
+    /// <c>file_do</c>): numbers the connection and starts the meter as for a file, then
+    /// applies <c>-z</c>, writes the <c>-i</c> header block, stops there for <c>-I</c>, and
+    /// writes the entry names.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="path">The parsed URL path.</param>
+    /// <param name="opened">The open that found the directory, carrying its timestamp.</param>
+    /// <param name="lister">The lister to read the entry names from.</param>
+    /// <returns>The outcome of the listing.</returns>
+    private async ValueTask<TransferResult> ListDirectoryAsync(
+        ITransferContext context,
+        FileUrlPath path,
+        FileOpenResult opened,
+        IDirectoryLister lister)
+    {
+        long connectionNumber = connectionNumbers.NumberNextConnection();
+        context.Progress.ReportTransferStarted();
+
+        SourceLastWrite lastWrite = LastWriteOf(opened);
+        KeyValuePair<string, string>[] headers = FileTransferMessages.DirectoryPseudoHeaders(lastWrite.HeaderTime);
+        TransferResult result = await StartBodyAsync(context, lastWrite, headers).ConfigureAwait(false)
+            ?? WithPseudoHeaders(
+                context.NoBody
+                    ? TransferResult.Success(0)
+                    : await WriteEntryNamesAsync(context, path, lister).ConfigureAwait(false),
+                headers);
+
+        return EndDownload(context, result, connectionNumber, lastWrite);
+    }
+
+    /// <summary>
+    /// Writes each entry name that does not start with <c>.</c>, then <c>\n</c>, as two
+    /// body writes, in the lister's order, stopping at <c>--max-filesize</c> as any body
+    /// write does (curl's <c>cw_download_write</c> writes what fits, then fails).
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="path">The parsed URL path.</param>
+    /// <param name="lister">The lister to read the entry names from.</param>
+    /// <returns>
+    /// A success carrying the bytes written; exit 26 when the directory cannot be listed;
+    /// exit 23 when the output refused a write; exit 63 at <c>--max-filesize</c>.
+    /// </returns>
+    private static async ValueTask<TransferResult> WriteEntryNamesAsync(
+        ITransferContext context,
+        FileUrlPath path,
+        IDirectoryLister lister)
+    {
+        if (await lister.ListEntryNamesAsync(path.OsPath, context.CancellationToken).ConfigureAwait(false) is not { } names)
+        {
+            return TransferResult.Failure(CurlExitCode.ReadError, FileTransferMessages.DirectoryListingFailed);
+        }
+
+        long maxWritten = context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue;
+        long transferred = 0;
+
+        foreach (byte[] piece in ListingWrites(names))
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            context.Events.ReportDataReceived(piece);
+            int allowed = (int)Math.Min(piece.Length, maxWritten - transferred);
+
+            if (await TryWriteInSlicesAsync(context.Output, piece.AsMemory(0, allowed), ChunkSize, context.CancellationToken)
+                    .ConfigureAwait(false) is { } failure)
+            {
+                return TransferResult.Failure(
+                    CurlExitCode.WriteError,
+                    FileTransferMessages.OutputWriteFailed(failure.Offered, failure.Accepted),
+                    transferred + failure.WrittenBefore);
+            }
+
+            transferred += allowed;
+
+            if (allowed < piece.Length)
+            {
+                return new TransferResult(
+                    CurlExitCode.FilesizeExceeded,
+                    transferred,
+                    FileTransferMessages.MaxFileSizeExceeded(maxWritten, transferred));
+            }
+        }
+
+        return TransferResult.Success(transferred);
+    }
+
+    /// <summary>
+    /// The body writes of a directory listing: each entry name that does not start with
+    /// <c>.</c>, in UTF-8, followed by a write of <c>\n</c>.
+    /// </summary>
+    /// <param name="names">Every entry name, in the order the lister gave them.</param>
+    /// <returns>The writes, in order.</returns>
+    private static IEnumerable<byte[]> ListingWrites(IReadOnlyList<string> names)
+    {
+        foreach (string name in names.Where(name => !name.StartsWith('.')))
+        {
+            yield return Encoding.UTF8.GetBytes(name);
+            yield return FileTransferMessages.DirectoryEntrySeparator;
+        }
+    }
 
     /// <summary>
     /// Applies the time condition, emits the headers, applies every other option that can
@@ -318,27 +547,51 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// <param name="context">The transfer being performed.</param>
     /// <param name="source">The opened source, which this method does not dispose.</param>
     /// <param name="opened">The metadata that came with the open.</param>
+    /// <param name="lastWrite">The source's last-write time.</param>
     /// <returns>The outcome of the download.</returns>
     private static async ValueTask<TransferResult> DownloadFromAsync(
         ITransferContext context,
         Stream source,
-        FileOpenResult opened)
+        FileOpenResult opened,
+        SourceLastWrite lastWrite)
     {
-        if (!MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
-        {
-            return TransferResult.TimeConditionNotMet();
-        }
+        KeyValuePair<string, string>[] headers = FileTransferMessages.PseudoHeaders(opened.Length, lastWrite.HeaderTime);
 
-        if (await WriteHeadersAsync(context, opened).ConfigureAwait(false) is { } headerFailure)
+        if (await StartBodyAsync(context, lastWrite, headers).ConfigureAwait(false) is { } ended)
         {
-            return headerFailure;
+            return ended;
         }
 
         TransferResult result = context.NoBody
             ? TransferResult.Success(0)
             : await DownloadBodyAsync(context, source, opened.Length).ConfigureAwait(false);
 
-        return WithPseudoHeaders(result, opened);
+        return WithPseudoHeaders(result, headers);
+    }
+
+    /// <summary>
+    /// Applies the time condition and writes the header block, the steps a file and a
+    /// listed directory share before their bodies.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="lastWrite">The source's last-write time.</param>
+    /// <param name="headers">The pseudo-headers to write.</param>
+    /// <returns>
+    /// <see langword="null" /> when the body follows; otherwise the unmet time condition's
+    /// success or the failed header write.
+    /// </returns>
+    private static async ValueTask<TransferResult?> StartBodyAsync(
+        ITransferContext context,
+        SourceLastWrite lastWrite,
+        KeyValuePair<string, string>[] headers)
+    {
+        if (!HasRange(context) && !MeetsTimeCondition(context.TimeCondition, lastWrite.UnixSeconds))
+        {
+            context.Events.ReportInfo(FileTransferMessages.TimeConditionNotMet(context.TimeCondition!.Kind));
+            return TransferResult.TimeConditionNotMet();
+        }
+
+        return await WriteHeadersAsync(context, FileTransferMessages.HeaderLines(headers)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -347,18 +600,18 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// wrote them anywhere and whatever the body did after, as measured in BL-285.
     /// </summary>
     /// <param name="result">The outcome of the body stage.</param>
-    /// <param name="opened">The metadata the pseudo-headers were built from.</param>
+    /// <param name="headers">The pseudo-headers the transfer produced.</param>
     /// <returns>
     /// <paramref name="result" /> with a report of the pseudo-headers and, because a report
     /// replaces <see cref="TransferResult.BytesTransferred" /> as the source of
     /// <c>%{size_download}</c>, its byte count.
     /// </returns>
-    private static TransferResult WithPseudoHeaders(TransferResult result, FileOpenResult opened) =>
+    private static TransferResult WithPseudoHeaders(TransferResult result, KeyValuePair<string, string>[] headers) =>
         result with
         {
             Report = new TransferReport
             {
-                PseudoHeaders = FileTransferMessages.PseudoHeaders(opened.Length, opened.LastWriteTimeUtc),
+                PseudoHeaders = headers,
                 DownloadSize = result.BytesTransferred,
             },
         };
@@ -376,6 +629,15 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         Stream source,
         long length)
     {
+        // curl 8.21.0's file_do calls Curl_range only after the open and the -i header
+        // block, and never under -I, so text that names no range fails here and no
+        // earlier: a range only RangeText carries is one no parser could read.
+        if (context.Range is null && context.RangeText is not null)
+        {
+            return ValueTask.FromResult(
+                TransferResult.Failure(CurlExitCode.RangeError, FileTransferMessages.RangeNotDelivered));
+        }
+
         if (!TryResolveWindow(
             context,
             length,
@@ -545,8 +807,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         // curl knows the length of a -T file and not of standard input, and only a known
         // length turns a failed read into exit 26; the curl tool reports a failed read as the
         // end of the file, so with no length to fall short of, the upload simply ends there.
-        long? needed = upload.CanSeek ? upload.Length - upload.Position : null;
-        long skip = context.ResumeFrom ?? 0;
+        long? needed = RemainingLength(upload);
+        long skip = context.ResumeFrom.GetValueOrDefault();
 
         bool skipped = await TrySkipAsync(upload, skip, context.CancellationToken)
             .ConfigureAwait(false);
@@ -563,11 +825,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         // only 131072/200000, with size_upload 131062, 61072 and 0.
         int firstChunkSize = UploadChunkSize - (int)(skip % UploadChunkSize);
 
-        // A fresh converter per upload, so the carriage return it remembers never leaks
-        // from one transfer into the next. Bytes skipped by -C are not seen by it.
-        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = context.ConvertLineEndings
-            ? new CrlfUploadConverter(UploadChunkSize).Convert
-            : static chunk => chunk;
+        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = CreateUploadChunkConverter(context);
 
         return await CopyAsync(
                 upload,
@@ -594,6 +852,32 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
                 context.CancellationToken)
             .ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Measures how many bytes an upload source has left to give.
+    /// </summary>
+    /// <param name="upload">The stream to upload from.</param>
+    /// <returns>
+    /// The bytes from its position to its end, or <see langword="null" /> when it cannot
+    /// seek, as standard input cannot, so its length is unknown.
+    /// </returns>
+    private static long? RemainingLength(Stream upload) =>
+        upload.CanSeek ? upload.Length - upload.Position : null;
+
+    /// <summary>
+    /// Picks what each upload chunk goes through on its way to the destination.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <returns>
+    /// A fresh <c>--crlf</c> converter when <see cref="ITransferContext.ConvertLineEndings" />
+    /// is set, fresh per upload so the carriage return it remembers never leaks from one
+    /// transfer into the next (bytes skipped by <c>-C</c> are not seen by it); otherwise
+    /// a pass-through.
+    /// </returns>
+    private static Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> CreateUploadChunkConverter(ITransferContext context) =>
+        context.ConvertLineEndings
+            ? new CrlfUploadConverter(UploadChunkSize).Convert
+            : static chunk => chunk;
 
     /// <summary>
     /// Moves up to <paramref name="count" /> bytes in <paramref name="chunkSize" /> chunks,
@@ -903,7 +1187,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// <c>curl: (23)</c> (measured 2026-09-26, BL-111 Notes).
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
-    /// <param name="opened">The metadata that came with the open.</param>
+    /// <param name="lines">The header lines to write, the blank line last.</param>
     /// <returns>
     /// <see langword="null" /> when the headers were written or not asked for, otherwise
     /// the exit 23 failure, reporting the length of the line that failed as the bytes
@@ -911,14 +1195,14 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// </returns>
     private static async ValueTask<TransferResult?> WriteHeadersAsync(
         ITransferContext context,
-        FileOpenResult opened)
+        string[] lines)
     {
         if (context.HeaderOutput is not { } headerOutput)
         {
             return null;
         }
 
-        foreach (string line in FileTransferMessages.PseudoHeaderLines(opened.Length, opened.LastWriteTimeUtc))
+        foreach (string line in lines)
         {
             byte[] bytes = Encoding.ASCII.GetBytes(line);
 
@@ -937,9 +1221,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// Applies <c>-z</c>/<c>--time-cond</c> to the timestamp the open reported.
     /// </summary>
     /// <param name="condition">The condition, or <see langword="null" /> for none.</param>
-    /// <param name="lastWriteTimeUtc">
-    /// The file's last-write timestamp, or <see langword="null" /> when the file system
-    /// could not determine one.
+    /// <param name="lastWriteUnixSeconds">
+    /// The file's last-write time in whole Unix seconds, or <see langword="null" /> when the
+    /// file system could not determine one.
     /// </param>
     /// <returns>
     /// <see langword="true" /> when the body should be transferred. An unmet condition is
@@ -960,30 +1244,42 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// </remarks>
     private static bool MeetsTimeCondition(
         TimeCondition? condition,
-        DateTimeOffset? lastWriteTimeUtc)
+        long? lastWriteUnixSeconds)
     {
         return condition is null
-            || lastWriteTimeUtc is not { } knownLastWriteTimeUtc
-            || MeetsKnownTimeCondition(condition, knownLastWriteTimeUtc);
+            || lastWriteUnixSeconds is not { } knownLastWriteUnixSeconds
+            || MeetsKnownTimeCondition(condition, knownLastWriteUnixSeconds);
     }
 
     /// <summary>
-    /// Compares a known file timestamp with a time condition, in whole seconds.
+    /// Tells whether the transfer asks for part of the file, which is when curl 8.21.0's
+    /// <c>file_do</c> skips the time condition (<c>lib/file.c</c>: it checks
+    /// <c>-z</c> only when <c>state.range</c> is unset): <c>-r</c> text, parsable or not,
+    /// or a positive <c>-C</c> offset. Measured on 2026-10-03: <c>-r 0-0 -z</c> and
+    /// <c>-C 1 -z</c> with an unmet date both transfer (BL-1388).
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <returns><see langword="true" /> when the transfer has a range.</returns>
+    private static bool HasRange(ITransferContext context) =>
+        context.Range is not null || context.RangeText is not null || context.ResumeFrom is > 0;
+
+    /// <summary>
+    /// Compares a known file time with a time condition in whole Unix seconds, which reach
+    /// past 9999 where <see cref="DateTimeOffset" /> stops.
     /// </summary>
     /// <param name="condition">The condition to apply.</param>
-    /// <param name="lastWriteTimeUtc">The file's last-modified timestamp.</param>
+    /// <param name="fileSeconds">The file's last-modified time in whole Unix seconds.</param>
     /// <returns>
     /// <see langword="true" /> when the body should be transferred, including when either
-    /// side truncates to the Unix epoch, which curl reads as unknown.
+    /// side is the Unix epoch, which curl reads as unknown.
     /// </returns>
     private static bool MeetsKnownTimeCondition(
         TimeCondition condition,
-        DateTimeOffset lastWriteTimeUtc)
+        long fileSeconds)
     {
-        long fileSeconds = WholeSeconds(lastWriteTimeUtc);
-        long conditionSeconds = WholeSeconds(condition.Value);
+        long conditionSeconds = condition.ValueUnixSeconds;
 
-        if (fileSeconds == UnixEpochWholeSeconds || conditionSeconds == UnixEpochWholeSeconds)
+        if (fileSeconds == 0 || conditionSeconds == 0)
         {
             return true;
         }
@@ -992,15 +1288,6 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
             ? fileSeconds > conditionSeconds
             : fileSeconds < conditionSeconds;
     }
-
-    /// <summary>
-    /// Counts the whole seconds from <see cref="DateTimeOffset.MinValue" /> to
-    /// <paramref name="value" /> in UTC, dropping any fraction of a second.
-    /// </summary>
-    /// <param name="value">The timestamp to truncate.</param>
-    /// <returns>The timestamp as a count of whole seconds.</returns>
-    private static long WholeSeconds(DateTimeOffset value) =>
-        value.UtcTicks / TimeSpan.TicksPerSecond;
 
     /// <summary>
     /// Turns <c>-C</c>/<c>--continue-at</c> or <c>-r</c>/<c>--range</c> into the window of
@@ -1076,27 +1363,69 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         out string errorMessage)
     {
         errorMessage = FileTransferMessages.ResumeFailed;
-        start = 0;
-        count = 0;
 
         if (range.Kind == ByteRangeKind.Suffix)
         {
-            long suffixLength = range.SuffixLength ?? 0;
-
-            if (suffixLength > length + 1)
-            {
-                errorMessage = FileTransferMessages.CouldNotResumeDownload;
-
-                return false;
-            }
-
-            start = Math.Max(0, length - suffixLength);
-            count = length - start;
-
-            return true;
+            return TryResolveSuffix(range.SuffixLength.GetValueOrDefault(), length, out start, out count, out errorMessage);
         }
 
-        start = range.FirstBytePosition ?? 0;
+        return TryResolveFromStart(range, length, out start, out count);
+    }
+
+    /// <summary>
+    /// Turns a suffix range - <c>-r -N</c> - into a window: the last
+    /// <paramref name="suffixLength" /> bytes, or the whole file when it holds fewer.
+    /// </summary>
+    /// <param name="suffixLength">How many trailing bytes were asked for.</param>
+    /// <param name="length">The length of the opened file.</param>
+    /// <param name="start">On success, the first byte position to send.</param>
+    /// <param name="count">On success, how many bytes to send from there.</param>
+    /// <param name="errorMessage">On failure, the exit 36 message to report.</param>
+    /// <returns>
+    /// <see langword="false" /> when more than one byte more than the file holds was asked for.
+    /// </returns>
+    private static bool TryResolveSuffix(
+        long suffixLength,
+        long length,
+        out long start,
+        out long count,
+        out string errorMessage)
+    {
+        errorMessage = FileTransferMessages.ResumeFailed;
+        start = 0;
+        count = 0;
+
+        if (suffixLength > length + 1)
+        {
+            errorMessage = FileTransferMessages.CouldNotResumeDownload;
+
+            return false;
+        }
+
+        start = Math.Max(0, length - suffixLength);
+        count = length - start;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Turns a <c>first-last</c> or <c>first-</c> range into a window, clamped to the file.
+    /// </summary>
+    /// <param name="range">The requested range, not a suffix.</param>
+    /// <param name="length">The length of the opened file.</param>
+    /// <param name="start">On success, the first byte position to send.</param>
+    /// <param name="count">On success, how many bytes to send from there.</param>
+    /// <returns>
+    /// <see langword="false" /> when the first byte position is strictly past the end of the file.
+    /// </returns>
+    private static bool TryResolveFromStart(
+        ByteRange range,
+        long length,
+        out long start,
+        out long count)
+    {
+        count = 0;
+        start = range.FirstBytePosition.GetValueOrDefault();
 
         if (start > length)
         {
@@ -1110,17 +1439,14 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         // to long.MinValue, so the copy loop's "transferred < count" was false on the
         // first test and the handler reported success having written nothing. A range
         // asking for the whole file returned an empty one, with exit 0.
-        count = range.LastBytePosition is { } lastBytePosition
-            ? (Math.Min(lastBytePosition, length - 1) - start) + 1
-            : length - start;
-
-        // An empty file has no last byte to clamp to, so the line above computes 1 for
-        // a zero-length source. Nothing is transferred either way, but the reported
-        // count has to be zero.
-        if (count < 0 || length == 0)
-        {
-            count = 0;
-        }
+        // On an empty file the clamp lands on -1 and the count on 0. ByteRange keeps the end
+        // at or past the start, and the start is at most the length here, so the count is
+        // never negative; Math.Max states that floor without a branch no input can reach.
+        count = Math.Max(
+            0,
+            range.LastBytePosition is { } lastBytePosition
+                ? (Math.Min(lastBytePosition, length - 1) - start) + 1
+                : length - start);
 
         return true;
     }

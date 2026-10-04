@@ -373,7 +373,7 @@ public sealed class NegotiateHttpAuthenticatorTests
         ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
         ScriptedSecurityContextFactory factory = new(context);
 
-        await new NegotiateHttpAuthenticator(factory, wordsFailuresAsSspi: true).StepWithoutAnsweringAsync(Request(null) with { Events = events }, CancellationToken.None);
+        await new NegotiateHttpAuthenticator(factory, wordsFailuresAsSspi: true).StepWithoutAnsweringAsync(Request(null) with { Events = events }, ["Negotiate"], CancellationToken.None);
 
         CollectionAssert.AreEqual(new[] { NegotiateFailureLines.For(SecurityContextStatus.NoCredentials, wordsAsSspi: true) }, events.Info);
         Assert.IsTrue(context.IsDisposed);
@@ -387,7 +387,7 @@ public sealed class NegotiateHttpAuthenticatorTests
         ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]));
         NegotiateHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(context));
 
-        await authenticator.StepWithoutAnsweringAsync(Request(null) with { Events = events }, CancellationToken.None);
+        await authenticator.StepWithoutAnsweringAsync(Request(null) with { Events = events }, ["Negotiate"], CancellationToken.None);
 
         Assert.IsEmpty(events.Info);
         Assert.IsTrue(context.IsDisposed);
@@ -400,7 +400,7 @@ public sealed class NegotiateHttpAuthenticatorTests
         ScriptedSecurityContext context = new();
 
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(
-            () => new NegotiateHttpAuthenticator(new ScriptedSecurityContextFactory(context)).StepWithoutAnsweringAsync(Request(null), CancellationToken.None).AsTask());
+            () => new NegotiateHttpAuthenticator(new ScriptedSecurityContextFactory(context)).StepWithoutAnsweringAsync(Request(null), ["Negotiate"], CancellationToken.None).AsTask());
 
         Assert.IsTrue(context.IsDisposed);
     }
@@ -408,7 +408,7 @@ public sealed class NegotiateHttpAuthenticatorTests
     [TestMethod]
     public async Task StepWithoutAnsweringAsync_NullRequest_Throws()
     {
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Default.StepWithoutAnsweringAsync(null!, CancellationToken.None).AsTask());
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Default.StepWithoutAnsweringAsync(null!, ["Negotiate"], CancellationToken.None).AsTask());
     }
 
     [TestMethod]

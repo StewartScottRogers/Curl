@@ -1,3 +1,4 @@
+using System.Net;
 using Curl.Ntlm;
 using Curl.Protocol.Abstractions;
 
@@ -120,7 +121,8 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
     internal static SecurityContextRequest ContextRequestFor(HttpAuthRequest request)
     {
         SecurityContextRequest defaults = new(SecurityMechanism.Ntlm, NegotiateHttpAuthenticator.HttpServiceName, request.Url.IdnHost);
-        if (request.Credential is not { UserName.Length: > 0 } credential)
+        NetworkCredential? credential = request.Credential;
+        if (string.IsNullOrEmpty(credential?.UserName))
         {
             return defaults;
         }

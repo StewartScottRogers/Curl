@@ -53,6 +53,73 @@ public sealed class RtspReplyHeaderLineTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_NulByteInAHeaderLine_ReportsItAfterTheLinesBeforeAndFailsWith8()
+    {
+        (TransferResult result, string headers, List<string> transcript) =
+            await RunAsync("RTSP/1.0 200 OK\r\nCSeq: 1\r\nX-A: a\0b\r\nContent-Length: 0\r\n\r\n");
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual("Nul byte in header", result.ErrorMessage);
+        Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\n", headers);
+        CollectionAssert.AreEqual(
+            new[] { "< RTSP/1.0 200 OK\r\n", "< CSeq: 1\r\n", "* Nul byte in header", "* closing connection #0" },
+            transcript[^4..]);
+    }
+
+    [TestMethod]
+    [DataRow("RTSP/1.0 200 OK\r\nCSeq: 1\r\nX-A: a\0\rb\r\n\r\n", "RTSP/1.0 200 OK\r\nCSeq: 1\r\n")]
+    [DataRow("RTSP/1.0 200 OK\r\nCSeq: 1\r\nX-A a\0b\r\n\r\n", "RTSP/1.0 200 OK\r\nCSeq: 1\r\n")]
+    [DataRow("RTSP/1.0 200 O\0K\r\nCSeq: 1\r\n\r\n", "")]
+    [DataRow("RTSP/1.0 200 O\0\rK\r\nCSeq: 1\r\n\r\n", "")]
+    [DataRow("RTSP/1.0 200 O\rK\0\r\nCSeq: 1\r\n\r\n", "")]
+    public async Task ExecuteAsync_NulByteBesideAnotherFault_IsReportedFirst(string reply, string written)
+    {
+        (TransferResult result, string headers, _) = await RunAsync(reply);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual("Nul byte in header", result.ErrorMessage);
+        Assert.AreEqual(written, headers);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NulByteBeforeTheStatusLinesBlank_FailsAsWeird()
+    {
+        (TransferResult result, string headers, _) = await RunAsync("RTSP/1.0\0 200 OK\r\nCSeq: 1\r\n\r\n");
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual("Weird server reply", result.ErrorMessage);
+        Assert.AreEqual(string.Empty, headers);
+    }
+
+    [TestMethod]
+    [DataRow("Location: /x\r\nLocation: /y\r\n", "Location: /x\r\n")]
+    [DataRow("Location:\r\nLocation: /y\r\nlocation: /z\r\n", "Location:\r\nLocation: /y\r\n")]
+    public async Task ExecuteAsync_SecondDifferentLocation_ReportsItAfterTheLinesBeforeAndFailsWith8(string lines, string writtenAfterCSeq)
+    {
+        (TransferResult result, string headers, List<string> transcript) =
+            await RunAsync("RTSP/1.0 302 Found\r\nCSeq: 1\r\n" + lines + "Content-Length: 0\r\n\r\n");
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual("Multiple Location headers", result.ErrorMessage);
+        Assert.AreEqual("RTSP/1.0 302 Found\r\nCSeq: 1\r\n" + writtenAfterCSeq, headers);
+        CollectionAssert.AreEqual(
+            new[] { "< " + writtenAfterCSeq.Split("\r\n")[^2] + "\r\n", "* Multiple Location headers", "* closing connection #0" },
+            transcript[^3..]);
+    }
+
+    [TestMethod]
+    [DataRow("Location: /x\r\nLocation: /x\r\n")]
+    [DataRow("Location: /x\r\nLocation:  /x \r\n")]
+    [DataRow("Location: /x\r\nLocation:\r\n")]
+    public async Task ExecuteAsync_RepeatedEqualLocation_IsAccepted(string lines)
+    {
+        (TransferResult result, string headers, _) = await RunAsync("RTSP/1.0 302 Found\r\nCSeq: 1\r\n" + lines + "Content-Length: 0\r\n\r\n");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("RTSP/1.0 302 Found\r\nCSeq: 1\r\n" + lines + "Content-Length: 0\r\n\r\n", headers);
+    }
+
+    [TestMethod]
     [DataRow("X-A: 1\r\n  cont\r\n", "X-A: 1 cont\r\n")]
     [DataRow("X-A: 1  \r\n\t \tcont  \r\n", "X-A: 1 cont  \r\n")]
     [DataRow("X-A: 1\r\n a\r\n b\r\nX-B: 2\r\n", "X-A: 1 a b\r\nX-B: 2\r\n")]
@@ -164,10 +231,46 @@ public sealed class RtspReplyHeaderLineTests
         Assert.IsFalse(transcript.Exists(line => line.StartsWith('{')));
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_ContentLengthTooLarge_ReportsOverflowBeforeTheLineAndWritesNothing()
+    {
+        var output = new MemoryStream();
+        (TransferResult result, _, List<string> transcript) = await RunAsync(
+            new ScriptedConnection(Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 99999999999999999999\r\n\r\nhello")),
+            output);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(0, output.Length);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "< RTSP/1.0 200 OK\r\n",
+                "< CSeq: 1\r\n",
+                "* Overflow Content-Length: value",
+                "< Content-Length: 99999999999999999999\r\n",
+                "< \r\n",
+                "* shutting down connection #0",
+            },
+            transcript[^6..]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TwoEqualTooLargeContentLengthNumbersOnOneLine_ReportOneOverflowAndExit0()
+    {
+        (TransferResult result, _, List<string> transcript) = await RunAsync(
+            "RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 99999999999999999999, 99999999999999999999\r\n\r\nhello");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "< CSeq: 1\r\n", "* Overflow Content-Length: value", "< Content-Length: 99999999999999999999, 99999999999999999999\r\n", "< \r\n" },
+            transcript[^5..^1]);
+        Assert.AreEqual(1, transcript.Count(line => line.StartsWith("* Overflow", StringComparison.Ordinal)));
+    }
+
     private static Task<(TransferResult Result, string Headers, List<string> Transcript)> RunAsync(string reply) =>
         RunAsync(new ScriptedConnection(Bytes(reply)));
 
-    private static async Task<(TransferResult Result, string Headers, List<string> Transcript)> RunAsync(ScriptedConnection server)
+    private static async Task<(TransferResult Result, string Headers, List<string> Transcript)> RunAsync(ScriptedConnection server, Stream? output = null)
     {
         var headers = new MemoryStream();
         var events = new RecordingTransferEvents();
@@ -175,7 +278,7 @@ public sealed class RtspReplyHeaderLineTests
             .ExecuteAsync(new TransferContext
             {
                 Url = CurlUrl.Parse("rtsp://127.0.0.1:47950/media"),
-                Output = new MemoryStream(),
+                Output = output ?? new MemoryStream(),
                 HeaderOutput = headers,
                 Events = events,
             });

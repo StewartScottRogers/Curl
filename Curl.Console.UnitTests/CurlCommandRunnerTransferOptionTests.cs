@@ -16,9 +16,9 @@ public sealed class CurlCommandRunnerTransferOptionTests
 {
     private const string SourceUrl = "file:///source.txt";
 
-    private static readonly string NewLine = Environment.NewLine;
+    private const string SshUrl = "sftp://127.0.0.1/source.txt";
 
-    private static readonly string NotDeliveredLine = "curl: (33) " + ByteRangeParser.NotDeliveredMessage + NewLine;
+    private static readonly string NewLine = Environment.NewLine;
 
     private readonly MemoryStream standardOutput = new();
     private readonly MemoryStream standardError = new();
@@ -43,16 +43,17 @@ public sealed class CurlCommandRunnerTransferOptionTests
     [TestMethod]
     [DataRow("3-1")]
     [DataRow("-0")]
-    public async Task RunAsync_RangeThatNamesNoRange_ReturnsExit33WithoutDispatching(string rangeText)
+    public async Task RunAsync_SshRangeThatNamesNoRange_DispatchesTheTextWithNoRange(string rangeText)
     {
-        RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
+        RecordingProtocolHandler sftp = RecordingProtocolHandler.WritingPath("sftp");
 
-        int exitCode = await RunAsync(["-r", rangeText, SourceUrl], file);
+        int exitCode = await RunAsync(["-s", "-k", "-r", rangeText, SshUrl], sftp);
 
-        Assert.AreEqual(33, exitCode);
-        Assert.AreEqual(NotDeliveredLine, StandardErrorText);
-        Assert.IsEmpty(file.Contexts);
-        Assert.AreEqual(0, standardOutput.Length);
+        Assert.AreEqual(0, exitCode, StandardErrorText);
+        Assert.AreEqual(string.Empty, StandardErrorText);
+        ITransferContext context = sftp.Contexts.Single();
+        Assert.AreEqual(rangeText, context.RangeText);
+        Assert.IsNull(context.Range);
     }
 
     [TestMethod]
@@ -86,21 +87,20 @@ public sealed class CurlCommandRunnerTransferOptionTests
     }
 
     [TestMethod]
-    public async Task RunAsync_RangeWithInvalidCharacter_PrintsTheWarningThenExit33()
+    public async Task RunAsync_SshRangeWithInvalidCharacter_PrintsTheWarningThenDispatchesTheText()
     {
-        RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
+        RecordingProtocolHandler sftp = RecordingProtocolHandler.WritingPath("sftp");
 
-        int exitCode = await RunAsync(["-r", "abc", SourceUrl], file);
+        int exitCode = await RunAsync(["-k", "-r", "abc", SshUrl], sftp);
 
-        Assert.AreEqual(33, exitCode);
-        Assert.AreEqual(
+        Assert.AreEqual(0, exitCode, StandardErrorText);
+        Assert.StartsWith(
             Lines(
                 "Warning: Invalid character is found in given range. A specified range MUST ",
                 "Warning: have only digits in 'start'-'stop'. The server's response to this ",
-                "Warning: request is uncertain.")
-            + NotDeliveredLine,
+                "Warning: request is uncertain."),
             StandardErrorText);
-        Assert.IsEmpty(file.Contexts);
+        Assert.AreEqual("abc", sftp.Contexts.Single().RangeText);
     }
 
     [TestMethod]

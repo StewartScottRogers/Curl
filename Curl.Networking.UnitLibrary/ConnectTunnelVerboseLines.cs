@@ -137,24 +137,63 @@ internal static class ConnectTunnelVerboseLines
     /// <see langword="true" /> when the reply marks the Digest nonce stale, which curl answers
     /// again without a problem line (BL-864 Notes).
     /// </param>
-    internal static void ReportReplyHead(ITransferEvents events, ReadOnlySpan<byte> head, int statusCode, string? authorization, bool digestNonceIsStale = false)
+    internal static void ReportReplyHead(ITransferEvents events, ReadOnlySpan<byte> head, int statusCode, string? authorization, bool digestNonceIsStale = false) =>
+        ReportReplyHead(events, head, statusCode, authorization, digestNonceIsStale, forConnectUdp: false);
+
+    /// <summary>
+    /// Reports the reply head as <see cref="ReportReplyHead(ITransferEvents, ReadOnlySpan{byte}, int, string?, bool)" />
+    /// does, and after each <c>Content-Length</c> or <c>Transfer-Encoding</c> line of a reply whose
+    /// status ignores them (<see cref="HttpProxyTunnel.IgnoresBodyFields" />) curl 8.21.0's
+    /// <c>Ignoring &lt;field&gt; in CONNECT &lt;code&gt; response</c>, <c>CONNECT-UDP</c> when
+    /// <paramref name="forConnectUdp" /> (measured, BL-1399).
+    /// </summary>
+    /// <param name="events">Where the lines go.</param>
+    /// <param name="head">The reply head, its final blank line included.</param>
+    /// <param name="statusCode">The reply's status code.</param>
+    /// <param name="authorization">The <c>Proxy-Authorization</c> value the request sent, or <see langword="null" />.</param>
+    /// <param name="digestNonceIsStale"><see langword="true" /> when the reply marks the Digest nonce stale.</param>
+    /// <param name="forConnectUdp"><see langword="true" /> for a reply to CONNECT-UDP.</param>
+    internal static void ReportReplyHead(ITransferEvents events, ReadOnlySpan<byte> head, int statusCode, string? authorization, bool digestNonceIsStale, bool forConnectUdp)
     {
         var refusedScheme = statusCode == 407 ? RefusedScheme(authorization, digestNonceIsStale) : null;
+        var ignoredFieldLine = HttpProxyTunnel.IgnoresBodyFields(statusCode, forConnectUdp)
+            ? $" in {(forConnectUdp ? "CONNECT-UDP" : "CONNECT")} {statusCode:D3} response"
+            : null;
         while (!head.IsEmpty)
         {
             var lineFeed = head.IndexOf((byte)'\n');
             var end = lineFeed < 0 ? head.Length : lineFeed + 1;
-            ReportReplyLine(events, head[..end], statusCode, refusedScheme);
+            ReportReplyLine(events, head[..end], refusedScheme, ignoredFieldLine);
             head = head[end..];
         }
     }
 
-    // One reply header line, then the lines curl writes after it: RespondedChunked for a
-    // non-2xx chunked Transfer-Encoding, the problem lines for a refused scheme's challenge.
-    private static void ReportReplyLine(ITransferEvents events, ReadOnlySpan<byte> line, int statusCode, string? refusedScheme)
+    /// <summary>
+    /// Reports the failure curl writes as a <c>-v</c> line right after a reply line, the
+    /// <c>Content-Length</c> line of an exit 8 <see cref="HttpProxyTunnel.UnsupportedContentLength" />
+    /// reply; nothing for any other reply (measured, BL-1399).
+    /// </summary>
+    /// <param name="events">Where the line goes.</param>
+    /// <param name="reply">The reply read.</param>
+    internal static void ReportReplyFailure(ITransferEvents events, HttpProxyTunnelReply reply)
+    {
+        if (reply.FailureExitCode == CurlExitCode.WeirdServerReply)
+        {
+            events.ReportInfo(HttpProxyTunnel.UnsupportedContentLength);
+        }
+    }
+
+    // One reply header line, then the lines curl writes after it: the Ignoring line for a field
+    // the status ignores, RespondedChunked for a non-2xx chunked Transfer-Encoding, the problem
+    // lines for a refused scheme's challenge.
+    private static void ReportReplyLine(ITransferEvents events, ReadOnlySpan<byte> line, string? refusedScheme, string? ignoredFieldLine)
     {
         events.ReportResponseHeader(line);
-        if (statusCode / 100 != 2 && IsChunkedTransferEncoding(line))
+        if (ignoredFieldLine is not null)
+        {
+            ReportIgnoredField(events, line, ignoredFieldLine);
+        }
+        else if (IsChunkedTransferEncoding(line))
         {
             events.ReportInfo(RespondedChunked);
         }
@@ -162,6 +201,20 @@ internal static class ConnectTunnelVerboseLines
         if (refusedScheme is not null)
         {
             ReportProblemLines(events, Encoding.Latin1.GetString(line), refusedScheme);
+        }
+    }
+
+    // The Ignoring line after a Content-Length or Transfer-Encoding line, the name compared
+    // without regard to case as curl's checkprefix does; nothing after any other line.
+    private static void ReportIgnoredField(ITransferEvents events, ReadOnlySpan<byte> line, string ignoredFieldLine)
+    {
+        var text = Encoding.Latin1.GetString(line);
+        foreach (var field in (string[])["Content-Length", "Transfer-Encoding"])
+        {
+            if (text.StartsWith(field + ":", StringComparison.OrdinalIgnoreCase))
+            {
+                events.ReportInfo($"Ignoring {field}{ignoredFieldLine}");
+            }
         }
     }
 

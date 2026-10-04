@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
@@ -11,8 +12,10 @@ namespace Curl.Cryptography;
 /// <c>Blowfish_expandstate</c>).
 /// </summary>
 /// <remarks>
-/// Not constant-time: every round indexes the S-boxes with key- and data-dependent bytes,
-/// as Blowfish is specified (ADR-0118). <see cref="Clear" /> zeroes the state.
+/// Constant-time in the key and the data: the F function (<see cref="Mix" />) reads every
+/// entry of all four S-boxes and keeps the ones it needs by mask, so no memory address
+/// depends on the key, the password or the block (ADR-0400). <see cref="Clear" /> zeroes
+/// the state.
 /// </remarks>
 internal sealed class BlowfishState
 {
@@ -128,8 +131,37 @@ internal sealed class BlowfishState
         }
     }
 
-    /// <summary>Blowfish's F function: ((S1[a] + S2[b]) ^ S3[c]) + S4[d] over the bytes of <paramref name="half" />.</summary>
-    private uint Mix(uint half) =>
-        ((boxes[(int)(half >> 24)] + boxes[256 + (int)((half >> 16) & 0xFF)]) ^ boxes[512 + (int)((half >> 8) & 0xFF)])
-        + boxes[768 + (int)(half & 0xFF)];
+    /// <summary>
+    /// Blowfish's F function: ((S1[a] + S2[b]) ^ S3[c]) + S4[d] over the bytes of
+    /// <paramref name="half" />, without a secret-dependent address (ADR-0400): one pass
+    /// reads every entry of all four S-boxes, in order, a vector at a time, and keeps the
+    /// entry at each box's index by an equality mask.
+    /// </summary>
+    internal uint Mix(uint half)
+    {
+        nuint width = (nuint)Vector<uint>.Count;
+        Vector<uint> step = new((uint)width);
+        Vector<uint> position = Vector<uint>.Indices;
+        Vector<uint> first = new(half >> 24);
+        Vector<uint> second = new((half >> 16) & 0xFF);
+        Vector<uint> third = new((half >> 8) & 0xFF);
+        Vector<uint> fourth = new(half & 0xFF);
+        Vector<uint> fromFirst = Vector<uint>.Zero;
+        Vector<uint> fromSecond = Vector<uint>.Zero;
+        Vector<uint> fromThird = Vector<uint>.Zero;
+        Vector<uint> fromFourth = Vector<uint>.Zero;
+        // The loop bound is fixed and 256 is a multiple of every vector width, so no load leaves the boxes.
+        ref uint table = ref MemoryMarshal.GetArrayDataReference(boxes);
+        for (nuint offset = 0; offset < 256; offset += width)
+        {
+            fromFirst |= Vector.Equals(position, first) & Vector.LoadUnsafe(ref table, offset);
+            fromSecond |= Vector.Equals(position, second) & Vector.LoadUnsafe(ref table, 256 + offset);
+            fromThird |= Vector.Equals(position, third) & Vector.LoadUnsafe(ref table, 512 + offset);
+            fromFourth |= Vector.Equals(position, fourth) & Vector.LoadUnsafe(ref table, 768 + offset);
+            position += step;
+        }
+
+        // One lane of each accumulator holds the entry and the rest are zero, so the sum is the entry.
+        return ((Vector.Sum(fromFirst) + Vector.Sum(fromSecond)) ^ Vector.Sum(fromThird)) + Vector.Sum(fromFourth);
+    }
 }

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.ExceptionServices;
 
 using Curl.Protocol.Abstractions;
 
@@ -14,7 +15,7 @@ namespace Curl.Networking;
 /// closed, all without a line on the events, as curl prints nothing for them (measured, BL-644 Notes).
 /// </summary>
 /// <remarks>
-/// Every attempt is started, and every outcome reported, from the one loop in <see cref="DialAsync" />,
+/// Every attempt is started, and every outcome reported, from the one loop in <see cref="RaceAsync" />,
 /// so the events and the diagnostic log see one line at a time in the order curl prints them:
 /// <c>Trying</c> before each attempt, and the <c>connect to ... failed</c> line when one fails (BL-408).
 /// </remarks>
@@ -61,44 +62,83 @@ internal sealed class AddressFamilyRace(
         var first = new Queue<IPEndPoint>(addresses.Where(address => address.AddressFamily == firstFamily).Select(address => new IPEndPoint(address, port)));
         var second = new Queue<IPEndPoint>(addresses.Where(address => address.AddressFamily != firstFamily).Select(address => new IPEndPoint(address, port)));
         using var race = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var (outcome, exception) = await RaceCapturingExceptionAsync(first, second, race.Token).ConfigureAwait(false);
+        await race.CancelAsync().ConfigureAwait(false);
+        await CloseAbandonedAsync().ConfigureAwait(false);
+        exception?.Throw();
+        return outcome;
+    }
+
+    /// <summary>
+    /// Runs <see cref="RaceAsync" />, giving what escaped it, a cancellation included, in place of
+    /// throwing it, so the race is ended the same way whether it threw or not.
+    /// </summary>
+    private async ValueTask<((DialedTcpConnection? Dialed, IPEndPoint? RemoteEndPoint, SocketError LastError, LocalBindFailure? LastBindFailure) Outcome, ExceptionDispatchInfo? Exception)> RaceCapturingExceptionAsync(
+        Queue<IPEndPoint> first,
+        Queue<IPEndPoint> second,
+        CancellationToken raceToken)
+    {
         try
         {
-            var secondFamilyDue = StartFirst(first, second, race.Token);
-            while (_running.Count > 0)
+            return (await RaceAsync(first, second, raceToken).ConfigureAwait(false), null);
+        }
+        catch (Exception exception)
+        {
+            return (default, ExceptionDispatchInfo.Capture(exception));
+        }
+    }
+
+    /// <summary>
+    /// Runs the race of <paramref name="first" /> and <paramref name="second" /> until an attempt
+    /// connects or every address has failed, leaving the attempts still running in
+    /// <see cref="_running" /> for <see cref="CloseAbandonedAsync" />.
+    /// </summary>
+    private async ValueTask<(DialedTcpConnection? Dialed, IPEndPoint? RemoteEndPoint, SocketError LastError, LocalBindFailure? LastBindFailure)> RaceAsync(
+        Queue<IPEndPoint> first,
+        Queue<IPEndPoint> second,
+        CancellationToken raceToken)
+    {
+        var secondFamilyDue = StartFirst(first, second, raceToken);
+        while (_running.Count > 0)
+        {
+            var completed = await Task.WhenAny(RunningTasks(secondFamilyDue)).ConfigureAwait(false);
+            if (completed == secondFamilyDue)
             {
-                var completed = await Task.WhenAny(RunningTasks(secondFamilyDue)).ConfigureAwait(false);
-                if (completed == secondFamilyDue)
-                {
-                    // A delay cancelled by the caller is no reason to start the other family.
-                    race.Token.ThrowIfCancellationRequested();
-                    secondFamilyDue = null;
-                    StartSecondFamilyOnTime(second, race.Token);
-                    continue;
-                }
-
-                var attempt = _running.Single(running => running.Dial == completed);
-                _running.Remove(attempt);
-                if (await OutcomeOfAsync(attempt).ConfigureAwait(false) is { } dialed)
-                {
-                    return (dialed, attempt.RemoteEndPoint, SocketError.Success, null);
-                }
-
-                StartNext(attempt.Family, race.Token);
-                if (_running.Count == 0 && secondFamilyDue is not null)
-                {
-                    // The first family has failed on every address: curl starts the other at once.
-                    secondFamilyDue = null;
-                    StartNext(second, race.Token);
-                }
+                // A delay cancelled by the caller is no reason to start the other family.
+                raceToken.ThrowIfCancellationRequested();
+                secondFamilyDue = null;
+                StartSecondFamilyOnTime(second, raceToken);
+                continue;
             }
 
-            return NoConnection();
+            var attempt = _running.Single(running => running.Dial == completed);
+            _running.Remove(attempt);
+            if (await OutcomeOfAsync(attempt).ConfigureAwait(false) is { } dialed)
+            {
+                return (dialed, attempt.RemoteEndPoint, SocketError.Success, null);
+            }
+
+            secondFamilyDue = StartAfterFailure(attempt.Family, second, secondFamilyDue, raceToken);
         }
-        finally
+
+        return NoConnection();
+    }
+
+    /// <summary>
+    /// Starts the next address of the failed attempt's <paramref name="family" />, and, when the first
+    /// family has failed on every address before the delay ran out, the other family at once, as curl
+    /// does. Gives the delay still pending: none once the other family has started.
+    /// </summary>
+    private Task? StartAfterFailure(Queue<IPEndPoint> family, Queue<IPEndPoint> second, Task? secondFamilyDue, CancellationToken raceToken)
+    {
+        StartNext(family, raceToken);
+        if (_running.Count > 0 || secondFamilyDue is null)
         {
-            await race.CancelAsync().ConfigureAwait(false);
-            await CloseAbandonedAsync().ConfigureAwait(false);
+            return secondFamilyDue;
         }
+
+        StartNext(second, raceToken);
+        return null;
     }
 
     // The second family's delay ran out with the first still running.

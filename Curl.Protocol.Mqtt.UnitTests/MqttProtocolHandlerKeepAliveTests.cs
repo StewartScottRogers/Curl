@@ -68,6 +68,24 @@ public sealed class MqttProtocolHandlerKeepAliveTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_PublishWhilePingRequestOutstanding_SendsNoSecondPingRequest()
+    {
+        Subscription subscription = await SubscribeAsync();
+        subscription.Clock.Advance(PingDue);
+        await WaitUntilAsync(() => subscription.Connection.Written.Length == Hex(Connect + Subscribe + PingRequest).Length);
+
+        subscription.Connection.Send(Hex("30 08 00 01 74 68 65 6C 6C 6F"));
+        await WaitUntilAsync(() => subscription.Output.ToArray().Length == 8);
+        subscription.Clock.Advance(TimeSpan.FromSeconds(300));
+
+        Assert.IsNull(subscription.Clock.NextTimerDueAt);
+        CollectionAssert.AreEqual(Hex(Connect + Subscribe + PingRequest), subscription.Connection.Written);
+        TransferResult result = await subscription.CloseAsync();
+        CollectionAssert.AreEqual(Hex("00 01 74 68 65 6C 6C 6F"), subscription.Output.ToArray());
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_PublishArrivingAtFiftyNineSeconds_RestartsTheSixtySecondCount()
     {
         Subscription subscription = await SubscribeAsync();

@@ -375,6 +375,33 @@ public sealed class SetCookieParserTests
         Assert.IsNull(refusal);
     }
 
+    /// <summary>
+    /// The three headers measured on curl 8.21.0 on 2026-10-02 (BL-1298): curl's refusal prints the rest of the
+    /// header line from the <c>Domain</c> value, its CR LF included (<c>lib/cookie.c</c> lines 518-525).
+    /// </summary>
+    [TestMethod]
+    [DataRow("g=1; Domain=.example.com; Path=/", "skipped cookie with bad tailmatch domain: example.com; Path=/\r\n")]
+    [DataRow("h=1; Domain=example.com", "skipped cookie with bad tailmatch domain: example.com\r\n")]
+    [DataRow("i=1; Domain=example.com  ", "skipped cookie with bad tailmatch domain: example.com  \r\n")]
+    public void Parse_DomainTheHostMayNotSet_RefusesWithTheRestOfTheLineAndItsCrLf(string header, string expectedRefusal)
+    {
+        Cookie? cookie = SetCookieParser.Parse(header, CurlUrl.Parse("http://127.0.0.1/"), DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+
+        Assert.IsNull(cookie);
+        Assert.AreEqual(expectedRefusal, refusal);
+    }
+
+    /// <summary>A <c>-b</c> file line is not a received header: <c>Domain</c> never refuses it and its refusals are unchanged.</summary>
+    [TestMethod]
+    [DataRow("g=1; Domain=.example.com; Path=/", null)]
+    [DataRow("noequals; Domain=example.com", "invalid cookie, dropped")]
+    public void ParseFromCookieFile_DomainLine_KeepsItsRefusalText(string header, string? expectedRefusal)
+    {
+        SetCookieParser.ParseFromCookieFile(header, DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+
+        Assert.AreEqual(expectedRefusal, refusal);
+    }
+
     private static void AssertParsesAsCurlDid(string url, string header, string? expectedJarLine)
     {
         Cookie? cookie = Parse(url, header);

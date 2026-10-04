@@ -27,6 +27,7 @@ a negative `ResumeFrom` as exit 36 for both before either starts.
 | --- | --- | --- |
 | `ResumeFrom` | honoured: start of the window sent (`TryResolveWindow`) | honoured: a positive offset opens the destination for append and skips that many source bytes (`UploadAsync`, `UploadIntoAsync`) |
 | `Range` | honoured: the window sent, when `ResumeFrom` is not set (`TryResolveWindow`) | ignored |
+| `RangeText` | honoured only to refuse text that names no range (`RangeText` set, `Range` null) with exit 33, after the open and the `-i` headers and never under `-I` (`DownloadBodyAsync`, BL-1334) | ignored |
 | `NoBody` | honoured: headers only, then success (`DownloadFromAsync`) | ignored |
 | `TimeCondition` | honoured: an unmet condition is success with nothing written (`DownloadFromAsync`) | ignored |
 | `HeaderOutput` | honoured: receives the pseudo-headers (`DownloadFromAsync`) | ignored |
@@ -43,6 +44,12 @@ Every row was read from `FileProtocolHandler.cs` — `ExecuteAsync`, `DownloadFr
 `UploadAsync`, `UploadIntoAsync` and `TryResolveWindow` — on 2026-09-26, the `PathAsIs` and `Progress` rows on 2026-09-27,
 and the `TimeProvider` and `DiagnosticLog` rows on 2026-09-29 (BL-927). When the handler
 starts or stops reading a member, change its row in the same commit.
+
+A directory takes the download path's listing branch (`ListDirectoryAsync`, BL-1401) when
+`FileProtocolHandler.ListsDirectories` is set - by default everywhere but Windows - and the
+`IFileSystem` is also an `IDirectoryLister`; it honours `TimeCondition`, `HeaderOutput`
+(only `Last-Modified`), `NoBody` and `MaxFileSize` as a file does, and ignores `Range`,
+`RangeText` and `ResumeFrom` beyond skipping `-z`. Otherwise a directory is exit 37.
 
 `TimeProvider` only times the diagnostic log's transfer-end line: nothing in a local file
 transfer is timed out or retried, and `-z`/`--time-cond` compares against the timestamp the open

@@ -8,7 +8,7 @@ namespace Curl.Protocol.Telnet.Fakes;
 /// returned by one read, in order, and then the next read either fails with
 /// <see cref="IOException" /> (<see cref="ReadFailsAfterReads" />) or never completes,
 /// as a server that stays silent. With <see cref="WritesFail" /> every write fails with
-/// <see cref="IOException" />, as a send on a reset connection does.
+/// <see cref="IOException" />, with no socket error inside.
 /// </summary>
 /// <param name="reads">What the server sends before the connection breaks.</param>
 public sealed class FaultingConnection(params byte[][] reads) : IConnection

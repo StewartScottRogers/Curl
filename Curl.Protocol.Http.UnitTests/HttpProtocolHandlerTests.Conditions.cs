@@ -17,6 +17,10 @@ public sealed partial class HttpProtocolHandlerTests
 
     private const string WholeHead = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n";
 
+    private const string Year40000Head = "HTTP/1.1 200 OK\r\nLast-Modified: Mon, 01 Jan 40000 00:00:00 GMT\r\nContent-Length: 5\r\n\r\n";
+
+    private const long Year40000UnixSeconds = 1_200_110_860_800;
+
     private static readonly DateTimeOffset ConditionTime = new(1994, 11, 6, 8, 49, 37, TimeSpan.Zero);
 
     [TestMethod]
@@ -319,6 +323,33 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(TimeConditionKind.IfModifiedSince, "If-Modified-Since", DisplayName = "-z \"Mon, 01 Jan 40000 00:00:00 GMT\"")]
+    [DataRow(TimeConditionKind.IfUnmodifiedSince, "If-Unmodified-Since", DisplayName = "-z \"-Mon, 01 Jan 40000 00:00:00 GMT\"")]
+    public async Task ExecuteAsync_TimeConditionInYear40000_FailsWith43OnWindowsAndSendsTheFiveDigitYearElsewhere(TimeConditionKind kind, string name)
+    {
+        string expected = $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:18796\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n{name}: Sat, 01 Jan 40000 00:00:00 GMT\r\n\r\n";
+        ScriptedConnection connection = Connection(WholeHead + "hello", 65536, OperatingSystem.IsWindows() ? null : expected);
+        TransferContext context = new TransferContext
+        {
+            Url = ConditionUrl(18796),
+            Output = new MemoryStream(),
+            TimeCondition = TimeCondition.FromUnixSeconds(1200110860800L, kind),
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
+            Assert.IsEmpty(connection.Written);
+        }
+        else
+        {
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        }
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TimeConditionOverriddenByHeader_SendsTheHeaderOnly()
     {
         const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18833\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nIf-Modified-Since: x\r\n\r\n";
@@ -423,6 +454,36 @@ public sealed partial class HttpProtocolHandlerTests
             .ExecuteAsync(ConditionContext(18846, new MemoryStream()));
 
         Assert.IsNull(result.SourceLastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_LastModifiedPastYear9999_SetsTheSourceTimeInUnixSeconds()
+    {
+        TransferResult result = await Handler(QueueConnector.For(Connection(Year40000Head + "hello", 65536)))
+            .ExecuteAsync(ConditionContext(18846, new MemoryStream()));
+
+        Assert.AreEqual(Year40000UnixSeconds, result.SourceLastWriteUnixSeconds);
+    }
+
+    [TestMethod]
+    [DataRow(TimeConditionKind.IfModifiedSince, true, DisplayName = "-z \"1 Jan 2030\"")]
+    [DataRow(TimeConditionKind.IfUnmodifiedSince, false, DisplayName = "-z -\"1 Jan 2030\"")]
+    public async Task ExecuteAsync_LastModifiedPastYear9999_ComparesTheConditionInUnixSeconds(TimeConditionKind kind, bool delivers)
+    {
+        MemoryStream output = new();
+        TransferContext context = new()
+        {
+            Url = ConditionUrl(18846),
+            Output = output,
+            TimeCondition = new TimeCondition(new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero), kind),
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(Year40000Head + "hello", 65536))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(!delivers, result.TimeConditionUnmet);
+        Assert.AreEqual(delivers ? "hello" : string.Empty, Latin1(output.ToArray()));
+        Assert.AreEqual(Year40000UnixSeconds, result.SourceLastWriteUnixSeconds);
     }
 
     [TestMethod]

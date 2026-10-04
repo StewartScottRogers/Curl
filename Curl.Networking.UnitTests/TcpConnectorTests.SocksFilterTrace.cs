@@ -192,6 +192,94 @@ public sealed partial class TcpConnectorTests
             SocksLines(events));
     }
 
+    [TestMethod]
+    [DataRow(ProxyKind.Socks4)]
+    [DataRow(ProxyKind.Socks4a)]
+    [DataRow(ProxyKind.Socks5)]
+    [DataRow(ProxyKind.Socks5Hostname)]
+    public async Task ConnectAsync_TracingSocksForPlainHttp_QueriesAlpnOnTheSocksFilterOnceEstablished(ProxyKind kind)
+    {
+        // curl -s -v --trace-config socks -x socks5h://127.0.0.1:18611 http://example.test/a writes
+        // [SOCKS] query ALPN after Established connection, before using HTTP/1.x (BL-1246 Notes).
+        byte[] reply = kind is ProxyKind.Socks4 or ProxyKind.Socks4a ? Socks4Granted : [.. Socks5NoAuthentication, .. Socks5Succeeded];
+        var openedAtQuery = -1;
+        RecordingTransferEvents? recording = null;
+        recording = new RecordingTransferEvents
+        {
+            OnInfo = line => openedAtQuery = line == TcpConnector.SocksQueryAlpnLine ? recording!.Opened.Count : openedAtQuery,
+        };
+
+        var events = await TraceThroughSocksAsync(kind, "127.0.0.1", reply, poolScheme: "http", recording: recording);
+
+        Assert.AreEqual(TcpConnector.SocksQueryAlpnLine, events.Info[^1]);
+        Assert.AreEqual(1, openedAtQuery);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_TracingSocksAndTcpForPlainHttp_QueriesAlpnOnlyOnTheSocksFilter()
+    {
+        // With --trace-config socks and tcp curl writes [SOCKS] query ALPN and no [TCP] one (BL-1246 Notes).
+        var events = await TraceThroughSocksAsync(
+            ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded], poolScheme: "http", tracesTcp: true);
+
+        CollectionAssert.Contains(events.Info, TcpConnector.SocksQueryAlpnLine);
+        CollectionAssert.DoesNotContain(events.Info, TcpConnector.QueryAlpnLine);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_TracingTcpButNotSocksForPlainHttp_WritesNoQueryAlpnLine()
+    {
+        // curl -s -v --trace-config network -x socks5h://... http://example.test/a writes no query ALPN
+        // line: the untraced SOCKS filter answers the query (BL-1246 Notes).
+        var events = await TraceThroughSocksAsync(
+            ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded], tracesSocks: false, poolScheme: "http", tracesTcp: true);
+
+        Assert.IsFalse(events.Info.Any(line => line.EndsWith("query ALPN", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    [DataRow(null)]
+    [DataRow("ftp")]
+    public async Task ConnectAsync_TracingSocksForAnotherScheme_WritesNoQueryAlpnLine(string? poolScheme)
+    {
+        var events = await TraceThroughSocksAsync(
+            ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded], poolScheme: poolScheme);
+
+        CollectionAssert.DoesNotContain(events.Info, TcpConnector.SocksQueryAlpnLine);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_TracingSocksForAnHttpsTarget_LeavesTheAlpnQueryToTls()
+    {
+        // Over TLS the SSL filter is topmost and answers the ALPN query (BL-1246 Notes).
+        var events = await TraceThroughSocksAsync(
+            ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded], poolScheme: "https", useTls: true);
+
+        CollectionAssert.Contains(events.Info, "[SOCKS] SOCKS5 request granted.");
+        CollectionAssert.DoesNotContain(events.Info, TcpConnector.SocksQueryAlpnLine);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_TracingSocksThroughAPreProxyToAForwardProxy_QueriesAlpnOnTheSocksFilter()
+    {
+        // curl -s -v --trace-config proxy --preproxy socks5h://127.0.0.1:18619 -x http://proxy.test:3128
+        // http://example.test/a writes [SOCKS] query ALPN before using HTTP/1.x (BL-1246 Notes).
+        var events = new RecordingTransferEvents();
+        var connector = new TcpConnector(
+            new FakeDnsResolver(PreProxyAddress),
+            new FakeTcpDialer { DialOutcome = _ => new ScriptedConnection([.. Socks5NoAuthentication, .. Socks5Succeeded]) },
+            new FakeTlsProvider(),
+            new ManualTimeProvider(),
+            preProxy: Socks5PreProxy)
+        {
+            TracesSocksFilter = true,
+        };
+
+        await connector.ConnectAsync(ForwardProxyTarget with { Events = events, PoolScheme = "http" }, CancellationToken.None);
+
+        Assert.AreEqual(TcpConnector.SocksQueryAlpnLine, events.Info[^1]);
+    }
+
     private static string[] SocksLines(RecordingTransferEvents events) =>
         [.. events.Info.Where(line => line.StartsWith("[SOCKS] ", StringComparison.Ordinal))];
 
@@ -206,9 +294,13 @@ public sealed partial class TcpConnectorTests
         byte[] proxyReply,
         string? resolveEntry = null,
         bool tracesSocks = true,
-        bool tracesSetup = false)
+        bool tracesSetup = false,
+        string? poolScheme = null,
+        bool tracesTcp = false,
+        bool useTls = false,
+        RecordingTransferEvents? recording = null)
     {
-        var events = new RecordingTransferEvents();
+        var events = recording ?? new RecordingTransferEvents();
         string[] entries = resolveEntry is null ? ["socks.example:1080:192.0.2.10"] : ["socks.example:1080:192.0.2.10", resolveEntry];
         var connector = new TcpConnector(
             new FakeDnsResolver(),
@@ -219,10 +311,11 @@ public sealed partial class TcpConnectorTests
         {
             TracesSocksFilter = tracesSocks,
             TracesSetupFilter = tracesSetup,
+            TracesTcpFilter = tracesTcp,
         };
 
         await connector.ConnectAsync(
-            new ConnectTarget(host, 8080, UseTls: false) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, null), Events = events },
+            new ConnectTarget(host, 8080, useTls) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, null), Events = events, PoolScheme = poolScheme },
             CancellationToken.None);
         return events;
     }

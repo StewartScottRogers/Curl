@@ -17,9 +17,6 @@ internal sealed class Pop3BodyPieces
     /// <summary>Gets how many pieces are held.</summary>
     public int Count => ends.Count;
 
-    /// <summary>Gets how many bytes the pieces hold together.</summary>
-    public int Length => bytes.WrittenCount;
-
     /// <summary>
     /// Gets the piece at <paramref name="index" />, valid until <see cref="Clear" />.
     /// </summary>

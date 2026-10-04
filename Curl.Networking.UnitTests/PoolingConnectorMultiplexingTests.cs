@@ -154,6 +154,21 @@ public sealed class PoolingConnectorMultiplexingTests
     }
 
     [TestMethod]
+    public async Task IsSharedWithAnotherTransfer_AfterItsLeaseEnded_KeepsWhatItWasWhenItEnded()
+    {
+        await using var pool = CreatePool();
+        var first = await pool.ConnectAsync(Target(), CancellationToken.None);
+        first.Connection!.TryHoldSession(new LimitedSession(100));
+        var second = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        await first.Connection.DisposeAsync();
+        await second.Connection!.DisposeAsync();
+
+        Assert.IsTrue(first.Connection.IsSharedWithAnotherTransfer);
+        Assert.IsFalse(second.Connection.IsSharedWithAnotherTransfer);
+    }
+
+    [TestMethod]
     public async Task DisposeAsync_OfTheLastLease_ReturnsTheConnectionToThePool()
     {
         await using var pool = CreatePool();

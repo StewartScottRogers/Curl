@@ -333,17 +333,27 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         }
 
         long readSoFar = BytesWritten + read;
-        bool endOfBody = length is { } total ? readSoFar == total : read == 0;
-        string[] lines = IsUpload
-            ? [HttpClientReaderTraceLines.InputRead(requested, length, readSoFar, read, endOfBody)]
-            : HttpClientReaderTraceLines.MimeRead(requested, length.GetValueOrDefault(), readSoFar, read);
-        foreach (string line in lines)
+        bool endOfBody = EndsBody(length, readSoFar, read);
+        foreach (string line in StreamReadLines(requested, length, readSoFar, read, endOfBody))
         {
             Events.ReportInfo(line);
         }
 
         ReportClientRead(room, read, endOfBody, isChunked);
     }
+
+    /// <summary>
+    /// Tells whether a read ends a stream body: one of known length once all of it is read, one
+    /// of unknown length when the read gives nothing.
+    /// </summary>
+    private static bool EndsBody(long? length, long readSoFar, int read) =>
+        length is { } total ? readSoFar == total : read == 0;
+
+    /// <summary>Gives the reader's lines for one read of a stream body: a <c>-T</c> upload's file reader line, or a multipart body's two lines.</summary>
+    private string[] StreamReadLines(int requested, long? length, long readSoFar, int read, bool endOfBody) =>
+        IsUpload
+            ? [HttpClientReaderTraceLines.InputRead(requested, length, readSoFar, read, endOfBody)]
+            : HttpClientReaderTraceLines.MimeRead(requested, length.GetValueOrDefault(), readSoFar, read);
 
     /// <summary>
     /// Reports the client's line for one read; for a chunked body first the chunk encoder's lines,

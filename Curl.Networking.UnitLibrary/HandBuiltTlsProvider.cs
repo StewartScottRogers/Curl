@@ -540,9 +540,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         RethrowIfCancellation(thrown);
         CertificateStatusText.Report(run.Events, failure?.CertificateStatusRejection);
         ReportEchRejection(run, failure);
-        return thrown is null
+        return SchannelFailureEcho.Report(run.Events, _matchesSchannelBuild, thrown is null
             ? FailedHandshake(failure!)
-            : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(thrown));
+            : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(thrown)));
     }
 
     // A rejected ECH offer: curl traces the server's retry_configs before its failf, or

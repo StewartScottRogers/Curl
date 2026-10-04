@@ -153,6 +153,28 @@ public sealed partial class TcpConnectorTests
             events.Calls);
     }
 
+    [TestMethod]
+    [DataRow(false, "http")]
+    [DataRow(true, "https")]
+    public async Task ConnectAsync_TracingTheTcpFilterWithHaproxy_WritesTheLinesSendBeforeTheConnectionOpened(bool useTls, string poolScheme)
+    {
+        // curl -s -v --trace-config tcp --haproxy-protocol http://127.0.0.1:18531/ writes
+        // [TCP] send(len=44) -> 0, 44 before Established connection (BL-1253 Notes).
+        var events = new CountingTransferEvents();
+        var connection = new ScriptedConnection([]);
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), new FakeTcpDialer { DialOutcome = _ => connection }, new FakeTlsProvider(), new ManualTimeProvider(), haproxyProtocol: new HaproxyProtocolHeader(null))
+        {
+            TracesTcpFilter = true,
+        };
+
+        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18531, useTls) { Events = events, PoolScheme = poolScheme }, CancellationToken.None);
+
+        int length = connection.Written.Count;
+        int sendIndex = events.Calls.IndexOf($"[TCP] send(len={length}) -> 0, {length}");
+        Assert.AreEqual(events.Calls.IndexOf("[TCP] connected on fd=3") + 1, sendIndex);
+        Assert.IsTrue(sendIndex < events.Calls.IndexOf("opened"));
+    }
+
     private static TcpConnector HaproxyConnector(ScriptedConnection connection, bool tracesSetup, bool tracesHaproxy) =>
         new(new FakeDnsResolver(Loopback), new FakeTcpDialer { DialOutcome = _ => connection }, new FakeTlsProvider(), new ManualTimeProvider(), haproxyProtocol: new HaproxyProtocolHeader(null))
         {

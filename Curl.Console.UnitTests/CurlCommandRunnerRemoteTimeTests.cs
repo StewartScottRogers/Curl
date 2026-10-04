@@ -16,7 +16,17 @@ public sealed class CurlCommandRunnerRemoteTimeTests
 {
     private const string SourceUrl = "file:///source.txt";
 
+    /// <summary>40000-01-01T00:00:00Z in Unix seconds, past what <see cref="DateTimeOffset" /> holds.</summary>
+    private const long Year40000UnixSeconds = 1200110860800;
+
+    /// <summary>30827-12-31T23:59:59Z in Unix seconds, the latest time curl 8.21.0 sets on Windows.</summary>
+    private const long WindowsMaximumFileTimeUnixSeconds = 910670515199;
+
     private static readonly DateTimeOffset SourceLastWriteTimeUtc = new(2020, 1, 2, 10, 4, 5, TimeSpan.Zero);
+
+    private static readonly DateTimeOffset WindowsMinimumFileTimeUtc = new(1752, 9, 14, 0, 0, 0, TimeSpan.Zero);
+
+    private static readonly DateTimeOffset Year1700 = new(1700, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     private readonly MemoryStream standardOutput = new();
     private readonly MemoryStream standardError = new();
@@ -32,7 +42,7 @@ public sealed class CurlCommandRunnerRemoteTimeTests
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hello", Encoding.ASCII.GetString(outputFiles.Written["out.txt"].ToArray()));
         Assert.HasCount(1, outputFiles.LastWriteTimesSet);
-        Assert.AreEqual(("out.txt", SourceLastWriteTimeUtc, false), outputFiles.LastWriteTimesSet[0]);
+        Assert.AreEqual(("out.txt", SourceLastWriteTimeUtc.ToUnixTimeSeconds(), false), outputFiles.LastWriteTimesSet[0]);
     }
 
     [TestMethod]
@@ -106,7 +116,7 @@ public sealed class CurlCommandRunnerRemoteTimeTests
         Assert.AreEqual(0, exitCode);
         Assert.HasCount(1, outputFiles.LastWriteTimesSet);
         Assert.AreEqual("out.txt", outputFiles.LastWriteTimesSet[0].Path);
-        Assert.AreEqual(SourceLastWriteTimeUtc, outputFiles.LastWriteTimesSet[0].LastWriteTimeUtc);
+        Assert.AreEqual(SourceLastWriteTimeUtc.ToUnixTimeSeconds(), outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
     }
 
     [TestMethod]
@@ -121,7 +131,7 @@ public sealed class CurlCommandRunnerRemoteTimeTests
         Assert.AreEqual(0, exitCode);
         Assert.IsFalse(outputFiles.Written.ContainsKey("out.txt"));
         Assert.HasCount(1, outputFiles.LastWriteTimesSet);
-        Assert.AreEqual(("out.txt", SourceLastWriteTimeUtc, false), outputFiles.LastWriteTimesSet[0]);
+        Assert.AreEqual(("out.txt", SourceLastWriteTimeUtc.ToUnixTimeSeconds(), false), outputFiles.LastWriteTimesSet[0]);
     }
 
     /// <summary>
@@ -187,6 +197,131 @@ public sealed class CurlCommandRunnerRemoteTimeTests
         Assert.DoesNotContain("Warning", Encoding.UTF8.GetString(standardError.ToArray()));
     }
 
+    /// <summary>
+    /// curl 8.21.0 (mingw, Schannel), measured 2026-10-03: <c>-R -o</c> with
+    /// <c>Last-Modified: Mon, 01 Jan 1700 00:00:00 GMT</c> warns and stamps 1752-09-14T00:00:00Z,
+    /// as <c>tool_filetime.c</c>'s <c>_WIN32</c> <c>setfiletime</c> caps it, before any
+    /// <c>Failed to set filetime</c> warning.
+    /// </summary>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    public async Task RunAsync_RemoteTimeBefore1752OnWindows_CapsToTheMinimumAndWarnsFirst()
+    {
+        outputFiles = new InMemoryFileSystem { FileTimeErrorCode = 2 };
+
+        int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBody(Year1700), runsOnWindows: true);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(WindowsMinimumFileTimeUtc.ToUnixTimeSeconds(), outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
+        string errors = Encoding.UTF8.GetString(standardError.ToArray());
+        Assert.StartsWith("Warning: Capping set filetime to minimum to avoid overflow", errors);
+        Assert.Contains("Warning: Failed to set filetime -6857222400 on outfile", errors);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteTimeAtTheMinimumOnWindows_SetsItUnchangedWithoutWarning()
+    {
+        int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBody(WindowsMinimumFileTimeUtc), runsOnWindows: true);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(WindowsMinimumFileTimeUtc.ToUnixTimeSeconds(), outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
+        Assert.AreEqual(0, standardError.Length);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteTimeOneSecondBeforeTheMinimumOnWindowsUnderSilent_CapsWithoutWarning()
+    {
+        int exitCode = await RunAsync(
+            ["-s", "-R", "-o", "out.txt", SourceUrl],
+            WritingBody(WindowsMinimumFileTimeUtc.AddSeconds(-1)),
+            runsOnWindows: true);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(WindowsMinimumFileTimeUtc.ToUnixTimeSeconds(), outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
+        Assert.AreEqual(0, standardError.Length);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteTimeBefore1752OffWindows_SetsItUnchangedWithoutWarning()
+    {
+        int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBody(Year1700), runsOnWindows: false);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(Year1700.ToUnixTimeSeconds(), outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
+        Assert.AreEqual(0, standardError.Length);
+    }
+
+    /// <summary>
+    /// curl 8.21.0 (mingw, Schannel), measured 2026-10-03: <c>-R -o</c> with
+    /// <c>Last-Modified: Mon, 01 Jan 40000 00:00:00 GMT</c> warns and stamps
+    /// 30827-12-31T23:59:59Z, as <c>tool_filetime.c</c>'s <c>_WIN32</c> <c>setfiletime</c>
+    /// caps it, before any <c>Failed to set filetime</c> warning.
+    /// </summary>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    public async Task RunAsync_RemoteTimePast30827OnWindows_CapsToTheMaximumAndWarnsFirst()
+    {
+        outputFiles = new InMemoryFileSystem { FileTimeErrorCode = 2 };
+
+        int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBodyAt(Year40000UnixSeconds), runsOnWindows: true);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(WindowsMaximumFileTimeUnixSeconds, outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
+        string errors = Encoding.UTF8.GetString(standardError.ToArray());
+        Assert.StartsWith("Warning: Capping set filetime to max to avoid overflow" + Environment.NewLine, errors);
+        Assert.Contains("Warning: Failed to set filetime 910670515199 on outfile", errors);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteTimePast30827OnWindowsSetsTheTime_PrintsOnlyTheCappingWarning()
+    {
+        int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBodyAt(Year40000UnixSeconds), runsOnWindows: true);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            "Warning: Capping set filetime to max to avoid overflow" + Environment.NewLine,
+            Encoding.UTF8.GetString(standardError.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteTimePast30827OnWindowsUnderSilent_CapsWithoutWarning()
+    {
+        int exitCode = await RunAsync(["-s", "-R", "-o", "out.txt", SourceUrl], WritingBodyAt(Year40000UnixSeconds), runsOnWindows: true);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(WindowsMaximumFileTimeUnixSeconds, outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
+        Assert.AreEqual(0, standardError.Length);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteTimeAtTheMaximumOnWindows_SetsItUnchangedWithoutWarning()
+    {
+        int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBodyAt(WindowsMaximumFileTimeUnixSeconds), runsOnWindows: true);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(WindowsMaximumFileTimeUnixSeconds, outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
+        Assert.AreEqual(0, standardError.Length);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteTimePast30827OffWindows_SetsItUnchangedWithoutWarning()
+    {
+        int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBodyAt(Year40000UnixSeconds), runsOnWindows: false);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(Year40000UnixSeconds, outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
+        Assert.AreEqual(0, standardError.Length);
+    }
+
+    private static RecordingProtocolHandler WritingBodyAt(long sourceLastWriteUnixSeconds) =>
+        new("file", async context =>
+        {
+            byte[] body = Encoding.ASCII.GetBytes("hello");
+            await context.Output.WriteAsync(body, context.CancellationToken);
+
+            return TransferResult.Success(body.Length) with { SourceLastWriteUnixSeconds = sourceLastWriteUnixSeconds };
+        });
+
     private static RecordingProtocolHandler WritingBody(DateTimeOffset? sourceLastWriteTimeUtc) =>
         new("file", async context =>
         {
@@ -196,7 +331,7 @@ public sealed class CurlCommandRunnerRemoteTimeTests
             return TransferResult.Success(body.Length) with { SourceLastWriteTimeUtc = sourceLastWriteTimeUtc };
         });
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler) =>
-        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows: false)
+    private Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler, bool runsOnWindows = false) =>
+        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows)
             .RunAsync(arguments);
 }

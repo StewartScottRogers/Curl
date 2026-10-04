@@ -14,7 +14,7 @@ namespace Curl.Protocol.Http;
 /// </content>
 public sealed partial class HttpProtocolHandlerTests
 {
-    private static readonly HttpRequestOptions TcpFirst = new() { TriesTcpBeforeQuic = true };
+    private static readonly HttpRequestOptions TcpFirst = new() { TcpFirstAttemptVersion = "h2" };
 
     [TestMethod]
     public async Task ExecuteAsync_Http3TcpFirstAndTcpPending_StartsQuicOnlyOnceTheHappyEyeballsTimeoutPasses()
@@ -71,6 +71,22 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(DateTimeOffset.UnixEpoch, time.GetUtcNow());
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(new Version(3, 0), result.Report!.HttpVersion);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http3TcpFirst_GivesBothAttemptsOneTargetNamingTheTcpFirstAttemptVersion()
+    {
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        RacingConnector connector = new();
+        connector.TcpResult.SetResult(ConnectResult.Refused("Failed to connect to 127.0.0.1 port 18731 after 0 ms: Could not connect to server"));
+
+        Task<TransferResult> transfer = RaceHandler(connector).ExecuteAsync(RaceContext(time, options: TcpFirst with { TcpFirstAttemptVersion = "h1" })).AsTask();
+        await connector.QuicStarted;
+        connector.QuicResult.SetResult(MultiplexedConnectResult.Connected(Http3OkConnection(), null));
+        await transfer;
+
+        Assert.AreEqual("h1", connector.TcpTarget!.TcpFirstAttemptVersion);
+        Assert.AreSame(connector.TcpTarget, connector.QuicTarget);
     }
 
     [TestMethod]

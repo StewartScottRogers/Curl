@@ -254,6 +254,17 @@ public sealed class CommandLineExpandOptionTests
     }
 
     [TestMethod]
+    public void Parse_ExpandedFlagFollowedByANullArgument_IsRefusedAsGivenAnEmptyValue()
+    {
+        CommandLineParseResult result = Parse(["--expand-silent", null!, Url]);
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "curl: option --expand-silent: variable expansion failure", CommandLineRefusal.TryHelpLine },
+            result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
     public void Parse_ExpandedFlagAsTheLastArgument_IsApplied()
     {
         CommandLineParseResult result = Parse([Url, "--expand-silent"]);

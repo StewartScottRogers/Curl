@@ -153,14 +153,14 @@ internal static class CurlComposition
             new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
             new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
             new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)) { TracesStateMachine = tracesSmtp },
-            new LdapProtocolHandler(recordingConnector, OperatingSystem.IsWindows() ? LdapDialect.WinLdap : LdapDialect.OpenLdap),
+            new LdapProtocolHandler(recordingConnector, LdapDialectFor(OperatingSystem.IsWindows())),
             new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()) { TracesFrames = tracesWs },
             new RtspProtocolHandler(recordingConnector, httpAuthenticator),
             new SmbProtocolHandler(recordingConnector),
             new SshProtocolHandler(
                 recordingConnector,
                 new PhysicalFileSystem(),
-                OperatingSystem.IsWindows() ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference,
+                SshAlgorithmPreferencesFor(OperatingSystem.IsWindows()),
                 CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())) { TracesStateMachine = tracesSsh },
             http,
             new RoutingFtpProtocolHandler(
@@ -170,6 +170,23 @@ internal static class CurlComposition
 
         return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(handler, recorder))];
     }
+
+    /// <summary>
+    /// Gives the LDAP library the platform's curl is built with: WinLDAP on Windows, OpenLDAP elsewhere.
+    /// </summary>
+    /// <param name="runsOnWindows">Whether the run is on Windows.</param>
+    /// <returns>The dialect.</returns>
+    internal static LdapDialect LdapDialectFor(bool runsOnWindows) =>
+        runsOnWindows ? LdapDialect.WinLdap : LdapDialect.OpenLdap;
+
+    /// <summary>
+    /// Gives the SSH algorithms the platform's curl offers: the Schannel build's on Windows, the
+    /// OpenSSL build's elsewhere.
+    /// </summary>
+    /// <param name="runsOnWindows">Whether the run is on Windows.</param>
+    /// <returns>The algorithm preferences.</returns>
+    internal static SshAlgorithmPreferences SshAlgorithmPreferencesFor(bool runsOnWindows) =>
+        runsOnWindows ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference;
 
     /// <summary>
     /// Creates the FTP handler for <c>ftp</c> and <c>ftps</c> (ADR-0102): the control connection
@@ -431,6 +448,27 @@ internal static class CurlComposition
     /// <param name="options">The parsed command line.</param>
     /// <returns><see langword="true" /> when the lines are written.</returns>
     internal static bool TracesH1Proxy(CommandLineOptions options) => TracesProxyComponent(options, "h1-proxy");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[SSL]</c> lines are written around an origin's TLS handshake:
+    /// <c>ssl</c>, <c>network</c> or <c>all</c> is among the trace components, which <c>-vvvv</c> puts
+    /// there too; <c>proxy</c> and <c>tls</c> do not (measured, BL-1287 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesSsl(CommandLineOptions options) =>
+        options.TraceComponents.Contains("ssl") || options.TraceComponents.Contains("network") || options.TraceComponents.Contains("all");
+
+    /// <summary>
+    /// Whether curl 8.21.0's <c>[SSL-PROXY]</c> lines are written around an HTTPS proxy's TLS handshake:
+    /// <c>proxy</c> or a <c>--trace-config all</c> is among the trace components; neither <c>ssl</c>,
+    /// <c>network</c> nor the <c>all</c> that <c>-vvvv</c> puts there turns them on (measured, BL-1287 Notes).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true" /> when the lines are written.</returns>
+    internal static bool TracesSslProxy(CommandLineOptions options) =>
+        options.TraceComponents.Contains("proxy")
+        || (options.TraceComponents.Contains("all") && !options.VerbosityTraceComponents.Contains("all"));
 
     private static bool TracesProxyComponent(CommandLineOptions options, string component) =>
         options.TraceComponents.Contains(component)
@@ -818,13 +856,17 @@ internal static class CurlComposition
             TracesSocksFilter = TracesSocks(options),
             TracesHttpProxyFilter = TracesHttpProxy(options),
             TracesH1ProxyFilter = TracesH1Proxy(options),
+            TracesSslFilter = TracesSsl(options),
+            TracesSslProxyFilter = TracesSslProxy(options),
             TracesHappyEyeballsFilter = TracesHappyEyeballs(options),
             TracesTcpFilter = TracesTcp(options),
             TracesTimers = TracesTimer(options),
             TracesTimerExpiry = TracesMulti(options),
             TracedConnectTimeout = options.ConnectTimeout > TimeSpan.Zero ? options.ConnectTimeout : null,
+            TracedTransferTimeout = options.MaxTime > TimeSpan.Zero ? options.MaxTime : null,
             TracesHttpsConnectFilter = TracesHttpsConnect(options),
             HttpsConnectFirstAttemptVersion = HttpsConnectFirstAttemptVersionOf(options.HttpVersion),
+            HttpsConnectSecondAttemptVersion = options.HttpVersion == RequestedHttpVersion.Http3 ? "h2" : null,
             ResolverEvents = resolverEvents,
         };
 
@@ -978,7 +1020,8 @@ internal static class CurlComposition
     /// <c>--proxy-anyauth</c> after a <c>407</c> (ADR-0186), NTLM's Type 1 and Type 3 and
     /// Negotiate's tokens on the same connection (ADR-0270). Its Negotiate and NTLM contexts come
     /// from <paramref name="securityContexts" />, with the <c>--proxy-service-name</c> and
-    /// <c>--delegation</c> of <see cref="NegotiateOptionsMapping.FromCommandLine" />.
+    /// <c>--delegation</c> of <see cref="NegotiateOptionsMapping.FromCommandLine" />; and an HTTP/2
+    /// tunnel through an <c>https://</c> proxy when <c>--proxy-http2</c> asked for one (ADR-0408).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <param name="securityContexts">Makes the proxy's NTLM and Negotiate contexts: <see cref="CreateSecurityContextFactory" />'s router in production.</param>
@@ -998,6 +1041,7 @@ internal static class CurlComposition
             CommandLineTextEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()),
             ProxyAuthSchemes = options.ProxyAuthSchemes,
             ProxyAuthenticator = CreateHttpAuthenticator(securityContexts, NegotiateOptionsMapping.FromCommandLine(options), diagnosticLog),
+            ProxyHttp2 = options.ProxyHttp2,
         };
 
     /// <summary>
@@ -1050,7 +1094,7 @@ internal static class CurlComposition
             defaultConfigFileSearch: DefaultConfigFileSearch.ForProcess,
             readEnvironmentVariable: name => Environment.GetEnvironmentVariable(name),
             terminalRendersStyles: terminalRendersStyles,
-            accountHomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            accountHomeDirectory: AccountHomeDirectory.ForProcess,
             runConnectionCache: runConnections,
             tlsSessions: tlsSessions,
             extendedAttributeWriter: NativeExtendedAttributeWriter.ForCurrentPlatform(),
@@ -1080,6 +1124,11 @@ internal static class CurlComposition
     /// through (<see cref="CreatePoolingConnector" />) and the runner closes when the run ends; or
     /// <see langword="null" /> to connect through <paramref name="connector" /> itself.
     /// </param>
+    /// <param name="parsesAsWindowsBuild">
+    /// Whether the runner reads the command line as curl's Windows Schannel build does; <see langword="null" />
+    /// for this process's platform. Tests pass <see langword="false" /> to reach <c>--http2</c>, <c>--http3</c> and
+    /// the TLS-SRP options on every platform (ADR-0397).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -1090,7 +1139,8 @@ internal static class CurlComposition
         ProxySelector? proxySelector = null,
         ISecurityContextFactory? securityContexts = null,
         TimeProvider? signingClock = null,
-        ConnectionCache? runConnections = null)
+        ConnectionCache? runConnections = null,
+        bool? parsesAsWindowsBuild = null)
     {
         LateBoundDiagnosticLog runLog = new();
         return new(
@@ -1104,7 +1154,8 @@ internal static class CurlComposition
             writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths(),
             runConnectionCache: runConnections,
-            lateBoundDiagnosticLog: runLog);
+            lateBoundDiagnosticLog: runLog,
+            parsesAsWindowsBuild: parsesAsWindowsBuild);
     }
 
     /// <summary>

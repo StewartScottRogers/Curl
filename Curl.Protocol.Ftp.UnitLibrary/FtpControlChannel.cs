@@ -22,6 +22,10 @@ namespace Curl.Protocol.Ftp;
 /// <see langword="null" /> without <c>-D</c>: each reply line reported is also written there,
 /// as curl 8.21.0 passes it as <c>CLIENTWRITE_INFO</c> (BL-1131).
 /// </param>
+/// <param name="connectEvents">
+/// The events the connector writes the control connection's <c>[TCP]</c> trace lines to, whose info
+/// lines <see cref="StopReporting" /> stops too (BL-1259).
+/// </param>
 /// <remarks>
 /// Commands and replies are Latin-1, so every byte of a percent-decoded path reaches the
 /// server unchanged, as curl sends it. A reply ends at the first line that starts with
@@ -31,7 +35,7 @@ namespace Curl.Protocol.Ftp;
 /// sent is reported with its CRLF, <c>PASS</c>'s password in clear, and every complete line
 /// read with its line end, skipped or not, until <see cref="StopReporting" />.
 /// </remarks>
-internal sealed class FtpControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken, FtpDiagnosticLog diagnostics, Stream? dumpHeaderOutput)
+internal sealed class FtpControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken, FtpDiagnosticLog diagnostics, Stream? dumpHeaderOutput, InfoLineStoppingTransferEvents connectEvents)
 {
     /// <summary>Where lines are reported: <c>events</c> until <see cref="StopReporting" />, nowhere after.</summary>
     private ITransferEvents reporting = events;
@@ -41,11 +45,12 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
 
     /// <summary>
     /// Reports and writes nothing more: curl sends <c>QUIT</c> as it closes the connection,
-    /// where neither <c>-v</c> nor the <c>-D</c> file sees it or its reply.
+    /// where neither <c>-v</c>, its <c>[TCP]</c> trace lines, nor the <c>-D</c> file sees it or its reply.
     /// </summary>
     public void StopReporting()
     {
         reporting = NoTransferEvents.Instance;
+        connectEvents.StopInfoLines();
         dumping = null;
     }
 

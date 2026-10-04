@@ -429,7 +429,7 @@ public sealed class TlsClientOptionsMappingTests
 
     private static CommandLineOptions Parse(string[] arguments)
     {
-        CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
+        CommandLineParseResult parsed = OpenSslBuildParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;
     }

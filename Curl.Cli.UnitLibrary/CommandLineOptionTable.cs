@@ -216,6 +216,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("cert-status", null, (options, on) => options.RequireCertificateStatus = on),
         CommandLineOption.NegatableFlag("ssl-auto-client-cert", null, (options, on) => options.AutoClientCertificate = on),
         CommandLineOption.NegatableFlag("proxy-insecure", null, (options, on) => options.ProxyInsecure = on),
+        CommandLineOption.NegatableFlag("proxy-http2", null, (options, on) => options.ProxyHttp2 = on).RefusedBySchannelBuild(),
         CommandLineOption.Value("proxy-cacert", null, SettingExistingFile("--proxy-cacert", (options, file) => options.ProxyCaCertificateFile = file)),
         CommandLineOption.FileName("proxy-capath", null, (options, directory) => options.ProxyCaCertificateDirectory = directory),
         CommandLineOption.FileName("proxy-cert", null, (options, certificate) => options.ProxyClientCertificate = certificate),
@@ -230,9 +231,9 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("proxy-ca-native", null, (options, on) => options.ProxyUseNativeCaStore = on),
         CommandLineOption.NegatableFlag("proxy-ssl-auto-client-cert", null, (options, on) => options.ProxyAutoClientCertificate = on),
         CommandLineOption.NegatableFlag("proxy-ssl-allow-beast", null, (options, on) => options.ProxyAllowBeast = on),
-        CommandLineOption.Value("proxy-tlsuser", null, AcceptingEmpty((options, user) => options.ProxyTlsUser = user)),
-        CommandLineOption.Text("proxy-tlspassword", null, (options, password) => options.ProxyTlsPassword = password),
-        CommandLineOption.Value("proxy-tlsauthtype", null, (options, value, spelledOption, _, _) => SetTlsAuthType(value, spelledOption, type => options.ProxyTlsAuthType = type)),
+        CommandLineOption.Value("proxy-tlsuser", null, AcceptingEmpty((options, user) => options.ProxyTlsUser = user)).RefusedBySchannelBuild(),
+        CommandLineOption.Text("proxy-tlspassword", null, (options, password) => options.ProxyTlsPassword = password).RefusedBySchannelBuild(),
+        CommandLineOption.Value("proxy-tlsauthtype", null, (options, value, spelledOption, _, _) => SetTlsAuthType(value, spelledOption, type => options.ProxyTlsAuthType = type)).RefusedBySchannelBuild(),
         CommandLineOption.FileName("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),
         CommandLineOption.FileName("key", null, (options, key) => options.PrivateKey = key),
         CommandLineOption.Text("cert-type", null, (options, type) => options.ClientCertificateType = type),
@@ -259,12 +260,12 @@ public static class CommandLineOptionTable
         CommandLineOption.Text("sigalgs", null, (options, algorithms) => options.SignatureAlgorithms = algorithms),
         CommandLineOption.NegatableFlag("tls-earlydata", null, (options, on) => options.TlsEarlyData = on),
         CommandLineOption.Value("ech", null, SetEch),
-        CommandLineOption.FileName("ssl-sessions", null, (options, file) => options.SslSessionsFile = file),
+        CommandLineOption.FileName("ssl-sessions", null, (options, file) => options.SslSessionsFile = file).RefusedBySchannelBuild(),
         CommandLineOption.Text("engine", null, SetEngine),
         CommandLineOption.Flag("dump-ca-embed", null, options => options.CaEmbedDumpRequested = true),
-        CommandLineOption.Text("tlsuser", null, (options, user) => options.TlsUser = user),
-        CommandLineOption.Value("tlspassword", null, AcceptingEmpty((options, password) => options.TlsPassword = password)),
-        CommandLineOption.Value("tlsauthtype", null, (options, value, spelledOption, _, _) => SetTlsAuthType(value, spelledOption, type => options.TlsAuthType = type)),
+        CommandLineOption.Text("tlsuser", null, (options, user) => options.TlsUser = user).RefusedBySchannelBuild(),
+        CommandLineOption.Value("tlspassword", null, AcceptingEmpty((options, password) => options.TlsPassword = password)).RefusedBySchannelBuild(),
+        CommandLineOption.Value("tlsauthtype", null, (options, value, spelledOption, _, _) => SetTlsAuthType(value, spelledOption, type => options.TlsAuthType = type)).RefusedBySchannelBuild(),
         CommandLineOption.Value("range", 'r', SetRange),
         CommandLineOption.Value("continue-at", 'C', SetResumeFrom),
         CommandLineOption.Value("max-filesize", null, SetMaxFileSize),
@@ -329,10 +330,10 @@ public static class CommandLineOptionTable
         CommandLineOption.Flag("http1.1", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http11)),
         CommandLineOption.Flag("ipv4", '4', options => options.IpAddressFamily = IpAddressFamilyChoice.IPv4Only),
         CommandLineOption.Flag("ipv6", '6', options => options.IpAddressFamily = IpAddressFamilyChoice.IPv6Only),
-        CommandLineOption.Flag("http2", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http2)),
-        CommandLineOption.Flag("http2-prior-knowledge", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http2PriorKnowledge)),
-        CommandLineOption.Flag("http3", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http3)),
-        CommandLineOption.Flag("http3-only", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http3Only)),
+        CommandLineOption.Flag("http2", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http2)).RefusedBySchannelBuild(),
+        CommandLineOption.Flag("http2-prior-knowledge", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http2PriorKnowledge)).RefusedBySchannelBuild(),
+        CommandLineOption.Flag("http3", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http3)).RefusedBySchannelBuild(),
+        CommandLineOption.Flag("http3-only", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http3Only)).RefusedBySchannelBuild(),
         CommandLineOption.NoFunctionFlag("sslv2", '2', negatable: false),
         CommandLineOption.NoFunctionFlag("sslv3", '3', negatable: false),
         CommandLineOption.NoFunctionFlag("metalink", null, negatable: true),
@@ -1636,9 +1637,9 @@ public static class CommandLineOptionTable
     {
         TimeConditionKind kind = value.StartsWith('-') ? TimeConditionKind.IfUnmodifiedSince : TimeConditionKind.IfModifiedSince;
         string date = value.StartsWith('-') || value.StartsWith('+') || value.StartsWith('=') ? value[1..] : value;
-        if (TryReadTimeConditionDate(date, dataFileReader, out DateTimeOffset instant, out string? failureReason))
+        if (TryReadTimeConditionDate(date, dataFileReader, out long unixSeconds, out string? failureReason))
         {
-            options.TimeCondition = new TimeCondition(instant, kind);
+            options.TimeCondition = TimeCondition.FromUnixSeconds(unixSeconds, kind);
             return null;
         }
 
@@ -1664,28 +1665,22 @@ public static class CommandLineOptionTable
 
     /// <summary>
     /// Reads a <c>-z</c> date, without its prefix, as a date or, failing that, as the name of a file
-    /// whose modification time is the date, as curl 8.21.0's tool does.
+    /// whose modification time is the date, as curl 8.21.0's tool does. The date is kept in Unix
+    /// seconds, as curl's 64-bit <c>time_t</c> keeps it, so a year past 9999 is read whole
+    /// (<c>Mon, 01 Jan 40000 00:00:00 GMT</c> is 1200110860800; ADR-0410, BL-1424).
     /// </summary>
-    private static bool TryReadTimeConditionDate(string date, IDataFileReader dataFileReader, out DateTimeOffset instant, out string? failureReason)
+    private static bool TryReadTimeConditionDate(string date, IDataFileReader dataFileReader, out long unixSeconds, out string? failureReason)
     {
         failureReason = null;
-        if (CurlDateParser.TryParse(date, out long unixSeconds))
+        if (CurlDateParser.TryParse(date, out unixSeconds))
         {
-            instant = TimeConditionInstant(unixSeconds);
             return true;
         }
 
-        return dataFileReader.TryReadModificationTime(date, out instant, out failureReason);
+        bool read = dataFileReader.TryReadModificationTime(date, out DateTimeOffset modificationTime, out failureReason);
+        unixSeconds = modificationTime.ToUnixTimeSeconds();
+        return read;
     }
-
-    /// <summary>
-    /// The instant a <c>-z</c> date's Unix seconds name. One after the last whole second a
-    /// <see cref="DateTimeOffset"/> holds, which curl computes in a 64-bit <c>time_t</c>, reads as that
-    /// second, 9999-12-31 23:59:59 UTC (ADR-0073); <see cref="CurlDateParser"/> refuses every year
-    /// before 1583, so none falls before year 1.
-    /// </summary>
-    private static DateTimeOffset TimeConditionInstant(long unixSeconds) =>
-        DateTimeOffset.FromUnixTimeSeconds(Math.Min(unixSeconds, DateTimeOffset.MaxValue.ToUnixTimeSeconds()));
 
     /// <summary>
     /// Turns <c>--location-trusted</c> on or off: it follows redirects and sends credentials to every

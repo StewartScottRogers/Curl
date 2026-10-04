@@ -71,6 +71,56 @@ public sealed class WriteOutTemplateRendererTests
     }
 
     [TestMethod]
+    public async Task RenderAsync_VariableNameOf24Bytes_StopsTheOutputSilently()
+    {
+        // curl -s -o NUL -w "a%{abcdefghijklmnopqrstuvw}b%{abcdefghijklmnopqrstuvwx}c\n" file:///C:/Windows/win.ini
+        // wrote "ab" and only the 23-byte name's warning (BL-1301).
+        Harness harness = new(writesLineFeedAsCrLf: false);
+
+        await harness.RenderAsync("a%{abcdefghijklmnopqrstuvw}b%{abcdefghijklmnopqrstuvwx}c\\n");
+
+        Assert.AreEqual("ab", harness.StandardOutputText);
+        Assert.AreEqual("curl: unknown --write-out variable: 'abcdefghijklmnopqrstuvw'\n", harness.StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RenderAsync_VariableNameLengths_StopOnlyFrom24Bytes()
+    {
+        Harness harness = new(writesLineFeedAsCrLf: false);
+        harness.Variables.Values["http_code"] = "200";
+
+        await harness.RenderAsync("%{http_code}|%{abcdefghijklmnopqrstuvw}|%{" + new string('é', 12) + "}|%{http_code}");
+
+        Assert.AreEqual("200||", harness.StandardOutputText);
+        Assert.AreEqual("curl: unknown --write-out variable: 'abcdefghijklmnopqrstuvw'\n", harness.StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RenderAsync_LongNameAfterSwitches_FlushesPendingTextAndClosesTheFile()
+    {
+        Harness harness = new(writesLineFeedAsCrLf: false);
+
+        await harness.RenderAsync("O%output{f.txt}F%{stderr}E%{abcdefghijklmnopqrstuvwx}Z");
+
+        Assert.AreEqual("O", harness.StandardOutputText);
+        Assert.AreEqual("E", harness.StandardErrorText);
+        Assert.AreEqual("F", harness.Files.ContentOf("f.txt"));
+        Assert.IsTrue(harness.Files.AllClosed);
+    }
+
+    [TestMethod]
+    public async Task RenderAsync_LongNameWhileWritingToAFile_FlushesAndClosesTheFile()
+    {
+        Harness harness = new(writesLineFeedAsCrLf: false);
+
+        await harness.RenderAsync("%output{g.txt}G%{abcdefghijklmnopqrstuvwx}Z");
+
+        Assert.AreEqual(string.Empty, harness.StandardOutputText);
+        Assert.AreEqual("G", harness.Files.ContentOf("g.txt"));
+        Assert.IsTrue(harness.Files.AllClosed);
+    }
+
+    [TestMethod]
     public async Task RenderAsync_VariableNames_AreCaseSensitiveAndUntrimmed()
     {
         // curl -w "%{HTTP_CODE}|%{ http_code}|%{}|%" wrote "|||%" and three warnings.

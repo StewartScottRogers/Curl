@@ -4,9 +4,10 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Core.FileSystem;
 
 /// <summary>
-/// The real-disk <see cref="IFileSystem" /> and <see cref="IFileTimeSetter" />: opens local files with
+/// The real-disk <see cref="IFileSystem" />, <see cref="IDirectoryLister" /> and <see cref="IFileTimeSetter" />: opens local files with
 /// <see cref="FileStream" /> and reports every failed open as a
-/// <see cref="FileAccessStatus" />, never as an exception.
+/// <see cref="FileAccessStatus" />, never as an exception, and lists a directory's entry
+/// names, reporting one it cannot list as <see langword="null" />.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -19,7 +20,8 @@ namespace Curl.Core.FileSystem;
 /// rejects (<c>c|/Windows</c>, a literal <c>%</c>). Every exception
 /// <see cref="FileOpenFailure.IsOpenFailure(Exception)" /> names is absorbed into
 /// <see cref="FileOpenResult.Failed(FileAccessStatus, Exception?)" />, which carries it; the only exception either open
-/// lets out is the <see cref="OperationCanceledException" /> of a cancelled token.
+/// lets out is the <see cref="OperationCanceledException" /> of a cancelled token. An open
+/// that fails because the path is a directory carries the directory's last-write time.
 /// </para>
 /// <para>
 /// A read open is seekable for a regular file. A handle the operating system cannot seek -
@@ -45,9 +47,15 @@ namespace Curl.Core.FileSystem;
 /// it is ignored and the option has no effect.
 /// </para>
 /// </remarks>
-public sealed class PhysicalFileSystem : IFileSystem, IFileTimeSetter
+public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTimeSetter
 {
     private const int BufferSize = 4096;
+
+    /// <summary>The Unix seconds of 0001-01-01T00:00:00Z, the earliest <see cref="DateTime" />.</summary>
+    private const long MinimumDateTimeUnixSeconds = -62135596800;
+
+    /// <summary>The Unix seconds of 9999-12-31T23:59:59Z, the latest whole second of <see cref="DateTime" />.</summary>
+    private const long MaximumDateTimeUnixSeconds = 253402300799;
 
     [UnsupportedOSPlatformGuard("windows")]
     private readonly bool setsUnixCreateMode;
@@ -122,16 +130,49 @@ public sealed class PhysicalFileSystem : IFileSystem, IFileTimeSetter
 
     /// <inheritdoc />
     /// <remarks>
+    /// Lists with <see cref="Directory.EnumerateFileSystemEntries(string)" />, unsorted, so
+    /// the names come in the operating system's order as curl's <c>readdir</c> loop gives
+    /// them. Every exception <see cref="FileOpenFailure.IsOpenFailure(Exception)" /> names,
+    /// such as the <see cref="DirectoryNotFoundException" /> of a missing directory or the
+    /// <see cref="IOException" /> of a regular file, is reported as <see langword="null" />.
+    /// </remarks>
+    /// <exception cref="OperationCanceledException">
+    /// <paramref name="cancellationToken" /> was cancelled before the listing.
+    /// </exception>
+    public ValueTask<IReadOnlyList<string>?> ListEntryNamesAsync(string path, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            return ValueTask.FromResult<IReadOnlyList<string>?>(
+                Directory.EnumerateFileSystemEntries(path).Select(entry => Path.GetFileName(entry)).ToList());
+        }
+        catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
+        {
+            return ValueTask.FromResult<IReadOnlyList<string>?>(null);
+        }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
     /// Every exception <see cref="FileOpenFailure.IsOpenFailure(Exception)" /> names, such as
     /// the <see cref="FileNotFoundException" /> of a missing file, is reported as
     /// <see langword="false" />, with the error code
-    /// <see cref="FileOpenFailure.Win32ErrorCodeOf(Exception)" /> reads from it.
+    /// <see cref="FileOpenFailure.Win32ErrorCodeOf(Exception)" /> reads from it. A time
+    /// <see cref="DateTime" /> cannot hold, past year 9999 or before year 1, is set by
+    /// <see cref="NativeFileTimeSetter" /> with the operating system's own call.
     /// </remarks>
-    public bool TrySetLastWriteTimeUtc(string path, DateTimeOffset lastWriteTimeUtc, out int errorCode)
+    public bool TrySetLastWriteUnixSeconds(string path, long unixSeconds, out int errorCode)
     {
         try
         {
-            File.SetLastWriteTimeUtc(path, lastWriteTimeUtc.UtcDateTime);
+            if (unixSeconds is < MinimumDateTimeUnixSeconds or > MaximumDateTimeUnixSeconds)
+            {
+                return NativeFileTimeSetter.TrySetLastWriteUnixSeconds(path, unixSeconds, out errorCode);
+            }
+
+            File.SetLastWriteTimeUtc(path, DateTimeOffset.FromUnixTimeSeconds(unixSeconds).UtcDateTime);
         }
         catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
         {
@@ -210,10 +251,28 @@ public sealed class PhysicalFileSystem : IFileSystem, IFileTimeSetter
         }
         catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
         {
-            return FileOpenResult.Failed(FileOpenFailure.StatusFor(exception, Directory.Exists(path)), exception);
+            return FailedOpenOf(path, exception);
         }
 
         return FileOpenResult.Opened(stream, LengthOf(stream), LastWriteTimeUtcOf(stream));
+    }
+
+    /// <summary>
+    /// The result of an open that threw; for a directory it carries the directory's
+    /// last-write time, as curl's <c>fstat</c> of a directory records its modification
+    /// time, so a listing can write <c>Last-Modified</c> and apply <c>-z</c>.
+    /// </summary>
+    /// <param name="path">The operating-system path that failed to open.</param>
+    /// <param name="exception">The exception the open threw.</param>
+    /// <returns>The failed result.</returns>
+    private static FileOpenResult FailedOpenOf(string path, Exception exception)
+    {
+        bool isDirectory = Directory.Exists(path);
+        FileOpenResult failed = FileOpenResult.Failed(FileOpenFailure.StatusFor(exception, isDirectory), exception);
+
+        return failed.Status == FileAccessStatus.IsDirectory
+            ? failed with { LastWriteTimeUtc = new DateTimeOffset(Directory.GetLastWriteTimeUtc(path), TimeSpan.Zero) }
+            : failed;
     }
 
     /// <summary>

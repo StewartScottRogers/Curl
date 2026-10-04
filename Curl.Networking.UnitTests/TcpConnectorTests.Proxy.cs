@@ -115,6 +115,25 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenA407ContentLengthIsNotANumber_FailsWithWeirdServerReplyAfterItsLine()
+    {
+        // Measured (BL-1399): "HTTP/1.1 407 Proxy Auth\r\nContent-Length: abc\r\n\r\n" ->
+        // "< Content-Length: abc", "* Unsupported Content-Length value", exit 8.
+        var events = new RecordingTransferEvents();
+        var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 407 Proxy Auth\r\nContent-Length: abc\r\nX-After: 1\r\n\r\n"));
+        var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
+
+        var result = await connector.ConnectAsync(PlainTarget with { Events = events }, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual("Unsupported Content-Length value", result.ErrorMessage);
+        Assert.IsTrue(proxyConnection.IsDisposed);
+        CollectionAssert.AreEqual(
+            new[] { "< HTTP/1.1 407 Proxy Auth", "< Content-Length: abc", "* Unsupported Content-Length value" },
+            events.Transcript.SkipWhile(line => !line.StartsWith("< ", StringComparison.Ordinal)).ToArray());
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheReplyIsTooLarge_FailsWithRecvErrorAndDisposesTheConnection()
     {
         var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nX-Pad: " + new string('a', 16377)));

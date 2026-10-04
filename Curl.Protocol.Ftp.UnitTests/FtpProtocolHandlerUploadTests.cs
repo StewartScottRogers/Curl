@@ -283,24 +283,44 @@ public sealed class FtpProtocolHandlerUploadTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_DataConnectionResetMidUpload_FailsWithExit55ConnectionWasResetCountingTheBytesSent()
     {
-        // The first 16384-byte chunk is sent; the second write is reset.
-        string upload = new('x', 16384 + 12);
-        var data = new ScriptedConnection
-        {
-            WritesBeforeFailure = 1,
-            WriteFailure = new IOException("reset", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset)),
-        };
-        FtpRun run = await FtpRun.ExecuteAsync(
-            Url,
-            new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn + Passive + Opened + Complete + Bye)),
-            data,
-            c => new TransferContext { Url = c.Url, Output = c.Output, Upload = Seekable(upload) });
+        var data = ResettingDataConnection();
+        FtpRun run = await RunResetMidUploadAsync(data);
 
         Assert.AreEqual(16384, data.Sent.Length);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset", 16384), run.Result);
         Assert.IsTrue(data.IsDisposed);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_DataConnectionResetMidUploadOffWindows_FailsWithExit55AndTheErrorsOwnMessageCountingTheBytesSent()
+    {
+        var data = ResettingDataConnection();
+        FtpRun run = await RunResetMidUploadAsync(data);
+
+        string words = new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset).Message;
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + words, 16384), run.Result);
+        Assert.IsTrue(data.IsDisposed);
+    }
+
+    // The first 16384-byte chunk is sent; the second write is reset.
+    private static ScriptedConnection ResettingDataConnection() => new()
+    {
+        WritesBeforeFailure = 1,
+        WriteFailure = new IOException("reset", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset)),
+    };
+
+    private static Task<FtpRun> RunResetMidUploadAsync(ScriptedConnection data)
+    {
+        string upload = new('x', 16384 + 12);
+        return FtpRun.ExecuteAsync(
+            Url,
+            new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn + Passive + Opened + Complete + Bye)),
+            data,
+            c => new TransferContext { Url = c.Url, Output = c.Output, Upload = Seekable(upload) });
     }
 
     [TestMethod]

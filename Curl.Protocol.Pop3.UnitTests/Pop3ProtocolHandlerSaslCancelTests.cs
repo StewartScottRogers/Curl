@@ -224,6 +224,35 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         Assert.IsEmpty(sasl.Challenges.Single().Challenge);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_ExchangeCancelsWithAReason_ReportsItThenCancelsAndFallsBack()
+    {
+        const string Reason = "GSSAPI handshake failure (invalid security data)";
+        var sasl = new RankedSaslAuthenticator(("GSSAPI", [0x31], []));
+        sasl.CancelReasons["GSSAPI"] = Reason;
+
+        (TransferResult result, RecordingTransferEvents events, string sent, _) = await RunAsync(
+            Greeting + "+OK\r\nSASL GSSAPI\r\nUSER\r\n.\r\n+ \r\n+ YQ==\r\n" + Cancelled + "+OK User accepted\r\n+OK Logged in\r\n" + Retrieved, sasl);
+
+        Assert.AreEqual("CAPA\r\nAUTH GSSAPI\r\nMQ==\r\n*\r\nUSER user\r\nPASS secret\r\n" + RetrieveSent, sent);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(
+            (string[])["< + YQ==\r\n", "* " + Reason, "> *\r\n", "< " + Cancelled],
+            events.Transcript.SkipWhile(line => line != "< + YQ==\r\n").Take(4).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ExchangeGivesNoAnswerAndNoReason_FailsWithLoginDeniedWithoutCancelling()
+    {
+        var sasl = new RankedSaslAuthenticator(("GSSAPI", [0x31], []));
+
+        (TransferResult result, _, string sent, _) = await RunAsync(
+            Greeting + "+OK\r\nSASL GSSAPI\r\nUSER\r\n.\r\n+ \r\n+ YQ==\r\n", sasl);
+
+        Assert.AreEqual("CAPA\r\nAUTH GSSAPI\r\nMQ==\r\n", sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
+    }
+
     private static RankedSaslAuthenticator CramMd5() => new(("CRAM-MD5", null, [CramMd5Answer]));
 
     private static async Task<(TransferResult Result, RecordingTransferEvents Events, string Sent, RecordingDiagnosticLog Log)> RunAsync(

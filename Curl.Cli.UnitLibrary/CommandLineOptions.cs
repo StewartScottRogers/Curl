@@ -235,6 +235,16 @@ public sealed class CommandLineOptions
     /// </summary>
     public bool ReadsArgumentsAsUtf8 { get => globals.ReadsArgumentsAsUtf8; internal set => globals.ReadsArgumentsAsUtf8 = value; }
 
+    /// <summary>
+    /// <see langword="true"/> when the command line is read as curl's Windows Schannel build reads it: that
+    /// build's libcurl has no HTTP/2, HTTP/3, TLS-SRP or SSL session export, so <c>--http2</c>,
+    /// <c>--http2-prior-knowledge</c>, <c>--http3</c>, <c>--http3-only</c>, <c>--tlsuser</c>, <c>--tlspassword</c>,
+    /// <c>--tlsauthtype</c>, their three <c>--proxy-</c> forms and <c>--ssl-sessions</c> are refused with
+    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedBySchannelBuild"/>,
+    /// ADR-0397). Set by <see cref="CommandLineParser"/> for the platform it is asked to behave as.
+    /// </summary>
+    public bool ActsAsWindowsSchannelBuild { get => globals.ActsAsWindowsSchannelBuild; internal set => globals.ActsAsWindowsSchannelBuild = value; }
+
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
     public bool Silent { get => globals.Silent; internal set => globals.Silent = value; }
 
@@ -1241,6 +1251,14 @@ public sealed class CommandLineOptions
     /// after it: skip verification of an HTTPS proxy's certificate. <c>-k</c> never reaches the proxy.
     /// </summary>
     public bool ProxyInsecure { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--proxy-http2</c> was given and no <c>--no-proxy-http2</c> came after it:
+    /// offer <c>h2</c> to an <c>https://</c> proxy and tunnel over HTTP/2 when it picks it (curl's
+    /// <c>CURLPROXY_HTTPS2</c>, ADR-0408). It changes nothing with any other proxy type or no proxy. The
+    /// Windows Schannel build refuses both spellings, so it is only ever set off Windows.
+    /// </summary>
+    public bool ProxyHttp2 { get; internal set; }
 
     /// <summary>
     /// The <c>--proxy-cacert</c> file, verbatim, checked as <c>--cacert</c> is; <see langword="null"/> when

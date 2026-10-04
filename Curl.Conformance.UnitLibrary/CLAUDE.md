@@ -50,7 +50,9 @@ such an early end start the next request; `upgrade` ends a request with `Upgrade
 headers too. `SwsHttpServerConnection` carries out the rest (ADR-0042): each reply goes out in
 writes of up to 20 bytes (`SwsServerSend`), each readable when sws would write it, with
 `writedelay: N` ms after each and `<postcmd>` `wait N` seconds (`SwsPostReplyCommands`) after
-the last, timed on the `TimeProvider` given to the connector; `idle` answers nothing, and a read
+the last, timed on the `TimeProvider` given to the connector (a wait that wakes more than a
+second late, as after a stall on a busy runner, waits 250 ms more so curl's own overdue timers,
+such as `-m`, fire first; BL-1321); `idle` answers nothing, and a read
 then waits until cancelled; `stream` answers with `a string to stream 01234567890\n` without end
 and reads nothing more; `connection-monitor` records `[DISCONNECT]\n` in `ReceivedBytes`
 (`SwsServerRecording`, one flag for the server as in sws) when a connection that carried a
@@ -77,7 +79,11 @@ than `http`, `file` or `none`, a missing feature, a variable with no value, an u
 outside the case's log directory), writes `<client><file>` parts into
 the case's log directory, splits `<client><command>` with `UpstreamCommandLineSplitter` as
 the shell `runtests.pl` uses would, and runs curl through an `UpstreamCurlInvocation` against
-the `sws` emulation and `UnreachableDatagramConnector`, under a time limit from an injected
+the `sws` emulation and `UnreachableDatagramConnector`. The emulation's clock is the real one
+only when `CurlTimerOptions` finds a curl timer that races the server (`-m`, `-y`, `-Y`,
+`--connect-timeout`, `--expect100-timeout`); otherwise it is a `WaitSkippingTimeProvider`, which
+moves on by each wait at once, so `writedelay` and `<postcmd>` `wait` keep their order and take
+no real time (ADR-0404, BL-1355). The run is under a time limit from an injected
 `TimeProvider` (a run past it cannot be stopped, since curl's runner takes no cancellation
 token, so the case fails and the run is abandoned). `UpstreamCaseVerification` compares the `UpstreamCaseRun` against
 `<verify>` (protocol after `<strip>` / `<strippart>`, run as `UpstreamPerlSubstitution`s

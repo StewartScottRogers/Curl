@@ -123,7 +123,7 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
         Assert.IsNull(result.Report);
     }
 
-    // Not measurable on Windows (see FileTransferMessages.PseudoHeaderLines): without a
+    // Not measurable on Windows (see FileTransferMessages.PseudoHeaders): without a
     // timestamp the Last-Modified line is not written, so it is not reported either.
     [TestMethod]
     public async Task ExecuteAsync_UnknownTimestamp_ReportsTheTwoLinesWritten()

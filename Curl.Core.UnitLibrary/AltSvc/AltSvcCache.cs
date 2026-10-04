@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using AddedAlternative = Curl.Protocol.Abstractions.AltSvcAlternative;
 
 namespace Curl.Core.AltSvc;
 
@@ -84,7 +85,11 @@ public sealed class AltSvcCache(TimeProvider timeProvider, IDiagnosticLog? diagn
     /// <param name="sourceAlpn">The HTTP version the response came over.</param>
     /// <param name="sourceHost">The origin's host, an IPv6 address without brackets, as curl passes it.</param>
     /// <param name="sourcePort">The origin's port.</param>
-    public void ApplyHeader(string headerValue, AltSvcAlpn sourceAlpn, string sourceHost, int sourcePort)
+    /// <returns>
+    /// One outcome per alternative added, in header order, then the reason reading stopped when the
+    /// header's host, IPv6 literal or port was bad (ADR-0409); empty when neither.
+    /// </returns>
+    public IReadOnlyList<AltSvcHeaderOutcome> ApplyHeader(string headerValue, AltSvcAlpn sourceAlpn, string sourceHost, int sourcePort)
     {
         ArgumentNullException.ThrowIfNull(headerValue);
         ArgumentNullException.ThrowIfNull(sourceHost);
@@ -95,10 +100,26 @@ public sealed class AltSvcCache(TimeProvider timeProvider, IDiagnosticLog? diagn
             entries.RemoveAll(entry => entry.IsFor(sourceAlpn, sourceHost, sourcePort));
         }
 
-        long now = NowSeconds();
-        foreach (AltSvcAlternative alternative in header.Alternatives)
+        List<AltSvcHeaderOutcome> outcomes = AddAlternatives(header.Alternatives, sourceAlpn, sourceHost, sourcePort);
+        if (header.SkipReason is { } skipReason)
         {
-            Add(AltSvcEntry.Create(
+            outcomes.Add(AltSvcHeaderOutcome.Skipping(skipReason));
+        }
+
+        return outcomes;
+    }
+
+    /// <summary>
+    /// Adds an entry for each of <paramref name="alternatives" /> from the origin, expiring its
+    /// <c>ma</c> seconds from now, and returns one outcome per entry added.
+    /// </summary>
+    private List<AltSvcHeaderOutcome> AddAlternatives(IReadOnlyList<AltSvcAlternative> alternatives, AltSvcAlpn sourceAlpn, string sourceHost, int sourcePort)
+    {
+        List<AltSvcHeaderOutcome> outcomes = [];
+        long now = NowSeconds();
+        foreach (AltSvcAlternative alternative in alternatives)
+        {
+            AltSvcEntry? entry = AltSvcEntry.Create(
                 sourceAlpn,
                 sourceHost,
                 sourcePort,
@@ -106,8 +127,15 @@ public sealed class AltSvcCache(TimeProvider timeProvider, IDiagnosticLog? diagn
                 alternative.Host ?? sourceHost,
                 alternative.Port,
                 ExpiryAfter(now, alternative.MaxAgeSeconds),
-                alternative.Persist));
+                alternative.Persist);
+            if (entry is not null)
+            {
+                Add(entry);
+                outcomes.Add(AltSvcHeaderOutcome.Adding(new AddedAlternative(AltSvcAlpnToken.Format(entry.DestinationAlpn), entry.DestinationHost, entry.DestinationPort)));
+            }
         }
+
+        return outcomes;
     }
 
     /// <summary>
@@ -227,13 +255,10 @@ public sealed class AltSvcCache(TimeProvider timeProvider, IDiagnosticLog? diagn
     private static DateTimeOffset ExpiryAfter(long now, long maxAgeSeconds) =>
         DateTimeOffset.FromUnixTimeSeconds(maxAgeSeconds > LatestExpiry - now ? LatestExpiry : now + maxAgeSeconds);
 
-    private void Add(AltSvcEntry? entry)
+    private void Add(AltSvcEntry entry)
     {
-        if (entry is not null)
-        {
-            entries.Add(entry);
-            log.Stored(entry);
-        }
+        entries.Add(entry);
+        log.Stored(entry);
     }
 
     private long NowSeconds() => timeProvider.GetUtcNow().ToUnixTimeSeconds();

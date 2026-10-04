@@ -32,10 +32,11 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
     private const string UserAndPass = "USER user\r\nPASS secret\r\n";
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     [DataRow(0, "", 1, DisplayName = "CAPA")]
     [DataRow(1, Capa, 2, DisplayName = "USER")]
     [DataRow(3, Capa + UserAndPass, 4, DisplayName = "RETR")]
-    public async Task ExecuteAsync_WriteReset_FailsWithExit55SendFailureAndStops(int writesBeforeFailure, string sent, int reads)
+    public async Task ExecuteAsync_WriteResetOnWindows_FailsWithExit55WinsockWordsAndStops(int writesBeforeFailure, string sent, int reads)
     {
         ScriptedConnection connection = Conversation(writesBeforeFailure, Reset());
 
@@ -44,6 +45,42 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), result);
         Assert.AreEqual(sent, Encoding.Latin1.GetString(connection.Sent));
         Assert.AreEqual(reads, connection.ReadCount);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [DataRow(0, "", 1, DisplayName = "CAPA")]
+    [DataRow(1, Capa, 2, DisplayName = "USER")]
+    [DataRow(3, Capa + UserAndPass, 4, DisplayName = "RETR")]
+    public async Task ExecuteAsync_WriteResetOffWindows_FailsWithExit55StrerrorWordsAndStops(int writesBeforeFailure, string sent, int reads)
+    {
+        ScriptedConnection connection = Conversation(writesBeforeFailure, Reset());
+
+        TransferResult result = await ExecuteAsync(connection, new RecordingTransferEvents());
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + ResetMessage()), result);
+        Assert.AreEqual(sent, Encoding.Latin1.GetString(connection.Sent));
+        Assert.AreEqual(reads, connection.ReadCount);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_WriteAbortedOnWindows_FailsWithExit55ConnectionWasAborted()
+    {
+        TransferResult result = await ExecuteAsync(Conversation(1, Aborted()), new RecordingTransferEvents());
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was aborted"), result);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_WriteAbortedOffWindows_FailsWithExit55TheSocketErrorsOwnMessage()
+    {
+        TransferResult result = await ExecuteAsync(Conversation(1, Aborted()), new RecordingTransferEvents());
+
+        Assert.AreEqual(
+            TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + new SocketException((int)SocketError.ConnectionAborted).Message),
+            result);
     }
 
     [TestMethod]
@@ -62,7 +99,8 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_RetrWriteReset_ReportsTheFailureAndClosesTheConnection()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_RetrWriteResetOnWindows_ReportsTheFailureAndClosesTheConnection()
     {
         var events = new RecordingTransferEvents();
 
@@ -70,6 +108,20 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
 
         CollectionAssert.AreEqual(
             (string[])["* Send failure: Connection was reset", "* closing connection #0"],
+            events.Transcript[^2..]);
+        Assert.AreEqual("> PASS secret\r\n", events.Transcript[^4]);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_RetrWriteResetOffWindows_ReportsTheFailureAndClosesTheConnection()
+    {
+        var events = new RecordingTransferEvents();
+
+        await ExecuteAsync(Conversation(3, Reset()), events);
+
+        CollectionAssert.AreEqual(
+            (string[])["* Send failure: " + ResetMessage(), "* closing connection #0"],
             events.Transcript[^2..]);
         Assert.AreEqual("> PASS secret\r\n", events.Transcript[^4]);
     }
@@ -109,6 +161,11 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
 
     private static IOException Reset() =>
         new("Unable to write data to the transport connection.", new SocketException((int)SocketError.ConnectionReset));
+
+    private static string ResetMessage() => new SocketException((int)SocketError.ConnectionReset).Message;
+
+    private static IOException Aborted() =>
+        new("Unable to write data to the transport connection.", new SocketException((int)SocketError.ConnectionAborted));
 
     /// <summary>A whole USER/PASS retrieval, one response per read, whose writes fail from the given one on.</summary>
     private static ScriptedConnection Conversation(int writesBeforeFailure, Exception failure) =>

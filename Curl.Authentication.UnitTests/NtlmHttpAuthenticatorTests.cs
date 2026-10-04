@@ -275,6 +275,14 @@ public sealed partial class NtlmHttpAuthenticatorTests
     }
 
     [TestMethod]
+    public void ContextRequestFor_NoCredential_AsksForTheDefaultCredentials()
+    {
+        SecurityContextRequest request = NtlmHttpAuthenticator.ContextRequestFor(Request("u:p") with { Credential = null });
+
+        Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1"), request);
+    }
+
+    [TestMethod]
     public void ContextRequestFor_CredentialWithItsOwnDomain_KeepsIt()
     {
         HttpAuthRequest request = Request("u:p") with { Credential = new NetworkCredential("u", "p", "CORP"), Url = CurlUrl.Parse("http://[::1]:18526/x") };

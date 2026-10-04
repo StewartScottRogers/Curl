@@ -347,7 +347,7 @@ public sealed class TelnetProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_UploadSendIsReset_ExitsWith55SendFailure()
+    public async Task ExecuteAsync_UploadSendFailsWithoutSocketError_ExitsWith55FailedSendingDataToThePeer()
     {
         var connection = new FaultingConnection(Hex("68 69")) { WritesFail = true };
         var output = new MemoryStream();
@@ -356,12 +356,12 @@ public sealed class TelnetProtocolHandlerTests
             .ExecuteAsync(new TransferContext { Url = TelnetUrl, Output = output, Upload = new MemoryStream("a\n"u8.ToArray()) });
 
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
-        Assert.AreEqual("Send failure: Connection was reset", result.ErrorMessage);
+        Assert.AreEqual("Failed sending data to the peer", result.ErrorMessage);
         Assert.IsTrue(connection.IsDisposed);
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_NegotiationReplySendIsReset_ExitsWith55SendFailure()
+    public async Task ExecuteAsync_NegotiationReplySendFailsWithoutSocketError_ExitsWith55FailedSendingDataToThePeer()
     {
         var connection = new FaultingConnection(Hex("68 69 FF FB 01")) { WritesFail = true };
         var output = new MemoryStream();
@@ -369,7 +369,7 @@ public sealed class TelnetProtocolHandlerTests
         TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
             .ExecuteAsync(new TransferContext { Url = TelnetUrl, Output = output });
 
-        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 2, "Send failure: Connection was reset"), result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 2, "Failed sending data to the peer"), result);
         Assert.AreEqual("68 69", ToHex(output.ToArray()));
     }
 

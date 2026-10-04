@@ -148,6 +148,13 @@ public sealed record HttpRequestOptions
     public bool IgnoreContentLength { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>--http0.9</c> was given: accept an HTTP/0.9
+    /// response, one with no status line or headers, as a body read to close instead of
+    /// failing with exit 1.
+    /// </summary>
+    public bool AllowHttp09Reply { get; init; }
+
+    /// <summary>
     /// Gets the request line's target from <c>--request-target</c>, verbatim, or
     /// <see langword="null" /> to derive it from <see cref="ITransferContext.Url" />.
     /// </summary>
@@ -212,13 +219,35 @@ public sealed record HttpRequestOptions
     /// <remarks>
     /// Set for an <c>--alt-svc</c> entry that names the origin itself with <c>h2</c> or <c>h1</c>, which
     /// curl 8.21.0 makes the preferred first attempt (<c>cf_hc_get_pref_alpn</c>, BL-948). Any other
-    /// version ignores it.
+    /// version ignores it. It is <see langword="true" /> exactly when <see cref="TcpFirstAttemptVersion" /> is set.
     /// </remarks>
-    public bool TriesTcpBeforeQuic { get; init; }
+    public bool TriesTcpBeforeQuic => TcpFirstAttemptVersion is not null;
+
+    /// <summary>
+    /// Gets the HTTP version, <c>h2</c> or <c>h1</c>, of the <c>--alt-svc</c> entry naming the origin
+    /// itself that makes TCP the first attempt of a <see cref="HttpVersionPreference.Http3" /> transfer
+    /// (<see cref="TriesTcpBeforeQuic" />), or <see langword="null" />, the default, to start with QUIC.
+    /// </summary>
+    /// <remarks>
+    /// The handler puts it on the <see cref="ConnectTarget" /> of the race, where the connector names it in
+    /// curl 8.22.0's <c>[HTTPS-CONNECT] 1st attempt uses &lt;version&gt; from preferred version</c> line
+    /// (measured, BL-1320 Notes).
+    /// </remarks>
+    public string? TcpFirstAttemptVersion { get; init; }
 
     /// <summary>
     /// Gets the store each <c>Alt-Svc</c> header of an HTTPS response is handed to
     /// (<c>--alt-svc</c>), or <see langword="null" />, the default, to learn none.
     /// </summary>
     public IAltSvcStore? AltSvcStore { get; init; }
+
+    /// <summary>
+    /// Gets the store each <c>Strict-Transport-Security</c> header of an HTTPS response is handed to
+    /// as it is read (<c>--hsts</c>, ADR-0409), or <see langword="null" />, the default, to learn none.
+    /// </summary>
+    /// <remarks>
+    /// The seam only so far: no handler reads it until BL-1420 wires the HTTP handler and
+    /// <c>Curl.Console</c> to it.
+    /// </remarks>
+    public IHstsStore? HstsStore { get; init; }
 }

@@ -37,8 +37,11 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
     /// <param name="progress">Told the bytes written so far after each line.</param>
     /// <param name="cancellationToken">Cancels the listing.</param>
     /// <param name="quotes">The <c>-Q</c> commands, run after <c>REALPATH</c> and after the handle's close; none when not given.</param>
+    /// <param name="maxFileSize">The <c>--max-filesize</c> limit; no limit when not given or 0 (BL-1389).</param>
     /// <returns>
-    /// Success with the bytes written; the <c>READDIR</c> status's exit code and <c>Could not
+    /// Success with the bytes written; exit 63, <c>Exceeded the maximum allowed file size (N)
+    /// with N bytes</c>, when a line would pass <paramref name="maxFileSize" />, after writing
+    /// the bytes under it; the <c>READDIR</c> status's exit code and <c>Could not
     /// open remote file for reading: &lt;description&gt; :: -31</c> when a <c>READDIR</c>
     /// fails; exit 27, <c>Out of memory</c>, when a <c>READLINK</c> does; exit 79, <c>Error
     /// in the SSH layer</c>, when the connection breaks during the listing - each with the
@@ -56,7 +59,8 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
         Stream output,
         ITransferProgress progress,
         CancellationToken cancellationToken,
-        SftpQuoteCommands? quotes = null)
+        SftpQuoteCommands? quotes = null,
+        long? maxFileSize = null)
     {
         quotes ??= SftpQuoteCommands.None;
         Trace.Enter("SSH_SFTP_INIT");
@@ -92,7 +96,7 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
                 Trace.Enter("SSH_SFTP_READDIR_INIT");
                 byte[] handle = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
                     () => session.OpenDirectoryAsync(directory, cancellationToken)).ConfigureAwait(false);
-                Listing listing = new(session, handle, directory, listOnly, output, progress, Trace);
+                Listing listing = new(session, handle, directory, listOnly, new DownloadSizeLimit(maxFileSize), output, progress, Trace);
                 TransferResult result = await listing.RunAsync(cancellationToken).ConfigureAwait(false);
                 if (result.IsSuccess)
                 {
@@ -122,8 +126,10 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
         return end < 0 ? bytes : bytes.AsSpan(0, end);
     }
 
-    // One listing of the directory to the output, counting the bytes as they go.
-    private sealed class Listing(SftpSession session, byte[] handle, byte[] directory, bool listOnly, Stream output, ITransferProgress progress, SshStateTrace trace)
+    // One listing of the directory to the output, counting the bytes as they go; a line that
+    // would pass the --max-filesize limit is cut at it, as curl 8.21.0's cw_download_write
+    // cuts every body write, and the listing fails with exit 63 (BL-1389).
+    private sealed class Listing(SftpSession session, byte[] handle, byte[] directory, bool listOnly, DownloadSizeLimit maxFileSize, Stream output, ITransferProgress progress, SshStateTrace trace)
     {
         private long written;
 
@@ -131,8 +137,7 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
         {
             try
             {
-                await ListUntilEndAsync(cancellationToken).ConfigureAwait(false);
-                return TransferResult.Success(written);
+                return await ListUntilEndAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception exception) when (SshConnectionFailure.Is(exception))
             {
@@ -146,7 +151,7 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
 
         private TransferResult Failure(SshTransferException failure) => TransferResult.Failure(failure.ExitCode, failure.Message, written);
 
-        private async ValueTask ListUntilEndAsync(CancellationToken cancellationToken)
+        private async ValueTask<TransferResult> ListUntilEndAsync(CancellationToken cancellationToken)
         {
             trace.Enter("SSH_SFTP_READDIR");
             IReadOnlyList<SftpDirectoryEntry> entries;
@@ -155,12 +160,20 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
                 foreach (SftpDirectoryEntry entry in entries)
                 {
                     byte[] line = await LineForAsync(entry, cancellationToken).ConfigureAwait(false);
-                    await output.WriteAsync(line, cancellationToken).ConfigureAwait(false);
-                    written += line.Length;
+                    int allowed = maxFileSize.AllowedOf(written, line.Length);
+                    await output.WriteAsync(line.AsMemory(0, allowed), cancellationToken).ConfigureAwait(false);
+                    written += allowed;
                     progress.ReportDownloaded(written, null);
+                    if (allowed < line.Length)
+                    {
+                        return maxFileSize.Exceeded(written);
+                    }
+
                     TraceLineWritten();
                 }
             }
+
+            return TransferResult.Success(written);
         }
 
         // Measured (BL-1204): curl writes a -l name from SSH_SFTP_READDIR itself, and ends a

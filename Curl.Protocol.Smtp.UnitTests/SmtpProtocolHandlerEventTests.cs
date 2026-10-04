@@ -95,6 +95,56 @@ public sealed class SmtpProtocolHandlerEventTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_MessageRefusedAfterData_WritesNoFailureLineAndLeavesTheConnectionIntact()
+    {
+        // curl 8.21.0 -sv, DATADONE=554 rejected, "hi\r\n" on stdin: exit 8, -v ends with
+        // "< 554 rejected" then "Connection #0 ... left intact"; QUIT follows (BL-1297). curl
+        // read stdin, so its mark went out as data of its own; a seekable upload sends one piece.
+        RecordingTransferEvents events = new();
+
+        SmtpRun run = await RunAsync(Greeting + EhloReply + Ok + Ok + StartData + "554 rejected\r\n" + Bye, events, "hi\r\n");
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, run.Result.ExitCode);
+        Assert.AreEqual("Weird server reply", run.Result.ErrorMessage);
+        CollectionAssert.AreEqual(
+            (string[])[
+                "} 7",
+                "* upload completely sent off: 7 bytes",
+                "< 554 rejected\r\n",
+                "* Connection #0 to host 127.0.0.1:18025 left intact",
+            ],
+            events.Transcript.TakeLast(4).ToArray());
+        CollectionAssert.DoesNotContain(events.Transcript.ToArray(), "* Weird server reply");
+        StringAssert.EndsWith(run.Sent, "QUIT\r\n");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MailFromRefused_StillWritesTheFailureAndShutsTheConnectionDown()
+    {
+        RecordingTransferEvents events = new();
+
+        SmtpRun run = await RunAsync(Greeting + EhloReply + "552 too big\r\n" + Bye, events, "hi\r\n");
+
+        Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        CollectionAssert.AreEqual(
+            (string[])["< 552 too big\r\n", "* MAIL failed: 552", "* shutting down connection #0"],
+            events.Transcript.TakeLast(3).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MessageReplyHoldsANulByte_StillWritesItsOwnFailureLine()
+    {
+        RecordingTransferEvents events = new();
+
+        SmtpRun run = await RunAsync(Greeting + EhloReply + Ok + Ok + StartData + "554 re\0jected\r\n" + Bye, events, "hi\r\n");
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, run.Result.ExitCode);
+        CollectionAssert.AreEqual(
+            (string[])["* upload completely sent off: 7 bytes", "* Nul byte in server response line", "* closing connection #0"],
+            events.Transcript.TakeLast(3).ToArray());
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Verify_ReportsTheReplyWrittenToTheOutputAsDataReceived()
     {
         RecordingTransferEvents events = new();

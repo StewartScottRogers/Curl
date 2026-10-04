@@ -181,16 +181,38 @@ public sealed class RtspProtocolHandlerVerboseTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SendReset_ReportsTheRequestTheMessageFailedSendingRtspRequestAndClosing()
+    [OSCondition(OperatingSystems.Windows)]
+    [DataRow(SocketError.ConnectionReset, "Send failure: Connection was reset")]
+    [DataRow(SocketError.ConnectionAborted, "Send failure: Connection was aborted")]
+    public async Task ExecuteAsync_SendSocketError_ReportsTheRequestTheWinsockWordsFailedSendingRtspRequestAndClosing(SocketError error, string message)
     {
-        var reset = new IOException("reset", new SocketException((int)SocketError.ConnectionReset));
+        var failure = new IOException("send", new SocketException((int)error));
 
-        (TransferResult result, List<string> transcript) = await RunAsync(ConnectResult.Connected(new FailingConnection(writeFailure: reset)));
+        (TransferResult result, List<string> transcript) = await RunAsync(ConnectResult.Connected(new FailingConnection(writeFailure: failure)));
 
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
-        Assert.AreEqual("Send failure: Connection was reset", result.ErrorMessage);
+        Assert.AreEqual(message, result.ErrorMessage);
         CollectionAssert.AreEqual(
-            new[] { "> " + Request, "* Send failure: Connection was reset", "* Failed sending RTSP request", "* closing connection #0" },
+            new[] { "> " + Request, "* " + message, "* Failed sending RTSP request", "* closing connection #0" },
+            transcript);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [DataRow(SocketError.ConnectionReset)]
+    [DataRow(SocketError.ConnectionAborted)]
+    public async Task ExecuteAsync_SendSocketError_ReportsTheRequestTheSocketErrorsOwnMessageFailedSendingRtspRequestAndClosing(SocketError error)
+    {
+        var socketError = new SocketException((int)error);
+        string message = "Send failure: " + socketError.Message;
+
+        (TransferResult result, List<string> transcript) = await RunAsync(
+            ConnectResult.Connected(new FailingConnection(writeFailure: new IOException("send", socketError))));
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+        CollectionAssert.AreEqual(
+            new[] { "> " + Request, "* " + message, "* Failed sending RTSP request", "* closing connection #0" },
             transcript);
     }
 

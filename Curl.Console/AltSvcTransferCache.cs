@@ -114,29 +114,20 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
         HttpVersionPreference version = HttpVersionMapping.ToHttpVersionPreference(requestedVersion);
         return MatchFor(url) switch
         {
-            null => http with { AltSvcRoute = null, Version = version, TriesTcpBeforeQuic = false },
+            null => http with { AltSvcRoute = null, Version = version, TcpFirstAttemptVersion = null },
             { IsSameDestination: true } same => http with
             {
                 AltSvcRoute = null,
                 Version = SameDestinationVersion(same.Entry.DestinationAlpn, version),
-                TriesTcpBeforeQuic = same.Entry.DestinationAlpn != AltSvcAlpn.H3,
+                TcpFirstAttemptVersion = TcpFirstAttemptVersionOf(same.Entry.DestinationAlpn),
             },
-            { } other => http with { AltSvcRoute = RouteTo(other), Version = SwitchedVersion(other, version), TriesTcpBeforeQuic = false },
+            { } other => http with { AltSvcRoute = RouteTo(other), Version = SwitchedVersion(other, version), TcpFirstAttemptVersion = null },
         };
     }
 
     /// <inheritdoc />
-    public IReadOnlyList<AltSvcAlternative> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now)
-    {
-        HashSet<AltSvcEntry> held = new(cache.Entries, ReferenceEqualityComparer.Instance);
+    public IReadOnlyList<AltSvcHeaderOutcome> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now) =>
         cache.ApplyHeader(altSvcHeader, SourceAlpnOf(responseVersion), origin.IdnHost, origin.Port);
-        return
-        [
-            .. cache.Entries
-                .Where(entry => !held.Contains(entry))
-                .Select(entry => new AltSvcAlternative(AltSvcAlpnToken.Format(entry.DestinationAlpn), entry.DestinationHost, entry.DestinationPort)),
-        ];
-    }
 
     /// <summary>
     /// The source ALPN a header is learned under, from the version its response came over, as curl 8.21.0's
@@ -236,6 +227,18 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// </summary>
     private HttpVersionPreference SameDestinationVersion(AltSvcAlpn destination, HttpVersionPreference version) =>
         destination == AltSvcAlpn.H3 && requestedVersion is null ? HttpVersionPreference.Http3 : version;
+
+    /// <summary>
+    /// The version a TCP attempt that goes before QUIC names for an entry naming the origin itself:
+    /// <c>h2</c> or <c>h1</c>, and <see langword="null" /> for <c>h3</c>, which leaves QUIC first.
+    /// </summary>
+    private static string? TcpFirstAttemptVersionOf(AltSvcAlpn destination) =>
+        destination switch
+        {
+            AltSvcAlpn.H2 => "h2",
+            AltSvcAlpn.H1 => "h1",
+            _ => null,
+        };
 
     /// <summary>
     /// The version a connection to another host or port uses: <paramref name="version" /> when the entry

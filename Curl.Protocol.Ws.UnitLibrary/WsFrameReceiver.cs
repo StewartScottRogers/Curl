@@ -1,3 +1,4 @@
+using System.Globalization;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Ws;
@@ -24,14 +25,22 @@ namespace Curl.Protocol.Ws;
 /// Receives curl's <c>--trace-config ws</c> lines for each frame decoded and each pong sent
 /// (<see cref="WsFrameTrace" />, BL-1164); <see langword="null" /> writes none.
 /// </param>
+/// <param name="maxFileSize">
+/// <c>--max-filesize</c>: how many frame bytes, heads included, may be decoded before the
+/// transfer fails with exit 63; <see langword="null" /> or 0 is no limit (BL-1294).
+/// </param>
 /// <remarks>
 /// Measured against curl 8.21.0 (BL-581): a close frame is neither answered nor the end, so
 /// reading goes on until the connection closes; every ping answered is echoed in one pong,
 /// but when several pings complete in the bytes of one read only the last is answered, as
 /// curl replaces a pong it has not yet sent. A protocol violation fails with 56 after the
 /// payload decoded before it has been handed on, and no pong is sent for that read.
+/// <c>--max-filesize</c> counts the raw frame bytes, as curl 8.21.0's download writer runs
+/// before its WebSocket decoder: a read that would pass the limit is cut to the bytes under it,
+/// those are decoded and their payload handed on, and the transfer fails with exit 63 and no
+/// pong; a read that reaches the limit exactly does not fail (BL-1294).
 /// </remarks>
-internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSource randomSource, ITransferProgress progress, ITransferEvents events, IDiagnosticLog? diagnosticLog = null, WsFrameTrace? trace = null)
+internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSource randomSource, ITransferProgress progress, ITransferEvents events, IDiagnosticLog? diagnosticLog = null, WsFrameTrace? trace = null, long? maxFileSize = null)
 {
     private const int ReadBufferSize = 16384;
 
@@ -63,7 +72,8 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
     /// <param name="cancellationToken">Cancels the writes and any pong.</param>
     /// <returns>A task that completes once the bytes are decoded.</returns>
     /// <exception cref="WsTransferException">
-    /// A frame broke the protocol (56) or a pong could not be sent (55).
+    /// A frame broke the protocol (56), the bytes passed <c>--max-filesize</c> (63) or a pong
+    /// could not be sent (55).
     /// </exception>
     internal ValueTask DeliverAlreadyReceivedAsync(
         ReadOnlyMemory<byte> alreadyReceived,
@@ -76,7 +86,8 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
     /// <param name="cancellationToken">Cancels the reads and writes.</param>
     /// <returns>A task that completes once the server has closed the connection.</returns>
     /// <exception cref="WsTransferException">
-    /// A frame broke the protocol (56), a read failed (56) or a pong could not be sent (55).
+    /// A frame broke the protocol (56), a read failed (56), the bytes passed <c>--max-filesize</c>
+    /// (63) or a pong could not be sent (55).
     /// </exception>
     internal async ValueTask ReceiveUntilClosedAsync(
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload,
@@ -106,14 +117,25 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
             events.ReportDataReceived(received.Span);
         }
 
-        BytesReceived += received.Length;
+        int allowed = LengthUnderMaxFileSize(received.Length);
+        BytesReceived += allowed;
         progress.ReportDownloaded(BytesReceived, null);
-        await DeliverAsync(decoder.Decode(received.Span), writePayload, cancellationToken).ConfigureAwait(false);
+        await DeliverAsync(decoder.Decode(received.Span[..allowed]), writePayload, isCut: allowed < received.Length, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Gives how many of the <paramref name="length" /> bytes just received stay under
+    /// <c>--max-filesize</c>, as curl 8.21.0's <c>cw_download_write</c> cuts a write.
+    /// </summary>
+    private int LengthUnderMaxFileSize(int length) =>
+        maxFileSize is { } limit && limit > 0
+            ? (int)Math.Min(length, limit - BytesReceived)
+            : length;
 
     private async ValueTask DeliverAsync(
         WsDecodedBytes decoded,
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload,
+        bool isCut,
         CancellationToken cancellationToken)
     {
         if (decoded.Payload.Length > 0)
@@ -125,6 +147,13 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
         if (decoded.Failure is { } failure)
         {
             throw failure;
+        }
+
+        if (isCut)
+        {
+            throw new WsTransferException(
+                CurlExitCode.FilesizeExceeded,
+                string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({maxFileSize}) with {BytesReceived} bytes"));
         }
 
         if (decoded.LastPing is { } ping)

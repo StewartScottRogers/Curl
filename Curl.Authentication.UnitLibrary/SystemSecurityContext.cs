@@ -50,14 +50,26 @@ internal sealed class SystemSecurityContext(NegotiateAuthenticationClientOptions
     private NegotiateAuthentication Established() =>
         IsCompleted ? authentication! : throw new InvalidOperationException("The security context is not established.");
 
+    /// <summary>Gets the step the BCL's answer to one <c>GetOutgoingBlob</c> comes to.</summary>
+    /// <param name="code">The status the BCL answered.</param>
+    /// <param name="token">The token the BCL answered, <see langword="null" /> when it has none.</param>
+    /// <returns>
+    /// The mapped status, carrying <paramref name="token" /> (empty for none) only when the
+    /// handshake goes on or completes, and an empty token for any failure.
+    /// </returns>
+    internal static SecurityContextStep StepOf(NegotiateAuthenticationStatusCode code, byte[]? token)
+    {
+        SecurityContextStatus status = NegotiateAuthenticationStatusMapping.StatusOf(code);
+        return new SecurityContextStep(status, status is SecurityContextStatus.ContinueNeeded or SecurityContextStatus.Completed ? token ?? [] : []);
+    }
+
     private SecurityContextStep Step(ReadOnlySpan<byte> incomingToken)
     {
         try
         {
             authentication ??= new NegotiateAuthentication(options);
             byte[]? token = authentication.GetOutgoingBlob(incomingToken, out NegotiateAuthenticationStatusCode code);
-            SecurityContextStatus status = NegotiateAuthenticationStatusMapping.StatusOf(code);
-            return new SecurityContextStep(status, status is SecurityContextStatus.ContinueNeeded or SecurityContextStatus.Completed ? token ?? [] : []);
+            return StepOf(code, token);
         }
         catch (Win32Exception)
         {

@@ -131,6 +131,21 @@ internal static class TftpPackets
     }
 
     /// <summary>
+    /// Builds the bare ERROR packet curl 8.21.0 sends when its download writer stops a
+    /// download (<c>tftp_rx</c>'s <c>TFTP_EVENT_ERROR</c>): the opcode and, in the error-code
+    /// field, the last block acknowledged, with no message and no NUL.
+    /// </summary>
+    /// <param name="lastAcknowledgedBlock">The last block acknowledged; 0 when only an OACK was.</param>
+    /// <returns>The four-byte datagram.</returns>
+    internal static byte[] BuildAbandonment(ushort lastAcknowledgedBlock)
+    {
+        var packet = new byte[4];
+        BinaryPrimitives.WriteUInt16BigEndian(packet, ErrorOpcode);
+        BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(2), lastAcknowledgedBlock);
+        return packet;
+    }
+
+    /// <summary>
     /// Reads the 16-bit big-endian field at <paramref name="offset" />: the opcode at 0,
     /// the block number or error code at 2.
     /// </summary>

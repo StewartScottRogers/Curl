@@ -76,6 +76,13 @@
     rather than a FIN. Use it to measure what curl prints when the server resets the
     connection, as during a TLS handshake (BL-369). request.bin is then empty.
 
+.PARAMETER ResetAfterResponse
+    After sending each response (and after HoldOpenMilliseconds, when given), close the
+    connection with a zero linger time, so Windows sends a TCP RST rather than a FIN and
+    curl's next write fails with a connection reset at once. Use it to measure what curl
+    prints when a write fails after the server has spoken, as for a telnet negotiation
+    reply (BL-1312). Default off: close with a FIN.
+
 .PARAMETER HoldOpenMilliseconds
     After sending each response, keep the connection open instead of closing it, until
     curl closes its end or this many milliseconds pass without a byte from curl, and
@@ -433,6 +440,42 @@
     by the base64 SHA-256 of that SubjectPublicKeyInfo, the hash --pinnedpubkey sha256//
     names. The files are left for the caller to delete.
 
+.PARAMETER Http2
+    With -Tls, stand in for an HTTPS proxy that picks h2 by ALPN (BL-1413, ADR-0408), so
+    curl's --proxy-http2 tunnel can be measured. It serves one connection: TLS 1.2 with the
+    throwaway certificate, the protocol ProxyAlpn names chosen by ALPN, then HTTP/2 framing -
+    the connection preface, an empty SETTINGS, SETTINGS and PING acknowledged, and curl's
+    HEADERS (and CONTINUATION) decoded with HPACK, Huffman strings included. The first
+    request is answered with a HEADERS frame holding ":status: <ProxyStatus>" as an HPACK
+    literal without indexing. A 2xx answer to a CONNECT opens the tunnel: once the DATA curl
+    sends through it holds a blank line, the first Response is sent back as one DATA frame
+    that ends the stream. Any other status, or a request that is not a CONNECT (curl
+    forwards a plain http:// URL as a GET unless given -p), is answered with
+    "content-length: 0" and ends the stream. The session ends when curl sends GOAWAY, hangs
+    up, or is silent for five seconds.
+
+    request.bin then holds the decrypted bytes curl sent (the preface and every frame), and
+    transcript.txt one line per frame: "> " for curl's, "< " for the recorder's, e.g.
+    "> HEADERS stream 1 flags 0x04" followed by ">   :method: CONNECT" and one such line per
+    decoded header field, "> SETTINGS 3=100 4=10485760 2=0" or "> DATA stream 1 flags 0x00
+    76 bytes: GET / HTTP/1.1\r\n...". With ProxyAlpn http/1.1 the lines are curl's CONNECT
+    request and the tunnelled request, and the replies. Needs -Tls; combining it with -Ftp,
+    -Smtp, -Imap, -Pop3, -Script, -NoServer, -UnixSocket or -Tftp is refused. Needs
+    PowerShell 7 (pwsh), since Windows PowerShell 5.1's .NET Framework cannot choose a
+    protocol by ALPN as a TLS server; HPACK's Huffman strings are decoded by .NET's own
+    internal decoder, found by reflection.
+
+.PARAMETER ProxyStatus
+    With -Http2, the status the proxy answers curl's first request with: a 2xx opens a
+    CONNECT tunnel, anything else refuses it. Default 200. With ProxyAlpn http/1.1 the
+    status line's reason phrase is "Connection established" for 200, "Proxy Authentication
+    Required" for 407, and "Status" otherwise.
+
+.PARAMETER ProxyAlpn
+    With -Http2, the one protocol the proxy accepts by ALPN: h2 (the default) or http/1.1,
+    to measure curl falling back to an HTTP/1.1 CONNECT when the proxy will not speak
+    HTTP/2.
+
 .PARAMETER FtpIdleMilliseconds
     How long, in -Ftp mode, the server waits for curl's next command before it hangs up.
     Default 5000. Raise it to measure a wait longer than five seconds, such as curl's
@@ -553,6 +596,14 @@
     Runs the steps in ldap-bind-search.txt (the example under .PARAMETER Script);
     request.bin then holds curl's BindRequest and SearchRequest, and transcript.txt both
     directions as hex.
+
+.EXAMPLE
+    pwsh -File .\Record-CurlExchange.ps1 -Tls -Http2 -ProxyStatus 200 -Port 18443 -ListenAddress 172.26.96.1 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello' -Curl wsl.exe -CurlArgs '-d','Ubuntu','--','curl','-v','--proxy-insecure','--proxy-http2','-p','-x','https://172.26.96.1:18443','http://example.test/' -OutDirectory fixtures\h2-proxy-tunnel
+
+    Stands in for an HTTP/2 HTTPS proxy on the Windows host's WSL address for Linux curl;
+    transcript.txt shows the CONNECT stream's decoded ":method: CONNECT" and ":authority:
+    example.test:80", the 200, and the GET curl sent through the tunnel, and stdout.bin
+    holds hello.
 #>
 [CmdletBinding()]
 param(
@@ -563,6 +614,7 @@ param(
     [ValidateRange(1, 1000)] [int] $Connections = 1,
     [ValidateRange(0, 600000)] [int] $ResponseDelayMilliseconds = 0,
     [switch] $Reset,
+    [switch] $ResetAfterResponse,
     [ValidateRange(0, 600000)] [int] $HoldOpenMilliseconds = 0,
     [ValidateRange(0, 1000)] [int] $AnswerHeldRequests = 0,
     [ValidateRange(-1, [int]::MaxValue)] [int] $RespondAfterBodyBytes = -1,
@@ -597,6 +649,9 @@ param(
     [string] $TlsEmptyCrlFile,
     [string] $TlsRevokingCrlFile,
     [string] $TlsPublicKeyFile,
+    [switch] $Http2,
+    [ValidateRange(100, 999)] [int] $ProxyStatus = 200,
+    [ValidateSet('h2', 'http/1.1')] [string] $ProxyAlpn = 'h2',
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
     [switch] $NoServer,
@@ -624,6 +679,9 @@ if (-not $NoServer -and -not $UnixSocket -and $Port -eq 0) { throw '-Port is req
 if ($UdpSink -and $Port -eq 0) { throw '-UdpSink binds UDP on -Port, so -Port is required with it.' }
 if ($Tftp -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls -or $NoServer -or $UnixSocket -or $UdpSink)) { throw '-Tftp serves one TFTP transfer on UDP -Port, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script, -Tls, -NoServer, -UnixSocket or -UdpSink.' }
 if (@($DnsSilentPort | Where-Object { $DnsPort -notcontains $_ }).Count -gt 0) { throw '-DnsSilentPort names a port -DnsPort does not; give each silent port in -DnsPort too.' }
+if ($Http2 -and -not $Tls) { throw '-Http2 is an HTTPS proxy that picks h2 by ALPN, so it needs -Tls.' }
+if ($Http2 -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $NoServer -or $UnixSocket -or $Tftp)) { throw '-Http2 serves one HTTPS proxy connection, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script, -NoServer, -UnixSocket or -Tftp.' }
+if ($Http2 -and $PSVersionTable.PSVersion.Major -lt 7) { throw '-Http2 needs PowerShell 7 (pwsh): Windows PowerShell 5.1''s .NET Framework cannot pick a protocol by ALPN as a TLS server.' }
 
 function Get-ReferenceCurlPath {
     $git = Get-Command git.exe -ErrorAction SilentlyContinue
@@ -697,7 +755,7 @@ function ConvertTo-CommandLineArgument {
 # The server runs in its own runspace so curl can run in this one. It returns one
 # byte array per connection served.
 $serveConnections = {
-    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen, [bool] $CloseNotify, [int] $AnswerHeld)
+    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen, [bool] $CloseNotify, [int] $AnswerHeld, [bool] $ResetAfterAnswer)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -811,6 +869,8 @@ $serveConnections = {
                 try { $stream.ShutdownAsync().Wait() } catch { }  # curl may have hung up already.
             }
         } finally {
+            # A zero linger time makes Close send RST instead of FIN.
+            if ($ResetAfterAnswer) { $client.LingerState = New-Object System.Net.Sockets.LingerOption($true, 0) }
             $client.Close()
         }
     }
@@ -2026,6 +2086,403 @@ public sealed class RecorderUnixSocketListener
     $listener.Start()
     $server = [System.Management.Automation.PowerShell]::Create()
 }
+$http2Proxy = $null
+if ($Http2) {
+    # C#, not PowerShell, so its thread needs no runspace. ALPN on the server side needs
+    # SslServerAuthenticationOptions, which only PowerShell 7's .NET has. HPACK's Huffman
+    # strings are decoded by .NET's own internal decoder, reached by reflection, so the
+    # 257-code table is not copied here.
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Security;
+using System.Net.Sockets;
+using System.Reflection;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Threading;
+
+public sealed class RecorderHttp2Proxy
+{
+    private delegate int HuffmanDecoder(ReadOnlySpan<byte> source, ref byte[] destination);
+
+    private static readonly string[] StaticNames =
+    {
+        ":authority", ":method", ":method", ":path", ":path", ":scheme", ":scheme", ":status", ":status", ":status",
+        ":status", ":status", ":status", ":status", "accept-charset", "accept-encoding", "accept-language", "accept-ranges", "accept", "access-control-allow-origin",
+        "age", "allow", "authorization", "cache-control", "content-disposition", "content-encoding", "content-language", "content-length", "content-location", "content-range",
+        "content-type", "cookie", "date", "etag", "expect", "expires", "from", "host", "if-match", "if-modified-since",
+        "if-none-match", "if-range", "if-unmodified-since", "last-modified", "link", "location", "max-forwards", "proxy-authenticate", "proxy-authorization", "range",
+        "referer", "refresh", "retry-after", "server", "set-cookie", "strict-transport-security", "transfer-encoding", "user-agent", "vary", "via",
+        "www-authenticate"
+    };
+
+    private static readonly string[] StaticValues =
+    {
+        "", "GET", "POST", "/", "/index.html", "http", "https", "200", "204", "206",
+        "304", "400", "404", "500", "", "gzip, deflate"
+    };
+
+    private readonly TcpListener _listener;
+    private readonly X509Certificate2 _certificate;
+    private readonly string _alpn;
+    private readonly int _status;
+    private readonly byte[] _tunnelResponse;
+    private readonly StringBuilder _log = new StringBuilder();
+    private readonly MemoryStream _received = new MemoryStream();
+    private readonly List<KeyValuePair<string, string>> _dynamicTable = new List<KeyValuePair<string, string>>();
+    private readonly HuffmanDecoder _huffman;
+    private Thread _thread;
+
+    public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse)
+    {
+        _listener = listener;
+        _certificate = certificate;
+        _alpn = alpn;
+        _status = status;
+        _tunnelResponse = tunnelResponse;
+        MethodInfo decode = Type.GetType("System.Net.Http.HPack.Huffman, System.Net.Http", true)
+            .GetMethod("Decode", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+        _huffman = (HuffmanDecoder)Delegate.CreateDelegate(typeof(HuffmanDecoder), decode);
+    }
+
+    public string Log { get { lock (_log) { return _log.ToString(); } } }
+
+    public byte[] Received { get { lock (_received) { return _received.ToArray(); } } }
+
+    public void Start()
+    {
+        _thread = new Thread(Serve) { IsBackground = true };
+        _thread.Start();
+    }
+
+    // curl has exited: give the connection a moment to finish, then stop waiting for one.
+    public void Finish()
+    {
+        _thread.Join(2000);
+        _listener.Stop();
+        _thread.Join(6000);
+    }
+
+    private void Note(string line) { lock (_log) { _log.Append(line).Append('\n'); } }
+
+    private static string Escape(byte[] bytes, int offset, int count)
+    {
+        return Encoding.Latin1.GetString(bytes, offset, count).Replace("\r", "\\r").Replace("\n", "\\n");
+    }
+
+    private void Serve()
+    {
+        TcpClient client;
+        try { client = _listener.AcceptTcpClient(); }
+        catch (SocketException) { Note("= curl opened no connection"); return; }
+        catch (ObjectDisposedException) { Note("= curl opened no connection"); return; }
+        using (client)
+        {
+            try
+            {
+                var tls = new SslStream(client.GetStream(), false);
+                var options = new SslServerAuthenticationOptions
+                {
+                    ServerCertificate = _certificate,
+                    EnabledSslProtocols = SslProtocols.Tls12,
+                    ApplicationProtocols = new List<SslApplicationProtocol> { _alpn == "h2" ? SslApplicationProtocol.Http2 : SslApplicationProtocol.Http11 }
+                };
+                tls.AuthenticateAsServer(options);
+                tls.ReadTimeout = 5000;
+                string negotiated = tls.NegotiatedApplicationProtocol.ToString();
+                Note("= TLS handshake completed, ALPN " + (negotiated.Length == 0 ? "none" : negotiated));
+                if (negotiated == "h2") { ServeHttp2(tls); } else { ServeHttp11(tls); }
+            }
+            catch (Exception exception)
+            {
+                Note("= " + exception.GetType().Name + ": " + exception.Message);
+            }
+        }
+    }
+
+    // Reads exactly count bytes, recording them; null when curl hung up or went quiet.
+    private byte[] ReadExact(Stream stream, int count)
+    {
+        var buffer = new byte[count];
+        int got = 0;
+        while (got < count)
+        {
+            int read;
+            try { read = stream.Read(buffer, got, count - got); }
+            catch (IOException) { return null; }
+            if (read <= 0) { return null; }
+            got += read;
+        }
+        lock (_received) { _received.Write(buffer, 0, count); }
+        return buffer;
+    }
+
+    private void WriteFrame(Stream stream, byte type, byte flags, int streamId, byte[] payload)
+    {
+        var frame = new byte[9 + payload.Length];
+        frame[0] = (byte)(payload.Length >> 16);
+        frame[1] = (byte)(payload.Length >> 8);
+        frame[2] = (byte)payload.Length;
+        frame[3] = type;
+        frame[4] = flags;
+        frame[5] = (byte)(streamId >> 24);
+        frame[6] = (byte)(streamId >> 16);
+        frame[7] = (byte)(streamId >> 8);
+        frame[8] = (byte)streamId;
+        Buffer.BlockCopy(payload, 0, frame, 9, payload.Length);
+        stream.Write(frame, 0, frame.Length);
+        stream.Flush();
+    }
+
+    private static byte[] BigEndian32(int value)
+    {
+        return new[] { (byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value };
+    }
+
+    private void ServeHttp2(Stream stream)
+    {
+        byte[] preface = ReadExact(stream, 24);
+        if (preface == null) { Note("= curl hung up before the connection preface"); return; }
+        Note("> PREFACE " + Escape(preface, 0, preface.Length));
+        WriteFrame(stream, 4, 0, 0, new byte[0]);
+        Note("< SETTINGS");
+        var headerBlock = new MemoryStream();
+        var tunnel = new MemoryStream();
+        int tunnelStream = 0;
+        bool answered = false;
+        while (true)
+        {
+            byte[] head = ReadExact(stream, 9);
+            if (head == null) { Note("= curl closed the connection"); return; }
+            int length = (head[0] << 16) | (head[1] << 8) | head[2];
+            byte type = head[3];
+            byte flags = head[4];
+            int streamId = ((head[5] & 0x7f) << 24) | (head[6] << 16) | (head[7] << 8) | head[8];
+            byte[] payload = length == 0 ? new byte[0] : ReadExact(stream, length);
+            if (payload == null) { Note("= curl closed the connection mid-frame"); return; }
+            string frame = " stream " + streamId + " flags 0x" + flags.ToString("x2");
+            switch (type)
+            {
+                case 0:
+                {
+                    int start = 0, end = length;
+                    if ((flags & 0x8) != 0) { start = 1; end = length - payload[0]; }
+                    Note("> DATA" + frame + " " + (end - start) + " bytes: " + Escape(payload, start, end - start));
+                    tunnel.Write(payload, start, end - start);
+                    if (end > start)
+                    {
+                        WriteFrame(stream, 8, 0, 0, BigEndian32(length));
+                        WriteFrame(stream, 8, 0, streamId, BigEndian32(length));
+                    }
+                    if (!answered && streamId == tunnelStream && _status / 100 == 2 && Encoding.Latin1.GetString(tunnel.ToArray()).Contains("\r\n\r\n"))
+                    {
+                        answered = true;
+                        WriteFrame(stream, 0, 1, streamId, _tunnelResponse);
+                        Note("< DATA stream " + streamId + " flags 0x01 " + _tunnelResponse.Length + " bytes: " + Escape(_tunnelResponse, 0, _tunnelResponse.Length));
+                    }
+                    break;
+                }
+                case 1:
+                case 9:
+                {
+                    int start = 0, end = length;
+                    if (type == 1 && (flags & 0x8) != 0) { start = 1; end = length - payload[0]; }
+                    if (type == 1 && (flags & 0x20) != 0) { start += 5; }
+                    Note((type == 1 ? "> HEADERS" : "> CONTINUATION") + frame);
+                    headerBlock.Write(payload, start, end - start);
+                    if ((flags & 0x4) != 0)
+                    {
+                        bool connect = false;
+                        foreach (KeyValuePair<string, string> field in DecodeHeaderBlock(headerBlock.ToArray()))
+                        {
+                            Note(">   " + field.Key + ": " + field.Value);
+                            if (field.Key == ":method" && field.Value == "CONNECT") { connect = true; }
+                        }
+                        headerBlock.SetLength(0);
+                        if (tunnelStream == 0)
+                        {
+                            tunnelStream = streamId;
+                            AnswerConnect(stream, streamId, connect);
+                        }
+                    }
+                    break;
+                }
+                case 2: Note("> PRIORITY" + frame); break;
+                case 3: Note("> RST_STREAM" + frame + " error " + ((payload[0] << 24) | (payload[1] << 16) | (payload[2] << 8) | payload[3])); break;
+                case 4:
+                    if ((flags & 0x1) != 0) { Note("> SETTINGS ACK"); break; }
+                    var settings = new StringBuilder("> SETTINGS");
+                    for (int i = 0; i + 6 <= length; i += 6)
+                    {
+                        settings.Append(' ').Append((payload[i] << 8) | payload[i + 1]).Append('=').Append((uint)((payload[i + 2] << 24) | (payload[i + 3] << 16) | (payload[i + 4] << 8) | payload[i + 5]));
+                    }
+                    Note(settings.ToString());
+                    WriteFrame(stream, 4, 1, 0, new byte[0]);
+                    Note("< SETTINGS ACK");
+                    break;
+                case 6:
+                    Note("> PING" + frame);
+                    if ((flags & 0x1) == 0) { WriteFrame(stream, 6, 1, 0, payload); Note("< PING ACK"); }
+                    break;
+                case 7:
+                    Note("> GOAWAY last stream " + (((payload[0] & 0x7f) << 24) | (payload[1] << 16) | (payload[2] << 8) | payload[3]) + " error " + ((payload[4] << 24) | (payload[5] << 16) | (payload[6] << 8) | payload[7]));
+                    return;
+                case 8: Note("> WINDOW_UPDATE" + frame + " increment " + ((payload[0] & 0x7f) << 24 | (payload[1] << 16) | (payload[2] << 8) | payload[3])); break;
+                default: Note("> frame type " + type + frame + " " + length + " bytes"); break;
+            }
+        }
+    }
+
+    // :status as a literal without indexing (name index 8). A refusal, or the answer to a
+    // request that is not a CONNECT (a forwarded GET), has no body and ends the stream.
+    private void AnswerConnect(Stream stream, int streamId, bool connect)
+    {
+        var block = new List<byte> { 0x08 };
+        AppendLiteral(block, _status.ToString());
+        bool refused = _status / 100 != 2 || !connect;
+        if (refused)
+        {
+            // content-length is static index 28: 15 in the 4-bit prefix, then 13.
+            block.Add(0x0f);
+            block.Add(0x0d);
+            AppendLiteral(block, "0");
+        }
+        byte flags = (byte)(refused ? 0x05 : 0x04);
+        WriteFrame(stream, 1, flags, streamId, block.ToArray());
+        Note("< HEADERS stream " + streamId + " flags 0x" + flags.ToString("x2"));
+        Note("<   :status: " + _status);
+        if (refused) { Note("<   content-length: 0"); }
+    }
+
+    private static void AppendLiteral(List<byte> block, string value)
+    {
+        block.Add((byte)value.Length);
+        block.AddRange(Encoding.Latin1.GetBytes(value));
+    }
+
+    private static int ReadInteger(byte[] block, ref int position, int prefixBits)
+    {
+        int limit = (1 << prefixBits) - 1;
+        int value = block[position++] & limit;
+        if (value < limit) { return value; }
+        int shift = 0;
+        byte next;
+        do
+        {
+            next = block[position++];
+            value += (next & 0x7f) << shift;
+            shift += 7;
+        }
+        while ((next & 0x80) != 0);
+        return value;
+    }
+
+    private string ReadString(byte[] block, ref int position)
+    {
+        bool huffman = (block[position] & 0x80) != 0;
+        int length = ReadInteger(block, ref position, 7);
+        int start = position;
+        position += length;
+        if (!huffman) { return Encoding.Latin1.GetString(block, start, length); }
+        byte[] decoded = new byte[length * 2 + 16];
+        int count = _huffman(new ReadOnlySpan<byte>(block, start, length), ref decoded);
+        return Encoding.Latin1.GetString(decoded, 0, count);
+    }
+
+    private KeyValuePair<string, string> Lookup(int index)
+    {
+        if (index <= StaticNames.Length)
+        {
+            return new KeyValuePair<string, string>(StaticNames[index - 1], index <= StaticValues.Length ? StaticValues[index - 1] : "");
+        }
+        return _dynamicTable[index - StaticNames.Length - 1];
+    }
+
+    // RFC 7541: indexed fields, literals with, without and never indexed, and size updates.
+    // The dynamic table is never evicted: one CONNECT never fills it.
+    private List<KeyValuePair<string, string>> DecodeHeaderBlock(byte[] block)
+    {
+        var fields = new List<KeyValuePair<string, string>>();
+        int position = 0;
+        while (position < block.Length)
+        {
+            byte first = block[position];
+            if ((first & 0x80) != 0)
+            {
+                fields.Add(Lookup(ReadInteger(block, ref position, 7)));
+            }
+            else if ((first & 0xe0) == 0x20)
+            {
+                ReadInteger(block, ref position, 5);
+            }
+            else
+            {
+                bool indexed = (first & 0xc0) == 0x40;
+                int index = ReadInteger(block, ref position, indexed ? 6 : 4);
+                string name = index == 0 ? ReadString(block, ref position) : Lookup(index).Key;
+                var field = new KeyValuePair<string, string>(name, ReadString(block, ref position));
+                if (indexed) { _dynamicTable.Insert(0, field); }
+                fields.Add(field);
+            }
+        }
+        return fields;
+    }
+
+    // Reads up to and including the blank line ending a header block; null if curl stops first.
+    private byte[] ReadHeaderBlock(Stream stream)
+    {
+        var block = new MemoryStream();
+        while (true)
+        {
+            byte[] one = ReadExact(stream, 1);
+            if (one == null) { return null; }
+            block.WriteByte(one[0]);
+            if (block.Length >= 4 && Encoding.Latin1.GetString(block.ToArray(), (int)block.Length - 4, 4) == "\r\n\r\n") { return block.ToArray(); }
+        }
+    }
+
+    private void NoteLines(string prefix, string text)
+    {
+        foreach (string line in text.Split(new[] { "\r\n" }, StringSplitOptions.None)) { if (line.Length > 0) { Note(prefix + line); } }
+    }
+
+    // The http/1.1 fallback: a CONNECT answered with a status line, then the tunnelled request.
+    private void ServeHttp11(Stream stream)
+    {
+        byte[] connect = ReadHeaderBlock(stream);
+        if (connect == null) { Note("= curl hung up before its CONNECT ended"); return; }
+        NoteLines("> ", Encoding.Latin1.GetString(connect));
+        bool refused = _status / 100 != 2;
+        string reason = _status == 200 ? "Connection established" : _status == 407 ? "Proxy Authentication Required" : "Status";
+        string reply = "HTTP/1.1 " + _status + " " + reason + "\r\n" + (refused ? "Content-Length: 0\r\n" : "") + "\r\n";
+        byte[] replyBytes = Encoding.Latin1.GetBytes(reply);
+        stream.Write(replyBytes, 0, replyBytes.Length);
+        stream.Flush();
+        NoteLines("< ", reply);
+        if (refused) { WaitForHangUp(stream); return; }
+        byte[] request = ReadHeaderBlock(stream);
+        if (request == null) { Note("= curl hung up before its tunnelled request ended"); return; }
+        NoteLines(">   ", Encoding.Latin1.GetString(request));
+        stream.Write(_tunnelResponse, 0, _tunnelResponse.Length);
+        stream.Flush();
+        Note("<   " + Escape(_tunnelResponse, 0, _tunnelResponse.Length));
+        WaitForHangUp(stream);
+    }
+
+    private void WaitForHangUp(Stream stream)
+    {
+        while (ReadExact(stream, 1) != null) { }
+        Note("= curl closed the connection");
+    }
+}
+'@
+    $server.Dispose()
+    $server = $null
+    $http2Proxy = New-Object RecorderHttp2Proxy($listener, $tlsCertificate, $ProxyAlpn, $ProxyStatus, $responseBytes[0])
+}
 $dnsResponder = $null
 if ($DnsPort.Count -gt 0 -or $DohPort.Count -gt 0) {
     # C#, not a PowerShell class, so its threads need no runspace; Windows PowerShell 5.1
@@ -2607,6 +3064,9 @@ if ($UdpSink) {
 try {
     if ($NoServer -or $Tftp) {
         $serverRun = $null
+    } elseif ($Http2) {
+        $serverRun = $null
+        $http2Proxy.Start()
     } elseif ($Ftp) {
         [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress).AddArgument($sessionHelpers.ToString()).AddArgument($FtpDataHoldMilliseconds)
     } elseif ($Smtp) {
@@ -2618,7 +3078,7 @@ try {
     } elseif ($Script) {
         [void] $server.AddScript($serveScriptedSession).AddArgument($listener).AddArgument($scriptSteps).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ScriptIdleMilliseconds).AddArgument($ScriptGapMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
-        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests)
+        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests).AddArgument([bool] $ResetAfterResponse)
     }
     if ($null -ne $server) { $serverRun = $server.BeginInvoke() }
 
@@ -2682,6 +3142,11 @@ try {
         $requests = $server.EndInvoke($serverRun)
         if ($server.Streams.Error.Count -gt 0) { throw $server.Streams.Error[0] }
     }
+    if ($null -ne $http2Proxy) {
+        $http2Proxy.Finish()
+        $requests = @(, @(, $http2Proxy.Received))
+        [void] $transcript.Append($http2Proxy.Log)
+    }
 
     if ($null -ne $tftpResponder) { $tftpResponder.Stop() }
 
@@ -2727,7 +3192,7 @@ if ($Tftp) {
 if ($null -ne $dnsResponder) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'dns.txt'), $dnsResponder.Log, [System.Text.Encoding]::ASCII)
 }
-if ($Smtp -or $Imap -or $Pop3 -or $Script) {
+if ($Smtp -or $Imap -or $Pop3 -or $Script -or $Http2) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
 }
 $curlExecutable = $Curl

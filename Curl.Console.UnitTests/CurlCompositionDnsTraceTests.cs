@@ -276,6 +276,54 @@ public sealed class CurlCompositionDnsTraceTests
     }
 
     [TestMethod]
+    public async Task Connect_UnderTraceConfigTimerWithMaxTime_WritesTheTimeoutsSetAndGivesLines()
+    {
+        // curl -s -v --trace-config timer -m 5 http://127.0.0.1:P/ (BL-1258 Notes).
+        List<string> lines = await ConnectAsync("-v", "--trace-config", "timer", "-m", "5");
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "[TIMER] [TIMEOUT] set for 5000000ns",
+                "  Trying 127.0.0.1:47110...",
+                "[TIMER] [TIMEOUT] gives multi timeout in 5000ms",
+                "[TIMER] [HAPPY_EYEBALLS] cleared",
+                "Established connection",
+            },
+            lines);
+    }
+
+    [TestMethod]
+    [DataRow("5", "1", "CONNECTTIMEOUT")]
+    [DataRow("1", "5", "TIMEOUT")]
+    public async Task Connect_UnderTraceConfigTimerWithMaxTimeAndAConnectTimeout_SetsBothAndTheNearestGivesTheMultiTimeout(
+        string maxTime, string connectTimeout, string nearest)
+    {
+        // curl -s -v --trace-config timer -m 5 --connect-timeout 1, and -m 1 --connect-timeout 5 (BL-1258 Notes).
+        List<string> lines = await ConnectAsync("-v", "--trace-config", "timer", "-m", maxTime, "--connect-timeout", connectTimeout);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                $"[TIMER] [TIMEOUT] set for {maxTime}000000ns",
+                $"[TIMER] [CONNECTTIMEOUT] set for {connectTimeout}000000ns",
+                "  Trying 127.0.0.1:47110...",
+                $"[TIMER] [{nearest}] gives multi timeout in 1000ms",
+                "[TIMER] [HAPPY_EYEBALLS] cleared",
+                "Established connection",
+            },
+            lines);
+    }
+
+    [TestMethod]
+    public async Task Connect_UnderTraceConfigTimerWithMaxTimeZero_WritesNoTimeoutLine()
+    {
+        List<string> lines = await ConnectAsync("-v", "--trace-config", "timer", "-m", "0");
+
+        Assert.IsFalse(lines.Any(line => line.StartsWith("[TIMER] [TIMEOUT]", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     [DataRow("-v", "--trace-config", "timer")]
     [DataRow("-v", "--trace-config", "network")]
     [DataRow("-v", "--trace-config", "timer", "--connect-timeout", "0")]

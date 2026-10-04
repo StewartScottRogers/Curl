@@ -90,6 +90,22 @@ internal static class HttpConnectionInfoLines
     internal const string NoEndOfMessageIndicator = "no chunk, no close, no size. Assume close to signal end";
 
     /// <summary>
+    /// The line written before a Content-Length header line whose number is too large for a
+    /// signed 64-bit integer (<see cref="HttpContentLength.OverflowsLine" />): the length stays
+    /// unknown and the connection is shut down after the body (measured, BL-1387).
+    /// </summary>
+    internal const string OverflowContentLength = "Overflow Content-Length: value";
+
+    /// <summary>
+    /// Formats the line written when the read that completes a chunked body holds bytes after
+    /// it, which are dropped (curl 8.21.0 <c>lib/http_chunks.c</c>, measured, BL-1387).
+    /// </summary>
+    /// <param name="length">How many bytes follow the body in that read.</param>
+    /// <returns>The line.</returns>
+    internal static string LeftoversAfterChunking(int length) =>
+        string.Create(CultureInfo.InvariantCulture, $"Leftovers after chunking: {length} bytes");
+
+    /// <summary>
     /// The line written before the empty line of a head whose body is read and discarded on a
     /// connection that stays open, as for a redirect <c>-L</c> follows (measured, BL-449 Notes).
     /// </summary>

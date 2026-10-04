@@ -277,20 +277,53 @@ internal sealed class FtpStateTrace(ITransferEvents events, bool enabled)
         Note("closing DATA connection");
     }
 
+    /// <summary>
+    /// The state each command enters that does not depend on the transfer. A lookup rather
+    /// than a string <c>switch</c>, which compiles to a branch per character tested and
+    /// put <see cref="StateOf" /> at a cyclomatic complexity of 122 (BL-1333).
+    /// </summary>
+    private static readonly Dictionary<string, string> FixedStates = new(StringComparer.Ordinal)
+    {
+        ["USER"] = "USER",
+        ["PASS"] = "PASS",
+        ["PWD"] = "PWD",
+        ["ACCT"] = "ACCT",
+        ["SYST"] = "SYST",
+        ["CWD"] = "CWD",
+        ["MDTM"] = "MDTM",
+        ["AUTH"] = "AUTH",
+        ["PBSZ"] = "PBSZ",
+        ["PROT"] = "PROT",
+        ["CCC"] = "CCC",
+        ["PRET"] = "PRET",
+        ["MKD"] = "MKD",
+        ["SITE"] = "NAMEFMT",
+        ["EPSV"] = "PASV",
+        ["PASV"] = "PASV",
+        ["EPRT"] = "PORT",
+        ["PORT"] = "PORT",
+    };
+
+    /// <summary>The commands that enter <c>&lt;transfer&gt;_&lt;verb&gt;</c>, such as <c>RETR_SIZE</c>.</summary>
+    private static readonly HashSet<string> TransferSteps = new(StringComparer.Ordinal) { "TYPE", "SIZE", "REST" };
+
+    /// <summary>The commands that enter the transfer's own state, such as <c>RETR</c>.</summary>
+    private static readonly HashSet<string> TransferCommands = new(StringComparer.Ordinal) { "RETR", "STOR", "APPE", "LIST", "NLST" };
+
     private string? StateOf(string command)
     {
         string verb = command.Split(' ', 2)[0];
-        return verb switch
+        if (FixedStates.TryGetValue(verb, out string? fixedState))
         {
-            "USER" or "PASS" or "PWD" or "ACCT" or "SYST" or "CWD" or "MDTM" => verb,
-            "AUTH" or "PBSZ" or "PROT" or "CCC" or "PRET" or "MKD" => verb,
-            "SITE" => "NAMEFMT",
-            "EPSV" or "PASV" => "PASV",
-            "EPRT" or "PORT" => "PORT",
-            "TYPE" or "SIZE" or "REST" => transfer + "_" + verb,
-            "RETR" or "STOR" or "APPE" or "LIST" or "NLST" => transfer,
-            _ => null,
-        };
+            return fixedState;
+        }
+
+        if (TransferSteps.Contains(verb))
+        {
+            return transfer + "_" + verb;
+        }
+
+        return TransferCommands.Contains(verb) ? transfer : null;
     }
 
     /// <summary>Writes the change to <paramref name="next" />; curl writes none when the state stays the same.</summary>

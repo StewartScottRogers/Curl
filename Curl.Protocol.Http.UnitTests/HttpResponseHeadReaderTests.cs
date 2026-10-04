@@ -212,6 +212,64 @@ public sealed class HttpResponseHeadReaderTests
     }
 
     [TestMethod]
+    [DataRow("hello world\r\n\r\n", DisplayName = "Plain text")]
+    [DataRow("HTTP\r\nX: y\r\n\r\n", DisplayName = "HTTP without a slash")]
+    [DataRow("ICY", DisplayName = "Fewer bytes than HTTP/")]
+    public async Task ReadAsync_NoStatusLineWithHttp09Accepted_GivesAnHttp09HeadWithEveryByteAsTheBody(string response)
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), chunkSize);
+            HttpResponseHeadReader reader = new(connection) { AcceptsHttp09 = true };
+            HttpResponseHead head = await reader.ReadAsync(CancellationToken.None);
+            byte[] rest = new byte[65536];
+            int restLength = 0;
+            int read;
+            while ((read = await connection.ReadAsync(rest.AsMemory(restLength), CancellationToken.None)) > 0)
+            {
+                restLength += read;
+            }
+
+            AssertStatus(head, new Version(0, 9), 0, string.Empty);
+            Assert.IsEmpty(head.Headers);
+            Assert.AreEqual(0, head.HeadBytes.Length);
+            Assert.IsTrue(reader.EndedAtEmptyLine);
+            Assert.AreEqual(response, Latin1(head.BodyPrefix) + Encoding.Latin1.GetString(rest, 0, restLength), $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_StatusLineWithHttp09Accepted_ParsesTheStatusLine()
+    {
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n\r\nhi"), 1);
+
+        HttpResponseHead head = await new HttpResponseHeadReader(connection) { AcceptsHttp09 = true }.ReadAsync(CancellationToken.None);
+
+        AssertStatus(head, HttpVersion.Version11, 200, "OK");
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_Http2StreamWithHttp09Accepted_ParsesTheHttp2StatusLine()
+    {
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/2 200 \r\n\r\n"), 65536);
+
+        HttpResponseHead head = await new HttpResponseHeadReader(connection) { AcceptsHttp09 = true, IsHttp2OrHttp3 = true }.ReadAsync(CancellationToken.None);
+
+        AssertStatus(head, HttpVersion.Version20, 200, string.Empty);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_NoBytesWithHttp09Accepted_IsAnEmptyReply()
+    {
+        ScriptedConnection connection = new([], 65536);
+
+        HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
+            async () => await new HttpResponseHeadReader(connection) { AcceptsHttp09 = true }.ReadAsync(CancellationToken.None));
+
+        Assert.AreEqual(CurlExitCode.GotNothing, thrown.ExitCode);
+    }
+
+    [TestMethod]
     public async Task ReadAsync_NoStatusLine_IsRejectedBeforeTheLineIsWhole()
     {
         // The read after "ICY" would fail; curl gives up on HTTP/0.9 bytes before reading it.
@@ -283,7 +341,8 @@ public sealed class HttpResponseHeadReaderTests
     [TestMethod]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Type: te", DisplayName = "Inside the headers")]
     [DataRow("", DisplayName = "Before the status line")]
-    public async Task ReadAsync_ConnectionResetWhileReadingTheHead_ReturnsRecvError(string response)
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ReadAsync_ConnectionResetWhileReadingTheHead_ReturnsRecvErrorWithTheWinsockWords(string response)
     {
         // Measured inside the headers: curl: (56) Recv failure: Connection was reset.
         await AssertFailsEveryWayAsync(
@@ -291,6 +350,21 @@ public sealed class HttpResponseHeadReaderTests
             CurlExitCode.RecvError,
             "Recv failure: Connection was reset",
             new IOException("reset", new SocketException((int)SocketError.ConnectionReset)));
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Type: te", DisplayName = "Inside the headers")]
+    [DataRow("", DisplayName = "Before the status line")]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ReadAsync_ConnectionResetWhileReadingTheHead_ReturnsRecvErrorWithTheSocketErrorsOwnWords(string response)
+    {
+        SocketException socketError = new((int)SocketError.ConnectionReset);
+
+        await AssertFailsEveryWayAsync(
+            response,
+            CurlExitCode.RecvError,
+            "Recv failure: " + socketError.Message,
+            new IOException("reset", socketError));
     }
 
     [TestMethod]

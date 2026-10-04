@@ -57,4 +57,24 @@ public sealed class BlowfishStateTests
         Assert.AreEqual(0x01234567u, left);
         Assert.AreEqual(0x89ABCDEFu, right);
     }
+
+    // The masked scan must pick the same entries a direct look-up does, at every index of every S-box.
+    [TestMethod]
+    public void Mix_EveryIndexOfEveryBox_EqualsTheDirectLookUpFormula()
+    {
+        BlowfishState state = new();
+        state.Initialize();
+        ReadOnlySpan<uint> boxes = BlowfishPiDigits.SubstitutionBoxes;
+
+        for (uint value = 0; value < 256; value++)
+        {
+            uint a = value;
+            uint b = (value + 85) & 0xFF;
+            uint c = (value + 170) & 0xFF;
+            uint d = 255 - value;
+            uint expected = ((boxes[(int)a] + boxes[256 + (int)b]) ^ boxes[512 + (int)c]) + boxes[768 + (int)d];
+
+            Assert.AreEqual(expected, state.Mix((a << 24) | (b << 16) | (c << 8) | d), $"index {value}");
+        }
+    }
 }

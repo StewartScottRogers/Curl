@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace Curl.Cryptography;
 
 /// <summary>
@@ -195,6 +197,30 @@ public sealed class BrainpoolEcdhTests
     }
 
     [TestMethod]
+    [DataRow(BrainpoolCurve.BrainpoolP256r1)]
+    [DataRow(BrainpoolCurve.BrainpoolP384r1)]
+    [DataRow(BrainpoolCurve.BrainpoolP512r1)]
+    public void TryComputeSharedSecret_PeerPointWithOnlyYRaisedByThePrime_ReturnsFalseAndZeroesTheSecret(BrainpoolCurve curve)
+    {
+        // x is the peer's own coordinate and y + p (or (p - y) + p, the point's negation)
+        // still reduces to a point of the curve, so only the check that y is below p refuses it.
+        string[] vector = Rfc7027Vectors[(int)curve];
+        int length = BrainpoolEcdh.GetPrivateKeyLength(curve);
+        BigInteger prime = Unsigned(Primes[(int)curve]);
+        BigInteger y = Unsigned(vector[5]);
+        BigInteger raised = y + prime < BigInteger.One << (8 * length) ? y + prime : prime - y + prime;
+        Assert.IsTrue(raised < BigInteger.One << (8 * length));
+        byte[] peer = Convert.FromHexString("04" + vector[4] + Convert.ToHexString(raised.ToByteArray(isUnsigned: true, isBigEndian: true)).PadLeft(2 * length, '0'));
+        byte[] secret = new byte[length];
+        Array.Fill(secret, (byte)0xFF);
+
+        bool agreed = BrainpoolEcdh.TryComputeSharedSecret(curve, Convert.FromHexString(vector[0]), peer, secret);
+
+        Assert.IsFalse(agreed);
+        Assert.IsTrue(secret.All(value => value == 0));
+    }
+
+    [TestMethod]
     [DataRow("")]
     [DataRow("00")]
     [DataRow("A9FB57DBA1EEA9BC3E660A909D838D718C397AA3B561A6F7901E0E82974856A7")]
@@ -259,4 +285,6 @@ public sealed class BrainpoolEcdhTests
     }
 
     private static string Hex(byte[] value) => Convert.ToHexString(value);
+
+    private static BigInteger Unsigned(string hex) => new(Convert.FromHexString(hex), isUnsigned: true, isBigEndian: true);
 }

@@ -37,8 +37,10 @@ then `MqttProtocolHandler` reports the failure's message unless curl prints it w
 `failf` (`MqttTransferMessages.IsStrerrorText`), then `Error 55 sending MQTT CONNECT
 request` when the CONNECT could not be sent (`MqttTransferException.FollowingLine`,
 BL-1229), and `closing connection #N` after exit 23 or `shutting down connection #N` after
-anything else. A failed send is exit 55 `Send failure: Connection was reset` for a reset
-and `Failed sending data to the peer` otherwise.
+anything else. A send or read that fails with a socket error is exit 55 `Send failure:
+<words>` or exit 56 `Recv failure: <words>`, the words from `CurlSocketErrorText` for the
+platform (BL-1341); any other failed send is `Failed sending data to the peer`, and any
+other failed or closed read `Failure when receiving data from the peer`.
 
 Keep-alive (BL-1116): while a packet's first byte is awaited, `MqttSession` races the
 read (`MqttPacketReader.WhenFirstByteReadyAsync`, which keeps the read it starts for the

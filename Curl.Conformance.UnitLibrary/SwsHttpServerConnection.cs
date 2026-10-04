@@ -35,6 +35,11 @@ internal sealed class SwsHttpServerConnection : IConnection
     // sws reads an upgraded connection until a select() of one second finds nothing to read.
     private static readonly TimeSpan UpgradedTrafficQuietTime = TimeSpan.FromSeconds(1);
 
+    // No case's timing depends on a gap this short, and no healthy timer fires this late.
+    private static readonly TimeSpan LateWakeLimit = TimeSpan.FromSeconds(1);
+
+    private static readonly TimeSpan StalledTimersSettleTime = TimeSpan.FromMilliseconds(250);
+
     private readonly SwsHttpReplySelector replySelector;
 
     private readonly SwsServerCommands serverCommands;
@@ -197,11 +202,28 @@ internal sealed class SwsHttpServerConnection : IConnection
     // A system timer can fire a little before the time provider's timestamp reaches the moment,
     // and a read that woke early would find nothing sent and return 0, ending the reply early;
     // so the wait goes on until the moment has passed.
+    // A wake more than LateWakeLimit past the moment means the process stalled (a busy CI runner),
+    // and every other timer that fell due in the stall - curl's -m among them - fires now, in no
+    // set order; so the server waits StalledTimersSettleTime more for them to go first, and a stall
+    // cannot put the close of test29's ten-second wait ahead of its two-second -m (BL-1321).
     private async ValueTask WaitUntilAsync(TimeSpan moment, CancellationToken cancellationToken)
     {
-        for (TimeSpan remaining = moment - Now; remaining > TimeSpan.Zero; remaining = moment - Now)
+        TimeSpan remaining = moment - Now;
+        if (remaining <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        do
         {
             await Task.Delay(remaining, timeProvider, cancellationToken);
+            remaining = moment - Now;
+        }
+        while (remaining > TimeSpan.Zero);
+
+        if (-remaining > LateWakeLimit)
+        {
+            await Task.Delay(StalledTimersSettleTime, timeProvider, cancellationToken);
         }
     }
 

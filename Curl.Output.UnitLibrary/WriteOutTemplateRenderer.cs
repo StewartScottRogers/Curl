@@ -25,7 +25,8 @@ namespace Curl.Output;
 /// <para>
 /// A file that cannot be opened leaves the output where it was. A header name of 256 bytes
 /// or more renders nothing, and a file name of 512 bytes or more is not opened, as curl's
-/// fixed buffers do. Text is written as UTF-8.
+/// fixed buffers do. A <c>%{name}</c> of 24 bytes or more ends the rendering there,
+/// silently, as curl's 24-byte name buffer does. Text is written as UTF-8.
 /// </para>
 /// <para>
 /// The Windows curl writes all three targets in text mode, so every line feed it writes,
@@ -43,6 +44,7 @@ public sealed class WriteOutTemplateRenderer(
     WriteOutTimeDialect timeDialect,
     TimeProvider timeProvider)
 {
+    private const int VariableNameBufferBytes = 24;
     private const int HeaderNameBufferBytes = 256;
     private const int FileNameBufferBytes = 512;
 
@@ -221,6 +223,13 @@ public sealed class WriteOutTemplateRenderer(
             if (!TryReadToClosingBrace(out string name))
             {
                 pending.Append(VariableOpening);
+                return;
+            }
+
+            // curl's name buffer refuses a name this long, and its loop ends there silently.
+            if (Encoding.UTF8.GetByteCount(name) >= VariableNameBufferBytes)
+            {
+                position = template.Length;
                 return;
             }
 

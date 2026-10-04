@@ -125,7 +125,6 @@ public sealed partial class CookieStoreTests
     [TestMethod]
     [DataRow("sub\\missing.txt", DisplayName = "Relative, backslash")]
     [DataRow("sub/missing.txt", DisplayName = "Relative, slash")]
-    [DataRow("adir", DisplayName = "A directory")]
     public async Task LoadCookieFileAsync_CannotOpen_ReportsTheWarning(string path)
     {
         RecordingTransferEvents events = new();
@@ -136,6 +135,56 @@ public sealed partial class CookieStoreTests
         CollectionAssert.AreEqual(new[] { $"WARNING: failed to open cookie file \"{path}\"" }, events.Info);
         Assert.IsEmpty(store.Cookies);
     }
+
+    /// <summary>
+    /// Measured on curl 8.21.0 (mingw, Schannel) on 2026-10-03 (BL-1393): <c>curl -sv -b &lt;existing directory&gt;</c>
+    /// wrote this line and carried on, exit 0, because Windows' <c>fopen</c> fails for a directory.
+    /// </summary>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task LoadCookieFileAsync_Directory_OnWindows_ReportsFailedToOpen()
+    {
+        RecordingTransferEvents events = new();
+        CookieStore store = new();
+
+        await store.LoadCookieFileAsync(
+            new FakeFileSystem { ReadFailure = FileAccessStatus.IsDirectory }, "/dir/cookies", discardSessionCookies: false, Now, events, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "WARNING: failed to open cookie file \"/dir/cookies\"" }, events.Info);
+        Assert.IsEmpty(store.Cookies);
+    }
+
+    /// <summary>
+    /// curl 8.21.0's <c>lib/cookie.c</c> (lines 1146-1156): off Windows <c>fopen</c> opens a directory, and the
+    /// <c>S_ISDIR</c> check after it writes this line and loads nothing (BL-1393).
+    /// </summary>
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task LoadCookieFileAsync_Directory_OffWindows_ReportsPointsToADirectory()
+    {
+        RecordingTransferEvents events = new();
+        CookieStore store = new();
+
+        await store.LoadCookieFileAsync(
+            new FakeFileSystem { ReadFailure = FileAccessStatus.IsDirectory }, "/dir/cookies", discardSessionCookies: false, Now, events, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "WARNING: cookie filename points to a directory: \"/dir/cookies\"" }, events.Info);
+        Assert.IsEmpty(store.Cookies);
+    }
+
+    [TestMethod]
+    [DataRow(FileAccessStatus.IsDirectory, false, "WARNING: cookie filename points to a directory: \"/dir/cookies\"", DisplayName = "Directory, off Windows")]
+    [DataRow(FileAccessStatus.IsDirectory, true, "WARNING: failed to open cookie file \"/dir/cookies\"", DisplayName = "Directory, Windows")]
+    [DataRow(FileAccessStatus.NotFound, false, "WARNING: failed to open cookie file \"/dir/cookies\"", DisplayName = "Not found, off Windows")]
+    [DataRow(FileAccessStatus.NotFound, true, "WARNING: failed to open cookie file \"/dir/cookies\"", DisplayName = "Not found, Windows")]
+    [DataRow(FileAccessStatus.AccessDenied, false, "WARNING: failed to open cookie file \"/dir/cookies\"", DisplayName = "Access denied, off Windows")]
+    [DataRow(FileAccessStatus.AccessDenied, true, "WARNING: failed to open cookie file \"/dir/cookies\"", DisplayName = "Access denied, Windows")]
+    public void DescribeCookieFileOpenFailure_GivesEachPlatformsLine(FileAccessStatus status, bool isWindows, string expected) =>
+        Assert.AreEqual(expected, CookieStore.DescribeCookieFileOpenFailure("/dir/cookies", status, isWindows));
+
+    [TestMethod]
+    public void DescribeCookieFileOpenFailure_NullPath_Throws() =>
+        Assert.ThrowsExactly<ArgumentNullException>(() => CookieStore.DescribeCookieFileOpenFailure(null!, FileAccessStatus.NotFound, isWindows: true));
 
     [TestMethod]
     public async Task LoadCookieFile_NullEvents_Throw()

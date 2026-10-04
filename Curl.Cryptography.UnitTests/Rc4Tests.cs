@@ -346,7 +346,17 @@ public sealed class Rc4Tests
     [DataRow(256)]
     public void Constructor_OneOr256ByteKey_IsAccepted(int length)
     {
-        using Rc4 rc4 = new(new byte[length]);
+        using Rc4 encryptor = new(new byte[length]);
+        using Rc4 decryptor = new(new byte[length]);
+        byte[] plaintext = new byte[16];
+        byte[] ciphertext = new byte[16];
+        byte[] decrypted = new byte[16];
+
+        encryptor.ApplyKeyStream(plaintext, ciphertext);
+        decryptor.ApplyKeyStream(ciphertext, decrypted);
+
+        CollectionAssert.AreNotEqual(plaintext, ciphertext);
+        CollectionAssert.AreEqual(plaintext, decrypted);
     }
 
     [TestMethod]

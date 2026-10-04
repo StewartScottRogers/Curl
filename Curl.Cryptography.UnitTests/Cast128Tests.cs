@@ -138,9 +138,12 @@ public sealed class Cast128Tests
     public void EncryptCbc_EmptySource_WritesNothing()
     {
         using Cast128 cast = new(Convert.FromHexString(Key128));
+        byte[] buffer = [0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5];
 
-        cast.EncryptCbc(Convert.FromHexString(Vector), [], []);
-        cast.DecryptCbc(Convert.FromHexString(Vector), [], []);
+        cast.EncryptCbc(Convert.FromHexString(Vector), [], buffer.AsSpan(0, 0));
+        cast.DecryptCbc(Convert.FromHexString(Vector), [], buffer.AsSpan(0, 0));
+
+        Assert.AreEqual("A5A5A5A5A5A5A5A5", Convert.ToHexString(buffer));
     }
 
     [TestMethod]
@@ -159,6 +162,15 @@ public sealed class Cast128Tests
     public void Constructor_FiveOr16ByteKey_IsAccepted(int length)
     {
         using Cast128 cast = new(new byte[length]);
+        byte[] plaintext = new byte[Cast128.BlockSize];
+        byte[] ciphertext = new byte[Cast128.BlockSize];
+        byte[] decrypted = new byte[Cast128.BlockSize];
+
+        cast.EncryptBlock(plaintext, ciphertext);
+        cast.DecryptBlock(ciphertext, decrypted);
+
+        CollectionAssert.AreNotEqual(plaintext, ciphertext);
+        CollectionAssert.AreEqual(plaintext, decrypted);
     }
 
     [TestMethod]

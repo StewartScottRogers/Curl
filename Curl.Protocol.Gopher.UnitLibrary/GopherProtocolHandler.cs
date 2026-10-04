@@ -1,4 +1,3 @@
-using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Gopher;
@@ -20,7 +19,13 @@ namespace Curl.Protocol.Gopher;
 /// <see cref="ITransferContext.DumpHeaderOutput" /> when there is one (<c>-D</c>), as curl
 /// passes them to its client as headers, and a refusal there is exit 23. The
 /// reply is copied to <see cref="ITransferContext.Output" /> until the server closes the
-/// connection, which ends the transfer with exit 0, even when nothing was received. A
+/// connection, which ends the transfer with exit 0, even when nothing was received. Under
+/// <see cref="ITransferContext.NoBody" /> (<c>-I</c>) the selector is sent and the reply is
+/// never read, exit 0, as gopher has no headers for curl to receive (BL-1308). With
+/// <see cref="ITransferContext.MaxFileSize" /> above 0 the reply is written up to that many
+/// bytes, counted across reads, and a read that goes past it is cut there and ends the
+/// transfer with exit 63 (<see cref="CurlExitCode.FilesizeExceeded" />); a reply exactly at
+/// the limit is not a failure. A
 /// selector that decodes to a NUL byte is exit 3 (<see cref="CurlExitCode.UrlMalformat" />),
 /// found after connecting as in curl. A failed connect is returned unchanged; a failed
 /// send is exit 55, a failed receive exit 56 and a failed output write exit 23, all
@@ -140,6 +145,13 @@ public sealed class GopherProtocolHandler : IProtocolHandler
 
         log.SelectorSent(selector);
 
+        // lib/transfer.c: gopher has no response-header writer, so under -I curl never
+        // receives and the transfer ends once the selector is sent.
+        if (context.NoBody)
+        {
+            return TransferResult.Success(0);
+        }
+
         return await CopyReplyAsync(connection, context).ConfigureAwait(false);
     }
 
@@ -215,12 +227,11 @@ public sealed class GopherProtocolHandler : IProtocolHandler
 
     /// <summary>
     /// The exit 55 message for a failed send: the socket filter's <c>Send failure:</c> text
-    /// for a reset, and curl's fallback text for anything else.
+    /// (<see cref="CurlSocketErrorText" />) for a socket error, and curl's fallback text for
+    /// anything else.
     /// </summary>
     private static string SendFailure(IOException exception) =>
-        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
-            ? GopherTransferMessages.SendConnectionReset
-            : GopherTransferMessages.SendFailed;
+        CurlSocketErrorText.SendFailure(exception) ?? GopherTransferMessages.SendFailed;
 
     /// <summary>
     /// Writes a piece of the request just sent to the <c>-D</c> stream, as curl 8.21.0's
@@ -260,6 +271,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
     {
         CancellationToken cancellationToken = context.CancellationToken;
         byte[] buffer = new byte[ReadBufferSize];
+        long limit = context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue;
         long bytesWritten = 0;
         while (true)
         {
@@ -279,30 +291,41 @@ public sealed class GopherProtocolHandler : IProtocolHandler
                 return TransferResult.Success(bytesWritten);
             }
 
+            int allowed = (int)Math.Min(read, limit - bytesWritten);
             try
             {
-                await context.Output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                await context.Output.WriteAsync(buffer.AsMemory(0, allowed), cancellationToken).ConfigureAwait(false);
             }
             catch (IOException exception)
             {
                 return new TransferResult(
                     CurlExitCode.WriteError,
                     bytesWritten,
-                    GopherTransferMessages.OutputWriteFailed(read, BytesAcceptedBy(exception)));
+                    GopherTransferMessages.OutputWriteFailed(allowed, BytesAcceptedBy(exception)));
             }
 
-            bytesWritten += read;
+            bytesWritten += allowed;
             context.Progress.ReportDownloaded(bytesWritten, null);
+            if (allowed < read)
+            {
+                return new TransferResult(
+                    CurlExitCode.FilesizeExceeded,
+                    bytesWritten,
+                    GopherTransferMessages.MaxFileSizeExceeded(limit, bytesWritten));
+            }
         }
     }
 
     /// <summary>
     /// The exit 56 message for a failed read: the TLS build's own text when a
-    /// <c>gophers</c> connection ended without <c>close_notify</c> (ADR-0221), and curl's
-    /// fallback text for anything else.
+    /// <c>gophers</c> connection ended without <c>close_notify</c> (ADR-0221), the socket
+    /// filter's <c>Recv failure:</c> text (<see cref="CurlSocketErrorText" />) for a socket
+    /// error, and curl's fallback text for anything else.
     /// </summary>
     private static string ReceiveFailure(IOException exception) =>
-        exception is MissingCloseNotifyException ? exception.Message : GopherTransferMessages.ReceiveFailed;
+        exception is MissingCloseNotifyException
+            ? exception.Message
+            : CurlSocketErrorText.ReceiveFailure(exception) ?? GopherTransferMessages.ReceiveFailed;
 
     /// <summary>
     /// How many bytes of a failed write the output accepted: the count an

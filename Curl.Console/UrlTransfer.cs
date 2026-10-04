@@ -51,17 +51,18 @@ internal sealed class UrlTransfer
         string? uploadFile,
         bool sanitizesForWindows)
     {
-        UrlOutput? output = urlIndex < options.UrlOutputs.Count ? options.UrlOutputs[urlIndex] : null;
+        // The parser gives every URL an output entry at its own position.
+        UrlOutput output = options.UrlOutputs[urlIndex];
         UrlIndex = urlIndex;
         UrlNumber = urlNumber;
         TransferId = transferId;
         Url = match.Url;
         UploadFile = uploadFile;
-        OutputFileName = output?.FileName is { } fileName and not StandardOutputFileName
+        OutputFileName = output.FileName is { } fileName and not StandardOutputFileName
             ? match.ResolveOutputFileName(fileName, sanitizesForWindows)
             : null;
-        UsesRemoteName = output?.UsesRemoteName ?? false;
-        DiscardsBody = output?.DiscardsBody ?? false;
+        UsesRemoteName = output.UsesRemoteName;
+        DiscardsBody = output.DiscardsBody;
     }
 
     /// <summary>Gets the position of the command-line URL in its option group, which pairs it with its output entry.</summary>

@@ -24,7 +24,8 @@ namespace Curl.Cli;
 /// injected <see cref="IDataFileReader"/>: the file it names, or standard input for <c>@-</c>.
 /// A <c>-F</c> / <c>--form</c> value is read into form parts by <see cref="MultipartFormField"/>,
 /// and a command line that asks for a form and a <c>-d</c> body both is refused once read, with
-/// <see cref="CommandLineRefusal.FormAndDataBoth"/>.
+/// <see cref="CommandLineRefusal.FormAndDataBoth"/>, as is a <c>-C</c> byte offset beside either, with
+/// <see cref="CommandLineRefusal.ContinueAtWithBody"/>.
 /// A <c>-K</c> / <c>--config</c> file is read through the same reader and its lines applied in
 /// place of the option (see <see cref="ConfigFileApplier"/>). Only the overload taking a
 /// <see cref="DefaultConfigFileSearch"/> reads the default config file (<c>.curlrc</c>) first; the others
@@ -107,7 +108,8 @@ public static class CommandLineParser
     /// Parses <paramref name="arguments"/> as the four-argument overload does, but as curl's build for
     /// the platform <paramref name="isWindows"/> names reads them rather than as this process's
     /// platform: off Windows an option value starting with a character in U+2000-U+203F is warned
-    /// about (<see cref="CommandLineOptions.ReadsArgumentsAsUtf8"/>), on Windows it is not.
+    /// about (<see cref="CommandLineOptions.ReadsArgumentsAsUtf8"/>), on Windows it is not, and on Windows the
+    /// options its libcurl was built without are refused (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild"/>).
     /// </summary>
     /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
     /// <param name="pathExists">Reports whether a file or directory exists at a path.</param>
@@ -136,11 +138,27 @@ public static class CommandLineParser
     /// line is accepted when the file names a URL.
     /// </returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
-    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch)
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch) =>
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch, OperatingSystem.IsWindows());
+
+    /// <summary>
+    /// Parses <paramref name="arguments"/> after curl's default config file, as the overload without
+    /// <paramref name="isWindows"/> does, but as curl's build for the platform <paramref name="isWindows"/>
+    /// names reads them, as the five-argument overload taking <paramref name="isWindows"/> does.
+    /// </summary>
+    /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
+    /// <param name="pathExists">Reports whether a file or directory exists at a path.</param>
+    /// <param name="passwordPrompt">Asks for the password of a <c>-u</c> user given without one; called at most once.</param>
+    /// <param name="dataFileReader">Reads the default config file, and every file an option names.</param>
+    /// <param name="defaultConfigFileSearch">Lists where to look for the default config file; <see cref="DefaultConfigFileSearch.ForProcess"/> for this process.</param>
+    /// <param name="isWindows">Whether to read the arguments as curl's Windows Schannel build does.</param>
+    /// <returns>As the overload without <paramref name="isWindows"/> returns.</returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows)
     {
         ArgumentNullException.ThrowIfNull(defaultConfigFileSearch);
 
-        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), OperatingSystem.IsWindows());
+        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows);
     }
 
     private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows)
@@ -150,7 +168,7 @@ public static class CommandLineParser
         ArgumentNullException.ThrowIfNull(passwordPrompt);
         ArgumentNullException.ThrowIfNull(dataFileReader);
 
-        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows };
+        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows };
         if (!SkipsDefaultConfigFile(arguments))
         {
             ConfigFileApplier.ApplyDefaultFile(options, defaultConfigFileCandidates, pathExists, dataFileReader);
@@ -204,8 +222,9 @@ public static class CommandLineParser
 
     /// <summary>
     /// Checks each option group once the command line is all read, as curl 8.21.0 does while setting
-    /// up that group's transfers: a group is refused when it names no URL, or when it asks for a
-    /// multipart form post and a <c>-d</c> body both. A refused first group refuses the command line;
+    /// up that group's transfers: a group is refused when it names no URL, when it asks for a
+    /// multipart form post and a <c>-d</c> body both, or when it pairs a <c>-C</c> byte offset with either.
+    /// A refused first group refuses the command line;
     /// a later one is accepted with the groups before it and <see cref="CommandLineParseResult.RefusalAfterGroups"/>,
     /// as curl runs those groups first (measured 2026-09-28, BL-508 Notes).
     /// </summary>
@@ -237,8 +256,28 @@ public static class CommandLineParser
             return CommandLineRefusal.NoUrlSpecified();
         }
 
-        return group.HttpMethodSelected == SelectedHttpMethod.MultipartFormPost && group.PostData is not null
-            ? RefuseFormAndDataBoth(group)
+        bool formPost = group.HttpMethodSelected == SelectedHttpMethod.MultipartFormPost;
+        if (formPost && group.PostData is not null)
+        {
+            return RefuseFormAndDataBoth(group);
+        }
+
+        return group.ResumeFrom > 0 ? ContinueAtWithBodyRefusal(group, formPost) : null;
+    }
+
+    /// <summary>
+    /// Refuses a <c>-C</c> byte offset beside a <c>-F</c> form or a <c>-d</c> body sent as a POST, as
+    /// curl 8.21.0 does; <see langword="null"/> when there is neither, or <c>-G</c> sends the body as the query.
+    /// </summary>
+    private static CommandLineRefusal? ContinueAtWithBodyRefusal(CommandLineOptions group, bool formPost)
+    {
+        if (formPost)
+        {
+            return CommandLineRefusal.ContinueAtWithBody("--form", group.ErrorsHidden);
+        }
+
+        return group.PostData is not null && !group.DataInQuery
+            ? CommandLineRefusal.ContinueAtWithBody("--data", group.ErrorsHidden)
             : null;
     }
 
@@ -368,14 +407,13 @@ public static class CommandLineParser
         RefuseUnlistedName(argument, negatedName);
 
     /// <summary>
-    /// Refuses the short letter at <paramref name="letter"/> that <see cref="CommandLineOptionTable"/> has no
-    /// row for, spelled as the whole argument: not implemented yet when it is one of curl 8.21.0's letters
-    /// (ADR-0137), unknown otherwise.
+    /// Refuses a short letter <see cref="CommandLineOptionTable"/> has no row for, spelled as the whole
+    /// argument, as an unknown option. Every one of curl 8.21.0's letters has a row (BL-1421), so such a
+    /// letter is never one curl knows; <c>CommandLineUnimplementedOptionTests</c> fails should a row for
+    /// one ever be removed.
     /// </summary>
-    private static CommandLineRefusal RefuseUnlistedLetter(string argument, int letter) =>
-        CurlOptionAliasTable.IsLetter(argument[letter])
-            ? CommandLineRefusal.InstalledLibcurlDoesNotSupport(argument)
-            : CommandLineRefusal.UnknownOption(argument);
+    private static CommandLineRefusal RefuseUnlistedLetter(string argument) =>
+        CommandLineRefusal.UnknownOption(argument);
 
     /// <summary>Reads a long name that is not in the table: as <c>--expand-&lt;name&gt;</c>, or else as <c>--no-&lt;name&gt;</c>.</summary>
     private static CommandLineRefusal? ParseUnlistedLong(CommandLineOptions options, string argument, string longName, string? attachedValue, ArgumentReader reader) =>
@@ -459,7 +497,7 @@ public static class CommandLineParser
     {
         if (!CommandLineOptionTable.TryFindShort(argument[letter], out CommandLineOption? option))
         {
-            refusal = RefuseUnlistedLetter(argument, letter);
+            refusal = RefuseUnlistedLetter(argument);
             return true;
         }
 

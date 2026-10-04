@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Core.AltSvc;
 
@@ -16,7 +17,8 @@ namespace Curl.Core.AltSvc;
 /// skipped. The quote must follow the <c>=</c> at once. A host in brackets is an IPv6
 /// address; no host means the origin's. A host longer than 2048 characters (46 in brackets),
 /// a port above 65535, a missing port or a missing quote stops reading, keeping the
-/// alternatives before it. A parameter name runs to the next <c>=</c>, so in
+/// alternatives before it; <see cref="AltSvcHeader.SkipReason" /> says why when the host, IPv6
+/// literal or port was bad (ADR-0409). A parameter name runs to the next <c>=</c>, so in
 /// <c>h2=":1"; foo, h3=":2"</c> the <c>h3</c> alternative is read as part of a parameter and
 /// lost, as it is to curl.
 /// </para>
@@ -50,10 +52,11 @@ public static class AltSvcHeaderParser
         }
 
         List<AltSvcAlternative> alternatives = [];
+        AltSvcSkipReason? skipReason;
         int position = 0;
         do
         {
-            if (!TryReadAlternative(value, ref position, out AltSvcAlternative? alternative))
+            if (!TryReadAlternative(value, ref position, out AltSvcAlternative? alternative, out skipReason))
             {
                 break;
             }
@@ -67,7 +70,7 @@ public static class AltSvcHeaderParser
         }
         while (TryReadChar(value, ref position, ','));
 
-        return new AltSvcHeader(false, alternatives);
+        return new AltSvcHeader(false, alternatives, skipReason);
     }
 
     private static bool IsClear(string value)
@@ -79,11 +82,13 @@ public static class AltSvcHeaderParser
 
     /// <summary>
     /// Reads one <c>alpn="[host]:port"</c> and its parameters; the alternative is
-    /// <see langword="null" /> when its ALPN is unknown.
+    /// <see langword="null" /> when its ALPN is unknown, and the skip reason says why reading
+    /// failed where curl writes a line for it.
     /// </summary>
-    private static bool TryReadAlternative(string value, ref int position, out AltSvcAlternative? alternative)
+    private static bool TryReadAlternative(string value, ref int position, out AltSvcAlternative? alternative, out AltSvcSkipReason? skipReason)
     {
         alternative = null;
+        skipReason = null;
         int equals = value.IndexOf('=', position);
         if (equals <= position || !value.AsSpan(equals + 1).StartsWith('"'))
         {
@@ -92,7 +97,7 @@ public static class AltSvcHeaderParser
 
         AltSvcAlpn? alpn = AltSvcAlpnToken.Parse(value.AsSpan(position, equals - position).Trim(" \t"));
         position = equals + 2;
-        if (!TryReadDestination(value, ref position, out string? host, out int port))
+        if (!TryReadDestination(value, ref position, out string? host, out int port, out skipReason))
         {
             return false;
         }
@@ -102,25 +107,60 @@ public static class AltSvcHeaderParser
         return true;
     }
 
-    private static bool TryReadDestination(string value, ref int position, out string? host, out int port)
+    private static bool TryReadDestination(string value, ref int position, out string? host, out int port, out AltSvcSkipReason? skipReason)
     {
         port = 0;
-        return TryReadHost(value, ref position, out host)
-            && TryReadPort(value, ref position, out port)
-            && TryReadChar(value, ref position, '"');
+        skipReason = ReadHost(value, ref position, out host) ?? ReadPort(value, ref position, out port);
+        return skipReason is null && TryReadChar(value, ref position, '"');
     }
 
-    private static bool TryReadHost(string value, ref int position, out string? host)
+    /// <summary>
+    /// Reads the host and the <c>:</c> after it; returns why it could not, or
+    /// <see langword="null" /> when it did.
+    /// </summary>
+    private static AltSvcSkipReason? ReadHost(string value, ref int position, out string? host)
     {
         host = null;
         if (TryReadChar(value, ref position, ':'))
         {
-            return true;
+            return null;
         }
 
-        return TryReadChar(value, ref position, '[')
-            ? TryReadUntil(value, ref position, ']', MaxIpv6AddressLength, out host) && TryReadChar(value, ref position, ':')
-            : TryReadUntil(value, ref position, ':', AltSvcEntry.MaxHostLength, out host);
+        if (!TryReadChar(value, ref position, '['))
+        {
+            return ReadHostName(value, ref position, out host);
+        }
+
+        if (!TryReadUntil(value, ref position, ']', MaxIpv6AddressLength, out host))
+        {
+            return AltSvcSkipReason.BadIpv6Hostname;
+        }
+
+        return TryReadChar(value, ref position, ':') ? null : AltSvcSkipReason.UnknownPortNumber;
+    }
+
+    /// <summary>
+    /// Reads a host name up to the next <c>:</c> and passes it: a name longer than
+    /// <see cref="AltSvcEntry.MaxHostLength" /> is a bad host name, and one no <c>:</c> follows
+    /// has no port.
+    /// </summary>
+    private static AltSvcSkipReason? ReadHostName(string value, ref int position, out string? host)
+    {
+        host = null;
+        int end = value.IndexOf(':', position);
+        if ((end < 0 ? value.Length : end) - position > AltSvcEntry.MaxHostLength)
+        {
+            return AltSvcSkipReason.BadHostname;
+        }
+
+        if (end < 0)
+        {
+            return AltSvcSkipReason.UnknownPortNumber;
+        }
+
+        host = value[position..end];
+        position = end + 1;
+        return null;
     }
 
     /// <summary>
@@ -141,7 +181,11 @@ public static class AltSvcHeaderParser
         return true;
     }
 
-    private static bool TryReadPort(string value, ref int position, out int port)
+    /// <summary>
+    /// Reads the port's digits; returns <see cref="AltSvcSkipReason.UnknownPortNumber" /> when
+    /// there are none or they make more than 65535.
+    /// </summary>
+    private static AltSvcSkipReason? ReadPort(string value, ref int position, out int port)
     {
         int end = position;
         while (end < value.Length && char.IsAsciiDigit(value[end]))
@@ -152,7 +196,7 @@ public static class AltSvcHeaderParser
         bool read = int.TryParse(value.AsSpan(position, end - position), NumberStyles.None, CultureInfo.InvariantCulture, out port)
             && port <= ushort.MaxValue;
         position = end;
-        return read;
+        return read ? null : AltSvcSkipReason.UnknownPortNumber;
     }
 
     private static (long MaxAge, bool Persist) ReadParameters(string value, ref int position)

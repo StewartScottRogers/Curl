@@ -436,9 +436,9 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             events, judgedHandshake, verificationFailure.HasValue, peerVerification, peerCertificates, isProxy, targetHost);
         peerVerification.ReportPinnedPublicKeyRefusal(events, _matchesSchannelBuild);
 
-        return verificationFailure is { } rejected
+        return SchannelFailureEcho.Report(events, _matchesSchannelBuild, verificationFailure is { } rejected
             ? ConnectResult.Failed(rejected.ExitCode, rejected.Message)
-            : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(failure));
+            : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(failure)));
     }
 
     /// <summary>
