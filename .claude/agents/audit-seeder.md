@@ -36,6 +36,9 @@ Do exactly this:
    `SequenceEqual`, `Parse_Port_Rejects` or `weak-assertion` - taken from the entry's **Catch**
    and made concrete for this site. A finding catches the defect when it comes from the same
    auditor, names the same file, and contains this fragment in its title, key or evidence.
+   Never use a finding kind alone as the `catch` where the real tree can produce the same kind:
+   for a planted CI red spell (PD-502) the `catch` is the planted failed run's `databaseId`,
+   which no real run in the copy may share, never `ci-red` (BL-1367).
 5. **Touch nothing else.** Never change the checkout you were started in, the real log folder,
    or anything outside the worktree, the log copy and the manifest path.
 
