@@ -1,5 +1,6 @@
 using System.Globalization;
 using Curl.Core.Fakes;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Core.AltSvc;
 
@@ -352,6 +353,45 @@ public sealed class AltSvcCacheTests
         Assert.ThrowsExactly<ArgumentNullException>(() => cache.Find(AltSvcAlpn.H1, "a", 443, null!));
         Assert.ThrowsExactly<ArgumentNullException>(() => cache.FindForOrigin(null!, "a", 443, AnyAlpn));
         Assert.ThrowsExactly<ArgumentNullException>(() => cache.FormatFile(null!));
+    }
+
+    [TestMethod]
+    public void ApplyHeader_GoodAlternativeThenBadPort_ReturnsTheAddedOneThenUnknownPortNumber()
+    {
+        AltSvcCache cache = CacheAt(2026, 9, 29, 5, 20, 5);
+
+        IReadOnlyList<AltSvcHeaderOutcome> outcomes = cache.ApplyHeader("h2=\"a.test:443\", h2=\":abc\"", AltSvcAlpn.H1, "localhost", 18443);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                AltSvcHeaderOutcome.Adding(new Curl.Protocol.Abstractions.AltSvcAlternative("h2", "a.test", 443)),
+                AltSvcHeaderOutcome.Skipping(AltSvcSkipReason.UnknownPortNumber),
+            },
+            outcomes.ToArray());
+    }
+
+    [TestMethod]
+    public void ApplyHeader_ReadableHeaderWithoutAStop_ReturnsOnlyTheAddedAlternatives()
+    {
+        AltSvcCache cache = CacheAt(2026, 9, 29, 5, 20, 5);
+
+        IReadOnlyList<AltSvcHeaderOutcome> outcomes = cache.ApplyHeader("h3=\"[::1]:8443\"", AltSvcAlpn.H1, "localhost", 18443);
+
+        CollectionAssert.AreEqual(
+            new[] { AltSvcHeaderOutcome.Adding(new Curl.Protocol.Abstractions.AltSvcAlternative("h3", "::1", 8443)) },
+            outcomes.ToArray());
+    }
+
+    [TestMethod]
+    public void ApplyHeader_EmptyOriginHost_AddsNothingAndReturnsNoOutcome()
+    {
+        AltSvcCache cache = CacheAt(2026, 9, 29, 5, 20, 5);
+
+        IReadOnlyList<AltSvcHeaderOutcome> outcomes = cache.ApplyHeader("h2=\":443\"", AltSvcAlpn.H1, string.Empty, 18443);
+
+        Assert.IsEmpty(outcomes);
+        Assert.IsEmpty(cache.Entries);
     }
 
     private static AltSvcCache CacheAt(int year, int month, int day, int hour, int minute, int second) =>
