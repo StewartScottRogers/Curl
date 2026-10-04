@@ -1,5 +1,5 @@
 ---
-id: BL-1441
+id: BL-1445
 title: Give the conformance harness's CreateRunner a %output{} file opener and the -# progress bar
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-04
 completed:
 ---
-# BL-1441 — Give the conformance harness's CreateRunner a %output{} file opener and the -# progress bar
+# BL-1445 — Give the conformance harness's CreateRunner a %output{} file opener and the -# progress bar
 
 ## Goal
 
