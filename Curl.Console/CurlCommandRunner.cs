@@ -336,16 +336,25 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private Func<string, string?> EnvironmentVariables => readEnvironmentVariable ?? NoEnvironmentVariables;
 
-    /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
     /// <summary>
     /// The earliest time curl 8.21.0 sets on a Windows file for <c>-R</c>, 1752-09-14T00:00:00Z
-    /// (Unix -6857222400); an earlier source time is capped to it.
+    /// in Unix seconds; an earlier source time is capped to it.
     /// </summary>
-    private static readonly DateTimeOffset WindowsMinimumFileTimeUtc = DateTimeOffset.FromUnixTimeSeconds(-6857222400);
+    private const long WindowsMinimumFileTimeUnixSeconds = -6857222400;
+
+    /// <summary>
+    /// The latest time curl 8.21.0 sets on a Windows file for <c>-R</c>, 30827-12-31T23:59:59Z
+    /// in Unix seconds (<c>tool_filetime.c</c>); a later source time is capped to it.
+    /// </summary>
+    private const long WindowsMaximumFileTimeUnixSeconds = 910670515199;
 
     /// <summary>The warning curl 8.21.0 writes on Windows when it caps an <c>-R</c> time to the minimum.</summary>
     private const string FileTimeCappedToMinimumWarning = "Warning: Capping set filetime to minimum to avoid overflow";
 
+    /// <summary>The warning curl 8.21.0 writes on Windows when it caps an <c>-R</c> time to the maximum.</summary>
+    private const string FileTimeCappedToMaximumWarning = "Warning: Capping set filetime to max to avoid overflow";
+
+    /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
     private const string StandardOutputHeaderFile = "-";
 
     /// <summary>The <c>--stderr</c> value that sends standard error to standard output.</summary>
@@ -4172,9 +4181,9 @@ internal sealed class CurlCommandRunner(
         TransferResult completed)
     {
         await WriteRequestedExtendedAttributesAsync(options, output, url, completed).ConfigureAwait(false);
-        if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
+        if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteUnixSeconds is { } sourceLastWriteUnixSeconds)
         {
-            await StampOutputFileTimeAsync(options, output.Path, sourceLastWriteTimeUtc).ConfigureAwait(false);
+            await StampOutputFileTimeAsync(options, output.Path, sourceLastWriteUnixSeconds).ConfigureAwait(false);
         }
     }
 
@@ -4233,37 +4242,53 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="outputFile">The closed <c>-o</c> file.</param>
-    /// <param name="sourceLastWriteTimeUtc">The source's last-write time.</param>
+    /// <param name="sourceLastWriteUnixSeconds">The source's last-write time in Unix seconds.</param>
     /// <returns>A task that completes when the time is set or the warning written.</returns>
     /// <remarks>
     /// curl 8.21.0 (Windows, measured 2026-09-26) mutes the warning under <c>-s</c> and under
     /// <c>-s -S</c> alike: <c>-S</c> brings back error messages, not warnings. The line is the
     /// Windows form on every platform, for the reason <see cref="RemoteTimeFailureWarning" />
-    /// gives. On Windows a time before <see cref="WindowsMinimumFileTimeUtc" /> is first capped
-    /// to it with <see cref="FileTimeCappedToMinimumWarning" /> (muted by <c>-s</c>), as
-    /// curl 8.21.0's <c>setfiletime</c> caps it; off Windows it is set as given (BL-1392).
+    /// gives. On Windows a time outside <see cref="WindowsMinimumFileTimeUnixSeconds" /> to
+    /// <see cref="WindowsMaximumFileTimeUnixSeconds" /> is first capped to the nearer end with
+    /// <see cref="FileTimeCappedToMinimumWarning" /> or <see cref="FileTimeCappedToMaximumWarning" />
+    /// (muted by <c>-s</c>), as curl 8.21.0's <c>setfiletime</c> caps it; off Windows it is
+    /// set as given, as curl's <c>utimes</c> branch does (BL-1392, BL-1425).
     /// </remarks>
     private async Task StampOutputFileTimeAsync(
         CommandLineOptions options,
         string outputFile,
-        DateTimeOffset sourceLastWriteTimeUtc)
+        long sourceLastWriteUnixSeconds)
     {
-        if (runsOnWindows && sourceLastWriteTimeUtc < WindowsMinimumFileTimeUtc)
+        string? cappedWarning = null;
+        if (runsOnWindows)
         {
-            sourceLastWriteTimeUtc = WindowsMinimumFileTimeUtc;
-            if (!options.Silent)
-            {
-                await WriteErrorLineAsync(FileTimeCappedToMinimumWarning).ConfigureAwait(false);
-            }
+            (sourceLastWriteUnixSeconds, cappedWarning) = CapToWindowsFileTime(sourceLastWriteUnixSeconds);
         }
 
-        if (!outputFileTimeSetter.TrySetLastWriteTimeUtc(outputFile, sourceLastWriteTimeUtc, out int errorCode)
+        if (cappedWarning is not null && !options.Silent)
+        {
+            await WriteErrorLineAsync(cappedWarning).ConfigureAwait(false);
+        }
+
+        if (!outputFileTimeSetter.TrySetLastWriteUnixSeconds(outputFile, sourceLastWriteUnixSeconds, out int errorCode)
             && !options.Silent)
         {
-            await WriteErrorLineAsync(RemoteTimeFailureWarning.For(sourceLastWriteTimeUtc, errorCode))
+            await WriteErrorLineAsync(RemoteTimeFailureWarning.For(sourceLastWriteUnixSeconds, errorCode))
                 .ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Caps an <c>-R</c> time to the range curl 8.21.0 sets on a Windows file.
+    /// </summary>
+    /// <param name="unixSeconds">The source's time in Unix seconds.</param>
+    /// <returns>The time to set, and the capping warning to print, or <see langword="null" /> when it was in range.</returns>
+    private static (long UnixSeconds, string? Warning) CapToWindowsFileTime(long unixSeconds) => unixSeconds switch
+    {
+        < WindowsMinimumFileTimeUnixSeconds => (WindowsMinimumFileTimeUnixSeconds, FileTimeCappedToMinimumWarning),
+        > WindowsMaximumFileTimeUnixSeconds => (WindowsMaximumFileTimeUnixSeconds, FileTimeCappedToMaximumWarning),
+        _ => (unixSeconds, null),
+    };
 
     /// <summary>
     /// Stores <c>--xattr</c>'s attributes on <paramref name="outputFile" /> after a successful

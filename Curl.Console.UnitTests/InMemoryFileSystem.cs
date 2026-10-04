@@ -59,7 +59,7 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
 
     public List<FileWriteMode> WriteModes { get; } = [];
 
-    public List<(string Path, DateTimeOffset LastWriteTimeUtc, bool WhileOpen)> LastWriteTimesSet { get; } = [];
+    public List<(string Path, long LastWriteUnixSeconds, bool WhileOpen)> LastWriteTimesSet { get; } = [];
 
     public int FileTimeErrorCode { get; init; }
 
@@ -113,10 +113,10 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
         return ValueTask.FromResult(FileOpenResult.Opened(stream, 0, null));
     }
 
-    public bool TrySetLastWriteTimeUtc(string path, DateTimeOffset lastWriteTimeUtc, out int errorCode)
+    public bool TrySetLastWriteUnixSeconds(string path, long unixSeconds, out int errorCode)
     {
         bool whileOpen = Written.TryGetValue(path, out MemoryStream? stream) && stream.CanWrite;
-        LastWriteTimesSet.Add((path, lastWriteTimeUtc, whileOpen));
+        LastWriteTimesSet.Add((path, unixSeconds, whileOpen));
         errorCode = FileTimeErrorCode;
 
         return errorCode == 0;
