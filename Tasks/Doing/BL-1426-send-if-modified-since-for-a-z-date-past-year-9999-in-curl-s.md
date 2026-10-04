@@ -34,3 +34,4 @@ An HTTP request under a `-z` date past year 9999 sends `If-Modified-Since`/`If-U
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
