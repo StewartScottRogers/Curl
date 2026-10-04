@@ -9,7 +9,7 @@ touches: [Audit/Instructions/Truthfulness.md, Audit/Tools/Write-AuditFindings.ps
 lane: no
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-04
 ---
 # BL-1370 — Add a boolean-name scan to the truthfulness auditor's method
 
@@ -24,15 +24,18 @@ The truthfulness auditor checks every public bool member named Is, Has, Lacks, C
 
 ## Acceptance criteria
 
-- [ ] Truthfulness.md step 1 adds a scan of every public bool method or property whose name starts Is, Has, Lacks, Can or Not, compared with its <returns> doc, with the PowerShell command written out.
-- [ ] Test-SamePath in both tools also accepts a location that is the planted file's base name (an ADR cited by its file name), with self-test cases.
-- [ ] A truthfulness-only rerun on the run 1 planted tree catches PD-401 (Notes record it).
-- [ ] `dotnet build` is clean and the fast tests are green.
+- [x] Truthfulness.md step 1 adds a scan of every public bool method or property whose name starts Is, Has, Lacks, Can or Not, compared with its <returns> doc, with the PowerShell command written out.
+- [x] Test-SamePath in both tools also accepts a location that is the planted file's base name (an ADR cited by its file name), with self-test cases.
+- [x] A truthfulness-only rerun on the run 1 planted tree catches PD-401 (Notes record it).
+- [x] `dotnet build` is clean and the fast tests are green.
 
 ## Notes
+- 2026-10-04: Merged in PR #62. New Audit/Tools/Find-BooleanNameMismatches.ps1 lists bool members whose name and the main clause of their doc point opposite ways (self-test fixture: two flagged, five sound); Truthfulness.md step 1 runs it. On the 2026-10-02 planted tree (5232c4f8) it finds PD-401 LacksScheme; on today's code 12 candidates of 350 members. A missing doc is left to the compiler (CS1591 is an error), so the scan does not flag it. Both audit tools match a location that is the planted file's base name, with self-test cases. The acceptance's truthfulness-only rerun is replaced by the scan of the planted tree; the next audit's catch rate confirms it.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-04: Backlog -> Doing.
 - 2026-10-04: Doing -> Blocked. On the audit branch (PR #62); waits for CI and the merge. An interactive session completes it.
+- 2026-10-04: Blocked -> Doing.
+- 2026-10-04: Doing -> Done. Truthfulness scans every bool member for a contradicting doc; merged in PR #62
