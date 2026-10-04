@@ -12,11 +12,16 @@ internal interface IOutputPaths
     /// there, as curl's <c>mkdir</c> taking <c>EEXIST</c> as success does.
     /// </summary>
     /// <param name="path">The directory.</param>
+    /// <param name="errorNumber">
+    /// Zero when it succeeded; otherwise the failure as the C runtime's <c>errno</c>, which picks
+    /// curl's message (<see cref="DirectoryCreationFailure" />), <c>EACCES</c> letting the next
+    /// directory be tried.
+    /// </param>
     /// <returns>
     /// <see langword="true" /> when something already existed there or the directory was
     /// created; <see langword="false" /> when it could not be created.
     /// </returns>
-    bool TryCreateDirectory(string path);
+    bool TryCreateDirectory(string path, out int errorNumber);
 
     /// <summary>
     /// Tells whether anything, a file or a directory, is at <paramref name="path" />, as curl's

@@ -390,6 +390,9 @@ internal sealed class CurlCommandRunner(
             MultipartBoundary.CreateRandom,
             standardInput);
 
+    /// <summary>The C runtime numbers <c>--create-dirs</c> and <c>-R</c> failures are worded in (BL-1433).</summary>
+    private readonly CRuntimeErrorNumbers errorNumbers = CRuntimeErrorNumbers.For(runsOnWindows, OperatingSystem.IsMacOS());
+
     /// <summary>The <see cref="IOutputPaths" /> used when the runner is given none.</summary>
     private static readonly PhysicalOutputPaths DiskOutputPaths = new();
 
@@ -2212,9 +2215,9 @@ internal sealed class CurlCommandRunner(
         }
 
         if (options.CreateDirectories
-            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, saveFile, runsOnWindows) is { } directory)
+            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, saveFile, runsOnWindows) is { } failure)
         {
-            return await ReportCannotCreateDirectoryAsync(options, directory).ConfigureAwait(false);
+            return await ReportCannotCreateDirectoryAsync(options, failure).ConfigureAwait(false);
         }
 
         FileOpenResult opened = await fileSystem
@@ -3712,9 +3715,9 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult?> CreateOutputDirectoriesOrSkipAsync(CommandLineOptions options, string outputFile)
     {
         if (options.CreateDirectories
-            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, outputFile, runsOnWindows) is { } directory)
+            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, outputFile, runsOnWindows) is { } failure)
         {
-            return await ReportCannotCreateDirectoryAsync(options, directory).ConfigureAwait(false);
+            return await ReportCannotCreateDirectoryAsync(options, failure).ConfigureAwait(false);
         }
 
         return options.SkipExisting && OutputPaths.Exists(outputFile)
@@ -3826,18 +3829,19 @@ internal sealed class CurlCommandRunner(
         options.RemoteHeaderName && transfer.OutputFileName is null;
 
     /// <summary>
-    /// Prints curl's <c>curl: Error creating directory &lt;dir&gt;</c> line for a
-    /// <c>--create-dirs</c> directory that could not be created, unless <c>-s</c> was given
+    /// Prints curl's line for a <c>--create-dirs</c> directory that could not be created -
+    /// <c>curl: Error creating directory &lt;dir&gt;</c> or the errno's own message
+    /// (<see cref="DirectoryCreationFailure.Message" />, BL-1433) - unless <c>-s</c> was given
     /// without <c>-S</c>, as curl 8.21.0 does (measured 2026-09-27, BL-239 Notes).
     /// </summary>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="directory">The directory, as a leading part of the output path.</param>
+    /// <param name="failure">The directory and why it could not be created.</param>
     /// <returns><see cref="CannotCreateDirectoryFailure" />.</returns>
-    private async Task<TransferResult> ReportCannotCreateDirectoryAsync(CommandLineOptions options, string directory)
+    private async Task<TransferResult> ReportCannotCreateDirectoryAsync(CommandLineOptions options, DirectoryCreationFailure failure)
     {
         if (ShowsErrors(options))
         {
-            await WriteErrorLineAsync($"curl: Error creating directory {directory}").ConfigureAwait(false);
+            await WriteErrorLineAsync(failure.Message(errorNumbers)).ConfigureAwait(false);
         }
 
         return CannotCreateDirectoryFailure;
@@ -4256,8 +4260,8 @@ internal sealed class CurlCommandRunner(
     /// <remarks>
     /// curl 8.21.0 (Windows, measured 2026-09-26) mutes the warning under <c>-s</c> and under
     /// <c>-s -S</c> alike: <c>-S</c> brings back error messages, not warnings. The line is the
-    /// Windows form on every platform, for the reason <see cref="RemoteTimeFailureWarning" />
-    /// gives. On Windows a time outside <see cref="WindowsMinimumFileTimeUnixSeconds" /> to
+    /// Windows <c>CreateFile</c> form on Windows and the POSIX <c>strerror</c> form naming the
+    /// file elsewhere, as <see cref="RemoteTimeFailureWarning" /> describes (BL-1433). On Windows a time outside <see cref="WindowsMinimumFileTimeUnixSeconds" /> to
     /// <see cref="WindowsMaximumFileTimeUnixSeconds" /> is first capped to the nearer end with
     /// <see cref="FileTimeCappedToMinimumWarning" /> or <see cref="FileTimeCappedToMaximumWarning" />
     /// (muted by <c>-s</c>), as curl 8.21.0's <c>setfiletime</c> caps it; off Windows it is
@@ -4282,10 +4286,23 @@ internal sealed class CurlCommandRunner(
         if (!outputFileTimeSetter.TrySetLastWriteUnixSeconds(outputFile, sourceLastWriteUnixSeconds, out int errorCode)
             && !options.Silent)
         {
-            await WriteErrorLineAsync(RemoteTimeFailureWarning.For(sourceLastWriteUnixSeconds, errorCode))
+            await WriteErrorLineAsync(FileTimeFailureWarning(outputFile, sourceLastWriteUnixSeconds, errorCode))
                 .ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Gives the platform's <see cref="RemoteTimeFailureWarning" /> line: the Windows
+    /// <c>CreateFile</c> form on Windows, the POSIX <c>strerror</c> form elsewhere (BL-1433).
+    /// </summary>
+    /// <param name="outputFile">The <c>-o</c> file.</param>
+    /// <param name="sourceLastWriteUnixSeconds">The time that could not be set, in Unix seconds.</param>
+    /// <param name="errorCode">The Win32 error code on Windows, <c>utimes</c>'s <c>errno</c> elsewhere.</param>
+    /// <returns>The warning line.</returns>
+    private string FileTimeFailureWarning(string outputFile, long sourceLastWriteUnixSeconds, int errorCode) =>
+        runsOnWindows
+            ? RemoteTimeFailureWarning.ForWindowsOpen(sourceLastWriteUnixSeconds, errorCode)
+            : RemoteTimeFailureWarning.ForPosix(sourceLastWriteUnixSeconds, outputFile, errorCode, errorNumbers);
 
     /// <summary>
     /// Caps an <c>-R</c> time to the range curl 8.21.0 sets on a Windows file.

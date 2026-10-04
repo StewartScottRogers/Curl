@@ -168,6 +168,25 @@ public sealed class CurlCommandRunnerRemoteNameTests
         Assert.AreEqual(0, outputFiles.Written.Count);
     }
 
+    /// <summary>
+    /// A <c>mkdir</c> that fails with <c>EROFS</c> prints curl 8.21.0's own message for it,
+    /// <c>tool_dirhie.c</c>'s <c>show_dir_errno</c>, and still exits 23 (BL-1433).
+    /// </summary>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    public async Task RunAsync_CreateDirectoriesOnReadOnlyFileSystem_SaysSoAndStopsTheRun()
+    {
+        outputFiles.DirectoryErrorNumbers.Add("ro", 30);
+
+        int exitCode = await RunAsync([Ok], "--create-dirs", "-o", "ro/c.txt", Host + "/f.txt");
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual(
+            "curl: ro resides on a read-only file system" + NewLine
+            + "curl: (23) Failed writing received data to disk/application" + NewLine,
+            StandardErrorText);
+    }
+
     [TestMethod]
     public async Task RunAsync_SilentCreateDirectoriesFails_PrintsNothing()
     {
