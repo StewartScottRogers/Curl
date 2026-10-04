@@ -8,7 +8,7 @@ depends-on: [BL-1402]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1411 — Refuse URL and .netrc credentials holding control characters as curl's url.c does: exit 3 for the URL, exit 26 for .netrc, except a control character other than NUL over HTTP and WebSocket
 
@@ -30,17 +30,20 @@ Before connecting, a transfer whose URL user name or password percent-decodes to
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Console.UnitTests` over fake connectors pin each measured case: the two stderr lines under `-sSv`, the exit code, and that the fake connector records no connection for the refused ones.
-- [ ] Tests pin that `%7f` and `%c3%a9` in an `ftp://` URL user name are accepted, `%1f` is refused, and that `ws://u%01x:p@host/` is accepted while `ws://u%00x:p@host/` is refused.
-- [ ] Redirect hops keep today's behaviour for credentials they already had; a hop's own URL credentials are checked the same way (pin one `-L` case to an `ftp://` target with `%01` in its user).
-- [ ] `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member in the code this task changed.
+- [x] Tests in `Curl.Console.UnitTests` over fake connectors pin each measured case: the two stderr lines under `-sSv`, the exit code, and that the fake connector records no connection for the refused ones.
+- [x] Tests pin that `%7f` and `%c3%a9` in an `ftp://` URL user name are accepted, `%1f` is refused, and that `ws://u%01x:p@host/` is accepted while `ws://u%00x:p@host/` is refused.
+- [x] Redirect hops keep today's behaviour for credentials they already had; a hop's own URL credentials are checked the same way (pin one `-L` case to an `ftp://` target with `%01` in its user).
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member in the code this task changed.
 
 ## Notes
 
 - Not this task: the `-v` line `Could not find host <host> in the <file> file; using defaults` that curl writes when the netrc file has no entry for the host (`lib/url.c` lines 1466-1470); file it separately if it is still missing after this task.
 - Depends on BL-1402 only because both change `Curl.Console`. No option changes, so `--ai-help` is unaffected.
 
+- 2026-10-03 (lane 1): `TransferCredentialLookup` now refuses URL credentials decoding to a byte below 0x20 (only 0x00 for http, https, ws, wss) with exit 3, and a matching netrc entry holding one with exit 26 except over those four schemes; `CurlCommandRunner` writes the `-v` info line and checks each redirect hop's URL in its hop proxy selector. Decisions in ADR-0413: not checked beside a `-u` user name, `--netrc-optional` refuses too, a hop is checked after its proxy is chosen. Tests: `CurlCommandRunnerCredentialControlCodeTests` (18). Measure-CodeQuality -Library Curl.Console: 0 failing members.
+
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. URL credentials with a control character fail with exit 3 and netrc ones with exit 26 before connecting, as curl 8.21.0's url.c does
