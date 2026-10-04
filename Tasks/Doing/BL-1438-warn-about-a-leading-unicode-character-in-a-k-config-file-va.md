@@ -33,3 +33,4 @@ On Windows, an option value read from a `-K` config file that starts with a char
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
