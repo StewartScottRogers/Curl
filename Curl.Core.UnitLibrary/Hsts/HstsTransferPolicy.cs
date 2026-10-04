@@ -23,7 +23,7 @@ namespace Curl.Core.Hsts;
 /// expired lines (<see cref="HstsCache" />, BL-1072); <see langword="null" /> for none. Only
 /// the host is written, never the URL, so no credential can be.
 /// </param>
-public sealed class HstsTransferPolicy(TimeProvider timeProvider, IDiagnosticLog? diagnosticLog = null)
+public sealed class HstsTransferPolicy(TimeProvider timeProvider, IDiagnosticLog? diagnosticLog = null) : IHstsStore
 {
     /// <summary>
     /// What curl's <c>-v</c> line says before the switched URL: <c>Switched from HTTP to HTTPS due to
@@ -95,7 +95,8 @@ public sealed class HstsTransferPolicy(TimeProvider timeProvider, IDiagnosticLog
 
     /// <summary>
     /// Learns each <c>Strict-Transport-Security</c> header of <paramref name="report" />, in the order
-    /// received, when <paramref name="url" /> is <c>https</c>.
+    /// received, when <paramref name="url" /> is <c>https</c>, as <see cref="StoreFromResponse" /> does
+    /// for each at the clock's current time.
     /// </summary>
     /// <param name="url">The URL the response came from.</param>
     /// <param name="report">The response's report; <see langword="null" /> when there was none.</param>
@@ -103,22 +104,52 @@ public sealed class HstsTransferPolicy(TimeProvider timeProvider, IDiagnosticLog
     {
         ArgumentNullException.ThrowIfNull(url);
 
-        if (url.Scheme != "https" || report is null)
+        if (report is null)
         {
             return;
         }
 
-        lock (gate)
+        foreach (KeyValuePair<string, string> header in report.ResponseHeaders)
         {
-            foreach (KeyValuePair<string, string> header in report.ResponseHeaders)
+            if (string.Equals(header.Key, HeaderName, StringComparison.OrdinalIgnoreCase))
             {
-                if (string.Equals(header.Key, HeaderName, StringComparison.OrdinalIgnoreCase))
-                {
-                    cache.ApplyHeader(header.Value, HostName(url));
-                    WriteIfEnabled(DiagnosticLogLevel.Verbose, HostName(url), name => $"learned {HeaderName} from {name}");
-                }
+                StoreFromResponse(url, header.Value, timeProvider.GetUtcNow());
             }
         }
+    }
+
+    /// <summary>
+    /// Learns one <c>Strict-Transport-Security</c> header of a response from <paramref name="origin" />,
+    /// as <see cref="HstsCache.ApplyHeader(string, string, DateTimeOffset)" /> does, when the origin is
+    /// <c>https</c>; a header received over plain <c>http</c> is ignored (ADR-0409).
+    /// </summary>
+    /// <param name="origin">The URL of the request the response answered.</param>
+    /// <param name="headerValue">The header's value, verbatim.</param>
+    /// <param name="now">The receive time the header's <c>max-age</c> counts from.</param>
+    /// <returns>
+    /// <see langword="false" /> only when the header is illegal and curl writes
+    /// <c>Illegal STS header skipped</c>; <see langword="true" /> otherwise, including for an
+    /// IP-address host and an <c>http</c> origin, which store nothing.
+    /// </returns>
+    public bool StoreFromResponse(CurlUrl origin, string headerValue, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(origin);
+        ArgumentNullException.ThrowIfNull(headerValue);
+
+        if (origin.Scheme != "https")
+        {
+            return true;
+        }
+
+        string host = HostName(origin);
+        bool legal;
+        lock (gate)
+        {
+            legal = cache.ApplyHeader(headerValue, host, now);
+        }
+
+        WriteIfEnabled(DiagnosticLogLevel.Verbose, host, name => $"learned {HeaderName} from {name}");
+        return legal;
     }
 
     /// <summary>
