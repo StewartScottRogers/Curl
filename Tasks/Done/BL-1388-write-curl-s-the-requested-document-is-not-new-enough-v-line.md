@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests]
 requirement: FR-009
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1388 — Write curl's 'The requested document is not new enough' -v line for an unmet file:// -z, and ignore -z under -r or -C as file_do does
 
@@ -29,17 +29,19 @@ A `file://` download whose file fails `-z` writes curl 8.21.0's `* The requested
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.File.UnitTests` over a fake file system with a file dated 2001-01-01 and an if-modified-since condition of 2020-01-01 pins the info line `The requested document is not new enough`, the transfer ending with nothing written and exit 0; a second test pins `The requested document is not old enough` for an if-unmodified-since condition of 1999-01-01.
-- [ ] Tests pin that with `Range` 0-0 and with `ResumeFrom = 1` the same unmet condition is ignored and the bytes `h` and `i\n` are written.
-- [ ] Tests pin that a met condition, and a file or condition time at the Unix epoch, write no new line.
-- [ ] Test paths are drive-less (`file:///dir/f.txt` style through the fake file system), so the tests pass on Windows, Linux and macOS.
-- [ ] `dotnet build Curl.Protocol.File.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.File.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary` reports no failing member in the code this task changed.
+- [x] A test in `Curl.Protocol.File.UnitTests` over a fake file system with a file dated 2001-01-01 and an if-modified-since condition of 2020-01-01 pins the info line `The requested document is not new enough`, the transfer ending with nothing written and exit 0; a second test pins `The requested document is not old enough` for an if-unmodified-since condition of 1999-01-01.
+- [x] Tests pin that with `Range` 0-0 and with `ResumeFrom = 1` the same unmet condition is ignored and the bytes `h` and `i\n` are written.
+- [x] Tests pin that a met condition, and a file or condition time at the Unix epoch, write no new line.
+- [x] Test paths are drive-less (`file:///dir/f.txt` style through the fake file system), so the tests pass on Windows, Linux and macOS.
+- [x] `dotnet build Curl.Protocol.File.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.File.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary` reports no failing member in the code this task changed.
 
 ## Notes
 
 - `-r` text that names no range (`5-2`) also sets curl's `state.range`, so `-z` is skipped there too and the exit 33 after the open (BL-1334) follows whatever the condition says; a test pins that with an unmet condition.
+- Done: `DownloadFromAsync` now checks `-z` only when `HasRange` is false (`Range` or `RangeText` set, or `ResumeFrom > 0`; `-C 0` keeps the check, as curl sets no range for it), and reports `FileTransferMessages.TimeConditionNotMet(kind)` before returning. Tests: `FileProtocolHandlerTimeConditionLineTests` (10 cases). File tests 355 green; `Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. file:// -v writes 'The requested document is not new/old enough' for an unmet -z, and -r or -C N ignores -z as curl's file_do does
