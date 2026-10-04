@@ -212,7 +212,8 @@ internal static class HttpRequestHeadFormatter
 
     /// <summary>
     /// Appends <c>If-Modified-Since</c> for <c>-z date</c> or <c>If-Unmodified-Since</c> for
-    /// <c>-z -date</c>, the time in RFC 1123 form in GMT, unless an <c>-H</c> value names it.
+    /// <c>-z -date</c>, the time in RFC 1123 form in GMT (<see cref="HttpConditionDate" />),
+    /// unless an <c>-H</c> value names it.
     /// </summary>
     private static void AppendTimeCondition(StringBuilder head, HttpCustomHeader[] customHeaders, TimeCondition? timeCondition)
     {
@@ -222,7 +223,7 @@ internal static class HttpRequestHeadFormatter
         }
 
         string name = timeCondition.Kind == TimeConditionKind.IfUnmodifiedSince ? "If-Unmodified-Since" : "If-Modified-Since";
-        AppendUnlessOverridden(head, customHeaders, name, timeCondition.Value.UtcDateTime.ToString("r", CultureInfo.InvariantCulture));
+        AppendUnlessOverridden(head, customHeaders, name, HttpConditionDate.Format(timeCondition));
     }
 
     /// <summary>

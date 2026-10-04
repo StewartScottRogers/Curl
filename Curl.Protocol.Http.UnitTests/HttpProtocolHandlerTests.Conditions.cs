@@ -323,6 +323,33 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(TimeConditionKind.IfModifiedSince, "If-Modified-Since", DisplayName = "-z \"Mon, 01 Jan 40000 00:00:00 GMT\"")]
+    [DataRow(TimeConditionKind.IfUnmodifiedSince, "If-Unmodified-Since", DisplayName = "-z \"-Mon, 01 Jan 40000 00:00:00 GMT\"")]
+    public async Task ExecuteAsync_TimeConditionInYear40000_FailsWith43OnWindowsAndSendsTheFiveDigitYearElsewhere(TimeConditionKind kind, string name)
+    {
+        string expected = $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:18796\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n{name}: Sat, 01 Jan 40000 00:00:00 GMT\r\n\r\n";
+        ScriptedConnection connection = Connection(WholeHead + "hello", 65536, OperatingSystem.IsWindows() ? null : expected);
+        TransferContext context = new TransferContext
+        {
+            Url = ConditionUrl(18796),
+            Output = new MemoryStream(),
+            TimeCondition = TimeCondition.FromUnixSeconds(1200110860800L, kind),
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
+            Assert.IsEmpty(connection.Written);
+        }
+        else
+        {
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        }
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TimeConditionOverriddenByHeader_SendsTheHeaderOnly()
     {
         const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18833\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nIf-Modified-Since: x\r\n\r\n";
