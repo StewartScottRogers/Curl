@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
 requirement: FR-035
 created: 2026-10-04
-completed:
+completed: 2026-10-04
 ---
 # BL-1444 — Follow curl when a TFTP reply's opcode is curl's INIT or TIMEOUT event or switches the transfer's direction
 
@@ -30,13 +30,21 @@ The four opcode cases BL-1435 measured but left ignored behave as curl 8.21.0 do
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.Tftp.UnitTests` pin each measured case above: the packets sent, the `-v` lines in order, the exit code and message.
-- [ ] The upload's first-reply DATA case is measured, its `stderr.txt` and exit code put in Notes, and pinned.
-- [ ] `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration"` passes; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Tftp.UnitLibrary` reports no failing member.
+- [x] Tests in `Curl.Protocol.Tftp.UnitTests` pin each measured case above: the packets sent, the `-v` lines in order, the exit code and message.
+- [x] The upload's first-reply DATA case is measured, its `stderr.txt` and exit code put in Notes, and pinned.
+- [x] `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration"` passes; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Tftp.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Re-measured every case 2026-10-04 (curl 8.21.0 mingw64, `-v`, `-TftpNoOack`, 600-byte file or upload). Correction to the Context: opcode 0 or 7 as the first reply *does* print `* Internal error: Unexpected packet`, for downloads and uploads alike (the earlier reading lost lines that shared a progress-meter line).
+- Upload, first reply DATA (`WRQ=PACKET 0003000141`): exit 0. `stderr.txt` `-v` lines: `Trying 127.0.0.1:<port>...`, `Established connection ...`, `set timeouts for state 0; Total 300000, retry 6 maxtry 50`, `{ [1 bytes data]`, `Connected for receive`, `set timeouts for state 1; Total 0, retry 5 maxtry 3`, `shutting down connection #0`. curl sends ACK 1 and writes `A` to stdout.
+- Download, first reply ACK 0: `Connected for transmit`, `set timeouts for state 2; ...`, `tftp_tx: internal error, event: 3`, `Timeout waiting for block 2 ACK. Retries = 1` to `4`; empty DATA 1 sent four times; exit 28 `tftp_tx: internal error, event: 3`.
+- Design (ADR-0414): a direction switch hands over to the other class's `TakeOverAsync` with a `TftpHandOver`; every `failf` is a noted failure whose message the transfer keeps, generalising the too-short note, so an upload's `tftp_tx: internal error, event: N` is now noted too.
+- `TftpProtocolHandlerTests.ExecuteAsync_FirstReplyAckTimeoutOpcodeAndWrongBlock_AreIgnored` pinned the old ignoring; it now pins only the wrong-block case, as `ExecuteAsync_FirstReplyOfTheWrongBlock_IsIgnored`.
+- Measure-CodeQuality (Tftp library): 100% line and branch, 0 failing members after splitting both `AnswerAsync` methods. Full build clean; all 33 fast test projects pass.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-04: Backlog -> Doing.
+- 2026-10-04: Doing -> Done. TFTP opcodes 0 and 7 re-send or time out, and a first reply that switches direction hands the transfer over, as curl 8.21.0 does
