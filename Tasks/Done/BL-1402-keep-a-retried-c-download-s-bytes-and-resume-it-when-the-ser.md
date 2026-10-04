@@ -8,7 +8,7 @@ depends-on: [BL-1396]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1402 — Keep a retried -C - download's bytes and resume it when the server takes ranges, with curl's 'Keeping N bytes' and 'Throwing away N bytes' notes
 
@@ -29,17 +29,21 @@ Under `--retry` with `-o <file>`, a failed attempt's bytes are handled as curl 8
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Console.UnitTests` over fake connectors pin the first measured case: the note line after the retry warning, the retry's `Range: bytes=5-`, the output file `hello56789`, exit 0.
-- [ ] Tests pin the second case (the throw-away note, no `Range`, the file `0123456789`), the same with `-v` absent (no note), and the case without `-C -` (truncated, no `Keeping` note, `Throwing away 5 bytes` under `-v`).
-- [ ] Tests pin no keeping for `-C -` with `-X GET`, with `-d`, and for an attempt that failed with exit 23; and nothing kept or noted when the body goes to standard output.
-- [ ] `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member in the code this task changed.
+- [x] Tests in `Curl.Console.UnitTests` over fake connectors pin the first measured case: the note line after the retry warning, the retry's `Range: bytes=5-`, the output file `hello56789`, exit 0.
+- [x] Tests pin the second case (the throw-away note, no `Range`, the file `0123456789`), the same with `-v` absent (no note), and the case without `-C -` (truncated, no `Keeping` note, `Throwing away 5 bytes` under `-v`).
+- [x] Tests pin no keeping for `-C -` with `-X GET`, with `-d`, and for an attempt that failed with exit 23; and nothing kept or noted when the body goes to standard output.
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member in the code this task changed.
 
 ## Notes
 
 - `Curl.Core.UnitLibrary/TransferRetrier.cs` says every attempt runs on a context "unchanged" and leaves readying the output to its caller; keep the resume decision in `Curl.Console`, where the attempt context is built (`createAttemptContext`), unless the retrier's contract has to change, in which case say so and file it.
 - Depends on BL-1396 only because both change `Curl.Console`. No option changes, so `--ai-help` is unaffected.
+- Done (2026-10-03): the decision stays in `Curl.Console`; `TransferRetrier`'s contract is unchanged. `FollowRetryingAsync` now creates each attempt's context from that attempt's `-C` offset (`Func<long?, TransferContext>`), and its retry callback asks `AttemptBytesKeptForResume` (`IsAutoResumable`, `TakesTheResume`, `AcceptsByteRanges`) how many bytes to keep. `WriteRetryLinesAsync` then calls `KeepOrThrowAwayAttemptBytesAsync`, which keeps the bytes (`DeferredOutputFileStream.KeepForRetry`) or cuts them back (`TruncateForRetry`) and writes the note under `-v` or a `--trace` option, the same gate as the other `Note:` lines. `DeferredOutputFileStream.AttemptBytesWritten` counts the attempt's bytes on a seekable file only, the way curl counts only a regular file.
+- Choices: the "plain GET" test uses the attempt report's effective `Method` (so `-d`, `-T` and `-I` are excluded), and `-X` of any value excludes. A `206` keeps the bytes only when the attempt resumed from an offset above zero, and `Accept-Ranges` is matched without regard to case.
+- Results: 13 new tests in `CurlCommandRunnerRetryTests` (2565 Console fast tests pass); `Measure-CodeQuality.ps1 -Library Curl.Console` gives 100% line and branch coverage, 0 failing members, worst CRAP 10.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. A retried -C - download keeps its bytes and resumes when the server takes ranges, with curl's Keeping/Throwing away notes under -v
