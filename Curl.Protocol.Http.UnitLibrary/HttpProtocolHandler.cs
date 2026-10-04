@@ -1033,6 +1033,7 @@ public sealed class HttpProtocolHandler(
                 ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
                 cookiesStored = StoreCookie(context, header, cookiesStored);
                 StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
+                StoreHsts(context, options.HstsStore, header);
             },
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
             IsHttp2OrHttp3 = requestStream is not null,
@@ -1822,7 +1823,8 @@ public sealed class HttpProtocolHandler(
     /// <c>https</c> URL and <paramref name="store" /> is set, to the store with the transfer's
     /// URL as the origin, and reports curl 8.21.0's <c>Added alt-svc: &lt;host&gt;:&lt;port&gt; over
     /// &lt;id&gt;</c> for each alternative it added, before the header line (measured, BL-623
-    /// Notes); a skipped alternative writes nothing yet (BL-1420, ADR-0409). curl learns no
+    /// Notes), and for each it skipped the <c>lib/altsvc.c</c> line its reason names, in header
+    /// order (measured, ADR-0409). curl learns no
     /// alternative over plain <c>http</c>. The store is told
     /// <paramref name="responseVersion" />, the version the response came over, as curl 8.21.0
     /// passes <c>k->httpversion</c> to <c>Curl_altsvc_parse</c> (BL-947).
@@ -1837,9 +1839,41 @@ public sealed class HttpProtocolHandler(
         }
 
         IReadOnlyList<AltSvcHeaderOutcome> outcomes = store.StoreFromResponse(context.Url, header.Value, responseVersion, context.TimeProvider.GetUtcNow());
-        foreach (AltSvcAlternative added in outcomes.Select(outcome => outcome.Added).OfType<AltSvcAlternative>())
+        foreach (AltSvcHeaderOutcome outcome in outcomes)
         {
-            context.Events.ReportInfo($"Added alt-svc: {added.Host}:{added.Port} over {added.Alpn}");
+            context.Events.ReportInfo(AltSvcOutcomeLine(outcome));
+        }
+    }
+
+    /// <summary>
+    /// Gets curl 8.21.0's <c>-v</c> line for one <c>Alt-Svc</c> outcome: <c>Added alt-svc: ...</c>
+    /// for an alternative added, or the <c>lib/altsvc.c</c> text for the reason one was skipped
+    /// (ADR-0409).
+    /// </summary>
+    private static string AltSvcOutcomeLine(AltSvcHeaderOutcome outcome) =>
+        outcome switch
+        {
+            { Added: { } added } => $"Added alt-svc: {added.Host}:{added.Port} over {added.Alpn}",
+            { SkipReason: AltSvcSkipReason.BadHostname } => "Bad alt-svc hostname, ignoring.",
+            { SkipReason: AltSvcSkipReason.BadIpv6Hostname } => "Bad alt-svc IPv6 hostname, ignoring.",
+            _ => "Unknown alt-svc port number, ignoring.",
+        };
+
+    /// <summary>
+    /// Hands <paramref name="header" />, when it is a <c>Strict-Transport-Security</c> header of a
+    /// response to an <c>https</c> URL and <paramref name="store" /> is set, to the store with the
+    /// transfer's URL as the origin, and reports curl 8.21.0's <c>Illegal STS header skipped</c>
+    /// before the header line when the store refuses it (measured, ADR-0409). curl learns no HSTS
+    /// over plain <c>http</c>.
+    /// </summary>
+    private static void StoreHsts(ITransferContext context, IHstsStore? store, HttpResponseHeader header)
+    {
+        if (store is not null
+            && context.Url.Scheme == "https"
+            && string.Equals(header.Name, "Strict-Transport-Security", StringComparison.OrdinalIgnoreCase)
+            && !store.StoreFromResponse(context.Url, header.Value, context.TimeProvider.GetUtcNow()))
+        {
+            context.Events.ReportInfo("Illegal STS header skipped");
         }
     }
 
