@@ -42,3 +42,4 @@ A `file://` download whose file fails `-z` writes curl 8.21.0's `* The requested
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
