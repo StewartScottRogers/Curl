@@ -37,3 +37,4 @@ An `sftp://host/dir/` listing, long form or `-l`, honours `ITransferContext.MaxF
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
