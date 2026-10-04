@@ -39,3 +39,4 @@ The four opcode cases BL-1435 measured but left ignored behave as curl 8.21.0 do
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
