@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: [BL-1432]
-touches: [Curl.Console, Curl.Console.UnitTests]
+touches: [Curl.Console, Curl.Console.UnitTests, Curl.Core.UnitLibrary]
 requirement: FR-011
 created: 2026-10-04
-completed:
+completed: 2026-10-04
 ---
 # BL-1433 — Word -R and --create-dirs file-system failures off Windows as curl's POSIX build does
 
@@ -26,14 +26,22 @@ Off Windows, Curl words a failed `-R` time stamp and a `--create-dirs` directory
 
 ## Acceptance criteria
 
-- [ ] `RemoteTimeFailureWarning` gives the POSIX form off Windows, taking the output file name and errno, with a data-driven test over ENOENT, EACCES, EPERM, EROFS and an unknown errno (glibc `Unknown error <n>`, macOS `Unknown error: <n>`), each platform's text pinned through an injected platform flag so every row runs on every OS.
-- [ ] A test pins the Windows `SetFileTime failed` form for a stamp that fails after the file opened, and the existing `CreateFile failed` tests still pass.
-- [ ] `--create-dirs` tests in `Curl.Console.UnitTests` pin each of the five messages above by injected errno, and that EACCES and EEXIST on a leading directory are skipped so the next directory is tried, as in `create_dir_hierarchy`.
-- [ ] Test paths are drive-less; `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member.
+- [x] `RemoteTimeFailureWarning` gives the POSIX form off Windows, taking the output file name and errno, with a data-driven test over ENOENT, EACCES, EPERM, EROFS and an unknown errno (glibc `Unknown error <n>`, macOS `Unknown error: <n>`), each platform's text pinned through an injected platform flag so every row runs on every OS.
+- [x] A test pins the Windows `SetFileTime failed` form for a stamp that fails after the file opened, and the existing `CreateFile failed` tests still pass.
+- [x] `--create-dirs` tests in `Curl.Console.UnitTests` pin each of the five messages above by injected errno, and that EACCES and EEXIST on a leading directory are skipped so the next directory is tried, as in `create_dir_hierarchy`.
+- [x] Test paths are drive-less; `dotnet build Curl.Console.UnitTests -warnaserror` is clean; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no failing member.
 
 ## Notes
+
+- Added `Curl.Core.UnitLibrary` to `touches`: off Windows `PhysicalFileSystem.TrySetLastWriteUnixSeconds` went through `File.SetLastWriteTimeUtc`, whose failure code is Win32-style (`UnauthorizedAccessException` reads as 5, `EIO`), not errno. Now every time off Windows goes through `NativeFileTimeSetter`'s `utimes`, so the code is a real errno; Windows unchanged. No task in Doing on `origin/work/dark-factory` named Curl.Core.UnitLibrary (only BL-1441, Conformance).
+- New: `CRuntimeErrorNumbers` (per-platform errno numbers + `strerror` texts; glibc `Unknown error <n>`, macOS `Unknown error: <n>`), `DirectoryCreationFailure` (curl's five `show_dir_errno` messages). `IOutputPaths.TryCreateDirectory` gives the errno; `OutputFileDirectories` passes over `EACCES`/`EEXIST`; `PhysicalOutputPaths.ErrorNumberOf` reads errno from the exception.
+- `RemoteTimeFailureWarning`: `ForWindowsOpen` (measured `CreateFile` line), `ForWindowsStamp` (`SetFileTime` line, pinned by test), `ForPosix`. On Windows the runner still prints `ForWindowsOpen`: .NET does not say whether open or stamp failed. Filed BL-1449 to tell them apart.
+- Decision recorded in ADR-0415. .NET folds `EPERM` into `UnauthorizedAccessException`, so an `EPERM` directory is passed over as `EACCES` is; noted there.
+- The POSIX texts come from upstream source and the C libraries, not a Linux/macOS measurement (lanes run on Windows).
+- Gates: `dotnet build -warnaserror` clean; Curl.Console.UnitTests 2652 passed, 24 skipped; Curl.Core PhysicalFileSystem tests 33 passed; `Measure-CodeQuality.ps1 -Library Curl.Console,Curl.Core.UnitLibrary`: both 100% line/branch, 0 failing members after splitting `CreateLeadingDirectories` and `StampOutputFileTimeAsync` (worst CRAP 10).
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-04: Backlog -> Doing.
+- 2026-10-04: Doing -> Done. Off Windows -R and --create-dirs failures print curl's POSIX errno texts
