@@ -37,7 +37,7 @@ Under `-v`, when an MQTT PUBLISH body has not fully arrived and the next read wo
 - Implementation: `MqttPacketReader.ReadChunkAsync` takes an optional `whenReadMustWait` callback, called when nothing is buffered and the connection's read is not complete when it returns (the model of curl's `CURLE_AGAIN`, stated in its remarks); `MqttSession.WritePublishAsync` passes `ReportReadMustWait`, which writes `MqttTransferMessages.ReadMustWait`. Header and CONNACK/SUBACK reads pass none, as curl writes the line only in `mqtt_read_publish`.
 - Test fake: `ScriptedConnection.HeldReads` names reads that complete only after a `Task.Yield`, i.e. pending when `ReadAsync` returns.
 - Coverage: `Curl.Protocol.Mqtt.UnitLibrary` 100% line, 100% branch, 0 failing members.
-- Follow-up filed: BL-1441 - curl writes the body part by part with `mqtt_doing: state [6]` lines around each wait; Curl still buffers the whole body and writes it once.
+- Follow-up filed: BL-1442 - curl writes the body part by part with `mqtt_doing: state [6]` lines around each wait; Curl still buffers the whole body and writes it once.
 
 ## Log
 

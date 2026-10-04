@@ -1,5 +1,5 @@
 ---
-id: BL-1441
+id: BL-1442
 title: Write an MQTT PUBLISH body as it arrives, with curl's mqtt_doing state [6] lines around each wait
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-039
 created: 2026-10-04
 completed:
 ---
-# BL-1441 — Write an MQTT PUBLISH body as it arrives, with curl's mqtt_doing state [6] lines around each wait
+# BL-1442 — Write an MQTT PUBLISH body as it arrives, with curl's mqtt_doing state [6] lines around each wait
 
 ## Goal
 
