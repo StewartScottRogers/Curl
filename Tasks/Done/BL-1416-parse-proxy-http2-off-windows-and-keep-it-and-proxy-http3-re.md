@@ -38,7 +38,7 @@ Off Windows, `--proxy-http2` and `--no-proxy-http2` parse into a proxy-HTTP/2 se
 - `--proxy-http3` still has no row, so it keeps the ADR-0137 refusal on both platforms. `--ai-help` derives both answers from the table (the Windows refusal line for `--proxy-http2`, "Not supported by this build yet" for `--proxy-http3`), and tests pin both.
 - `--libcurl` writes nothing for `--proxy-http2`, following ADR-0326 for options the Schannel reference build refuses (listed in `WritesNothing`). The setting is per `--next` group, as curl's `proxyver` is.
 - Carrying the setting to the connector (ALPN `h2`, HTTP/2 CONNECT) is ADR-0408 decisions 4-6, for other tasks.
-- Coverage: `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` reports 99.98% line and 99.89% branch, with 3 failing members, none in code this task changed (`ArgumentReader.PeekNext`, `CommandLineParser.RefuseUnlistedLetter`, `AccountHomeDirectory` line 15). Every line this task added is covered. Filed BL-1417 for those three gaps.
+- Coverage: `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` reports 99.98% line and 99.89% branch, with 3 failing members, none in code this task changed (`ArgumentReader.PeekNext`, `CommandLineParser.RefuseUnlistedLetter`, `AccountHomeDirectory` line 15). Every line this task added is covered. Filed BL-1421 for those three gaps.
 
 ## Log
 

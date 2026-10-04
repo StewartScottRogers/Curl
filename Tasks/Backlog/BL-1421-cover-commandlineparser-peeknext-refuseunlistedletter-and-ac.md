@@ -1,5 +1,5 @@
 ---
-id: BL-1417
+id: BL-1421
 title: Cover CommandLineParser.PeekNext, RefuseUnlistedLetter and AccountHomeDirectory's Windows gap in Curl.Cli.UnitLibrary
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-03
 completed:
 ---
-# BL-1417 — Cover CommandLineParser.PeekNext, RefuseUnlistedLetter and AccountHomeDirectory's Windows gap in Curl.Cli.UnitLibrary
+# BL-1421 — Cover CommandLineParser.PeekNext, RefuseUnlistedLetter and AccountHomeDirectory's Windows gap in Curl.Cli.UnitLibrary
 
 ## Goal
 
