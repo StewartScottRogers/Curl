@@ -34,7 +34,7 @@ On Linux and macOS a `file://` URL naming a directory writes the names of its en
 ## Notes
 
 - Decision (sensible default, no ADR needed - the platform split follows the standing "match the platform's curl" rule): the choice is `FileProtocolHandler.ListsDirectories`, an internal init property defaulting to `!OperatingSystem.IsWindows()`, so tests inject either answer and the composition root is untouched.
-- The directory's timestamp comes from the failed open's `FileOpenResult.LastWriteTimeUtc` (`Failed(IsDirectory) with { LastWriteTimeUtc = ... }`); `IDirectoryLister` gives names only. `PhysicalFileSystem` does not fill it in yet, so on a real disk the `-i` block is only the blank line and `-z` always transfers: filed BL-1418 (Curl.Core, outside this task's touches).
+- The directory's timestamp comes from the failed open's `FileOpenResult.LastWriteTimeUtc` (`Failed(IsDirectory) with { LastWriteTimeUtc = ... }`); `IDirectoryLister` gives names only. `PhysicalFileSystem` does not fill it in yet, so on a real disk the `-i` block is only the blank line and `-z` always transfers: filed BL-1422 (Curl.Core, outside this task's touches).
 - The listing of `b.txt`, `.hidden`, `a.txt`, `sub` is `b.txt\na.txt\nsub\n`, which is 16 bytes, not the 18 the first criterion said; the test asserts 16.
 - `--max-filesize` writes what fits of each write, then exit 63, as `cw_download_write` does; a failed `opendir` is exit 26 with curl's easy error text and no `-v` line (no `failf` upstream), and closes the connection as other exit 26 failures do.
 - Range options do nothing to a listing except skip `-z`, as for a file (`HasRange`).

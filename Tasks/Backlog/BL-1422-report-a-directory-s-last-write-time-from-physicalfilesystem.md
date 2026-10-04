@@ -1,5 +1,5 @@
 ---
-id: BL-1418
+id: BL-1422
 title: Report a directory's last-write time from PhysicalFileSystem's IsDirectory open
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-004
 created: 2026-10-03
 completed:
 ---
-# BL-1418 — Report a directory's last-write time from PhysicalFileSystem's IsDirectory open
+# BL-1422 — Report a directory's last-write time from PhysicalFileSystem's IsDirectory open
 
 ## Goal
 
