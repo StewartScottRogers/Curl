@@ -25,6 +25,14 @@ public sealed class UpstreamCaseVerificationTests
     }
 
     [TestMethod]
+    public void FindFirstDifference_ProtocolWithCrlfAndNonewline_CutsTheLastLineFeedBeforeForcingCrlf()
+    {
+        string sections = "<verify>\n<protocol crlf=\"yes\" nonewline=\"yes\">\nPOST / HTTP/1.1\n\nbody\n</protocol>\n</verify>\n";
+
+        Assert.IsNull(Verify(sections, Run(received: "POST / HTTP/1.1\r\n\r\nbody")));
+    }
+
+    [TestMethod]
     public void FindFirstDifference_ProtocolThatDiffers_NamesIt()
     {
         string sections = "<verify>\n<protocol nonewline=\"yes\">\nGET / HTTP/1.1\n</protocol>\n</verify>\n";

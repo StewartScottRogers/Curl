@@ -89,6 +89,28 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    [DataRow("headers", "GET / HTTP/1.0\r\n\r\nbody\n")]
+    [DataRow("yes", "GET / HTTP/1.0\r\n\r\nbody\r\n")]
+    public async Task RunAsync_StdinAndFileWithCrlf_AreGivenWithCrlfLineEndings(string crlf, string expected)
+    {
+        string logDirectory = CreateLogDirectory();
+        string? stdin = null;
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            stdin = await new StreamReader(invocation.StandardInput).ReadToEndAsync();
+            return 0;
+        });
+        string body = "GET / HTTP/1.0\n\nbody\n";
+        string testFile = $"<testcase>\n<client>\n<command>\na\n</command>\n<file name=\"%LOGDIR/in.txt\" crlf=\"{crlf}\">\n{body}</file>\n"
+            + $"<stdin crlf=\"{crlf}\">\n{body}</stdin>\n</client>\n</testcase>\n";
+
+        await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), logDirectory);
+
+        Assert.AreEqual(expected, stdin);
+        Assert.AreEqual(expected, File.ReadAllText($"{logDirectory}/in.txt"));
+    }
+
+    [TestMethod]
     public async Task RunAsync_OutputFileCurlWrote_IsComparedWithTheReplyData()
     {
         UpstreamCaseRunner runner = Runner(invocation =>
