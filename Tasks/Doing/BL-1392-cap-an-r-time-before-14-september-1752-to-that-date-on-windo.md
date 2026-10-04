@@ -41,3 +41,4 @@ On Windows, `-R`/`--remote-time` stamps an output file whose source time is earl
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
