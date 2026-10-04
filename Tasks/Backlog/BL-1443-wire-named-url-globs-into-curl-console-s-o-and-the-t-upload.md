@@ -1,5 +1,5 @@
 ---
-id: BL-1441
+id: BL-1443
 title: Wire named URL globs into Curl.Console's -o and the -T upload glob
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-04
 completed:
 ---
-# BL-1441 — Wire named URL globs into Curl.Console's -o and the -T upload glob
+# BL-1443 — Wire named URL globs into Curl.Console's -o and the -T upload glob
 
 ## Goal
 

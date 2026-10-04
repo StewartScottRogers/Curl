@@ -38,7 +38,7 @@ completed: 2026-10-04
 - Decided (sensible default, no upstream source on hand): any character but `>` may be in a name, and the empty name `<>` is a name. Upstream test data only exercises letters; revisit if a conformance diff shows otherwise.
 - Decided: `Duplicate glob name`'s position is the 0-based offset just past `>` (`pattern - ipattern`, as the task says), not the parser's other errors' closed-set-adjusted column; both give 40 for test2410.
 - `SubstituteGlobValues` and `ResolveOutputFileName` keep returning a string and leave an unknown `#<name>` as written, so Curl.Console is unchanged; the new `TryResolveOutputFileName` returns curl's exit 43 failure.
-- Follow-up filed: BL-1441 wires `TryResolveOutputFileName` into Curl.Console's `-o` (`UrlTransfer.cs:62`) and looks names up in the `-T` upload glob (`Curl.Cli.UnitLibrary/UploadFileGlob.cs`).
+- Follow-up filed: BL-1443 wires `TryResolveOutputFileName` into Curl.Console's `-o` (`UrlTransfer.cs:62`) and looks names up in the `-T` upload glob (`Curl.Cli.UnitLibrary/UploadFileGlob.cs`).
 - Measure-CodeQuality -Library Curl.Core.UnitLibrary: 100% line, 100% branch, 0 failing members (after extracting `ReadGlobName`/`ReadNamedGlob` from `ReadNextPiece`, which first measured at complexity 12). Curl.Core.UnitTests: 1413 passed, 6 skipped.
 
 ## Log
