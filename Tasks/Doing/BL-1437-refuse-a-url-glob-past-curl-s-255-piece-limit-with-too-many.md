@@ -33,3 +33,4 @@ A URL glob with more pieces than curl 8.21.0 allows fails as curl's does: `curl:
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
