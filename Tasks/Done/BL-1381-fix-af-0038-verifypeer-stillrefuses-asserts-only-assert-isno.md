@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1381 — Fix AF-0038: VerifyPeer_..._StillRefuses asserts only Assert.IsNotNull(failure), not which refusal
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now pins the whole refusal: `(CurlExitCode.PeerFailedVerification, UntrustedRootLine)`, the Schannel build's SEC_E_UNTRUSTED_ROOT line that `SchannelPeerFailedVerification` returns without `--cacert`. No production change; feature pipeline stages beyond the test were not needed for a one-assertion test fix.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. VerifyPeer best-effort test asserts exit 60 and the exact SEC_E_UNTRUSTED_ROOT text (AF-0038)
