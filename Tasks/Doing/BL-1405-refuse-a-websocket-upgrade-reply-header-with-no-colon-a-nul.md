@@ -40,3 +40,4 @@ A `ws://` or `wss://` upgrade reply whose head carries a header line curl 8.21.0
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
