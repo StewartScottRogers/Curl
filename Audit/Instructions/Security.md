@@ -105,4 +105,4 @@ index, as in an S-box cipher), `secret-in-output`, `secret-in-log`,
 
 ## Method counts
 
-Run every step above on every audit; re-audits come on top, never instead. Report ``method.fuzzTargets`` and ``method.timingSitesRead`` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).
+Run every step above on every audit; re-audits come on top, never instead. Report `method.fuzzTargets` and `method.timingSitesRead` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).

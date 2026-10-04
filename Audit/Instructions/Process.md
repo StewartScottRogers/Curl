@@ -32,7 +32,7 @@ Put every metric it prints in `metrics`, with the names [Report-Format.md](Repor
 defines: `tasksDone`, `medianTaskMinutes`, `p90TaskMinutes`, `tasksClaimedMoreThanOnce`,
 `requeues`, `resumedRuns`, `ciRedMinutes`, `laneIdleMinutes`, `waitOverlapMinutes`,
 `waitNothingReadyMinutes`, `tokensInput`, `tokensOutput`, `costUsd` and `costUsdPerTaskDone`.
-Add `waitOtherMinutes` as well when the tool reports it. Note in your summary when the tool's
+Add `waitOtherMinutes` and `laneMinutes` as well. The tool also prints `ciRedSpells` (each red spell's start, end, minutes and the CI run that turned it red) and `unfinishedRuns` (the run logs that end with no result and no `FACTORY: DONE` or `FACTORY: BLOCKED`): these are lists, not metrics, so quote them as evidence (BL-1366). Note in your summary when the tool's
 `ciRunsFrom` is later than `-Since`: the CI numbers then cover less than the period.
 
 ## 2. Findings
@@ -44,14 +44,21 @@ the named log files).
 | Rule | Threshold | What to find out |
 | --- | --- | --- |
 | Redone work | a task claimed 3 or more times, or requeued twice | why, from its `Log` and its run logs (`<ID>-<stamp>-L<n>.jsonl`, `.err.txt`) |
-| CI red | over 60 minutes in total, or any single red spell over 30 minutes | which commit turned it red, which test, and how long until a task was filed and fixed |
-| Overlap waits | `waitOverlapMinutes` over 20% of lane time | the `touches` that serialised lanes (often a shared file such as `RunDarkFactory.ps1` or `Curl.slnx`), and whether a narrower `touches` would have been true |
-| Empty queue | `waitNothingReadyMinutes` over 20% of lane time, with ready tasks assigned to Stewart or interactive only | which tasks were waiting on him or on an interactive session |
+| CI red | `ciRedMinutes` over 60, or any one of `ciRedSpells` over 30 minutes | for each such spell, its run id, the commit and test that turned it red, and how long until a task was filed and fixed |
+| Overlap waits | `waitOverlapMinutes` over 20% of `laneMinutes` | the `touches` that serialised lanes (often a shared file such as `RunDarkFactory.ps1` or `Curl.slnx`), and whether a narrower `touches` would have been true |
+| Empty queue | `waitNothingReadyMinutes` over 20% of `laneMinutes`, with ready tasks assigned to Stewart or interactive only | which tasks were waiting on him or on an interactive session |
 | Cost outliers | one task over 3 times the median `costUsd` | the 5 costliest tasks, and what in their runs drove the cost (turns, retries, rereading) |
-| Unfinished runs | a run whose log ends without `FACTORY: DONE` or `FACTORY: BLOCKED` | what stopped it: a timeout, a usage limit, a crash |
+| Unfinished runs | any file in `unfinishedRuns` | for each, what stopped it: a timeout, a usage limit, a crash |
 
-Lane time is the sum, over every lane in the period, of the time from its first to its last
-log line. A threshold not crossed is not a finding.
+Lane time (`laneMinutes`) is the sum, over every lane in the period, of the time from its first to
+its last log line.
+
+**Every rule, every audit.** Your summary has one line per rule above, all six: the rule, its
+number from the tool, and `crossed` or `not crossed`. Every crossed rule is a finding (one per
+task for redone work, cost outliers and unfinished runs; one per spell for CI red), even when
+the cause looks harmless; a rule not crossed is not a finding. A finding's `location` names the
+log file it rests on, as `logs/<file>` (the lane trace, the run log, or `logs/ci-runs.json`).
+`method.rulesChecked` is the number of rules you gave a line, so 6 in a full run (BL-1366).
 
 ## 3. Not your subject
 
@@ -74,4 +81,4 @@ and kinds are `redone-work`, `ci-red`, `overlap-wait`, `empty-queue`, `cost-outl
 
 ## Method counts
 
-Run every step above on every audit; re-audits come on top, never instead. Report ``method.rulesChecked`` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).
+Run every step above on every audit; re-audits come on top, never instead. Report `method.rulesChecked` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).

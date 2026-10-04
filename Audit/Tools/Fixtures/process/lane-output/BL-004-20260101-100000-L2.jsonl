@@ -1,0 +1,2 @@
+{"type":"system","subtype":"init","session_id":"fixture"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Working on BL-004."}]}}
