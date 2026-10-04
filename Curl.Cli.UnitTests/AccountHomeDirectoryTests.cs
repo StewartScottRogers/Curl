@@ -31,6 +31,14 @@ public sealed class AccountHomeDirectoryTests
     }
 
     [TestMethod]
+    public void ReadFromUserDatabase_OnAnyPlatform_IsTheUserProfileFolder()
+    {
+        string directory = AccountHomeDirectory.ReadFromUserDatabase();
+
+        Assert.AreEqual(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), directory);
+    }
+
+    [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public void ForProcess_OnWindows_IsNull()
     {
