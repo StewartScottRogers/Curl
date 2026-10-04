@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
 using Curl.Protocol.Abstractions;
@@ -12,7 +13,7 @@ namespace Curl.Core.FileSystem;
 /// for its coverage gate.
 /// </summary>
 [TestClass]
-public sealed class PhysicalFileSystemTests
+public sealed partial class PhysicalFileSystemTests
 {
     private const UnixFileMode DefaultCreateMode = TransferContext.DefaultCreateFileMode;
 
@@ -377,14 +378,14 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    public async Task TrySetLastWriteTimeUtc_ExistingFile_SetsItsLastWriteTime()
+    public async Task TrySetLastWriteUnixSeconds_ExistingFile_SetsItsLastWriteTime()
     {
         using var directory = new TemporaryDirectory();
         string path = directory.Combine("out.txt");
         await System.IO.File.WriteAllBytesAsync(path, Content);
         var lastWriteTimeUtc = new DateTimeOffset(2020, 1, 2, 10, 4, 5, TimeSpan.Zero);
 
-        bool set = new PhysicalFileSystem().TrySetLastWriteTimeUtc(path, lastWriteTimeUtc, out int errorCode);
+        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(path, lastWriteTimeUtc.ToUnixTimeSeconds(), out int errorCode);
 
         Assert.IsTrue(set);
         Assert.AreEqual(0, errorCode);
@@ -392,15 +393,87 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    public void TrySetLastWriteTimeUtc_MissingFile_ReturnsFalseWithErrorFileNotFound()
+    public void TrySetLastWriteUnixSeconds_MissingFile_ReturnsFalseWithErrorFileNotFound()
     {
         using var directory = new TemporaryDirectory();
 
-        bool set = new PhysicalFileSystem().TrySetLastWriteTimeUtc(directory.Combine("missing.txt"), DateTimeOffset.UnixEpoch, out int errorCode);
+        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(directory.Combine("missing.txt"), 0, out int errorCode);
 
         Assert.IsFalse(set);
         Assert.AreEqual(2, errorCode);
     }
+
+    /// <summary>
+    /// 30827-12-31T23:59:59Z, the time curl 8.21.0 caps an <c>-R</c> time to on Windows, is
+    /// past <see cref="DateTime" />; it reaches the file through <c>SetFileTime</c> and reads
+    /// back through the raw Win32 file time (BL-1425).
+    /// </summary>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    [SupportedOSPlatform("windows")]
+    public async Task TrySetLastWriteUnixSeconds_OnWindowsYear30827_SetsTheRawFileTime()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.Combine("out.txt");
+        await System.IO.File.WriteAllBytesAsync(path, Content);
+
+        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(path, 910670515199, out int errorCode);
+
+        Assert.IsTrue(set);
+        Assert.AreEqual(0, errorCode);
+        Assert.AreEqual(910670515199, (ReadWin32LastWriteFileTime(path) / 10_000_000) - 11_644_473_600);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void TrySetLastWriteUnixSeconds_OnWindowsMissingFilePastYear9999_ReturnsFalseWithErrorFileNotFound()
+    {
+        using var directory = new TemporaryDirectory();
+
+        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(directory.Combine("missing.txt"), 910670515199, out int errorCode);
+
+        Assert.IsFalse(set);
+        Assert.AreEqual(2, errorCode);
+    }
+
+    /// <summary>
+    /// A time past year 9999, or before year 1, is set or refused by the operating system and
+    /// reported either way, never thrown: <c>utimes</c> takes either off Windows, and Windows'
+    /// <c>SetFileTime</c> refuses a time before 1601.
+    /// </summary>
+    /// <param name="unixSeconds">The time to set.</param>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    [DataRow(1200110860800L)]
+    [DataRow(-62135596801L)]
+    public async Task TrySetLastWriteUnixSeconds_OutsideDateTime_ReportsTheOutcomeWithoutThrowing(long unixSeconds)
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.Combine("out.txt");
+        await System.IO.File.WriteAllBytesAsync(path, Content);
+
+        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(path, unixSeconds, out int errorCode);
+
+        Assert.AreEqual(set, errorCode == 0);
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static long ReadWin32LastWriteFileTime(string path)
+    {
+        using Microsoft.Win32.SafeHandles.SafeFileHandle file = System.IO.File.OpenHandle(path);
+        _ = GetFileTime(file, IntPtr.Zero, IntPtr.Zero, out long lastWrite);
+
+        return lastWrite;
+    }
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetFileTime(
+        Microsoft.Win32.SafeHandles.SafeFileHandle file,
+        IntPtr creationTime,
+        IntPtr lastAccessTime,
+        out long lastWriteTime);
 
     private static void AssertFailed(FileAccessStatus expected, FileOpenResult result)
     {

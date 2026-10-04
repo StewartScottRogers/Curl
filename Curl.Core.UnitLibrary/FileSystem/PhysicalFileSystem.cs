@@ -51,6 +51,12 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
 {
     private const int BufferSize = 4096;
 
+    /// <summary>The Unix seconds of 0001-01-01T00:00:00Z, the earliest <see cref="DateTime" />.</summary>
+    private const long MinimumDateTimeUnixSeconds = -62135596800;
+
+    /// <summary>The Unix seconds of 9999-12-31T23:59:59Z, the latest whole second of <see cref="DateTime" />.</summary>
+    private const long MaximumDateTimeUnixSeconds = 253402300799;
+
     [UnsupportedOSPlatformGuard("windows")]
     private readonly bool setsUnixCreateMode;
 
@@ -153,13 +159,20 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
     /// Every exception <see cref="FileOpenFailure.IsOpenFailure(Exception)" /> names, such as
     /// the <see cref="FileNotFoundException" /> of a missing file, is reported as
     /// <see langword="false" />, with the error code
-    /// <see cref="FileOpenFailure.Win32ErrorCodeOf(Exception)" /> reads from it.
+    /// <see cref="FileOpenFailure.Win32ErrorCodeOf(Exception)" /> reads from it. A time
+    /// <see cref="DateTime" /> cannot hold, past year 9999 or before year 1, is set by
+    /// <see cref="NativeFileTimeSetter" /> with the operating system's own call.
     /// </remarks>
-    public bool TrySetLastWriteTimeUtc(string path, DateTimeOffset lastWriteTimeUtc, out int errorCode)
+    public bool TrySetLastWriteUnixSeconds(string path, long unixSeconds, out int errorCode)
     {
         try
         {
-            File.SetLastWriteTimeUtc(path, lastWriteTimeUtc.UtcDateTime);
+            if (unixSeconds is < MinimumDateTimeUnixSeconds or > MaximumDateTimeUnixSeconds)
+            {
+                return NativeFileTimeSetter.TrySetLastWriteUnixSeconds(path, unixSeconds, out errorCode);
+            }
+
+            File.SetLastWriteTimeUtc(path, DateTimeOffset.FromUnixTimeSeconds(unixSeconds).UtcDateTime);
         }
         catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
         {
