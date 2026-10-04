@@ -4,7 +4,7 @@ title: Stamp an -R time past year 9999 and cap it above 30827-12-31 on Windows w
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1421, BL-1422]
+depends-on: [BL-1427, BL-1428]
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: FR-011
 created: 2026-10-03
@@ -21,7 +21,7 @@ completed:
 - ADR-0410, decision 4. Measured 2026-10-03 with curl 8.21.0 (mingw, Schannel), `--no-progress-meter -R -o <file>` against `Last-Modified: Mon, 01 Jan 40000 00:00:00 GMT`: stderr `Warning: Capping set filetime to max to avoid overflow`, file stamped 30827-12-31T23:59:59Z, exit 0.
 - curl 8.21.0 `src/tool_filetime.c` lines 94-98: on Windows a Unix time above `910670515199` is set to `910670515199` with that warning unless `-s`; line 128 on (POSIX) hands the time to `utimes` unchanged.
 - `Curl.Console/CurlCommandRunner.cs` `StampOutputFileTimeAsync` already has BL-1392's minimum cap (`WindowsMinimumFileTimeUtc`, `FileTimeCappedToMinimumWarning`, `runsOnWindows`); mirror it. `Curl.Core.UnitLibrary/FileSystem/IFileTimeSetter.cs` takes a `DateTimeOffset` and `PhysicalFileSystem` uses `File.SetLastWriteTimeUtc(DateTime)`, which cannot hold 30827: make it take Unix seconds and set times past 9999 itself (`SetFileTime` on Windows, `utimensat` off Windows, via `LibraryImport`). `RemoteTimeFailureWarning.For` prints the Unix seconds it is given.
-- Depends on BL-1421 (`SourceLastWriteUnixSeconds`) and BL-1422 (HTTP produces such a time, for the end-to-end test).
+- Depends on BL-1427 (`SourceLastWriteUnixSeconds`) and BL-1428 (HTTP produces such a time, for the end-to-end test).
 
 ## Acceptance criteria
 

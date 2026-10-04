@@ -4,7 +4,7 @@ title: Read a -z date past year 9999 into TimeCondition's Unix seconds as curl d
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1421]
+depends-on: [BL-1427]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: FR-011
 created: 2026-10-03
@@ -20,7 +20,7 @@ completed:
 
 - ADR-0410, decision 5. `Curl.Cli.UnitLibrary/CommandLineOptionTable.cs` `SetTimeCondition` builds `new TimeCondition(instant, kind)` from a `DateTimeOffset`, so such a date cannot be read today.
 - curl reads `-z` dates with `curl_getdate`, the same parser that reads `Last-Modified`, and it read year 40000 there (measured 2026-10-03, BL-1409). Measure first with `Record-CurlExchange.ps1`: `curl -z "Mon, 01 Jan 40000 00:00:00 GMT" http://127.0.0.1:PORT/` (does it send `If-Modified-Since`, and is any warning printed?) and a year that overflows `time_t`.
-- Depends on BL-1421 for `TimeCondition.ValueUnixSeconds`. The header text curl sends is BL-1426's.
+- Depends on BL-1427 for `TimeCondition.ValueUnixSeconds`. The header text curl sends is BL-1426's.
 
 ## Acceptance criteria
 

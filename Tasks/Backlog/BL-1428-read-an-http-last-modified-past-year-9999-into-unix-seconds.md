@@ -1,16 +1,16 @@
 ---
-id: BL-1422
+id: BL-1428
 title: Read an HTTP Last-Modified past year 9999 into Unix seconds and compare -z in Unix seconds
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1421]
+depends-on: [BL-1427]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: FR-011
 created: 2026-10-03
 completed:
 ---
-# BL-1422 — Read an HTTP Last-Modified past year 9999 into Unix seconds and compare -z in Unix seconds
+# BL-1428 — Read an HTTP Last-Modified past year 9999 into Unix seconds and compare -z in Unix seconds
 
 ## Goal
 
@@ -20,7 +20,7 @@ An HTTP `Last-Modified` with a year past 9999 is read into `TransferResult.Sourc
 
 - ADR-0410, decision 2. `Curl.Protocol.Http.UnitLibrary/HttpLastModified.cs` parses with `DateTimeOffset.TryParseExact`, so `Mon, 01 Jan 40000 00:00:00 GMT` is an unknown time today; `HttpDownloadConditions.IsMet` compares `DateTimeOffset`s.
 - Measured 2026-10-03, curl 8.21.0 (mingw, Schannel), `--no-progress-meter -R -o <file>` against `Last-Modified: Mon, 01 Jan 40000 00:00:00 GMT`: the time is read (the file is stamped, capped to 30827-12-31T23:59:59Z on Windows, exit 0), so the year is not limited to four digits.
-- Depends on BL-1421 for `SourceLastWriteUnixSeconds` and `TimeCondition.ValueUnixSeconds`.
+- Depends on BL-1427 for `SourceLastWriteUnixSeconds` and `TimeCondition.ValueUnixSeconds`.
 
 ## Acceptance criteria
 

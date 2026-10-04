@@ -1,5 +1,5 @@
 ---
-id: BL-1421
+id: BL-1427
 title: Store TransferResult's and TimeCondition's times as Unix seconds so a time past year 9999 can travel
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-011
 created: 2026-10-03
 completed:
 ---
-# BL-1421 — Store TransferResult's and TimeCondition's times as Unix seconds so a time past year 9999 can travel
+# BL-1427 — Store TransferResult's and TimeCondition's times as Unix seconds so a time past year 9999 can travel
 
 ## Goal
 
