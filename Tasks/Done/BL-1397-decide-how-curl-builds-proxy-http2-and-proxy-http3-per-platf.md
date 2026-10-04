@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1397 — Decide how Curl builds --proxy-http2 and --proxy-http3 per platform, record the ADR and file the work
 
@@ -26,15 +26,18 @@ An ADR, "Decided by Claude under Stewart's delegation", says how Curl implements
 
 ## Acceptance criteria
 
-- [ ] A new ADR under `Documentation/Planning/Decisions/` marked "Decided by Claude under Stewart's delegation" states: which platforms accept `--proxy-http2` and `--proxy-http3` and which keep the ADR-0137 refusal; the ALPN offered to the proxy (`h2`) and the fallback when the proxy picks `http/1.1`; which library holds the HTTP/2 CONNECT tunnel (named projects that exist in `Curl.slnx`); and the `-v` lines that must be measured before the work pins them.
-- [ ] The implementation tasks the ADR calls for are filed with `task-board.ps1 new`, each naming its project in `touches`, in dependency order, the option-parsing task first and keeping `--ai-help` right in its acceptance criteria.
-- [ ] `Documentation/Planning/Decisions/README.md` lists the new ADR if that README keeps an index.
+- [x] A new ADR under `Documentation/Planning/Decisions/` marked "Decided by Claude under Stewart's delegation" states: which platforms accept `--proxy-http2` and `--proxy-http3` and which keep the ADR-0137 refusal; the ALPN offered to the proxy (`h2`) and the fallback when the proxy picks `http/1.1`; which library holds the HTTP/2 CONNECT tunnel (named projects that exist in `Curl.slnx`); and the `-v` lines that must be measured before the work pins them.
+- [x] The implementation tasks the ADR calls for are filed with `task-board.ps1 new`, each naming its project in `touches`, in dependency order, the option-parsing task first and keeping `--ai-help` right in its acceptance criteria.
+- [x] `Documentation/Planning/Decisions/README.md` lists the new ADR if that README keeps an index.
 
 ## Notes
 
 - No code changes in this task.
+- Decided in ADR-0408: `--proxy-http2` refused on Windows (Schannel build has no HTTP2), accepted off Windows (measured: WSL curl 8.18.0 OpenSSL with nghttp2 accepts it); `--proxy-http3` refused everywhere (no reference build has HTTP3 or USE_PROXY_HTTP3; 8.18.0 does not know the option). Tunnel in Curl.Networking.UnitLibrary using Curl.Http2.UnitLibrary, ALPN `h2,http/1.1`, falls back to the HTTP/1.1 tunnel.
+- Filed in dependency order: BL-1412 (Cli parsing, --ai-help), BL-1413 (Record-CurlExchange.ps1 -Http2 to measure the -v lines), BL-1414 (Networking tunnel, depends on BL-1413), BL-1415 (Console wiring, depends on BL-1412 and BL-1414).
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. ADR-0408 decides --proxy-http2/--proxy-http3 per platform; BL-1412..BL-1415 filed
