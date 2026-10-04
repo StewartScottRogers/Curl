@@ -8,7 +8,7 @@ depends-on: [BL-1394]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: FR-091
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1399 — Write curl's 'Ignoring Content-Length in CONNECT 200 response' lines and refuse a non-numeric CONNECT reply Content-Length with exit 8
 
@@ -31,12 +31,20 @@ Reading a proxy's reply to `CONNECT` (and to `CONNECT-UDP`), Curl writes curl 8.
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Networking.UnitTests` drive `HttpProxyTunnel` with each measured reply and pin the info line right after its header line and before the empty line, with the tunnel opened for the 2xx replies and no reply body read.
-- [ ] A test pins the 407 with `Content-Length: abc`: exit 8 (`CurlExitCode.WeirdServerReply`), message `Unsupported Content-Length value`, the line after the header line; a 407 with `Content-Length:  12 ` (blanks) is still read as 12.
-- [ ] Tests pin the `CONNECT-UDP` wording for a `101` and a `200` reply carrying `Content-Length` and `Transfer-Encoding`.
-- [ ] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean; `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no failing member in the code this task changed.
+- [x] Tests in `Curl.Networking.UnitTests` drive `HttpProxyTunnel` with each measured reply and pin the info line right after its header line and before the empty line, with the tunnel opened for the 2xx replies and no reply body read.
+- [x] A test pins the 407 with `Content-Length: abc`: exit 8 (`CurlExitCode.WeirdServerReply`), message `Unsupported Content-Length value`, the line after the header line; a 407 with `Content-Length:  12 ` (blanks) is still read as 12.
+- [x] Tests pin the `CONNECT-UDP` wording for a `101` and a `200` reply carrying `Content-Length` and `Transfer-Encoding`.
+- [x] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean; `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no failing member in the code this task changed.
+
+## Notes
+
+- `HttpProxyTunnel.ReadReplyAsync` gained a `forConnectUdp` overload; `IgnoresBodyFields` (2xx, and 101 for CONNECT-UDP) decides whether `Content-Length` is read. One that does not start with a digit, or overflows, fails the reply: `FailureExitCode` `WeirdServerReply`, `UnsupportedContentLength`, `Head` cut after that line. `HttpProxyTunnelReply.RecvErrorMessage` is renamed `FailureMessage`, since it now carries exit 8 too.
+- Default taken: the value is read as curl's `curlx_str_numblanks` reads it, leading digits (`7x` is 7); a sign or an empty value is not a number.
+- `ConnectTunnelVerboseLines.ReportReplyHead` writes `Ignoring Content-Length|Transfer-Encoding in CONNECT[-UDP] <code> response` after the field's line, and no `CONNECT responded chunked` where the status ignores the field; `ReportReplyFailure` writes `Unsupported Content-Length value` after the CONNECT head (the CONNECT-UDP path already writes its failure message).
+- Measure-CodeQuality -Library Curl.Networking.UnitLibrary: 0 failing members. Tests: 3007 passed.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. CONNECT replies write curl's Ignoring Content-Length/Transfer-Encoding lines and a non-numeric Content-Length is exit 8

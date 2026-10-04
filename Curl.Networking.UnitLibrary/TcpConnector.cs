@@ -1779,6 +1779,7 @@ public sealed partial class TcpConnector(
             trace.ReportReceiving(events);
             var reply = await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false);
             ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization, DigestStaleChallenge.IsOfferedIn(reply.ProxyAuthenticate));
+            ConnectTunnelVerboseLines.ReportReplyFailure(events, reply);
             trace.ReportResponse(events, reply.OpensTunnel);
             if (tunnel.HeadOutput is { } headOutput && !reply.Head.IsEmpty)
             {
@@ -1820,8 +1821,8 @@ public sealed partial class TcpConnector(
     }
 
     private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure) =>
-        reply.RecvErrorMessage is { } recvErrorMessage
-            ? ConnectResult.Failed(CurlExitCode.RecvError, firstSspiFailure ?? recvErrorMessage)
+        reply.FailureMessage is { } failureMessage
+            ? ConnectResult.Failed(reply.FailureExitCode, firstSspiFailure ?? failureMessage)
             : ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? $"CONNECT tunnel failed, response {reply.StatusCode}");
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(

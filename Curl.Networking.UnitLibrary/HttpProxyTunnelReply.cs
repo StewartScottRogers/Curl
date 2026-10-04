@@ -1,19 +1,21 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Networking;
 
 /// <summary>
-/// What <see cref="HttpProxyTunnel.ReadReplyAsync" /> read from the proxy: the status code
-/// and the header fields curl acts on of a complete reply, or the exit 56 message for one
+/// What <see cref="HttpProxyTunnel.ReadReplyAsync(Protocol.Abstractions.IConnection, bool, CancellationToken)" /> read from the proxy: the status code
+/// and the header fields curl acts on of a complete reply, or the exit code and message for one
 /// curl gives up on.
 /// </summary>
 /// <param name="StatusCode">
 /// The status code on the reply's first line, <c>0</c> when it is not an HTTP status line;
-/// <c>0</c> as well when <paramref name="RecvErrorMessage" /> is set.
+/// <c>0</c> as well when <paramref name="FailureMessage" /> is set.
 /// </param>
-/// <param name="RecvErrorMessage">
-/// The message for <see cref="Protocol.Abstractions.CurlExitCode.RecvError" /> (56) when the
-/// reply was cut short or too large, else <see langword="null" />.
+/// <param name="FailureMessage">
+/// The message curl prints when it gives up on the reply - cut short or too large, exit 56, or
+/// a <c>Content-Length</c> that is not a number, exit 8 - else <see langword="null" />.
 /// </param>
-internal readonly record struct HttpProxyTunnelReply(int StatusCode, string? RecvErrorMessage)
+internal readonly record struct HttpProxyTunnelReply(int StatusCode, string? FailureMessage)
 {
     private readonly IReadOnlyList<string>? _proxyAuthenticate;
 
@@ -23,9 +25,15 @@ internal readonly record struct HttpProxyTunnelReply(int StatusCode, string? Rec
     public int StatusCode { get; } = StatusCode;
 
     /// <summary>
-    /// Gets the exit 56 message, or <see langword="null" /> for a complete reply.
+    /// Gets the message curl prints when it gives up on the reply, or <see langword="null" /> for a complete reply.
     /// </summary>
-    public string? RecvErrorMessage { get; } = RecvErrorMessage;
+    public string? FailureMessage { get; } = FailureMessage;
+
+    /// <summary>
+    /// Gets the exit code that goes with <see cref="FailureMessage" />:
+    /// <see cref="CurlExitCode.RecvError" /> (56) unless the reply says otherwise.
+    /// </summary>
+    public CurlExitCode FailureExitCode { get; init; } = CurlExitCode.RecvError;
 
     /// <summary>
     /// Gets the value of every <c>Proxy-Authenticate</c> field, verbatim apart from the blanks
@@ -67,19 +75,19 @@ internal readonly record struct HttpProxyTunnelReply(int StatusCode, string? Rec
     /// Gets a value indicating whether the proxy opened the tunnel: a complete reply with a
     /// status from 200 to 299, as curl 8.21.0 accepts (measured: 299 opens it, 300 does not).
     /// </summary>
-    public bool OpensTunnel => RecvErrorMessage is null && StatusCode is >= 200 and <= 299;
+    public bool OpensTunnel => FailureMessage is null && StatusCode is >= 200 and <= 299;
 
     /// <summary>
     /// Gets a value indicating whether the proxy opened a CONNECT-UDP tunnel: a complete reply
     /// with status 101 or one from 200 to 299, as curl 8.22.0 accepts both a
     /// <c>101 Switching Protocols</c> and a <c>200 OK</c> (measured, BL-942).
     /// </summary>
-    public bool OpensUdpTunnel => OpensTunnel || (RecvErrorMessage is null && StatusCode == 101);
+    public bool OpensUdpTunnel => OpensTunnel || (FailureMessage is null && StatusCode == 101);
 
     /// <summary>
-    /// Creates the reply curl gives up on, with its exit 56 message.
+    /// Creates the reply curl gives up on with exit 56, with its message.
     /// </summary>
-    /// <param name="recvErrorMessage">The message curl prints.</param>
+    /// <param name="failureMessage">The message curl prints.</param>
     /// <returns>A reply with status code <c>0</c> and the message.</returns>
-    public static HttpProxyTunnelReply Failed(string recvErrorMessage) => new(0, recvErrorMessage);
+    public static HttpProxyTunnelReply Failed(string failureMessage) => new(0, failureMessage);
 }

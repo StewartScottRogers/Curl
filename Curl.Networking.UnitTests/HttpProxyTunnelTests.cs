@@ -229,7 +229,7 @@ public sealed class HttpProxyTunnelTests
         var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
 
         Assert.AreEqual(expected, result.StatusCode);
-        Assert.IsNull(result.RecvErrorMessage);
+        Assert.IsNull(result.FailureMessage);
     }
 
     [TestMethod]
@@ -251,7 +251,7 @@ public sealed class HttpProxyTunnelTests
 
         var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
 
-        Assert.AreEqual("Proxy CONNECT aborted", result.RecvErrorMessage);
+        Assert.AreEqual("Proxy CONNECT aborted", result.FailureMessage);
         Assert.IsTrue(result.Head.IsEmpty);
     }
 
@@ -269,8 +269,8 @@ public sealed class HttpProxyTunnelTests
     [TestMethod]
     [DataRow("", 0L, true)]
     [DataRow("Content-Length: 12\r\n", 12L, true)]
-    [DataRow("Content-Length: 12\r\nContent-Length: x\r\n", 12L, true)]
-    [DataRow("Content-Length: -1\r\n", 0L, true)]
+    [DataRow("Content-Length:  12 \r\n", 12L, true)]
+    [DataRow("Content-Length: 12\r\nContent-Length: 7x\r\n", 7L, true)]
     [DataRow("Connection: keep-alive\r\n", 0L, true)]
     [DataRow("Connection: close\r\n", 0L, false)]
     [DataRow("Proxy-Connection: Keep-Alive, Close\r\n", 0L, false)]
@@ -286,6 +286,51 @@ public sealed class HttpProxyTunnelTests
         Assert.AreEqual(contentLength, result.ContentLength);
         Assert.AreEqual(reusable, result.LeavesConnectionReusable);
         Assert.IsEmpty(result.ProxyAuthenticate);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 407 Proxy Auth\r\n", "Content-Length: abc\r\n", false, DisplayName = "a 407, measured")]
+    [DataRow("HTTP/1.1 407 Proxy Auth\r\nContent-Length: 3\r\n", "content-length: -1\r\n", false, DisplayName = "a sign")]
+    [DataRow("HTTP/1.1 403 No\r\n", "Content-Length: 99999999999999999999\r\n", false, DisplayName = "an overflow")]
+    [DataRow("HTTP/1.1 101 Switching\r\n", "Content-Length: abc\r\n", false, DisplayName = "a 101 to CONNECT")]
+    [DataRow("HTTP/1.1 302 Found\r\n", "Content-Length:\r\n", true, DisplayName = "empty, to CONNECT-UDP")]
+    public async Task ReadReplyAsync_WhenAContentLengthTheStatusDoesNotIgnoreIsNotANumber_FailsWithExit8AtItsLine(string before, string field, bool forConnectUdp)
+    {
+        // curl 8.21.0's lib/cf-h1-proxy.c: failf "Unsupported Content-Length value", CURLE_WEIRD_SERVER_REPLY.
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(before + field + "X-After: 1\r\n\r\nbody"));
+
+        var result = await HttpProxyTunnel.ReadReplyAsync(connection, forConnectUdp, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.FailureExitCode);
+        Assert.AreEqual("Unsupported Content-Length value", result.FailureMessage);
+        Assert.AreEqual(0, result.StatusCode);
+        Assert.AreEqual(before + field, Encoding.Latin1.GetString(result.Head.Span));
+        Assert.IsFalse(result.OpensTunnel);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 Connection established\r\nContent-Length: 5\r\n\r\n", false, DisplayName = "a 200, measured")]
+    [DataRow("HTTP/1.1 200 Connection established\r\nTransfer-Encoding: chunked\r\n\r\n", false, DisplayName = "a chunked 200, measured")]
+    [DataRow("HTTP/1.1 299 Fine\r\nContent-Length: 5\r\n\r\n", false, DisplayName = "a 299, measured")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: abc\r\n\r\n", false, DisplayName = "a 200 not a number")]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\nContent-Length: abc\r\n\r\n", true, DisplayName = "a 101 to CONNECT-UDP")]
+    public async Task ReadReplyAsync_WhenTheStatusIgnoresTheBodyFields_OpensTheTunnelAndReadsNoBody(string head, bool forConnectUdp)
+    {
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(head + "tunnel"));
+
+        var result = await HttpProxyTunnel.ReadReplyAsync(connection, forConnectUdp, CancellationToken.None);
+
+        Assert.IsNull(result.FailureMessage);
+        Assert.IsTrue(result.OpensUdpTunnel);
+        Assert.AreEqual(0L, result.ContentLength);
+        Assert.AreEqual(head, Encoding.Latin1.GetString(result.Head.Span));
+        Assert.AreEqual("tunnel".Length, connection.UnreadCount);
+    }
+
+    [TestMethod]
+    public void FailureExitCode_OfAFailedReply_IsRecvError()
+    {
+        Assert.AreEqual(CurlExitCode.RecvError, HttpProxyTunnelReply.Failed("Proxy CONNECT aborted").FailureExitCode);
     }
 
     [TestMethod]
