@@ -8,7 +8,7 @@ depends-on: [BL-1404]
 touches: [Curl.Protocol.Ws.UnitLibrary, Curl.Protocol.Ws.UnitTests]
 requirement: FR-078
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1405 — Refuse a WebSocket upgrade reply header with no colon, a NUL byte, a carriage return or a second different Location with curl's exit 8
 
@@ -29,15 +29,19 @@ A `ws://` or `wss://` upgrade reply whose head carries a header line curl 8.21.0
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.Ws.UnitTests` drive the handler with each measured reply and pin the `-v` lines, exit 8 (`CurlExitCode.WeirdServerReply`) and the message, with the refused line not written.
-- [ ] Tests pin that two equal `Location` headers are accepted, and that a `101` reply with a header line lacking a colon is refused the same way (the checks apply to every head).
-- [ ] `dotnet build Curl.Protocol.Ws.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Ws.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ws.UnitLibrary` reports no failing member in the code this task changed.
+- [x] Tests in `Curl.Protocol.Ws.UnitTests` drive the handler with each measured reply and pin the `-v` lines, exit 8 (`CurlExitCode.WeirdServerReply`) and the message, with the refused line not written.
+- [x] Tests pin that two equal `Location` headers are accepted, and that a `101` reply with a header line lacking a colon is refused the same way (the checks apply to every head).
+- [x] `dotnet build Curl.Protocol.Ws.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Ws.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ws.UnitLibrary` reports no failing member in the code this task changed.
 
 ## Notes
 
 - Measured too: a `101` reply `HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nBadHeader\r\nConnection: Upgrade\r\n\r\n` writes `< Upgrade: websocket`, `* Header without colon`, `* closing connection #0`; exit 8.
+- 2026-10-03 (lane 8): `WsHeaderLines.FindRefusedLine` checks each header line after the status line in curl's order (carriage return, NUL, colon, Location) and returns where the first refused line starts. `WsProtocolHandler.CheckHead` runs it on every head, `101` included, then runs the BL-1404 `Content-Length` check on the head before that line only, so whichever header fails first wins. A refused `101` now takes the refusal path (head up to the line, the message, `closing connection #N`, exit 8).
+- Choice: a continuation line (leading space or tab) after a header is not checked for a colon, and one straight after the status line is refused with `Header without colon`, as the HTTP library's `HttpResponseHeadBuilder` does. The status line itself is left to `WsStatusLine`.
+- Tests: `WsProtocolHandlerHeaderLineTests` (the measured replies, the 101 case, equal Locations, order against Content-Length) and `WsHeaderLinesTests`; 350 pass. Measure-CodeQuality: 100% line and branch, 0 failing members (`CheckLine` split after it measured complexity 16).
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. WebSocket upgrade replies with a colonless, NUL, stray-CR or second different Location header line fail with exit 8 as curl does
