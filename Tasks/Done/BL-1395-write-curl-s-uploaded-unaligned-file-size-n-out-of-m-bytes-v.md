@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1395 — Write curl's 'Uploaded unaligned file size (N out of M bytes)' -v line when an FTP upload of a known size fails before sending it all
 
@@ -27,16 +27,20 @@ When an FTP upload of a known size (`-T <file>`) ends with exit 9, 25 or another
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.Ftp.UnitTests` over the fake FTP server upload a 92-byte source and pin, in order, the measured `-v` lines for the CWD-refused case (exit 9) and the STOR-553 case (exit 25), each with `Uploaded unaligned file size (0 out of 92 bytes)` and the message of the first failure as the result's message.
-- [ ] Tests pin no such line for an upload of unknown size (standard input), for a successful upload, and for a failure `ftp_done_status` does not map to OK (a login refused with exit 67).
-- [ ] A test pins the `--crlf` (line-ending conversion) STOR-553 case with the line.
-- [ ] `dotnet build Curl.Protocol.Ftp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Ftp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary` reports no failing member in the code this task changed.
+- [x] Tests in `Curl.Protocol.Ftp.UnitTests` over the fake FTP server upload a 92-byte source and pin, in order, the measured `-v` lines for the CWD-refused case (exit 9) and the STOR-553 case (exit 25), each with `Uploaded unaligned file size (0 out of 92 bytes)` and the message of the first failure as the result's message.
+- [x] Tests pin no such line for an upload of unknown size (standard input), for a successful upload, and for a failure `ftp_done_status` does not map to OK (a login refused with exit 67).
+- [x] A test pins the `--crlf` (line-ending conversion) STOR-553 case with the line.
+- [x] `dotnet build Curl.Protocol.Ftp.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.Ftp.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary` reports no failing member in the code this task changed.
 
 ## Notes
 
 - Tests must not read `C:/Windows/win.ini`; use an in-memory 92-byte source so they pass on Linux and macOS.
+- Done: `FtpSession.ReportUnalignedUpload` writes the line in `QuitAndFailLeavingConnectionIntactAsync`, the one exit every failure `ftp_done` maps to OK takes (exits 9, 10, 12, 13, 17, 18, 19, 23, 25, 30, 36, 63, 78 - the set `ftp_done_status` maps), so a refused login (67) and other connection-invalidating failures never reach it. Known size = a seekable source's remaining bytes (`KnownSizeOf`), recomputed after a `-C` skip as curl reduces `infilesize`; standard input is not seekable, so it has none. Under `--crlf` only a shortfall writes it.
+- Default taken: the library emits the line as an info event in curl's order relative to its own lines; where the console places the first failure's `-v` copy (`* Failed FTP upload: 553`) is unchanged and outside this task's touches.
+- Tests: `FtpProtocolHandlerUnalignedUploadTests` (8). `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. FTP uploads of a known size that fail before sending it all write curl's 'Uploaded unaligned file size (N out of M bytes)' -v line
