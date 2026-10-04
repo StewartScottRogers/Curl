@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1376 — Bring CurlUrlAuthority.Parse and CurlUrlHost.TryNormalize under cyclomatic complexity 10
 
@@ -23,13 +23,16 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` reports 0 failing members, still at 100% line and branch.
-- [ ] No test changes its expected value; `dotnet test Curl.Protocol.Abstractions.UnitTests` passes.
-- [ ] `dotnet build` is clean and the fast tests are green.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` reports 0 failing members, still at 100% line and branch.
+- [x] No test changes its expected value; `dotnet test Curl.Protocol.Abstractions.UnitTests` passes.
+- [x] `dotnet build` is clean and the fast tests are green.
 
 ## Notes
+
+- `CurlUrlAuthority.Parse` now delegates the host and port to a new private `ParseHostAndPort`, then copies the login parts onto its result; `CurlUrlHost.TryNormalize` delegates the unbracketed host to a new private `TryNormalizeAddressOrName`. No behaviour or test changed. Measured: 100% line, 100% branch, 0 failing members; Abstractions tests 704 passed.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. CurlUrlAuthority.Parse and CurlUrlHost.TryNormalize split under complexity 10; Abstractions library has 0 failing members at 100% line and branch

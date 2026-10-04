@@ -52,12 +52,27 @@ internal sealed record CurlUrlAuthority(
             return null;
         }
 
+        CurlUrlAuthority? hostAndPort = ParseHostAndPort(text[(at + 1)..], scheme is not null, out rejection);
+        if (hostAndPort is null)
+        {
+            return null;
+        }
+
         CurlUrlAuthority login = at < 0
             ? None
             : SplitLogin(text[..at], CurlUrlScheme.HasLoginOptions(scheme));
-        string hostAndPort = text[(at + 1)..];
 
-        rejection = SplitPort(hostAndPort, scheme is not null, out string host, out int? port);
+        return hostAndPort with { User = login.User, Password = login.Password, Options = login.Options };
+    }
+
+    /// <summary>
+    /// Parses the host and port after the user information: the port split off, the host
+    /// required and normalised.
+    /// </summary>
+    /// <returns>An authority with no user information, or <see langword="null" /> when curl rejects it.</returns>
+    private static CurlUrlAuthority? ParseHostAndPort(string hostAndPort, bool hasScheme, out CurlUrlRejection rejection)
+    {
+        rejection = SplitPort(hostAndPort, hasScheme, out string host, out int? port);
         if (rejection == CurlUrlRejection.None && host.Length == 0)
         {
             rejection = CurlUrlRejection.NoHost;
@@ -69,7 +84,7 @@ internal sealed record CurlUrlAuthority(
             return null;
         }
 
-        return login with { Host = normalizedHost, IdnHost = idnHost, ZoneId = zoneId, Port = port };
+        return None with { Host = normalizedHost, IdnHost = idnHost, ZoneId = zoneId, Port = port };
     }
 
     /// <summary>
