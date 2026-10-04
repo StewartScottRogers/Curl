@@ -30,6 +30,19 @@ methods. For each: does it do what its name says, and nothing its name hides? A 
 also writes a file, a `TryX` that throws, a `Helper` or `Manager` where a specific name exists,
 two names for one concept, or one name for two concepts, is a finding.
 
+Then scan every bool member, beyond the 30 drawn (BL-1370):
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Find-BooleanNameMismatches.ps1 -Root <audited tree> -OutFile <temp folder>\boolean-names.json
+```
+
+It lists each public or internal bool method or property named `Is`, `Has`, `Can`, `Should`,
+`Lacks`, `Not`, `No`, `Never` or `Missing` whose name and doc comment point opposite ways: a
+negative name (`LacksScheme`, `IsNotEmpty`) with a doc whose main clause says nothing negative,
+or the reverse. Read each candidate's code: when the name, the doc or the code says the opposite
+of the other two, that is a finding. Say in your summary how many candidates you read and filed;
+they count toward `method.names`.
+
 ## 2. XML doc comments - the same members
 
 For the same 60 members, read their XML documentation comments. Is every statement true of the

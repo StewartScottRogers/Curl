@@ -140,7 +140,9 @@ function Test-SamePath([string]$Location, [string]$Planted) {
     # The finding's location names the planted file: the same path, or one ending with it (a
     # process defect's file is relative to the log copy, which auditors cite as logs/...).
     if (-not $Location -or -not $Planted) { return $false }
-    return ($Location -ieq $Planted) -or $Location.EndsWith('/' + $Planted, [StringComparison]::OrdinalIgnoreCase)
+    # Or the planted file's base name alone: an ADR or script cited by its file name (BL-1370).
+    return ($Location -ieq $Planted) -or $Location.EndsWith('/' + $Planted, [StringComparison]::OrdinalIgnoreCase) -or
+        ($Planted.Contains('/') -and $Location -ieq $Planted.Substring($Planted.LastIndexOf('/') + 1))
 }
 
 function Test-AtPlantedLine([string]$Location, $Planted) {
@@ -308,7 +310,8 @@ if ($SelfTest) {
         $newFields = @([regex]::Matches(($af7 -split '\r?\n---')[0], '(?m)^([a-z-]+):') | ForEach-Object { $_.Groups[1].Value }) -join ','
         $sections = @([regex]::Matches($af7, '(?m)^## (.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() }) -join ','
         Check 'front matter and sections match the template' ($newFields -eq $templateFields -and $sections -eq 'Summary,Evidence,Reproduction,Re-audits,Log' -and $af7 -match '(?m)^- 2026-10-14: filed proposed\.\r?$' -and $af7 -notmatch '\{\{') "$newFields | $sections"
-        Check 'a process defect cited under logs/ is the same file' ((Test-SamePath 'logs/ci-runs.json' 'ci-runs.json') -and -not (Test-SamePath 'logs/other-ci-runs.json' 'ci-runs.json') -and (Test-SamePath 'Curl.Tls.UnitLibrary/TlsMac.cs' 'Curl.Tls.UnitLibrary/TlsMac.cs')) 'logs/ci-runs.json'
+        Check 'a process defect cited under logs/ is the same file' ((Test-SamePath 'logs/ci-runs.json' 'ci-runs.json') -and -not (Test-SamePath 'logs/other-ci-runs.json' 'ci-runs.json') -and (Test-SamePath 'Curl.Tls.UnitLibrary/TlsMac.cs' 'Curl.Tls.UnitLibrary/TlsMac.cs'))
+        Check 'a file cited by its base name is the planted file' ((Test-SamePath 'ADR-0401-x.md' 'Documentation/Planning/Decisions/ADR-0401-x.md') -and -not (Test-SamePath 'ADR-0402-x.md' 'Documentation/Planning/Decisions/ADR-0401-x.md') -and -not (Test-SamePath 'TlsMac.cs' 'TlsMac.cs.bak')) 'ADR-0401-x.md' 'logs/ci-runs.json'
         Check 'a differently worded report at the planted line is a catch, not a finding' (-not ((Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -match 'returns at the first differing byte')) 'TlsMac.cs:41'
         $plantedAt40 = [pscustomobject]@{ line = 40 }
         Check 'the planted-line window is 2 lines' ((Test-AtPlantedLine 'x.cs:42' $plantedAt40) -and -not (Test-AtPlantedLine 'x.cs:43' $plantedAt40) -and (Test-AtPlantedLine 'x.cs:30-38' $plantedAt40) -and -not (Test-AtPlantedLine 'x.cs:30-37' $plantedAt40) -and -not (Test-AtPlantedLine 'x.cs' $plantedAt40) -and -not (Test-AtPlantedLine 'x.cs:40' ([pscustomobject]@{ line = $null }))) '42 yes, 43 no, 30-38 yes, 30-37 no, no line no'

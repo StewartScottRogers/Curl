@@ -137,7 +137,9 @@ function Test-SamePath([string]$Location, [string]$Planted) {
     # The finding's location names the planted file: the same path, or one ending with it (a
     # process defect's file is relative to the log copy, which auditors cite as logs/...).
     if (-not $Location -or -not $Planted) { return $false }
-    return ($Location -ieq $Planted) -or $Location.EndsWith('/' + $Planted, [StringComparison]::OrdinalIgnoreCase)
+    # Or the planted file's base name alone: an ADR or script cited by its file name (BL-1370).
+    return ($Location -ieq $Planted) -or $Location.EndsWith('/' + $Planted, [StringComparison]::OrdinalIgnoreCase) -or
+        ($Planted.Contains('/') -and $Location -ieq $Planted.Substring($Planted.LastIndexOf('/') + 1))
 }
 
 function Test-AtPlantedLine([string]$Location, $Planted) {
@@ -379,7 +381,8 @@ if ($SelfTest) {
         Check 'unreliable numbers are marked' ($text -match '\| security \| opus \| 0 \(unreliable\) \|') 'security row'
         Check 'the model column comes from -Models' ($text -match '\| process \| sonnet \|' -and $text -match '\| security \| opus \|') 'process sonnet, security opus'
         Check 'new findings listed' ($text -match '- \[AF-0002\]\(\.\./Findings/AF-0002-x\.md\) - High - quality - New quality finding') 'AF-0002'
-        Check 'a process defect cited under logs/ is the same file' ((Test-SamePath 'logs/ci-runs.json' 'ci-runs.json') -and -not (Test-SamePath 'logs/other-ci-runs.json' 'ci-runs.json') -and (Test-SamePath 'Curl.Tls.UnitLibrary/TlsMac.cs' 'Curl.Tls.UnitLibrary/TlsMac.cs')) 'logs/ci-runs.json'
+        Check 'a process defect cited under logs/ is the same file' ((Test-SamePath 'logs/ci-runs.json' 'ci-runs.json') -and -not (Test-SamePath 'logs/other-ci-runs.json' 'ci-runs.json') -and (Test-SamePath 'Curl.Tls.UnitLibrary/TlsMac.cs' 'Curl.Tls.UnitLibrary/TlsMac.cs'))
+        Check 'a file cited by its base name is the planted file' ((Test-SamePath 'ADR-0401-x.md' 'Documentation/Planning/Decisions/ADR-0401-x.md') -and -not (Test-SamePath 'ADR-0402-x.md' 'Documentation/Planning/Decisions/ADR-0401-x.md') -and -not (Test-SamePath 'TlsMac.cs' 'TlsMac.cs.bak')) 'ADR-0401-x.md' 'logs/ci-runs.json'
         # The two real process reports of planted log defects (2026-10-02 and 2026-10-03, BL-1365).
         $plant1 = [pscustomobject]@{ id = 'PD-501'; auditor = 'process'; file = 'DarkFactory-20261001-120001-L9.log'; line = $null; catch = 'BL-1121' }
         $plant2 = [pscustomobject]@{ id = 'PD-501'; auditor = 'process'; file = 'DarkFactory-20261002-231500-L9.log'; line = 2; catch = 'BL-1289' }
