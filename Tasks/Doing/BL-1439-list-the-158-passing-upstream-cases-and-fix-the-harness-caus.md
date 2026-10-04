@@ -37,3 +37,4 @@ The 158 upstream cases that already pass are on `Curl.Conformance.UnitTests/Pass
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
