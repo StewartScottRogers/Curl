@@ -40,3 +40,4 @@ When an HTTP download ends after the head because `-C` asked for an offset the r
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
