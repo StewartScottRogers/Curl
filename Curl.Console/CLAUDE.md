@@ -277,6 +277,10 @@ login takes the URL's user name, and one with no password sends an empty one, ne
 `--netrc-optional` ignores both. When the file is in use, `TransferCredentialLookup.ForRedirectHops`
 gives `RedirectFollower` the same lookup for each redirect hop's URL, so every hop sends its own
 host's entry or none, `--location-trusted` or not (BL-790). Measured on curl 8.21.0 (BL-505 Notes).
+URL credentials that percent-decode to a byte below 0x20 (only `%00` for `http`, `https`, `ws` and
+`wss`) fail with `curl: (3) error extracting credentials from URL` before connecting, a redirect
+hop's too, and a matching netrc entry holding one with `curl: (26) control code detected in .netrc
+credentials` except over those four schemes; `-v` writes each as an info line first (BL-1411).
 An `ftp` or `ftps` URL is claimed by `RoutingFtpProtocolHandler`, which hands an `ftp` one to
 the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any

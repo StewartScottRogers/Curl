@@ -3388,7 +3388,8 @@ internal sealed class CurlCommandRunner(
         RedirectFollower follower = new(
             dispatch.Dispatcher,
             (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
-                TransferProxySelection.TrySelect(dispatch.ProxySelector, options, hopUrl, out hopProxy, out hopFailure, diagnosticLog),
+                TransferProxySelection.TrySelect(dispatch.ProxySelector, options, hopUrl, out hopProxy, out hopFailure, diagnosticLog)
+                && TransferCredentialLookup.TryCheckUrlCredentials(options, hopUrl, out hopFailure),
             hsts: Hsts,
             selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
             selectHopCredentials: CredentialLookup.ForRedirectHops(options));
@@ -3490,13 +3491,18 @@ internal sealed class CurlCommandRunner(
     /// <param name="proxySelector">Chooses the transfer's proxy.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">The transfer's URL.</param>
+    /// <param name="transfer">
+    /// The transfer, whose events get curl's <c>-v</c> info line for credentials refused for a control
+    /// character (BL-1411).
+    /// </param>
     /// <param name="proxy">The proxy chosen, or <see langword="null" /> to connect directly.</param>
-    /// <param name="failure">The proxy's or the netrc file's failure, when either refuses the transfer.</param>
+    /// <param name="failure">The proxy's, the credentials' or the netrc file's failure, when one refuses the transfer.</param>
     /// <returns><see langword="false" /> when the transfer ends before it starts.</returns>
     private bool TrySelectProxyAndCredentials(
         ProxySelector proxySelector,
         CommandLineOptions options,
         CurlUrl url,
+        UrlTransfer transfer,
         out ProxyEndpoint? proxy,
         [NotNullWhen(false)] out TransferResult? failure)
     {
@@ -3507,6 +3513,11 @@ internal sealed class CurlCommandRunner(
 
         bool looked = CredentialLookup.TryLookUp(options, url, out NetworkCredential? lookedUpCredentials, out failure);
         Running.LookedUpCredentials = lookedUpCredentials;
+        if (failure is not null && TransferCredentialLookup.IsControlCodeRefusal(failure))
+        {
+            EventsBeforeConnecting(transfer).ReportInfo(failure.ErrorMessage!);
+        }
+
         return looked;
     }
 
@@ -3608,7 +3619,7 @@ internal sealed class CurlCommandRunner(
             return unstarted;
         }
 
-        if (!TrySelectProxyAndCredentials(proxySelector, options, url, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
+        if (!TrySelectProxyAndCredentials(proxySelector, options, url, transfer, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
             return proxyFailure;
         }

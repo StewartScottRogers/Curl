@@ -38,6 +38,14 @@ namespace Curl.Console;
 /// (<see cref="ForRedirectHops" />), so each hop sends its own host's entry, or none, under
 /// <c>--location-trusted</c> too, as curl 8.21.0 does (measured, BL-505 Notes; BL-790).
 /// </para>
+/// <para>
+/// Credentials holding a control character are refused before anything is sent, as curl 8.21.0's
+/// <c>lib/url.c</c> refuses them (BL-1411): URL ones that decode to a byte below 0x20 (only 0x00 for
+/// <c>http</c>, <c>https</c>, <c>ws</c> and <c>wss</c>) with exit 3 and
+/// <see cref="UrlCredentialsMessage" />, on every redirect hop too
+/// (<see cref="TryCheckUrlCredentials" />); a matching netrc entry's with exit 26 and
+/// <see cref="NetrcControlCodeMessage" />, except over those four schemes.
+/// </para>
 /// </remarks>
 /// <param name="fileReader">Reads the netrc file.</param>
 /// <param name="readEnvironmentVariable">
@@ -56,6 +64,18 @@ internal sealed class TransferCredentialLookup(
     internal const string NoSuchFileMessage = ".netrc error: no such file";
 
     /// <summary>
+    /// The message curl 8.21.0 prints after <c>curl: (3) </c> when the URL's user name or password
+    /// percent-decodes to a control character its scheme refuses (<c>lib/url.c</c>, BL-1411).
+    /// </summary>
+    internal const string UrlCredentialsMessage = "error extracting credentials from URL";
+
+    /// <summary>
+    /// The message curl 8.21.0 prints after <c>curl: (26) </c> when a netrc entry's login or
+    /// password holds a control character its scheme refuses (<c>lib/url.c</c>, BL-1411).
+    /// </summary>
+    internal const string NetrcControlCodeMessage = "control code detected in .netrc credentials";
+
+    /// <summary>
     /// Looks up the credentials the transfer of <paramref name="url" /> sends.
     /// </summary>
     /// <param name="options">The option group of the transfer.</param>
@@ -65,7 +85,10 @@ internal sealed class TransferCredentialLookup(
     /// <see langword="null" /> when neither the URL nor the netrc file has anything to say, so the
     /// <c>-u</c> ones stand.
     /// </param>
-    /// <param name="failure">The exit-26 failure the transfer ends with, when it fails.</param>
+    /// <param name="failure">
+    /// The exit-3 failure for URL credentials holding a control character, or the exit-26 one for
+    /// the netrc file, the transfer ends with, when it fails.
+    /// </param>
     /// <returns><see langword="false" /> when the transfer fails before it starts.</returns>
     internal bool TryLookUp(
         CommandLineOptions options,
@@ -74,10 +97,9 @@ internal sealed class TransferCredentialLookup(
         [NotNullWhen(false)] out TransferResult? failure)
     {
         credentials = null;
-        failure = null;
-        if (!string.IsNullOrEmpty(options.Credentials?.UserName))
+        if (!TryCheckUrlCredentials(options, url, out failure) || UserOptionWins(options))
         {
-            return true;
+            return failure is null;
         }
 
         if (options.NetrcUse == NetrcUse.Ignored)
@@ -89,10 +111,89 @@ internal sealed class TransferCredentialLookup(
         string? urlUser = DecodedUserInformation(url.User);
         string? text = ReadNetrcText(options);
         NetrcLookupResult result = text is null ? NetrcLookupResult.NotFound : NetrcFile.Find(text, url.Host, urlUser, diagnosticLog);
-        failure = FailureOf(options.NetrcUse, FailureMessageOf(text, result));
+        failure = FailureOf(options.NetrcUse, FailureMessageOf(text, result)) ?? NetrcControlCodeFailure(url, result);
         credentials = CredentialsOf(result, urlUser, DecodedUserInformation(url.Password));
         return failure is null;
     }
+
+    /// <summary>
+    /// Refuses <paramref name="url" /> when the credentials written in it percent-decode to a control
+    /// character its scheme refuses, as curl 8.21.0 decodes them with <c>REJECT_CTRL</c> (any byte
+    /// below 0x20), or <c>REJECT_ZERO</c> (only 0x00) for <c>http</c>, <c>https</c>, <c>ws</c> and
+    /// <c>wss</c>, before it connects (measured 2026-10-03, BL-1411). A <c>-u</c> with a user name
+    /// wins over the URL's credentials, so they are not checked under one. Each redirect hop's URL is
+    /// checked the same way.
+    /// </summary>
+    /// <param name="options">The option group of the transfer.</param>
+    /// <param name="url">The transfer's or the redirect hop's URL.</param>
+    /// <param name="failure">The exit-3 failure, when the credentials are refused.</param>
+    /// <returns><see langword="false" /> when the credentials are refused.</returns>
+    internal static bool TryCheckUrlCredentials(
+        CommandLineOptions options,
+        CurlUrl url,
+        [NotNullWhen(false)] out TransferResult? failure)
+    {
+        failure = !UserOptionWins(options) && (HasRefusedControlCode(url, DecodedUserInformation(url.User)) || HasRefusedControlCode(url, DecodedUserInformation(url.Password)))
+            ? TransferResult.Failure(CurlExitCode.UrlMalformat, UrlCredentialsMessage)
+            : null;
+        return failure is null;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="failure" /> refuses credentials for a control character, which curl
+    /// 8.21.0 also writes as a <c>-v</c> info line before its <c>curl: (N)</c> line.
+    /// </summary>
+    /// <param name="failure">A failure <see cref="TryLookUp" /> returned.</param>
+    /// <returns><see langword="true" /> for <see cref="UrlCredentialsMessage" /> and <see cref="NetrcControlCodeMessage" />.</returns>
+    internal static bool IsControlCodeRefusal(TransferResult failure) =>
+        failure.ErrorMessage is UrlCredentialsMessage or NetrcControlCodeMessage;
+
+    /// <summary>Whether <c>-u</c> gives a user name, which wins over the URL's and the netrc file's credentials.</summary>
+    /// <param name="options">The option group of the transfer.</param>
+    /// <returns><see langword="true" /> when <c>-u</c> gives a user name.</returns>
+    private static bool UserOptionWins(CommandLineOptions options) =>
+        !string.IsNullOrEmpty(options.Credentials?.UserName);
+
+    /// <summary>
+    /// curl's exit-26 failure for a matching netrc entry whose login or password holds a byte below
+    /// 0x20, which every scheme but <c>http</c>, <c>https</c>, <c>ws</c> and <c>wss</c> refuses before
+    /// anything is sent, <c>--netrc-optional</c> or not (<c>lib/url.c</c>'s <c>str_has_ctrl</c>, BL-1411).
+    /// </summary>
+    /// <param name="url">The transfer's URL, whose scheme decides.</param>
+    /// <param name="result">The lookup in the netrc file.</param>
+    /// <returns>The failure, or <see langword="null" /> when the credentials may be sent.</returns>
+    private static TransferResult? NetrcControlCodeFailure(CurlUrl url, NetrcLookupResult result) =>
+        result.Outcome == NetrcLookupOutcome.Found
+            && !AllowsControlCodesInCredentials(url)
+            && (HasControlCode(result.Login) || HasControlCode(result.Password))
+            ? TransferResult.Failure(CurlExitCode.ReadError, NetrcControlCodeMessage)
+            : null;
+
+    /// <summary>
+    /// Whether the decoded URL user name or password holds a control character the URL's scheme
+    /// refuses: 0x00 for <c>http</c>, <c>https</c>, <c>ws</c> and <c>wss</c>, any byte below 0x20 for
+    /// the rest. 0x7f and every byte from 0x80 are accepted, as curl's <c>Curl_urldecode</c> accepts them.
+    /// </summary>
+    /// <param name="url">The URL, whose scheme decides.</param>
+    /// <param name="decoded">The decoded part, or <see langword="null" /> when absent.</param>
+    /// <returns><see langword="true" /> when the part is refused.</returns>
+    private static bool HasRefusedControlCode(CurlUrl url, string? decoded) =>
+        AllowsControlCodesInCredentials(url) ? decoded?.Contains('\0') == true : HasControlCode(decoded);
+
+    /// <summary>Whether <paramref name="text" /> holds a character below 0x20.</summary>
+    /// <param name="text">A user name or password, or <see langword="null" />.</param>
+    /// <returns><see langword="true" /> when it holds a control character.</returns>
+    private static bool HasControlCode(string? text) =>
+        text is not null && text.AsSpan().IndexOfAnyInRange('\0', '\u001f') >= 0;
+
+    /// <summary>
+    /// Whether the URL's scheme is one of the four that carry curl's <c>PROTOPT_USERPWDCTRL</c>
+    /// (<c>lib/protocol.c</c>): <c>http</c>, <c>https</c>, <c>ws</c> and <c>wss</c>.
+    /// </summary>
+    /// <param name="url">The URL.</param>
+    /// <returns><see langword="true" /> for those four schemes.</returns>
+    private static bool AllowsControlCodesInCredentials(CurlUrl url) =>
+        url.Scheme is "http" or "https" or "ws" or "wss";
 
     /// <summary>
     /// Gets the lookup each redirect hop's credentials come from when the netrc file is in use: the
