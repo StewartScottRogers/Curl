@@ -1070,8 +1070,9 @@ public sealed class HttpProtocolHandler(
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
             bool discardsBody = DiscardsBody(options, retry, exchange.RedirectUrl);
             ReportIgnoredBody(plan, actedOn, discardsBody);
-            headReader.ReportHeldLines();
             delivery = DeliveryOf(plan, actedOn, discardsBody);
+            HttpDownloadConditions.ReportUndeliveredBody(context, actedOn, delivery);
+            headReader.ReportHeldLines();
             await ReadBodyAsync(plan, actedOn, body, TrailerStreamOf(requestStream, connection), delivery, discardsBody, cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(fail, HttpFailMode.FailWithBody, actedOn);
         }

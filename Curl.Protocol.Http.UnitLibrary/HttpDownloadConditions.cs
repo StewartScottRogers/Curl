@@ -13,6 +13,14 @@ internal static class HttpDownloadConditions
 
     private const int RangeNotSatisfiable = 416;
 
+    private const string EntireDocumentAlreadyDownloaded = "The entire document is already downloaded";
+
+    private const string DocumentNotNewEnough = "The requested document is not new enough";
+
+    private const string DocumentNotOldEnough = "The requested document is not old enough";
+
+    private const string SimulateNotModified = "Simulate an HTTP 304 response";
+
     /// <summary>
     /// Gives the body size <c>--max-filesize</c> allows: <see langword="null" /> when none was
     /// given or it is zero, which curl also takes as no limit.
@@ -67,6 +75,31 @@ internal static class HttpDownloadConditions
 
         long resumeFrom = context.ResumeFrom.GetValueOrDefault();
         return resumeFrom > 0 ? DecideResume(head, resumeFrom, sendsBody) : DecideTimeCondition(context, head);
+    }
+
+    /// <summary>
+    /// Reports the <c>-v</c> lines curl 8.21.0's <c>http_firstwrite</c> writes, before the head's
+    /// empty line, for a body it leaves unread although the response has one (measured, BL-1398
+    /// Notes): <c>The entire document is already downloaded</c> for a resume at the
+    /// Content-Length, and <c>The requested document is not new enough</c> (or <c>not old
+    /// enough</c>) then <c>Simulate an HTTP 304 response</c> for a <c>Last-Modified</c> that fails
+    /// <c>-z</c>. A 416 or a real 304 writes neither.
+    /// </summary>
+    /// <param name="context">The transfer.</param>
+    /// <param name="head">The final response's head.</param>
+    /// <param name="delivery">What <see cref="Decide" /> made of the body.</param>
+    internal static void ReportUndeliveredBody(ITransferContext context, HttpResponseHead head, HttpBodyDelivery delivery)
+    {
+        int statusCode = head.StatusLine.StatusCode;
+        if (delivery == HttpBodyDelivery.NothingLeftToResume && statusCode != RangeNotSatisfiable)
+        {
+            context.Events.ReportInfo(EntireDocumentAlreadyDownloaded);
+        }
+        else if (delivery == HttpBodyDelivery.TimeConditionUnmet && statusCode != NotModified)
+        {
+            context.Events.ReportInfo(context.TimeCondition!.Kind == TimeConditionKind.IfUnmodifiedSince ? DocumentNotOldEnough : DocumentNotNewEnough);
+            context.Events.ReportInfo(SimulateNotModified);
+        }
     }
 
     /// <summary>
