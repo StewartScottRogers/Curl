@@ -42,3 +42,4 @@ Under `--retry` with `-o <file>`, a failed attempt's bytes are handled as curl 8
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
