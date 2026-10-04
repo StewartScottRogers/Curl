@@ -173,7 +173,7 @@ public sealed class CurlCompositionLdapTests
 
         string protocols = Encoding.ASCII.GetString(standardOutput.ToArray()).Split(Environment.NewLine).Single(line => line.StartsWith("Protocols:", StringComparison.Ordinal));
         Assert.AreEqual(CurlVersionText.ProtocolsLine, protocols);
-        StringAssert.Contains(protocols, " imaps ldap ldaps mqtt ");
+        StringAssert.Contains(protocols, " ipns ldap ldaps mqtt ");
         Assert.AreEqual(0, exitCode);
     }
 

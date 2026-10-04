@@ -19,9 +19,11 @@ public static class CurlVersionText
     /// <summary>
     /// The third line: the schemes the registered handlers serve, in curl's alphabetical order —
     /// <c>file</c>, <c>dict</c>, <c>ftp</c>/<c>ftps</c>, <c>gopher</c>/<c>gophers</c>, <c>telnet</c>, <c>tftp</c>,
-    /// <c>imap</c>/<c>imaps</c>, <c>mqtt</c>/<c>mqtts</c>, <c>pop3</c>/<c>pop3s</c>, <c>rtsp</c>, <c>scp</c>/<c>sftp</c>, <c>smb</c>/<c>smbs</c>, <c>smtp</c>/<c>smtps</c>, <c>ws</c>/<c>wss</c> and <c>http</c>/<c>https</c>.
+    /// <c>imap</c>/<c>imaps</c>, <c>mqtt</c>/<c>mqtts</c>, <c>pop3</c>/<c>pop3s</c>, <c>rtsp</c>, <c>scp</c>/<c>sftp</c>, <c>smb</c>/<c>smbs</c>, <c>smtp</c>/<c>smtps</c>, <c>ws</c>/<c>wss</c> and <c>http</c>/<c>https</c> —
+    /// and <c>ipfs</c>/<c>ipns</c>, which the tool serves by rewriting to a gateway as curl does and which
+    /// every curl 8.21.0 build lists (ADR-0021 amendment, BL-1417).
     /// </summary>
-    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss";
+    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss";
 
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
@@ -33,8 +35,10 @@ public static class CurlVersionText
     /// <c>HTTP3</c> on every platform now that <c>--http3</c> and <c>--http3-only</c> work (ADR-0144), and
     /// <c>TLS-SRP</c> on every platform now that <c>--tlsuser</c> and <c>--proxy-tlsuser</c> authenticate the
     /// hand-built handshake with SRP (ADR-0328, BL-1135), after <c>SSL</c> as curl 8.18.0's OpenSSL build lists it.
+    /// BL-1417's audit added <c>alt-svc</c>, <c>ECH</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>HTTPSRR</c>, <c>IDN</c>,
+    /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment).
     /// </summary>
-    public const string FeaturesLine = "Features: AsynchDNS brotli GSS-API HTTP2 HTTP3 IPv6 Kerberos Largefile libz NTLM SPNEGO SSL TLS-SRP";
+    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL TLS-SRP UnixSockets zstd";
 
     /// <summary>Returns the four lines for the platform described, without line terminators.</summary>
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>
