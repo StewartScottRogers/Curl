@@ -34,3 +34,4 @@ Under `-v`/`--trace`, a PUBLISH body that arrives in parts is reported and writt
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-04: Backlog -> Doing.
