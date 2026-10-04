@@ -385,6 +385,51 @@ public sealed class PhysicalFileSystemTests
         Assert.IsNull(result.Content);
     }
 
+    [TestMethod]
+    public async Task ListEntryNamesAsync_CancelledToken_ThrowsOperationCanceledException()
+    {
+        var fileSystem = new PhysicalFileSystem();
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            () => fileSystem.ListEntryNamesAsync("unused", new CancellationToken(canceled: true)).AsTask());
+    }
+
+    [TestMethod]
+    public async Task ListEntryNamesAsync_Directory_ReturnsEveryEntryNameIncludingDotNamesAndSubdirectories()
+    {
+        using var directory = new TemporaryDirectory();
+        await System.IO.File.WriteAllBytesAsync(directory.Combine("a.txt"), Content);
+        await System.IO.File.WriteAllBytesAsync(directory.Combine(".hidden"), Content);
+        Directory.CreateDirectory(directory.Combine("sub"));
+
+        var names = await new PhysicalFileSystem().ListEntryNamesAsync(directory.Path, CancellationToken.None);
+
+        Assert.IsNotNull(names);
+        CollectionAssert.AreEquivalent(new[] { "a.txt", ".hidden", "sub" }, names.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ListEntryNamesAsync_MissingDirectory_ReturnsNull()
+    {
+        using var directory = new TemporaryDirectory();
+
+        var names = await new PhysicalFileSystem().ListEntryNamesAsync(directory.Combine("missing"), CancellationToken.None);
+
+        Assert.IsNull(names);
+    }
+
+    [TestMethod]
+    public async Task ListEntryNamesAsync_RegularFile_ReturnsNull()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.Combine("source.txt");
+        await System.IO.File.WriteAllBytesAsync(path, Content);
+
+        var names = await new PhysicalFileSystem().ListEntryNamesAsync(path, CancellationToken.None);
+
+        Assert.IsNull(names);
+    }
+
     /// <summary>
     /// A directory under the system temporary path, removed with everything in it on
     /// disposal.

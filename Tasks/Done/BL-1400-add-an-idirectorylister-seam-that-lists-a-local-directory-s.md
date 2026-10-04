@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests]
 requirement: FR-004
 created: 2026-10-03
-completed:
+completed: 2026-10-03
 ---
 # BL-1400 — Add an IDirectoryLister seam that lists a local directory's entry names, implemented by PhysicalFileSystem
 
@@ -24,16 +24,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `IDirectoryLister` exists in `Curl.Protocol.Abstractions.UnitLibrary` with the member above and XML doc comments saying what each return means; `IFileSystem`'s remark about directories says the Windows build cannot open a directory (exit 37) while the Linux and macOS builds list it, citing `lib/file.c` lines 568-589.
-- [ ] `PhysicalFileSystem` implements it; tests in `Curl.Core.UnitTests` create a temporary directory with `a.txt`, `.hidden` and a subdirectory `sub` and assert the three names come back (in any order, compared as a set), and that a missing directory and a regular file give `null`.
-- [ ] Nothing else in the solution changes behaviour: `dotnet build -warnaserror` of `Curl.Protocol.Abstractions.UnitTests` and `Curl.Core.UnitTests` is clean and both pass with `--filter "TestCategory!=Integration"`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` and `-Library Curl.Core.UnitLibrary` report no failing member in the code this task changed.
+- [x] `IDirectoryLister` exists in `Curl.Protocol.Abstractions.UnitLibrary` with the member above and XML doc comments saying what each return means; `IFileSystem`'s remark about directories says the Windows build cannot open a directory (exit 37) while the Linux and macOS builds list it, citing `lib/file.c` lines 568-589.
+- [x] `PhysicalFileSystem` implements it; tests in `Curl.Core.UnitTests` create a temporary directory with `a.txt`, `.hidden` and a subdirectory `sub` and assert the three names come back (in any order, compared as a set), and that a missing directory and a regular file give `null`.
+- [x] Nothing else in the solution changes behaviour: `dotnet build -warnaserror` of `Curl.Protocol.Abstractions.UnitTests` and `Curl.Core.UnitTests` is clean and both pass with `--filter "TestCategory!=Integration"`; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` and `-Library Curl.Core.UnitLibrary` report no failing member in the code this task changed.
 
 ## Notes
 
 - Kept small on purpose: a change to `Curl.Protocol.Abstractions.UnitLibrary` makes the quality measurement run nearly every test project.
 - The `file` handler's use of it is the next task (it depends on this one).
+- 2026-10-03 (lane 6): `PhysicalFileSystem.ListEntryNamesAsync` materialises `Directory.EnumerateFileSystemEntries` inside the try, so the lazy enumerator's `DirectoryNotFoundException` (missing) and `IOException` (regular file) are both caught by `FileOpenFailure.IsOpenFailure` and returned as `null`. Measure-CodeQuality over both libraries: 0 failing members. Four new tests in `PhysicalFileSystemTests`.
 
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
+- 2026-10-03: Doing -> Done. IDirectoryLister lists a directory's entry names; PhysicalFileSystem implements it

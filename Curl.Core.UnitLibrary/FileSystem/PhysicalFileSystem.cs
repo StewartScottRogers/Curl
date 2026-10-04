@@ -4,9 +4,10 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Core.FileSystem;
 
 /// <summary>
-/// The real-disk <see cref="IFileSystem" /> and <see cref="IFileTimeSetter" />: opens local files with
+/// The real-disk <see cref="IFileSystem" />, <see cref="IDirectoryLister" /> and <see cref="IFileTimeSetter" />: opens local files with
 /// <see cref="FileStream" /> and reports every failed open as a
-/// <see cref="FileAccessStatus" />, never as an exception.
+/// <see cref="FileAccessStatus" />, never as an exception, and lists a directory's entry
+/// names, reporting one it cannot list as <see langword="null" />.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -45,7 +46,7 @@ namespace Curl.Core.FileSystem;
 /// it is ignored and the option has no effect.
 /// </para>
 /// </remarks>
-public sealed class PhysicalFileSystem : IFileSystem, IFileTimeSetter
+public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTimeSetter
 {
     private const int BufferSize = 4096;
 
@@ -118,6 +119,32 @@ public sealed class PhysicalFileSystem : IFileSystem, IFileTimeSetter
             : OptionsFor(fileMode, FileAccess.Write, FileShare.Read);
 
         return ValueTask.FromResult(Open(path, options));
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Lists with <see cref="Directory.EnumerateFileSystemEntries(string)" />, unsorted, so
+    /// the names come in the operating system's order as curl's <c>readdir</c> loop gives
+    /// them. Every exception <see cref="FileOpenFailure.IsOpenFailure(Exception)" /> names,
+    /// such as the <see cref="DirectoryNotFoundException" /> of a missing directory or the
+    /// <see cref="IOException" /> of a regular file, is reported as <see langword="null" />.
+    /// </remarks>
+    /// <exception cref="OperationCanceledException">
+    /// <paramref name="cancellationToken" /> was cancelled before the listing.
+    /// </exception>
+    public ValueTask<IReadOnlyList<string>?> ListEntryNamesAsync(string path, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            return ValueTask.FromResult<IReadOnlyList<string>?>(
+                Directory.EnumerateFileSystemEntries(path).Select(entry => Path.GetFileName(entry)).ToList());
+        }
+        catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
+        {
+            return ValueTask.FromResult<IReadOnlyList<string>?>(null);
+        }
     }
 
     /// <inheritdoc />
