@@ -42,3 +42,4 @@ An HTTP/1.x response whose `Content-Length` is too large for a signed 64-bit num
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-03: Backlog -> Doing.
