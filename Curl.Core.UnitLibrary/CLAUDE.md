@@ -109,8 +109,11 @@ under `/dev/` off Windows, which `SeekableFileLength` sends chunked as libcurl d
 `Globbing\UrlGlob` is curl 8.21.0's URL globbing (ADR-0032): `TryParse` reads `{a,b}` sets
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and
 curl's `<reason> in position N:` message, caret and all; `Unglobbed` is the URL under `-g`.
+A glob may be named, `{<name>a,b}` or `[<name>1-3]` (at most 64 characters; a name used
+twice is exit 3, `Duplicate glob name`; BL-1436).
 `Expand()` yields each URL lazily, rightmost glob fastest, and `UrlGlobMatch.SubstituteGlobValues`
-replaces `#N` in an `-o` name. `UrlGlobMatch.ResolveOutputFileName` is the name curl
+replaces `#N` and `#<name>` in an `-o` name; `UrlGlobMatch.TryResolveOutputFileName` also
+fails a `#<name>` naming no glob as curl does (exit 43, `no glob exists with this name`). `UrlGlobMatch.ResolveOutputFileName` is the name curl
 writes to: as written under `-g`, otherwise substituted and, when the caller passes
 `OperatingSystem.IsWindows()`, sanitized by `WindowsOutputFileNameSanitizer` as curl's
 Windows build does (control characters and `| < > " ? *` become `_`; BL-283). It is not

@@ -95,6 +95,7 @@ public sealed class UrlGlob
     {
         var url = new System.Text.StringBuilder();
         var globValues = new List<string>();
+        var globNames = new List<string?>();
         for (int position = 0; position < pieces.Count; position++)
         {
             string value = pieces[position].ValueAt(indexes[position]);
@@ -102,10 +103,11 @@ public sealed class UrlGlob
             if (pieces[position].IsGlob)
             {
                 globValues.Add(value);
+                globNames.Add(pieces[position].Name);
             }
         }
 
-        return new UrlGlobMatch(url.ToString(), globValues, isGlobbing);
+        return new UrlGlobMatch(url.ToString(), globValues, globNames, isGlobbing);
     }
 
     private void Advance(long[] indexes)

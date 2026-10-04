@@ -26,6 +26,11 @@ namespace Curl.Core.Globbing;
 /// digit count. Either range may hold one value only with step 1, and its step may not
 /// exceed its span. The product of every glob's value count must fit a <see cref="long" />.
 /// </para>
+/// <para>
+/// A <c>&lt;name&gt;</c> of at most 64 characters straight after a <c>{</c> or <c>[</c>
+/// names the glob; one with no <c>&gt;</c> or a longer one is read as set or range content.
+/// A name used twice is <c>Duplicate glob name</c>.
+/// </para>
 /// </remarks>
 internal sealed class UrlGlobParser(string url)
 {
@@ -40,6 +45,8 @@ internal sealed class UrlGlobParser(string url)
         "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-._~");
 
     private readonly List<UrlGlobPiece> pieces = [];
+
+    private readonly HashSet<string> globNames = new(StringComparer.Ordinal);
 
     private int index;
 
@@ -81,7 +88,34 @@ internal sealed class UrlGlobParser(string url)
         }
 
         char opener = url[index++];
-        return opener == '{' ? ReadSet() : ReadRange();
+        return ReadGlobName(out string? name) ?? ReadNamedGlob(opener, name);
+    }
+
+    /// <summary>
+    /// Reads the optional <c>&lt;name&gt;</c> after a glob's opener. A name already used is
+    /// curl's <c>Duplicate glob name</c>, at the offset just past its <c>&gt;</c>.
+    /// </summary>
+    private UrlGlobError? ReadGlobName(out string? name)
+    {
+        name = UrlGlobName.Read(url, index);
+        if (name is null)
+        {
+            return null;
+        }
+
+        index += name.Length + 2;
+        return globNames.Add(name) ? null : new UrlGlobError("Duplicate glob name", index);
+    }
+
+    private UrlGlobError? ReadNamedGlob(char opener, string? name)
+    {
+        UrlGlobError? error = opener == '{' ? ReadSet() : ReadRange();
+        if (error is null)
+        {
+            pieces[^1].Name = name;
+        }
+
+        return error;
     }
 
     /// <summary>Reads literal text up to the next <c>{</c> or glob-opening <c>[</c>.</summary>

@@ -252,4 +252,125 @@ public sealed class UrlGlobTests
     [TestMethod]
     public void SubstituteGlobValues_NullName_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed("x").Expand().Single().SubstituteGlobValues(null!));
+
+    [TestMethod]
+    public void Expand_NamedGlobs_ExpandLikeUnnamedOnes()
+    {
+        Assert.IsTrue(UrlGlob.TryParse("http://h/{<a>x,y}[<b>1-2]", out UrlGlob? named, out _));
+        Assert.IsTrue(UrlGlob.TryParse("http://h/{x,y}[1-2]", out UrlGlob? unnamed, out _));
+
+        CollectionAssert.AreEqual(
+            unnamed.Expand().Select(match => match.Url).ToArray(),
+            named.Expand().Select(match => match.Url).ToArray());
+        Assert.AreEqual(4, named.UrlCount);
+    }
+
+    [TestMethod]
+    [DataRow("#<a>-#<b>")]
+    [DataRow("#1-#2")]
+    [DataRow("#<a>-#2")]
+    public void SubstituteGlobValues_NamedOrNumberedReference_IsTheGlobsValue(string outputFileName)
+    {
+        Assert.IsTrue(UrlGlob.TryParse("http://h/{<a>x,y}[<b>1-2]", out UrlGlob? glob, out _));
+
+        Assert.AreEqual("x-1", glob.Expand().First().SubstituteGlobValues(outputFileName));
+    }
+
+    [TestMethod]
+    [DataRow("http://h/{<bad x,y}", "http://h/<bad x|http://h/y")]
+    [DataRow("http://h/{<>x,y}", "http://h/x|http://h/y")]
+    public void Expand_BrokenOrEmptyGlobName_IsReadAsCurlReadsIt(string url, string expectedUrls)
+    {
+        Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out _));
+
+        CollectionAssert.AreEqual(expectedUrls.Split('|'), glob.Expand().Select(match => match.Url).ToArray());
+    }
+
+    [TestMethod]
+    public void Expand_GlobNameOverSixtyFourCharacters_IsSetContent()
+    {
+        string name = new('n', 65);
+        Assert.IsTrue(UrlGlob.TryParse($"http://h/{{<{name}>x,y}}", out UrlGlob? glob, out _));
+
+        CollectionAssert.AreEqual(
+            new[] { $"http://h/<{name}>x", "http://h/y" },
+            glob.Expand().Select(match => match.Url).ToArray());
+    }
+
+    [TestMethod]
+    public void SubstituteGlobValues_SixtyFourCharacterName_IsResolved()
+    {
+        string name = new('n', 64);
+        Assert.IsTrue(UrlGlob.TryParse($"http://h/{{<{name}>x,y}}", out UrlGlob? glob, out _));
+
+        CollectionAssert.AreEqual(
+            new[] { "http://h/x", "http://h/y" },
+            glob.Expand().Select(match => match.Url).ToArray());
+        Assert.AreEqual("o_x", glob.Expand().First().SubstituteGlobValues($"o_#<{name}>"));
+    }
+
+    [TestMethod]
+    public void TryParse_DuplicateGlobName_IsUrlMalformatAtCurlsPosition()
+    {
+        const string url = "https://dummy.example/{<test>A,B}{<test>C,D}";
+
+        Assert.IsFalse(UrlGlob.TryParse(url, out _, out TransferResult? failure));
+
+        Assert.AreEqual(CurlExitCode.UrlMalformat, failure.ExitCode);
+        Assert.AreEqual($"Duplicate glob name in position 40:\n{url}\n{new string(' ', 39)}^", failure.ErrorMessage);
+    }
+
+    [TestMethod]
+    public void TryResolveOutputFileName_UnknownGlobName_IsBadFunctionArgumentAtCurlsPosition()
+    {
+        Assert.IsTrue(UrlGlob.TryParse("http://h/{<a>x}", out UrlGlob? glob, out _));
+
+        Assert.IsFalse(glob.Expand().Single().TryResolveOutputFileName(
+            "somewhere/#<foo>", sanitizesForWindows: false, out string? fileName, out TransferResult? failure));
+
+        Assert.IsNull(fileName);
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, failure.ExitCode);
+        Assert.AreEqual(
+            $"no glob exists with this name in position 16:\nsomewhere/#<foo>\n{new string(' ', 15)}^",
+            failure.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow("somewhere/#<foo", false, "somewhere/#<foo")]
+    [DataRow("o_#<a>_#1_#9", false, "o_x_x_#9")]
+    [DataRow("o?_#<a>", true, "o__x")]
+    [DataRow("o_#<" + "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn" + ">", false, "o_#<nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn>")]
+    public void TryResolveOutputFileName_KnownOrMalformedReference_IsResolved(string outputFileName, bool sanitizesForWindows, string expected)
+    {
+        Assert.IsTrue(UrlGlob.TryParse("http://h/{<a>x}", out UrlGlob? glob, out _));
+
+        Assert.IsTrue(glob.Expand().Single().TryResolveOutputFileName(
+            outputFileName, sanitizesForWindows, out string? fileName, out TransferResult? failure));
+
+        Assert.IsNull(failure);
+        Assert.AreEqual(expected, fileName);
+    }
+
+    [TestMethod]
+    public void SubstituteGlobValues_UnknownGlobName_IsLeftAsWritten()
+    {
+        Assert.IsTrue(UrlGlob.TryParse("http://h/{<a>x}", out UrlGlob? glob, out _));
+
+        Assert.AreEqual("o_#<foo>_x", glob.Expand().Single().SubstituteGlobValues("o_#<foo>_#<a>"));
+    }
+
+    [TestMethod]
+    public void TryResolveOutputFileName_GlobOff_IsTheNameAsWritten()
+    {
+        UrlGlobMatch match = UrlGlob.Unglobbed("http://h/{<a>x}").Expand().Single();
+
+        Assert.IsTrue(match.TryResolveOutputFileName("o?#<foo>", sanitizesForWindows: true, out string? fileName, out TransferResult? failure));
+
+        Assert.IsNull(failure);
+        Assert.AreEqual("o?#<foo>", fileName);
+    }
+
+    [TestMethod]
+    public void TryResolveOutputFileName_NullName_Throws() =>
+        Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed("x").Expand().Single().TryResolveOutputFileName(null!, sanitizesForWindows: true, out _, out _));
 }
