@@ -22,7 +22,10 @@ namespace Curl.Protocol.Rtsp;
 /// and the connection closed after the transfer (BL-1403), unless a <c>--max-filesize</c> limit is set, when it fails
 /// with 63, <c>Maximum file size exceeded</c> (BL-1292). A carriage return inside a line fails with 8,
 /// <c>Carriage return found in header</c> (on the status line only once it has passed the
-/// status check), and a header line with no colon with 8, <c>Header without colon</c>; each
+/// status check), a NUL byte anywhere in a line, checked before the carriage return and colon
+/// and on the status line too once it has passed the status check, with 8, <c>Nul byte in header</c>
+/// (BL-1406), a second <c>Location</c> whose value differs from the first with 8,
+/// <c>Multiple Location headers</c> (BL-1406), and a header line with no colon with 8, <c>Header without colon</c>; each
 /// header line arrives with its continuation lines already joined (<see cref="RtspHeaderFolding" />).
 /// The line that fails is not written. A <c>Session</c> header, in any case, is handed to <c>session</c>, which keeps
 /// the first ID and fails a different one with 86 as the line is read (BL-592).
@@ -52,6 +55,12 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
     /// <summary>The exit 8 message for a header line with no colon.</summary>
     internal const string HeaderWithoutColon = "Header without colon";
 
+    /// <summary>The exit 8 message for a NUL byte in a line of the head.</summary>
+    internal const string NulByteInHeader = "Nul byte in header";
+
+    /// <summary>The exit 8 message for a second <c>Location</c> header that differs from the first.</summary>
+    internal const string MultipleLocationHeaders = "Multiple Location headers";
+
     private const string Version = "RTSP/1.0";
 
     private const int MaximumStatusCode = 999;
@@ -61,6 +70,8 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
     private long? declaredLength;
 
     private bool lengthTooLarge;
+
+    private string? location;
 
     /// <summary>Gets a value indicating whether the status line has been read.</summary>
     internal bool HasStatus { get; private set; }
@@ -97,6 +108,7 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
         if (!HasStatus)
         {
             StatusCode = ParseStatusCode(text);
+            RefuseNulByte(text);
             RefuseCarriageReturn(text);
             HasStatus = true;
         }
@@ -106,9 +118,19 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
         }
         else
         {
+            RefuseNulByte(text);
             RefuseCarriageReturn(text);
             RefuseMissingColon(text);
             AcceptHeader(text);
+        }
+    }
+
+    /// <summary>Fails with 8 when a NUL byte comes anywhere in the line.</summary>
+    private static void RefuseNulByte(string line)
+    {
+        if (line.Contains('\0'))
+        {
+            throw new RtspTransferException(CurlExitCode.WeirdServerReply, NulByteInHeader);
         }
     }
 
@@ -161,6 +183,10 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
         else if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
         {
             AcceptContentLength(line["Content-Length:".Length..]);
+        }
+        else if (line.StartsWith("Location:", StringComparison.OrdinalIgnoreCase))
+        {
+            KeepLocation(line.AsSpan("Location:".Length).Trim(WhiteSpace).ToString());
         }
         else if (line.StartsWith("Session:", StringComparison.OrdinalIgnoreCase))
         {
@@ -230,6 +256,26 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
         {
             session.CloseConnection();
         }
+    }
+
+    /// <summary>
+    /// Keeps the first non-empty <c>Location</c> value and refuses a later one that differs from
+    /// it, as curl 8.21.0's shared <c>http_header_l</c> does; an empty value, or a repeat that
+    /// differs only in surrounding blanks, is ignored (measured, BL-1406).
+    /// </summary>
+    private void KeepLocation(string value)
+    {
+        if (value.Length == 0)
+        {
+            return;
+        }
+
+        if (location is not null && !location.Equals(value, StringComparison.Ordinal))
+        {
+            throw new RtspTransferException(CurlExitCode.WeirdServerReply, MultipleLocationHeaders);
+        }
+
+        location = value;
     }
 
     private static RtspTransferException InvalidLength() => new(CurlExitCode.WeirdServerReply, InvalidContentLength);
