@@ -4,7 +4,7 @@ title: Attack Curl.Cryptography.UnitLibrary with adversarial black-box tests in 
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1491, BL-1464]
+depends-on: [BL-1491, BL-1464, BL-1525]
 touches: [Curl.Cryptography.UnitTests]
 requirement: none
 created: 2026-10-06
@@ -36,3 +36,4 @@ completed:
 ## Log
 
 - 2026-10-06: Created.
+- 2026-10-06: Now depends on BL-1525, which speeds up X25519, X448 and CAST-128, so the attacks run against the final code.
