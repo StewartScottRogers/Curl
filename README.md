@@ -18,6 +18,18 @@ of at most 10 and a CRAP score of at most 30. The [full report](https://stewarts
 shows each library against those gates and every member outside one, measured on Windows
 and regenerated on the same schedule as the video above.*
 
+### Integration tests
+
+[![Integration tests: passed out of run on each platform - click for the runs](https://github.com/StewartScottRogers/Curl/raw/gource/integration/badge.svg)](https://github.com/StewartScottRogers/Curl/actions/workflows/integration.yml?query=branch%3Awork%2Fdark-factory)
+
+*The tests marked `TestCategory("Integration")` - real loopback sockets, TLS servers and
+disk files - run in CI on Windows, Linux and macOS, on every push and pull request, in
+their own [Integration tests](.github/workflows/integration.yml) workflow beside the fast
+tests' CI. The badge shows each platform's passed out of run for the latest finished run on
+`work/dark-factory`, and is red when any failed. **They never fail a run yet**: a failure
+is listed in the run's summary and on the badge but blocks nothing, until
+`INTEGRATION_FAILURES_FAIL_THE_RUN` in that workflow is set to `'true'`.*
+
 ### [▦ Live task board](https://stewartscottrogers.github.io/Curl/board/)
 
 *The [live task board](https://stewartscottrogers.github.io/Curl/board/) shows every task
@@ -78,6 +90,12 @@ Needs the .NET 10 SDK. Builds and tests on Windows, Linux and macOS.
 ```
 dotnet build
 dotnet test --filter "TestCategory!=Integration"
+```
+
+The Integration tests, as CI runs them (they open loopback sockets and write temporary files):
+
+```
+dotnet test --filter "TestCategory=Integration"
 ```
 
 Run a factory shift (Windows):

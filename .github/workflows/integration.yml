@@ -1,0 +1,111 @@
+# Runs the tests marked TestCategory("Integration") - real loopback sockets, TLS servers and
+# disk files - on Windows, Linux and macOS, and reports them in the run's summary and on the
+# README's Integration tests badge. Stewart's request (2026-10-06): run them in CI, but never
+# fail until he changes INTEGRATION_FAILURES_FAIL_THE_RUN below.
+#
+# It is a workflow of its own, not a job in ci.yml, because the Integration tests take far
+# longer than the fast tests (Curl.Cryptography.UnitTests' alone took 27 minutes locally on
+# 2026-10-06): inside CI they would hold every CI run, and the dark factory's merge to
+# master that waits on it, for half an hour. Its result does not count towards the CI
+# workflow, so nothing here can block a merge.
+#
+# On work/dark-factory, where lanes push every few minutes, runs queue rather than cancel:
+# the run in progress always finishes, and only the newest waiting push runs next, so the
+# badge keeps updating.
+name: Integration tests
+
+on:
+  push:
+    # The same branches CI skips: factory/* holds lanes' partial work, gource and board hold
+    # no code to build.
+    branches-ignore: [gource, board, 'factory/**']
+  pull_request:
+  workflow_dispatch:
+
+# Write, for the results published to the gource branch on a push to work/dark-factory; no
+# other step pushes anything.
+permissions:
+  contents: write
+
+env:
+  # Stewart's switch (2026-10-06). 'false': a failing Integration test is listed in the job
+  # summary and on the README badge, but the run stays green. 'true': it fails the run (a
+  # red Integration tests run; to block merges with it, also make it a required check).
+  INTEGRATION_FAILURES_FAIL_THE_RUN: 'false'
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    name: Integration tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # A build failure is CI's to report; here it only means there are no results.
+      - name: Build
+        id: build
+        continue-on-error: true
+        run: dotnet build -c Release
+
+      # With continue-on-error, a failing or timed-out test run leaves the job green; the
+      # last step alone decides whether it fails the run.
+      - name: Integration tests
+        id: integration
+        if: ${{ steps.build.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 120
+        run: dotnet test -c Release --no-build --filter "TestCategory=Integration" --logger trx --results-directory "${{ runner.temp }}/integration-results"
+
+      - name: Report Integration tests
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: ./.github/integration/Write-IntegrationTestSummary.ps1 -ResultsDirectory "${{ runner.temp }}/integration-results" -Platform '${{ runner.os }}' -JsonPath "${{ runner.temp }}/integration.json"
+
+      # Each platform commits its own <platform>.json onto the gource branch without force and
+      # redraws the badge from all three, as gource.yml's coverage job does with coverage/;
+      # gource.yml's render job carries integration/ into its force-pushed commit. A
+      # publishing failure only leaves the badge stale, so it never fails the job.
+      - name: Publish results to the gource branch
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/work/dark-factory' }}
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $url = "https://x-access-token:$env:GITHUB_TOKEN@github.com/$env:GITHUB_REPOSITORY.git"
+          $platform = '${{ runner.os }}'.ToLowerInvariant()
+          foreach ($try in 1..5) {
+            $dir = Join-Path $env:RUNNER_TEMP "site-$try"
+            # Sparse and blob-less: the branch also holds hundreds of MB of video this step never needs.
+            git clone -q --depth 1 --filter=blob:none --sparse --branch gource $url $dir
+            if ($LASTEXITCODE -ne 0) { throw 'no gource branch to publish onto' }
+            git -C $dir sparse-checkout set integration
+            $target = Join-Path $dir 'integration'
+            New-Item -ItemType Directory -Force $target | Out-Null
+            Copy-Item (Join-Path $env:RUNNER_TEMP 'integration.json') (Join-Path $target "$platform.json")
+            ./.github/integration/Write-IntegrationTestBadge.ps1 -Directory $target
+            git -C $dir config user.name 'github-actions[bot]'
+            git -C $dir config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git -C $dir add integration
+            git -C $dir commit -q -m "chore(integration): $platform results $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mmZ'))"
+            git -C $dir push -q origin gource
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Start-Sleep -Seconds (5 * $try)
+          }
+          throw 'push to gource kept being refused'
+
+      - name: Fail the run when Integration failures are switched on
+        if: ${{ !cancelled() && env.INTEGRATION_FAILURES_FAIL_THE_RUN == 'true' && steps.integration.outcome != 'success' }}
+        run: exit 1
