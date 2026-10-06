@@ -10,7 +10,8 @@
 #                  measures, .github/coverage/make-coverage-report.cs renders the page and
 #                  the badge, and the result is committed onto the gource branch;
 #   * render     - the video. It waits for coverage, then force-pushes a new single-commit
-#                  gource branch that carries the coverage/ and board/ folders over;
+#                  gource branch that carries the coverage/, board/ and integration/ folders
+#                  over (integration/ is the Integration test badge integration.yml commits);
 #   * board-page - on every run on work/dark-factory, never gated on decide (other branches
 #                  carry older copies of the page and would put them back): when .github/board/site/index.html
 #                  is in this commit and differs from the gource branch's board/index.html,
@@ -218,8 +219,16 @@ jobs:
             curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
               "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/gource/board/index.html" -o board/index.html || rm -f board/index.html
           fi
+          # The Integration test results integration.yml committed onto the branch: the badge
+          # and each platform's result file.
+          mkdir -p integration
+          for f in badge.svg windows.json linux.json macos.json; do
+            curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/gource/integration/$f" -o "integration/$f" || rm -f "integration/$f"
+          done
           extra=$( [ -f coverage/index.html ] && echo coverage || true )
           [ -f board/index.html ] && extra="$extra board"
+          [ -f integration/badge.svg ] && extra="$extra integration"
           # GitHub refuses any file over 100 MB (GH001), and a refused push leaves the README's
           # video frozen while the coverage job keeps the branch looking fresh. Name every
           # file over 95 MiB and stop here instead. GitHub Pages serves at most 1 GB: stop
