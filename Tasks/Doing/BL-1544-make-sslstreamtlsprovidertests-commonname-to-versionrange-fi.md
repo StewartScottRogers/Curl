@@ -34,3 +34,4 @@ Every test declared in `Curl.Networking.UnitTests`' `SslStreamTlsProviderTests` 
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
