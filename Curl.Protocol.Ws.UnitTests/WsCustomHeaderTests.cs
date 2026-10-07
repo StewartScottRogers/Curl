@@ -1,9 +1,13 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Ws;
 
 /// <summary>Pins how one <c>-H</c> entry is read, as curl reads it.</summary>
 [TestClass]
 public sealed class WsCustomHeaderTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("X-A: 1", "X-A: 1")]
     [DataRow("X-A:", null)]
@@ -15,7 +19,14 @@ public sealed class WsCustomHeaderTests
     [DataRow("X-A", null)]
     public void Parse_Entry_SendsTheLineCurlSends(string entry, string? sentLine)
     {
-        Assert.AreEqual(sentLine, WsCustomHeader.Parse(entry).SentLine);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("entry", entry);
+
+        string? actual = WsCustomHeader.Parse(entry).SentLine;
+
+        diagnostics.Act("sent line", actual ?? "(null)");
+        diagnostics.Assert("sent line", sentLine ?? "(null)", actual ?? "(null)");
+        Assert.AreEqual(sentLine, actual);
     }
 
     [TestMethod]
@@ -24,7 +35,14 @@ public sealed class WsCustomHeaderTests
     [DataRow("Connection;", null)]
     public void Value_Entry_IsTheTrimmedValueOfANameValueEntry(string entry, string? value)
     {
-        Assert.AreEqual(value, WsCustomHeader.Parse(entry).Value);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("entry", entry);
+
+        string? actual = WsCustomHeader.Parse(entry).Value;
+
+        diagnostics.Act("value", actual ?? "(null)");
+        diagnostics.Assert("value", value ?? "(null)", actual ?? "(null)");
+        Assert.AreEqual(value, actual);
     }
 
     [TestMethod]
@@ -34,6 +52,14 @@ public sealed class WsCustomHeaderTests
     [DataRow("X: a", "Connection", false)]
     public void Names_Entry_MatchesTheNameInAnyCase(string entry, string name, bool names)
     {
-        Assert.AreEqual(names, WsCustomHeader.Parse(entry).Names(name));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("entry", entry);
+        diagnostics.Arrange("name", name);
+
+        bool actual = WsCustomHeader.Parse(entry).Names(name);
+
+        diagnostics.Act("names", actual);
+        diagnostics.Assert("names", names, actual);
+        Assert.AreEqual(names, actual);
     }
 }

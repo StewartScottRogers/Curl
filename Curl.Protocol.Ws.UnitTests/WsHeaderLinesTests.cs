@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ws;
 
@@ -6,6 +7,8 @@ namespace Curl.Protocol.Ws;
 [TestClass]
 public sealed class WsHeaderLinesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("HTTP/1.1 200 OK\r\nA: b\r\n\r\n")]
     [DataRow("HTTP/1.1 200 OK\nA: b\n\n")]
@@ -14,10 +17,17 @@ public sealed class WsHeaderLinesTests
     [DataRow("HTTP/1.1 302 Found\r\nLocations: /x\r\nLocation: /y\r\n\r\n")]
     public void FindRefusedLine_AcceptedHead_ReturnsTheHeadLength(string head)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] bytes = Encoding.Latin1.GetBytes(head);
+        diagnostics.Bytes("reply head", bytes);
+        diagnostics.Arrange("reply head", head);
 
         int lineStart = WsHeaderLines.FindRefusedLine(bytes, out string? refusal);
 
+        diagnostics.Act("line start", lineStart);
+        diagnostics.Act("refusal", refusal ?? "none");
+        diagnostics.Assert("line start", bytes.Length, lineStart);
+        diagnostics.Assert("refusal", null, refusal);
         Assert.AreEqual(bytes.Length, lineStart);
         Assert.IsNull(refusal);
     }
@@ -31,6 +41,7 @@ public sealed class WsHeaderLinesTests
     [DataRow("HTTP/1.1 302 Found\r\nLocation: /x\r\nLocation: /X\r\n\r\n", WsHeaderLines.MultipleLocationHeaders)]
     public void FindRefusedLine_RefusedLine_ReturnsWhereItStartsAndTheMessage(string head, string message)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] bytes = Encoding.Latin1.GetBytes(head);
         int expectedStart = head.IndexOf('\n', StringComparison.Ordinal) + 1;
         if (message == WsHeaderLines.MultipleLocationHeaders)
@@ -38,8 +49,15 @@ public sealed class WsHeaderLinesTests
             expectedStart = head.LastIndexOf("Location", StringComparison.Ordinal);
         }
 
+        diagnostics.Bytes("reply head", bytes);
+        diagnostics.Arrange("expected refusal", message);
+
         int lineStart = WsHeaderLines.FindRefusedLine(bytes, out string? refusal);
 
+        diagnostics.Act("line start", lineStart);
+        diagnostics.Act("refusal", refusal ?? "none");
+        diagnostics.Assert("line start", expectedStart, lineStart);
+        diagnostics.Assert("refusal", message, refusal);
         Assert.AreEqual(expectedStart, lineStart);
         Assert.AreEqual(message, refusal);
     }

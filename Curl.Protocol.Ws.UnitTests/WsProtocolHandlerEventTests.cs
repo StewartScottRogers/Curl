@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ws.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ws;
 
@@ -44,36 +45,59 @@ public sealed class WsProtocolHandlerEventTests
         "* [WS] Received 101, switch to WebSocket",
     ];
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public async Task ExecuteAsync_FramesWithTheHead_ReportsThemAsOneReadThenTheEmptyRead()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101 + HelloAndClose)));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] scripted = Bytes(Head101 + HelloAndClose);
+        diagnostics.Arrange("url", "ws://127.0.0.1:47932/p");
+        diagnostics.Bytes("scripted 101 head and frames", scripted);
 
-        CollectionAssert.AreEqual(
-            (string[])[.. UpgradeLines, "{ 11", "{ 0", "* shutting down connection #0"],
-            events.Transcript);
+        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(scripted));
+
+        string[] expected = [.. UpgradeLines, "{ 11", "{ 0", "* shutting down connection #0"];
+        diagnostics.Act("events", Show(events.Transcript));
+        diagnostics.Assert("events", Show(expected), Show(events.Transcript));
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NoBody_ReportsTheFramesWithTheHeadAsOneReadThenEmptyReply()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v -I (BL-788): "{ [11 bytes data]", "* Empty reply from server", then shutting down.
         var events = new RecordingTransferEvents();
-        await Handler(new ScriptedConnection(Bytes(Head101 + HelloAndClose)), 0).ExecuteAsync(
+        byte[] scripted = Bytes(Head101 + HelloAndClose);
+        diagnostics.Arrange("url", "ws://127.0.0.1:47932/p");
+        diagnostics.Arrange("NoBody", true);
+        diagnostics.Bytes("scripted 101 head and frames", scripted);
+        await Handler(new ScriptedConnection(scripted), 0).ExecuteAsync(
             new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47932/p"), Output = new MemoryStream(), Events = events, NoBody = true });
 
-        CollectionAssert.AreEqual(
-            (string[])[.. UpgradeLines.Select(line => line.Replace("> GET ", "> HEAD ", StringComparison.Ordinal)), "{ 11", "* Empty reply from server", "* shutting down connection #0"],
-            events.Transcript);
+        string[] expected = [.. UpgradeLines.Select(line => line.Replace("> GET ", "> HEAD ", StringComparison.Ordinal)), "{ 11", "* Empty reply from server", "* shutting down connection #0"];
+        diagnostics.Act("events", Show(events.Transcript));
+        diagnostics.Assert("events", Show(expected), Show(events.Transcript));
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NoBodyAndNothingWithTheHead_ReportsNoRead()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var events = new RecordingTransferEvents();
-        await Handler(new ScriptedConnection(Bytes(Head101)), 0).ExecuteAsync(
+        byte[] scripted = Bytes(Head101);
+        diagnostics.Arrange("url", "ws://127.0.0.1:47932/p");
+        diagnostics.Arrange("NoBody", true);
+        diagnostics.Bytes("scripted 101 head", scripted);
+        await Handler(new ScriptedConnection(scripted), 0).ExecuteAsync(
             new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47932/p"), Output = new MemoryStream(), Events = events, NoBody = true });
 
+        diagnostics.Act("events", Show(events.Transcript));
+        diagnostics.Assert("contains an empty read", false, events.Transcript.Contains("{ 0"));
+        diagnostics.Assert("second to last event", "* Empty reply from server", events.Transcript[^2]);
         CollectionAssert.DoesNotContain(events.Transcript, "{ 0");
         Assert.AreEqual("* Empty reply from server", events.Transcript[^2]);
     }
@@ -81,55 +105,86 @@ public sealed class WsProtocolHandlerEventTests
     [TestMethod]
     public async Task ExecuteAsync_FramesAfterTheHead_ReportsEachRead()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101), Bytes("\x81\x05hello"), Bytes("\x88\x02\x03\xe8")), connectionNumber: 2);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] head = Bytes(Head101);
+        byte[] text = Bytes("\x81\x05hello");
+        byte[] close = Bytes("\x88\x02\x03\xe8");
+        diagnostics.Arrange("connectionNumber", 2);
+        diagnostics.Bytes("scripted 101 head", head);
+        diagnostics.Bytes("scripted text frame", text);
+        diagnostics.Bytes("scripted close frame", close);
 
-        CollectionAssert.AreEqual(
-            (string[])[.. UpgradeLines, "{ 7", "{ 4", "{ 0", "* shutting down connection #2"],
-            events.Transcript);
+        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(head, text, close), connectionNumber: 2);
+
+        string[] expected = [.. UpgradeLines, "{ 7", "{ 4", "{ 0", "* shutting down connection #2"];
+        diagnostics.Act("events", Show(events.Transcript));
+        diagnostics.Assert("events", Show(expected), Show(events.Transcript));
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NoFrameAfterThe101_ReportsTheEmptyReadAndEmptyReply()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101)));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] scripted = Bytes(Head101);
+        diagnostics.Arrange("url", "ws://127.0.0.1:47932/p");
+        diagnostics.Bytes("scripted 101 head", scripted);
 
-        CollectionAssert.AreEqual(
-            (string[])[.. UpgradeLines, "{ 0", "* Empty reply from server", "* shutting down connection #0"],
-            events.Transcript);
+        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(scripted));
+
+        string[] expected = [.. UpgradeLines, "{ 0", "* Empty reply from server", "* shutting down connection #0"];
+        diagnostics.Act("events", Show(events.Transcript));
+        diagnostics.Assert("events", Show(expected), Show(events.Transcript));
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_Refused_ReportsTheRefusalBeforeTheBlankLineAndCloses()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n")));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] scripted = Bytes("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
+        diagnostics.Arrange("url", "ws://127.0.0.1:47932/p");
+        diagnostics.Bytes("scripted refusal", scripted);
 
-        CollectionAssert.AreEqual(
-            (string[])
-            [
-                .. UpgradeLines[..3],
-                "< HTTP/1.1 404 Not Found\r\n",
-                "< Content-Length: 0\r\n",
-                "* Refused WebSocket upgrade: 404",
-                "< \r\n",
-                "* closing connection #0",
-            ],
-            events.Transcript);
+        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(scripted));
+
+        string[] expected =
+        [
+            .. UpgradeLines[..3],
+            "< HTTP/1.1 404 Not Found\r\n",
+            "< Content-Length: 0\r\n",
+            "* Refused WebSocket upgrade: 404",
+            "< \r\n",
+            "* closing connection #0",
+        ];
+        diagnostics.Act("events", Show(events.Transcript));
+        diagnostics.Assert("events", Show(expected), Show(events.Transcript));
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NoReply_ReportsEmptyReplyAndCloses()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "ws://127.0.0.1:47932/p");
+        diagnostics.Arrange("scripted reply", "nothing");
+        diagnostics.Arrange("connectionNumber", 1);
+
         RecordingTransferEvents events = await RunAsync(new ScriptedConnection(), connectionNumber: 1);
 
-        CollectionAssert.AreEqual(
-            (string[])[.. UpgradeLines[..3], "* Empty reply from server", "* closing connection #1"],
-            events.Transcript);
+        string[] expected = [.. UpgradeLines[..3], "* Empty reply from server", "* closing connection #1"];
+        diagnostics.Act("events", Show(events.Transcript));
+        diagnostics.Assert("events", Show(expected), Show(events.Transcript));
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     /// <summary>
     /// Each violation <see cref="WsFrameDecoder" /> detects, after a whole <c>ok</c> text frame,
     /// with the lines curl 8.21.0 writes for it under <c>-sv</c> (BL-813, measured 2026-09-29).
     /// </summary>
+    /// <param name="violation">The bytes after the text frame.</param>
+    /// <param name="read">The data-received event for the whole read.</param>
+    /// <param name="message">The violation's message.</param>
     [TestMethod]
     [DataRow("\u000f\u0000", "{ 6", "[WS] invalid opcode: 0f")]
     [DataRow("Á\u0000", "{ 6", "[WS] invalid reserved bits: c1")]
@@ -140,37 +195,49 @@ public sealed class WsProtocolHandlerEventTests
     [DataRow("\u0082\u007f\u0080\u0000\u0000\u0000\u0000\u0000\u0000\u0000", "{ 14", "[WS] frame length longer than 63 bits not supported")]
     public async Task ExecuteAsync_FrameViolation_ReportsTheViolationTheTwoDecodeErrorsAndCloses(string violation, string read, string message)
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101 + "\u0081\u0002ok" + violation)));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] scripted = Bytes(Head101 + "\u0081\u0002ok" + violation);
+        diagnostics.Arrange("expected violation", message);
+        diagnostics.Bytes("scripted 101 head, text frame and violation", scripted);
 
-        CollectionAssert.AreEqual(
-            (string[])
-            [
-                .. UpgradeLines,
-                read,
-                "* " + message,
-                "* [WS] decode frame error 56",
-                "* [WS] decode payload error 56",
-                "* closing connection #0",
-            ],
-            events.Transcript);
+        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(scripted));
+
+        string[] expected =
+        [
+            .. UpgradeLines,
+            read,
+            "* " + message,
+            "* [WS] decode frame error 56",
+            "* [WS] decode payload error 56",
+            "* closing connection #0",
+        ];
+        diagnostics.Act("events", Show(events.Transcript));
+        diagnostics.Assert("events", Show(expected), Show(events.Transcript));
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TextMessageInterrupted_ReportsTheViolationTheTwoDecodeErrorsAndCloses()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101 + "\u0001\u0002ok\u0081\u0000")));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] scripted = Bytes(Head101 + "\u0001\u0002ok\u0081\u0000");
+        diagnostics.Arrange("url", "ws://127.0.0.1:47932/p");
+        diagnostics.Bytes("scripted 101 head and interrupted text message", scripted);
 
-        CollectionAssert.AreEqual(
-            (string[])
-            [
-                .. UpgradeLines,
-                "{ 6",
-                "* [WS] fragmented message interrupted by new TEXT msg",
-                "* [WS] decode frame error 56",
-                "* [WS] decode payload error 56",
-                "* closing connection #0",
-            ],
-            events.Transcript);
+        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(scripted));
+
+        string[] expected =
+        [
+            .. UpgradeLines,
+            "{ 6",
+            "* [WS] fragmented message interrupted by new TEXT msg",
+            "* [WS] decode frame error 56",
+            "* [WS] decode payload error 56",
+            "* closing connection #0",
+        ];
+        diagnostics.Act("events", Show(events.Transcript));
+        diagnostics.Assert("events", Show(expected), Show(events.Transcript));
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     /// <summary>
@@ -182,11 +249,17 @@ public sealed class WsProtocolHandlerEventTests
     [TestMethod]
     public async Task ExecuteAsync_UploadWithAFrameAfterTheHead_ReportsTheFrameReadBeforeTheFrameSent()
     {
-        RecordingTransferEvents events = await UploadAsync(new ScriptedConnection(Bytes(Head101 + "\x81\x02ok")));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] scripted = Bytes(Head101 + "\x81\x02ok");
+        diagnostics.Arrange("upload", "abc");
+        diagnostics.Bytes("scripted 101 head and frame", scripted);
 
-        CollectionAssert.AreEqual(
-            (string[])[.. UpgradeLines, "{ 4", "} 9", "* upload completely sent off: 9 bytes", "{ 0", "* shutting down connection #0"],
-            events.Transcript);
+        RecordingTransferEvents events = await UploadAsync(new ScriptedConnection(scripted));
+
+        string[] expected = [.. UpgradeLines, "{ 4", "} 9", "* upload completely sent off: 9 bytes", "{ 0", "* shutting down connection #0"];
+        diagnostics.Act("events", Show(events.Transcript));
+        diagnostics.Assert("events", Show(expected), Show(events.Transcript));
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     /// <summary>
@@ -196,11 +269,17 @@ public sealed class WsProtocolHandlerEventTests
     [TestMethod]
     public async Task ExecuteAsync_UploadWithNothingAfterTheHead_ReportsTheFrameSentThenTheEmptyReply()
     {
-        RecordingTransferEvents events = await UploadAsync(new ScriptedConnection(Bytes(Head101)));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] scripted = Bytes(Head101);
+        diagnostics.Arrange("upload", "abc");
+        diagnostics.Bytes("scripted 101 head", scripted);
 
-        CollectionAssert.AreEqual(
-            (string[])[.. UpgradeLines, "} 9", "* upload completely sent off: 9 bytes", "{ 0", "* Empty reply from server", "* shutting down connection #0"],
-            events.Transcript);
+        RecordingTransferEvents events = await UploadAsync(new ScriptedConnection(scripted));
+
+        string[] expected = [.. UpgradeLines, "} 9", "* upload completely sent off: 9 bytes", "{ 0", "* Empty reply from server", "* shutting down connection #0"];
+        diagnostics.Act("events", Show(events.Transcript));
+        diagnostics.Assert("events", Show(expected), Show(events.Transcript));
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     private static async Task<RecordingTransferEvents> UploadAsync(ScriptedConnection connection)
@@ -233,4 +312,7 @@ public sealed class WsProtocolHandlerEventTests
             new FixedRandomSource());
 
     private static byte[] Bytes(string text) => Encoding.Latin1.GetBytes(text);
+
+    private static string Show(IEnumerable<string> lines) =>
+        string.Join(" | ", lines).Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal);
 }

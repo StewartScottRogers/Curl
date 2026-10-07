@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ws.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ws;
 
@@ -12,6 +13,10 @@ namespace Curl.Protocol.Ws;
 [TestClass]
 public sealed class WsProtocolHandlerFrameTraceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private const string Url = "ws://127.0.0.1:47932/p";
+
     private const string Head101 =
         "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: x\r\n\r\n";
 
@@ -25,10 +30,10 @@ public sealed class WsProtocolHandlerFrameTraceTests
     [TestMethod]
     public async Task ExecuteAsync_TextThenEmptyClose_WritesTheMeasuredLines()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101 + "\x81\x02hi\x88\x00")));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        RecordingTransferEvents events = await RunAsync(diagnostics, Bytes(Head101 + "\x81\x02hi\x88\x00"));
 
-        CollectionAssert.AreEqual(
-            (string[])
+        string[] expected =
             [
                 .. SwitchLines,
                 "{ 6",
@@ -39,17 +44,19 @@ public sealed class WsProtocolHandlerFrameTraceTests
                 "* [WS] websocket established, callback mode",
                 "{ 0",
                 "* shutting down connection #0",
-            ],
-            AfterTheHead(events));
+            ];
+        string[] actual = AfterTheHead(events);
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_BinaryThenCloseWithACode_WritesTheMeasuredLines()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101 + "\x82\u0003abc\x88\x02\x03\xe8")));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        RecordingTransferEvents events = await RunAsync(diagnostics, Bytes(Head101 + "\x82\u0003abc\x88\x02\x03\xe8"));
 
-        CollectionAssert.AreEqual(
-            (string[])
+        string[] expected =
             [
                 .. SwitchLines,
                 "{ 9",
@@ -62,17 +69,19 @@ public sealed class WsProtocolHandlerFrameTraceTests
                 "* [WS] websocket established, callback mode",
                 "{ 0",
                 "* shutting down connection #0",
-            ],
-            AfterTheHead(events));
+            ];
+        string[] actual = AfterTheHead(events);
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_FragmentedText_NamesTheNonFinalFragmentAndTheContinuation()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101 + "\u0001\u0001a\x80\u0001b")));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        RecordingTransferEvents events = await RunAsync(diagnostics, Bytes(Head101 + "\u0001\u0001a\x80\u0001b"));
 
-        CollectionAssert.AreEqual(
-            (string[])
+        string[] expected =
             [
                 .. SwitchLines,
                 "{ 6",
@@ -85,17 +94,19 @@ public sealed class WsProtocolHandlerFrameTraceTests
                 "* [WS] websocket established, callback mode",
                 "{ 0",
                 "* shutting down connection #0",
-            ],
-            AfterTheHead(events));
+            ];
+        string[] actual = AfterTheHead(events);
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TwoPingsInOneRead_WritesAnAutoPongForEachAndTheOnePongSent()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101 + "\x89\x01p\x89\x02qq")));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        RecordingTransferEvents events = await RunAsync(diagnostics, Bytes(Head101 + "\x89\x01p\x89\x02qq"));
 
-        CollectionAssert.AreEqual(
-            (string[])
+        string[] expected =
             [
                 .. SwitchLines,
                 "{ 7",
@@ -113,17 +124,19 @@ public sealed class WsProtocolHandlerFrameTraceTests
                 "* [WS] websocket established, callback mode",
                 "{ 0",
                 "* shutting down connection #0",
-            ],
-            AfterTheHead(events));
+            ];
+        string[] actual = AfterTheHead(events);
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_EmptyPingThenText_WritesTheEmptyPongLines()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101 + "\x89\x00\x81\x01z")));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        RecordingTransferEvents events = await RunAsync(diagnostics, Bytes(Head101 + "\x89\x00\x81\x01z"));
 
-        CollectionAssert.AreEqual(
-            (string[])
+        string[] expected =
             [
                 .. SwitchLines,
                 "{ 5",
@@ -138,31 +151,38 @@ public sealed class WsProtocolHandlerFrameTraceTests
                 "* [WS] websocket established, callback mode",
                 "{ 0",
                 "* shutting down connection #0",
-            ],
-            AfterTheHead(events));
+            ];
+        string[] actual = AfterTheHead(events);
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NothingAfterThe101_WritesEstablishedBeforeTheEmptyRead()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101)));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        RecordingTransferEvents events = await RunAsync(diagnostics, Bytes(Head101));
 
-        CollectionAssert.AreEqual(
-            (string[])
+        string[] expected =
             [
                 .. SwitchLines,
                 "* [WS] websocket established, callback mode",
                 "{ 0",
                 "* Empty reply from server",
                 "* shutting down connection #0",
-            ],
-            AfterTheHead(events));
+            ];
+        string[] actual = AfterTheHead(events);
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_Upload_WritesTheReaderLineAndTheEncodedFrameBeforeItIsSent()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var events = new RecordingTransferEvents();
+        diagnostics.Arrange("upload", "hello");
+        diagnostics.Bytes("server reply", Bytes(Head101 + "\x81\x02hi"));
         await Handler(new ScriptedConnection(Bytes(Head101 + "\x81\x02hi"))).ExecuteAsync(new TransferContext
         {
             Url = CurlUrl.Parse("ws://127.0.0.1:47932/p"),
@@ -171,8 +191,7 @@ public sealed class WsProtocolHandlerFrameTraceTests
             Events = events,
         });
 
-        CollectionAssert.AreEqual(
-            (string[])
+        string[] expected =
             [
                 .. SwitchLines,
                 "* [WS] UPLOAD set, add ws-encode reader",
@@ -187,14 +206,19 @@ public sealed class WsProtocolHandlerFrameTraceTests
                 "* upload completely sent off: 11 bytes",
                 "{ 0",
                 "* shutting down connection #0",
-            ],
-            AfterTheHead(events));
+            ];
+        string[] actual = AfterTheHead(events);
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NoBody_WritesEstablishedAfterTheUndecodedRead()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var events = new RecordingTransferEvents();
+        diagnostics.Arrange("no body", true);
+        diagnostics.Bytes("server reply", Bytes(Head101 + "\x81\x02hi"));
         await Handler(new ScriptedConnection(Bytes(Head101 + "\x81\x02hi"))).ExecuteAsync(new TransferContext
         {
             Url = CurlUrl.Parse("ws://127.0.0.1:47932/p"),
@@ -203,16 +227,17 @@ public sealed class WsProtocolHandlerFrameTraceTests
             NoBody = true,
         });
 
-        CollectionAssert.AreEqual(
-            (string[])
+        string[] expected =
             [
                 .. SwitchLines,
                 "{ 4",
                 "* [WS] websocket established, callback mode",
                 "* Empty reply from server",
                 "* shutting down connection #0",
-            ],
-            AfterTheHead(events));
+            ];
+        string[] actual = AfterTheHead(events);
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     /// <summary>
@@ -223,10 +248,10 @@ public sealed class WsProtocolHandlerFrameTraceTests
     [TestMethod]
     public async Task ExecuteAsync_PayloadSplitAcrossReads_WritesEachRunPassed()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101), Bytes("\x81\x03"), Bytes("a"), Bytes("bc")));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        RecordingTransferEvents events = await RunAsync(diagnostics, Bytes(Head101), Bytes("\x81\x03"), Bytes("a"), Bytes("bc"));
 
-        CollectionAssert.AreEqual(
-            (string[])
+        string[] expected =
             [
                 .. SwitchLines,
                 "* [WS] websocket established, callback mode",
@@ -241,17 +266,19 @@ public sealed class WsProtocolHandlerFrameTraceTests
                 "* [WS] decoded passing [TEXT payload=3/3]",
                 "{ 0",
                 "* shutting down connection #0",
-            ],
-            AfterTheHead(events));
+            ];
+        string[] actual = AfterTheHead(events);
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_HeadSplitAcrossReads_WritesTheFrameOnceItsHeadIsWhole()
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101), Bytes("\x81"), Bytes("\x01z")));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        RecordingTransferEvents events = await RunAsync(diagnostics, Bytes(Head101), Bytes("\x81"), Bytes("\x01z"));
 
-        CollectionAssert.AreEqual(
-            (string[])
+        string[] expected =
             [
                 .. SwitchLines,
                 "* [WS] websocket established, callback mode",
@@ -262,14 +289,19 @@ public sealed class WsProtocolHandlerFrameTraceTests
                 "* [WS] decoded passing [TEXT payload=1/1]",
                 "{ 0",
                 "* shutting down connection #0",
-            ],
-            AfterTheHead(events));
+            ];
+        string[] actual = AfterTheHead(events);
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NotTraced_WritesNoTraceLines()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var events = new RecordingTransferEvents();
+        diagnostics.Arrange("frame tracing", false);
+        diagnostics.Bytes("server reply", Bytes(Head101 + "\x89\x01p\x81\x02hi\x88\x00"));
         await Handler(new ScriptedConnection(Bytes(Head101 + "\x89\x01p\x81\x02hi\x88\x00")), tracesFrames: false).ExecuteAsync(new TransferContext
         {
             Url = CurlUrl.Parse("ws://127.0.0.1:47932/p"),
@@ -278,6 +310,8 @@ public sealed class WsProtocolHandlerFrameTraceTests
             Events = events,
         });
 
+        string[] wsLines = events.Transcript.Where(line => line.StartsWith("* [WS] ", StringComparison.Ordinal)).ToArray();
+        Report(diagnostics, ["* [WS] Received 101, switch to WebSocket"], wsLines);
         CollectionAssert.AreEqual(
             (string[])["* [WS] Received 101, switch to WebSocket"],
             events.Transcript.Where(line => line.StartsWith("* [WS] ", StringComparison.Ordinal)).ToArray());
@@ -286,11 +320,32 @@ public sealed class WsProtocolHandlerFrameTraceTests
     private static string[] AfterTheHead(RecordingTransferEvents events) =>
         [.. events.Transcript.SkipWhile(line => line != SwitchLines[0])];
 
-    private static async Task<RecordingTransferEvents> RunAsync(ScriptedConnection connection)
+    private static void ArrangeServer(TestDiagnostics diagnostics, params byte[][] reads)
     {
+        diagnostics.Arrange("url", Url);
+        diagnostics.Arrange("server reads", reads.Length);
+        for (int index = 0; index < reads.Length; index++)
+        {
+            diagnostics.Bytes("server read " + (index + 1), reads[index]);
+        }
+    }
+
+    private static void Report(TestDiagnostics diagnostics, string[] expected, string[] actual)
+    {
+        diagnostics.Act("trace lines", string.Join(" | ", actual));
+        diagnostics.Assert("trace lines", string.Join(" | ", expected), string.Join(" | ", actual));
+    }
+
+    private static async Task<RecordingTransferEvents> RunAsync(TestDiagnostics diagnostics, params byte[][] reads)
+    {
+        ArrangeServer(diagnostics, reads);
         var events = new RecordingTransferEvents();
-        await Handler(connection).ExecuteAsync(
-            new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47932/p"), Output = new MemoryStream(), Events = events });
+        using (diagnostics.Phase("frame exchange"))
+        {
+            await Handler(new ScriptedConnection(reads)).ExecuteAsync(
+                new TransferContext { Url = CurlUrl.Parse(Url), Output = new MemoryStream(), Events = events });
+        }
+
         return events;
     }
 
