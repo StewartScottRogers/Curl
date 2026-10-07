@@ -33,3 +33,4 @@ Every test in `Curl.Networking.UnitTests`' `TcpConnectionListenerTests.cs` and t
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
