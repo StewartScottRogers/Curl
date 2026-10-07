@@ -34,3 +34,4 @@ When a test host process dies part way through a run (a stack overflow, `Environ
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Lane 3 could not integrate: fast tests failed twice (EveryMember_ManyConcurrentCallers_EndWithTheSameCookiesAsOneAfterAnother; then EveryMember_ManyConcurrentCallers_EndWithTheSameCookiesAsOneAfterAnother) after rebasing onto the other lanes' work. The work is on branch factory/BL-1653-lane-3-20261007-111121; start with git cherry-pick --no-commit factory/BL-1653-lane-3-20261007-111121 and fix it.
+- 2026-10-07: Backlog -> Doing.
