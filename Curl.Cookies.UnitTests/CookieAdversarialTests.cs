@@ -757,12 +757,20 @@ public sealed class CookieAdversarialTests
             CallEveryMember(sequential, number);
         }
 
-        string[] expected = [.. sequential.Cookies.Select(NetscapeCookieFile.FormatLine).Order(StringComparer.Ordinal)];
-        string[] actual = [.. concurrent.Cookies.Select(NetscapeCookieFile.FormatLine).Order(StringComparer.Ordinal)];
-        Diagnostics.AssertTexts("cookies, sorted", expected, actual);
+        // Every caller replaces "shared", so its final value is whichever caller wrote last: the
+        // thread scheduler's choice, not the store's. Compare it as "some caller's whole number".
+        string[] expected = [.. sequential.Cookies.Select(LineWithSharedValueMasked).Order(StringComparer.Ordinal)];
+        string[] actual = [.. concurrent.Cookies.Select(LineWithSharedValueMasked).Order(StringComparer.Ordinal)];
+        string sharedValue = concurrent.Cookies.Single(cookie => cookie.Name == "shared").Value;
+        Diagnostics.AssertTexts("cookies, sorted, shared value masked", expected, actual);
+        Diagnostics.Act("shared value, last writer's", sharedValue);
         Assert.IsTrue(failures.IsEmpty, string.Join(Environment.NewLine, failures));
         CollectionAssert.AreEqual(expected, actual);
+        Assert.IsTrue(int.TryParse(sharedValue, NumberStyles.None, CultureInfo.InvariantCulture, out int writer) && writer < callers, "shared=" + sharedValue + " was written by no caller");
     }
+
+    private static string LineWithSharedValueMasked(Cookie cookie) =>
+        NetscapeCookieFile.FormatLine(cookie.Name == "shared" ? cookie with { Value = "(any caller)" } : cookie);
 
     private static void CallEveryMember(CookieStore store, int number)
     {
