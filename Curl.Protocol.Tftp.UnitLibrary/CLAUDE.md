@@ -60,7 +60,12 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
 - Download and upload: a datagram under four bytes re-sends the last packet (RRQ, WRQ,
   ACK or DATA) at once and counts a retry without moving the next scheduled re-send;
   whatever failure then ends the transfer says `Received too short packet` (curl keeps
-  the first failure it noted; measured for a download at exits 7, 28, 56 and 68).
+  the first failure it noted; measured for a download at exits 7, 28, 56 and 68). Each
+  one is reported as the `-v` line `Received too short packet`. A receive that fails with
+  `SocketError.ConnectionReset` (Windows) or `ConnectionRefused` (Linux, macOS) - an ICMP
+  port-unreachable for the datagram sent - is answered the same way
+  (`TftpTimeLimits.RefusedReceive`, BL-1452), so a port where nothing listens ends with
+  exit 7 `Received too short packet` once the retries run out.
 - Upload only: an ACK of the wrong block re-sends the last packet at once and counts a
   retry (one too many is exit 55 `tftp_tx: giving up waiting for block N ack`), without
   moving the next scheduled re-send. Before DATA 1, a re-send after an ACK is the WRQ's

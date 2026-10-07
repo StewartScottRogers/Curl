@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Tftp;
@@ -26,6 +28,13 @@ internal sealed class TftpTimeLimits(ITransferContext context, long startTimesta
 {
     /// <summary>The connect timeout curl applies when none is given.</summary>
     private static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromSeconds(300);
+
+    /// <summary>
+    /// What <see cref="ReceiveBeforeAsync" /> returns when the receive failed because the
+    /// server's port refused the datagram sent: an empty datagram from nowhere, which the
+    /// transfer answers as curl answers a datagram under four bytes. Compared by reference.
+    /// </summary>
+    internal static readonly DatagramReceived RefusedReceive = new(0, new IPEndPoint(IPAddress.None, 0));
 
     /// <summary>How long the operation ran before this transfer started.</summary>
     private readonly TimeSpan timeBeforeStart = TimeBeforeStart(context, startTimestamp);
@@ -67,12 +76,22 @@ internal sealed class TftpTimeLimits(ITransferContext context, long startTimesta
     /// <param name="buffer">Where the datagram is written.</param>
     /// <param name="resendAt">The elapsed time the next re-send is due at.</param>
     /// <returns>
-    /// The datagram's length and source, or <see langword="null" /> when the deadline came
-    /// first.
+    /// The datagram's length and source, <see cref="RefusedReceive" /> when the receive
+    /// failed with <see cref="SocketError.ConnectionReset" /> or
+    /// <see cref="SocketError.ConnectionRefused" />, or <see langword="null" /> when the
+    /// deadline came first.
     /// </returns>
     /// <exception cref="OperationCanceledException">
     /// <see cref="ITransferContext.CancellationToken" /> was cancelled.
     /// </exception>
+    /// <remarks>
+    /// An ICMP port-unreachable for a datagram sent makes the next receive fail -
+    /// WSAECONNRESET on Windows, ECONNREFUSED on Linux and macOS. curl 8.21.0's
+    /// <c>tftp_receive_packet</c> sees <c>recvfrom</c> return -1, under four bytes, and
+    /// fails it as <c>Received too short packet</c> (measured, BL-1452), so the failure is
+    /// caught here rather than in the datagram channel, whose contract stays that a failed
+    /// receive throws.
+    /// </remarks>
     internal async ValueTask<DatagramReceived?> ReceiveBeforeAsync(
         IDatagramChannel channel,
         Memory<byte> buffer,
@@ -90,6 +109,10 @@ internal sealed class TftpTimeLimits(ITransferContext context, long startTimesta
         catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested || Elapsed() >= maxTime)
         {
             return null;
+        }
+        catch (SocketException refused) when (refused.SocketErrorCode is SocketError.ConnectionReset or SocketError.ConnectionRefused)
+        {
+            return RefusedReceive;
         }
     }
 

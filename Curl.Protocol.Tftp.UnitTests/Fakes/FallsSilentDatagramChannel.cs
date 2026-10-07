@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Tftp.Fakes;
@@ -45,6 +46,11 @@ public sealed class FallsSilentDatagramChannel(
         cancellationToken.ThrowIfCancellationRequested();
         if (pending.TryDequeue(out var next))
         {
+            if (next.Source is RefusedEndPoint refused)
+            {
+                throw new SocketException((int)refused.Error);
+            }
+
             next.Datagram.CopyTo(buffer);
             return ValueTask.FromResult(new DatagramReceived(next.Datagram.Length, next.Source));
         }
@@ -57,6 +63,23 @@ public sealed class FallsSilentDatagramChannel(
         throw new InvalidOperationException("The handler waited on a silent channel with no timer to end the wait.");
     }
 
+    /// <summary>
+    /// Gets a script entry whose receive throws <see cref="SocketException" /> with
+    /// <paramref name="error" /> instead of handing out a datagram, as a receive does after
+    /// an ICMP port-unreachable for a datagram sent.
+    /// </summary>
+    /// <param name="error">The receive's socket error.</param>
+    /// <returns>The script entry.</returns>
+    public static (byte[] Datagram, EndPoint Source) Refusal(SocketError error) => ([], new RefusedEndPoint(error));
+
     /// <inheritdoc />
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    /// <summary>The source of a <see cref="Refusal" /> entry, carrying its socket error.</summary>
+    /// <param name="error">The receive's socket error.</param>
+    private sealed class RefusedEndPoint(SocketError error) : EndPoint
+    {
+        /// <summary>Gets the receive's socket error.</summary>
+        public SocketError Error { get; } = error;
+    }
 }

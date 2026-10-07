@@ -176,11 +176,22 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     }
 
     /// <summary>
-    /// Answers one received datagram.
+    /// Answers one receive: a refused one (<see cref="TftpTimeLimits.RefusedReceive" />) as a
+    /// datagram under four bytes, any other by <see cref="AnswerDatagramAsync" />.
     /// </summary>
     /// <param name="received">The datagram's length and source.</param>
     /// <returns>The transfer's outcome when this datagram ended it, otherwise <see langword="null" />.</returns>
-    private ValueTask<TransferResult?> AnswerAsync(DatagramReceived received)
+    private ValueTask<TransferResult?> AnswerAsync(DatagramReceived received) =>
+        ReferenceEquals(received, TftpTimeLimits.RefusedReceive)
+            ? AnswerTooShortAsync()
+            : AnswerDatagramAsync(received);
+
+    /// <summary>
+    /// Answers one datagram the channel handed out.
+    /// </summary>
+    /// <param name="received">The datagram's length and source.</param>
+    /// <returns>The transfer's outcome when this datagram ended it, otherwise <see langword="null" />.</returns>
+    private ValueTask<TransferResult?> AnswerDatagramAsync(DatagramReceived received)
     {
         if (IsFromStranger(received.RemoteEndPoint))
         {
@@ -438,14 +449,16 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     }
 
     /// <summary>
-    /// Answers a datagram under four bytes as curl does: notes it, so the failure that ends
-    /// the download carries its message, and re-sends the last packet at once without
+    /// Answers a datagram under four bytes, or a receive the server's port refused, as curl
+    /// does: notes <c>Received too short packet</c>, reported at once and carried by the
+    /// failure that ends the download, and re-sends the last packet at once without
     /// moving the next scheduled re-send.
     /// </summary>
     /// <returns>The failure when the retries had already run out, otherwise <see langword="null" />.</returns>
     private ValueTask<TransferResult?> AnswerTooShortAsync()
     {
         notedFailure ??= TooShortMessage;
+        events.InternalError(TooShortMessage);
         return ResendOrRunOutAsync();
     }
 
