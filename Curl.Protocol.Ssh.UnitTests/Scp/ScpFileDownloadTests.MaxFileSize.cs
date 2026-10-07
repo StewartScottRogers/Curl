@@ -1,5 +1,8 @@
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.Keys;
+using Curl.Protocol.Ssh.Sftp;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Scp;
 
@@ -16,8 +19,11 @@ public sealed partial class ScpFileDownloadTests
     {
         Outcome outcome = await DownloadAsync(HelloLineScript(), "/f", 3);
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (3) with 3 bytes", 3), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (3) with 3 bytes", 3), outcome.Result);
+        Diagnostics.AssertBytes("output", "hel"u8.ToArray(), outcome.Output);
         CollectionAssert.AreEqual("hel"u8.ToArray(), outcome.Output);
+        Diagnostics.AssertProgress(new[] { (3L, (long?)6) }, outcome.Progress);
         CollectionAssert.AreEqual(new[] { (3L, (long?)6) }, outcome.Progress);
         List<byte[]> written = SftpServerScript.SshPayloads(outcome.Written);
         Assert.AreEqual(Connection.SshConnectionMessageNumber.ChannelClose, written[^1][0], "the channel is still closed");
@@ -30,8 +36,11 @@ public sealed partial class ScpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/f", 7);
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (7) with 7 bytes", 7), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (7) with 7 bytes", 7), outcome.Result);
+        Diagnostics.AssertBytes("output", "hellowo"u8.ToArray(), outcome.Output);
         CollectionAssert.AreEqual("hellowo"u8.ToArray(), outcome.Output);
+        Diagnostics.AssertProgress(new[] { (5L, (long?)10), (7L, (long?)10) }, outcome.Progress);
         CollectionAssert.AreEqual(new[] { (5L, (long?)10), (7L, (long?)10) }, outcome.Progress);
     }
 
@@ -44,7 +53,9 @@ public sealed partial class ScpFileDownloadTests
     {
         Outcome outcome = await DownloadAsync(HelloLineScript(), "/f", maxFileSize);
 
+        Diagnostics.AssertResult(TransferResult.Success(6), outcome.Result);
         Assert.AreEqual(TransferResult.Success(6), outcome.Result);
+        Diagnostics.AssertBytes("output", "hello\n"u8.ToArray(), outcome.Output);
         CollectionAssert.AreEqual("hello\n"u8.ToArray(), outcome.Output);
     }
 
