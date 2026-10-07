@@ -34,3 +34,4 @@ A `file://` URL whose path percent-decodes to a NUL byte (`%00`) fails before an
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
