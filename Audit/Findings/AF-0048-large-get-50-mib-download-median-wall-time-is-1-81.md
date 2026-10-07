@@ -3,8 +3,8 @@ id: AF-0048
 title: large-get (50 MiB download) median wall time is 1.81x curl's
 auditor: performance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: performance:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:large-get:slower-than-curl
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-Performance.ps1 -Iterations 20 -
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
