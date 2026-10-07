@@ -3,8 +3,8 @@ id: AF-0044
 title: SFTP range number overflow bound `value > (long.MaxValue - digit) / 10` can become >= with no test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs:ReadNumber-gt:surviving-mutant
 reproduction: mutation Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs:133:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
