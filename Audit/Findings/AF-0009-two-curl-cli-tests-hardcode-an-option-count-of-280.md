@@ -41,6 +41,7 @@ dotnet test Curl.Cli.UnitTests -c Release --filter "Name=OptionTable_EveryRow_Is
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the dotnet test reproduction: Passed! Failed 0, Passed 2, Total 2. Both tests pass.
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | dotnet test Curl.Cli.UnitTests with the two filtered tests: Passed 2, Failed 0.
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | Both named Curl.Cli tests pass (Passed: 2, Failed: 0).
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | Ran the reproduction: 'Failed! - Failed: 2, Passed: 0'. Both OptionTable_EveryRow_IsClassifiedAsGlobalOrPerGroupExactlyOnce and EveryListedOption_IsParsedAndListedOnce fail with 'expected count: 281, actual count: 282'. The hardcoded count still does not match the table, so Curl.Cli's baseline stays red.
 
 ## Log
 

@@ -3,15 +3,15 @@ id: AF-0001
 title: CLAUDE.md layout says '48 projects' but the repository has 66
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: Stewart accepted it on 2026-09-30.
+status: closed
+reason: Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.
 key: truthfulness:CLAUDE.md:repository-layout-project-count:false-statement
 task: BL-1065
 found: 2026-09-30
 found-at: d065d6d3507e2ed87905d40a24233af193913378
 scorecard: 2026-09-30_1754.md
-closed:
-closed-by:
+closed: 2026-10-07
+closed-by: 2026-10-07_0844.md
 ---
 # AF-0001 - CLAUDE.md layout says '48 projects' but the repository has 66
 
@@ -42,8 +42,10 @@ Run from the repository root:
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | CLAUDE.md:202 reads '66 projects, one flat alphabetical run'. Counting directories matching 'Curl.*' gives 66. The statement matches the repository.
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | CLAUDE.md:202 now says '66 projects, one flat alphabetical run'; the repository has 66 Curl.* directories.
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | CLAUDE.md:202 now reads '66 projects, one flat alphabetical run'; counting 'Curl.*' directories gives 66.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction: CLAUDE.md's layout line is '...  66 projects, one flat alphabetical run' and (Get-ChildItem -Directory -Filter 'Curl.*').Count is 66. The count matches the repository.
 
 ## Log
 
 - 2026-09-30: filed proposed.
 - 2026-09-30: proposed -> accepted. Stewart accepted it on 2026-09-30 (log written 2026-10-02, BL-1183).
+- 2026-10-07: accepted -> closed. Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.

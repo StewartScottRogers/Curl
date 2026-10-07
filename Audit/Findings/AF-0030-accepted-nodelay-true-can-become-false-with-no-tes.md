@@ -39,6 +39,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 ## Re-audits
 
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: yes | Seed-0 mutation run: TcpPendingConnection.cs:86 `NoDelay = true` to false survived.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | By hand, same method as AF-0006: TcpPendingConnection.cs:77 'accepted.NoDelay = true' -> 'false'. Killed by TurnOffNagle_SetsNoDelayOnTheAcceptedSocket. This is the only 'NoDelay = true' assignment in the library.
 
 ## Log
 

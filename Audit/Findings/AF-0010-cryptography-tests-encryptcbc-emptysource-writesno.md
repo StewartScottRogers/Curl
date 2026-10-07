@@ -41,6 +41,7 @@ Select-String -Path Curl.Cryptography.UnitTests/BlowfishTests.cs -Pattern 'Encry
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | BlowfishTests.cs:145-153 EncryptCbc_EmptySource_WritesNothing now asserts Assert.AreEqual("A5A5A5A5A5A5A5A5", ...). Cast128Tests.cs:146 and CamelliaTests.cs:87 assert the same. BlowfishTests Constructor_56ByteKey_IsAccepted (line 167) has CollectionAssert.AreNotEqual and AreEqual at lines 177-178. I did not check the ChaCha20 or Rc4 test files.
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | Blowfish, Cast128 and Camellia EncryptCbc_EmptySource_WritesNothing assert Assert.AreEqual("A5A5A5A5A5A5A5A5", ...); Blowfish Constructor_56ByteKey_IsAccepted asserts CollectionAssert. ChaCha20 and Rc4 have no tests of those names.
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | EncryptCbc_EmptySource_WritesNothing and Constructor_56ByteKey_IsAccepted now assert (Assert.AreEqual and CollectionAssert). Cast128 and Camellia also assert. ChaCha20 and Rc4 have no tests with those names.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction and read the tests: BlowfishTests.EncryptCbc_EmptySource_WritesNothing now ends with Assert.AreEqual("A5A5A5A5A5A5A5A5", Convert.ToHexString(buffer)), and Constructor_56ByteKey_IsAccepted asserts AreNotEqual(plaintext, ciphertext) and AreEqual(plaintext, decrypted). The Cast128 and Camellia twins also assert the buffer. Find-WeakTests.ps1 flags none of these tests in Blowfish, Cast128, Camellia, ChaCha20 or Rc4 as no-assertion.
 
 ## Log
 

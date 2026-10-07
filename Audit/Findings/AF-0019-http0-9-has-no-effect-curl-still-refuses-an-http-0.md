@@ -3,15 +3,15 @@ id: AF-0019
 title: --http0.9 has no effect: Curl still refuses an HTTP/0.9 reply with exit 1 where curl prints it and exits 0
 auditor: conformance
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.
 key: conformance:Curl.Protocol.Http.UnitLibrary/HttpStatusLine.cs:--http0.9:exit-code
 task: BL-1275
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
-closed:
-closed-by:
+closed: 2026-10-07
+closed-by: 2026-10-07_0844.md
 ---
 # AF-0019 - --http0.9 has no effect: Curl still refuses an HTTP/0.9 reply with exit 1 where curl prints it and exits 0
 
@@ -39,8 +39,10 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 ## Re-audits
 
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction against curl 8.21.0 Schannel (TEMP redirected to the scratch folder): 'curl: exit 0, stdout [just text], stderr []' and 'candidate: exit 0, stdout [just text], stderr []'. Curl now accepts the HTTP/0.9 reply under --http0.9.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction: 'curl: exit 0, stdout [just text], stderr []' and 'candidate: exit 0, stdout [just text], stderr []'. Curl now prints the HTTP/0.9 reply under --http0.9.
 
 ## Log
 
 - 2026-10-02: filed proposed.
 - 2026-10-02: proposed -> accepted.
+- 2026-10-07: accepted -> closed. Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.

@@ -38,6 +38,8 @@ Select-String -Path Curl.Networking.UnitTests/FastOpenSocketOptionTests.cs -Patt
 
 ## Re-audits
 
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction: no 'Assert.IsNotNull(new TcpDialer' match in FastOpenSocketOptionTests.cs. FailureToOpenSocket_WithMultipathTcpOnWindows_IsTheSystemsRefusal now asserts Assert.AreEqual(SocketError.ProtocolNotSupported, refusal?.SocketErrorCode).
+
 ## Log
 
 - 2026-10-03: filed proposed.

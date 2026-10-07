@@ -40,6 +40,8 @@ dotnet run Audit/Tools/Fuzz/Fuzz.cs -- --target ssh --iterations 1000 --seed 1 -
 
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: yes | still reported
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: yes | Ran dotnet run Audit/Tools/Fuzz/Fuzz.cs -- --target ssh --iterations 1000 --seed 1 --out <scratch>\fuzz-ssh-reaudit: printed 'ssh: Curl.Protocol.Ssh.UnitLibrary exposes no public reader or decoder of raw bytes (public types: SshProtocolHandler, SshAlgorithmPreferences, ISshRandomSource, SystemSshRandomSource); nothing to fuzz.' and exited 2.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | still reported
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | Ran dotnet run Audit/Tools/Fuzz/Fuzz.cs -- --target ssh --iterations 1000 --seed 1 --out <scratch>\fuzz-ssh-reaudit: printed 'ssh: Curl.Protocol.Ssh.UnitLibrary exposes no public reader or decoder of raw bytes (public types: SshProtocolHandler, SshAlgorithmPreferences, ISshRandomSource, SystemSshRandomSource); nothing to fuzz.' and exited 2. The library still offers no byte-level entry point.
 
 ## Log
 

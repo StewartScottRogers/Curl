@@ -3,15 +3,15 @@ id: AF-0020
 title: -C <offset> combined with -d, --json or -F is not refused: curl exits 2 'cannot mix --continue-at with --data/--form', Curl sends the request
 auditor: conformance
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.
 key: conformance:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:--continue-at:exit-code
 task: BL-1276
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
-closed:
-closed-by:
+closed: 2026-10-07
+closed-by: 2026-10-07_0844.md
 ---
 # AF-0020 - -C <offset> combined with -d, --json or -F is not refused: curl exits 2 'cannot mix --continue-at with --data/--form', Curl sends the request
 
@@ -39,8 +39,10 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 ## Re-audits
 
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction against curl 8.21.0 Schannel. Both binaries exit 2 with 'curl: cannot mix --continue-at with --data' / '--form' followed by 'curl: (2) Failed initialization', for both -d x and -F a=b. Also checked -C 10 --json {}: both exit 2 with the same --data message.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction: for both -C 10 -d x and -C 10 -F a=b, curl and candidate both exit 2 with 'curl: cannot mix --continue-at with --data' / '--form' followed by 'curl: (2) Failed initialization'.
 
 ## Log
 
 - 2026-10-02: filed proposed.
 - 2026-10-02: proposed -> accepted.
+- 2026-10-07: accepted -> closed. Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.

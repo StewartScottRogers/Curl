@@ -3,15 +3,15 @@ id: AF-0002
 title: Curl.Cli README names a CommandLineOption.UnsupportedFlag builder that does not exist and says --http2 is refused as unsupported
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-09-30.
+status: closed
+reason: Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Cli.UnitLibrary/README.md:CommandLineOption.UnsupportedFlag:false-statement
 task: BL-1068
 found: 2026-09-30
 found-at: d065d6d3507e2ed87905d40a24233af193913378
 scorecard: 2026-09-30_1754.md
-closed:
-closed-by:
+closed: 2026-10-07
+closed-by: 2026-10-07_0844.md
 ---
 # AF-0002 - Curl.Cli README names a CommandLineOption.UnsupportedFlag builder that does not exist and says --http2 is refused as unsupported
 
@@ -42,8 +42,10 @@ Select-String -Path Curl.Cli.UnitLibrary/CommandLineOption.cs,Curl.Cli.UnitLibra
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Select-String for 'UnsupportedFlag' finds nothing in CommandLineOption.cs or CommandLineOptionTable.cs, and Curl.Cli.UnitLibrary/README.md does not mention it. The only hit is CommandLineOptionTable.cs:332, Flag("http2", ...).RefusedBySchannelBuild(). That row is the real mechanism: CommandLineOption.cs:83-91 returns CommandLineRefusal.InstalledLibcurlDoesNotSupport, which is what the README now says. ADR-0137 line 84 still names UnsupportedFlag, a stale claim in another document that was not part of this re-audit.
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | UnsupportedFlag appears in no .cs file and no README. CommandLineOptionTable.cs:332 has Flag("http2", ...).RefusedBySchannelBuild(), which refuses only when ActsAsWindowsSchannelBuild is true. The README no longer names the builder.
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | Select-String finds no UnsupportedFlag in CommandLineOption.cs or CommandLineOptionTable.cs, and the Curl.Cli README no longer names it. Flag("http2" at CommandLineOptionTable.cs:332 carries .RefusedBySchannelBuild(), which exists at CommandLineOption.cs:83, so the README's claim that --http2 is refused is true.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction: no 'UnsupportedFlag' anywhere in CommandLineOption.cs or CommandLineOptionTable.cs; the one match is CommandLineOptionTable.cs:332 'CommandLineOption.Flag("http2", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http2)).RefusedBySchannelBuild()'. Curl.Cli.UnitLibrary/README.md no longer mentions UnsupportedFlag (0 matches). It now lists --http2 among the options that select a RequestedHttpVersion (line 13), and line 20 says InstalledLibcurlDoesNotSupport is the text for --http2 and the other options ADR-0017 refuses, which matches RefusedBySchannelBuild. The README now agrees with the code.
 
 ## Log
 
 - 2026-09-30: filed proposed.
 - 2026-09-30: proposed -> accepted. Stewart accepted it on 2026-09-30 (log written 2026-10-02, BL-1183).
+- 2026-10-07: accepted -> closed. Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.

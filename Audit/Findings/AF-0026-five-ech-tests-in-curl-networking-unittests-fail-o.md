@@ -40,6 +40,7 @@ dotnet test Curl.Networking.UnitTests -c Release -nologo
 
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | dotnet test Curl.Networking.UnitTests -c Release: Passed 2973, Failed 0, Skipped 31.
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | dotnet test Curl.Networking.UnitTests -c Release: Failed 0, Passed 2974, Skipped 30.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | Ran the reproduction: 'Failed! - Failed: 5, Passed: 3038, Skipped: 30, Total: 3073'. The failures are AuthenticateAsClientAsync_WithEchHardAndNoUsableList_FailsWithExit35BeforeSendingAByte, ..._WithEchTrueAndNoUsableList_SendsAPlainHello and three rows of ..._WithEch_WritesCurlsEchLinesBeforeTheHello. All throw System.IndexOutOfRangeException at Curl.Tls.TlsReader.ReadUnsigned (TlsReader.cs:98), reached from EchConfigList.ReadConfigs (EchConfigList.cs:42). TlsReader.Take (TlsReader.cs:111-121) advances the position with no check against the buffer length, so malformed input throws instead of becoming a DecodeError. Curl.Tls.UnitTests is red too (ATruncatedBodyIsADecodeError, DecodeAnswersATruncatedBodyWithDecodeError rows and more). The Networking mutation baseline therefore still fails, and no mutants can be run.
 
 ## Log
 

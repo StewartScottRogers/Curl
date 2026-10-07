@@ -3,15 +3,15 @@ id: AF-0027
 title: With --tls13-ciphers and -O/--remote-name-all on a URL without a file name, Curl prints the Schannel 'ignoring --tls13-ciphers' warning before 'No remote filename', curl prints them the other way round
 auditor: conformance
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.
 key: conformance:Curl.Console/CurlComposition.cs:--tls13-ciphers:stderr
 task: BL-1362
 found: 2026-10-03
 found-at: 454d1d2abbb96213c945e91f0dc3d241bd40cc2d
 scorecard: 2026-10-03_0623.md
-closed:
-closed-by:
+closed: 2026-10-07
+closed-by: 2026-10-07_0844.md
 ---
 # AF-0027 - With --tls13-ciphers and -O/--remote-name-all on a URL without a file name, Curl prints the Schannel 'ignoring --tls13-ciphers' warning before 'No remote filename', curl prints them the other way round
 
@@ -38,7 +38,10 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 
 ## Re-audits
 
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction: curl and candidate both exit 0 with first two stderr lines [Warning: No remote filename, uses "curl_response" | Warning: ignoring --tls13-ciphers, not supported by libcurl with Schannel], in the same order. The reproduction's -O wrote an untracked empty curl_response into the tree root, which I deleted; git status is clean.
+
 ## Log
 
 - 2026-10-03: filed proposed.
 - 2026-10-03: proposed -> accepted.
+- 2026-10-07: accepted -> closed. Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.

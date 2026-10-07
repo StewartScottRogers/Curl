@@ -3,15 +3,15 @@ id: AF-0022
 title: Options the Windows Schannel curl refuses with exit 2 (--http2, --http2-prior-knowledge, --http3, --http3-only, --tlsuser, --tlspassword, --tlsauthtype, --ssl-sessions) are accepted by Curl
 auditor: conformance
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.
 key: conformance:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:build-feature-options:refused-option
 task: BL-1278
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
-closed:
-closed-by:
+closed: 2026-10-07
+closed-by: 2026-10-07_0844.md
 ---
 # AF-0022 - Options the Windows Schannel curl refuses with exit 2 (--http2, --http2-prior-knowledge, --http3, --http3-only, --tlsuser, --tlspassword, --tlsauthtype, --ssl-sessions) are accepted by Curl
 
@@ -39,8 +39,10 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 ## Re-audits
 
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction against curl 8.21.0 Schannel: --http2, --tlsuser 1 and --ssl-sessions f.txt exit 2 from both binaries. Also checked --http2-prior-knowledge, --http3, --http3-only, --tlspassword x and --tlsauthtype SRP with -sS: both binaries exit 2 with the identical 'option --X: the installed libcurl version does not support this' text.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction: --http2, --tlsuser 1 and --ssl-sessions f.txt all exit 2 for both curl and candidate.
 
 ## Log
 
 - 2026-10-02: filed proposed.
 - 2026-10-02: proposed -> accepted.
+- 2026-10-07: accepted -> closed. Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.

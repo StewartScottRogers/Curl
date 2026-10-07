@@ -3,15 +3,15 @@ id: AF-0023
 title: Record-CurlExchange.ps1 misses Content-Length unless it is the last request header, so it drops a body sent in a later TCP write and resets the connection
 auditor: conformance
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.
 key: conformance:Record-CurlExchange.ps1:Test-RequestComplete:request
 task: BL-1279
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
-closed:
-closed-by:
+closed: 2026-10-07
+closed-by: 2026-10-07_0844.md
 ---
 # AF-0023 - Record-CurlExchange.ps1 misses Content-Length unless it is the last request header, so it drops a body sent in a later TCP write and resets the connection
 
@@ -39,8 +39,10 @@ $h = "POST / HTTP/1.1`r`nContent-Length: 3`r`nContent-Type: x"; [regex]::Match($
 ## Re-audits
 
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | The reproduction as written errors with 'Cannot index into a null array', because its -Pattern is double-quoted and PowerShell expands $headers to an empty string, so it can be run but cannot give either result. Rerun with the same pattern single-quoted ('Match\(\$headers, ''(.+)''\)'), it returns True. Record-CurlExchange.ps1:714 now uses '(?im)^Content-Length:[ \t]*(\d+)[ \t]*\r?$', which matches a Content-Length header that is not the last header.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | The reproduction as written, run in a fresh Windows PowerShell, throws 'Cannot index into a null array': inside the double-quoted pattern "Match\(\$headers, ...", PowerShell expands $headers to an empty string, so Select-String finds nothing. Rerun with the pattern in single quotes ('Match\(\$headers, ''(.+)''\)'): it finds Record-CurlExchange.ps1:778's pattern '(?im)^Content-Length:[ \t]*(\d+)[ \t]*\r?$', and [regex]::Match on 'POST / HTTP/1.1`r`nContent-Length: 3`r`nContent-Type: x' returns True. The multiline regex now finds a Content-Length that is not the last header.
 
 ## Log
 
 - 2026-10-02: filed proposed.
 - 2026-10-02: proposed -> accepted.
+- 2026-10-07: accepted -> closed. Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.
