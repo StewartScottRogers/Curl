@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smtp.Fakes;
 
@@ -31,6 +32,52 @@ public sealed record SmtpRun(
 
     /// <summary>Gets every byte written to the plaintext connection, as Latin-1 text.</summary>
     public string Sent => Encoding.Latin1.GetString(Connection.Sent);
+
+    /// <summary>
+    /// Runs <paramref name="url" /> against <paramref name="connection" />, writing the URL,
+    /// the script and the security level as ARRANGE lines and the run's result, commands and
+    /// handshakes as ACT lines.
+    /// </summary>
+    internal static Task<SmtpRun> ExecuteAsync(
+        TestDiagnostics diagnostics,
+        string url,
+        ScriptedConnection connection,
+        TransportSecurityLevel sslLevel = TransportSecurityLevel.None,
+        params ConnectResult[] handshakes) =>
+        ExecuteAsync(diagnostics, new TransferContext { Url = CurlUrl.Parse(url), Output = Stream.Null, SslLevel = sslLevel }, connection, null, Windows1252, handshakes);
+
+    /// <summary>
+    /// Runs <paramref name="context" /> against <paramref name="connection" />, writing the
+    /// context and the script as ARRANGE lines and the run's result, commands and handshakes
+    /// as ACT lines.
+    /// </summary>
+    internal static Task<SmtpRun> ExecuteAsync(
+        TestDiagnostics diagnostics,
+        TransferContext context,
+        ScriptedConnection connection,
+        ISaslAuthenticator? saslAuthenticator = null,
+        params ConnectResult[] handshakes) =>
+        ExecuteAsync(diagnostics, context, connection, saslAuthenticator, Windows1252, handshakes);
+
+    /// <summary>
+    /// Runs the transfer with the handler sending command-line text in
+    /// <paramref name="commandLineText" />'s argv bytes, writing the context and the script
+    /// as ARRANGE lines and the run's result, commands and handshakes as ACT lines.
+    /// </summary>
+    internal static async Task<SmtpRun> ExecuteAsync(
+        TestDiagnostics diagnostics,
+        TransferContext context,
+        ScriptedConnection connection,
+        ISaslAuthenticator? saslAuthenticator,
+        SmtpCommandLineText commandLineText,
+        params ConnectResult[] handshakes)
+    {
+        diagnostics.ArrangeContext(context, connection.Script);
+        diagnostics.Arrange("handshakes", string.Join(", ", handshakes.Select(handshake => handshake.Connection is null ? $"failed {handshake.ExitCode}" : "connected")));
+        SmtpRun run = await ExecuteAsync(context, connection, saslAuthenticator, commandLineText, handshakes);
+        diagnostics.ActRun(run);
+        return run;
+    }
 
     public static Task<SmtpRun> ExecuteAsync(
         string url,

@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smtp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smtp;
 
@@ -17,6 +18,11 @@ namespace Curl.Protocol.Smtp;
 public sealed class SmtpProtocolHandlerAddressEncodingTests
 {
     private const string Url = "smtp://127.0.0.1:18776/h";
+
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     private const string Greeting = "220 localhost ESMTP\r\n";
 
@@ -118,9 +124,15 @@ public sealed class SmtpProtocolHandlerAddressEncodingTests
     [DataRow(false, true, "Ã¶", DisplayName = "Linux and macOS: UTF-8")]
     public void ForPlatform_ChoosesThePlatformsArgvEncoding(bool windows, bool hostHasAnsiCodePage, string expected)
     {
+        Diagnostics.Arrange("windows", windows);
+        Diagnostics.Arrange("host has ANSI code page", hostHasAnsiCodePage);
         Encoding? ansi = hostHasAnsiCodePage ? CodePagesEncodingProvider.Instance.GetEncoding(1252) : null;
 
-        Assert.AreEqual(expected, SmtpCommandLineText.ForPlatform(windows, ansi).ToWire("ö"));
+        string actual = SmtpCommandLineText.ForPlatform(windows, ansi).ToWire("ö");
+
+        Diagnostics.Act("ToWire(\"ö\")", SmtpDiagnostics.Show(actual));
+        Diagnostics.AssertValues("ToWire", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -128,8 +140,13 @@ public sealed class SmtpProtocolHandlerAddressEncodingTests
     {
         Encoding? ansi = SmtpCommandLineText.ReadSystemAnsiCodePage(() => CodePagesEncodingProvider.Instance.GetEncoding(0));
         string expected = SmtpCommandLineText.ForPlatform(OperatingSystem.IsWindows(), ansi).ToWire("ö");
+        Diagnostics.Arrange("expected ToWire(\"ö\")", SmtpDiagnostics.Show(expected));
 
-        Assert.AreEqual(expected, SmtpCommandLineText.Platform.ToWire("ö"));
+        string actual = SmtpCommandLineText.Platform.ToWire("ö");
+
+        Diagnostics.Act("Platform.ToWire(\"ö\")", SmtpDiagnostics.Show(actual));
+        Diagnostics.AssertValues("Platform.ToWire", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -138,8 +155,13 @@ public sealed class SmtpProtocolHandlerAddressEncodingTests
         Encoding shiftJis = CodePagesEncodingProvider.Instance.GetEncoding(932)!;
         int reads = 0;
 
+        Diagnostics.Arrange("first read answers", "code page 932");
+
         Encoding? encoding = SmtpCommandLineText.ReadSystemAnsiCodePage(() => { reads++; return shiftJis; });
 
+        Diagnostics.Act("code page and reads", $"{encoding?.CodePage}, {reads}");
+        Diagnostics.Assert("code page", 932, encoding!.CodePage);
+        Diagnostics.Assert("reads", 1, reads);
         Assert.AreEqual(932, encoding!.CodePage);
         Assert.AreEqual(1, reads);
     }
@@ -150,8 +172,13 @@ public sealed class SmtpProtocolHandlerAddressEncodingTests
         Encoding shiftJis = CodePagesEncodingProvider.Instance.GetEncoding(932)!;
         int reads = 0;
 
+        Diagnostics.Arrange("first read answers", "null, then code page 932");
+
         Encoding? encoding = SmtpCommandLineText.ReadSystemAnsiCodePage(() => ++reads == 1 ? null : shiftJis);
 
+        Diagnostics.Act("code page and reads", $"{encoding?.CodePage}, {reads}");
+        Diagnostics.Assert("code page", 932, encoding!.CodePage);
+        Diagnostics.Assert("reads", 2, reads);
         Assert.AreEqual(932, encoding!.CodePage);
         Assert.AreEqual(2, reads);
     }
@@ -161,8 +188,13 @@ public sealed class SmtpProtocolHandlerAddressEncodingTests
     {
         int reads = 0;
 
+        Diagnostics.Arrange("every read answers", "null");
+
         Encoding? encoding = SmtpCommandLineText.ReadSystemAnsiCodePage(() => { reads++; return null; });
 
+        Diagnostics.Act("encoding and reads", $"{encoding?.CodePage.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(null)"}, {reads}");
+        Diagnostics.Assert("encoding", "(null)", encoding is null ? "(null)" : "an encoding");
+        Diagnostics.Assert("reads", 2, reads);
         Assert.IsNull(encoding);
         Assert.AreEqual(2, reads);
     }
@@ -170,24 +202,31 @@ public sealed class SmtpProtocolHandlerAddressEncodingTests
     [TestMethod]
     public void Constructor_NullCommandLineText_Throws()
     {
+        Diagnostics.Arrange("command line text", "(null)");
+        Diagnostics.Act("constructing the handler", "expecting ArgumentNullException");
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), "thrown by the assertion below");
+
         Assert.ThrowsExactly<ArgumentNullException>(
             () => new SmtpProtocolHandler(new QueuedConnector(), new QueuedTlsProvider(), null, () => "h", null!));
     }
 
-    private static void AssertSent(string expected, SmtpRun run) =>
+    private void AssertSent(string expected, SmtpRun run)
+    {
+        Diagnostics.Diff("sent", expected, run.Sent);
         Assert.AreEqual(expected, run.Sent, "sent bytes: " + Convert.ToHexString(run.Connection.Sent));
+    }
 
-    private static Task<SmtpRun> SendAsync(string ehlo, string from, string recipient, SmtpCommandLineText commandLineText) =>
+    private Task<SmtpRun> SendAsync(string ehlo, string from, string recipient, SmtpCommandLineText commandLineText) =>
         RunAsync(
             ehlo + MessageAccepted,
             new MailRequestOptions { From = from, Recipients = [recipient] },
             new MemoryStream(Encoding.ASCII.GetBytes(Message)),
             commandLineText);
 
-    private static Task<SmtpRun> RunAsync(string replies, MailRequestOptions mail, Stream? upload, SmtpCommandLineText commandLineText)
+    private Task<SmtpRun> RunAsync(string replies, MailRequestOptions mail, Stream? upload, SmtpCommandLineText commandLineText)
     {
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Upload = upload, Mail = mail };
         return SmtpRun.ExecuteAsync(
-            context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + replies)), saslAuthenticator: null, commandLineText);
+            Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + replies)), saslAuthenticator: null, commandLineText);
     }
 }
