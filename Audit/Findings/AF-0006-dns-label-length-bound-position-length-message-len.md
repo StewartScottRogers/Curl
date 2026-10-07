@@ -5,12 +5,16 @@ auditor: quality
 severity: Medium
 status: accepted
 reason: 
-key: quality:Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs:DecodeName-gt-boundary:surviving-mutant
+key: quality:Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs:AppendLabel-gt:surviving-mutant
+reproduction: mutation Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs:319:>
 task: BL-1262
+tasks: BL-1262
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0006 - DNS label length bound `position + length > message.Length` can become >= with no test failing
@@ -30,7 +34,7 @@ Mutant survived (seed 0): `>` became `>=` in the check that returns DnsMessageFa
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 0 -TimeoutSeconds 300 -OutFile $env:TEMP\mutation-net.json
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs:319:> -Member AppendLabel -ExcludeBaselineFailures -TimeoutSeconds 600
 ```
 
 - Expected: The mutant at Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs:319 (>) is killed.

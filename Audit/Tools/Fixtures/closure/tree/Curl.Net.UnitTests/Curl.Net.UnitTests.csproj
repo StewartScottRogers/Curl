@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Net.UnitLibrary\Curl.Net.UnitLibrary.csproj" />
+  </ItemGroup>
+</Project>

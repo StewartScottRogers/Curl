@@ -1,0 +1,1 @@
+{ "seed": 1, "commit": "abc1234", "planted": [ { "id": "PD-103", "auditor": "security", "file": "Curl.Dep.UnitLibrary/Reader.cs", "line": 9, "description": "bounds check removed", "catch": "Reader" }, { "id": "PD-104", "auditor": "security", "file": "Curl.Other.UnitLibrary/Cited.cs", "line": 3, "description": "x", "catch": "Cited" } ] }

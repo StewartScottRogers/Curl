@@ -44,8 +44,15 @@ checkable by someone else. The design is
   command, run from the repository root, with the result a correct tree gives and the
   result the audited tree gave ([Report-Format.md](Report-Format.md#a-finding)).
 - A re-audit is judged only by running the reproduction. A task reaching Done, a commit
-  message or an ADR saying it was fixed is not evidence that it no longer reproduces.
+  message or an ADR saying it was fixed is not evidence that it no longer reproduces. A
+  reproduction you could not run, or whose result does not tell, is `"reproduces": null`
+  ("not re-audited"), never `false`.
+- The tree you audit has planted defects in it. A re-audit verdict on a finding in a project
+  that depends on a planted defect's project, or whose evidence names a planted file, is set
+  aside by the audit run as "not re-audited"; it is not counted as yes or no (ADR-0422).
 - Breaking rule 1 or rule 6 makes your audit unreliable: the audit run treats an
   auditor that changed the audited tree, or returned no parseable report block, as
-  unreliable for that scorecard ([Scorecards/README.md](../Scorecards/README.md#reliability)),
-  and an unreliable re-audit closes nothing.
+  unreliable for that scorecard ([Scorecards/README.md](../Scorecards/README.md#reliability)).
+  An unreliable re-audit closes a finding only with evidence beside it: the audit run's own
+  rerun of a mechanical reproduction agreeing, or a second consecutive "no" from you on a later
+  audit ([Findings/README.md](../Findings/README.md#closing)).

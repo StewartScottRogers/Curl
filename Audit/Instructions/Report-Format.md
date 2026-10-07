@@ -48,14 +48,14 @@ anything not in the block is lost to them. The rules every auditor follows are i
 | `severity` | string | `Critical`, `High`, `Medium` or `Low`, as defined in [Findings/README.md](../Findings/README.md#severities). |
 | `location` | string | Where the defect is: a repository-relative path with `/` separators and a line, `path:line`, or `path` alone when the defect is the whole file. Evidence outside the audited tree uses the same shape: a file in the log folder the prompt names as `logs/<file>:<line>`, a commit as `commit:<sha>`. Never an absolute path. |
 | `evidence` | string | What was observed and why it is a defect: the quoted code, command output or measurement. |
-| `reproduction` | object | `{ "command", "expected", "actual" }`: one command a stranger runs from the repository root (PowerShell, no Python), what a correct tree gives, and what the audited tree gave. |
+| `reproduction` | object | `{ "command", "expected", "actual" }`: one command a stranger runs from the repository root (PowerShell, no Python), what a correct tree gives, and what the audited tree gave. A surviving-mutant finding also carries `"mutation": "<file>:<line>:<operator>"`, the mutant as `Audit/Tools/Invoke-MutationTest.ps1` printed it: the audit run reruns it itself, and the finding's key is built from it ([Findings/README.md](../Findings/README.md#closing)). |
 
 ### A re-audit
 
 | Key | Type | Value |
 | --- | --- | --- |
 | `finding` | string | The finding's ID, `AF-####`, as the prompt gives it. |
-| `reproduces` | boolean | `true` when running the finding's reproduction still gives its actual (defective) result, `false` when it gives the expected one. |
+| `reproduces` | boolean or `null` | `true` when running the finding's reproduction still gives its actual (defective) result, `false` when it gives the expected one, `null` when it could not be run or could not tell (recorded as "not re-audited"; never `false` for a reproduction not run). |
 | `evidence` | string | What running the reproduction showed. |
 
 ## The key
@@ -219,14 +219,15 @@ How a reported finding fills [FINDING-TEMPLATE.md](../Findings/FINDING-TEMPLATE.
 | `{{TITLE}}` | `title` |
 | `{{AUDITOR}}` | `auditor` |
 | `{{SEVERITY}}` | `severity` |
-| `{{KEY}}` | `key` |
+| `{{KEY}}` | `key`; with `reproduction.mutation`, the key built from the mutant: `quality:<file>:<member>-<operator word>:surviving-mutant`. |
+| `{{REPRODUCTION}}` | `mutation <file>:<line>:<operator>` from `reproduction.mutation`, or `none`. |
 | `{{FOUND}}` | The audit's date, `yyyy-MM-dd`. |
 | `{{FOUND_AT}}` | `commit` |
 | `{{SCORECARD}}` | The file name of the audit's scorecard. |
 | `{{SUMMARY}}` | Written by the tool from `title`, `auditor`, `severity` and `location`, with the notes [Findings/README.md](../Findings/README.md#rules) requires. |
 | `{{LOCATION}}` | `location` |
 | `{{EVIDENCE}}` | `evidence` |
-| `{{REPRODUCTION_COMMAND}}` | `reproduction.command` |
+| `{{REPRODUCTION_COMMAND}}` | `reproduction.command`; with `reproduction.mutation`, the targeted `Invoke-MutationTest.ps1 -Site` command for it. |
 | `{{REPRODUCTION_EXPECTED}}` | `reproduction.expected` |
 | `{{REPRODUCTION_ACTUAL}}` | `reproduction.actual` |
 

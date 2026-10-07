@@ -5,12 +5,16 @@ auditor: quality
 severity: Medium
 status: accepted
 reason: 
-key: quality:Curl.Cryptography.UnitLibrary/AeadAesCcm.cs:RequireMessageLength:surviving-mutant
+key: quality:Curl.Cryptography.UnitLibrary/AeadAesCcm.cs:RequireMessageLength-lt:surviving-mutant
+reproduction: mutation Curl.Cryptography.UnitLibrary/AeadAesCcm.cs:168:<
 task: BL-1378
+tasks: BL-1378
 found: 2026-10-03
 found-at: 2c24c2d74dc2c9775b64948efc3ca57b8937627e
 scorecard: 2026-10-03_1459.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0035 - AES-CCM length-field check `lengthFieldSize < sizeof(int)` can become `<=` with no test failing
@@ -30,7 +34,7 @@ Mutant `lengthFieldSize <= sizeof(int)` survived at seed 0. With an 11-byte nonc
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Cryptography.UnitLibrary -MaxMutants 40 -Seed 0 -TimeoutSeconds 300 -OutFile $env:TEMP\mutation-crypto.json
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Cryptography.UnitLibrary/AeadAesCcm.cs:168:< -Member RequireMessageLength -ExcludeBaselineFailures -TimeoutSeconds 600
 ```
 
 - Expected: The mutant at AeadAesCcm.cs:168 is killed.

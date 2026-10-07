@@ -5,12 +5,16 @@ auditor: quality
 severity: Medium
 status: accepted
 reason: 
-key: quality:Curl.Networking.UnitLibrary/TcpPendingConnection.cs:AcceptedSocketNoDelay:surviving-mutant
+key: quality:Curl.Networking.UnitLibrary/TcpPendingConnection.cs:AcceptStreamConnectionAsync-true:surviving-mutant
+reproduction: mutation Curl.Networking.UnitLibrary/TcpPendingConnection.cs:77:true
 task: BL-1372
+tasks: BL-1372, BL-1379
 found: 2026-10-03
 found-at: d1db9881553d55cd92c0e74bb41561c3dea9ea84
 scorecard: 2026-10-03_1233.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0030 - `accepted.NoDelay = true` can become false with no test failing
@@ -30,7 +34,7 @@ Mutation seed 0 changed `accepted.NoDelay = true;` to `false`; survived. TCP_NOD
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 0 -TimeoutSeconds 300 -OutFile $env:TEMP\mutation-net.json
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/TcpPendingConnection.cs:77:true -Member TurnOffNagle -ExcludeBaselineFailures -TimeoutSeconds 600
 ```
 
 - Expected: Mutant at TcpPendingConnection.cs:86 is killed.

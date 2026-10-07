@@ -5,12 +5,16 @@ auditor: quality
 severity: Medium
 status: accepted
 reason: 
-key: quality:Curl.Networking.UnitLibrary/ConnectToMappings.cs:Failure-IsMapped:surviving-mutant
+key: quality:Curl.Networking.UnitLibrary/ConnectToMappings.cs:Failure-false:surviving-mutant
+reproduction: mutation Curl.Networking.UnitLibrary/ConnectToMappings.cs:135:false
 task: BL-1264
+tasks: BL-1264
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0008 - ConnectToMappings.Failure can report IsMapped: true instead of false with no test failing
@@ -30,7 +34,7 @@ Mutant survived (seed 0): `new(string.Empty, 0, IsMapped: false, message)` becam
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 0 -TimeoutSeconds 300 -OutFile $env:TEMP\mutation-net.json
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/ConnectToMappings.cs:135:false -Member Failure -ExcludeBaselineFailures -TimeoutSeconds 600
 ```
 
 - Expected: The mutant at Curl.Networking.UnitLibrary/ConnectToMappings.cs:135 (false) is killed.

@@ -5,12 +5,16 @@ auditor: quality
 severity: High
 status: proposed
 reason:
-key: quality:Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs:ReadNumber-GreaterToGreaterOrEqual:surviving-mutant
+key: quality:Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs:ReadNumber-gt:surviving-mutant
+reproduction: mutation Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs:133:>
 task: none
+tasks:
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0044 - SFTP range number overflow bound `value > (long.MaxValue - digit) / 10` can become >= with no test failing
@@ -30,7 +34,7 @@ Invoke-MutationTest.ps1 -Library Curl.Protocol.Ssh.UnitLibrary -MaxMutants 40 -S
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Protocol.Ssh.UnitLibrary -MaxMutants 40 -Seed 0 -TimeoutSeconds 300 -OutFile $env:TEMP\mutation-ssh.json
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs:133:> -Member ReadNumber -ExcludeBaselineFailures -TimeoutSeconds 600
 ```
 
 - Expected: The mutant at Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs:133 (> to >=) is killed.
