@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cryptography;
 
 /// <summary>
@@ -12,6 +14,9 @@ public sealed class X448Tests
     private const string BobPrivateKey = "1c306a7ac2a0e2e0990b294470cba339e6453772b075811d8fad0d1d6927c120bb5ee8972b0d3e21374c9c921b09d1b0366f10b65173992d";
     private const string BobPublicKey = "3eb7a829b0cd20f5bcfc0b599b6feccf6da4627107bdb0d4f345b43027d8b972fc3e34fb4232a13ca706dcb57aec3dae07bdc1c67bf33609";
     private const string AliceAndBobSharedSecret = "07fff4181ac6cc95ec1c16a94a0f74d12da232ce40a77552281d282bb60c0b56fd2464c335543936521c24403085d59a449a5037514a879d";
+
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
 
     // RFC 7748 section 5.2, the two X448 input/output vectors.
     [TestMethod]
@@ -28,10 +33,18 @@ public sealed class X448Tests
         string uCoordinate,
         string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] result = new byte[X448.KeySize];
+        diagnostics.Arrange("source", "RFC 7748 section 5.2 input/output vector");
+        diagnostics.Bytes("scalar", Convert.FromHexString(scalar));
+        diagnostics.Bytes("u-coordinate", Convert.FromHexString(uCoordinate));
 
         bool succeeded = X448.TryComputeSharedSecret(Convert.FromHexString(scalar), Convert.FromHexString(uCoordinate), result);
+        diagnostics.Act("succeeded", succeeded);
+        diagnostics.Bytes("output u-coordinate", result);
 
+        diagnostics.Assert("succeeded", true, succeeded);
+        diagnostics.Diff("output u-coordinate", expected, Convert.ToHexStringLower(result));
         Assert.IsTrue(succeeded);
         Assert.AreEqual(expected, Convert.ToHexStringLower(result));
     }
@@ -42,7 +55,20 @@ public sealed class X448Tests
     [DataRow(1_000, "aa3b4749d55b9daf1e5b00288826c467274ce3ebbdd5c17b975e09d4af6c67cf10d087202db88286e2b79fceea3ec353ef54faa26e219f38")]
     public void TryComputeSharedSecret_Rfc7748Section52Iterations_GiveTheExpectedK(int iterations, string expected)
     {
-        Assert.AreEqual(expected, Iterate(iterations));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("source", "RFC 7748 section 5.2 iterated vector, starting from k = u = 5");
+        diagnostics.Arrange("iterations", iterations);
+
+        string k;
+        using (diagnostics.Phase("iterate"))
+        {
+            k = Iterate(iterations);
+        }
+
+        diagnostics.Act("k", k);
+
+        diagnostics.Diff("k", expected, k);
+        Assert.AreEqual(expected, k);
     }
 
     // RFC 7748 section 5.2, the 1,000,000 iteration vector; hours, not milliseconds.
@@ -50,9 +76,23 @@ public sealed class X448Tests
     [TestCategory("Integration")]
     public void TryComputeSharedSecret_Rfc7748Section52MillionIterations_GivesTheExpectedK()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        const string Expected = "077f453681caca3693198420bbe515cae0002472519b3e67661a7e89cab94695c8f4bcd66e61b9b9c946da8d524de3d69bd9d9d66b997e37";
+        diagnostics.Arrange("source", "RFC 7748 section 5.2 iterated vector, starting from k = u = 5");
+        diagnostics.Arrange("iterations", 1_000_000);
+
+        string k;
+        using (diagnostics.Phase("iterate"))
+        {
+            k = Iterate(1_000_000);
+        }
+
+        diagnostics.Act("k", k);
+
+        diagnostics.Diff("k", Expected, k);
         Assert.AreEqual(
             "077f453681caca3693198420bbe515cae0002472519b3e67661a7e89cab94695c8f4bcd66e61b9b9c946da8d524de3d69bd9d9d66b997e37",
-            Iterate(1_000_000));
+            k);
     }
 
     // RFC 7748 section 6.2.
@@ -61,10 +101,15 @@ public sealed class X448Tests
     [DataRow(BobPrivateKey, BobPublicKey)]
     public void ComputePublicKey_Rfc7748Section62Key_GivesThePublishedPublicKey(string privateKey, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] publicKey = new byte[X448.KeySize];
+        diagnostics.Arrange("source", "RFC 7748 section 6.2");
+        diagnostics.Bytes("private key", Convert.FromHexString(privateKey));
 
         X448.ComputePublicKey(Convert.FromHexString(privateKey), publicKey);
+        diagnostics.Act("public key", Convert.ToHexStringLower(publicKey));
 
+        diagnostics.Diff("public key", expected, Convert.ToHexStringLower(publicKey));
         Assert.AreEqual(expected, Convert.ToHexStringLower(publicKey));
     }
 
@@ -74,10 +119,18 @@ public sealed class X448Tests
     [DataRow(BobPrivateKey, AlicePublicKey)]
     public void TryComputeSharedSecret_Rfc7748Section62Keys_GiveThePublishedSharedSecret(string privateKey, string peerPublicKey)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] sharedSecret = new byte[X448.KeySize];
+        diagnostics.Arrange("source", "RFC 7748 section 6.2");
+        diagnostics.Bytes("private key", Convert.FromHexString(privateKey));
+        diagnostics.Bytes("peer public key", Convert.FromHexString(peerPublicKey));
 
         bool succeeded = X448.TryComputeSharedSecret(Convert.FromHexString(privateKey), Convert.FromHexString(peerPublicKey), sharedSecret);
+        diagnostics.Act("succeeded", succeeded);
+        diagnostics.Act("shared secret", Convert.ToHexString(sharedSecret));
 
+        diagnostics.Assert("succeeded", true, succeeded);
+        diagnostics.Diff("shared secret", AliceAndBobSharedSecret, Convert.ToHexStringLower(sharedSecret));
         Assert.IsTrue(succeeded);
         Assert.AreEqual(AliceAndBobSharedSecret, Convert.ToHexStringLower(sharedSecret));
     }
@@ -93,10 +146,17 @@ public sealed class X448Tests
     [DataRow("00000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff")]
     public void TryComputeSharedSecret_LowOrderPeerKey_ReturnsFalseWithAnAllZeroSecret(string peerPublicKey)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] sharedSecret = [.. Enumerable.Repeat((byte)0xAA, X448.KeySize)];
+        diagnostics.Arrange("source", "RFC 7748 section 7 low-order u-coordinates");
+        diagnostics.Bytes("private key", Convert.FromHexString(AlicePrivateKey));
+        diagnostics.Bytes("peer public key", Convert.FromHexString(peerPublicKey));
 
         bool succeeded = X448.TryComputeSharedSecret(Convert.FromHexString(AlicePrivateKey), Convert.FromHexString(peerPublicKey), sharedSecret);
+        diagnostics.Act("succeeded", succeeded);
 
+        diagnostics.Assert("succeeded", false, succeeded);
+        diagnostics.Diff("shared secret", new byte[X448.KeySize], sharedSecret);
         Assert.IsFalse(succeeded);
         CollectionAssert.AreEqual(new byte[X448.KeySize], sharedSecret);
     }
@@ -104,18 +164,25 @@ public sealed class X448Tests
     [TestMethod]
     public void TryComputeSharedSecret_FlippedPeerKeyBit_GivesADifferentSecret()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] peerPublicKey = Convert.FromHexString(BobPublicKey);
         peerPublicKey[0] ^= 0x01;
         byte[] sharedSecret = new byte[X448.KeySize];
+        diagnostics.Arrange("source", "RFC 7748 section 6.2 keys, bit 0 of Bob's public key flipped");
+        diagnostics.Bytes("private key", Convert.FromHexString(AlicePrivateKey));
+        diagnostics.Bytes("peer public key", peerPublicKey);
 
         X448.TryComputeSharedSecret(Convert.FromHexString(AlicePrivateKey), peerPublicKey, sharedSecret);
+        diagnostics.Act("shared secret", Convert.ToHexString(sharedSecret));
 
+        diagnostics.Diff("shared secret against the published one", AliceAndBobSharedSecret, Convert.ToHexStringLower(sharedSecret));
         Assert.AreNotEqual(AliceAndBobSharedSecret, Convert.ToHexStringLower(sharedSecret));
     }
 
     [TestMethod]
     public void GeneratePrivateKey_TwoKeys_AgreeOnASharedSecret()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] alice = new byte[X448.KeySize];
         byte[] bob = new byte[X448.KeySize];
         X448.GeneratePrivateKey(alice);
@@ -126,9 +193,17 @@ public sealed class X448Tests
         X448.ComputePublicKey(bob, bobPublic);
         byte[] aliceSecret = new byte[X448.KeySize];
         byte[] bobSecret = new byte[X448.KeySize];
+        diagnostics.Arrange("source", "two private keys from the system random number generator");
 
-        Assert.IsTrue(X448.TryComputeSharedSecret(alice, bobPublic, aliceSecret));
-        Assert.IsTrue(X448.TryComputeSharedSecret(bob, alicePublic, bobSecret));
+        bool aliceSucceeded = X448.TryComputeSharedSecret(alice, bobPublic, aliceSecret);
+        bool bobSucceeded = X448.TryComputeSharedSecret(bob, alicePublic, bobSecret);
+        diagnostics.Act("Alice succeeded", aliceSucceeded);
+        diagnostics.Act("Bob succeeded", bobSucceeded);
+
+        diagnostics.Assert("private keys differ", true, !alice.AsSpan().SequenceEqual(bob));
+        diagnostics.Diff("shared secret", aliceSecret, bobSecret);
+        Assert.IsTrue(aliceSucceeded);
+        Assert.IsTrue(bobSucceeded);
         CollectionAssert.AreNotEqual(alice, bob);
         CollectionAssert.AreEqual(aliceSecret, bobSecret);
     }
@@ -138,7 +213,13 @@ public sealed class X448Tests
     [DataRow(57)]
     public void GeneratePrivateKey_WrongLength_Throws(int length)
     {
-        Assert.ThrowsExactly<ArgumentException>(() => X448.GeneratePrivateKey(new byte[length]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("private key length", length);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => X448.GeneratePrivateKey(new byte[length]));
+        diagnostics.Act("exception", exception.Message);
+
+        diagnostics.Assert("exception type", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -146,8 +227,15 @@ public sealed class X448Tests
     [DataRow(56, 55)]
     public void ComputePublicKey_WrongLength_Throws(int privateKeyLength, int publicKeyLength)
     {
-        Assert.ThrowsExactly<ArgumentException>(
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("private key length", privateKeyLength);
+        diagnostics.Arrange("public key length", publicKeyLength);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(
             () => X448.ComputePublicKey(new byte[privateKeyLength], new byte[publicKeyLength]));
+        diagnostics.Act("exception", exception.Message);
+
+        diagnostics.Assert("exception type", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -156,8 +244,16 @@ public sealed class X448Tests
     [DataRow(56, 56, 0)]
     public void TryComputeSharedSecret_WrongLength_Throws(int privateKeyLength, int peerPublicKeyLength, int sharedSecretLength)
     {
-        Assert.ThrowsExactly<ArgumentException>(
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("private key length", privateKeyLength);
+        diagnostics.Arrange("peer public key length", peerPublicKeyLength);
+        diagnostics.Arrange("shared secret length", sharedSecretLength);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(
             () => X448.TryComputeSharedSecret(new byte[privateKeyLength], new byte[peerPublicKeyLength], new byte[sharedSecretLength]));
+        diagnostics.Act("exception", exception.Message);
+
+        diagnostics.Assert("exception type", nameof(ArgumentException), exception.GetType().Name);
     }
 
     private static string Iterate(int iterations)
