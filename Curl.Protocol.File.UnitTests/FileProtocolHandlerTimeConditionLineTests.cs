@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.File;
 
@@ -23,15 +24,29 @@ public sealed class FileProtocolHandlerTimeConditionLineTests
 
     private static byte[] Content => Encoding.ASCII.GetBytes("hi\n");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     // curl -sv -z "Jan 1 2020" file:///.../f.txt: stderr "* The requested document is not
     // new enough", "* shutting down connection #0"; nothing on stdout; exit 0.
     [TestMethod]
     public async Task ExecuteAsync_IfModifiedSinceNotMet_ReportsNotNewEnoughAndWritesNothing()
     {
         var condition = new TimeCondition(new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfModifiedSince);
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("fileDate", FileDate);
+        Diagnostics.Arrange("timeCondition", condition);
 
         (TransferResult result, MemoryStream output, RecordingTransferEvents events) = await DownloadAsync(condition, FileDate);
 
+        string[] expected = ["* The requested document is not new enough", ShuttingDown];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("output length", output.Length);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("output length", 0, output.Length);
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsEmpty(output.ToArray());
         CollectionAssert.AreEqual(new[] { "* The requested document is not new enough", ShuttingDown }, events.Transcript);
@@ -42,9 +57,19 @@ public sealed class FileProtocolHandlerTimeConditionLineTests
     public async Task ExecuteAsync_IfUnmodifiedSinceNotMet_ReportsNotOldEnoughAndWritesNothing()
     {
         var condition = new TimeCondition(new DateTimeOffset(1999, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfUnmodifiedSince);
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("fileDate", FileDate);
+        Diagnostics.Arrange("timeCondition", condition);
 
         (TransferResult result, MemoryStream output, RecordingTransferEvents events) = await DownloadAsync(condition, FileDate);
 
+        string[] expected = ["* The requested document is not old enough", ShuttingDown];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("output length", output.Length);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("output length", 0, output.Length);
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsEmpty(output.ToArray());
         CollectionAssert.AreEqual(new[] { "* The requested document is not old enough", ShuttingDown }, events.Transcript);
@@ -54,11 +79,24 @@ public sealed class FileProtocolHandlerTimeConditionLineTests
     [TestMethod]
     public async Task ExecuteAsync_RangeWithUnmetCondition_IgnoresTheCondition()
     {
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("timeCondition", UnmetCondition);
+        Diagnostics.Arrange("range", "0-0");
+
         (TransferResult result, MemoryStream output, RecordingTransferEvents events) = await DownloadAsync(
             UnmetCondition,
             FileDate,
             range: ByteRange.Bounded(0, 0), rangeText: "0-0");
 
+        string[] expected = ["<= h", ShuttingDown];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("TimeConditionUnmet", result.TimeConditionUnmet);
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("TimeConditionUnmet", false, result.TimeConditionUnmet);
+        Diagnostics.Diff("output", Encoding.ASCII.GetBytes("h"), output.ToArray());
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsFalse(result.TimeConditionUnmet);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("h"), output.ToArray());
@@ -69,11 +107,24 @@ public sealed class FileProtocolHandlerTimeConditionLineTests
     [TestMethod]
     public async Task ExecuteAsync_ResumeWithUnmetCondition_IgnoresTheCondition()
     {
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("timeCondition", UnmetCondition);
+        Diagnostics.Arrange("resumeFrom", 1);
+
         (TransferResult result, MemoryStream output, RecordingTransferEvents events) = await DownloadAsync(
             UnmetCondition,
             FileDate,
             resumeFrom: 1);
 
+        string[] expected = ["<= i\n", ShuttingDown];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("TimeConditionUnmet", result.TimeConditionUnmet);
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("TimeConditionUnmet", false, result.TimeConditionUnmet);
+        Diagnostics.Diff("output", Encoding.ASCII.GetBytes("i\n"), output.ToArray());
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsFalse(result.TimeConditionUnmet);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("i\n"), output.ToArray());
@@ -84,11 +135,22 @@ public sealed class FileProtocolHandlerTimeConditionLineTests
     [TestMethod]
     public async Task ExecuteAsync_ResumeFromZeroWithUnmetCondition_ReportsNotNewEnough()
     {
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("timeCondition", UnmetCondition);
+        Diagnostics.Arrange("resumeFrom", 0);
+
         (TransferResult result, MemoryStream output, RecordingTransferEvents events) = await DownloadAsync(
             UnmetCondition,
             FileDate,
             resumeFrom: 0);
 
+        string[] expected = ["* The requested document is not new enough", ShuttingDown];
+        Diagnostics.Act("TimeConditionUnmet", result.TimeConditionUnmet);
+        Diagnostics.Act("output length", output.Length);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("TimeConditionUnmet", true, result.TimeConditionUnmet);
+        Diagnostics.Assert("output length", 0, output.Length);
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.IsTrue(result.TimeConditionUnmet);
         Assert.IsEmpty(output.ToArray());
         CollectionAssert.AreEqual(new[] { "* The requested document is not new enough", ShuttingDown }, events.Transcript);
@@ -99,11 +161,23 @@ public sealed class FileProtocolHandlerTimeConditionLineTests
     [TestMethod]
     public async Task ExecuteAsync_RangeTextNamingNoRangeWithUnmetCondition_FailsWithExit33()
     {
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("timeCondition", UnmetCondition);
+        Diagnostics.Arrange("rangeText", "5-2");
+
         (TransferResult result, MemoryStream output, RecordingTransferEvents events) = await DownloadAsync(
             UnmetCondition,
             FileDate,
             rangeText: "5-2");
 
+        string[] expected = [ShuttingDown];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("ErrorMessage", result.ErrorMessage);
+        Diagnostics.Act("output length", output.Length);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.RangeError, result.ExitCode);
+        Diagnostics.Assert("output length", 0, output.Length);
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.RangeError, result.ExitCode);
         Assert.IsEmpty(output.ToArray());
         CollectionAssert.AreEqual(new[] { ShuttingDown }, events.Transcript);
@@ -115,9 +189,19 @@ public sealed class FileProtocolHandlerTimeConditionLineTests
     public async Task ExecuteAsync_MetCondition_ReportsNoConditionLine(TimeConditionKind kind, int year)
     {
         var condition = new TimeCondition(new DateTimeOffset(year, 1, 1, 0, 0, 0, TimeSpan.Zero), kind);
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("fileDate", FileDate);
+        Diagnostics.Arrange("timeCondition", condition);
 
         (TransferResult result, MemoryStream output, RecordingTransferEvents events) = await DownloadAsync(condition, FileDate);
 
+        string[] expected = ["<= hi\n", ShuttingDown];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", Content, output.ToArray());
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(Content, output.ToArray());
         CollectionAssert.AreEqual(new[] { "<= hi\n", ShuttingDown }, events.Transcript);
@@ -127,10 +211,21 @@ public sealed class FileProtocolHandlerTimeConditionLineTests
     [TestMethod]
     public async Task ExecuteAsync_FileAtTheUnixEpoch_ReportsNoConditionLine()
     {
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("fileDate", DateTimeOffset.UnixEpoch);
+        Diagnostics.Arrange("timeCondition", UnmetCondition);
+
         (TransferResult result, MemoryStream output, RecordingTransferEvents events) = await DownloadAsync(
             UnmetCondition,
             DateTimeOffset.UnixEpoch);
 
+        string[] expected = ["<= hi\n", ShuttingDown];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", Content, output.ToArray());
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(Content, output.ToArray());
         CollectionAssert.AreEqual(new[] { "<= hi\n", ShuttingDown }, events.Transcript);
@@ -140,9 +235,19 @@ public sealed class FileProtocolHandlerTimeConditionLineTests
     public async Task ExecuteAsync_ConditionAtTheUnixEpoch_ReportsNoConditionLine()
     {
         var condition = new TimeCondition(DateTimeOffset.UnixEpoch, TimeConditionKind.IfUnmodifiedSince);
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("fileDate", FileDate);
+        Diagnostics.Arrange("timeCondition", condition);
 
         (TransferResult result, MemoryStream output, RecordingTransferEvents events) = await DownloadAsync(condition, FileDate);
 
+        string[] expected = ["<= hi\n", ShuttingDown];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", Content, output.ToArray());
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(Content, output.ToArray());
         CollectionAssert.AreEqual(new[] { "<= hi\n", ShuttingDown }, events.Transcript);

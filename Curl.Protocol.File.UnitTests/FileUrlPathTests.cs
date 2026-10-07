@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.File;
 
@@ -20,20 +21,32 @@ namespace Curl.Protocol.File;
 [TestClass]
 public sealed class FileUrlPathTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void TryParse_NullUrl_ThrowsArgumentNullException()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(
+        Diagnostics.Arrange("url", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => FileUrlPath.TryParse(null!, out _));
+
+        Diagnostics.Act("exception", $"{exception.GetType().Name}: {exception.Message}");
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void TryParse_NonFileScheme_ReturnsFalse()
     {
+        Diagnostics.Arrange("url", "http://example.com/x");
         var url = CurlUrl.Parse("http://example.com/x");
 
         bool parsed = FileUrlPath.TryParse(url, out _);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Assert("parsed", false, parsed);
         Assert.IsFalse(parsed);
     }
 
@@ -41,12 +54,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_UppercaseScheme_IsAccepted()
     {
+        Diagnostics.Arrange("url", "FILE:///tmp/x");
         var url = CurlUrl.Parse("FILE:///tmp/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/x", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/x", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/x", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/x"), path.OsPath);
     }
@@ -55,12 +74,18 @@ public sealed class FileUrlPathTests
     [OSCondition(OperatingSystems.Windows)]
     public void TryParse_EmptyHostAndDriveLetter_ReturnsBothFormsOfThePath()
     {
+        Diagnostics.Arrange("url", "file:///C:/dir/hello.txt");
         var url = CurlUrl.Parse("file:///C:/dir/hello.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "C:/dir/hello.txt", path.UrlPath);
+        Diagnostics.Assert("os path", "C:/dir/hello.txt", Slashed(path.OsPath));
         Assert.AreEqual("C:/dir/hello.txt", path.UrlPath);
         Assert.AreEqual(NativePath("C:/dir/hello.txt"), path.OsPath);
     }
@@ -70,12 +95,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PercentTwentyEscape_DecodesToASpaceInTheOperatingSystemPathOnly()
     {
+        Diagnostics.Arrange("url", "file:///tmp/dir/my%20file.txt");
         var url = CurlUrl.Parse("file:///tmp/dir/my%20file.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/dir/my%20file.txt", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/dir/my file.txt", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/dir/my%20file.txt", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/dir/my file.txt"), path.OsPath);
     }
@@ -83,12 +114,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PercentTwentyFiveEscape_DecodesToASinglePercent()
     {
+        Diagnostics.Arrange("url", "file:///tmp/a%25b.txt");
         var url = CurlUrl.Parse("file:///tmp/a%25b.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/a%25b.txt", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/a%b.txt", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/a%25b.txt", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/a%b.txt"), path.OsPath);
     }
@@ -98,12 +135,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_TruncatedEscape_IsLeftLiteral()
     {
+        Diagnostics.Arrange("url", "file:///tmp/a%2");
         var url = CurlUrl.Parse("file:///tmp/a%2");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/a%2", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/a%2", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/a%2", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/a%2"), path.OsPath);
     }
@@ -111,12 +154,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_NonHexadecimalEscape_IsLeftLiteral()
     {
+        Diagnostics.Arrange("url", "file:///tmp/a%GGb");
         var url = CurlUrl.Parse("file:///tmp/a%GGb");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/a%GGb", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/a%GGb", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/a%GGb", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/a%GGb"), path.OsPath);
     }
@@ -124,12 +173,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_TrailingPercent_IsLeftLiteral()
     {
+        Diagnostics.Arrange("url", "file:///tmp/a%");
         var url = CurlUrl.Parse("file:///tmp/a%");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/a%", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/a%", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/a%", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/a%"), path.OsPath);
     }
@@ -139,12 +194,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PercentTwoFEscape_DecodesToASeparator()
     {
+        Diagnostics.Arrange("url", "file:///tmp/dir%2Fhello.txt");
         var url = CurlUrl.Parse("file:///tmp/dir%2Fhello.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/dir%2Fhello.txt", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/dir/hello.txt", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/dir%2Fhello.txt", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/dir/hello.txt"), path.OsPath);
     }
@@ -152,12 +213,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_LocalhostHost_IsAcceptedAndDropped()
     {
+        Diagnostics.Arrange("url", "file://localhost/tmp/x");
         var url = CurlUrl.Parse("file://localhost/tmp/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/x", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/x", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/x", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/x"), path.OsPath);
     }
@@ -165,12 +232,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_UppercaseLocalhostHost_IsAcceptedAndDropped()
     {
+        Diagnostics.Arrange("url", "file://LOCALHOST/tmp/x");
         var url = CurlUrl.Parse("file://LOCALHOST/tmp/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/x", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/x", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/x", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/x"), path.OsPath);
     }
@@ -178,12 +251,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_LoopbackAddressHost_IsAcceptedAndDropped()
     {
+        Diagnostics.Arrange("url", "file://127.0.0.1/tmp/x");
         var url = CurlUrl.Parse("file://127.0.0.1/tmp/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/x", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/x", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/x", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/x"), path.OsPath);
     }
@@ -191,8 +270,12 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void CurlUrlTryParse_NamedHost_ReturnsFalse()
     {
+        Diagnostics.Arrange("url", "file://example.com/x");
+
         bool parsed = CurlUrl.TryParse("file://example.com/x", pathAsIs: false, out _);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Assert("parsed", false, parsed);
         Assert.IsFalse(parsed);
     }
 
@@ -201,32 +284,48 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void CurlUrlTryParse_IpVersionSixLoopbackHost_ReturnsFalse()
     {
+        Diagnostics.Arrange("url", "file://[::1]/x");
+
         bool parsed = CurlUrl.TryParse("file://[::1]/x", pathAsIs: false, out _);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Assert("parsed", false, parsed);
         Assert.IsFalse(parsed);
     }
 
     [TestMethod]
     public void CurlUrlTryParse_NonLoopbackAddressHost_ReturnsFalse()
     {
+        Diagnostics.Arrange("url", "file://127.0.0.2/x");
+
         bool parsed = CurlUrl.TryParse("file://127.0.0.2/x", pathAsIs: false, out _);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Assert("parsed", false, parsed);
         Assert.IsFalse(parsed);
     }
 
     [TestMethod]
     public void CurlUrlTryParse_SchemeAndEmptyAuthorityOnly_ReturnsFalse()
     {
+        Diagnostics.Arrange("url", "file://");
+
         bool parsed = CurlUrl.TryParse("file://", pathAsIs: false, out _);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Assert("parsed", false, parsed);
         Assert.IsFalse(parsed);
     }
 
     [TestMethod]
     public void CurlUrlTryParse_AcceptedHostWithNoPath_ReturnsFalse()
     {
+        Diagnostics.Arrange("url", "file://localhost");
+
         bool parsed = CurlUrl.TryParse("file://localhost", pathAsIs: false, out _);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Assert("parsed", false, parsed);
         Assert.IsFalse(parsed);
     }
 
@@ -234,12 +333,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_RootPath_KeepsTheLeadingSlash()
     {
+        Diagnostics.Arrange("url", "file:///");
         var url = CurlUrl.Parse("file:///");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/", path.UrlPath);
+        Diagnostics.Assert("os path", "/", Slashed(path.OsPath));
         Assert.AreEqual("/", path.UrlPath);
         Assert.AreEqual(NativePath("/"), path.OsPath);
     }
@@ -248,12 +353,18 @@ public sealed class FileUrlPathTests
     [OSCondition(OperatingSystems.Windows)]
     public void TryParse_LowercaseDriveLetter_LosesTheLeadingSlash()
     {
+        Diagnostics.Arrange("url", "file:///c:/Windows/win.ini");
         var url = CurlUrl.Parse("file:///c:/Windows/win.ini");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "c:/Windows/win.ini", path.UrlPath);
+        Diagnostics.Assert("os path", "c:/Windows/win.ini", Slashed(path.OsPath));
         Assert.AreEqual("c:/Windows/win.ini", path.UrlPath);
         Assert.AreEqual(NativePath("c:/Windows/win.ini"), path.OsPath);
     }
@@ -269,12 +380,18 @@ public sealed class FileUrlPathTests
     [OSCondition(OperatingSystems.Windows)]
     public void TryParse_DriveLetterSpelledWithABar_LosesTheLeadingSlashAndKeepsTheBar()
     {
+        Diagnostics.Arrange("url", "file:///c|/Windows/win.ini");
         var url = CurlUrl.Parse("file:///c|/Windows/win.ini");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "c|/Windows/win.ini", path.UrlPath);
+        Diagnostics.Assert("os path", "c|/Windows/win.ini", Slashed(path.OsPath));
         Assert.AreEqual("c|/Windows/win.ini", path.UrlPath);
         Assert.AreEqual(NativePath("c|/Windows/win.ini"), path.OsPath);
     }
@@ -282,12 +399,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PathWithoutADriveLetter_KeepsTheLeadingSlash()
     {
+        Diagnostics.Arrange("url", "file:///Windows/win.ini");
         var url = CurlUrl.Parse("file:///Windows/win.ini");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/Windows/win.ini", path.UrlPath);
+        Diagnostics.Assert("os path", "/Windows/win.ini", Slashed(path.OsPath));
         Assert.AreEqual("/Windows/win.ini", path.UrlPath);
         Assert.AreEqual(NativePath("/Windows/win.ini"), path.OsPath);
     }
@@ -296,12 +419,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_SingleSlashAfterScheme_IsAccepted()
     {
+        Diagnostics.Arrange("url", "file:/tmp/x");
         var url = CurlUrl.Parse("file:/tmp/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/x", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/x", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/x", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/x"), path.OsPath);
     }
@@ -311,12 +440,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_FourSlashUncPath_KeepsBothLeadingSlashes()
     {
+        Diagnostics.Arrange("url", "file:////localhost/C$/x");
         var url = CurlUrl.Parse("file:////localhost/C$/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "//localhost/C$/x", path.UrlPath);
+        Diagnostics.Assert("os path", "//localhost/C$/x", Slashed(path.OsPath));
         Assert.AreEqual("//localhost/C$/x", path.UrlPath);
         Assert.AreEqual(NativePath("//localhost/C$/x"), path.OsPath);
     }
@@ -324,12 +459,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_FiveSlashPath_KeepsThreeLeadingSlashes()
     {
+        Diagnostics.Arrange("url", "file://///localhost/x");
         var url = CurlUrl.Parse("file://///localhost/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "///localhost/x", path.UrlPath);
+        Diagnostics.Assert("os path", "///localhost/x", Slashed(path.OsPath));
         Assert.AreEqual("///localhost/x", path.UrlPath);
         Assert.AreEqual(NativePath("///localhost/x"), path.OsPath);
     }
@@ -337,12 +478,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_Query_IsDropped()
     {
+        Diagnostics.Arrange("url", "file:///tmp/x?a=1");
         var url = CurlUrl.Parse("file:///tmp/x?a=1");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/x", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/x", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/x", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/x"), path.OsPath);
     }
@@ -350,12 +497,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_Fragment_IsDropped()
     {
+        Diagnostics.Arrange("url", "file:///tmp/x#frag");
         var url = CurlUrl.Parse("file:///tmp/x#frag");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/x", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/x", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/x", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/x"), path.OsPath);
     }
@@ -365,12 +518,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_BackslashDotDotSegments_ResolveBeforeTheOpen()
     {
+        Diagnostics.Arrange("url", @"file:///tmp/dir\..\secret.txt");
         var url = CurlUrl.Parse(@"file:///tmp/dir\..\secret.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/secret.txt", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/secret.txt", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/secret.txt", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/secret.txt"), path.OsPath);
     }
@@ -380,12 +539,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_BackslashBeforeDotDot_BecomesASeparatorBeforeTheDotDotIsResolved()
     {
+        Diagnostics.Arrange("url", @"file:///tmp/a\../b");
         var url = CurlUrl.Parse(@"file:///tmp/a\../b");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/b", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/b", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/b", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/b"), path.OsPath);
     }
@@ -393,12 +558,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_SingleDotSegments_AreRemoved()
     {
+        Diagnostics.Arrange("url", "file:///tmp/./a/./b.txt");
         var url = CurlUrl.Parse("file:///tmp/./a/./b.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/a/b.txt", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/a/b.txt", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/a/b.txt", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/a/b.txt"), path.OsPath);
     }
@@ -410,12 +581,18 @@ public sealed class FileUrlPathTests
     [OSCondition(OperatingSystems.Windows)]
     public void TryParse_DotDotAboveTheDrive_StopsAtTheDrive()
     {
+        Diagnostics.Arrange("url", "file:///C:/../../Windows/win.ini");
         var url = CurlUrl.Parse("file:///C:/../../Windows/win.ini");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "C:/Windows/win.ini", path.UrlPath);
+        Diagnostics.Assert("os path", "C:/Windows/win.ini", Slashed(path.OsPath));
         Assert.AreEqual("C:/Windows/win.ini", path.UrlPath);
         Assert.AreEqual(NativePath("C:/Windows/win.ini"), path.OsPath);
     }
@@ -426,12 +603,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_DriveLetterWithoutASlash_IsRemovedByDotDotLikeAnySegment()
     {
+        Diagnostics.Arrange("url", "file://localhost/Q:dir/../x");
         var url = CurlUrl.Parse("file://localhost/Q:dir/../x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/x", path.UrlPath);
+        Diagnostics.Assert("os path", "/x", Slashed(path.OsPath));
         Assert.AreEqual("/x", path.UrlPath);
         Assert.AreEqual(NativePath("/x"), path.OsPath);
     }
@@ -442,12 +625,18 @@ public sealed class FileUrlPathTests
     [OSCondition(OperatingSystems.Windows)]
     public void TryParse_BareDrive_IsKeptWhole()
     {
+        Diagnostics.Arrange("url", "file://localhost/C:");
         var url = CurlUrl.Parse("file://localhost/C:");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "C:", path.UrlPath);
+        Diagnostics.Assert("os path", "C:", Slashed(path.OsPath));
         Assert.AreEqual("C:", path.UrlPath);
         Assert.AreEqual("C:", path.OsPath);
     }
@@ -463,12 +652,18 @@ public sealed class FileUrlPathTests
     [DataRow("file:///Q:dir/../x", "/x")]
     public void TryParse_SpellingUriRefused_QuotesThePathCurlQuotes(string text, string urlPath)
     {
+        Diagnostics.Arrange("url", text);
         var url = CurlUrl.Parse(text);
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", urlPath, path.UrlPath);
+        Diagnostics.Assert("os path", urlPath, Slashed(path.OsPath));
         Assert.AreEqual(urlPath, path.UrlPath);
         Assert.AreEqual(NativePath(urlPath), path.OsPath);
     }
@@ -479,12 +674,18 @@ public sealed class FileUrlPathTests
     [OSCondition(OperatingSystems.Windows)]
     public void TryParse_DriveFollowedByAnEscapedSlash_OpensThePathTheEscapeSpells()
     {
+        Diagnostics.Arrange("url", "file:///C:%2FWindows/win.ini");
         var url = CurlUrl.Parse("file:///C:%2FWindows/win.ini");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "C:%2FWindows/win.ini", path.UrlPath);
+        Diagnostics.Assert("os path", "C:/Windows/win.ini", Slashed(path.OsPath));
         Assert.AreEqual("C:%2FWindows/win.ini", path.UrlPath);
         Assert.AreEqual(NativePath("C:/Windows/win.ini"), path.OsPath);
     }
@@ -501,12 +702,19 @@ public sealed class FileUrlPathTests
         string urlPath,
         string osPath)
     {
+        Diagnostics.Arrange("url", text);
+        Diagnostics.Arrange("driveLetters", false);
         var url = CurlUrl.Parse(text);
 
         bool parsed = FileUrlPath.TryParse(url, driveLetters: false, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", urlPath, path.UrlPath);
+        Diagnostics.Assert("os path", osPath, Slashed(path.OsPath));
         Assert.AreEqual(urlPath, path.UrlPath);
         Assert.AreEqual(NativePath(osPath), path.OsPath);
         Assert.StartsWith(Path.DirectorySeparatorChar.ToString(), path.OsPath);
@@ -520,12 +728,19 @@ public sealed class FileUrlPathTests
         string urlPath,
         string osPath)
     {
+        Diagnostics.Arrange("url", text);
+        Diagnostics.Arrange("driveLetters", true);
         var url = CurlUrl.Parse(text);
 
         bool parsed = FileUrlPath.TryParse(url, driveLetters: true, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", urlPath, path.UrlPath);
+        Diagnostics.Assert("os path", osPath, Slashed(path.OsPath));
         Assert.AreEqual(urlPath, path.UrlPath);
         Assert.AreEqual(NativePath(osPath), path.OsPath);
     }
@@ -535,12 +750,18 @@ public sealed class FileUrlPathTests
     [OSCondition(OperatingSystems.Windows)]
     public void TryParse_DriveLettersOnWithAWrittenSlash_DropsTheLeadingSlash()
     {
+        Diagnostics.Arrange("url", "file:///C:/Windows/win.ini");
         var url = CurlUrl.Parse("file:///C:/Windows/win.ini");
 
         bool parsed = FileUrlPath.TryParse(url, driveLetters: true, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "C:/Windows/win.ini", path.UrlPath);
+        Diagnostics.Assert("os path", "C:/Windows/win.ini", Slashed(path.OsPath));
         Assert.AreEqual("C:/Windows/win.ini", path.UrlPath);
         Assert.AreEqual(NativePath("C:/Windows/win.ini"), path.OsPath);
     }
@@ -563,12 +784,18 @@ public sealed class FileUrlPathTests
     [DataRow(@"file:///tmp\dir\..\nosuch.txt", "/tmp/nosuch.txt")]
     public void TryParse_DotSegments_AreRemovedAsCurlQuotesThem(string urlText, string expected)
     {
+        Diagnostics.Arrange("url", urlText);
         var url = CurlUrl.Parse(urlText);
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", expected, path.UrlPath);
+        Diagnostics.Assert("os path", expected, Slashed(path.OsPath));
         Assert.AreEqual(expected, path.UrlPath);
         Assert.AreEqual(NativePath(expected), path.OsPath);
     }
@@ -589,12 +816,18 @@ public sealed class FileUrlPathTests
         string urlText,
         string expected)
     {
+        Diagnostics.Arrange("url", urlText);
         var url = CurlUrl.Parse(urlText);
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", expected, path.UrlPath);
+        Diagnostics.Assert("os path", expected, Slashed(path.OsPath));
         Assert.AreEqual(expected, path.UrlPath);
         Assert.AreEqual(NativePath(expected), path.OsPath);
     }
@@ -608,12 +841,16 @@ public sealed class FileUrlPathTests
     [DataRow("file:///tmp/dir/%2e", "/tmp/dir/")]
     public void TryParse_EncodedDotSegments_AreRemovedLikePlainOnes(string urlText, string expected)
     {
+        Diagnostics.Arrange("url", urlText);
         var url = CurlUrl.Parse(urlText);
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", expected, path.UrlPath);
         Assert.AreEqual(expected, path.UrlPath);
     }
 
@@ -622,12 +859,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_EscapedBackslash_IsNotASeparatorForDotSegmentRemoval()
     {
+        Diagnostics.Arrange("url", "file:///tmp/dir%5c..%5cx");
         var url = CurlUrl.Parse("file:///tmp/dir%5c..%5cx");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/dir%5C..%5Cx", path.UrlPath);
+        Diagnostics.Assert("os path", Slashed(NativePath("/tmp/dir") + @"\..\x"), Slashed(path.OsPath));
         Assert.AreEqual("/tmp/dir%5C..%5Cx", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/dir") + @"\..\x", path.OsPath);
     }
@@ -635,12 +878,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PathAsIsFalse_RemovesDotSegments()
     {
+        Diagnostics.Arrange("url", "file:///tmp/dir/../x");
         var url = CurlUrl.Parse("file:///tmp/dir/../x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/x", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/x", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/x", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/x"), path.OsPath);
     }
@@ -650,12 +899,18 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PathAsIs_KeepsDotDotButStillConvertsBackslashes()
     {
+        Diagnostics.Arrange("url", @"file:///tmp/dir\..\x (path as is)");
         var url = CurlUrl.Parse(@"file:///tmp/dir\..\x", pathAsIs: true);
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/dir/../x", path.UrlPath);
+        Diagnostics.Assert("os path", "/tmp/dir/../x", Slashed(path.OsPath));
         Assert.AreEqual("/tmp/dir/../x", path.UrlPath);
         Assert.AreEqual(NativePath("/tmp/dir/../x"), path.OsPath);
     }
@@ -663,12 +918,16 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PathAsIs_KeepsSingleDotSegments()
     {
+        Diagnostics.Arrange("url", "file:///tmp/dir/./x (path as is)");
         var url = CurlUrl.Parse("file:///tmp/dir/./x", pathAsIs: true);
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/dir/./x", path.UrlPath);
         Assert.AreEqual("/tmp/dir/./x", path.UrlPath);
     }
 
@@ -683,22 +942,31 @@ public sealed class FileUrlPathTests
     [DataRow("file:///tmp/dir/a%2Eb", "/tmp/dir/a%2Eb")]
     public void TryParse_LowercaseEscape_IsQuotedWithUppercaseHexDigits(string url, string expected)
     {
+        Diagnostics.Arrange("url", url);
+
         bool parsed = FileUrlPath.TryParse(CurlUrl.Parse(url), out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", expected, path.UrlPath);
         Assert.AreEqual(expected, path.UrlPath);
     }
 
     [TestMethod]
     public void TryParse_PathAsIsLowercaseEncodedDots_AreQuotedWithUppercaseHexDigits()
     {
+        Diagnostics.Arrange("url", "file:///tmp/dir/%2e%2e/x (path as is)");
         var url = CurlUrl.Parse("file:///tmp/dir/%2e%2e/x", pathAsIs: true);
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/dir/%2E%2E/x", path.UrlPath);
         Assert.AreEqual("/tmp/dir/%2E%2E/x", path.UrlPath);
     }
 
@@ -715,10 +983,15 @@ public sealed class FileUrlPathTests
     [DataRow("file:///tmp/dir/a%%2eb", "/tmp/dir/a%%2Eb")]
     public void TryParse_MalformedEscape_IsQuotedExactlyAsWritten(string url, string expected)
     {
+        Diagnostics.Arrange("url", url);
+
         bool parsed = FileUrlPath.TryParse(CurlUrl.Parse(url), out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", expected, path.UrlPath);
         Assert.AreEqual(expected, path.UrlPath);
     }
 
@@ -737,10 +1010,15 @@ public sealed class FileUrlPathTests
         string url,
         string expected)
     {
+        Diagnostics.Arrange("url", url);
+
         bool parsed = FileUrlPath.TryParse(CurlUrl.Parse(url), out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", expected, path.UrlPath);
         Assert.AreEqual(expected, path.UrlPath);
     }
 
@@ -748,12 +1026,16 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_UnescapedNonAsciiCharacter_IsKeptInTheOperatingSystemPath()
     {
+        Diagnostics.Arrange("url", "file:///tmp/nodir/a\u00E9b");
         var url = CurlUrl.Parse("file:///tmp/nodir/a\u00E9b");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("os path", "/tmp/nodir/a\u00E9b", Slashed(path.OsPath));
         Assert.AreEqual(NativePath("/tmp/nodir/a\u00E9b"), path.OsPath);
     }
 
@@ -762,12 +1044,16 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_NonAsciiBesideAsciiAndAnEscape_EncodesOnlyTheNonAsciiCharacter()
     {
+        Diagnostics.Arrange("url", "file:///tmp/dir/../a\"%e9\u00E9b");
         var url = CurlUrl.Parse("file:///tmp/dir/../a\"%e9\u00E9b");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "/tmp/a\"%E9%C3%A9b", path.UrlPath);
         Assert.AreEqual("/tmp/a\"%E9%C3%A9b", path.UrlPath);
     }
 
@@ -778,12 +1064,18 @@ public sealed class FileUrlPathTests
     [OSCondition(OperatingSystems.Windows)]
     public void TryParse_DriveLetterAuthority_KeepsItAsTheHeadOfThePath()
     {
+        Diagnostics.Arrange("url", "file://C:/dir/hello.txt");
         var url = CurlUrl.Parse("file://C:/dir/hello.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "C:/dir/hello.txt", path.UrlPath);
+        Diagnostics.Assert("os path", "C:/dir/hello.txt", Slashed(path.OsPath));
         Assert.AreEqual("C:/dir/hello.txt", path.UrlPath);
         Assert.AreEqual(NativePath("C:/dir/hello.txt"), path.OsPath);
     }
@@ -792,14 +1084,23 @@ public sealed class FileUrlPathTests
     [OSCondition(OperatingSystems.Windows)]
     public void TryParse_DriveLetterAuthority_MatchesTheEmptyAuthorityForm()
     {
+        Diagnostics.Arrange("two slash url", "file://C:/dir/hello.txt");
+        Diagnostics.Arrange("three slash url", "file:///C:/dir/hello.txt");
         var twoSlashes = CurlUrl.Parse("file://C:/dir/hello.txt");
         var threeSlashes = CurlUrl.Parse("file:///C:/dir/hello.txt");
 
         bool parsedTwo = FileUrlPath.TryParse(twoSlashes, out var fromTwo);
         bool parsedThree = FileUrlPath.TryParse(threeSlashes, out var fromThree);
 
+        Diagnostics.Act("parsed two", parsedTwo);
+        Diagnostics.Act("parsed three", parsedThree);
+        Diagnostics.Act("two slash url path", fromTwo?.UrlPath);
+        Diagnostics.Act("three slash url path", fromThree?.UrlPath);
+        Diagnostics.Assert("parsed two", true, parsedTwo);
+        Diagnostics.Assert("parsed three", true, parsedThree);
         Assert.IsTrue(parsedTwo);
         Assert.IsTrue(parsedThree);
+        Diagnostics.Assert("paths equal", fromThree, fromTwo);
         Assert.AreEqual(fromThree, fromTwo);
     }
 
@@ -808,11 +1109,17 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void With_NoChanges_CopiesAnEqualPath()
     {
+        Diagnostics.Arrange("url", "file:///tmp/dir/hello.txt");
+
         bool parsed = FileUrlPath.TryParse(CurlUrl.Parse("file:///tmp/dir/hello.txt"), out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
         FileUrlPath copy = path with { };
+        Diagnostics.Act("copy url path", copy.UrlPath);
+        Diagnostics.Assert("copy equals original", path, copy);
         Assert.AreNotSame(path, copy);
         Assert.AreEqual(path, copy);
     }
@@ -823,12 +1130,18 @@ public sealed class FileUrlPathTests
     [OSCondition(OperatingSystems.Windows)]
     public void TryParse_LowercaseDriveLetterAuthority_KeepsItAsTheHeadOfThePath()
     {
+        Diagnostics.Arrange("url", "file://d:/nope.txt");
         var url = CurlUrl.Parse("file://d:/nope.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "d:/nope.txt", path.UrlPath);
+        Diagnostics.Assert("os path", "d:/nope.txt", Slashed(path.OsPath));
         Assert.AreEqual("d:/nope.txt", path.UrlPath);
         Assert.AreEqual(NativePath("d:/nope.txt"), path.OsPath);
     }
@@ -840,12 +1153,18 @@ public sealed class FileUrlPathTests
     [OSCondition(OperatingSystems.Windows)]
     public void TryParse_BarDriveLetterAuthority_KeepsTheBarUnrewritten()
     {
+        Diagnostics.Arrange("url", "file://D|/nope.txt");
         var url = CurlUrl.Parse("file://D|/nope.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Act("url path", path?.UrlPath);
+        Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
+        Diagnostics.Assert("url path", "D|/nope.txt", path.UrlPath);
+        Diagnostics.Assert("os path", "D|/nope.txt", Slashed(path.OsPath));
         Assert.AreEqual("D|/nope.txt", path.UrlPath);
         Assert.AreEqual(NativePath("D|/nope.txt"), path.OsPath);
     }
@@ -862,11 +1181,18 @@ public sealed class FileUrlPathTests
     public void CurlUrlTryParse_AuthorityThatIsNeitherADriveNorAnAcceptedHost_ReturnsFalse(
         string candidate)
     {
+        Diagnostics.Arrange("url", candidate);
+
         bool parsed = CurlUrl.TryParse(candidate, pathAsIs: false, out _);
 
+        Diagnostics.Act("parsed", parsed);
+        Diagnostics.Assert("parsed", false, parsed);
         Assert.IsFalse(parsed);
     }
 
     private static string NativePath(string slashedPath) =>
         slashedPath.Replace('/', Path.DirectorySeparatorChar);
+
+    private static string? Slashed(string? nativePath) =>
+        nativePath?.Replace(Path.DirectorySeparatorChar, '/');
 }

@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.File;
 
@@ -23,6 +24,10 @@ public sealed class FileProtocolHandlerDecisionTests
 
     private const string DestinationWriteFailedMessage = "Failed sending data to the peer";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private static CurlUrl FileUrl => CurlUrl.Parse("file:///dir/f.txt");
 
     private static string OsPath => "/dir/f.txt".Replace('/', Path.DirectorySeparatorChar);
@@ -43,9 +48,14 @@ public sealed class FileProtocolHandlerDecisionTests
         };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("fake file /dir/f.txt bytes", Content.Length);
+
         await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("open token count", fileSystem.OpenCancellationTokens.Count);
         CancellationToken token = Assert.ContainsSingle(fileSystem.OpenCancellationTokens);
+        Diagnostics.Assert("open token", cancellation.Token, token);
         Assert.AreEqual(cancellation.Token, token);
     }
 
@@ -63,9 +73,14 @@ public sealed class FileProtocolHandlerDecisionTests
         };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("upload bytes", Content.Length);
+
         await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("open token count", fileSystem.OpenCancellationTokens.Count);
         CancellationToken token = Assert.ContainsSingle(fileSystem.OpenCancellationTokens);
+        Diagnostics.Assert("open token", cancellation.Token, token);
         Assert.AreEqual(cancellation.Token, token);
     }
 
@@ -86,11 +101,18 @@ public sealed class FileProtocolHandlerDecisionTests
         };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("fake file /dir/f.txt bytes", Content.Length);
+
         await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("header write token count", headers.WriteCancellationTokens.Count);
+        Diagnostics.Act("body write token count", output.WriteCancellationTokens.Count);
+        Diagnostics.Assert("header write token count", 4, headers.WriteCancellationTokens.Count);
         Assert.HasCount(4, headers.WriteCancellationTokens);
         Assert.IsTrue(headers.WriteCancellationTokens.All(token => token == cancellation.Token));
         CancellationToken bodyToken = Assert.ContainsSingle(output.WriteCancellationTokens);
+        Diagnostics.Assert("body write token", cancellation.Token, bodyToken);
         Assert.AreEqual(cancellation.Token, bodyToken);
     }
 
@@ -110,8 +132,17 @@ public sealed class FileProtocolHandlerDecisionTests
         };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("header output", "fails on write 1");
+
         var result = await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Assert("exit code", CurlExitCode.WriteError, result.ExitCode);
+        Diagnostics.Assert("error message", HeaderWriteFailedForFirstLine, result.ErrorMessage);
+        Diagnostics.Assert("body write count", 0, output.WriteLengths.Count);
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
         Assert.AreEqual(HeaderWriteFailedForFirstLine, result.ErrorMessage);
         Assert.AreEqual(0L, result.BytesTransferred);
@@ -133,7 +164,16 @@ public sealed class FileProtocolHandlerDecisionTests
         };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("header output", "fails on write 1");
+
         await handler.ExecuteAsync(context);
+
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Assert(
+            "info lines",
+            HeaderWriteFailedForFirstLine + " | closing connection #0",
+            string.Join(" | ", events.Info));
 
         // Exit 23 is premature to libcurl's multi_done, so the connection line that follows
         // is "closing", not "shutting down" (BL-936).
@@ -156,8 +196,15 @@ public sealed class FileProtocolHandlerDecisionTests
         };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("upload bytes", Content.Length);
+
         var result = await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("destination disposed", destination.WasDisposed);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("destination disposed", true, destination.WasDisposed);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsTrue(destination.WasDisposed);
     }
@@ -176,8 +223,17 @@ public sealed class FileProtocolHandlerDecisionTests
         };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("destination", "fails on write 1");
+
         var result = await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Assert("exit code", CurlExitCode.SendError, result.ExitCode);
+        Diagnostics.Assert("error message", DestinationWriteFailedMessage, result.ErrorMessage);
+        Diagnostics.Assert("destination disposed", true, destination.WasDisposed);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(DestinationWriteFailedMessage, result.ErrorMessage);
         Assert.AreEqual(0L, result.BytesTransferred);
@@ -201,8 +257,16 @@ public sealed class FileProtocolHandlerDecisionTests
         };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("resume from", 3);
+
         var result = await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Bytes("destination", destination.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("bytes transferred", 0L, result.BytesTransferred);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(0L, result.BytesTransferred);
         Assert.IsEmpty(destination.ToArray());
@@ -221,8 +285,15 @@ public sealed class FileProtocolHandlerDecisionTests
         var context = new TransferContext { Url = FileUrl, Output = output };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("source", "read 1 faults as TaskCanceledException, token not cancelled");
+
         var result = await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("body write count", 0, output.WriteLengths.Count);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(0L, result.BytesTransferred);
         Assert.IsEmpty(output.WriteLengths);
@@ -242,8 +313,15 @@ public sealed class FileProtocolHandlerDecisionTests
         };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("destination", "write 1 faults as TaskCanceledException, token not cancelled");
+
         var result = await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Assert("exit code", CurlExitCode.SendError, result.ExitCode);
+        Diagnostics.Assert("error message", DestinationWriteFailedMessage, result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(DestinationWriteFailedMessage, result.ErrorMessage);
         Assert.IsTrue(destination.WasDisposed);
@@ -265,8 +343,16 @@ public sealed class FileProtocolHandlerDecisionTests
         };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("existing destination", "Hel");
+        Diagnostics.Arrange("resume from", 3);
+
         var result = await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Diff("destination", Content, fileSystem.WrittenBytes(OsPath));
+        Diagnostics.Assert("bytes transferred", 7L, result.BytesTransferred);
         CollectionAssert.AreEqual(Content, fileSystem.WrittenBytes(OsPath));
         Assert.AreEqual(7L, result.BytesTransferred);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -288,8 +374,16 @@ public sealed class FileProtocolHandlerDecisionTests
         };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("resume from", 4);
+        Diagnostics.Arrange("upload", "seekable, 10 bytes");
+
         var result = await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("upload read count", upload.ReadCount);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Assert("upload read count", 2, upload.ReadCount);
+        Diagnostics.Diff("destination", Encoding.ASCII.GetBytes("o file"), fileSystem.WrittenBytes(OsPath));
         var call = Assert.ContainsSingle(fileSystem.Calls);
         Assert.AreEqual(FileSystemCall.Write(OsPath, FileWriteMode.Append), call);
         Assert.AreEqual(2, upload.ReadCount);
@@ -314,8 +408,16 @@ public sealed class FileProtocolHandlerDecisionTests
         };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("resume from", 4);
+        Diagnostics.Arrange("upload", "non-seekable, 10 bytes");
+
         var result = await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("upload read count", upload.ReadCount);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Assert("upload read count", 3, upload.ReadCount);
+        Diagnostics.Diff("destination", Encoding.ASCII.GetBytes("o file"), fileSystem.WrittenBytes(OsPath));
         var call = Assert.ContainsSingle(fileSystem.Calls);
         Assert.AreEqual(FileSystemCall.Write(OsPath, FileWriteMode.Append), call);
         Assert.AreEqual(3, upload.ReadCount);
@@ -331,6 +433,9 @@ public sealed class FileProtocolHandlerDecisionTests
     public async Task ExecuteAsync_ResumeFromAndRangeTogetherUnreachableFromTheCommandLine_ResumeFromWins()
     {
         var output = new ChunkRecordingStream();
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("resume from", 2);
+        Diagnostics.Arrange("range", "0-0");
 
         var result = await DownloadAsync(
             Content,
@@ -342,6 +447,9 @@ public sealed class FileProtocolHandlerDecisionTests
                 Range = ByteRange.Bounded(0, 0),
             });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Diff("body", Encoding.ASCII.GetBytes("llo file"), output.ToArray());
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("llo file"), output.ToArray());
         Assert.AreEqual(8L, result.BytesTransferred);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -355,10 +463,17 @@ public sealed class FileProtocolHandlerDecisionTests
     {
         var output = new ChunkRecordingStream();
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("range", "suffix 100 of 10 bytes");
+
         var result = await DownloadAsync(
             Content,
             new TransferContext { Url = FileUrl, Output = output, Range = ByteRange.Suffix(100) });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Assert("exit code", CurlExitCode.BadDownloadResume, result.ExitCode);
+        Diagnostics.Assert("error message", CouldNotResumeDownloadMessage, result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.BadDownloadResume, result.ExitCode);
         Assert.AreEqual(CouldNotResumeDownloadMessage, result.ErrorMessage);
         Assert.IsEmpty(output.WriteLengths);
@@ -369,8 +484,14 @@ public sealed class FileProtocolHandlerDecisionTests
     {
         var output = new ChunkRecordingStream();
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("range", "from offset 0 of an empty file");
+
         var result = await DownloadAsync([], new TransferContext { Url = FileUrl, Output = output, Range = ByteRange.FromOffset(0) });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Assert("bytes transferred", 0L, result.BytesTransferred);
         Assert.IsEmpty(output.WriteLengths);
         Assert.AreEqual(0L, result.BytesTransferred);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -381,8 +502,14 @@ public sealed class FileProtocolHandlerDecisionTests
     {
         var output = new ChunkRecordingStream();
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("range", "0-4 of an empty file");
+
         var result = await DownloadAsync([], new TransferContext { Url = FileUrl, Output = output, Range = ByteRange.Bounded(0, 4) });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Assert("bytes transferred", 0L, result.BytesTransferred);
         Assert.IsEmpty(output.WriteLengths);
         Assert.AreEqual(0L, result.BytesTransferred);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -393,8 +520,14 @@ public sealed class FileProtocolHandlerDecisionTests
     {
         var output = new ChunkRecordingStream();
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("range", "2-99 of 10 bytes");
+
         var result = await DownloadAsync(Content, new TransferContext { Url = FileUrl, Output = output, Range = ByteRange.Bounded(2, 99) });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Diff("body", Encoding.ASCII.GetBytes("llo file"), output.ToArray());
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("llo file"), output.ToArray());
         Assert.AreEqual(8L, result.BytesTransferred);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -407,8 +540,14 @@ public sealed class FileProtocolHandlerDecisionTests
     {
         var output = new ChunkRecordingStream();
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("range", "10-12 of 10 bytes");
+
         var result = await DownloadAsync(Content, new TransferContext { Url = FileUrl, Output = output, Range = ByteRange.Bounded(10, 12) });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Assert("bytes transferred", 0L, result.BytesTransferred);
         Assert.IsEmpty(output.WriteLengths);
         Assert.AreEqual(0L, result.BytesTransferred);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -428,8 +567,15 @@ public sealed class FileProtocolHandlerDecisionTests
         var context = new TransferContext { Url = FileUrl, Output = output };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("source", "short reads of 3 bytes, 10 bytes total");
+
         var result = await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("first read length", source.ReadLengths[0]);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Assert("first read length", 3, source.ReadLengths[0]);
+        Diagnostics.Diff("body", Content, output.ToArray());
         Assert.AreEqual(3, source.ReadLengths[0]);
         CollectionAssert.AreEqual(Content, output.ToArray());
         Assert.AreEqual((long)Content.Length, result.BytesTransferred);
@@ -444,8 +590,15 @@ public sealed class FileProtocolHandlerDecisionTests
         var context = new TransferContext { Output = new ChunkRecordingStream(), Url = FileUrl, Upload = upload };
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///dir/f.txt");
+        Diagnostics.Arrange("upload", "short reads of 3 bytes, 10 bytes total");
+
         var result = await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("first read length", upload.ReadLengths[0]);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Assert("first read length", 3, upload.ReadLengths[0]);
+        Diagnostics.Diff("destination", Content, fileSystem.WrittenBytes(OsPath));
         Assert.AreEqual(3, upload.ReadLengths[0]);
         CollectionAssert.AreEqual(Content, fileSystem.WrittenBytes(OsPath));
         Assert.AreEqual((long)Content.Length, result.BytesTransferred);

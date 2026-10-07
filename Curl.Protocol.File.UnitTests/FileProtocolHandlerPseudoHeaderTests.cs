@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.File;
 
@@ -16,6 +17,10 @@ namespace Curl.Protocol.File;
 [TestClass]
 public sealed class FileProtocolHandlerPseudoHeaderTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private static readonly KeyValuePair<string, string>[] ExpectedPseudoHeaders =
     [
         new("Content-Length", "12"),
@@ -34,8 +39,15 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
     [TestMethod]
     public async Task ExecuteAsync_DownloadWithoutHeaderOutput_ReportsThreePseudoHeadersAndNoResponseHeaders()
     {
+        Diagnostics.Arrange("url", "file:///bl285tmp/a.txt");
+        Diagnostics.Arrange("file", "/bl285tmp/a.txt, 12 bytes");
+
         var result = await DownloadAsync(new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream() });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("pseudo-headers", DescribePseudoHeaders(result));
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("download size", 12L, result.Report?.DownloadSize);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsNotNull(result.Report);
         CollectionAssert.AreEqual(ExpectedPseudoHeaders, result.Report.PseudoHeaders.ToArray());
@@ -48,10 +60,15 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
     public async Task ExecuteAsync_DownloadWithHeaderOutput_ReportsTheLinesItWrote()
     {
         var headers = new ChunkRecordingStream();
+        Diagnostics.Arrange("url", "file:///bl285tmp/a.txt");
+        Diagnostics.Arrange("header output", "requested");
 
         var result = await DownloadAsync(
             new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream(), HeaderOutput = headers });
 
+        Diagnostics.Act("pseudo-headers", DescribePseudoHeaders(result));
+        Diagnostics.Bytes("header output", headers.ToArray());
+        Diagnostics.Assert("pseudo-headers", DescribeExpected(ExpectedPseudoHeaders), DescribePseudoHeaders(result));
         Assert.IsNotEmpty(headers.ToArray());
         CollectionAssert.AreEqual(ExpectedPseudoHeaders, result.Report!.PseudoHeaders.ToArray());
         Assert.IsEmpty(result.Report.ResponseHeaders);
@@ -61,10 +78,17 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
     [TestMethod]
     public async Task ExecuteAsync_HeadOnlyOrRange_ReportsThreePseudoHeaders()
     {
+        Diagnostics.Arrange("url", "file:///bl285tmp/a.txt");
+        Diagnostics.Arrange("transfers", "head only, and range 0-2");
+
         var headOnly = await DownloadAsync(new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream(), NoBody = true });
         var ranged = await DownloadAsync(
             new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream(), Range = ByteRange.Bounded(0, 2) });
 
+        Diagnostics.Act("head only pseudo-headers", DescribePseudoHeaders(headOnly));
+        Diagnostics.Act("ranged pseudo-headers", DescribePseudoHeaders(ranged));
+        Diagnostics.Assert("head only download size", 0L, headOnly.Report!.DownloadSize);
+        Diagnostics.Assert("ranged download size", 3L, ranged.Report!.DownloadSize);
         Assert.HasCount(3, headOnly.Report!.PseudoHeaders);
         Assert.AreEqual(0L, headOnly.Report.DownloadSize);
         Assert.HasCount(3, ranged.Report!.PseudoHeaders);
@@ -75,8 +99,14 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
     [TestMethod]
     public async Task ExecuteAsync_ResumePastTheEnd_FailsButStillReportsThreePseudoHeaders()
     {
+        Diagnostics.Arrange("url", "file:///bl285tmp/a.txt");
+        Diagnostics.Arrange("resume from", 100);
+
         var result = await DownloadAsync(new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream(), ResumeFrom = 100 });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("pseudo-headers", DescribePseudoHeaders(result));
+        Diagnostics.Assert("exit code", CurlExitCode.BadDownloadResume, result.ExitCode);
         Assert.AreEqual(CurlExitCode.BadDownloadResume, result.ExitCode);
         Assert.HasCount(3, result.Report!.PseudoHeaders);
     }
@@ -88,10 +118,15 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
         var condition = new TimeCondition(
             new DateTimeOffset(2099, 1, 1, 0, 0, 0, TimeSpan.Zero),
             TimeConditionKind.IfModifiedSince);
+        Diagnostics.Arrange("url", "file:///bl285tmp/a.txt");
+        Diagnostics.Arrange("time condition", "if modified since 2099-01-01");
 
         var result = await DownloadAsync(
             new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream(), TimeCondition = condition });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("pseudo-headers", DescribePseudoHeaders(result));
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsNull(result.Report);
     }
@@ -102,8 +137,14 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
     {
         var handler = new FileProtocolHandler(new FakeFileSystem());
 
+        Diagnostics.Arrange("url", "file:///bl285tmp/a.txt");
+        Diagnostics.Arrange("file system", "empty");
+
         var result = await handler.ExecuteAsync(new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream() });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("pseudo-headers", DescribePseudoHeaders(result));
+        Diagnostics.Assert("exit code", CurlExitCode.FileCouldntReadFile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
         Assert.IsNull(result.Report);
     }
@@ -116,9 +157,15 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
         fileSystem.WriteInto(OsPath, new ChunkRecordingStream());
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///bl285tmp/a.txt");
+        Diagnostics.Arrange("upload bytes", Content.Length);
+
         var result = await handler.ExecuteAsync(
             new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream(), Upload = new MemoryStream(Content) });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("pseudo-headers", DescribePseudoHeaders(result));
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsNull(result.Report);
     }
@@ -132,8 +179,13 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
         fileSystem.AddFileWithoutTimestamp(OsPath, Content);
         var handler = new FileProtocolHandler(fileSystem);
 
+        Diagnostics.Arrange("url", "file:///bl285tmp/a.txt");
+        Diagnostics.Arrange("file", "/bl285tmp/a.txt, 12 bytes, no timestamp");
+
         var result = await handler.ExecuteAsync(new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream() });
 
+        Diagnostics.Act("pseudo-headers", DescribePseudoHeaders(result));
+        Diagnostics.Assert("pseudo-headers", DescribeExpected(ExpectedPseudoHeaders[..2]), DescribePseudoHeaders(result));
         CollectionAssert.AreEqual(ExpectedPseudoHeaders[..2], result.Report!.PseudoHeaders.ToArray());
     }
 
@@ -142,6 +194,9 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
     [TestMethod]
     public async Task ExecuteAsync_HeaderOutputFails_ReportsNoHeaders()
     {
+        Diagnostics.Arrange("url", "file:///bl285tmp/a.txt");
+        Diagnostics.Arrange("header output", "fails on write 1");
+
         var result = await DownloadAsync(
             new TransferContext
             {
@@ -150,9 +205,18 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
                 HeaderOutput = FaultingStream.FailingOnWrite(1),
             });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("pseudo-headers", DescribePseudoHeaders(result));
+        Diagnostics.Assert("exit code", CurlExitCode.WriteError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
         Assert.IsNull(result.Report);
     }
+
+    private static string DescribePseudoHeaders(TransferResult result) =>
+        result.Report is null ? "(no report)" : DescribeExpected(result.Report.PseudoHeaders);
+
+    private static string DescribeExpected(IEnumerable<KeyValuePair<string, string>> headers) =>
+        string.Join(" | ", headers.Select(header => $"{header.Key}: {header.Value}"));
 
     private static async Task<TransferResult> DownloadAsync(TransferContext context)
     {

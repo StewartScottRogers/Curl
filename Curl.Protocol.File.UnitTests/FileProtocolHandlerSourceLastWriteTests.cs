@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File.Fakes;
+using Curl.Testing;
 using Microsoft.Win32.SafeHandles;
 
 namespace Curl.Protocol.File;
@@ -34,11 +35,23 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
 
     private static string OsPath => "/dir/f.txt".Replace('/', Path.DirectorySeparatorChar);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_RawTimePast9999WithNoLimit_ReachesSourceLastWriteUnixSeconds()
     {
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("rawUnixSeconds", Year30000UnixSeconds);
+        Diagnostics.Arrange("lastRepresentableUnixSeconds", "none");
+
         (TransferResult result, _, string headers) = await DownloadAsync(Year30000UnixSeconds, null, null);
 
+        Diagnostics.Act("SourceLastWriteUnixSeconds", result.SourceLastWriteUnixSeconds);
+        Diagnostics.Act("headers", headers);
+        Diagnostics.Assert("SourceLastWriteUnixSeconds", Year30000UnixSeconds, result.SourceLastWriteUnixSeconds);
+        Diagnostics.Assert("headers contain Last-Modified", false, headers.Contains("Last-Modified", StringComparison.Ordinal));
         Assert.AreEqual(Year30000UnixSeconds, result.SourceLastWriteUnixSeconds);
         Assert.DoesNotContain("Last-Modified", headers);
     }
@@ -46,8 +59,17 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
     [TestMethod]
     public async Task ExecuteAsync_RawTimeInRange_KeepsTheOpenTime()
     {
-        (TransferResult result, _, string headers) = await DownloadAsync(FileDate.ToUnixTimeSeconds() + 5, null, null);
+        long rawUnixSeconds = FileDate.ToUnixTimeSeconds() + 5;
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("fileDate", FileDate);
+        Diagnostics.Arrange("rawUnixSeconds", rawUnixSeconds);
 
+        (TransferResult result, _, string headers) = await DownloadAsync(rawUnixSeconds, null, null);
+
+        Diagnostics.Act("SourceLastWriteTimeUtc", result.SourceLastWriteTimeUtc);
+        Diagnostics.Act("headers", headers);
+        Diagnostics.Assert("SourceLastWriteTimeUtc", FileDate, result.SourceLastWriteTimeUtc);
+        Diagnostics.Assert("headers contain Last-Modified line", true, headers.Contains("Last-Modified: Mon, 01 Jan 2001 00:00:00 GMT", StringComparison.Ordinal));
         Assert.AreEqual(FileDate, result.SourceLastWriteTimeUtc);
         Assert.Contains("Last-Modified: Mon, 01 Jan 2001 00:00:00 GMT", headers);
     }
@@ -55,16 +77,32 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
     [TestMethod]
     public async Task ExecuteAsync_NoRawTime_KeepsTheOpenTime()
     {
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("fileDate", FileDate);
+        Diagnostics.Arrange("lastRepresentableUnixSeconds", WindowsLimitUnixSeconds);
+
         (TransferResult result, _, _) = await DownloadAsync(null, WindowsLimitUnixSeconds, null);
 
+        Diagnostics.Act("SourceLastWriteUnixSeconds", result.SourceLastWriteUnixSeconds);
+        Diagnostics.Assert("SourceLastWriteUnixSeconds", FileDate.ToUnixTimeSeconds(), result.SourceLastWriteUnixSeconds);
         Assert.AreEqual(FileDate.ToUnixTimeSeconds(), result.SourceLastWriteUnixSeconds);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_RawTimePastWindowsLimit_GivesNoRemoteTimeAndAMinusOneHeader()
     {
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("rawUnixSeconds", Year30000UnixSeconds);
+        Diagnostics.Arrange("lastRepresentableUnixSeconds", WindowsLimitUnixSeconds);
+
         (TransferResult result, byte[] body, string headers) = await DownloadAsync(Year30000UnixSeconds, WindowsLimitUnixSeconds, null);
 
+        Diagnostics.Act("SourceLastWriteUnixSeconds", result.SourceLastWriteUnixSeconds);
+        Diagnostics.Act("headers", headers);
+        Diagnostics.Bytes("body", body);
+        Diagnostics.Assert("SourceLastWriteUnixSeconds", null, result.SourceLastWriteUnixSeconds);
+        Diagnostics.Assert("headers contain minus-one Last-Modified", true, headers.Contains("Last-Modified: Wed, 31 Dec 1969 23:59:59 GMT", StringComparison.Ordinal));
+        Diagnostics.Diff("body", Encoding.ASCII.GetBytes("hi\n"), body);
         Assert.IsNull(result.SourceLastWriteUnixSeconds);
         Assert.Contains("Last-Modified: Wed, 31 Dec 1969 23:59:59 GMT", headers);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("hi\n"), body);
@@ -73,8 +111,16 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
     [TestMethod]
     public async Task ExecuteAsync_RawTimePastWindowsLimitIfModifiedSince_ComparesMinusOneAndWritesNothing()
     {
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("rawUnixSeconds", Year30000UnixSeconds);
+        Diagnostics.Arrange("timeCondition", ModifiedSince2020);
+
         (TransferResult result, byte[] body, _) = await DownloadAsync(Year30000UnixSeconds, WindowsLimitUnixSeconds, ModifiedSince2020);
 
+        Diagnostics.Act("TimeConditionUnmet", result.TimeConditionUnmet);
+        Diagnostics.Act("body length", body.Length);
+        Diagnostics.Assert("TimeConditionUnmet", true, result.TimeConditionUnmet);
+        Diagnostics.Assert("body length", 0, body.Length);
         Assert.IsTrue(result.TimeConditionUnmet);
         Assert.IsEmpty(body);
     }
@@ -82,8 +128,16 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
     [TestMethod]
     public async Task ExecuteAsync_RawTimePastWindowsLimitIfUnmodifiedSince_ComparesMinusOneAndWritesTheBody()
     {
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("rawUnixSeconds", Year30000UnixSeconds);
+        Diagnostics.Arrange("timeCondition", UnmodifiedSince2020);
+
         (TransferResult result, byte[] body, _) = await DownloadAsync(Year30000UnixSeconds, WindowsLimitUnixSeconds, UnmodifiedSince2020);
 
+        Diagnostics.Act("TimeConditionUnmet", result.TimeConditionUnmet);
+        Diagnostics.Bytes("body", body);
+        Diagnostics.Assert("TimeConditionUnmet", false, result.TimeConditionUnmet);
+        Diagnostics.Diff("body", Encoding.ASCII.GetBytes("hi\n"), body);
         Assert.IsFalse(result.TimeConditionUnmet);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("hi\n"), body);
     }
@@ -91,8 +145,16 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
     [TestMethod]
     public async Task ExecuteAsync_RawTimePast9999IfModifiedSince_ComparesUnixSecondsAndWritesTheBody()
     {
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("rawUnixSeconds", Year30000UnixSeconds);
+        Diagnostics.Arrange("timeCondition", ModifiedSince2020);
+
         (TransferResult result, byte[] body, _) = await DownloadAsync(Year30000UnixSeconds, null, ModifiedSince2020);
 
+        Diagnostics.Act("TimeConditionUnmet", result.TimeConditionUnmet);
+        Diagnostics.Bytes("body", body);
+        Diagnostics.Assert("TimeConditionUnmet", false, result.TimeConditionUnmet);
+        Diagnostics.Diff("body", Encoding.ASCII.GetBytes("hi\n"), body);
         Assert.IsFalse(result.TimeConditionUnmet);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("hi\n"), body);
     }
@@ -100,8 +162,16 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
     [TestMethod]
     public async Task ExecuteAsync_RawTimePast9999IfUnmodifiedSince_ComparesUnixSecondsAndWritesNothing()
     {
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("rawUnixSeconds", Year30000UnixSeconds);
+        Diagnostics.Arrange("timeCondition", UnmodifiedSince2020);
+
         (TransferResult result, byte[] body, _) = await DownloadAsync(Year30000UnixSeconds, null, UnmodifiedSince2020);
 
+        Diagnostics.Act("TimeConditionUnmet", result.TimeConditionUnmet);
+        Diagnostics.Act("body length", body.Length);
+        Diagnostics.Assert("TimeConditionUnmet", true, result.TimeConditionUnmet);
+        Diagnostics.Assert("body length", 0, body.Length);
         Assert.IsTrue(result.TimeConditionUnmet);
         Assert.IsEmpty(body);
     }
@@ -109,7 +179,13 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
     [TestMethod]
     public void NoRawSourceLastWriteReader_ReadLastWriteUnixSeconds_ReadsNothing()
     {
-        Assert.IsNull(new NoRawSourceLastWriteReader().ReadLastWriteUnixSeconds(new MemoryStream()));
+        Diagnostics.Arrange("source", "empty MemoryStream");
+
+        long? actual = new NoRawSourceLastWriteReader().ReadLastWriteUnixSeconds(new MemoryStream());
+
+        Diagnostics.Act("ReadLastWriteUnixSeconds", actual);
+        Diagnostics.Assert("ReadLastWriteUnixSeconds", null, actual);
+        Assert.IsNull(actual);
     }
 
     [TestMethod]
@@ -126,9 +202,14 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
             var fileSystem = new FakeFileSystem();
             fileSystem.AddFileReadingFrom(OsPath, source, source.Length);
             var handler = new FileProtocolHandler(fileSystem) { LastRepresentableUnixSeconds = null };
+            Diagnostics.Arrange("url", FileUrl);
+            Diagnostics.Arrange("source length", source.Length);
+            Diagnostics.Arrange("stamped unix seconds", Year30000UnixSeconds);
 
             TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = FileUrl, Output = new MemoryStream() });
 
+            Diagnostics.Act("SourceLastWriteUnixSeconds", result.SourceLastWriteUnixSeconds);
+            Diagnostics.Assert("SourceLastWriteUnixSeconds", Year30000UnixSeconds, result.SourceLastWriteUnixSeconds);
             Assert.AreEqual(Year30000UnixSeconds, result.SourceLastWriteUnixSeconds);
         }
         finally
@@ -151,8 +232,14 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
             var fileSystem = new FakeFileSystem();
             fileSystem.AddFileReadingFrom(OsPath, source, source.Length);
 
+            Diagnostics.Arrange("url", FileUrl);
+            Diagnostics.Arrange("source length", source.Length);
+            Diagnostics.Arrange("stamped unix seconds", Year30000UnixSeconds);
+
             TransferResult result = await new FileProtocolHandler(fileSystem).ExecuteAsync(new TransferContext { Url = FileUrl, Output = new MemoryStream() });
 
+            Diagnostics.Act("SourceLastWriteUnixSeconds", result.SourceLastWriteUnixSeconds);
+            Diagnostics.Assert("SourceLastWriteUnixSeconds", null, result.SourceLastWriteUnixSeconds);
             Assert.IsNull(result.SourceLastWriteUnixSeconds);
         }
         finally
@@ -166,7 +253,13 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     public void Win32SourceLastWriteReader_NotAFileStream_ReadsNothing()
     {
-        Assert.IsNull(new Win32SourceLastWriteReader().ReadLastWriteUnixSeconds(new MemoryStream()));
+        Diagnostics.Arrange("source", "empty MemoryStream");
+
+        long? actual = new Win32SourceLastWriteReader().ReadLastWriteUnixSeconds(new MemoryStream());
+
+        Diagnostics.Act("ReadLastWriteUnixSeconds", actual);
+        Diagnostics.Assert("ReadLastWriteUnixSeconds", null, actual);
+        Assert.IsNull(actual);
     }
 
     [TestMethod]
@@ -177,7 +270,13 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
         using var pipe = new System.IO.Pipes.AnonymousPipeServerStream(System.IO.Pipes.PipeDirection.In);
         using var pipeAsFile = new FileStream(new SafeFileHandle(pipe.SafePipeHandle.DangerousGetHandle(), ownsHandle: false), FileAccess.Read);
 
-        Assert.IsLessThanOrEqualTo(0L, new Win32SourceLastWriteReader().ReadLastWriteUnixSeconds(pipeAsFile)!.Value);
+        Diagnostics.Arrange("source", "anonymous pipe read end as FileStream");
+
+        long actual = new Win32SourceLastWriteReader().ReadLastWriteUnixSeconds(pipeAsFile)!.Value;
+
+        Diagnostics.Act("ReadLastWriteUnixSeconds", actual);
+        Diagnostics.Assert("ReadLastWriteUnixSeconds <= 0", true, actual <= 0L);
+        Assert.IsLessThanOrEqualTo(0L, actual);
     }
 
     private static void StampYear30000(string path)

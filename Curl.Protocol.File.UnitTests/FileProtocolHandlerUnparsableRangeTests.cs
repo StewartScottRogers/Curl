@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.File;
 
@@ -18,6 +19,13 @@ public sealed class FileProtocolHandlerUnparsableRangeTests
 {
     private const string RangeNotDelivered = "Requested range was not delivered by the server";
 
+    private const string HeaderBlock =
+        "Content-Length: 12\r\nAccept-ranges: bytes\r\nLast-Modified: Wed, 24 Jun 2026 12:34:56 GMT\r\n\r\n";
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private static CurlUrl FileUrl => CurlUrl.Parse("file:///bl1334tmp/f.txt");
 
     private static string OsPath => "/bl1334tmp/f.txt".Replace('/', Path.DirectorySeparatorChar);
@@ -28,10 +36,19 @@ public sealed class FileProtocolHandlerUnparsableRangeTests
     [TestMethod]
     public async Task ExecuteAsync_RangeTextNamingNoRange_FailsWithExit33AndWritesNothing()
     {
+        Diagnostics.Arrange("url", "file:///bl1334tmp/f.txt");
+        Diagnostics.Arrange("range text", "5-2");
+        Diagnostics.Bytes("file content", Content);
         var output = new ChunkRecordingStream();
 
         var result = await DownloadAsync(new TransferContext { Url = FileUrl, Output = output, RangeText = "5-2" });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.RangeError, result.ExitCode);
+        Diagnostics.Assert("error message", RangeNotDelivered, result.ErrorMessage);
+        Diagnostics.Assert("output length", 0, output.ToArray().Length);
         Assert.AreEqual(CurlExitCode.RangeError, result.ExitCode);
         Assert.AreEqual(RangeNotDelivered, result.ErrorMessage);
         Assert.IsEmpty(output.ToArray());
@@ -42,11 +59,15 @@ public sealed class FileProtocolHandlerUnparsableRangeTests
     [TestMethod]
     public async Task ExecuteAsync_RangeTextNamingNoRange_ReportsOnlyTheShutdownLine()
     {
+        Diagnostics.Arrange("url", "file:///bl1334tmp/f.txt");
+        Diagnostics.Arrange("range text", "5-2");
         var events = new RecordingTransferEvents();
 
         await DownloadAsync(
             new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream(), RangeText = "5-2", Events = events });
 
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript", "* shutting down connection #0", string.Join(" | ", events.Transcript));
         CollectionAssert.AreEqual(new[] { "* shutting down connection #0" }, events.Transcript);
     }
 
@@ -54,17 +75,25 @@ public sealed class FileProtocolHandlerUnparsableRangeTests
     [TestMethod]
     public async Task ExecuteAsync_RangeTextNamingNoRangeWithHeaderOutput_WritesTheHeaderBlockThenFails()
     {
+        Diagnostics.Arrange("url", "file:///bl1334tmp/f.txt");
+        Diagnostics.Arrange("range text", "5-2");
         var headers = new ChunkRecordingStream();
         var output = new ChunkRecordingStream();
 
         var result = await DownloadAsync(
             new TransferContext { Url = FileUrl, Output = output, HeaderOutput = headers, RangeText = "5-2" });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Bytes("headers", headers.ToArray());
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.RangeError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RangeError, result.ExitCode);
+        Diagnostics.Diff("headers", HeaderBlock, Encoding.ASCII.GetString(headers.ToArray()));
         Assert.AreEqual(
             "Content-Length: 12\r\nAccept-ranges: bytes\r\nLast-Modified: Wed, 24 Jun 2026 12:34:56 GMT\r\n\r\n",
             Encoding.ASCII.GetString(headers.ToArray()));
         Assert.IsEmpty(output.ToArray());
+        Diagnostics.Assert("pseudo header count", 3, result.Report!.PseudoHeaders.Count);
         Assert.HasCount(3, result.Report!.PseudoHeaders);
     }
 
@@ -72,6 +101,9 @@ public sealed class FileProtocolHandlerUnparsableRangeTests
     [TestMethod]
     public async Task ExecuteAsync_RangeTextNamingNoRangeWithNoBody_SucceedsWithTheHeaderBlock()
     {
+        Diagnostics.Arrange("url", "file:///bl1334tmp/f.txt");
+        Diagnostics.Arrange("range text", "5-2");
+        Diagnostics.Arrange("no body", true);
         var headers = new ChunkRecordingStream();
 
         var result = await DownloadAsync(
@@ -84,7 +116,11 @@ public sealed class FileProtocolHandlerUnparsableRangeTests
                 RangeText = "5-2",
             });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Bytes("headers", headers.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("headers", HeaderBlock, Encoding.ASCII.GetString(headers.ToArray()));
         Assert.AreEqual(
             "Content-Length: 12\r\nAccept-ranges: bytes\r\nLast-Modified: Wed, 24 Jun 2026 12:34:56 GMT\r\n\r\n",
             Encoding.ASCII.GetString(headers.ToArray()));
@@ -94,11 +130,17 @@ public sealed class FileProtocolHandlerUnparsableRangeTests
     [TestMethod]
     public async Task ExecuteAsync_RangeTextNamingNoRangeForMissingFile_FailsWithExit37()
     {
+        Diagnostics.Arrange("url", "file:///bl1334tmp/f.txt");
+        Diagnostics.Arrange("file system entries", 0);
         var handler = new FileProtocolHandler(new FakeFileSystem());
 
         var result = await handler.ExecuteAsync(
             new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream(), RangeText = "5-2" });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Assert("exit code", CurlExitCode.FileCouldntReadFile, result.ExitCode);
+        Diagnostics.Assert("error message", "Could not open file /bl1334tmp/f.txt", result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
         Assert.AreEqual("Could not open file /bl1334tmp/f.txt", result.ErrorMessage);
     }
@@ -109,9 +151,16 @@ public sealed class FileProtocolHandlerUnparsableRangeTests
     [DataRow("-0")]
     public async Task ExecuteAsync_OtherRangeTextNamingNoRange_FailsWithExit33(string rangeText)
     {
+        Diagnostics.Arrange("url", "file:///bl1334tmp/f.txt");
+        Diagnostics.Arrange("range text", rangeText);
+
         var result = await DownloadAsync(
             new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream(), RangeText = rangeText });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Assert("exit code", CurlExitCode.RangeError, result.ExitCode);
+        Diagnostics.Assert("error message", RangeNotDelivered, result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.RangeError, result.ExitCode);
         Assert.AreEqual(RangeNotDelivered, result.ErrorMessage);
     }
@@ -120,12 +169,18 @@ public sealed class FileProtocolHandlerUnparsableRangeTests
     [TestMethod]
     public async Task ExecuteAsync_RangeTextWithParsedRange_SendsTheWindow()
     {
+        Diagnostics.Arrange("url", "file:///bl1334tmp/f.txt");
+        Diagnostics.Arrange("range text", "0-4");
         var output = new ChunkRecordingStream();
 
         var result = await DownloadAsync(
             new TransferContext { Url = FileUrl, Output = output, RangeText = "0-4", Range = ByteRange.Bounded(0, 4) });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", "hello", Encoding.ASCII.GetString(output.ToArray()));
         Assert.AreEqual("hello", Encoding.ASCII.GetString(output.ToArray()));
     }
 
@@ -137,6 +192,9 @@ public sealed class FileProtocolHandlerUnparsableRangeTests
         var destination = new ChunkRecordingStream();
         fileSystem.WriteInto(OsPath, destination);
         var handler = new FileProtocolHandler(fileSystem);
+        Diagnostics.Arrange("url", "file:///bl1334tmp/f.txt");
+        Diagnostics.Arrange("range text", "5-2");
+        Diagnostics.Bytes("upload", Content);
 
         var result = await handler.ExecuteAsync(
             new TransferContext
@@ -147,7 +205,11 @@ public sealed class FileProtocolHandlerUnparsableRangeTests
                 RangeText = "5-2",
             });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Bytes("written", destination.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("written", Content, destination.ToArray());
         CollectionAssert.AreEqual(Content, destination.ToArray());
     }
 
