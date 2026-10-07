@@ -5,7 +5,7 @@ namespace Curl.Core;
 
 /// <summary>
 /// Pins the line format of the shared <see cref="TestDiagnostics" /> linked into every
-/// test project (BL-1457, ADR-0416), driven by a fake clock so no test waits.
+/// test project (BL-1457, ADR-0417), driven by a fake clock so no test waits.
 /// </summary>
 [TestClass]
 public sealed class TestDiagnosticsTests

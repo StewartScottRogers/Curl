@@ -35,7 +35,7 @@ Every test in all 33 `.UnitTests` projects writes a `START` line, an `END` line 
   - `END <test>: <outcome> in <n> ms (arrange <a>, act <b>, assert <c>)` - the counts are how many `ARRANGE`, `ACT` and `ASSERT`/`DIFF` lines the test wrote, so a per-project task can check from a log that a test wrote its diagnostics.
   - `SLOW: <test> took <n> ms (budget 3000 ms)` when elapsed is greater than the budget, after the `END` line. The 3000 ms budget is one named constant (e.g. `TestDiagnostics.SlowTestBudgetMilliseconds`).
 - Keep the decision logic (formatting, the budget comparison, hex and diff rendering) in plain methods that take their inputs (elapsed `TimeSpan`, `TimeProvider`, byte spans), so it is unit-tested without the global hooks and without waiting.
-- ADRs: the highest number on 2026-10-04 is ADR-0415, so the next free one is ADR-0416 (check again before writing; lanes file ADRs concurrently).
+- ADRs: the highest number on 2026-10-04 is ADR-0415, so the next free one is ADR-0416 (check again before writing; lanes file ADRs concurrently). ADR-0416 went to BL-1451 meanwhile, so this task's ADR is ADR-0417.
 
 ## Acceptance criteria
 

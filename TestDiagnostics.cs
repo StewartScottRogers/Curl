@@ -1,5 +1,5 @@
 // Shared test diagnostics, linked into every .UnitTests project by Directory.Build.props
-// (BL-1457, ADR-0416). Every test writes a START line before it runs and an END line
+// (BL-1457, ADR-0417). Every test writes a START line before it runs and an END line
 // after, with its outcome, elapsed milliseconds and how many ARRANGE, ACT and ASSERT or
 // DIFF lines it wrote, and a SLOW: line when it ran over the 3-second budget. Tests add
 // labelled context through TestDiagnostics.For(TestContext), so an AI reading a failed or
