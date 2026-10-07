@@ -158,3 +158,4 @@ completed:
 - 2026-10-07: Doing -> Backlog. Partly done, code in the shift's stash: bench vs HEAD X25519 3.5x, X448 2.7x (needs Karatsuba or more JIT inlining work), CAST 7.5x; Integration TRX timings and Measure-CodeQuality not yet run. See Notes.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Partly done, code in the shift's stash: new Accumulator128 removes Int128 calls; bench vs HEAD X25519 2.9x, X448 2.6x, CAST 7x; coverage 100/100, Integration tests pass. Left: X25519/X448 to 5x (64-bit-only limbs or Karatsuba) and timing on an unloaded machine. See Notes.
+- 2026-10-07: Backlog -> Doing.
