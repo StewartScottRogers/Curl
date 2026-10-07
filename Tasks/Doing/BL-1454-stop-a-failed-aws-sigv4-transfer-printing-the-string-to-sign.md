@@ -53,3 +53,4 @@ A failed transfer under `--aws-sigv4` ends with curl's own error line (for a ref
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Fix lies in Curl.Protocol.Http.UnitLibrary (HttpProtocolHandler.WithFirstAuthorizationFailure), which BL-1446 in Doing touches; starts again once BL-1446 is Done
+- 2026-10-07: Backlog -> Doing.
