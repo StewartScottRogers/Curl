@@ -1,5 +1,5 @@
 ---
-id: BL-1527
+id: BL-1534
 title: Make Curl.Core.UnitTests' AltSvc and ByteRangeParser tests write descriptive diagnostic output
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1527 — Make Curl.Core.UnitTests' AltSvc and ByteRangeParser tests write descriptive diagnostic output
+# BL-1534 — Make Curl.Core.UnitTests' AltSvc and ByteRangeParser tests write descriptive diagnostic output
 
 ## Goal
 

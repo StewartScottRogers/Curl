@@ -4,7 +4,7 @@ title: Make every test in Curl.Core.UnitTests write descriptive diagnostic outpu
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1457, BL-1527, BL-1528, BL-1529, BL-1530, BL-1531, BL-1532, BL-1533]
+depends-on: [BL-1457, BL-1534, BL-1528, BL-1529, BL-1530, BL-1531, BL-1532, BL-1533]
 touches: [Curl.Core.UnitTests]
 requirement: none
 created: 2026-10-04
@@ -36,10 +36,10 @@ Every test in `Curl.Core.UnitTests` writes, through BL-1457's shared `TestDiagno
 ## Notes
 
 - Large: 635 test methods in 51 files is probably more than one `/task-run` can finish. Stewart asked for one task per project, so it is filed whole. If the runner judges it too big, it splits it before changing any test: it files tasks that each cover a range of the project's files by name (each `-Pipeline direct -DependsOn BL-1457 -Touches Curl.Core.UnitTests`, with these criteria limited to its files' classes through `--filter "FullyQualifiedName~<class>"`), adds them to this task's `depends-on`, and moves this task back to `Backlog`; this task then only runs the whole-project checks above.
-- 2026-10-07 (lane 3): split as above. 634 test methods in 52 files is far more than one run's time and token budget. Seven tasks cover every test file except `TestDiagnosticsTests.cs`, which BL-1457 added already writing diagnostics, in groups of 72 to 115 tests: BL-1527 (AltSvc, ByteRangeParser), BL-1528 (FileSystem, Globbing), BL-1529 (Hsts, IpfsGatewayRewriter, watchdogs), BL-1530 (Multipart), BL-1531 (proxy, dispatcher, rate limit, redirect side files), BL-1532 (RedirectFollowerTests, redirect and retry policies), BL-1533 (TransferRetrier, UrlSchemeGuesser). Their filters use the tests' namespaces, which are `Curl.Core.*`, not `Curl.Core.UnitTests.*`. Once they are Done, this task runs only the whole-project checks and records the before and after counts.
+- 2026-10-07 (lane 3): split as above. 634 test methods in 52 files is far more than one run's time and token budget. Seven tasks cover every test file except `TestDiagnosticsTests.cs`, which BL-1457 added already writing diagnostics, in groups of 72 to 115 tests: BL-1534 (AltSvc, ByteRangeParser), BL-1528 (FileSystem, Globbing), BL-1529 (Hsts, IpfsGatewayRewriter, watchdogs), BL-1530 (Multipart), BL-1531 (proxy, dispatcher, rate limit, redirect side files), BL-1532 (RedirectFollowerTests, redirect and retry policies), BL-1533 (TransferRetrier, UrlSchemeGuesser). Their filters use the tests' namespaces, which are `Curl.Core.*`, not `Curl.Core.UnitTests.*`. Once they are Done, this task runs only the whole-project checks and records the before and after counts.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
-- 2026-10-07: Doing -> Backlog. Split into BL-1527..BL-1533 (one per range of test files); waits on them, then runs only the whole-project checks
+- 2026-10-07: Doing -> Backlog. Split into BL-1534..BL-1533 (one per range of test files); waits on them, then runs only the whole-project checks
