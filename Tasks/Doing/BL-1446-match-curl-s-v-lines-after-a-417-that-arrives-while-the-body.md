@@ -33,3 +33,4 @@ After a 417 that arrives while the body is being sent, Curl's `-v` lines between
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
