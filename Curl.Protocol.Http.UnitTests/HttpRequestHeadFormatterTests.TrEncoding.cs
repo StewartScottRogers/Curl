@@ -81,9 +81,9 @@ public sealed partial class HttpRequestHeadFormatterTests
         };
         TimeCondition condition = new(new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfModifiedSince);
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse(TrUrl), options, authorization: "Basic dTpw", cookie: "c=1", timeCondition: condition);
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl(TrUrl), Arranged(options), authorization: "Basic dTpw", cookie: "c=1", timeCondition: condition);
 
-        Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
+        Assert.AreEqual(ExpectedHead(expected, head), Encoding.Latin1.GetString(head));
     }
 
     [TestMethod]
@@ -120,8 +120,8 @@ public sealed partial class HttpRequestHeadFormatterTests
         string expected = "GET http://example.com/a HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
             + expectedHeaders + "\r\n";
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://example.com/a"), options, forwardProxy: true);
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl("http://example.com/a"), Arranged(options), forwardProxy: true);
 
-        Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
+        Assert.AreEqual(ExpectedHead(expected, head), Encoding.Latin1.GetString(head));
     }
 }
