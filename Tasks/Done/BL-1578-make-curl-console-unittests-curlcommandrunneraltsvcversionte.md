@@ -1,0 +1,44 @@
+---
+id: BL-1578
+title: Make Curl.Console.UnitTests' CurlCommandRunnerAltSvcVersionTests to CurlCommandRunnerCustomRequestNoteTests tests write descriptive diagnostic output
+priority: Normal
+assignee: Claude
+pipeline: direct
+depends-on: [BL-1457]
+touches: [Curl.Console.UnitTests]
+requirement: none
+created: 2026-10-07
+completed: 2026-10-07
+---
+# BL-1578 — Make Curl.Console.UnitTests' CurlCommandRunnerAltSvcVersionTests to CurlCommandRunnerCustomRequestNoteTests tests write descriptive diagnostic output
+
+## Goal
+
+Every test in these `Curl.Console.UnitTests` files (10 files, 90 test methods, counted 2026-10-07) writes, through BL-1457's `TestDiagnostics` helper, its Arrange inputs, Act result and assertion context (plus `PHASE` timings where it has phases), with no test's logic or assertions changed: `CurlCommandRunnerAltSvcVersionTests.cs`, `CurlCommandRunnerCertificateStatusVerboseTests.cs`, `CurlCommandRunnerConfigFileTests.cs`, `CurlCommandRunnerConnectionPoolTests.cs`, `CurlCommandRunnerConnectionSwitchTests.cs`, `CurlCommandRunnerConnectTimeoutTests.cs`, `CurlCommandRunnerCookieStringJoinTests.cs`, `CurlCommandRunnerCookieTests.cs`, `CurlCommandRunnerCredentialControlCodeTests.cs`, `CurlCommandRunnerCustomRequestNoteTests.cs`.
+
+## Context
+
+- Split from BL-1461 (one task per range of files, as its Notes direct); BL-1461 keeps the whole-project checks and depends on this task. Follow BL-1461's Context: what matters in this project (command line, the scripted connector's script, request bytes, stdout and stderr, exit code), `Documentation/Wiki/Test-Diagnostics.md` and BL-1457's ADR for the line format; no prefix of your own; output only; large payloads through `BYTES`; nothing printed may depend on the operating system. BL-1541 and BL-1542 show the pattern in `Curl.Networking.UnitTests`.
+- "These classes' filter" below is one `FullyQualifiedName~Curl.Console.<Class>.` term per class the listed files declare (a partial class's files count once), joined with `|`.
+
+## Acceptance criteria
+
+- [x] `dotnet test Curl.Console.UnitTests --filter "<these classes' filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
+- [x] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` is clean and `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Console.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
+
+## Notes
+
+- Pattern as BL-1577 (`CurlCommandRunnerAltSvcTests.cs`): each class gets `TestContext` and a `Diagnostics` property; its run helper writes `ARRANGE command line` (plus scripted responses, input files, connector), a `PHASE run`, `ACT exit code` and `BYTES` for stdout, stderr, request bytes and written files; each test writes `ASSERT`/`DIFF` lines mirroring its assertions. Tests that bypass the helper write their own ARRANGE/ACT.
+- OS-neutral output (choice): where the product writes `Environment.NewLine` (config-file notes, connect-timeout and credential errors, alt-svc cache file, cookie jar files), the printed text has platform newlines written as LF (`Lf`, `Unix`, `Visible` helpers, labels say "platform newlines as LF"), so the log reads the same on Windows, Linux and macOS. Protocol CRLFs are left as they are. `FakeHome` in the config-file tests is a fixed string constant, not the machine's temp path.
+- Counts before -> after (`Assert.` / `[TestMethod` / `[DataRow(`): AltSvcVersion 65/18/7 -> 65/18/7; CertificateStatusVerbose 5/2/0 -> 5/2/0; ConfigFile 35/16/6 -> 35/16/6; ConnectionPool 12/5/0 -> 12/5/0; ConnectionSwitch 3/1/10 -> 3/1/10; ConnectTimeout 6/3/7 -> 6/3/7; CookieStringJoin 17/7/4 -> 17/7/4; Cookie 33/20/10 -> 33/20/10; CredentialControlCode 29/10/11 -> 32/10/11; CustomRequestNote 13/8/18 -> 13/8/18.
+- Filtered detailed run: 144 tests, 144 `END` lines, none with arrange, act or assert 0. Full fast run of Curl.Console.UnitTests: 2661 passed, 24 skipped, 0 failed.
+- SLOW: none printed a `SLOW:` line.
+
+## Log
+
+- 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every test in CurlCommandRunnerAltSvcVersionTests to CurlCommandRunnerCustomRequestNoteTests writes OS-neutral ARRANGE, ACT and ASSERT/DIFF diagnostics

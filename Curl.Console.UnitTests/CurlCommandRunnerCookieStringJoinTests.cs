@@ -2,6 +2,7 @@ using System.Text;
 
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -29,6 +30,10 @@ public sealed class CurlCommandRunnerCookieStringJoinTests
 
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string[] StandardErrorLines =>
         Encoding.UTF8.GetString(standardError.ToArray()).Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
 
@@ -39,6 +44,8 @@ public sealed class CurlCommandRunnerCookieStringJoinTests
 
         int exitCode = await RunAsync(server, ["-s", "-b", "a=1", "-b", " b=2", "-b", "\tc=3", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("request bytes", $"GET / HTTP/1.1\r\n{Head}Cookie: a=1; b=2;\tc=3\r\n\r\n", Latin1(server.Written));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual($"GET / HTTP/1.1\r\n{Head}Cookie: a=1; b=2;\tc=3\r\n\r\n", Latin1(server.Written));
     }
@@ -50,6 +57,8 @@ public sealed class CurlCommandRunnerCookieStringJoinTests
 
         int exitCode = await RunAsync(server, ["-s", "-b", "a=1", "-b", " b=2", "-c", "jar.txt", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("request bytes", $"GET / HTTP/1.1\r\n{Head}Cookie: a=1; b=2\r\n\r\n", Latin1(server.Written));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual($"GET / HTTP/1.1\r\n{Head}Cookie: a=1; b=2\r\n\r\n", Latin1(server.Written));
     }
@@ -62,6 +71,8 @@ public sealed class CurlCommandRunnerCookieStringJoinTests
 
         int exitCode = await RunAsync(server, ["-sS", "-b", cookie, Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("request bytes", $"GET / HTTP/1.1\r\n{Head}Cookie: {cookie}\r\n\r\n", Latin1(server.Written));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual($"GET / HTTP/1.1\r\n{Head}Cookie: {cookie}\r\n\r\n", Latin1(server.Written));
     }
@@ -75,6 +86,8 @@ public sealed class CurlCommandRunnerCookieStringJoinTests
 
         int exitCode = await RunAsync(server, ["-sS", "-b", first, "-b", second, Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("request bytes", $"GET / HTTP/1.1\r\n{Head}Cookie: {first}; {second}\r\n\r\n", Latin1(server.Written));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual($"GET / HTTP/1.1\r\n{Head}Cookie: {first}; {second}\r\n\r\n", Latin1(server.Written));
     }
@@ -88,6 +101,9 @@ public sealed class CurlCommandRunnerCookieStringJoinTests
 
         int exitCode = await RunAsync(server, ["-sS", .. CookieArguments(lengths), Url]);
 
+        Diagnostics.Assert("exit code", 100, exitCode);
+        Diagnostics.Assert("stderr lines", string.Join(" | ", new[] { TooLargeError, string.Empty }), string.Join(" | ", StandardErrorLines));
+        Diagnostics.Assert("connections made", 0, server.Targets.Count());
         Assert.AreEqual(100, exitCode);
         CollectionAssert.AreEqual(new[] { TooLargeError, string.Empty }, StandardErrorLines);
         Assert.IsEmpty(server.Targets);
@@ -102,8 +118,12 @@ public sealed class CurlCommandRunnerCookieStringJoinTests
 
         int exitCode = await RunAsync(server, ["-v", "-o", "out", .. CookieArguments(lengths), Url]);
 
-        Assert.AreEqual(100, exitCode);
         string[] lines = StandardErrorLines;
+        Diagnostics.Assert("exit code", 100, exitCode);
+        Diagnostics.Assert("first stderr line", TooLongWarning, lines[0]);
+        Diagnostics.Assert("stderr has the too-large error", true, lines.Contains(TooLargeError));
+        Diagnostics.Assert("connections made", 0, server.Targets.Count());
+        Assert.AreEqual(100, exitCode);
         Assert.AreEqual(TooLongWarning, lines[0]);
         CollectionAssert.Contains(lines, TooLargeError);
         Assert.IsEmpty(server.Targets);
@@ -116,6 +136,8 @@ public sealed class CurlCommandRunnerCookieStringJoinTests
 
         int exitCode = await RunAsync(server, ["-s", "-H", "Cookie: x=1", "-b", CookieString(8200), Url]);
 
+        Diagnostics.Assert("exit code", 100, exitCode);
+        Diagnostics.Assert("connections made", 0, server.Targets.Count());
         Assert.AreEqual(100, exitCode);
         Assert.IsEmpty(server.Targets);
     }
@@ -126,18 +148,44 @@ public sealed class CurlCommandRunnerCookieStringJoinTests
     /// <summary>One <c>-b</c> pair per length.</summary>
     private static string[] CookieArguments(int[] lengths) => [.. lengths.SelectMany(length => new[] { "-b", CookieString(length) })];
 
-    private static ScriptedConnector Serve(params string[] responses) => new(responses.Select(Encoding.Latin1.GetBytes));
+    private ScriptedConnector Serve(params string[] responses)
+    {
+        Diagnostics.Arrange(
+            "scripted responses",
+            string.Join(" | ", responses.Select(response => response.Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal))));
+        return new(responses.Select(Encoding.Latin1.GetBytes));
+    }
 
-    private Task<int> RunAsync(IConnector connector, string[] arguments) =>
-        new CurlCommandRunner(
-                options => CreateTransferDispatch(connector, options),
-                fileSystem,
-                fileSystem,
-                new MemoryStream(),
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: true)
-            .RunAsync(arguments);
+    private static string Abbreviate(string argument) =>
+        argument.Length > 80 ? $"{argument[..20]}... ({argument.Length} characters)" : argument;
+
+    private async Task<int> RunAsync(IConnector connector, string[] arguments)
+    {
+        Diagnostics.Arrange("command line", string.Join(" ", arguments.Select(Abbreviate)));
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    options => CreateTransferDispatch(connector, options),
+                    fileSystem,
+                    fileSystem,
+                    new MemoryStream(),
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: true)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+        if (connector is ScriptedConnector scripted)
+        {
+            Diagnostics.Bytes("request bytes", scripted.Written);
+        }
+
+        return exitCode;
+    }
 
     /// <summary>The production handler set over <paramref name="connector" />, with the run's cookies.</summary>
     private static TransferDispatch CreateTransferDispatch(IConnector connector, Cli.CommandLineOptions options)
