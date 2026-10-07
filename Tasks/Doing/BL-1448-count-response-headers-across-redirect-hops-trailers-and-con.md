@@ -41,3 +41,4 @@ curl 8.21.0's 5000-header limit (`curl: (100) Too many response headers, 5000 is
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Needs Curl.Core.UnitTests (RedirectFollower carries the header count between hops), which BL-1532 in Doing touches; measurements and plan are in Notes
+- 2026-10-07: Backlog -> Doing.
