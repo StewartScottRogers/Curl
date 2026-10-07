@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1590 — Make Curl.Console.UnitTests' CurlCompositionReadTraceTests to CurlCompositionTests tests write descriptive diagnostic output
 
@@ -41,3 +41,4 @@ Every test in these `Curl.Console.UnitTests` files (14 files, 109 test methods, 
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. All 109 tests in the 14 CurlComposition test files write ARRANGE, ACT and ASSERT diagnostics
